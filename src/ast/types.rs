@@ -1,0 +1,168 @@
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum WordPart {
+    Literal(String),
+    SingleQuoted(String),
+    DoubleQuoted(Vec<WordPart>),
+    Variable {
+        name: String,
+        expansion_type: ParamExpansion,
+    },
+    CommandSubstitution(String),
+    Arithmetic(String),
+    Tilde(String),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum ParamExpansion {
+    Normal,
+    Length,
+    DefaultValue {
+        default: String,
+        assign_if_unset: bool,
+    },
+    UseAlternative {
+        alternative: String,
+    },
+    ErrorIfUnset {
+        message: String,
+    },
+    RemoveSuffix {
+        pattern: String,
+        longest: bool,
+    },
+    RemovePrefix {
+        pattern: String,
+        longest: bool,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct Word {
+    pub parts: Vec<WordPart>,
+}
+
+impl Word {
+    pub fn from_literal(s: &str) -> Self {
+        Self {
+            parts: vec![WordPart::Literal(s.to_string())],
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Assignment {
+    pub name: String,
+    pub value: Word,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum RedirectKind {
+    Input,        // <
+    Output,       // >
+    Append,       // >>
+    ReadWrite,    // <>
+    DupInput,     // <&
+    DupOutput,    // >&
+    Heredoc,      // <<
+    HeredocStrip, // <<-
+    Clobber,      // >|
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Redirection {
+    pub fd: Option<i32>,
+    pub kind: RedirectKind,
+    pub target: Word,
+    pub heredoc_content: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct SimpleCommand {
+    pub assignments: Vec<Assignment>,
+    pub words: Vec<Word>,
+    pub redirections: Vec<Redirection>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Command {
+    Simple(SimpleCommand),
+    Compound {
+        kind: CompoundCommand,
+        redirections: Vec<Redirection>,
+    },
+    FunctionDef {
+        name: String,
+        body: Box<Command>,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum CompoundCommand {
+    If {
+        condition: CommandList,
+        then_branch: CommandList,
+        elif_branches: Vec<(CommandList, CommandList)>,
+        else_branch: Option<CommandList>,
+    },
+    While {
+        condition: CommandList,
+        body: CommandList,
+    },
+    Until {
+        condition: CommandList,
+        body: CommandList,
+    },
+    For {
+        var_name: String,
+        items: Option<Vec<Word>>,
+        body: CommandList,
+    },
+    Case {
+        word: Word,
+        items: Vec<CaseItem>,
+    },
+    Subshell(CommandList),
+    Group(CommandList),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct CaseItem {
+    pub patterns: Vec<Word>,
+    pub body: CommandList,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Pipeline {
+    pub negated: bool,
+    pub commands: Vec<Command>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AndOrOp {
+    And, // &&
+    Or,  // ||
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AndOrList {
+    pub first: Pipeline,
+    pub rest: Vec<(AndOrOp, Pipeline)>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ListOp {
+    Sequential, // ;
+    Background, // &
+    Newline,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ListItem {
+    pub and_or: AndOrList,
+    pub op: ListOp,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct CommandList {
+    pub items: Vec<ListItem>,
+}
