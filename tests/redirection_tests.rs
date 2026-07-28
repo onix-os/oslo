@@ -5,6 +5,8 @@
 mod common;
 
 use common::{assert_out, run, run_in};
+use std::process::{Command, Stdio};
+use std::time::{Duration, Instant};
 
 // --- redirection ---
 
@@ -89,4 +91,59 @@ fn dash_heredoc_strips_leading_tabs() {
 fn here_string_feeds_stdin() {
     assert_out("cat <<< hello", "hello");
     assert_out(r#"cat <<< "a b""#, "a b");
+}
+
+/// A heredoc body used to be written into a pipe with no reader attached, so anything past the
+/// 64 KB pipe buffer wedged the shell forever. This cannot use `run()`: a regression here hangs
+/// instead of failing, and `Command::output` would block the whole test run.
+#[test]
+fn a_large_heredoc_does_not_deadlock() {
+    const LINE: &str = "0123456789abcdefghijklmnopqrstuvwxyz0123456789abcdefghijklmnopqrstuvwxyz0123456789abcdefghijklmno";
+    const LINES: usize = 10_486; // just over 1 MB at 100 bytes a line
+
+    let mut script = String::from("cat <<EOF\n");
+    for _ in 0..LINES {
+        script.push_str(LINE);
+        script.push('\n');
+    }
+    script.push_str("EOF\n");
+
+    let dir = tempfile::tempdir().unwrap();
+    // A script file, not `-c`: Linux caps a single argv string at MAX_ARG_STRLEN (128 KB), well
+    // under the size that used to deadlock.
+    let script_path = dir.path().join("heredoc.sh");
+    std::fs::write(&script_path, &script).unwrap();
+
+    let out_path = dir.path().join("heredoc.out");
+    // stdout goes to a file rather than a pipe so the deadline below measures the shell, not a
+    // test harness that forgot to drain 1 MB.
+    let mut child = Command::new(common::rush_bin())
+        .arg(&script_path)
+        .current_dir(dir.path())
+        .stdin(Stdio::null())
+        .stdout(std::fs::File::create(&out_path).unwrap())
+        .stderr(Stdio::null())
+        .spawn()
+        .expect("spawn rush");
+
+    let deadline = Instant::now() + Duration::from_secs(10);
+    let status = loop {
+        match child.try_wait().expect("try_wait") {
+            Some(status) => break status,
+            None if Instant::now() >= deadline => {
+                let _ = child.kill();
+                let _ = child.wait();
+                panic!("a {}-byte heredoc deadlocked the shell", LINES * 100);
+            }
+            None => std::thread::sleep(Duration::from_millis(20)),
+        }
+    };
+
+    assert!(status.success(), "rush exited with {:?}", status.code());
+    let written = std::fs::metadata(&out_path).unwrap().len();
+    assert_eq!(
+        written,
+        (LINES * (LINE.len() + 1)) as u64,
+        "the whole heredoc body should reach the command's stdin"
+    );
 }

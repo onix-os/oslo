@@ -54,6 +54,14 @@ pub(super) fn convert_command(cmd: &ast::Command) -> Result<rush_ast::Command> {
     }
 }
 
+/// A construct rush parses but cannot yet execute.
+///
+/// Reported as a syntax error so it reaches the user with a non-zero status and the name of the
+/// thing that is missing, rather than being approximated into something that runs.
+fn unsupported(construct: &str) -> ShellError {
+    ShellError::SyntaxError(format!("{} is not supported yet", construct))
+}
+
 pub(super) fn convert_compound_command(
     compound: &ast::CompoundCommand,
 ) -> Result<rush_ast::Command> {
@@ -91,14 +99,16 @@ pub(super) fn convert_compound_command(
             }
         }
         ast::CompoundCommand::CaseClause(case_clause) => convert_case_clause(case_clause)?,
-        // Arithmetic `((...))` and arithmetic-for `for ((;;))` have no representation in rush's
-        // AST. Reject rather than silently succeed, so the caller falls back or reports.
-        other => {
-            return Err(ShellError::SyntaxError(format!(
-                "unsupported compound command: {}",
-                other
-            )));
+        // These parse but have no representation in rush's AST. Naming the construct matters:
+        // this diagnostic is now the whole of the user's feedback, where it used to be swallowed
+        // by a fallback parser that reinterpreted the entire program.
+        ast::CompoundCommand::Arithmetic(_) => {
+            return Err(unsupported("((...)) arithmetic command"));
         }
+        ast::CompoundCommand::ArithmeticForClause(_) => {
+            return Err(unsupported("for ((...)) arithmetic loop"));
+        }
+        ast::CompoundCommand::Coprocess(_) => return Err(unsupported("coproc")),
     };
 
     Ok(rush_ast::Command::Compound {

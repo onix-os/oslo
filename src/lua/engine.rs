@@ -38,14 +38,7 @@ impl LuaEngine {
         let env_exec = Arc::clone(&env);
         let exec_fn = self.lua.create_function(move |_, cmd_str: String| {
             let mut env_guard = env_exec.lock().unwrap();
-            let ast = if let Ok(parsed) = crate::parser::brush_adapter::parse_bash_script(&cmd_str)
-            {
-                parsed
-            } else {
-                let lexer = crate::lexer::Lexer::new(&cmd_str);
-                let mut parser = crate::parser::Parser::new(lexer);
-                parser.parse_command_list().map_err(|e| e.into_lua_err())?
-            };
+            let ast = crate::parser::parse_bash_script(&cmd_str).map_err(|e| e.into_lua_err())?;
             let status = crate::exec::eval_command_list(&mut env_guard, &ast)
                 .map_err(|e| e.into_lua_err())?;
             Ok(status)

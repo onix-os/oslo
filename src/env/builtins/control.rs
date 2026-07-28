@@ -97,14 +97,21 @@ pub fn builtin_eval(env: &mut Environment, args: &[String]) -> Result<i32> {
     }
 
     let code = args[1..].join(" ");
-    if let Ok(ast) = crate::parser::brush_adapter::parse_bash_script(&code) {
-        eval_command_list(env, &ast)
-    } else {
-        let lexer = crate::lexer::Lexer::new(&code);
-        let mut parser = crate::parser::Parser::new(lexer);
-        let ast = parser.parse_command_list()?;
-        eval_command_list(env, &ast)
-    }
+
+    // `x='eval "$x"'; eval "$x"` recurses through the parser and the evaluator with no function
+    // call to bound it, so `eval` carries the same nesting counter `source` does.
+    env.enter_nested_script()?;
+    let result = match crate::parser::parse_bash_script(&code) {
+        Ok(ast) => eval_command_list(env, &ast),
+        // A syntax error in evaluated text is the *builtin's* failure, not the script's: bash
+        // reports it, gives `eval` status 2, and carries on with the next command.
+        Err(e) => {
+            eprintln!("rush: eval: {}", e);
+            Ok(2)
+        }
+    };
+    env.exit_nested_script();
+    result
 }
 
 pub fn builtin_source(env: &mut Environment, args: &[String]) -> Result<i32> {
@@ -122,14 +129,20 @@ pub fn builtin_source(env: &mut Environment, args: &[String]) -> Result<i32> {
         }
     };
 
-    let result = if let Ok(ast) = crate::parser::brush_adapter::parse_bash_script(&content) {
-        eval_command_list(env, &ast)
-    } else {
-        let lexer = crate::lexer::Lexer::new(&content);
-        let mut parser = crate::parser::Parser::new(lexer);
-        let ast = parser.parse_command_list()?;
-        eval_command_list(env, &ast)
+    // A file that sources itself re-enters the parser and the evaluator once per level. The
+    // counter is entered only after the file is known to be readable, so a missing file still
+    // costs nothing, and exited on every path out so a `return` cannot leave it drifting.
+    env.enter_nested_script()?;
+    let result = match crate::parser::parse_bash_script(&content) {
+        Ok(ast) => eval_command_list(env, &ast),
+        // As with `eval`: the sourced file failing to parse leaves `source` with status 2 and
+        // the calling script still running.
+        Err(e) => {
+            eprintln!("rush: {}: {}", file_path, e);
+            Ok(2)
+        }
     };
+    env.exit_nested_script();
 
     // `return` ends a sourced script early and supplies its status.
     match result {

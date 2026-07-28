@@ -1,10 +1,79 @@
 use crate::ast::Command;
+use crate::env::nesting::{DepthGuard, MAX_FUNCTION_DEPTH, MAX_SCRIPT_DEPTH};
 use crate::error::Result;
 use std::collections::{HashMap, HashSet};
 use std::env;
 use std::path::PathBuf;
 
 pub type BuiltinFn = fn(&mut Environment, &[String]) -> Result<i32>;
+
+/// Whether `name` is a valid shell variable name: `[A-Za-z_][A-Za-z0-9_]*`.
+///
+/// `export`, `local` and `readonly` reject anything else *before* it can reach the process
+/// environment, because `std::env::set_var` panics on a name the OS refuses (empty, or
+/// containing `=`) and a panic in the interpreter loop takes an interactive session with it.
+pub fn is_valid_identifier(name: &str) -> bool {
+    let mut chars = name.chars();
+    match chars.next() {
+        Some(c) if c.is_ascii_alphabetic() || c == '_' => {}
+        _ => return false,
+    }
+    chars.all(|c| c.is_ascii_alphanumeric() || c == '_')
+}
+
+/// Whether `name`/`value` can be handed to the process environment without aborting.
+///
+/// Deliberately weaker than [`is_valid_identifier`]: names inherited from `environ` may contain
+/// characters no shell would accept (`BASH_FUNC_x%%`), and forwarding those to a child is
+/// correct. Only the three things `environ` genuinely cannot represent are refused — an empty
+/// name, a `=` in a name, and a NUL anywhere, since NUL terminates a C string.
+fn is_environ_safe(name: &str, value: &str) -> bool {
+    !name.is_empty() && !name.contains(['=', '\0']) && !value.contains('\0')
+}
+
+/// Report a name/value the process environment cannot represent; `true` if it was rejected.
+///
+/// The last line of defence for callers that reach [`Environment::set_var`] without doing their
+/// own validation (`read`, a `for` loop variable, a `${x=default}` expansion): the assignment is
+/// dropped with a diagnostic rather than aborting the shell.
+fn reject_unrepresentable(name: &str, value: &str) -> bool {
+    if name.is_empty() || name.contains(['=', '\0']) {
+        eprintln!("rush: {}: not a valid identifier", name);
+        true
+    } else if value.contains('\0') {
+        eprintln!("rush: {}: value contains a NUL byte", name);
+        true
+    } else {
+        false
+    }
+}
+
+/// Publish `name=value` to the process environment; a pair `environ` cannot hold is dropped.
+///
+/// Every write to `environ` in this module funnels through here so the soundness argument lives
+/// in exactly one place.
+fn environ_set(name: &str, value: &str) {
+    if !is_environ_safe(name, value) {
+        return;
+    }
+    // SAFETY: `std::env::set_var` is unsafe in edition 2024 because it mutates the global
+    // `environ` with no synchronisation, so a concurrent `getenv` in another thread could read a
+    // freed pointer. rush is single-threaded: nothing in the crate spawns a thread, the parser,
+    // interpreter, builtins and Lua engine all run on the main thread, and a forked child starts
+    // with only the forking thread alive. The guard above rules out the other failure mode — the
+    // call panics on an empty name, a `=` in the name, or a NUL in either half.
+    unsafe { env::set_var(name, value) }
+}
+
+/// Drop `name` from the process environment; a name `environ` cannot hold is ignored.
+fn environ_remove(name: &str) {
+    if !is_environ_safe(name, "") {
+        return;
+    }
+    // SAFETY: as in `environ_set` — no other thread exists to observe the mutation, and the
+    // guard above excludes the names `remove_var` panics on.
+    unsafe { env::remove_var(name) }
+}
 
 pub struct Environment {
     vars: HashMap<String, (String, bool)>, // (value, is_exported)
@@ -26,6 +95,10 @@ pub struct Environment {
     /// command list. Outside any loop they must instead do nothing at all — `break; echo hi`
     /// still prints `hi` — so the builtins consult this before signalling.
     loop_depth: usize,
+    /// How deep the current shell-function call chain is.
+    function_depth: DepthGuard,
+    /// How deep the current `source`/`eval` chain is.
+    script_depth: DepthGuard,
 }
 
 impl Default for Environment {
@@ -63,6 +136,8 @@ impl Environment {
             dir_stack: Vec::new(),
             scope_stack: Vec::new(),
             loop_depth: 0,
+            function_depth: DepthGuard::new(MAX_FUNCTION_DEPTH),
+            script_depth: DepthGuard::new(MAX_SCRIPT_DEPTH),
         };
 
         crate::env::builtins::register_default_builtins(&mut env_struct);
@@ -82,6 +157,27 @@ impl Environment {
         self.loop_depth > 0
     }
 
+    /// Begin a shell-function call; `Err` once the call chain is too deep to be safe.
+    ///
+    /// The caller must pair this with [`Self::exit_function`] on every path out of the call,
+    /// including an unwinding `return` or error.
+    pub fn enter_function(&mut self) -> Result<()> {
+        self.function_depth.enter()
+    }
+
+    pub fn exit_function(&mut self) {
+        self.function_depth.exit()
+    }
+
+    /// Begin a nested `source` or `eval`; `Err` once the chain is too deep to be safe.
+    pub fn enter_nested_script(&mut self) -> Result<()> {
+        self.script_depth.enter()
+    }
+
+    pub fn exit_nested_script(&mut self) {
+        self.script_depth.exit()
+    }
+
     pub fn push_scope(&mut self) {
         self.scope_stack.push(HashMap::new());
     }
@@ -92,22 +188,18 @@ impl Environment {
                 match orig_val {
                     Some((val, is_exp)) => {
                         self.vars.insert(k.clone(), (val.clone(), is_exp));
-                        unsafe {
-                            if is_exp {
-                                env::set_var(&k, &val);
-                            } else {
-                                // The variable existed but was not exported. If it was exported
-                                // temporarily inside this scope, the process environment still
-                                // holds it and would leak into every later child.
-                                env::remove_var(&k);
-                            }
+                        if is_exp {
+                            environ_set(&k, &val);
+                        } else {
+                            // The variable existed but was not exported. If it was exported
+                            // temporarily inside this scope, the process environment still
+                            // holds it and would leak into every later child.
+                            environ_remove(&k);
                         }
                     }
                     None => {
                         self.vars.remove(&k);
-                        unsafe {
-                            env::remove_var(&k);
-                        }
+                        environ_remove(&k);
                     }
                 }
             }
@@ -123,18 +215,27 @@ impl Environment {
         }
     }
 
-    pub fn set_local_var(&mut self, name: &str, value: &str) {
+    /// Set `name` in the innermost scope. `false` if the assignment was refused.
+    pub fn set_local_var(&mut self, name: &str, value: &str) -> bool {
+        // Checked before `save_for_restore`: a name recorded in the frame is passed to
+        // `environ_remove` when the scope pops, so an unusable one must never get in there.
+        if reject_unrepresentable(name, value) {
+            return false;
+        }
         self.save_for_restore(name);
-        self.set_var(name, value, false);
+        self.set_var(name, value, false)
     }
 
     /// Set a variable that is exported for the lifetime of the innermost scope only.
     ///
     /// This is what a command-prefix assignment (`FOO=bar cmd`) needs: `cmd` must see `FOO` in
     /// its environment, and the shell must not.
-    pub fn set_local_exported_var(&mut self, name: &str, value: &str) {
+    pub fn set_local_exported_var(&mut self, name: &str, value: &str) -> bool {
+        if reject_unrepresentable(name, value) {
+            return false;
+        }
         self.save_for_restore(name);
-        self.set_var(name, value, true);
+        self.set_var(name, value, true)
     }
 
     pub fn set_readonly(&mut self, name: &str) {
@@ -206,41 +307,51 @@ impl Environment {
         }
     }
 
-    pub fn set_var(&mut self, name: &str, value: &str, export: bool) {
+    /// Assign `name=value`. `false` if the variable is read-only or unrepresentable.
+    pub fn set_var(&mut self, name: &str, value: &str, export: bool) -> bool {
         if self.is_readonly(name) {
             eprintln!("rush: {}: is read only", name);
-            return;
+            return false;
+        }
+        if reject_unrepresentable(name, value) {
+            return false;
         }
         let is_exp = export || self.vars.get(name).map(|(_, exp)| *exp).unwrap_or(false);
         self.vars
             .insert(name.to_string(), (value.to_string(), is_exp));
         if is_exp {
-            unsafe {
-                env::set_var(name, value);
-            }
+            environ_set(name, value);
         }
+        true
     }
 
     pub fn unset_var(&mut self, name: &str) {
         self.vars.remove(name);
-        unsafe {
-            env::remove_var(name);
-        }
+        environ_remove(name);
     }
 
-    pub fn export_var(&mut self, name: &str) {
-        if let Some((val, exp)) = self.vars.get_mut(name) {
-            *exp = true;
-            let val_clone = val.clone();
-            unsafe {
-                env::set_var(name, val_clone);
+    /// Mark an existing variable exported, creating it empty if it does not exist.
+    ///
+    /// `false` if its current value cannot live in `environ` — a NUL-bearing value read from a
+    /// binary file, say, which `export` must refuse instead of handing to `setenv`.
+    pub fn export_var(&mut self, name: &str) -> bool {
+        if let Some((val, _)) = self.vars.get(name) {
+            let val = val.clone();
+            if reject_unrepresentable(name, &val) {
+                return false;
             }
+            if let Some((_, exp)) = self.vars.get_mut(name) {
+                *exp = true;
+            }
+            environ_set(name, &val);
         } else {
-            self.vars.insert(name.to_string(), ("".to_string(), true));
-            unsafe {
-                env::set_var(name, "");
+            if reject_unrepresentable(name, "") {
+                return false;
             }
+            self.vars.insert(name.to_string(), ("".to_string(), true));
+            environ_set(name, "");
         }
+        true
     }
 
     pub fn get_all_vars(&self) -> HashMap<String, String> {
@@ -343,5 +454,71 @@ impl Environment {
                 | "true"
                 | "false"
         ) || self.custom_builtins.contains_key(trimmed)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Environment, is_valid_identifier};
+
+    #[test]
+    fn identifier_rules_match_posix_names() {
+        for ok in ["a", "_", "_x9", "FOO_BAR", "x1"] {
+            assert!(is_valid_identifier(ok), "{ok} should be a valid name");
+        }
+        for bad in ["", "=1", "1a", "a b", "a-b", "a=b", "a\0", "é", "$x"] {
+            assert!(!is_valid_identifier(bad), "{bad:?} should be rejected");
+        }
+    }
+
+    /// Each of these reached `env::set_var`/`remove_var` before R1.7 and aborted the shell.
+    #[test]
+    fn unrepresentable_assignments_are_refused_not_fatal() {
+        let mut env = Environment::new();
+        assert!(!env.set_var("=1", "x", true));
+        assert!(!env.set_var("", "x", true));
+        assert!(!env.set_var("a=b", "x", true));
+        assert_eq!(env.get_var("=1"), None);
+
+        // A NUL cannot survive the trip through `environ`, so the whole assignment is refused
+        // rather than silently truncated at the NUL.
+        assert!(!env.set_var("NUL_TEST", "a\0b", true));
+        assert_eq!(env.get_var("NUL_TEST"), None);
+    }
+
+    #[test]
+    fn exporting_a_nul_bearing_value_is_refused() {
+        let mut env = Environment::new();
+        // Not exported, so this never touches `environ` — the value only becomes a problem when
+        // `export` tries to publish it.
+        env.vars
+            .insert("NUL_EXPORT".to_string(), ("a\0b".to_string(), false));
+        assert!(!env.export_var("NUL_EXPORT"));
+        assert!(!env.get_exported_vars().contains_key("NUL_EXPORT"));
+    }
+
+    #[test]
+    fn unset_of_an_impossible_name_is_a_no_op() {
+        let mut env = Environment::new();
+        env.unset_var("=1");
+        env.unset_var("");
+    }
+
+    /// A rejected `local` must not be recorded in the scope frame: `pop_scope` would then hand
+    /// the same impossible name to `remove_var` and abort at function exit instead.
+    #[test]
+    fn rejected_local_does_not_poison_the_scope_frame() {
+        let mut env = Environment::new();
+        env.push_scope();
+        assert!(!env.set_local_var("=1", "x"));
+        assert!(!env.set_local_exported_var("BAD\0NAME", "x"));
+        env.pop_scope();
+    }
+
+    #[test]
+    fn valid_unexported_assignment_still_works() {
+        let mut env = Environment::new();
+        assert!(env.set_var("PLAIN_TEST", "value", false));
+        assert_eq!(env.get_var("PLAIN_TEST"), Some("value"));
     }
 }

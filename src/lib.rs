@@ -14,4 +14,4 @@ pub use exec::{JobManager, eval_command_list};
 pub use interactive::RushHelper;
 pub use lexer::Lexer;
 pub use lua::LuaEngine;
-pub use parser::Parser;
+pub use parser::parse_bash_script;

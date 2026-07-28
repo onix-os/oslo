@@ -1,12 +1,13 @@
 //! Bridge from [`brush_parser`]'s AST to rush's own [`crate::ast`].
 //!
 //! brush is a spec-compliant bash parser; rush's evaluator works on its own simpler AST. This
-//! module is the translation layer, and it is the one every entry point actually goes through —
-//! `main`, `eval`, `source`, command substitution and the Lua `rush.exec` binding all try brush
-//! first and only fall back to the hand-written parser when brush reports a syntax error.
+//! module is the translation layer, and it is the *only* path from source text to a runnable
+//! program: `main`, `eval`, `source`, command substitution and the Lua `rush.exec` binding all
+//! come through here, and an error raised here is what the user sees.
 //!
 //! That makes fidelity here load-bearing: anything this module drops is silently unobservable at
-//! runtime, because there is no error to fall back on.
+//! runtime. Anything it cannot represent must therefore be *rejected by name* (see the
+//! unsupported-construct arm in `commands.rs`), never approximated.
 //!
 //! # Known gaps
 //!
@@ -34,6 +35,11 @@ use commands::convert_command;
 use std::io::Cursor;
 
 pub fn parse_bash_script(script: &str) -> Result<rush_ast::CommandList> {
+    // Before brush sees the text, not after: brush is recursive descent, so absurdly nested input
+    // overflows the stack inside `parse_program` and aborts the process before any error of ours
+    // could be produced. See [`crate::parser::nesting`].
+    crate::parser::nesting::check_nesting(script)?;
+
     let script_buf = format!("{}\n", script);
     let cursor = Cursor::new(script_buf.as_bytes());
     let parser_opts = ParserOptions::default();
@@ -41,10 +47,9 @@ pub fn parse_bash_script(script: &str) -> Result<rush_ast::CommandList> {
 
     match parser.parse_program() {
         Ok(prog) => convert_program(&prog),
-        Err(e) => Err(ShellError::SyntaxError(format!(
-            "Failed to parse script: {}",
-            e
-        ))),
+        // brush's own message already names the position; wrapping it in more prose would only
+        // bury the line and column the user needs.
+        Err(e) => Err(ShellError::SyntaxError(e.to_string())),
     }
 }
 

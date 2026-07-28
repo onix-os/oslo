@@ -1,81 +1,117 @@
+//! The `rush` binary: argument handling, script execution, and the interactive REPL.
+
+mod cli;
+
+use cli::{Action, Invocation};
 use rush::env::Environment;
 use rush::error::{Result, ShellError};
 use rush::exec::{JobManager, eval_command_list};
 use rush::interactive::RushHelper;
-use rush::lexer::Lexer;
 use rush::lua::LuaEngine;
-use rush::parser::Parser;
+use rush::parser::parse_bash_script;
 use rustyline::Editor;
 use rustyline::error::ReadlineError;
 use std::env;
 use std::fs;
+use std::io::Read;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 fn main() {
     let args: Vec<String> = env::args().collect();
 
-    if args.len() > 1 {
-        if args[1] == "-c" && args.len() > 2 {
-            // Run inline command
-            let mut env = Environment::new();
-            match run_string(&mut env, &args[2]) {
-                // The shell's exit status is that of the last command it ran.
-                Ok(status) => std::process::exit(status),
-                Err(e) => handle_exit_error(e),
+    let invocation = match cli::parse(&args) {
+        Ok(inv) => inv,
+        Err(exit) => {
+            if exit.to_stderr {
+                eprintln!("{}", exit.message.trim_end());
+            } else {
+                println!("{}", exit.message.trim_end());
             }
-        } else if args[1] == "--lua-script" && args.len() > 2 {
-            // Run Lua script directly
-            let env = Arc::new(Mutex::new(Environment::new()));
-            let lua = LuaEngine::new().expect("Failed to initialize Lua");
-            let _ = lua.setup_bindings(env);
-            if let Err(e) = lua.load_file(&args[2]) {
-                eprintln!("rush: lua error: {}", e);
-                std::process::exit(1);
+            std::process::exit(exit.status);
+        }
+    };
+
+    match invocation.action {
+        Action::LuaScript(ref path) => run_lua_script(path),
+        Action::Command(ref text) => run_program(&invocation, text),
+        Action::Script(ref path) => match fs::read_to_string(path) {
+            Ok(script) => run_program(&invocation, &script),
+            Err(_) => {
+                eprintln!("rush: {}: No such file or directory", path);
+                std::process::exit(127);
             }
-            return;
-        } else if !args[1].starts_with('-') {
-            // Run script file
-            let mut env = Environment::new();
-            env.set_positional(args[2..].to_vec());
-            match fs::read_to_string(&args[1]) {
-                Ok(script) => match run_string(&mut env, &script) {
-                    Ok(status) => std::process::exit(status),
-                    Err(e) => handle_exit_error(e),
-                },
-                Err(_) => {
-                    eprintln!("rush: {}: No such file or directory", args[1]);
-                    std::process::exit(127);
+        },
+        Action::Stdin => {
+            if invocation.force_interactive || stdin_is_a_terminal() {
+                run_repl();
+            } else {
+                let mut script = String::new();
+                if let Err(e) = std::io::stdin().read_to_string(&mut script) {
+                    eprintln!("rush: cannot read standard input: {}", e);
+                    std::process::exit(1);
                 }
+                run_program(&invocation, &script);
             }
         }
     }
-
-    // Run interactive REPL
-    run_repl();
 }
 
-fn handle_exit_error(err: ShellError) {
+/// A shell is interactive by default only when it is talking to a person.
+///
+/// stderr is checked as well as stdin: `rush < script` has a terminal on stderr but must run the
+/// script, and `rush 2>log` from a terminal must still prompt.
+fn stdin_is_a_terminal() -> bool {
+    nix::unistd::isatty(0).unwrap_or(false) && nix::unistd::isatty(2).unwrap_or(false)
+}
+
+fn run_program(invocation: &Invocation, script: &str) -> ! {
+    let mut env = Environment::new();
+    env.shell_name = invocation.name.clone();
+    env.set_positional(invocation.positional.clone());
+    match run_string(&mut env, script) {
+        // The shell's exit status is that of the last command it ran.
+        Ok(status) => std::process::exit(status),
+        Err(e) => handle_exit_error(e),
+    }
+}
+
+fn run_lua_script(path: &str) -> ! {
+    let env = Arc::new(Mutex::new(Environment::new()));
+    let lua = LuaEngine::new().expect("Failed to initialize Lua");
+    let _ = lua.setup_bindings(env);
+    if let Err(e) = lua.load_file(path) {
+        eprintln!("rush: lua error: {}", e);
+        std::process::exit(1);
+    }
+    std::process::exit(0);
+}
+
+fn handle_exit_error(err: ShellError) -> ! {
     match err {
         ShellError::Exit(code) => std::process::exit(code),
         e => {
+            let status = failure_status(&e);
             eprintln!("rush: {}", e);
-            std::process::exit(1);
+            std::process::exit(status);
         }
+    }
+}
+
+/// The exit status a fatal error leaves behind.
+///
+/// A shell that cannot parse its input exits 2, the status every POSIX shell uses for a syntax
+/// error and the one `make` and CI scripts test for. Anything else is a plain failure.
+fn failure_status(err: &ShellError) -> i32 {
+    match err {
+        ShellError::SyntaxError(_) => 2,
+        _ => 1,
     }
 }
 
 fn run_string(env: &mut Environment, input: &str) -> Result<i32> {
-    let result = if let Ok(ast) = rush::parser::brush_adapter::parse_bash_script(input) {
-        eval_command_list(env, &ast)
-    } else {
-        let lexer = Lexer::new(input);
-        let mut parser = Parser::new(lexer);
-        let ast = parser.parse_command_list()?;
-        eval_command_list(env, &ast)
-    };
-
-    absorb_loop_control(result)
+    let ast = parse_bash_script(input)?;
+    absorb_loop_control(eval_command_list(env, &ast))
 }
 
 /// `break`, `continue` and `return` outside any loop or function are a no-op, not an error.
@@ -90,7 +126,7 @@ fn absorb_loop_control(result: Result<i32>) -> Result<i32> {
     }
 }
 
-fn run_repl() {
+fn run_repl() -> ! {
     let env_struct = Arc::new(Mutex::new(Environment::new()));
     let lua = LuaEngine::new().expect("Failed to initialize Lua engine");
     let _ = lua.setup_bindings(Arc::clone(&env_struct));
@@ -98,8 +134,10 @@ fn run_repl() {
     // Try loading ~/.config/rush/init.lua
     if let Some(home) = env::var_os("HOME") {
         let init_path = PathBuf::from(home).join(".config/rush/init.lua");
-        if init_path.exists() {
-            let _ = lua.load_file(init_path.to_str().unwrap());
+        if init_path.exists()
+            && let Some(path) = init_path.to_str()
+        {
+            let _ = lua.load_file(path);
         }
     }
 
@@ -121,7 +159,10 @@ fn run_repl() {
     let mut jobs = JobManager::new();
     jobs.setup_signals();
 
-    println!("rush v0.1.0 - POSIX Compatible Shell with Lua & Fish-style Features");
+    println!(
+        "rush {} - POSIX Compatible Shell with Lua & Fish-style Features",
+        env!("CARGO_PKG_VERSION")
+    );
     println!("Type 'exit' or Ctrl-D to exit.");
 
     let mut last_status = 0;
@@ -144,20 +185,11 @@ fn run_repl() {
                 let _ = rl.add_history_entry(trimmed);
 
                 let mut env_guard = env_struct.lock().unwrap();
-                let res = if let Ok(ast) = rush::parser::brush_adapter::parse_bash_script(trimmed) {
-                    eval_command_list(&mut env_guard, &ast)
-                } else {
-                    let lexer = Lexer::new(trimmed);
-                    let mut parser = Parser::new(lexer);
-                    if let Ok(ast) = parser.parse_command_list() {
-                        eval_command_list(&mut env_guard, &ast)
-                    } else {
-                        Err(ShellError::SyntaxError(
-                            "Failed to parse command".to_string(),
-                        ))
-                    }
-                };
-                let res = absorb_loop_control(res);
+                let res = absorb_loop_control(
+                    parse_bash_script(trimmed)
+                        .and_then(|ast| eval_command_list(&mut env_guard, &ast)),
+                );
+                drop(env_guard);
 
                 match res {
                     Ok(status) => {
@@ -170,8 +202,8 @@ fn run_repl() {
                         std::process::exit(code);
                     }
                     Err(err) => {
+                        last_status = failure_status(&err);
                         eprintln!("rush: {}", err);
-                        last_status = 1;
                     }
                 }
             }
@@ -192,4 +224,5 @@ fn run_repl() {
     if let Some(ref path) = history_path {
         let _ = rl.save_history(path);
     }
+    std::process::exit(last_status);
 }

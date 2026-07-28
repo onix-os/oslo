@@ -13,6 +13,7 @@ use crate::lexer::Lexer;
 use nix::sys::wait::{WaitStatus, waitpid};
 use nix::unistd::{ForkResult, fork};
 use std::ffi::CString;
+use std::os::unix::ffi::OsStrExt;
 
 pub(crate) fn eval_simple_command(env: &mut Environment, simple: &SimpleCommand) -> Result<i32> {
     if simple.words.is_empty() {
@@ -107,15 +108,12 @@ fn run_command_word(
     }
 
     if let Some(func_body) = env.get_function(&cmd_name).cloned() {
-        let mut guard = RedirectGuard::new();
-        guard.apply(env, redirections)?;
-
-        let old_pos = env.get_positional().to_vec();
-        env.set_positional(words[1..].to_vec());
-        env.push_scope();
-        let res = eval_command(env, &func_body);
-        env.pop_scope();
-        env.set_positional(old_pos);
+        // Checked before anything is set up, so a refused call has nothing to unwind. `f() { f; }`
+        // recurses through the whole evaluator; without this the stack overflows and Rust aborts
+        // the process outright, status 134 and a core dump.
+        env.enter_function()?;
+        let res = call_function(env, &func_body, words, redirections);
+        env.exit_function();
 
         // `return` unwinds to here and becomes the function's exit status. `break`/`continue`
         // are also absorbed: they must not escape into a loop in the caller.
@@ -137,11 +135,10 @@ fn run_command_word(
         }
     };
 
-    let c_path = CString::new(path.to_str().unwrap()).unwrap();
-    let c_args: Vec<CString> = words
-        .iter()
-        .map(|w| CString::new(w.as_str()).unwrap())
-        .collect();
+    // Both conversions take the raw bytes: a resolved path is an `OsStr`, not necessarily UTF-8
+    // (a PATH entry can be any byte string), and `to_str().unwrap()` aborted the shell on one.
+    let c_path = exec_cstring(path.as_os_str().as_bytes());
+    let c_args: Vec<CString> = words.iter().map(|w| exec_cstring(w.as_bytes())).collect();
 
     unsafe {
         match fork() {
@@ -164,6 +161,42 @@ fn run_command_word(
             Err(e) => Err(ShellError::ExecutionError(format!("Fork failed: {}", e))),
         }
     }
+}
+
+/// Run a shell function body with its own positional parameters and variable scope.
+///
+/// Split out from [`run_command_word`] so the call-depth counter can be entered and exited around
+/// exactly one expression: a redirection failure here still has to leave the depth balanced.
+fn call_function(
+    env: &mut Environment,
+    body: &Command,
+    words: &[String],
+    redirections: &[Redirection],
+) -> Result<i32> {
+    let mut guard = RedirectGuard::new();
+    guard.apply(env, redirections)?;
+
+    let old_pos = env.get_positional().to_vec();
+    env.set_positional(words[1..].to_vec());
+    env.push_scope();
+    let res = eval_command(env, body);
+    env.pop_scope();
+    env.set_positional(old_pos);
+    res
+}
+
+/// Turn user-controlled bytes into an argv entry for `execv`, dropping any NUL bytes.
+///
+/// argv entries are NUL-terminated, so an embedded NUL cannot reach `execv` under any encoding —
+/// the only question is what the shell does about it. bash keeps NULs out of shell strings in the
+/// first place (command substitution and `read` both drop them), so dropping here reproduces the
+/// argument bash would have built. What it must never do is what the previous
+/// `CString::new(..).unwrap()` did: kill the whole shell, exit 101, over one byte of input data.
+fn exec_cstring(bytes: &[u8]) -> CString {
+    let stripped: Vec<u8> = bytes.iter().copied().filter(|b| *b != 0).collect();
+    // NUL-free by construction, so this cannot fail; the fallback keeps the exec path free of
+    // panicking calls even if that ever stops being true.
+    CString::new(stripped).unwrap_or_default()
 }
 
 /// Split an alias body into argv entries.
@@ -229,5 +262,36 @@ fn execute_builtin(env: &mut Environment, cmd_name: &str, words: &[String]) -> R
                 Ok(0)
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::exec_cstring;
+    use std::ffi::{CString, OsStr};
+    use std::os::unix::ffi::OsStrExt;
+
+    #[test]
+    fn plain_argument_is_unchanged() {
+        assert_eq!(exec_cstring(b"hello"), CString::new("hello").unwrap());
+        assert_eq!(exec_cstring(b""), CString::new("").unwrap());
+    }
+
+    #[test]
+    fn embedded_nul_is_dropped_not_fatal() {
+        assert_eq!(exec_cstring(b"a\0b"), CString::new("ab").unwrap());
+        assert_eq!(exec_cstring(b"\0\0"), CString::new("").unwrap());
+        assert_eq!(exec_cstring(b"a\0"), CString::new("a").unwrap());
+        assert_eq!(exec_cstring(b"\0a"), CString::new("a").unwrap());
+    }
+
+    /// A PATH entry — and therefore a resolved binary path — need not be UTF-8.
+    #[test]
+    fn non_utf8_path_survives() {
+        let raw = b"/b\xffn/echo";
+        assert_eq!(
+            exec_cstring(OsStr::from_bytes(raw).as_bytes()).as_bytes(),
+            raw
+        );
     }
 }

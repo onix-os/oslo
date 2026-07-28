@@ -1,19 +1,12 @@
 use rush::env::Environment;
 use rush::exec::eval_command_list;
-use rush::lexer::Lexer;
 use rush::lua::LuaEngine;
-use rush::parser::Parser;
+use rush::parser::parse_bash_script;
 use std::sync::{Arc, Mutex};
 
 fn run_cmd(env: &mut Environment, input: &str) -> i32 {
-    if let Ok(ast) = rush::parser::brush_adapter::parse_bash_script(input) {
-        eval_command_list(env, &ast).expect("Execution failed")
-    } else {
-        let lexer = Lexer::new(input);
-        let mut parser = Parser::new(lexer);
-        let ast = parser.parse_command_list().expect("Parsing failed");
-        eval_command_list(env, &ast).expect("Execution failed")
-    }
+    let ast = parse_bash_script(input).expect("Parsing failed");
+    eval_command_list(env, &ast).expect("Execution failed")
 }
 
 #[test]
