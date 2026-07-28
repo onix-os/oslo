@@ -1,0 +1,2 @@
+# mode: posix
+echo 'unterminated

@@ -9,11 +9,19 @@ permissions:
   contents: read
 
 jobs:
+  # Releases ship macOS binaries, so macOS has to be a gate and not a surprise. The toolchain
+  # action is pinned to an exact stable release: `@stable` silently moves under us, which turns
+  # a new lint into a red build on an unrelated PR.
   verify:
-    runs-on: ubuntu-latest
+    name: verify (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@1.94.0
         with:
           components: rustfmt, clippy
       - uses: actions/cache@v4
@@ -28,3 +36,29 @@ jobs:
       - name: Verify
         run: make verify
 
+  # Cargo.toml claims rust-version = 1.88; this job is what makes the claim true.
+  msrv:
+    name: msrv (1.88)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@1.88.0
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: msrv-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: |
+            msrv-${{ runner.os }}-
+      - name: Declared rust-version matches the pinned toolchain
+        run: |
+          declared="$(sed -n 's/^rust-version *= *"\([^"]*\)".*/\1/p' Cargo.toml | head -1)"
+          if [ "$declared" != "1.88" ]; then
+            echo "Cargo.toml rust-version is '$declared' but this job pins 1.88." >&2
+            echo "Update both together, or the MSRV is not actually being checked." >&2
+            exit 1
+          fi
+      - name: Build at MSRV
+        run: cargo check --all-targets

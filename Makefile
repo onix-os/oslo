@@ -17,7 +17,7 @@ $(info ------------------------------------------)
 $(info Project: $(PROJECT_NAME) v$(PROJECT_VERSION))
 $(info ------------------------------------------)
 
-.PHONY: build b compile c run r example test t check check-all test-all check-loc clippy rustdoc fmt fmt-check clean verify release help h
+.PHONY: build b compile c run r example test t check check-all test-all check-loc clippy rustdoc fmt fmt-check clean verify install uninstall release help h
 
 build:
 	@$(CARGO) build
@@ -70,7 +70,20 @@ clean:
 check-loc:
 	@./scripts/check-loc.sh
 
-verify: fmt-check check-loc check test check-all test-all clippy rustdoc
+# check-all/test-all are deliberately absent: the crate declares no [features], so they are
+# byte-identical reruns of check/test and only slow the gate down. Add them back the day a
+# [features] section appears.
+verify: fmt-check check-loc check test clippy rustdoc
+
+install:
+	@$(CARGO) build --release --bin $(PROJECT_NAME)
+	@install -d "$(DESTDIR)$(PREFIX)/bin"
+	@install -m 755 "target/release/$(PROJECT_NAME)" "$(DESTDIR)$(PREFIX)/bin/$(PROJECT_NAME)"
+	@echo "installed $(DESTDIR)$(PREFIX)/bin/$(PROJECT_NAME)"
+
+uninstall:
+	@rm -f "$(DESTDIR)$(PREFIX)/bin/$(PROJECT_NAME)"
+	@echo "removed $(DESTDIR)$(PREFIX)/bin/$(PROJECT_NAME)"
 
 release:
 	@if [ -z "$(HAS_REL)" ]; then \
@@ -103,6 +116,8 @@ help:
 	@echo "  check-loc    Fail if any source file exceeds 600 lines"
 	@echo "  clean        Remove Cargo build artifacts"
 	@echo "  verify       Run the full local gate"
+	@echo "  install      Install the release binary into \$$PREFIX/bin ($(PREFIX)/bin)"
+	@echo "  uninstall    Remove the installed binary from \$$PREFIX/bin"
 	@echo "  release      Release a new version"
 	@echo
 

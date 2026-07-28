@@ -25,13 +25,19 @@ jobs:
             artifact: "rush-macos-arm64"
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@1.94.0
       - name: Build
-        run: cargo build --release --example main
+        run: cargo build --release --bin rush
+      # A shell that cannot run `echo` is not worth shipping; catch that before the asset is
+      # attached to the release rather than after someone downloads it. stdin comes from
+      # /dev/null so a REPL-fallback bug cannot hang the runner.
+      - name: Smoke test
+        run: |
+          out="$(./target/release/rush -c 'echo ok' </dev/null)"
+          test "$out" = "ok" || { echo "smoke test printed '$out', expected 'ok'" >&2; exit 1; }
       - name: Package
-        run: tar -czf "${{ matrix.artifact }}.tar.gz" "target/release/examples/main"
+        run: tar -C target/release -czf "${{ matrix.artifact }}.tar.gz" rush
       - name: Upload artifact
         uses: softprops/action-gh-release@v2
         with:
           files: ${{ matrix.artifact }}.tar.gz
-
