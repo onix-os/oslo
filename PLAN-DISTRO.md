@@ -69,6 +69,24 @@ functions: `exec`, `get_var`, `set_var`, `get_pwd`, `get_alias`, `set_alias`, `s
 B1 and B2 are the two that make Lua unusable for real work. A scripting language that cannot read
 `argv` or capture a command's output is a configuration language.
 
+### Round B status — done
+
+All six closed. `arg`/`...` (B1), `oslo.capture` returning `{out, status}` (B2), `oslo.cd` through
+the `cd` builtin so `$PWD` agrees (B3), `oslo.env`/`oslo.unset` (B4), `oslo.exit` travelling as a
+shell exit rather than a Lua error (B5), and `oslo.glob` (B6).
+
+Two things the work turned up:
+
+* `oslo.capture` has **no `err` field**. It runs the same capture `$(cmd)` does, which leaves
+  stderr on the shell's own — so an `err` could only ever be empty, and an always-empty field
+  reads as "no diagnostics" rather than "nobody looked". `oslo.capture("cmd 2>&1")` folds them.
+  Capturing the two streams separately needs a second pipe through `eval_command_substitution`
+  and is the one Lua item left open.
+* `#!/usr/bin/env oslo` used to be read as *shell*, so the shebang an oslo Lua script most
+  naturally carries sent it to the shell parser. It now decides nothing — it names the shell, not
+  the language — and the extension or the text answers. Found by running the README's own example
+  rather than by a test, which is why C2 below is worth having.
+
 ## Round C — proving it, not asserting it
 
 The differential corpus is 390 scripts and none of them is a distro script. What that buys is

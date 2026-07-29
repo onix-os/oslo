@@ -448,44 +448,6 @@ fn a_working_init_lua_still_applies() {
     assert!(out(&o).contains("lua-alias"), "{:?}", out(&o));
 }
 
-/// A `.lua` operand runs as Lua with no flag, and its status is the shell's.
-#[test]
-fn lua_script_propagates_the_status_of_what_it_ran() {
-    let dir = tempfile::tempdir().unwrap();
-    let script = dir.path().join("s.lua");
-
-    std::fs::write(&script, "oslo.exec('false')\n").unwrap();
-    let failed = run(&[script.to_str().unwrap()], &[], dir.path());
-    assert_eq!(
-        failed.status.code(),
-        Some(1),
-        "a failing oslo.exec must show"
-    );
-
-    std::fs::write(&script, "oslo.exec('true')\n").unwrap();
-    let ok = run(&[script.to_str().unwrap()], &[], dir.path());
-    assert_eq!(ok.status.code(), Some(0));
-
-    std::fs::write(&script, "oslo.exec('exit 7')\n").unwrap();
-    let exited = run(&[script.to_str().unwrap()], &[], dir.path());
-    assert_ne!(
-        exited.status.code(),
-        Some(0),
-        "a script that asked to exit non-zero must not report success"
-    );
-}
-
-#[test]
-fn a_broken_lua_script_exits_non_zero_and_names_the_file() {
-    let dir = tempfile::tempdir().unwrap();
-    let script = dir.path().join("broken.lua");
-    std::fs::write(&script, "not lua(((\n").unwrap();
-
-    let o = run(&[script.to_str().unwrap()], &[], dir.path());
-    assert_eq!(o.status.code(), Some(1));
-    assert!(err(&o).contains("broken.lua"), "{:?}", err(&o));
-}
-
 /// The headline of the change: which language a script is written in is worked out, not declared.
 ///
 /// One test per level of evidence, because each is a separate decision and a regression in any

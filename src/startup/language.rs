@@ -90,9 +90,13 @@ fn from_shebang(text: &str) -> Option<Language> {
     if interpreter.starts_with("lua") {
         return Some(Language::Lua);
     }
-    if interpreter.ends_with("sh") || interpreter.starts_with("oslo") {
+    if interpreter.ends_with("sh") {
         return Some(Language::Shell);
     }
+    // `#!/usr/bin/env oslo` names *this shell* and says nothing about the language, which is the
+    // whole question — so it decides nothing and the extension or the text answers instead. It is
+    // also the shebang someone will most naturally write on an oslo Lua script, and reading it as
+    // "shell" sent every such file to the shell parser.
     None
 }
 
@@ -166,11 +170,27 @@ mod tests {
         // `env` forwards to the interpreter after it.
         assert_eq!(detect(None, None, "#!/usr/bin/env lua\n"), Language::Lua);
         assert_eq!(detect(None, None, "#!/usr/bin/env bash\n"), Language::Shell);
-        // Versioned interpreters, and oslo naming itself.
+        // Versioned interpreters.
         assert_eq!(detect(None, None, "#!/usr/bin/lua5.4\n"), Language::Lua);
+    }
+
+    /// `#!/usr/bin/env oslo` names the shell, not the language, so it must not decide — it is the
+    /// shebang an oslo Lua script naturally carries, and reading it as "shell" sent every such
+    /// file to the shell parser. The extension, then the text, answer instead.
+    #[test]
+    fn oslos_own_shebang_defers_to_the_next_test() {
         assert_eq!(
-            detect(None, None, "#!/usr/local/bin/oslo\n"),
+            detect(None, Some("deploy.lua"), "#!/usr/bin/env oslo\nprint(1)\n"),
+            Language::Lua
+        );
+        assert_eq!(
+            detect(None, Some("deploy.sh"), "#!/usr/bin/env oslo\necho hi\n"),
             Language::Shell
+        );
+        // No extension either: the text is all that is left.
+        assert_eq!(
+            detect(None, None, "#!/usr/bin/env oslo\nlocal t = {}\nprint(#t)\n"),
+            Language::Lua
         );
     }
 

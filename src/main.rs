@@ -41,17 +41,21 @@ fn main() {
         // `-c` is the POSIX interface and is always shell: every `sh -c` idiom in the world
         // depends on that, and `--lua` is there for the caller who wants otherwise.
         Action::Command(ref text) => match invocation.force_language {
-            Some(Language::Lua) => {
-                std::process::exit(startup::lua_init::run_lua_source(text, "-c"))
-            }
+            Some(Language::Lua) => std::process::exit(startup::lua_init::run_lua_source(
+                text,
+                "-c",
+                &invocation.positional,
+            )),
             _ => run_program(&invocation, text),
         },
         // A script operand names a file whose language is worked out from the file itself.
         Action::Script(ref path) => match fs::read_to_string(path) {
             Ok(script) => match language::detect(invocation.force_language, Some(path), &script) {
-                Language::Lua => {
-                    std::process::exit(startup::lua_init::run_lua_source(&script, path))
-                }
+                Language::Lua => std::process::exit(startup::lua_init::run_lua_source(
+                    &script,
+                    path,
+                    &invocation.positional,
+                )),
                 Language::Shell => run_program(&invocation, &script),
             },
             Err(_) => {
@@ -69,9 +73,11 @@ fn main() {
                     std::process::exit(1);
                 }
                 match language::detect(invocation.force_language, None, &script) {
-                    Language::Lua => {
-                        std::process::exit(startup::lua_init::run_lua_source(&script, "stdin"))
-                    }
+                    Language::Lua => std::process::exit(startup::lua_init::run_lua_source(
+                        &script,
+                        "stdin",
+                        &invocation.positional,
+                    )),
                     Language::Shell => run_program(&invocation, &script),
                 }
             }

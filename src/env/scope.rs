@@ -421,6 +421,24 @@ impl Environment {
 
     /// Remove `name` entirely, in whichever shape it has. `unset a` drops the whole array, not
     /// just its element 0.
+    /// Every exported name and its value — what a child process would be handed.
+    ///
+    /// Exported only, because that is the question a caller is asking when it wants "the
+    /// environment": a shell-local variable is not part of it and would mislead anyone iterating
+    /// this to decide what a command will see.
+    pub fn exported_vars(&self) -> Vec<(String, String)> {
+        let mut out: Vec<(String, String)> = self
+            .vars
+            .iter()
+            .filter(|(_, (_, exported))| *exported)
+            .map(|(name, (value, _))| (name.clone(), value.clone()))
+            .collect();
+        // Sorted so a caller that prints them gets a stable order; a HashMap's is arbitrary and
+        // would make any test or diff over the result flap.
+        out.sort();
+        out
+    }
+
     pub fn unset_var(&mut self, name: &str) {
         self.vars.remove(name);
         self.arrays.remove(name);

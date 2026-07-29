@@ -12,7 +12,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 /// its interpreter and is neither `Send` nor `Sync`, while the registry stores
 /// `Arc<dyn Fn … + Send + Sync>` so that `Environment` stays sendable. The closure therefore
 /// captures only the name and looks the callback back up through here.
-const BUILTIN_KEY_PREFIX: &str = "oslo_builtin_";
+pub(crate) const BUILTIN_KEY_PREFIX: &str = "oslo_builtin_";
 
 thread_local! {
     /// The interpreter a builtin registered on this thread should call back into.
@@ -30,7 +30,7 @@ thread_local! {
 /// builtin executes, and the evaluator is already holding this mutex. `lock` there is a hang —
 /// the shell stops responding with no output at all. A Lua error instead is recoverable and says
 /// what happened.
-fn borrow_env(env: &Mutex<Environment>) -> LuaResult<MutexGuard<'_, Environment>> {
+pub(crate) fn borrow_env(env: &Mutex<Environment>) -> LuaResult<MutexGuard<'_, Environment>> {
     env.try_lock().map_err(|_| {
         mlua::Error::runtime(
             "oslo: shell state is busy; the oslo.* API cannot be used from inside a builtin \
@@ -62,7 +62,7 @@ fn status_from_lua(value: LuaValue) -> i32 {
 /// that ran: a Lua error becomes a diagnostic on stderr plus status 1, the same shape a builtin
 /// written in Rust uses to report a bad invocation. `args[0]` is the builtin's own name, so the
 /// callback sees the same argv a native builtin does.
-fn call_lua_builtin(name: &str, args: &[String]) -> i32 {
+pub(crate) fn call_lua_builtin(name: &str, args: &[String]) -> i32 {
     let Some(lua) = ACTIVE_LUA.with(|slot| slot.borrow().clone()) else {
         eprintln!("oslo: {}: no Lua interpreter on this thread", name);
         return 127;
@@ -83,6 +83,8 @@ fn call_lua_builtin(name: &str, args: &[String]) -> i32 {
 }
 
 pub struct LuaEngine {
+    /// Arguments passed to the chunk as `...`; see [`LuaEngine::set_script_args`].
+    script_args: RefCell<Vec<String>>,
     lua: Lua,
     pub prompt_fn: Option<LuaFunction>,
     pub precmd_fn: Option<LuaFunction>,
@@ -102,6 +104,7 @@ impl LuaEngine {
 
         Ok(Self {
             lua,
+            script_args: RefCell::new(Vec::new()),
             prompt_fn: None,
             precmd_fn: None,
             postcmd_fn: None,
@@ -110,115 +113,10 @@ impl LuaEngine {
     }
 
     pub fn setup_bindings(&self, env: Arc<Mutex<Environment>>) -> Result<()> {
-        let globals = self.lua.globals();
-        let oslo_table = self.lua.create_table()?;
-
         // Published before anything can be registered, so a builtin registered by the very
         // script that is being loaded can already find its way back here.
         ACTIVE_LUA.with(|slot| *slot.borrow_mut() = Some(self.lua.clone()));
-
-        // oslo.exec(cmd_string)
-        let env_exec = Arc::clone(&env);
-        let exec_fn = self.lua.create_function(move |_, cmd_str: String| {
-            let mut env_guard = borrow_env(&env_exec)?;
-            let ast = crate::parser::parse_bash_script(&cmd_str).map_err(|e| e.into_lua_err())?;
-            let status = crate::exec::eval_command_list(&mut env_guard, &ast)
-                .map_err(|e| e.into_lua_err())?;
-            Ok(status)
-        })?;
-        oslo_table.set("exec", exec_fn)?;
-
-        // oslo.get_var(name)
-        let env_get = Arc::clone(&env);
-        let get_var_fn = self.lua.create_function(move |_, name: String| {
-            let env_guard = borrow_env(&env_get)?;
-            Ok(env_guard.get_param(&name))
-        })?;
-        oslo_table.set("get_var", get_var_fn)?;
-
-        // oslo.set_var(name, val)
-        let env_set = Arc::clone(&env);
-        let set_var_fn = self
-            .lua
-            .create_function(move |_, (name, val): (String, String)| {
-                let mut env_guard = borrow_env(&env_set)?;
-                env_guard.set_var(&name, &val, true);
-                Ok(())
-            })?;
-        oslo_table.set("set_var", set_var_fn)?;
-
-        // oslo.get_pwd()
-        let get_pwd_fn = self.lua.create_function(|_, ()| {
-            let pwd = std::env::current_dir()
-                .unwrap_or_default()
-                .to_string_lossy()
-                .to_string();
-            Ok(pwd)
-        })?;
-        oslo_table.set("get_pwd", get_pwd_fn)?;
-
-        // oslo.set_alias(name, target)
-        let env_alias = Arc::clone(&env);
-        let set_alias_fn =
-            self.lua
-                .create_function(move |_, (name, target): (String, String)| {
-                    let mut env_guard = borrow_env(&env_alias)?;
-                    env_guard.set_alias(&name, &target);
-                    Ok(())
-                })?;
-        oslo_table.set("set_alias", set_alias_fn)?;
-
-        // oslo.get_alias(name)
-        let env_get_alias = Arc::clone(&env);
-        let get_alias_fn = self.lua.create_function(move |_, name: String| {
-            let env_guard = borrow_env(&env_get_alias)?;
-            Ok(env_guard.get_alias(&name).map(|s| s.to_string()))
-        })?;
-        oslo_table.set("get_alias", get_alias_fn)?;
-
-        // oslo.register_builtin(name, callback)
-        //
-        // The callback is stored and run (PLAN R9.8). Until this round it was *dropped* and the
-        // stub `|_, _| Ok(0)` registered under the name instead, which is worse than doing
-        // nothing: `oslo.register_builtin('ls', …)` made `ls /` print nothing and exit 0.
-        let env_builtin = Arc::clone(&env);
-        let register_fn =
-            self.lua
-                .create_function(move |lua, (name, func): (String, LuaFunction)| {
-                    let name = name.trim().to_string();
-                    if name.is_empty() {
-                        return Err(mlua::Error::runtime(
-                            "oslo.register_builtin: the builtin name must not be empty",
-                        ));
-                    }
-                    // Registered with the interpreter first: if this fails there is no name in
-                    // the shell's registry pointing at a callback that is not there.
-                    lua.set_named_registry_value(&format!("{}{}", BUILTIN_KEY_PREFIX, name), func)?;
-                    let mut env_guard = borrow_env(&env_builtin)?;
-                    let key = name.clone();
-                    env_guard.register_dynamic_builtin(&name, move |_env, args| {
-                        Ok(call_lua_builtin(&key, args))
-                    });
-                    Ok(())
-                })?;
-        oslo_table.set("register_builtin", register_fn)?;
-
-        // oslo.set_prompt(callback)
-        let set_prompt_fn = self.lua.create_function(|lua, func: LuaFunction| {
-            lua.set_named_registry_value("oslo_prompt_fn", func)?;
-            Ok(())
-        })?;
-        oslo_table.set("set_prompt", set_prompt_fn)?;
-
-        // There is deliberately no `oslo.set_right_prompt` (PLAN R9.7). It was registered, and
-        // `render_right_prompt` had no caller anywhere, so a script that set one saw nothing.
-        // Drawing it means writing the string at `width - len` and restoring the cursor before
-        // handing the line over — and rustyline repaints from the prompt to end-of-line on every
-        // keystroke, erasing it again. Advertising an API that cannot work is worse than not
-        // having one; if it comes back it comes back with a line editor that supports it.
-
-        globals.set("oslo", oslo_table)?;
-        Ok(())
+        crate::lua::api::install(&self.lua, env).map_err(ShellError::Lua)
     }
 
     pub fn eval_script(&self, script: &str) -> Result<()> {
@@ -239,11 +137,50 @@ impl LuaEngine {
         self.eval_named(source, &format!("@{}", name))
     }
 
+    /// Publish a script's arguments the way every Lua interpreter does.
+    ///
+    /// `arg[0]` is the script, `arg[1..n]` its arguments — and the same list is passed to the
+    /// chunk so `...` works too. Without this a Lua program could not read its own argv at all:
+    /// `oslo build.lua release` gave the script `arg == nil`, which makes Lua a configuration
+    /// language rather than a scripting one.
+    ///
+    /// `arg[-1]` is the interpreter, matching `lua`'s own convention, so a script that re-executes
+    /// itself can find the shell it is running under.
+    pub fn set_script_args(&self, script: &str, args: &[String]) -> Result<()> {
+        let table = self.lua.create_table().map_err(ShellError::Lua)?;
+        table
+            .set(
+                -1i32,
+                std::env::current_exe()
+                    .map(|p| p.to_string_lossy().into_owned())
+                    .unwrap_or_else(|_| "oslo".to_string()),
+            )
+            .map_err(ShellError::Lua)?;
+        table.set(0i32, script).map_err(ShellError::Lua)?;
+        for (i, value) in args.iter().enumerate() {
+            table
+                .set(i as i32 + 1, value.as_str())
+                .map_err(ShellError::Lua)?;
+        }
+        self.lua
+            .globals()
+            .set("arg", table)
+            .map_err(ShellError::Lua)?;
+        self.script_args
+            .replace(args.iter().map(String::from).collect());
+        Ok(())
+    }
+
     fn eval_named(&self, script: &str, chunk_name: &str) -> Result<()> {
+        // `call` rather than `exec`, so the arguments reach the chunk's `...` as well as `arg`.
+        // With no arguments set this is exactly what `exec` did.
+        // `Variadic`, not `Vec`: a `Vec` converts to a single Lua *table* argument, so `...`
+        // would be one table rather than the arguments themselves.
+        let args = mlua::Variadic::from_iter(self.script_args.borrow().iter().cloned());
         self.lua
             .load(script)
             .set_name(chunk_name)
-            .exec()
+            .call::<()>(args)
             .map_err(ShellError::Lua)
     }
 

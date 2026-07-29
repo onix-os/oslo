@@ -63,37 +63,53 @@ POSIX scripts. Give a file a shebang and the question never arises.
 `-c` is always shell, whatever the text looks like: every `sh -c` idiom depends on that. Use
 `oslo --lua -c 'print(1)'` for the other reading.
 
-`~/.config/oslo/init.lua` is loaded at startup.
+### Writing a program in Lua
+
+A Lua program gets `arg` and `...` the way any Lua interpreter provides them, captures a command's
+answer, and chooses the shell's exit status:
 
 ```lua
-oslo.set_prompt(function()
-  return oslo.get_pwd() .. " ❯ "
-end)
+#!/usr/bin/env oslo
+-- deploy.lua — run it as: oslo deploy.lua staging
+local target = arg[1] or "dev"
 
-oslo.set_alias("gs", "git status")
-oslo.exec("echo from lua")
-oslo.set_var("EDITOR", "nvim")
+local branch = oslo.capture("git rev-parse --abbrev-ref HEAD")
+if branch.status ~= 0 then
+  io.stderr:write("not a git checkout\n")
+  oslo.exit(1)
+end
 
-oslo.register_builtin("hello", function(argv)
-  print("hello, " .. (argv[2] or "world"))
-  return 0
-end)
+for _, cfg in ipairs(oslo.glob("conf/*.conf")) do
+  print(("%s -> %s"):format(cfg, target))
+end
+
+oslo.cd("/srv/" .. target)
+oslo.set_var("DEPLOY_ENV", target)          -- exported, so children see it
+oslo.exit(oslo.exec("./install.sh"))
 ```
 
-Available: `oslo.exec`, `oslo.get_var`, `oslo.set_var`, `oslo.get_pwd`, `oslo.set_alias`,
-`oslo.get_alias`, `oslo.set_prompt`, `oslo.register_builtin`.
+The API, by what it acts on:
 
-`oslo.register_builtin(name, fn)` makes `name` a builtin, ahead of `PATH` and overriding any
-builtin of the same name. The callback receives argv as a table with `argv[1]` set to the
-builtin's own name. Its return value is the exit status: no return value or `true` is 0, `false`
-is 1, a number is that number. A Lua error is reported on stderr and the builtin exits 1.
+| | |
+|---|---|
+| **Commands** | `oslo.exec(cmd)` → status, output goes to the shell's stdout · `oslo.capture(cmd)` → `{out, status}` |
+| **Variables** | `oslo.get_var(n)` · `oslo.set_var(n, v)` · `oslo.unset(n)` · `oslo.env()` → table of exported names |
+| **Filesystem** | `oslo.get_pwd()` · `oslo.cd(path)` → `true` or `nil, err` · `oslo.glob(pat)` → array |
+| **Shell** | `oslo.set_alias(n, t)` · `oslo.get_alias(n)` · `oslo.register_builtin(n, fn)` · `oslo.set_prompt(fn)` · `oslo.exit(code)` |
+| **Arguments** | `arg[0]` the script, `arg[1..n]` its operands, `arg[-1]` the interpreter; the same list as `...` |
 
-Two limits worth knowing. The rest of the `oslo.*` API is unavailable *inside* such a callback —
-the shell state is already borrowed by the evaluator running it, so `oslo.exec` and friends raise
-an error there rather than deadlocking. And there is no right prompt: `oslo.set_right_prompt`
-existed but nothing ever drew what it returned, so it was removed rather than left as an API that
-silently does nothing.
+`oslo.capture` strips trailing newlines, as `$(cmd)` does. It has **no `err` field**: it captures
+stdout and leaves stderr on the shell's own, so an `err` could only ever be empty — and a field
+that is always empty reads as "no diagnostics" rather than "nobody looked". Fold them the way a
+shell does when you want both: `oslo.capture("cmd 2>&1")`.
 
+Failures answer the way Lua's own library does — `nil, message` rather than a raised error — so
+`local ok, err = oslo.cd(p)` reads like `io.open`. An error is raised only for a mistake in the
+calling script, such as an empty builtin name.
+
+### Configuration
+
+`~/.config/oslo/init.lua` is loaded at startup.
 ## Interactive
 
 Syntax highlighting (valid commands green, unknown red), history hints, a completion dropdown

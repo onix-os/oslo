@@ -7,6 +7,7 @@
 
 use oslo::Environment;
 use oslo::LuaEngine;
+use oslo::error::ShellError;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
@@ -54,6 +55,30 @@ pub fn load_init_lua(lua: &LuaEngine, path: &Path) {
     }
 }
 
+/// The status `oslo.exit(n)` asked for, if that is what ended the script.
+///
+/// The request travels as a `ShellError::Exit` wrapped by mlua, and mlua nests: a callback error
+/// carries its cause, which may itself be wrapped with context. Walking the chain is what makes
+/// `oslo.exit` work from inside a function, a `pcall`-free callback, or a registered builtin,
+/// rather than only at the top level of a script.
+fn requested_exit(err: &ShellError) -> Option<i32> {
+    let ShellError::Lua(lua_err) = err else {
+        return None;
+    };
+    fn walk(e: &mlua::Error) -> Option<i32> {
+        match e {
+            mlua::Error::CallbackError { cause, .. } => walk(cause),
+            mlua::Error::WithContext { cause, .. } => walk(cause),
+            mlua::Error::ExternalError(inner) => match inner.downcast_ref::<ShellError>() {
+                Some(ShellError::Exit(code)) => Some(*code),
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+    walk(lua_err)
+}
+
 /// Blank out a leading `#!` line so Lua can parse the source.
 ///
 /// Lua's *file* loader skips a shebang; loading the same bytes as a string does not, so
@@ -77,7 +102,7 @@ fn without_shebang(source: &str) -> String {
 /// from anything that checks an exit code.
 ///
 /// `name` is what a diagnostic calls the source — a path, or `-c`/`stdin` when there is no file.
-pub fn run_lua_source(source: &str, name: &str) -> i32 {
+pub fn run_lua_source(source: &str, name: &str, args: &[String]) -> i32 {
     let env = Arc::new(Mutex::new(Environment::new()));
     let lua = match LuaEngine::new() {
         Ok(lua) => lua,
@@ -89,7 +114,17 @@ pub fn run_lua_source(source: &str, name: &str) -> i32 {
     if !install_bindings(&lua, Arc::clone(&env)) {
         return 1;
     }
+    if let Err(e) = lua.set_script_args(name, args) {
+        eprintln!("oslo: lua: {}", e);
+        return 1;
+    }
     if let Err(e) = lua.eval_as(&without_shebang(source), name) {
+        // `oslo.exit(n)` unwinds as a shell exit rather than a Lua failure. Without this it
+        // reached here as an ordinary error and printed a traceback, so the one API for choosing
+        // an exit status produced a diagnostic and exit 1 instead.
+        if let Some(code) = requested_exit(&e) {
+            return code;
+        }
         eprintln!("oslo: {}: {}", name, e);
         return 1;
     }
