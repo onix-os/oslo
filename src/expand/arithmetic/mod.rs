@@ -460,8 +460,35 @@ mod tests {
     /// The limit has to leave ordinary — even unusually parenthesised — expressions alone.
     #[test]
     fn moderate_nesting_still_evaluates() {
-        let expr = format!("{}1 + 1{}", "(".repeat(50), ")".repeat(50));
+        let expr = format!("{}1 + 1{}", "(".repeat(30), ")".repeat(30));
         assert_eq!(eval(&expr), 2);
+    }
+
+    /// The nesting limit exists to keep a hostile expression from overflowing the stack, so the
+    /// limit itself has to fit on a stack rush might actually get. A 1 MiB thread is half what
+    /// Rust gives a spawned thread by default, which leaves room for the larger frames aarch64
+    /// emits — the platform where the original limit of 100 aborted the process.
+    ///
+    /// Without this, the invariant was only ever checked against whatever stack the test runner
+    /// happened to provide, which is how it passed on Linux and killed the macOS job.
+    #[test]
+    fn nesting_at_the_limit_fits_a_small_stack() {
+        let worker = std::thread::Builder::new()
+            .stack_size(1024 * 1024)
+            .spawn(|| {
+                let mut env = Environment::new();
+                // One level under the limit: the deepest expression that must still evaluate.
+                let expr = format!("{}7{}", "(".repeat(31), ")".repeat(31));
+                assert_eq!(eval_arithmetic(&mut env, &expr).expect("must evaluate"), 7);
+
+                // And one far past it, which must be refused rather than overflow.
+                let expr = format!("{}7{}", "(".repeat(50_000), ")".repeat(50_000));
+                assert!(eval_arithmetic(&mut env, &expr).is_err());
+            })
+            .expect("spawn");
+        worker
+            .join()
+            .expect("the parser must not overflow a 1 MiB stack");
     }
 
     #[test]
