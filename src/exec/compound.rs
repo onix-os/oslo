@@ -12,6 +12,8 @@ use crate::env::Environment;
 use crate::env::builtins::run_exit_trap;
 use crate::error::{Result, ShellError};
 use crate::exec::pipeline::{eval_command_list, status_of, suspend_errexit, wait_for_status};
+use crate::expand::glob::ShellPattern;
+use crate::expand::word::expand_word_to_pattern;
 use crate::expand::{expand_word, expand_word_to_string};
 use nix::unistd::{ForkResult, fork};
 
@@ -115,13 +117,14 @@ fn eval_conditional_loop(
 ///
 /// Neither the subject nor the patterns are field-split or pathname-expanded; `expand_word` would
 /// glob `f*` against the working directory instead of leaving it as a pattern to match against.
+///
+/// The pattern keeps its quoting all the way to the matcher. Flattening it to a string first made
+/// `case $x in "$expected")` — an ordinary way to compare two strings — a pattern match, so a
+/// `$expected` of `*` answered yes for every subject.
 fn any_pattern_matches(env: &mut Environment, patterns: &[Word], subject: &str) -> Result<bool> {
     for pat_word in patterns {
-        let pat_str = expand_word_to_string(env, pat_word)?;
-        let matches = glob::Pattern::new(&pat_str)
-            .map(|p| p.matches(subject))
-            .unwrap_or(pat_str == subject);
-        if matches {
+        let runs = expand_word_to_pattern(env, pat_word)?;
+        if ShellPattern::from_runs(&runs).matches(subject) {
             return Ok(true);
         }
     }

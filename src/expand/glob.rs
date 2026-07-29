@@ -1,7 +1,7 @@
 //! Pathname expansion.
 //!
-//! The matcher is written here rather than delegated to the `glob` crate because a shell needs a
-//! dialect the crate does not offer. Three of its defaults are wrong for POSIX:
+//! The matcher is oslo's own rather than a `glob` crate because a shell needs a dialect no such
+//! crate offers. Three of the obvious defaults are wrong for POSIX:
 //!
 //! * `*` matches a leading `.`, so `rm *` would sweep up `.git`, `.ssh` and `.env`;
 //! * `**` is always globstar, while POSIX (and bash without `shopt -s globstar`) reads it as an
@@ -12,71 +12,18 @@
 //! Walking the directory tree by hand fixes all three at once: each pattern component is matched
 //! against one directory's entries, and every match is spelled by appending to the literal text
 //! the pattern itself used.
+//!
+//! The pattern dialect itself lives in [`compile`], because `case`, `[[ ]]` and `${v#p}` need the
+//! same one and none of them is about paths. What stays here is what only a path has: the `/`
+//! that splits a pattern into components, and the leading dot a component may not match blindly.
+
+mod compile;
 
 use crate::expand::word::{Run, field_text};
+use compile::{Item, compile_items, matches_items};
 use std::fs;
 
-/// One element of a compiled pattern component.
-#[derive(Debug, PartialEq, Eq)]
-enum Item {
-    /// A character that must match itself — either typed literally or quoted into submission.
-    Ch(char),
-    /// `?`: exactly one character, never a `/`, never a leading `.`.
-    Any,
-    /// `*`: any run of characters, with the same two exceptions.
-    Star,
-    /// `[abc]`, `[a-z]`, `[!abc]`.
-    Class { negated: bool, members: Vec<Member> },
-}
-
-#[derive(Debug, PartialEq, Eq)]
-enum Member {
-    Ch(char),
-    Range(char, char),
-    /// A POSIX character class: the `alpha` of `[[:alpha:]]`.
-    Named(String),
-}
-
-/// Whether `ch` belongs to the POSIX character class `name`.
-///
-/// An unknown name matches nothing rather than aborting: a shell has no way to report a bad
-/// pattern, and the word will fall back to its literal text if this was its only chance to match.
-fn in_named_class(name: &str, ch: char) -> bool {
-    match name {
-        "alnum" => ch.is_alphanumeric(),
-        "alpha" => ch.is_alphabetic(),
-        "blank" => ch == ' ' || ch == '\t',
-        "cntrl" => ch.is_control(),
-        "digit" => ch.is_ascii_digit(),
-        "graph" => !ch.is_control() && !ch.is_whitespace(),
-        "lower" => ch.is_lowercase(),
-        "print" => !ch.is_control(),
-        "punct" => ch.is_ascii_punctuation(),
-        "space" => ch.is_whitespace(),
-        "upper" => ch.is_uppercase(),
-        "xdigit" => ch.is_ascii_hexdigit(),
-        _ => false,
-    }
-}
-
-impl Item {
-    fn matches_char(&self, ch: char) -> bool {
-        match self {
-            Item::Ch(c) => *c == ch,
-            Item::Any => true,
-            // `*` is handled by the outer loop; it never consumes a single character on its own.
-            Item::Star => false,
-            Item::Class { negated, members } => {
-                let hit = members.iter().any(|m| match m {
-                    Member::Ch(c) => *c == ch,
-                    Member::Range(lo, hi) => *lo <= ch && ch <= *hi,
-                    Member::Named(name) => in_named_class(name, ch),
-                });
-                hit != *negated
-            }
-        }
-    }
-}
+pub use compile::ShellPattern;
 
 /// One `/`-separated piece of a pattern.
 enum Component {
@@ -142,157 +89,31 @@ fn split_components(chars: &[(char, bool)]) -> (Vec<Component>, bool) {
 
 /// Compile one component, remembering whether anything in it actually globs.
 fn compile(chars: &[(char, bool)]) -> Component {
-    let mut items = Vec::new();
-    let mut has_metacharacter = false;
-    let mut i = 0;
-
-    while i < chars.len() {
-        let (ch, globs) = chars[i];
-        if globs {
-            match ch {
-                '*' => {
-                    // POSIX has no globstar: `**` is just `*`, and two adjacent stars would only
-                    // make the matcher backtrack for nothing.
-                    if items.last() != Some(&Item::Star) {
-                        items.push(Item::Star);
-                    }
-                    has_metacharacter = true;
-                    i += 1;
-                    continue;
-                }
-                '?' => {
-                    items.push(Item::Any);
-                    has_metacharacter = true;
-                    i += 1;
-                    continue;
-                }
-                '[' => {
-                    if let Some((class, next)) = parse_class(chars, i) {
-                        items.push(class);
-                        has_metacharacter = true;
-                        i = next;
-                        continue;
-                    }
-                }
-                _ => {}
-            }
-        }
-        items.push(Item::Ch(ch));
-        i += 1;
-    }
-
+    let (items, has_metacharacter) = compile_items(chars);
     if has_metacharacter {
-        Component::Pattern(items)
-    } else {
-        Component::Literal(
-            items
-                .iter()
-                .map(|i| match i {
-                    Item::Ch(c) => *c,
-                    _ => unreachable!("a component with no metacharacter holds only characters"),
-                })
-                .collect(),
-        )
+        return Component::Pattern(items);
     }
+    Component::Literal(
+        items
+            .iter()
+            .map(|i| match i {
+                Item::Ch(c) => *c,
+                _ => unreachable!("a component with no metacharacter holds only characters"),
+            })
+            .collect(),
+    )
 }
 
-/// Parse `[...]` starting at `start`, or return `None` when it is never closed.
+/// Whether a directory entry named `name` matches a compiled component.
 ///
-/// An unclosed `[` is a literal `[` — `echo a[` prints `a[` rather than failing — so the caller
-/// needs to be able to back out. A `]` in the first position is a member, not the terminator.
-fn parse_class(chars: &[(char, bool)], start: usize) -> Option<(Item, usize)> {
-    let mut i = start + 1;
-    let mut negated = false;
-    if let Some(&(ch, _)) = chars.get(i)
-        && (ch == '!' || ch == '^')
-    {
-        negated = true;
-        i += 1;
-    }
-
-    let mut members = Vec::new();
-    while i < chars.len() {
-        let (ch, globs) = chars[i];
-        // A quoted `]` is data; only an unquoted one can close the class.
-        if ch == ']' && globs && !members.is_empty() {
-            return Some((Item::Class { negated, members }, i + 1));
-        }
-        // `[[:digit:]]` nests a named class inside the bracket, so its `]` is not the closer.
-        if let Some((name, next)) = parse_named_class(chars, i) {
-            members.push(Member::Named(name));
-            i = next;
-            continue;
-        }
-        // `a-z` is a range, but the `-` in `[a-]` is an ordinary member.
-        if let (Some(&('-', true)), Some(&(hi, hi_globs))) = (chars.get(i + 1), chars.get(i + 2))
-            && !(hi == ']' && hi_globs)
-        {
-            members.push(Member::Range(ch, hi));
-            i += 3;
-            continue;
-        }
-        members.push(Member::Ch(ch));
-        i += 1;
-    }
-    None
-}
-
-/// Parse `[:name:]` at `start`, returning the name and the index just past the closing `]`.
-fn parse_named_class(chars: &[(char, bool)], start: usize) -> Option<(String, usize)> {
-    if chars.get(start)?.0 != '[' || chars.get(start + 1)?.0 != ':' {
-        return None;
-    }
-    let mut name = String::new();
-    let mut i = start + 2;
-    while let Some(&(ch, _)) = chars.get(i) {
-        if ch == ':' && chars.get(i + 1).map(|c| c.0) == Some(']') {
-            return Some((name, i + 2));
-        }
-        name.push(ch);
-        i += 1;
-    }
-    None
-}
-
-/// Whether `name` matches a compiled component.
+/// The leading-dot rule is a *pathname* rule and lives only here: a hidden file is matched only
+/// by a pattern that spells the dot out, which is what keeps `rm *` away from `.git` and `.ssh`.
+/// `case .git in *)` has no such exemption, which is why the matcher itself does not know it.
 fn matches(items: &[Item], name: &str) -> bool {
-    // The leading-dot rule: a hidden file is only matched by a pattern that spells the dot out,
-    // which is what keeps `*` away from `.git` and `.ssh`.
     if name.starts_with('.') && items.first() != Some(&Item::Ch('.')) {
         return false;
     }
-
-    let name: Vec<char> = name.chars().collect();
-    let (mut i, mut j) = (0, 0);
-    // The most recent `*` and how much of the name it had swallowed, for backtracking.
-    let mut star: Option<(usize, usize)> = None;
-
-    while j < name.len() {
-        match items.get(i) {
-            Some(Item::Star) => {
-                star = Some((i, j));
-                i += 1;
-            }
-            Some(item) if item.matches_char(name[j]) => {
-                i += 1;
-                j += 1;
-            }
-            _ => match star {
-                // Let the star eat one more character and try the rest of the pattern again.
-                Some((star_index, eaten)) => {
-                    i = star_index + 1;
-                    j = eaten + 1;
-                    star = Some((star_index, j));
-                }
-                None => return false,
-            },
-        }
-    }
-
-    while items.get(i) == Some(&Item::Star) {
-        i += 1;
-    }
-    i == items.len()
+    matches_items(items, name)
 }
 
 /// Match the components against the filesystem, one directory level at a time.

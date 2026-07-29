@@ -15,7 +15,8 @@ use crate::ast::{ParamExpansion, ReplaceScope, Word};
 use crate::env::Environment;
 use crate::error::{Result, ShellError};
 use crate::expand::arithmetic::eval_arithmetic;
-use crate::expand::word::expand_word_to_string;
+use crate::expand::glob::ShellPattern;
+use crate::expand::word::{expand_word_to_pattern, expand_word_to_string};
 
 /// The single string a `${…}` reference stands for, once its value is known.
 pub(super) fn apply(
@@ -83,7 +84,7 @@ pub(super) fn apply(
             pattern: word,
             longest,
         } => {
-            let pat = expand_word_to_string(env, word)?;
+            let pat = compile_pattern(env, word)?;
             let value = val.unwrap_or_default();
             pattern::remove_prefix(&value, &pat, *longest)
         }
@@ -92,7 +93,7 @@ pub(super) fn apply(
             pattern: word,
             longest,
         } => {
-            let pat = expand_word_to_string(env, word)?;
+            let pat = compile_pattern(env, word)?;
             let value = val.unwrap_or_default();
             pattern::remove_suffix(&value, &pat, *longest)
         }
@@ -113,7 +114,7 @@ pub(super) fn apply(
             replacement,
             scope,
         } => {
-            let pat = expand_word_to_string(env, pat_word)?;
+            let pat = compile_pattern(env, pat_word)?;
             let rep = expand_word_to_string(env, replacement)?;
             let value = val.unwrap_or_default();
             match scope {
@@ -130,11 +131,11 @@ pub(super) fn apply(
             all,
         } => {
             let selector = match selector {
-                Some(word) => Some(expand_word_to_string(env, word)?),
+                Some(word) => Some(compile_pattern(env, word)?),
                 None => None,
             };
             let value = val.unwrap_or_default();
-            pattern::convert_case(&value, selector.as_deref(), *upper, *all)
+            pattern::convert_case(&value, selector.as_ref(), *upper, *all)
         }
 
         // `${!name}` reads `name`'s value and expands *that* parameter. Only the second lookup
@@ -159,11 +160,20 @@ pub(super) fn apply(
     Ok(text)
 }
 
+/// Expand an operator's pattern operand and compile it, quoting and all.
+///
+/// The quoting has to survive: `${v#"$prefix"}` is how a script strips a *literal* prefix, and
+/// flattening the operand to a string first turned every `*` a variable happened to contain into
+/// a metacharacter.
+fn compile_pattern(env: &mut Environment, word: &Word) -> Result<ShellPattern> {
+    Ok(ShellPattern::from_runs(&expand_word_to_pattern(env, word)?))
+}
+
 /// Whether the parameter counts as "set" for the `${x-d}` family.
 ///
 /// The `:` forms treat a set-but-empty parameter as absent, the colon-less ones test only for
 /// unset — which is the entire difference between `x=; ${x:-d}` (`d`) and `x=; ${x-d}` (empty).
-fn is_present(val: &Option<String>, test_null: bool) -> bool {
+pub(super) fn is_present(val: &Option<String>, test_null: bool) -> bool {
     match val {
         Some(v) => !(test_null && v.is_empty()),
         None => false,

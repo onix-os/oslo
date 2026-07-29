@@ -111,9 +111,22 @@ impl FieldBuilder {
 /// This is the representation later stages want: quoting is still attached to each run, so a
 /// consumer can decide for itself which of the remaining steps apply.
 pub fn expand_word_fields(env: &mut Environment, word: &Word) -> Result<Vec<Field>> {
+    expand_word_fields_in(env, word, false)
+}
+
+/// Expand `word` into fields inside an enclosing quoting context.
+///
+/// Only `${x-word}` and `${x+word}` need the `in_quotes` argument: their payload is expanded
+/// where the `${…}` stands, so `"${1+"$@"}"` has to see that it is inside quotes even though the
+/// payload's own `"$@"` carries quotes of its own.
+pub fn expand_word_fields_in(
+    env: &mut Environment,
+    word: &Word,
+    in_quotes: bool,
+) -> Result<Vec<Field>> {
     let mut builder = FieldBuilder::default();
     for part in &word.parts {
-        let segments = expand_word_part(env, part, false)?;
+        let segments = expand_word_part(env, part, in_quotes)?;
         builder.push(segments);
     }
     Ok(builder.finish())
@@ -258,6 +271,19 @@ pub fn expand_word_to_string(env: &mut Environment, word: &Word) -> Result<Strin
         .map(|f| field_text(f))
         .collect::<Vec<_>>()
         .join(&env.ifs_separator()))
+}
+
+/// Expand a word that is going to be used as a *pattern*, keeping its quoting.
+///
+/// The same expansions as [`expand_word_to_string`], but the result is runs rather than a flat
+/// string, because for a pattern the quoting is not decoration — it decides per character whether
+/// a `*` is a metacharacter. Flattening first is how `case $answer in "$expected")` came to match
+/// anything at all when `$expected` happened to contain a `*`.
+///
+/// Several fields can only arise from `$@`; they are concatenated, which is the same text a
+/// context insisting on one string would have got.
+pub fn expand_word_to_pattern(env: &mut Environment, word: &Word) -> Result<Vec<Run>> {
+    Ok(expand_word_fields(env, word)?.concat())
 }
 
 /// Full expansion of one word: parameters, substitutions, field splitting, then pathname

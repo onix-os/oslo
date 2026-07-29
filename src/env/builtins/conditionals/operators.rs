@@ -14,6 +14,7 @@
 //!   readable by an ordinary user, because `stat` only needs search permission on the *directory*.
 
 use crate::env::scope::Environment;
+use crate::expand::glob::ShellPattern;
 use std::fs;
 use std::os::unix::fs::{FileTypeExt, MetadataExt};
 
@@ -186,15 +187,15 @@ pub(super) fn eval_binary(mode: Mode, left: &str, op: &str, right: &str) -> Test
     })
 }
 
+/// `[[ left == right ]]`, where `right` is a pattern, against `[ left = right ]`, where it is not.
+///
+/// The operand arrives already flattened, so `from_unquoted` is the only honest reading of it —
+/// which is also why the adapter decides quoting *before* this point, emitting the POSIX operator
+/// word for `[[ $x == "$y" ]]` so the comparison lands in the `Posix` arm.
 fn pattern_or_literal(mode: Mode, left: &str, right: &str) -> bool {
     match mode {
         Mode::Posix => left == right,
-        Mode::Extended => match glob::Pattern::new(right) {
-            Ok(p) => p.matches(left),
-            // An invalid pattern falls back to literal comparison, matching bash's behaviour of
-            // treating an unparseable pattern as ordinary text.
-            Err(_) => left == right,
-        },
+        Mode::Extended => ShellPattern::from_unquoted(right).matches(left),
     }
 }
 

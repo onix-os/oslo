@@ -9,18 +9,7 @@
 //! Every entry point works in *characters*, never bytes, so a multi-byte value cannot be cut
 //! mid-character.
 
-use glob::Pattern;
-
-/// Does the whole of `text` match `pattern`?
-///
-/// A pattern the glob syntax rejects (`a[b`) is not an error in a shell — POSIX says an
-/// unterminated bracket expression is just those characters, so it falls back to literal equality.
-pub fn matches(text: &str, pattern: &str) -> bool {
-    match Pattern::new(pattern) {
-        Ok(p) => p.matches(text),
-        Err(_) => text == pattern,
-    }
-}
+use crate::expand::glob::ShellPattern;
 
 /// Every index at which `s` may be cut, ascending: each character boundary plus the end.
 fn cuts(s: &str) -> Vec<usize> {
@@ -35,13 +24,13 @@ fn cuts(s: &str) -> Vec<usize> {
 /// Tests every prefix of `value`; the shortest form takes the first one that matches, the longest
 /// form the last. The empty prefix is a candidate, so `${v#}` and a non-matching pattern both
 /// leave the value alone.
-pub fn remove_prefix(value: &str, pattern: &str, longest: bool) -> String {
+pub fn remove_prefix(value: &str, pattern: &ShellPattern, longest: bool) -> String {
     let mut candidates = cuts(value);
     if longest {
         candidates.reverse();
     }
     for cut in candidates {
-        if matches(&value[..cut], pattern) {
+        if pattern.matches(&value[..cut]) {
             return value[cut..].to_string();
         }
     }
@@ -53,13 +42,13 @@ pub fn remove_prefix(value: &str, pattern: &str, longest: bool) -> String {
 /// The mirror image of [`remove_prefix`]: a *short* suffix starts at a *high* index, so the
 /// shortest form walks the cut points from the end. Getting this direction backwards is what made
 /// `v=abcabc; ${v%abc}` yield `""` instead of `abc`.
-pub fn remove_suffix(value: &str, pattern: &str, longest: bool) -> String {
+pub fn remove_suffix(value: &str, pattern: &ShellPattern, longest: bool) -> String {
     let mut candidates = cuts(value);
     if !longest {
         candidates.reverse();
     }
     for cut in candidates {
-        if matches(&value[cut..], pattern) {
+        if pattern.matches(&value[cut..]) {
             return value[..cut].to_string();
         }
     }
@@ -67,12 +56,12 @@ pub fn remove_suffix(value: &str, pattern: &str, longest: bool) -> String {
 }
 
 /// The longest match of `pattern` starting exactly at byte index `start`, as an end index.
-fn match_at(value: &str, start: usize, pattern: &str) -> Option<usize> {
+fn match_at(value: &str, start: usize, pattern: &ShellPattern) -> Option<usize> {
     let rest = &value[start..];
     let mut ends = cuts(rest);
     ends.reverse();
     ends.into_iter()
-        .find(|&end| matches(&rest[..end], pattern))
+        .find(|&end| pattern.matches(&rest[..end]))
         .map(|end| start + end)
 }
 
@@ -81,7 +70,7 @@ fn match_at(value: &str, start: usize, pattern: &str) -> Option<usize> {
 /// Matching is longest-at-each-position, left to right. A zero-length match is ignored rather
 /// than replaced — `v=ab; ${v//x*/-}` is `ab` in bash, not `-a-b-` — which also keeps the scan
 /// from standing still.
-pub fn replace(value: &str, pattern: &str, replacement: &str, all: bool) -> String {
+pub fn replace(value: &str, pattern: &ShellPattern, replacement: &str, all: bool) -> String {
     let mut out = String::new();
     let mut pos = 0;
     let mut replaced = false;
@@ -106,7 +95,7 @@ pub fn replace(value: &str, pattern: &str, replacement: &str, all: bool) -> Stri
 }
 
 /// `${v/#pat/rep}` — replace only a match anchored at the start, longest first.
-pub fn replace_prefix(value: &str, pattern: &str, replacement: &str) -> String {
+pub fn replace_prefix(value: &str, pattern: &ShellPattern, replacement: &str) -> String {
     match match_at(value, 0, pattern) {
         Some(end) => format!("{replacement}{}", &value[end..]),
         None => value.to_string(),
@@ -114,9 +103,9 @@ pub fn replace_prefix(value: &str, pattern: &str, replacement: &str) -> String {
 }
 
 /// `${v/%pat/rep}` — replace only a match anchored at the end, longest first.
-pub fn replace_suffix(value: &str, pattern: &str, replacement: &str) -> String {
+pub fn replace_suffix(value: &str, pattern: &ShellPattern, replacement: &str) -> String {
     for cut in cuts(value) {
-        if matches(&value[cut..], pattern) {
+        if pattern.matches(&value[cut..]) {
             return format!("{}{replacement}", &value[..cut]);
         }
     }
@@ -163,12 +152,12 @@ pub fn substring(value: &str, offset: i64, length: Option<i64>) -> Result<String
 
 /// `${v^pat}` / `${v,,pat}` — convert the characters matching `pattern` (all of them when it is
 /// `None`), either just the first or every one.
-pub fn convert_case(value: &str, pattern: Option<&str>, upper: bool, all: bool) -> String {
+pub fn convert_case(value: &str, pattern: Option<&ShellPattern>, upper: bool, all: bool) -> String {
     let mut out = String::new();
     for (index, ch) in value.chars().enumerate() {
         let selected = match pattern {
             None => true,
-            Some(p) => matches(&ch.to_string(), p),
+            Some(p) => p.matches(&ch.to_string()),
         };
         // The single-character forms examine the first character and no other, so
         // `v=hello; ${v^l}` leaves the value alone: `h` is not what the pattern named.
@@ -188,66 +177,87 @@ pub fn convert_case(value: &str, pattern: Option<&str>, upper: bool, all: bool) 
 mod tests {
     use super::*;
 
+    /// Tests spell patterns as source text, so every metacharacter in them is meant as one.
+    fn pat(text: &str) -> ShellPattern {
+        ShellPattern::from_unquoted(text)
+    }
+
     #[test]
     fn prefix_removal_is_anchored_and_globs() {
         let p = "/usr/local/lib/libfoo.so";
-        assert_eq!(remove_prefix(p, "*/", true), "libfoo.so");
-        assert_eq!(remove_prefix(p, "*/", false), "usr/local/lib/libfoo.so");
-        assert_eq!(remove_prefix(p, "/usr", false), "/local/lib/libfoo.so");
-        assert_eq!(remove_prefix(p, "*.", true), "so");
+        assert_eq!(remove_prefix(p, &pat("*/"), true), "libfoo.so");
+        assert_eq!(
+            remove_prefix(p, &pat("*/"), false),
+            "usr/local/lib/libfoo.so"
+        );
+        assert_eq!(
+            remove_prefix(p, &pat("/usr"), false),
+            "/local/lib/libfoo.so"
+        );
+        assert_eq!(remove_prefix(p, &pat("*."), true), "so");
         // Unanchored substring search would have stripped nothing here.
-        assert_eq!(remove_prefix("abcabc", "abc", false), "abc");
-        assert_eq!(remove_prefix("abcabc", "abc", true), "abc");
-        assert_eq!(remove_prefix("abc", "x", true), "abc");
-        assert_eq!(remove_prefix("abc", "", false), "abc");
+        assert_eq!(remove_prefix("abcabc", &pat("abc"), false), "abc");
+        assert_eq!(remove_prefix("abcabc", &pat("abc"), true), "abc");
+        assert_eq!(remove_prefix("abc", &pat("x"), true), "abc");
+        assert_eq!(remove_prefix("abc", &pat(""), false), "abc");
     }
 
     #[test]
     fn suffix_removal_picks_the_right_length() {
-        assert_eq!(remove_suffix("archive.tar.gz", ".*", false), "archive.tar");
-        assert_eq!(remove_suffix("archive.tar.gz", ".*", true), "archive");
+        assert_eq!(
+            remove_suffix("archive.tar.gz", &pat(".*"), false),
+            "archive.tar"
+        );
+        assert_eq!(remove_suffix("archive.tar.gz", &pat(".*"), true), "archive");
         let p = "/usr/local/lib/libfoo.so";
-        assert_eq!(remove_suffix(p, "/*", false), "/usr/local/lib");
-        assert_eq!(remove_suffix(p, "/*", true), "");
+        assert_eq!(remove_suffix(p, &pat("/*"), false), "/usr/local/lib");
+        assert_eq!(remove_suffix(p, &pat("/*"), true), "");
         // The regression that started this: shortest-suffix must leave the first `abc` standing.
-        assert_eq!(remove_suffix("abcabc", "abc", false), "abc");
-        assert_eq!(remove_suffix("abcabc", "abc", true), "abc");
-        assert_eq!(remove_suffix("abc", "x", false), "abc");
+        assert_eq!(remove_suffix("abcabc", &pat("abc"), false), "abc");
+        assert_eq!(remove_suffix("abcabc", &pat("abc"), true), "abc");
+        assert_eq!(remove_suffix("abc", &pat("x"), false), "abc");
     }
 
+    /// The quoting a pattern arrived with is what the operator matches by: `${v#"a*"}` strips a
+    /// literal `a*` and leaves `axc` alone.
     #[test]
-    fn a_malformed_pattern_is_literal_text() {
-        assert!(matches("a[b", "a[b"));
-        assert!(!matches("ab", "a[b"));
+    fn a_quoted_metacharacter_is_a_character() {
+        use crate::expand::word::{Origin, Run};
+        let literal = ShellPattern::from_runs(&[Run::new("a*", Origin::Quoted)]);
+        assert_eq!(remove_prefix("a*c", &literal, false), "c");
+        assert_eq!(remove_prefix("axc", &literal, false), "axc");
     }
 
     #[test]
     fn replacement_honours_scope() {
-        assert_eq!(replace("a-b-c", "-", "+", false), "a+b-c");
-        assert_eq!(replace("a-b-c", "-", "+", true), "a+b+c");
-        assert_eq!(replace("one.two.three", ".", " ", true), "one two three");
-        assert_eq!(replace_prefix("a-b-c", "a", "A"), "A-b-c");
-        assert_eq!(replace_prefix("a-b-c", "b", "B"), "a-b-c");
-        assert_eq!(replace_suffix("a-b-c", "c", "C"), "a-b-C");
-        assert_eq!(replace_suffix("a-b-c", "b", "B"), "a-b-c");
+        assert_eq!(replace("a-b-c", &pat("-"), "+", false), "a+b-c");
+        assert_eq!(replace("a-b-c", &pat("-"), "+", true), "a+b+c");
+        assert_eq!(
+            replace("one.two.three", &pat("."), " ", true),
+            "one two three"
+        );
+        assert_eq!(replace_prefix("a-b-c", &pat("a"), "A"), "A-b-c");
+        assert_eq!(replace_prefix("a-b-c", &pat("b"), "B"), "a-b-c");
+        assert_eq!(replace_suffix("a-b-c", &pat("c"), "C"), "a-b-C");
+        assert_eq!(replace_suffix("a-b-c", &pat("b"), "B"), "a-b-c");
     }
 
     /// A pattern that matches only the empty string replaces nothing, and does not spin.
     #[test]
     fn an_empty_match_is_ignored() {
-        assert_eq!(replace("ab", "x*", "-", true), "ab");
-        assert_eq!(replace("ab", "x*", "-", false), "ab");
-        assert_eq!(replace("ab", "", "-", true), "ab");
+        assert_eq!(replace("ab", &pat("x*"), "-", true), "ab");
+        assert_eq!(replace("ab", &pat("x*"), "-", false), "ab");
+        assert_eq!(replace("ab", &pat(""), "-", true), "ab");
         // The anchored forms do accept one, which is how `${v/#/X}` prepends.
-        assert_eq!(replace_prefix("ab", "", "X"), "Xab");
-        assert_eq!(replace_suffix("ab", "", "X"), "abX");
+        assert_eq!(replace_prefix("ab", &pat(""), "X"), "Xab");
+        assert_eq!(replace_suffix("ab", &pat(""), "X"), "abX");
     }
 
     /// Longest-at-each-position, not shortest: `*` eats the rest of the value in one match.
     #[test]
     fn replacement_takes_the_longest_match_at_each_position() {
-        assert_eq!(replace("aaa", "a*", "X", true), "X");
-        assert_eq!(replace("abc", "?", "X", true), "XXX");
+        assert_eq!(replace("aaa", &pat("a*"), "X", true), "X");
+        assert_eq!(replace("abc", &pat("?"), "X", true), "XXX");
     }
 
     #[test]
@@ -269,7 +279,7 @@ mod tests {
     #[test]
     fn substring_counts_characters() {
         assert_eq!(substring("héllo", 1, Some(2)), Ok("él".into()));
-        assert_eq!(remove_prefix("héllo", "h?", false), "llo");
+        assert_eq!(remove_prefix("héllo", &pat("h?"), false), "llo");
     }
 
     #[test]
@@ -278,9 +288,12 @@ mod tests {
         assert_eq!(convert_case("hello", None, true, false), "Hello");
         assert_eq!(convert_case("WORLD", None, false, true), "world");
         assert_eq!(convert_case("WORLD", None, false, false), "wORLD");
-        assert_eq!(convert_case("hello", Some("l"), true, true), "heLLo");
+        assert_eq!(convert_case("hello", Some(&pat("l")), true, true), "heLLo");
         // `${v^l}`: only the first character is a candidate, and it is not an `l`.
-        assert_eq!(convert_case("hello", Some("l"), true, false), "hello");
-        assert_eq!(convert_case("hello", Some("[el]"), true, true), "hELLo");
+        assert_eq!(convert_case("hello", Some(&pat("l")), true, false), "hello");
+        assert_eq!(
+            convert_case("hello", Some(&pat("[el]")), true, true),
+            "hELLo"
+        );
     }
 }
