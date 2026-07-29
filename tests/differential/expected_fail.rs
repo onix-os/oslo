@@ -26,33 +26,15 @@ pub const EXPECTED_FAIL: &[(&str, &str, &str)] = &[
     // Empty: every Round 1 finding now matches bash.
 
     // --- Round 2: quoting, fields, and parameter expansion ---
-    // R2.4 landed only in part: an unrecognised form is now a loud `bad substitution` error
-    // instead of a silent empty string, and ${#}/${#@} count the positionals. The forms below
-    // are still unrecognised, so they abort the command rather than expanding.
-    ("expansion_colonless_forms.sh", "R2.4", "${x-d} / ${x+s} are unimplemented: bad substitution"),
-    ("expansion_substring.sh", "R2.4", "${v:off:len} is unimplemented: bad substitution"),
-    ("expansion_pattern_replace.sh", "R2.4", "${v/pat/rep} is unimplemented: bad substitution"),
-    ("expansion_case_modification.sh", "R2.4", "${v^^} / ${v,,} are unimplemented: bad substitution"),
-    ("expansion_indirect.sh", "R2.4", "${!name} is unimplemented: bad substitution"),
-    ("expansion_param_error.sh", "R2.4", "a fatal expansion error exits 1, bash exits 127"),
-    ("syntax_bad_substitution_body.sh", "R2.4", "a parse error inside $( ) exits 2, bash exits 127 for a fatal expansion error"),
+    // Empty: the expansion operators match bash, and so does the status a fatal expansion error
+    // leaves a non-interactive shell with (127, decided by `ShellError::fatal_exit_status`).
 
     // --- Round 3: arithmetic ---
-    ("arith_division_by_zero.sh", "R3.1", "a fatal arithmetic error exits 1, bash exits 127"),
+    // Empty: the operator ladder matches bash, and a fatal arithmetic error exits 127 with it.
 
     // --- Round 4: exit status, descriptors, and subshell state ---
-    ("control_subshell_inherits.sh", "R4.1", "the forked child rebuilds Environment::new()"),
-    ("expansion_cmdsub_function.sh", "R4.1", "a command substitution cannot see the shell's functions"),
-    ("builtin_exit_status.sh", "R4.2", "( exit n ) collapses to 1"),
-    ("status_subshell.sh", "R4.2", "( exit n ) collapses to 1"),
-    ("status_exit_in_pipeline.sh", "R4.2", "exit n in a pipeline stage collapses to 1"),
-    ("status_and_or_updates.sh", "R4.4", "$? is not updated between and-or members"),
-    ("status_assignment_substitution.sh", "R4.4", "an assignment-only command always reports 0"),
-    ("status_function.sh", "R4.4", "$? is not updated between and-or members"),
-    ("redir_fd_not_leaked.sh", "R4.5", "saved descriptors are not CLOEXEC and leak into children"),
-    ("redir_bad_fd.sh", "R4.8", "a redirection error aborts the whole script"),
-    ("redir_missing_input_builtin.sh", "R4.8", "a redirection error on a builtin aborts the whole script"),
-    ("status_background.sh", "R4.9", "the [bg] notice is printed unconditionally on stdout"),
+    // Empty: exit codes survive subshells, pipeline stages and background jobs; `$?` is written
+    // after every pipeline; a signalled child reports 128 + signo.
 
     // --- Round 5: builtins conformance ---
     ("builtin_test_and_or.sh", "R5.1", "every 4+-operand test expression is true"),

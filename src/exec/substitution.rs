@@ -4,8 +4,8 @@
 
 use crate::env::Environment;
 use crate::error::{Result, ShellError};
-use crate::exec::pipeline::eval_command_list;
-use nix::sys::wait::waitpid;
+use crate::exec::compound::flush_stdout;
+use crate::exec::pipeline::{eval_command_list, status_of, wait_for_status};
 use nix::unistd::{ForkResult, close, dup2, fork, pipe};
 use std::os::fd::{AsRawFd, IntoRawFd};
 
@@ -17,20 +17,26 @@ pub fn eval_command_substitution(env: &mut Environment, cmd_str: &str) -> Result
 
     let (reader, writer) =
         pipe().map_err(|e| ShellError::ExecutionError(format!("Pipe failed: {}", e)))?;
-    let vars = env.get_all_vars();
+
+    // Anything already buffered belongs to the parent's stdout, not to the captured output.
+    flush_stdout();
 
     unsafe {
         match fork() {
             Ok(ForkResult::Child) => {
+                // R4.7: the substitution body is a subshell like any other and must not inherit
+                // the shell's own signal policy.
+                crate::exec::job::reset_signals_for_child();
                 let _ = close(reader.into_raw_fd());
                 let _ = dup2(writer.as_raw_fd(), 1);
                 let _ = close(writer.into_raw_fd());
 
-                let mut child_env = Environment::new();
-                for (k, v) in vars {
-                    child_env.set_var(&k, &v, true);
-                }
-                let res = eval_command_list(&mut child_env, &ast).unwrap_or(1);
+                // The child keeps the inherited environment, so `$(helper_fn)` can still see
+                // the shell's functions and `$(echo $1)` its positional parameters.
+                env.enter_subshell();
+                let res = status_of(eval_command_list(env, &ast));
+                // Without this the capture pipe would close on an unflushed partial line.
+                flush_stdout();
                 std::process::exit(res);
             }
             Ok(ForkResult::Parent { child }) => {
@@ -39,7 +45,10 @@ pub fn eval_command_substitution(env: &mut Environment, cmd_str: &str) -> Result
                 use std::io::Read;
                 let mut file = std::fs::File::from(reader);
                 let _ = file.read_to_end(&mut output);
-                let _ = waitpid(child, None);
+                // Kept, not discarded: an assignment-only command reports the status of the last
+                // substitution in it (`x=$(exit 5)` leaves `$?` at 5), and this is the only place
+                // that number exists. `Environment::take_substitution_status` consumes it.
+                env.note_substitution_status(wait_for_status(child));
                 // A shell word is a C string, so it cannot carry a NUL. bash drops NUL bytes
                 // from substitution output rather than truncating or aborting; keeping them
                 // would push a NUL into argv and kill the `CString` conversion at exec time.

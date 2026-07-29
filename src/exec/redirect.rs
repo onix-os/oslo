@@ -2,13 +2,28 @@ use crate::ast::{RedirectKind, Redirection};
 use crate::env::Environment;
 use crate::error::{Result, ShellError};
 use crate::expand::expand_word;
+use nix::fcntl::{FcntlArg, fcntl};
 use nix::unistd::dup2;
 use std::fs::{File, OpenOptions};
 use std::io::{Seek, SeekFrom, Write};
-use std::os::fd::{AsRawFd, IntoRawFd, RawFd};
+use std::os::fd::{AsRawFd, RawFd};
 
+/// Lowest descriptor number a saved copy may occupy.
+///
+/// bash reserves everything from 10 up for its own bookkeeping and so does this shell: a script
+/// that writes `exec 3>log` or `cmd 2>&5` is entitled to descriptors 3..9, and a saved copy parked
+/// there would be visible to — and clobberable by — the script that the save exists to protect.
+const SAVE_FD_FLOOR: RawFd = 10;
+
+/// Restores the descriptors a set of redirections overwrote, when it is dropped.
+///
+/// Each entry is the descriptor that was redirected plus, if it was open beforehand, a private
+/// copy of what it used to point at. `None` means the descriptor was *closed* before the
+/// redirection, and the only faithful restore is to close it again.
 pub struct RedirectGuard {
-    saved_fds: Vec<(RawFd, RawFd)>,
+    saved_fds: Vec<(RawFd, Option<RawFd>)>,
+    /// When false, `apply` skips saving entirely and `Drop` has nothing to undo.
+    save: bool,
 }
 
 impl Default for RedirectGuard {
@@ -21,6 +36,19 @@ impl RedirectGuard {
     pub fn new() -> Self {
         Self {
             saved_fds: Vec::new(),
+            save: true,
+        }
+    }
+
+    /// A guard for a forked child that is about to `execv`, where nothing is ever restored.
+    ///
+    /// The child's descriptor table dies with the `exec`, so saving copies of it only burns
+    /// syscalls — and, if the shell ever stops calling `std::process::exit` on the failure path,
+    /// risks handing the new program descriptors it was never meant to see.
+    pub fn for_exec() -> Self {
+        Self {
+            saved_fds: Vec::new(),
+            save: false,
         }
     }
 
@@ -38,9 +66,8 @@ impl RedirectGuard {
                 _ => 1,
             });
 
-            // Save target_fd if not saved already
-            if let Ok(saved) = nix::unistd::dup(target_fd) {
-                self.saved_fds.push((target_fd, saved.into_raw_fd()));
+            if self.save {
+                self.saved_fds.push((target_fd, save_fd(target_fd)));
             }
 
             match redir.kind {
@@ -87,7 +114,15 @@ impl RedirectGuard {
                     if target_str == "-" {
                         let _ = nix::unistd::close(target_fd);
                     } else if let Ok(src_fd) = target_str.parse::<RawFd>() {
-                        dup2(src_fd, target_fd)?;
+                        // Report the descriptor number the script named, the way bash does; the
+                        // raw errno text ("EBADF: Bad file descriptor") names nothing the author
+                        // can act on.
+                        dup2(src_fd, target_fd).map_err(|_| {
+                            ShellError::ExecutionError(format!(
+                                "{}: Bad file descriptor",
+                                target_str
+                            ))
+                        })?;
                     } else {
                         return Err(ShellError::ExecutionError(format!(
                             "Invalid file descriptor for dup: {}",
@@ -179,11 +214,36 @@ fn unlinked_temp_file() -> Result<File> {
     )))
 }
 
+/// Stash whatever `target_fd` currently points at, out of the way of the script and of `exec`.
+///
+/// `dup(2)` is the obvious call and the wrong one twice over. It hands back the *lowest* free
+/// descriptor — 3 or 4 in a fresh shell — which puts the shell's private copy of stdout squarely
+/// in the range a script addresses by number, so `2>&3` inside a redirected group silently
+/// succeeds where it should fail. And a plain `dup` never sets `FD_CLOEXEC`, so every child the
+/// shell forks inherits those copies. `F_DUPFD_CLOEXEC` with a floor fixes both.
+///
+/// `None` means there was nothing to save: `target_fd` was already closed, which is a state the
+/// restore path has to be able to reproduce.
+fn save_fd(target_fd: RawFd) -> Option<RawFd> {
+    fcntl(target_fd, FcntlArg::F_DUPFD_CLOEXEC(SAVE_FD_FLOOR)).ok()
+}
+
 impl Drop for RedirectGuard {
     fn drop(&mut self) {
+        // Reverse order: `cmd >a >b` saved the pre-`a` state first, and unwinding b-then-a is what
+        // puts the descriptor back where the command found it.
         for (target_fd, saved_fd) in self.saved_fds.drain(..).rev() {
-            let _ = dup2(saved_fd, target_fd);
-            let _ = nix::unistd::close(saved_fd);
+            match saved_fd {
+                Some(saved_fd) => {
+                    let _ = dup2(saved_fd, target_fd);
+                    let _ = nix::unistd::close(saved_fd);
+                }
+                // Nothing was open here before, so restoring means closing. Skipping this is how
+                // `cmd 5>file` used to leak descriptor 5 into every command the shell ran next.
+                None => {
+                    let _ = nix::unistd::close(target_fd);
+                }
+            }
         }
     }
 }
@@ -218,5 +278,61 @@ mod tests {
         let mut got = String::new();
         file.read_to_string(&mut got).unwrap();
         assert_eq!(got.len(), content.len());
+    }
+
+    /// The descriptor a script can name is 0..9. Anything the shell keeps for itself has to sit
+    /// above that, or `2>&3` inside a redirected group hits the shell's own copy of stdout.
+    #[test]
+    fn a_saved_copy_lands_out_of_the_range_a_script_can_name() {
+        let saved = save_fd(1).expect("stdout is open");
+        assert!(
+            saved >= SAVE_FD_FLOOR,
+            "saved copy landed on fd {saved}, inside the range a script addresses by number"
+        );
+        let _ = nix::unistd::close(saved);
+    }
+
+    /// Without `FD_CLOEXEC` every child the shell forks inherits a duplicate of the shell's
+    /// original stdout and stderr, and can read or scribble on them behind the redirection.
+    #[test]
+    fn a_saved_copy_does_not_survive_exec() {
+        use nix::fcntl::FdFlag;
+
+        let saved = save_fd(1).expect("stdout is open");
+        let flags = FdFlag::from_bits_truncate(fcntl(saved, FcntlArg::F_GETFD).expect("F_GETFD"));
+        assert!(
+            flags.contains(FdFlag::FD_CLOEXEC),
+            "saved copy on fd {saved} is not close-on-exec"
+        );
+        let _ = nix::unistd::close(saved);
+    }
+
+    /// A descriptor that was closed before the redirection has no copy to restore, and leaving it
+    /// open is not "no restore" — it is a leak that outlives the command (`cmd 5>file`).
+    #[test]
+    fn a_descriptor_with_no_saved_copy_is_closed_on_restore() {
+        // A private descriptor, not one of the shell's: these tests share a process, and a test
+        // that reached for a fixed number like 5 would race whatever else is running.
+        let opened = save_fd(1).expect("stdout is open");
+
+        let mut guard = RedirectGuard::new();
+        guard.saved_fds.push((opened, None));
+        drop(guard);
+
+        assert_eq!(
+            fcntl(opened, FcntlArg::F_GETFD),
+            Err(nix::errno::Errno::EBADF),
+            "fd {opened} was left open with nothing to restore it to"
+        );
+    }
+
+    /// The pre-exec child never restores anything, so it must not spend syscalls building a save
+    /// list — and must not leave copies of the shell's descriptors lying around either.
+    #[test]
+    fn the_exec_guard_saves_nothing() {
+        let mut guard = RedirectGuard::for_exec();
+        let mut env = Environment::new();
+        guard.apply(&mut env, &[]).expect("no redirections");
+        assert!(guard.saved_fds.is_empty());
     }
 }

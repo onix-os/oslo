@@ -69,7 +69,19 @@ fn run_program(invocation: &Invocation, script: &str) -> ! {
     let mut env = Environment::new();
     env.shell_name = invocation.name.clone();
     env.set_positional(invocation.positional.clone());
-    match run_string(&mut env, script) {
+
+    // Parsing is kept out of `run_string` so the two kinds of failure stay distinguishable. A
+    // script that does not parse never runs at all and exits 2; anything that goes wrong later
+    // happened *during* execution, and gets the 127 below.
+    let ast = match parse_bash_script(script) {
+        Ok(ast) => ast,
+        Err(e) => {
+            eprintln!("rush: {}", e);
+            std::process::exit(e.failure_status());
+        }
+    };
+
+    match absorb_loop_control(eval_command_list(&mut env, &ast)) {
         // The shell's exit status is that of the last command it ran.
         Ok(status) => std::process::exit(status),
         Err(e) => handle_exit_error(e),
@@ -87,31 +99,20 @@ fn run_lua_script(path: &str) -> ! {
     std::process::exit(0);
 }
 
+/// End a non-interactive shell that could not finish its script.
 fn handle_exit_error(err: ShellError) -> ! {
     match err {
         ShellError::Exit(code) => std::process::exit(code),
+        // Everything else aborted the script mid-flight. `ShellError::fatal_exit_status` decides
+        // what that is worth — deliberately *not* the status the same error produces elsewhere:
+        // inside a subshell or a pipeline stage it is just a failed command, worth 1, and an
+        // interactive shell only sets `$?` and carries on.
         e => {
-            let status = failure_status(&e);
+            let status = e.fatal_exit_status();
             eprintln!("rush: {}", e);
             std::process::exit(status);
         }
     }
-}
-
-/// The exit status a fatal error leaves behind.
-///
-/// A shell that cannot parse its input exits 2, the status every POSIX shell uses for a syntax
-/// error and the one `make` and CI scripts test for. Anything else is a plain failure.
-fn failure_status(err: &ShellError) -> i32 {
-    match err {
-        ShellError::SyntaxError(_) => 2,
-        _ => 1,
-    }
-}
-
-fn run_string(env: &mut Environment, input: &str) -> Result<i32> {
-    let ast = parse_bash_script(input)?;
-    absorb_loop_control(eval_command_list(env, &ast))
 }
 
 /// `break`, `continue` and `return` outside any loop or function are a no-op, not an error.
@@ -127,6 +128,11 @@ fn absorb_loop_control(result: Result<i32>) -> Result<i32> {
 }
 
 fn run_repl() -> ! {
+    // Everything downstream that behaves differently for a person than for a script — the job
+    // notice, whether a background job keeps the terminal's stdin — reads this.
+    // (Addressed by path rather than a re-export: `exec::mod` is being edited elsewhere.)
+    rush::exec::pipeline::set_interactive(true);
+
     let env_struct = Arc::new(Mutex::new(Environment::new()));
     let lua = LuaEngine::new().expect("Failed to initialize Lua engine");
     let _ = lua.setup_bindings(Arc::clone(&env_struct));
@@ -202,7 +208,9 @@ fn run_repl() -> ! {
                         std::process::exit(code);
                     }
                     Err(err) => {
-                        last_status = failure_status(&err);
+                        // An interactive shell survives what would kill a script: the error
+                        // becomes `$?` (1, or 2 for a syntax error) and the prompt comes back.
+                        last_status = err.failure_status();
                         eprintln!("rush: {}", err);
                     }
                 }

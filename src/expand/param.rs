@@ -171,19 +171,22 @@ fn expand_to_string(
             pattern::convert_case(&value, selector.as_deref(), *upper, *all)
         }
 
-        // `${!name}` reads `name`'s value and expands *that* parameter. An unset or empty `name`
-        // is not an error — it simply names nothing.
+        // `${!name}` reads `name`'s value and expands *that* parameter. Only the second lookup
+        // may come up empty: bash makes a `name` that does not *hold a name* a fatal expansion
+        // error, and it names a different culprit depending on which step failed.
         ParamExpansion::Indirect => match val {
-            None => String::new(),
-            Some(target) if target.is_empty() => String::new(),
-            Some(target) => {
-                if !is_param_name(&target) {
-                    return Err(ShellError::ExpansionError(format!(
-                        "{target}: invalid indirect expansion"
-                    )));
-                }
-                env.get_param(&target).unwrap_or_default()
+            None => {
+                return Err(ShellError::ExpansionError(format!(
+                    "{name}: invalid indirect expansion"
+                )));
             }
+            // An empty value lands here too, which is why the message quotes nothing.
+            Some(target) if !is_param_name(&target) => {
+                return Err(ShellError::ExpansionError(format!(
+                    "{target}: invalid variable name"
+                )));
+            }
+            Some(target) => env.get_param(&target).unwrap_or_default(),
         },
     };
 
@@ -520,16 +523,23 @@ mod tests {
         }
     }
 
+    /// `rush_ref`, not `name`: [`Environment::new`] inherits the real environment, and a plain
+    /// word like `name` is genuinely exported by some development shells — which would make the
+    /// unset case below pass or fail depending on who ran the tests.
     #[test]
     fn indirection_follows_the_named_parameter() {
-        let vars = [("target", "payload"), ("name", "target")];
-        let got = expand(&vars, "name", ParamExpansion::Indirect);
+        let vars = [("rush_target", "payload"), ("rush_ref", "rush_target")];
+        let got = expand(&vars, "rush_ref", ParamExpansion::Indirect);
         assert_eq!(got, Ok("payload".into()));
-        // An unset level in the chain is empty, not an error.
-        let got = expand(&[], "name", ParamExpansion::Indirect);
+        // Only the *inner* parameter may be unset; that is an empty string, not an error.
+        let vars = [("rush_ref", "rush_nosuchvar")];
+        let got = expand(&vars, "rush_ref", ParamExpansion::Indirect);
         assert_eq!(got, Ok(String::new()));
-        // But a value that is not a name at all is a bad substitution.
-        let got = expand(&[("name", "not a name")], "name", ParamExpansion::Indirect);
-        assert!(got.is_err());
+        // bash aborts the expansion when the referring parameter is unset, or holds anything
+        // that is not a name — including the empty string.
+        for vars in [vec![], vec![("rush_ref", "")], vec![("rush_ref", "a b")]] {
+            let got = expand(&vars, "rush_ref", ParamExpansion::Indirect);
+            assert!(got.is_err(), "{vars:?} expanded to {got:?}");
+        }
     }
 }

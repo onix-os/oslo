@@ -6,10 +6,18 @@
 use crate::ast::*;
 use crate::env::Environment;
 use crate::error::{Result, ShellError};
-use crate::exec::pipeline::eval_command_list;
+use crate::exec::pipeline::{eval_command_list, status_of, wait_for_status};
 use crate::expand::{expand_word, expand_word_to_string};
-use nix::sys::wait::{WaitStatus, waitpid};
 use nix::unistd::{ForkResult, fork};
+
+/// Push whatever this shell has buffered out to fd 1.
+///
+/// Called on both sides of a subshell fork: before, so the parent's buffer is not copied into the
+/// child and printed twice; in the child before `process::exit`, which skips every destructor.
+pub(crate) fn flush_stdout() {
+    use std::io::Write;
+    let _ = std::io::stdout().flush();
+}
 
 /// What one iteration of a loop body decided.
 enum LoopStep {
@@ -169,24 +177,29 @@ pub(crate) fn eval_compound_command(
             Ok(0)
         }
         CompoundCommand::Subshell(body) => {
-            let vars = env.get_all_vars();
+            // Anything this shell has buffered would be duplicated by the fork and printed twice.
+            flush_stdout();
             unsafe {
                 match fork() {
                     Ok(ForkResult::Child) => {
-                        let mut child_env = Environment::new();
-                        for (k, v) in vars {
-                            child_env.set_var(&k, &v, true);
-                        }
-                        let res = eval_command_list(&mut child_env, body).unwrap_or(1);
+                        // R4.7: a subshell is a process that runs commands, so it starts from the
+                        // signal state a program is entitled to — in particular SIGPIPE at
+                        // `SIG_DFL`, so `( while :; do echo x; done ) | head -1` dies on the
+                        // closed pipe instead of spinning on EPIPE.
+                        crate::exec::job::reset_signals_for_child();
+                        // The child keeps the environment `fork` just copied: functions,
+                        // aliases, positionals, `$?` and export flags all survive, and nothing
+                        // private is force-exported. Only subshell-local state is refreshed.
+                        env.enter_subshell();
+                        // `status_of`, not `unwrap_or(1)`: `( exit 3 )` unwinds as an error
+                        // carrying its code, and the exit status is the only channel left here.
+                        let res = status_of(eval_command_list(env, body));
+                        // `process::exit` runs no destructors, so a partial line written by
+                        // `echo -n` would die in the buffer instead of reaching the parent.
+                        flush_stdout();
                         std::process::exit(res);
                     }
-                    Ok(ForkResult::Parent { child }) => {
-                        if let Ok(WaitStatus::Exited(_, code)) = waitpid(child, None) {
-                            Ok(code)
-                        } else {
-                            Ok(1)
-                        }
-                    }
+                    Ok(ForkResult::Parent { child }) => Ok(wait_for_status(child)),
                     Err(e) => Err(ShellError::ExecutionError(format!(
                         "Subshell fork failed: {}",
                         e

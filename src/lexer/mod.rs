@@ -1,11 +1,13 @@
 //! Tokenizing shell input.
 //!
 //! Split by what is being scanned: [`scanner`] holds the cursor and operator handling,
-//! [`quoting`] scans words and quoted runs, [`expansion`] scans `$`-expansions, and the private
-//! `ansi_c` module decodes `$'…'` escapes.
+//! [`quoting`] scans words and quoted runs, [`expansion`] scans `$`-expansions, the private
+//! `param` module splits a `${…}` body into its operator and operands, and the private `ansi_c`
+//! module decodes `$'…'` escapes.
 
 mod ansi_c;
 pub mod expansion;
+mod param;
 pub mod quoting;
 pub mod scanner;
 pub mod token;

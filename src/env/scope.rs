@@ -82,6 +82,15 @@ pub struct Environment {
     pub pid: u32,
     pub last_bg_pid: Option<u32>,
     pub shell_name: String,
+    /// This process's own pid, which differs from [`Self::pid`] inside a forked subshell: `$$`
+    /// keeps reporting the *invoking* shell (POSIX; `bash -c 'echo $$; (echo $$)'` prints one
+    /// number twice), so job control and `$BASHPID` need the real one kept separately.
+    current_pid: u32,
+    /// Exit status of every stage of the most recent pipeline, left to right. Stored, not yet
+    /// exposed: `PIPESTATUS` needs arrays (Round 8), `pipefail` (Round 6) reads the same vector.
+    pipeline_status: Vec<i32>,
+    /// Exit status of the last command substitution, until something consumes it.
+    substitution_status: Option<i32>,
     aliases: HashMap<String, String>,
     functions: HashMap<String, Command>,
     custom_builtins: HashMap<String, BuiltinFn>,
@@ -128,6 +137,9 @@ impl Environment {
             pid,
             last_bg_pid: None,
             shell_name: "rush".to_string(),
+            current_pid: pid,
+            pipeline_status: vec![0],
+            substitution_status: None,
             aliases,
             functions: HashMap::new(),
             custom_builtins: HashMap::new(),
@@ -142,6 +154,57 @@ impl Environment {
 
         crate::env::builtins::register_default_builtins(&mut env_struct);
         env_struct
+    }
+
+    /// Mark this environment as the one a freshly forked subshell is running in.
+    ///
+    /// A subshell *is* the shell: `fork` already copied every variable with its export flag,
+    /// every function, alias, positional parameter, `$0`, `$?`, readonly mark and the directory
+    /// stack, so the child keeps what it inherited and only genuinely subshell-local state is
+    /// refreshed here. Rebuilding an `Environment::new()` instead lost all of that *and*
+    /// re-exported private variables into the child's `environ` — `x=1; (env | grep '^x=')`
+    /// used to leak a variable the parent never exported.
+    ///
+    /// Refreshed: the recorded pid, and the traps, which POSIX resets to their default action in
+    /// a subshell (`trap 'echo T' EXIT; (:)` prints `T` once). Deliberately kept: `$$`, the
+    /// invoking shell's pid, and `$!`, which bash inherits into a subshell.
+    pub fn enter_subshell(&mut self) {
+        self.current_pid = std::process::id();
+        self.signal_traps.clear();
+    }
+
+    /// Whether this environment belongs to a forked subshell rather than the top-level shell.
+    pub fn in_subshell(&self) -> bool {
+        self.current_pid != self.pid
+    }
+
+    /// This process's real pid, as opposed to `$$`. See [`Self::enter_subshell`].
+    pub fn current_pid(&self) -> u32 {
+        self.current_pid
+    }
+
+    /// Record every stage of a pipeline's exit status, left to right. A one-command pipeline
+    /// records a single status, as bash's `PIPESTATUS` does.
+    pub fn set_pipeline_status(&mut self, statuses: Vec<i32>) {
+        self.pipeline_status = statuses;
+    }
+
+    /// The stage statuses of the most recent pipeline. Never empty.
+    pub fn pipeline_status(&self) -> &[i32] {
+        &self.pipeline_status
+    }
+
+    /// Record what a command substitution exited with. Called by `exec::substitution`.
+    pub fn note_substitution_status(&mut self, status: i32) {
+        self.substitution_status = Some(status);
+    }
+
+    /// Take the status of the last command substitution, clearing it.
+    ///
+    /// What an assignment-only command reports (POSIX: `x=$(exit 5)` leaves `$?` at 5). Consumed
+    /// rather than read, so a later assignment with no substitution reports 0, not a stale number.
+    pub fn take_substitution_status(&mut self) -> Option<i32> {
+        self.substitution_status.take()
     }
 
     pub fn enter_loop(&mut self) {

@@ -10,7 +10,7 @@ use crate::exec::pipeline::eval_command;
 use crate::exec::redirect::RedirectGuard;
 use crate::expand::{expand_word, expand_word_to_string};
 use crate::lexer::Lexer;
-use nix::sys::wait::{WaitStatus, waitpid};
+use nix::sys::wait::{WaitPidFlag, WaitStatus, waitpid};
 use nix::unistd::{ForkResult, fork};
 use std::ffi::CString;
 use std::os::unix::ffi::OsStrExt;
@@ -23,7 +23,7 @@ pub(crate) fn eval_simple_command(env: &mut Environment, simple: &SimpleCommand)
             let val_str = expand_word_to_string(env, &assign.value)?;
             env.set_var(&assign.name, &val_str, false);
         }
-        return Ok(0);
+        return Ok(apply_wordless_redirections(env, &simple.redirections));
     }
 
     let mut words = Vec::new();
@@ -36,7 +36,7 @@ pub(crate) fn eval_simple_command(env: &mut Environment, simple: &SimpleCommand)
             let val_str = expand_word_to_string(env, &assign.value)?;
             env.set_var(&assign.name, &val_str, false);
         }
-        return Ok(0);
+        return Ok(apply_wordless_redirections(env, &simple.redirections));
     }
 
     let raw_name = words[0].trim().to_string();
@@ -102,7 +102,9 @@ fn run_command_word(
     let clean_cmd_name = cmd_name.trim();
     if env.is_builtin(clean_cmd_name) {
         let mut guard = RedirectGuard::new();
-        guard.apply(env, redirections)?;
+        if let Err(e) = guard.apply(env, redirections) {
+            return Ok(report_redirect_failure(&e));
+        }
 
         return execute_builtin(env, clean_cmd_name, words);
     }
@@ -143,21 +145,20 @@ fn run_command_word(
     unsafe {
         match fork() {
             Ok(ForkResult::Child) => {
+                // Before anything else, and in particular before `execv`: the program about to
+                // replace this process must not inherit the shell's own signal policy.
+                crate::exec::job::reset_signals_for_child();
+
                 let mut guard = RedirectGuard::new();
                 if let Err(e) = guard.apply(env, redirections) {
-                    eprintln!("rush: redirection error: {}", e);
-                    std::process::exit(1);
+                    std::process::exit(report_redirect_failure(&e));
                 }
 
                 let _ = nix::unistd::execv(&c_path, &c_args);
                 eprintln!("rush: exec failed for {}", cmd_name);
                 std::process::exit(126);
             }
-            Ok(ForkResult::Parent { child }) => match waitpid(child, None) {
-                Ok(WaitStatus::Exited(_, code)) => Ok(code),
-                Ok(WaitStatus::Signaled(_, sig, _)) => Ok(128 + sig as i32),
-                _ => Ok(1),
-            },
+            Ok(ForkResult::Parent { child }) => Ok(wait_for_child(child, &cmd_name)),
             Err(e) => Err(ShellError::ExecutionError(format!("Fork failed: {}", e))),
         }
     }
@@ -174,7 +175,11 @@ fn call_function(
     redirections: &[Redirection],
 ) -> Result<i32> {
     let mut guard = RedirectGuard::new();
-    guard.apply(env, redirections)?;
+    if let Err(e) = guard.apply(env, redirections) {
+        // The body does not run at all: `f < /nonexistent` is a failed command, not a call whose
+        // stdin happens to be the shell's.
+        return Ok(report_redirect_failure(&e));
+    }
 
     let old_pos = env.get_positional().to_vec();
     env.set_positional(words[1..].to_vec());
@@ -183,6 +188,75 @@ fn call_function(
     env.pop_scope();
     env.set_positional(old_pos);
     res
+}
+
+/// Wait for a foreground child and turn its wait status into an exit status.
+///
+/// `WUNTRACED` is not optional now that children are started with SIGTSTP at `SIG_DFL`
+/// ([`crate::exec::job::reset_signals_for_child`]). Ctrl-Z stops the child, and a plain
+/// `waitpid` — which only reports *termination* — would then block the shell forever on a
+/// process nobody can resume, turning a suspend into a hang. Reporting the stop instead returns
+/// the prompt; the process stays stopped until job control (`fg`/`bg`) can adopt it.
+///
+/// `EINTR` is retried rather than reported: a trapped signal arriving mid-wait says nothing
+/// about how the command ended.
+///
+/// A non-interactive bash *does* block on a stopped child — `bash -c 'sh -c "kill -STOP $$"'`
+/// never returns — so this is a deliberate divergence from the oracle, in the one direction
+/// where the oracle's behaviour is indistinguishable from a deadlock.
+fn wait_for_child(child: nix::unistd::Pid, cmd_name: &str) -> i32 {
+    loop {
+        match waitpid(child, Some(WaitPidFlag::WUNTRACED)) {
+            Ok(WaitStatus::Exited(_, code)) => return code,
+            // A shell reports a signal death as 128 + the signal number, which is how `$?` tells
+            // `kill -9` (137) apart from an exit status of 9.
+            Ok(WaitStatus::Signaled(_, sig, _)) => return 128 + sig as i32,
+            Ok(WaitStatus::Stopped(_, sig)) => {
+                eprintln!("rush: {}: stopped ({})", cmd_name, sig);
+                return 128 + sig as i32;
+            }
+            Ok(_) => continue,
+            Err(nix::errno::Errno::EINTR) => continue,
+            Err(_) => return 1,
+        }
+    }
+}
+
+/// Report a redirection failure and hand back the status the failed command takes on.
+///
+/// A redirection that cannot be set up fails *the command*, not the shell. rush used to propagate
+/// the error to `main`, which exited — so `echo hi < /nonexistent; echo CONTINUE` never printed
+/// CONTINUE, while the same redirection on an external command continued happily. The two paths
+/// disagreed with each other; this is the one place that decides.
+///
+/// Status 1, measured against `bash --posix` for a builtin (`read x < /nonexistent`), a bad
+/// descriptor (`echo hi >&7`), a function, a compound and an external command: all print a
+/// diagnostic, set `$?` to 1 and carry on.
+///
+/// The one case bash treats differently is a redirection error on a *special* builtin (`:`,
+/// `export`, …) in POSIX mode, which does abort the shell. rush does not implement the special
+/// builtin distinction anywhere yet — see the `robust_special_builtin_failure.sh` corpus case —
+/// so it is not invented here; continuing is the behaviour of every non-POSIX-mode shell and of
+/// bash for every other command.
+pub(crate) fn report_redirect_failure(err: &ShellError) -> i32 {
+    eprintln!("rush: {}", err);
+    1
+}
+
+/// Apply the redirections of a command that has no command word.
+///
+/// `> out` on its own still creates `out`, and `x=1 < /nonexistent` still fails with status 1
+/// after performing the assignment. The guard is dropped immediately, which restores the saved
+/// descriptors — the redirection's only lasting effect is on the filesystem.
+fn apply_wordless_redirections(env: &mut Environment, redirections: &[Redirection]) -> i32 {
+    if redirections.is_empty() {
+        return 0;
+    }
+    let mut guard = RedirectGuard::new();
+    match guard.apply(env, redirections) {
+        Ok(()) => 0,
+        Err(e) => report_redirect_failure(&e),
+    }
 }
 
 /// Turn user-controlled bytes into an argv entry for `execv`, dropping any NUL bytes.

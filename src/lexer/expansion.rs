@@ -4,7 +4,7 @@
 //! substitution, and `$((...))` arithmetic.
 
 use super::ansi_c;
-use super::quoting::parse_word_source;
+use super::param;
 use super::scanner::{Lexer, is_special_param, is_var_name_char};
 use crate::ast::{ParamExpansion, WordPart};
 use crate::error::{Result, ShellError};
@@ -145,137 +145,13 @@ impl Lexer<'_> {
         // Depth- and quote-aware, so `${x:-${y}}` keeps its whole payload and `${x:-a}b}` does
         // not end early on the brace inside the quotes.
         let content = self.scan_raw_delimited('{', '}', "parameter expansion", 0)?;
-
-        if content.starts_with('#') && content.len() > 1 {
-            return Ok(WordPart::Variable {
-                name: content[1..].to_string(),
-                expansion_type: ParamExpansion::Length,
-            });
-        }
-
-        let Some((idx, op)) = find_param_operator(&content) else {
-            return Ok(WordPart::Variable {
-                name: content,
-                expansion_type: ParamExpansion::Normal,
-            });
-        };
-
-        let name = content[..idx].to_string();
-        // The operand is one word, expanded later: `${x:-$HOME}` has to yield the home directory,
-        // and `${x:=$y}` has to *assign* the expanded text rather than the four characters `$y`.
-        let arg = parse_word_source(&content[idx + op.len()..])?;
-        let expansion_type = match op {
-            ":-" => ParamExpansion::DefaultValue {
-                default: arg,
-                assign_if_unset: false,
-                test_null: true,
-            },
-            ":=" => ParamExpansion::DefaultValue {
-                default: arg,
-                assign_if_unset: true,
-                test_null: true,
-            },
-            ":+" => ParamExpansion::UseAlternative {
-                alternative: arg,
-                test_null: true,
-            },
-            ":?" => ParamExpansion::ErrorIfUnset {
-                message: arg,
-                test_null: true,
-            },
-            "%%" => ParamExpansion::RemoveSuffix {
-                pattern: arg,
-                longest: true,
-            },
-            "%" => ParamExpansion::RemoveSuffix {
-                pattern: arg,
-                longest: false,
-            },
-            "##" => ParamExpansion::RemovePrefix {
-                pattern: arg,
-                longest: true,
-            },
-            _ => ParamExpansion::RemovePrefix {
-                pattern: arg,
-                longest: false,
-            },
-        };
-
-        Ok(WordPart::Variable {
-            name,
-            expansion_type,
-        })
+        param::parse_braced_body(&content)
     }
-}
-
-/// The `${…}` operators, longest first so `%%` is never read as `%` followed by a pattern.
-const PARAM_OPERATORS: &[&str] = &[":-", ":=", ":+", ":?", "%%", "##", "%", "#"];
-
-/// Find the operator that splits a `${…}` body into name and argument.
-///
-/// Scanning rather than `str::find` per operator, for two reasons. Nested expansions have their
-/// own operators — `${a#${b:-c}}` must split on the `#`, not on the `:-` four characters later,
-/// which would cut the name in half mid-`${`. And the winner is the *leftmost* operator, not the
-/// first one a fixed search order happens to hit: `${v%a:-b}` strips a suffix, it has no default.
-fn find_param_operator(content: &str) -> Option<(usize, &'static str)> {
-    let chars: Vec<(usize, char)> = content.char_indices().collect();
-    let mut k = 0;
-    let mut depth = 0usize;
-
-    while k < chars.len() {
-        let (offset, ch) = chars[k];
-        match ch {
-            '\\' => {
-                k += 2;
-                continue;
-            }
-            '\'' | '"' | '`' => {
-                k = skip_quoted(&chars, k);
-                continue;
-            }
-            '$' if matches!(chars.get(k + 1), Some((_, '{')) | Some((_, '('))) => {
-                depth += 1;
-                k += 2;
-                continue;
-            }
-            '}' | ')' if depth > 0 => {
-                depth -= 1;
-            }
-            // A leading `#` is the length form, `${#name}`, not a prefix strip.
-            _ if depth == 0 && k > 0 => {
-                if let Some(op) = PARAM_OPERATORS
-                    .iter()
-                    .find(|op| content[offset..].starts_with(**op))
-                {
-                    return Some((offset, op));
-                }
-            }
-            _ => {}
-        }
-        k += 1;
-    }
-
-    None
-}
-
-/// Index just past the quoted run that starts at `k`.
-fn skip_quoted(chars: &[(usize, char)], k: usize) -> usize {
-    let closer = chars[k].1;
-    let mut i = k + 1;
-    while i < chars.len() {
-        match chars[i].1 {
-            // A backslash is data inside `'…'`; everywhere else it hides the next character.
-            '\\' if closer != '\'' => i += 2,
-            c if c == closer => return i + 1,
-            _ => i += 1,
-        }
-    }
-    i
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::ast::{ParamExpansion, Word, WordPart};
+    use crate::ast::{ParamExpansion, WordPart};
     use crate::lexer::{Lexer, Token};
 
     fn parts(src: &str) -> Vec<WordPart> {
@@ -340,110 +216,6 @@ mod tests {
                     expansion_type: ParamExpansion::Normal,
                 },
             ])
-        );
-    }
-
-    // --- R2.6: brace depth and quote state ---
-
-    /// `${x:-${y}}` used to stop at the first `}`, leaving `}` behind as literal text.
-    #[test]
-    fn a_braced_payload_may_contain_a_braced_expansion() {
-        assert_eq!(
-            one_part("${x:-${y}}"),
-            WordPart::Variable {
-                name: "x".into(),
-                expansion_type: ParamExpansion::DefaultValue {
-                    default: Word {
-                        parts: vec![WordPart::Variable {
-                            name: "y".into(),
-                            expansion_type: ParamExpansion::Normal,
-                        }]
-                    },
-                    assign_if_unset: false,
-                    test_null: true,
-                },
-            }
-        );
-    }
-
-    /// The operator search has to skip nested expansions: the `:-` here belongs to the inner
-    /// `${b:-c}`, so splitting on it would cut the name off mid-`${`.
-    #[test]
-    fn a_nested_operator_does_not_win() {
-        let WordPart::Variable {
-            name,
-            expansion_type,
-        } = one_part("${a#${b:-c}}")
-        else {
-            panic!("expected a variable");
-        };
-        assert_eq!(name, "a");
-        assert!(matches!(
-            expansion_type,
-            ParamExpansion::RemovePrefix { longest: false, .. }
-        ));
-    }
-
-    /// `%%` beats `%`, and the leftmost operator beats a later one of a different kind.
-    #[test]
-    fn the_leftmost_longest_operator_wins() {
-        assert!(matches!(
-            one_part("${v%%.*}"),
-            WordPart::Variable {
-                expansion_type: ParamExpansion::RemoveSuffix { longest: true, .. },
-                ..
-            }
-        ));
-        assert!(matches!(
-            one_part("${v%a:-b}"),
-            WordPart::Variable {
-                expansion_type: ParamExpansion::RemoveSuffix { longest: false, .. },
-                ..
-            }
-        ));
-    }
-
-    /// A `}` inside quotes, or inside a nested substitution, is data.
-    #[test]
-    fn a_quoted_brace_does_not_close_the_expansion() {
-        assert_eq!(
-            one_part("${x:-'a}b'}"),
-            WordPart::Variable {
-                name: "x".into(),
-                expansion_type: ParamExpansion::DefaultValue {
-                    default: Word {
-                        parts: vec![WordPart::SingleQuoted("a}b".into())]
-                    },
-                    assign_if_unset: false,
-                    test_null: true,
-                },
-            }
-        );
-        assert!(matches!(
-            one_part("${x:-$(echo })}"),
-            WordPart::Variable {
-                expansion_type: ParamExpansion::DefaultValue { .. },
-                ..
-            }
-        ));
-    }
-
-    /// The payload is a word, not text: `${x:-$HOME}` has to expand later, not print `$HOME`.
-    #[test]
-    fn a_payload_is_parsed_as_a_word() {
-        let WordPart::Variable {
-            expansion_type: ParamExpansion::DefaultValue { default, .. },
-            ..
-        } = one_part("${x:-$(pwd)/sub}")
-        else {
-            panic!("expected a default-value expansion");
-        };
-        assert_eq!(
-            default.parts,
-            vec![
-                WordPart::CommandSubstitution("pwd".into()),
-                WordPart::Literal("/sub".into()),
-            ]
         );
     }
 }
