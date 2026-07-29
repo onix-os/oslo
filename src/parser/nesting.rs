@@ -88,16 +88,28 @@ enum Open {
     Do,
 }
 
-fn open(stack: &mut Vec<Open>, what: Open, max: &mut usize) {
-    stack.push(what);
+/// One open construct, plus the quoting to go back to when it closes.
+///
+/// The quoting matters for exactly one case, and it is not rare: `"$(cmd)"`. The body of a command
+/// substitution is *fresh shell input* even inside double quotes, so `'…'` quotes again in there.
+/// Without restoring on the closing `)`, a scan that entered `"$(` stayed in double-quote mode and
+/// read the single-quoted `awk` or `jq` program inside as shell — counting its braces, and losing
+/// track completely at the first `"` in it. That is what made this guard reject 17 real scripts.
+type Frame = (Open, Quote);
+
+fn open(stack: &mut Vec<Frame>, what: Open, quote: Quote, max: &mut usize) {
+    stack.push((what, quote));
     *max = (*max).max(stack.len());
 }
 
-/// Close `what` if it is what is actually open; a closer that matches nothing is ignored.
-fn close(stack: &mut Vec<Open>, what: Open) {
-    if stack.last() == Some(&what) {
-        stack.pop();
+/// Close `what` if it is what is actually open, returning the quoting to resume in.
+///
+/// A closer that matches nothing is ignored and changes no quoting.
+fn close(stack: &mut Vec<Frame>, what: Open) -> Option<Quote> {
+    if stack.last().map(|(open, _)| *open) == Some(what) {
+        return stack.pop().map(|(_, quote)| quote);
     }
+    None
 }
 
 /// What one pass over the input found.
@@ -108,9 +120,100 @@ struct Scan {
     unmatched: usize,
 }
 
+/// Remove here-document bodies, which are data and not shell.
+///
+/// The scan counts openers, and a heredoc body is free to contain whatever it likes: `config.guess`
+/// — the autoconf script in every autotools project — writes a **C program** through `<<EOF`, and
+/// its braces were counted as shell nesting. That is 22 phantom unmatched openers, and it is why
+/// this guard rejected a script every distro builds against.
+///
+/// Deliberately approximate in the safe direction: the delimiter is recognised by shape
+/// (`<<WORD`, `<<-WORD`, `<<'WORD'`) rather than by re-lexing, and anything not recognised is left
+/// in place to be counted as before. Requiring an identifier after `<<` is also what keeps the
+/// arithmetic shift in `$(( 1 << 2 ))` from being read as a heredoc.
+fn strip_heredoc_bodies(input: &str) -> String {
+    let mut out = String::with_capacity(input.len());
+    let mut lines = input.lines();
+    while let Some(line) = lines.next() {
+        out.push_str(line);
+        out.push('\n');
+        for (delimiter, strip_tabs) in heredoc_delimiters(line) {
+            for body in lines.by_ref() {
+                let candidate = if strip_tabs {
+                    body.trim_start_matches('\t')
+                } else {
+                    body
+                };
+                if candidate == delimiter {
+                    break;
+                }
+            }
+        }
+    }
+    out
+}
+
+/// The delimiters a line opens here-documents for, in the order they will be read.
+fn heredoc_delimiters(line: &str) -> Vec<(String, bool)> {
+    let chars: Vec<char> = line.chars().collect();
+    let mut found = Vec::new();
+    let mut i = 0;
+    while i + 1 < chars.len() {
+        if chars[i] != '<' || chars[i + 1] != '<' {
+            i += 1;
+            continue;
+        }
+        // `<<<` is a here-string: its operand is a word on the same line, not a body.
+        if chars.get(i + 2) == Some(&'<') {
+            i += 3;
+            continue;
+        }
+        let mut j = i + 2;
+        let strip_tabs = chars.get(j) == Some(&'-');
+        if strip_tabs {
+            j += 1;
+        }
+        while chars.get(j).is_some_and(|c| *c == ' ') {
+            j += 1;
+        }
+        let quote = match chars.get(j) {
+            Some('\'') => Some('\''),
+            Some('"') => Some('"'),
+            _ => None,
+        };
+        if quote.is_some() {
+            j += 1;
+        }
+        let start = j;
+        // A delimiter is a word, so it cannot start with a digit: `$(( 1 << 2 ))` is an
+        // arithmetic shift, and reading `2` as a heredoc name would swallow the rest of the file.
+        if !chars
+            .get(j)
+            .is_some_and(|c| c.is_ascii_alphabetic() || *c == '_')
+        {
+            i += 2;
+            continue;
+        }
+        while chars
+            .get(j)
+            .is_some_and(|c| c.is_ascii_alphanumeric() || *c == '_')
+        {
+            j += 1;
+        }
+        if j == start {
+            i += 2;
+            continue;
+        }
+        found.push((chars[start..j].iter().collect::<String>(), strip_tabs));
+        i = j;
+    }
+    found
+}
+
 /// The deepest simultaneous nesting anywhere in `input`, and what it left open.
 fn scan_nesting(input: &str) -> Scan {
-    let mut stack: Vec<Open> = Vec::new();
+    let input = &strip_heredoc_bodies(input);
+    let mut stack: Vec<Frame> = Vec::new();
     let mut max = 0usize;
     let mut quote = Quote::None;
     let mut escaped = false;
@@ -147,10 +250,24 @@ fn scan_nesting(input: &str) -> Scan {
                 match c {
                     '\\' => escaped = true,
                     '"' => quote = Quote::None,
-                    '(' if prev_dollar => open(&mut stack, Open::Paren, &mut max),
-                    '{' if prev_dollar => open(&mut stack, Open::Brace, &mut max),
-                    ')' => close(&mut stack, Open::Paren),
-                    '}' => close(&mut stack, Open::Brace),
+                    // `$(` opens a command substitution, whose body is shell again: leave
+                    // double-quote mode until the matching `)` puts it back.
+                    '(' if prev_dollar => {
+                        open(&mut stack, Open::Paren, Quote::Double, &mut max);
+                        quote = Quote::None;
+                        prev_dollar = false;
+                        continue;
+                    }
+                    // `${` is a parameter expansion, not shell input, so quoting carries on.
+                    '{' if prev_dollar => open(&mut stack, Open::Brace, Quote::Double, &mut max),
+                    ')' => {
+                        if let Some(resume) = close(&mut stack, Open::Paren) {
+                            quote = resume;
+                        }
+                    }
+                    '}' => {
+                        close(&mut stack, Open::Brace);
+                    }
                     _ => {}
                 }
                 prev_dollar = c == '$';
@@ -183,6 +300,7 @@ fn scan_nesting(input: &str) -> Scan {
                 open(
                     &mut stack,
                     if c == '(' { Open::Paren } else { Open::Brace },
+                    Quote::None,
                     &mut max,
                 );
                 word.clear();
@@ -191,7 +309,14 @@ fn scan_nesting(input: &str) -> Scan {
             // A command may follow a closer directly — that is exactly what a `case` arm is —
             // so the next word is still a candidate keyword.
             ')' | '}' => {
-                close(&mut stack, if c == ')' { Open::Paren } else { Open::Brace });
+                // Restores the quoting `"$(` left behind. Without this the scan stayed unquoted
+                // after the substitution closed, so the `"` that ended the string *opened* one and
+                // every keyword after it went uncounted.
+                if let Some(resume) =
+                    close(&mut stack, if c == ')' { Open::Paren } else { Open::Brace })
+                {
+                    quote = resume;
+                }
                 word.clear();
                 cmd_pos = true;
             }
@@ -200,13 +325,19 @@ fn scan_nesting(input: &str) -> Scan {
             _ => {
                 if cmd_pos {
                     match word.as_str() {
-                        "if" => open(&mut stack, Open::If, &mut max),
-                        "case" => open(&mut stack, Open::Case, &mut max),
+                        "if" => open(&mut stack, Open::If, Quote::None, &mut max),
+                        "case" => open(&mut stack, Open::Case, Quote::None, &mut max),
                         // One level per loop body, whatever the loop keyword was.
-                        "do" => open(&mut stack, Open::Do, &mut max),
-                        "fi" => close(&mut stack, Open::If),
-                        "esac" => close(&mut stack, Open::Case),
-                        "done" => close(&mut stack, Open::Do),
+                        "do" => open(&mut stack, Open::Do, Quote::None, &mut max),
+                        "fi" => {
+                            let _ = close(&mut stack, Open::If);
+                        }
+                        "esac" => {
+                            let _ = close(&mut stack, Open::Case);
+                        }
+                        "done" => {
+                            let _ = close(&mut stack, Open::Do);
+                        }
                         _ => {}
                     }
                 }
@@ -220,12 +351,18 @@ fn scan_nesting(input: &str) -> Scan {
     // and the `if` it never closed is exactly what this count is for.
     if cmd_pos {
         match word.as_str() {
-            "if" => open(&mut stack, Open::If, &mut max),
-            "case" => open(&mut stack, Open::Case, &mut max),
-            "do" => open(&mut stack, Open::Do, &mut max),
-            "fi" => close(&mut stack, Open::If),
-            "esac" => close(&mut stack, Open::Case),
-            "done" => close(&mut stack, Open::Do),
+            "if" => open(&mut stack, Open::If, Quote::None, &mut max),
+            "case" => open(&mut stack, Open::Case, Quote::None, &mut max),
+            "do" => open(&mut stack, Open::Do, Quote::None, &mut max),
+            "fi" => {
+                let _ = close(&mut stack, Open::If);
+            }
+            "esac" => {
+                let _ = close(&mut stack, Open::Case);
+            }
+            "done" => {
+                let _ = close(&mut stack, Open::Do);
+            }
             _ => {}
         }
     }
@@ -250,7 +387,10 @@ fn next_is_command_position(c: char, word: &str, was_cmd_pos: bool) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{MAX_INPUT_NESTING, MAX_UNMATCHED_OPENERS, check_nesting, scan_nesting};
+    use super::{
+        MAX_INPUT_NESTING, MAX_UNMATCHED_OPENERS, check_nesting, heredoc_delimiters, scan_nesting,
+        strip_heredoc_bodies,
+    };
 
     fn max_nesting_depth(input: &str) -> usize {
         scan_nesting(input).max_depth
@@ -376,5 +516,71 @@ mod tests {
         let script = format!("{}x", "(".repeat(MAX_UNMATCHED_OPENERS));
         assert_eq!(unmatched(&script), MAX_UNMATCHED_OPENERS);
         assert!(check_nesting(&script).is_ok());
+    }
+
+    /// A here-document body is data. `config.guess` — the autoconf script every autotools project
+    /// ships — writes a C program through `<<EOF`, and counting its braces as shell produced 22
+    /// phantom unmatched openers and rejected the script outright.
+    #[test]
+    fn a_heredoc_body_is_not_counted_as_shell() {
+        let script = "cat <<EOF\n{ ( [ unbalanced\nEOF\necho after\n";
+        assert_eq!(scan_nesting(script).unmatched, 0);
+        assert!(check_nesting(script).is_ok());
+        // The body is gone, the surrounding shell is not.
+        let stripped = strip_heredoc_bodies(script);
+        assert!(!stripped.contains("unbalanced"));
+        assert!(stripped.contains("echo after"));
+    }
+
+    #[test]
+    fn heredoc_delimiters_are_recognised_in_every_spelling() {
+        assert_eq!(
+            heredoc_delimiters("cat <<EOF"),
+            vec![("EOF".to_string(), false)]
+        );
+        assert_eq!(
+            heredoc_delimiters("cat <<-EOF"),
+            vec![("EOF".to_string(), true)]
+        );
+        assert_eq!(
+            heredoc_delimiters("cat <<'EOF'"),
+            vec![("EOF".to_string(), false)]
+        );
+        assert_eq!(
+            heredoc_delimiters("cat <<\"EOF\""),
+            vec![("EOF".to_string(), false)]
+        );
+        // Two on one line are read in order.
+        assert_eq!(
+            heredoc_delimiters("diff <<A <<B"),
+            vec![("A".to_string(), false), ("B".to_string(), false)]
+        );
+        // A here-*string* has no body, and an arithmetic shift is not a heredoc at all.
+        assert!(heredoc_delimiters("cat <<<word").is_empty());
+        assert!(heredoc_delimiters("echo $(( 1 << 2 ))").is_empty());
+    }
+
+    /// `<<-` strips leading tabs from the terminator, so the body must end at an indented one.
+    #[test]
+    fn a_dash_heredoc_ends_at_an_indented_terminator() {
+        let script = "cat <<-EOF\n\t{ { {\n\tEOF\necho after\n";
+        assert_eq!(scan_nesting(script).unmatched, 0);
+    }
+
+    /// The body of `$(…)` is shell again even inside double quotes, so `'…'` quotes in there.
+    /// Without this a scan that entered `"$(` read the single-quoted `awk` program inside as
+    /// shell — counting its braces and losing sync at its first `"`.
+    #[test]
+    fn a_substitution_inside_double_quotes_re_enters_shell() {
+        let script = "x=\"$(awk '{ print $1 } { print $2 }' file)\"\necho done\n";
+        assert_eq!(scan_nesting(script).unmatched, 0);
+        assert!(check_nesting(script).is_ok());
+    }
+
+    /// …and quoting resumes on the closing paren, so a `\"` after it still ends the string.
+    #[test]
+    fn quoting_resumes_after_the_substitution_closes() {
+        let script = "x=\"$(echo hi)\" ; y='{{{' ; echo \"$x\"\n";
+        assert_eq!(scan_nesting(script).unmatched, 0);
     }
 }
