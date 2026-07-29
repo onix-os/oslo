@@ -209,22 +209,27 @@ exits 2. There used to be a second, hand-written parser used as a fallback, whic
 here-document support and therefore executed heredoc *bodies* as commands; it is gone. The
 hand-written lexer stays — the adapter re-lexes brush's raw word text through it.
 
-brush-parser is **vendored** in `vendor/brush-parser`, at the published 0.4.0 with one patch: the
-tokenizer takes the longest match, so an arithmetic `for` loop with an empty condition has its two
-section separators fused into a single `;;` operator and `for ((;;))` fails to parse where
-`for (( ; ; ))` succeeds. The patch adds an alternative to the grammar's `arithmetic_for_clause`
-rather than teaching the tokenizer to split `;;`, which would put every `case` terminator in every
-script downstream of it. `vendor/brush-parser/PATCH.md` has the diff, the reasoning and the
-upstream PR text; the fork ends when that PR ships.
+brush-parser is used **unmodified**, straight from crates.io. It was briefly vendored to carry one
+grammar patch — the tokenizer takes the longest match, so an arithmetic `for` loop with an empty
+condition has its two section separators fused into the single `;;` that ends a `case` item, and
+`for ((;;))` fails to parse where `for (( ; ; ))` succeeds. The fix is a 28-line alternative in one
+grammar rule, but carrying it meant keeping 10,181 lines of someone else's parser across 247 files
+in this repo, to own a change smaller than this paragraph. That is the wrong side of the trade, so
+the fork is gone and the construct is a [known gap](#known-gaps). The patch belongs upstream.
 
 ## Known gaps
 
 Each of these is reproducible against the binary, and all but the last are differences from bash.
-The first three have a corpus case, named in `tests/differential/expected_fail.rs`, so the
+The first four have a corpus case, named in `tests/differential/expected_fail.rs`, so the
 differential suite watches them and will fail the day one is fixed and the line is not deleted.
 The rest are recorded only here: a corpus case for a known-missing feature buys a second copy of
 this list and a row in the ratchet, which is worth it for a bug and not for an absence.
 
+- `for ((;;))` is a syntax error when the section separators touch. Write `for (( ; ; ))` instead;
+  the ordinary `for ((i=0;i<3;i++))` is unaffected. The cause is upstream: brush's tokenizer takes
+  the longest match and fuses the two `;` into the single `;;` that ends a `case` item, so the
+  arithmetic-for rule never sees them. A small alternative in that one grammar rule fixes it, but
+  only by vendoring the whole parser — better sent upstream than carried here.
 - Process substitution (`<(cmd)`, `>(cmd)`) is refused by name with exit status 2. Refusing is
   deliberate — silently dropping the argument made `diff <(a) <(b)` report false success — but the
   `/dev/fd/N` implementation is not written.
