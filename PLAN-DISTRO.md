@@ -173,8 +173,30 @@ inside `$( )`, a failing body, and `head -1 <(yes)` for the SIGPIPE path. No des
 Known gap: `for f in <(echo a)` is still a parse error. bash accepts a process substitution in a
 `for` word list; it did not appear in any of the 740 scripts.
 
-C1 is done (every Round A defect has a corpus case); C2, a Lua corpus with expected-output
-oracles, is not started.
+C1 is done (every Round A defect has a corpus case).
+
+**C2, the Lua corpus, is done** — `tests/lua_corpus/`, 10 cases, driven by
+`tests/lua_corpus_tests.rs`.
+
+The oracle is the difference that shapes it. The shell corpus can be trusted without anyone
+reading it, because bash supplies the expected output; there is no second Lua shell to do that
+here, so the expectation is **recorded in the case and written by hand**. Capturing it from a run
+would record today's behaviour — bugs included — and then assert it forever, which is worse than
+no test because it looks like coverage. A case with no `--[[ expect ]]` block fails for the same
+reason.
+
+Writing the expectations first paid for itself immediately: of ten cases, four disagreed with the
+shell on the first run, and deciding which side was wrong each time is the point of the exercise.
+Three were mine — field splitting means `echo  spaced  out` really does print one space; a
+`match("[^:]+$")` keeps its leading space; mlua does not load the `debug` library. The fourth was
+a design question worth writing down rather than a bug: `oslo.exec("exit 5")` *ends the script*,
+because `exec` runs in this shell — which is the same reason `cd` through it persists.
+
+The second test in the file is the one that matters most. Every case must be **detected** as Lua
+without being told, so the corpus exercises the real `oslo case.lua` path rather than forcing
+`--lua`. Reintroducing the shipped bug — `#!/usr/bin/env oslo` read as shell — fails it with
+"was read as shell, not Lua", which is exactly the bug that reached a release and was found by
+running the README example rather than by any test.
 
 ## Sequencing
 
