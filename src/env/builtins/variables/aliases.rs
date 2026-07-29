@@ -27,7 +27,7 @@ fn is_valid_alias_name(name: &str) -> bool {
 pub fn builtin_alias(env: &mut Environment, args: &[String]) -> Result<i32> {
     let opts = match options::parse(args, "p") {
         Ok(o) => o,
-        Err(letter) => return Ok(options::invalid("alias", letter, ALIAS_USAGE)),
+        Err(letter) => return Err(options::invalid("alias", letter, ALIAS_USAGE)),
     };
     let operands = &args[opts.operands..];
 
@@ -70,7 +70,7 @@ pub fn builtin_alias(env: &mut Environment, args: &[String]) -> Result<i32> {
 pub fn builtin_unalias(env: &mut Environment, args: &[String]) -> Result<i32> {
     let opts = match options::parse(args, "a") {
         Ok(o) => o,
-        Err(letter) => return Ok(options::invalid("unalias", letter, UNALIAS_USAGE)),
+        Err(letter) => return Err(options::invalid("unalias", letter, UNALIAS_USAGE)),
     };
 
     if opts.has('a') {

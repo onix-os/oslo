@@ -85,11 +85,16 @@ fn classify_tokenizer_error(err: &TokenizerError) -> InputStatus {
     }
 }
 
-/// Whether `line` opens a here-document whose body has not started yet.
+/// Whether `line` opens a here-document, so that what follows it is a body rather than a command.
 ///
-/// [`classify`] already answers this through the tokenizer, but the REPL wants to *say* so —
-/// bash's continuation prompt after `cat <<EOF` is still PS2, and a caller that wants to label
-/// the state (or refuse history expansion inside a body) needs the fact separately.
+/// [`classify`] already knows this — it is why `cat <<EOF` comes back [`InputStatus::Incomplete`]
+/// — but it cannot *say* it: "the input ended in the middle of something" is the same answer for
+/// an open quote, and those are not the same thing at all. The REPL's history expansion has to
+/// tell them apart, because a here-document body is **data**: a `!` in it must reach the file
+/// being written, not be replaced by a previous command (`startup::repl::read_command`).
+///
+/// A scanner rather than a parse, deliberately — it must answer for a line brush cannot parse
+/// yet, which is every line that opens a here-document.
 pub fn opens_here_document(line: &str) -> bool {
     let bytes = line.as_bytes();
     let mut i = 0;
@@ -201,10 +206,23 @@ mod tests {
     fn here_document_introducers_are_detected() {
         assert!(opens_here_document("cat <<EOF"));
         assert!(opens_here_document("cat <<-EOF"));
+        assert!(opens_here_document("cat <<'EOF'"));
+        assert!(opens_here_document("sort <<EOF | uniq"));
         assert!(!opens_here_document("cat <<<word"));
         assert!(!opens_here_document("echo '<<EOF'"));
         assert!(!opens_here_document("echo a < b"));
         assert!(!opens_here_document(r"echo \<\<EOF"));
+    }
+
+    /// The distinction the REPL's history expansion depends on: a line that is unfinished because
+    /// a quote is open is not a line that opens a here-document, even though [`classify`] gives
+    /// both the same answer.
+    #[test]
+    fn an_open_quote_is_not_a_here_document() {
+        assert_eq!(classify("echo 'a"), InputStatus::Incomplete);
+        assert!(!opens_here_document("echo 'a"));
+        assert_eq!(classify("cat <<EOF"), InputStatus::Incomplete);
+        assert!(opens_here_document("cat <<EOF"));
     }
 
     #[test]

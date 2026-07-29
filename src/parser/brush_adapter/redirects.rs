@@ -6,6 +6,7 @@
 use super::words::single_word;
 use crate::ast as rush_ast;
 use crate::error::{Result, ShellError};
+use crate::lexer::parse_heredoc_body;
 use brush_parser::ast;
 
 pub(super) fn convert_redirect_list(
@@ -36,8 +37,8 @@ pub(super) fn convert_redirect(redir: &ast::IoRedirect) -> Result<Vec<rush_ast::
             };
 
             let target_word = match target {
-                ast::IoFileRedirectTarget::Filename(w) => single_word(w),
-                ast::IoFileRedirectTarget::Duplicate(w) => single_word(w),
+                ast::IoFileRedirectTarget::Filename(w) => single_word(w)?,
+                ast::IoFileRedirectTarget::Duplicate(w) => single_word(w)?,
                 ast::IoFileRedirectTarget::Fd(n) => rush_ast::Word::from_literal(&n.to_string()),
                 ast::IoFileRedirectTarget::ProcessSubstitution(..) => {
                     return Err(ShellError::SyntaxError(
@@ -51,13 +52,15 @@ pub(super) fn convert_redirect(redir: &ast::IoRedirect) -> Result<Vec<rush_ast::
                 kind: redirect_kind,
                 target: target_word,
                 heredoc_content: None,
+                here_string: false,
             }])
         }
 
         ast::IoRedirect::HereDocument(fd, doc) => {
             let mut content = doc.doc.to_string();
-            // `<<-` strips leading tabs from every line, including the delimiter line. The
-            // evaluator writes the body verbatim, so strip here.
+            // `<<-` strips leading tabs from every line, including the delimiter line. This runs
+            // on the raw text, before lexing: a tab is stripped because of where it sits in the
+            // line, which is a fact about the source and not about the parts it lexes into.
             if doc.remove_tabs {
                 content = content
                     .lines()
@@ -69,6 +72,21 @@ pub(super) fn convert_redirect(redir: &ast::IoRedirect) -> Result<Vec<rush_ast::
                 }
             }
 
+            // A quoted delimiter (`<<'EOF'`) makes the whole body literal, and brush is the one
+            // that knows: the quotes are on the delimiter line, which never reaches us.
+            //
+            // Lexing here rather than at apply time means a body containing an unterminated
+            // `${`, `$(` or backtick is a parse error for the whole script, where bash reports
+            // it when the redirection runs and carries on. Both refuse — neither shell emits the
+            // malformed text — and refusing earlier is the direction this parser errs in
+            // everywhere else. A body that is meant to hold such text is a body whose delimiter
+            // should be quoted, which is exactly the branch below.
+            let body = if doc.requires_expansion {
+                parse_heredoc_body(&content)?
+            } else {
+                rush_ast::Word::from_literal(&content)
+            };
+
             Ok(vec![rush_ast::Redirection {
                 fd: *fd,
                 kind: if doc.remove_tabs {
@@ -77,16 +95,22 @@ pub(super) fn convert_redirect(redir: &ast::IoRedirect) -> Result<Vec<rush_ast::
                     rush_ast::RedirectKind::Heredoc
                 },
                 target: rush_ast::Word::from_literal(doc.here_end.as_ref()),
-                heredoc_content: Some(content),
+                heredoc_content: Some(body),
+                here_string: false,
             }])
         }
 
-        // `<<< word` is a here-document whose body is the single word.
+        // `<<< word` is a here-document whose body is one ordinary word, expansions and all.
+        // `single_word` is what keeps the quoting: a here-string is a single word by
+        // construction, so it re-lexes into parts and expansion does the quote removal that a
+        // textual strip used to do wrongly (`<<< a"b"c` lost nothing, `<<< "a"x"b"` lost the
+        // wrong quotes).
         ast::IoRedirect::HereString(fd, word) => Ok(vec![rush_ast::Redirection {
             fd: *fd,
             kind: rush_ast::RedirectKind::Heredoc,
             target: rush_ast::Word::from_literal(""),
-            heredoc_content: Some(format!("{}\n", strip_quotes(word.as_ref()))),
+            heredoc_content: Some(single_word(word)?),
+            here_string: true,
         }]),
 
         // `&>file` / `&>>file`: send stdout to the file, then point stderr at stdout.
@@ -98,30 +122,17 @@ pub(super) fn convert_redirect(redir: &ast::IoRedirect) -> Result<Vec<rush_ast::
                 } else {
                     rush_ast::RedirectKind::Output
                 },
-                target: single_word(word),
+                target: single_word(word)?,
                 heredoc_content: None,
+                here_string: false,
             },
             rush_ast::Redirection {
                 fd: Some(2),
                 kind: rush_ast::RedirectKind::DupOutput,
                 target: rush_ast::Word::from_literal("1"),
                 heredoc_content: None,
+                here_string: false,
             },
         ]),
     }
-}
-
-/// Strip one layer of matching surrounding quotes.
-///
-/// Here-string bodies are written to the pipe verbatim, so quotes that were syntax rather than
-/// content would otherwise show up in the output.
-fn strip_quotes(s: &str) -> String {
-    let bytes = s.as_bytes();
-    if bytes.len() >= 2
-        && ((bytes[0] == b'"' && bytes[bytes.len() - 1] == b'"')
-            || (bytes[0] == b'\'' && bytes[bytes.len() - 1] == b'\''))
-    {
-        return s[1..s.len() - 1].to_string();
-    }
-    s.to_string()
 }

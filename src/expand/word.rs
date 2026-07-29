@@ -19,7 +19,6 @@ use crate::ast::{ParamExpansion, Word, WordPart};
 use crate::env::Environment;
 use crate::error::{Result, ShellError};
 use crate::expand::arithmetic::eval_arithmetic;
-use crate::expand::brace::expand_braces;
 use crate::expand::fields::{ifs_of, split_field};
 use crate::expand::glob::expand_glob;
 use crate::expand::param::{expand_array_ref, expand_param};
@@ -253,23 +252,25 @@ pub fn expand_word_to_string(env: &mut Environment, word: &Word) -> Result<Strin
 
 /// Full expansion of one word: parameters, substitutions, field splitting, then pathname
 /// expansion — the argument list a command actually receives.
+///
+/// Brace expansion is not here, and deliberately so. It is the one expansion that yields whole
+/// *words* rather than fields, and matching bash means running it on the word's source text
+/// before the word is lexed at all — so it lives in [`crate::expand::brace`] and is applied by
+/// the parser, once per word, at the positions where bash applies it. By the time a [`Word`]
+/// reaches this function its groups are already gone.
 pub fn expand_word(env: &mut Environment, word: &Word) -> Result<Vec<String>> {
     let mut out = Vec::new();
-    // Brace expansion runs first and is the only step that yields whole *words*: `a{1,2}` is two
-    // words, each of which then goes through the rest of the pipeline on its own.
     // `set -f` switches pathname expansion off wholesale, so the field's own text is the answer.
     // Read once per word rather than per field: an expansion cannot change the option mid-word.
     let glob = !env.noglob();
-    for word in expand_braces(word) {
-        let fields = expand_word_fields(env, &word)?;
-        let ifs = ifs_of(env);
-        for field in fields {
-            for split in split_field(&ifs, field) {
-                if glob {
-                    out.extend(expand_glob(&split));
-                } else {
-                    out.push(field_text(&split));
-                }
+    let fields = expand_word_fields(env, word)?;
+    let ifs = ifs_of(env);
+    for field in fields {
+        for split in split_field(&ifs, field) {
+            if glob {
+                out.extend(expand_glob(&split));
+            } else {
+                out.push(field_text(&split));
             }
         }
     }

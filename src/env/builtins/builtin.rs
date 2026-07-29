@@ -19,6 +19,13 @@ pub fn builtin_builtin(env: &mut Environment, args: &[String]) -> Result<i32> {
     // but never re-applied here) nor a function of the same name can intercept the call. `args`
     // is shifted by one so the builtin sees its own name as argv[0].
     match env.exec_custom_builtin(name, &args[1..]) {
+        // As with `command`: reaching the builtin this way strips it of the specialness that
+        // makes a utility error fatal, so the error folds back to its status.
+        // `bash --posix -c 'builtin export BAD-NAME=1; echo alive'` prints `alive`.
+        Some(Err(e)) => match e.survivable_utility_status() {
+            Some(status) => Ok(status),
+            None => Err(e),
+        },
         Some(result) => result,
         None => {
             eprintln!("rush: builtin: {}: not a shell builtin", name);

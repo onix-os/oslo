@@ -279,9 +279,12 @@ mod tests {
 
     /// How long a known finding gets to prove it is still a finding.
     ///
-    /// Both recorded bugs are non-termination in one form or another, so "did not finish" is a
-    /// reproduction and not an inconclusive result. Two seconds against a normal input's fraction
-    /// of a millisecond leaves room for the slowest CI runner to still be unambiguous.
+    /// `fuzz/known/` is empty as of Round 11 — both findings it held are fixed and their inputs
+    /// moved to `fuzz/seeds/` — so this bounds nothing today and exists for the next entry. Both
+    /// of the two it did hold were non-termination in one form or another, which is why "did not
+    /// finish" counts as a reproduction here rather than as an inconclusive result. Two seconds
+    /// against a normal input's fraction of a millisecond leaves the slowest CI runner
+    /// unambiguous.
     const KNOWN_DEADLINE: Duration = Duration::from_secs(2);
 
     /// Does this input still panic, or still fail to terminate?

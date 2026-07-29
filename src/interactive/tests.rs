@@ -21,9 +21,13 @@ fn helper(env: Environment) -> RushHelper {
     h
 }
 
+/// Unexported deliberately: exporting reaches `unsafe { env::set_var }` (`crate::env::scope`),
+/// which mutates the real `environ` of the test process from a libtest worker thread while other
+/// tests in this binary walk it in `Environment::new()`. The readers under test
+/// (`completion`, `hinting`, the highlighter) all go through `get_var`, so the flag buys nothing.
 fn env_with_path(dir: &Path) -> Environment {
     let mut env = Environment::new();
-    env.set_var("PATH", dir.to_str().unwrap(), true);
+    env.set_var("PATH", dir.to_str().unwrap(), false);
     env
 }
 

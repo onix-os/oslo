@@ -206,6 +206,7 @@ fn read_command(
 ) -> Input {
     let mut buffer = String::new();
     let mut secret = false;
+    let mut heredoc = HeredocTracker::default();
 
     loop {
         let prompt = if buffer.is_empty() {
@@ -245,20 +246,64 @@ fn read_command(
             raw.as_str()
         };
 
-        // Owned so the immutable borrow of the editor ends before the entry is added.
-        let previous: Vec<String> = history_entries(rl);
-        let Some(expanded) = expand_history(line, &previous) else {
-            return Input::Nothing;
+        let expanded = if heredoc.expands_history() {
+            // Owned so the immutable borrow of the editor ends before the entry is added.
+            let previous: Vec<String> = history_entries(rl);
+            match expand_history(line, &previous) {
+                Some(expanded) => expanded,
+                None => return Input::Nothing,
+            }
+        } else {
+            line.to_string()
         };
+        // Observed on the expanded text, which is what actually goes into the buffer.
+        heredoc.observe(&expanded);
 
         buffer.push_str(&expanded);
         if is_complete(&buffer) {
+            // The frecency table is fed from here rather than from the editor's `validate`,
+            // because with editor multi-line off (which is what `PS2` costs) `validate` never
+            // sees a multi-line command whole — see `RushHelper::record_command_use`.
+            if let Some(helper) = rl.helper() {
+                helper.record_command_use(&buffer);
+            }
             return Input::Command {
                 text: buffer,
                 secret,
             };
         }
         buffer.push('\n');
+    }
+}
+
+/// Whether the line about to be read is the body of a here-document.
+///
+/// The body of a here-document is **data**, and history expansion rewrites a line before it is
+/// parsed — so `cat > note <<EOF` followed by a line containing `!` would silently write some
+/// earlier command into the file instead of what was typed. bash does not expand there, and
+/// [`rush::interactive::syntax::opens_here_document`] exists precisely to tell "unfinished
+/// because a document is open" from "unfinished because a quote is open". It had no callers at
+/// all, so every heredoc body typed at rush's prompt was being rewritten (PLAN C8).
+///
+/// One bit of state, given a name because it is the bit that decides whether a typed line is a
+/// command or data, and because the loop that owns it needs a terminal to exercise.
+#[derive(Default)]
+struct HeredocTracker(bool);
+
+impl HeredocTracker {
+    /// Whether history expansion may rewrite the next line.
+    fn expands_history(&self) -> bool {
+        !self.0
+    }
+
+    /// Take account of a line that has been accepted into the buffer.
+    ///
+    /// Only ever turns the bit on. A document whose delimiter arrives part-way through an
+    /// unfinished command leaves the rest of that command unexpanded too — the safe direction:
+    /// the cost is a `!!` that has to be typed out in full, against a `!` inside a heredoc
+    /// quietly becoming somebody else's command.
+    fn observe(&mut self, line: &str) {
+        self.0 |= rush::interactive::syntax::opens_here_document(line);
     }
 }
 
@@ -337,7 +382,56 @@ fn publish_history(rl: &Repl) {
 
 #[cfg(test)]
 mod tests {
-    use super::is_complete;
+    use super::{HeredocTracker, is_complete};
+
+    /// The command line that opens a here-document is still a command, so it is expanded; every
+    /// line after it is body, so none of them are.
+    #[test]
+    fn history_expansion_stops_at_a_here_document_body() {
+        let mut heredoc = HeredocTracker::default();
+        assert!(heredoc.expands_history());
+
+        heredoc.observe("cat > note <<EOF");
+        assert!(!heredoc.expands_history(), "the body must not be rewritten");
+
+        heredoc.observe("remember: 10! is 3628800");
+        assert!(!heredoc.expands_history());
+        heredoc.observe("EOF");
+        assert!(!heredoc.expands_history(), "conservative to the end");
+    }
+
+    /// An ordinary unfinished command keeps its history expansion: `for i in …` continued onto a
+    /// second line is code on both lines, and `!!` there still means what it always did.
+    #[test]
+    fn an_ordinary_continuation_is_still_expanded() {
+        let mut heredoc = HeredocTracker::default();
+        for line in ["for i in 1 2 3; do", "  echo $i", "done"] {
+            assert!(heredoc.expands_history(), "{line:?}");
+            heredoc.observe(line);
+        }
+        // A here-string takes its body from the same line, so it opens nothing.
+        let mut heredoc = HeredocTracker::default();
+        heredoc.observe("wc -l <<<\"$text\" &&");
+        assert!(heredoc.expands_history());
+    }
+
+    /// C10: a multi-line command teaches the ranker about every command in it, not just the one
+    /// on the line that happened to parse on its own.
+    #[test]
+    fn a_multi_line_command_feeds_the_frecency_table() {
+        use rush::Environment;
+        use rush::interactive::RushHelper;
+        use std::sync::{Arc, Mutex};
+
+        // Not interactive, so the table is in memory and no file in `$HOME` is touched.
+        let helper = RushHelper::new(Arc::new(Mutex::new(Environment::new())));
+        assert_eq!(helper.frecency_score("zzrepl_a"), 0.0);
+        assert_eq!(helper.frecency_score("zzrepl_b"), 0.0);
+
+        helper.record_command_use("for i in 1 2\ndo\n  zzrepl_a $i\n  zzrepl_b\ndone");
+        assert!(helper.frecency_score("zzrepl_a") > 0.0);
+        assert!(helper.frecency_score("zzrepl_b") > 0.0);
+    }
 
     #[test]
     fn an_unfinished_compound_command_asks_for_more() {

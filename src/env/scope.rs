@@ -18,6 +18,12 @@ use std::path::PathBuf;
 pub use array::{ShellArray, array_literal_body};
 pub use registry::{BuiltinFn, is_special_builtin};
 
+/// What a call frame entered without a name reads as, in `caller`'s output.
+///
+/// bash's own spelling for the same gap: `f() { caller; }; f` in `bash -c` prints `1 NULL`,
+/// because there is no file for the frame to have come from.
+pub const UNNAMED_FUNCTION: &str = "NULL";
+
 /// Whether `name` is a valid shell variable name: `[A-Za-z_][A-Za-z0-9_]*`.
 ///
 /// `export`, `local` and `readonly` reject anything else *before* it can reach the process
@@ -122,6 +128,9 @@ pub struct Environment {
     loop_depth: usize,
     /// How deep the current shell-function call chain is.
     function_depth: DepthGuard,
+    /// The name of every shell function on that chain, outermost first. Pushed and popped with
+    /// the counter above; read by `caller`.
+    call_stack: Vec<String>,
     /// How deep the current `source`/`eval` chain is.
     script_depth: DepthGuard,
     /// The `set -e`/`set -o pipefail` options. Read through the accessors in the `options`
@@ -169,6 +178,7 @@ impl Environment {
             scope_stack: Vec::new(),
             loop_depth: 0,
             function_depth: DepthGuard::new(MAX_FUNCTION_DEPTH),
+            call_stack: Vec::new(),
             script_depth: DepthGuard::new(MAX_SCRIPT_DEPTH),
             options: ShellOptions::default(),
         };
@@ -253,13 +263,36 @@ impl Environment {
     /// Begin a shell-function call; `Err` once the call chain is too deep to be safe.
     ///
     /// The caller must pair this with [`Self::exit_function`] on every path out of the call,
-    /// including an unwinding `return` or error.
+    /// including an unwinding `return` or error. A refused entry is not entered and must not be
+    /// exited.
+    ///
+    /// Prefer [`Self::enter_function_named`]: `caller` can only report a name that was recorded
+    /// on the way in, and this form records the placeholder bash prints when it has none.
     pub fn enter_function(&mut self) -> Result<()> {
-        self.function_depth.enter()
+        self.enter_function_named(UNNAMED_FUNCTION)
+    }
+
+    /// Begin a shell-function call, recording which function it is.
+    ///
+    /// The name is what `caller n` reports as the second field. Kept beside the depth counter
+    /// rather than in a table of its own so the two cannot drift: one push, one pop, both here.
+    pub fn enter_function_named(&mut self, name: &str) -> Result<()> {
+        self.function_depth.enter()?;
+        self.call_stack.push(name.to_string());
+        Ok(())
     }
 
     pub fn exit_function(&mut self) {
-        self.function_depth.exit()
+        self.function_depth.exit();
+        self.call_stack.pop();
+    }
+
+    /// The shell functions currently executing, innermost last.
+    ///
+    /// A frame entered through [`Self::enter_function`] rather than
+    /// [`Self::enter_function_named`] reads as [`UNNAMED_FUNCTION`].
+    pub fn call_stack(&self) -> &[String] {
+        &self.call_stack
     }
 
     /// Whether a shell function is currently executing.
@@ -398,6 +431,12 @@ impl Environment {
         if is_exp {
             environ_set(name, value);
         }
+        if name == "PATH" {
+            // Every remembered command location was resolved through the old `PATH`, so keeping
+            // them would make `PATH=/new/bin:$PATH; tool` still run the old `tool` — the one
+            // failure a command cache is always blamed for. bash flushes here too.
+            crate::env::builtins::hash_forget_all();
+        }
         true
     }
 
@@ -483,6 +522,16 @@ impl Environment {
 
     pub fn set_function(&mut self, name: &str, body: Command) {
         self.functions.insert(name.to_string(), body);
+    }
+
+    /// Forget the function `name`; `true` if there was one.
+    ///
+    /// `unset -f` is the only caller, and without this it had nothing to call: the functions
+    /// table was exposed read-only, so a function could be defined and never taken back.
+    /// The answer is not `unset`'s exit status — bash exits 0 for `unset -f nosuchfn` — but it
+    /// is what a caller that needs to know would ask for.
+    pub fn remove_function(&mut self, name: &str) -> bool {
+        self.functions.remove(name).is_some()
     }
 
     pub fn get_function(&self, name: &str) -> Option<&Command> {

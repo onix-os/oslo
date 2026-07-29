@@ -127,10 +127,16 @@ impl RushHelper {
 
     /// Count the commands in an accepted line towards their frecency.
     ///
-    /// The tracker had no callers at all before this; `get_score` answered zero for everything,
-    /// which is why ranking collapsed to alphabetical order. Called from `validate`, which is the
-    /// one place the editor sees a line the user committed to — so a shell that never touches
-    /// `main.rs` still learns.
+    /// **Whose job it is to call this depends on who assembles the command**, and getting that
+    /// wrong is how multi-line commands stopped counting (PLAN C10). `validate` calls it only
+    /// while [`RushHelper::set_editor_multiline`] is on, because that is the mode in which
+    /// rustyline itself accumulates continuation lines and `validate` really does see the whole
+    /// program. With it off — which is what the REPL does, so that `PS2` can be drawn — `validate`
+    /// sees each line separately and answers `Incomplete` for every one but the last, so the loop
+    /// that built the buffer calls this instead. The comment that used to be here claimed
+    /// `validate` was "the one place the editor sees a line the user committed to"; it had been
+    /// false since the REPL turned editor multi-line off, and `for i in …; do git …; done` never
+    /// taught the ranker anything about `git`.
     pub fn record_command_use(&self, line: &str) {
         for name in words::command_words(line) {
             self.frecency.record(&name);
@@ -288,7 +294,13 @@ impl Validator for RushHelper {
         match syntax::classify(input) {
             InputStatus::Incomplete if self.editor_multiline => Ok(ValidationResult::Incomplete),
             InputStatus::Complete => {
-                self.record_command_use(input);
+                // Only when the editor is the thing assembling the command: otherwise `input` is
+                // one line of a program the caller is still building, and the caller records the
+                // finished buffer. Recording in both places would count every single-line command
+                // twice and every multi-line command once, which is worse than counting neither.
+                if self.editor_multiline {
+                    self.record_command_use(input);
+                }
                 Ok(ValidationResult::Valid(None))
             }
             // A syntax error is not something another line can repair, and bash reports it from

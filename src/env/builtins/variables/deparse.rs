@@ -274,16 +274,21 @@ impl Deparser {
             RedirectKind::Heredoc | RedirectKind::HeredocStrip => {
                 self.seq += 1;
                 let delimiter = format!("RUSH_HEREDOC_{}", self.seq);
-                let mut body = redirection.heredoc_content.clone().unwrap_or_default();
+                let mut body = redirection
+                    .heredoc_content
+                    .as_ref()
+                    .map(heredoc_body)
+                    .unwrap_or_default();
                 if !body.is_empty() && !body.ends_with('\n') {
                     body.push('\n');
                 }
                 body.push_str(&delimiter);
                 body.push('\n');
                 self.pending.push(body);
-                // The delimiter is left unquoted because the AST does not record whether the
-                // original one was quoted, and an unquoted heredoc — the common case — must keep
-                // expanding its body when the definition is read back.
+                // The delimiter is left unquoted, which is safe in both directions because
+                // `heredoc_body` re-escapes anything expansion would act on: a body that was
+                // parsed literally (`<<'EOF'`) is written back with its `$` escaped, and one
+                // that was parsed as parts is written back as those parts.
                 format!("{}{}{}", fd, op, delimiter)
             }
             _ => format!("{}{}{}", fd, op, word(&redirection.target)),
@@ -294,6 +299,40 @@ impl Deparser {
 /// Render a word outside quotes.
 fn word(w: &Word) -> String {
     w.parts.iter().map(|p| part(p, false)).collect()
+}
+
+/// Render a word as the body of an unquoted here-document.
+///
+/// Neither of the other two contexts fits. Outside quotes, a literal `$` would be written bare
+/// and expand when the definition is read back; inside double quotes, a literal `"` would be
+/// written `\"` and the backslash would survive, because a heredoc body has no `"` escape. The
+/// live set here is exactly `\`, `$` and a backtick.
+///
+/// Quotes are not syntax in a body, so a quoted run contributes its *contents* and no quote
+/// characters. That matters for `<<< "$v"`, which has no `<<<` spelling on the way out and is
+/// printed as a here-document: rendering the part as `"…"` would put two literal quotes in the
+/// text the command reads.
+fn heredoc_body(w: &Word) -> String {
+    w.parts.iter().map(heredoc_part).collect()
+}
+
+fn heredoc_part(p: &WordPart) -> String {
+    match p {
+        // A single-quoted or escaped run was inert in the original, and escaping every live
+        // character is what keeps it inert once the quotes that made it so are gone.
+        WordPart::Literal(s) | WordPart::SingleQuoted(s) | WordPart::Escaped(s) => s
+            .chars()
+            .map(|c| match c {
+                '\\' | '$' | '`' => format!("\\{}", c),
+                c => c.to_string(),
+            })
+            .collect(),
+        WordPart::DoubleQuoted(parts) => parts.iter().map(heredoc_part).collect(),
+        // A tilde does not expand in a heredoc body, so the prefix has to be written as the path
+        // it stood for — which the deparser cannot know. Printing it back is the honest choice:
+        // `~` is what the author wrote.
+        other => part(other, false),
+    }
 }
 
 /// Render one word part. `in_quotes` selects the escaping rules of a double-quoted context.
@@ -487,5 +526,32 @@ mod tests {
         assert!(printed.contains("<<RUSH_HEREDOC_1"), "{printed}");
         assert!(printed.contains("\nbody\nRUSH_HEREDOC_1\n"), "{printed}");
         is_stable("f() {\ncat <<EOF\nbody\nEOF\n}");
+    }
+
+    /// R11.B2. The printed delimiter is always unquoted, so an inert body has to be re-escaped
+    /// on the way out or `<<'EOF'` comes back as a body that expands.
+    #[test]
+    fn a_literal_body_is_escaped_because_the_delimiter_is_not_quoted() {
+        let printed = round_trip("f() {\ncat <<'EOF'\nraw $v `x` \\\nEOF\n}");
+        assert!(
+            printed.contains("raw \\$v \\`x\\` \\\\\n"),
+            "an inert body was printed live: {printed}"
+        );
+        is_stable("f() {\ncat <<'EOF'\nraw $v `x` \\\nEOF\n}");
+    }
+
+    /// A here-string has no `<<<` spelling on the way out, so it prints as a here-document — and
+    /// its quotes must not survive into the body, where they would stop being syntax.
+    #[test]
+    fn a_here_string_loses_its_quotes_rather_than_printing_them() {
+        let printed = round_trip(r#"f() { cat <<< "hs $v"; }"#);
+        assert!(
+            printed.contains("\nhs ${v}\n"),
+            "quotes leaked into the body: {printed}"
+        );
+        is_stable(r#"f() { cat <<< "hs $v"; }"#);
+        // A single-quoted run inside it was inert, and stays inert once the quotes are gone.
+        let inert = round_trip(r#"f() { cat <<< 'raw $v'; }"#);
+        assert!(inert.contains("\nraw \\$v\n"), "{inert}");
     }
 }

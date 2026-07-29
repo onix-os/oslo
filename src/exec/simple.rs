@@ -1,62 +1,29 @@
 //! Evaluating a simple command.
 //!
 //! Expansion, alias substitution, command-prefix assignments, then command search: the order in
-//! which a word becomes an alias, a function, a builtin or a program on PATH. Running the
-//! program once it has been found is the `external` submodule's job.
+//! which a word becomes an alias, a function, a builtin or a program on PATH.
+//!
+//! The submodules are the parts that answer a question of their own: `external` runs a program
+//! once it has been found, `assign` decides what each shape of assignment means, `trace` renders
+//! `set -x`, `autocd` owns the `shopt -s autocd` option, and `posix` owns everything POSIX mode
+//! changes about a command's *outcome*.
 
 mod assign;
+mod autocd;
 mod external;
+mod posix;
 mod trace;
+
+pub use autocd::set_autocd;
 
 use crate::ast::*;
 use crate::env::Environment;
-use crate::env::scope::is_special_builtin;
 use crate::error::{Result, ShellError};
 use crate::exec::pipeline::eval_command;
 use crate::exec::redirect::RedirectGuard;
 use crate::exec::simple::external::{Lookup, look_up_command, run_external};
 use crate::expand::{expand_word, expand_word_to_string};
 use crate::lexer::Lexer;
-use std::sync::atomic::{AtomicBool, Ordering};
-
-/// Whether a command word that names a directory should be treated as `cd` to it.
-///
-/// bash's `shopt -s autocd`, and off for the same reason bash has it off: in a script `build`
-/// means "run the build command", and silently changing directory instead makes every later
-/// relative path in that script resolve somewhere else, with status 0 to say all is well
-/// (PLAN R5.13). Process-global rather than a field on [`Environment`], like
-/// [`crate::exec::pipeline::set_interactive`]: it is a property of the invocation, and a forked
-/// child inherits it as it stands.
-///
-/// autocd is a `shopt` option, and `shopt` still does not exist — `set -o` (PLAN R6.1) covers
-/// only the POSIX option set, which autocd is not part of. [`set_autocd`] stays the hook a
-/// future `shopt` will call, and the `RUSH_AUTOCD` shell variable is how a user opts in today.
-static AUTOCD: AtomicBool = AtomicBool::new(false);
-
-/// Whether this shell is in POSIX mode, which decides only one thing here: whether a special
-/// builtin is found before a shell function, as POSIX 2.9.1.1 requires and bash does only
-/// under `--posix`.
-static POSIX_MODE: AtomicBool = AtomicBool::new(false);
-
-/// Enable or disable autocd: whether a command word naming a directory means `cd` to it.
-///
-/// Off by default, and effective only in an interactive shell. This is the hook `shopt -s
-/// autocd` will call once `shopt` exists; the `set -o` table in `crate::env::options` does not
-/// carry it, because bash does not either.
-pub fn set_autocd(yes: bool) {
-    AUTOCD.store(yes, Ordering::Relaxed);
-}
-
-/// Declare whether this shell is in POSIX mode (`--posix`, `set -o posix`).
-pub fn set_posix_mode(yes: bool) {
-    POSIX_MODE.store(yes, Ordering::Relaxed);
-}
-
-/// Whether this shell is in POSIX mode; see [`set_posix_mode`].
-pub fn posix_mode() -> bool {
-    POSIX_MODE.load(Ordering::Relaxed)
-}
-
 pub(crate) fn eval_simple_command(env: &mut Environment, simple: &SimpleCommand) -> Result<i32> {
     // R6.5: a signal that arrived while the previous command ran is handled *between* commands,
     // where the trap body can run ordinary shell code. See `run_pending_traps`.
@@ -146,16 +113,30 @@ pub(crate) fn eval_simple_command(env: &mut Environment, simple: &SimpleCommand)
 /// assignments whose word expanded to nothing — because they have to agree about the two things
 /// that are easy to get subtly different: the assignment is still performed, and `set -x` still
 /// traces it.
+///
+/// An assignment that the environment *refused* — a read-only name, or one `environ` cannot hold
+/// — is a failed command. This used to answer `Ok(0)` regardless: `set_var` printed
+/// `r: is read only`, returned `false`, and the `false` was dropped on the floor, so `r=2; echo
+/// $?` said the assignment had worked (PLAN C3).
 fn apply_assignments_only(env: &mut Environment, simple: &SimpleCommand) -> Result<i32> {
     let mut assignments = Vec::with_capacity(simple.assignments.len());
+    let mut refused: Option<String> = None;
     for assign in &simple.assignments {
         // Applied before the next one is expanded, not batched at the end: POSIX 2.9.1 evaluates
         // assignments left to right and makes each visible to the next, so `a=1 b=${a}2` sets
         // `b` to `12`. What each shape means is `assign`'s business.
-        let value = assign::apply_assignment(env, assign)?;
-        assignments.push((assign.name().to_string(), value));
+        let outcome = assign::apply_assignment(env, assign)?;
+        if !outcome.assigned && refused.is_none() {
+            refused = Some(assign.name().to_string());
+        }
+        assignments.push((assign.name().to_string(), outcome.trace));
     }
+    // Traced first: `set -x` shows what the shell tried to do, and the refusal is on stderr
+    // beside it. The first name to fail is the one reported, as bash reports the first.
     trace::trace_command(env, &assignments, &[]);
+    if let Some(name) = refused {
+        return posix::assignment_failure(env, &name);
+    }
     Ok(apply_wordless_redirections(env, &simple.redirections))
 }
 
@@ -181,7 +162,10 @@ fn run_command_word(
 ) -> Result<i32> {
     let name = cmd_name.trim();
 
-    if posix_mode() && is_special_builtin(name) && env.is_builtin(name) {
+    if posix::special_builtins_outrank_functions(env)
+        && crate::env::scope::is_special_builtin(name)
+        && env.is_builtin(name)
+    {
         return run_builtin(env, name, words, redirections);
     }
 
@@ -202,6 +186,9 @@ fn run_command_word(
 /// last. `exec > "$log" 2>&1` — `exec` with no command word — is the form POSIX says applies to
 /// the shell itself from then on, so its guard must not restore anything; every other builtin
 /// gets the ordinary guard that puts the descriptors back when the command ends.
+///
+/// Both outcomes are then passed through `posix`, which is where a *special* builtin's utility
+/// error or redirection error becomes the end of a POSIX-mode shell.
 fn run_builtin(
     env: &mut Environment,
     name: &str,
@@ -214,9 +201,10 @@ fn run_builtin(
         RedirectGuard::new()
     };
     if let Err(e) = guard.apply(env, redirections) {
-        return Ok(report_redirect_failure(&e));
+        return posix::redirect_failure(env, name, report_redirect_failure(&e));
     }
-    execute_builtin(env, name, words)
+    let result = execute_builtin(env, name, words);
+    posix::resolve_builtin_result(env, name, result)
 }
 
 /// Call a shell function, absorbing the control flow that must not escape it.
@@ -255,7 +243,7 @@ fn run_program(
 ) -> Result<i32> {
     match look_up_command(cmd_name) {
         Lookup::Program(path) => run_external(env, &path, cmd_name, words, redirections),
-        Lookup::Directory => match try_autocd(env, cmd_name, words) {
+        Lookup::Directory => match autocd::try_autocd(env, cmd_name, words) {
             Some(result) => result,
             None => report_unrunnable(env, redirections, cmd_name, "Is a directory", 126),
         },
@@ -266,7 +254,7 @@ fn run_program(
         // was never a candidate; it only becomes one if autocd is on. bash reports the same
         // "command not found" and 127 here even with `shopt -s autocd` set, as long as the shell
         // is not interactive.
-        Lookup::NotFound => match try_autocd(env, cmd_name, words) {
+        Lookup::NotFound => match autocd::try_autocd(env, cmd_name, words) {
             Some(result) => result,
             None => report_unrunnable(env, redirections, cmd_name, "command not found", 127),
         },
@@ -295,40 +283,6 @@ fn report_unrunnable(
     }
     eprintln!("rush: {}: {}", cmd_name, reason);
     Ok(status)
-}
-
-/// `cd` to `cmd_name` if this shell is allowed to guess that is what was meant.
-///
-/// `None` — the overwhelmingly common answer — leaves the caller to report the real failure.
-/// Three conditions, all required: the shell is interactive (a person is there to see the
-/// directory change and to have meant it), autocd is switched on, and the command is a bare
-/// word with no arguments, since `build --release` is unambiguously not a `cd`.
-fn try_autocd(env: &mut Environment, cmd_name: &str, words: &[String]) -> Option<Result<i32>> {
-    if words.len() != 1 || !autocd_enabled(env) {
-        return None;
-    }
-    if !std::path::Path::new(cmd_name).is_dir() {
-        return None;
-    }
-    Some(crate::env::builtins::builtin_cd(
-        env,
-        &["cd".to_string(), cmd_name.to_string()],
-    ))
-}
-
-/// Whether autocd may fire: interactive *and* opted in.
-///
-/// The interactive half is not configurable, in bash either — `bash -O autocd -c 'somedir'`
-/// still reports `command not found`. A script's meaning must not depend on which directories
-/// happen to exist beside it.
-fn autocd_enabled(env: &Environment) -> bool {
-    if !crate::exec::pipeline::is_interactive() {
-        return false;
-    }
-    AUTOCD.load(Ordering::Relaxed)
-        || env
-            .get_var("RUSH_AUTOCD")
-            .is_some_and(|v| !v.is_empty() && v != "0")
 }
 
 /// Run a shell function body with its own positional parameters and variable scope.
@@ -369,10 +323,11 @@ fn call_function(
 /// diagnostic, set `$?` to 1 and carry on.
 ///
 /// The one case bash treats differently is a redirection error on a *special* builtin (`:`,
-/// `export`, …) in POSIX mode, which does abort the shell. rush does not implement the special
-/// builtin distinction anywhere yet — see the `robust_special_builtin_failure.sh` corpus case —
-/// so it is not invented here; continuing is the behaviour of every non-POSIX-mode shell and of
-/// bash for every other command.
+/// `export`, …) in POSIX mode, which does abort the shell. That is now implemented, but not
+/// here: this function only reports and scores the failure, and [`posix::redirect_failure`]
+/// decides whether the shell survives it. Callers on a path that cannot be a special builtin —
+/// a function, a compound, an external command, a command word with no builtin behind it — use
+/// this answer directly, because for them the question never arises.
 pub(crate) fn report_redirect_failure(err: &ShellError) -> i32 {
     eprintln!("rush: {}", err);
     1
@@ -399,6 +354,10 @@ fn apply_wordless_redirections(env: &mut Environment, redirections: &[Redirectio
 /// Lexed and expanded the same way as any other command words, so a quoted alias body such as
 /// `alias g='grep --color "a b"'` keeps its argument grouping instead of being split on spaces.
 fn expand_alias(env: &mut Environment, alias: &str) -> Result<Vec<String>> {
+    // bash substitutes an alias body into the command line and then expands the line, so the
+    // body's brace groups are expanded like anyone else's. Here the body is lexed directly, and
+    // brace expansion runs ahead of the lexer, so it has to be applied to the text first.
+    let alias = &crate::expand::brace::expand_braces_in_line(alias);
     let mut lexer = Lexer::new(alias);
     let mut out = Vec::new();
 
@@ -456,9 +415,15 @@ mod tests {
     /// Tests here therefore use names unique to each test rather than a shared `v`.
     fn run(src: &str) -> Environment {
         let mut env = Environment::new();
-        let script = crate::parser::parse_bash_script(src).expect("parse");
-        crate::exec::eval_command_list(&mut env, &script).expect("exec");
+        run_in(&mut env, src).expect("exec");
         env
+    }
+
+    /// Run a snippet in an environment the caller has already configured, and hand back the
+    /// result rather than unwrapping it — the POSIX-mode cases are about the error itself.
+    fn run_in(env: &mut Environment, src: &str) -> crate::error::Result<i32> {
+        let script = crate::parser::parse_bash_script(src).expect("parse");
+        crate::exec::eval_command_list(env, &script)
     }
 
     fn var(src: &str, name: &str) -> String {
@@ -530,19 +495,72 @@ mod tests {
         assert_eq!(env.get_var("rush_shadow_test"), Some("1"));
     }
 
-    /// POSIX mode is the only mode in which a special builtin outranks a function. The flag is
-    /// process-global, so it is restored before the assertion that would otherwise leak it into
-    /// every later test in this binary.
+    /// POSIX mode is the only mode in which a special builtin outranks a function.
+    ///
+    /// The mode lives on the `Environment` now, not in a process-global that every other test in
+    /// this binary had to be protected from: the second half here simply runs in a different
+    /// environment, and nothing has to be restored afterwards.
     #[test]
     fn posix_mode_puts_special_builtins_ahead_of_functions() {
         let env = run("export() { rush_shadow_export=1; }\nexport rush_ignored=x");
         assert_eq!(env.get_var("rush_shadow_export"), Some("1"));
 
-        super::set_posix_mode(true);
-        let env = run("export() { rush_shadow_export2=1; }\nexport rush_special=y");
-        super::set_posix_mode(false);
+        let mut env = Environment::new();
+        env.set_option(crate::env::options::ShellOption::Posix, true);
+        run_in(
+            &mut env,
+            "export() { rush_shadow_export2=1; }\nexport rush_special=y",
+        )
+        .expect("exec");
         assert_eq!(env.get_var("rush_shadow_export2"), None);
         assert_eq!(env.get_var("rush_special"), Some("y"));
+    }
+
+    /// C3: a refused assignment is a *failed* command, not a silent success.
+    ///
+    /// Outside POSIX mode the shell carries on with status 1, which is what
+    /// `bash -c $'readonly r=1\nr=2\necho "$?"\necho after'` does.
+    #[test]
+    fn a_refused_assignment_fails_the_command_and_the_shell_carries_on() {
+        let mut env = Environment::new();
+        env.set_var("rush_ro_a", "1", false);
+        env.set_readonly("rush_ro_a");
+        assert_eq!(run_in(&mut env, "rush_ro_a=2").expect("not fatal"), 1);
+        assert_eq!(env.get_var("rush_ro_a"), Some("1"));
+        // …and the next command still runs.
+        assert_eq!(run_in(&mut env, "rush_ro_b=ok").expect("not fatal"), 0);
+        assert_eq!(env.get_var("rush_ro_b"), Some("ok"));
+    }
+
+    /// …and in POSIX mode the same assignment ends the shell, as POSIX 2.8.1 requires and
+    /// `bash --posix -c` does. It unwinds as `exit`, so the EXIT trap still runs.
+    #[test]
+    fn a_refused_assignment_exits_a_posix_shell() {
+        let mut env = Environment::new();
+        env.set_option(crate::env::options::ShellOption::Posix, true);
+        env.set_var("rush_ro_c", "1", false);
+        env.set_readonly("rush_ro_c");
+        match run_in(&mut env, "rush_ro_c=2\nrush_never=reached") {
+            Err(crate::error::ShellError::Exit(status)) => {
+                assert_eq!(status, crate::error::FATAL_EXIT_STATUS);
+            }
+            other => panic!("expected the shell to exit, got {:?}", other),
+        }
+        assert_eq!(env.get_var("rush_never"), None);
+    }
+
+    /// An ordinary non-zero status must *not* end a POSIX shell, even from a special builtin.
+    /// `bash --posix -c 'shift 5; echo alive'` prints `alive` and exits 0; a check written as
+    /// `status != 0` would have killed the shell here.
+    #[test]
+    fn a_failing_special_builtin_that_is_not_a_utility_error_is_survivable() {
+        let mut env = Environment::new();
+        env.set_option(crate::env::options::ShellOption::Posix, true);
+        assert_eq!(
+            run_in(&mut env, "shift 5\nrush_still_alive=yes").expect("not fatal"),
+            0
+        );
+        assert_eq!(env.get_var("rush_still_alive"), Some("yes"));
     }
 
     /// Every builtin now dispatches through the registry, so a name the registry does not have

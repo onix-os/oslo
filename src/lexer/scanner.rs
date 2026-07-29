@@ -46,6 +46,15 @@ impl<'a> Lexer<'a> {
         self.chars.get(self.pos + 1).copied()
     }
 
+    /// How far the cursor has moved through the input, in characters.
+    ///
+    /// Exposed so a caller that loops on [`Lexer::next`] can tell a token apart from no progress
+    /// at all. Note that [`Lexer::peek`] moves it too — a peeked token is already scanned — so
+    /// only a loop that consumes with `next` alone may read this as "bytes consumed".
+    pub fn offset(&self) -> usize {
+        self.pos
+    }
+
     pub(super) fn advance(&mut self) -> Option<char> {
         if self.pos < self.chars.len() {
             let ch = self.chars[self.pos];
@@ -74,7 +83,7 @@ impl<'a> Lexer<'a> {
 
     fn skip_whitespace(&mut self) {
         while let Some(ch) = self.current_char() {
-            if ch == ' ' || ch == '\t' || ch == '\r' {
+            if is_blank(ch) {
                 self.advance();
             } else if ch == '\\' && self.peek_char() == Some('\n') {
                 // Line continuation
@@ -84,6 +93,22 @@ impl<'a> Lexer<'a> {
                 break;
             }
         }
+    }
+
+    /// Turn a stalled scan into an error instead of an endless stream of empty tokens.
+    ///
+    /// [`Lexer::next`] must consume at least one character per token, or any caller looping to
+    /// `Eof` never reaches it. `next_token` reaches [`Lexer::scan_word`] only after
+    /// `skip_whitespace` and `scan_operator` have both declined a character that is not EOF, so
+    /// word scanning consuming nothing means those three disagree about what that character is.
+    /// That was a real bug once — see [`is_blank`] — and this makes the next one loud.
+    pub(super) fn stalled_at(&self) -> ShellError {
+        let ch = self.current_char().unwrap_or('\0');
+        ShellError::SyntaxError(format!(
+            "lexer made no progress at U+{:04X}: it is neither a separator, an operator nor part \
+             of a word",
+            ch as u32
+        ))
     }
 
     fn next_token(&mut self) -> Result<Token> {
@@ -388,6 +413,26 @@ impl Lexer<'_> {
             "Unterminated backquote".to_string(),
         ))
     }
+}
+
+/// The blanks that separate one token from the next — the *only* ones.
+///
+/// This is the shell's definition, not Unicode's: POSIX separates tokens on the characters in
+/// `IFS`, whose default is space, tab and newline, and bash tokenizes on exactly space and tab
+/// (newline is an operator, handled by [`is_operator_char`], and `\r` is accepted here so a file
+/// with CRLF line endings still lexes). Every other character `char::is_whitespace` reports —
+/// U+000B vertical tab, U+000C form feed, U+00A0 no-break space, U+2028, the rest of Unicode
+/// `White_Space` — is an ordinary word character, and `echo a<NBSP>b` prints one word in bash.
+///
+/// It is a free function, and both the token scanner and the word scanner call it, because they
+/// used to disagree: [`Lexer::skip_whitespace`] stepped over this set while
+/// [`Lexer::scan_word_parts`] ended a word at any `char::is_whitespace()`. A character in the gap
+/// was skipped by neither and consumed by neither, so `scan_word` returned a part-less word
+/// without moving the cursor and every caller looping to `Eof` spun forever, allocating — a hang
+/// and an out-of-memory reachable by pasting a no-break space into any script. Any future change
+/// to what counts as a separator has to happen here, where it cannot apply to only one of them.
+pub(super) fn is_blank(ch: char) -> bool {
+    ch == ' ' || ch == '\t' || ch == '\r'
 }
 
 pub(super) fn is_operator_char(ch: char) -> bool {

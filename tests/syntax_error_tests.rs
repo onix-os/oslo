@@ -198,3 +198,67 @@ fn sourcing_an_unparseable_file_returns_two_and_the_script_continues() {
     let r = run("printf 'if\\n' > bad.sh; . ./bad.sh; echo AFTER=$?");
     assert_eq!(r.out(), "AFTER=2", "stderr: {}", r.stderr);
 }
+
+/// Round 11 A1: a Unicode blank pasted into a script used to kill the shell at *parse* time.
+///
+/// `Lexer::skip_whitespace` stepped over a set of characters `scan_word_parts` refused to consume,
+/// so the lexer handed back empty words forever and the adapter grew a `Vec` until the allocator
+/// aborted — status 134, a core dump, and no command run. A no-break space out of a web page or a
+/// PDF was enough. bash treats every one of these as an ordinary word character, and so does rush.
+#[test]
+fn a_unicode_blank_is_word_data_and_never_a_hang() {
+    for blank in ['\u{0b}', '\u{0c}', '\u{a0}', '\u{85}', '\u{2028}'] {
+        let r = run(&format!("echo a{blank}b"));
+        assert_eq!(r.status, 0, "U+{:04X}: stderr {}", blank as u32, r.stderr);
+        assert_eq!(r.out(), format!("a{blank}b"), "U+{:04X}", blank as u32);
+    }
+
+    // The same character everywhere else a word is lexed: an assignment value, an array literal,
+    // a `for` list and a quoted run all go through the one scanner.
+    let r = run("v=1\u{a0}2; echo \"[$v]\"");
+    assert_eq!(r.out(), "[1\u{a0}2]", "stderr: {}", r.stderr);
+    let r = run("a=(x\u{0b}y z); echo \"${a[0]}|${a[1]}\"");
+    assert_eq!(r.out(), "x\u{0b}y|z", "stderr: {}", r.stderr);
+}
+
+/// Round 11 A2: openers that never close made brush backtrack exponentially.
+///
+/// `brush_parser` is a PEG, so an unmatched `(` doubles the alternatives it re-tries: 25 of them
+/// held the shell at 100% CPU indefinitely, and the nesting guard never saw it because 25 is a
+/// quarter of the *depth* it bounds. bash rejects all of these in under a millisecond with status
+/// 2, which is now also what rush does.
+#[test]
+fn unmatched_openers_are_refused_instead_of_backtracked() {
+    for opener in [
+        "(",
+        "{ ",
+        "if true; then ",
+        "while true; do ",
+        "case $x in ",
+    ] {
+        let script = format!("{}echo NOT_REACHED", opener.repeat(25));
+        let r = run(&script);
+        assert_eq!(r.status, 2, "{opener:?}: stderr {}", r.stderr);
+        assert!(!r.stdout.contains("NOT_REACHED"), "{opener:?} ran its body");
+        assert!(
+            r.stderr.contains("unmatched openers"),
+            "{opener:?}: {:?}",
+            r.stderr
+        );
+    }
+}
+
+/// The bound must not touch input that closes what it opens, however wide.
+#[test]
+fn balanced_input_at_the_same_width_still_runs() {
+    for (opener, closer) in [
+        ("{ ", "; }"),
+        ("if true; then ", "; fi"),
+        ("while false; do :; done; ", ""),
+    ] {
+        let script = format!("{}echo ok{}", opener.repeat(40), closer.repeat(40));
+        let r = run(&script);
+        assert_eq!(r.out(), "ok", "{opener:?}: stderr {}", r.stderr);
+        assert_eq!(r.status, 0, "{opener:?}");
+    }
+}

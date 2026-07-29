@@ -109,10 +109,10 @@ fn run_program(invocation: &Invocation, script: &str) -> ! {
 /// while `c` and `s` say where the program came from and no `set` command can change them. Both
 /// live in the same bitset because `$-` reports both.
 fn apply_invocation_options(env: &mut Environment, invocation: &Invocation) {
-    for letter in invocation.set_options.chars() {
-        if let Some(option) = ShellOption::from_letter(letter) {
-            env.set_option(option, true);
-        }
+    // `Invocation::options` covers both spellings. Walking `set_options` here instead would drop
+    // every option that has no letter — `--posix` is exactly that shape.
+    for option in invocation.options() {
+        env.set_option(option, true);
     }
     match invocation.action {
         Action::Command(_) => env.set_option(ShellOption::CommandString, true),

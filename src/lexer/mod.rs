@@ -12,6 +12,7 @@ pub mod quoting;
 pub mod scanner;
 pub mod token;
 
+pub use quoting::parse_heredoc_body;
 pub use scanner::Lexer;
 pub use token::Token;
 

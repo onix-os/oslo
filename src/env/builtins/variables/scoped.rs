@@ -37,7 +37,7 @@ pub fn builtin_local(env: &mut Environment, args: &[String]) -> Result<i32> {
 
     let opts = match options::parse(args, "irx") {
         Ok(o) => o,
-        Err(letter) => return Ok(options::invalid("local", letter, LOCAL_USAGE)),
+        Err(letter) => return Err(options::invalid("local", letter, LOCAL_USAGE)),
     };
 
     let mut status = 0;
@@ -81,7 +81,7 @@ pub fn builtin_local(env: &mut Environment, args: &[String]) -> Result<i32> {
 pub fn builtin_readonly(env: &mut Environment, args: &[String]) -> Result<i32> {
     let opts = match options::parse(args, "p") {
         Ok(o) => o,
-        Err(letter) => return Ok(options::invalid("readonly", letter, READONLY_USAGE)),
+        Err(letter) => return Err(options::invalid("readonly", letter, READONLY_USAGE)),
     };
     let operands = &args[opts.operands..];
 
@@ -91,11 +91,16 @@ pub fn builtin_readonly(env: &mut Environment, args: &[String]) -> Result<i32> {
     }
 
     let mut status = 0;
+    // `readonly` is a special builtin, so a name it cannot accept ends a POSIX-mode shell — see
+    // the identical note in [`super::exporting::builtin_export`]. A *refused* assignment below is
+    // an ordinary failure and is deliberately not tracked here.
+    let mut bad_name = false;
     for arg in operands {
         let (name, assigned) = split_assignment(arg);
         if !is_valid_identifier(name) {
             super::not_an_identifier("readonly", arg);
             status = 1;
+            bad_name = true;
             continue;
         }
         // A refused assignment must not leave the name read-only: the user would then be unable
@@ -117,6 +122,12 @@ pub fn builtin_readonly(env: &mut Environment, args: &[String]) -> Result<i32> {
         env.set_readonly(name);
     }
 
+    if bad_name {
+        return Err(crate::error::ShellError::utility_error(
+            "readonly: not a valid identifier",
+            1,
+        ));
+    }
     Ok(status)
 }
 
@@ -201,10 +212,10 @@ mod tests {
     #[test]
     fn readonly_of_an_invalid_name_fails() {
         let mut env = Environment::new();
-        assert_eq!(
-            builtin_readonly(&mut env, &words(&["readonly", "=1"])).unwrap(),
-            1
-        );
+        // A utility error worth 1: `readonly` is special, so `bash --posix -c 'readonly 1bad=1;
+        // echo alive'` prints no `alive`.
+        let err = builtin_readonly(&mut env, &words(&["readonly", "=1"])).expect_err("fails");
+        assert_eq!(err.survivable_utility_status(), Some(1));
         assert!(!env.is_readonly("=1"));
         assert!(!env.is_readonly(""));
     }

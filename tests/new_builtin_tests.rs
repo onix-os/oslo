@@ -334,10 +334,22 @@ fn ulimit_can_report_the_hard_limit() {
     }
 }
 
-/// Silently accepting a value it cannot apply would tell a script it has headroom it does not.
+/// The set direction really sets: `ulimit` used to refuse an operand outright, because `nix`'s
+/// `resource` feature was off and accepting a value it could not apply would have told a script
+/// it had headroom it did not have. Lowered, never raised, so the test does not depend on
+/// privileges. Its own process, so nothing else inherits the smaller limit.
 #[test]
-fn ulimit_refuses_to_pretend_it_set_a_limit() {
-    let r = run("ulimit -n 4096");
+fn ulimit_applies_a_limit_it_reports_back() {
+    assert_out("ulimit -c 0; ulimit -c", "0");
+    assert_out("ulimit -n 128; ulimit -n", "128");
+    // File sizes go through a 512-byte block conversion in both directions.
+    assert_out("ulimit -f 4096; ulimit -f", "4096");
+}
+
+/// A value that is not a number is refused rather than rounded to something.
+#[test]
+fn ulimit_refuses_a_value_that_is_not_a_limit() {
+    let r = run("ulimit -n abc");
     assert_eq!(r.status, 1);
     assert!(!r.stderr.is_empty());
 }

@@ -10,17 +10,22 @@
 //! so `export -p > f; . f` restores exactly what was there. A `HashMap` iteration order and a
 //! `{:?}` value are neither, which is what the listings used to be.
 //!
-//! # Helpers this module still needs from [`Environment`]
+//! # Utility errors
 //!
-//! Two behaviours are parsed and diagnosed here but cannot be *carried out* without new methods
-//! on [`Environment`], whose relevant fields are private:
+//! Four of these builtins are POSIX *special* builtins (`export`, `unset`, `readonly` via
+//! [`scoped`], `set` via [`parameters`]), and POSIX 2.8.1 ends a non-interactive shell that gives
+//! one a *utility* error. So a bad option letter or a name that is not an identifier is returned
+//! as [`ShellError::UtilityError`] rather than as a status, and
+//! `crate::exec::simple::posix::resolve_builtin_result` decides what becomes of it — folding it
+//! back to the same status this code used to return whenever POSIX mode is off, which is always
+//! for `alias`/`unalias`/`local`, none of which are special.
 //!
-//! * `unset -f name` needs `Environment::remove_function`; the functions map is exposed
-//!   read-only.
-//! * `local` outside a function must fail, which needs `Environment::in_function` (the function
-//!   depth counter and the scope stack are both private).
+//! An ordinary failure stays an ordinary status: `export -f nosuchfn` and `local` outside a
+//! function report 1 and are survivable in every shell, and mixing the two up is what would kill
+//! a `--posix` script on `shift 5`.
 //!
 //! [`Environment`]: crate::env::scope::Environment
+//! [`ShellError::UtilityError`]: crate::error::ShellError::UtilityError
 
 mod aliases;
 mod deparse;
@@ -57,11 +62,11 @@ mod tests {
     fn export_of_an_invalid_name_fails_without_setting_anything() {
         let mut env = Environment::new();
         for bad in ["=1", "1abc=x", "a b=1", "a-b"] {
-            assert_eq!(
-                builtin_export(&mut env, &words(&["export", bad])).unwrap(),
-                1,
-                "export {bad:?} should fail"
-            );
+            // A utility error worth 1, which is what a POSIX-mode shell exits with; outside
+            // POSIX mode `crate::exec::simple::posix` folds it back to `Ok(1)`.
+            let err = builtin_export(&mut env, &words(&["export", bad]))
+                .expect_err("export {bad:?} should fail");
+            assert_eq!(err.survivable_utility_status(), Some(1), "export {bad:?}");
         }
         assert!(env.get_var("=1").is_none());
         assert!(env.get_var("1abc").is_none());

@@ -162,7 +162,12 @@ pub(crate) fn suspend_errexit() -> ErrExitSuspension {
 }
 
 /// Whether an enclosing construct has exempted the command about to be judged.
-fn errexit_suspended() -> bool {
+///
+/// Read by `crate::exec::simple::posix` as well as by errexit itself: bash applies the same
+/// exemption list to POSIX 2.8.1's "a special builtin's utility error ends the shell", so
+/// `bash --posix -c 'export BAD-NAME=1 || true; echo alive'` prints `alive` while the same
+/// command on its own does not.
+pub(crate) fn errexit_suspended() -> bool {
     ERREXIT_SUSPENDED.with(|d| d.get()) > 0
 }
 

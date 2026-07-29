@@ -71,7 +71,16 @@ fn run(env: &mut Environment, operands: &[String], default_path: bool) -> Result
     // Deliberately *not* `env.get_function` first: skipping the function lookup is the entire
     // point of this builtin.
     if let Some(result) = env.exec_custom_builtin(name, operands) {
-        return result;
+        // POSIX 2.9.1.1: `command` makes a special builtin behave as a regular one, which is
+        // precisely the property that would have ended a POSIX-mode shell over a utility error.
+        // `bash --posix -c 'command export BAD-NAME=1; echo alive'` prints `alive`.
+        return match result {
+            Err(e) => match e.survivable_utility_status() {
+                Some(status) => Ok(status),
+                None => Err(e),
+            },
+            ok => ok,
+        };
     }
 
     match lookup_program(name, default_path) {

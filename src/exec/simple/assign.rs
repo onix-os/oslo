@@ -17,11 +17,32 @@ use crate::error::{Result, ShellError};
 use crate::expand::arithmetic::eval_arithmetic;
 use crate::expand::{expand_word, expand_word_to_string};
 
-/// Apply one assignment to the shell's own variables.
+/// What one assignment did.
 ///
-/// The `String` handed back is what `set -x` traces; an array literal traces as the elements it
-/// expanded to, which is the information a reader of the trace actually wants.
-pub(super) fn apply_assignment(env: &mut Environment, assign: &Assignment) -> Result<String> {
+/// `assigned` exists because the environment can *refuse*: a read-only name, or a name or value
+/// `environ` cannot represent. `Environment::set_var` prints the reason and returns `false`, and
+/// that `false` used to be discarded at the call site — so `readonly r=1; r=2; echo $?` printed
+/// the diagnostic and then claimed success (PLAN C3). Returning it makes the caller decide, which
+/// it must, because in POSIX mode the answer is that the shell stops.
+pub(super) struct Outcome {
+    /// What `set -x` traces; an array literal traces as the elements it expanded to, which is the
+    /// information a reader of the trace actually wants.
+    pub trace: String,
+    /// Whether the variable now holds the value.
+    pub assigned: bool,
+}
+
+impl Outcome {
+    fn new(trace: impl Into<String>, assigned: bool) -> Self {
+        Outcome {
+            trace: trace.into(),
+            assigned,
+        }
+    }
+}
+
+/// Apply one assignment to the shell's own variables.
+pub(super) fn apply_assignment(env: &mut Environment, assign: &Assignment) -> Result<Outcome> {
     match (&assign.target, &assign.value) {
         (AssignmentTarget::Name(name), AssignmentValue::Scalar(word)) => {
             let value = expand_word_to_string(env, word)?;
@@ -29,15 +50,15 @@ pub(super) fn apply_assignment(env: &mut Environment, assign: &Assignment) -> Re
                 // `x+=b` on an *array* appends an element, as bash does; on a scalar it
                 // concatenates. Which one it is depends on what the name already holds.
                 if env.get_array(name).is_some() {
-                    env.append_array_element(name, &value);
-                    return Ok(value);
+                    let ok = env.append_array_element(name, &value);
+                    return Ok(Outcome::new(value, ok));
                 }
                 let value = format!("{}{}", env.get_var(name).unwrap_or_default(), value);
-                env.set_var(name, &value, false);
-                return Ok(value);
+                let ok = env.set_var(name, &value, false);
+                return Ok(Outcome::new(value, ok));
             }
-            env.set_var(name, &value, false);
-            Ok(value)
+            let ok = env.set_var(name, &value, false);
+            Ok(Outcome::new(value, ok))
         }
 
         (AssignmentTarget::Element { name, index }, AssignmentValue::Scalar(word)) => {
@@ -47,8 +68,8 @@ pub(super) fn apply_assignment(env: &mut Environment, assign: &Assignment) -> Re
                 let existing = env.get_array(name).and_then(|a| a.get(index)).unwrap_or("");
                 value = format!("{existing}{value}");
             }
-            env.set_array_element(name, index, &value);
-            Ok(value)
+            let ok = env.set_array_element(name, index, &value);
+            Ok(Outcome::new(value, ok))
         }
 
         (AssignmentTarget::Name(name), AssignmentValue::Array(elements)) => {
@@ -58,8 +79,8 @@ pub(super) fn apply_assignment(env: &mut Environment, assign: &Assignment) -> Re
             let joined = format!("({})", array.joined(" "));
             // Inside a function `a=(…)` is still global unless `local`/`declare` said otherwise,
             // which is what `set_array` does; `set_local_array` is the declaration builtins' path.
-            env.set_array(name, array);
-            Ok(joined)
+            let ok = env.set_array(name, array);
+            Ok(Outcome::new(joined, ok))
         }
 
         // `a[0]=(1 2)` — bash rejects this too ("cannot assign list to array member"). Refusing is
@@ -175,6 +196,57 @@ mod tests {
         crate::exec::eval_command_list(&mut env, &script).expect("exec");
         assert_eq!(env.get_var("rush_x9[2]"), None);
         assert_eq!(env.get_array("rush_x9").unwrap().get(2), Some("y"));
+    }
+
+    /// A refused assignment reports failure and leaves the old value in place, in every shape.
+    ///
+    /// The status the shell reports for it is `exec::simple`'s decision, not this module's; what
+    /// is asserted here is that the `false` reaches the caller at all, which is the bug: it used
+    /// to be dropped, so the shell said the assignment had worked.
+    #[test]
+    fn a_read_only_name_refuses_every_shape_of_assignment() {
+        use crate::ast::{
+            ArrayElement, Assignment, AssignmentTarget, AssignmentValue, Word as AstWord,
+        };
+
+        let mut env = Environment::new();
+        env.set_var("rush_ro", "1", false);
+        env.set_readonly("rush_ro");
+
+        let scalar = Assignment::scalar("rush_ro", AstWord::from_literal("2"));
+        let mut appended = Assignment::scalar("rush_ro", AstWord::from_literal("x"));
+        appended.append = true;
+        let literal = Assignment {
+            target: AssignmentTarget::Name("rush_ro".to_string()),
+            value: AssignmentValue::Array(vec![ArrayElement {
+                index: None,
+                value: AstWord::from_literal("a"),
+            }]),
+            append: false,
+        };
+        let element = Assignment {
+            target: AssignmentTarget::Element {
+                name: "rush_ro".to_string(),
+                index: AstWord::from_literal("3"),
+            },
+            value: AssignmentValue::Scalar(AstWord::from_literal("z")),
+            append: false,
+        };
+
+        for assignment in [&scalar, &appended, &literal, &element] {
+            let outcome = super::apply_assignment(&mut env, assignment).expect("evaluates");
+            assert!(!outcome.assigned, "{assignment:?} should have been refused");
+        }
+        assert_eq!(env.get_var("rush_ro"), Some("1"));
+    }
+
+    /// A name or value `environ` cannot hold is refused the same way, and it is not a read-only
+    /// name — so no caller may read "refused" as "read-only".
+    #[test]
+    fn an_unrepresentable_value_is_also_a_refusal() {
+        let mut env = Environment::new();
+        assert!(!env.set_var("rush_nul", "a\0b", false));
+        assert!(!env.is_readonly("rush_nul"));
     }
 
     /// The subscript is arithmetic, evaluated when the assignment runs.

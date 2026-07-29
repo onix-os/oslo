@@ -34,9 +34,16 @@ fn helper(env: Environment) -> RushHelper {
 }
 
 /// An environment whose `$PATH` is exactly `dir`, so command completion is deterministic.
+///
+/// Set *unexported*, and that is not a detail. Exporting reaches `unsafe { env::set_var }`
+/// (`src/env/scope.rs`), which rewrites this test process's real `environ` from a libtest worker
+/// thread while sixteen siblings in this binary are inside `Environment::new()`'s `env::vars()`
+/// walk — the R10.3 data race, plus a wrecked `$PATH` for anything that spawns a command
+/// afterwards. Nothing is lost: completion, hinting and highlighting all read `$PATH` through
+/// `Environment::get_var`, never through `getenv`.
 fn env_with_path(dir: &Path) -> Environment {
     let mut env = Environment::new();
-    env.set_var("PATH", dir.to_str().unwrap(), true);
+    env.set_var("PATH", dir.to_str().unwrap(), false);
     env
 }
 

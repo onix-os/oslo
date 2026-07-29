@@ -37,9 +37,9 @@ pub const EXPECTED_FAIL: &[(&str, &str, &str)] = &[
     // after every pipeline; a signalled child reports 128 + signo.
 
     // --- Round 5: builtins conformance ---
-    ("builtin_exec_redirect.sh", "R5.7", "`exec 3> file` closes fd 3: exec::simple now builds the non-restoring guard, but redirect.rs `apply` opens the file (which lands on fd 3), does a no-op dup2(3,3), then drops the File and closes it"),
-    ("builtin_unset.sh", "R5.10", "unset -f cannot remove a function"),
-    ("builtin_readonly.sh", "R5.10", "assignment to a readonly variable succeeds"),
+    // Empty: `readonly` now refuses the assignment *and* reports it. `builtin_readonly.sh` needed
+    // both halves of R11 to close — R5.10's status propagation, and the differential harness
+    // finally running rush in the same `--posix` mode it was giving the oracle.
 
     // --- Round 6: shell options and traps ---
     // Empty: every option in the `set -o` table that has behaviour now acts on it, and traps are
@@ -51,17 +51,15 @@ pub const EXPECTED_FAIL: &[(&str, &str, &str)] = &[
     // in Round 7 needs a pty and is covered by the job-control integration tests instead.
 
     // --- Round 8: missing language features ---
-    ("array_whole_operators.sh", "R8.1", "an operator applied to a whole array — `${a[@]:1}` slicing, `${a[@]#pat}` element-wise — is rejected loudly instead of evaluated; every other array form matches bash"),
-    ("arith_for_unspaced_sections.sh", "R8.3", "brush 0.4 tokenizes the `;;` in `for ((;;))` as the case terminator, so the idiomatic unspaced infinite loop is a parse error; `for (( ; ; ))` works"),
     ("syntax_unsupported_process_substitution.sh", "R8.4", "process substitution is refused by name (step 1); the `/dev/fd/N` implementation is step 2 and deferred"),
     ("syntax_unsupported_coproc.sh", "R8.5", "coproc is refused by name and deliberately not implemented — it needs job control; bash runs the body and exits 0"),
     ("syntax_unsupported_select.sh", "R8.6", "select is refused by name and deliberately not implemented — it needs a prompt, PS3 and REPLY; bash runs the loop and reads EOF"),
 
     // --- divergences the audit did not enumerate ---
-    ("redir_heredoc.sh", "UNFILED", "an unquoted heredoc body is not parameter-expanded"),
-    ("redir_herestring_expansion.sh", "UNFILED", "a here-string word is not expanded, only unquoted"),
-    ("robust_special_builtin_failure.sh", "UNFILED", "a failing special builtin does not exit a POSIX-mode shell"),
-    ("expansion_brace_precedes_params.sh", "UNFILED", "brace expansion works on word parts, so `{$v,y}z` cannot fuse into the name `$vz` the way bash's textual pass does"),
+    // Empty: `robust_special_builtin_failure.sh` closed with R11's C4. It needed three things at
+    // once — a `--posix` flag, a differential harness that gives rush the same mode it gives the
+    // oracle, and a builtin that reports a *utility* error rather than a non-zero status, so that
+    // `export "=1"` is fatal where `shift 5` is not.
 ];
 
 /// Corpus file and why bash cannot arbitrate it. Empty is the healthy state.

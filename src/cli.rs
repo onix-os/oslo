@@ -37,10 +37,30 @@ pub struct Invocation {
     pub login: bool,
     /// Single-letter `set` options given on the command line, e.g. `ex` for `-e -x`.
     ///
-    /// Letters only, in the order they were written, deduplicated. `main` turns each one into a
-    /// [`ShellOption`] on the new shell's `Environment`; the letters that are not options at all
-    /// (`-c`, `-i`, `-l`, `-s`) are handled by the fields above and never appear here.
+    /// Letters only, in the order they were written, deduplicated. The letters that are not
+    /// options at all (`-c`, `-i`, `-l`, `-s`) are handled by the fields above and never appear
+    /// here. Read through [`Invocation::options`], never directly: an option with no letter
+    /// cannot be spelled here at all.
     pub set_options: String,
+    /// Options given by their long name, e.g. `--posix`.
+    ///
+    /// A separate field because [`Self::set_options`] is a string of letters and the options that
+    /// matter most here — `posix` above all — deliberately have none: `$-` must not claim a
+    /// letter bash does not report.
+    pub long_options: Vec<ShellOption>,
+}
+
+impl Invocation {
+    /// Every `set` option this command line asks for, however it was spelled.
+    ///
+    /// The one place a caller should read the two option fields from, so that adding a long
+    /// option can never again mean adding a second loop somewhere that forgets it.
+    pub fn options(&self) -> impl Iterator<Item = ShellOption> + '_ {
+        self.set_options
+            .chars()
+            .filter_map(ShellOption::from_letter)
+            .chain(self.long_options.iter().copied())
+    }
 }
 
 /// Argument parsing finished without producing an invocation: print `message` and exit.
@@ -69,11 +89,31 @@ pub fn usage() -> String {
         s,
         "  -e -u -x ...      set a shell option, as `set` does (see `set -o`)"
     );
+    let _ = writeln!(
+        s,
+        "  --posix           follow POSIX where bash's default differs"
+    );
     let _ = writeln!(s, "  --lua-script FILE run a Lua script, then exit");
     let _ = writeln!(s, "  --version         print the version, then exit");
     let _ = writeln!(s, "  --help            print this message, then exit");
     let _ = writeln!(s, "  --                end of options");
     s
+}
+
+/// The `set -o` names that are also command-line flags.
+///
+/// Deliberately a short explicit list rather than "anything `set -o` accepts": bash rejects
+/// `--errexit`, and a shell that quietly accepted it would be inventing an interface. `--posix`
+/// is here because POSIX mode cannot be reached any other way before the first command runs —
+/// `set -o posix` on line 1 of a script is already too late for the option to have decided how
+/// that line's command word was searched for.
+const LONG_FLAGS: &[&str] = &["posix"];
+
+fn long_option(name: &str) -> Option<ShellOption> {
+    LONG_FLAGS
+        .contains(&name)
+        .then(|| ShellOption::from_name(name))
+        .flatten()
 }
 
 fn usage_error(problem: String) -> Exit {
@@ -93,6 +133,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, Exit> {
     let mut force_interactive = false;
     let mut login = false;
     let mut set_options = String::new();
+    let mut long_options: Vec<ShellOption> = Vec::new();
 
     let mut i = 1;
     // Set once `-c` has taken its command string: everything after it is an operand, whatever it
@@ -142,9 +183,14 @@ pub fn parse(argv: &[String]) -> Result<Invocation, Exit> {
                         }
                     }
                 }
-                other => {
-                    return Err(usage_error(format!("--{}: invalid option", other)));
-                }
+                other => match long_option(other) {
+                    Some(option) => {
+                        if !long_options.contains(&option) {
+                            long_options.push(option);
+                        }
+                    }
+                    None => return Err(usage_error(format!("--{}: invalid option", other))),
+                },
             }
             i += 1;
             continue;
@@ -235,6 +281,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, Exit> {
         force_interactive,
         login,
         set_options,
+        long_options,
     })
 }
 
@@ -373,6 +420,46 @@ mod tests {
         let inv = parse_args(&["-s", "a", "b"]).expect("parse");
         assert_eq!(inv.action, Action::Stdin);
         assert_eq!(inv.positional, vec!["a".to_string(), "b".to_string()]);
+    }
+
+    /// `--posix` was not an option at all: `rush --posix -c 'echo x'` was a usage error, which is
+    /// what made the whole POSIX-mode code path unreachable in production.
+    #[test]
+    fn posix_is_a_long_option_and_reaches_the_option_set() {
+        let inv = parse_args(&["--posix", "-c", "echo x"]).expect("parse");
+        assert_eq!(inv.action, Action::Command("echo x".to_string()));
+        assert!(inv.options().any(|o| o == ShellOption::Posix));
+        // It has no letter, so it must not have leaked into the `$-` string either.
+        assert_eq!(inv.set_options, "");
+    }
+
+    /// `options()` is the single reader, so a mixed command line yields both spellings.
+    #[test]
+    fn options_yields_letters_and_long_names_together() {
+        let inv = parse_args(&["--posix", "-ex", "run.sh"]).expect("parse");
+        let opts: Vec<_> = inv.options().collect();
+        assert!(opts.contains(&ShellOption::ErrExit));
+        assert!(opts.contains(&ShellOption::XTrace));
+        assert!(opts.contains(&ShellOption::Posix));
+    }
+
+    /// Repeats collapse, as they do for letters.
+    #[test]
+    fn a_repeated_long_option_is_recorded_once() {
+        let inv = parse_args(&["--posix", "--posix"]).expect("parse");
+        assert_eq!(inv.long_options, vec![ShellOption::Posix]);
+    }
+
+    /// The long-name flags are an explicit list, not "everything `set -o` accepts": bash rejects
+    /// `--errexit`, and accepting it would be inventing an interface.
+    #[test]
+    fn a_set_o_name_is_not_automatically_a_long_option() {
+        let err = parse_args(&["--errexit"]).expect_err("not a command-line flag");
+        assert!(
+            err.message.contains("--errexit: invalid option"),
+            "{}",
+            err.message
+        );
     }
 
     #[test]

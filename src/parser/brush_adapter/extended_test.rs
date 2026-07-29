@@ -60,7 +60,7 @@ fn extended_test_to_and_or(expr: &ast::ExtendedTestExpr) -> Result<rush_ast::And
         ast::ExtendedTestExpr::UnaryTest(pred, word) => {
             let op = unary_predicate_op(pred);
             Ok(bracket_and_or(
-                vec![rush_ast::Word::from_literal(op), single_word(word)],
+                vec![rush_ast::Word::from_literal(op), single_word(word)?],
                 false,
             ))
         }
@@ -68,9 +68,9 @@ fn extended_test_to_and_or(expr: &ast::ExtendedTestExpr) -> Result<rush_ast::And
             let (op, negate) = binary_predicate_op(pred, right);
             Ok(bracket_and_or(
                 vec![
-                    single_word(left),
+                    single_word(left)?,
                     rush_ast::Word::from_literal(op),
-                    single_word(right),
+                    single_word(right)?,
                 ],
                 negate,
             ))

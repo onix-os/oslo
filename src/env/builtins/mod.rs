@@ -13,6 +13,7 @@
 
 pub(crate) mod arrays;
 mod builtin;
+mod caller;
 mod colon;
 mod command;
 mod conditionals;
@@ -25,13 +26,17 @@ mod hash;
 mod io;
 mod jobs;
 mod r#let;
+mod mapfile;
 mod process;
+mod shopt;
 mod spawn;
+mod suspend;
 mod times;
 mod ulimit;
 mod variables;
 
 pub use builtin::builtin_builtin;
+pub use caller::builtin_caller;
 pub use colon::builtin_colon;
 pub use command::builtin_command;
 pub use conditionals::{builtin_extended_test, builtin_test};
@@ -47,7 +52,10 @@ pub use hash::builtin_hash;
 pub use io::{builtin_echo, builtin_read};
 pub use jobs::{builtin_bg, builtin_disown, builtin_fg, builtin_jobs, builtin_wait};
 pub use r#let::builtin_let;
+pub use mapfile::builtin_mapfile;
 pub use process::{builtin_kill, builtin_trap, builtin_umask, run_exit_trap, run_pending_traps};
+pub use shopt::builtin_shopt;
+pub use suspend::builtin_suspend;
 pub use times::builtin_times;
 pub use ulimit::builtin_ulimit;
 pub use variables::{
@@ -65,9 +73,17 @@ pub use exec::makes_redirections_permanent as exec_makes_redirections_permanent;
 
 /// The shell's remembered command locations, for whoever resolves `PATH` lookups.
 ///
-/// [`hash_remember`] records a resolution and [`hash_recall`] replays one; `hash` on its own
-/// reports the table and `hash -r` clears it. Nothing in the command-resolution path calls these
-/// yet, so today the table only holds what an explicit `hash name` put in it.
+/// [`hash_lookup`] is the one a command-resolution path wants: it answers from the table, falls
+/// back to a `PATH` search, and remembers the result. [`hash_remember`] and [`hash_recall`] are
+/// its two halves, for a caller that has already searched. `hash` on its own reports the table
+/// and `hash -r` clears it.
+///
+/// `crate::exec::simple::external::look_up_command` resolves every bare command word through
+/// [`hash_lookup`], which is what makes the table describe the session rather than only what an
+/// explicit `hash name` put there. [`hash_forget_all`] is the invalidation side: `hash -r` and an
+/// assignment to `PATH`.
+pub use hash::forget_all as hash_forget_all;
+pub use hash::lookup as hash_lookup;
 pub use hash::recall as hash_recall;
 pub use hash::remember as hash_remember;
 
@@ -128,6 +144,17 @@ pub fn register_default_builtins(env: &mut Environment) {
     env.register_custom_builtin("times", builtin_times);
     env.register_custom_builtin("ulimit", builtin_ulimit);
 
+    // `shopt` is a namespace of its own, not an alias for `set -o`: see the module docs. It is
+    // also the only way to reach `exec::simple::set_autocd`, which had no caller before it.
+    env.register_custom_builtin("shopt", builtin_shopt);
+    env.register_custom_builtin("caller", builtin_caller);
+    env.register_custom_builtin("suspend", builtin_suspend);
+
+    // One builtin, two names, exactly as in bash — `readarray` is the spelling that says what it
+    // does, `mapfile` is the one scripts were written against.
+    env.register_custom_builtin("mapfile", builtin_mapfile);
+    env.register_custom_builtin("readarray", builtin_mapfile);
+
     // Two names for one builtin. Registering them is also what makes the `is_declaration` branch
     // in `exec::simple` mean something: it exists so that `declare FOO=bar` reaches the builtin
     // instead of being applied behind its back.
@@ -145,8 +172,22 @@ mod tests {
     fn every_new_builtin_is_registered() {
         let env = Environment::new();
         for name in [
-            ":", "exec", "command", "builtin", "getopts", "let", "hash", "times", "ulimit",
-            "declare", "typeset",
+            ":",
+            "exec",
+            "command",
+            "builtin",
+            "getopts",
+            "let",
+            "hash",
+            "times",
+            "ulimit",
+            "declare",
+            "typeset",
+            "shopt",
+            "mapfile",
+            "readarray",
+            "caller",
+            "suspend",
         ] {
             assert!(env.is_builtin(name), "{name} is not registered");
             assert!(

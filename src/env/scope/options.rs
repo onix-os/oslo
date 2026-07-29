@@ -90,6 +90,21 @@ impl Environment {
         self.option(ShellOption::Monitor)
     }
 
+    /// `--posix` / `set -o posix`: follow POSIX where bash's own default differs.
+    ///
+    /// **This is the single source of truth for POSIX mode.** It used to be two: a process-global
+    /// `AtomicBool` in `exec::simple` with only `#[cfg(test)]` writers, *and* this option, which
+    /// the `set -o` table accepted and nothing ever read. The command line and `set -o posix`
+    /// both land here now, so the two can no longer disagree — and a forked subshell inherits the
+    /// mode with the rest of its environment rather than out of a static.
+    ///
+    /// Two things read it: command search puts a special builtin ahead of a function
+    /// (POSIX 2.9.1.1), and a utility error ends the shell (POSIX 2.8.1) — see
+    /// `crate::exec::simple::posix`.
+    pub fn posix(&self) -> bool {
+        self.option(ShellOption::Posix)
+    }
+
     /// Whether this shell is interactive. Set from the invocation; `set` cannot change it.
     pub fn interactive(&self) -> bool {
         self.option(ShellOption::Interactive)
@@ -130,5 +145,21 @@ mod tests {
         env.set_option(ShellOption::NoUnset, true);
         env.enter_subshell();
         assert!(env.nounset());
+    }
+
+    /// POSIX mode has exactly one home, and `set -o posix` reaches it. The option had no reader
+    /// at all before, which is what made `--posix` unimplementable and the special-builtin rule
+    /// in `exec::simple` dead code.
+    #[test]
+    fn posix_mode_is_an_ordinary_option() {
+        let mut env = Environment::new();
+        assert!(!env.posix());
+        env.set_option(ShellOption::Posix, true);
+        assert!(env.posix());
+        assert!(env.option(ShellOption::Posix));
+        // …and it survives into a subshell, where a static could not have been undone on the way
+        // back out.
+        env.enter_subshell();
+        assert!(env.posix());
     }
 }

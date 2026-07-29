@@ -29,9 +29,17 @@ but see [Known gaps](#known-gaps) before relying on it as a login shell.
 | **Expansion** | `$var`, `${var}`, `${var:-d}` `${var:=d}` `${var:+a}` `${var:?e}` `${#var}` `${var%p}` `${var#p}`, `$(cmd)`, backticks, `$((expr))`, `~`, globs, IFS field splitting |
 | **Jobs** | `cmd &` runs in the background; `$!` holds its pid |
 
-Builtins: `cd` `pwd` `echo` `export` `unset` `set` `shift` `exit` `break` `continue` `return`
-`alias` `unalias` `type` `eval` `source` `.` `read` `local` `pushd` `popd` `dirs` `readonly`
-`test` `[` `[[` `trap` `umask` `wait` `kill` `true` `false`.
+Builtins, by what they act on:
+
+| | |
+|---|---|
+| **Shell state** | `set` `shopt` `export` `readonly` `local` `declare` `typeset` `unset` `shift` `alias` `unalias` `hash` |
+| **Control** | `exit` `break` `continue` `return` `eval` `exec` `source` `.` `command` `builtin` `caller` `:` `true` `false` |
+| **Input and words** | `echo` `read` `mapfile` `readarray` `getopts` `let` |
+| **Directories** | `cd` `pwd` `pushd` `popd` `dirs` |
+| **Tests** | `test` `[` `[[` |
+| **Jobs and signals** | `jobs` `fg` `bg` `disown` `wait` `kill` `trap` `suspend` |
+| **Process** | `type` `umask` `times` `ulimit` |
 
 ## Lua
 
@@ -144,7 +152,7 @@ contain** — `redirects.rs`, `quoting.rs`, `conditionals.rs` — never for thei
 
 ## Testing
 
-`cargo test` runs three kinds of suite, deliberately different in what they can see:
+`cargo test` runs four kinds of suite, deliberately different in what they can see:
 
 - **In-process** — `tests/posix_shell_tests.rs` builds an AST, evaluates it and inspects
   `Environment` directly. Fast, but blind to anything that only goes wrong in a real process.
@@ -155,14 +163,28 @@ contain** — `redirects.rs`, `quoting.rs`, `conditionals.rs` — never for thei
   perfectly correct while the shell is visibly broken.
 - **Differential** — `tests/differential_tests.rs` runs every script in `tests/corpus/` through
   both rush and bash and compares stdout and exit status (stderr by shape only, since diagnostic
-  wording should differ). It is a ratchet: `tests/differential/expected_fail.rs` names each case
-  rush still gets wrong along with the finding that explains it, and the suite fails both when an
-  unlisted case diverges *and* when a listed case starts passing. Closing a bug means deleting a
-  line there.
+  wording should differ). Each script names its oracle on the first line, `# mode: posix` or
+  `# mode: bash`, and **both** shells are run in that mode; giving only bash the `--posix` was a
+  harness bug that judged 304 cases against a mode rush was not in. It is a ratchet:
+  `tests/differential/expected_fail.rs` names each case rush still gets wrong along with the
+  finding that explains it, and the suite fails both when an unlisted case diverges *and* when a
+  listed case starts passing. Closing a bug means deleting a line there.
+- **Fuzz replay** — `cargo test --manifest-path fuzz/Cargo.toml --lib` runs `tests/corpus/` and
+  `fuzz/seeds/` through the three `cargo-fuzz` targets on stable, with no nightly and no
+  libFuzzer. `fuzz/known/` is the second ratchet, in the same two directions: an input that still
+  crashes or hangs the shell lives there with a note, and the suite fails the day it stops
+  reproducing. It is empty today. `fuzz/README.md` covers running the fuzzer proper.
 
 The line editor is covered without a pty: `RushHelper` is public, so `tests/interactive_tests.rs`
 and `src/interactive/tests.rs` call `complete`, `hint`, `highlight` and `input_status` directly
 against temporary directories.
+
+One rule holds across all of it: **a test that writes `environ`, the working directory or the
+umask spawns the binary rather than running in process.** libtest runs `#[test]` functions as
+threads of one process, and those three belong to the process; `Environment::set_var` on an
+exported name reaches `unsafe { std::env::set_var }`, which racing another thread's `env::vars()`
+walk is undefined behaviour rather than flakiness. `tests/posix_shell_tests.rs` and
+`tests/subshell_state_tests.rs` split into `spawned` and `in_process` modules for exactly this.
 
 ## Architecture
 
@@ -187,31 +209,68 @@ exits 2. There used to be a second, hand-written parser used as a fallback, whic
 here-document support and therefore executed heredoc *bodies* as commands; it is gone. The
 hand-written lexer stays — the adapter re-lexes brush's raw word text through it.
 
+brush-parser is **vendored** in `vendor/brush-parser`, at the published 0.4.0 with one patch: the
+tokenizer takes the longest match, so an arithmetic `for` loop with an empty condition has its two
+section separators fused into a single `;;` operator and `for ((;;))` fails to parse where
+`for (( ; ; ))` succeeds. The patch adds an alternative to the grammar's `arithmetic_for_clause`
+rather than teaching the tokenizer to split `;;`, which would put every `case` terminator in every
+script downstream of it. `vendor/brush-parser/PATCH.md` has the diff, the reasoning and the
+upstream PR text; the fork ends when that PR ships.
+
 ## Known gaps
 
-Each of these is reproducible against the binary, and each has a corpus case in
-`tests/differential/expected_fail.rs` unless noted.
+Each of these is reproducible against the binary, and all but the last are differences from bash.
+The first three have a corpus case, named in `tests/differential/expected_fail.rs`, so the
+differential suite watches them and will fail the day one is fixed and the line is not deleted.
+The rest are recorded only here: a corpus case for a known-missing feature buys a second copy of
+this list and a row in the ratchet, which is worth it for a bug and not for an absence.
 
-- Parameter expansion does not run inside unquoted here-document bodies or here-strings; the text
-  is passed through with quotes removed but `$v` left alone.
 - Process substitution (`<(cmd)`, `>(cmd)`) is refused by name with exit status 2. Refusing is
   deliberate — silently dropping the argument made `diff <(a) <(b)` report false success — but the
   `/dev/fd/N` implementation is not written.
 - `coproc` and `select` are likewise refused by name. Both need machinery (job control, and a
   prompt plus `REPLY`) out of proportion to how often scripts use them.
+- A failing *special* builtin does not exit a POSIX-mode shell. `rush --posix -c 'export
+  BAD-NAME=1; echo alive'` prints `alive`; `bash --posix` stops at the `export`. The narrower
+  POSIX rule that a failed *variable assignment* is fatal does hold — `readonly r=1; r=2` ends the
+  shell under `--posix` and does not outside it, as in bash.
 - Arrays are indexed only. `declare -A` reports that associative arrays are unsupported rather
-  than pretending, and an operator applied to a whole array (`${a[@]:1}`, `${a[@]#pat}`) is
-  rejected instead of evaluated.
-- `for ((;;))` needs spaces: brush tokenizes the `;;` in the unspaced form as the `case`
-  terminator, so write `for (( ; ; ))`.
-- `unset -f` cannot remove a function, and assignment to a `readonly` variable succeeds when it
-  should fail.
-- `exec 3> file` closes fd 3 instead of leaving it open.
-- A failing special builtin does not exit a POSIX-mode shell.
-- No `shopt`, so `globstar` cannot be turned on; `**` behaves as `*`.
+  than pretending. Slicing (`${a[@]:1}`, `${@:2}`) and element-wise operators (`${a[@]#pat}`,
+  `${@^^}`) do work on a whole array and on the positional parameters; the list-valued
+  `${a[@]:-default}` family is still rejected instead of evaluated.
+- `shopt` exists, but `autocd` is the only option it can switch. Every other option it knows
+  reports the state rush actually has and *fails* when asked for the other one, so
+  `shopt -s globstar` is an error rather than a lie: `**` still behaves as `*`.
+- The command hash table only holds what an explicit `hash name` put there. `hash -r`, the
+  reporting and the completion cache are all wired; the `PATH` search itself does not record
+  what it resolved yet.
 - No `SECONDS`, `RANDOM`, `LINENO`, `/dev/tcp`, restricted mode, or `vi`/`emacs` editing modes.
 - History expansion (`!!`, `!$`, `^old^new`) applies to REPL lines only, not to `-c` or scripts —
   the same rule bash uses.
+
+### Input limits
+
+Two ways to hang the shell with *data* survived until Round 11, and both were found by the
+fuzzer rather than by the corpus:
+
+- A no-break space — or any other character in Unicode `White_Space` that is not a shell blank —
+  anywhere in a command made the parser loop, growing a `Vec` until the allocator aborted the
+  process (exit 134) before a single command ran. Pasting a line out of a web page was enough.
+- An unmatched `(` made `brush-parser`'s PEG retry an exponential number of alternatives: 20 of
+  them took 0.64 s, 25 took 15.9 s, 30 never finished, all at 100% CPU.
+
+Both are fixed. Their reproducers moved to `fuzz/seeds/` and are replayed on every `cargo test`,
+and `fuzz/known/` — the directory for fuzzer findings that are *still* open — is empty.
+
+The first fix costs nothing: the token scanner and the word scanner now share one predicate, and
+it is the shell's separator set (space, tab, carriage return; newline is an operator) rather than
+Unicode's, so `echo a<NBSP>b` prints one word exactly as bash does. The second is a bound, and
+with the pre-existing depth limit it is the only restriction on input shape worth knowing:
+
+- **At most 16 unmatched openers**, refused as a syntax error with exit status 2. bash rejects
+  every input this rejects, so nothing that used to parse stops parsing.
+- **At most 100 levels of nesting**, counted across `(`, `{`, `[` and the arithmetic and
+  substitution forms.
 
 ## License
 

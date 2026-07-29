@@ -40,13 +40,18 @@ pub(crate) enum Lookup {
 /// directly and its failure mode reported precisely. Only a bare word goes through PATH, where
 /// anything that is not an executable file is simply skipped and the word is "not found",
 /// exactly as bash reports it.
+///
+/// The bare-word search goes through [`hash_lookup`](crate::env::builtins::hash_lookup) rather
+/// than `which` directly: that is what fills the `hash` table, so `ls; hash` lists `ls` the way
+/// bash does. Nothing else changes — a hit is a path `which` would have returned, and the table
+/// is dropped whenever `PATH` is assigned or `hash -r` runs.
 pub(crate) fn look_up_command(name: &str) -> Lookup {
     if name.contains('/') {
         return classify_path(Path::new(name));
     }
-    match which::which(name) {
-        Ok(path) => Lookup::Program(path),
-        Err(_) => Lookup::NotFound,
+    match crate::env::builtins::hash_lookup(name) {
+        Some(path) => Lookup::Program(path),
+        None => Lookup::NotFound,
     }
 }
 

@@ -4,6 +4,8 @@
 //! called `-p` and `unalias -a` deleted an alias called `-a`. One parser, used by all of them,
 //! is what stops that class of bug coming back one builtin at a time.
 
+use crate::error::ShellError;
+
 /// The option letters found before the operands, and where the operands start.
 #[derive(Debug)]
 pub struct Options {
@@ -48,14 +50,21 @@ pub fn parse(args: &[String], accepted: &str) -> Result<Options, char> {
     Ok(Options { letters, operands })
 }
 
-/// Report an option the builtin does not accept, and yield the status bash uses for one.
+/// Report an option the builtin does not accept, and yield the error a caller should return.
 ///
-/// 2, not 1: a usage error is not the same as the command running and failing, and scripts that
-/// branch on `$?` rely on the difference.
-pub fn invalid(builtin: &str, letter: char, usage: &str) -> i32 {
+/// Status 2, not 1: a usage error is not the same as the command running and failing, and scripts
+/// that branch on `$?` rely on the difference.
+///
+/// A [`ShellError::UtilityError`] rather than a bare `2` because POSIX 2.8.1 ends a
+/// non-interactive shell whose *special* builtin hit a utility error, and three of this parser's
+/// five users are special. Which of them are is not decided here: `crate::exec::simple::posix`
+/// asks `is_special_builtin`, so `export -z` ends a `--posix` shell while `unalias -z` reports 2
+/// and carries on — matching bash on both. Outside POSIX mode every one of them folds back to
+/// `Ok(2)`, which is what this function used to return directly.
+pub fn invalid(builtin: &str, letter: char, usage: &str) -> ShellError {
     eprintln!("rush: {}: -{}: invalid option", builtin, letter);
     eprintln!("{}", usage);
-    2
+    ShellError::utility_error(format!("{}: -{}: invalid option", builtin, letter), 2)
 }
 
 #[cfg(test)]

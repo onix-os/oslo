@@ -14,7 +14,7 @@
 set -euo pipefail
 
 README="${1:-README.md}"
-ROOTS='src|tests|scripts|examples|fuzz|benches|.github'
+ROOTS='src|tests|scripts|examples|fuzz|benches|vendor|.github'
 
 status=0
 

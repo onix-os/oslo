@@ -4,7 +4,7 @@ use super::deparse::function_definition;
 use super::quoting::quote_minimal;
 use crate::env::options::{SetError, SetListing, parse_set_args};
 use crate::env::scope::{Environment, is_valid_identifier};
-use crate::error::Result;
+use crate::error::{Result, ShellError};
 
 const USAGE: &str = "set: usage: set [-abCefhkmnotuvx] [-o option-name] [--] [-] [arg ...]";
 
@@ -36,7 +36,13 @@ pub fn builtin_set(env: &mut Environment, args: &[String]) -> Result<i32> {
             if matches!(err, SetError::InvalidOption(_)) {
                 eprintln!("{}", USAGE);
             }
-            return Ok(2);
+            // Not `Ok(2)`: `set` is a *special* builtin, and POSIX 2.8.1 ends a non-interactive
+            // shell that gives one a utility error. `bash --posix -c 'set -o nosuchopt; echo
+            // alive'` prints no `alive` and exits 2. Outside POSIX mode `posix::
+            // resolve_builtin_result` folds this straight back to `Ok(2)`, so nothing else
+            // changes — the error type is how the builtin says "utility error" rather than
+            // "ran and returned 2", which `shift 5` also does and which must *not* be fatal.
+            return Err(ShellError::utility_error("set: invalid option", 2));
         }
     };
 
@@ -115,10 +121,18 @@ mod tests {
     use crate::env::Environment;
     use crate::env::builtins::variables::tests::words;
 
+    /// `set`'s status, whether it came back as one or as the utility error a special builtin
+    /// raises so that POSIX mode can end the shell over it. Both carry the same number, and
+    /// which one it is belongs to `crate::exec::simple::posix` rather than to these tests.
     fn set(env: &mut Environment, parts: &[&str]) -> i32 {
         let mut argv = vec!["set".to_string()];
         argv.extend(words(parts));
-        builtin_set(env, &argv).expect("set never errors")
+        match builtin_set(env, &argv) {
+            Ok(status) => status,
+            Err(e) => e
+                .survivable_utility_status()
+                .expect("set only ever fails with a utility error"),
+        }
     }
 
     /// The finding: every one of these words used to become a positional parameter.
@@ -161,6 +175,11 @@ mod tests {
     #[test]
     fn an_unknown_option_is_a_usage_error_worth_two() {
         let mut env = Environment::new();
+        // A *utility* error, not a status: `set` is a special builtin, so `bash --posix -c
+        // 'set -z; echo alive'` prints no `alive`. The distinction is the return type.
+        let err = builtin_set(&mut env, &words(&["set", "-z"])).expect_err("a utility error");
+        assert_eq!(err.survivable_utility_status(), Some(2));
+
         assert_eq!(set(&mut env, &["-e", "-z"]), 2);
         // Nothing was applied: the whole line is refused, not the part after the mistake.
         assert!(!env.errexit());

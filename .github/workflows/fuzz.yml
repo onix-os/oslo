@@ -35,9 +35,10 @@ env:
   # tests/differential/expected_fail.rs works for the differential corpus. Delete the entry the
   # day the bug is fixed — `known_findings_are_still_open` will already have failed to remind you.
   #
-  # fuzz_lexer: `lexer_unicode_whitespace_never_advances`, a scanner that stops advancing.
-  # fuzz_parse: the same bug, plus `parser_unbalanced_nesting_is_exponential`.
-  FUZZ_KNOWN_OPEN: "fuzz_parse fuzz_lexer"
+  # Empty: both recorded findings — a scanner that stopped advancing on a Unicode blank, and
+  # exponential backtracking on unmatched openers — are fixed, and their reproducers now live in
+  # fuzz/seeds/ as regression inputs. Every target is expected to fuzz clean.
+  FUZZ_KNOWN_OPEN: ""
 
 jobs:
   # The half that needs no nightly and no sanitizer: replay every committed input through every

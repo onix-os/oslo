@@ -19,9 +19,10 @@
 //! timeout. rush has live hangs (`while read` never terminates), and an unguarded suite would
 //! wedge CI instead of failing it — so a timeout is a first-class verdict here, not an accident.
 //!
-//! Corpus scripts declare their oracle on the first line: `# mode: posix` runs `bash --posix -c`
-//! for POSIX semantics, `# mode: bash` runs plain `bash -c` for the bash extensions (arrays,
-//! `[[ ]]`, `(( ))`, brace expansion) that rush also aims to support.
+//! Corpus scripts declare their oracle on the first line: `# mode: posix` runs `--posix -c` for
+//! POSIX semantics, `# mode: bash` runs a plain `-c` for the bash extensions (arrays, `[[ ]]`,
+//! `(( ))`, brace expansion) that rush also aims to support. The mode goes to **both** shells —
+//! see [`compare`] for what it cost to get that wrong.
 
 mod common;
 
@@ -163,12 +164,23 @@ enum Verdict {
     Differ(String),
 }
 
-fn compare(case: &Case) -> Verdict {
-    let rush = execute(&common::rush_bin(), &["-c"], &case.script).expect("spawn rush");
-    let args: &[&str] = match case.oracle {
+/// The argv prefix a case's declared mode asks for — the *same* one for both shells.
+///
+/// It is a function rather than two literals at the call site because that is the shape the bug
+/// took: until Round 11 rush was always given a bare `-c` while bash got `--posix` for a
+/// `# mode: posix` case, so all 304 of those cases were judged against an oracle rush was never
+/// in. A POSIX-only behaviour could then neither be tested nor regress here, and a case that
+/// passed only because rush had stayed in bash mode looked green.
+fn mode_args(oracle: Oracle) -> &'static [&'static str] {
+    match oracle {
         Oracle::Posix => &["--posix", "-c"],
         Oracle::Bash => &["-c"],
-    };
+    }
+}
+
+fn compare(case: &Case) -> Verdict {
+    let args = mode_args(case.oracle);
+    let rush = execute(&common::rush_bin(), args, &case.script).expect("spawn rush");
     let bash = execute(Path::new("bash"), args, &case.script)
         .expect("spawn bash — the differential suite needs bash on PATH as its oracle");
 
@@ -357,6 +369,32 @@ fn corpus_matches_bash() {
         "differential corpus: {matched} matching bash, {still_failing} known-failing, \
          {} known-divergent",
         divergent.len()
+    );
+}
+
+/// The mode flag has to *reach* rush, not merely sit on its command line.
+///
+/// [`mode_args`] sends the same argv to both shells, but a `--posix` that rush parsed and then
+/// dropped would look identical from here — which is what the suite could not tell apart before
+/// Round 11. So assert the observable difference directly: under POSIX a failed variable
+/// assignment ends the shell, and outside it the shell carries on. Without this, a regression
+/// that made `--posix` inert would show up only as `# mode: posix` cases quietly agreeing with a
+/// bash-mode rush.
+#[test]
+fn the_posix_flag_changes_what_rush_does() {
+    const SCRIPT: &str = "readonly r=1; r=2; echo alive";
+
+    let posix = execute(&common::rush_bin(), mode_args(Oracle::Posix), SCRIPT).expect("spawn rush");
+    assert_eq!(
+        posix.stdout, "",
+        "under --posix a refused assignment must end the shell before `echo alive`"
+    );
+    assert!(!posix.stderr_empty, "the refusal must still be reported");
+
+    let bash_mode = execute(&common::rush_bin(), mode_args(Oracle::Bash), SCRIPT).expect("spawn");
+    assert_eq!(
+        bash_mode.stdout, "alive\n",
+        "without --posix the same refusal is an ordinary failed command"
     );
 }
 

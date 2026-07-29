@@ -7,7 +7,10 @@
 use super::convert_compound_list;
 use super::extended_test::convert_extended_test;
 use super::redirects::{convert_redirect, convert_redirect_list};
-use super::words::{convert_word, convert_words_from_str, single_command_list};
+use super::words::{
+    convert_braced_word, convert_braced_words_from_str, convert_word, convert_words_from_str,
+    single_command_list, single_word,
+};
 use crate::ast as rush_ast;
 use crate::error::{Result, ShellError};
 use brush_parser::ast;
@@ -117,7 +120,7 @@ pub(super) fn convert_compound_command(
                 Some(vals) => {
                     let mut converted = Vec::new();
                     for w in vals {
-                        converted.extend(convert_word(w));
+                        converted.extend(convert_braced_word(w)?);
                     }
                     Some(converted)
                 }
@@ -189,16 +192,13 @@ fn convert_if_clause(if_clause: &ast::IfClauseCommand) -> Result<rush_ast::Compo
 }
 
 fn convert_case_clause(case_clause: &ast::CaseClauseCommand) -> Result<rush_ast::CompoundCommand> {
-    let word = convert_word(&case_clause.value)
-        .into_iter()
-        .next()
-        .unwrap_or_else(|| rush_ast::Word::from_literal(""));
+    let word = single_word(&case_clause.value)?;
 
     let mut items = Vec::new();
     for case in &case_clause.cases {
         let mut patterns = Vec::new();
         for p in &case.patterns {
-            patterns.extend(convert_word(p));
+            patterns.extend(convert_word(p)?);
         }
 
         let body = match &case.cmd {
@@ -272,7 +272,7 @@ pub(super) fn convert_simple_command(
         for item in &prefix.0 {
             match item {
                 ast::CommandPrefixOrSuffixItem::AssignmentWord(assign, _) => {
-                    assignments.push(convert_assignment(assign));
+                    assignments.push(convert_assignment(assign)?);
                 }
                 ast::CommandPrefixOrSuffixItem::IoRedirect(redir) => {
                     redirections.extend(convert_redirect(redir)?);
@@ -280,7 +280,9 @@ pub(super) fn convert_simple_command(
                 // brush's prefix grammar admits only assignments and redirections, but the item
                 // enum is shared with the suffix. If one ever arrives it is an argument, and
                 // dropping it would change the command being run.
-                ast::CommandPrefixOrSuffixItem::Word(w) => words.extend(convert_word(w)),
+                ast::CommandPrefixOrSuffixItem::Word(w) => {
+                    words.extend(convert_braced_word(w)?);
+                }
                 ast::CommandPrefixOrSuffixItem::ProcessSubstitution(..) => {
                     return Err(process_substitution_unsupported());
                 }
@@ -289,14 +291,14 @@ pub(super) fn convert_simple_command(
     }
 
     if let Some(cmd_word) = &simple.word_or_name {
-        words.extend(convert_word(cmd_word));
+        words.extend(convert_braced_word(cmd_word)?);
     }
 
     if let Some(suffix) = &simple.suffix {
         for item in &suffix.0 {
             match item {
                 ast::CommandPrefixOrSuffixItem::Word(w) => {
-                    words.extend(convert_word(w));
+                    words.extend(convert_braced_word(w)?);
                 }
                 ast::CommandPrefixOrSuffixItem::AssignmentWord(_, raw) => {
                     // Only a *prefix* `name=value` is an assignment; after the command name it
@@ -305,7 +307,7 @@ pub(super) fn convert_simple_command(
                     // Use brush's raw source word rather than re-joining name and value: the
                     // rejoined text would be a bare literal, so its quotes would survive
                     // expansion and the value would then be field-split on its own spaces.
-                    words.extend(convert_word(raw));
+                    words.extend(convert_braced_word(raw)?);
                 }
                 ast::CommandPrefixOrSuffixItem::IoRedirect(redir) => {
                     redirections.extend(convert_redirect(redir)?);
@@ -330,32 +332,33 @@ pub(super) fn convert_simple_command(
 /// `a=(1 2 3)` kept only the first word of `(1 2 3)`, so `echo "$a"` printed the source
 /// parentheses, and `a[1]=x` became a variable *literally named* `a[1]` — which looked like it
 /// worked only because `${a[1]}` was mangled into the same odd name on the way back out.
-fn convert_assignment(assign: &ast::Assignment) -> rush_ast::Assignment {
+fn convert_assignment(assign: &ast::Assignment) -> Result<rush_ast::Assignment> {
     let target = match &assign.name {
         ast::AssignmentName::VariableName(name) => rush_ast::AssignmentTarget::Name(name.clone()),
         ast::AssignmentName::ArrayElementName(name, index) => rush_ast::AssignmentTarget::Element {
             name: name.clone(),
-            index: single_word_from_str(index),
+            index: single_word_from_str(index)?,
         },
     };
 
     let value = match &assign.value {
         ast::AssignmentValue::Scalar(word) => {
-            rush_ast::AssignmentValue::Scalar(single_word_from_str(word.as_ref()))
+            rush_ast::AssignmentValue::Scalar(single_word_from_str(word.as_ref())?)
         }
-        ast::AssignmentValue::Array(elements) => rush_ast::AssignmentValue::Array(
-            elements
-                .iter()
-                .flat_map(|(index, value)| convert_array_element(index.as_ref(), value))
-                .collect(),
-        ),
+        ast::AssignmentValue::Array(elements) => {
+            let mut converted = Vec::new();
+            for (index, value) in elements {
+                converted.extend(convert_array_element(index.as_ref(), value)?);
+            }
+            rush_ast::AssignmentValue::Array(converted)
+        }
     };
 
-    rush_ast::Assignment {
+    Ok(rush_ast::Assignment {
         target,
         value,
         append: assign.append,
-    }
+    })
 }
 
 /// One element of an array literal.
@@ -366,25 +369,25 @@ fn convert_assignment(assign: &ast::Assignment) -> rush_ast::Assignment {
 fn convert_array_element(
     index: Option<&brush_parser::ast::Word>,
     value: &ast::Word,
-) -> Vec<rush_ast::ArrayElement> {
+) -> Result<Vec<rush_ast::ArrayElement>> {
     match index {
-        Some(index) => vec![rush_ast::ArrayElement {
-            index: Some(single_word_from_str(index.as_ref())),
-            value: single_word_from_str(value.as_ref()),
-        }],
-        None => convert_words_from_str(value.as_ref())
+        Some(index) => Ok(vec![rush_ast::ArrayElement {
+            index: Some(single_word_from_str(index.as_ref())?),
+            value: single_word_from_str(value.as_ref())?,
+        }]),
+        None => Ok(convert_braced_words_from_str(value.as_ref())?
             .into_iter()
             .map(|value| rush_ast::ArrayElement { index: None, value })
-            .collect(),
+            .collect()),
     }
 }
 
 /// Re-lex `text` as one word, which is what every assignment operand is.
-fn single_word_from_str(text: &str) -> rush_ast::Word {
-    convert_words_from_str(text)
+fn single_word_from_str(text: &str) -> Result<rush_ast::Word> {
+    Ok(convert_words_from_str(text)?
         .into_iter()
         .next()
-        .unwrap_or_else(|| rush_ast::Word::from_literal(""))
+        .unwrap_or_else(|| rush_ast::Word::from_literal("")))
 }
 
 #[cfg(test)]

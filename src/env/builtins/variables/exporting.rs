@@ -3,7 +3,7 @@
 use super::options;
 use super::quoting::single_quoted;
 use crate::env::scope::{Environment, is_valid_identifier};
-use crate::error::Result;
+use crate::error::{Result, ShellError};
 
 const EXPORT_USAGE: &str = "usage: export [-fnp] [name[=value] ...]";
 const UNSET_USAGE: &str = "usage: unset [-fv] [name ...]";
@@ -16,7 +16,7 @@ const UNSET_USAGE: &str = "usage: unset [-fv] [name ...]";
 pub fn builtin_export(env: &mut Environment, args: &[String]) -> Result<i32> {
     let opts = match options::parse(args, "fnp") {
         Ok(o) => o,
-        Err(letter) => return Ok(options::invalid("export", letter, EXPORT_USAGE)),
+        Err(letter) => return Err(options::invalid("export", letter, EXPORT_USAGE)),
     };
     let operands = &args[opts.operands..];
 
@@ -33,6 +33,12 @@ pub fn builtin_export(env: &mut Environment, args: &[String]) -> Result<i32> {
     }
 
     let mut status = 0;
+    // A name `export` cannot accept is a *utility error*, not just a failed command, and POSIX
+    // 2.8.1 ends a non-interactive shell over one because `export` is special. It is tracked
+    // separately from `status` because the other ways this loop fails are not: `export -f
+    // nosuchfn` reports 1 and `bash --posix` carries on. The whole line is still processed first —
+    // bash sets the good names before it gives up.
+    let mut bad_name = false;
     for arg in operands {
         let (name, value) = match arg.find('=') {
             Some(idx) => (&arg[..idx], Some(&arg[idx + 1..])),
@@ -41,6 +47,7 @@ pub fn builtin_export(env: &mut Environment, args: &[String]) -> Result<i32> {
         if !is_valid_identifier(name) {
             super::not_an_identifier("export", arg);
             status = 1;
+            bad_name = true;
             continue;
         }
         // `-n` still performs the assignment: `export -n x=1` sets x and leaves it unexported.
@@ -59,6 +66,14 @@ pub fn builtin_export(env: &mut Environment, args: &[String]) -> Result<i32> {
         }
     }
 
+    if bad_name {
+        // Folded back to `Ok(1)` by `posix::resolve_builtin_result` outside POSIX mode, so this
+        // is invisible to an ordinary shell — see [`crate::exec::simple::posix`].
+        return Err(ShellError::utility_error(
+            "export: not a valid identifier",
+            1,
+        ));
+    }
     Ok(status)
 }
 
@@ -123,7 +138,7 @@ fn unexport(env: &mut Environment, name: &str) -> bool {
 pub fn builtin_unset(env: &mut Environment, args: &[String]) -> Result<i32> {
     let opts = match options::parse(args, "fv") {
         Ok(o) => o,
-        Err(letter) => return Ok(options::invalid("unset", letter, UNSET_USAGE)),
+        Err(letter) => return Err(options::invalid("unset", letter, UNSET_USAGE)),
     };
     if opts.has('f') && opts.has('v') {
         eprintln!("rush: unset: cannot simultaneously unset a function and a variable");
@@ -150,10 +165,10 @@ pub fn builtin_unset(env: &mut Environment, args: &[String]) -> Result<i32> {
         let target_function = opts.has('f')
             || (!opts.has('v') && env.get_var(name).is_none() && env.get_function(name).is_some());
         if target_function {
-            // Parsed, dispatched, and then stalled: removing a function needs
-            // `Environment::remove_function`, and the functions map is exposed read-only. The
-            // flag is handled here so that wiring it up is one line, and so that `unset -f`
-            // stops falling through to the *variable* path and unsetting the wrong thing.
+            // Not an error when there is no such function: bash exits 0 for
+            // `unset -f nosuchfn`, so the removal's answer is deliberately discarded. What
+            // matters is that this arm no longer falls through to the *variable* path.
+            env.remove_function(name);
             continue;
         }
         if env.is_readonly(name) {
@@ -193,16 +208,15 @@ mod tests {
     }
 
     #[test]
+    /// Worth 2 — and worth it as a *utility* error, because both builtins are special and
+    /// `bash --posix -c 'export -z; echo alive'` prints no `alive`. Outside POSIX mode
+    /// `crate::exec::simple::posix` folds it straight back to `Ok(2)`.
     fn an_unknown_option_is_a_usage_error() {
         let mut env = Environment::new();
-        assert_eq!(
-            builtin_export(&mut env, &words(&["export", "-z"])).unwrap(),
-            2
-        );
-        assert_eq!(
-            builtin_unset(&mut env, &words(&["unset", "-z"])).unwrap(),
-            2
-        );
+        let err = builtin_export(&mut env, &words(&["export", "-z"])).expect_err("utility error");
+        assert_eq!(err.survivable_utility_status(), Some(2));
+        let err = builtin_unset(&mut env, &words(&["unset", "-z"])).expect_err("utility error");
+        assert_eq!(err.survivable_utility_status(), Some(2));
     }
 
     /// Unsetting a read-only variable must fail *and change nothing*, or the name is left
@@ -245,6 +259,44 @@ mod tests {
         assert_eq!(
             builtin_unset(&mut env, &words(&["unset", "1x"])).unwrap(),
             1
+        );
+    }
+
+    /// An empty command, for tests that only need *a* function body.
+    fn nothing() -> crate::ast::Command {
+        crate::ast::Command::Simple(crate::ast::SimpleCommand {
+            assignments: Vec::new(),
+            words: Vec::new(),
+            redirections: Vec::new(),
+        })
+    }
+
+    /// The whole point of `-f`: the function is gone afterwards.
+    #[test]
+    fn unset_f_removes_the_function() {
+        let mut env = Environment::new();
+        env.set_function("gone", nothing());
+        assert_eq!(
+            builtin_unset(&mut env, &words(&["unset", "-f", "gone"])).unwrap(),
+            0
+        );
+        assert!(env.get_function("gone").is_none());
+    }
+
+    /// With no flag, a name that is only a function names the function — and a name that is
+    /// neither is still not an error, as in bash.
+    #[test]
+    fn bare_unset_removes_a_function_and_forgives_a_missing_one() {
+        let mut env = Environment::new();
+        env.set_function("only_fn", nothing());
+        assert_eq!(
+            builtin_unset(&mut env, &words(&["unset", "only_fn"])).unwrap(),
+            0
+        );
+        assert!(env.get_function("only_fn").is_none());
+        assert_eq!(
+            builtin_unset(&mut env, &words(&["unset", "-f", "no_such_fn"])).unwrap(),
+            0
         );
     }
 

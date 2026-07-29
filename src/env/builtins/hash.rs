@@ -38,7 +38,11 @@ pub fn builtin_hash(_env: &mut Environment, args: &[String]) -> Result<i32> {
         for c in arg[1..].chars() {
             match c {
                 'r' => {
-                    TABLE.with(|t| t.borrow_mut().clear());
+                    // `forget_all` also drops the line editor's own set of runnable names, built
+                    // by walking `$PATH`: `hash -r` means "forget where commands live", so a
+                    // completion list that outlived the reset would be offering a path the shell
+                    // has just been told to stop trusting.
+                    forget_all();
                     cleared = true;
                 }
                 other => {
@@ -76,14 +80,52 @@ pub fn builtin_hash(_env: &mut Environment, args: &[String]) -> Result<i32> {
     Ok(status)
 }
 
-/// Record that `name` resolved to `path`, so `hash` can report it.
+/// Resolve a command word through the table, filling it in on a miss.
 ///
-/// Exposed for the command-resolution path in [`crate::exec::simple`], which is where lookups
-/// actually happen; until that calls it the table only holds what `hash name` put there.
+/// This is the whole point of the cache and the one function the command-resolution path needs:
+/// a bare word is answered from the table when it is there, searched for and remembered when it
+/// is not, and the hit is counted either way so `hash` can report it.
+///
+/// A word containing a slash is a path, not a `PATH` search — bash does not hash those, and
+/// neither does this: caching `./configure` would make the entry meaningless the moment the
+/// shell changed directory.
+pub fn lookup(name: &str) -> Option<PathBuf> {
+    if name.contains('/') {
+        return resolve_program(name);
+    }
+    if let Some(path) = recall(name) {
+        // A remembered path that has since been removed is worse than no cache at all: the shell
+        // would report "cannot execute" for a command that a fresh `PATH` search would find in
+        // the next directory along. Re-search instead, which also drops the dead entry.
+        if path.is_file() {
+            return Some(path);
+        }
+        TABLE.with(|t| t.borrow_mut().remove(name));
+    }
+    let path = resolve_program(name)?;
+    remember(name, path.clone());
+    Some(path)
+}
+
+/// Drop every remembered location.
+///
+/// `hash -r`'s other caller is [`Environment::set_var`](crate::env::scope::Environment::set_var):
+/// assigning to `PATH` invalidates every entry in the table by definition.
+pub fn forget_all() {
+    TABLE.with(|t| t.borrow_mut().clear());
+    crate::interactive::invalidate_command_cache();
+}
+
+/// Record that `name` resolved to `path`, and count the lookup that found it.
+///
+/// The path is *replaced*, not kept: a stale entry that survived a `PATH` change is the failure
+/// mode a command cache exists to be blamed for, and `hash -r` is not the only thing that should
+/// be able to correct one.
 pub fn remember(name: &str, path: PathBuf) {
     TABLE.with(|t| {
         let mut table = t.borrow_mut();
-        let entry = table.entry(name.to_string()).or_insert((path, 0));
+        let entry = table.entry(name.to_string()).or_insert((path.clone(), 0));
+        entry.0 = path;
         entry.1 += 1;
     });
 }
@@ -142,6 +184,52 @@ mod tests {
         assert!(recall("rush-hash-test").is_some());
         assert_eq!(builtin_hash(&mut env, &argv(&["hash", "-r"])).unwrap(), 0);
         assert!(recall("rush-hash-test").is_none());
+    }
+
+    /// The command-resolution entry point: a search fills the table, and the next lookup is
+    /// answered from it. Without this the table only ever held what an explicit `hash name` put
+    /// there, and `sh; hash` reported an empty cache where bash listed `sh`.
+    #[test]
+    fn a_lookup_populates_the_table_and_the_next_one_is_served_from_it() {
+        assert_eq!(super::lookup("sh"), super::resolve_program("sh"));
+        assert!(recall("sh").is_some(), "the search should have been cached");
+        assert_eq!(super::lookup("no-such-command-xyz"), None);
+        assert!(recall("no-such-command-xyz").is_none());
+    }
+
+    /// A word with a slash is a path, not a `PATH` search, so it must not enter the table:
+    /// `./x` means something different in every directory.
+    #[test]
+    fn a_path_is_not_hashed() {
+        assert!(super::lookup("/bin/sh").is_some());
+        assert!(recall("/bin/sh").is_none());
+    }
+
+    /// A binary that moved must not be reported at its old location for the rest of the session.
+    #[test]
+    fn remembering_again_replaces_the_path() {
+        remember("rush-moved", PathBuf::from("/old/rush-moved"));
+        remember("rush-moved", PathBuf::from("/new/rush-moved"));
+        assert_eq!(recall("rush-moved"), Some(PathBuf::from("/new/rush-moved")));
+    }
+
+    /// `hash -r` has to reach the *other* cache too: the line editor completes from its own set
+    /// of `$PATH` executables, and a shell that kept offering a command it had just been told to
+    /// forget would be contradicting itself.
+    #[test]
+    fn resetting_also_drops_the_completion_cache() {
+        use crate::interactive::command_index::CommandIndex;
+        use std::sync::Arc;
+
+        let dir = tempfile::tempdir().unwrap();
+        let path = dir.path().to_str().unwrap();
+        let before = CommandIndex::executables(path);
+
+        let mut env = Environment::new();
+        assert_eq!(builtin_hash(&mut env, &argv(&["hash", "-r"])).unwrap(), 0);
+
+        // A fresh allocation means the directories were read again rather than replayed.
+        assert!(!Arc::ptr_eq(&before, &CommandIndex::executables(path)));
     }
 
     #[test]

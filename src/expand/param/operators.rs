@@ -3,6 +3,12 @@
 //! Split from the module that *finds* the value so that a scalar and an array element share one
 //! implementation of every operator: `${v:-d}` and `${a[0]:-d}` differ only in where the value
 //! came from and, for the assigning forms, where it goes back to. That is what [`Target`] carries.
+//!
+//! Two operators mean something different when the reference stands for a *list* — `${a[@]}`,
+//! `$@`, `$*`. Slicing selects elements ([`slice_list`]) and the pattern operators rewrite each
+//! element ([`map_elements`]); neither touches the string those elements would join into. Both
+//! live here, once, so that the array path and the positional path cannot drift apart the way
+//! they did when `"${@:2}"` character-sliced the space-joined positionals.
 
 use super::{Target, pattern};
 use crate::ast::{ParamExpansion, ReplaceScope, Word};
@@ -164,6 +170,98 @@ fn is_present(val: &Option<String>, test_null: bool) -> bool {
     }
 }
 
+/// Does this operator rewrite *each element* of a list, rather than the list as a whole?
+///
+/// `${a[@]#pat}` strips the prefix from every element and `${@^^}` upper-cases every positional;
+/// the answer is a list of the same length. Slicing is the other list-valued form and deliberately
+/// not here — it selects elements instead of rewriting them, so it has its own entry point.
+pub(super) fn is_elementwise(expansion_type: &ParamExpansion) -> bool {
+    matches!(
+        expansion_type,
+        ParamExpansion::RemovePrefix { .. }
+            | ParamExpansion::RemoveSuffix { .. }
+            | ParamExpansion::Replace { .. }
+            | ParamExpansion::CaseConvert { .. }
+    )
+}
+
+/// Apply an element-wise operator to every value, keeping the list's length.
+///
+/// Each element goes through [`apply`] as a [`Target::Value`], so `${a[@]%.c}` and `${v%.c}` are
+/// the same code and cannot disagree about what `%` means.
+pub(super) fn map_elements(
+    env: &mut Environment,
+    values: &[String],
+    expansion_type: &ParamExpansion,
+) -> Result<Vec<String>> {
+    debug_assert!(
+        is_elementwise(expansion_type),
+        "map_elements is only defined for the operators is_elementwise admits"
+    );
+    values
+        .iter()
+        .map(|value| apply(env, &Target::Value(value), expansion_type))
+        .collect()
+}
+
+/// `${list:offset:length}` — the elements a slice selects.
+///
+/// A negative offset counts back from the end, as it does for a string. A negative *length* does
+/// not: see [`window`].
+///
+/// The caller decides *which* list. `${a[@]:1}` passes the array's elements; `${@:1}` passes
+/// `$0` followed by the positionals, which is why `${@:1}` is the first argument.
+pub(super) fn slice_list(
+    env: &mut Environment,
+    values: &[String],
+    offset: &Word,
+    length: Option<&Word>,
+) -> Result<Vec<String>> {
+    let start = eval_operand(env, offset)?;
+    let count = match length {
+        Some(word) => Some(eval_operand(env, word)?),
+        None => None,
+    };
+    let (from, to) = window(values.len(), start, count)
+        .map_err(|n| ShellError::ExpansionError(format!("{n}: substring expression < 0")))?;
+    Ok(values[from..to].to_vec())
+}
+
+/// The half-open element range `offset` and `length` select out of a list of `len` items.
+///
+/// `Err` carries the offending length, for the caller to report as bash does. This is where the
+/// list rule parts company with the string rule and the difference is not an oversight: a
+/// negative length names an *end position* in `${v:1:-1}`, but slicing a list with one is a fatal
+/// `substring expression < 0` in bash however many elements there are, so `${a[@]:0:-1}` and
+/// `${@:1:-1}` are errors where `${v:0:-1}` is a value.
+fn window(
+    len: usize,
+    offset: i64,
+    length: Option<i64>,
+) -> std::result::Result<(usize, usize), i64> {
+    let len = len as i64;
+
+    let start = if offset < 0 {
+        // Still negative after counting back from the end means the window starts before the
+        // list, and bash selects nothing at all rather than clamping to the front.
+        let from_end = len + offset;
+        if from_end < 0 {
+            return Ok((0, 0));
+        }
+        from_end
+    } else {
+        offset.min(len)
+    };
+
+    let end = match length {
+        None => len,
+        Some(n) if n < 0 => return Err(n),
+        Some(n) => (start + n).min(len),
+    };
+
+    Ok((start as usize, end.max(start) as usize))
+}
+
 /// A substring operand is an arithmetic expression, so `${v:i+1:n-1}` works.
 ///
 /// An absent operand is 0 rather than an error: `${v: }` is degenerate but not fatal, and the
@@ -175,4 +273,32 @@ fn eval_operand(env: &mut Environment, word: &Word) -> Result<i64> {
         return Ok(0);
     }
     eval_arithmetic(env, text)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::window;
+
+    #[test]
+    fn a_window_clamps_and_counts_back_from_the_end() {
+        assert_eq!(window(3, 1, None), Ok((1, 3)));
+        assert_eq!(window(3, 0, Some(2)), Ok((0, 2)));
+        assert_eq!(window(3, 1, Some(0)), Ok((1, 1)));
+        assert_eq!(window(3, -1, None), Ok((2, 3)));
+        assert_eq!(window(3, -2, Some(1)), Ok((1, 2)));
+        // Past either end selects nothing rather than producing a range that would panic.
+        assert_eq!(window(3, 9, None), Ok((3, 3)));
+        assert_eq!(window(3, 1, Some(9)), Ok((1, 3)));
+        assert_eq!(window(3, -9, None), Ok((0, 0)));
+        assert_eq!(window(0, 0, None), Ok((0, 0)));
+    }
+
+    /// The one place the list rule is *not* the string rule: `${v:0:-1}` drops the last character
+    /// but `${a[@]:0:-1}` is fatal, whatever the array holds.
+    #[test]
+    fn a_negative_length_is_fatal_for_a_list() {
+        assert_eq!(window(3, 0, Some(-1)), Err(-1));
+        assert_eq!(window(4, 1, Some(-1)), Err(-1));
+        assert_eq!(window(0, 0, Some(-1)), Err(-1));
+    }
 }

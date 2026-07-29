@@ -23,9 +23,43 @@ use crate::error::{Result, ShellError};
 /// Real scripts do not come close: the deepest nesting in a large shell codebase is single digits.
 pub const MAX_INPUT_NESTING: usize = 100;
 
-/// Refuse input whose nesting would overflow the stack inside the parser.
+/// How many openers may still be open when the input runs out.
+///
+/// A *different* failure from depth, and the reason [`MAX_INPUT_NESTING`] alone was not enough:
+/// `brush_parser` is a PEG, so it backtracks, and on an opener that never closes it re-tries an
+/// exponential number of alternatives before it can conclude the input is malformed. Measured on
+/// a debug build with `rush -c "$(printf '(%.0s' $(seq n))x"`, parse time doubles per unmatched
+/// `(` — 10 openers 0.01 s, 20 openers 0.64 s, 25 openers 15.9 s, 30 openers unfinished after
+/// half a minute. Depth 25 is a quarter of what the depth guard permits, so the guard never saw
+/// it, and the shell sat at 100% CPU on input as short as `(((((((((((((((((((((((((x`.
+///
+/// 16 is chosen against that measurement, not against taste: it is 2^9 times cheaper than the
+/// 25-opener case, so the worst input this admits costs tens of milliseconds and the parser's own
+/// syntax error arrives on its own. It cannot be much lower without risking a false positive,
+/// because this scan is approximate by design — it does not know about here-document bodies, so
+/// unmatched brackets in one are counted as if they were code. Sixteen simultaneously *unclosed*
+/// openers is far past any real script: correct input closes what it opens, and the only way to
+/// reach this legitimately would be a heredoc body carrying seventeen more `(` than `)`.
+///
+/// This is a syntax error and not a resource limit, so it reports one — bash exits 2 on every
+/// input this rejects, and rush now does too.
+const MAX_UNMATCHED_OPENERS: usize = 16;
+
+/// Refuse input whose nesting would overflow the stack inside the parser, or whose unmatched
+/// openers would make it backtrack for longer than anyone will wait.
 pub fn check_nesting(input: &str) -> Result<()> {
-    if max_nesting_depth(input) > MAX_INPUT_NESTING {
+    let scan = scan_nesting(input);
+
+    // Unmatched first: input that is both too deep and unbalanced is a syntax error, and bash
+    // exits 2 on it. Reporting the depth limit instead would exit 1 for input bash rejects.
+    if scan.unmatched > MAX_UNMATCHED_OPENERS {
+        return Err(ShellError::SyntaxError(format!(
+            "unexpected end of input: {} unmatched openers, at most {MAX_UNMATCHED_OPENERS} are \
+             parseable",
+            scan.unmatched
+        )));
+    }
+    if scan.max_depth > MAX_INPUT_NESTING {
         return Err(ShellError::ExecutionError(
             "maximum nesting level exceeded".to_string(),
         ));
@@ -66,8 +100,16 @@ fn close(stack: &mut Vec<Open>, what: Open) {
     }
 }
 
-/// The deepest simultaneous nesting anywhere in `input`.
-fn max_nesting_depth(input: &str) -> usize {
+/// What one pass over the input found.
+struct Scan {
+    /// The deepest simultaneous nesting anywhere in the input.
+    max_depth: usize,
+    /// How many openers were still open when the input ended.
+    unmatched: usize,
+}
+
+/// The deepest simultaneous nesting anywhere in `input`, and what it left open.
+fn scan_nesting(input: &str) -> Scan {
     let mut stack: Vec<Open> = Vec::new();
     let mut max = 0usize;
     let mut quote = Quote::None;
@@ -174,7 +216,24 @@ fn max_nesting_depth(input: &str) -> usize {
         }
     }
 
-    max
+    // A trailing word is still a keyword: `if true; then echo hi` ends with nothing after `hi`,
+    // and the `if` it never closed is exactly what this count is for.
+    if cmd_pos {
+        match word.as_str() {
+            "if" => open(&mut stack, Open::If, &mut max),
+            "case" => open(&mut stack, Open::Case, &mut max),
+            "do" => open(&mut stack, Open::Do, &mut max),
+            "fi" => close(&mut stack, Open::If),
+            "esac" => close(&mut stack, Open::Case),
+            "done" => close(&mut stack, Open::Do),
+            _ => {}
+        }
+    }
+
+    Scan {
+        max_depth: max,
+        unmatched: stack.len(),
+    }
 }
 
 /// Whether the word after separator `c` (which followed `word`) may start a command.
@@ -191,7 +250,15 @@ fn next_is_command_position(c: char, word: &str, was_cmd_pos: bool) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{MAX_INPUT_NESTING, check_nesting, max_nesting_depth};
+    use super::{MAX_INPUT_NESTING, MAX_UNMATCHED_OPENERS, check_nesting, scan_nesting};
+
+    fn max_nesting_depth(input: &str) -> usize {
+        scan_nesting(input).max_depth
+    }
+
+    fn unmatched(input: &str) -> usize {
+        scan_nesting(input).unmatched
+    }
 
     #[test]
     fn ordinary_scripts_are_shallow() {
@@ -258,6 +325,56 @@ mod tests {
     fn input_at_the_limit_is_accepted() {
         let n = MAX_INPUT_NESTING;
         let script = format!("{}true{}", "{ ".repeat(n), "; }".repeat(n));
+        assert!(check_nesting(&script).is_ok());
+    }
+
+    /// Balanced input leaves nothing open, however deep or however it is written.
+    #[test]
+    fn well_formed_scripts_close_what_they_open() {
+        for script in [
+            "echo hello",
+            "f() { echo hi; }",
+            "if true; then echo hi; fi",
+            "for i in 1 2; do echo $i; done",
+            "case $x in a) echo a;; *) echo b;; esac",
+            "while read l; do if [ -n \"$l\" ]; then echo \"$(date)\"; fi; done",
+            "echo \"smile :(\"",
+            "echo 'if ( { do'",
+            // No trailing separator: the last word still has to be classified.
+            "if true; then echo hi; fi",
+            "x=1; case $x in 1) echo one;; esac",
+            &format!("{}true{}", "( ".repeat(50), " )".repeat(50)),
+        ] {
+            assert_eq!(unmatched(script), 0, "{script}");
+            assert!(check_nesting(script).is_ok(), "{script}");
+        }
+    }
+
+    /// The A2 hang: 25 unmatched `(` made brush backtrack for minutes at 100% CPU.
+    #[test]
+    fn unmatched_openers_are_refused_before_the_parser_backtracks() {
+        let n = MAX_UNMATCHED_OPENERS + 1;
+        for opener in [
+            "(",
+            "{ ",
+            "if true; then ",
+            "while true; do ",
+            "case $x in ",
+        ] {
+            let script = format!("{}x", opener.repeat(n));
+            assert_eq!(unmatched(&script), n, "{script}");
+            let err = check_nesting(&script).expect_err("must be refused");
+            assert!(err.to_string().contains("unmatched openers"), "{err}");
+            // A syntax error, not a resource limit: bash exits 2 on all of these.
+            assert_eq!(err.failure_status(), 2);
+        }
+    }
+
+    /// One short of the bound still reaches the parser, which reports the syntax error itself.
+    #[test]
+    fn a_few_unmatched_openers_still_reach_the_parser() {
+        let script = format!("{}x", "(".repeat(MAX_UNMATCHED_OPENERS));
+        assert_eq!(unmatched(&script), MAX_UNMATCHED_OPENERS);
         assert!(check_nesting(&script).is_ok());
     }
 }

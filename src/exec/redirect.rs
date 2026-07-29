@@ -1,12 +1,12 @@
 use crate::ast::{RedirectKind, Redirection};
 use crate::env::Environment;
 use crate::error::{Result, ShellError};
-use crate::expand::expand_word;
-use nix::fcntl::{FcntlArg, fcntl};
+use crate::expand::{expand_word, expand_word_to_string};
+use nix::fcntl::{FcntlArg, FdFlag, fcntl};
 use nix::unistd::dup2;
 use std::fs::{File, OpenOptions};
 use std::io::{Seek, SeekFrom, Write};
-use std::os::fd::{AsRawFd, RawFd};
+use std::os::fd::RawFd;
 
 /// Lowest descriptor number a saved copy may occupy.
 ///
@@ -75,16 +75,16 @@ impl RedirectGuard {
                     let file = File::open(&target_str).map_err(|e| {
                         ShellError::ExecutionError(format!("{}: {}", target_str, e))
                     })?;
-                    dup2(file.as_raw_fd(), target_fd)?;
+                    install(file, target_fd)?;
                 }
                 // `>` and `>|` differ in exactly one situation, and only when `set -C` is on.
                 RedirectKind::Output => {
                     let file = open_for_output(&target_str, env.noclobber())?;
-                    dup2(file.as_raw_fd(), target_fd)?;
+                    install(file, target_fd)?;
                 }
                 RedirectKind::Clobber => {
                     let file = open_for_output(&target_str, false)?;
-                    dup2(file.as_raw_fd(), target_fd)?;
+                    install(file, target_fd)?;
                 }
                 RedirectKind::Append => {
                     let file = OpenOptions::new()
@@ -94,7 +94,7 @@ impl RedirectGuard {
                         .map_err(|e| {
                             ShellError::ExecutionError(format!("{}: {}", target_str, e))
                         })?;
-                    dup2(file.as_raw_fd(), target_fd)?;
+                    install(file, target_fd)?;
                 }
                 RedirectKind::ReadWrite => {
                     let file = OpenOptions::new()
@@ -106,7 +106,7 @@ impl RedirectGuard {
                         .map_err(|e| {
                             ShellError::ExecutionError(format!("{}: {}", target_str, e))
                         })?;
-                    dup2(file.as_raw_fd(), target_fd)?;
+                    install(file, target_fd)?;
                 }
                 RedirectKind::DupInput | RedirectKind::DupOutput => {
                     if target_str == "-" {
@@ -129,14 +129,65 @@ impl RedirectGuard {
                     }
                 }
                 RedirectKind::Heredoc | RedirectKind::HeredocStrip => {
-                    let content = redir.heredoc_content.as_deref().unwrap_or("");
-                    let body = heredoc_body(content)?;
-                    dup2(body.as_raw_fd(), target_fd)?;
+                    let mut content = match &redir.heredoc_content {
+                        // Not `expand_word`: a body is one document, not an argument list, so
+                        // field splitting would collapse its whitespace and globbing would turn
+                        // a line reading `*` into a directory listing.
+                        Some(word) => expand_word_to_string(env, word)?,
+                        None => String::new(),
+                    };
+                    // A here-string's newline goes on *after* expansion. `<<< "$(cmd)"` has to
+                    // lose the trailing newlines command substitution strips before this one is
+                    // added, or every such body gains a blank line.
+                    if redir.here_string {
+                        content.push('\n');
+                    }
+                    let body = heredoc_body(&content)?;
+                    install(body, target_fd)?;
                 }
             }
         }
         Ok(())
     }
+}
+
+/// Point `target_fd` at `file`, and make sure the descriptor survives `file` going out of scope.
+///
+/// `dup2` plus a drop looks like it works and does not. `open(2)` hands back the lowest free
+/// descriptor, so in a shell that has never redirected anything `exec 3>log` opens the file *on
+/// fd 3* — the very number the script asked for. `dup2(3, 3)` is then a POSIX no-op, the `File`
+/// drops at the end of the statement, and fd 3 closes: `echo x >&3` on the next line reports
+/// "Bad file descriptor". `{ echo x >&3; } 3>log` fails the same way; nothing about this is
+/// specific to `exec`.
+///
+/// Taking the descriptor out of the `File` is what fixes it: after `into_raw_fd` nothing runs a
+/// destructor, so this function owns the close and can order it after the `dup2` instead of
+/// before. When `open` already landed on the wanted number there is nothing to duplicate at all.
+///
+/// `mem::forget` would have been the shorter spelling and the wrong one. Rust opens files
+/// `O_CLOEXEC`, and the old code got child inheritance right only *because* `dup2` clears
+/// `FD_CLOEXEC` on the descriptor it creates. In the no-op case there is no new descriptor, so a
+/// forgotten `File` would keep the flag and hide fd 3 from every program the script `exec`s — the
+/// same corpus case failing for the opposite reason. Clearing it explicitly says so rather than
+/// depending on a side effect of a call that may not happen.
+fn install(file: File, target_fd: RawFd) -> Result<()> {
+    use std::os::fd::IntoRawFd;
+
+    let raw = file.into_raw_fd();
+    if raw != target_fd {
+        // `raw` stays open across this call, so the descriptor is never unowned: a `close` first
+        // would hand the number back to the kernel, and in a threaded process anything could
+        // claim it before the `dup2` that was meant to reuse it.
+        if let Err(e) = dup2(raw, target_fd) {
+            let _ = nix::unistd::close(raw);
+            return Err(e.into());
+        }
+        let _ = nix::unistd::close(raw);
+    }
+    // A redirection is inherited by the command it applies to, and for `exec` that command is a
+    // program which replaces this process.
+    fcntl(target_fd, FcntlArg::F_SETFD(FdFlag::empty()))?;
+    Ok(())
 }
 
 /// Open the target of `>` or `>|`, honouring `set -C` when `refuse_existing` says to.
@@ -294,6 +345,7 @@ impl Drop for RedirectGuard {
 mod tests {
     use super::*;
     use std::io::Read;
+    use std::os::fd::AsRawFd;
     use std::os::unix::fs::MetadataExt;
 
     /// On Linux `heredoc_body` always takes the memfd path, so the fallback is only ever reached
@@ -395,6 +447,66 @@ mod tests {
         std::fs::write(&path, b"payload").expect("write");
         let _ = open_for_output(path.to_str().unwrap(), true).expect_err("noclobber must refuse");
         assert_eq!(std::fs::read(&path).expect("read"), b"payload");
+    }
+
+    /// R11.C1, exactly. `open` returns the lowest free descriptor, so `3>file` in a clean shell
+    /// gets a `File` that already *is* fd 3 — and `dup2(3, 3)` followed by a drop closes the
+    /// redirection it just made. Handing `install` a file whose descriptor is the target is that
+    /// case with the timing taken out of it.
+    #[test]
+    fn installing_a_file_onto_its_own_descriptor_leaves_it_open() {
+        use nix::fcntl::FdFlag;
+
+        let file = File::open("/dev/null").expect("/dev/null");
+        let target = file.as_raw_fd();
+        install(file, target).expect("install");
+
+        let flags = fcntl(target, FcntlArg::F_GETFD)
+            .expect("the descriptor the redirection installed was closed");
+        // Not close-on-exec: `exec 3>log; exec prog` has to hand fd 3 to `prog`. The old code got
+        // this right only as a side effect of `dup2`, which the no-op case never reached.
+        assert!(
+            !FdFlag::from_bits_truncate(flags).contains(FdFlag::FD_CLOEXEC),
+            "fd {target} is close-on-exec, so an exec'd child cannot see it"
+        );
+        let _ = nix::unistd::close(target);
+    }
+
+    /// The ordinary case: the file has to be moved onto a descriptor it did not open on, and the
+    /// content has to survive the move.
+    #[test]
+    fn installing_a_file_elsewhere_moves_its_contents() {
+        use std::io::Read;
+
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("data");
+        std::fs::write(&path, b"payload").expect("write");
+
+        // A number this process is not using. `install` overwrites whatever is on the target, so
+        // the placeholder does not have to be — and must not be — closed first: closing it would
+        // hand the number back and let a sibling test claim it.
+        let placeholder = File::open("/dev/null").expect("/dev/null");
+        let target = fcntl(
+            placeholder.as_raw_fd(),
+            FcntlArg::F_DUPFD_CLOEXEC(SAVE_FD_FLOOR),
+        )
+        .expect("scratch descriptor");
+
+        let file = File::open(&path).expect("open");
+        assert_ne!(
+            file.as_raw_fd(),
+            target,
+            "the two-descriptor case is what this covers"
+        );
+        install(file, target).expect("install");
+
+        let mut installed = unsafe { <File as std::os::fd::FromRawFd>::from_raw_fd(target) };
+        let mut got = String::new();
+        installed.read_to_string(&mut got).expect("read");
+        assert_eq!(
+            got, "payload",
+            "fd {target} is not the file that was installed"
+        );
     }
 
     /// The pre-exec child never restores anything, so it must not spend syscalls building a save

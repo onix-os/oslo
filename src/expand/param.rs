@@ -33,6 +33,13 @@ pub(crate) enum Target<'a> {
     Param(&'a str),
     /// One element of an indexed array, with its subscript already evaluated.
     Element { name: &'a str, index: i64 },
+    /// A value already in hand, with no slot in the environment behind it.
+    ///
+    /// This is what element-wise application needs: `${a[@]#pat}` runs the operator over values
+    /// the array path already read out, and there is no per-element name to look up. Nothing can
+    /// assign through it, which is why the `${a[@]:=v}` family is still refused rather than
+    /// routed here.
+    Value(&'a str),
 }
 
 impl Target<'_> {
@@ -44,6 +51,7 @@ impl Target<'_> {
                 .get_array(name)
                 .and_then(|array| array.get(*index))
                 .map(str::to_string),
+            Self::Value(value) => Some((*value).to_string()),
         }
     }
 
@@ -57,6 +65,9 @@ impl Target<'_> {
             Self::Element { name, index } => {
                 env.set_array_element(name, *index, text);
             }
+            // `operators::map_elements` accepts only the four rewriting operators, none of which
+            // assigns, so this arm is unreachable by construction.
+            Self::Value(_) => unreachable!("an element-wise operator never assigns"),
         }
     }
 
@@ -65,6 +76,7 @@ impl Target<'_> {
         match self {
             Self::Param(name) => (*name).to_string(),
             Self::Element { name, index } => format!("{name}[{index}]"),
+            Self::Value(value) => (*value).to_string(),
         }
     }
 }
@@ -81,10 +93,17 @@ pub fn expand_param(
 ) -> Result<Vec<Field>> {
     let origin = origin_of(in_quotes);
 
-    // `$@` and `$*` are the only parameters that can be more than one field, and only `$@` keeps
-    // them apart. Every other form has a single string as its value, so it takes the path below.
-    if matches!(expansion_type, ParamExpansion::Normal) && matches!(name, "@" | "*") {
-        return Ok(positional_fields(env, name, origin));
+    // `$@` and `$*` are the only parameters that stand for a *list*, and only `$@` keeps its
+    // members apart. Everything list-valued has to be answered here: falling through to the
+    // scalar path below joins the positionals with a space first, which is how `"${@:2}"` came
+    // to hand back one character-sliced field instead of the arguments it was forwarding.
+    if matches!(name, "@" | "*") {
+        if matches!(expansion_type, ParamExpansion::Normal) {
+            return Ok(positional_fields(env, name, origin));
+        }
+        if let Some(fields) = array::positional_list(env, name, expansion_type, origin)? {
+            return Ok(fields);
+        }
     }
 
     let text = expand_to_string(env, name, expansion_type)?;
@@ -142,19 +161,17 @@ fn is_param_name(name: &str) -> bool {
 /// runs `cmd` rather than `cmd ""`. `$*` is always exactly one field, joined by the first
 /// character of IFS.
 fn positional_fields(env: &Environment, name: &str, origin: Origin) -> Vec<Field> {
-    let params = env.get_positional();
-    if name == "@" {
-        return params
-            .iter()
-            .map(|p| vec![Run::new(p.clone(), origin)])
-            .collect();
-    }
-    vec![vec![Run::new(params.join(&env.ifs_separator()), origin)]]
+    array::list_fields(
+        env.get_positional(),
+        name == "@",
+        &env.ifs_separator(),
+        origin,
+    )
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{expand_to_string, is_param_name, positional_fields};
+    use super::{expand_param, expand_to_string, is_param_name, positional_fields};
     use crate::ast::{ParamExpansion, ReplaceScope, Word, WordPart};
     use crate::env::Environment;
     use crate::expand::word::{Origin, field_text};
@@ -252,6 +269,96 @@ mod tests {
         assert!(!is_param_name(""));
         assert!(!is_param_name("1a"));
         assert!(!is_param_name("v-d"));
+    }
+
+    /// Expand `${@<op>}` / `${*<op>}` over `params`, as a list of field texts.
+    fn positional(params: &[&str], name: &str, op: ParamExpansion) -> Result<Vec<String>, String> {
+        let mut env = Environment::new();
+        env.set_positional(params.iter().map(|p| (*p).to_string()).collect());
+        expand_param(&mut env, name, &op, true)
+            .map(|fields| fields.iter().map(|f| field_text(f)).collect())
+            .map_err(|e| e.to_string())
+    }
+
+    fn slice(offset: &str, length: Option<&str>) -> ParamExpansion {
+        ParamExpansion::Substring {
+            offset: lit(offset),
+            length: length.map(lit),
+        }
+    }
+
+    /// R11/B5: `${@:1}` slices the *argument list*.
+    ///
+    /// This used to fall through to the scalar path, which joins the positionals with a space and
+    /// then cuts characters out of that string — so `set -- a b c; "${@:1}"` handed back the one
+    /// field `" b c"` and every `"${@:2}"` forwarding idiom silently corrupted its arguments.
+    #[test]
+    fn slicing_the_positionals_selects_arguments_not_characters() {
+        let args = ["a", "b", "c"];
+        let got = positional(&args, "@", slice("1", None));
+        assert_eq!(got, Ok(vec!["a".into(), "b".into(), "c".into()]));
+        assert_eq!(
+            positional(&args, "@", slice("2", None)),
+            Ok(vec!["b".into(), "c".into()])
+        );
+        assert_eq!(
+            positional(&args, "@", slice("1", Some("2"))),
+            Ok(vec!["a".into(), "b".into()])
+        );
+        // Negative counts back from the end of the same list; past the front selects nothing, and
+        // `"$@"` with nothing selected is no field rather than one empty one.
+        assert_eq!(
+            positional(&args, "@", slice("-2", None)),
+            Ok(vec!["b".into(), "c".into()])
+        );
+        assert_eq!(positional(&args, "@", slice("9", None)), Ok(vec![]));
+        // An argument that contains the separator stays one field, which is the whole reason the
+        // joined string is the wrong thing to slice.
+        assert_eq!(
+            positional(&["a b", "c"], "@", slice("1", None)),
+            Ok(vec!["a b".into(), "c".into()])
+        );
+        // `${*:1}` is the joined form of the same slice: one field, always.
+        assert_eq!(
+            positional(&args, "*", slice("2", None)),
+            Ok(vec!["b c".into()])
+        );
+        assert_eq!(
+            positional(&args, "*", slice("9", None)),
+            Ok(vec![String::new()])
+        );
+        // bash makes a negative length fatal for a list, unlike for a string.
+        assert!(positional(&args, "@", slice("1", Some("-1"))).is_err());
+    }
+
+    /// The list bash slices is `$0 $1 $2 …`, one longer than `$@` — which is why the forwarding
+    /// idiom is written `"${@:1}"` and `"${@:0}"` picks up the shell's own name.
+    #[test]
+    fn a_positional_slice_is_offset_by_arg_zero() {
+        let mut env = Environment::new();
+        env.set_positional(vec!["a".into(), "b".into()]);
+        let zero = env.get_param("0").expect("$0 is always set");
+        let got = expand_param(&mut env, "@", &slice("0", None), true).unwrap();
+        let texts: Vec<String> = got.iter().map(|f| field_text(f)).collect();
+        assert_eq!(texts, vec![zero, "a".to_string(), "b".to_string()]);
+    }
+
+    /// The twin of the array rule: `${@#pat}` rewrites each argument, and `$0` takes no part.
+    #[test]
+    fn a_pattern_operator_maps_over_the_positionals() {
+        let op = ParamExpansion::RemovePrefix {
+            pattern: lit("a"),
+            longest: false,
+        };
+        let got = positional(&["a.c", "b.c"], "@", op);
+        assert_eq!(got, Ok(vec![".c".into(), "b.c".into()]));
+
+        let op = ParamExpansion::CaseConvert {
+            pattern: None,
+            upper: true,
+            all: true,
+        };
+        assert_eq!(positional(&["ab", "cd"], "*", op), Ok(vec!["AB CD".into()]));
     }
 
     #[test]

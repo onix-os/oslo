@@ -211,7 +211,21 @@ pub struct Redirection {
     pub fd: Option<i32>,
     pub kind: RedirectKind,
     pub target: Word,
-    pub heredoc_content: Option<String>,
+    /// Body of a here-document or here-string, as parts rather than text.
+    ///
+    /// It has to be a [`Word`]: an unquoted heredoc body is expanded before it reaches the
+    /// command, so the parser cannot flatten it to a string without deciding, at parse time,
+    /// what `$v` means. A quoted delimiter (`<<'EOF'`) suppresses expansion, and the parser
+    /// records that by storing a single literal part.
+    pub heredoc_content: Option<Word>,
+    /// True when the body came from `<<< word` rather than `<<DELIM`.
+    ///
+    /// A here-string's document is the expanded word *plus* a newline, and a here-document's is
+    /// the body text exactly as written — which already carries its own line terminators. The
+    /// newline cannot be baked into `heredoc_content`, because `<<< "$(cmd)"` must first lose
+    /// the trailing newlines command substitution strips, and a literal part appended before
+    /// expansion is not covered by that rule.
+    pub here_string: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]

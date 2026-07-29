@@ -3,7 +3,7 @@
 //! A shell word is a sequence of parts — literal text, single-quoted runs, double-quoted runs
 //! (which may themselves contain expansions) — which the evaluator later expands in order.
 
-use super::scanner::{Lexer, is_operator_char};
+use super::scanner::{Lexer, is_blank, is_operator_char};
 use crate::ast::{Word, WordPart};
 use crate::error::{Result, ShellError};
 use crate::lexer::token::Token;
@@ -20,9 +20,34 @@ pub(super) fn parse_word_source(source: &str) -> Result<Word> {
     })
 }
 
+/// Split an unquoted here-document body into the parts expansion will run over.
+///
+/// A body is not a word and must not be scanned like one. The word scanner terminates nothing
+/// when asked to run to end of input, but it still treats `'` and `"` as quotes and `~` as a
+/// tilde prefix; inside a heredoc all three are ordinary characters, so `echo "it's fine"` in a
+/// body would raise "unterminated single quote" on a script bash runs without complaint.
+///
+/// The live set is exactly the one double quotes have — `$`, `` ` ``, and a backslash before
+/// `$`, `` ` ``, `\` or a newline — which is why this shares the double-quote scanner's shape
+/// and differs only in having no closing delimiter to look for.
+pub fn parse_heredoc_body(source: &str) -> Result<Word> {
+    let mut lexer = Lexer::new(source);
+    Ok(Word {
+        parts: lexer.scan_heredoc_parts()?,
+    })
+}
+
 impl Lexer<'_> {
     pub(super) fn scan_word(&mut self) -> Result<Token> {
+        let start = self.offset();
         let parts = self.scan_word_parts(false)?;
+
+        // A word with no parts that also consumed nothing is not a token, it is a stall. Refusing
+        // it here bounds every loop over `next()` no matter which scanner disagreed; see
+        // `Lexer::stalled_at`. `''` and `""` are not this case — both produce a part.
+        if parts.is_empty() && self.offset() == start {
+            return Err(self.stalled_at());
+        }
 
         // A bare run of digits immediately followed by `<` or `>` is an fd number, as in `2>`.
         // One literal part and nothing else is what rules out `\2>` and `"2">`: any quoting at
@@ -66,7 +91,11 @@ impl Lexer<'_> {
         let mut current_lit = String::new();
 
         while let Some(ch) = self.current_char() {
-            if !to_eof && (ch.is_whitespace() || is_operator_char(ch)) {
+            // `is_blank`, not `char::is_whitespace`: the two must name the same set as
+            // `skip_whitespace` or a character in the gap ends the word here and is then skipped
+            // by nobody, which is a lexer that cannot advance. `\n` is covered by
+            // `is_operator_char`.
+            if !to_eof && (is_blank(ch) || is_operator_char(ch)) {
                 break;
             }
 
@@ -160,22 +189,39 @@ impl Lexer<'_> {
     }
 
     pub(super) fn scan_double_quote(&mut self) -> Result<Vec<WordPart>> {
+        self.scan_quoted_run(Some('"'))
+    }
+
+    /// Scan a heredoc body: the same live set, no closing delimiter, EOF is the end.
+    fn scan_heredoc_parts(&mut self) -> Result<Vec<WordPart>> {
+        self.scan_quoted_run(None)
+    }
+
+    /// The run shared by double quotes and here-document bodies.
+    ///
+    /// `closing` is the character that ends the run, and it doubles as the extra character a
+    /// backslash may escape — `\"` is a quote inside `"…"`, while in a heredoc body there is no
+    /// such character and `\"` stays two characters, exactly as bash writes it out.
+    ///
+    /// `None` also means running off the end is not an error: a body ends where the delimiter
+    /// line was, and the caller has already cut it there.
+    fn scan_quoted_run(&mut self, closing: Option<char>) -> Result<Vec<WordPart>> {
         let mut parts = Vec::new();
         let mut current_lit = String::new();
 
         while let Some(ch) = self.current_char() {
-            match ch {
-                '"' => {
-                    self.advance();
-                    if !current_lit.is_empty() {
-                        parts.push(WordPart::Literal(current_lit));
-                    }
-                    return Ok(parts);
+            if Some(ch) == closing {
+                self.advance();
+                if !current_lit.is_empty() {
+                    parts.push(WordPart::Literal(current_lit));
                 }
+                return Ok(parts);
+            }
+            match ch {
                 '\\' => {
                     self.advance();
                     if let Some(next) = self.current_char() {
-                        if matches!(next, '$' | '`' | '"' | '\\' | '\n') {
+                        if matches!(next, '$' | '`' | '\\' | '\n') || Some(next) == closing {
                             if next != '\n' {
                                 current_lit.push(next);
                             }
@@ -211,16 +257,29 @@ impl Lexer<'_> {
             }
         }
 
-        Err(ShellError::SyntaxError(
-            "Unterminated double quote".to_string(),
-        ))
+        if closing.is_some() {
+            return Err(ShellError::SyntaxError(
+                "Unterminated double quote".to_string(),
+            ));
+        }
+        if !current_lit.is_empty() {
+            parts.push(WordPart::Literal(current_lit));
+        }
+        Ok(parts)
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use super::parse_heredoc_body;
     use crate::ast::WordPart;
     use crate::lexer::{Lexer, Token};
+
+    fn body(src: &str) -> Vec<WordPart> {
+        parse_heredoc_body(src)
+            .unwrap_or_else(|e| panic!("heredoc body {src:?} did not scan: {e}"))
+            .parts
+    }
 
     fn parts(src: &str) -> Vec<WordPart> {
         match Lexer::new(src).next() {
@@ -363,5 +422,125 @@ mod tests {
     fn an_unterminated_substitution_is_a_syntax_error() {
         assert!(Lexer::new("$(echo hi").next().is_err());
         assert!(Lexer::new("${x:-y").next().is_err());
+    }
+
+    /// Round 11 A1. `skip_whitespace` stepped over these and `scan_word_parts` refused to consume
+    /// them, so the lexer returned part-less words forever and every caller looping to `Eof` hung
+    /// while allocating. They are ordinary word characters in bash, and now here.
+    #[test]
+    fn unicode_blanks_are_word_characters_not_separators() {
+        for blank in [
+            '\u{0b}', '\u{0c}', '\u{a0}', '\u{2028}', '\u{2007}', '\u{85}',
+        ] {
+            let src = format!("a{blank}b");
+            assert_eq!(
+                parts(&src),
+                vec![WordPart::Literal(src.clone())],
+                "U+{:04X} split a word",
+                blank as u32
+            );
+        }
+    }
+
+    // --- R11.B2: here-document bodies ---
+
+    /// The reason a body cannot go through the word scanner. All three of these end a word, or
+    /// open a quote that never closes, and in a heredoc all three are ordinary characters.
+    #[test]
+    fn quotes_blanks_and_tildes_are_plain_text_in_a_body() {
+        assert_eq!(
+            body("it's \"fine\"\t~root *\n"),
+            vec![WordPart::Literal("it's \"fine\"\t~root *\n".into())]
+        );
+        assert!(
+            super::parse_word_source("it's fine").is_err(),
+            "the word scanner accepts an unterminated quote, so this test proves nothing"
+        );
+    }
+
+    /// The live set is the double-quoted one, so expansions still become parts.
+    #[test]
+    fn expansions_in_a_body_are_still_scanned() {
+        assert_eq!(
+            body("x=$v\n"),
+            vec![
+                WordPart::Literal("x=".into()),
+                WordPart::Variable {
+                    name: "v".into(),
+                    expansion_type: crate::ast::ParamExpansion::Normal,
+                },
+                WordPart::Literal("\n".into()),
+            ]
+        );
+        assert_eq!(
+            body("$(echo a)`echo b`$((1+1))"),
+            vec![
+                WordPart::CommandSubstitution("echo a".into()),
+                WordPart::CommandSubstitution("echo b".into()),
+                WordPart::Arithmetic("1+1".into()),
+            ]
+        );
+    }
+
+    /// A backslash escapes `$`, a backtick, another backslash and a newline — and nothing else.
+    /// `\"` in particular is two characters here, where inside double quotes it is one.
+    #[test]
+    fn only_four_escapes_exist_in_a_body() {
+        assert_eq!(body("\\$v"), vec![WordPart::Literal("$v".into())]);
+        assert_eq!(body("\\`x"), vec![WordPart::Literal("`x".into())]);
+        assert_eq!(body("\\\\"), vec![WordPart::Literal("\\".into())]);
+        assert_eq!(body("a\\\nb"), vec![WordPart::Literal("ab".into())]);
+        assert_eq!(
+            body("\\\"q\\\""),
+            vec![WordPart::Literal("\\\"q\\\"".into())]
+        );
+        assert_eq!(body("\\n\\t"), vec![WordPart::Literal("\\n\\t".into())]);
+    }
+
+    /// A body ends where its delimiter line was, which the caller has already cut off. Running
+    /// out of input is therefore the normal ending, not the error it is inside quotes.
+    #[test]
+    fn a_body_ends_at_end_of_input_rather_than_erroring() {
+        assert_eq!(body(""), vec![]);
+        assert_eq!(
+            body("no trailing newline"),
+            vec![WordPart::Literal("no trailing newline".into())]
+        );
+        assert!(
+            Lexer::new("unterminated").scan_double_quote().is_err(),
+            "the shared scanner must still refuse an unterminated double quote"
+        );
+    }
+
+    /// The property that makes the hang impossible rather than merely fixed: whatever the input,
+    /// `next()` either consumes something or reaches `Eof`/an error.
+    #[test]
+    fn every_token_consumes_at_least_one_character() {
+        for src in [
+            "a\u{0b}b",
+            "echo a\u{a0}b",
+            "\u{2028}",
+            "\u{a0}",
+            "\u{0c}\u{0b}\u{85}",
+            "a b\tc\rd\ne",
+            "''",
+            "\"\"",
+            "x=1\u{0b}2",
+            "~\u{a0}",
+        ] {
+            let mut lexer = Lexer::new(src);
+            // One token per character is the ceiling; anything past it is a scanner that stopped
+            // advancing, which is the bug this bounds rather than a test of tokenization.
+            for _ in 0..=src.chars().count() {
+                let before = lexer.offset();
+                match lexer.next() {
+                    Ok(Token::Eof) | Err(_) => break,
+                    Ok(tok) => assert!(
+                        lexer.offset() > before,
+                        "{src:?}: {tok:?} consumed nothing at offset {before}"
+                    ),
+                }
+            }
+        }
     }
 }

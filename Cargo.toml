@@ -16,7 +16,9 @@ path = "src/lib.rs"
 
 [dependencies]
 mlua = { version = "0.10", features = ["lua54", "vendored", "async"] }
-nix = { version = "0.29", features = ["process", "signal", "term", "fs", "user"] }
+# `resource` is what `ulimit` sets limits through. Without it the builtin can only read
+# /proc/self/limits, and `ulimit -n 512` has to be refused rather than silently ignored.
+nix = { version = "0.29", features = ["process", "signal", "term", "fs", "user", "resource"] }
 rustyline = "15.0"
 glob = "0.3"
 # `[[ str =~ ere ]]` needs a real POSIX-ERE engine. Approximating it with globs would make every
@@ -27,9 +29,20 @@ thiserror = "2.0"
 
 tracing = "0.1"
 tracing-subscriber = "0.3"
-brush-parser = "0.4.0"
+# Vendored 0.4.0 — the published release, plus one grammar patch so that `for ((;;))` parses.
+# brush's tokenizer takes the longest match and fuses the loop's two section separators into a
+# single `;;` operator whenever the condition is empty, which the grammar's arithmetic-for rule
+# then cannot match. The patch and the upstream PR text are in vendor/brush-parser/PATCH.md;
+# this line goes back to `brush-parser = "0.x"` the day the fix lands upstream.
+brush-parser = { path = "vendor/brush-parser" }
 
 [dev-dependencies]
 tempfile = "3.17"
+
+# The vendored parser is a path dependency, which would otherwise make it a workspace member and
+# so a target of `cargo fmt --all` and the 600-line file limit. Neither applies to a dependency
+# whose source is upstream's: reformatting it would bury the one-rule patch in noise.
+[workspace]
+exclude = ["vendor/brush-parser"]
 
 

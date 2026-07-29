@@ -2,7 +2,7 @@
 
 use super::read_input::{InputSpec, is_terminal, probe_readable, read_logical_line, status_of};
 use super::read_split::{all_fields, assign_fields};
-use crate::env::scope::Environment;
+use crate::env::scope::{Environment, ShellArray};
 use crate::error::Result;
 use std::os::fd::RawFd;
 
@@ -89,6 +89,20 @@ fn parse_number<T: std::str::FromStr>(
         .map_err(|_| invalid(format!("-{flag}: {value}: invalid number")))
 }
 
+/// `-t`'s argument: seconds, which must be a finite non-negative number.
+///
+/// A negative or non-finite deadline has no meaning — it cannot be waited for and it cannot be
+/// probed — so bash rejects it rather than rounding it to zero, and so does rush. Clamping it to
+/// an immediate probe would turn a typo into a silently different read.
+fn timeout_seconds(value: &str) -> std::result::Result<f64, OptionError> {
+    match value.parse::<f64>() {
+        Ok(secs) if secs.is_finite() && secs >= 0.0 => Ok(secs),
+        _ => Err(invalid(format!(
+            "-t: {value}: invalid timeout specification"
+        ))),
+    }
+}
+
 /// Apply one option letter, returning the unconsumed remainder of its cluster.
 fn apply_flag<'a>(
     opts: &mut ReadOptions,
@@ -118,7 +132,7 @@ fn apply_flag<'a>(
             opts.limit = Some(parse_number('N', &value)?);
             opts.exact = true;
         }
-        't' => opts.timeout = Some(parse_number('t', &value)?),
+        't' => opts.timeout = Some(timeout_seconds(&value)?),
         'u' => opts.fd = parse_number('u', &value)?,
         // `-d ''` is bash's way of spelling a NUL delimiter, which is what `find -print0` needs.
         'd' => opts.delim = value.bytes().next().unwrap_or(0),
@@ -223,12 +237,24 @@ pub fn builtin_read(env: &mut Environment, args: &[String]) -> Result<i32> {
     };
 
     if let Some(array) = &opts.array {
-        // rush has no array variables yet, so only the element `$array` would expand to — the
-        // first — can be represented. `all_fields` is the whole answer, ready to be bound once
-        // arrays exist.
-        let fields = all_fields(env, &line);
-        let first = fields.first().cloned().unwrap_or_default();
-        env.set_var(array, &first, false);
+        // `-a` replaces the array wholesale — a shorter line must not leave the previous read's
+        // tail behind — and any `name…` operands are ignored, as in bash.
+        //
+        // `-N` reads a fixed count *through* delimiters, so there is nothing to split on: the
+        // text arrives as the single element bash leaves in `${array[0]}`.
+        let fields = if opts.exact {
+            let text = line.text();
+            if text.is_empty() {
+                Vec::new()
+            } else {
+                vec![text]
+            }
+        } else {
+            all_fields(env, &line)
+        };
+        if !env.set_array(array, ShellArray::from_values(fields)) {
+            return Ok(1);
+        }
     } else if opts.exact || opts.names.is_empty() {
         assign_verbatim(env, &opts.names, &line.text());
     } else {
@@ -292,6 +318,42 @@ mod tests {
             .map(|s| s.to_string())
             .collect();
         assert_eq!(parse_options(&argv).expect("options parse").delim, 0);
+    }
+
+    #[test]
+    fn dash_a_names_an_array_and_not_a_variable() {
+        let argv: Vec<String> = ["read", "-a", "arr", "extra"]
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
+        let opts = parse_options(&argv).expect("options parse");
+        assert_eq!(opts.array.as_deref(), Some("arr"));
+        // bash ignores operand names once `-a` is given; they must not become the array's name.
+        assert_eq!(opts.names, ["extra"]);
+    }
+
+    #[test]
+    fn a_timeout_must_be_a_finite_non_negative_number() {
+        let reject = |value: &str| {
+            let argv: Vec<String> = ["read", "-t", value, "v"]
+                .iter()
+                .map(|s| s.to_string())
+                .collect();
+            parse_options(&argv).err().map(|e| e.status)
+        };
+        assert_eq!(reject("-1"), Some(1));
+        assert_eq!(reject("inf"), Some(1));
+        assert_eq!(reject("nan"), Some(1));
+        // …but a fraction is the whole point of the option, and zero is the probe form.
+        let accept = |value: &str| {
+            let argv: Vec<String> = ["read", "-t", value, "v"]
+                .iter()
+                .map(|s| s.to_string())
+                .collect();
+            parse_options(&argv).expect("options parse").timeout
+        };
+        assert_eq!(accept("0.5"), Some(0.5));
+        assert_eq!(accept("0"), Some(0.0));
     }
 
     #[test]

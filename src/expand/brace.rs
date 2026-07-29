@@ -1,27 +1,41 @@
 //! Brace expansion: `a{1,2}b` -> `a1b a2b`, `{1..5}` -> `1 2 3 4 5`.
 //!
-//! This runs *before* every other expansion, because it is the only one that turns one word into
-//! several words rather than one word into several fields. `mkdir -p build/{bin,lib}` must reach
-//! `mkdir` as two arguments; no amount of later field splitting can recover that, since splitting
-//! only ever cuts the *result* of an expansion on IFS.
+//! This is the only expansion that turns one word into several *words* rather than one word into
+//! several fields. `mkdir -p build/{bin,lib}` must reach `mkdir` as two arguments, and no amount
+//! of later field splitting can recover that, since splitting only ever cuts the *result* of an
+//! expansion on IFS.
 //!
-//! It operates on the word's parts rather than on its source text, because quoting has already
-//! been resolved by then and quoting is what decides whether a brace is syntax: `"{a,b}"` and
-//! `{a\,b}` are literal, `{a,b}` is not. A [`WordPart`] that is not unquoted literal text is
-//! therefore opaque here — it can neither open a group nor separate alternatives — while every
-//! character of a [`WordPart::Literal`] is a candidate piece of brace syntax.
+//! It runs on the word's **source text**, before the word is lexed, which is where bash runs it
+//! and is the whole reason it lives on this side of the lexer. A brace group is a piece of
+//! *lexical* syntax, not a boundary between already-formed word parts, so it can fuse the text on
+//! either side of itself into a single token:
+//!
+//! ```text
+//! v=x; echo {$v,y}z    ->  $vz  yz    the group's suffix extends the *name* `$v`, so `$vz` is unset
+//! v=x; echo $v{a,b}    ->  $va  $vb   and so does an alternative, when the name comes first
+//! v=x; echo ${v}{a,b}  ->  xa   xb    `${v}` closes the name, so here the fusion cannot happen
+//! ```
+//!
+//! Expanding over word *parts* instead gets the third line right and the first two wrong, because
+//! by then `$v` is a part of its own and can never grow a `z`. That was rush's behaviour until
+//! this pass moved ahead of the lexer.
+//!
+//! Because the text is still unlexed, this module has to decide for itself which characters are
+//! syntax — quoting is exactly what says whether a brace is a brace (`"{a,b}"` and `{a\,b}` are
+//! literal), and an expansion is opaque even when it contains a comma (`${x:-a,b}` is one word).
+//! `to_atoms` is that decision, and it is the only place in this file that looks at a character
+//! for any reason other than brace syntax.
 //!
 //! Anything that does not parse as a group stays exactly as it was typed. That is not a fallback,
 //! it is the specification: `echo {a}` prints `{a}`, and a shell that guessed otherwise would
 //! quietly rewrite awk programs and JSON literals.
 //!
-//! Working on parts rather than text costs one known deviation from bash, whose brace expansion is
-//! textual and therefore able to fuse a group boundary into a *name*: bash reads `{$v,y}z` as the
-//! two words `$vz` and `yz`, so the first names a variable that does not exist. Here `$v` is
-//! already its own part and the result is `<v>z`. Recovering bash's answer means expanding braces
-//! on source text before the word is lexed, which is a parser change, not an expansion one.
+//! This file owns the syntax — what is a group, where it ends, how groups combine. The `sequence`
+//! module beside it owns what a `{n..m}` denotes.
 
-use crate::ast::{Word, WordPart};
+mod sequence;
+
+use sequence::sequence_alternatives;
 
 /// Ceiling on how many items one `{n..m}` may generate.
 ///
@@ -31,67 +45,184 @@ use crate::ast::{Word, WordPart};
 /// failure than an allocation that takes the shell down with it.
 const SEQUENCE_LIMIT: i128 = 100_000;
 
+/// Ceiling on how many words one word's brace expansion may produce in total.
+///
+/// [`SEQUENCE_LIMIT`] bounds a single range; this bounds their product, which is what
+/// `{1..1000}{1..1000}` multiplies out to. It matters more here than it would inside the
+/// evaluator, because this pass runs while the *parser* is building the command — so without it
+/// `if false; then echo {1..100000}{1..100000}; fi` wedges the shell on a branch it was never
+/// going to take, and no `if` guarding the line can save it. Over budget the word is left exactly
+/// as it was typed, the same answer this pass gives any other group it declines.
+const WORD_LIMIT: usize = 100_000;
+
 /// One position in a word, as brace expansion sees it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Atom {
-    /// A character of unquoted literal text, and so a possible `{`, `,` or `}`.
+    /// A character that is exposed to brace syntax, and so a possible `{`, `,` or `}`.
     Raw(char),
-    /// A quoted run or an expansion. Opaque: it survives into the output untouched.
-    Part(WordPart),
+    /// A quoted run or an expansion, carried through verbatim. Opaque: the characters inside it
+    /// are text for the lexer that runs after this pass, never brace syntax here.
+    Opaque(String),
 }
 
-/// Expand the brace groups in `word`, yielding one word per combination.
+/// Expand the brace groups in the source text of one word, one output word per combination.
 ///
 /// A word with no expandable group comes back as itself, which is the overwhelmingly common case
 /// and the reason for the cheap `{` scan up front.
-pub fn expand_braces(word: &Word) -> Vec<Word> {
-    let has_brace = word
-        .parts
-        .iter()
-        .any(|p| matches!(p, WordPart::Literal(s) if s.contains('{')));
-    if !has_brace {
-        return vec![word.clone()];
+pub fn expand_braces_text(word: &str) -> Vec<String> {
+    if !word.contains('{') {
+        return vec![word.to_string()];
     }
 
     let atoms = to_atoms(word);
     let expanded = expand_atoms(&atoms);
-    // Nothing expandable: hand back the original word rather than a rebuilt equal one, so a word
+    // Nothing expandable: hand back the original text rather than a rebuilt equal one, so a word
     // that merely mentions a brace is not paying for a reconstruction.
     if expanded.len() == 1 && expanded[0] == atoms {
-        return vec![word.clone()];
+        return vec![word.to_string()];
     }
     expanded.iter().map(|a| from_atoms(a)).collect()
 }
 
-fn to_atoms(word: &Word) -> Vec<Atom> {
-    let mut atoms = Vec::new();
-    for part in &word.parts {
-        match part {
-            WordPart::Literal(s) => atoms.extend(s.chars().map(Atom::Raw)),
-            other => atoms.push(Atom::Part(other.clone())),
+/// Brace-expand every word of a string that holds a *list* of words, rewriting it in place.
+///
+/// Two places in rush hold a list of words as one string and lex it themselves rather than going
+/// through the parser: an alias body (`alias mk='mkdir -p {a,b}'`) and a `declare -a` array
+/// literal. Brace expansion happens per word and before the lexer, so neither can get it from
+/// [`crate::expand::expand_word`] — this is the same pass applied at the same boundary, one word
+/// at a time.
+///
+/// The separators between the words are copied through untouched rather than normalised, so a
+/// newline inside an alias body stays a newline.
+pub fn expand_braces_in_line(text: &str) -> String {
+    if !text.contains('{') {
+        return text.to_string();
+    }
+
+    let atoms = to_atoms(text);
+    let mut out = String::with_capacity(text.len());
+    let mut word: Vec<Atom> = Vec::new();
+    for atom in atoms {
+        // Only an unquoted blank separates words; a quoted one is part of the word it sits in.
+        if matches!(atom, Atom::Raw(c) if c.is_whitespace()) {
+            push_expanded(&mut out, &word);
+            word.clear();
+            out.push_str(&from_atoms(std::slice::from_ref(&atom)));
+        } else {
+            word.push(atom);
         }
+    }
+    push_expanded(&mut out, &word);
+    out
+}
+
+/// Append one word's brace expansion, the alternatives separated so the lexer sees several words.
+fn push_expanded(out: &mut String, word: &[Atom]) {
+    for (i, expanded) in expand_atoms(word).iter().enumerate() {
+        if i > 0 {
+            out.push(' ');
+        }
+        out.push_str(&from_atoms(expanded));
+    }
+}
+
+/// Split the word's text into the characters brace syntax may read and the runs it may not.
+///
+/// The opaque runs are the constructs whose interior belongs to a later stage: quotes, an escape,
+/// a parameter expansion, a command substitution, an arithmetic expansion. Every one of them can
+/// contain a `{`, `}` or `,` that is not brace syntax — `${x:-a,b}` is one word in bash, and
+/// `$(f a,b)` is one too — and none of them can be recognised after the fact from a lexed word.
+///
+/// A `$` that starts none of those is an ordinary character: `{$v,y}z` has to leave `$v` exposed,
+/// because fusing it with the `z` after the group is the entire point of running here.
+fn to_atoms(text: &str) -> Vec<Atom> {
+    let chars: Vec<char> = text.chars().collect();
+    let mut atoms = Vec::with_capacity(chars.len());
+    let mut i = 0;
+    while i < chars.len() {
+        let end = match chars[i] {
+            // A backslash quotes exactly one character, itself included if nothing follows.
+            '\\' => (i + 2).min(chars.len()),
+            '\'' => closing(&chars, i + 1, '\'', false),
+            '"' => closing(&chars, i + 1, '"', true),
+            '`' => closing(&chars, i + 1, '`', true),
+            '$' if matches!(chars.get(i + 1), Some('\'')) => closing(&chars, i + 2, '\'', true),
+            // `${...}` and `$(...)`, the latter covering `$((...))` because its parentheses
+            // balance. Both nest, and both may contain quotes that hide a closing delimiter.
+            '$' if matches!(chars.get(i + 1), Some('{')) => nested(&chars, i + 1, '{', '}'),
+            '$' if matches!(chars.get(i + 1), Some('(')) => nested(&chars, i + 1, '(', ')'),
+            c => {
+                atoms.push(Atom::Raw(c));
+                i += 1;
+                continue;
+            }
+        };
+        atoms.push(Atom::Opaque(chars[i..end].iter().collect()));
+        i = end;
     }
     atoms
 }
 
-fn from_atoms(atoms: &[Atom]) -> Word {
-    let mut parts: Vec<WordPart> = Vec::new();
-    let mut lit = String::new();
+/// Index just past the `close` that ends a run starting at `from`, or the end of the text.
+///
+/// An unterminated quote runs to the end on purpose: the word is a syntax error and the lexer will
+/// say so, but until it does, the text inside must not be mistaken for brace syntax.
+fn closing(chars: &[char], from: usize, close: char, escapes: bool) -> usize {
+    let mut i = from;
+    while i < chars.len() {
+        if escapes && chars[i] == '\\' {
+            i += 2;
+            continue;
+        }
+        if chars[i] == close {
+            return i + 1;
+        }
+        i += 1;
+    }
+    chars.len()
+}
+
+/// Index just past the delimiter closing the `open` at `from`, honouring nesting and quotes.
+fn nested(chars: &[char], from: usize, open: char, close: char) -> usize {
+    let mut depth = 0usize;
+    let mut i = from;
+    while i < chars.len() {
+        match chars[i] {
+            '\\' => {
+                i += 2;
+                continue;
+            }
+            '\'' => {
+                i = closing(chars, i + 1, '\'', false);
+                continue;
+            }
+            '"' => {
+                i = closing(chars, i + 1, '"', true);
+                continue;
+            }
+            c if c == open => depth += 1,
+            c if c == close => {
+                depth -= 1;
+                if depth == 0 {
+                    return i + 1;
+                }
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+    chars.len()
+}
+
+fn from_atoms(atoms: &[Atom]) -> String {
+    let mut out = String::new();
     for atom in atoms {
         match atom {
-            Atom::Raw(c) => lit.push(*c),
-            Atom::Part(p) => {
-                if !lit.is_empty() {
-                    parts.push(WordPart::Literal(std::mem::take(&mut lit)));
-                }
-                parts.push(p.clone());
-            }
+            Atom::Raw(c) => out.push(*c),
+            Atom::Opaque(s) => out.push_str(s),
         }
     }
-    if !lit.is_empty() {
-        parts.push(WordPart::Literal(lit));
-    }
-    Word { parts }
+    out
 }
 
 fn is_raw(atom: &Atom, ch: char) -> bool {
@@ -104,6 +235,12 @@ fn is_raw(atom: &Atom, ch: char) -> bool {
 /// group, and bash still expands the later one, giving `{a}b {a}c`. So a pair that turns out not
 /// to be a group is skipped rather than ending the search.
 fn expand_atoms(atoms: &[Atom]) -> Vec<Vec<Atom>> {
+    let mut budget = WORD_LIMIT;
+    expand_bounded(atoms, &mut budget).unwrap_or_else(|| vec![atoms.to_vec()])
+}
+
+/// [`expand_atoms`], with [`WORD_LIMIT`] to spend. `None` once it is gone.
+fn expand_bounded(atoms: &[Atom], budget: &mut usize) -> Option<Vec<Vec<Atom>>> {
     for open in 0..atoms.len() {
         if !is_raw(&atoms[open], '{') {
             continue;
@@ -120,12 +257,13 @@ fn expand_atoms(atoms: &[Atom]) -> Vec<Vec<Atom>> {
         };
 
         let prefix = &atoms[..open];
-        let suffixes = expand_atoms(&atoms[close + 1..]);
+        let suffixes = expand_bounded(&atoms[close + 1..], budget)?;
         let mut out = Vec::new();
         for alternative in alternatives {
             // An alternative may itself contain groups: `{a,b{c,d}}` is `a bc bd`.
-            for body in expand_atoms(&alternative) {
+            for body in expand_bounded(&alternative, budget)? {
                 for suffix in &suffixes {
+                    *budget = budget.checked_sub(1)?;
                     let mut word = Vec::with_capacity(prefix.len() + body.len() + suffix.len());
                     word.extend_from_slice(prefix);
                     word.extend_from_slice(&body);
@@ -134,9 +272,9 @@ fn expand_atoms(atoms: &[Atom]) -> Vec<Vec<Atom>> {
                 }
             }
         }
-        return out;
+        return Some(out);
     }
-    vec![atoms.to_vec()]
+    Some(vec![atoms.to_vec()])
 }
 
 /// Index of the `}` closing the `{` at `open`, honouring nesting.
@@ -180,134 +318,27 @@ fn comma_alternatives(inner: &[Atom]) -> Option<Vec<Vec<Atom>>> {
     (parts.len() > 1).then_some(parts)
 }
 
-/// Expand `{n..m}`, `{n..m..step}` and their single-character form `{a..e}`.
-fn sequence_alternatives(inner: &[Atom]) -> Option<Vec<Vec<Atom>>> {
-    // A sequence expression is pure text; a `$x` anywhere in it means this is not one.
-    let text = inner
-        .iter()
-        .map(|a| match a {
-            Atom::Raw(c) => Some(*c),
-            Atom::Part(_) => None,
-        })
-        .collect::<Option<String>>()?;
-
-    let mut fields = text.split("..");
-    let start = fields.next()?;
-    let end = fields.next()?;
-    let step = fields.next();
-    if fields.next().is_some() {
-        return None;
-    }
-    let step = match step {
-        // bash takes the magnitude and gets direction from the endpoints, so `{1..5..-2}` counts
-        // up; a zero step is read as one rather than as a sequence that never terminates.
-        Some(s) => s.parse::<i64>().ok()?.checked_abs()?.max(1),
-        None => 1,
-    };
-
-    let items = numeric_sequence(start, end, step).or_else(|| char_sequence(start, end, step))?;
-    Some(
-        items
-            .into_iter()
-            .map(|s| s.chars().map(Atom::Raw).collect())
-            .collect(),
-    )
-}
-
-/// Whether an operand asks for zero padding, i.e. it has a leading zero of its own.
-///
-/// `{01..10}` is `01 02 ... 10`; `{1..10}` is not padded.
-fn is_zero_padded(s: &str) -> bool {
-    let digits = s
-        .strip_prefix('-')
-        .or_else(|| s.strip_prefix('+'))
-        .unwrap_or(s);
-    digits.len() > 1 && digits.starts_with('0')
-}
-
-fn numeric_sequence(start: &str, end: &str, step: i64) -> Option<Vec<String>> {
-    let from: i64 = start.parse().ok()?;
-    let to: i64 = end.parse().ok()?;
-    // bash counts the sign into the field width: `{-01..1}` is `-01 000 001`.
-    let width = if is_zero_padded(start) || is_zero_padded(end) {
-        start.len().max(end.len())
-    } else {
-        0
-    };
-
-    let count = (i128::from(to) - i128::from(from)).abs() / i128::from(step) + 1;
-    if count > SEQUENCE_LIMIT {
-        return None;
-    }
-
-    let mut out = Vec::with_capacity(count as usize);
-    for i in 0..count {
-        let v = if from <= to {
-            i128::from(from) + i * i128::from(step)
-        } else {
-            i128::from(from) - i * i128::from(step)
-        };
-        out.push(format!("{v:0width$}"));
-    }
-    Some(out)
-}
-
-fn char_sequence(start: &str, end: &str, step: i64) -> Option<Vec<String>> {
-    let from = i64::from(single_ascii(start)?);
-    let to = i64::from(single_ascii(end)?);
-
-    // Counting first keeps the arithmetic bounded: the largest multiple of `step` used is at most
-    // the distance between the endpoints, so an absurd step just yields the single first item.
-    let count = (to - from).abs() / step + 1;
-    let mut out = Vec::with_capacity(count as usize);
-    for i in 0..count {
-        let c = if from <= to {
-            from + i * step
-        } else {
-            from - i * step
-        };
-        out.push(char::from(u8::try_from(c).ok()?).to_string());
-    }
-    Some(out)
-}
-
-/// A sequence endpoint written as one ASCII letter, as in `{a..z}`.
-///
-/// Letters only: `{1..z}` is not a range in bash either, and reading it as one would turn a
-/// mistyped numeric range into a stream of punctuation.
-fn single_ascii(s: &str) -> Option<u8> {
-    let mut chars = s.chars();
-    let c = chars.next()?;
-    if chars.next().is_some() || !c.is_ascii_alphabetic() {
-        return None;
-    }
-    Some(c as u8)
-}
-
 #[cfg(test)]
 mod tests {
-    use super::expand_braces;
-    use crate::ast::{ParamExpansion, Word, WordPart};
-
-    /// Expand a word written as plain unquoted text, the shape most cases have.
-    fn expand(text: &str) -> Vec<String> {
-        expand_braces(&Word::from_literal(text))
-            .iter()
-            .map(|w| {
-                w.parts
-                    .iter()
-                    .map(|p| match p {
-                        WordPart::Literal(s) => s.clone(),
-                        other => panic!("unexpected part {other:?}"),
-                    })
-                    .collect()
-            })
-            .collect()
-    }
+    use super::expand_braces_text as expand;
 
     #[test]
     fn comma_list_expands_with_prefix_and_suffix() {
         assert_eq!(expand("x{a,b}y"), vec!["xay", "xby"]);
+    }
+
+    /// The idiom the whole pass exists for: one word in, several *words* out.
+    #[test]
+    fn whole_word_groups_are_the_point() {
+        assert_eq!(expand("build/{bin,lib}"), vec!["build/bin", "build/lib"]);
+        assert_eq!(
+            expand("out/{a,b}/{x,y}"),
+            vec!["out/a/x", "out/a/y", "out/b/x", "out/b/y"]
+        );
+        assert_eq!(
+            expand("file{1,2,3}.txt"),
+            vec!["file1.txt", "file2.txt", "file3.txt"]
+        );
     }
 
     #[test]
@@ -342,86 +373,90 @@ mod tests {
         assert_eq!(expand("{a{b,c}"), vec!["{ab", "{ac"]);
     }
 
+    /// A product that would run the shell out of memory is declined, not attempted — and it is
+    /// declined at *parse* time, so an `if` that never runs the line cannot be wedged by it.
     #[test]
-    fn numeric_ranges_count_both_ways() {
-        assert_eq!(expand("{1..4}"), vec!["1", "2", "3", "4"]);
-        assert_eq!(expand("{4..1}"), vec!["4", "3", "2", "1"]);
-        assert_eq!(expand("{-2..2}"), vec!["-2", "-1", "0", "1", "2"]);
-    }
-
-    #[test]
-    fn range_step_is_a_magnitude() {
-        assert_eq!(expand("{0..10..3}"), vec!["0", "3", "6", "9"]);
-        // A negative step is not a direction: the endpoints already gave one.
-        assert_eq!(expand("{1..5..-2}"), vec!["1", "3", "5"]);
-        // bash reads a zero step as one, rather than as a group it refuses to expand.
-        assert_eq!(expand("{1..3..0}"), vec!["1", "2", "3"]);
-    }
-
-    #[test]
-    fn leading_zero_pads_the_whole_range() {
-        assert_eq!(expand("{08..11}"), vec!["08", "09", "10", "11"]);
-        assert_eq!(expand("{-01..1}"), vec!["-01", "000", "001"]);
-    }
-
-    #[test]
-    fn character_ranges_walk_the_alphabet() {
-        assert_eq!(expand("{a..e}"), vec!["a", "b", "c", "d", "e"]);
-        assert_eq!(expand("{e..a..2}"), vec!["e", "c", "a"]);
-    }
-
-    #[test]
-    fn malformed_ranges_stay_literal() {
-        assert_eq!(expand("{1...5}"), vec!["{1...5}"]);
-        assert_eq!(expand("{1..z}"), vec!["{1..z}"]);
-        assert_eq!(expand("{a..b..c}"), vec!["{a..b..c}"]);
-        // Refusing an absurd range is the same answer as any other unparsable group.
-        assert_eq!(expand("{1..99999999}"), vec!["{1..99999999}"]);
+    fn an_unbounded_product_is_declined_like_any_other_group() {
+        let huge = "{1..100000}{1..100000}";
+        assert_eq!(expand(huge), vec![huge]);
+        // The limit is on the product; a single range that reaches it still expands.
+        assert_eq!(expand("{1..100000}").len(), 100_000);
     }
 
     #[test]
     fn words_without_braces_are_returned_untouched() {
-        let w = Word::from_literal("plain");
-        assert_eq!(expand_braces(&w), vec![w]);
+        assert_eq!(expand("plain"), vec!["plain"]);
     }
 
-    /// Quoted text is not brace syntax, and an expansion inside a group survives into each
-    /// alternative as an expansion rather than being flattened to text.
+    /// Quoting is what decides whether a brace is syntax, and this pass has to decide it for
+    /// itself because the word has not been lexed yet.
     #[test]
-    fn quoted_braces_are_literal_and_expansions_are_carried_along() {
-        let quoted = Word {
-            parts: vec![WordPart::SingleQuoted("{a,b}".into())],
-        };
-        assert_eq!(expand_braces(&quoted), vec![quoted.clone()]);
-
-        let var = WordPart::Variable {
-            name: "x".into(),
-            expansion_type: ParamExpansion::Normal,
-        };
-        let w = Word {
-            parts: vec![
-                WordPart::Literal("{".into()),
-                var.clone(),
-                WordPart::Literal(",b}".into()),
-            ],
-        };
-        let got = expand_braces(&w);
-        assert_eq!(got.len(), 2);
-        assert_eq!(got[0].parts, vec![var]);
-        assert_eq!(got[1].parts, vec![WordPart::Literal("b".into())]);
+    fn quoting_makes_a_brace_literal() {
+        assert_eq!(expand("\"{a,b}\""), vec!["\"{a,b}\""]);
+        assert_eq!(expand("'{a,b}'"), vec!["'{a,b}'"]);
+        assert_eq!(expand("{a\\,b}"), vec!["{a\\,b}"]);
+        assert_eq!(expand("\\{a,b\\}"), vec!["\\{a,b\\}"]);
+        // A quoted run is opaque, not invisible: the group around it is still a group.
+        assert_eq!(expand("{\"a,b\",c}"), vec!["\"a,b\"", "c"]);
     }
 
-    /// A comma that only exists because of an expansion does not split the group: the group is
-    /// delimited by syntax, not by the text an expansion happens to produce.
+    /// An expansion is one opaque run, so a comma or brace inside it is not brace syntax.
     #[test]
-    fn a_comma_from_an_expansion_does_not_split() {
-        let w = Word {
-            parts: vec![
-                WordPart::Literal("{a".into()),
-                WordPart::SingleQuoted(",".into()),
-                WordPart::Literal("b}".into()),
-            ],
-        };
-        assert_eq!(expand_braces(&w), vec![w.clone()]);
+    fn expansions_are_opaque() {
+        assert_eq!(expand("${x:-a,b}"), vec!["${x:-a,b}"]);
+        assert_eq!(expand("${x:-{a,b}}"), vec!["${x:-{a,b}}"]);
+        assert_eq!(expand("$(f a,b)"), vec!["$(f a,b)"]);
+        assert_eq!(expand("$((1,2))"), vec!["$((1,2))"]);
+        assert_eq!(expand("`f a,b`"), vec!["`f a,b`"]);
+        assert_eq!(expand("$'a,b'"), vec!["$'a,b'"]);
+        // …and a group *containing* one still expands, carrying it through untouched.
+        assert_eq!(expand("{$(f a,b),y}"), vec!["$(f a,b)", "y"]);
+    }
+
+    /// The reason this pass runs before the lexer: a group boundary can land inside a name.
+    #[test]
+    fn a_group_boundary_fuses_into_the_text_around_it() {
+        assert_eq!(expand("{$v,y}z"), vec!["$vz", "yz"]);
+        assert_eq!(expand("pre{$v,y}post"), vec!["pre$vpost", "preypost"]);
+        assert_eq!(expand("$v{a,b}"), vec!["$va", "$vb"]);
+        // `${v}` closes the name itself, so there is nothing for the group to fuse into.
+        assert_eq!(expand("${v}{a,b}"), vec!["${v}a", "${v}b"]);
+    }
+
+    /// An unterminated quote is a syntax error the lexer will report; until it does, the text
+    /// inside must not be read as brace syntax.
+    #[test]
+    fn an_unterminated_quote_swallows_the_rest_of_the_word() {
+        assert_eq!(expand("'{a,b}"), vec!["'{a,b}"]);
+        assert_eq!(expand("x\"{a,b}"), vec!["x\"{a,b}"]);
+    }
+
+    mod in_line {
+        use super::super::expand_braces_in_line as line;
+
+        #[test]
+        fn each_word_expands_on_its_own() {
+            assert_eq!(line("mkdir -p {a,b}"), "mkdir -p a b");
+            assert_eq!(line("cp {a,b} {c,d}"), "cp a b c d");
+        }
+
+        /// The separators are the caller's, not this pass's: an alias body may be several lines.
+        #[test]
+        fn separators_survive_verbatim() {
+            assert_eq!(line("echo\t{a,b}\nls"), "echo\ta b\nls");
+            assert_eq!(line("echo  a"), "echo  a");
+        }
+
+        #[test]
+        fn a_line_without_a_group_is_returned_unchanged() {
+            assert_eq!(line("grep --color \"a b\""), "grep --color \"a b\"");
+            assert_eq!(line("echo a{b}c"), "echo a{b}c");
+        }
+
+        /// A quoted blank does not separate words, so the group around it stays one word.
+        #[test]
+        fn a_quoted_blank_does_not_split_a_word() {
+            assert_eq!(line("echo {\"a b\",c}"), "echo \"a b\" c");
+        }
     }
 }
