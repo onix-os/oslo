@@ -238,7 +238,42 @@ kernel takes `comm` from the file named to `execve` — the script — so `/proc
 that means anything; and a shell as init cannot reap while blocked in a foreground command, so
 that check belongs in `/init` and not in a suite running under it.
 
-## Sequencing
+## C3 completed — real execution, not just parsing
+
+The 740-script sweep proved *parsing*. Running GNU hello's `./configure` — 25 150 lines of
+generated shell — proved execution, and immediately found that oslo could not parse it at all.
+
+The sweep had never covered it. Its file list was `*.sh` plus shebang-detected executables in the
+nix store, and autoconf `configure` scripts live in source trees, not there. A number that read as
+comprehensive had systematically excluded the most important shell script in the build world.
+
+The cause was the nesting guard again, in three more places. Each was found by instrumenting the
+scanner to report *which lines* it still thought were open, rather than by bisecting — bisecting a
+file with `head` truncates it mid-construct, so every prefix looks unbalanced and the result means
+nothing.
+
+* **A `)` inside double quotes closed a live construct.** `if (eval "test \$(( 1 + 1 )) = 2")` has
+  an *escaped* `$`, so the `((` opens nothing while the `))` closed the real `(` from `if (`. Every
+  `fi`, `done` and `esac` after that matched against the wrong frame. A `)` in double quotes is now
+  never a closer — a genuine `$(` leaves quoted mode, so its closing paren arrives in the unquoted
+  branch instead.
+* **`<<\_ACEOF` was not recognised as a here-document.** The delimiter can be backslash-quoted as
+  well as `'`- or `"`-quoted; autoconf uses that spelling 15 times per `configure`, and those
+  bodies are `--help` prose full of the words "do", "if" and "case", each opening a construct that
+  never closed.
+* **The threshold measured the wrong thing.** `MAX_UNMATCHED_OPENERS` was calibrated against short
+  pathological input — `(((((…x` at a prompt — where a few unclosed parens cost seconds of PEG
+  backtracking. That risk lives in *small* inputs; a 25 000-line script is not one opener repeated,
+  and a parser working through valid text makes progress rather than backtracking. Meanwhile this
+  scan is approximate by design, so on a large file the count reflects its own mistakes more than
+  the input's. The allowance now grows with input size: strict where the hang was measured,
+  generous where the approximation is unreliable and the hang is not realistic.
+
+Result: **`./configure` completes under oslo with exit 0**, producing a working `Makefile` and
+`config.status`. `make` then fails identically under oslo and under a bash-configured tree
+(`aclocal-1.16` is missing on this machine), which is the controlled comparison that matters.
+
+The sweep is now **740 of 740**, with the last standing false positive gone as well.
 
 A1 and A2 first and alone: A1 is a correctness *and* safety defect, and it is a prerequisite for
 C3's cheap sweep. A3–A7 are independent of each other. B1/B2 unblock every other Lua item. C

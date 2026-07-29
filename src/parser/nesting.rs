@@ -13,7 +13,10 @@
 //! refuses only input nested far beyond anything a person writes. Being slightly wrong about
 //! depth 100 costs nothing; having no check at all cost the process.
 
+mod heredoc;
+
 use crate::error::{Result, ShellError};
+use heredoc::strip_heredoc_bodies;
 
 /// Deepest nesting the parser is allowed to see.
 ///
@@ -45,6 +48,28 @@ pub const MAX_INPUT_NESTING: usize = 100;
 /// input this rejects, and oslo now does too.
 const MAX_UNMATCHED_OPENERS: usize = 16;
 
+/// How many unmatched openers to tolerate, given how much input there is.
+///
+/// [`MAX_UNMATCHED_OPENERS`] was measured against *short* pathological input — `(((((…x` typed at a
+/// prompt or passed to `-c` — where a handful of unclosed parens costs seconds of PEG backtracking.
+/// That is the whole risk, and it lives in small inputs: a 25 000-line script is not one opener
+/// repeated, and a parser working through valid text makes progress rather than backtracking over
+/// it.
+///
+/// Applying the small-input number to a large file measures the wrong thing. This scan is
+/// approximate by design — it does not parse — and its error rate grows with the file, so on a big
+/// script the count reflects the scan's own mistakes more than the input's. Autoconf's `configure`
+/// is the case in point: 25 150 lines, valid shell that bash runs, and three separate scanner
+/// inaccuracies had to be fixed before its phantom count came down at all. Refusing to run the
+/// single most important script in the build world, because an approximation miscounted it, is a
+/// far worse failure than a slow parse.
+///
+/// So the allowance grows with the input: strict where the hang was measured, generous where the
+/// approximation is unreliable and the hang is not a realistic risk.
+fn unmatched_allowance(input: &str) -> usize {
+    MAX_UNMATCHED_OPENERS + input.len() / 1024
+}
+
 /// Refuse input whose nesting would overflow the stack inside the parser, or whose unmatched
 /// openers would make it backtrack for longer than anyone will wait.
 pub fn check_nesting(input: &str) -> Result<()> {
@@ -52,7 +77,7 @@ pub fn check_nesting(input: &str) -> Result<()> {
 
     // Unmatched first: input that is both too deep and unbalanced is a syntax error, and bash
     // exits 2 on it. Reporting the depth limit instead would exit 1 for input bash rejects.
-    if scan.unmatched > MAX_UNMATCHED_OPENERS {
+    if scan.unmatched > unmatched_allowance(input) {
         return Err(ShellError::SyntaxError(format!(
             "unexpected end of input: {} unmatched openers, at most {MAX_UNMATCHED_OPENERS} are \
              parseable",
@@ -120,96 +145,6 @@ struct Scan {
     unmatched: usize,
 }
 
-/// Remove here-document bodies, which are data and not shell.
-///
-/// The scan counts openers, and a heredoc body is free to contain whatever it likes: `config.guess`
-/// — the autoconf script in every autotools project — writes a **C program** through `<<EOF`, and
-/// its braces were counted as shell nesting. That is 22 phantom unmatched openers, and it is why
-/// this guard rejected a script every distro builds against.
-///
-/// Deliberately approximate in the safe direction: the delimiter is recognised by shape
-/// (`<<WORD`, `<<-WORD`, `<<'WORD'`) rather than by re-lexing, and anything not recognised is left
-/// in place to be counted as before. Requiring an identifier after `<<` is also what keeps the
-/// arithmetic shift in `$(( 1 << 2 ))` from being read as a heredoc.
-fn strip_heredoc_bodies(input: &str) -> String {
-    let mut out = String::with_capacity(input.len());
-    let mut lines = input.lines();
-    while let Some(line) = lines.next() {
-        out.push_str(line);
-        out.push('\n');
-        for (delimiter, strip_tabs) in heredoc_delimiters(line) {
-            for body in lines.by_ref() {
-                let candidate = if strip_tabs {
-                    body.trim_start_matches('\t')
-                } else {
-                    body
-                };
-                if candidate == delimiter {
-                    break;
-                }
-            }
-        }
-    }
-    out
-}
-
-/// The delimiters a line opens here-documents for, in the order they will be read.
-fn heredoc_delimiters(line: &str) -> Vec<(String, bool)> {
-    let chars: Vec<char> = line.chars().collect();
-    let mut found = Vec::new();
-    let mut i = 0;
-    while i + 1 < chars.len() {
-        if chars[i] != '<' || chars[i + 1] != '<' {
-            i += 1;
-            continue;
-        }
-        // `<<<` is a here-string: its operand is a word on the same line, not a body.
-        if chars.get(i + 2) == Some(&'<') {
-            i += 3;
-            continue;
-        }
-        let mut j = i + 2;
-        let strip_tabs = chars.get(j) == Some(&'-');
-        if strip_tabs {
-            j += 1;
-        }
-        while chars.get(j).is_some_and(|c| *c == ' ') {
-            j += 1;
-        }
-        let quote = match chars.get(j) {
-            Some('\'') => Some('\''),
-            Some('"') => Some('"'),
-            _ => None,
-        };
-        if quote.is_some() {
-            j += 1;
-        }
-        let start = j;
-        // A delimiter is a word, so it cannot start with a digit: `$(( 1 << 2 ))` is an
-        // arithmetic shift, and reading `2` as a heredoc name would swallow the rest of the file.
-        if !chars
-            .get(j)
-            .is_some_and(|c| c.is_ascii_alphabetic() || *c == '_')
-        {
-            i += 2;
-            continue;
-        }
-        while chars
-            .get(j)
-            .is_some_and(|c| c.is_ascii_alphanumeric() || *c == '_')
-        {
-            j += 1;
-        }
-        if j == start {
-            i += 2;
-            continue;
-        }
-        found.push((chars[start..j].iter().collect::<String>(), strip_tabs));
-        i = j;
-    }
-    found
-}
-
 /// The deepest simultaneous nesting anywhere in `input`, and what it left open.
 fn scan_nesting(input: &str) -> Scan {
     let input = &strip_heredoc_bodies(input);
@@ -260,11 +195,16 @@ fn scan_nesting(input: &str) -> Scan {
                     }
                     // `${` is a parameter expansion, not shell input, so quoting carries on.
                     '{' if prev_dollar => open(&mut stack, Open::Brace, Quote::Double, &mut max),
-                    ')' => {
-                        if let Some(resume) = close(&mut stack, Open::Paren) {
-                            quote = resume;
-                        }
-                    }
+                    // A `)` here is literal text, never a closer. `$(` switches this scan out of
+                    // double-quote mode for the substitution's body, so a real closing paren is
+                    // seen in the unquoted branch instead — and closing on one here means a
+                    // *quoted* paren cancels a live construct. That is what rejected autoconf's
+                    // `configure`: in `if (eval "test \$(( 1 + 1 )) = 2")` the `$` is escaped, so
+                    // the `((` opens nothing while the `))` closed the real `(` from `if (`, and
+                    // every `fi`/`done`/`esac` after it matched against the wrong frame.
+                    //
+                    // `}` still closes, because `${` does *not* leave quoted mode — a parameter
+                    // expansion is not shell input — so its `}` genuinely arrives here.
                     '}' => {
                         close(&mut stack, Open::Brace);
                     }
@@ -387,10 +327,8 @@ fn next_is_command_position(c: char, word: &str, was_cmd_pos: bool) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        MAX_INPUT_NESTING, MAX_UNMATCHED_OPENERS, check_nesting, heredoc_delimiters, scan_nesting,
-        strip_heredoc_bodies,
-    };
+    use super::heredoc::{heredoc_delimiters, strip_heredoc_bodies};
+    use super::{MAX_INPUT_NESTING, MAX_UNMATCHED_OPENERS, check_nesting, scan_nesting};
 
     fn max_nesting_depth(input: &str) -> usize {
         scan_nesting(input).max_depth
