@@ -296,20 +296,29 @@ the fork is gone and the construct is a [known gap](#known-gaps). The patch belo
 ## Known gaps
 
 Each of these is reproducible against the binary, and all but the last are differences from bash.
-The first four have a corpus case, named in `tests/differential/expected_fail.rs`, so the
-differential suite watches them and will fail the day one is fixed and the line is not deleted.
-The rest are recorded only here: a corpus case for a known-missing feature buys a second copy of
-this list and a row in the ratchet, which is worth it for a bug and not for an absence.
+Three of them — the `for` loop, `coproc` and `select` — have a corpus case named in
+`tests/differential/expected_fail.rs`, so the differential suite watches them and will fail the day
+one is fixed and the line is not deleted. The rest are recorded only here: a corpus case for a
+known-missing feature buys a second copy of this list and a row in the ratchet, which is worth it
+for a bug and not for an absence.
 
 - `for ((;;))` is a syntax error when the section separators touch. Write `for (( ; ; ))` instead;
   the ordinary `for ((i=0;i<3;i++))` is unaffected. The cause is upstream: brush's tokenizer takes
   the longest match and fuses the two `;` into the single `;;` that ends a `case` item, so the
   arithmetic-for rule never sees them. A small alternative in that one grammar rule fixes it, but
   only by vendoring the whole parser — better sent upstream than carried here.
-- Process substitution (`<(cmd)`, `>(cmd)`) is refused by name with exit status 2. Refusing is
-  deliberate — silently dropping the argument made `diff <(a) <(b)` report false success — but the
-  `/dev/fd/N` implementation is not written.
-- `coproc` and `select` are likewise refused by name. Both need machinery (job control, and a
+- `$(case …)` does not parse: `x=$(case a in a) echo hit;; esac)` is a syntax error, because the
+  `)` ending a case pattern is read as the one closing the substitution. **Write it with backticks
+  — `` x=`case a in a) echo hit;; esac` `` — which works today.** This one is a real POSIX gap
+  rather than a missing extension, so it is worth knowing about even though it appears in none of
+  the 740 real scripts oslo was swept against. The cause is upstream, in the same tokenizer as the
+  `for` loop above, and is tracked as brush issue #1052 — where the maintainer calls it design-level
+  and it is confirmed *not* fixed by the parser rewrite in progress. So it is a gap to plan around,
+  not one to expect to disappear.
+- Process substitution needs `/dev/fd`, which is a symlink to `/proc/self/fd` on Linux. It is there
+  on any normal system, but an initramfs or a minimal container that has not set it up will fail
+  `<(cmd)` with "cannot open /dev/fd/3". bash has the same dependency.
+- `coproc` and `select` are refused by name. Both need machinery (job control, and a
   prompt plus `REPLY`) out of proportion to how often scripts use them.
 - A failing *special* builtin does not exit a POSIX-mode shell. `oslo --posix -c 'export
   BAD-NAME=1; echo alive'` prints `alive`; `bash --posix` stops at the `export`. The narrower
