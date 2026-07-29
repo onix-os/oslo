@@ -120,6 +120,48 @@ confidence in the *language*; what it does not buy is confidence in the *job*.
 * C4 — boot-path realism: behaviour as PID 1 (orphan reaping), behaviour with no `/proc` mounted,
   behaviour when `PATH` is empty.
 
+### Round C status
+
+**C3, the sweep, is the finding.** 745 real shell scripts from this system's store were put through
+`bash -n` and `oslo -n`; 5 are not shell at all. Of the 740 bash accepts:
+
+| | before | after |
+|---|---|---|
+| oslo parses | 658 | **665** |
+| rejected — process substitution | 65 | 74 |
+| rejected — nesting guard (false positives) | 17 | 1 |
+
+The nesting guard was rejecting real scripts, and the module comment had predicted both causes and
+judged them unlikely:
+
+* **A here-document body is data.** `config.guess` — in every autotools project — writes a **C
+  program** through `<<EOF`, and its braces counted as 22 phantom unmatched openers. Bodies are now
+  stripped before the scan.
+* **`$(…)` inside `"…"` is shell again.** A scan that entered `"$(` stayed in double-quote mode and
+  read the single-quoted `awk`/`jq` program inside as shell, losing sync at its first `"`. The
+  scan now leaves quoted mode for a substitution body and restores it on the closing `)`.
+
+Both fixes are measured against the same input the guard exists for: 40 unmatched `(` is still
+refused, in 17 ms. Two bugs in the fixes were caught by tests rather than by the sweep — `<< 2`
+read as a heredoc named `2`, and quoting not resumed when a substitution closed in unquoted
+context, which an *existing* test caught.
+
+One false positive remains (1 of 740): a generator that builds C source inside a double-quoted
+shell string, where the approximate scan desynchronises on the C string literals. It fails safely,
+with a syntax error rather than a hang, which is the direction this guard is meant to fail in.
+
+**C4, boot realism.** Empty `PATH` leaves the builtins working; no `HOME`, no `TERM` and no tty are
+all fine; a child killed by a signal reports 137 and the shell survives; orphaned grandchildren are
+reaped. The shell no longer reads `/proc` anywhere — `times` uses `getrusage(2)` and the prompt's
+hostname `gethostname(2)` — so a root without `/proc` mounted is no longer a special case. True
+PID-1 behaviour could not be exercised here: `unshare -p` needs privileges this sandbox refuses.
+
+**Still open: process substitution**, now the *only* parser gap, and it accounts for all 74
+remaining rejections — 10% of the real scripts on this machine. It was deferred as "not POSIX",
+which is true and, on this evidence, not the right test for a distro that intends oslo to be its
+only shell. C1 is done (every Round A defect has a corpus case); C2, a Lua corpus with
+expected-output oracles, is not started.
+
 ## Sequencing
 
 A1 and A2 first and alone: A1 is a correctness *and* safety defect, and it is a prerequisite for
