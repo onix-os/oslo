@@ -24,6 +24,7 @@ thread_local! {
 
 /// `hash [-r] [name…]`.
 pub fn builtin_hash(_env: &mut Environment, args: &[String]) -> Result<i32> {
+    let mut cleared = false;
     let mut i = 1;
     while i < args.len() {
         let arg = &args[i];
@@ -36,7 +37,10 @@ pub fn builtin_hash(_env: &mut Environment, args: &[String]) -> Result<i32> {
         }
         for c in arg[1..].chars() {
             match c {
-                'r' => TABLE.with(|t| t.borrow_mut().clear()),
+                'r' => {
+                    TABLE.with(|t| t.borrow_mut().clear());
+                    cleared = true;
+                }
                 other => {
                     eprintln!("rush: hash: -{}: invalid option", other);
                     eprintln!("hash: usage: hash [-r] [name ...]");
@@ -49,7 +53,11 @@ pub fn builtin_hash(_env: &mut Environment, args: &[String]) -> Result<i32> {
 
     let names = &args[i.min(args.len())..];
     if names.is_empty() {
-        print_table();
+        // `hash -r` is a request to forget, not to report: printing the table it just emptied
+        // put "hash table empty" on the stdout of every script that clears the cache.
+        if !cleared {
+            print_table();
+        }
         return Ok(0);
     }
 

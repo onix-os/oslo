@@ -27,6 +27,14 @@ fn split_assignment(arg: &str) -> (&str, Option<&str>) {
 /// nothing to record and arithmetic on assignment is not implemented. Rejecting it outright
 /// would break scripts for a declaration that is only ever an optimisation hint.
 pub fn builtin_local(env: &mut Environment, args: &[String]) -> Result<i32> {
+    // Outside a function there is no frame to pop, so the "local" would be a global that outlives
+    // the line that declared it — the opposite of what was asked for. Refusing is what bash does,
+    // and silence here is how a script ends up with a leaked global it never sees.
+    if !env.in_function() {
+        eprintln!("rush: local: can only be used in a function");
+        return Ok(1);
+    }
+
     let opts = match options::parse(args, "irx") {
         Ok(o) => o,
         Err(letter) => return Ok(options::invalid("local", letter, LOCAL_USAGE)),
@@ -131,10 +139,29 @@ mod tests {
     use super::{builtin_local, builtin_readonly};
     use crate::env::scope::Environment;
 
+    /// What a function call does to the environment, which is the only state in which `local` is
+    /// legal: a frame to write into *and* a non-zero call depth. `push_scope` alone is not enough,
+    /// because a prefix assignment pushes a frame too and `local` is refused there.
+    fn in_a_function() -> Environment {
+        let mut env = Environment::new();
+        env.enter_function().unwrap();
+        env.push_scope();
+        env
+    }
+
+    #[test]
+    fn local_outside_a_function_is_refused() {
+        let mut env = Environment::new();
+        assert_eq!(
+            builtin_local(&mut env, &words(&["local", "x=1"])).unwrap(),
+            1
+        );
+        assert!(env.get_var("x").is_none());
+    }
+
     #[test]
     fn local_of_an_invalid_name_fails() {
-        let mut env = Environment::new();
-        env.push_scope();
+        let mut env = in_a_function();
         assert_eq!(
             builtin_local(&mut env, &words(&["local", "=1"])).unwrap(),
             1
@@ -147,8 +174,7 @@ mod tests {
     /// `local -r x=1` used to declare two variables, one of them called `-r`.
     #[test]
     fn local_options_are_not_names() {
-        let mut env = Environment::new();
-        env.push_scope();
+        let mut env = in_a_function();
         assert_eq!(
             builtin_local(&mut env, &words(&["local", "-r", "LOCAL_RO=1"])).unwrap(),
             0
@@ -162,8 +188,7 @@ mod tests {
 
     #[test]
     fn local_i_is_accepted_without_becoming_a_variable() {
-        let mut env = Environment::new();
-        env.push_scope();
+        let mut env = in_a_function();
         assert_eq!(
             builtin_local(&mut env, &words(&["local", "-i", "LOCAL_INT=7"])).unwrap(),
             0

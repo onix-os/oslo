@@ -95,6 +95,13 @@ pub fn parse(argv: &[String]) -> Result<Invocation, Exit> {
     let mut set_options = String::new();
 
     let mut i = 1;
+    // Set once `-c` has taken its command string: everything after it is an operand, whatever it
+    // looks like. bash, dash and the Debian `sh` all agree — `sh -c 'echo $1' -- a` puts `--` in
+    // `$0` rather than treating it as the end of options, and `sh -c cmd -x y` runs with `-x` as
+    // `$0` and tracing *off*. It matters because `find -exec sh -c '…' -- {} +` and the `xargs`
+    // idioms built on it are exactly how the `-c` convention is used (PLAN R9.12).
+    let mut operands_only = false;
+
     while i < argv.len() {
         let arg = argv[i].clone();
 
@@ -169,6 +176,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, Exit> {
                     } else {
                         command = Some(rest);
                     }
+                    operands_only = true;
                     pos = letters.len();
                     continue;
                 }
@@ -190,6 +198,9 @@ pub fn parse(argv: &[String]) -> Result<Invocation, Exit> {
             pos += 1;
         }
         i += 1;
+        if operands_only {
+            break;
+        }
     }
 
     let operands = &argv[i.min(argv.len())..];
@@ -284,6 +295,28 @@ mod tests {
         assert_eq!(inv.action, Action::Script("run.sh".to_string()));
         assert_eq!(inv.name, "run.sh");
         assert_eq!(inv.positional, vec!["one".to_string(), "two".to_string()]);
+    }
+
+    #[test]
+    fn dash_c_ends_option_parsing_at_its_command_string() {
+        // `find -exec sh -c '…' -- {} +` passes `--` as `$0`; treating it as the end of options
+        // would shift every positional by one and silently run the command against nothing.
+        let inv = parse_args(&["-c", "echo", "--", "x", "y"]).expect("parse");
+        assert_eq!(inv.name, "--");
+        assert_eq!(inv.positional, vec!["x".to_string(), "y".to_string()]);
+
+        // Nor is a later `-x` an option any more: it is `$1`, and tracing stays off.
+        let inv = parse_args(&["-c", "echo", "name", "-x", "z"]).expect("parse");
+        assert_eq!(inv.name, "name");
+        assert_eq!(inv.positional, vec!["-x".to_string(), "z".to_string()]);
+        assert_eq!(inv.set_options, "");
+    }
+
+    #[test]
+    fn options_before_dash_c_are_still_options() {
+        let inv = parse_args(&["-x", "-c", "echo", "name"]).expect("parse");
+        assert_eq!(inv.set_options, "x");
+        assert_eq!(inv.name, "name");
     }
 
     #[test]

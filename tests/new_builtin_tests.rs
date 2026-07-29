@@ -237,6 +237,15 @@ fn hash_with_no_arguments_reports_the_table() {
     assert!(!r.stdout.is_empty());
 }
 
+/// `hash -r` is a request to forget, not to report. It used to fall through to the listing, so
+/// every script that cleared the cache got "hash table empty" on its stdout.
+#[test]
+fn resetting_the_hash_table_prints_nothing() {
+    let r = run("hash sh; hash -r");
+    assert_eq!(r.status, 0);
+    assert_eq!(r.out(), "", "stderr: {}", r.stderr);
+}
+
 /// Two lines of `<minutes>m<seconds>s` pairs, the shape every shell's `times` prints.
 #[test]
 fn times_prints_two_lines_of_cpu_time() {

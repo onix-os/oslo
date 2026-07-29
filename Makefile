@@ -17,7 +17,7 @@ $(info ------------------------------------------)
 $(info Project: $(PROJECT_NAME) v$(PROJECT_VERSION))
 $(info ------------------------------------------)
 
-.PHONY: build b compile c run r example test t check check-all test-all check-loc clippy rustdoc fmt fmt-check clean verify install uninstall release help h
+.PHONY: build b compile c run r example test t check check-all test-all check-loc check-readme clippy rustdoc fmt fmt-check clean verify install uninstall release help h
 
 build:
 	@$(CARGO) build
@@ -70,10 +70,13 @@ clean:
 check-loc:
 	@./scripts/check-loc.sh
 
+check-readme:
+	@./scripts/check-readme.sh
+
 # check-all/test-all are deliberately absent: the crate declares no [features], so they are
 # byte-identical reruns of check/test and only slow the gate down. Add them back the day a
 # [features] section appears.
-verify: fmt-check check-loc check test clippy rustdoc
+verify: fmt-check check-loc check-readme check test clippy rustdoc
 
 install:
 	@$(CARGO) build --release --bin $(PROJECT_NAME)
@@ -114,6 +117,7 @@ help:
 	@echo "  fmt          Format the workspace"
 	@echo "  fmt-check    Check formatting"
 	@echo "  check-loc    Fail if any source file exceeds 600 lines"
+	@echo "  check-readme Fail if the README names a file that does not exist"
 	@echo "  clean        Remove Cargo build artifacts"
 	@echo "  verify       Run the full local gate"
 	@echo "  install      Install the release binary into \$$PREFIX/bin ($(PREFIX)/bin)"

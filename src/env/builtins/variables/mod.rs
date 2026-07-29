@@ -86,6 +86,8 @@ mod tests {
     #[test]
     fn a_bad_name_does_not_stop_the_rest_of_the_line() {
         let mut env = Environment::new();
+        // `local` is legal only inside a function call, so the test has to be in one.
+        env.enter_function().unwrap();
         env.push_scope();
         let args = words(&["local", "=1", "GOOD_ONE=yes"]);
         assert_eq!(builtin_local(&mut env, &args).unwrap(), 1);

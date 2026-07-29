@@ -262,6 +262,15 @@ impl Environment {
         self.function_depth.exit()
     }
 
+    /// Whether a shell function is currently executing.
+    ///
+    /// `local` needs this rather than the scope-frame stack, because a prefix assignment
+    /// (`FOO=bar cmd`) pushes a frame too — so a non-empty stack does not mean "inside a
+    /// function", and `local x=1` at the top level would silently create a global.
+    pub fn in_function(&self) -> bool {
+        self.function_depth.depth() > 0
+    }
+
     /// Begin a nested `source` or `eval`; `Err` once the chain is too deep to be safe.
     pub fn enter_nested_script(&mut self) -> Result<()> {
         self.script_depth.enter()

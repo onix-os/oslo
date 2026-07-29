@@ -45,10 +45,26 @@ end)
 rush.set_alias("gs", "git status")
 rush.exec("echo from lua")
 rush.set_var("EDITOR", "nvim")
+
+rush.register_builtin("hello", function(argv)
+  print("hello, " .. (argv[2] or "world"))
+  return 0
+end)
 ```
 
 Available: `rush.exec`, `rush.get_var`, `rush.set_var`, `rush.get_pwd`, `rush.set_alias`,
-`rush.get_alias`, `rush.set_prompt`, `rush.set_right_prompt`, `rush.register_builtin`.
+`rush.get_alias`, `rush.set_prompt`, `rush.register_builtin`.
+
+`rush.register_builtin(name, fn)` makes `name` a builtin, ahead of `PATH` and overriding any
+builtin of the same name. The callback receives argv as a table with `argv[1]` set to the
+builtin's own name. Its return value is the exit status: no return value or `true` is 0, `false`
+is 1, a number is that number. A Lua error is reported on stderr and the builtin exits 1.
+
+Two limits worth knowing. The rest of the `rush.*` API is unavailable *inside* such a callback —
+the shell state is already borrowed by the evaluator running it, so `rush.exec` and friends raise
+an error there rather than deadlocking. And there is no right prompt: `rush.set_right_prompt`
+existed but nothing ever drew what it returned, so it was removed rather than left as an API that
+silently does nothing.
 
 ## Interactive
 
@@ -128,15 +144,25 @@ contain** — `redirects.rs`, `quoting.rs`, `conditionals.rs` — never for thei
 
 ## Testing
 
-Two suites, deliberately different in kind:
+`cargo test` runs three kinds of suite, deliberately different in what they can see:
 
-- `tests/posix_shell_tests.rs` — in-process: build an AST, evaluate it, inspect `Environment`.
-- `tests/shell_behavior_tests.rs` — end-to-end: spawn the real binary and assert on stdout and
-  exit status.
+- **In-process** — `tests/posix_shell_tests.rs` builds an AST, evaluates it and inspects
+  `Environment` directly. Fast, but blind to anything that only goes wrong in a real process.
+- **End-to-end** — most of `tests/`: `tests/common/mod.rs` spawns the real binary with stdin from
+  `/dev/null` under a timeout, and the test asserts on stdout, stderr and exit status. This exists
+  because the first kind cannot see a whole class of defect: a redirection dropped during AST
+  conversion, or an exit status never propagated to `main`, leaves the environment looking
+  perfectly correct while the shell is visibly broken.
+- **Differential** — `tests/differential_tests.rs` runs every script in `tests/corpus/` through
+  both rush and bash and compares stdout and exit status (stderr by shape only, since diagnostic
+  wording should differ). It is a ratchet: `tests/differential/expected_fail.rs` names each case
+  rush still gets wrong along with the finding that explains it, and the suite fails both when an
+  unlisted case diverges *and* when a listed case starts passing. Closing a bug means deleting a
+  line there.
 
-The second exists because the first cannot see a whole class of defect. A redirection dropped
-during AST conversion, or an exit status never propagated to `main`, leaves the environment
-looking perfectly correct while the shell is visibly broken.
+The line editor is covered without a pty: `RushHelper` is public, so `tests/interactive_tests.rs`
+and `src/interactive/tests.rs` call `complete`, `hint`, `highlight` and `input_status` directly
+against temporary directories.
 
 ## Architecture
 
@@ -163,16 +189,29 @@ hand-written lexer stays — the adapter re-lexes brush's raw word text through 
 
 ## Known gaps
 
-- Parameter expansion does not run inside unquoted here-document bodies.
-- `case` fallthrough (`;&`, `;;&`) is parsed but behaves as `;;`.
-- Process substitution (`<(cmd)`, `>(cmd)`) is not supported.
-- `[[ str =~ regex ]]` is rejected rather than approximated — there is no regex engine.
-- Arithmetic supports `+ - * / % ( )` only; other operators are rejected.
-- `((expr))`, `for ((;;))`, `coproc` and `select` are rejected by name, with exit status 2.
-- `-e` and `-x` are accepted on the command line and recorded, but not yet honoured.
-- Job control is minimal: `&` works, but there are no `jobs` / `fg` / `bg` builtins.
-- `rush.register_builtin` records the name but the Lua callback is not invoked.
-- The REPL has no multi-line continuation — an unterminated `for` is a syntax error, not a prompt.
+Each of these is reproducible against the binary, and each has a corpus case in
+`tests/differential/expected_fail.rs` unless noted.
+
+- Parameter expansion does not run inside unquoted here-document bodies or here-strings; the text
+  is passed through with quotes removed but `$v` left alone.
+- Process substitution (`<(cmd)`, `>(cmd)`) is refused by name with exit status 2. Refusing is
+  deliberate — silently dropping the argument made `diff <(a) <(b)` report false success — but the
+  `/dev/fd/N` implementation is not written.
+- `coproc` and `select` are likewise refused by name. Both need machinery (job control, and a
+  prompt plus `REPLY`) out of proportion to how often scripts use them.
+- Arrays are indexed only. `declare -A` reports that associative arrays are unsupported rather
+  than pretending, and an operator applied to a whole array (`${a[@]:1}`, `${a[@]#pat}`) is
+  rejected instead of evaluated.
+- `for ((;;))` needs spaces: brush tokenizes the `;;` in the unspaced form as the `case`
+  terminator, so write `for (( ; ; ))`.
+- `unset -f` cannot remove a function, and assignment to a `readonly` variable succeeds when it
+  should fail.
+- `exec 3> file` closes fd 3 instead of leaving it open.
+- A failing special builtin does not exit a POSIX-mode shell.
+- No `shopt`, so `globstar` cannot be turned on; `**` behaves as `*`.
+- No `SECONDS`, `RANDOM`, `LINENO`, `/dev/tcp`, restricted mode, or `vi`/`emacs` editing modes.
+- History expansion (`!!`, `!$`, `^old^new`) applies to REPL lines only, not to `-c` or scripts —
+  the same rule bash uses.
 
 ## License
 

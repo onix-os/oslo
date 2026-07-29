@@ -12,6 +12,13 @@
 //!
 //! Every test here therefore goes through the same path a user does: argv in, stdout and exit
 //! code out.
+//!
+//! The second reason to reach for this harness is isolation. Process-global state — `environ`,
+//! the working directory, the umask — belongs to the *process*, not to the test, and libtest runs
+//! tests as threads of one process. A test that changes any of those in process is not merely
+//! flaky against its neighbours; `std::env::set_var` racing another thread's `getenv` is
+//! undefined behaviour. Spawning the binary gives each such test its own `environ`, its own cwd
+//! and its own umask by construction, with no cooperative locking to remember to take.
 
 use std::path::PathBuf;
 use std::process::{Command, Output, Stdio};
@@ -42,6 +49,16 @@ pub struct Run {
 impl Run {
     pub fn out(&self) -> &str {
         self.stdout.trim_end()
+    }
+
+    pub fn err(&self) -> &str {
+        self.stderr.trim_end()
+    }
+
+    /// stdout split into lines with the trailing blank removed, for scripts that print a
+    /// sequence of observations (a `pwd` before and after a `cd`, say).
+    pub fn lines(&self) -> Vec<&str> {
+        self.out().lines().collect()
     }
 }
 
@@ -78,6 +95,20 @@ pub fn assert_out(script: &str, expected: &str) {
         expected,
         "script: {}\nstderr: {}",
         script,
+        r.stderr
+    );
+}
+
+/// As [`assert_out`], but in a directory the caller controls — needed whenever the script's
+/// meaning depends on where it runs (`pwd`, `pushd`, a relative command word).
+pub fn assert_out_in(dir: &std::path::Path, script: &str, expected: &str) {
+    let r = run_in(dir, script);
+    assert_eq!(
+        r.out(),
+        expected,
+        "script: {}\ncwd: {}\nstderr: {}",
+        script,
+        dir.display(),
         r.stderr
     );
 }

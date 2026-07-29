@@ -55,15 +55,9 @@ pub fn render_default_left_prompt(last_status: i32) -> String {
     )
 }
 
-pub fn render_default_right_prompt() -> String {
-    let now = std::time::SystemTime::now();
-    let duration = now
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default();
-    let secs = duration.as_secs();
-    let hours = (secs / 3600 + 2) % 24; // Local estimate
-    let mins = (secs / 60) % 60;
-    let s = secs % 60;
-
-    format!("\x1b[90m[{:02}:{:02}:{:02}]\x1b[0m", hours, mins, s)
-}
+// There is no right prompt (PLAN R9.7). The renderer that used to be here printed a clock at a
+// hardcoded UTC+2 and was never called by anything but its own smoke test: nothing drew it, and
+// `rush.set_right_prompt` fed a function nothing read. Drawing one for real means writing at
+// `terminal_width - display_width` and restoring the cursor before the line editor takes over,
+// and rustyline repaints from the prompt to end-of-line on every keystroke, which erases it.
+// The dead API is gone rather than half-implemented; see `lua::engine::LuaEngine::setup_bindings`.

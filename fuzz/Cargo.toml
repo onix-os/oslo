@@ -1,0 +1,53 @@
+[package]
+name = "rush-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+# Matches the crate under test; the fuzz job pins a nightly newer than this.
+rust-version = "1.88"
+
+[package.metadata]
+cargo-fuzz = true
+
+# rush's root manifest has no [workspace] section, so it is a one-package workspace. This empty
+# table keeps the fuzz crate out of it: the fuzz targets are built by a different toolchain with
+# different flags, and `cargo build` at the root must not start compiling libFuzzer.
+#
+# The cost is a second lock file, which is committed rather than ignored. A fuzz run that resolved
+# a newer brush-parser than Cargo.lock pins would be fuzzing a parser the shell does not ship.
+[workspace]
+
+[dependencies]
+libfuzzer-sys = "0.4"
+rush = { path = ".." }
+
+# The harness lives in a library so the same code can be exercised two ways: under libFuzzer on
+# nightly, and as an ordinary `cargo test --lib` replay of the committed corpus on stable. The
+# second is what keeps this directory from rotting on machines with no nightly toolchain.
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "fuzz_parse"
+path = "fuzz_targets/fuzz_parse.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fuzz_lexer"
+path = "fuzz_targets/fuzz_lexer.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fuzz_arith"
+path = "fuzz_targets/fuzz_arith.rs"
+test = false
+doc = false
+bench = false
+
+[profile.release]
+# Line numbers in a crash backtrace are the whole point of a fuzz report.
+debug = 1

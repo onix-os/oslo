@@ -1,72 +1,162 @@
+//! The interactive line editor: completion, hints, colouring and multi-line input.
+//!
+//! [`RushHelper`] is the rustyline `Helper`. The trait implementations here are deliberately thin
+//! — each one delegates to a module that can be called directly from a test, because none of this
+//! behaviour was reachable without a pty and that is precisely why it was all wrong.
+
+pub mod command_index;
+mod completion;
 pub mod dropdown;
+pub mod frecency_store;
+pub mod highlight;
+mod hinting;
 pub mod prompt;
 pub mod spec;
+pub mod syntax;
+pub mod words;
+
+#[cfg(test)]
+mod tests;
+
+pub use command_index::invalidate as invalidate_command_cache;
+pub use syntax::{DEFAULT_PS2, InputStatus};
+pub use words::{Quote, Word, current_word, extract_current_word};
 
 use crate::env::Environment;
 use dropdown::{CompletionCandidate, DropdownMenu};
-use rustyline::completion::{Completer, FilenameCompleter, Pair};
+use frecency_store::FrecencyStore;
+use highlight::TokenType;
+use rustyline::completion::{Completer, Pair};
 use rustyline::highlight::Highlighter;
 use rustyline::hint::{Hinter, HistoryHinter};
 use rustyline::validate::{ValidationContext, ValidationResult, Validator};
 use rustyline::{Context, Helper};
 use spec::SpecRegistry;
 use std::borrow::Cow;
-use std::collections::HashSet;
-use std::fs;
+use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
+
+/// Completion kinds worth remembering.
+///
+/// Filenames are deliberately absent: they are unbounded and mostly one-off, and letting them
+/// into the table would drown the command ranking it exists to serve.
+const RANKED_KINDS: &[&str] = &["command", "builtin", "subcommand"];
 
 pub struct RushHelper {
     env: Arc<Mutex<Environment>>,
-    _filename_completer: FilenameCompleter,
     history_hinter: HistoryHinter,
     spec_registry: SpecRegistry,
+    frecency: FrecencyStore,
+    /// Whether Tab may take the terminal over to draw the dropdown.
+    ///
+    /// Off when there is no terminal, which is what makes `complete` callable from a test: the
+    /// dropdown would otherwise swallow every ambiguous candidate list and return nothing.
+    menu: bool,
+    /// Whether the editor itself accumulates continuation lines.
+    ///
+    /// See [`RushHelper::set_editor_multiline`].
+    editor_multiline: bool,
+    /// `which` answers for the line being drawn, keyed by the line's hash.
+    ///
+    /// Only path-like names reach it — a bare name is answered by [`command_index`] — but
+    /// `highlight` runs on every refresh, so even one `stat` per token per keystroke is worth
+    /// spending a hash lookup to avoid.
+    which_cache: Mutex<(u64, HashMap<String, bool>)>,
 }
 
 impl RushHelper {
+    /// Build the helper for `env`.
+    ///
+    /// Two side effects hang off whether `env` belongs to an interactive shell: the dropdown
+    /// takes the terminal over, and the frecency table is read from and appended to a file in
+    /// `$HOME`. `$-` is the signal rather than `isatty`, because `cargo test` inherits a terminal
+    /// on stdin and a test must not write to the user's home directory.
     pub fn new(env: Arc<Mutex<Environment>>) -> Self {
+        let interactive = env.lock().unwrap().interactive();
+        let frecency = if interactive {
+            FrecencyStore::load(FrecencyStore::default_path())
+        } else {
+            FrecencyStore::in_memory()
+        };
         Self {
             env,
-            _filename_completer: FilenameCompleter::new(),
             history_hinter: HistoryHinter::new(),
             spec_registry: SpecRegistry::new(),
+            frecency,
+            menu: interactive,
+            editor_multiline: true,
+            which_cache: Mutex::new((0, HashMap::new())),
         }
     }
 
-    fn collect_command_names(&self) -> HashSet<String> {
-        let mut cmds = HashSet::new();
-        let env_guard = self.env.lock().unwrap();
+    /// Turn the Tab dropdown on or off.
+    ///
+    /// With it off, `complete` returns the whole candidate list instead of the one the user
+    /// picked — the shape a test wants.
+    pub fn set_menu(&mut self, enabled: bool) {
+        self.menu = enabled;
+    }
 
-        // Builtins, straight from the registry rather than a copy that drifts out of date.
-        for b in env_guard.builtin_names() {
-            cmds.insert(b.to_string());
+    /// Whether unterminated input is continued inside the editor.
+    ///
+    /// With it on (the default), `validate` answers `Incomplete` and rustyline keeps reading into
+    /// the same buffer. That fixes the three R9.1 failures on its own, but rustyline draws no
+    /// prompt on a continuation row and cannot be made to: it computes the cursor's column from
+    /// the raw buffer, so any prefix the highlighter added would put the cursor in the wrong
+    /// place. A caller that wants a real PS2 turns this off and drives the loop itself, calling
+    /// [`RushHelper::input_status`] after each line and re-reading with
+    /// [`RushHelper::continuation_prompt`] while the answer is [`InputStatus::Incomplete`].
+    pub fn set_editor_multiline(&mut self, enabled: bool) {
+        self.editor_multiline = enabled;
+    }
+
+    /// Whether `buffer` is a complete program, needs another line, or is a syntax error.
+    pub fn input_status(&self, buffer: &str) -> InputStatus {
+        syntax::classify(buffer)
+    }
+
+    /// The prompt to show while reading a continuation line: `$PS2`, or `> `.
+    pub fn continuation_prompt(&self) -> String {
+        self.env
+            .lock()
+            .unwrap()
+            .get_var("PS2")
+            .map(str::to_string)
+            .unwrap_or_else(|| DEFAULT_PS2.to_string())
+    }
+
+    /// Count the commands in an accepted line towards their frecency.
+    ///
+    /// The tracker had no callers at all before this; `get_score` answered zero for everything,
+    /// which is why ranking collapsed to alphabetical order. Called from `validate`, which is the
+    /// one place the editor sees a line the user committed to — so a shell that never touches
+    /// `main.rs` still learns.
+    pub fn record_command_use(&self, line: &str) {
+        for name in words::command_words(line) {
+            self.frecency.record(&name);
         }
+    }
 
-        // Aliases
-        for a in env_guard.get_aliases().keys() {
-            cmds.insert(a.clone());
+    /// This command's frecency score. Exposed for tests and for ranking outside the helper.
+    pub fn frecency_score(&self, name: &str) -> f64 {
+        self.frecency.score(name)
+    }
+
+    fn to_pair(candidate: CompletionCandidate) -> Pair {
+        Pair {
+            display: candidate.display,
+            replacement: candidate.replacement,
         }
+    }
 
-        // Functions
-        for f in env_guard.get_functions().keys() {
-            cmds.insert(f.clone());
+    fn record_accepted(&self, candidate: &CompletionCandidate) {
+        if candidate
+            .kind
+            .as_deref()
+            .is_some_and(|k| RANKED_KINDS.contains(&k))
+        {
+            self.frecency.record(&candidate.display);
         }
-
-        // Executables in PATH
-        if let Some(path_var) = env_guard.get_var("PATH") {
-            for dir in path_var.split(':') {
-                if let Ok(entries) = fs::read_dir(dir) {
-                    for entry in entries.flatten() {
-                        if let Ok(file_type) = entry.file_type()
-                            && (file_type.is_file() || file_type.is_symlink())
-                        {
-                            cmds.insert(entry.file_name().to_string_lossy().to_string());
-                        }
-                    }
-                }
-            }
-        }
-
-        cmds
     }
 }
 
@@ -79,168 +169,30 @@ impl Completer for RushHelper {
         pos: usize,
         _ctx: &Context<'_>,
     ) -> rustyline::Result<(usize, Vec<Pair>)> {
-        let (start, word) = extract_current_word(line, pos);
-        let mut cand_objs = Vec::new();
+        let (start, candidates) = self.candidates(line, pos);
 
-        // 1. If completing the first word (command name)
-        if start == 0 || line[..start].trim().is_empty() {
-            let candidates = self.collect_command_names();
-            for cmd in candidates {
-                if cmd.starts_with(word) {
-                    let desc = self
-                        .spec_registry
-                        .find_spec(&cmd)
-                        .map(|s| s.description.to_string());
-                    let kind = if self.env.lock().unwrap().is_builtin(&cmd) {
-                        Some("builtin".to_string())
-                    } else {
-                        Some("command".to_string())
-                    };
-                    cand_objs.push(CompletionCandidate {
-                        display: cmd.clone(),
-                        replacement: cmd,
-                        description: desc,
-                        kind,
-                    });
-                }
-            }
-        } else if let Some(var_prefix) = word.strip_prefix('$') {
-            // 2. Environment variables starting with $
-            let env_guard = self.env.lock().unwrap();
-            for (k, _) in env_guard.get_all_vars() {
-                if k.starts_with(var_prefix) {
-                    let replacement = format!("${}", k);
-                    cand_objs.push(CompletionCandidate {
-                        display: replacement.clone(),
-                        replacement,
-                        description: Some("Environment variable".to_string()),
-                        kind: Some("variable".to_string()),
-                    });
-                }
-            }
-        } else {
-            // 3. Subcommand & Option completions from IRIS spec_registry (e.g. `git commit -`, `cargo build --`)
-            let tokens: Vec<&str> = line[..start].split_whitespace().collect();
-            if !tokens.is_empty() {
-                let primary_cmd = tokens[0];
-                let sub_tokens = &tokens[1..];
-                let spec_matches =
-                    self.spec_registry
-                        .get_subcommand_suggestions(primary_cmd, sub_tokens, word);
-
-                for (name, desc) in spec_matches {
-                    let kind = if name.starts_with('-') {
-                        Some("flag".to_string())
-                    } else {
-                        Some("subcommand".to_string())
-                    };
-                    cand_objs.push(CompletionCandidate {
-                        display: name.to_string(),
-                        replacement: name.to_string(),
-                        description: Some(desc.to_string()),
-                        kind,
-                    });
-                }
-            }
-
-            // 4. Fallback/Augment Path & Directory completion
-            if cand_objs.is_empty() {
-                let cmd_name = line[..start].trim();
-                let is_cd_cmd = matches!(cmd_name, "cd" | "pushd");
-
-                let (dir_path, prefix) = if let Some(slash_idx) = word.rfind('/') {
-                    (&word[..=slash_idx], &word[slash_idx + 1..])
-                } else {
-                    ("", word)
-                };
-
-                let expand_dir = if let Some(rest) = dir_path.strip_prefix('~') {
-                    match std::env::var("HOME") {
-                        Ok(home) => format!("{}{}", home, rest),
-                        Err(_) => dir_path.to_string(),
-                    }
-                } else if dir_path.is_empty() {
-                    ".".to_string()
-                } else {
-                    dir_path.to_string()
-                };
-
-                if let Ok(entries) = fs::read_dir(&expand_dir) {
-                    for entry in entries.flatten() {
-                        let file_name = entry.file_name().to_string_lossy().to_string();
-                        if file_name.starts_with(prefix) {
-                            let is_dir = entry.file_type().map(|t| t.is_dir()).unwrap_or(false);
-                            if is_cd_cmd && !is_dir {
-                                continue;
-                            }
-
-                            let display = if is_dir {
-                                format!("{}/", file_name)
-                            } else {
-                                file_name.clone()
-                            };
-
-                            let replacement = format!("{}{}", dir_path, display);
-                            let description = if is_dir {
-                                Some("Directory".to_string())
-                            } else {
-                                Some("File".to_string())
-                            };
-                            let kind = if is_dir {
-                                Some("dir".to_string())
-                            } else {
-                                Some("file".to_string())
-                            };
-
-                            cand_objs.push(CompletionCandidate {
-                                display,
-                                replacement,
-                                description,
-                                kind,
-                            });
-                        }
-                    }
-                }
-            }
-        }
-
-        cand_objs.sort_by(|a, b| {
-            let score_a = self.spec_registry.frecency.get_score(&a.display);
-            let score_b = self.spec_registry.frecency.get_score(&b.display);
-            score_b
-                .partial_cmp(&score_a)
-                .unwrap_or(std::cmp::Ordering::Equal)
-                .then_with(|| a.display.cmp(&b.display))
-        });
-
-        if cand_objs.len() > 1 {
-            let prompt_str = prompt::render_default_left_prompt(0);
-            let prompt_len = dropdown::visible_len(&prompt_str);
-            let line_prefix_len = dropdown::visible_len(&line[..start]);
-            let indent_cols = prompt_len + line_prefix_len;
-
-            if let Some(selected) = DropdownMenu::select_interactive(cand_objs, indent_cols) {
-                return Ok((
-                    start,
-                    vec![Pair {
-                        display: selected.display,
-                        replacement: selected.replacement,
-                    }],
-                ));
-            }
+        if candidates.is_empty() {
             return Ok((start, Vec::new()));
-        } else if cand_objs.len() == 1 {
-            let item = cand_objs.remove(0);
-            return Ok((
-                start,
-                vec![Pair {
-                    display: item.display,
-                    replacement: item.replacement,
-                }],
-            ));
+        }
+        if candidates.len() == 1 || !self.menu {
+            if let [only] = candidates.as_slice() {
+                // Unambiguous: rustyline inserts it without asking, which is an acceptance.
+                self.record_accepted(only);
+            }
+            return Ok((start, candidates.into_iter().map(Self::to_pair).collect()));
         }
 
-        Ok((start, Vec::new()))
+        let prompt_str = prompt::render_default_left_prompt(0);
+        let indent_cols =
+            dropdown::visible_len(&prompt_str) + dropdown::visible_len(&line[..start]);
+
+        match DropdownMenu::select_interactive(candidates, indent_cols) {
+            Some(selected) => {
+                self.record_accepted(&selected);
+                Ok((start, vec![Self::to_pair(selected)]))
+            }
+            None => Ok((start, Vec::new())),
+        }
     }
 }
 
@@ -252,26 +204,14 @@ impl Hinter for RushHelper {
             return None;
         }
 
-        // Try history hinter first
+        // History wins: a line the user has actually run is a better guess than any name we could
+        // rank, and it is what makes the suggestion feel like a memory rather than a directory
+        // listing.
         if let Some(h) = self.history_hinter.hint(line, pos, ctx) {
             return Some(h);
         }
 
-        // Try auto-suggesting matching command name if typing first word
-        let (start, word) = extract_current_word(line, pos);
-        if start == 0 && !word.is_empty() {
-            let candidates = self.collect_command_names();
-            let mut matches: Vec<&String> = candidates
-                .iter()
-                .filter(|c| c.starts_with(word) && *c != word)
-                .collect();
-            matches.sort();
-            if let Some(first_match) = matches.first() {
-                return Some(first_match[word.len()..].to_string());
-            }
-        }
-
-        None
+        self.command_hint(line, pos)
     }
 }
 
@@ -281,43 +221,31 @@ impl Highlighter for RushHelper {
             return Cow::Borrowed(line);
         }
 
-        let mut highlighted = String::new();
-        let tokens = tokenize_for_highlight(line);
+        let path = self
+            .env
+            .lock()
+            .unwrap()
+            .get_var("PATH")
+            .unwrap_or_default()
+            .to_string();
 
-        for (tok_str, tok_type) in tokens.iter() {
-            match tok_type {
+        let mut out = String::with_capacity(line.len() * 2);
+        for (tok, kind) in highlight::tokenize_for_highlight(line) {
+            match kind {
                 TokenType::Command => {
-                    let env_guard = self.env.lock().unwrap();
-                    let is_valid = env_guard.is_builtin(tok_str)
-                        || env_guard.get_alias(tok_str).is_some()
-                        || env_guard.get_function(tok_str).is_some()
-                        || which::which(tok_str).is_ok();
-
-                    if is_valid {
-                        highlighted.push_str(&format!("\x1b[1;32m{}\x1b[0m", tok_str)); // Bold Green
-                    } else {
-                        highlighted.push_str(&format!("\x1b[1;31m{}\x1b[0m", tok_str)); // Bold Red
-                    }
+                    let valid = self.command_is_runnable(&tok, &path, line);
+                    let colour = if valid { "1;32" } else { "1;31" };
+                    out.push_str(&format!("\x1b[{}m{}\x1b[0m", colour, tok));
                 }
-                TokenType::Flag => {
-                    highlighted.push_str(&format!("\x1b[36m{}\x1b[0m", tok_str)); // Cyan
-                }
-                TokenType::String => {
-                    highlighted.push_str(&format!("\x1b[33m{}\x1b[0m", tok_str)); // Yellow
-                }
-                TokenType::Variable => {
-                    highlighted.push_str(&format!("\x1b[35m{}\x1b[0m", tok_str)); // Magenta
-                }
-                TokenType::Operator => {
-                    highlighted.push_str(&format!("\x1b[1;37m{}\x1b[0m", tok_str)); // Bold White
-                }
-                TokenType::Plain => {
-                    highlighted.push_str(tok_str);
-                }
+                TokenType::Flag => out.push_str(&format!("\x1b[36m{}\x1b[0m", tok)),
+                TokenType::String => out.push_str(&format!("\x1b[33m{}\x1b[0m", tok)),
+                TokenType::Variable => out.push_str(&format!("\x1b[35m{}\x1b[0m", tok)),
+                TokenType::Operator => out.push_str(&format!("\x1b[1;37m{}\x1b[0m", tok)),
+                TokenType::Plain => out.push_str(&tok),
             }
         }
 
-        Cow::Owned(highlighted)
+        Cow::Owned(out)
     }
 
     fn highlight_hint<'h>(&self, hint: &'h str) -> Cow<'h, str> {
@@ -326,141 +254,57 @@ impl Highlighter for RushHelper {
     }
 }
 
+impl RushHelper {
+    /// Whether a command token names something the shell could run, memoised per line.
+    fn command_is_runnable(&self, name: &str, path: &str, line: &str) -> bool {
+        let key = line_key(line);
+        let mut cache = self.which_cache.lock().unwrap();
+        if cache.0 != key {
+            *cache = (key, HashMap::new());
+        }
+        if let Some(&known) = cache.1.get(name) {
+            return known;
+        }
+        drop(cache);
+
+        let answer = {
+            let env = self.env.lock().unwrap();
+            highlight::command_resolves(name, path, |n| {
+                env.is_builtin(n) || env.get_alias(n).is_some() || env.get_function(n).is_some()
+            })
+        };
+
+        let mut cache = self.which_cache.lock().unwrap();
+        if cache.0 == key {
+            cache.1.insert(name.to_string(), answer);
+        }
+        answer
+    }
+}
+
 impl Validator for RushHelper {
     fn validate(&self, ctx: &mut ValidationContext<'_>) -> rustyline::Result<ValidationResult> {
         let input = ctx.input();
-        let mut in_single_quote = false;
-        let mut in_double_quote = false;
-
-        for ch in input.chars() {
-            match ch {
-                '\'' if !in_double_quote => in_single_quote = !in_single_quote,
-                '"' if !in_single_quote => in_double_quote = !in_double_quote,
-                _ => {}
+        match syntax::classify(input) {
+            InputStatus::Incomplete if self.editor_multiline => Ok(ValidationResult::Incomplete),
+            InputStatus::Complete => {
+                self.record_command_use(input);
+                Ok(ValidationResult::Valid(None))
             }
-        }
-
-        if in_single_quote || in_double_quote {
-            Ok(ValidationResult::Incomplete)
-        } else {
-            Ok(ValidationResult::Valid(None))
+            // A syntax error is not something another line can repair, and bash reports it from
+            // the executor rather than the editor. Accept the line so the parser produces the
+            // same diagnostic — and the same `$?` — it would for a script.
+            _ => Ok(ValidationResult::Valid(None)),
         }
     }
 }
 
 impl Helper for RushHelper {}
 
-#[derive(Debug, PartialEq, Eq)]
-enum TokenType {
-    Command,
-    Flag,
-    String,
-    Variable,
-    Operator,
-    Plain,
-}
-
-fn tokenize_for_highlight(line: &str) -> Vec<(String, TokenType)> {
-    let mut result = Vec::new();
-    let mut chars = line.chars().peekable();
-    let mut is_first_word = true;
-
-    while let Some(&ch) = chars.peek() {
-        if ch.is_whitespace() {
-            let mut space_str = String::new();
-            while let Some(&c) = chars.peek() {
-                if c.is_whitespace() {
-                    space_str.push(c);
-                    chars.next();
-                } else {
-                    break;
-                }
-            }
-            result.push((space_str, TokenType::Plain));
-            continue;
-        }
-
-        if matches!(ch, '|' | '&' | ';' | '<' | '>') {
-            let mut op_str = String::new();
-            op_str.push(ch);
-            chars.next();
-            if let Some(&next_ch) = chars.peek()
-                && ((ch == '|' && next_ch == '|')
-                    || (ch == '&' && next_ch == '&')
-                    || (ch == '>' && next_ch == '>'))
-            {
-                op_str.push(next_ch);
-                chars.next();
-            }
-            result.push((op_str, TokenType::Operator));
-            is_first_word = true;
-            continue;
-        }
-
-        if ch == '\'' || ch == '"' {
-            let quote = ch;
-            let mut str_lit = String::new();
-            str_lit.push(quote);
-            chars.next();
-            while let Some(&c) = chars.peek() {
-                str_lit.push(c);
-                chars.next();
-                if c == quote {
-                    break;
-                }
-            }
-            result.push((str_lit, TokenType::String));
-            is_first_word = false;
-            continue;
-        }
-
-        if ch == '$' {
-            let mut var_str = String::new();
-            var_str.push(ch);
-            chars.next();
-            while let Some(&c) = chars.peek() {
-                if c.is_alphanumeric() || c == '_' || c == '?' || c == '!' || c == '#' {
-                    var_str.push(c);
-                    chars.next();
-                } else {
-                    break;
-                }
-            }
-            result.push((var_str, TokenType::Variable));
-            is_first_word = false;
-            continue;
-        }
-
-        let mut word_str = String::new();
-        while let Some(&c) = chars.peek() {
-            if c.is_whitespace() || matches!(c, '|' | '&' | ';' | '<' | '>' | '\'' | '"' | '$') {
-                break;
-            }
-            word_str.push(c);
-            chars.next();
-        }
-
-        if is_first_word {
-            result.push((word_str, TokenType::Command));
-            is_first_word = false;
-        } else if word_str.starts_with('-') {
-            result.push((word_str, TokenType::Flag));
-        } else {
-            result.push((word_str, TokenType::Plain));
-        }
-    }
-
-    result
-}
-
-fn extract_current_word(line: &str, pos: usize) -> (usize, &str) {
-    let sub = &line[..pos];
-    if let Some(idx) =
-        sub.rfind(|c: char| c.is_whitespace() || matches!(c, '|' | '&' | ';' | '<' | '>'))
-    {
-        let start = idx + 1;
-        (start, &sub[start..])
-    } else {
-        (0, sub)
-    }
+/// A cheap identity for the line being highlighted. Collisions only cost a stale colour.
+fn line_key(line: &str) -> u64 {
+    use std::hash::{Hash, Hasher};
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    line.hash(&mut hasher);
+    hasher.finish()
 }

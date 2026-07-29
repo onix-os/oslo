@@ -144,6 +144,27 @@ fn local_options_are_not_variable_names() {
     assert_eq!(r.out(), "[1]\n[none]", "stderr: {}", r.stderr);
 }
 
+/// Outside a function there is no frame to pop, so `local` there is a global that outlives its
+/// line. Creating one silently is worse than refusing: the script gets a leak it never sees.
+#[test]
+fn local_outside_a_function_is_refused() {
+    let r = run("local x=1; echo status=$?; echo \"[${x:-unset}]\"");
+    assert_eq!(r.out(), "status=1\n[unset]", "stderr: {}", r.stderr);
+    assert!(
+        r.stderr.contains("can only be used in a function"),
+        "stderr: {}",
+        r.stderr
+    );
+}
+
+/// A prefix assignment pushes a scope frame of its own, so "the frame stack is non-empty" is not
+/// the same question as "we are inside a function".
+#[test]
+fn a_prefix_assignment_does_not_make_local_legal() {
+    let r = run("FOO=bar local x=1; echo status=$?");
+    assert_eq!(r.out(), "status=1", "stderr: {}", r.stderr);
+}
+
 /// `export -n` keeps the value in the shell and takes it out of the child's environment.
 #[test]
 fn export_n_unexports_without_losing_the_value() {
