@@ -61,7 +61,9 @@ jobs:
         run: |
           set -o pipefail
           cargo test --all-targets 2>&1 | tee /tmp/test.log && exit 0
-          grep -E '^(test .* FAILED|failures:|thread .* panicked|assertion|  left:|  right:|diverge)' /tmp/test.log \
+          # The differential assertion prints the offending corpus case names in the lines *after*
+          # the panic header, so match on content rather than on a line prefix.
+          grep -nE 'FAILED|panicked|diverge|expected failures|^  [a-z0-9_]+\.sh|left:|right:|assertion' /tmp/test.log \
             | head -60 | while IFS= read -r l; do echo "::error::test: $l"; done
           exit 1
       - name: clippy
