@@ -198,6 +198,39 @@ without being told, so the corpus exercises the real `oslo case.lua` path rather
 "was read as shell, not Lua", which is exactly the bug that reached a release and was found by
 running the README example rather than by any test.
 
+## C4 continued — the Alpine VM
+
+`scripts/alpine-vm.sh` boots oslo as an Alpine VM's **PID 1 and `/bin/sh`** and runs
+`scripts/alpine-vm-suite.sh` inside it. `--shell` drops to an interactive prompt in there instead.
+
+Alpine because it is musl and busybox: the static release artifact has to run on a system that
+shares no libc with the build host, and every utility in the image is a different implementation
+from the coreutils the differential corpus was written against. The rootfs *is* the initramfs, so
+`/init` is oslo — which is the shortest path to actually being PID 1 rather than simulating it.
+
+24 checks pass in there, including process substitution, `printf` with no coreutils present,
+`set -e`, EXIT traps in subshells, `set -a`, `128 + SIGTERM`, and the Lua API capturing `uname`.
+
+It earned its keep on the first boot, with three findings:
+
+* **`$(case …)` does not parse.** `echo $(case a in a) echo hit;; esac)` is a syntax error: the
+  substitution scanner reads the case pattern's `)` as its own closing paren. bash handles it, and
+  it is ordinary shell — the highest-value thing left to fix.
+* **Process substitution needs `/dev/fd`,** which a minirootfs does not ship. `cat <(echo x)` fails
+  with "can't open /dev/fd/3" until `/dev/fd -> /proc/self/fd` exists. bash has the same
+  dependency, so the VM's `/init` creates it as a real init would — but it is worth knowing that
+  `<(…)` is not available in an environment that has not set that up.
+* **PID 1 does not reap reparented orphans.** A double-forked orphan is reparented to init; oslo
+  reaps the jobs it started, at command boundaries, but never calls `waitpid(-1)` for children it
+  does not know about. The VM reports `ORPHANS-AT-BOUNDARY:1` — one zombie left even after init
+  reaches a boundary. Harmless for a login shell and wrong for an init, which is precisely the
+  distinction only a VM can draw.
+
+Two expectations of mine were wrong rather than the shell: `/proc/1/comm` reads `init` because the
+kernel takes `comm` from the file named to `execve` — the script — so `/proc/1/exe` is the check
+that means anything; and a shell as init cannot reap while blocked in a foreground command, so
+that check belongs in `/init` and not in a suite running under it.
+
 ## Sequencing
 
 A1 and A2 first and alone: A1 is a correctness *and* safety defect, and it is a prerequisite for

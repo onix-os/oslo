@@ -196,6 +196,18 @@ If you are already locked out, most systems let you log in over SSH with an expl
 (`ssh host -t /bin/bash -l`), or you can switch the entry back with `sudo chsh -s /bin/bash $USER`
 from a rescue session.
 
+## Testing as a distro's /bin/sh
+
+```sh
+scripts/alpine-vm.sh            # boot an Alpine VM with oslo as PID 1 and /bin/sh, run the suite
+scripts/alpine-vm.sh --shell    # boot to an interactive oslo prompt in there instead
+```
+
+Needs `qemu-system-x86_64`, `cpio` and network access on the first run (the Alpine minirootfs and
+kernel are cached afterwards). Alpine because it is musl and busybox: the static release binary has
+to run where no glibc exists, and every utility in the image is a different implementation from the
+ones the differential corpus compares against. See `PLAN-DISTRO.md` for what it found.
+
 ## File length
 
 **No source file may exceed 600 lines.** Enforced by `scripts/check-loc.sh`, which runs as part
