@@ -61,7 +61,7 @@ fn extended_test_to_and_or(expr: &ast::ExtendedTestExpr) -> Result<oslo_ast::And
         ast::ExtendedTestExpr::UnaryTest(pred, word) => {
             let op = unary_predicate_op(pred);
             Ok(bracket_and_or(
-                vec![oslo_ast::Word::from_literal(op), single_word(word)?],
+                vec![oslo_ast::Word::from_literal(op), operand(word)?],
                 false,
             ))
         }
@@ -69,14 +69,35 @@ fn extended_test_to_and_or(expr: &ast::ExtendedTestExpr) -> Result<oslo_ast::And
             let (op, negate) = binary_predicate_op(pred, right);
             Ok(bracket_and_or(
                 vec![
-                    single_word(left)?,
+                    operand(left)?,
                     oslo_ast::Word::from_literal(op),
-                    single_word(right)?,
+                    operand(right)?,
                 ],
                 negate,
             ))
         }
     }
+}
+
+/// One operand of a predicate, in a form that cannot become anything other than one word.
+///
+/// This is the difference between `[[ ]]` and `[ ]` that the lowering would otherwise lose. `[[`
+/// is a *syntactic* construct: its operands are not field-split and not pathname-expanded, so
+/// `[[ $x == "a b" ]]` is a comparison and `[[ -n $x ]]` with an empty `x` is still a test on one
+/// (empty) operand. Lowered to an ordinary command, they were expanded like ordinary arguments —
+/// so a value with a space became two operands (`too many arguments`), a value containing `*` was
+/// globbed against the working directory, and an empty value vanished, shifting the operator into
+/// the operand slot.
+///
+/// Wrapping the whole word in double quotes says exactly that, and reuses the expansion rules
+/// already written rather than adding a second set. It does not make the `==` right-hand side
+/// literal: pattern-versus-text is decided from the *source* quoting by [`binary_predicate_op`],
+/// before this runs, and is carried in the operator word.
+fn operand(word: &ast::Word) -> Result<oslo_ast::Word> {
+    let inner = single_word(word)?;
+    Ok(oslo_ast::Word {
+        parts: vec![oslo_ast::WordPart::DoubleQuoted(inner.parts)],
+    })
 }
 
 /// Build a `[[ <args> ]]` invocation as a one-pipeline and-or list.
