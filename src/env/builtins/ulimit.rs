@@ -1,8 +1,10 @@
 //! `ulimit` — report and change the resource limits the shell is running under.
 //!
-//! Values are read from `/proc/self/limits`, which is the same data `getrlimit` returns, and
-//! converted into the units every shell's `ulimit` reports in: 512-byte blocks for file sizes,
-//! kilobytes for memory sizes, plain counts for everything else.
+//! Both directions go through `getrlimit(2)`/`setrlimit(2)`. Reading used to parse
+//! `/proc/self/limits` instead — the same data, but only on Linux, so every `ulimit` query on
+//! macOS reported "cannot read this process's resource limits" while `ulimit -n 128` beside it
+//! silently succeeded. Values are converted into the units every shell's `ulimit` reports in:
+//! 512-byte blocks for file sizes, kilobytes for memory sizes, plain counts for everything else.
 //!
 //! Setting goes through `setrlimit(2)`, reached via `nix`'s `resource` feature. Not every limit
 //! exists on every system — `RLIMIT_NICE` and `RLIMIT_MSGQUEUE` are Linux's, not POSIX's — so
@@ -15,11 +17,10 @@ use crate::env::scope::Environment;
 use crate::error::Result;
 use nix::sys::resource::{RLIM_INFINITY, Resource, getrlimit, rlim_t, setrlimit};
 
-/// One selectable limit: its option letter, its name in `/proc/self/limits`, its description, and
-/// the divisor that turns bytes into the unit `ulimit` prints.
+/// One selectable limit: its option letter, its description, and the divisor that turns the
+/// kernel's units into the unit `ulimit` prints.
 struct Limit {
     flag: char,
-    proc_name: &'static str,
     label: &'static str,
     /// 1 for a plain count or a time in seconds, 512 for a size in blocks, 1024 for a size in kB.
     divisor: u64,
@@ -29,21 +30,21 @@ struct Limit {
 /// each row across five lines would hide that it is a table at all.
 #[rustfmt::skip]
 const LIMITS: &[Limit] = &[
-    Limit { flag: 'c', proc_name: "Max core file size", label: "core file size (blocks)", divisor: 512 },
-    Limit { flag: 'd', proc_name: "Max data size", label: "data seg size (kbytes)", divisor: 1024 },
-    Limit { flag: 'e', proc_name: "Max nice priority", label: "scheduling priority", divisor: 1 },
-    Limit { flag: 'f', proc_name: "Max file size", label: "file size (blocks)", divisor: 512 },
-    Limit { flag: 'i', proc_name: "Max pending signals", label: "pending signals", divisor: 1 },
-    Limit { flag: 'l', proc_name: "Max locked memory", label: "max locked memory (kbytes)", divisor: 1024 },
-    Limit { flag: 'm', proc_name: "Max resident set", label: "max memory size (kbytes)", divisor: 1024 },
-    Limit { flag: 'n', proc_name: "Max open files", label: "open files", divisor: 1 },
-    Limit { flag: 'q', proc_name: "Max msgqueue size", label: "POSIX message queues (bytes)", divisor: 1 },
-    Limit { flag: 'r', proc_name: "Max realtime priority", label: "real-time priority", divisor: 1 },
-    Limit { flag: 's', proc_name: "Max stack size", label: "stack size (kbytes)", divisor: 1024 },
-    Limit { flag: 't', proc_name: "Max cpu time", label: "cpu time (seconds)", divisor: 1 },
-    Limit { flag: 'u', proc_name: "Max processes", label: "max user processes", divisor: 1 },
-    Limit { flag: 'v', proc_name: "Max address space", label: "virtual memory (kbytes)", divisor: 1024 },
-    Limit { flag: 'x', proc_name: "Max file locks", label: "file locks", divisor: 1 },
+    Limit { flag: 'c', label: "core file size (blocks)", divisor: 512 },
+    Limit { flag: 'd', label: "data seg size (kbytes)", divisor: 1024 },
+    Limit { flag: 'e', label: "scheduling priority", divisor: 1 },
+    Limit { flag: 'f', label: "file size (blocks)", divisor: 512 },
+    Limit { flag: 'i', label: "pending signals", divisor: 1 },
+    Limit { flag: 'l', label: "max locked memory (kbytes)", divisor: 1024 },
+    Limit { flag: 'm', label: "max memory size (kbytes)", divisor: 1024 },
+    Limit { flag: 'n', label: "open files", divisor: 1 },
+    Limit { flag: 'q', label: "POSIX message queues (bytes)", divisor: 1 },
+    Limit { flag: 'r', label: "real-time priority", divisor: 1 },
+    Limit { flag: 's', label: "stack size (kbytes)", divisor: 1024 },
+    Limit { flag: 't', label: "cpu time (seconds)", divisor: 1 },
+    Limit { flag: 'u', label: "max user processes", divisor: 1 },
+    Limit { flag: 'v', label: "virtual memory (kbytes)", divisor: 1024 },
+    Limit { flag: 'x', label: "file locks", divisor: 1 },
 ];
 
 /// Which of the two limits a `-H`/`-S` run selected.
@@ -115,14 +116,12 @@ pub fn builtin_ulimit(_env: &mut Environment, args: &[String]) -> Result<i32> {
     }
 
     let hard = which.reports_hard();
-    let Some(text) = read_limits() else {
-        eprintln!("rush: ulimit: cannot read this process's resource limits");
-        return Ok(1);
-    };
 
+    // `-a` reports what this system actually has: a limit the platform does not define is skipped
+    // rather than printed as an error, so the listing stays a listing.
     if all {
         for limit in LIMITS {
-            match lookup(&text, limit, hard) {
+            match report(limit, hard) {
                 Some(value) => println!("-{}: {:<30} {}", limit.flag, limit.label, value),
                 None => continue,
             }
@@ -136,7 +135,7 @@ pub fn builtin_ulimit(_env: &mut Environment, args: &[String]) -> Result<i32> {
             .iter()
             .find(|l| l.flag == flag)
             .expect("validated above");
-        match lookup(&text, limit, hard) {
+        match report(limit, hard) {
             Some(value) => println!("{}", value),
             None => {
                 eprintln!("rush: ulimit: -{}: no such limit on this system", flag);
@@ -145,10 +144,6 @@ pub fn builtin_ulimit(_env: &mut Environment, args: &[String]) -> Result<i32> {
         }
     }
     Ok(status)
-}
-
-fn read_limits() -> Option<String> {
-    std::fs::read_to_string("/proc/self/limits").ok()
 }
 
 /// The `getrlimit`/`setrlimit` resource a flag selects, or `None` where this system has no such
@@ -265,85 +260,72 @@ fn set_one(flag: char, operand: &str, which: Which) -> i32 {
     }
 }
 
-/// Find one limit in the text of `/proc/self/limits` and convert it to `ulimit`'s units.
-fn lookup(text: &str, limit: &Limit, hard: bool) -> Option<String> {
-    for line in text.lines() {
-        let Some(rest) = line.strip_prefix(limit.proc_name) else {
-            continue;
-        };
-        // The name is a prefix of the line, and "Max realtime priority" is *not* a prefix of
-        // "Max realtime timeout", so a bare prefix match is unambiguous here — but the character
-        // after the name must be a space, or "Max file size" would also match "Max file sizes".
-        if !rest.starts_with(' ') {
-            continue;
-        }
-        let mut fields = rest.split_whitespace();
-        let soft = fields.next()?;
-        let value = if hard { fields.next()? } else { soft };
-        return Some(match value {
-            "unlimited" => "unlimited".to_string(),
-            n => (n.parse::<u64>().ok()? / limit.divisor).to_string(),
-        });
+/// Read one limit and convert it to `ulimit`'s units, or `None` where the platform has no such
+/// limit — which is the same answer [`resource_for`] gives the set direction, so a flag cannot be
+/// reportable and unsettable or the reverse.
+fn report(limit: &Limit, hard: bool) -> Option<String> {
+    let resource = resource_for(limit.flag)?;
+    let (soft_value, hard_value) = getrlimit(resource).ok()?;
+    let value = if hard { hard_value } else { soft_value };
+    Some(format_limit(value, limit.divisor))
+}
+
+/// Render one raw limit in the unit its flag reports.
+///
+/// Split from [`report`] so the conversion can be tested without `setrlimit`: the limits belong to
+/// the whole test process, and a test that moves them races every test running beside it.
+fn format_limit(value: rlim_t, divisor: u64) -> String {
+    if value == RLIM_INFINITY {
+        return "unlimited".to_string();
     }
-    None
+    // Truncating division, matching bash: a limit that is not a whole number of blocks is
+    // reported as the number of whole blocks it covers. `rlim_t` is `u64` on every target in the
+    // matrix, so this divides without a conversion — clippy rejects one as useless either way.
+    (value / divisor).to_string()
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{LIMITS, builtin_ulimit, lookup, read_limits};
+    use super::{LIMITS, builtin_ulimit, format_limit, report, resource_for};
     use crate::env::Environment;
-
-    const SAMPLE: &str = "\
-Limit                     Soft Limit           Hard Limit           Units
-Max cpu time              unlimited            unlimited            seconds
-Max file size             unlimited            unlimited            bytes
-Max stack size            8388608              unlimited            bytes
-Max core file size        0                    unlimited            bytes
-Max open files            1024                 1048576              files
-";
+    use nix::sys::resource::RLIM_INFINITY;
 
     fn limit_for(flag: char) -> &'static super::Limit {
         LIMITS.iter().find(|l| l.flag == flag).expect("known flag")
-    }
-
-    /// The soft limit is the default, and the hard one is what `-H` asks for.
-    #[test]
-    fn soft_and_hard_limits_are_read_separately() {
-        assert_eq!(
-            lookup(SAMPLE, limit_for('n'), false).as_deref(),
-            Some("1024")
-        );
-        assert_eq!(
-            lookup(SAMPLE, limit_for('n'), true).as_deref(),
-            Some("1048576")
-        );
     }
 
     /// Sizes are reported in the units every shell's `ulimit` uses, not in bytes: kilobytes for
     /// memory, 512-byte blocks for files.
     #[test]
     fn sizes_are_converted_to_the_units_shells_report() {
-        assert_eq!(
-            lookup(SAMPLE, limit_for('s'), false).as_deref(),
-            Some("8192")
-        );
-        assert_eq!(lookup(SAMPLE, limit_for('c'), false).as_deref(), Some("0"));
-        assert_eq!(
-            lookup(SAMPLE, limit_for('t'), false).as_deref(),
-            Some("unlimited")
-        );
+        assert_eq!(format_limit(8_388_608, 1024), "8192");
+        assert_eq!(format_limit(4096 * 512, 512), "4096");
+        assert_eq!(format_limit(1024, 1), "1024");
+        assert_eq!(format_limit(0, 512), "0");
+        assert_eq!(format_limit(RLIM_INFINITY, 1024), "unlimited");
     }
 
+    /// The six POSIX limits have to exist everywhere rush builds. This is what stops a query path
+    /// from being silently unavailable on one platform — which is exactly how the `/proc`-based
+    /// reader this replaced went unnoticed until CI ran on macOS.
     #[test]
-    fn a_limit_this_kernel_does_not_report_is_absent() {
-        assert_eq!(lookup(SAMPLE, limit_for('x'), false), None);
+    fn the_posix_limits_are_readable_on_every_platform() {
+        for flag in ['c', 'd', 'f', 'n', 's', 't'] {
+            assert!(
+                resource_for(flag).is_some(),
+                "-{flag} has no resource on this platform"
+            );
+            assert!(
+                report(limit_for(flag), false).is_some(),
+                "-{flag} could not be read on this platform"
+            );
+        }
     }
 
     /// A limit really is applied: lower the soft core-file limit and read it back through the
     /// same path a script would. Restored afterwards, because this is the test process's own
     /// limit and every later test inherits it.
     #[test]
-    #[cfg(target_os = "linux")]
     fn setting_a_limit_changes_what_the_query_reports() {
         use nix::sys::resource::{Resource, getrlimit, setrlimit};
         let (soft, hard) = getrlimit(Resource::RLIMIT_CORE).expect("core limit");
@@ -351,8 +333,7 @@ Max open files            1024                 1048576              files
         let mut env = Environment::new();
         let args = vec!["ulimit".to_string(), "-Sc".to_string(), "0".to_string()];
         assert_eq!(builtin_ulimit(&mut env, &args).unwrap(), 0);
-        let text = read_limits().expect("/proc/self/limits");
-        assert_eq!(lookup(&text, limit_for('c'), false).as_deref(), Some("0"));
+        assert_eq!(report(limit_for('c'), false).as_deref(), Some("0"));
 
         setrlimit(Resource::RLIMIT_CORE, soft, hard).expect("restore");
     }
@@ -387,12 +368,5 @@ Max open files            1024                 1048576              files
             parse_operand(&u64::MAX.to_string(), 1024).is_none(),
             "a value that overflows its own unit is not a limit"
         );
-    }
-
-    #[test]
-    #[cfg(target_os = "linux")]
-    fn the_running_process_reports_its_own_open_file_limit() {
-        let text = read_limits().expect("/proc/self/limits");
-        assert!(lookup(&text, limit_for('n'), false).is_some());
     }
 }

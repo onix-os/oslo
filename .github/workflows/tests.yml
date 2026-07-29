@@ -71,8 +71,12 @@ jobs:
       # cases with nothing turning red. Re-running these three tests costs about three seconds.
       - name: differential corpus (oracle report)
         run: |
-          cargo test --test differential_tests -- --nocapture 2>&1 | tee /tmp/diff.log
-          grep -E 'differential corpus vs|needs bash' /tmp/diff.log \
+          # Informational on purpose: `test` below is the gate, and failing here as well would
+          # only report the same divergence twice. `|| true` says so explicitly rather than
+          # leaving it to the pipeline's exit status, which is what made an earlier version of
+          # this step report success while the suite underneath it was failing.
+          cargo test --test differential_tests -- --nocapture 2>&1 | tee /tmp/diff.log || true
+          grep -E 'differential corpus vs|needs bash|diverge from bash' /tmp/diff.log \
             | while IFS= read -r l; do echo "::notice::$l"; done
       - name: test
         run: |
