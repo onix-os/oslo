@@ -19,6 +19,15 @@ const KEYWORDS: &[&str] = &[
     "function", "if", "in", "select", "then", "time", "until", "while", "{", "}",
 ];
 
+/// Whether the parser would take `name` as a reserved word rather than a command name.
+///
+/// `command -v`/`-V` must answer this the same way `type` does — POSIX lists reserved words among
+/// the things `command -v` reports, and a shell where `command -v if` fails is one that modernish
+/// refuses to initialise on at all.
+pub fn is_keyword(name: &str) -> bool {
+    KEYWORDS.contains(&name)
+}
+
 /// One way a name resolves, in the order dispatch would try them.
 enum Kind {
     Alias(String),

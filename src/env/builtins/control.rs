@@ -8,6 +8,8 @@ mod resolve;
 mod unparse;
 
 pub use resolve::builtin_type;
+/// Whether a name is a reserved word; `command -v` has to agree with `type` about this.
+pub use resolve::is_keyword;
 /// Render a function definition as shell source; also what `set` and `declare -f` need to print.
 pub use unparse::format_function;
 

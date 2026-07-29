@@ -5,6 +5,7 @@
 //! same lookup to answer "what would run?" without running it, which is what every
 //! `if command -v foo >/dev/null` feature probe in the wild is asking.
 
+use crate::env::builtins::control::is_keyword;
 use crate::env::builtins::spawn::{NOT_FOUND, resolve_program, run_external};
 use crate::env::scope::Environment;
 use crate::error::Result;
@@ -128,7 +129,10 @@ fn terse_description(env: &Environment, name: &str, default_path: bool) -> Optio
     if let Some(body) = env.get_alias(name) {
         return Some(format!("alias {}='{}'", name, body));
     }
-    if env.get_function(name).is_some() || env.is_builtin(name) {
+    // A reserved word is not a builtin and has no path, but `command -v if` still has to print
+    // `if` — POSIX lists reserved words among what `-v` reports, and the probe that noticed this
+    // was missing (modernish's) treats its absence as fatal rather than as a missing feature.
+    if is_keyword(name) || env.get_function(name).is_some() || env.is_builtin(name) {
         return Some(name.to_string());
     }
     lookup_program(name, default_path).map(|p| p.display().to_string())
@@ -141,6 +145,9 @@ fn verbose_description(env: &Environment, name: &str, default_path: bool) -> Opt
     }
     if let Some(body) = env.get_alias(name) {
         return Some(format!("{} is aliased to `{}'", name, body));
+    }
+    if is_keyword(name) {
+        return Some(format!("{} is a shell keyword", name));
     }
     if env.get_function(name).is_some() {
         return Some(format!("{} is a function", name));
