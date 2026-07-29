@@ -1,9 +1,8 @@
 SHELL := /bin/bash
 
-# Parsed with grep rather than a sed bracket expression: `[^#\[[:space:]]` is read differently by
-# GNU and BSD sed, and when it yields nothing the $(error) below fires for *every* target — which
-# on a macOS runner looks like the whole gate failing in 17 seconds for no stated reason.
-PROJECT_META := $(shell grep -vE '^[[:space:]]*(#|\[|$$)' PROJECT 2>/dev/null | tr -d '[:blank:]')
+# Delegated to a script on purpose — see the comment at the top of it. Parsing PROJECT inline here
+# needs a literal `#`, and GNU Make 3.81 (what macOS ships) mis-parses that inside $(shell ...).
+PROJECT_META := $(shell $(CURDIR)/scripts/project-meta.sh)
 PROJECT_NAME := $(word 1,$(PROJECT_META))
 PROJECT_VERSION := $(word 2,$(PROJECT_META))
 ifeq ($(PROJECT_NAME),)
@@ -71,9 +70,9 @@ test-all:
 clean:
 	@$(CARGO) clean
 
-# Echoes the name the Makefile parsed out of PROJECT. CI prints this because a portability
-# difference in the sed above yields an empty name, which trips the $(error) at the top of this
-# file before any target runs — a failure that looks like nothing at all in a run summary.
+# Echoes the name the Makefile parsed out of PROJECT. CI prints it because an empty name trips the
+# $(error) at the top of this file before any target runs, and that failure looks like nothing at
+# all in a run summary — every step just fails instantly. Printing the value names the cause.
 print-name:
 	@echo '$(PROJECT_NAME)'
 
