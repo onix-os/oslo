@@ -60,9 +60,19 @@ impl Environment {
         self.option(ShellOption::Verbose)
     }
 
-    /// `set -n`: read and parse commands but do not run them.
+    /// `set -n`: read and parse commands but do not run them — what `sh -n script` is for.
+    ///
+    /// This accessor existed with no callers, so the option appeared in `set -o` and did nothing:
+    /// `oslo -n -c 'echo x'` printed `x`, where bash and dash print nothing. That is worse than an
+    /// unimplemented option, because `sh -n` is how packaging validates maintainer scripts, and
+    /// running one that was only meant to be parsed is a security problem rather than a missing
+    /// feature.
+    ///
+    /// Always false for an interactive shell. POSIX says the option "shall be ignored" there, and
+    /// the reason is practical: a `set -n` typed at a prompt would otherwise leave a session that
+    /// reads every later line and runs none of them, with no way to type its way out.
     pub fn noexec(&self) -> bool {
-        self.option(ShellOption::NoExec)
+        self.option(ShellOption::NoExec) && !self.interactive()
     }
 
     /// `set -f`: do not expand pathnames.

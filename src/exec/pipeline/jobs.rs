@@ -11,6 +11,7 @@
 use super::{describe, eval_and_or_list, is_interactive, status_of};
 use crate::ast::{AndOrList, Pipeline};
 use crate::env::Environment;
+use crate::env::builtins::run_exit_trap;
 use crate::error::{Result, ShellError};
 use crate::exec::compound::flush_stdout;
 use crate::exec::job;
@@ -41,7 +42,8 @@ pub(super) fn spawn_background(env: &mut Environment, and_or: &AndOrList) -> Res
                 detach_stdin();
                 let res = status_of(eval_and_or_list(env, and_or));
                 flush_stdout();
-                std::process::exit(res);
+                // A background job is a subshell too: `{ trap ... EXIT; ...; } &` must clean up.
+                std::process::exit(run_exit_trap(env, res));
             }
             Ok(ForkResult::Parent { child }) => {
                 let pgid = job::place_child(child, None);

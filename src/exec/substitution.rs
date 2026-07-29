@@ -3,6 +3,7 @@
 //! Runs the command in a forked child with stdout on a pipe and captures what it writes.
 
 use crate::env::Environment;
+use crate::env::builtins::run_exit_trap;
 use crate::error::{Result, ShellError};
 use crate::exec::compound::flush_stdout;
 use crate::exec::pipeline::{eval_command_list, status_of, wait_for_status};
@@ -37,7 +38,10 @@ pub fn eval_command_substitution(env: &mut Environment, cmd_str: &str) -> Result
                 let res = status_of(eval_command_list(env, &ast));
                 // Without this the capture pipe would close on an unflushed partial line.
                 flush_stdout();
-                std::process::exit(res);
+                // The substitution is a shell of its own, so an EXIT trap set inside it runs here
+                // — and its output is captured along with everything else the child wrote, which
+                // is what bash does too.
+                std::process::exit(run_exit_trap(env, res));
             }
             Ok(ForkResult::Parent { child }) => {
                 let _ = close(writer.into_raw_fd());

@@ -22,6 +22,7 @@ mod timing;
 
 use crate::ast::*;
 use crate::env::Environment;
+use crate::env::builtins::run_exit_trap;
 use crate::error::{Result, ShellError};
 use crate::exec::compound::{eval_compound_command, flush_stdout};
 use crate::exec::job;
@@ -186,6 +187,19 @@ fn run_list_items(env: &mut Environment, cmd_list: &CommandList) -> Result<i32> 
     let mut last_status = 0;
 
     for item in &cmd_list.items {
+        // `set -n`: read the program, run none of it. Checked per command rather than once before
+        // the list so that `set -n` *within* a script stops execution from that point, which is
+        // where bash stops too — and so that `oslo -n script` never reaches a command at all.
+        //
+        // POSIX excuses interactive shells from honouring it, which is what stops a stray `set -n`
+        // at a prompt from turning the session into a shell that silently ignores everything.
+        //
+        // This is a gate on *execution*, not on parsing: the program is already parsed by the time
+        // it gets here, so a syntax error has been reported whether or not this option is set,
+        // which is the whole point of `sh -n`.
+        if env.noexec() {
+            return Ok(last_status);
+        }
         // R7.4: a command boundary is the one moment the shell is provably not waiting for a
         // foreground child, which is what makes reaping every finished background job here safe.
         job::reap_background_jobs();
@@ -358,7 +372,8 @@ fn run_stages(env: &mut Environment, pipeline: &Pipeline) -> Result<i32> {
                     // R4.2: `echo x | exit 3` exits the stage with 3, not with 1.
                     let status = status_of(eval_command(env, cmd));
                     flush_stdout();
-                    std::process::exit(status);
+                    // Each stage is a subshell, so a trap it installed for its own exit fires here.
+                    std::process::exit(run_exit_trap(env, status));
                 }
                 Ok(ForkResult::Parent { child }) => {
                     // The same `setpgid` the child just made, from the other side: whichever

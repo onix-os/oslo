@@ -1,4 +1,5 @@
 mod array;
+mod environ;
 mod frames;
 mod options;
 mod registry;
@@ -9,6 +10,7 @@ use crate::ast::Command;
 use crate::env::nesting::{DepthGuard, MAX_FUNCTION_DEPTH, MAX_SCRIPT_DEPTH};
 use crate::env::options::ShellOptions;
 use crate::error::Result;
+use environ::{environ_remove, environ_set, reject_unrepresentable};
 use frames::ScopeFrame;
 use registry::BuiltinRegistry;
 use std::collections::{HashMap, HashSet};
@@ -36,60 +38,6 @@ pub fn is_valid_identifier(name: &str) -> bool {
         _ => return false,
     }
     chars.all(|c| c.is_ascii_alphanumeric() || c == '_')
-}
-
-/// Whether `name`/`value` can be handed to the process environment without aborting.
-///
-/// Deliberately weaker than [`is_valid_identifier`]: names inherited from `environ` may contain
-/// characters no shell would accept (`BASH_FUNC_x%%`), and forwarding those to a child is
-/// correct. Only the three things `environ` genuinely cannot represent are refused — an empty
-/// name, a `=` in a name, and a NUL anywhere, since NUL terminates a C string.
-fn is_environ_safe(name: &str, value: &str) -> bool {
-    !name.is_empty() && !name.contains(['=', '\0']) && !value.contains('\0')
-}
-
-/// Report a name/value the process environment cannot represent; `true` if it was rejected.
-///
-/// The last line of defence for callers that reach [`Environment::set_var`] without doing their
-/// own validation (`read`, a `for` loop variable, a `${x=default}` expansion): the assignment is
-/// dropped with a diagnostic rather than aborting the shell.
-fn reject_unrepresentable(name: &str, value: &str) -> bool {
-    if name.is_empty() || name.contains(['=', '\0']) {
-        eprintln!("oslo: {}: not a valid identifier", name);
-        true
-    } else if value.contains('\0') {
-        eprintln!("oslo: {}: value contains a NUL byte", name);
-        true
-    } else {
-        false
-    }
-}
-
-/// Publish `name=value` to the process environment; a pair `environ` cannot hold is dropped.
-///
-/// Every write to `environ` in this module funnels through here so the soundness argument lives
-/// in exactly one place.
-fn environ_set(name: &str, value: &str) {
-    if !is_environ_safe(name, value) {
-        return;
-    }
-    // SAFETY: `std::env::set_var` is unsafe in edition 2024 because it mutates the global
-    // `environ` with no synchronisation, so a concurrent `getenv` in another thread could read a
-    // freed pointer. oslo is single-threaded: nothing in the crate spawns a thread, the parser,
-    // interpreter, builtins and Lua engine all run on the main thread, and a forked child starts
-    // with only the forking thread alive. The guard above rules out the other failure mode — the
-    // call panics on an empty name, a `=` in the name, or a NUL in either half.
-    unsafe { env::set_var(name, value) }
-}
-
-/// Drop `name` from the process environment; a name `environ` cannot hold is ignored.
-fn environ_remove(name: &str) {
-    if !is_environ_safe(name, "") {
-        return;
-    }
-    // SAFETY: as in `environ_set` — no other thread exists to observe the mutation, and the
-    // guard above excludes the names `remove_var` panics on.
-    unsafe { env::remove_var(name) }
 }
 
 pub struct Environment {
@@ -184,7 +132,33 @@ impl Environment {
         };
 
         crate::env::builtins::register_default_builtins(&mut env_struct);
+        env_struct.seed_process_vars();
         env_struct
+    }
+
+    /// Set the variables that describe the process the shell is running as.
+    ///
+    /// Unset, these fail *quietly* and wrongly: `[ "$UID" = 0 ]` is the root check in most install
+    /// scripts, and an unset `$UID` makes it answer "not root" on a machine where the script is
+    /// running as root. `$PPID` names the parent for lock files and process trees.
+    ///
+    /// Not exported, matching bash: they describe *this* shell, and a child that inherited its
+    /// parent's `$PPID` would be told the wrong thing. They are set only if the name is not
+    /// already taken, so an inherited environment variable of the same name still wins — the
+    /// shell should not overwrite something the caller deliberately put there.
+    fn seed_process_vars(&mut self) {
+        let uid = nix::unistd::getuid().as_raw();
+        let euid = nix::unistd::geteuid().as_raw();
+        let ppid = nix::unistd::getppid().as_raw();
+        for (name, value) in [
+            ("UID", uid.to_string()),
+            ("EUID", euid.to_string()),
+            ("PPID", ppid.to_string()),
+        ] {
+            if !self.vars.contains_key(name) {
+                self.vars.insert(name.to_string(), (value, false));
+            }
+        }
     }
 
     /// Mark this environment as the one a freshly forked subshell is running in.
@@ -425,7 +399,12 @@ impl Environment {
             array.set(0, value);
             return true;
         }
-        let is_exp = export || self.vars.get(name).map(|(_, exp)| *exp).unwrap_or(false);
+        // `set -a` exports every name that is assigned to, which is why this belongs here and not
+        // at the `name=value` site: POSIX applies it to *any* assignment, so `read`, a `for` loop
+        // variable and `${v:=x}` are all covered by deciding it once. The idiom it exists for is
+        // `set -a; . /etc/os-release`, which before this exported nothing at all.
+        let is_exp =
+            export || self.allexport() || self.vars.get(name).map(|(_, exp)| *exp).unwrap_or(false);
         self.vars
             .insert(name.to_string(), (value.to_string(), is_exp));
         if is_exp {

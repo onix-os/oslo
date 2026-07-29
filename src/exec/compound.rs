@@ -9,6 +9,7 @@
 
 use crate::ast::*;
 use crate::env::Environment;
+use crate::env::builtins::run_exit_trap;
 use crate::error::{Result, ShellError};
 use crate::exec::pipeline::{eval_command_list, status_of, suspend_errexit, wait_for_status};
 use crate::expand::{expand_word, expand_word_to_string};
@@ -328,7 +329,11 @@ pub(crate) fn eval_compound_command(
                         // `process::exit` runs no destructors, so a partial line written by
                         // `echo -n` would die in the buffer instead of reaching the parent.
                         flush_stdout();
-                        std::process::exit(res);
+                        // A subshell is a shell, so a trap it set for its own exit has to run before it goes.
+                        // `enter_subshell` cleared whatever the parent had, so this only ever fires
+                        // a handler installed *inside* here — which is why `trap T EXIT; (:)`
+                        // still prints once and not twice.
+                        std::process::exit(run_exit_trap(env, res));
                     }
                     Ok(ForkResult::Parent { child }) => Ok(wait_for_status(child)),
                     Err(e) => Err(ShellError::ExecutionError(format!(
