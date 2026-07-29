@@ -251,14 +251,11 @@ fn heredoc_body(content: &str) -> Result<File> {
 
 /// An empty read/write file with no name in the filesystem, so nothing has to clean it up.
 fn anonymous_file() -> Result<File> {
-    #[cfg(any(target_os = "linux", target_os = "android"))]
-    {
-        use nix::sys::memfd::{MemFdCreateFlag, memfd_create};
-        // ENOSYS below Linux 3.17, and blocked by some seccomp policies; fall back rather than
-        // making heredocs a kernel-version feature.
-        if let Ok(fd) = memfd_create(c"rush-heredoc", MemFdCreateFlag::MFD_CLOEXEC) {
-            return Ok(File::from(fd));
-        }
+    use nix::sys::memfd::{MemFdCreateFlag, memfd_create};
+    // ENOSYS below Linux 3.17, and blocked by some seccomp policies; fall back rather than making
+    // heredocs a kernel-version feature.
+    if let Ok(fd) = memfd_create(c"rush-heredoc", MemFdCreateFlag::MFD_CLOEXEC) {
+        return Ok(File::from(fd));
     }
     unlinked_temp_file()
 }

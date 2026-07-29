@@ -466,11 +466,10 @@ mod tests {
 
     /// The nesting limit exists to keep a hostile expression from overflowing the stack, so the
     /// limit itself has to fit on a stack rush might actually get. A 1 MiB thread is half what
-    /// Rust gives a spawned thread by default, which leaves room for the larger frames aarch64
-    /// emits — the platform where the original limit of 100 aborted the process.
+    /// Rust gives a spawned thread by default, so the limit holds with room to spare.
     ///
-    /// Without this, the invariant was only ever checked against whatever stack the test runner
-    /// happened to provide, which is how it passed on Linux and killed the macOS job.
+    /// Without this the invariant was only ever checked against whatever stack the test runner
+    /// happened to provide, which is exactly how a limit of 100 shipped while overflowing.
     #[test]
     fn nesting_at_the_limit_fits_a_small_stack() {
         let worker = std::thread::Builder::new()

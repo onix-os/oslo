@@ -14,17 +14,9 @@ use std::time::{Duration, Instant};
 
 /// The kernel reports the ignored-signal set as a hex bitmask in `/proc/self/status`.
 ///
-/// The *behaviour* under test — a child starting life with the dispositions the shell had, rather
-/// than the defaults — is not Linux-specific, but this way of observing it is: nothing on macOS
-/// exposes another process's ignored-signal mask to a shell script. The tests that read it are
-/// gated to Linux, deliberately and visibly. `a_writer_to_a_closed_pipe_dies_quietly` covers the
-/// load-bearing half of the same guarantee on every platform, by watching what SIGPIPE actually
-/// does rather than by reading a mask.
-///
 /// Anything non-zero here is a disposition the child did not ask for and cannot see: the Rust
 /// runtime's `SIG_IGN` for SIGPIPE (bit 13, `0x1000`), and — in the REPL — the shell's own
 /// `SIG_IGN` for SIGTSTP/SIGTTIN/SIGTTOU. bash leaves this field at zero.
-#[cfg(target_os = "linux")]
 fn sig_ign_mask(script: &str) -> u64 {
     let r = run(script);
     let line = r
@@ -38,7 +30,6 @@ fn sig_ign_mask(script: &str) -> u64 {
 }
 
 #[test]
-#[cfg(target_os = "linux")] // reads /proc/self/status; see sig_ign_mask
 fn an_exec_ed_child_ignores_nothing() {
     assert_eq!(sig_ign_mask("grep SigIgn /proc/self/status"), 0);
 }
@@ -46,7 +37,6 @@ fn an_exec_ed_child_ignores_nothing() {
 /// A pipeline stage forks twice — once for the stage, once for the command — so it is the path
 /// most likely to lose the reset.
 #[test]
-#[cfg(target_os = "linux")] // reads /proc/self/status; see sig_ign_mask
 fn a_pipeline_stage_ignores_nothing() {
     assert_eq!(sig_ign_mask("cat /proc/self/status | grep SigIgn"), 0);
 }
@@ -107,8 +97,7 @@ fn a_stopped_child_does_not_wedge_the_shell() {
     }
 
     assert!(!wedged, "the shell blocked on a stopped child");
-    // 128 + SIGSTOP, the status a shell reports for a job it left suspended. SIGSTOP is 19 on
-    // Linux and 17 on macOS, so the number is computed rather than written out.
+    // 128 + SIGSTOP, the status a shell reports for a job it left suspended.
     let stopped = 128 + nix::sys::signal::Signal::SIGSTOP as i32;
     assert!(
         stdout.contains(&format!("s={stopped}")),
@@ -119,7 +108,6 @@ fn a_stopped_child_does_not_wedge_the_shell() {
 
 /// A blocked signal survives `exec` too, so the mask has to be cleared as well as the handlers.
 #[test]
-#[cfg(target_os = "linux")] // reads /proc/self/status; see sig_ign_mask
 fn an_exec_ed_child_blocks_nothing() {
     let r = run("grep SigBlk /proc/self/status");
     let hex = r

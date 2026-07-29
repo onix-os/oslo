@@ -1,7 +1,7 @@
 SHELL := /bin/bash
 
 # Delegated to a script on purpose — see the comment at the top of it. Parsing PROJECT inline here
-# needs a literal `#`, and GNU Make 3.81 (what macOS ships) mis-parses that inside $(shell ...).
+# needs a literal `#`, which older GNU Make mis-parses inside $(shell ...).
 PROJECT_META := $(shell $(CURDIR)/scripts/project-meta.sh)
 PROJECT_NAME := $(word 1,$(PROJECT_META))
 PROJECT_VERSION := $(word 2,$(PROJECT_META))

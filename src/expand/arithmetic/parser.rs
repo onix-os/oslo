@@ -15,11 +15,10 @@ use crate::expand::arithmetic::lexer::{CompoundOp, Token};
 ///
 /// The number is measured, not guessed. One nesting level does not cost one frame — it descends
 /// the whole precedence chain — which works out to roughly 20 KiB of stack per level in a debug
-/// build on x86_64, and appreciably more on aarch64. The first limit here was 100, which fits
-/// Linux's 2 MiB test-thread stack and does *not* fit macOS's, so the guard against crashing
-/// crashed on one platform of the release matrix. 32 leaves margin on the smallest stack rush
-/// runs on and is still far past anything a human writes; `nesting_at_the_limit_fits_a_small_stack`
-/// is what keeps that true.
+/// build. The first limit here was 100, which needs over 2 MiB and so overflowed a spawned
+/// thread's default stack: the guard against crashing crashed. 32 leaves margin on the smallest
+/// stack rush is likely to get and is still far past anything a human writes;
+/// `nesting_at_the_limit_fits_a_small_stack` is what keeps that true.
 const MAX_DEPTH: usize = 32;
 
 fn too_deep() -> ShellError {

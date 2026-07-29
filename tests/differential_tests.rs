@@ -61,7 +61,7 @@ struct Case {
     script: String,
     /// Lowest bash `(major, minor)` that arbitrates this case, from a `# needs-bash: 5.3` header.
     ///
-    /// Bash is a moving specification, not a fixed one: three of its behaviours changed between
+    /// Bash is a moving specification, not a fixed one: four of its behaviours changed between
     /// 5.2 and 5.3, and rush follows the newer answer. Running those cases against an older oracle
     /// compares rush to a bash that has since been corrected, so the case is skipped and counted
     /// rather than reported as a rush defect. This is deliberately *not* a third escape hatch
@@ -308,9 +308,9 @@ fn run_all(cases: &[Case]) -> Vec<(String, Verdict)> {
 /// The oracle's `(major, minor)`, asserting it is new enough to arbitrate anything at all.
 ///
 /// The corpus uses constructs bash grew in 4.x (`${v^^}`, `&>`), so an ancient oracle would
-/// report differences that say nothing about rush. macOS ships bash 3.2 for licensing reasons —
-/// fail with the reason rather than with 40 mystery divergences. The minor version matters too:
-/// it decides which cases carry a `# needs-bash:` line this runner cannot honour.
+/// report differences that say nothing about rush — so fail with the reason rather than with 40
+/// mystery divergences. The minor version matters too: it decides which cases carry a
+/// `# needs-bash:` line this runner cannot honour.
 fn oracle_version() -> (u32, u32) {
     let out = Command::new("bash")
         .args(["-c", "echo ${BASH_VERSINFO[0]}.${BASH_VERSINFO[1]}"])
@@ -326,7 +326,7 @@ fn oracle_version() -> (u32, u32) {
     assert!(
         major >= 4,
         "the oracle must be bash 4 or newer (found {major}.{minor}); \
-         on macOS install a current bash and put it ahead of /bin/bash on PATH"
+         install a current bash and put it ahead of the old one on PATH"
     );
     (major, minor)
 }

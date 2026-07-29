@@ -9,16 +9,13 @@ permissions:
   contents: read
 
 jobs:
-  # Releases ship macOS binaries, so macOS has to be a gate and not a surprise. The toolchain
-  # action is pinned to an exact stable release: `@stable` silently moves under us, which turns
-  # a new lint into a red build on an unrelated PR.
+  # rush targets Linux, and only Linux. There is no macOS job because there is no macOS support to
+  # protect: the shell uses /proc, memfd and Linux signal numbers directly rather than routing
+  # around them. The toolchain action is pinned to an exact stable release: `@stable` silently
+  # moves under us, which turns a new lint into a red build on an unrelated PR.
   verify:
-    name: verify (${{ matrix.os }})
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, macos-latest]
+    name: verify
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@1.94.0
@@ -36,14 +33,6 @@ jobs:
       # `make verify` as one step reports only "the gate failed". Splitting it means the run
       # summary alone names the stage, which matters because reading job logs needs admin rights
       # on this repository and the person debugging a red build usually does not have them.
-      # The differential corpus is only as good as its oracle, and macOS ships bash 3.2 for
-      # licensing reasons — old enough that the suite refuses to run against it. Homebrew's bash
-      # is current, so put it ahead of /bin/bash rather than letting the whole corpus go untested.
-      - name: Use a current bash as the oracle (macOS)
-        if: runner.os == 'macOS'
-        run: |
-          brew list bash >/dev/null 2>&1 || brew install bash
-          echo "$(brew --prefix)/bin" >> "$GITHUB_PATH"
       - name: Toolchain and environment
         run: |
           echo "make:  $(make --version | head -1)"

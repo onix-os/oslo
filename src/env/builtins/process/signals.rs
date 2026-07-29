@@ -57,18 +57,9 @@ pub fn all() -> Vec<(i32, String)> {
     out
 }
 
-/// Realtime signals exist on Linux only; elsewhere the range is empty and the names never match.
-#[cfg(any(target_os = "linux", target_os = "android"))]
+/// The kernel's realtime signal range, which `kill -l` numbers and names.
 fn realtime_range() -> std::ops::RangeInclusive<i32> {
     nix::libc::SIGRTMIN()..=nix::libc::SIGRTMAX()
-}
-
-#[cfg(not(any(target_os = "linux", target_os = "android")))]
-fn realtime_range() -> std::ops::RangeInclusive<i32> {
-    #[allow(clippy::reversed_empty_ranges)]
-    {
-        1..=0
-    }
 }
 
 /// `RTMIN`, `RTMAX`, `RTMIN+n` and `RTMAX-n`, the spelling `kill -l` prints and accepts back.
@@ -161,7 +152,6 @@ mod tests {
         assert_eq!(parse_spec("NOSUCHSIG"), None);
     }
 
-    #[cfg(any(target_os = "linux", target_os = "android"))]
     #[test]
     fn realtime_names_match_the_kernel_range() {
         let min = nix::libc::SIGRTMIN();

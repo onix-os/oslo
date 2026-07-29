@@ -210,8 +210,8 @@ fn host_name() -> String {
     {
         return name;
     }
-    // `gethostname(2)`, not /proc/sys/kernel/hostname: the file is Linux's, so every macOS prompt
-    // fell through to the "localhost" placeholder no matter what the machine was called.
+    // `gethostname(2)` rather than /proc/sys/kernel/hostname: one syscall, no file to read and
+    // no trailing newline to remember to strip.
     nix::unistd::gethostname()
         .ok()
         .and_then(|n| n.into_string().ok())

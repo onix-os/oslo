@@ -1,17 +1,15 @@
 //! `ulimit` — report and change the resource limits the shell is running under.
 //!
-//! Both directions go through `getrlimit(2)`/`setrlimit(2)`. Reading used to parse
-//! `/proc/self/limits` instead — the same data, but only on Linux, so every `ulimit` query on
-//! macOS reported "cannot read this process's resource limits" while `ulimit -n 128` beside it
-//! silently succeeded. Values are converted into the units every shell's `ulimit` reports in:
-//! 512-byte blocks for file sizes, kilobytes for memory sizes, plain counts for everything else.
+//! Both directions go through `getrlimit(2)`/`setrlimit(2)`, reached via `nix`'s `resource`
+//! feature. Reading used to parse `/proc/self/limits` by hand instead — the same numbers, at the
+//! cost of a text format to keep in step with the kernel.
 //!
-//! Setting goes through `setrlimit(2)`, reached via `nix`'s `resource` feature. Not every limit
-//! exists on every system — `RLIMIT_NICE` and `RLIMIT_MSGQUEUE` are Linux's, not POSIX's — so
-//! [`resource_for`] answers `None` where the platform has no such limit and the builtin says so
-//! rather than pretending the limit was applied. That distinction is the whole reason this
-//! builtin refused the set direction outright before it could implement it: a script told it has
-//! headroom it does not have will happily open the files it cannot open.
+//! Values are converted into the units every shell's `ulimit` reports in: 512-byte blocks for file
+//! sizes, kilobytes for memory sizes, plain counts for everything else.
+//!
+//! A limit that cannot be applied is reported rather than passed over in silence: a script told it
+//! has headroom it does not have will happily open the files it cannot open, which is why this
+//! builtin refused the set direction outright until it could implement it.
 
 use crate::env::scope::Environment;
 use crate::error::Result;
@@ -117,8 +115,8 @@ pub fn builtin_ulimit(_env: &mut Environment, args: &[String]) -> Result<i32> {
 
     let hard = which.reports_hard();
 
-    // `-a` reports what this system actually has: a limit the platform does not define is skipped
-    // rather than printed as an error, so the listing stays a listing.
+    // A limit the kernel will not report is skipped rather than printed as an error, so the
+    // listing stays a listing.
     if all {
         for limit in LIMITS {
             match report(limit, hard) {
@@ -138,7 +136,7 @@ pub fn builtin_ulimit(_env: &mut Environment, args: &[String]) -> Result<i32> {
         match report(limit, hard) {
             Some(value) => println!("{}", value),
             None => {
-                eprintln!("rush: ulimit: -{}: no such limit on this system", flag);
+                eprintln!("rush: ulimit: -{}: cannot read this limit", flag);
                 status = 1;
             }
         }
@@ -146,41 +144,30 @@ pub fn builtin_ulimit(_env: &mut Environment, args: &[String]) -> Result<i32> {
     Ok(status)
 }
 
-/// The `getrlimit`/`setrlimit` resource a flag selects, or `None` where this system has no such
-/// limit.
+/// The `getrlimit`/`setrlimit` resource a flag selects.
 ///
-/// Six of these are Linux's own. Naming them unconditionally would not compile on macOS, which
-/// the release matrix builds; answering `None` there is what turns "this system has no such
-/// limit" into a diagnostic instead of a lie.
+/// Every flag in [`LIMITS`] maps, so an unknown one is a bug in that table rather than a property
+/// of the machine — the option parser has already rejected anything not in it.
 #[rustfmt::skip]
-fn resource_for(flag: char) -> Option<Resource> {
-    Some(match flag {
+fn resource_for(flag: char) -> Resource {
+    match flag {
         'c' => Resource::RLIMIT_CORE,
         'd' => Resource::RLIMIT_DATA,
+        'e' => Resource::RLIMIT_NICE,
         'f' => Resource::RLIMIT_FSIZE,
+        'i' => Resource::RLIMIT_SIGPENDING,
+        'l' => Resource::RLIMIT_MEMLOCK,
+        'm' => Resource::RLIMIT_RSS,
         'n' => Resource::RLIMIT_NOFILE,
+        'q' => Resource::RLIMIT_MSGQUEUE,
+        'r' => Resource::RLIMIT_RTPRIO,
         's' => Resource::RLIMIT_STACK,
         't' => Resource::RLIMIT_CPU,
-        #[cfg(not(any(target_os = "freebsd", target_os = "netbsd", target_os = "openbsd")))]
-        'v' => Resource::RLIMIT_AS,
-        #[cfg(any(target_os = "linux", target_os = "android"))]
-        'e' => Resource::RLIMIT_NICE,
-        #[cfg(any(target_os = "linux", target_os = "android"))]
-        'i' => Resource::RLIMIT_SIGPENDING,
-        #[cfg(any(target_os = "linux", target_os = "android"))]
-        'l' => Resource::RLIMIT_MEMLOCK,
-        #[cfg(any(target_os = "linux", target_os = "android"))]
-        'm' => Resource::RLIMIT_RSS,
-        #[cfg(any(target_os = "linux", target_os = "android"))]
-        'q' => Resource::RLIMIT_MSGQUEUE,
-        #[cfg(any(target_os = "linux", target_os = "android"))]
-        'r' => Resource::RLIMIT_RTPRIO,
-        #[cfg(any(target_os = "linux", target_os = "android"))]
         'u' => Resource::RLIMIT_NPROC,
-        #[cfg(any(target_os = "linux", target_os = "android"))]
+        'v' => Resource::RLIMIT_AS,
         'x' => Resource::RLIMIT_LOCKS,
-        _ => return None,
-    })
+        other => unreachable!("ulimit -{other} is not in the LIMITS table"),
+    }
 }
 
 /// What a `ulimit` operand means, in the units the flag is reported in.
@@ -216,11 +203,7 @@ fn set_one(flag: char, operand: &str, which: Which) -> i32 {
         .iter()
         .find(|l| l.flag == flag)
         .expect("the option run only accepts flags from the table");
-    let Some(resource) = resource_for(flag) else {
-        eprintln!("rush: ulimit: -{}: no such limit on this system", flag);
-        return 1;
-    };
-    let Ok((soft, hard)) = getrlimit(resource) else {
+    let Ok((soft, hard)) = getrlimit(resource_for(flag)) else {
         eprintln!("rush: ulimit: -{}: cannot read the current limit", flag);
         return 1;
     };
@@ -248,7 +231,7 @@ fn set_one(flag: char, operand: &str, which: Which) -> i32 {
         Which::Hard => (soft, value),
         Which::Both => (value, value),
     };
-    match setrlimit(resource, new_soft, new_hard) {
+    match setrlimit(resource_for(flag), new_soft, new_hard) {
         Ok(()) => 0,
         Err(errno) => {
             eprintln!(
@@ -260,12 +243,10 @@ fn set_one(flag: char, operand: &str, which: Which) -> i32 {
     }
 }
 
-/// Read one limit and convert it to `ulimit`'s units, or `None` where the platform has no such
-/// limit — which is the same answer [`resource_for`] gives the set direction, so a flag cannot be
-/// reportable and unsettable or the reverse.
+/// Read one limit and convert it to `ulimit`'s units, or `None` if the kernel refuses to report
+/// it at all.
 fn report(limit: &Limit, hard: bool) -> Option<String> {
-    let resource = resource_for(limit.flag)?;
-    let (soft_value, hard_value) = getrlimit(resource).ok()?;
+    let (soft_value, hard_value) = getrlimit(resource_for(limit.flag)).ok()?;
     let value = if hard { hard_value } else { soft_value };
     Some(format_limit(value, limit.divisor))
 }
@@ -286,7 +267,7 @@ fn format_limit(value: rlim_t, divisor: u64) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::{LIMITS, builtin_ulimit, format_limit, report, resource_for};
+    use super::{LIMITS, builtin_ulimit, format_limit, report};
     use crate::env::Environment;
     use nix::sys::resource::RLIM_INFINITY;
 
@@ -305,19 +286,16 @@ mod tests {
         assert_eq!(format_limit(RLIM_INFINITY, 1024), "unlimited");
     }
 
-    /// The six POSIX limits have to exist everywhere rush builds. This is what stops a query path
-    /// from being silently unavailable on one platform — which is exactly how the `/proc`-based
-    /// reader this replaced went unnoticed until CI ran on macOS.
+    /// Every flag in the table has to be readable through the same path a script uses. The
+    /// `/proc`-based reader this replaced answered for only some of them and said nothing about
+    /// the rest.
     #[test]
-    fn the_posix_limits_are_readable_on_every_platform() {
-        for flag in ['c', 'd', 'f', 'n', 's', 't'] {
+    fn every_listed_limit_is_readable() {
+        for limit in LIMITS {
             assert!(
-                resource_for(flag).is_some(),
-                "-{flag} has no resource on this platform"
-            );
-            assert!(
-                report(limit_for(flag), false).is_some(),
-                "-{flag} could not be read on this platform"
+                report(limit, false).is_some(),
+                "-{} could not be read",
+                limit.flag
             );
         }
     }

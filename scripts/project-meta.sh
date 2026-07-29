@@ -2,11 +2,10 @@
 # Prints the project name and version from the PROJECT file, one per line.
 #
 # This lives in a script rather than inline in the Makefile because the parsing needs a `#` (to
-# skip comment lines), and GNU Make 3.81 — which is what macOS ships, and what CI therefore runs —
-# treats a `#` inside `$(shell ...)` as the start of a Make comment. It truncates the call and
-# reports `unterminated call to function 'shell': missing ')'`, which fires for *every* target and
-# looks like the whole gate failing for no stated reason. Make 4.x parses the same line correctly,
-# so the bug is invisible on Linux.
+# skip comment lines), and GNU Make 3.81 treats a `#` inside `$(shell ...)` as the start of a Make
+# comment. It truncates the call and reports `unterminated call to function 'shell': missing ')'`,
+# which fires for *every* target and looks like the whole gate failing for no stated reason.
+# Make 4.x parses the same line correctly, so the bug only shows on an old make.
 #
 # Format of PROJECT: name on the first content line, version on the second. Blank lines, `#`
 # comments, and `[section]` headers are ignored.

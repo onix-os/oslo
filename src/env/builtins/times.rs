@@ -2,11 +2,10 @@
 //!
 //! Two lines, `user system`: the shell's own times first, its waited-for children's second.
 //!
-//! The numbers come from `getrusage(2)`, which is what `times(2)` is built on and is available
-//! everywhere rush runs. They used to come from `/proc/self/stat`, parsed by hand — the same
-//! numbers on Linux and nothing at all on macOS, where the builtin quietly printed four zeroes.
-//! That was defensible only while `nix`'s `resource` feature was off; `ulimit` turned it on, so
-//! the reason for the workaround outlived the workaround itself.
+//! The numbers come from `getrusage(2)`, which is what `times(2)` is built on. They used to come
+//! from `/proc/self/stat`, parsed by hand, because `nix` only exposes the call behind a feature
+//! this crate did not enable — `ulimit` turned that feature on, so the reason for the workaround
+//! outlived the workaround itself.
 
 use crate::env::scope::Environment;
 use crate::error::Result;
@@ -60,9 +59,7 @@ mod tests {
         assert_eq!(format_seconds(61.5), "1m1.500s");
     }
 
-    /// The real clock, on every platform rush builds for — not just the one with `/proc`. The
-    /// `#[cfg(target_os = "linux")]` this replaces is what let the macOS build ship a `times`
-    /// that always printed zeroes.
+    /// The real clock, through the same call the builtin uses.
     #[test]
     fn the_running_process_reports_its_own_times() {
         let t = cpu_times().expect("getrusage must work on this platform");

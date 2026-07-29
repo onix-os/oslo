@@ -6,12 +6,10 @@
 //! up in*, and whether the shell ever collects the children it started. Both are readable from an
 //! ordinary `rush -c` run.
 //!
-//! Everything here goes through `ps -o pgid=` / `ps -o ppid=,stat=` rather than `/proc`. That is
-//! not a stylistic preference. These tests originally read `/proc/<pid>/stat`, which does not
-//! exist on macOS — so on that half of the release matrix `awk` printed nothing, the comparisons
-//! became `"" == ""`, and three of them *passed while measuring nothing at all*. A test that
-//! cannot fail is worse than an absent one, so each test below also asserts that its probe
-//! returned data before drawing any conclusion from it.
+//! Every test here asserts that its probe returned data before drawing a conclusion from it.
+//! That is not defensive padding: when these read `/proc/<pid>/stat` on a machine that had no
+//! `/proc`, `awk` printed nothing, the comparisons became `"" == ""`, and three of them passed
+//! while measuring nothing at all. A test that cannot fail is worse than an absent one.
 //!
 //! A process cannot report its own group through the shell's `$$` (that is the shell's group, not
 //! the child's), so where a *child's* group is the subject the script runs `sh -c 'ps -o pgid= -p
@@ -77,7 +75,7 @@ fn child_states(stdout: &str) -> impl Iterator<Item = &str> {
 
 /// The zombie tests keep one `sleep` alive precisely so the probe has something to find. If it
 /// finds nothing, `ps` or `awk` did not work here and a count of zero zombies means nothing —
-/// which is how these two passed on macOS while measuring nothing.
+/// which is how these two once passed while measuring nothing.
 fn assert_child_states_were_observed(stdout: &str, stderr: &str) {
     assert!(
         child_states(stdout).next().is_some(),
@@ -189,8 +187,8 @@ fn pipeline_stages_stay_in_the_shells_group_without_job_control() {
 /// it — the precondition for everything `wait`, `jobs` and `kill %n` do.
 #[test]
 fn the_background_pid_names_a_live_process() {
-    // `kill -0` is the portable "does this pid exist" question; `/proc/$!` only answers it on
-    // Linux, and answered "no" on macOS for a job that was very much alive.
+    // `kill -0` asks the kernel directly whether the pid exists, which is the question; testing
+    // for `/proc/$!` asks whether procfs is mounted as well.
     let r = run(r#"sleep 5 &
            bg=$!
            kill -0 $bg && echo alive
