@@ -110,6 +110,7 @@ calling script, such as an empty builtin name.
 ### Configuration
 
 `~/.config/oslo/init.lua` is loaded at startup.
+
 ## Interactive
 
 Syntax highlighting (valid commands green, unknown red), history hints, a completion dropdown
