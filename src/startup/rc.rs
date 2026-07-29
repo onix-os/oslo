@@ -210,9 +210,14 @@ fn host_name() -> String {
     {
         return name;
     }
-    std::fs::read_to_string("/proc/sys/kernel/hostname")
-        .map(|s| s.trim().to_string())
-        .unwrap_or_else(|_| "localhost".to_string())
+    // `gethostname(2)`, not /proc/sys/kernel/hostname: the file is Linux's, so every macOS prompt
+    // fell through to the "localhost" placeholder no matter what the machine was called.
+    nix::unistd::gethostname()
+        .ok()
+        .and_then(|n| n.into_string().ok())
+        .map(|n| n.trim().to_string())
+        .filter(|n| !n.is_empty())
+        .unwrap_or_else(|| "localhost".to_string())
 }
 
 /// The working directory with `$HOME` written as `~`, as every prompt shows it.

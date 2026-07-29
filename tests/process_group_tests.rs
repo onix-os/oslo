@@ -3,12 +3,20 @@
 //! R7.1 and R7.4. Everything the terminal arbitrates — `tcsetpgrp`, Ctrl-C reaching only the
 //! foreground job, Ctrl-Z parking one — needs a controlling terminal and is verified by hand.
 //! What survives without one is still the load-bearing half: *which process group each child ends
-//! up in*, and whether the shell ever collects the children it started. Both are readable out of
-//! `/proc` from an ordinary `rush -c` run.
+//! up in*, and whether the shell ever collects the children it started. Both are readable from an
+//! ordinary `rush -c` run.
 //!
-//! The field numbers come from `proc(5)`: field 1 of `/proc/<pid>/stat` is the pid, field 5 is
-//! the process group. `comm` (field 2) can contain spaces and parentheses, which is why every
-//! test here reads the fields with `awk` rather than splitting the line itself.
+//! Everything here goes through `ps -o pgid=` / `ps -o ppid=,stat=` rather than `/proc`. That is
+//! not a stylistic preference. These tests originally read `/proc/<pid>/stat`, which does not
+//! exist on macOS — so on that half of the release matrix `awk` printed nothing, the comparisons
+//! became `"" == ""`, and three of them *passed while measuring nothing at all*. A test that
+//! cannot fail is worse than an absent one, so each test below also asserts that its probe
+//! returned data before drawing any conclusion from it.
+//!
+//! A process cannot report its own group through the shell's `$$` (that is the shell's group, not
+//! the child's), so where a *child's* group is the subject the script runs `sh -c 'ps -o pgid= -p
+//! $$'` — an external command reporting on itself, which is exactly the process whose placement
+//! is in question.
 
 mod common;
 
@@ -22,15 +30,17 @@ use std::process::{Command, Stdio};
 /// reaping is opportunistic and happens at command boundaries.
 #[test]
 fn background_jobs_leave_no_zombies() {
-    let r = run("for i in 1 2 3 4 5 6 7 8 9 10; do sleep 0 & done
+    let r = run("sleep 5 &
+         keep=$!
+         for i in 1 2 3 4 5 6 7 8 9 10; do sleep 0 & done
          sleep 0.4
          :
          :
-         ps -o stat= --ppid $$");
-    let zombies = r
-        .stdout
-        .lines()
-        .filter(|l| l.trim().starts_with('Z'))
+         ps -A -o ppid=,stat= | awk -v p=$$ '$1 == p { print $2 }'
+         kill $keep");
+    assert_child_states_were_observed(&r.stdout, &r.stderr);
+    let zombies = child_states(&r.stdout)
+        .filter(|s| s.starts_with('Z'))
         .count();
     assert_eq!(
         zombies, 0,
@@ -42,16 +52,38 @@ fn background_jobs_leave_no_zombies() {
 /// The same, at a scale that would be obvious in `ps`: twenty jobs, none of them left behind.
 #[test]
 fn twenty_background_jobs_are_all_collected() {
-    let r = run("i=0
+    let r = run("sleep 5 &
+         keep=$!
+         i=0
          while [ $i -lt 20 ]; do
              sleep 0 &
              i=$((i + 1))
          done
          sleep 0.5
          :
-         ps -o stat= --ppid $$ | grep -c Z");
-    // `grep -c` prints 0 and exits 1 when nothing matches, which is the healthy outcome.
-    assert_eq!(r.out(), "0", "stderr: {}", r.stderr);
+         ps -A -o ppid=,stat= | awk -v p=$$ '$1 == p { print $2 }'
+         kill $keep");
+    assert_child_states_were_observed(&r.stdout, &r.stderr);
+    let zombies = child_states(&r.stdout)
+        .filter(|s| s.starts_with('Z'))
+        .count();
+    assert_eq!(zombies, 0, "twenty background jobs left {zombies} behind");
+}
+
+/// The `ps | awk` probe reports one line per child of the shell.
+fn child_states(stdout: &str) -> impl Iterator<Item = &str> {
+    stdout.lines().map(str::trim).filter(|l| !l.is_empty())
+}
+
+/// The zombie tests keep one `sleep` alive precisely so the probe has something to find. If it
+/// finds nothing, `ps` or `awk` did not work here and a count of zero zombies means nothing —
+/// which is how these two passed on macOS while measuring nothing.
+fn assert_child_states_were_observed(stdout: &str, stderr: &str) {
+    assert!(
+        child_states(stdout).next().is_some(),
+        "the ps/awk probe listed no children at all, so it cannot show the absence of zombies; \
+         stderr: {stderr}"
+    );
 }
 
 /// R7.1: a background job leads a process group of its own, so a signal aimed at it — or at the
@@ -63,11 +95,19 @@ fn twenty_background_jobs_are_all_collected() {
 fn a_background_job_leads_its_own_process_group() {
     let r = run(r#"sleep 5 &
            bg=$!
-           awk '{ print $1, $5 }' /proc/$bg/stat
+           ps -o pid=,pgid= -p $bg
            kill $bg"#);
     let mut fields = r.out().split_whitespace();
-    let pid: i32 = fields.next().expect("pid").parse().expect("numeric pid");
-    let pgrp: i32 = fields.next().expect("pgrp").parse().expect("numeric pgrp");
+    let pid: i32 = fields
+        .next()
+        .unwrap_or_else(|| panic!("ps reported no pid; stderr: {}", r.stderr))
+        .parse()
+        .expect("numeric pid");
+    let pgrp: i32 = fields
+        .next()
+        .unwrap_or_else(|| panic!("ps reported no pgid; stderr: {}", r.stderr))
+        .parse()
+        .expect("numeric pgrp");
     assert_eq!(
         pid, pgrp,
         "a background job must lead its own group, got pid {pid} in group {pgrp}"
@@ -79,7 +119,8 @@ fn a_background_job_leads_its_own_process_group() {
 fn two_background_jobs_do_not_share_a_group() {
     let r = run(r#"sleep 5 & a=$!
            sleep 5 & b=$!
-           awk '{ print $5 }' /proc/$a/stat /proc/$b/stat
+           ps -o pgid= -p $a
+           ps -o pgid= -p $b
            kill $a $b"#);
     let groups: Vec<&str> = r.out().split_whitespace().collect();
     assert_eq!(groups.len(), 2, "expected two groups, got: {}", r.out());
@@ -94,7 +135,8 @@ fn two_background_jobs_do_not_share_a_group() {
 /// per job are an interactive shell's business — which is why a script's behaviour is unchanged.
 #[test]
 fn a_foreground_command_stays_in_the_shells_group_without_job_control() {
-    let script = r#"awk '{ print $5 }' /proc/self/stat"#;
+    // An external command reporting its *own* group — the process whose placement is the subject.
+    let script = r#"sh -c 'ps -o pgid= -p $$'"#;
     let output = Command::new(rush_bin())
         .arg("-c")
         .arg(script)
@@ -107,12 +149,17 @@ fn a_foreground_command_stays_in_the_shells_group_without_job_control() {
     // invocation style.
     let own = Command::new(rush_bin())
         .arg("-c")
-        .arg(r#"awk '{ print $5 }' /proc/$$/stat"#)
+        .arg(r#"ps -o pgid= -p $$"#)
         .stdin(Stdio::null())
         .output()
         .expect("spawn rush");
     let shell_pgrp = String::from_utf8_lossy(&own.stdout).trim().to_string();
 
+    assert!(
+        !child_pgrp.is_empty() && !shell_pgrp.is_empty(),
+        "ps reported no group (child {child_pgrp:?}, shell {shell_pgrp:?}); \
+         comparing two empty strings would pass while testing nothing"
+    );
     assert_eq!(
         child_pgrp, shell_pgrp,
         "a foreground command was moved out of the shell's process group with job control off"
@@ -123,9 +170,15 @@ fn a_foreground_command_stays_in_the_shells_group_without_job_control() {
 /// terminal signal still reaches all of them.
 #[test]
 fn pipeline_stages_stay_in_the_shells_group_without_job_control() {
-    let r = run(r#"awk '{ print $5 }' /proc/self/stat | cat; awk '{ print $5 }' /proc/$$/stat"#);
-    let lines: Vec<&str> = r.out().lines().collect();
-    assert_eq!(lines.len(), 2, "expected two pgids, got {}", r.out());
+    let r = run(r#"sh -c 'ps -o pgid= -p $$' | cat; ps -o pgid= -p $$"#);
+    let lines: Vec<&str> = r.out().lines().map(str::trim).collect();
+    assert_eq!(
+        lines.len(),
+        2,
+        "expected two pgids, got {:?}; stderr: {}",
+        r.out(),
+        r.stderr
+    );
     assert_eq!(
         lines[0], lines[1],
         "a pipeline stage left the shell's group"
@@ -136,8 +189,11 @@ fn pipeline_stages_stay_in_the_shells_group_without_job_control() {
 /// it — the precondition for everything `wait`, `jobs` and `kill %n` do.
 #[test]
 fn the_background_pid_names_a_live_process() {
+    // `kill -0` is the portable "does this pid exist" question; `/proc/$!` only answers it on
+    // Linux, and answered "no" on macOS for a job that was very much alive.
     let r = run(r#"sleep 5 &
-           test -d /proc/$! && echo alive
-           kill $!"#);
+           bg=$!
+           kill -0 $bg && echo alive
+           kill $bg"#);
     assert_eq!(r.out(), "alive", "stderr: {}", r.stderr);
 }
