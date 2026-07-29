@@ -16,14 +16,14 @@ use common::{run, run_in};
 /// The reproduction from PLAN R1.1, in its current form.
 ///
 /// The original used `((x++))` as the unparseable line; R8.2 implemented it, so the trigger is
-/// now a process substitution — still a construct the adapter rejects, which is exactly what used
+/// now a `coproc` — still a construct the adapter rejects, which is exactly what used
 /// to reroute the whole script to the fallback parser and run the heredoc body as commands.
 #[test]
 fn a_heredoc_body_is_never_executed_when_the_script_fails_to_parse() {
     let dir = tempfile::tempdir().unwrap();
     let marker = dir.path().join("heredoc_executed_marker");
     let script = format!(
-        "cat <(echo x)\ncat <<EOF\ntouch {}\nEOF\n",
+        "coproc echo x\ncat <<EOF\ntouch {}\nEOF\n",
         marker.to_string_lossy()
     );
 
@@ -106,9 +106,6 @@ fn unsupported_constructs_are_named_in_the_diagnostic() {
         // R8.6: `select` is absent from brush's grammar, so without the source-text check this
         // would surface as "syntax error at line 1 col 8" — a diagnostic that reads like a typo.
         ("select x in a b; do echo $x; done", "select"),
-        // R8.4: the deleted-from-argv case. Refusing is step 1; `/dev/fd/N` is step 2.
-        ("cat <(echo hi)", "process substitution"),
-        ("cat > >(cat)", "process substitution"),
     ] {
         let r = run(script);
         assert_ne!(r.status, 0, "{script:?} must not succeed");
@@ -126,7 +123,7 @@ fn a_rejected_construct_stops_the_whole_script() {
     for script in [
         "select x in a b; do echo $x; done\necho NOT_REACHED",
         "coproc foo { true; }\necho NOT_REACHED",
-        "cat <(echo hi)\necho NOT_REACHED",
+        "coproc echo hi\necho NOT_REACHED",
     ] {
         let r = run(script);
         assert_ne!(r.status, 0, "{script:?}");

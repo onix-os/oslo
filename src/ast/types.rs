@@ -25,6 +25,17 @@ pub enum WordPart {
         expansion_type: ParamExpansion,
     },
     CommandSubstitution(String),
+    /// `<(cmd)` or `>(cmd)` — the command runs, and the word becomes a *filename* naming a pipe
+    /// connected to it.
+    ///
+    /// A word part rather than a redirection because that is what it is: `diff <(a) <(b)` passes
+    /// two ordinary arguments to `diff`, which opens them like files. The `bool` is whether the
+    /// shell reads from the command (`<`) or writes to it (`>`).
+    ProcessSubstitution {
+        /// True for `<(cmd)`: the substituted process writes, the caller reads.
+        reads_from_command: bool,
+        command: String,
+    },
     Arithmetic(String),
     Tilde(String),
 }

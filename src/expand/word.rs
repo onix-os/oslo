@@ -182,6 +182,16 @@ pub fn expand_word_part(
             expansion_type,
         } => expand_array_ref(env, name, subscript, expansion_type, in_quotes)?,
         WordPart::Arithmetic(expr) => single(eval_arithmetic(env, expr)?.to_string(), produced),
+        WordPart::ProcessSubstitution {
+            reads_from_command,
+            command,
+        } => {
+            // The path is an ordinary word from here on: it globs like one and splits like one,
+            // which is what lets `cat <(echo hi)` pass it as a plain argument.
+            let (path, handle) = crate::exec::procsub::open(env, command, *reads_from_command)?;
+            env.procsubs.push(handle);
+            single(path, produced)
+        }
         WordPart::CommandSubstitution(cmd) => {
             let output = crate::exec::eval_command_substitution(env, cmd)?;
             // Trailing newlines are stripped per POSIX.

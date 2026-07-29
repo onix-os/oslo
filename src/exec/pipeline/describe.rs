@@ -117,6 +117,10 @@ fn describe_part(part: &WordPart) -> String {
         WordPart::Variable { name, .. } => format!("${}", name),
         WordPart::ArrayRef { name, .. } => format!("${{{}[...]}}", name),
         WordPart::CommandSubstitution(text) => format!("$({})", text),
+        WordPart::ProcessSubstitution {
+            reads_from_command,
+            command,
+        } => format!("{}({command})", if *reads_from_command { '<' } else { '>' }),
         WordPart::Arithmetic(text) => format!("$(({}))", text),
         WordPart::Tilde(rest) => format!("~{}", rest),
     }

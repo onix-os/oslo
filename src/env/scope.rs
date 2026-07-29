@@ -65,6 +65,12 @@ pub struct Environment {
     /// Every builtin this shell has. The one list consulted by [`Self::is_builtin`], the
     /// dispatcher in `exec::simple` and `type`; see the `registry` submodule.
     builtins: BuiltinRegistry,
+    /// Process substitutions opened while expanding the command now being prepared.
+    ///
+    /// Lives here because the descriptor has to outlive *expansion* — the program opens
+    /// `/dev/fd/N` only once every word is expanded and the command runs — but must not outlive
+    /// the command. `crate::exec::simple` closes them when it is done.
+    pub procsubs: Vec<crate::exec::procsub::Substitution>,
     signal_traps: HashMap<String, String>,
     /// Traps this shell inherited and then reset because it is a subshell.
     ///
@@ -128,6 +134,7 @@ impl Environment {
             aliases,
             functions: HashMap::new(),
             builtins: BuiltinRegistry::default(),
+            procsubs: Vec::new(),
             signal_traps: HashMap::new(),
             inherited_traps: HashMap::new(),
             readonly_vars: HashSet::new(),

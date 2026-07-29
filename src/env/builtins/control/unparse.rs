@@ -344,6 +344,10 @@ fn format_part(part: &WordPart) -> String {
             }
         }
         WordPart::CommandSubstitution(src) => format!("$({src})"),
+        WordPart::ProcessSubstitution {
+            reads_from_command,
+            command,
+        } => format!("{}({command})", if *reads_from_command { '<' } else { '>' }),
         WordPart::Arithmetic(src) => format!("$(({src}))"),
         WordPart::Tilde(rest) => format!("~{rest}"),
     }

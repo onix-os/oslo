@@ -25,6 +25,18 @@ use crate::exec::simple::external::{Lookup, look_up_command, run_external};
 use crate::expand::{expand_word, expand_word_to_string};
 use crate::lexer::Lexer;
 pub(crate) fn eval_simple_command(env: &mut Environment, simple: &SimpleCommand) -> Result<i32> {
+    // Any `<(cmd)` in this command's words opens a pipe during expansion; it has to stay open
+    // until the command has run and be closed afterwards, whichever way the command ends. The
+    // wrapper is what guarantees the second half on the error paths too.
+    let result = eval_simple_command_inner(env, simple);
+    if !env.procsubs.is_empty() {
+        let mut open = std::mem::take(&mut env.procsubs);
+        crate::exec::procsub::finish(&mut open);
+    }
+    result
+}
+
+fn eval_simple_command_inner(env: &mut Environment, simple: &SimpleCommand) -> Result<i32> {
     // R6.5: a signal that arrived while the previous command ran is handled *between* commands,
     // where the trap body can run ordinary shell code. See `run_pending_traps`.
     crate::env::builtins::run_pending_traps(env)?;

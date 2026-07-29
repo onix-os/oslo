@@ -5,7 +5,7 @@
 
 use super::words::single_word;
 use crate::ast as oslo_ast;
-use crate::error::{Result, ShellError};
+use crate::error::Result;
 use crate::lexer::parse_heredoc_body;
 use brush_parser::ast;
 
@@ -40,10 +40,10 @@ pub(super) fn convert_redirect(redir: &ast::IoRedirect) -> Result<Vec<oslo_ast::
                 ast::IoFileRedirectTarget::Filename(w) => single_word(w)?,
                 ast::IoFileRedirectTarget::Duplicate(w) => single_word(w)?,
                 ast::IoFileRedirectTarget::Fd(n) => oslo_ast::Word::from_literal(&n.to_string()),
-                ast::IoFileRedirectTarget::ProcessSubstitution(..) => {
-                    return Err(ShellError::SyntaxError(
-                        "process substitution is not supported".to_string(),
-                    ));
+                // `cmd < <(other)`: the redirect target is the pipe's name, so this is the same
+                // word the argument form builds.
+                ast::IoFileRedirectTarget::ProcessSubstitution(kind, subshell) => {
+                    super::commands::convert_process_substitution(kind, subshell)
                 }
             };
 

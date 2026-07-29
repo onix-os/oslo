@@ -367,6 +367,10 @@ fn part(p: &WordPart, in_quotes: bool) -> String {
             expansion_type,
         ),
         WordPart::CommandSubstitution(s) => format!("$({})", s),
+        WordPart::ProcessSubstitution {
+            reads_from_command,
+            command,
+        } => format!("{}({command})", if *reads_from_command { '<' } else { '>' }),
         WordPart::Arithmetic(s) => format!("$(({}))", s),
         WordPart::Tilde(s) => format!("~{}", s),
     }

@@ -242,15 +242,22 @@ fn expr_text(expr: Option<&ast::UnexpandedArithmeticExpr>) -> Option<String> {
         .filter(|text| !text.trim().is_empty())
 }
 
-/// `<(cmd)` / `>(cmd)` used as a *word*.
+/// `<(cmd)` / `>(cmd)` used as a *word*, which is where it usually appears: `diff <(a) <(b)`
+/// passes two ordinary arguments that happen to name pipes.
 ///
-/// The same error the redirect-target form has always raised. Until this file returned it, a
-/// process substitution in argument position was deleted from argv and nothing said so: `cat
-/// <(echo hi)` ran `cat` with no arguments and exited 0, and `diff <(a) <(b)` reported a false
-/// success — a wrong answer with a passing status, which is the worst shape a shell bug can take.
-/// The `/dev/fd/N` implementation is deferred; refusing is what makes the gap visible.
-fn process_substitution_unsupported() -> ShellError {
-    ShellError::SyntaxError("process substitution is not supported".to_string())
+/// The body is carried as text and re-parsed when it runs, exactly as `$(cmd)` is. brush's own
+/// rendering wraps it in `( )`, which is right — a process substitution is a subshell.
+pub(super) fn convert_process_substitution(
+    kind: &ast::ProcessSubstitutionKind,
+    subshell: &ast::SubshellCommand,
+) -> oslo_ast::Word {
+    let rendered = subshell.list.to_string();
+    oslo_ast::Word {
+        parts: vec![oslo_ast::WordPart::ProcessSubstitution {
+            reads_from_command: matches!(kind, ast::ProcessSubstitutionKind::Read),
+            command: rendered,
+        }],
+    }
 }
 
 /// Convert `[[ ... ]]` into equivalent `test` commands.
@@ -283,8 +290,8 @@ pub(super) fn convert_simple_command(
                 ast::CommandPrefixOrSuffixItem::Word(w) => {
                     words.extend(convert_braced_word(w)?);
                 }
-                ast::CommandPrefixOrSuffixItem::ProcessSubstitution(..) => {
-                    return Err(process_substitution_unsupported());
+                ast::CommandPrefixOrSuffixItem::ProcessSubstitution(kind, subshell) => {
+                    words.push(convert_process_substitution(kind, subshell));
                 }
             }
         }
@@ -312,8 +319,8 @@ pub(super) fn convert_simple_command(
                 ast::CommandPrefixOrSuffixItem::IoRedirect(redir) => {
                     redirections.extend(convert_redirect(redir)?);
                 }
-                ast::CommandPrefixOrSuffixItem::ProcessSubstitution(..) => {
-                    return Err(process_substitution_unsupported());
+                ast::CommandPrefixOrSuffixItem::ProcessSubstitution(kind, subshell) => {
+                    words.push(convert_process_substitution(kind, subshell));
                 }
             }
         }

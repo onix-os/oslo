@@ -7,6 +7,7 @@
 pub mod compound;
 pub mod job;
 pub mod pipeline;
+pub mod procsub;
 pub mod redirect;
 pub mod simple;
 pub mod substitution;
