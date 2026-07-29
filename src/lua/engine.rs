@@ -227,10 +227,16 @@ impl LuaEngine {
 
     pub fn load_file(&self, path: &str) -> Result<()> {
         let content = std::fs::read_to_string(path)?;
-        // Named after the file, so a traceback out of `init.lua` — including one raised inside a
-        // builtin registered there — points at the user's script. Lua's default chunk name is the
-        // first line of the source, which for a chunk loaded from a string is the Rust call site.
-        self.eval_named(&content, &format!("@{}", path))
+        self.eval_as(&content, path)
+    }
+
+    /// Run Lua source under `name`.
+    ///
+    /// Naming the chunk is what makes a traceback out of `init.lua` — including one raised inside
+    /// a builtin registered there — point at the user's script. Lua's default chunk name is the
+    /// first line of the source, which for a chunk loaded from a string is the Rust call site.
+    pub fn eval_as(&self, source: &str, name: &str) -> Result<()> {
+        self.eval_named(source, &format!("@{}", name))
     }
 
     fn eval_named(&self, script: &str, chunk_name: &str) -> Result<()> {

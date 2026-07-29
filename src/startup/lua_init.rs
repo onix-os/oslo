@@ -54,12 +54,30 @@ pub fn load_init_lua(lua: &LuaEngine, path: &Path) {
     }
 }
 
-/// `--lua-script FILE`: run a Lua script instead of a shell one, and exit with its status.
+/// Blank out a leading `#!` line so Lua can parse the source.
+///
+/// Lua's *file* loader skips a shebang; loading the same bytes as a string does not, so
+/// `#!/usr/bin/env lua` reaches the parser and dies with "unexpected symbol near '#'". The line is
+/// replaced rather than removed so every later line keeps its number and a traceback still points
+/// at the right place.
+fn without_shebang(source: &str) -> String {
+    match source.strip_prefix("#!") {
+        None => source.to_string(),
+        Some(rest) => match rest.find('\n') {
+            Some(end) => format!("\n{}", &rest[end + 1..]),
+            None => String::new(),
+        },
+    }
+}
+
+/// Run Lua source as the shell's program, and exit with its status.
 ///
 /// "Its status" is `$?` as the script leaves it, so `oslo.exec("false")` at the end of the file
-/// exits 1. Before this, the process exited 0 no matter what the script ran, which made
-/// `--lua-script` unusable from anything that checks an exit code.
-pub fn run_lua_script(path: &str) -> i32 {
+/// exits 1; the process used to exit 0 no matter what the script ran, which made this unusable
+/// from anything that checks an exit code.
+///
+/// `name` is what a diagnostic calls the source — a path, or `-c`/`stdin` when there is no file.
+pub fn run_lua_source(source: &str, name: &str) -> i32 {
     let env = Arc::new(Mutex::new(Environment::new()));
     let lua = match LuaEngine::new() {
         Ok(lua) => lua,
@@ -71,9 +89,36 @@ pub fn run_lua_script(path: &str) -> i32 {
     if !install_bindings(&lua, Arc::clone(&env)) {
         return 1;
     }
-    if let Err(e) = lua.load_file(path) {
-        eprintln!("oslo: {}: {}", path, e);
+    if let Err(e) = lua.eval_as(&without_shebang(source), name) {
+        eprintln!("oslo: {}: {}", name, e);
         return 1;
     }
     env.lock().map(|guard| guard.last_status).unwrap_or(1)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::without_shebang;
+
+    /// A shebanged Lua script has to parse, and its line numbers have to survive: Lua's file
+    /// loader skips `#!` but its string loader does not, and switching to the latter is what
+    /// made `oslo script` able to detect the language at all.
+    #[test]
+    fn a_shebang_is_blanked_out_without_shifting_the_lines() {
+        let out = without_shebang("#!/usr/bin/env lua\nprint(1)\n");
+        assert_eq!(out, "\nprint(1)\n");
+        assert_eq!(out.lines().count(), 2, "line numbers must not shift");
+    }
+
+    #[test]
+    fn source_without_a_shebang_is_untouched() {
+        assert_eq!(without_shebang("print(1)\n"), "print(1)\n");
+        // A `#` that is not a shebang is Lua's length operator and must survive.
+        assert_eq!(without_shebang("print(#t)\n"), "print(#t)\n");
+    }
+
+    #[test]
+    fn a_shebang_with_no_newline_leaves_nothing_to_run() {
+        assert_eq!(without_shebang("#!/usr/bin/lua"), "");
+    }
 }

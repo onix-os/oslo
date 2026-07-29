@@ -13,6 +13,7 @@
 //! * [`repl`] — the interactive loop that uses all three.
 
 pub mod history;
+pub mod language;
 pub mod lua_init;
 pub mod rc;
 pub mod repl;

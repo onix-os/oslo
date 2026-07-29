@@ -448,13 +448,14 @@ fn a_working_init_lua_still_applies() {
     assert!(out(&o).contains("lua-alias"), "{:?}", out(&o));
 }
 
+/// A `.lua` operand runs as Lua with no flag, and its status is the shell's.
 #[test]
 fn lua_script_propagates_the_status_of_what_it_ran() {
     let dir = tempfile::tempdir().unwrap();
     let script = dir.path().join("s.lua");
 
     std::fs::write(&script, "oslo.exec('false')\n").unwrap();
-    let failed = run(&["--lua-script", script.to_str().unwrap()], &[], dir.path());
+    let failed = run(&[script.to_str().unwrap()], &[], dir.path());
     assert_eq!(
         failed.status.code(),
         Some(1),
@@ -462,11 +463,11 @@ fn lua_script_propagates_the_status_of_what_it_ran() {
     );
 
     std::fs::write(&script, "oslo.exec('true')\n").unwrap();
-    let ok = run(&["--lua-script", script.to_str().unwrap()], &[], dir.path());
+    let ok = run(&[script.to_str().unwrap()], &[], dir.path());
     assert_eq!(ok.status.code(), Some(0));
 
     std::fs::write(&script, "oslo.exec('exit 7')\n").unwrap();
-    let exited = run(&["--lua-script", script.to_str().unwrap()], &[], dir.path());
+    let exited = run(&[script.to_str().unwrap()], &[], dir.path());
     assert_ne!(
         exited.status.code(),
         Some(0),
@@ -480,7 +481,77 @@ fn a_broken_lua_script_exits_non_zero_and_names_the_file() {
     let script = dir.path().join("broken.lua");
     std::fs::write(&script, "not lua(((\n").unwrap();
 
-    let o = run(&["--lua-script", script.to_str().unwrap()], &[], dir.path());
+    let o = run(&[script.to_str().unwrap()], &[], dir.path());
     assert_eq!(o.status.code(), Some(1));
     assert!(err(&o).contains("broken.lua"), "{:?}", err(&o));
+}
+
+/// The headline of the change: which language a script is written in is worked out, not declared.
+///
+/// One test per level of evidence, because each is a separate decision and a regression in any
+/// one of them is invisible in the others.
+#[test]
+fn a_scripts_language_is_detected_rather_than_flagged() {
+    let dir = tempfile::tempdir().unwrap();
+    let write = |name: &str, body: &str| {
+        let p = dir.path().join(name);
+        std::fs::write(&p, body).unwrap();
+        p.to_str().unwrap().to_string()
+    };
+
+    // By extension.
+    let lua = write("a.lua", "print('lua by extension')\n");
+    assert!(out(&run(&[&lua], &[], dir.path())).contains("lua by extension"));
+
+    let sh = write("a.sh", "echo 'shell by extension'\n");
+    assert!(out(&run(&[&sh], &[], dir.path())).contains("shell by extension"));
+
+    // By shebang, with no extension to help — and the shebang must not reach Lua's parser.
+    let shebang = write("noext", "#!/usr/bin/env lua\nprint('lua by shebang')\n");
+    let o = run(&[&shebang], &[], dir.path());
+    assert!(out(&o).contains("lua by shebang"), "{:?}", err(&o));
+
+    // By shebang, outranking a misleading extension.
+    let mislabelled = write(
+        "b.sh",
+        "#!/usr/bin/env lua\nprint('shebang beats extension')\n",
+    );
+    let o = run(&[&mislabelled], &[], dir.path());
+    assert!(out(&o).contains("shebang beats extension"), "{:?}", err(&o));
+
+    // By syntax, with neither a shebang nor an extension.
+    let sniffed = write("plain", "local t = {1, 2}\nprint('lua by syntax ' .. #t)\n");
+    let o = run(&[&sniffed], &[], dir.path());
+    assert!(out(&o).contains("lua by syntax 2"), "{:?}", err(&o));
+}
+
+/// `--lua` and `--sh` override every signal, for the file that genuinely cannot be told apart.
+#[test]
+fn the_language_can_be_forced_against_every_other_signal() {
+    let dir = tempfile::tempdir().unwrap();
+    let p = dir.path().join("looks_like_shell.sh");
+    std::fs::write(&p, "print('forced to lua')\n").unwrap();
+    let o = run(&["--lua", p.to_str().unwrap()], &[], dir.path());
+    assert!(out(&o).contains("forced to lua"), "{:?}", err(&o));
+
+    let p = dir.path().join("looks_like_lua.lua");
+    std::fs::write(&p, "echo 'forced to shell'\n").unwrap();
+    let o = run(&["--sh", p.to_str().unwrap()], &[], dir.path());
+    assert!(out(&o).contains("forced to shell"), "{:?}", err(&o));
+}
+
+/// `-c` stays shell whatever the text looks like: every `sh -c` idiom depends on it, and the
+/// differential corpus is 390 scripts' worth of that assumption.
+#[test]
+fn dash_c_is_shell_even_when_the_text_could_be_lua() {
+    let dir = tempfile::tempdir().unwrap();
+    // Valid Lua that prints `hi`. Read as shell the parentheses are a syntax error — which is
+    // exactly what bash reports for the same string, also with status 2.
+    let o = run(&["-c", "print('hi')"], &[], dir.path());
+    assert_eq!(o.status.code(), Some(2), "stderr: {:?}", err(&o));
+    assert!(!out(&o).contains("hi"), "-c ran as Lua: {:?}", out(&o));
+
+    // And `--lua` is the way to ask for the other reading.
+    let o = run(&["--lua", "-c", "print('hi')"], &[], dir.path());
+    assert!(out(&o).contains("hi"), "{:?}", err(&o));
 }

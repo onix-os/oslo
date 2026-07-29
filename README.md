@@ -4,12 +4,12 @@
 and fish-style interactive features. Linux only.
 
 ```sh
-oslo                      # interactive REPL when stdin is a terminal, else read stdin
-oslo script.sh arg1 arg2  # run a script
-oslo -c 'echo hello'      # run a command
-oslo -s < script.sh       # read the program from standard input
-oslo --lua-script init.lua
-oslo --help               # -c -s -i -l -e -x --version --help --
+oslo                       # interactive REPL when stdin is a terminal, else read stdin
+oslo script.sh arg1 arg2   # run a shell script
+oslo build.lua             # run a Lua script — same command, no flag
+oslo -c 'echo hello'       # run a shell command
+oslo -s < script.sh        # read the program from standard input
+oslo --help                # -c -s -i -l -e -x --lua --sh --version --help --
 ```
 
 ## Status
@@ -43,6 +43,25 @@ Builtins, by what they act on:
 | **Process** | `type` `umask` `times` `ulimit` |
 
 ## Lua
+
+Lua is a first-class way to write a program for this shell, not an add-on: `oslo build.lua` and
+`oslo deploy.sh` are the same command, and neither needs a flag saying which language it got.
+
+The language is worked out from the strongest evidence available, in order:
+
+1. **`--lua` or `--sh`**, if you passed one. Nothing else gets a vote.
+2. **The shebang** — `#!/usr/bin/env lua` against `#!/bin/sh`. Matched on the interpreter's
+   basename, so `lua5.4` counts and `/opt/lua/bin/bash` does not.
+3. **The extension** — `.lua` against `.sh`/`.bash`/`.zsh`/`.ksh`.
+4. **The text**, and only when it is unambiguous: constructs that would be a syntax error in the
+   other language, such as `ipairs(` or `--[[` against `$(` or `esac`.
+
+If even the text is ambiguous the answer is shell — that is the case where a file was handed to a
+shell with nothing indicating otherwise, and guessing the other way would silently reinterpret
+POSIX scripts. Give a file a shebang and the question never arises.
+
+`-c` is always shell, whatever the text looks like: every `sh -c` idiom depends on that. Use
+`oslo --lua -c 'print(1)'` for the other reading.
 
 `~/.config/oslo/init.lua` is loaded at startup.
 

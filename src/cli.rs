@@ -7,6 +7,7 @@
 //! previous implementation recognised three forms and silently started a REPL for everything
 //! else, so `oslo --version` read the caller's stdin and exited 0.
 
+use crate::startup::language::Language;
 use oslo::env::options::ShellOption;
 use std::fmt::Write as _;
 
@@ -17,8 +18,6 @@ pub enum Action {
     Command(String),
     /// A script operand: read the program from this path.
     Script(String),
-    /// `--lua-script FILE`: run a Lua configuration script instead of a shell script.
-    LuaScript(String),
     /// `-s`, or no operand at all: read the program from standard input.
     Stdin,
 }
@@ -42,6 +41,12 @@ pub struct Invocation {
     /// here. Read through [`Invocation::options`], never directly: an option with no letter
     /// cannot be spelled here at all.
     pub set_options: String,
+    /// `--lua` or `--sh`: run the program as that language instead of detecting it.
+    ///
+    /// `None` is the normal case and means "work it out from the shebang, the extension, then the
+    /// text" — see [`crate::startup::language`]. The flag exists for the file that genuinely
+    /// cannot be told apart, not as the usual way to run Lua.
+    pub force_language: Option<Language>,
     /// Options given by their long name, e.g. `--posix`.
     ///
     /// A separate field because [`Self::set_options`] is a string of letters and the options that
@@ -93,7 +98,14 @@ pub fn usage() -> String {
         s,
         "  --posix           follow POSIX where bash's default differs"
     );
-    let _ = writeln!(s, "  --lua-script FILE run a Lua script, then exit");
+    let _ = writeln!(
+        s,
+        "  --lua             run the program as Lua (normally detected)"
+    );
+    let _ = writeln!(
+        s,
+        "  --sh              run the program as shell (normally detected)"
+    );
     let _ = writeln!(s, "  --version         print the version, then exit");
     let _ = writeln!(s, "  --help            print this message, then exit");
     let _ = writeln!(s, "  --                end of options");
@@ -128,7 +140,7 @@ fn usage_error(problem: String) -> Exit {
 pub fn parse(argv: &[String]) -> Result<Invocation, Exit> {
     let mut name = argv.first().cloned().unwrap_or_else(|| "oslo".to_string());
     let mut command: Option<String> = None;
-    let mut lua_script: Option<String> = None;
+    let mut force_language: Option<Language> = None;
     let mut read_stdin = false;
     let mut force_interactive = false;
     let mut login = false;
@@ -172,17 +184,8 @@ pub fn parse(argv: &[String]) -> Result<Invocation, Exit> {
                         status: 0,
                     });
                 }
-                "lua-script" => {
-                    i += 1;
-                    match argv.get(i) {
-                        Some(path) => lua_script = Some(path.clone()),
-                        None => {
-                            return Err(usage_error(
-                                "--lua-script: option requires an argument".to_string(),
-                            ));
-                        }
-                    }
-                }
+                "lua" => force_language = Some(Language::Lua),
+                "sh" => force_language = Some(Language::Shell),
                 other => match long_option(other) {
                     Some(option) => {
                         if !long_options.contains(&option) {
@@ -251,12 +254,12 @@ pub fn parse(argv: &[String]) -> Result<Invocation, Exit> {
 
     let operands = &argv[i.min(argv.len())..];
 
-    // Precedence: an explicit `--lua-script` or `-c` decides where the program comes from;
-    // `-s` forces stdin even when operands follow; otherwise the first operand is a script.
-    let (action, positional) = match (lua_script, command) {
-        (Some(path), _) => (Action::LuaScript(path), operands.to_vec()),
+    // Precedence: `-c` decides where the program comes from; `-s` forces stdin even when operands
+    // follow; otherwise the first operand is a script. Which *language* that program is written in
+    // is a separate question, answered after the text is in hand.
+    let (action, positional) = match command {
         // With `-c`, the first operand is `$0` and the rest are positional, as in POSIX.
-        (None, Some(text)) => {
+        Some(text) => {
             if let Some((zero, rest)) = operands.split_first() {
                 name = zero.clone();
                 (Action::Command(text), rest.to_vec())
@@ -264,8 +267,8 @@ pub fn parse(argv: &[String]) -> Result<Invocation, Exit> {
                 (Action::Command(text), Vec::new())
             }
         }
-        (None, None) if read_stdin => (Action::Stdin, operands.to_vec()),
-        (None, None) => match operands.split_first() {
+        None if read_stdin => (Action::Stdin, operands.to_vec()),
+        None => match operands.split_first() {
             Some((path, rest)) => {
                 name = path.clone();
                 (Action::Script(path.clone()), rest.to_vec())
@@ -281,6 +284,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, Exit> {
         force_interactive,
         login,
         set_options,
+        force_language,
         long_options,
     })
 }
@@ -462,9 +466,34 @@ mod tests {
         );
     }
 
+    /// A Lua file is an ordinary operand. There is no flag to run Lua, which is the point:
+    /// `--lua-script FILE` used to be the only way, in a shell whose scripting language is Lua.
     #[test]
-    fn lua_script_still_works() {
-        let inv = parse_args(&["--lua-script", "init.lua"]).expect("parse");
-        assert_eq!(inv.action, Action::LuaScript("init.lua".to_string()));
+    fn a_lua_file_is_just_a_script_operand() {
+        let inv = parse_args(&["init.lua"]).expect("parse");
+        assert_eq!(inv.action, Action::Script("init.lua".to_string()));
+        assert_eq!(inv.name, "init.lua");
+        assert_eq!(inv.force_language, None, "nothing was forced");
+    }
+
+    #[test]
+    fn the_language_can_still_be_forced_either_way() {
+        let lua = parse_args(&["--lua", "script"]).expect("parse");
+        assert_eq!(lua.force_language, Some(Language::Lua));
+        assert_eq!(lua.action, Action::Script("script".to_string()));
+
+        let sh = parse_args(&["--sh", "script"]).expect("parse");
+        assert_eq!(sh.force_language, Some(Language::Shell));
+    }
+
+    /// The flag it replaced must not linger as a silently-accepted no-op.
+    #[test]
+    fn the_old_lua_script_flag_is_gone() {
+        let err = parse_args(&["--lua-script", "init.lua"]).expect_err("must be rejected");
+        assert!(
+            err.message.contains("--lua-script: invalid option"),
+            "{}",
+            err.message
+        );
     }
 }

@@ -17,6 +17,7 @@ use oslo::env::options::ShellOption;
 use oslo::error::{Result, ShellError};
 use oslo::exec::eval_command_list;
 use oslo::parser::parse_bash_script;
+use startup::language::{self, Language};
 use std::env;
 use std::fs;
 use std::io::Read;
@@ -37,10 +38,22 @@ fn main() {
     };
 
     match invocation.action {
-        Action::LuaScript(ref path) => std::process::exit(startup::lua_init::run_lua_script(path)),
-        Action::Command(ref text) => run_program(&invocation, text),
+        // `-c` is the POSIX interface and is always shell: every `sh -c` idiom in the world
+        // depends on that, and `--lua` is there for the caller who wants otherwise.
+        Action::Command(ref text) => match invocation.force_language {
+            Some(Language::Lua) => {
+                std::process::exit(startup::lua_init::run_lua_source(text, "-c"))
+            }
+            _ => run_program(&invocation, text),
+        },
+        // A script operand names a file whose language is worked out from the file itself.
         Action::Script(ref path) => match fs::read_to_string(path) {
-            Ok(script) => run_program(&invocation, &script),
+            Ok(script) => match language::detect(invocation.force_language, Some(path), &script) {
+                Language::Lua => {
+                    std::process::exit(startup::lua_init::run_lua_source(&script, path))
+                }
+                Language::Shell => run_program(&invocation, &script),
+            },
             Err(_) => {
                 eprintln!("oslo: {}: No such file or directory", path);
                 std::process::exit(127);
@@ -55,7 +68,12 @@ fn main() {
                     eprintln!("oslo: cannot read standard input: {}", e);
                     std::process::exit(1);
                 }
-                run_program(&invocation, &script);
+                match language::detect(invocation.force_language, None, &script) {
+                    Language::Lua => {
+                        std::process::exit(startup::lua_init::run_lua_source(&script, "stdin"))
+                    }
+                    Language::Shell => run_program(&invocation, &script),
+                }
             }
         }
     }
