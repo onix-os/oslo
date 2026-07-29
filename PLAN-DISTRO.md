@@ -279,6 +279,27 @@ A1 and A2 first and alone: A1 is a correctness *and* safety defect, and it is a 
 C3's cheap sweep. A3–A7 are independent of each other. B1/B2 unblock every other Lua item. C
 follows whatever has landed.
 
+## Still open: an external oracle, and the pty paths
+
+Both belong in the Alpine VM, in one invocation — it has a console and a throwaway filesystem,
+which is what each of them needs.
+
+* **An oracle nobody here wrote.** Every test in this repo encodes one person's reading of POSIX,
+  including its blind spots — twice in one session a hand-written probe was wrong and the shell was
+  right. [modernish](https://github.com/modernish/modernish) is the candidate: its capability probe
+  ran a long way under oslo on the host, through its whole bug-detection phase (`BUG_TRAPFNEXI`,
+  `BUG_LOOPRET3`, `BUG_LNNONEG` and the rest), and stopped on the sandbox's missing `/dev/tty`
+  rather than on anything oslo did. Its `BUG_*` names are a ready-made conformance checklist.
+
+  Run it with `--prefix` pointed at a scratch directory. `install.sh -n` is **not** a dry run — it
+  installed 298 files outside the repo when that was assumed. Inside the VM the question does not
+  arise, which is the better reason to run it there.
+
+* **The pty-dependent paths.** Job control, Ctrl-C, Ctrl-Z, `fg`/`bg`, terminal handoff: verified by
+  hand, never automated, and therefore the parts most likely to regress unnoticed. The VM boots to a
+  console, so they are testable there without a pty harness on the host.
+  `scripts/alpine-vm.sh --shell` already drops into an interactive oslo inside it.
+
 ## Out of scope, deliberately
 
 Process substitution, `coproc` and `select` stay refused-by-name — none appears in POSIX `sh`, and
