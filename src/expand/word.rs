@@ -1,0 +1,355 @@
+//! The expansion pipeline, and the provenance every later stage consults.
+//!
+//! A shell word is not a string. It is a sequence of *runs*, each of which remembers whether the
+//! characters in it were quoted, typed literally, or produced by an expansion — because the three
+//! answers lead to three different behaviours downstream:
+//!
+//! * field splitting acts on the result of an *unquoted expansion* and on nothing else, so
+//!   `IFS=:; echo a:b:c` is one word while `IFS=:; v=a:b:c; echo $v` is three;
+//! * pathname expansion reads `*` as a metacharacter only where the user did not quote it, so
+//!   `echo "a"*` globs and `echo "a*"` does not;
+//! * `"$@"` yields one field per positional parameter, which a single string cannot represent
+//!   at all.
+//!
+//! Collapsing all of that into one `String` plus one word-level `is_quoted` flag was the single
+//! defect behind five separate wrong answers, which is why the representation lives here rather
+//! than being reconstructed by each consumer.
+
+use crate::ast::{Word, WordPart};
+use crate::env::Environment;
+use crate::error::Result;
+use crate::expand::arithmetic::eval_arithmetic;
+use crate::expand::brace::expand_braces;
+use crate::expand::fields::{ifs_of, split_field};
+use crate::expand::glob::expand_glob;
+use crate::expand::param::expand_param;
+use crate::expand::tilde::expand_tilde;
+
+/// Where the characters in a [`Run`] came from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Origin {
+    /// Unquoted text the script itself contains. Its metacharacters glob, but it is never
+    /// field-split: POSIX splits expansion *results*, not the source text around them.
+    Literal,
+    /// Quoted or backslash-escaped text. Literal for pathname expansion, never field-split.
+    Quoted,
+    /// The output of an unquoted expansion. Field-split on IFS; whatever survives still globs.
+    Expanded,
+}
+
+/// A maximal stretch of expanded text sharing one [`Origin`].
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Run {
+    pub text: String,
+    pub origin: Origin,
+}
+
+impl Run {
+    pub fn new(text: impl Into<String>, origin: Origin) -> Self {
+        Self {
+            text: text.into(),
+            origin,
+        }
+    }
+
+    /// Whether pathname expansion may read this run's `*`, `?` and `[` as metacharacters.
+    pub fn globs(&self) -> bool {
+        self.origin != Origin::Quoted
+    }
+
+    /// Whether IFS field splitting may cut this run.
+    pub fn splits(&self) -> bool {
+        self.origin == Origin::Expanded
+    }
+}
+
+/// One prospective word: the runs that concatenate into a single field.
+pub type Field = Vec<Run>;
+
+/// The text a field carries, with quoting forgotten.
+pub fn field_text(field: &[Run]) -> String {
+    field.iter().map(|r| r.text.as_str()).collect()
+}
+
+/// Accumulates parts into fields, splicing a multi-field part into its neighbours.
+///
+/// `pre"$@"post` over three positionals is `pre<1>`, `<2>`, `<3>post`: the first field joins what
+/// came before it and the last stays open for what follows. `open: None` distinguishes "nothing
+/// has contributed yet" from "an empty field so far", which is exactly what lets `"$@"` with no
+/// positionals vanish while `""` survives as an empty argument.
+#[derive(Default)]
+struct FieldBuilder {
+    done: Vec<Field>,
+    open: Option<Field>,
+}
+
+impl FieldBuilder {
+    fn push(&mut self, segments: Vec<Field>) {
+        let mut segments = segments.into_iter();
+        // No segments at all means the part contributed nothing *and* broke nothing: the word
+        // `x"$@"y` with no positionals is still the single field `xy`.
+        let Some(first) = segments.next() else {
+            return;
+        };
+        let mut current = self.open.take().unwrap_or_default();
+        current.extend(first);
+        for segment in segments {
+            self.done.push(std::mem::replace(&mut current, segment));
+        }
+        self.open = Some(current);
+    }
+
+    fn finish(mut self) -> Vec<Field> {
+        if let Some(open) = self.open.take() {
+            self.done.push(open);
+        }
+        self.done
+    }
+}
+
+/// Expand `word` into fields, *before* IFS splitting and pathname expansion.
+///
+/// This is the representation later stages want: quoting is still attached to each run, so a
+/// consumer can decide for itself which of the remaining steps apply.
+pub fn expand_word_fields(env: &mut Environment, word: &Word) -> Result<Vec<Field>> {
+    let mut builder = FieldBuilder::default();
+    for part in &word.parts {
+        let segments = expand_word_part(env, part, false)?;
+        builder.push(segments);
+    }
+    Ok(builder.finish())
+}
+
+/// Expand one word part into the fields it contributes.
+///
+/// Almost always exactly one field. `"$@"` is the exception that forces the return type: it is one
+/// field per positional parameter, and *no field at all* when there are none — which is how
+/// `cmd "$@"` with no arguments manages to run `cmd` rather than `cmd ""`.
+///
+/// `in_quotes` is the enclosing double-quote context, which decides whether an expansion's output
+/// is splittable and whether literal text globs.
+pub fn expand_word_part(
+    env: &mut Environment,
+    part: &WordPart,
+    in_quotes: bool,
+) -> Result<Vec<Field>> {
+    let typed = if in_quotes {
+        Origin::Quoted
+    } else {
+        Origin::Literal
+    };
+    let produced = if in_quotes {
+        Origin::Quoted
+    } else {
+        Origin::Expanded
+    };
+
+    let single = |text: String, origin: Origin| vec![vec![Run::new(text, origin)]];
+
+    Ok(match part {
+        WordPart::Literal(s) => single(s.clone(), typed),
+        // `\*` is a literal asterisk and `a\ b` is one field: an escaped character is quoted in
+        // every sense that matters after the lexer.
+        WordPart::Escaped(s) => single(s.clone(), Origin::Quoted),
+        WordPart::SingleQuoted(s) => single(s.clone(), Origin::Quoted),
+        WordPart::DoubleQuoted(parts) => {
+            if parts.is_empty() {
+                // `""` is an explicit empty field, not the absence of one.
+                single(String::new(), Origin::Quoted)
+            } else {
+                let mut builder = FieldBuilder::default();
+                for inner in parts {
+                    let segments = expand_word_part(env, inner, true)?;
+                    builder.push(segments);
+                }
+                builder.finish()
+            }
+        }
+        // A home directory that happens to contain a glob character is still just a directory.
+        WordPart::Tilde(user) => single(expand_tilde(env, user), Origin::Quoted),
+        WordPart::Variable {
+            name,
+            expansion_type,
+        } => expand_param(env, name, expansion_type, in_quotes)?,
+        WordPart::Arithmetic(expr) => single(eval_arithmetic(env, expr)?.to_string(), produced),
+        WordPart::CommandSubstitution(cmd) => {
+            let output = crate::exec::eval_command_substitution(env, cmd)?;
+            // Trailing newlines are stripped per POSIX.
+            single(output.trim_end_matches('\n').to_string(), produced)
+        }
+    })
+}
+
+/// Expand to exactly one string, skipping field splitting and globbing.
+///
+/// This is what `case` needs for both the subject and its patterns. POSIX excludes both of the
+/// latter steps there, and applying them is actively wrong: globbing a pattern turns
+/// `case foo in f*)` into a match against whatever files happen to be in the working directory,
+/// so the branch silently stops firing depending on where you run the script.
+pub fn expand_word_to_string(env: &mut Environment, word: &Word) -> Result<String> {
+    let fields = expand_word_fields(env, word)?;
+    if fields.len() == 1 {
+        return Ok(field_text(&fields[0]));
+    }
+    // Only `$@` reaches here with more than one field. Joining is what a context that insisted on
+    // a single string would have got from `$*` anyway.
+    Ok(fields
+        .iter()
+        .map(|f| field_text(f))
+        .collect::<Vec<_>>()
+        .join(&env.ifs_separator()))
+}
+
+/// Full expansion of one word: parameters, substitutions, field splitting, then pathname
+/// expansion — the argument list a command actually receives.
+pub fn expand_word(env: &mut Environment, word: &Word) -> Result<Vec<String>> {
+    let mut out = Vec::new();
+    // Brace expansion runs first and is the only step that yields whole *words*: `a{1,2}` is two
+    // words, each of which then goes through the rest of the pipeline on its own.
+    for word in expand_braces(word) {
+        let fields = expand_word_fields(env, &word)?;
+        let ifs = ifs_of(env);
+        for field in fields {
+            for split in split_field(&ifs, field) {
+                out.extend(expand_glob(&split));
+            }
+        }
+    }
+    Ok(out)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Origin, Run, expand_word, expand_word_fields};
+    use crate::ast::{Word, WordPart};
+    use crate::env::Environment;
+
+    fn word(parts: Vec<WordPart>) -> Word {
+        Word { parts }
+    }
+
+    fn texts(fields: &[Vec<Run>]) -> Vec<String> {
+        fields.iter().map(|f| super::field_text(f)).collect()
+    }
+
+    #[test]
+    fn quoted_and_unquoted_runs_keep_their_origins() {
+        let mut env = Environment::new();
+        let w = word(vec![
+            WordPart::DoubleQuoted(vec![WordPart::Literal("a".into())]),
+            WordPart::Literal("*".into()),
+        ]);
+        let fields = expand_word_fields(&mut env, &w).unwrap();
+        assert_eq!(fields.len(), 1);
+        assert_eq!(fields[0][0].origin, Origin::Quoted);
+        assert_eq!(fields[0][1].origin, Origin::Literal);
+    }
+
+    #[test]
+    fn escaped_characters_are_quoted() {
+        let mut env = Environment::new();
+        let w = word(vec![
+            WordPart::Literal("a".into()),
+            WordPart::Escaped(" ".into()),
+            WordPart::Literal("b".into()),
+        ]);
+        // The escaped space must neither split the field nor be treated as IFS whitespace.
+        assert_eq!(expand_word(&mut env, &w).unwrap(), vec!["a b".to_string()]);
+    }
+
+    #[test]
+    fn quoted_at_is_one_field_per_positional() {
+        let mut env = Environment::new();
+        env.set_positional(vec!["a b".into(), "c".into(), String::new()]);
+        let w = word(vec![WordPart::DoubleQuoted(vec![WordPart::Variable {
+            name: "@".into(),
+            expansion_type: crate::ast::ParamExpansion::Normal,
+        }])]);
+        assert_eq!(expand_word(&mut env, &w).unwrap(), vec!["a b", "c", ""]);
+    }
+
+    #[test]
+    fn quoted_at_with_no_positionals_yields_no_field() {
+        let mut env = Environment::new();
+        env.set_positional(Vec::new());
+        let w = word(vec![WordPart::DoubleQuoted(vec![WordPart::Variable {
+            name: "@".into(),
+            expansion_type: crate::ast::ParamExpansion::Normal,
+        }])]);
+        assert!(expand_word(&mut env, &w).unwrap().is_empty());
+    }
+
+    /// `x"$@"y` splices: the first positional joins `x`, the last joins `y`.
+    #[test]
+    fn at_splices_into_its_neighbours() {
+        let mut env = Environment::new();
+        env.set_positional(vec!["1".into(), "2".into(), "3".into()]);
+        let w = word(vec![
+            WordPart::Literal("x".into()),
+            WordPart::DoubleQuoted(vec![WordPart::Variable {
+                name: "@".into(),
+                expansion_type: crate::ast::ParamExpansion::Normal,
+            }]),
+            WordPart::Literal("y".into()),
+        ]);
+        let fields = expand_word_fields(&mut env, &w).unwrap();
+        assert_eq!(texts(&fields), vec!["x1", "2", "3y"]);
+    }
+
+    /// With nothing to splice, the neighbours still join into one field.
+    #[test]
+    fn empty_at_leaves_its_neighbours_joined() {
+        let mut env = Environment::new();
+        env.set_positional(Vec::new());
+        let w = word(vec![
+            WordPart::Literal("x".into()),
+            WordPart::DoubleQuoted(vec![WordPart::Variable {
+                name: "@".into(),
+                expansion_type: crate::ast::ParamExpansion::Normal,
+            }]),
+            WordPart::Literal("y".into()),
+        ]);
+        assert_eq!(expand_word(&mut env, &w).unwrap(), vec!["xy".to_string()]);
+    }
+
+    #[test]
+    fn empty_double_quotes_are_an_empty_argument() {
+        let mut env = Environment::new();
+        let w = word(vec![WordPart::DoubleQuoted(Vec::new())]);
+        assert_eq!(expand_word(&mut env, &w).unwrap(), vec![String::new()]);
+    }
+
+    #[test]
+    fn unset_unquoted_parameter_yields_no_field() {
+        let mut env = Environment::new();
+        env.unset_var("RUSH_NO_SUCH_VAR");
+        let w = word(vec![WordPart::Variable {
+            name: "RUSH_NO_SUCH_VAR".into(),
+            expansion_type: crate::ast::ParamExpansion::Normal,
+        }]);
+        assert!(expand_word(&mut env, &w).unwrap().is_empty());
+    }
+
+    #[test]
+    fn literal_text_is_never_split_on_ifs() {
+        let mut env = Environment::new();
+        env.set_var("IFS", ":", false);
+        let w = word(vec![WordPart::Literal("a:b:c".into())]);
+        assert_eq!(
+            expand_word(&mut env, &w).unwrap(),
+            vec!["a:b:c".to_string()]
+        );
+    }
+
+    #[test]
+    fn expansion_output_is_split_on_ifs() {
+        let mut env = Environment::new();
+        env.set_var("IFS", ":", false);
+        env.set_var("V", "a:b:c", false);
+        let w = word(vec![WordPart::Variable {
+            name: "V".into(),
+            expansion_type: crate::ast::ParamExpansion::Normal,
+        }]);
+        assert_eq!(expand_word(&mut env, &w).unwrap(), vec!["a", "b", "c"]);
+    }
+}

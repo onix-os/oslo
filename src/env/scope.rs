@@ -287,6 +287,15 @@ impl Environment {
         }
     }
 
+    /// What `$*` joins positional parameters with: the first character of IFS, or nothing at all
+    /// when IFS is set but empty. An unset IFS means the default, whose first character is a space.
+    pub fn ifs_separator(&self) -> String {
+        match self.get_var("IFS") {
+            Some(ifs) => ifs.chars().next().map(String::from).unwrap_or_default(),
+            None => " ".to_string(),
+        }
+    }
+
     pub fn get_param(&self, name: &str) -> Option<String> {
         match name {
             "?" => Some(self.last_status.to_string()),
@@ -294,7 +303,10 @@ impl Environment {
             "!" => self.last_bg_pid.map(|p| p.to_string()),
             "#" => Some(self.positional.len().to_string()),
             "0" => Some(self.shell_name.clone()),
-            "*" | "@" => Some(self.positional.join(" ")),
+            // Only the forms that genuinely need a single string reach here: `"$@"` and `$@` are
+            // resolved as a *field list* in `expand::param`, because collapsing them to one string
+            // is what silently corrupted every wrapper script's arguments.
+            "*" | "@" => Some(self.positional.join(&self.ifs_separator())),
             s => {
                 if let Ok(idx) = s.parse::<usize>()
                     && idx > 0

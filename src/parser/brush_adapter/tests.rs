@@ -283,7 +283,9 @@ fn plain_else_has_no_elif_branches() {
 fn flatten_word(w: &Word) -> String {
     fn part(p: &WordPart, out: &mut String) {
         match p {
-            WordPart::Literal(l) | WordPart::SingleQuoted(l) => out.push_str(l),
+            WordPart::Literal(l) | WordPart::SingleQuoted(l) | WordPart::Escaped(l) => {
+                out.push_str(l)
+            }
             WordPart::DoubleQuoted(inner) => {
                 for p in inner {
                     part(p, out);

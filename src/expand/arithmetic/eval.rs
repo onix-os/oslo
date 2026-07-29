@@ -1,0 +1,199 @@
+//! Evaluation of a parsed arithmetic expression against the shell environment.
+//!
+//! Every operator here is wrapping. bash's arithmetic is C `intmax_t` arithmetic, which wraps;
+//! plain Rust operators would panic in a debug build and wrap in a release one, and the same
+//! script must not depend on the build profile.
+
+use crate::env::Environment;
+use crate::error::{Result, ShellError};
+use crate::expand::arithmetic::lexer::{self, tokenize};
+use crate::expand::arithmetic::operand::expand_expression;
+use crate::expand::arithmetic::parser::{self, BinOp, Expr, UnOp};
+
+/// How long a chain of "this variable's value is itself an expression" may get.
+///
+/// An identifier that does not hold a plain number is evaluated as an expression in its own right:
+/// `a=b; b=7; $((a))` is 7 and `x="1+1"; $((x))` is 2, both of which used to be 0. That makes
+/// `a=a` — or any longer cycle — non-terminating, so the chain is bounded and a cycle is reported
+/// rather than run into the stack. 32 is far past any real indirection and far short of the limit.
+const MAX_RESOLVE_DEPTH: usize = 32;
+
+/// Evaluate an arithmetic expression, applying any assignments it performs.
+///
+/// The environment is taken mutably because `$((i++))` and `$((x = 9))` are expressions with
+/// side effects; a read-only environment made them structurally impossible to support.
+pub fn eval_arithmetic(env: &mut Environment, expr: &str) -> Result<i64> {
+    eval_text(env, expr, 0)
+}
+
+/// Expand, scan, parse and evaluate one piece of expression text.
+///
+/// `depth` counts how many variable values deep this text was found; it is what stops a cycle of
+/// variables naming each other from recursing forever.
+fn eval_text(env: &mut Environment, expr: &str, depth: usize) -> Result<i64> {
+    // Expansion first, and over the whole string: POSIX runs parameter expansion, command
+    // substitution and quote removal across the expression before any of it is arithmetic.
+    let expanded = expand_expression(env, expr)?;
+    let tokens = tokenize(&expanded)?;
+    let ast = parser::parse(&tokens)?;
+    eval(env, &ast, depth)
+}
+
+/// Read a variable as a number.
+///
+/// A plain numeric value is that number. Anything else is re-evaluated as an expression, which is
+/// how bash resolves `a=b; b=7` and how a variable holding `1+1` becomes 2. An unset variable, or
+/// one whose value evaluates to nothing recognisable, is 0.
+fn resolve(env: &mut Environment, name: &str, depth: usize) -> Result<i64> {
+    let Some(text) = env.get_param(name) else {
+        return Ok(0);
+    };
+    if let Some(n) = lexer::literal_value(&text) {
+        return Ok(n);
+    }
+    if text.trim().is_empty() {
+        return Ok(0);
+    }
+    if depth >= MAX_RESOLVE_DEPTH {
+        return Err(ShellError::ExpansionError(format!(
+            "{name}: expression recursion level exceeded"
+        )));
+    }
+    eval_text(env, &text, depth + 1)
+}
+
+fn store(env: &mut Environment, name: &str, value: i64) -> i64 {
+    env.set_var(name, &value.to_string(), false);
+    value
+}
+
+fn eval(env: &mut Environment, expr: &Expr, depth: usize) -> Result<i64> {
+    match expr {
+        Expr::Number(n) => Ok(*n),
+        Expr::Var(name) => resolve(env, name, depth),
+        Expr::Unary(op, operand) => {
+            let v = eval(env, operand, depth)?;
+            Ok(match op {
+                UnOp::Pos => v,
+                // `-i64::MIN` overflows, and `-9223372036854775808` is how `i64::MIN` is written.
+                UnOp::Neg => v.wrapping_neg(),
+                UnOp::Not => i64::from(v == 0),
+                UnOp::BitNot => !v,
+            })
+        }
+        Expr::Binary(op, left, right) => {
+            let l = eval(env, left, depth)?;
+            let r = eval(env, right, depth)?;
+            apply(*op, l, r)
+        }
+        // The short-circuiting pair must not evaluate the right side at all: `0 && (1/0)` is 0 in
+        // bash, not a division error, and `0 && (x = 1)` must leave `x` alone.
+        Expr::LogicalAnd(left, right) => {
+            if eval(env, left, depth)? == 0 {
+                Ok(0)
+            } else {
+                Ok(i64::from(eval(env, right, depth)? != 0))
+            }
+        }
+        Expr::LogicalOr(left, right) => {
+            if eval(env, left, depth)? != 0 {
+                Ok(1)
+            } else {
+                Ok(i64::from(eval(env, right, depth)? != 0))
+            }
+        }
+        Expr::Conditional(cond, then, other) => {
+            if eval(env, cond, depth)? != 0 {
+                eval(env, then, depth)
+            } else {
+                eval(env, other, depth)
+            }
+        }
+        Expr::Comma(left, right) => {
+            eval(env, left, depth)?;
+            eval(env, right, depth)
+        }
+        Expr::Assign(name, op, rhs) => {
+            let value = match op {
+                None => eval(env, rhs, depth)?,
+                Some(op) => {
+                    let current = resolve(env, name, depth)?;
+                    let operand = eval(env, rhs, depth)?;
+                    apply(*op, current, operand)?
+                }
+            };
+            Ok(store(env, name, value))
+        }
+        Expr::PreStep(name, delta) => {
+            let value = resolve(env, name, depth)?.wrapping_add(*delta);
+            Ok(store(env, name, value))
+        }
+        Expr::PostStep(name, delta) => {
+            let old = resolve(env, name, depth)?;
+            store(env, name, old.wrapping_add(*delta));
+            Ok(old)
+        }
+    }
+}
+
+fn apply(op: BinOp, l: i64, r: i64) -> Result<i64> {
+    Ok(match op {
+        BinOp::Add => l.wrapping_add(r),
+        BinOp::Sub => l.wrapping_sub(r),
+        BinOp::Mul => l.wrapping_mul(r),
+        BinOp::Div => {
+            if r == 0 {
+                return Err(ShellError::ExpansionError("Division by zero".to_string()));
+            }
+            // `i64::MIN / -1` is the one non-zero divisor that overflows; bash yields `i64::MIN`
+            // for it, which is what the checked failure wraps to.
+            l.checked_div(r).unwrap_or(i64::MIN)
+        }
+        BinOp::Rem => {
+            if r == 0 {
+                return Err(ShellError::ExpansionError("Division by zero".to_string()));
+            }
+            // Same overflow case; the mathematical remainder is 0 and bash agrees.
+            l.checked_rem(r).unwrap_or(0)
+        }
+        BinOp::Pow => return power(l, r),
+        // C leaves an over-wide shift undefined; every shell in practice inherits the hardware's
+        // count-modulo-64, which is what Rust's `wrapping_sh*` does. `-1 as u32` lands on 63,
+        // matching bash's `1 << -1` == i64::MIN.
+        BinOp::Shl => l.wrapping_shl(r as u32),
+        BinOp::Shr => l.wrapping_shr(r as u32),
+        BinOp::BitAnd => l & r,
+        BinOp::BitOr => l | r,
+        BinOp::BitXor => l ^ r,
+        BinOp::Eq => i64::from(l == r),
+        BinOp::Ne => i64::from(l != r),
+        BinOp::Lt => i64::from(l < r),
+        BinOp::Le => i64::from(l <= r),
+        BinOp::Gt => i64::from(l > r),
+        BinOp::Ge => i64::from(l >= r),
+    })
+}
+
+/// `base ** exp` with C wrapping.
+///
+/// Squaring rather than repeated multiplication: wrapping multiplication is arithmetic modulo
+/// 2^64, so both give the same answer, but `2 ** 9223372036854775807` finishes here instead of
+/// hanging the shell.
+fn power(base: i64, exp: i64) -> Result<i64> {
+    if exp < 0 {
+        return Err(ShellError::ExpansionError(
+            "exponent less than 0".to_string(),
+        ));
+    }
+    let mut result: i64 = 1;
+    let mut acc = base;
+    let mut n = exp as u64;
+    while n > 0 {
+        if n & 1 == 1 {
+            result = result.wrapping_mul(acc);
+        }
+        acc = acc.wrapping_mul(acc);
+        n >>= 1;
+    }
+    Ok(result)
+}

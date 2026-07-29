@@ -16,6 +16,14 @@ fn pipelines_pass_data_between_stages() {
     assert_out("printf 'a\\nb\\nc\\n' | grep b", "b");
 }
 
+/// A pipeline's status is its last stage's. Moved here from the in-process suite: forking a
+/// pipeline stage out of libtest's thread pool deadlocked the child (see `posix_shell_tests.rs`).
+#[test]
+fn pipeline_status_is_the_last_stage() {
+    assert_eq!(run("echo hello | grep -q hello").status, 0);
+    assert_eq!(run("echo hello | grep -q nope").status, 1);
+}
+
 #[test]
 fn and_or_short_circuits() {
     assert_out("false && echo NO || echo YES", "YES");
@@ -25,6 +33,23 @@ fn and_or_short_circuits() {
 #[test]
 fn command_substitution_captures_output() {
     assert_out("X=$(echo sub); echo got:$X", "got:sub");
+}
+
+/// R2.9: an assignment RHS gets command substitution but no field splitting, so a value that
+/// contains newlines keeps them instead of collapsing to `a b`. Lives here rather than beside
+/// the other R2.9 unit tests in `src/exec/simple.rs` because command substitution forks, and
+/// forking out of libtest's thread pool deadlocks the child in the allocator.
+#[test]
+fn assignment_rhs_keeps_embedded_newlines() {
+    assert_out(
+        "rush_n1=$(printf 'a\\nb'); printf '[%s]' \"$rush_n1\"",
+        "[a\nb]",
+    );
+    // Trailing newlines are still stripped: that is command substitution's own rule.
+    assert_out(
+        "rush_n2=$(printf 'a\\n\\n\\n'); printf '[%s]' \"$rush_n2\"",
+        "[a]",
+    );
 }
 
 #[test]

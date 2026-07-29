@@ -1,8 +1,10 @@
 //! Tokenizing shell input.
 //!
 //! Split by what is being scanned: [`scanner`] holds the cursor and operator handling,
-//! [`quoting`] scans words and quoted runs, [`expansion`] scans `$`-expansions.
+//! [`quoting`] scans words and quoted runs, [`expansion`] scans `$`-expansions, and the private
+//! `ansi_c` module decodes `$'…'` escapes.
 
+mod ansi_c;
 pub mod expansion;
 pub mod quoting;
 pub mod scanner;
@@ -10,3 +12,16 @@ pub mod token;
 
 pub use scanner::Lexer;
 pub use token::Token;
+
+use crate::ast::Word;
+use crate::error::Result;
+
+/// Parse a string that is known to hold exactly one word into its parts.
+///
+/// Nothing terminates the word: whitespace and operator characters are ordinary text, because the
+/// caller has already decided where the word ends. Arithmetic expansion needs this — POSIX runs
+/// parameter expansion, command substitution and quote removal over the expression *text* before
+/// any of it is arithmetic, and `$(( $(wc -l < f) * 2 ))` is one such expression, spaces and all.
+pub fn parse_single_word(source: &str) -> Result<Word> {
+    quoting::parse_word_source(source)
+}

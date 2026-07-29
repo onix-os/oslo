@@ -55,12 +55,13 @@ fn test_for_loop() {
     assert_eq!(env.get_param("VALS"), Some("abc".to_string()));
 }
 
-#[test]
-fn test_pipeline_execution() {
-    let mut env = Environment::new();
-    let status = run_cmd(&mut env, "echo hello | grep -q hello");
-    assert_eq!(status, 0);
-}
+// Pipeline execution is deliberately *not* tested in process. Every pipeline stage is a
+// `fork()` (`exec/pipeline.rs`), and libtest runs these tests on a thread pool: a child forked
+// out of a multi-threaded parent inherits whatever locks the other threads held at that instant,
+// so it can deadlock in the allocator before reaching `execv` while the parent blocks in
+// `waitpid`. That made `cargo test` hang for roughly one run in twenty. It is a property of the
+// harness rather than of the shell — rush itself never spawns a thread — so the pipeline cases
+// live in `expansion_tests.rs`, which spawns the real binary.
 
 #[test]
 fn test_lua_integration_exec() {

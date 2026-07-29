@@ -8,7 +8,7 @@ use crate::env::Environment;
 use crate::error::{Result, ShellError};
 use crate::exec::pipeline::eval_command;
 use crate::exec::redirect::RedirectGuard;
-use crate::expand::expand_word;
+use crate::expand::{expand_word, expand_word_to_string};
 use crate::lexer::Lexer;
 use nix::sys::wait::{WaitStatus, waitpid};
 use nix::unistd::{ForkResult, fork};
@@ -18,8 +18,9 @@ use std::os::unix::ffi::OsStrExt;
 pub(crate) fn eval_simple_command(env: &mut Environment, simple: &SimpleCommand) -> Result<i32> {
     if simple.words.is_empty() {
         for assign in &simple.assignments {
-            let expanded = expand_word(env, &assign.value)?;
-            let val_str = expanded.join(" ");
+            // Assignment RHS is *not* field-split or globbed (POSIX 2.9.1), so `x=*.rs` stores the
+            // literal pattern and `x=$(printf 'a\nb')` keeps its newline.
+            let val_str = expand_word_to_string(env, &assign.value)?;
             env.set_var(&assign.name, &val_str, false);
         }
         return Ok(0);
@@ -32,8 +33,7 @@ pub(crate) fn eval_simple_command(env: &mut Environment, simple: &SimpleCommand)
 
     if words.is_empty() {
         for assign in &simple.assignments {
-            let expanded = expand_word(env, &assign.value)?;
-            let val_str = expanded.join(" ");
+            let val_str = expand_word_to_string(env, &assign.value)?;
             env.set_var(&assign.name, &val_str, false);
         }
         return Ok(0);
@@ -65,7 +65,7 @@ pub(crate) fn eval_simple_command(env: &mut Environment, simple: &SimpleCommand)
     // `export FOO=bar` must reach `export`, not be applied behind its back.
     let mut prefix_assignments = Vec::new();
     for assign in &simple.assignments {
-        let val_str = expand_word(env, &assign.value)?.join(" ");
+        let val_str = expand_word_to_string(env, &assign.value)?;
         if is_declaration {
             words.push(format!("{}={}", assign.name, val_str));
         } else {
@@ -268,8 +268,72 @@ fn execute_builtin(env: &mut Environment, cmd_name: &str, words: &[String]) -> R
 #[cfg(test)]
 mod tests {
     use super::exec_cstring;
+    use crate::env::Environment;
     use std::ffi::{CString, OsStr};
     use std::os::unix::ffi::OsStrExt;
+
+    /// Run a snippet in a fresh environment and hand back the environment to inspect.
+    ///
+    /// `Environment::new()` snapshots the *process* environment and `export` writes back into it,
+    /// so an exported name set by one test is visible to every environment built afterwards.
+    /// Tests here therefore use names unique to each test rather than a shared `v`.
+    fn run(src: &str) -> Environment {
+        let mut env = Environment::new();
+        let script = crate::parser::parse_bash_script(src).expect("parse");
+        crate::exec::eval_command_list(&mut env, &script).expect("exec");
+        env
+    }
+
+    fn var(src: &str, name: &str) -> String {
+        run(src).get_var(name).unwrap_or_default().to_string()
+    }
+
+    /// POSIX 2.9.1: the assignment RHS gets tilde, parameter, command and arithmetic expansion,
+    /// but *not* field splitting and *not* pathname expansion. Globbing it would make the value
+    /// depend on the working directory's contents; splitting it would collapse any IFS character
+    /// or newline the value legitimately contains.
+    ///
+    /// `Cargo.*` is used rather than a scratch directory on purpose: unit tests run in the crate
+    /// root, where that pattern really does match files, so a regression to `expand_word` would
+    /// show up as `Cargo.lock Cargo.toml` instead of a silently-unchanged literal.
+    #[test]
+    fn assignment_rhs_is_not_globbed() {
+        assert_eq!(var("rush_g1=Cargo.*", "rush_g1"), "Cargo.*");
+        assert_eq!(var("rush_g2=Cargo.* true", "rush_g2"), "");
+        assert_eq!(var("export rush_g3=Cargo.*", "rush_g3"), "Cargo.*");
+    }
+
+    #[test]
+    fn assignment_rhs_is_not_field_split() {
+        assert_eq!(var("IFS=:\nrush_s1=a:b:c", "rush_s1"), "a:b:c");
+        assert_eq!(var("IFS=:\nexport rush_s2=a:b:c", "rush_s2"), "a:b:c");
+        // Interior whitespace from an unquoted expansion survives too.
+        assert_eq!(var("rush_s3='a  b'\nrush_s4=$rush_s3", "rush_s4"), "a  b");
+    }
+
+    // The third leg of R2.9 — `x=$(printf 'a\nb')` keeps its newline — is deliberately *not*
+    // tested here. Command substitution forks (`exec/substitution.rs`), and libtest runs unit
+    // tests on a pool of threads: a child forked out of a multi-threaded process inherits any
+    // mutex another thread happened to hold, so the child deadlocks in the allocator before it
+    // can write to the pipe and the parent blocks forever in `waitpid`. That is a property of
+    // the harness, not of the shell (rush itself is single-threaded), so the case lives in
+    // `tests/expansion_tests.rs`, which spawns the real binary.
+
+    /// The `words.is_empty()` fallback path — a command word that expands to nothing leaves only
+    /// the assignments — must apply the same rule as the ordinary one.
+    #[test]
+    fn assignment_survives_an_empty_command_word() {
+        assert_eq!(
+            var("IFS=:\nrush_e1=\nrush_e2=a:b $rush_e1", "rush_e2"),
+            "a:b"
+        );
+    }
+
+    /// A prefix assignment is scoped to its command and must not leak back out.
+    #[test]
+    fn prefix_assignment_does_not_outlive_its_command() {
+        assert_eq!(run("rush_p1=a:b true").get_var("rush_p1"), None);
+    }
 
     #[test]
     fn plain_argument_is_unchanged() {
