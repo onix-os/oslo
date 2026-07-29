@@ -169,6 +169,13 @@ contain** — `redirects.rs`, `quoting.rs`, `conditionals.rs` — never for thei
   `tests/differential/expected_fail.rs` names each case rush still gets wrong along with the
   finding that explains it, and the suite fails both when an unlisted case diverges *and* when a
   listed case starts passing. Closing a bug means deleting a line there.
+
+  Bash is a moving specification, so a case may add `# needs-bash: 5.3` under its mode line. Four
+  behaviours changed between 5.2 and 5.3 — whether a failing special builtin is fatal, `cd`'s
+  status for too many operands, and two column widths — and rush follows 5.3. Against an older
+  oracle those cases are skipped and counted rather than blamed on rush, and the suite prints the
+  oracle's version and the skip list on every run so a CI image that ages cannot quietly stop
+  testing them. The oracle must be bash 4 or newer; macOS ships 3.2, so CI installs a current one.
 - **Fuzz replay** — `cargo test --manifest-path fuzz/Cargo.toml --lib` runs `tests/corpus/` and
   `fuzz/seeds/` through the three `cargo-fuzz` targets on stable, with no nightly and no
   libFuzzer. `fuzz/known/` is the second ratchet, in the same two directions: an input that still
