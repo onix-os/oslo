@@ -11,7 +11,7 @@
 //! `-a` declares an indexed array, and `name=(…)` builds one whether or not `-a` was given —
 //! bash infers the attribute from the literal, and so does this.
 //!
-//! Attributes rush cannot represent are **refused**, not ignored. `declare -i n` in bash makes
+//! Attributes oslo cannot represent are **refused**, not ignored. `declare -i n` in bash makes
 //! every later assignment to `n` an arithmetic evaluation, and `declare -A` makes an
 //! *associative* array, which PLAN.md defers deliberately: a second value shape nothing else in
 //! the shell understands would buy far less than indexed arrays do. Accepting either and quietly
@@ -58,7 +58,7 @@ pub fn builtin_declare(env: &mut Environment, args: &[String]) -> Result<i32> {
                 (false, 'g') => attrs.global = true,
                 (false, 'p') => attrs.print = true,
                 // `-f` and `-F` are treated alike: bash's `-f` prints each function's body, and
-                // rush has no way to render an AST back to source that would not be a guess at
+                // oslo has no way to render an AST back to source that would not be a guess at
                 // what the author wrote. Both therefore report the name only, as `-F` does.
                 (false, 'f' | 'F') => attrs.functions = true,
                 (false, 'a') => attrs.indexed = true,
@@ -66,14 +66,14 @@ pub fn builtin_declare(env: &mut Environment, args: &[String]) -> Result<i32> {
                 // doing" table keeps associative arrays out of this round on purpose, so say that
                 // rather than declaring an *indexed* array and letting `m[key]=v` write element 0.
                 (false, 'A') => {
-                    eprintln!("rush: {}: -A: associative arrays are not supported", name);
+                    eprintln!("oslo: {}: -A: associative arrays are not supported", name);
                     return Ok(2);
                 }
                 // Every remaining letter names an attribute this shell has no representation
                 // for. Saying so beats declaring a scalar and calling it an array.
                 (plus, c) => {
                     let sign = if plus { '+' } else { '-' };
-                    eprintln!("rush: {}: {}{}: attribute not supported", name, sign, c);
+                    eprintln!("oslo: {}: {}{}: attribute not supported", name, sign, c);
                     return Ok(2);
                 }
             }
@@ -107,7 +107,7 @@ fn apply(env: &mut Environment, operand: &str, attrs: &Attributes, builtin: &str
     };
 
     if !is_valid_identifier(name) {
-        eprintln!("rush: {}: `{}': not a valid identifier", builtin, operand);
+        eprintln!("oslo: {}: `{}': not a valid identifier", builtin, operand);
         return Ok(false);
     }
 
@@ -203,7 +203,7 @@ fn print_variables(env: &mut Environment, names: &[String]) -> i32 {
         match env.get_var(name).map(str::to_string) {
             Some(value) => render(env, name, &value),
             None => {
-                eprintln!("rush: declare: {}: not found", name);
+                eprintln!("oslo: declare: {}: not found", name);
                 status = 1;
             }
         }
@@ -278,41 +278,41 @@ mod tests {
     fn a_plain_declaration_assigns() {
         let mut env = Environment::new();
         assert_eq!(
-            builtin_declare(&mut env, &argv(&["declare", "rush_d1=value"])).unwrap(),
+            builtin_declare(&mut env, &argv(&["declare", "oslo_d1=value"])).unwrap(),
             0
         );
-        assert_eq!(env.get_var("rush_d1"), Some("value"));
+        assert_eq!(env.get_var("oslo_d1"), Some("value"));
     }
 
     #[test]
     fn export_and_readonly_attributes_are_applied() {
         let mut env = Environment::new();
         assert_eq!(
-            builtin_declare(&mut env, &argv(&["declare", "-rx", "rush_d2=v"])).unwrap(),
+            builtin_declare(&mut env, &argv(&["declare", "-rx", "oslo_d2=v"])).unwrap(),
             0
         );
-        assert!(env.get_exported_vars().contains_key("rush_d2"));
-        assert!(env.is_readonly("rush_d2"));
+        assert!(env.get_exported_vars().contains_key("oslo_d2"));
+        assert!(env.is_readonly("oslo_d2"));
     }
 
     /// `-r` is applied after the value, or `declare -r x=1` would freeze `x` before it had one.
     #[test]
     fn a_readonly_declaration_keeps_its_initial_value() {
         let mut env = Environment::new();
-        builtin_declare(&mut env, &argv(&["declare", "-r", "rush_d3=kept"])).unwrap();
-        assert_eq!(env.get_var("rush_d3"), Some("kept"));
+        builtin_declare(&mut env, &argv(&["declare", "-r", "oslo_d3=kept"])).unwrap();
+        assert_eq!(env.get_var("oslo_d3"), Some("kept"));
     }
 
     /// Inside a scope frame — a function call — a declaration is local and is undone on exit.
     #[test]
     fn a_declaration_inside_a_function_is_local() {
         let mut env = Environment::new();
-        env.set_var("rush_d4", "outer", false);
+        env.set_var("oslo_d4", "outer", false);
         env.push_scope();
-        builtin_declare(&mut env, &argv(&["declare", "rush_d4=inner"])).unwrap();
-        assert_eq!(env.get_var("rush_d4"), Some("inner"));
+        builtin_declare(&mut env, &argv(&["declare", "oslo_d4=inner"])).unwrap();
+        assert_eq!(env.get_var("oslo_d4"), Some("inner"));
         env.pop_scope();
-        assert_eq!(env.get_var("rush_d4"), Some("outer"));
+        assert_eq!(env.get_var("oslo_d4"), Some("outer"));
     }
 
     /// `-g` is the opt-out: the assignment outlives the frame it was made in.
@@ -320,9 +320,9 @@ mod tests {
     fn a_global_declaration_escapes_the_frame() {
         let mut env = Environment::new();
         env.push_scope();
-        builtin_declare(&mut env, &argv(&["declare", "-g", "rush_d5=global"])).unwrap();
+        builtin_declare(&mut env, &argv(&["declare", "-g", "oslo_d5=global"])).unwrap();
         env.pop_scope();
-        assert_eq!(env.get_var("rush_d5"), Some("global"));
+        assert_eq!(env.get_var("oslo_d5"), Some("global"));
     }
 
     /// An attribute with no representation in this shell is refused, not silently downgraded to
@@ -332,16 +332,16 @@ mod tests {
     fn an_unrepresentable_attribute_is_refused() {
         let mut env = Environment::new();
         assert_eq!(
-            builtin_declare(&mut env, &argv(&["declare", "-A", "rush_d6"])).unwrap(),
+            builtin_declare(&mut env, &argv(&["declare", "-A", "oslo_d6"])).unwrap(),
             2
         );
-        assert_eq!(env.get_var("rush_d6"), None);
-        assert!(env.get_array("rush_d6").is_none());
+        assert_eq!(env.get_var("oslo_d6"), None);
+        assert!(env.get_array("oslo_d6").is_none());
         assert_eq!(
-            builtin_declare(&mut env, &argv(&["declare", "-i", "rush_d7=1"])).unwrap(),
+            builtin_declare(&mut env, &argv(&["declare", "-i", "oslo_d7=1"])).unwrap(),
             2
         );
-        assert_eq!(env.get_var("rush_d7"), None);
+        assert_eq!(env.get_var("oslo_d7"), None);
     }
 
     /// `-a` declares an array even with no value, so `${#name[@]}` is 0 rather than an error.
@@ -349,23 +349,23 @@ mod tests {
     fn the_array_attribute_creates_an_empty_array() {
         let mut env = Environment::new();
         assert_eq!(
-            builtin_declare(&mut env, &argv(&["declare", "-a", "rush_d8"])).unwrap(),
+            builtin_declare(&mut env, &argv(&["declare", "-a", "oslo_d8"])).unwrap(),
             0
         );
-        assert_eq!(env.get_array("rush_d8").map(|a| a.len()), Some(0));
+        assert_eq!(env.get_array("oslo_d8").map(|a| a.len()), Some(0));
     }
 
     /// A `name=(…)` operand is an array whether or not `-a` was given — the shape decides.
     #[test]
     fn a_literal_operand_builds_an_array() {
         let mut env = Environment::new();
-        builtin_declare(&mut env, &argv(&["declare", "rush_d9=(1 2 3)"])).unwrap();
+        builtin_declare(&mut env, &argv(&["declare", "oslo_d9=(1 2 3)"])).unwrap();
         assert_eq!(
-            env.get_array("rush_d9").map(|a| a.joined(" ")),
+            env.get_array("oslo_d9").map(|a| a.joined(" ")),
             Some("1 2 3".into())
         );
         // …and it is not the source text, which is what used to be stored.
-        assert_eq!(env.get_var("rush_d9"), Some("1"));
+        assert_eq!(env.get_var("oslo_d9"), Some("1"));
     }
 
     #[test]
@@ -381,7 +381,7 @@ mod tests {
     fn a_missing_name_under_p_is_reported() {
         let mut env = Environment::new();
         assert_eq!(
-            builtin_declare(&mut env, &argv(&["declare", "-p", "rush_no_such_var"])).unwrap(),
+            builtin_declare(&mut env, &argv(&["declare", "-p", "oslo_no_such_var"])).unwrap(),
             1
         );
     }

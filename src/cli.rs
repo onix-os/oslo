@@ -1,13 +1,13 @@
-//! Command-line argument handling for the `rush` binary.
+//! Command-line argument handling for the `oslo` binary.
 //!
 //! Kept apart from `main` so the decision table — which option takes an argument, what becomes
 //! `$0`, when the shell is interactive — can be unit-tested without spawning a process.
 //!
 //! The rule that matters most: an argument this parser does not understand is an error. The
 //! previous implementation recognised three forms and silently started a REPL for everything
-//! else, so `rush --version` read the caller's stdin and exited 0.
+//! else, so `oslo --version` read the caller's stdin and exited 0.
 
-use rush::env::options::ShellOption;
+use oslo::env::options::ShellOption;
 use std::fmt::Write as _;
 
 /// Where the shell's input comes from.
@@ -72,13 +72,13 @@ pub struct Exit {
 }
 
 pub fn version_line() -> String {
-    format!("rush version {}", env!("CARGO_PKG_VERSION"))
+    format!("oslo version {}", env!("CARGO_PKG_VERSION"))
 }
 
 pub fn usage() -> String {
     let mut s = String::new();
-    let _ = writeln!(s, "usage: rush [option]... [script [argument]...]");
-    let _ = writeln!(s, "       rush [option]... -c command [name [argument]...]");
+    let _ = writeln!(s, "usage: oslo [option]... [script [argument]...]");
+    let _ = writeln!(s, "       oslo [option]... -c command [name [argument]...]");
     let _ = writeln!(s);
     let _ = writeln!(s, "Options:");
     let _ = writeln!(s, "  -c COMMAND        run COMMAND, then exit");
@@ -118,7 +118,7 @@ fn long_option(name: &str) -> Option<ShellOption> {
 
 fn usage_error(problem: String) -> Exit {
     Exit {
-        message: format!("rush: {}\n{}", problem, usage()),
+        message: format!("oslo: {}\n{}", problem, usage()),
         to_stderr: true,
         status: 2,
     }
@@ -126,7 +126,7 @@ fn usage_error(problem: String) -> Exit {
 
 /// Interpret `argv` (including `argv[0]`).
 pub fn parse(argv: &[String]) -> Result<Invocation, Exit> {
-    let mut name = argv.first().cloned().unwrap_or_else(|| "rush".to_string());
+    let mut name = argv.first().cloned().unwrap_or_else(|| "oslo".to_string());
     let mut command: Option<String> = None;
     let mut lua_script: Option<String> = None;
     let mut read_stdin = false;
@@ -230,8 +230,8 @@ pub fn parse(argv: &[String]) -> Result<Invocation, Exit> {
                 'i' => force_interactive = true,
                 'l' => login = true,
                 // Any letter `set` would accept means the same thing here, so
-                // `rush -f script.sh` starts with globbing off rather than being rejected.
-                // The table in `rush::env::options` is the only list of them.
+                // `oslo -f script.sh` starts with globbing off rather than being rejected.
+                // The table in `oslo::env::options` is the only list of them.
                 letter if ShellOption::from_letter(letter).is_some() => {
                     if !set_options.contains(letter) {
                         set_options.push(letter);
@@ -290,7 +290,7 @@ mod tests {
     use super::*;
 
     fn parse_args(args: &[&str]) -> Result<Invocation, Exit> {
-        let argv: Vec<String> = std::iter::once("rush")
+        let argv: Vec<String> = std::iter::once("oslo")
             .chain(args.iter().copied())
             .map(str::to_string)
             .collect();
@@ -301,7 +301,7 @@ mod tests {
     fn no_arguments_reads_stdin() {
         let inv = parse_args(&[]).expect("parse");
         assert_eq!(inv.action, Action::Stdin);
-        assert_eq!(inv.name, "rush");
+        assert_eq!(inv.name, "oslo");
         assert!(inv.positional.is_empty());
     }
 
@@ -412,7 +412,7 @@ mod tests {
         let h = parse_args(&["--help"]).expect_err("terminates");
         assert_eq!(h.status, 0);
         assert!(!h.to_stderr);
-        assert!(h.message.contains("usage: rush"));
+        assert!(h.message.contains("usage: oslo"));
     }
 
     #[test]
@@ -422,7 +422,7 @@ mod tests {
         assert_eq!(inv.positional, vec!["a".to_string(), "b".to_string()]);
     }
 
-    /// `--posix` was not an option at all: `rush --posix -c 'echo x'` was a usage error, which is
+    /// `--posix` was not an option at all: `oslo --posix -c 'echo x'` was a usage error, which is
     /// what made the whole POSIX-mode code path unreachable in production.
     #[test]
     fn posix_is_a_long_option_and_reaches_the_option_set() {

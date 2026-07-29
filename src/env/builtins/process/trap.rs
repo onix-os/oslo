@@ -6,7 +6,7 @@
 //! The grammar is small but every clause of it is load-bearing:
 //!
 //! * `trap ACTION cond...` installs, `trap - cond...` resets, `trap '' cond...` ignores. The
-//!   reset form is the one rush used to get wrong in the most damaging way available: `-` was
+//!   reset form is the one oslo used to get wrong in the most damaging way available: `-` was
 //!   stored as the *handler text*, so `trap - EXIT` installed a handler that would try to run a
 //!   command called `-`.
 //! * `trap N cond...`, where the first operand is an unsigned integer, resets as well. POSIX
@@ -105,7 +105,7 @@ pub fn builtin_trap(env: &mut Environment, args: &[String]) -> Result<i32> {
     };
 
     if conditions.is_empty() {
-        eprintln!("rush: trap: usage: trap [-lp] [[action] condition ...]");
+        eprintln!("oslo: trap: usage: trap [-lp] [[action] condition ...]");
         return Ok(2);
     }
 
@@ -122,7 +122,7 @@ pub fn builtin_trap(env: &mut Environment, args: &[String]) -> Result<i32> {
 /// Record one condition's new disposition, and tell the kernel about it. False on a bad operand.
 fn apply(env: &mut Environment, spec: &str, action: &str) -> bool {
     let Some(condition) = resolve(spec) else {
-        eprintln!("rush: trap: {}: invalid signal specification", spec);
+        eprintln!("oslo: trap: {}: invalid signal specification", spec);
         return false;
     };
 
@@ -130,7 +130,7 @@ fn apply(env: &mut Environment, spec: &str, action: &str) -> bool {
         // Honest refusal rather than a silent no-op: a script that sets an ERR trap and gets
         // status 0 back is entitled to believe the handler will run.
         eprintln!(
-            "rush: trap: {}: condition not supported; no handler was installed",
+            "oslo: trap: {}: condition not supported; no handler was installed",
             name
         );
         return false;
@@ -167,7 +167,7 @@ fn list(env: &Environment, conditions: &[String]) -> i32 {
             match resolve(spec) {
                 Some(condition) => wanted.push(condition),
                 None => {
-                    eprintln!("rush: trap: {}: invalid signal specification", spec);
+                    eprintln!("oslo: trap: {}: invalid signal specification", spec);
                     status = 1;
                 }
             }

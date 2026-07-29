@@ -391,7 +391,7 @@ mod tests {
     fn scratch(tag: &str) -> PathBuf {
         static COUNTER: AtomicUsize = AtomicUsize::new(0);
         let n = COUNTER.fetch_add(1, Ordering::Relaxed);
-        let dir = std::env::temp_dir().join(format!("rush-glob-{}-{tag}-{n}", std::process::id()));
+        let dir = std::env::temp_dir().join(format!("oslo-glob-{}-{tag}-{n}", std::process::id()));
         let _ = fs::remove_dir_all(&dir);
         fs::create_dir_all(&dir).expect("create scratch dir");
         dir

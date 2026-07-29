@@ -72,8 +72,8 @@ mod tests {
     fn unknown_user_is_left_alone() {
         let env = Environment::new();
         assert_eq!(
-            expand_tilde(&env, "rush-no-such-user"),
-            "~rush-no-such-user"
+            expand_tilde(&env, "oslo-no-such-user"),
+            "~oslo-no-such-user"
         );
     }
 

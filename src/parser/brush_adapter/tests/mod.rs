@@ -1,4 +1,4 @@
-//! Conversion tests for the brush -> rush AST bridge.
+//! Conversion tests for the brush -> oslo AST bridge.
 
 use super::*;
 use crate::ast::*;

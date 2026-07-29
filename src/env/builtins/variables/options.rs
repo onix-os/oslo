@@ -62,7 +62,7 @@ pub fn parse(args: &[String], accepted: &str) -> Result<Options, char> {
 /// and carries on — matching bash on both. Outside POSIX mode every one of them folds back to
 /// `Ok(2)`, which is what this function used to return directly.
 pub fn invalid(builtin: &str, letter: char, usage: &str) -> ShellError {
-    eprintln!("rush: {}: -{}: invalid option", builtin, letter);
+    eprintln!("oslo: {}: -{}: invalid option", builtin, letter);
     eprintln!("{}", usage);
     ShellError::utility_error(format!("{}: -{}: invalid option", builtin, letter), 2)
 }

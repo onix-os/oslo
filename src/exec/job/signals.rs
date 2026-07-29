@@ -13,7 +13,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 /// SIGPIPE is in the list even though the shell never touches it deliberately: the Rust runtime
 /// sets it to `SIG_IGN` before `main` so a write to a closed socket returns `EPIPE` instead of
 /// killing the process. An ignored disposition survives `execv` (only *handled* signals are reset
-/// by exec), so without this every command rush runs inherits it — which is why `yes | head -1`
+/// by exec), so without this every command oslo runs inherits it — which is why `yes | head -1`
 /// printed `yes: standard output: Broken pipe` instead of dying quietly on the closed pipe.
 const RESET_IN_CHILD: [Signal; 6] = [
     Signal::SIGPIPE,
@@ -30,7 +30,7 @@ const RESET_IN_CHILD: [Signal; 6] = [
 /// running commands. It is the counterpart of [`install_shell_signals`]: the REPL ignores
 /// SIGTSTP/SIGTTIN/SIGTTOU so that job-control keystrokes and terminal access from a background
 /// process cannot stop the shell itself, but a child that inherits those cannot be suspended at
-/// all — Ctrl-Z on anything rush launched did nothing.
+/// all — Ctrl-Z on anything oslo launched did nothing.
 ///
 /// R7.1: it also renounces job control for the child (`control::leave_job_control`). A
 /// forked subshell is *not* the session's shell: if it kept the terminal descriptor it would put
@@ -50,7 +50,7 @@ pub fn reset_signals_for_child() {
         }
     }
 
-    // A blocked signal also survives exec. Nothing in rush blocks signals for longer than a
+    // A blocked signal also survives exec. Nothing in oslo blocks signals for longer than a
     // `tcsetpgrp` pair, but a mask inherited from whatever started the shell — or caught mid-swap
     // by a fork — would be passed on to every command it runs.
     let _ = signal::sigprocmask(SigmaskHow::SIG_SETMASK, Some(&SigSet::empty()), None);

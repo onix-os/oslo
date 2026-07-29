@@ -28,7 +28,7 @@ pub fn builtin_test(env: &mut Environment, args: &[String]) -> Result<i32> {
         if expr.last().map(String::as_str) == Some("]") {
             expr = &expr[..expr.len() - 1];
         } else {
-            eprintln!("rush: [: missing `]'");
+            eprintln!("oslo: [: missing `]'");
             return Ok(2);
         }
     }
@@ -78,7 +78,7 @@ fn report(name: &str, outcome: TestResult<bool>) -> Result<i32> {
         Ok(true) => Ok(0),
         Ok(false) => Ok(1),
         Err(err) => {
-            eprintln!("rush: {}: {}", name, err.message());
+            eprintln!("oslo: {}: {}", name, err.message());
             Ok(2)
         }
     }

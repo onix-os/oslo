@@ -1,6 +1,6 @@
 //! The two lists that make the differential suite a ratchet.
 //!
-//! `EXPECTED_FAIL` names every corpus case rush currently gets wrong, with the PLAN.md finding
+//! `EXPECTED_FAIL` names every corpus case oslo currently gets wrong, with the PLAN.md finding
 //! that explains it. Two rules keep the list from rotting:
 //!
 //! * a case that is not listed and does not match bash fails the suite — no new divergence
@@ -15,7 +15,7 @@
 //! Entries there are skipped, never compared, and each one needs a reason. Keep the two lists
 //! separate: "we are wrong" and "the comparison is meaningless" are different claims.
 
-/// Corpus file, PLAN.md finding ID, and what rush does instead.
+/// Corpus file, PLAN.md finding ID, and what oslo does instead.
 ///
 /// One row per line, deliberately: closing a finding is a one-line deletion, and rustfmt would
 /// otherwise wrap each row across four lines and hide that.
@@ -39,7 +39,7 @@ pub const EXPECTED_FAIL: &[(&str, &str, &str)] = &[
     // --- Round 5: builtins conformance ---
     // Empty: `readonly` now refuses the assignment *and* reports it. `builtin_readonly.sh` needed
     // both halves of R11 to close — R5.10's status propagation, and the differential harness
-    // finally running rush in the same `--posix` mode it was giving the oracle.
+    // finally running oslo in the same `--posix` mode it was giving the oracle.
 
     // --- Round 6: shell options and traps ---
     // Empty: every option in the `set -o` table that has behaviour now acts on it, and traps are
@@ -66,7 +66,7 @@ pub const EXPECTED_FAIL: &[(&str, &str, &str)] = &[
 
     // --- divergences the audit did not enumerate ---
     // Empty: `robust_special_builtin_failure.sh` closed with R11's C4. It needed three things at
-    // once — a `--posix` flag, a differential harness that gives rush the same mode it gives the
+    // once — a `--posix` flag, a differential harness that gives oslo the same mode it gives the
     // oracle, and a builtin that reports a *utility* error rather than a non-zero status, so that
     // `export "=1"` is fatal where `shift 5` is not.
 ];

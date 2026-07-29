@@ -57,7 +57,7 @@ pub fn render_default_left_prompt(last_status: i32) -> String {
 
 // There is no right prompt (PLAN R9.7). The renderer that used to be here printed a clock at a
 // hardcoded UTC+2 and was never called by anything but its own smoke test: nothing drew it, and
-// `rush.set_right_prompt` fed a function nothing read. Drawing one for real means writing at
+// `oslo.set_right_prompt` fed a function nothing read. Drawing one for real means writing at
 // `terminal_width - display_width` and restoring the cursor before the line editor takes over,
 // and rustyline repaints from the prompt to end-of-line on every keystroke, which erases it.
 // The dead API is gone rather than half-implemented; see `lua::engine::LuaEngine::setup_bindings`.

@@ -1,8 +1,8 @@
 //! A nesting-depth pre-check on raw shell source, run before the parser sees it.
 //!
-//! `brush_parser` is recursive descent, and rush's AST conversion, evaluator and even the `Drop`
+//! `brush_parser` is recursive descent, and oslo's AST conversion, evaluator and even the `Drop`
 //! glue that frees the AST all recurse over the same shape. Deeply nested input therefore
-//! overflows the stack *inside brush*, before any rush code that could report the problem runs —
+//! overflows the stack *inside brush*, before any oslo code that could report the problem runs —
 //! and Rust turns a stack overflow into `SIGABRT`, so the shell died with status 134 and a core
 //! dump. Nothing downstream can defend against that: the only place to stop it is before the
 //! parser is called at all.
@@ -28,7 +28,7 @@ pub const MAX_INPUT_NESTING: usize = 100;
 /// A *different* failure from depth, and the reason [`MAX_INPUT_NESTING`] alone was not enough:
 /// `brush_parser` is a PEG, so it backtracks, and on an opener that never closes it re-tries an
 /// exponential number of alternatives before it can conclude the input is malformed. Measured on
-/// a debug build with `rush -c "$(printf '(%.0s' $(seq n))x"`, parse time doubles per unmatched
+/// a debug build with `oslo -c "$(printf '(%.0s' $(seq n))x"`, parse time doubles per unmatched
 /// `(` — 10 openers 0.01 s, 20 openers 0.64 s, 25 openers 15.9 s, 30 openers unfinished after
 /// half a minute. Depth 25 is a quarter of what the depth guard permits, so the guard never saw
 /// it, and the shell sat at 100% CPU on input as short as `(((((((((((((((((((((((((x`.
@@ -42,7 +42,7 @@ pub const MAX_INPUT_NESTING: usize = 100;
 /// reach this legitimately would be a heredoc body carrying seventeen more `(` than `)`.
 ///
 /// This is a syntax error and not a resource limit, so it reports one — bash exits 2 on every
-/// input this rejects, and rush now does too.
+/// input this rejects, and oslo now does too.
 const MAX_UNMATCHED_OPENERS: usize = 16;
 
 /// Refuse input whose nesting would overflow the stack inside the parser, or whose unmatched

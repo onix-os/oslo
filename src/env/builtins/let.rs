@@ -13,7 +13,7 @@ use crate::expand::arithmetic::eval_arithmetic;
 pub fn builtin_let(env: &mut Environment, args: &[String]) -> Result<i32> {
     let exprs = &args[1.min(args.len())..];
     if exprs.is_empty() {
-        eprintln!("rush: let: expression expected");
+        eprintln!("oslo: let: expression expected");
         return Ok(1);
     }
 
@@ -24,7 +24,7 @@ pub fn builtin_let(env: &mut Environment, args: &[String]) -> Result<i32> {
             // An unparseable expression is the builtin's failure, not the shell's: bash reports
             // it, gives `let` status 1, and carries on with the next command.
             Err(e) => {
-                eprintln!("rush: let: {}", e);
+                eprintln!("oslo: let: {}", e);
                 return Ok(1);
             }
         }
@@ -48,8 +48,8 @@ mod tests {
     #[test]
     fn an_assignment_reaches_the_environment() {
         let mut env = Environment::new();
-        assert_eq!(run(&mut env, &["rush_let_x = 1 + 2"]), 0);
-        assert_eq!(env.get_var("rush_let_x"), Some("3"));
+        assert_eq!(run(&mut env, &["oslo_let_x = 1 + 2"]), 0);
+        assert_eq!(env.get_var("oslo_let_x"), Some("3"));
     }
 
     /// Every expression is evaluated; only the last one decides the status.
@@ -57,10 +57,10 @@ mod tests {
     fn several_expressions_all_run() {
         let mut env = Environment::new();
         assert_eq!(
-            run(&mut env, &["rush_let_a=5", "rush_let_b=rush_let_a*2"]),
+            run(&mut env, &["oslo_let_a=5", "oslo_let_b=oslo_let_a*2"]),
             0
         );
-        assert_eq!(env.get_var("rush_let_b"), Some("10"));
+        assert_eq!(env.get_var("oslo_let_b"), Some("10"));
     }
 
     /// The inverted status: a zero result is a *failed* `let`, which is what makes `let` usable
@@ -70,7 +70,7 @@ mod tests {
         let mut env = Environment::new();
         assert_eq!(run(&mut env, &["1 > 3"]), 1);
         assert_eq!(run(&mut env, &["3 > 1"]), 0);
-        assert_eq!(run(&mut env, &["rush_let_z = 0"]), 1);
+        assert_eq!(run(&mut env, &["oslo_let_z = 0"]), 1);
     }
 
     #[test]

@@ -30,7 +30,7 @@ pub fn builtin_set(env: &mut Environment, args: &[String]) -> Result<i32> {
     let parsed = match parse_set_args(args) {
         Ok(parsed) => parsed,
         Err(err) => {
-            eprintln!("rush: set: {}", err);
+            eprintln!("oslo: set: {}", err);
             // The usage line answers "which letters are there?", so it follows a bad *letter*
             // and not a bad `-o` name, where it would list nothing relevant.
             if matches!(err, SetError::InvalidOption(_)) {
@@ -97,7 +97,7 @@ pub fn builtin_shift(env: &mut Environment, args: &[String]) -> Result<i32> {
         match args[1].parse::<usize>() {
             Ok(num) => num,
             Err(_) => {
-                eprintln!("rush: shift: {}: numeric argument required", args[1]);
+                eprintln!("oslo: shift: {}: numeric argument required", args[1]);
                 return Ok(1);
             }
         }
@@ -107,7 +107,7 @@ pub fn builtin_shift(env: &mut Environment, args: &[String]) -> Result<i32> {
 
     let pos = env.get_positional().to_vec();
     if n > pos.len() {
-        eprintln!("rush: shift: shift count out of range");
+        eprintln!("oslo: shift: shift count out of range");
         return Ok(1);
     }
 

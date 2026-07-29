@@ -527,22 +527,22 @@ mod tests {
         }
     }
 
-    /// `rush_ref`, not `name`: [`Environment::new`] inherits the real environment, and a plain
+    /// `oslo_ref`, not `name`: [`Environment::new`] inherits the real environment, and a plain
     /// word like `name` is genuinely exported by some development shells — which would make the
     /// unset case below pass or fail depending on who ran the tests.
     #[test]
     fn indirection_follows_the_named_parameter() {
-        let vars = [("rush_target", "payload"), ("rush_ref", "rush_target")];
-        let got = expand(&vars, "rush_ref", ParamExpansion::Indirect);
+        let vars = [("oslo_target", "payload"), ("oslo_ref", "oslo_target")];
+        let got = expand(&vars, "oslo_ref", ParamExpansion::Indirect);
         assert_eq!(got, Ok("payload".into()));
         // Only the *inner* parameter may be unset; that is an empty string, not an error.
-        let vars = [("rush_ref", "rush_nosuchvar")];
-        let got = expand(&vars, "rush_ref", ParamExpansion::Indirect);
+        let vars = [("oslo_ref", "oslo_nosuchvar")];
+        let got = expand(&vars, "oslo_ref", ParamExpansion::Indirect);
         assert_eq!(got, Ok(String::new()));
         // bash aborts the expansion when the referring parameter is unset, or holds anything
         // that is not a name — including the empty string.
-        for vars in [vec![], vec![("rush_ref", "")], vec![("rush_ref", "a b")]] {
-            let got = expand(&vars, "rush_ref", ParamExpansion::Indirect);
+        for vars in [vec![], vec![("oslo_ref", "")], vec![("oslo_ref", "a b")]] {
+            let got = expand(&vars, "oslo_ref", ParamExpansion::Indirect);
             assert!(got.is_err(), "{vars:?} expanded to {got:?}");
         }
     }

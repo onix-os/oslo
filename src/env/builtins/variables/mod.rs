@@ -45,7 +45,7 @@ pub use scoped::{builtin_local, builtin_readonly};
 /// The whole word is quoted back, not the part before the `=`, so `export '=1'` names what the
 /// user actually typed.
 fn not_an_identifier(builtin: &str, word: &str) {
-    eprintln!("rush: {}: '{}': not a valid identifier", builtin, word);
+    eprintln!("oslo: {}: '{}': not a valid identifier", builtin, word);
 }
 
 #[cfg(test)]

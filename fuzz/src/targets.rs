@@ -5,8 +5,8 @@
 //! panic, an abort from a debug-build overflow, a stack exhaustion from unbounded recursion, or a
 //! non-terminating loop.
 
-use rush::Environment;
-use rush::lexer::{Lexer, Token, parse_single_word};
+use oslo::Environment;
+use oslo::lexer::{Lexer, Token, parse_single_word};
 use std::sync::{Mutex, MutexGuard, Once};
 
 use crate::{MAX_EXPR, MAX_SCRIPT, MAX_WORD, opens_command_substitution, text};
@@ -16,7 +16,7 @@ pub fn parse_script(data: &[u8]) {
     let Some(source) = text(data, MAX_SCRIPT) else {
         return;
     };
-    let _ = rush::parse_bash_script(&source);
+    let _ = oslo::parse_bash_script(&source);
 }
 
 /// Run the word lexer and its token scanner over one input.
@@ -67,7 +67,7 @@ pub fn eval_arith(data: &[u8]) {
         return;
     }
     let mut env = fuzz_env();
-    let _ = rush::expand::arithmetic::eval_arithmetic(&mut env, &expr);
+    let _ = oslo::expand::arithmetic::eval_arithmetic(&mut env, &expr);
 }
 
 /// A shell environment with a fixed, interesting set of variables.
@@ -334,7 +334,7 @@ mod tests {
     #[test]
     fn deep_nesting_is_refused_not_overflowed() {
         // The nesting pre-check exists because brush's recursive descent overflows the stack
-        // before any rush code can report it. A fuzzer finds this input in seconds.
+        // before any oslo code can report it. A fuzzer finds this input in seconds.
         for depth in [50, 200, 5_000] {
             parse_script(format!("{}{}", "(".repeat(depth), ")".repeat(depth)).as_bytes());
             parse_script(format!("{}true{}", "{ ".repeat(depth), "; }".repeat(depth)).as_bytes());

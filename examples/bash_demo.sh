@@ -1,6 +1,6 @@
 #!/usr/bin/env sh
 
-echo "=== Running Complex .sh Script with rush ==="
+echo "=== Running Complex .sh Script with oslo ==="
 
 # Variable assignments & arithmetic
 A=15
@@ -13,7 +13,7 @@ say_hello() {
     echo "Hello from shell function: $1"
 }
 
-say_hello "RushShell"
+say_hello "OsloShell"
 
 # If-Else Statement
 if [ $SUM -gt 30 ]; then

@@ -11,7 +11,7 @@ pub mod parser;
 pub use env::Environment;
 pub use error::{Result, ShellError};
 pub use exec::{JobManager, eval_command_list};
-pub use interactive::RushHelper;
+pub use interactive::OsloHelper;
 pub use lexer::Lexer;
 pub use lua::LuaEngine;
 pub use parser::parse_bash_script;

@@ -42,7 +42,7 @@ pub fn builtin_cd(env: &mut Environment, args: &[String]) -> Result<i32> {
     let (mode, operands) = match parse_mode(args) {
         Ok(parsed) => parsed,
         Err(flag) => {
-            eprintln!("rush: cd: {flag}: invalid option");
+            eprintln!("oslo: cd: {flag}: invalid option");
             eprintln!("{CD_USAGE}");
             return Ok(2);
         }
@@ -51,7 +51,7 @@ pub fn builtin_cd(env: &mut Environment, args: &[String]) -> Result<i32> {
     if operands.len() > 1 {
         // A usage error rather than a failed cd: the shell has not moved, and bash reports 2
         // for every builtin whose arguments do not parse.
-        eprintln!("rush: cd: too many arguments");
+        eprintln!("oslo: cd: too many arguments");
         return Ok(2);
     }
 
@@ -62,7 +62,7 @@ pub fn builtin_cd(env: &mut Environment, args: &[String]) -> Result<i32> {
         None => match env.get_var("HOME").map(str::to_string) {
             Some(home) if !home.is_empty() => home,
             _ => {
-                eprintln!("rush: cd: HOME not set");
+                eprintln!("oslo: cd: HOME not set");
                 return Ok(1);
             }
         },
@@ -71,7 +71,7 @@ pub fn builtin_cd(env: &mut Environment, args: &[String]) -> Result<i32> {
             match env.get_var("OLDPWD").map(str::to_string) {
                 Some(old) if !old.is_empty() => old,
                 _ => {
-                    eprintln!("rush: cd: OLDPWD not set");
+                    eprintln!("oslo: cd: OLDPWD not set");
                     return Ok(1);
                 }
             }
@@ -95,7 +95,7 @@ pub fn builtin_pwd(env: &mut Environment, args: &[String]) -> Result<i32> {
         // Operands are ignored: `pwd` has none, and bash does not complain about extras.
         Ok(parsed) => parsed,
         Err(flag) => {
-            eprintln!("rush: pwd: {flag}: invalid option");
+            eprintln!("oslo: pwd: {flag}: invalid option");
             eprintln!("{PWD_USAGE}");
             return Ok(2);
         }
@@ -106,7 +106,7 @@ pub fn builtin_pwd(env: &mut Environment, args: &[String]) -> Result<i32> {
         PathMode::Physical => match env::current_dir() {
             Ok(path) => println!("{}", path.display()),
             Err(e) => {
-                eprintln!("rush: pwd: error retrieving current directory: {e}");
+                eprintln!("oslo: pwd: error retrieving current directory: {e}");
                 return Ok(1);
             }
         },

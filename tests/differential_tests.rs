@@ -1,4 +1,4 @@
-//! Differential suite: every corpus script, run through rush and through bash.
+//! Differential suite: every corpus script, run through oslo and through bash.
 //!
 //! The audit that produced PLAN.md found one dominant failure mode — a plausible *wrong answer*
 //! with exit status 0. No self-referential test can see that class of bug, because the expected
@@ -16,12 +16,12 @@
 //!   should complain does, and a shell that should stay quiet does.
 //!
 //! Every case runs with stdin on `/dev/null`, in its own scratch directory, under a wall-clock
-//! timeout. rush has live hangs (`while read` never terminates), and an unguarded suite would
+//! timeout. oslo has live hangs (`while read` never terminates), and an unguarded suite would
 //! wedge CI instead of failing it — so a timeout is a first-class verdict here, not an accident.
 //!
 //! Corpus scripts declare their oracle on the first line: `# mode: posix` runs `--posix -c` for
 //! POSIX semantics, `# mode: bash` runs a plain `-c` for the bash extensions (arrays, `[[ ]]`,
-//! `(( ))`, brace expansion) that rush also aims to support. The mode goes to **both** shells —
+//! `(( ))`, brace expansion) that oslo also aims to support. The mode goes to **both** shells —
 //! see [`compare`] for what it cost to get that wrong.
 
 mod common;
@@ -42,7 +42,7 @@ use std::time::{Duration, Instant};
 /// Wall-clock budget per shell invocation. Generous: it exists to convert a hang into a failure,
 /// not to measure performance.
 fn timeout() -> Duration {
-    let secs = std::env::var("RUSH_DIFF_TIMEOUT_SECS")
+    let secs = std::env::var("OSLO_DIFF_TIMEOUT_SECS")
         .ok()
         .and_then(|s| s.parse().ok())
         .unwrap_or(10);
@@ -62,9 +62,9 @@ struct Case {
     /// Lowest bash `(major, minor)` that arbitrates this case, from a `# needs-bash: 5.3` header.
     ///
     /// Bash is a moving specification, not a fixed one: four of its behaviours changed between
-    /// 5.2 and 5.3, and rush follows the newer answer. Running those cases against an older oracle
-    /// compares rush to a bash that has since been corrected, so the case is skipped and counted
-    /// rather than reported as a rush defect. This is deliberately *not* a third escape hatch
+    /// 5.2 and 5.3, and oslo follows the newer answer. Running those cases against an older oracle
+    /// compares oslo to a bash that has since been corrected, so the case is skipped and counted
+    /// rather than reported as a oslo defect. This is deliberately *not* a third escape hatch
     /// alongside `EXPECTED_FAIL` and `KNOWN_DIVERGENT` — it says "this runner's oracle is too old
     /// to answer", which is a fact about the machine, and the count is printed so a CI image that
     /// silently ages cannot quietly stop testing things.
@@ -149,7 +149,7 @@ fn execute(program: &Path, args: &[&str], script: &str) -> io::Result<Outcome> {
         .stdin(Stdio::null())
         .stdout(fs::File::create(&out_path)?)
         .stderr(fs::File::create(&err_path)?)
-        // A user's $ENV or $BASH_ENV would be sourced by bash and ignored by rush, which is a
+        // A user's $ENV or $BASH_ENV would be sourced by bash and ignored by oslo, which is a
         // difference in the harness rather than in the shells.
         .env_remove("ENV")
         .env_remove("BASH_ENV")
@@ -189,7 +189,7 @@ fn execute(program: &Path, args: &[&str], script: &str) -> io::Result<Outcome> {
 
 enum Verdict {
     Match,
-    /// rush never terminated. Always a defect, never an acceptable difference.
+    /// oslo never terminated. Always a defect, never an acceptable difference.
     Hung,
     Differ(String),
 }
@@ -197,10 +197,10 @@ enum Verdict {
 /// The argv prefix a case's declared mode asks for — the *same* one for both shells.
 ///
 /// It is a function rather than two literals at the call site because that is the shape the bug
-/// took: until Round 11 rush was always given a bare `-c` while bash got `--posix` for a
-/// `# mode: posix` case, so all 304 of those cases were judged against an oracle rush was never
+/// took: until Round 11 oslo was always given a bare `-c` while bash got `--posix` for a
+/// `# mode: posix` case, so all 304 of those cases were judged against an oracle oslo was never
 /// in. A POSIX-only behaviour could then neither be tested nor regress here, and a case that
-/// passed only because rush had stayed in bash mode looked green.
+/// passed only because oslo had stayed in bash mode looked green.
 fn mode_args(oracle: Oracle) -> &'static [&'static str] {
     match oracle {
         Oracle::Posix => &["--posix", "-c"],
@@ -210,7 +210,7 @@ fn mode_args(oracle: Oracle) -> &'static [&'static str] {
 
 fn compare(case: &Case) -> Verdict {
     let args = mode_args(case.oracle);
-    let rush = execute(&common::rush_bin(), args, &case.script).expect("spawn rush");
+    let oslo = execute(&common::oslo_bin(), args, &case.script).expect("spawn oslo");
     let bash = execute(Path::new("bash"), args, &case.script)
         .expect("spawn bash — the differential suite needs bash on PATH as its oracle");
 
@@ -220,26 +220,26 @@ fn compare(case: &Case) -> Verdict {
             case.name
         ));
     }
-    if rush.timed_out {
+    if oslo.timed_out {
         return Verdict::Hung;
     }
 
     let mut report = String::new();
-    if rush.stdout != bash.stdout {
+    if oslo.stdout != bash.stdout {
         report.push_str("  stdout:\n");
-        report.push_str(&diff_lines(&bash.stdout, &rush.stdout));
+        report.push_str(&diff_lines(&bash.stdout, &oslo.stdout));
     }
-    if rush.status != bash.status {
+    if oslo.status != bash.status {
         report.push_str(&format!(
-            "  status: bash {} vs rush {}\n",
-            bash.status, rush.status
+            "  status: bash {} vs oslo {}\n",
+            bash.status, oslo.status
         ));
     }
-    if rush.stderr_empty != bash.stderr_empty {
+    if oslo.stderr_empty != bash.stderr_empty {
         report.push_str(&format!(
-            "  stderr: bash {} vs rush {}\n",
+            "  stderr: bash {} vs oslo {}\n",
             shape(bash.stderr_empty),
-            shape(rush.stderr_empty)
+            shape(oslo.stderr_empty)
         ));
     }
 
@@ -271,7 +271,7 @@ fn diff_lines(expected: &str, actual: &str) -> String {
             break;
         }
         out.push_str(&format!(
-            "    line {}: bash {:?} vs rush {:?}\n",
+            "    line {}: bash {:?} vs oslo {:?}\n",
             i + 1,
             e.unwrap_or(&"<no line>"),
             a.unwrap_or(&"<no line>")
@@ -308,7 +308,7 @@ fn run_all(cases: &[Case]) -> Vec<(String, Verdict)> {
 /// The oracle's `(major, minor)`, asserting it is new enough to arbitrate anything at all.
 ///
 /// The corpus uses constructs bash grew in 4.x (`${v^^}`, `&>`), so an ancient oracle would
-/// report differences that say nothing about rush — so fail with the reason rather than with 40
+/// report differences that say nothing about oslo — so fail with the reason rather than with 40
 /// mystery divergences. The minor version matters too: it decides which cases carry a
 /// `# needs-bash:` line this runner cannot honour.
 fn oracle_version() -> (u32, u32) {
@@ -381,7 +381,7 @@ fn corpus_matches_bash() {
             }
             (Verdict::Hung, Some(_)) | (Verdict::Differ(_), Some(_)) => still_failing += 1,
             (Verdict::Hung, None) => unexpected_failures
-                .push(format!("  {name}\n    rush never terminated (timed out)\n")),
+                .push(format!("  {name}\n    oslo never terminated (timed out)\n")),
             (Verdict::Differ(detail), None) => {
                 unexpected_failures.push(format!("  {name}\n{detail}"))
             }
@@ -436,26 +436,26 @@ fn corpus_matches_bash() {
     );
 }
 
-/// The mode flag has to *reach* rush, not merely sit on its command line.
+/// The mode flag has to *reach* oslo, not merely sit on its command line.
 ///
-/// [`mode_args`] sends the same argv to both shells, but a `--posix` that rush parsed and then
+/// [`mode_args`] sends the same argv to both shells, but a `--posix` that oslo parsed and then
 /// dropped would look identical from here — which is what the suite could not tell apart before
 /// Round 11. So assert the observable difference directly: under POSIX a failed variable
 /// assignment ends the shell, and outside it the shell carries on. Without this, a regression
 /// that made `--posix` inert would show up only as `# mode: posix` cases quietly agreeing with a
-/// bash-mode rush.
+/// bash-mode oslo.
 #[test]
-fn the_posix_flag_changes_what_rush_does() {
+fn the_posix_flag_changes_what_oslo_does() {
     const SCRIPT: &str = "readonly r=1; r=2; echo alive";
 
-    let posix = execute(&common::rush_bin(), mode_args(Oracle::Posix), SCRIPT).expect("spawn rush");
+    let posix = execute(&common::oslo_bin(), mode_args(Oracle::Posix), SCRIPT).expect("spawn oslo");
     assert_eq!(
         posix.stdout, "",
         "under --posix a refused assignment must end the shell before `echo alive`"
     );
     assert!(!posix.stderr_empty, "the refusal must still be reported");
 
-    let bash_mode = execute(&common::rush_bin(), mode_args(Oracle::Bash), SCRIPT).expect("spawn");
+    let bash_mode = execute(&common::oslo_bin(), mode_args(Oracle::Bash), SCRIPT).expect("spawn");
     assert_eq!(
         bash_mode.stdout, "alive\n",
         "without --posix the same refusal is an ordinary failed command"

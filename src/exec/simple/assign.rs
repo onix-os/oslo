@@ -155,47 +155,47 @@ mod tests {
 
     #[test]
     fn an_array_literal_stores_its_elements() {
-        assert_eq!(array_of("rush_x1=(1 2 3)", "rush_x1"), "1 2 3");
-        assert_eq!(array_of("rush_x2=()", "rush_x2"), "");
+        assert_eq!(array_of("oslo_x1=(1 2 3)", "oslo_x1"), "1 2 3");
+        assert_eq!(array_of("oslo_x2=()", "oslo_x2"), "");
     }
 
     /// The elements are words in list context: an unquoted expansion splits into several.
     #[test]
     fn an_unquoted_element_splits_into_several() {
-        let src = "rush_l='a b c'\nrush_x3=($rush_l)";
-        assert_eq!(array_of(src, "rush_x3"), "a b c");
+        let src = "oslo_l='a b c'\noslo_x3=($oslo_l)";
+        assert_eq!(array_of(src, "oslo_x3"), "a b c");
         // …and a quoted one does not.
-        let src = "rush_l='a b c'\nrush_x4=(\"$rush_l\" d)";
-        assert_eq!(array_of(src, "rush_x4"), "a b c d");
+        let src = "oslo_l='a b c'\noslo_x4=(\"$oslo_l\" d)";
+        assert_eq!(array_of(src, "oslo_x4"), "a b c d");
     }
 
     #[test]
     fn an_explicit_index_moves_the_running_position() {
         let mut env = Environment::new();
-        let script = crate::parser::parse_bash_script("rush_x5=(a [5]=b c)").expect("parse");
+        let script = crate::parser::parse_bash_script("oslo_x5=(a [5]=b c)").expect("parse");
         crate::exec::eval_command_list(&mut env, &script).expect("exec");
-        let array = env.get_array("rush_x5").expect("an array");
+        let array = env.get_array("oslo_x5").expect("an array");
         assert_eq!(array.indices().collect::<Vec<_>>(), vec![0, 5, 6]);
     }
 
     #[test]
     fn append_extends_an_array_and_concatenates_a_scalar() {
-        assert_eq!(array_of("rush_x6=(a b)\nrush_x6+=(c)", "rush_x6"), "a b c");
+        assert_eq!(array_of("oslo_x6=(a b)\noslo_x6+=(c)", "oslo_x6"), "a b c");
         let mut env = Environment::new();
-        let script = crate::parser::parse_bash_script("rush_x7=a\nrush_x7+=b").expect("parse");
+        let script = crate::parser::parse_bash_script("oslo_x7=a\noslo_x7+=b").expect("parse");
         crate::exec::eval_command_list(&mut env, &script).expect("exec");
-        assert_eq!(env.get_var("rush_x7"), Some("ab"));
+        assert_eq!(env.get_var("oslo_x7"), Some("ab"));
     }
 
     /// An element assignment must write the element, not a variable whose name contains brackets.
     #[test]
     fn an_element_assignment_writes_an_element() {
-        assert_eq!(array_of("rush_x8[2]=y", "rush_x8"), "y");
+        assert_eq!(array_of("oslo_x8[2]=y", "oslo_x8"), "y");
         let mut env = Environment::new();
-        let script = crate::parser::parse_bash_script("rush_x9[2]=y").expect("parse");
+        let script = crate::parser::parse_bash_script("oslo_x9[2]=y").expect("parse");
         crate::exec::eval_command_list(&mut env, &script).expect("exec");
-        assert_eq!(env.get_var("rush_x9[2]"), None);
-        assert_eq!(env.get_array("rush_x9").unwrap().get(2), Some("y"));
+        assert_eq!(env.get_var("oslo_x9[2]"), None);
+        assert_eq!(env.get_array("oslo_x9").unwrap().get(2), Some("y"));
     }
 
     /// A refused assignment reports failure and leaves the old value in place, in every shape.
@@ -210,14 +210,14 @@ mod tests {
         };
 
         let mut env = Environment::new();
-        env.set_var("rush_ro", "1", false);
-        env.set_readonly("rush_ro");
+        env.set_var("oslo_ro", "1", false);
+        env.set_readonly("oslo_ro");
 
-        let scalar = Assignment::scalar("rush_ro", AstWord::from_literal("2"));
-        let mut appended = Assignment::scalar("rush_ro", AstWord::from_literal("x"));
+        let scalar = Assignment::scalar("oslo_ro", AstWord::from_literal("2"));
+        let mut appended = Assignment::scalar("oslo_ro", AstWord::from_literal("x"));
         appended.append = true;
         let literal = Assignment {
-            target: AssignmentTarget::Name("rush_ro".to_string()),
+            target: AssignmentTarget::Name("oslo_ro".to_string()),
             value: AssignmentValue::Array(vec![ArrayElement {
                 index: None,
                 value: AstWord::from_literal("a"),
@@ -226,7 +226,7 @@ mod tests {
         };
         let element = Assignment {
             target: AssignmentTarget::Element {
-                name: "rush_ro".to_string(),
+                name: "oslo_ro".to_string(),
                 index: AstWord::from_literal("3"),
             },
             value: AssignmentValue::Scalar(AstWord::from_literal("z")),
@@ -237,7 +237,7 @@ mod tests {
             let outcome = super::apply_assignment(&mut env, assignment).expect("evaluates");
             assert!(!outcome.assigned, "{assignment:?} should have been refused");
         }
-        assert_eq!(env.get_var("rush_ro"), Some("1"));
+        assert_eq!(env.get_var("oslo_ro"), Some("1"));
     }
 
     /// A name or value `environ` cannot hold is refused the same way, and it is not a read-only
@@ -245,17 +245,17 @@ mod tests {
     #[test]
     fn an_unrepresentable_value_is_also_a_refusal() {
         let mut env = Environment::new();
-        assert!(!env.set_var("rush_nul", "a\0b", false));
-        assert!(!env.is_readonly("rush_nul"));
+        assert!(!env.set_var("oslo_nul", "a\0b", false));
+        assert!(!env.is_readonly("oslo_nul"));
     }
 
     /// The subscript is arithmetic, evaluated when the assignment runs.
     #[test]
     fn a_subscript_is_arithmetic() {
-        let src = "rush_i=1\nrush_xa[rush_i+1]=z";
+        let src = "oslo_i=1\noslo_xa[oslo_i+1]=z";
         let mut env = Environment::new();
         let script = crate::parser::parse_bash_script(src).expect("parse");
         crate::exec::eval_command_list(&mut env, &script).expect("exec");
-        assert_eq!(env.get_array("rush_xa").unwrap().get(2), Some("z"));
+        assert_eq!(env.get_array("oslo_xa").unwrap().get(2), Some("z"));
     }
 }

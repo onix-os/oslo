@@ -7,16 +7,16 @@
 
 mod common;
 
-use common::rush_bin;
+use common::oslo_bin;
 use std::io::Write;
 use std::process::{Command, Output, Stdio};
 
-fn rush(args: &[&str]) -> Output {
-    Command::new(rush_bin())
+fn oslo(args: &[&str]) -> Output {
+    Command::new(oslo_bin())
         .args(args)
         .stdin(Stdio::null())
         .output()
-        .expect("spawn rush")
+        .expect("spawn oslo")
 }
 
 fn stdout_of(out: &Output) -> String {
@@ -33,10 +33,10 @@ fn status_of(out: &Output) -> i32 {
 
 #[test]
 fn version_prints_the_crate_version_and_exits_zero() {
-    let out = rush(&["--version"]);
+    let out = oslo(&["--version"]);
     assert_eq!(status_of(&out), 0);
     let text = stdout_of(&out);
-    assert!(text.contains("rush"), "{text:?}");
+    assert!(text.contains("oslo"), "{text:?}");
     assert!(
         text.contains(env!("CARGO_PKG_VERSION")),
         "the version must come from Cargo, not a hardcoded string: {text:?}"
@@ -45,21 +45,21 @@ fn version_prints_the_crate_version_and_exits_zero() {
 
 #[test]
 fn help_prints_usage_on_stdout_and_exits_zero() {
-    let out = rush(&["--help"]);
+    let out = oslo(&["--help"]);
     assert_eq!(status_of(&out), 0);
     let text = stdout_of(&out);
-    assert!(text.contains("usage: rush"), "{text:?}");
+    assert!(text.contains("usage: oslo"), "{text:?}");
     assert!(text.contains("-c COMMAND"), "{text:?}");
     assert!(stderr_of(&out).is_empty());
 }
 
 #[test]
 fn an_unknown_option_prints_usage_on_stderr_and_exits_two() {
-    let out = rush(&["-Z"]);
+    let out = oslo(&["-Z"]);
     assert_eq!(status_of(&out), 2);
     let err = stderr_of(&out);
     assert!(err.contains("-Z"), "{err:?}");
-    assert!(err.contains("usage: rush"), "{err:?}");
+    assert!(err.contains("usage: oslo"), "{err:?}");
     assert!(
         stdout_of(&out).is_empty(),
         "usage errors do not go to stdout"
@@ -68,14 +68,14 @@ fn an_unknown_option_prints_usage_on_stderr_and_exits_two() {
 
 #[test]
 fn an_unknown_long_option_exits_two() {
-    let out = rush(&["--nonesuch"]);
+    let out = oslo(&["--nonesuch"]);
     assert_eq!(status_of(&out), 2);
     assert!(stderr_of(&out).contains("--nonesuch"));
 }
 
 #[test]
 fn dash_c_without_an_argument_exits_two() {
-    let out = rush(&["-c"]);
+    let out = oslo(&["-c"]);
     assert_eq!(status_of(&out), 2);
     assert!(
         stderr_of(&out).contains("requires an argument"),
@@ -86,14 +86,14 @@ fn dash_c_without_an_argument_exits_two() {
 
 #[test]
 fn dash_c_still_runs_a_command() {
-    let out = rush(&["-c", "echo hi"]);
+    let out = oslo(&["-c", "echo hi"]);
     assert_eq!(status_of(&out), 0);
     assert_eq!(stdout_of(&out), "hi\n");
 }
 
 #[test]
 fn dash_c_takes_name_and_positional_operands() {
-    let out = rush(&["-c", "echo $0 $# $1 $2", "myname", "one", "two"]);
+    let out = oslo(&["-c", "echo $0 $# $1 $2", "myname", "one", "two"]);
     assert_eq!(stdout_of(&out).trim_end(), "myname 2 one two");
 }
 
@@ -103,21 +103,21 @@ fn a_script_operand_gets_its_own_positionals() {
     let script = dir.path().join("s.sh");
     std::fs::write(&script, "echo $# $1 $2\n").unwrap();
 
-    let out = rush(&[script.to_str().unwrap(), "alpha", "beta"]);
+    let out = oslo(&[script.to_str().unwrap(), "alpha", "beta"]);
     assert_eq!(stdout_of(&out).trim_end(), "2 alpha beta");
     assert_eq!(status_of(&out), 0);
 }
 
 #[test]
 fn a_missing_script_exits_one_hundred_and_twenty_seven() {
-    let out = rush(&["/nonexistent/script/xyz.sh"]);
+    let out = oslo(&["/nonexistent/script/xyz.sh"]);
     assert_eq!(status_of(&out), 127);
     assert!(!stderr_of(&out).is_empty());
 }
 
 #[test]
 fn double_dash_ends_option_parsing() {
-    let out = rush(&["--", "/nonexistent/script/xyz.sh"]);
+    let out = oslo(&["--", "/nonexistent/script/xyz.sh"]);
     assert_eq!(
         status_of(&out),
         127,
@@ -129,7 +129,7 @@ fn double_dash_ends_option_parsing() {
 /// to run, so the shell exits 0 immediately instead of blocking on a prompt.
 #[test]
 fn stdin_from_dev_null_exits_zero_without_a_banner() {
-    let out = rush(&[]);
+    let out = oslo(&[]);
     assert_eq!(status_of(&out), 0);
     assert!(
         !stdout_of(&out).contains("POSIX Compatible Shell"),
@@ -141,13 +141,13 @@ fn stdin_from_dev_null_exits_zero_without_a_banner() {
 #[test]
 fn a_program_piped_into_stdin_is_executed() {
     for args in [vec![], vec!["-s"]] {
-        let mut child = Command::new(rush_bin())
+        let mut child = Command::new(oslo_bin())
             .args(&args)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
             .stderr(Stdio::piped())
             .spawn()
-            .expect("spawn rush");
+            .expect("spawn oslo");
         child
             .stdin
             .take()
@@ -162,12 +162,12 @@ fn a_program_piped_into_stdin_is_executed() {
 
 #[test]
 fn a_syntax_error_from_stdin_exits_two() {
-    let mut child = Command::new(rush_bin())
+    let mut child = Command::new(oslo_bin())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .expect("spawn rush");
+        .expect("spawn oslo");
     child
         .stdin
         .take()
@@ -181,7 +181,7 @@ fn a_syntax_error_from_stdin_exits_two() {
 /// The invocation's own flags are part of `$-`, which is how a script tells how it was started.
 #[test]
 fn dollar_dash_reports_the_invocation_and_the_command_line_options() {
-    let out = rush(&["-fu", "-c", "echo \"[$-]\""]);
+    let out = oslo(&["-fu", "-c", "echo \"[$-]\""]);
     assert_eq!(status_of(&out), 0, "stderr: {}", stderr_of(&out));
     // `f` and `u` from the command line, `c` because the program came from `-c`.
     assert_eq!(stdout_of(&out), "[fuc]\n");
@@ -190,7 +190,7 @@ fn dollar_dash_reports_the_invocation_and_the_command_line_options() {
 /// An option letter `set` would refuse is refused here too, with the same usage status.
 #[test]
 fn an_unknown_command_line_option_is_still_rejected() {
-    let out = rush(&["-Z", "-c", "echo ran"]);
+    let out = oslo(&["-Z", "-c", "echo ran"]);
     assert_eq!(status_of(&out), 2);
     assert!(stdout_of(&out).is_empty());
 }
@@ -199,7 +199,7 @@ fn an_unknown_command_line_option_is_still_rejected() {
 fn recorded_set_options_do_not_prevent_a_script_from_running() {
     // -e and -x reach the shell's option set (PLAN R6.1) and must not be mistaken for a script
     // name or an unknown option. Their *behaviour* arrives with R6.2/R6.3.
-    let out = rush(&["-ex", "-c", "echo ran"]);
+    let out = oslo(&["-ex", "-c", "echo ran"]);
     assert_eq!(status_of(&out), 0, "stderr: {}", stderr_of(&out));
     assert_eq!(stdout_of(&out), "ran\n");
 }

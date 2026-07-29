@@ -28,7 +28,7 @@ pub fn builtin_builtin(env: &mut Environment, args: &[String]) -> Result<i32> {
         },
         Some(result) => result,
         None => {
-            eprintln!("rush: builtin: {}: not a shell builtin", name);
+            eprintln!("oslo: builtin: {}: not a shell builtin", name);
             Ok(1)
         }
     }

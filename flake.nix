@@ -1,5 +1,5 @@
 {
-  description = "rush Rust development shell";
+  description = "oslo Rust development shell";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs?rev=4c1018dae018162ec878d42fec712642d214fdfa";

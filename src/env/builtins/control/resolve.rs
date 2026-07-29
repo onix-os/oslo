@@ -88,7 +88,7 @@ fn parse_options(args: &[String]) -> std::result::Result<(Options, &[String]), i
                 'P' => opts.force_path = true,
                 'f' => opts.no_functions = true,
                 other => {
-                    eprintln!("rush: type: -{other}: invalid option");
+                    eprintln!("oslo: type: -{other}: invalid option");
                     eprintln!("type: usage: type [-afptP] name [name ...]");
                     return Err(2);
                 }
@@ -162,7 +162,7 @@ pub fn builtin_type(env: &mut Environment, args: &[String]) -> Result<i32> {
             // `-t`, `-p` and `-P` are meant to be read by scripts: they report "no" with an exit
             // status and stay silent, where bare `type` complains.
             if !opts.terse && !opts.path && !opts.force_path {
-                eprintln!("rush: type: {name}: not found");
+                eprintln!("oslo: type: {name}: not found");
             }
             status = 1;
             continue;

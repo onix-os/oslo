@@ -67,7 +67,7 @@ pub fn builtin_mapfile(env: &mut Environment, args: &[String]) -> Result<i32> {
     let (opts, operands) = match parse_options(args) {
         Ok(parsed) => parsed,
         Err(e) => {
-            eprintln!("rush: mapfile: {}", e.message);
+            eprintln!("oslo: mapfile: {}", e.message);
             eprintln!("{}", USAGE);
             return Ok(e.status);
         }
@@ -76,14 +76,14 @@ pub fn builtin_mapfile(env: &mut Environment, args: &[String]) -> Result<i32> {
     // bash ignores operands after the first, so `mapfile a b` fills `a` and leaves `b` alone.
     let name = operands.first().map_or(DEFAULT_ARRAY, String::as_str);
     if !is_valid_identifier(name) {
-        eprintln!("rush: mapfile: `{}': not a valid identifier", name);
+        eprintln!("oslo: mapfile: `{}': not a valid identifier", name);
         return Ok(1);
     }
 
     let records = match read_records(&opts) {
         Ok(records) => records,
         Err(errno) => {
-            eprintln!("rush: mapfile: read error: {}", errno);
+            eprintln!("oslo: mapfile: read error: {}", errno);
             return Ok(1);
         }
     };

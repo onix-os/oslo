@@ -213,7 +213,7 @@ mod tests {
         assert_eq!(op_of("${#@}", "@"), ParamExpansion::Length);
     }
 
-    /// `${!prefix*}` is bash's name-listing form, which rush does not implement. It must reach
+    /// `${!prefix*}` is bash's name-listing form, which oslo does not implement. It must reach
     /// the expander as a non-name so it errors, not as something that quietly expands.
     #[test]
     fn the_name_listing_form_is_left_as_a_bad_name() {
@@ -437,7 +437,7 @@ mod tests {
     }
 
     /// The property the whole module protects: a body it cannot split stays a *name*, so the
-    /// expander rejects it. `${v@Q}` is a real bash operator rush does not implement.
+    /// expander rejects it. `${v@Q}` is a real bash operator oslo does not implement.
     #[test]
     fn an_unknown_operator_is_left_as_a_bad_name() {
         assert_eq!(op_of("${v@Q}", "v@Q"), ParamExpansion::Normal);

@@ -16,27 +16,65 @@ jobs:
       matrix:
         include:
           - os: ubuntu-latest
-            artifact: "rush-linux-amd64"
+            target: x86_64-unknown-linux-musl
+            artifact: "oslo-linux-amd64"
           - os: ubuntu-24.04-arm
-            artifact: "rush-linux-arm64"
-          - os: macos-15-intel
-            artifact: "rush-macos-amd64"
-          - os: macos-14
-            artifact: "rush-macos-arm64"
+            target: aarch64-unknown-linux-musl
+            artifact: "oslo-linux-arm64"
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@1.94.0
+        with:
+          targets: ${{ matrix.target }}
+      # `musl-gcc` is here to compile mlua's vendored Lua sources for the musl target, and for
+      # nothing else. Each runner is native to the target it builds, so the plain wrapper is the
+      # right compiler in both matrix entries.
+      - name: Install a musl C compiler
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
+      # Deliberately does NOT set a linker for the target. Pointing it at `musl-gcc` looks correct
+      # and silently produces a *dynamically* linked musl binary — one that records an INTERP
+      # pointing at whatever musl the build host had, and segfaults on any machine that does not
+      # have that exact path. Leaving the linker alone lets rustc use the musl libc it ships in the
+      # target's self-contained directory, which is what makes the result genuinely static.
       - name: Build
-        run: cargo build --release --bin rush
+        env:
+          RUSTFLAGS: "-C target-feature=+crt-static"
+        run: |
+          cc_var="CC_$(echo '${{ matrix.target }}' | tr - _)"
+          export "$cc_var=musl-gcc"
+          cargo build --release --locked --target '${{ matrix.target }}' --bin oslo
+      # "Static" is a claim about the ELF, so check the ELF. `ldd` is not enough: it prints
+      # "statically linked" for a musl binary that still has an INTERP and will not start.
+      - name: Assert the binary is static
+        run: |
+          bin="target/${{ matrix.target }}/release/oslo"
+          file "$bin"
+          if readelf -l "$bin" | grep -q 'program interpreter'; then
+            echo "::error::$bin requests a dynamic loader; it is not static" >&2
+            readelf -l "$bin" | grep 'program interpreter' >&2
+            exit 1
+          fi
+          if readelf -d "$bin" 2>/dev/null | grep -q NEEDED; then
+            echo "::error::$bin has NEEDED entries; it is not static" >&2
+            readelf -d "$bin" | grep NEEDED >&2
+            exit 1
+          fi
+          echo "no INTERP and no NEEDED — statically linked"
       # A shell that cannot run `echo` is not worth shipping; catch that before the asset is
       # attached to the release rather than after someone downloads it. stdin comes from
-      # /dev/null so a REPL-fallback bug cannot hang the runner.
+      # /dev/null so a REPL-fallback bug cannot hang the runner. The Lua check is here because
+      # mlua is the one dependency that compiles C, so it is the one most likely to be linked
+      # into a binary that builds and then dies on startup.
       - name: Smoke test
         run: |
-          out="$(./target/release/rush -c 'echo ok' </dev/null)"
+          bin="./target/${{ matrix.target }}/release/oslo"
+          out="$("$bin" -c 'echo ok' </dev/null)"
           test "$out" = "ok" || { echo "smoke test printed '$out', expected 'ok'" >&2; exit 1; }
+          lua="$(mktemp)"; echo 'print("lua " .. _VERSION)' > "$lua"
+          "$bin" --lua-script "$lua" </dev/null | grep -q 'lua Lua 5.4' \
+            || { echo "vendored Lua did not start in the static binary" >&2; exit 1; }
       - name: Package
-        run: tar -C target/release -czf "${{ matrix.artifact }}.tar.gz" rush
+        run: tar -C "target/${{ matrix.target }}/release" -czf "${{ matrix.artifact }}.tar.gz" oslo
       - name: Upload artifact
         uses: softprops/action-gh-release@v2
         with:

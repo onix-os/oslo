@@ -1,17 +1,17 @@
 //! The line editor driven directly, with no pty (PLAN R10.1).
 //!
-//! Every rustyline trait `RushHelper` implements is reachable from here except one: `validate`
+//! Every rustyline trait `OsloHelper` implements is reachable from here except one: `validate`
 //! takes a `ValidationContext`, whose constructor is `pub(crate)` in rustyline, so no test
 //! outside that crate can build one. The verdict `validate` returns is
-//! [`RushHelper::input_status`] — exposed for exactly this reason — and that is what the
+//! [`OsloHelper::input_status`] — exposed for exactly this reason — and that is what the
 //! validator section below pins, together with the parser cross-check an integration test can
 //! make and a unit test cannot: a buffer the editor calls `Complete` must be one the shell can
 //! actually parse.
 
-use rush::env::Environment;
-use rush::interactive::highlight::{self, TokenType};
-use rush::interactive::{DEFAULT_PS2, InputStatus, RushHelper, extract_current_word};
-use rush::parser::parse_bash_script;
+use oslo::env::Environment;
+use oslo::interactive::highlight::{self, TokenType};
+use oslo::interactive::{DEFAULT_PS2, InputStatus, OsloHelper, extract_current_word};
+use oslo::parser::parse_bash_script;
 use rustyline::Context;
 use rustyline::highlight::Highlighter;
 use rustyline::hint::Hinter;
@@ -24,11 +24,11 @@ use std::sync::{Arc, Mutex};
 
 /// A helper over `env` with the dropdown off.
 ///
-/// `Environment::new()` is not interactive, so `RushHelper::new` already leaves the menu off and
+/// `Environment::new()` is not interactive, so `OsloHelper::new` already leaves the menu off and
 /// the frecency table in memory; saying so explicitly keeps the tests honest if that default ever
 /// changes, because with the menu on `complete` would block on the terminal.
-fn helper(env: Environment) -> RushHelper {
-    let mut h = RushHelper::new(Arc::new(Mutex::new(env)));
+fn helper(env: Environment) -> OsloHelper {
+    let mut h = OsloHelper::new(Arc::new(Mutex::new(env)));
     h.set_menu(false);
     h
 }
@@ -53,7 +53,7 @@ fn make_exe(dir: &Path, name: &str) {
     fs::set_permissions(&p, fs::Permissions::from_mode(0o755)).unwrap();
 }
 
-fn displays(h: &RushHelper, line: &str, pos: usize) -> Vec<String> {
+fn displays(h: &OsloHelper, line: &str, pos: usize) -> Vec<String> {
     let (_, cands) = h.candidates(line, pos);
     cands.into_iter().map(|c| c.display).collect()
 }

@@ -381,9 +381,9 @@ mod tests {
     #[test]
     fn unset_unquoted_parameter_yields_no_field() {
         let mut env = Environment::new();
-        env.unset_var("RUSH_NO_SUCH_VAR");
+        env.unset_var("OSLO_NO_SUCH_VAR");
         let w = word(vec![WordPart::Variable {
-            name: "RUSH_NO_SUCH_VAR".into(),
+            name: "OSLO_NO_SUCH_VAR".into(),
             expansion_type: crate::ast::ParamExpansion::Normal,
         }]);
         assert!(expand_word(&mut env, &w).unwrap().is_empty());
@@ -406,7 +406,7 @@ mod tests {
         let mut env = Environment::new();
         env.set_option(crate::env::options::ShellOption::NoUnset, true);
         let w = word(vec![WordPart::Variable {
-            name: "RUSH_NO_SUCH_VAR".into(),
+            name: "OSLO_NO_SUCH_VAR".into(),
             expansion_type: crate::ast::ParamExpansion::Normal,
         }]);
         let err = expand_word(&mut env, &w).unwrap_err().to_string();
@@ -422,7 +422,7 @@ mod tests {
         env.set_positional(Vec::new());
 
         let defaulted = word(vec![WordPart::Variable {
-            name: "RUSH_NO_SUCH_VAR".into(),
+            name: "OSLO_NO_SUCH_VAR".into(),
             expansion_type: crate::ast::ParamExpansion::DefaultValue {
                 default: Word {
                     parts: vec![WordPart::Literal("d".into())],
@@ -444,10 +444,10 @@ mod tests {
     #[test]
     fn nounset_accepts_a_variable_that_is_set_but_empty() {
         let mut env = Environment::new();
-        env.set_var("RUSH_EMPTY_VAR", "", false);
+        env.set_var("OSLO_EMPTY_VAR", "", false);
         env.set_option(crate::env::options::ShellOption::NoUnset, true);
         let w = word(vec![WordPart::Variable {
-            name: "RUSH_EMPTY_VAR".into(),
+            name: "OSLO_EMPTY_VAR".into(),
             expansion_type: crate::ast::ParamExpansion::Normal,
         }]);
         assert!(expand_word(&mut env, &w).unwrap().is_empty());

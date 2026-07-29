@@ -4,7 +4,7 @@
 //! foreground job, Ctrl-Z parking one — needs a controlling terminal and is verified by hand.
 //! What survives without one is still the load-bearing half: *which process group each child ends
 //! up in*, and whether the shell ever collects the children it started. Both are readable from an
-//! ordinary `rush -c` run.
+//! ordinary `oslo -c` run.
 //!
 //! Every test here asserts that its probe returned data before drawing a conclusion from it.
 //! That is not defensive padding: when these read `/proc/<pid>/stat` on a machine that had no
@@ -18,7 +18,7 @@
 
 mod common;
 
-use common::{run, rush_bin};
+use common::{oslo_bin, run};
 use std::process::{Command, Stdio};
 
 /// R7.4, the finding as reported: five background jobs left five `Z`-state children behind for
@@ -135,22 +135,22 @@ fn two_background_jobs_do_not_share_a_group() {
 fn a_foreground_command_stays_in_the_shells_group_without_job_control() {
     // An external command reporting its *own* group — the process whose placement is the subject.
     let script = r#"sh -c 'ps -o pgid= -p $$'"#;
-    let output = Command::new(rush_bin())
+    let output = Command::new(oslo_bin())
         .arg("-c")
         .arg(script)
         .stdin(Stdio::null())
         .output()
-        .expect("spawn rush");
+        .expect("spawn oslo");
     let child_pgrp = String::from_utf8_lossy(&output.stdout).trim().to_string();
 
-    // The pgid of the rush process itself, read the same way, from the same non-interactive
+    // The pgid of the oslo process itself, read the same way, from the same non-interactive
     // invocation style.
-    let own = Command::new(rush_bin())
+    let own = Command::new(oslo_bin())
         .arg("-c")
         .arg(r#"ps -o pgid= -p $$"#)
         .stdin(Stdio::null())
         .output()
-        .expect("spawn rush");
+        .expect("spawn oslo");
     let shell_pgrp = String::from_utf8_lossy(&own.stdout).trim().to_string();
 
     assert!(

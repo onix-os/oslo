@@ -1,6 +1,6 @@
 //! Startup, configuration and history (PLAN R9.9, R9.10, R9.11, R9.12).
 //!
-//! The interactive parts are reachable without a pty because `rush -i` forces the REPL and
+//! The interactive parts are reachable without a pty because `oslo -i` forces the REPL and
 //! rustyline falls back to reading lines directly when stdin is not a terminal — and with
 //! `TERM=dumb` it writes the prompt to stdout, which is the only way to observe `PS1` and `PS2`
 //! from outside. Everything here therefore drives the real binary the way a user does, rather
@@ -8,13 +8,13 @@
 
 mod common;
 
-use common::rush_bin;
+use common::oslo_bin;
 use std::io::Write;
 use std::path::Path;
 use std::process::{Command, Output, Stdio};
 
 fn run(args: &[&str], vars: &[(&str, &str)], home: &Path) -> Output {
-    let mut cmd = Command::new(rush_bin());
+    let mut cmd = Command::new(oslo_bin());
     cmd.args(args)
         .env("HOME", home)
         .env_remove("ENV")
@@ -26,12 +26,12 @@ fn run(args: &[&str], vars: &[(&str, &str)], home: &Path) -> Output {
     for (k, v) in vars {
         cmd.env(k, v);
     }
-    cmd.output().expect("spawn rush")
+    cmd.output().expect("spawn oslo")
 }
 
 /// Drive the REPL: `-i` forces it, and stdin is a pipe rather than a terminal.
 fn repl(input: &str, vars: &[(&str, &str)], home: &Path) -> Output {
-    let mut cmd = Command::new(rush_bin());
+    let mut cmd = Command::new(oslo_bin());
     cmd.arg("-i")
         .env("HOME", home)
         .env_remove("ENV")
@@ -44,14 +44,14 @@ fn repl(input: &str, vars: &[(&str, &str)], home: &Path) -> Output {
     for (k, v) in vars {
         cmd.env(k, v);
     }
-    let mut child = cmd.spawn().expect("spawn rush -i");
+    let mut child = cmd.spawn().expect("spawn oslo -i");
     child
         .stdin
         .as_mut()
         .expect("stdin")
         .write_all(input.as_bytes())
-        .expect("write to rush");
-    child.wait_with_output().expect("rush output")
+        .expect("write to oslo");
+    child.wait_with_output().expect("oslo output")
 }
 
 fn out(o: &Output) -> String {
@@ -139,13 +139,13 @@ fn env_is_expanded_before_it_is_read() {
 }
 
 #[test]
-fn rushrc_is_read_by_an_interactive_shell_only() {
+fn oslorc_is_read_by_an_interactive_shell_only() {
     let dir = tempfile::tempdir().unwrap();
-    std::fs::write(dir.path().join(".rushrc"), "MARK=from-rushrc\n").unwrap();
+    std::fs::write(dir.path().join(".oslorc"), "MARK=from-oslorc\n").unwrap();
 
     let interactive = repl("echo $MARK\n", &[("HISTFILE", "")], dir.path());
     assert!(
-        out(&interactive).contains("from-rushrc"),
+        out(&interactive).contains("from-oslorc"),
         "{:?}",
         out(&interactive)
     );
@@ -159,18 +159,18 @@ fn rushrc_is_read_by_an_interactive_shell_only() {
 }
 
 #[test]
-fn an_alias_from_rushrc_is_visible_at_the_prompt() {
+fn an_alias_from_oslorc_is_visible_at_the_prompt() {
     let dir = tempfile::tempdir().unwrap();
-    std::fs::write(dir.path().join(".rushrc"), "alias hi='echo aliased'\n").unwrap();
+    std::fs::write(dir.path().join(".oslorc"), "alias hi='echo aliased'\n").unwrap();
 
     let o = repl("hi\n", &[("HISTFILE", "")], dir.path());
     assert!(out(&o).contains("aliased"), "{:?}", out(&o));
 }
 
 #[test]
-fn a_broken_rushrc_reports_and_leaves_the_shell_usable() {
+fn a_broken_oslorc_reports_and_leaves_the_shell_usable() {
     let dir = tempfile::tempdir().unwrap();
-    std::fs::write(dir.path().join(".rushrc"), "if then fi\nMARK=late\n").unwrap();
+    std::fs::write(dir.path().join(".oslorc"), "if then fi\nMARK=late\n").unwrap();
 
     let o = repl("echo alive\n", &[("HISTFILE", "")], dir.path());
     assert!(out(&o).contains("alive"), "{:?}", out(&o));
@@ -374,7 +374,7 @@ fn an_empty_histfile_disables_the_file() {
     let dir = tempfile::tempdir().unwrap();
     let o = repl("echo hi\n", &[("HISTFILE", "")], dir.path());
     assert!(out(&o).contains("hi"));
-    assert!(!dir.path().join(".rush_history").exists());
+    assert!(!dir.path().join(".oslo_history").exists());
 }
 
 #[test]
@@ -420,7 +420,7 @@ fn history_is_a_builtin_even_in_a_script() {
 #[test]
 fn a_broken_init_lua_is_reported_and_the_shell_still_starts() {
     let dir = tempfile::tempdir().unwrap();
-    let init = dir.path().join(".config/rush/init.lua");
+    let init = dir.path().join(".config/oslo/init.lua");
     std::fs::create_dir_all(init.parent().unwrap()).unwrap();
     std::fs::write(&init, "this is not lua(((\n").unwrap();
 
@@ -440,9 +440,9 @@ fn a_broken_init_lua_is_reported_and_the_shell_still_starts() {
 #[test]
 fn a_working_init_lua_still_applies() {
     let dir = tempfile::tempdir().unwrap();
-    let init = dir.path().join(".config/rush/init.lua");
+    let init = dir.path().join(".config/oslo/init.lua");
     std::fs::create_dir_all(init.parent().unwrap()).unwrap();
-    std::fs::write(&init, "rush.set_alias('hi', 'echo lua-alias')\n").unwrap();
+    std::fs::write(&init, "oslo.set_alias('hi', 'echo lua-alias')\n").unwrap();
 
     let o = repl("hi\n", &[("HISTFILE", "")], dir.path());
     assert!(out(&o).contains("lua-alias"), "{:?}", out(&o));
@@ -453,19 +453,19 @@ fn lua_script_propagates_the_status_of_what_it_ran() {
     let dir = tempfile::tempdir().unwrap();
     let script = dir.path().join("s.lua");
 
-    std::fs::write(&script, "rush.exec('false')\n").unwrap();
+    std::fs::write(&script, "oslo.exec('false')\n").unwrap();
     let failed = run(&["--lua-script", script.to_str().unwrap()], &[], dir.path());
     assert_eq!(
         failed.status.code(),
         Some(1),
-        "a failing rush.exec must show"
+        "a failing oslo.exec must show"
     );
 
-    std::fs::write(&script, "rush.exec('true')\n").unwrap();
+    std::fs::write(&script, "oslo.exec('true')\n").unwrap();
     let ok = run(&["--lua-script", script.to_str().unwrap()], &[], dir.path());
     assert_eq!(ok.status.code(), Some(0));
 
-    std::fs::write(&script, "rush.exec('exit 7')\n").unwrap();
+    std::fs::write(&script, "oslo.exec('exit 7')\n").unwrap();
     let exited = run(&["--lua-script", script.to_str().unwrap()], &[], dir.path());
     assert_ne!(
         exited.status.code(),

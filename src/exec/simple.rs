@@ -68,7 +68,7 @@ pub(crate) fn eval_simple_command(env: &mut Environment, simple: &SimpleCommand)
     // `export FOO=bar` must reach `export`, not be applied behind its back.
     let mut prefix_assignments = Vec::new();
     for assign in &simple.assignments {
-        // A prefix assignment lasts exactly as long as the command, and rush undoes it by
+        // A prefix assignment lasts exactly as long as the command, and oslo undoes it by
         // restoring a *scalar* from the scope frame. `a=(1 2) cmd` and `a[1]=x cmd` have no such
         // undo, so they are refused rather than left behind after the command finishes.
         let (AssignmentTarget::Name(name), AssignmentValue::Scalar(value)) =
@@ -148,7 +148,7 @@ fn apply_assignments_only(env: &mut Environment, simple: &SimpleCommand) -> Resu
 /// 2. **special builtin**, in POSIX mode only. POSIX puts `export`, `eval`, `set`, `.` and the
 ///    rest ahead of functions; bash follows that only under `--posix`, where it goes further and
 ///    refuses to *define* such a function at all.
-/// 3. **function**. This is the step rush skipped: `is_builtin` was consulted first, so
+/// 3. **function**. This is the step oslo skipped: `is_builtin` was consulted first, so
 ///    `echo() { … }`, `cd() { … }` and `test() { … }` could be defined but never called, and
 ///    `type echo` insisted it was a builtin. Wrapping a builtin is how a shell script overrides
 ///    behaviour it does not control, and silently ignoring the wrapper runs the original.
@@ -233,7 +233,7 @@ fn call_function_command(
 /// Run an external program, or explain why the word does not name one.
 ///
 /// The statuses are the ones a caller reads: 127 for "no such command", 126 for "found it,
-/// cannot run it". rush used to report 127 for a non-executable file and, for a directory,
+/// cannot run it". oslo used to report 127 for a non-executable file and, for a directory,
 /// nothing at all — it changed directory and returned 0 (PLAN R5.13).
 fn run_program(
     env: &mut Environment,
@@ -265,7 +265,7 @@ fn run_program(
 ///
 /// The diagnostic belongs to the *command*, not to the shell, so it goes wherever the command
 /// pointed its stderr: `nosuchcommand 2>/dev/null` is silent in every shell, and that is the
-/// shape of every feature probe written before `command -v` existed. rush printed to the shell's
+/// shape of every feature probe written before `command -v` existed. oslo printed to the shell's
 /// own stderr instead, so a script full of such probes filled the terminal with noise it had
 /// explicitly asked to discard.
 fn report_unrunnable(
@@ -281,7 +281,7 @@ fn report_unrunnable(
         // the one bash reports here as well.
         return Ok(report_redirect_failure(&e));
     }
-    eprintln!("rush: {}: {}", cmd_name, reason);
+    eprintln!("oslo: {}: {}", cmd_name, reason);
     Ok(status)
 }
 
@@ -313,7 +313,7 @@ fn call_function(
 
 /// Report a redirection failure and hand back the status the failed command takes on.
 ///
-/// A redirection that cannot be set up fails *the command*, not the shell. rush used to propagate
+/// A redirection that cannot be set up fails *the command*, not the shell. oslo used to propagate
 /// the error to `main`, which exited — so `echo hi < /nonexistent; echo CONTINUE` never printed
 /// CONTINUE, while the same redirection on an external command continued happily. The two paths
 /// disagreed with each other; this is the one place that decides.
@@ -329,7 +329,7 @@ fn call_function(
 /// a function, a compound, an external command, a command word with no builtin behind it — use
 /// this answer directly, because for them the question never arises.
 pub(crate) fn report_redirect_failure(err: &ShellError) -> i32 {
-    eprintln!("rush: {}", err);
+    eprintln!("oslo: {}", err);
     1
 }
 
@@ -381,7 +381,7 @@ fn expand_alias(env: &mut Environment, alias: &str) -> Result<Vec<String>> {
 /// The only dispatcher, and it owns no list of its own: it asks the registry. The `match` that
 /// used to be here named 30 builtins and their functions a second time, so the registry could
 /// hold a *different* implementation for a name and never be consulted — which is exactly what
-/// made `rush.register_builtin('echo', …)` do nothing (PLAN R5.6, R9.8) — while the `_` arm
+/// made `oslo.register_builtin('echo', …)` do nothing (PLAN R5.6, R9.8) — while the `_` arm
 /// answered `Ok(0)` for anything unlisted, turning a name that was a builtin only according to
 /// `is_builtin` into a command that silently succeeded without doing anything.
 ///
@@ -398,7 +398,7 @@ pub(crate) fn execute_builtin(
         // is a bug here rather than in the user's script — but it is still the user who gets the
         // message, so it says what a shell says about a name it cannot run.
         None => {
-            eprintln!("rush: {}: not a shell builtin", cmd_name);
+            eprintln!("oslo: {}: not a shell builtin", cmd_name);
             Ok(127)
         }
     }
@@ -440,17 +440,17 @@ mod tests {
     /// show up as `Cargo.lock Cargo.toml` instead of a silently-unchanged literal.
     #[test]
     fn assignment_rhs_is_not_globbed() {
-        assert_eq!(var("rush_g1=Cargo.*", "rush_g1"), "Cargo.*");
-        assert_eq!(var("rush_g2=Cargo.* true", "rush_g2"), "");
-        assert_eq!(var("export rush_g3=Cargo.*", "rush_g3"), "Cargo.*");
+        assert_eq!(var("oslo_g1=Cargo.*", "oslo_g1"), "Cargo.*");
+        assert_eq!(var("oslo_g2=Cargo.* true", "oslo_g2"), "");
+        assert_eq!(var("export oslo_g3=Cargo.*", "oslo_g3"), "Cargo.*");
     }
 
     #[test]
     fn assignment_rhs_is_not_field_split() {
-        assert_eq!(var("IFS=:\nrush_s1=a:b:c", "rush_s1"), "a:b:c");
-        assert_eq!(var("IFS=:\nexport rush_s2=a:b:c", "rush_s2"), "a:b:c");
+        assert_eq!(var("IFS=:\noslo_s1=a:b:c", "oslo_s1"), "a:b:c");
+        assert_eq!(var("IFS=:\nexport oslo_s2=a:b:c", "oslo_s2"), "a:b:c");
         // Interior whitespace from an unquoted expansion survives too.
-        assert_eq!(var("rush_s3='a  b'\nrush_s4=$rush_s3", "rush_s4"), "a  b");
+        assert_eq!(var("oslo_s3='a  b'\noslo_s4=$oslo_s3", "oslo_s4"), "a  b");
     }
 
     // The third leg of R2.9 — `x=$(printf 'a\nb')` keeps its newline — is deliberately *not*
@@ -458,7 +458,7 @@ mod tests {
     // tests on a pool of threads: a child forked out of a multi-threaded process inherits any
     // mutex another thread happened to hold, so the child deadlocks in the allocator before it
     // can write to the pipe and the parent blocks forever in `waitpid`. That is a property of
-    // the harness, not of the shell (rush itself is single-threaded), so the case lives in
+    // the harness, not of the shell (oslo itself is single-threaded), so the case lives in
     // `tests/expansion_tests.rs`, which spawns the real binary.
 
     /// The `words.is_empty()` fallback path — a command word that expands to nothing leaves only
@@ -466,7 +466,7 @@ mod tests {
     #[test]
     fn assignment_survives_an_empty_command_word() {
         assert_eq!(
-            var("IFS=:\nrush_e1=\nrush_e2=a:b $rush_e1", "rush_e2"),
+            var("IFS=:\noslo_e1=\noslo_e2=a:b $oslo_e1", "oslo_e2"),
             "a:b"
         );
     }
@@ -474,7 +474,7 @@ mod tests {
     /// A prefix assignment is scoped to its command and must not leak back out.
     #[test]
     fn prefix_assignment_does_not_outlive_its_command() {
-        assert_eq!(run("rush_p1=a:b true").get_var("rush_p1"), None);
+        assert_eq!(run("oslo_p1=a:b true").get_var("oslo_p1"), None);
     }
 
     /// A function must be found before the builtin of the same name (PLAN R5.6). Asserted on a
@@ -482,17 +482,17 @@ mod tests {
     /// `println!` but not what a builtin writes; if the wrapper never ran, the variable is unset.
     #[test]
     fn a_function_shadows_a_regular_builtin() {
-        let env = run("cd() { rush_shadow=called; }\ncd /nonexistent-dir");
-        assert_eq!(env.get_var("rush_shadow"), Some("called"));
+        let env = run("cd() { oslo_shadow=called; }\ncd /nonexistent-dir");
+        assert_eq!(env.get_var("oslo_shadow"), Some("called"));
     }
 
     /// …including the ones whose names the dispatcher used to hardcode.
     #[test]
     fn a_function_shadows_echo_and_test() {
-        let env = run("echo() { rush_shadow_echo=1; }\necho hi");
-        assert_eq!(env.get_var("rush_shadow_echo"), Some("1"));
-        let env = run("test() { rush_shadow_test=1; }\ntest -f /etc/hosts");
-        assert_eq!(env.get_var("rush_shadow_test"), Some("1"));
+        let env = run("echo() { oslo_shadow_echo=1; }\necho hi");
+        assert_eq!(env.get_var("oslo_shadow_echo"), Some("1"));
+        let env = run("test() { oslo_shadow_test=1; }\ntest -f /etc/hosts");
+        assert_eq!(env.get_var("oslo_shadow_test"), Some("1"));
     }
 
     /// POSIX mode is the only mode in which a special builtin outranks a function.
@@ -502,18 +502,18 @@ mod tests {
     /// environment, and nothing has to be restored afterwards.
     #[test]
     fn posix_mode_puts_special_builtins_ahead_of_functions() {
-        let env = run("export() { rush_shadow_export=1; }\nexport rush_ignored=x");
-        assert_eq!(env.get_var("rush_shadow_export"), Some("1"));
+        let env = run("export() { oslo_shadow_export=1; }\nexport oslo_ignored=x");
+        assert_eq!(env.get_var("oslo_shadow_export"), Some("1"));
 
         let mut env = Environment::new();
         env.set_option(crate::env::options::ShellOption::Posix, true);
         run_in(
             &mut env,
-            "export() { rush_shadow_export2=1; }\nexport rush_special=y",
+            "export() { oslo_shadow_export2=1; }\nexport oslo_special=y",
         )
         .expect("exec");
-        assert_eq!(env.get_var("rush_shadow_export2"), None);
-        assert_eq!(env.get_var("rush_special"), Some("y"));
+        assert_eq!(env.get_var("oslo_shadow_export2"), None);
+        assert_eq!(env.get_var("oslo_special"), Some("y"));
     }
 
     /// C3: a refused assignment is a *failed* command, not a silent success.
@@ -523,13 +523,13 @@ mod tests {
     #[test]
     fn a_refused_assignment_fails_the_command_and_the_shell_carries_on() {
         let mut env = Environment::new();
-        env.set_var("rush_ro_a", "1", false);
-        env.set_readonly("rush_ro_a");
-        assert_eq!(run_in(&mut env, "rush_ro_a=2").expect("not fatal"), 1);
-        assert_eq!(env.get_var("rush_ro_a"), Some("1"));
+        env.set_var("oslo_ro_a", "1", false);
+        env.set_readonly("oslo_ro_a");
+        assert_eq!(run_in(&mut env, "oslo_ro_a=2").expect("not fatal"), 1);
+        assert_eq!(env.get_var("oslo_ro_a"), Some("1"));
         // …and the next command still runs.
-        assert_eq!(run_in(&mut env, "rush_ro_b=ok").expect("not fatal"), 0);
-        assert_eq!(env.get_var("rush_ro_b"), Some("ok"));
+        assert_eq!(run_in(&mut env, "oslo_ro_b=ok").expect("not fatal"), 0);
+        assert_eq!(env.get_var("oslo_ro_b"), Some("ok"));
     }
 
     /// …and in POSIX mode the same assignment ends the shell, as POSIX 2.8.1 requires and
@@ -538,15 +538,15 @@ mod tests {
     fn a_refused_assignment_exits_a_posix_shell() {
         let mut env = Environment::new();
         env.set_option(crate::env::options::ShellOption::Posix, true);
-        env.set_var("rush_ro_c", "1", false);
-        env.set_readonly("rush_ro_c");
-        match run_in(&mut env, "rush_ro_c=2\nrush_never=reached") {
+        env.set_var("oslo_ro_c", "1", false);
+        env.set_readonly("oslo_ro_c");
+        match run_in(&mut env, "oslo_ro_c=2\noslo_never=reached") {
             Err(crate::error::ShellError::Exit(status)) => {
                 assert_eq!(status, crate::error::FATAL_EXIT_STATUS);
             }
             other => panic!("expected the shell to exit, got {:?}", other),
         }
-        assert_eq!(env.get_var("rush_never"), None);
+        assert_eq!(env.get_var("oslo_never"), None);
     }
 
     /// An ordinary non-zero status must *not* end a POSIX shell, even from a special builtin.
@@ -557,10 +557,10 @@ mod tests {
         let mut env = Environment::new();
         env.set_option(crate::env::options::ShellOption::Posix, true);
         assert_eq!(
-            run_in(&mut env, "shift 5\nrush_still_alive=yes").expect("not fatal"),
+            run_in(&mut env, "shift 5\noslo_still_alive=yes").expect("not fatal"),
             0
         );
-        assert_eq!(env.get_var("rush_still_alive"), Some("yes"));
+        assert_eq!(env.get_var("oslo_still_alive"), Some("yes"));
     }
 
     /// Every builtin now dispatches through the registry, so a name the registry does not have
@@ -568,7 +568,7 @@ mod tests {
     #[test]
     fn an_unregistered_name_is_not_a_builtin() {
         let env = Environment::new();
-        assert!(!env.is_builtin("rush-not-a-builtin"));
+        assert!(!env.is_builtin("oslo-not-a-builtin"));
         assert!(env.is_builtin("type"));
     }
 }

@@ -53,7 +53,7 @@ fn absurd_arithmetic_nesting_is_diagnosed() {
     assert_diagnosed(&r, "50 000 nested parentheses");
 }
 
-/// This one never reached rush's own code: brush's parser overflowed the stack first.
+/// This one never reached oslo's own code: brush's parser overflowed the stack first.
 #[test]
 fn absurd_input_nesting_is_diagnosed() {
     let script = format!("{}true{}", "{ ".repeat(20_000), "; }".repeat(20_000));

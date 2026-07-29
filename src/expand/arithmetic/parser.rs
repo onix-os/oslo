@@ -17,7 +17,7 @@ use crate::expand::arithmetic::lexer::{CompoundOp, Token};
 /// the whole precedence chain — which works out to roughly 20 KiB of stack per level in a debug
 /// build. The first limit here was 100, which needs over 2 MiB and so overflowed a spawned
 /// thread's default stack: the guard against crashing crashed. 32 leaves margin on the smallest
-/// stack rush is likely to get and is still far past anything a human writes;
+/// stack oslo is likely to get and is still far past anything a human writes;
 /// `nesting_at_the_limit_fits_a_small_stack` is what keeps that true.
 const MAX_DEPTH: usize = 32;
 

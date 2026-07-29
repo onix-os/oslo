@@ -117,14 +117,14 @@ fn a_large_heredoc_does_not_deadlock() {
     let out_path = dir.path().join("heredoc.out");
     // stdout goes to a file rather than a pipe so the deadline below measures the shell, not a
     // test harness that forgot to drain 1 MB.
-    let mut child = Command::new(common::rush_bin())
+    let mut child = Command::new(common::oslo_bin())
         .arg(&script_path)
         .current_dir(dir.path())
         .stdin(Stdio::null())
         .stdout(std::fs::File::create(&out_path).unwrap())
         .stderr(Stdio::null())
         .spawn()
-        .expect("spawn rush");
+        .expect("spawn oslo");
 
     let deadline = Instant::now() + Duration::from_secs(10);
     let status = loop {
@@ -139,7 +139,7 @@ fn a_large_heredoc_does_not_deadlock() {
         }
     };
 
-    assert!(status.success(), "rush exited with {:?}", status.code());
+    assert!(status.success(), "oslo exited with {:?}", status.code());
     let written = std::fs::metadata(&out_path).unwrap().len();
     assert_eq!(
         written,

@@ -24,17 +24,17 @@ use std::path::PathBuf;
 use std::process::{Command, Output, Stdio};
 
 /// Path to the binary under test, as laid down next to the integration test executable.
-pub fn rush_bin() -> PathBuf {
-    // target/debug/deps/<test>-<hash> -> target/debug/rush
+pub fn oslo_bin() -> PathBuf {
+    // target/debug/deps/<test>-<hash> -> target/debug/oslo
     let mut p = std::env::current_exe().expect("test executable path");
     p.pop();
     if p.ends_with("deps") {
         p.pop();
     }
-    p.push("rush");
+    p.push("oslo");
     assert!(
         p.exists(),
-        "rush binary not found at {} — run `cargo build` first",
+        "oslo binary not found at {} — run `cargo build` first",
         p.display()
     );
     p
@@ -62,18 +62,18 @@ impl Run {
     }
 }
 
-/// Run `script` through `rush -c` in a scratch directory, with stdin closed.
+/// Run `script` through `oslo -c` in a scratch directory, with stdin closed.
 ///
 /// stdin is `/dev/null` deliberately: a dropped input redirection makes the command read the
 /// real stdin instead of the file, which without this would hang the test run rather than fail it.
 pub fn run_in(dir: &std::path::Path, script: &str) -> Run {
-    let output: Output = Command::new(rush_bin())
+    let output: Output = Command::new(oslo_bin())
         .arg("-c")
         .arg(script)
         .current_dir(dir)
         .stdin(Stdio::null())
         .output()
-        .expect("spawn rush");
+        .expect("spawn oslo");
 
     Run {
         stdout: String::from_utf8_lossy(&output.stdout).into_owned(),

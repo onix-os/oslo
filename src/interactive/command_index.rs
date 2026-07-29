@@ -158,20 +158,20 @@ mod tests {
     fn finds_executables_and_skips_data_files() {
         let _serial = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
         let dir = tempfile::tempdir().unwrap();
-        make_exe(dir.path(), "rush-test-exe");
-        fs::write(dir.path().join("rush-test-data"), b"x").unwrap();
+        make_exe(dir.path(), "oslo-test-exe");
+        fs::write(dir.path().join("oslo-test-data"), b"x").unwrap();
 
         let path = dir.path().to_str().unwrap();
         let names = CommandIndex::executables(path);
-        assert!(names.contains("rush-test-exe"));
-        assert!(!names.contains("rush-test-data"));
+        assert!(names.contains("oslo-test-exe"));
+        assert!(!names.contains("oslo-test-data"));
     }
 
     #[test]
     fn a_second_lookup_is_served_from_the_cache() {
         let _serial = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
         let dir = tempfile::tempdir().unwrap();
-        make_exe(dir.path(), "rush-cached-exe");
+        make_exe(dir.path(), "oslo-cached-exe");
         let path = dir.path().to_str().unwrap();
 
         let first = CommandIndex::executables(path);
@@ -186,11 +186,11 @@ mod tests {
         let dir = tempfile::tempdir().unwrap();
         let path = dir.path().to_str().unwrap();
         let before = CommandIndex::executables(path);
-        make_exe(dir.path(), "rush-late-exe");
+        make_exe(dir.path(), "oslo-late-exe");
         invalidate();
         let after = CommandIndex::executables(path);
-        assert!(!before.contains("rush-late-exe"));
-        assert!(after.contains("rush-late-exe"));
+        assert!(!before.contains("oslo-late-exe"));
+        assert!(after.contains("oslo-late-exe"));
     }
 
     #[test]
@@ -198,11 +198,11 @@ mod tests {
         let _serial = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
         let a = tempfile::tempdir().unwrap();
         let b = tempfile::tempdir().unwrap();
-        make_exe(a.path(), "rush-in-a");
-        make_exe(b.path(), "rush-in-b");
+        make_exe(a.path(), "oslo-in-a");
+        make_exe(b.path(), "oslo-in-b");
 
-        assert!(CommandIndex::executables(a.path().to_str().unwrap()).contains("rush-in-a"));
-        assert!(CommandIndex::executables(b.path().to_str().unwrap()).contains("rush-in-b"));
-        assert!(!CommandIndex::executables(b.path().to_str().unwrap()).contains("rush-in-a"));
+        assert!(CommandIndex::executables(a.path().to_str().unwrap()).contains("oslo-in-a"));
+        assert!(CommandIndex::executables(b.path().to_str().unwrap()).contains("oslo-in-b"));
+        assert!(!CommandIndex::executables(b.path().to_str().unwrap()).contains("oslo-in-a"));
     }
 }

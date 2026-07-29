@@ -47,7 +47,7 @@ pub fn builtin_alias(env: &mut Environment, args: &[String]) -> Result<i32> {
             Some(idx) => {
                 let name = &arg[..idx];
                 if !is_valid_alias_name(name) {
-                    eprintln!("rush: alias: `{}': invalid alias name", name);
+                    eprintln!("oslo: alias: `{}': invalid alias name", name);
                     status = 1;
                     continue;
                 }
@@ -56,7 +56,7 @@ pub fn builtin_alias(env: &mut Environment, args: &[String]) -> Result<i32> {
             None => match env.get_alias(arg) {
                 Some(value) => println!("alias {}={}", arg, single_quoted(value)),
                 None => {
-                    eprintln!("rush: alias: {}: not found", arg);
+                    eprintln!("oslo: alias: {}: not found", arg);
                     status = 1;
                 }
             },
@@ -91,7 +91,7 @@ pub fn builtin_unalias(env: &mut Environment, args: &[String]) -> Result<i32> {
         // Removing something that was not there is a failure, not a no-op: `unalias ls ||
         // add_default` has to be able to tell the difference.
         if env.get_alias(name).is_none() {
-            eprintln!("rush: unalias: {}: not found", name);
+            eprintln!("oslo: unalias: {}: not found", name);
             status = 1;
             continue;
         }

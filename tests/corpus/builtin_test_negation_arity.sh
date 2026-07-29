@@ -6,5 +6,5 @@
 [ ! -z "" ]; echo "$?"
 [ ! -n "" ]; echo "$?"
 [ ! ! a = a ]; echo "$?"
-[ ! \( -f /nonexistent-rush-file \) ]; echo "$?"
+[ ! \( -f /nonexistent-oslo-file \) ]; echo "$?"
 [ -f ! ]; echo "$?"

@@ -1,4 +1,4 @@
-//! The `rush.*` table: one test per binding, each with its failure mode (PLAN R10.2).
+//! The `oslo.*` table: one test per binding, each with its failure mode (PLAN R10.2).
 //!
 //! `register_builtin` has its own suite in `lua_builtin_tests.rs` (R9.8); what is left here is
 //! every other binding — `exec`, `get_var`, `set_var`, `get_pwd`, `set_alias`, `get_alias`,
@@ -6,8 +6,8 @@
 //! as the happy paths: a binding that swallows a bad call is an `init.lua` that silently does
 //! nothing, which is exactly how the dead `set_right_prompt` survived so long.
 
-use rush::env::Environment;
-use rush::lua::LuaEngine;
+use oslo::env::Environment;
+use oslo::lua::LuaEngine;
 use std::fs;
 use std::sync::{Arc, Mutex};
 
@@ -26,17 +26,17 @@ fn param(env: &Arc<Mutex<Environment>>, name: &str) -> Option<String> {
     env.lock().unwrap().get_param(name)
 }
 
-// ------------------------------------------------------------------------ rush.exec
+// ------------------------------------------------------------------------ oslo.exec
 
 #[test]
 fn exec_runs_a_command_and_returns_its_status() {
     let (lua, _env) = engine();
     lua.eval_script(
         r#"
-        assert(rush.exec("true") == 0, "true should be 0")
-        assert(rush.exec("false") == 1, "false should be 1")
-        assert(rush.exec("true && false") == 1, "the list status is the last one")
-        assert(rush.exec("false; true") == 0, "and only the last one")
+        assert(oslo.exec("true") == 0, "true should be 0")
+        assert(oslo.exec("false") == 1, "false should be 1")
+        assert(oslo.exec("true && false") == 1, "the list status is the last one")
+        assert(oslo.exec("false; true") == 0, "and only the last one")
         "#,
     )
     .expect("exec");
@@ -48,18 +48,18 @@ fn exec_cannot_be_used_to_exit_the_shell() {
     // `exit` unwinds the evaluator rather than returning a status, so it reaches Lua as an error
     // instead of ending the process. Pinned because it is the one command whose result a script
     // cannot read: the caller sees a raised error, not the number it asked to exit with.
-    let err = lua.eval_script(r#"rush.exec("exit 7")"#).unwrap_err();
+    let err = lua.eval_script(r#"oslo.exec("exit 7")"#).unwrap_err();
     assert!(err.to_string().contains('7'), "{err}");
 }
 
 #[test]
 fn exec_acts_on_the_shell_state_the_caller_shares() {
     let (lua, env) = engine();
-    // The whole point of the binding: `rush.exec` is not a subshell, it is *this* shell.
-    lua.eval_script(r#"rush.exec("ZZ_FROM_EXEC=42")"#).unwrap();
+    // The whole point of the binding: `oslo.exec` is not a subshell, it is *this* shell.
+    lua.eval_script(r#"oslo.exec("ZZ_FROM_EXEC=42")"#).unwrap();
     assert_eq!(param(&env, "ZZ_FROM_EXEC").as_deref(), Some("42"));
 
-    lua.eval_script(r#"rush.exec("false")"#).unwrap();
+    lua.eval_script(r#"oslo.exec("false")"#).unwrap();
     assert_eq!(param(&env, "?").as_deref(), Some("1"), "$? is shared too");
 }
 
@@ -67,25 +67,25 @@ fn exec_acts_on_the_shell_state_the_caller_shares() {
 fn exec_reports_unparseable_input_as_a_lua_error() {
     let (lua, _env) = engine();
     // A parse failure is the script's mistake and has no exit status to return; swallowing it
-    // would make `rush.exec` look like it ran something.
+    // would make `oslo.exec` look like it ran something.
     let err = lua
-        .eval_script(r#"rush.exec("if")"#)
+        .eval_script(r#"oslo.exec("if")"#)
         .expect_err("an unfinished command must be an error");
     assert!(err.to_string().contains("Lua error"), "{err}");
 
     // A *missing* command is not a Lua error: it is a command that ran and failed, like in any
     // shell.
-    lua.eval_script(r#"assert(rush.exec("zz-no-such-command-here") == 127)"#)
+    lua.eval_script(r#"assert(oslo.exec("zz-no-such-command-here") == 127)"#)
         .expect("a missing command is a status, not an error");
 }
 
 #[test]
 fn exec_without_a_command_string_is_an_error() {
     let (lua, _env) = engine();
-    assert!(lua.eval_script("rush.exec()").is_err());
+    assert!(lua.eval_script("oslo.exec()").is_err());
 }
 
-// --------------------------------------------------------------------- rush.get_var
+// --------------------------------------------------------------------- oslo.get_var
 
 #[test]
 fn get_var_reads_shell_variables_and_special_parameters() {
@@ -94,8 +94,8 @@ fn get_var_reads_shell_variables_and_special_parameters() {
 
     lua.eval_script(
         r#"
-        assert(rush.get_var("ZZ_READ_ME") == "value", "plain variable")
-        assert(rush.get_var("?") == "0", "special parameters resolve too")
+        assert(oslo.get_var("ZZ_READ_ME") == "value", "plain variable")
+        assert(oslo.get_var("?") == "0", "special parameters resolve too")
         "#,
     )
     .expect("get_var");
@@ -107,23 +107,23 @@ fn get_var_answers_nil_for_a_name_that_is_not_set() {
     // `nil`, not `""`: a script has to be able to tell "unset" from "set to empty".
     lua.eval_script(
         r#"
-        assert(rush.get_var("ZZ_DEFINITELY_UNSET") == nil, "unset must be nil")
+        assert(oslo.get_var("ZZ_DEFINITELY_UNSET") == nil, "unset must be nil")
         "#,
     )
     .expect("get_var");
-    assert!(lua.eval_script("rush.get_var()").is_err(), "name required");
+    assert!(lua.eval_script("oslo.get_var()").is_err(), "name required");
 }
 
-// --------------------------------------------------------------------- rush.set_var
+// --------------------------------------------------------------------- oslo.set_var
 
 #[test]
 fn set_var_is_visible_to_the_shell_and_to_lua() {
     let (lua, env) = engine();
     lua.eval_script(
         r#"
-        rush.set_var("ZZ_SET_BY_LUA", "hello")
-        assert(rush.get_var("ZZ_SET_BY_LUA") == "hello", "readable back")
-        assert(rush.exec('[ "$ZZ_SET_BY_LUA" = hello ]') == 0, "visible to commands")
+        oslo.set_var("ZZ_SET_BY_LUA", "hello")
+        assert(oslo.get_var("ZZ_SET_BY_LUA") == "hello", "readable back")
+        assert(oslo.exec('[ "$ZZ_SET_BY_LUA" = hello ]') == 0, "visible to commands")
         "#,
     )
     .expect("set_var");
@@ -133,24 +133,24 @@ fn set_var_is_visible_to_the_shell_and_to_lua() {
 #[test]
 fn set_var_needs_both_a_name_and_a_value() {
     let (lua, env) = engine();
-    assert!(lua.eval_script(r#"rush.set_var("ZZ_HALF")"#).is_err());
+    assert!(lua.eval_script(r#"oslo.set_var("ZZ_HALF")"#).is_err());
     assert_eq!(param(&env, "ZZ_HALF"), None, "nothing half-assigned");
 }
 
 #[test]
 fn set_var_cannot_overwrite_a_readonly_variable() {
     let (lua, env) = engine();
-    lua.eval_script(r#"rush.exec("readonly ZZ_LOCKED=1")"#)
+    lua.eval_script(r#"oslo.exec("readonly ZZ_LOCKED=1")"#)
         .unwrap();
 
     // The binding drops `set_var`'s `false`, so the refusal is silent in Lua — the shell prints
     // the diagnostic. What must not happen is the value changing.
-    lua.eval_script(r#"rush.set_var("ZZ_LOCKED", "2")"#)
+    lua.eval_script(r#"oslo.set_var("ZZ_LOCKED", "2")"#)
         .unwrap();
     assert_eq!(param(&env, "ZZ_LOCKED").as_deref(), Some("1"));
 }
 
-// --------------------------------------------------------------------- rush.get_pwd
+// --------------------------------------------------------------------- oslo.get_pwd
 
 #[test]
 fn get_pwd_reports_the_processs_working_directory() {
@@ -160,7 +160,7 @@ fn get_pwd_reports_the_processs_working_directory() {
         .to_string_lossy()
         .to_string();
     lua.eval_script(&format!(
-        r#"assert(rush.get_pwd() == {cwd:?}, "got " .. rush.get_pwd())"#
+        r#"assert(oslo.get_pwd() == {cwd:?}, "got " .. oslo.get_pwd())"#
     ))
     .expect("get_pwd");
 }
@@ -174,21 +174,21 @@ fn get_pwd_ignores_pwd_the_variable() {
     // would corrupt every other test in this binary.) Set unexported, for the same reason: an
     // exported assignment would write the real environment of the test process.
     env.lock().unwrap().set_var("PWD", "/nowhere-at-all", false);
-    lua.eval_script(r#"assert(rush.get_pwd() ~= "/nowhere-at-all", rush.get_pwd())"#)
+    lua.eval_script(r#"assert(oslo.get_pwd() ~= "/nowhere-at-all", oslo.get_pwd())"#)
         .expect("get_pwd");
-    lua.eval_script(r#"assert(rush.get_var("PWD") == "/nowhere-at-all", "the variable stands")"#)
+    lua.eval_script(r#"assert(oslo.get_var("PWD") == "/nowhere-at-all", "the variable stands")"#)
         .expect("get_var");
 }
 
-// ------------------------------------------------------- rush.set_alias / get_alias
+// ------------------------------------------------------- oslo.set_alias / get_alias
 
 #[test]
 fn an_alias_set_from_lua_is_the_shells_alias() {
     let (lua, env) = engine();
     lua.eval_script(
         r#"
-        rush.set_alias("zzl", "ls -la")
-        assert(rush.get_alias("zzl") == "ls -la", "readable back")
+        oslo.set_alias("zzl", "ls -la")
+        assert(oslo.get_alias("zzl") == "ls -la", "readable back")
         "#,
     )
     .expect("set_alias");
@@ -201,10 +201,10 @@ fn an_alias_set_from_lua_is_the_shells_alias() {
 #[test]
 fn get_alias_answers_nil_for_an_unknown_name() {
     let (lua, _env) = engine();
-    lua.eval_script(r#"assert(rush.get_alias("zz-no-such-alias") == nil)"#)
+    lua.eval_script(r#"assert(oslo.get_alias("zz-no-such-alias") == nil)"#)
         .expect("get_alias");
     assert!(
-        lua.eval_script("rush.get_alias()").is_err(),
+        lua.eval_script("oslo.get_alias()").is_err(),
         "name required"
     );
 }
@@ -212,23 +212,23 @@ fn get_alias_answers_nil_for_an_unknown_name() {
 #[test]
 fn set_alias_needs_a_target() {
     let (lua, env) = engine();
-    assert!(lua.eval_script(r#"rush.set_alias("zzhalf")"#).is_err());
+    assert!(lua.eval_script(r#"oslo.set_alias("zzhalf")"#).is_err());
     assert!(env.lock().unwrap().get_alias("zzhalf").is_none());
 }
 
-// ------------------------------------------------------------------ rush.set_prompt
+// ------------------------------------------------------------------ oslo.set_prompt
 
 #[test]
 fn the_prompt_callback_is_what_render_prompt_returns() {
     let (lua, _env) = engine();
     assert_eq!(lua.render_prompt(), None, "nothing set yet");
 
-    lua.eval_script(r#"rush.set_prompt(function() return "rush$ " end)"#)
+    lua.eval_script(r#"oslo.set_prompt(function() return "oslo$ " end)"#)
         .expect("set_prompt");
-    assert_eq!(lua.render_prompt().as_deref(), Some("rush$ "));
+    assert_eq!(lua.render_prompt().as_deref(), Some("oslo$ "));
 
     // The last one registered wins, so an `init.lua` reloaded twice does not stack prompts.
-    lua.eval_script(r#"rush.set_prompt(function() return "second> " end)"#)
+    lua.eval_script(r#"oslo.set_prompt(function() return "second> " end)"#)
         .unwrap();
     assert_eq!(lua.render_prompt().as_deref(), Some("second> "));
 }
@@ -238,8 +238,8 @@ fn a_prompt_callback_may_use_the_rest_of_the_api() {
     let (lua, _env) = engine();
     lua.eval_script(
         r#"
-        rush.set_var("ZZ_PROMPT_BIT", "x")
-        rush.set_prompt(function() return rush.get_var("ZZ_PROMPT_BIT") .. "> " end)
+        oslo.set_var("ZZ_PROMPT_BIT", "x")
+        oslo.set_prompt(function() return oslo.get_var("ZZ_PROMPT_BIT") .. "> " end)
         "#,
     )
     .unwrap();
@@ -252,11 +252,11 @@ fn a_prompt_callback_that_fails_leaves_the_prompt_to_the_shell() {
     let (lua, _env) = engine();
     // A broken prompt must not take the shell down, and must not print a traceback where the
     // prompt goes: `None` means "use the built-in prompt".
-    lua.eval_script(r#"rush.set_prompt(function() error("boom") end)"#)
+    lua.eval_script(r#"oslo.set_prompt(function() error("boom") end)"#)
         .unwrap();
     assert_eq!(lua.render_prompt(), None);
 
-    lua.eval_script(r#"rush.set_prompt(function() return nil end)"#)
+    lua.eval_script(r#"oslo.set_prompt(function() return nil end)"#)
         .unwrap();
     assert_eq!(lua.render_prompt(), None);
 }
@@ -264,11 +264,11 @@ fn a_prompt_callback_that_fails_leaves_the_prompt_to_the_shell() {
 #[test]
 fn set_prompt_refuses_anything_that_is_not_a_function() {
     let (lua, _env) = engine();
-    assert!(lua.eval_script(r#"rush.set_prompt("rush$ ")"#).is_err());
+    assert!(lua.eval_script(r#"oslo.set_prompt("oslo$ ")"#).is_err());
     assert_eq!(lua.render_prompt(), None, "and nothing was stored");
 }
 
-// ------------------------------------------------------------ rush.register_builtin
+// ------------------------------------------------------------ oslo.register_builtin
 
 #[test]
 fn register_builtin_refuses_a_callback_that_is_not_callable() {
@@ -276,11 +276,11 @@ fn register_builtin_refuses_a_callback_that_is_not_callable() {
     // The R9.8 suite covers the callback that runs; this is the other half — a bad registration
     // must not leave a name in the builtin registry with nothing behind it.
     assert!(
-        lua.eval_script(r#"rush.register_builtin("zzbad", "not a function")"#)
+        lua.eval_script(r#"oslo.register_builtin("zzbad", "not a function")"#)
             .is_err()
     );
     assert!(
-        lua.eval_script(r#"rush.register_builtin("zzbad")"#)
+        lua.eval_script(r#"oslo.register_builtin("zzbad")"#)
             .is_err()
     );
     assert!(!env.lock().unwrap().is_builtin("zzbad"));
@@ -293,16 +293,16 @@ fn there_is_no_right_prompt_binding() {
     let (lua, _env) = engine();
     // PLAN R9.7: it was registered and never rendered. A script that still calls it must fail
     // loudly rather than configure something nothing reads.
-    lua.eval_script(r#"assert(rush.set_right_prompt == nil)"#)
+    lua.eval_script(r#"assert(oslo.set_right_prompt == nil)"#)
         .expect("set_right_prompt must be absent");
 }
 
 #[test]
-fn the_rush_table_does_not_exist_until_the_bindings_are_installed() {
+fn the_oslo_table_does_not_exist_until_the_bindings_are_installed() {
     let lua = LuaEngine::new().expect("Lua init failed");
-    lua.eval_script("assert(rush == nil)")
+    lua.eval_script("assert(oslo == nil)")
         .expect("no bindings, no table");
-    assert!(lua.eval_script(r#"rush.exec("true")"#).is_err());
+    assert!(lua.eval_script(r#"oslo.exec("true")"#).is_err());
 }
 
 // ------------------------------------------------------------------ eval / load_file
@@ -314,7 +314,7 @@ fn load_file_runs_a_script_from_disk() {
     let path = dir.path().join("init.lua");
     fs::write(
         &path,
-        "rush.set_alias('zzfile', 'echo from-file')\nrush.set_var('ZZ_FROM_FILE', 'yes')\n",
+        "oslo.set_alias('zzfile', 'echo from-file')\noslo.set_var('ZZ_FROM_FILE', 'yes')\n",
     )
     .unwrap();
 
@@ -363,6 +363,6 @@ fn eval_script_reports_a_syntax_error() {
     let (lua, _env) = engine();
     assert!(lua.eval_script("this is not lua(").is_err());
     // And a valid script still runs afterwards: one bad chunk does not poison the interpreter.
-    lua.eval_script("rush.set_var('ZZ_AFTER_ERROR', '1')")
+    lua.eval_script("oslo.set_var('ZZ_AFTER_ERROR', '1')")
         .expect("the engine still works");
 }

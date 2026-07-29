@@ -23,7 +23,7 @@ fn split_assignment(arg: &str) -> (&str, Option<&str>) {
 /// The options are parsed rather than assigned to: `local -r x=1` used to create a variable
 /// literally called `-r` and then a second one called `x`.
 ///
-/// `-i` (integer) is accepted and otherwise ignored — rush keeps no attribute table, so there is
+/// `-i` (integer) is accepted and otherwise ignored — oslo keeps no attribute table, so there is
 /// nothing to record and arithmetic on assignment is not implemented. Rejecting it outright
 /// would break scripts for a declaration that is only ever an optimisation hint.
 pub fn builtin_local(env: &mut Environment, args: &[String]) -> Result<i32> {
@@ -31,7 +31,7 @@ pub fn builtin_local(env: &mut Environment, args: &[String]) -> Result<i32> {
     // the line that declared it — the opposite of what was asked for. Refusing is what bash does,
     // and silence here is how a script ends up with a leaked global it never sees.
     if !env.in_function() {
-        eprintln!("rush: local: can only be used in a function");
+        eprintln!("oslo: local: can only be used in a function");
         return Ok(1);
     }
 

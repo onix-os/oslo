@@ -1,6 +1,6 @@
 //! What the shell does with input it cannot run.
 //!
-//! rush used to carry a second, hand-written parser and re-parse the whole program with it
+//! oslo used to carry a second, hand-written parser and re-parse the whole program with it
 //! whenever brush or the adapter reported an error. That fallback had no here-document support,
 //! so it parsed heredoc *bodies* as commands and executed them — a file that merely contained
 //! `touch /tmp/pwned` created the file. It also stopped silently at a token it did not know, so
@@ -204,7 +204,7 @@ fn sourcing_an_unparseable_file_returns_two_and_the_script_continues() {
 /// `Lexer::skip_whitespace` stepped over a set of characters `scan_word_parts` refused to consume,
 /// so the lexer handed back empty words forever and the adapter grew a `Vec` until the allocator
 /// aborted — status 134, a core dump, and no command run. A no-break space out of a web page or a
-/// PDF was enough. bash treats every one of these as an ordinary word character, and so does rush.
+/// PDF was enough. bash treats every one of these as an ordinary word character, and so does oslo.
 #[test]
 fn a_unicode_blank_is_word_data_and_never_a_hang() {
     for blank in ['\u{0b}', '\u{0c}', '\u{a0}', '\u{85}', '\u{2028}'] {
@@ -226,7 +226,7 @@ fn a_unicode_blank_is_word_data_and_never_a_hang() {
 /// `brush_parser` is a PEG, so an unmatched `(` doubles the alternatives it re-tries: 25 of them
 /// held the shell at 100% CPU indefinitely, and the nesting guard never saw it because 25 is a
 /// quarter of the *depth* it bounds. bash rejects all of these in under a millisecond with status
-/// 2, which is now also what rush does.
+/// 2, which is now also what oslo does.
 #[test]
 fn unmatched_openers_are_refused_instead_of_backtracked() {
     for opener in [

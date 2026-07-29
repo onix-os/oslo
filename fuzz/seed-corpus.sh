@@ -33,7 +33,7 @@ emit() {
 }
 
 # The parser and the word lexer both take whole-file input: a script is a script, and the word
-# lexer's job on a script is to find the first word in it, which is exactly the entry rush uses.
+# lexer's job on a script is to find the first word in it, which is exactly the entry oslo uses.
 for script in "$scripts"/*.sh; do
     cp -f "$script" "$out/fuzz_parse/$(basename "$script")"
     cp -f "$script" "$out/fuzz_lexer/$(basename "$script")"

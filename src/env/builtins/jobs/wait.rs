@@ -20,7 +20,7 @@
 //!
 //! Every form of `wait` consumes what it reports, so a second `wait` for the same child is 127.
 //! That is the POSIX rule and what `bash --posix` does; *default* bash keeps the status and
-//! answers the same number again. rush follows POSIX, which is also the corpus oracle — see
+//! answers the same number again. oslo follows POSIX, which is also the corpus oracle — see
 //! [`JobTable::take_status`].
 
 use nix::errno::Errno;
@@ -39,7 +39,7 @@ pub fn builtin_wait(env: &mut Environment, args: &[String]) -> Result<i32> {
     let opts = match Options::parse(&args[1..]) {
         Ok(opts) => opts,
         Err(bad) => {
-            eprintln!("rush: wait: {}: invalid option", bad);
+            eprintln!("oslo: wait: {}: invalid option", bad);
             eprintln!("wait: usage: wait [-fn] [-p var] [id ...]");
             return Ok(2);
         }
@@ -159,7 +159,7 @@ fn resolve(id: &str) -> std::result::Result<Target, i32> {
         return match resolve_job(id) {
             Some(target) => Ok(target),
             None => {
-                eprintln!("rush: wait: {}: no such job", id);
+                eprintln!("oslo: wait: {}: no such job", id);
                 Err(NO_SUCH_CHILD)
             }
         };
@@ -167,7 +167,7 @@ fn resolve(id: &str) -> std::result::Result<Target, i32> {
     match id.parse::<i32>() {
         Ok(n) if n > 0 => Ok(resolve_pid(Pid::from_raw(n))),
         _ => {
-            eprintln!("rush: wait: `{}': not a pid or valid job spec", id);
+            eprintln!("oslo: wait: `{}': not a pid or valid job spec", id);
             Err(1)
         }
     }
@@ -256,7 +256,7 @@ fn wait_for_all_of(pids: &[Pid]) -> Option<(Pid, i32)> {
         match wait_for_pid(*pid) {
             Some(status) => last = Some((*pid, status)),
             None if pids.len() == 1 => eprintln!(
-                "rush: wait: pid {} is not a child of this shell",
+                "oslo: wait: pid {} is not a child of this shell",
                 pid.as_raw()
             ),
             None => {}

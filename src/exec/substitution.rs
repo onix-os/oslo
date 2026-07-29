@@ -56,7 +56,7 @@ pub fn eval_command_substitution(env: &mut Environment, cmd_str: &str) -> Result
                 let len_with_nuls = output.len();
                 output.retain(|&b| b != 0);
                 if output.len() != len_with_nuls {
-                    eprintln!("rush: warning: command substitution: ignored null byte in input");
+                    eprintln!("oslo: warning: command substitution: ignored null byte in input");
                 }
                 Ok(String::from_utf8_lossy(&output).into_owned())
             }

@@ -1,4 +1,4 @@
-//! What a command rush launches inherits, and what it must not.
+//! What a command oslo launches inherits, and what it must not.
 //!
 //! These go through the real binary because the defect they cover lives in the window between
 //! `fork` and `execv`: an in-process test can inspect `Environment` all it likes and never see
@@ -10,6 +10,7 @@ use common::run;
 use std::fs;
 use std::io::Read;
 use std::process::{Command, Stdio};
+use std::thread::sleep;
 use std::time::{Duration, Instant};
 
 /// The kernel reports the ignored-signal set as a hex bitmask in `/proc/self/status`.
@@ -63,7 +64,7 @@ fn a_stopped_child_does_not_wedge_the_shell() {
     let dir = tempfile::tempdir().expect("tempdir");
     let script = "sh -c 'echo $$ > pid; kill -STOP $$'\necho \"s=$?\"\necho CONTINUE";
 
-    let mut child = Command::new(common::rush_bin())
+    let mut child = Command::new(common::oslo_bin())
         .arg("-c")
         .arg(script)
         .current_dir(dir.path())
@@ -71,7 +72,7 @@ fn a_stopped_child_does_not_wedge_the_shell() {
         .stdout(Stdio::piped())
         .stderr(Stdio::null())
         .spawn()
-        .expect("spawn rush");
+        .expect("spawn oslo");
 
     let deadline = Instant::now() + Duration::from_secs(10);
     let wedged = loop {
@@ -117,4 +118,74 @@ fn an_exec_ed_child_blocks_nothing() {
         .expect("SigBlk value")
         .to_string();
     assert_eq!(u64::from_str_radix(&hex, 16).expect("hex mask"), 0);
+}
+
+/// R7.2: a SIGINT that arrives while a loop is *already running* still reaches the shell.
+///
+/// A shell that polls for interrupts only before entering a loop leaves `while :; do :; done`
+/// spinning past Ctrl-C forever — the finding this covers. The equivalent used to be a unit test
+/// that `fork()`ed from libtest's thread pool and deadlocked about one run in ten; see the note in
+/// `src/exec/pipeline/interrupt.rs`.
+///
+/// The trap is what makes this a test of the poll rather than of the kernel. With SIGINT at its
+/// default disposition the process dies no matter what the shell does, so asserting on that would
+/// pass just as happily with the interrupt check removed. A handler means the signal *cannot* end
+/// the loop on its own: only the shell noticing it between commands can, so a regression shows up
+/// as this test timing out instead of as a green run.
+///
+/// The loop is pure shell — no `sleep`, nothing entering the kernel — because a shell blocked in a
+/// syscall is interrupted by `EINTR`, which is the easy case and not the one that was broken.
+/// bash exits 42 here and prints `interrupted`, which is what oslo is checked against.
+#[test]
+fn a_running_loop_sees_a_trapped_sigint() {
+    let mut child = Command::new(common::oslo_bin())
+        .arg("-c")
+        .arg(r#"trap 'echo interrupted; exit 42' INT; while :; do :; done"#)
+        .stdin(Stdio::null())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .expect("spawn oslo");
+
+    // Long enough to be inside the loop rather than still parsing: interrupting a loop that has
+    // not started yet is the case that always worked.
+    sleep(Duration::from_millis(300));
+    assert!(
+        child.try_wait().expect("try_wait").is_none(),
+        "the shell exited before it could be interrupted"
+    );
+
+    nix::sys::signal::kill(
+        nix::unistd::Pid::from_raw(child.id() as i32),
+        nix::sys::signal::Signal::SIGINT,
+    )
+    .expect("send SIGINT");
+
+    let deadline = Instant::now() + Duration::from_secs(10);
+    let status = loop {
+        match child.try_wait().expect("try_wait") {
+            Some(status) => break Some(status),
+            None if Instant::now() >= deadline => {
+                let _ = child.kill();
+                let _ = child.wait();
+                break None;
+            }
+            None => sleep(Duration::from_millis(20)),
+        }
+    };
+
+    let status = status.expect("the loop spun past SIGINT: the trap never ran");
+    let mut out = String::new();
+    if let Some(mut pipe) = child.stdout.take() {
+        let _ = pipe.read_to_string(&mut out);
+    }
+    assert_eq!(
+        status.code(),
+        Some(42),
+        "the INT trap should have exited 42, output was {out:?}"
+    );
+    assert!(
+        out.contains("interrupted"),
+        "the INT trap did not run; output was {out:?}"
+    );
 }

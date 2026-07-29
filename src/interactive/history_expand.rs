@@ -3,7 +3,7 @@
 //! This lives in the binary, not in the library, and that is the whole point. History expansion
 //! rewrites a line *before* it is parsed, so a `!` inside data would become a different command
 //! than the one that was written. bash only does it for an interactive line and never for `-c`,
-//! `sh script`, or a sourced file; keeping the code out of `rush::` means no library consumer and
+//! `sh script`, or a sourced file; keeping the code out of `oslo::` means no library consumer and
 //! no non-interactive path can reach it even by accident.
 //!
 //! What is supported, all against a `history` slice ordered oldest-first, where event number `n`

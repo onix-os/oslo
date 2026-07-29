@@ -6,7 +6,7 @@
 //! directory and the umask belong to that process, not to the thread, so a test that changes one
 //! of them changes it for every test running at that instant. For the umask and the cwd that is
 //! merely wrong answers; for `environ` it is undefined behaviour — `Environment::set_var` reaches
-//! `unsafe { std::env::set_var }` (`src/env/scope.rs`), whose safety argument is "rush never
+//! `unsafe { std::env::set_var }` (`src/env/scope.rs`), whose safety argument is "oslo never
 //! spawns a thread". That argument holds for the shell and is false for its test harness, where
 //! another worker thread can be inside `Environment::new()`'s `env::vars()` walk reading the
 //! pointer array `set_var` is reallocating.
@@ -40,14 +40,14 @@ mod process_global {
     /// `export` has to reach the real `environ`, which is only observable from a child.
     ///
     /// The in-process ancestor of this test asserted `env.get_param("BAZ") == Some("qux")` — a
-    /// lookup in rush's own `HashMap`, which would have passed just as happily if the `environ`
+    /// lookup in oslo's own `HashMap`, which would have passed just as happily if the `environ`
     /// write had been dropped entirely. Reading it back out of `env(1)` tests the thing that
     /// matters, and the negative half tests the other direction: an unexported assignment must
     /// *not* leak into a child.
     #[test]
     fn exported_assignments_reach_a_child_and_plain_ones_do_not() {
         let r = run(
-            "RUSH_T_PLAIN=bar; export RUSH_T_EXPORTED=qux; echo \"$RUSH_T_PLAIN/$RUSH_T_EXPORTED\"; env",
+            "OSLO_T_PLAIN=bar; export OSLO_T_EXPORTED=qux; echo \"$OSLO_T_PLAIN/$OSLO_T_EXPORTED\"; env",
         );
         assert_eq!(r.status, 0, "stderr: {}", r.stderr);
 
@@ -61,12 +61,12 @@ mod process_global {
 
         let environ: Vec<&str> = lines.collect();
         assert!(
-            environ.contains(&"RUSH_T_EXPORTED=qux"),
+            environ.contains(&"OSLO_T_EXPORTED=qux"),
             "exported variable missing from the child's environment: {:?}",
             environ
         );
         assert!(
-            !environ.iter().any(|l| l.starts_with("RUSH_T_PLAIN")),
+            !environ.iter().any(|l| l.starts_with("OSLO_T_PLAIN")),
             "unexported variable leaked into the child's environment: {:?}",
             environ
         );
@@ -75,9 +75,9 @@ mod process_global {
     /// `export` on an already-set name promotes it without changing the value.
     #[test]
     fn export_of_an_existing_variable_promotes_it() {
-        let r = run("RUSH_T_LATE=one; export RUSH_T_LATE; env");
+        let r = run("OSLO_T_LATE=one; export OSLO_T_LATE; env");
         assert!(
-            r.out().lines().any(|l| l == "RUSH_T_LATE=one"),
+            r.out().lines().any(|l| l == "OSLO_T_LATE=one"),
             "stdout: {}\nstderr: {}",
             r.stdout,
             r.stderr
@@ -87,9 +87,9 @@ mod process_global {
     /// `unset` has to remove the name from `environ`, not just from the shell's table.
     #[test]
     fn unset_removes_an_exported_name_from_the_environment() {
-        let r = run("export RUSH_T_GONE=1; unset RUSH_T_GONE; env");
+        let r = run("export OSLO_T_GONE=1; unset OSLO_T_GONE; env");
         assert!(
-            !r.out().lines().any(|l| l.starts_with("RUSH_T_GONE")),
+            !r.out().lines().any(|l| l.starts_with("OSLO_T_GONE")),
             "stdout: {}\nstderr: {}",
             r.stdout,
             r.stderr
@@ -190,7 +190,7 @@ mod process_global {
     /// line is `build` would change directory instead of reporting that `build` does not exist,
     /// and every relative path after it would resolve somewhere the author never intended. autocd
     /// is an interactive convenience, gated on both an interactive shell and an explicit opt-in
-    /// (`rush::exec::simple::set_autocd`), and `-c` is neither.
+    /// (`oslo::exec::simple::set_autocd`), and `-c` is neither.
     #[test]
     fn auto_cd_is_off_outside_an_interactive_shell() {
         let tmp = tempfile::tempdir().expect("tempdir");
@@ -219,10 +219,10 @@ mod process_global {
 /// Every one of these is a pure function of the AST and the `Environment` it is handed. Nothing
 /// here may write `environ`, `chdir` or `umask` — see the module docs at the top of the file.
 mod in_process {
-    use rush::env::Environment;
-    use rush::exec::eval_command_list;
-    use rush::lua::LuaEngine;
-    use rush::parser::parse_bash_script;
+    use oslo::env::Environment;
+    use oslo::exec::eval_command_list;
+    use oslo::lua::LuaEngine;
+    use oslo::parser::parse_bash_script;
     use std::sync::{Arc, Mutex};
 
     /// Every variable these tests assign carries this prefix.
@@ -232,7 +232,7 @@ mod in_process {
     /// That is the one way an in-process test here could still write `environ`, and it would do
     /// so silently, depending on whoever's machine happened to export `X` or `COUNT`. A prefix no
     /// real environment uses closes that door, and [`fresh_env`] checks the door is shut.
-    const VAR_PREFIX: &str = "RUSH_T_";
+    const VAR_PREFIX: &str = "OSLO_T_";
 
     /// The only way these tests are allowed to obtain an `Environment`.
     ///
@@ -260,23 +260,23 @@ mod in_process {
     // out of a multi-threaded parent inherits whatever locks the other threads held at that
     // instant, so it can deadlock in the allocator before reaching `execv` while the parent blocks
     // in `waitpid`. That made `cargo test` hang for roughly one run in twenty. It is a property of
-    // the harness rather than of the shell — rush itself never spawns a thread — so the pipeline
+    // the harness rather than of the shell — oslo itself never spawns a thread — so the pipeline
     // cases live in `expansion_tests.rs`, which spawns the real binary.
 
     #[test]
     fn plain_assignment_is_visible_to_expansion() {
         let mut env = fresh_env();
-        let status = run_cmd(&mut env, "RUSH_T_FOO=bar; RUSH_T_ECHO=$RUSH_T_FOO");
+        let status = run_cmd(&mut env, "OSLO_T_FOO=bar; OSLO_T_ECHO=$OSLO_T_FOO");
         assert_eq!(status, 0);
-        assert_eq!(env.get_param("RUSH_T_FOO"), Some("bar".to_string()));
-        assert_eq!(env.get_param("RUSH_T_ECHO"), Some("bar".to_string()));
+        assert_eq!(env.get_param("OSLO_T_FOO"), Some("bar".to_string()));
+        assert_eq!(env.get_param("OSLO_T_ECHO"), Some("bar".to_string()));
     }
 
     #[test]
     fn test_arithmetic_expansion() {
         let mut env = fresh_env();
-        run_cmd(&mut env, "RUSH_T_X=10; RUSH_T_Y=$((RUSH_T_X + 5 * 2))");
-        assert_eq!(env.get_param("RUSH_T_Y"), Some("20".to_string()));
+        run_cmd(&mut env, "OSLO_T_X=10; OSLO_T_Y=$((OSLO_T_X + 5 * 2))");
+        assert_eq!(env.get_param("OSLO_T_Y"), Some("20".to_string()));
     }
 
     #[test]
@@ -284,10 +284,10 @@ mod in_process {
         let mut env = fresh_env();
         let status = run_cmd(
             &mut env,
-            "if true; then RUSH_T_OUT=yes; else RUSH_T_OUT=no; fi",
+            "if true; then OSLO_T_OUT=yes; else OSLO_T_OUT=no; fi",
         );
         assert_eq!(status, 0);
-        assert_eq!(env.get_param("RUSH_T_OUT"), Some("yes".to_string()));
+        assert_eq!(env.get_param("OSLO_T_OUT"), Some("yes".to_string()));
     }
 
     #[test]
@@ -295,9 +295,9 @@ mod in_process {
         let mut env = fresh_env();
         run_cmd(
             &mut env,
-            "RUSH_T_N=0; while [ $RUSH_T_N -lt 3 ]; do RUSH_T_N=$((RUSH_T_N + 1)); done",
+            "OSLO_T_N=0; while [ $OSLO_T_N -lt 3 ]; do OSLO_T_N=$((OSLO_T_N + 1)); done",
         );
-        assert_eq!(env.get_param("RUSH_T_N"), Some("3".to_string()));
+        assert_eq!(env.get_param("OSLO_T_N"), Some("3".to_string()));
     }
 
     #[test]
@@ -305,9 +305,9 @@ mod in_process {
         let mut env = fresh_env();
         run_cmd(
             &mut env,
-            "RUSH_T_V=\"\"; for i in a b c; do RUSH_T_V=\"$RUSH_T_V$i\"; done",
+            "OSLO_T_V=\"\"; for i in a b c; do OSLO_T_V=\"$OSLO_T_V$i\"; done",
         );
-        assert_eq!(env.get_param("RUSH_T_V"), Some("abc".to_string()));
+        assert_eq!(env.get_param("OSLO_T_V"), Some("abc".to_string()));
     }
 
     #[test]
@@ -318,15 +318,15 @@ mod in_process {
             .expect("Bindings failed");
 
         let script = r#"
-            rush.exec("RUSH_T_LUA=works")
-            res = rush.get_var("RUSH_T_LUA")
-            rush.set_alias("l", "ls -l")
-            alias_val = rush.get_alias("l")
+            oslo.exec("OSLO_T_LUA=works")
+            res = oslo.get_var("OSLO_T_LUA")
+            oslo.set_alias("l", "ls -l")
+            alias_val = oslo.get_alias("l")
         "#;
 
         lua.eval_script(script).expect("Script execution failed");
         let guard = env.lock().unwrap();
-        assert_eq!(guard.get_param("RUSH_T_LUA"), Some("works".to_string()));
+        assert_eq!(guard.get_param("OSLO_T_LUA"), Some("works".to_string()));
         assert_eq!(guard.get_alias("l"), Some("ls -l"));
     }
 
@@ -334,24 +334,24 @@ mod in_process {
     fn test_bash_script_parsing() {
         let mut env = fresh_env();
         let script = r#"
-            RUSH_T_A=20
-            RUSH_T_B=30
-            RUSH_T_C=$((RUSH_T_A + RUSH_T_B))
-            if [ $RUSH_T_C -eq 50 ]; then
-                RUSH_T_RESULT="success"
+            OSLO_T_A=20
+            OSLO_T_B=30
+            OSLO_T_C=$((OSLO_T_A + OSLO_T_B))
+            if [ $OSLO_T_C -eq 50 ]; then
+                OSLO_T_RESULT="success"
             fi
         "#;
         let status = run_cmd(&mut env, script);
         assert_eq!(status, 0);
-        assert_eq!(env.get_param("RUSH_T_RESULT"), Some("success".to_string()));
+        assert_eq!(env.get_param("OSLO_T_RESULT"), Some("success".to_string()));
     }
 
     #[test]
     fn test_eval_builtin() {
         let mut env = fresh_env();
-        let status = run_cmd(&mut env, "eval 'RUSH_T_EVAL=100'");
+        let status = run_cmd(&mut env, "eval 'OSLO_T_EVAL=100'");
         assert_eq!(status, 0);
-        assert_eq!(env.get_param("RUSH_T_EVAL"), Some("100".to_string()));
+        assert_eq!(env.get_param("OSLO_T_EVAL"), Some("100".to_string()));
     }
 
     /// `source` reads a file, so it needs a path — but not the *current directory*: the path is
@@ -360,11 +360,11 @@ mod in_process {
     fn test_source_builtin() {
         let mut env = fresh_env();
         let temp = tempfile::NamedTempFile::new().unwrap();
-        std::fs::write(temp.path(), "RUSH_T_SOURCED=hello").unwrap();
+        std::fs::write(temp.path(), "OSLO_T_SOURCED=hello").unwrap();
         let cmd = format!("source {}", temp.path().to_str().unwrap());
         let status = run_cmd(&mut env, &cmd);
         assert_eq!(status, 0);
-        assert_eq!(env.get_param("RUSH_T_SOURCED"), Some("hello".to_string()));
+        assert_eq!(env.get_param("OSLO_T_SOURCED"), Some("hello".to_string()));
     }
 
     #[test]
@@ -388,33 +388,33 @@ mod in_process {
     #[test]
     fn test_readonly_vars() {
         let mut env = fresh_env();
-        let status = run_cmd(&mut env, "readonly RUSH_T_IMMUTABLE=123");
+        let status = run_cmd(&mut env, "readonly OSLO_T_IMMUTABLE=123");
         assert_eq!(status, 0);
 
-        run_cmd(&mut env, "RUSH_T_IMMUTABLE=456");
-        assert_eq!(env.get_param("RUSH_T_IMMUTABLE"), Some("123".to_string()));
+        run_cmd(&mut env, "OSLO_T_IMMUTABLE=456");
+        assert_eq!(env.get_param("OSLO_T_IMMUTABLE"), Some("123".to_string()));
     }
 
     #[test]
     fn test_function_local_scope() {
         let mut env = fresh_env();
         let script = r#"
-            RUSH_T_G="outer"
+            OSLO_T_G="outer"
             my_func() {
-                local RUSH_T_G="inner"
+                local OSLO_T_G="inner"
             }
             my_func
         "#;
         let status = run_cmd(&mut env, script);
         assert_eq!(status, 0);
-        assert_eq!(env.get_param("RUSH_T_G"), Some("outer".to_string()));
+        assert_eq!(env.get_param("OSLO_T_G"), Some("outer".to_string()));
     }
 
     /// Reads the working directory but never changes it, which is only safe because no test in
     /// this binary changes it either — the cwd tests all live in `process_global`.
     #[test]
     fn test_interactive_prompt() {
-        let left = rush::interactive::prompt::render_default_left_prompt(0);
+        let left = oslo::interactive::prompt::render_default_left_prompt(0);
         assert!(!left.is_empty());
         // The right prompt was deleted in PLAN R9.7: nothing ever drew it, so this assertion was
         // the only thing keeping its renderer alive.
@@ -423,19 +423,19 @@ mod in_process {
     #[test]
     fn test_dropdown_menu_render() {
         let candidates = vec![
-            rush::interactive::dropdown::CompletionCandidate::new(
+            oslo::interactive::dropdown::CompletionCandidate::new(
                 "cargo".to_string(),
                 "cargo".to_string(),
                 Some("Rust package manager".to_string()),
             ),
-            rush::interactive::dropdown::CompletionCandidate::new(
+            oslo::interactive::dropdown::CompletionCandidate::new(
                 "cd".to_string(),
                 "cd".to_string(),
                 Some("Change working directory".to_string()),
             ),
         ];
         let (rendered, lines) =
-            rush::interactive::dropdown::render_vertical_dropdown(&candidates, 0, 8, 0);
+            oslo::interactive::dropdown::render_vertical_dropdown(&candidates, 0, 8, 0);
         assert!(rendered.contains("cargo"));
         assert!(rendered.contains("cd"));
         assert_eq!(lines, 4);

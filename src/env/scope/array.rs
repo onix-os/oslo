@@ -137,7 +137,7 @@ impl Environment {
     /// `[[ =~ ]]`. `false` if the variable is read-only.
     pub fn set_array(&mut self, name: &str, array: ShellArray) -> bool {
         if self.is_readonly(name) {
-            eprintln!("rush: {}: is read only", name);
+            eprintln!("oslo: {}: is read only", name);
             return false;
         }
         // A name can be a scalar or an array, never both: leaving the scalar behind would make
@@ -153,7 +153,7 @@ impl Environment {
     /// it becomes element 0, which is what it already was as far as `${b[0]}` was concerned.
     pub fn set_array_element(&mut self, name: &str, index: i64, value: &str) -> bool {
         if self.is_readonly(name) {
-            eprintln!("rush: {}: is read only", name);
+            eprintln!("oslo: {}: is read only", name);
             return false;
         }
         self.promote_scalar(name);
@@ -167,7 +167,7 @@ impl Environment {
     /// Append one element after the highest index in use.
     pub fn append_array_element(&mut self, name: &str, value: &str) -> bool {
         if self.is_readonly(name) {
-            eprintln!("rush: {}: is read only", name);
+            eprintln!("oslo: {}: is read only", name);
             return false;
         }
         self.promote_scalar(name);
@@ -257,20 +257,20 @@ mod tests {
     #[test]
     fn a_scalar_and_an_array_share_one_name() {
         let mut env = Environment::new();
-        env.set_var("rush_a1", "scalar", false);
-        env.set_array("rush_a1", ShellArray::from_values(["1", "2", "3"]));
-        assert_eq!(env.get_var("rush_a1"), Some("1"));
-        env.set_var("rush_a1", "4", false);
-        assert_eq!(env.get_array("rush_a1").unwrap().joined(" "), "4 2 3");
+        env.set_var("oslo_a1", "scalar", false);
+        env.set_array("oslo_a1", ShellArray::from_values(["1", "2", "3"]));
+        assert_eq!(env.get_var("oslo_a1"), Some("1"));
+        env.set_var("oslo_a1", "4", false);
+        assert_eq!(env.get_array("oslo_a1").unwrap().joined(" "), "4 2 3");
     }
 
     /// `b=hello; b[2]=world` keeps the scalar as element 0.
     #[test]
     fn an_element_assignment_promotes_an_existing_scalar() {
         let mut env = Environment::new();
-        env.set_var("rush_a2", "hello", false);
-        env.set_array_element("rush_a2", 2, "world");
-        let a = env.get_array("rush_a2").unwrap();
+        env.set_var("oslo_a2", "hello", false);
+        env.set_array_element("oslo_a2", 2, "world");
+        let a = env.get_array("oslo_a2").unwrap();
         assert_eq!(a.joined(" "), "hello world");
         assert_eq!(a.indices().collect::<Vec<_>>(), vec![0, 2]);
     }
@@ -278,10 +278,10 @@ mod tests {
     #[test]
     fn unsetting_a_variable_removes_its_array_too() {
         let mut env = Environment::new();
-        env.set_array("rush_a3", ShellArray::from_values(["x"]));
-        env.unset_var("rush_a3");
-        assert!(env.get_array("rush_a3").is_none());
-        assert_eq!(env.get_var("rush_a3"), None);
+        env.set_array("oslo_a3", ShellArray::from_values(["x"]));
+        env.unset_var("oslo_a3");
+        assert!(env.get_array("oslo_a3").is_none());
+        assert_eq!(env.get_var("oslo_a3"), None);
     }
 
     /// The contract another subsystem publishes a computed array through.

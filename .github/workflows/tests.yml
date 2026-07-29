@@ -9,7 +9,7 @@ permissions:
   contents: read
 
 jobs:
-  # rush targets Linux, and only Linux. There is no macOS job because there is no macOS support to
+  # oslo targets Linux, and only Linux. There is no macOS job because there is no macOS support to
   # protect: the shell uses /proc, memfd and Linux signal numbers directly rather than routing
   # around them. The toolchain action is pinned to an exact stable release: `@stable` silently
   # moves under us, which turns a new lint into a red build on an unrelated PR.

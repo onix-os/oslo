@@ -53,7 +53,7 @@ Fixed by counting what the pre-scan already knew and never reported — the open
 stack when the input ends. More than `MAX_UNMATCHED_OPENERS` of them is refused. The bound is 16,
 one doubling short of the 35 ms a debug build spends on sixteen, and it is reported as a
 `SyntaxError` because that is what it is: bash exits 2 on every input this rejects, and so does
-rush.
+oslo.
 
 Reproducer: `fuzz/seeds/fuzz_parse/unmatched_openers`.
 Differential case: `tests/corpus/syntax_unmatched_openers.sh`.

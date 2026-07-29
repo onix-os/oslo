@@ -112,13 +112,13 @@ mod tests {
     #[test]
     fn a_local_array_is_undone_by_its_frame() {
         let mut env = Environment::new();
-        env.set_var("rush_f1", "outer", false);
+        env.set_var("oslo_f1", "outer", false);
         env.push_scope();
-        env.set_local_array("rush_f1", ShellArray::from_values(["1", "2"]));
-        assert_eq!(env.get_var("rush_f1"), Some("1"));
+        env.set_local_array("oslo_f1", ShellArray::from_values(["1", "2"]));
+        assert_eq!(env.get_var("oslo_f1"), Some("1"));
         env.pop_scope();
-        assert!(env.get_array("rush_f1").is_none());
-        assert_eq!(env.get_var("rush_f1"), Some("outer"));
+        assert!(env.get_array("oslo_f1").is_none());
+        assert_eq!(env.get_var("oslo_f1"), Some("outer"));
     }
 
     /// And an array that only *existed* inside the frame is gone afterwards.
@@ -126,9 +126,9 @@ mod tests {
     fn a_local_array_with_no_outer_value_disappears() {
         let mut env = Environment::new();
         env.push_scope();
-        env.set_local_array("rush_f2", ShellArray::from_values(["x"]));
+        env.set_local_array("oslo_f2", ShellArray::from_values(["x"]));
         env.pop_scope();
-        assert!(env.get_array("rush_f2").is_none());
-        assert_eq!(env.get_var("rush_f2"), None);
+        assert!(env.get_array("oslo_f2").is_none());
+        assert_eq!(env.get_var("oslo_f2"), None);
     }
 }

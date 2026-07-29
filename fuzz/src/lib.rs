@@ -1,10 +1,10 @@
-//! Fuzz harness for the three rush parsers that consume text nobody vetted.
+//! Fuzz harness for the three oslo parsers that consume text nobody vetted.
 //!
 //! A shell reads attacker-shaped input by definition: a script downloaded from anywhere, a
 //! `$(( ))` body built from a variable, a completion candidate typed at a prompt. All three of the
 //! entry points fuzzed here take a `&str` and are reachable from data:
 //!
-//! * [`targets::parse_script`] — `brush_adapter::parse_bash_script`, the only parser rush has.
+//! * [`targets::parse_script`] — `brush_adapter::parse_bash_script`, the only parser oslo has.
 //! * [`targets::lex_word`] — the word lexer and its token scanner.
 //! * [`targets::eval_arith`] — `eval_arithmetic`, whose wrapping operators and resolve-depth
 //!   guard are the thing PLAN.md R3.5 asks to keep honest after the R3.1–R3.4 rewrite.
@@ -12,7 +12,7 @@
 //! Everything the fuzz targets do lives in this library rather than in the `fuzz_targets/` stubs,
 //! for one practical reason: a `#![no_main]` libFuzzer binary needs a nightly toolchain and a
 //! sanitizer runtime, and `cargo test --lib` here needs neither. The corpus replay in
-//! [`targets`] therefore runs on any machine that can build rush at all, so a missing nightly
+//! [`targets`] therefore runs on any machine that can build oslo at all, so a missing nightly
 //! costs coverage but never costs the check entirely.
 //!
 //! ## What the harness will not do
@@ -39,9 +39,9 @@ pub const MAX_WORD: usize = 16 * 1024;
 /// Longest arithmetic expression the evaluator target will look at.
 pub const MAX_EXPR: usize = 4 * 1024;
 
-/// Decode fuzzer bytes into the `&str` every rush parser wants, or `None` if the input is too big.
+/// Decode fuzzer bytes into the `&str` every oslo parser wants, or `None` if the input is too big.
 ///
-/// The decode is lossy on purpose. rush's public API is `&str`, so a strict `from_utf8` would make
+/// The decode is lossy on purpose. oslo's public API is `&str`, so a strict `from_utf8` would make
 /// the target return early on most mutations and spend the budget rediscovering UTF-8 rather than
 /// shell syntax. Lossy decoding keeps every byte string a usable test case; the replacement
 /// character it produces is itself an interesting word character.

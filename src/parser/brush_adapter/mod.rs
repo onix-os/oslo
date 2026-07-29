@@ -1,8 +1,8 @@
-//! Bridge from [`brush_parser`]'s AST to rush's own [`crate::ast`].
+//! Bridge from [`brush_parser`]'s AST to oslo's own [`crate::ast`].
 //!
-//! brush is a spec-compliant bash parser; rush's evaluator works on its own simpler AST. This
+//! brush is a spec-compliant bash parser; oslo's evaluator works on its own simpler AST. This
 //! module is the translation layer, and it is the *only* path from source text to a runnable
-//! program: `main`, `eval`, `source`, command substitution and the Lua `rush.exec` binding all
+//! program: `main`, `eval`, `source`, command substitution and the Lua `oslo.exec` binding all
 //! come through here, and an error raised here is what the user sees.
 //!
 //! That makes fidelity here load-bearing: anything this module drops is silently unobservable at
@@ -36,13 +36,13 @@ mod words;
 #[cfg(test)]
 mod tests;
 
-use crate::ast as rush_ast;
+use crate::ast as oslo_ast;
 use crate::error::{Result, ShellError};
 use brush_parser::{ParserOptions, ast};
 use commands::convert_command;
 use std::io::Cursor;
 
-pub fn parse_bash_script(script: &str) -> Result<rush_ast::CommandList> {
+pub fn parse_bash_script(script: &str) -> Result<oslo_ast::CommandList> {
     // Before brush sees the text, not after: brush is recursive descent, so absurdly nested input
     // overflows the stack inside `parse_program` and aborts the process before any error of ours
     // could be produced. See [`crate::parser::nesting`].
@@ -64,7 +64,7 @@ pub fn parse_bash_script(script: &str) -> Result<rush_ast::CommandList> {
     }
 }
 
-fn convert_program(prog: &ast::Program) -> Result<rush_ast::CommandList> {
+fn convert_program(prog: &ast::Program) -> Result<oslo_ast::CommandList> {
     let mut items = Vec::new();
 
     for compound_list in &prog.complete_commands {
@@ -73,53 +73,53 @@ fn convert_program(prog: &ast::Program) -> Result<rush_ast::CommandList> {
         }
     }
 
-    Ok(rush_ast::CommandList { items })
+    Ok(oslo_ast::CommandList { items })
 }
 
-pub(super) fn convert_compound_list(list: &ast::CompoundList) -> Result<rush_ast::CommandList> {
+pub(super) fn convert_compound_list(list: &ast::CompoundList) -> Result<oslo_ast::CommandList> {
     let mut items = Vec::new();
     for list_item in &list.0 {
         items.push(convert_list_item(list_item)?);
     }
-    Ok(rush_ast::CommandList { items })
+    Ok(oslo_ast::CommandList { items })
 }
 
 /// Convert one list item, preserving its separator.
 ///
 /// The separator is what distinguishes `sleep 10 &` from `sleep 10;` — dropping it silently
 /// turns every background job into a foreground one.
-fn convert_list_item(item: &ast::CompoundListItem) -> Result<rush_ast::ListItem> {
+fn convert_list_item(item: &ast::CompoundListItem) -> Result<oslo_ast::ListItem> {
     let and_or = convert_and_or(&item.0)?;
     let op = match item.1 {
-        ast::SeparatorOperator::Async => rush_ast::ListOp::Background,
-        ast::SeparatorOperator::Sequence => rush_ast::ListOp::Sequential,
+        ast::SeparatorOperator::Async => oslo_ast::ListOp::Background,
+        ast::SeparatorOperator::Sequence => oslo_ast::ListOp::Sequential,
     };
-    Ok(rush_ast::ListItem { and_or, op })
+    Ok(oslo_ast::ListItem { and_or, op })
 }
 
-fn convert_and_or(and_or: &ast::AndOrList) -> Result<rush_ast::AndOrList> {
+fn convert_and_or(and_or: &ast::AndOrList) -> Result<oslo_ast::AndOrList> {
     let first = convert_pipeline(&and_or.first)?;
     let mut rest = Vec::new();
 
     for item in &and_or.additional {
         let (op, pipeline) = match item {
-            ast::AndOr::And(p) => (rush_ast::AndOrOp::And, convert_pipeline(p)?),
-            ast::AndOr::Or(p) => (rush_ast::AndOrOp::Or, convert_pipeline(p)?),
+            ast::AndOr::And(p) => (oslo_ast::AndOrOp::And, convert_pipeline(p)?),
+            ast::AndOr::Or(p) => (oslo_ast::AndOrOp::Or, convert_pipeline(p)?),
         };
         rest.push((op, pipeline));
     }
 
-    Ok(rush_ast::AndOrList { first, rest })
+    Ok(oslo_ast::AndOrList { first, rest })
 }
 
-fn convert_pipeline(pipe: &ast::Pipeline) -> Result<rush_ast::Pipeline> {
+fn convert_pipeline(pipe: &ast::Pipeline) -> Result<oslo_ast::Pipeline> {
     let mut commands = Vec::new();
     for cmd in &pipe.seq {
         commands.push(convert_command(cmd)?);
     }
-    Ok(rush_ast::Pipeline {
+    Ok(oslo_ast::Pipeline {
         negated: pipe.bang,
-        // R8.7: brush records the keyword and rush used to read only `bang` and `seq`, so `time`
+        // R8.7: brush records the keyword and oslo used to read only `bang` and `seq`, so `time`
         // was accepted and then silently discarded. `-p` is flattened into the same flag; see the
         // known gap above.
         timed: pipe.timed.is_some(),

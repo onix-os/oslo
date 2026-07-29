@@ -1,15 +1,15 @@
-//! `rush.register_builtin` — PLAN R9.8.
+//! `oslo.register_builtin` — PLAN R9.8.
 //!
 //! Before this round the binding accepted a callback, dropped it, and registered the stub
-//! `|_, _| Ok(0)` under the name anyway. That made `rush.register_builtin('ls', …)` turn `ls /`
+//! `|_, _| Ok(0)` under the name anyway. That made `oslo.register_builtin('ls', …)` turn `ls /`
 //! into a command that printed nothing and exited 0 — a saboteur, not a no-op. These tests pin
 //! the three things that were wrong: the callback runs, its result is the exit status, and a
 //! failure inside it is not reported as success.
 
-use rush::env::Environment;
-use rush::exec::eval_command_list;
-use rush::lua::LuaEngine;
-use rush::parser::parse_bash_script;
+use oslo::env::Environment;
+use oslo::exec::eval_command_list;
+use oslo::lua::LuaEngine;
+use oslo::parser::parse_bash_script;
 use std::sync::{Arc, Mutex};
 
 /// A shell with `script` already evaluated by the Lua engine.
@@ -34,7 +34,7 @@ fn run(env: &Arc<Mutex<Environment>>, line: &str) -> i32 {
 fn a_registered_builtin_runs_and_its_return_value_is_the_status() {
     let (_lua, env) = shell_with_lua(
         r#"
-        rush.register_builtin("statuser", function(argv)
+        oslo.register_builtin("statuser", function(argv)
             return 7
         end)
         "#,
@@ -51,7 +51,7 @@ fn a_registered_builtin_runs_and_its_return_value_is_the_status() {
 fn the_callback_receives_argv_with_its_own_name_first() {
     let (_lua, env) = shell_with_lua(
         r#"
-        rush.register_builtin("argviewer", function(argv)
+        oslo.register_builtin("argviewer", function(argv)
             if table.concat(argv, ",") ~= "argviewer,one,two" then return 99 end
             return #argv
         end)
@@ -65,9 +65,9 @@ fn the_callback_receives_argv_with_its_own_name_first() {
 fn missing_and_boolean_return_values_become_a_status() {
     let (_lua, env) = shell_with_lua(
         r#"
-        rush.register_builtin("silent", function(argv) end)
-        rush.register_builtin("yes", function(argv) return true end)
-        rush.register_builtin("no", function(argv) return false end)
+        oslo.register_builtin("silent", function(argv) end)
+        oslo.register_builtin("yes", function(argv) return true end)
+        oslo.register_builtin("no", function(argv) return false end)
         "#,
     );
     assert_eq!(run(&env, "silent"), 0);
@@ -81,7 +81,7 @@ fn missing_and_boolean_return_values_become_a_status() {
 fn an_error_inside_the_callback_is_a_failure_status() {
     let (_lua, env) = shell_with_lua(
         r#"
-        rush.register_builtin("exploder", function(argv)
+        oslo.register_builtin("exploder", function(argv)
             error("deliberate")
         end)
         "#,
@@ -96,7 +96,7 @@ fn an_error_inside_the_callback_is_a_failure_status() {
 fn a_registered_name_overrides_the_native_builtin() {
     let (_lua, env) = shell_with_lua(
         r#"
-        rush.register_builtin("true", function(argv) return 3 end)
+        oslo.register_builtin("true", function(argv) return 3 end)
         "#,
     );
     assert_eq!(run(&env, "true"), 3);
@@ -108,21 +108,21 @@ fn a_registered_name_overrides_the_native_builtin() {
 fn a_registered_name_is_preferred_over_the_program_on_path() {
     let (_lua, env) = shell_with_lua(
         r#"
-        rush.register_builtin("env", function(argv) return 5 end)
+        oslo.register_builtin("env", function(argv) return 5 end)
         "#,
     );
     assert_eq!(run(&env, "env"), 5);
 }
 
 /// The re-entrancy rule, stated as a test so it cannot regress into a hang: the evaluator holds
-/// the shell state while the callback runs, so `rush.*` inside a callback raises a Lua error.
+/// the shell state while the callback runs, so `oslo.*` inside a callback raises a Lua error.
 /// Before `try_lock` this deadlocked, and an interactive shell simply stopped responding.
 #[test]
-fn calling_back_into_the_rush_api_errors_instead_of_deadlocking() {
+fn calling_back_into_the_oslo_api_errors_instead_of_deadlocking() {
     let (_lua, env) = shell_with_lua(
         r#"
-        rush.register_builtin("reenter", function(argv)
-            rush.set_var("SHOULD_NOT_HAPPEN", "1")
+        oslo.register_builtin("reenter", function(argv)
+            oslo.set_var("SHOULD_NOT_HAPPEN", "1")
             return 0
         end)
         "#,
@@ -139,7 +139,7 @@ fn an_empty_builtin_name_is_refused() {
     let lua = LuaEngine::new().expect("Lua init failed");
     lua.setup_bindings(Arc::clone(&env)).expect("bindings");
     let err = lua
-        .eval_script(r#"rush.register_builtin("  ", function() end)"#)
+        .eval_script(r#"oslo.register_builtin("  ", function() end)"#)
         .expect_err("an empty name must be an error");
     assert!(err.to_string().contains("must not be empty"), "{err}");
 }
@@ -152,7 +152,7 @@ fn set_right_prompt_no_longer_exists() {
     let lua = LuaEngine::new().expect("Lua init failed");
     lua.setup_bindings(Arc::clone(&env)).expect("bindings");
     assert!(
-        lua.eval_script("rush.set_right_prompt(function() return '' end)")
+        lua.eval_script("oslo.set_right_prompt(function() return '' end)")
             .is_err()
     );
 }

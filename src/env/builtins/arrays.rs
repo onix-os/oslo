@@ -22,7 +22,7 @@ use crate::lexer::{Lexer, Token};
 /// element per resulting field — the same rule an `a=(…)` assignment follows.
 pub fn array_elements(env: &mut Environment, body: &str) -> Result<ShellArray> {
     // Brace expansion is a pass over the *text* of each word, ahead of the lexer, so a body that
-    // rush lexes itself has to run it itself: `declare -a a='(x{1,2})'` is two elements.
+    // oslo lexes itself has to run it itself: `declare -a a='(x{1,2})'` is two elements.
     let body = crate::expand::brace::expand_braces_in_line(body);
     let mut lexer = Lexer::new(&body);
     let mut elements = Vec::new();
@@ -30,7 +30,7 @@ pub fn array_elements(env: &mut Environment, body: &str) -> Result<ShellArray> {
     loop {
         match lexer.next() {
             Ok(Token::Word(word)) => {
-                // `([2]=x)` is a real bash literal that rush does not implement here. Left as a
+                // `([2]=x)` is a real bash literal that oslo does not implement here. Left as a
                 // literal element it would silently become the *string* `[2]=x`.
                 if let Some(WordPart::Literal(text)) = word.parts.first()
                     && text.starts_with('[')
@@ -102,9 +102,9 @@ mod tests {
     #[test]
     fn quoting_decides_the_element_boundaries() {
         let mut env = Environment::new();
-        env.set_var("rush_al", "a b", false);
-        assert_eq!(array_elements(&mut env, "\"$rush_al\" c").unwrap().len(), 2);
-        assert_eq!(array_elements(&mut env, "$rush_al c").unwrap().len(), 3);
+        env.set_var("oslo_al", "a b", false);
+        assert_eq!(array_elements(&mut env, "\"$oslo_al\" c").unwrap().len(), 2);
+        assert_eq!(array_elements(&mut env, "$oslo_al c").unwrap().len(), 3);
     }
 
     /// The form that is not implemented says so instead of becoming a literal element.
@@ -118,9 +118,9 @@ mod tests {
     #[test]
     fn unsetting_an_element_leaves_the_other_indices_alone() {
         let mut env = Environment::new();
-        env.set_array("rush_ue", ShellArray::from_values(["1", "2", "3"]));
-        assert!(unset_element(&mut env, "rush_ue[1]").is_some());
-        let array = env.get_array("rush_ue").unwrap();
+        env.set_array("oslo_ue", ShellArray::from_values(["1", "2", "3"]));
+        assert!(unset_element(&mut env, "oslo_ue[1]").is_some());
+        let array = env.get_array("oslo_ue").unwrap();
         assert_eq!(array.indices().collect::<Vec<_>>(), vec![0, 2]);
         assert_eq!(array.joined(" "), "1 3");
     }
@@ -129,7 +129,7 @@ mod tests {
     #[test]
     fn a_plain_name_is_not_an_element() {
         let mut env = Environment::new();
-        assert!(unset_element(&mut env, "rush_ue").is_none());
+        assert!(unset_element(&mut env, "oslo_ue").is_none());
         assert!(unset_element(&mut env, "1bad[0]").is_none());
     }
 }

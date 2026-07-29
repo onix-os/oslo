@@ -12,7 +12,7 @@
 
 mod common;
 
-use common::{run_in, rush_bin};
+use common::{oslo_bin, run_in};
 use std::process::{Command, Stdio};
 
 /// The acceptance test: `trap 'rm -f …' EXIT` and the file is gone afterwards.
@@ -143,13 +143,13 @@ fn the_exit_trap_runs_at_end_of_input() {
     let scratch = dir.path().join("work.tmp");
     std::fs::write(&scratch, b"x").expect("seed the file");
 
-    let mut child = Command::new(rush_bin())
+    let mut child = Command::new(oslo_bin())
         .current_dir(dir.path())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .expect("spawn rush");
+        .expect("spawn oslo");
     {
         use std::io::Write;
         let stdin = child.stdin.as_mut().expect("stdin");

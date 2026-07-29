@@ -15,18 +15,18 @@ use std::sync::Arc;
 
 pub type BuiltinFn = fn(&mut Environment, &[String]) -> Result<i32>;
 
-/// A builtin supplied at run time — today only by `rush.register_builtin` from Lua.
+/// A builtin supplied at run time — today only by `oslo.register_builtin` from Lua.
 ///
 /// It has to be a closure rather than a [`BuiltinFn`], because the thing it has to remember (a
 /// key into the Lua registry) is not knowable when this crate is compiled. That is the whole of
 /// PLAN R9.8: `register_builtin` used to accept the callback, throw it away, register the stub
-/// `|_, _| Ok(0)` and *still* put the name in this table, so `rush.register_builtin('ls', …)`
+/// `|_, _| Ok(0)` and *still* put the name in this table, so `oslo.register_builtin('ls', …)`
 /// turned `ls /` into a command that printed nothing and exited 0.
 type DynBuiltin = Arc<dyn Fn(&mut Environment, &[String]) -> Result<i32> + Send + Sync>;
 
 /// How a registered name is implemented.
 ///
-/// Two variants rather than boxing everything: every builtin rush ships is a plain function, and
+/// Two variants rather than boxing everything: every builtin oslo ships is a plain function, and
 /// making the common path pay for an allocation and a virtual call to accommodate the rare
 /// script-registered one would be the wrong trade.
 enum Builtin {
@@ -49,7 +49,7 @@ const SPECIAL_BUILTINS: &[&str] = &[
     "shift", "times", "trap", "unset",
 ];
 
-/// Whether `name` is a POSIX special builtin. True even for names rush does not implement yet,
+/// Whether `name` is a POSIX special builtin. True even for names oslo does not implement yet,
 /// so that adding one does not silently change its search order.
 pub fn is_special_builtin(name: &str) -> bool {
     SPECIAL_BUILTINS.contains(&name.trim())
@@ -110,7 +110,7 @@ impl BuiltinRegistry {
 impl Environment {
     /// Register a builtin whose implementation is a closure rather than a plain function.
     ///
-    /// The entry point for `rush.register_builtin`. Generic rather than taking a boxed closure so
+    /// The entry point for `oslo.register_builtin`. Generic rather than taking a boxed closure so
     /// that no private type appears in a public signature; the argument is stored behind an `Arc`
     /// and shared, so registering the same closure twice is cheap.
     ///
@@ -137,7 +137,7 @@ fn invoke_dynamic_builtin(env: &mut Environment, args: &[String]) -> Result<i32>
         // Reachable only if a caller dispatched with an argv[0] that is not the builtin's name.
         // Loud and non-zero: the mistake this whole item exists to undo was a silent `Ok(0)`.
         None => {
-            eprintln!("rush: {}: registered builtin could not be resolved", name);
+            eprintln!("oslo: {}: registered builtin could not be resolved", name);
             Ok(127)
         }
     }

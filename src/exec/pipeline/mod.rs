@@ -75,7 +75,7 @@ pub fn report_error_status(err: ShellError) -> i32 {
     if let Some(status) = err.control_flow_status() {
         return status;
     }
-    eprintln!("rush: {}", err);
+    eprintln!("oslo: {}", err);
     err.failure_status()
 }
 

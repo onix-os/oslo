@@ -4,7 +4,7 @@
 //! nothing; and it sorted alphabetically, so typing `exit` suggested `exitsnoop-bpfcc` — a
 //! command the user has never run, ahead of the one they were plainly typing.
 
-use super::RushHelper;
+use super::OsloHelper;
 use super::command_index::CommandIndex;
 use super::words::{Quote, current_word};
 
@@ -17,7 +17,7 @@ enum Origin {
     Shell,
 }
 
-impl RushHelper {
+impl OsloHelper {
     /// The completion of the command name being typed, or `None`.
     ///
     /// Returns the *tail* to append, which is what rustyline draws past the cursor.

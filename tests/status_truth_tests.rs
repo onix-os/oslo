@@ -12,13 +12,13 @@
 
 mod common;
 
-use common::rush_bin;
+use common::oslo_bin;
 use std::io::Write;
 use std::process::{Command, Stdio};
 
 /// Run `script` with `input` on stdin, in `dir`.
 fn run_with_stdin(dir: &std::path::Path, script: &str, input: &str) -> (String, i32) {
-    let mut child = Command::new(rush_bin())
+    let mut child = Command::new(oslo_bin())
         .arg("-c")
         .arg(script)
         .current_dir(dir)
@@ -26,14 +26,14 @@ fn run_with_stdin(dir: &std::path::Path, script: &str, input: &str) -> (String, 
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .expect("spawn rush");
+        .expect("spawn oslo");
     child
         .stdin
         .as_mut()
         .expect("stdin")
         .write_all(input.as_bytes())
         .expect("write stdin");
-    let out = child.wait_with_output().expect("wait rush");
+    let out = child.wait_with_output().expect("wait oslo");
     (
         String::from_utf8_lossy(&out.stdout).into_owned(),
         out.status.code().unwrap_or(-1),
@@ -46,7 +46,7 @@ fn run_with_stdin(dir: &std::path::Path, script: &str, input: &str) -> (String, 
 /// call that could only fail — and a killed stage was reported as a clean exit.
 #[test]
 fn a_signalled_last_stage_reports_128_plus_the_signal() {
-    // `sh` kills its parent, which is the process rush forked for the stage — rush runs an
+    // `sh` kills its parent, which is the process oslo forked for the stage — oslo runs an
     // external command in a further child, so `$PPID` here is the stage and not the shell.
     let r = common::run(r#"echo x | sh -c 'kill -9 $PPID; sleep 5'; echo "status=$?""#);
     assert_eq!(r.out(), "status=137", "stderr: {}", r.stderr);

@@ -1,5 +1,5 @@
 [package]
-name = "rush-fuzz"
+name = "oslo-fuzz"
 version = "0.0.0"
 publish = false
 edition = "2024"
@@ -9,7 +9,7 @@ rust-version = "1.88"
 [package.metadata]
 cargo-fuzz = true
 
-# rush's root manifest has no [workspace] section, so it is a one-package workspace. This empty
+# oslo's root manifest has no [workspace] section, so it is a one-package workspace. This empty
 # table keeps the fuzz crate out of it: the fuzz targets are built by a different toolchain with
 # different flags, and `cargo build` at the root must not start compiling libFuzzer.
 #
@@ -19,7 +19,7 @@ cargo-fuzz = true
 
 [dependencies]
 libfuzzer-sys = "0.4"
-rush = { path = ".." }
+oslo = { path = ".." }
 
 # The harness lives in a library so the same code can be exercised two ways: under libFuzzer on
 # nightly, and as an ordinary `cargo test --lib` replay of the committed corpus on stable. The

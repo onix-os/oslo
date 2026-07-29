@@ -65,7 +65,7 @@ impl FrecencyStore {
 
     /// The default location, beside the history file.
     pub fn default_path() -> Option<PathBuf> {
-        std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".rush_frecency"))
+        std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".oslo_frecency"))
     }
 
     /// Count one use of `name`, in memory and on disk.

@@ -9,7 +9,7 @@
 //!
 //! libtest runs `#[test]` functions as threads of one process, and `environ` belongs to the
 //! process. `Environment::set_var` with the export flag set reaches `unsafe { env::set_var }`
-//! (`src/env/scope.rs`), whose safety argument is "rush never spawns a thread" — true of the
+//! (`src/env/scope.rs`), whose safety argument is "oslo never spawns a thread" — true of the
 //! shell, false of this harness, where a sibling test can be inside `Environment::new()`'s
 //! `env::vars()` walk reading the pointer array `set_var` is reallocating. That is undefined
 //! behaviour rather than flakiness, so it cannot be left to chance.
@@ -19,7 +19,7 @@
 //! calling thread — every lock another libtest worker happened to be holding (the allocator arena,
 //! stdio) is inherited locked and can never be released. The child then blocks on that futex
 //! forever and the whole test binary hangs, reproducibly at about one run in thirty under
-//! `--test-threads=16`. rush itself is single threaded, so this is a property of the harness, not
+//! `--test-threads=16`. oslo itself is single threaded, so this is a property of the harness, not
 //! of the shell; the answer is the same as for `environ` — do not do it in process.
 //!
 //! * [`spawned`] — anything that would write `environ`, the cwd or the umask, **or fork**. These
@@ -39,14 +39,14 @@ mod spawned {
     ///
     /// This ran in process until Round 11, where `export shown=public` reached
     /// `unsafe { env::set_var }` on a libtest worker while six siblings called
-    /// `Environment::new()`. It also asserted against `get_exported_vars()` — rush's own
+    /// `Environment::new()`. It also asserted against `get_exported_vars()` — oslo's own
     /// `HashMap`, which would have looked identical had the `environ` write been dropped. Asking
     /// `env(1)` from inside the subshell tests the thing that actually matters, and the prefix
     /// keeps the names out of any real environment.
     #[test]
     fn a_subshell_does_not_export_private_variables() {
-        let r = run("RUSH_T_SECRET=classified; export RUSH_T_SHOWN=public; \
-             ( echo \"sub=[$RUSH_T_SECRET]\"; env | grep -E '^RUSH_T_' | sort )");
+        let r = run("OSLO_T_SECRET=classified; export OSLO_T_SHOWN=public; \
+             ( echo \"sub=[$OSLO_T_SECRET]\"; env | grep -E '^OSLO_T_' | sort )");
         assert_eq!(r.status, 0, "stderr: {}", r.stderr);
         assert_eq!(
             r.lines(),
@@ -54,7 +54,7 @@ mod spawned {
                 // The subshell still sees the private value...
                 "sub=[classified]",
                 // ...and its children still do not.
-                "RUSH_T_SHOWN=public",
+                "OSLO_T_SHOWN=public",
             ],
             "stdout: {:?} stderr: {}",
             r.stdout,
@@ -108,11 +108,11 @@ mod spawned {
     }
 }
 
-/// Tests that only read and write rush's own state.
+/// Tests that only read and write oslo's own state.
 mod in_process {
-    use rush::env::Environment;
-    use rush::exec::eval_command_list;
-    use rush::parser::parse_bash_script;
+    use oslo::env::Environment;
+    use oslo::exec::eval_command_list;
+    use oslo::parser::parse_bash_script;
 
     fn run(env: &mut Environment, script: &str) -> i32 {
         let ast = parse_bash_script(script).expect("parse");
@@ -149,7 +149,7 @@ mod in_process {
         assert!(env.get_traps().is_empty());
     }
 
-    /// R4.1's other half, kept in process because it is about rush's own bookkeeping: an
+    /// R4.1's other half, kept in process because it is about oslo's own bookkeeping: an
     /// unexported variable survives `enter_subshell` without acquiring the export flag.
     ///
     /// The `environ`-visible half of this claim is

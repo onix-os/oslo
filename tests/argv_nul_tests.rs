@@ -14,7 +14,7 @@
 
 mod common;
 
-use common::rush_bin;
+use common::oslo_bin;
 use std::fs;
 use std::path::Path;
 use std::process::{Command, Output, Stdio};
@@ -26,12 +26,12 @@ struct Run {
 }
 
 fn run_in(dir: &Path, path_var: Option<&str>, script: &str) -> Run {
-    let mut cmd = Command::new(rush_bin());
+    let mut cmd = Command::new(oslo_bin());
     cmd.arg("-c").arg(script).current_dir(dir);
     if let Some(p) = path_var {
         cmd.env("PATH", p);
     }
-    let out: Output = cmd.stdin(Stdio::null()).output().expect("spawn rush");
+    let out: Output = cmd.stdin(Stdio::null()).output().expect("spawn oslo");
     Run {
         stdout: String::from_utf8_lossy(&out.stdout).into_owned(),
         stderr: String::from_utf8_lossy(&out.stderr).into_owned(),
@@ -135,10 +135,10 @@ fn unusual_path_entry_still_execs() {
     let dir = tempfile::tempdir().expect("tempdir");
     let bin_dir = dir.path().join("bü n");
     fs::create_dir(&bin_dir).expect("mkdir");
-    fs::copy("/bin/echo", bin_dir.join("rushtestecho")).expect("copy echo");
+    fs::copy("/bin/echo", bin_dir.join("oslotestecho")).expect("copy echo");
 
     let path = format!("{}:/usr/bin:/bin", bin_dir.display());
-    let r = run_in(dir.path(), Some(&path), "rushtestecho ok; echo STILL_ALIVE");
+    let r = run_in(dir.path(), Some(&path), "oslotestecho ok; echo STILL_ALIVE");
     assert_survived(&r, "non-ASCII PATH entry");
     assert!(r.stdout.contains("ok"), "stdout {:?}", r.stdout);
 }

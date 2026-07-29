@@ -1,6 +1,6 @@
 # mode: posix
 # R7.4: a shell that never waits for its background jobs accumulates one zombie per job for the
-# rest of its life. bash reaps on SIGCHLD, rush reaps at command boundaries; either way, by the
+# rest of its life. bash reaps on SIGCHLD, oslo reaps at command boundaries; either way, by the
 # time a later command looks, there is nothing left in `Z` state.
 i=0
 while [ $i -lt 6 ]; do

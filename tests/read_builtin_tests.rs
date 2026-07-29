@@ -16,7 +16,7 @@ use std::time::{Duration, Instant};
 const BOUND: Duration = Duration::from_secs(10);
 
 mod common;
-use common::rush_bin;
+use common::oslo_bin;
 
 struct Outcome {
     stdout: String,
@@ -79,10 +79,10 @@ fn bash() -> Option<std::path::PathBuf> {
         .map(Path::to_path_buf)
 }
 
-/// Assert rush's output, and that bash — the oracle — agrees with that same expectation.
+/// Assert oslo's output, and that bash — the oracle — agrees with that same expectation.
 fn assert_read(script: &str, files: &[(&str, &str)], expected: &str) {
-    let rush = execute(&rush_bin(), script, files);
-    assert_eq!(rush.stdout, expected, "rush output\nscript: {script}");
+    let oslo = execute(&oslo_bin(), script, files);
+    assert_eq!(oslo.stdout, expected, "oslo output\nscript: {script}");
 
     if let Some(bash) = bash() {
         let oracle = execute(&bash, script, files);
@@ -91,7 +91,7 @@ fn assert_read(script: &str, files: &[(&str, &str)], expected: &str) {
             "bash disagrees with the expectation, so the expectation is wrong\nscript: {script}"
         );
         assert_eq!(
-            rush.status, oracle.status,
+            oslo.status, oracle.status,
             "exit status differs from bash\nscript: {script}"
         );
     }

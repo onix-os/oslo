@@ -92,7 +92,7 @@ fn parse_number<T: std::str::FromStr>(
 /// `-t`'s argument: seconds, which must be a finite non-negative number.
 ///
 /// A negative or non-finite deadline has no meaning — it cannot be waited for and it cannot be
-/// probed — so bash rejects it rather than rounding it to zero, and so does rush. Clamping it to
+/// probed — so bash rejects it rather than rounding it to zero, and so does oslo. Clamping it to
 /// an immediate probe would turn a typo into a silently different read.
 fn timeout_seconds(value: &str) -> std::result::Result<f64, OptionError> {
     match value.parse::<f64>() {
@@ -115,7 +115,7 @@ fn apply_flag<'a>(
         match flag {
             'r' => opts.raw = true,
             's' => opts.silent = true,
-            // Readline editing options. rush reads a descriptor, not a line editor, so they
+            // Readline editing options. oslo reads a descriptor, not a line editor, so they
             // change nothing — but rejecting them would break scripts that pass them harmlessly.
             'e' | 'E' => {}
             _ => return Err(usage(format!("-{flag}: invalid option"))),
@@ -197,7 +197,7 @@ pub fn builtin_read(env: &mut Environment, args: &[String]) -> Result<i32> {
     let opts = match parse_options(args) {
         Ok(opts) => opts,
         Err(err) => {
-            eprintln!("rush: read: {}", err.message);
+            eprintln!("oslo: read: {}", err.message);
             return Ok(err.status);
         }
     };
@@ -231,7 +231,7 @@ pub fn builtin_read(env: &mut Environment, args: &[String]) -> Result<i32> {
     let line = match read_logical_line(&spec) {
         Ok(line) => line,
         Err(err) => {
-            eprintln!("rush: read: {}: {err}", opts.fd);
+            eprintln!("oslo: read: {}: {err}", opts.fd);
             return Ok(1);
         }
     };

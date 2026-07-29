@@ -2,7 +2,7 @@
 //!
 //! `set` with no arguments lists function definitions alongside variables, and the whole value of
 //! that listing is that it can be read back — so the AST has to be printed as source, not as
-//! `{:?}`. Nothing else in rush needs this, which is why it lives next to the listing builtins
+//! `{:?}`. Nothing else in oslo needs this, which is why it lives next to the listing builtins
 //! rather than in [`crate::ast`].
 //!
 //! One deliberate simplification: everything below the definition's outermost braces is printed
@@ -273,7 +273,7 @@ impl Deparser {
         match redirection.kind {
             RedirectKind::Heredoc | RedirectKind::HeredocStrip => {
                 self.seq += 1;
-                let delimiter = format!("RUSH_HEREDOC_{}", self.seq);
+                let delimiter = format!("OSLO_HEREDOC_{}", self.seq);
                 let mut body = redirection
                     .heredoc_content
                     .as_ref()
@@ -523,8 +523,8 @@ mod tests {
     #[test]
     fn a_heredoc_body_follows_its_line() {
         let printed = round_trip("f() {\ncat <<EOF\nbody\nEOF\n}");
-        assert!(printed.contains("<<RUSH_HEREDOC_1"), "{printed}");
-        assert!(printed.contains("\nbody\nRUSH_HEREDOC_1\n"), "{printed}");
+        assert!(printed.contains("<<OSLO_HEREDOC_1"), "{printed}");
+        assert!(printed.contains("\nbody\nOSLO_HEREDOC_1\n"), "{printed}");
         is_stable("f() {\ncat <<EOF\nbody\nEOF\n}");
     }
 

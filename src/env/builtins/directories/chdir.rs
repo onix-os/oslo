@@ -6,7 +6,7 @@
 //! the `CDPATH` search with its POSIX echo.
 //!
 //! The logical/physical distinction is the substance of the module. A shell that only ever
-//! stores `getcwd()` — which is what rush did — cannot answer `cd /tmp/link; pwd` the way every
+//! stores `getcwd()` — which is what oslo did — cannot answer `cd /tmp/link; pwd` the way every
 //! other shell does: the answer is the path the user walked, not the path the kernel resolved.
 
 use crate::env::scope::Environment;
@@ -29,7 +29,7 @@ pub enum PathMode {
 ///
 /// `$PWD` is authoritative — that is the entire point of `-L` — but only while it still names
 /// the directory the process is really in. An inherited `$PWD` from a parent that has since
-/// moved (every `rush -c` the differential harness spawns inherits one) would otherwise make
+/// moved (every `oslo -c` the differential harness spawns inherits one) would otherwise make
 /// `pwd` lie about a directory this shell never visited, so it is validated against `getcwd()`
 /// before it is trusted, exactly as bash validates it at startup.
 pub fn logical_pwd(env: &Environment) -> String {
@@ -162,7 +162,7 @@ pub fn change_directory(
     caller: &str,
 ) -> Option<String> {
     if operand.is_empty() {
-        eprintln!("rush: {caller}: null directory");
+        eprintln!("oslo: {caller}: null directory");
         return None;
     }
 
@@ -195,7 +195,7 @@ pub fn change_directory(
         None => match attempt(&origin, operand, mode) {
             Ok(found) => found,
             Err(e) => {
-                eprintln!("rush: {caller}: {operand}: {e}");
+                eprintln!("oslo: {caller}: {operand}: {e}");
                 return None;
             }
         },

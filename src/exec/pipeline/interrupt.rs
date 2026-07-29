@@ -96,7 +96,6 @@ mod tests {
     use crate::exec::pipeline::eval_command_list;
     use crate::parser::parse_bash_script;
     use nix::libc;
-    use nix::sys::wait::{WaitStatus, waitpid};
 
     fn run(src: &str) -> (i32, Environment) {
         let mut env = Environment::new();
@@ -120,58 +119,83 @@ mod tests {
     /// *after it has started*. A poll that only ran once, before the loop, would leave this
     /// spinning forever — which is exactly what the shell did.
     ///
-    /// Run in a forked child, and for two reasons: the loop is genuinely infinite until the
-    /// signal arrives, so a failure has to be observed as a child that never exits rather than as
-    /// a wedged test binary; and the child is single-threaded, so an interval timer can deliver
-    /// the interrupt to the same thread that is evaluating.
+    /// The interrupt flag is thread-local, so it has to be set on the very thread running the
+    /// evaluation. This used to be arranged by `fork()`ing and arming an interval timer in the
+    /// single-threaded child. That deadlocked: libtest runs tests on several threads and `fork`
+    /// keeps only the calling one, so a lock another thread happened to hold at that instant
+    /// stayed locked forever in the child, which hung with the parent blocked in `waitpid` behind
+    /// it. Decided purely by thread scheduling, it struck roughly one run in ten and wedged the
+    /// whole suite when it did.
+    ///
+    /// `timer_create` with `SIGEV_THREAD_ID` delivers to one nominated thread instead of to the
+    /// process, which gets the signal onto the evaluating thread without a fork and without
+    /// caring what the other test threads are doing.
+    ///
+    /// A trapped SIGINT does *not* substitute for this: traps are dispatched by their own
+    /// machinery, so an end-to-end test with `trap ... INT` still passes with this poll deleted.
     #[test]
     fn an_interrupt_ends_a_loop_that_has_already_started() {
-        let child = unsafe { nix::unistd::fork() }.expect("fork");
-        match child {
-            nix::unistd::ForkResult::Child => {
-                let status = interrupt_a_running_loop();
-                // `_exit`, not `exit`: libtest's atexit hooks belong to the parent.
-                unsafe { libc::_exit(status) };
-            }
-            nix::unistd::ForkResult::Parent { child } => {
-                assert_eq!(
-                    waitpid(child, None).expect("waitpid"),
-                    WaitStatus::Exited(child, INTERRUPTED_STATUS),
-                    "the loop did not end at 130"
-                );
-            }
-        }
+        // Run on a worker so the test thread keeps a deadline. libtest cannot time a test out, so
+        // without one a regression here spins forever and wedges the whole suite — which is the
+        // failure mode this test's previous incarnation had, for a different reason. On failure
+        // the worker is left spinning, which costs a core for the moment libtest takes to report
+        // and exit, and is much the lesser problem.
+        let (tx, rx) = std::sync::mpsc::channel();
+        std::thread::spawn(move || {
+            let _ = job::interrupt_pending();
+            arm_interrupt_for_this_thread();
+            let mut env = Environment::new();
+            let list =
+                parse_bash_script("while true; do :; done; echo unreachable").expect("parse");
+            let _ =
+                tx.send(eval_command_list(&mut env, &list).expect("interrupt was not absorbed"));
+        });
+
+        let status = rx
+            .recv_timeout(std::time::Duration::from_secs(10))
+            .expect("the loop never ended: a running loop did not notice the interrupt");
+        assert_eq!(status, INTERRUPTED_STATUS, "the loop did not end at 130");
     }
 
-    /// Arrange for an interrupt 100ms from now, then spin until it lands.
     extern "C" fn interrupt_now(_: libc::c_int) {
         job::note_interrupt();
     }
 
-    fn interrupt_a_running_loop() -> i32 {
+    /// Arrange for [`job::note_interrupt`] to run on *this* thread, 100ms from now.
+    fn arm_interrupt_for_this_thread() {
         unsafe {
             let mut action: libc::sigaction = std::mem::zeroed();
             action.sa_sigaction = interrupt_now as *const () as usize;
             libc::sigaction(libc::SIGALRM, &action, std::ptr::null_mut());
 
-            let timer = libc::itimerval {
-                it_interval: libc::timeval {
+            let tid = libc::syscall(libc::SYS_gettid) as libc::c_int;
+            let mut sev: libc::sigevent = std::mem::zeroed();
+            sev.sigev_notify = libc::SIGEV_THREAD_ID;
+            sev.sigev_signo = libc::SIGALRM;
+            sev.sigev_notify_thread_id = tid;
+
+            let mut timer: libc::timer_t = std::ptr::null_mut();
+            assert_eq!(
+                libc::timer_create(libc::CLOCK_MONOTONIC, &mut sev, &mut timer),
+                0,
+                "timer_create failed"
+            );
+            let spec = libc::itimerspec {
+                it_interval: libc::timespec {
                     tv_sec: 0,
-                    tv_usec: 0,
+                    tv_nsec: 0,
                 },
-                it_value: libc::timeval {
+                it_value: libc::timespec {
                     tv_sec: 0,
-                    tv_usec: 100_000,
+                    tv_nsec: 100_000_000,
                 },
             };
-            libc::setitimer(libc::ITIMER_REAL, &timer, std::ptr::null_mut());
+            assert_eq!(
+                libc::timer_settime(timer, 0, &spec, std::ptr::null_mut()),
+                0,
+                "timer_settime failed"
+            );
         }
-
-        let mut env = Environment::new();
-        let list = parse_bash_script("while true; do :; done; echo unreachable").expect("parse");
-        // Any unwind reaching here is a failure of the absorb, reported as a status the parent
-        // will not mistake for success.
-        eval_command_list(&mut env, &list).unwrap_or(99)
     }
 
     /// The interrupt unwinds *everything*, not one loop level: nested loops and a function call

@@ -45,7 +45,7 @@ pub fn builtin_command(env: &mut Environment, args: &[String]) -> Result<i32> {
                 'v' => mode = Mode::Terse,
                 'V' => mode = Mode::Verbose,
                 other => {
-                    eprintln!("rush: command: -{}: invalid option", other);
+                    eprintln!("oslo: command: -{}: invalid option", other);
                     eprintln!("command: usage: command [-pVv] command [arg ...]");
                     return Ok(2);
                 }
@@ -86,7 +86,7 @@ fn run(env: &mut Environment, operands: &[String], default_path: bool) -> Result
     match lookup_program(name, default_path) {
         Some(path) => run_external(&path, operands, name),
         None => {
-            eprintln!("rush: {}: command not found", name);
+            eprintln!("oslo: {}: command not found", name);
             Ok(NOT_FOUND)
         }
     }
@@ -111,7 +111,7 @@ fn describe(
                 // `-v` is silent on failure: every `if command -v foo >/dev/null 2>&1` probe in
                 // the wild relies on the status alone, and bash prints nothing there either.
                 if mode == Mode::Verbose {
-                    eprintln!("rush: command: {}: not found", name);
+                    eprintln!("oslo: command: {}: not found", name);
                 }
                 status = 1;
             }
@@ -217,10 +217,10 @@ mod tests {
     #[test]
     fn an_alias_is_reported_in_a_reusable_form() {
         let mut env = Environment::new();
-        env.set_alias("rushv", "ls -la");
+        env.set_alias("oslov", "ls -la");
         assert_eq!(
-            terse_description(&env, "rushv", false).as_deref(),
-            Some("alias rushv='ls -la'")
+            terse_description(&env, "oslov", false).as_deref(),
+            Some("alias oslov='ls -la'")
         );
     }
 }

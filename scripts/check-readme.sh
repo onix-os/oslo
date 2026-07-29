@@ -8,7 +8,7 @@
 # can be, and a stale path is a reliable tell that the surrounding paragraph is stale too.
 #
 # Scope is deliberately narrow, because a check that cries wolf gets deleted. Only backtick-quoted
-# tokens rooted at one of this repository's own top-level directories are examined; `~/.rushrc`,
+# tokens rooted at one of this repository's own top-level directories are examined; `~/.oslorc`,
 # `/dev/fd/N`, shell one-liners and module names cited as naming examples are all prose about
 # something other than this tree, and are left alone.
 set -euo pipefail

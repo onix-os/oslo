@@ -4,14 +4,14 @@
 //! here-strings, and the combined stdout/stderr form.
 
 use super::words::single_word;
-use crate::ast as rush_ast;
+use crate::ast as oslo_ast;
 use crate::error::{Result, ShellError};
 use crate::lexer::parse_heredoc_body;
 use brush_parser::ast;
 
 pub(super) fn convert_redirect_list(
     list: &ast::RedirectList,
-) -> Result<Vec<rush_ast::Redirection>> {
+) -> Result<Vec<oslo_ast::Redirection>> {
     let mut out = Vec::new();
     for r in &list.0 {
         out.extend(convert_redirect(r)?);
@@ -21,25 +21,25 @@ pub(super) fn convert_redirect_list(
 
 /// Convert one brush redirection.
 ///
-/// Returns a `Vec` because `&>file` expands to two rush redirections — there is no single node
+/// Returns a `Vec` because `&>file` expands to two oslo redirections — there is no single node
 /// meaning "stdout and stderr".
-pub(super) fn convert_redirect(redir: &ast::IoRedirect) -> Result<Vec<rush_ast::Redirection>> {
+pub(super) fn convert_redirect(redir: &ast::IoRedirect) -> Result<Vec<oslo_ast::Redirection>> {
     match redir {
         ast::IoRedirect::File(fd, kind, target) => {
             let redirect_kind = match kind {
-                ast::IoFileRedirectKind::Read => rush_ast::RedirectKind::Input,
-                ast::IoFileRedirectKind::Write => rush_ast::RedirectKind::Output,
-                ast::IoFileRedirectKind::Append => rush_ast::RedirectKind::Append,
-                ast::IoFileRedirectKind::ReadAndWrite => rush_ast::RedirectKind::ReadWrite,
-                ast::IoFileRedirectKind::Clobber => rush_ast::RedirectKind::Clobber,
-                ast::IoFileRedirectKind::DuplicateInput => rush_ast::RedirectKind::DupInput,
-                ast::IoFileRedirectKind::DuplicateOutput => rush_ast::RedirectKind::DupOutput,
+                ast::IoFileRedirectKind::Read => oslo_ast::RedirectKind::Input,
+                ast::IoFileRedirectKind::Write => oslo_ast::RedirectKind::Output,
+                ast::IoFileRedirectKind::Append => oslo_ast::RedirectKind::Append,
+                ast::IoFileRedirectKind::ReadAndWrite => oslo_ast::RedirectKind::ReadWrite,
+                ast::IoFileRedirectKind::Clobber => oslo_ast::RedirectKind::Clobber,
+                ast::IoFileRedirectKind::DuplicateInput => oslo_ast::RedirectKind::DupInput,
+                ast::IoFileRedirectKind::DuplicateOutput => oslo_ast::RedirectKind::DupOutput,
             };
 
             let target_word = match target {
                 ast::IoFileRedirectTarget::Filename(w) => single_word(w)?,
                 ast::IoFileRedirectTarget::Duplicate(w) => single_word(w)?,
-                ast::IoFileRedirectTarget::Fd(n) => rush_ast::Word::from_literal(&n.to_string()),
+                ast::IoFileRedirectTarget::Fd(n) => oslo_ast::Word::from_literal(&n.to_string()),
                 ast::IoFileRedirectTarget::ProcessSubstitution(..) => {
                     return Err(ShellError::SyntaxError(
                         "process substitution is not supported".to_string(),
@@ -47,7 +47,7 @@ pub(super) fn convert_redirect(redir: &ast::IoRedirect) -> Result<Vec<rush_ast::
                 }
             };
 
-            Ok(vec![rush_ast::Redirection {
+            Ok(vec![oslo_ast::Redirection {
                 fd: *fd,
                 kind: redirect_kind,
                 target: target_word,
@@ -84,17 +84,17 @@ pub(super) fn convert_redirect(redir: &ast::IoRedirect) -> Result<Vec<rush_ast::
             let body = if doc.requires_expansion {
                 parse_heredoc_body(&content)?
             } else {
-                rush_ast::Word::from_literal(&content)
+                oslo_ast::Word::from_literal(&content)
             };
 
-            Ok(vec![rush_ast::Redirection {
+            Ok(vec![oslo_ast::Redirection {
                 fd: *fd,
                 kind: if doc.remove_tabs {
-                    rush_ast::RedirectKind::HeredocStrip
+                    oslo_ast::RedirectKind::HeredocStrip
                 } else {
-                    rush_ast::RedirectKind::Heredoc
+                    oslo_ast::RedirectKind::Heredoc
                 },
-                target: rush_ast::Word::from_literal(doc.here_end.as_ref()),
+                target: oslo_ast::Word::from_literal(doc.here_end.as_ref()),
                 heredoc_content: Some(body),
                 here_string: false,
             }])
@@ -105,31 +105,31 @@ pub(super) fn convert_redirect(redir: &ast::IoRedirect) -> Result<Vec<rush_ast::
         // construction, so it re-lexes into parts and expansion does the quote removal that a
         // textual strip used to do wrongly (`<<< a"b"c` lost nothing, `<<< "a"x"b"` lost the
         // wrong quotes).
-        ast::IoRedirect::HereString(fd, word) => Ok(vec![rush_ast::Redirection {
+        ast::IoRedirect::HereString(fd, word) => Ok(vec![oslo_ast::Redirection {
             fd: *fd,
-            kind: rush_ast::RedirectKind::Heredoc,
-            target: rush_ast::Word::from_literal(""),
+            kind: oslo_ast::RedirectKind::Heredoc,
+            target: oslo_ast::Word::from_literal(""),
             heredoc_content: Some(single_word(word)?),
             here_string: true,
         }]),
 
         // `&>file` / `&>>file`: send stdout to the file, then point stderr at stdout.
         ast::IoRedirect::OutputAndError(word, append) => Ok(vec![
-            rush_ast::Redirection {
+            oslo_ast::Redirection {
                 fd: Some(1),
                 kind: if *append {
-                    rush_ast::RedirectKind::Append
+                    oslo_ast::RedirectKind::Append
                 } else {
-                    rush_ast::RedirectKind::Output
+                    oslo_ast::RedirectKind::Output
                 },
                 target: single_word(word)?,
                 heredoc_content: None,
                 here_string: false,
             },
-            rush_ast::Redirection {
+            oslo_ast::Redirection {
                 fd: Some(2),
-                kind: rush_ast::RedirectKind::DupOutput,
-                target: rush_ast::Word::from_literal("1"),
+                kind: oslo_ast::RedirectKind::DupOutput,
+                target: oslo_ast::Word::from_literal("1"),
                 heredoc_content: None,
                 here_string: false,
             },

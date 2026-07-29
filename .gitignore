@@ -1,7 +1,7 @@
 *.exe
 *.test
 *.out
-/rush
+/oslo
 /coverage.out
 /bin
 /build

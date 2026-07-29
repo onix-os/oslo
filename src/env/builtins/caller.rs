@@ -5,9 +5,9 @@
 //! the output, which is why the status matters more here than the text: 1 as soon as the frame
 //! asked for does not exist, 0 while it does.
 //!
-//! # What rush can and cannot report
+//! # What oslo can and cannot report
 //!
-//! Three fields: line, function, source. rush tracks the function names
+//! Three fields: line, function, source. oslo tracks the function names
 //! ([`Environment::call_stack`]) but has no `LINENO` — no construct in the AST carries a source
 //! position — and no per-frame source file. The missing fields are reported as `0` and as
 //! bash's own placeholder for a frame it cannot name, `NULL` (`bash -c 'f() { caller; }; f'`
@@ -17,7 +17,7 @@
 use crate::env::scope::{Environment, UNNAMED_FUNCTION};
 use crate::error::Result;
 
-/// The line field, which rush cannot fill in. Zero, not a plausible-looking number: a made-up
+/// The line field, which oslo cannot fill in. Zero, not a plausible-looking number: a made-up
 /// line sends a reader to the wrong place with no hint that it did.
 const UNKNOWN_LINE: &str = "0";
 
@@ -41,7 +41,7 @@ pub fn builtin_caller(env: &mut Environment, args: &[String]) -> Result<i32> {
     };
 
     let Ok(index) = operand.parse::<usize>() else {
-        eprintln!("rush: caller: {}: invalid frame specifier", operand);
+        eprintln!("oslo: caller: {}: invalid frame specifier", operand);
         return Ok(1);
     };
     // `caller n` names the function that *made* the call `n` levels out, not the function the

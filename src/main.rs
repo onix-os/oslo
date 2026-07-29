@@ -1,4 +1,4 @@
-//! The `rush` binary: argument handling, script execution, and the interactive REPL.
+//! The `oslo` binary: argument handling, script execution, and the interactive REPL.
 
 mod cli;
 mod startup;
@@ -11,12 +11,12 @@ mod history_expand;
 
 use cli::{Action, Invocation};
 use history_expand::Expansion;
-use rush::env::Environment;
-use rush::env::builtins::run_exit_trap;
-use rush::env::options::ShellOption;
-use rush::error::{Result, ShellError};
-use rush::exec::eval_command_list;
-use rush::parser::parse_bash_script;
+use oslo::env::Environment;
+use oslo::env::builtins::run_exit_trap;
+use oslo::env::options::ShellOption;
+use oslo::error::{Result, ShellError};
+use oslo::exec::eval_command_list;
+use oslo::parser::parse_bash_script;
 use std::env;
 use std::fs;
 use std::io::Read;
@@ -42,7 +42,7 @@ fn main() {
         Action::Script(ref path) => match fs::read_to_string(path) {
             Ok(script) => run_program(&invocation, &script),
             Err(_) => {
-                eprintln!("rush: {}: No such file or directory", path);
+                eprintln!("oslo: {}: No such file or directory", path);
                 std::process::exit(127);
             }
         },
@@ -52,7 +52,7 @@ fn main() {
             } else {
                 let mut script = String::new();
                 if let Err(e) = std::io::stdin().read_to_string(&mut script) {
-                    eprintln!("rush: cannot read standard input: {}", e);
+                    eprintln!("oslo: cannot read standard input: {}", e);
                     std::process::exit(1);
                 }
                 run_program(&invocation, &script);
@@ -63,8 +63,8 @@ fn main() {
 
 /// A shell is interactive by default only when it is talking to a person.
 ///
-/// stderr is checked as well as stdin: `rush < script` has a terminal on stderr but must run the
-/// script, and `rush 2>log` from a terminal must still prompt.
+/// stderr is checked as well as stdin: `oslo < script` has a terminal on stderr but must run the
+/// script, and `oslo 2>log` from a terminal must still prompt.
 fn stdin_is_a_terminal() -> bool {
     nix::unistd::isatty(0).unwrap_or(false) && nix::unistd::isatty(2).unwrap_or(false)
 }
@@ -88,7 +88,7 @@ fn run_program(invocation: &Invocation, script: &str) -> ! {
     let ast = match parse_bash_script(script) {
         Ok(ast) => ast,
         Err(e) => {
-            eprintln!("rush: {}", e);
+            eprintln!("oslo: {}", e);
             std::process::exit(e.failure_status());
         }
     };
@@ -137,7 +137,7 @@ fn exit_error_status(err: ShellError) -> i32 {
         // interactive shell only sets `$?` and carries on.
         e => {
             let status = e.fatal_exit_status();
-            eprintln!("rush: {}", e);
+            eprintln!("oslo: {}", e);
             status
         }
     }
@@ -173,7 +173,7 @@ fn expand_history(line: &str, history: &[String]) -> Option<String> {
             Some(expanded)
         }
         Err(err) => {
-            eprintln!("rush: {}", err);
+            eprintln!("oslo: {}", err);
             None
         }
     }

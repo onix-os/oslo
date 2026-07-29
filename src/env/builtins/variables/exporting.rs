@@ -95,9 +95,9 @@ fn print_listing(env: &Environment, only: Option<&[String]>) {
     }
 }
 
-/// `export -f name` — check that `name` really is a function, which is all rush can promise.
+/// `export -f name` — check that `name` really is a function, which is all oslo can promise.
 ///
-/// bash smuggles functions to children through `environ`; rush has no such encoding, and does
+/// bash smuggles functions to children through `environ`; oslo has no such encoding, and does
 /// not need one for its own subshells, which are forked and therefore already hold every
 /// function the parent had. Validating the name is the honest remainder: `export -f nosuch`
 /// must still fail the way it does everywhere else.
@@ -105,7 +105,7 @@ fn export_functions(env: &Environment, names: &[String]) -> i32 {
     let mut status = 0;
     for name in names {
         if env.get_function(name).is_none() {
-            eprintln!("rush: export: {}: not a function", name);
+            eprintln!("oslo: export: {}: not a function", name);
             status = 1;
         }
     }
@@ -123,7 +123,7 @@ fn unexport(env: &mut Environment, name: &str) -> bool {
         return true;
     };
     if env.is_readonly(name) {
-        eprintln!("rush: export: {}: readonly variable", name);
+        eprintln!("oslo: export: {}: readonly variable", name);
         return false;
     }
     env.unset_var(name);
@@ -141,7 +141,7 @@ pub fn builtin_unset(env: &mut Environment, args: &[String]) -> Result<i32> {
         Err(letter) => return Err(options::invalid("unset", letter, UNSET_USAGE)),
     };
     if opts.has('f') && opts.has('v') {
-        eprintln!("rush: unset: cannot simultaneously unset a function and a variable");
+        eprintln!("oslo: unset: cannot simultaneously unset a function and a variable");
         return Ok(2);
     }
 
@@ -150,7 +150,7 @@ pub fn builtin_unset(env: &mut Environment, args: &[String]) -> Result<i32> {
         // `unset 'a[1]'` drops one element and leaves the rest of the array where it was.
         if let Some(result) = crate::env::builtins::arrays::unset_element(env, name) {
             if let Err(e) = result {
-                eprintln!("rush: unset: {}", e);
+                eprintln!("oslo: unset: {}", e);
                 status = 1;
             }
             continue;
@@ -172,7 +172,7 @@ pub fn builtin_unset(env: &mut Environment, args: &[String]) -> Result<i32> {
             continue;
         }
         if env.is_readonly(name) {
-            eprintln!("rush: unset: {}: cannot unset: readonly variable", name);
+            eprintln!("oslo: unset: {}: cannot unset: readonly variable", name);
             status = 1;
             continue;
         }

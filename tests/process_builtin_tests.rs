@@ -87,7 +87,7 @@ fn signal_zero_probes_without_signalling() {
 #[test]
 fn named_signals_are_delivered_by_name() {
     // Taken from the name rather than written as `-10`: a literal here asserts the kernel's
-    // numbering as much as rush's parsing, and only one of those is under test.
+    // numbering as much as oslo's parsing, and only one of those is under test.
     let usr1 = format!("-{}", nix::sys::signal::Signal::SIGUSR1 as i32);
 
     for (spec, expected) in [

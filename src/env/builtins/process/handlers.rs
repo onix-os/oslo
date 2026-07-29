@@ -200,7 +200,7 @@ pub fn run_exit_trap(env: &mut Environment, status: i32) -> i32 {
         Ok(_) => status,
         Err(ShellError::Exit(code)) => code,
         Err(e) => {
-            eprintln!("rush: {}", e);
+            eprintln!("oslo: {}", e);
             status
         }
     }

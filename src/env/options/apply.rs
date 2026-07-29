@@ -2,7 +2,7 @@
 //!
 //! Kept apart from the `set` builtin so the rule that broke every `set -euo pipefail` script —
 //! *every* word became a positional parameter — is unit-testable without a shell to run it in,
-//! and so the same walk can serve the command line (`rush -e script`) later.
+//! and so the same walk can serve the command line (`oslo -e script`) later.
 //!
 //! Nothing is applied until the whole argument list has parsed. bash validates first too
 //! (`set -e -z` leaves `errexit` *off*), and it is the only defensible answer: a typo in the

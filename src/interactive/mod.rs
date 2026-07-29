@@ -1,6 +1,6 @@
 //! The interactive line editor: completion, hints, colouring and multi-line input.
 //!
-//! [`RushHelper`] is the rustyline `Helper`. The trait implementations here are deliberately thin
+//! [`OsloHelper`] is the rustyline `Helper`. The trait implementations here are deliberately thin
 //! — each one delegates to a module that can be called directly from a test, because none of this
 //! behaviour was reachable without a pty and that is precisely why it was all wrong.
 
@@ -42,7 +42,7 @@ use std::sync::{Arc, Mutex};
 /// into the table would drown the command ranking it exists to serve.
 const RANKED_KINDS: &[&str] = &["command", "builtin", "subcommand"];
 
-pub struct RushHelper {
+pub struct OsloHelper {
     env: Arc<Mutex<Environment>>,
     history_hinter: HistoryHinter,
     spec_registry: SpecRegistry,
@@ -54,7 +54,7 @@ pub struct RushHelper {
     menu: bool,
     /// Whether the editor itself accumulates continuation lines.
     ///
-    /// See [`RushHelper::set_editor_multiline`].
+    /// See [`OsloHelper::set_editor_multiline`].
     editor_multiline: bool,
     /// `which` answers for the line being drawn, keyed by the line's hash.
     ///
@@ -64,7 +64,7 @@ pub struct RushHelper {
     which_cache: Mutex<(u64, HashMap<String, bool>)>,
 }
 
-impl RushHelper {
+impl OsloHelper {
     /// Build the helper for `env`.
     ///
     /// Two side effects hang off whether `env` belongs to an interactive shell: the dropdown
@@ -104,8 +104,8 @@ impl RushHelper {
     /// prompt on a continuation row and cannot be made to: it computes the cursor's column from
     /// the raw buffer, so any prefix the highlighter added would put the cursor in the wrong
     /// place. A caller that wants a real PS2 turns this off and drives the loop itself, calling
-    /// [`RushHelper::input_status`] after each line and re-reading with
-    /// [`RushHelper::continuation_prompt`] while the answer is [`InputStatus::Incomplete`].
+    /// [`OsloHelper::input_status`] after each line and re-reading with
+    /// [`OsloHelper::continuation_prompt`] while the answer is [`InputStatus::Incomplete`].
     pub fn set_editor_multiline(&mut self, enabled: bool) {
         self.editor_multiline = enabled;
     }
@@ -129,7 +129,7 @@ impl RushHelper {
     ///
     /// **Whose job it is to call this depends on who assembles the command**, and getting that
     /// wrong is how multi-line commands stopped counting (PLAN C10). `validate` calls it only
-    /// while [`RushHelper::set_editor_multiline`] is on, because that is the mode in which
+    /// while [`OsloHelper::set_editor_multiline`] is on, because that is the mode in which
     /// rustyline itself accumulates continuation lines and `validate` really does see the whole
     /// program. With it off — which is what the REPL does, so that `PS2` can be drawn — `validate`
     /// sees each line separately and answers `Incomplete` for every one but the last, so the loop
@@ -166,7 +166,7 @@ impl RushHelper {
     }
 }
 
-impl Completer for RushHelper {
+impl Completer for OsloHelper {
     type Candidate = Pair;
 
     fn complete(
@@ -202,7 +202,7 @@ impl Completer for RushHelper {
     }
 }
 
-impl Hinter for RushHelper {
+impl Hinter for OsloHelper {
     type Hint = String;
 
     fn hint(&self, line: &str, pos: usize, ctx: &Context<'_>) -> Option<Self::Hint> {
@@ -221,7 +221,7 @@ impl Hinter for RushHelper {
     }
 }
 
-impl Highlighter for RushHelper {
+impl Highlighter for OsloHelper {
     fn highlight<'l>(&self, line: &'l str, _pos: usize) -> Cow<'l, str> {
         if line.is_empty() {
             return Cow::Borrowed(line);
@@ -260,7 +260,7 @@ impl Highlighter for RushHelper {
     }
 }
 
-impl RushHelper {
+impl OsloHelper {
     /// Whether a command token names something the shell could run, memoised per line.
     fn command_is_runnable(&self, name: &str, path: &str, line: &str) -> bool {
         let key = line_key(line);
@@ -288,7 +288,7 @@ impl RushHelper {
     }
 }
 
-impl Validator for RushHelper {
+impl Validator for OsloHelper {
     fn validate(&self, ctx: &mut ValidationContext<'_>) -> rustyline::Result<ValidationResult> {
         let input = ctx.input();
         match syntax::classify(input) {
@@ -311,7 +311,7 @@ impl Validator for RushHelper {
     }
 }
 
-impl Helper for RushHelper {}
+impl Helper for OsloHelper {}
 
 /// A cheap identity for the line being highlighted. Collisions only cost a stale colour.
 fn line_key(line: &str) -> u64 {

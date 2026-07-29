@@ -55,10 +55,10 @@ fn is_environ_safe(name: &str, value: &str) -> bool {
 /// dropped with a diagnostic rather than aborting the shell.
 fn reject_unrepresentable(name: &str, value: &str) -> bool {
     if name.is_empty() || name.contains(['=', '\0']) {
-        eprintln!("rush: {}: not a valid identifier", name);
+        eprintln!("oslo: {}: not a valid identifier", name);
         true
     } else if value.contains('\0') {
-        eprintln!("rush: {}: value contains a NUL byte", name);
+        eprintln!("oslo: {}: value contains a NUL byte", name);
         true
     } else {
         false
@@ -75,7 +75,7 @@ fn environ_set(name: &str, value: &str) {
     }
     // SAFETY: `std::env::set_var` is unsafe in edition 2024 because it mutates the global
     // `environ` with no synchronisation, so a concurrent `getenv` in another thread could read a
-    // freed pointer. rush is single-threaded: nothing in the crate spawns a thread, the parser,
+    // freed pointer. oslo is single-threaded: nothing in the crate spawns a thread, the parser,
     // interpreter, builtins and Lua engine all run on the main thread, and a forked child starts
     // with only the forking thread alive. The guard above rules out the other failure mode — the
     // call panics on an empty name, a `=` in the name, or a NUL in either half.
@@ -165,7 +165,7 @@ impl Environment {
             last_status: 0,
             pid,
             last_bg_pid: None,
-            shell_name: "rush".to_string(),
+            shell_name: "oslo".to_string(),
             current_pid: pid,
             pipeline_status: vec![0],
             substitution_status: None,
@@ -415,7 +415,7 @@ impl Environment {
     /// agree about it for free.
     pub fn set_var(&mut self, name: &str, value: &str, export: bool) -> bool {
         if self.is_readonly(name) {
-            eprintln!("rush: {}: is read only", name);
+            eprintln!("oslo: {}: is read only", name);
             return false;
         }
         if reject_unrepresentable(name, value) {

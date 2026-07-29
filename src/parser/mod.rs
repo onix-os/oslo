@@ -1,6 +1,6 @@
 //! Parsing: shell source text in, [`crate::ast`] out.
 //!
-//! There is exactly one parser — `brush_parser`, adapted in [`brush_adapter`]. rush used to carry
+//! There is exactly one parser — `brush_parser`, adapted in [`brush_adapter`]. oslo used to carry
 //! a second, hand-written one as a fallback for anything brush rejected, and that design turned
 //! every gap in the adapter into a silent reinterpretation of the whole program: the fallback had
 //! no here-document support, so it parsed heredoc *bodies* as commands and ran them. Inert data

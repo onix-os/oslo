@@ -15,7 +15,7 @@
 //! The one case that check cannot see is `OPTIND` being assigned *the value it already had* while
 //! the previous call stopped mid-cluster, over an identical argument list — `getopts ab o` on
 //! `-ab`, then `OPTIND=1`, then `getopts` again. bash hooks assignment to `OPTIND` itself and
-//! restarts; rush only ever sees the value, which did not change, so it resumes at `b`. Detecting
+//! restarts; oslo only ever sees the value, which did not change, so it resumes at `b`. Detecting
 //! it would need the variable layer to report writes, which is a change to `Environment`
 //! ([`crate::env::scope`]) rather than to this builtin.
 
@@ -64,7 +64,7 @@ enum Step {
 /// `getopts optstring name [args…]`.
 pub fn builtin_getopts(env: &mut Environment, args: &[String]) -> Result<i32> {
     let (Some(optstring), Some(name)) = (args.get(1), args.get(2)) else {
-        eprintln!("rush: getopts: usage: getopts optstring name [arg ...]");
+        eprintln!("oslo: getopts: usage: getopts optstring name [arg ...]");
         return Ok(2);
     };
 
@@ -155,7 +155,7 @@ fn report(opt: &str, name: &str, silent: bool, print_errors: bool, env: &mut Env
     if let Some(text) = message {
         if print_errors {
             let bad = env.get_var("OPTARG").unwrap_or_default().to_string();
-            eprintln!("rush: getopts: {} -- {}", text, bad);
+            eprintln!("oslo: getopts: {} -- {}", text, bad);
         }
         // Outside silent mode the offending character is *not* left in OPTARG: a script reading
         // it would mistake it for a real option argument. Silent mode is the opposite — reporting

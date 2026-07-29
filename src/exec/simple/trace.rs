@@ -3,7 +3,7 @@
 //! One line per simple command, on stderr, after expansion and before the command runs. The
 //! "after expansion" half is the whole value of the option: a trace of the *source* text would
 //! show `cp $src $dst`, which is exactly the two words whose values the reader is trying to find
-//! out. rush prints what the command is actually about to receive.
+//! out. oslo prints what the command is actually about to receive.
 //!
 //! stderr, never stdout: the trace has to stay out of `$(…)` and out of a redirected `> out`, or
 //! turning the option on changes the script's own output.
@@ -29,7 +29,7 @@ pub fn trace_command(env: &Environment, assignments: &[(String, String)], words:
 /// The trace prefix: `$PS4`, or `+ ` when it is unset.
 ///
 /// Taken literally rather than re-expanded. bash expands PS4 on every trace line, which is how
-/// `PS4='+ $LINENO '` works; rush has no `LINENO` yet, and expanding here would mean running
+/// `PS4='+ $LINENO '` works; oslo has no `LINENO` yet, and expanding here would mean running
 /// command substitutions from inside the tracer — with the tracer's own `set -x` still on.
 fn ps4(env: &Environment) -> String {
     env.get_var("PS4").unwrap_or("+ ").to_string()

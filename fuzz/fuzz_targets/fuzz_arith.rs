@@ -4,5 +4,5 @@
 use libfuzzer_sys::fuzz_target;
 
 fuzz_target!(|data: &[u8]| {
-    rush_fuzz::targets::eval_arith(data);
+    oslo_fuzz::targets::eval_arith(data);
 });

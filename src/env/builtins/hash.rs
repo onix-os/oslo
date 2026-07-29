@@ -46,7 +46,7 @@ pub fn builtin_hash(_env: &mut Environment, args: &[String]) -> Result<i32> {
                     cleared = true;
                 }
                 other => {
-                    eprintln!("rush: hash: -{}: invalid option", other);
+                    eprintln!("oslo: hash: -{}: invalid option", other);
                     eprintln!("hash: usage: hash [-r] [name ...]");
                     return Ok(2);
                 }
@@ -72,7 +72,7 @@ pub fn builtin_hash(_env: &mut Environment, args: &[String]) -> Result<i32> {
                 t.borrow_mut().insert(name.clone(), (path, 0));
             }),
             None => {
-                eprintln!("rush: hash: {}: not found", name);
+                eprintln!("oslo: hash: {}: not found", name);
                 status = 1;
             }
         }
@@ -180,10 +180,10 @@ mod tests {
     #[test]
     fn resetting_forgets_everything() {
         let mut env = Environment::new();
-        remember("rush-hash-test", PathBuf::from("/nowhere/rush-hash-test"));
-        assert!(recall("rush-hash-test").is_some());
+        remember("oslo-hash-test", PathBuf::from("/nowhere/oslo-hash-test"));
+        assert!(recall("oslo-hash-test").is_some());
         assert_eq!(builtin_hash(&mut env, &argv(&["hash", "-r"])).unwrap(), 0);
-        assert!(recall("rush-hash-test").is_none());
+        assert!(recall("oslo-hash-test").is_none());
     }
 
     /// The command-resolution entry point: a search fills the table, and the next lookup is
@@ -208,9 +208,9 @@ mod tests {
     /// A binary that moved must not be reported at its old location for the rest of the session.
     #[test]
     fn remembering_again_replaces_the_path() {
-        remember("rush-moved", PathBuf::from("/old/rush-moved"));
-        remember("rush-moved", PathBuf::from("/new/rush-moved"));
-        assert_eq!(recall("rush-moved"), Some(PathBuf::from("/new/rush-moved")));
+        remember("oslo-moved", PathBuf::from("/old/oslo-moved"));
+        remember("oslo-moved", PathBuf::from("/new/oslo-moved"));
+        assert_eq!(recall("oslo-moved"), Some(PathBuf::from("/new/oslo-moved")));
     }
 
     /// `hash -r` has to reach the *other* cache too: the line editor completes from its own set

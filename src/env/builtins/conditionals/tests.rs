@@ -78,13 +78,13 @@ const SHARED: &[(&[&str], i32)] = &[
     (&["-d", "/"], 0),
     (&["-e", "/"], 0),
     (&["-f", "/"], 1),
-    (&["-e", "/nonexistent-rush-xyz"], 1),
-    (&["-f", "/nonexistent-rush-xyz"], 1),
-    (&["-d", "/nonexistent-rush-xyz"], 1),
-    (&["-x", "/nonexistent-rush-xyz"], 1),
-    (&["-s", "/nonexistent-rush-xyz"], 1),
-    (&["-L", "/nonexistent-rush-xyz"], 1),
-    (&["-p", "/nonexistent-rush-xyz"], 1),
+    (&["-e", "/nonexistent-oslo-xyz"], 1),
+    (&["-f", "/nonexistent-oslo-xyz"], 1),
+    (&["-d", "/nonexistent-oslo-xyz"], 1),
+    (&["-x", "/nonexistent-oslo-xyz"], 1),
+    (&["-s", "/nonexistent-oslo-xyz"], 1),
+    (&["-L", "/nonexistent-oslo-xyz"], 1),
+    (&["-p", "/nonexistent-oslo-xyz"], 1),
     (&["-t", "not-a-number"], 1),
     // `-o` on a name no shell option has is false, not an error: that is what bash answers, and
     // it is what lets `[ -o pipefail ] || ...` run on a shell without the option.
@@ -132,7 +132,7 @@ const POSIX_GRAMMAR: &[(&[&str], i32)] = &[
     // `-a` binds tighter than `-o`: false AND false OR true.
     (&["x", "-a", "", "-o", "y"], 0),
     // R5.2: `!` negates at every arity.
-    (&["!", "-f", "/nonexistent-rush-xyz"], 0),
+    (&["!", "-f", "/nonexistent-oslo-xyz"], 0),
     (&["!", "-d", "/"], 1),
     (&["!", "a", "=", "a"], 1),
     (&["!", "a", "=", "b"], 0),
@@ -153,7 +153,7 @@ const POSIX_GRAMMAR: &[(&[&str], i32)] = &[
     (&["(", "a", "=", "b", ")", "-a", "(", "c", "=", "c", ")"], 1),
     (&["!", "(", "a", "=", "b", ")"], 0),
     // `test` is decimal-only, so `010` is ten. (`[[ ]]` in bash would read it as octal, since it
-    // runs arithmetic operands through the arithmetic evaluator; rush shares one evaluator.)
+    // runs arithmetic operands through the arithmetic evaluator; oslo shares one evaluator.)
     (&["010", "-eq", "10"], 0),
     (&["010", "-eq", "8"], 1),
     // Single words that look like operators but sit alone.
@@ -230,11 +230,11 @@ fn test_name_needs_no_closing_bracket() {
 #[test]
 fn extended_form_knows_about_shell_variables() {
     let mut env = Environment::new();
-    env.set_var("RUSH_TEST_V", "set", false);
+    env.set_var("OSLO_TEST_V", "set", false);
     let argv = vec![
         "[[".to_string(),
         "-v".to_string(),
-        "RUSH_TEST_V".to_string(),
+        "OSLO_TEST_V".to_string(),
         "]]".to_string(),
     ];
     assert_eq!(builtin_extended_test(&mut env, &argv).unwrap(), 0);
@@ -242,7 +242,7 @@ fn extended_form_knows_about_shell_variables() {
     let argv = vec![
         "[[".to_string(),
         "-v".to_string(),
-        "RUSH_TEST_UNSET".to_string(),
+        "OSLO_TEST_UNSET".to_string(),
         "]]".to_string(),
     ];
     assert_eq!(builtin_extended_test(&mut env, &argv).unwrap(), 1);
@@ -292,7 +292,7 @@ fn modified_since_last_read_counts_an_untouched_file() {
     assert_eq!(bracket(&["-N", &path]), 0);
     assert_eq!(double_bracket(&["-N", &path]), 0);
 
-    assert_eq!(bracket(&["-N", "/nonexistent-rush-xyz"]), 1);
+    assert_eq!(bracket(&["-N", "/nonexistent-oslo-xyz"]), 1);
 
     std::fs::remove_dir_all(&dir).ok();
 }
@@ -358,7 +358,7 @@ fn file_predicates_have_real_answers_in_both_forms() {
 }
 
 fn scratch_dir(tag: &str) -> std::path::PathBuf {
-    let dir = std::env::temp_dir().join(format!("rush-cond-{}-{}", tag, std::process::id()));
+    let dir = std::env::temp_dir().join(format!("oslo-cond-{}-{}", tag, std::process::id()));
     std::fs::remove_dir_all(&dir).ok();
     std::fs::create_dir_all(&dir).unwrap();
     dir

@@ -1,7 +1,7 @@
 //! Helper-level tests: the completer, hinter and validator driven directly, with no pty.
 //!
-//! Everything here goes through the public seams a test can reach — [`RushHelper::candidates`],
-//! [`RushHelper::command_hint`], [`RushHelper::input_status`] — plus `Completer::complete`
+//! Everything here goes through the public seams a test can reach — [`OsloHelper::candidates`],
+//! [`OsloHelper::command_hint`], [`OsloHelper::input_status`] — plus `Completer::complete`
 //! itself, which is callable once the dropdown is off. `Validator::validate` is *not* callable
 //! from outside rustyline (`ValidationContext::new` is crate-private), which is why the
 //! classifier is exposed separately.
@@ -13,10 +13,10 @@ use std::fs;
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 
-fn helper(env: Environment) -> RushHelper {
+fn helper(env: Environment) -> OsloHelper {
     // `Environment::new()` is not interactive, so the helper neither draws a dropdown nor writes
     // a frecency file; `complete` therefore returns the whole candidate list.
-    let mut h = RushHelper::new(Arc::new(Mutex::new(env)));
+    let mut h = OsloHelper::new(Arc::new(Mutex::new(env)));
     h.set_menu(false);
     h
 }
@@ -37,12 +37,12 @@ fn make_exe(dir: &Path, name: &str) {
     fs::set_permissions(&p, fs::Permissions::from_mode(0o755)).unwrap();
 }
 
-fn replacements(h: &RushHelper, line: &str) -> Vec<String> {
+fn replacements(h: &OsloHelper, line: &str) -> Vec<String> {
     let (_, cands) = h.candidates(line, line.len());
     cands.into_iter().map(|c| c.replacement).collect()
 }
 
-fn displays(h: &RushHelper, line: &str) -> Vec<String> {
+fn displays(h: &OsloHelper, line: &str) -> Vec<String> {
     let (_, cands) = h.candidates(line, line.len());
     cands.into_iter().map(|c| c.display).collect()
 }

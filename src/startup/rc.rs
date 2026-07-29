@@ -1,11 +1,11 @@
 //! Startup files and prompt strings (PLAN R9.10).
 //!
-//! Before this, the only thing a new shell read was `~/.config/rush/init.lua`, and only in the
+//! Before this, the only thing a new shell read was `~/.config/oslo/init.lua`, and only in the
 //! REPL: there was no way to define an alias or a function for an interactive session, and `-c`
 //! and script shells read no configuration at all. Two files fix that, and they are deliberately
 //! different in kind:
 //!
-//! * `~/.rushrc` is *shell* syntax, sourced by an interactive shell through the ordinary
+//! * `~/.oslorc` is *shell* syntax, sourced by an interactive shell through the ordinary
 //!   `source` builtin — so an alias, a function and a `PS1=` in it behave exactly as the same
 //!   lines typed at the prompt would.
 //! * `$ENV` is POSIX's own hook, and its value is subject to parameter expansion before use,
@@ -13,15 +13,15 @@
 //!
 //! `init.lua` remains an extra layer on top, not the only one.
 
-use rush::Environment;
-use rush::env::builtins::builtin_source;
-use rush::error::ShellError;
-use rush::expand::expand_word_to_string;
-use rush::interactive::prompt::render_default_left_prompt;
-use rush::lexer::parse_single_word;
+use oslo::Environment;
+use oslo::env::builtins::builtin_source;
+use oslo::error::ShellError;
+use oslo::expand::expand_word_to_string;
+use oslo::interactive::prompt::render_default_left_prompt;
+use oslo::lexer::parse_single_word;
 use std::path::PathBuf;
 
-/// A startup file asked the shell to end: `exit 3` in `.rushrc` is still an `exit`.
+/// A startup file asked the shell to end: `exit 3` in `.oslorc` is still an `exit`.
 pub type ExitRequest = Option<i32>;
 
 /// Read the files a shell of this kind reads before its first command.
@@ -34,7 +34,7 @@ pub type ExitRequest = Option<i32>;
 pub fn load_startup_files(env: &mut Environment, interactive: bool) -> ExitRequest {
     let mut sourced: Vec<PathBuf> = Vec::new();
 
-    if interactive && let Some(rc) = rushrc_path(env) {
+    if interactive && let Some(rc) = oslorc_path(env) {
         if let Some(status) = source_if_present(env, &rc) {
             return Some(status);
         }
@@ -51,8 +51,8 @@ pub fn load_startup_files(env: &mut Environment, interactive: bool) -> ExitReque
     None
 }
 
-/// `$HOME/.rushrc`, when `$HOME` says anything usable.
-fn rushrc_path(env: &Environment) -> Option<PathBuf> {
+/// `$HOME/.oslorc`, when `$HOME` says anything usable.
+fn oslorc_path(env: &Environment) -> Option<PathBuf> {
     let home = env
         .get_var("HOME")
         .map(str::to_string)
@@ -60,7 +60,7 @@ fn rushrc_path(env: &Environment) -> Option<PathBuf> {
     if home.is_empty() {
         return None;
     }
-    Some(PathBuf::from(home).join(".rushrc"))
+    Some(PathBuf::from(home).join(".oslorc"))
 }
 
 /// The file `$ENV` names, after parameter expansion, or `None` when the variable is unset,
@@ -101,7 +101,7 @@ fn source_if_present(env: &mut Environment, path: &std::path::Path) -> ExitReque
         Ok(_) => None,
         Err(ShellError::Exit(code)) => Some(code),
         Err(e) => {
-            eprintln!("rush: {}: {}", path.display(), e);
+            eprintln!("oslo: {}: {}", path.display(), e);
             None
         }
     }
@@ -168,7 +168,7 @@ fn decode_escapes(env: &Environment, raw: &str) -> String {
             Some('e') => out.push('\u{1b}'),
             Some('n') => out.push('\n'),
             Some('r') => out.push('\r'),
-            Some('s') => out.push_str("rush"),
+            Some('s') => out.push_str("oslo"),
             Some('$') => out.push(if nix::unistd::geteuid().is_root() {
                 '#'
             } else {

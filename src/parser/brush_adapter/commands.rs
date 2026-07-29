@@ -1,6 +1,6 @@
 //! Command and compound-command conversion.
 //!
-//! Turns brush's `Command` and `CompoundCommand` nodes into rush's equivalents: simple
+//! Turns brush's `Command` and `CompoundCommand` nodes into oslo's equivalents: simple
 //! commands with their assignments and redirections, `if`/`while`/`for`/`case` bodies, and
 //! function definitions.
 
@@ -11,19 +11,19 @@ use super::words::{
     convert_braced_word, convert_braced_words_from_str, convert_word, convert_words_from_str,
     single_command_list, single_word,
 };
-use crate::ast as rush_ast;
+use crate::ast as oslo_ast;
 use crate::error::{Result, ShellError};
 use brush_parser::ast;
 
-pub(super) fn convert_command(cmd: &ast::Command) -> Result<rush_ast::Command> {
+pub(super) fn convert_command(cmd: &ast::Command) -> Result<oslo_ast::Command> {
     match cmd {
         ast::Command::Simple(simple) => {
-            Ok(rush_ast::Command::Simple(convert_simple_command(simple)?))
+            Ok(oslo_ast::Command::Simple(convert_simple_command(simple)?))
         }
         ast::Command::Compound(compound, redirects) => {
             let mut converted = convert_compound_command(compound)?;
             // Redirections attached to the whole compound, e.g. `while ...; done > log`.
-            if let (rush_ast::Command::Compound { redirections, .. }, Some(list)) =
+            if let (oslo_ast::Command::Compound { redirections, .. }, Some(list)) =
                 (&mut converted, redirects)
             {
                 redirections.extend(convert_redirect_list(list)?);
@@ -32,12 +32,12 @@ pub(super) fn convert_command(cmd: &ast::Command) -> Result<rush_ast::Command> {
         }
         ast::Command::Function(func) => {
             let mut body = convert_compound_command(&func.body.0)?;
-            if let (rush_ast::Command::Compound { redirections, .. }, Some(list)) =
+            if let (oslo_ast::Command::Compound { redirections, .. }, Some(list)) =
                 (&mut body, &func.body.1)
             {
                 redirections.extend(convert_redirect_list(list)?);
             }
-            Ok(rush_ast::Command::FunctionDef {
+            Ok(oslo_ast::Command::FunctionDef {
                 name: func.fname.to_string(),
                 body: Box::new(body),
             })
@@ -48,8 +48,8 @@ pub(super) fn convert_command(cmd: &ast::Command) -> Result<rush_ast::Command> {
             // redirection has somewhere to live.
             match redirects {
                 None => Ok(converted),
-                Some(list) => Ok(rush_ast::Command::Compound {
-                    kind: rush_ast::CompoundCommand::Group(single_command_list(converted)),
+                Some(list) => Ok(oslo_ast::Command::Compound {
+                    kind: oslo_ast::CompoundCommand::Group(single_command_list(converted)),
                     redirections: convert_redirect_list(list)?,
                 }),
             }
@@ -57,7 +57,7 @@ pub(super) fn convert_command(cmd: &ast::Command) -> Result<rush_ast::Command> {
     }
 }
 
-/// A construct rush parses but cannot yet execute.
+/// A construct oslo parses but cannot yet execute.
 ///
 /// Reported as a syntax error so it reaches the user with a non-zero status and the name of the
 /// thing that is missing, rather than being approximated into something that runs.
@@ -65,7 +65,7 @@ fn unsupported(construct: &str) -> ShellError {
     ShellError::SyntaxError(format!("{} is not supported yet", construct))
 }
 
-/// A construct rush's parser cannot even *reach*, recognised from the source text.
+/// A construct oslo's parser cannot even *reach*, recognised from the source text.
 ///
 /// `select` is absent from brush 0.4's grammar entirely, so it surfaces as a bare "syntax error
 /// at line N col M" pointing at the `in` — a diagnostic that reads like a typo in the user's
@@ -98,20 +98,20 @@ pub(super) fn unreachable_construct(script: &str) -> Option<ShellError> {
 
 pub(super) fn convert_compound_command(
     compound: &ast::CompoundCommand,
-) -> Result<rush_ast::Command> {
+) -> Result<oslo_ast::Command> {
     let kind = match compound {
         ast::CompoundCommand::BraceGroup(group) => {
-            rush_ast::CompoundCommand::Group(convert_compound_list(&group.list)?)
+            oslo_ast::CompoundCommand::Group(convert_compound_list(&group.list)?)
         }
         ast::CompoundCommand::Subshell(subshell) => {
-            rush_ast::CompoundCommand::Subshell(convert_compound_list(&subshell.list)?)
+            oslo_ast::CompoundCommand::Subshell(convert_compound_list(&subshell.list)?)
         }
         ast::CompoundCommand::IfClause(if_clause) => convert_if_clause(if_clause)?,
-        ast::CompoundCommand::WhileClause(while_clause) => rush_ast::CompoundCommand::While {
+        ast::CompoundCommand::WhileClause(while_clause) => oslo_ast::CompoundCommand::While {
             condition: convert_compound_list(&while_clause.0)?,
             body: convert_compound_list(&while_clause.1.list)?,
         },
-        ast::CompoundCommand::UntilClause(until_clause) => rush_ast::CompoundCommand::Until {
+        ast::CompoundCommand::UntilClause(until_clause) => oslo_ast::CompoundCommand::Until {
             condition: convert_compound_list(&until_clause.0)?,
             body: convert_compound_list(&until_clause.1.list)?,
         },
@@ -126,7 +126,7 @@ pub(super) fn convert_compound_command(
                 }
                 None => None,
             };
-            rush_ast::CompoundCommand::For {
+            oslo_ast::CompoundCommand::For {
                 var_name: for_clause.variable_name.to_string(),
                 items,
                 body: convert_compound_list(&for_clause.body.list)?,
@@ -136,24 +136,24 @@ pub(super) fn convert_compound_command(
         // The expression text is carried through unparsed on purpose: parameters and command
         // substitutions inside it are expanded when the command runs, not now.
         ast::CompoundCommand::Arithmetic(arith) => {
-            rush_ast::CompoundCommand::Arithmetic(arith.expr.value.clone())
+            oslo_ast::CompoundCommand::Arithmetic(arith.expr.value.clone())
         }
         ast::CompoundCommand::ArithmeticForClause(for_clause) => {
-            rush_ast::CompoundCommand::ArithmeticFor {
+            oslo_ast::CompoundCommand::ArithmeticFor {
                 init: expr_text(for_clause.initializer.as_ref()),
                 cond: expr_text(for_clause.condition.as_ref()),
                 step: expr_text(for_clause.updater.as_ref()),
                 body: convert_compound_list(&for_clause.body.list)?,
             }
         }
-        // `coproc` parses but has no representation in rush's AST, and cannot get one until there
+        // `coproc` parses but has no representation in oslo's AST, and cannot get one until there
         // are arrays to publish the descriptors in and job control to manage the child. Naming
         // the construct matters: this diagnostic is the whole of the user's feedback, where it
         // used to be swallowed by a fallback parser that ran the body inline and synchronously.
         ast::CompoundCommand::Coprocess(_) => return Err(unsupported("coproc")),
     };
 
-    Ok(rush_ast::Command::Compound {
+    Ok(oslo_ast::Command::Compound {
         kind,
         redirections: Vec::new(),
     })
@@ -163,8 +163,8 @@ pub(super) fn convert_compound_command(
 ///
 /// brush flattens the chain into `elses: Vec<ElseClause>`, where a clause carrying a condition is
 /// an `elif` and the (at most one) clause without is the final `else`. Both map directly onto
-/// rush's `elif_branches` / `else_branch`.
-fn convert_if_clause(if_clause: &ast::IfClauseCommand) -> Result<rush_ast::CompoundCommand> {
+/// oslo's `elif_branches` / `else_branch`.
+fn convert_if_clause(if_clause: &ast::IfClauseCommand) -> Result<oslo_ast::CompoundCommand> {
     let condition = convert_compound_list(&if_clause.condition)?;
     let then_branch = convert_compound_list(&if_clause.then)?;
 
@@ -183,7 +183,7 @@ fn convert_if_clause(if_clause: &ast::IfClauseCommand) -> Result<rush_ast::Compo
         }
     }
 
-    Ok(rush_ast::CompoundCommand::If {
+    Ok(oslo_ast::CompoundCommand::If {
         condition,
         then_branch,
         elif_branches,
@@ -191,7 +191,7 @@ fn convert_if_clause(if_clause: &ast::IfClauseCommand) -> Result<rush_ast::Compo
     })
 }
 
-fn convert_case_clause(case_clause: &ast::CaseClauseCommand) -> Result<rush_ast::CompoundCommand> {
+fn convert_case_clause(case_clause: &ast::CaseClauseCommand) -> Result<oslo_ast::CompoundCommand> {
     let word = single_word(&case_clause.value)?;
 
     let mut items = Vec::new();
@@ -203,32 +203,32 @@ fn convert_case_clause(case_clause: &ast::CaseClauseCommand) -> Result<rush_ast:
 
         let body = match &case.cmd {
             Some(list) => convert_compound_list(list)?,
-            None => rush_ast::CommandList::default(),
+            None => oslo_ast::CommandList::default(),
         };
 
         // The terminator is part of the program, not punctuation: `;&` and `;;&` select different
         // branches from `;;`, and collapsing all three made a fallthrough chain run one branch.
         let post_action = match case.post_action {
-            ast::CaseItemPostAction::ExitCase => rush_ast::CaseAction::ExitCase,
+            ast::CaseItemPostAction::ExitCase => oslo_ast::CaseAction::ExitCase,
             ast::CaseItemPostAction::UnconditionallyExecuteNextCaseItem => {
-                rush_ast::CaseAction::FallThrough
+                oslo_ast::CaseAction::FallThrough
             }
             ast::CaseItemPostAction::ContinueEvaluatingCases => {
-                rush_ast::CaseAction::ContinueMatching
+                oslo_ast::CaseAction::ContinueMatching
             }
         };
 
-        items.push(rush_ast::CaseItem {
+        items.push(oslo_ast::CaseItem {
             patterns,
             body,
             post_action,
         });
     }
 
-    Ok(rush_ast::CompoundCommand::Case { word, items })
+    Ok(oslo_ast::CompoundCommand::Case { word, items })
 }
 
-/// brush stores each section of a `for ((…))` head as raw, unexpanded text; rush keeps it that
+/// brush stores each section of a `for ((…))` head as raw, unexpanded text; oslo keeps it that
 /// way so the shell's own expansions run over it at loop time.
 ///
 /// A section holding nothing but space is *absent*, not "the expression 0": brush hands back
@@ -255,7 +255,7 @@ fn process_substitution_unsupported() -> ShellError {
 
 /// Convert `[[ ... ]]` into equivalent `test` commands.
 ///
-/// rush has no dedicated node for extended tests, but the expression tree maps cleanly onto
+/// oslo has no dedicated node for extended tests, but the expression tree maps cleanly onto
 /// constructs it already evaluates: `&&` and `||` become an and-or list, `!` becomes a negated
 /// pipeline, and the leaf predicates become `test` invocations handled by the existing builtin.
 ///
@@ -263,7 +263,7 @@ fn process_substitution_unsupported() -> ShellError {
 /// command `true`, so every `[[ ... ]]` succeeded regardless of its contents.
 pub(super) fn convert_simple_command(
     simple: &ast::SimpleCommand,
-) -> Result<rush_ast::SimpleCommand> {
+) -> Result<oslo_ast::SimpleCommand> {
     let mut words = Vec::new();
     let mut assignments = Vec::new();
     let mut redirections = Vec::new();
@@ -319,7 +319,7 @@ pub(super) fn convert_simple_command(
         }
     }
 
-    Ok(rush_ast::SimpleCommand {
+    Ok(oslo_ast::SimpleCommand {
         assignments,
         words,
         redirections,
@@ -332,10 +332,10 @@ pub(super) fn convert_simple_command(
 /// `a=(1 2 3)` kept only the first word of `(1 2 3)`, so `echo "$a"` printed the source
 /// parentheses, and `a[1]=x` became a variable *literally named* `a[1]` — which looked like it
 /// worked only because `${a[1]}` was mangled into the same odd name on the way back out.
-fn convert_assignment(assign: &ast::Assignment) -> Result<rush_ast::Assignment> {
+fn convert_assignment(assign: &ast::Assignment) -> Result<oslo_ast::Assignment> {
     let target = match &assign.name {
-        ast::AssignmentName::VariableName(name) => rush_ast::AssignmentTarget::Name(name.clone()),
-        ast::AssignmentName::ArrayElementName(name, index) => rush_ast::AssignmentTarget::Element {
+        ast::AssignmentName::VariableName(name) => oslo_ast::AssignmentTarget::Name(name.clone()),
+        ast::AssignmentName::ArrayElementName(name, index) => oslo_ast::AssignmentTarget::Element {
             name: name.clone(),
             index: single_word_from_str(index)?,
         },
@@ -343,18 +343,18 @@ fn convert_assignment(assign: &ast::Assignment) -> Result<rush_ast::Assignment> 
 
     let value = match &assign.value {
         ast::AssignmentValue::Scalar(word) => {
-            rush_ast::AssignmentValue::Scalar(single_word_from_str(word.as_ref())?)
+            oslo_ast::AssignmentValue::Scalar(single_word_from_str(word.as_ref())?)
         }
         ast::AssignmentValue::Array(elements) => {
             let mut converted = Vec::new();
             for (index, value) in elements {
                 converted.extend(convert_array_element(index.as_ref(), value)?);
             }
-            rush_ast::AssignmentValue::Array(converted)
+            oslo_ast::AssignmentValue::Array(converted)
         }
     };
 
-    Ok(rush_ast::Assignment {
+    Ok(oslo_ast::Assignment {
         target,
         value,
         append: assign.append,
@@ -364,30 +364,30 @@ fn convert_assignment(assign: &ast::Assignment) -> Result<rush_ast::Assignment> 
 /// One element of an array literal.
 ///
 /// An unindexed element may still expand to several words — `a=($list)` and `a=(*.c)` both do —
-/// so it becomes one [`rush_ast::ArrayElement`] per word rather than being forced into one. An
+/// so it becomes one [`oslo_ast::ArrayElement`] per word rather than being forced into one. An
 /// *indexed* element (`[3]=x`) is a single value by construction.
 fn convert_array_element(
     index: Option<&brush_parser::ast::Word>,
     value: &ast::Word,
-) -> Result<Vec<rush_ast::ArrayElement>> {
+) -> Result<Vec<oslo_ast::ArrayElement>> {
     match index {
-        Some(index) => Ok(vec![rush_ast::ArrayElement {
+        Some(index) => Ok(vec![oslo_ast::ArrayElement {
             index: Some(single_word_from_str(index.as_ref())?),
             value: single_word_from_str(value.as_ref())?,
         }]),
         None => Ok(convert_braced_words_from_str(value.as_ref())?
             .into_iter()
-            .map(|value| rush_ast::ArrayElement { index: None, value })
+            .map(|value| oslo_ast::ArrayElement { index: None, value })
             .collect()),
     }
 }
 
 /// Re-lex `text` as one word, which is what every assignment operand is.
-fn single_word_from_str(text: &str) -> Result<rush_ast::Word> {
+fn single_word_from_str(text: &str) -> Result<oslo_ast::Word> {
     Ok(convert_words_from_str(text)?
         .into_iter()
         .next()
-        .unwrap_or_else(|| rush_ast::Word::from_literal("")))
+        .unwrap_or_else(|| oslo_ast::Word::from_literal("")))
 }
 
 #[cfg(test)]

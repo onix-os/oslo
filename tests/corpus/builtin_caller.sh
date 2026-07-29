@@ -1,5 +1,5 @@
 # mode: bash
-# Only the statuses are compared: rush tracks which functions are executing but has no LINENO,
+# Only the statuses are compared: oslo tracks which functions are executing but has no LINENO,
 # so the line and source fields it prints are placeholders. The status is what the stack-trace
 # idiom `i=0; while caller $i; do i=$((i+1)); done` actually reads.
 caller > /dev/null; echo "top=$?"

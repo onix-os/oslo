@@ -11,7 +11,7 @@
 //!
 //! * **Pattern versus literal.** In `[[ ]]`, quoting the right operand turns off its special
 //!   meaning — `[[ abc =~ "a.c" ]]` is false, because the quoted text is matched as ordinary
-//!   characters. rush decides this the same way it decides `==` versus `=`: the adapter looks at
+//!   characters. oslo decides this the same way it decides `==` versus `=`: the adapter looks at
 //!   the *source* quoting and emits a different operator word. [`REGEX_OP`] is the unquoted
 //!   (pattern) spelling, [`REGEX_LITERAL_OP`] the quoted one.
 //! * **`BASH_REMATCH`.** A successful match publishes the whole match at index 0 and each capture

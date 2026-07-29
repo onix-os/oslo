@@ -67,14 +67,14 @@ pub(super) fn try_autocd(
 /// still reports `command not found`. A script's meaning must not depend on which directories
 /// happen to exist beside it.
 ///
-/// `RUSH_AUTOCD` is the second way in, and it predates `shopt`: either switch is enough.
+/// `OSLO_AUTOCD` is the second way in, and it predates `shopt`: either switch is enough.
 fn enabled(env: &Environment) -> bool {
     if !crate::exec::pipeline::is_interactive() {
         return false;
     }
     autocd()
         || env
-            .get_var("RUSH_AUTOCD")
+            .get_var("OSLO_AUTOCD")
             .is_some_and(|v| !v.is_empty() && v != "0")
 }
 

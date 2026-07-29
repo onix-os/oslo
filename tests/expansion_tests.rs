@@ -4,7 +4,7 @@
 
 mod common;
 
-use common::{assert_out, run, rush_bin};
+use common::{assert_out, oslo_bin, run};
 use std::io::Write;
 use std::process::{Command, Stdio};
 
@@ -42,12 +42,12 @@ fn command_substitution_captures_output() {
 #[test]
 fn assignment_rhs_keeps_embedded_newlines() {
     assert_out(
-        "rush_n1=$(printf 'a\\nb'); printf '[%s]' \"$rush_n1\"",
+        "oslo_n1=$(printf 'a\\nb'); printf '[%s]' \"$oslo_n1\"",
         "[a\nb]",
     );
     // Trailing newlines are still stripped: that is command substitution's own rule.
     assert_out(
-        "rush_n2=$(printf 'a\\n\\n\\n'); printf '[%s]' \"$rush_n2\"",
+        "oslo_n2=$(printf 'a\\n\\n\\n'); printf '[%s]' \"$oslo_n2\"",
         "[a]",
     );
 }
@@ -93,12 +93,12 @@ fn script_files_run_with_arguments() {
     writeln!(f, "exit 4").unwrap();
     drop(f);
 
-    let output = Command::new(rush_bin())
+    let output = Command::new(oslo_bin())
         .arg(&script)
         .arg("hello")
         .stdin(Stdio::null())
         .output()
-        .expect("spawn rush");
+        .expect("spawn oslo");
 
     assert_eq!(
         String::from_utf8_lossy(&output.stdout).trim_end(),

@@ -52,13 +52,13 @@ pub fn run_external(program: &Path, argv: &[String], display_name: &str) -> Resu
     let c_args: Vec<CString> = argv.iter().map(|a| exec_cstring(a.as_bytes())).collect();
 
     // SAFETY: the child touches only async-signal-safe calls (`sigaction`, `sigprocmask`,
-    // `execv`, `write` via `eprintln`, `_exit`) before it replaces itself. rush is single
+    // `execv`, `write` via `eprintln`, `_exit`) before it replaces itself. oslo is single
     // threaded, so no other thread's lock can be inherited half-held.
     match unsafe { fork() } {
         Ok(ForkResult::Child) => {
             crate::exec::job::reset_signals_for_child();
             let _ = nix::unistd::execv(&c_path, &c_args);
-            eprintln!("rush: {}: cannot execute", display_name);
+            eprintln!("oslo: {}: cannot execute", display_name);
             std::process::exit(NOT_EXECUTABLE);
         }
         Ok(ForkResult::Parent { child }) => Ok(wait_for_child(child)),

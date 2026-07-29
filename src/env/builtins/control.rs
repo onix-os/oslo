@@ -22,7 +22,7 @@ use std::fs;
 /// merely *starts* with digits is not a number, or `exit 1x` would silently exit 1.
 fn numeric_operand<T: std::str::FromStr>(name: &str, raw: &str) -> std::result::Result<T, ()> {
     raw.trim().parse::<T>().map_err(|_| {
-        eprintln!("rush: {}: {}: numeric argument required", name, raw);
+        eprintln!("oslo: {}: {}: numeric argument required", name, raw);
     })
 }
 
@@ -34,7 +34,7 @@ fn loop_depth(name: &str, args: &[String]) -> std::result::Result<usize, i32> {
             // `break 0` is not a loop count; the message is the same one bash gives a
             // non-numeric operand, and `numeric_operand` has not printed it in this branch.
             Ok(0) => {
-                eprintln!("rush: {}: {}: numeric argument required", name, raw);
+                eprintln!("oslo: {}: {}: numeric argument required", name, raw);
                 Err(1)
             }
             Ok(n) => Ok(n),
@@ -84,7 +84,7 @@ pub fn builtin_return(env: &mut Environment, args: &[String]) -> Result<i32> {
 /// meant to reveal. It is a usage error, and bash leaves with 2.
 pub fn builtin_exit(env: &mut Environment, args: &[String]) -> Result<i32> {
     if args.len() > 2 {
-        eprintln!("rush: exit: too many arguments");
+        eprintln!("oslo: exit: too many arguments");
         // Not an exit: bash refuses the request and leaves the shell running.
         return Ok(1);
     }
@@ -123,7 +123,7 @@ pub fn builtin_eval(env: &mut Environment, args: &[String]) -> Result<i32> {
         // A syntax error in evaluated text is the *builtin's* failure, not the script's: bash
         // reports it, gives `eval` status 2, and carries on with the next command.
         Err(e) => {
-            eprintln!("rush: eval: {}", e);
+            eprintln!("oslo: eval: {}", e);
             Ok(2)
         }
     };
@@ -133,7 +133,7 @@ pub fn builtin_eval(env: &mut Environment, args: &[String]) -> Result<i32> {
 
 pub fn builtin_source(env: &mut Environment, args: &[String]) -> Result<i32> {
     if args.len() < 2 {
-        eprintln!("rush: source: filename argument required");
+        eprintln!("oslo: source: filename argument required");
         return Ok(1);
     }
 
@@ -141,7 +141,7 @@ pub fn builtin_source(env: &mut Environment, args: &[String]) -> Result<i32> {
     let content = match fs::read_to_string(file_path) {
         Ok(c) => c,
         Err(e) => {
-            eprintln!("rush: source: {}: {}", file_path, e);
+            eprintln!("oslo: source: {}: {}", file_path, e);
             return Ok(1);
         }
     };
@@ -155,7 +155,7 @@ pub fn builtin_source(env: &mut Environment, args: &[String]) -> Result<i32> {
         // As with `eval`: the sourced file failing to parse leaves `source` with status 2 and
         // the calling script still running.
         Err(e) => {
-            eprintln!("rush: {}: {}", file_path, e);
+            eprintln!("oslo: {}: {}", file_path, e);
             Ok(2)
         }
     };

@@ -1,7 +1,7 @@
 //! `export`, `unset`, `set`, `alias`, `unalias`, `local` and `readonly` through the real binary.
 //!
 //! The listings these builtins produce are only worth anything if a shell can read them back, and
-//! that is not something an in-process assertion can check: it needs the output of one rush to be
+//! that is not something an in-process assertion can check: it needs the output of one oslo to be
 //! the input of the next. Every round-trip test here therefore writes a listing to a file and
 //! sources it.
 

@@ -11,8 +11,8 @@
 //! points are the accessors on [`Environment`], not this type:
 //!
 //! ```
-//! # use rush::env::Environment;
-//! # use rush::env::options::ShellOption;
+//! # use oslo::env::Environment;
+//! # use oslo::env::options::ShellOption;
 //! # let mut env = Environment::new();
 //! env.set_option(ShellOption::ErrExit, true);
 //! assert!(env.errexit()); // the named accessor, for the options with behaviour

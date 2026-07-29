@@ -40,7 +40,7 @@ pub fn builtin_jobs(_env: &mut Environment, args: &[String]) -> Result<i32> {
             // lists everything rather than silently listing nothing: an honest superset.
             'n' => {}
             other => {
-                eprintln!("rush: jobs: -{}: invalid option", other);
+                eprintln!("oslo: jobs: -{}: invalid option", other);
                 eprintln!("jobs: usage: jobs [-lnprs] [jobspec ...]");
                 return Ok(2);
             }
@@ -127,7 +127,7 @@ pub fn builtin_fg(_env: &mut Environment, args: &[String]) -> Result<i32> {
 /// `bg [jobspec …]` — continue stopped jobs in the background.
 pub fn builtin_bg(_env: &mut Environment, args: &[String]) -> Result<i32> {
     if !job_control_active() {
-        eprintln!("rush: bg: no job control");
+        eprintln!("oslo: bg: no job control");
         return Ok(1);
     }
     let (_, operands) = split_operands(&args[1..]);
@@ -136,7 +136,7 @@ pub fn builtin_bg(_env: &mut Environment, args: &[String]) -> Result<i32> {
         Err(status) => return Ok(status),
     };
     if ids.is_empty() {
-        eprintln!("rush: bg: current: no such job");
+        eprintln!("oslo: bg: current: no such job");
         return Ok(1);
     }
     for id in ids {
@@ -164,7 +164,7 @@ pub fn builtin_disown(_env: &mut Environment, args: &[String]) -> Result<i32> {
             'r' => running_only = true,
             'h' => keep_listed = true,
             other => {
-                eprintln!("rush: disown: -{}: invalid option", other);
+                eprintln!("oslo: disown: -{}: invalid option", other);
                 eprintln!("disown: usage: disown [-h] [-ar] [jobspec ... | pid ...]");
                 return Ok(2);
             }
@@ -185,7 +185,7 @@ pub fn builtin_disown(_env: &mut Environment, args: &[String]) -> Result<i32> {
         Err(status) => return Ok(status),
     };
     if targets.is_empty() {
-        eprintln!("rush: disown: current: no such job");
+        eprintln!("oslo: disown: current: no such job");
         return Ok(1);
     }
 
@@ -243,7 +243,7 @@ fn one_job(args: &[String], name: &str) -> Result<Option<usize>> {
         // terminal, so there is nothing to hand over and nothing to take back. bash says exactly
         // this and fails, and a script that sees success here would wait on a job that is not
         // in the foreground at all.
-        eprintln!("rush: {}: no job control", name);
+        eprintln!("oslo: {}: no job control", name);
         return Ok(None);
     }
     let (_, operands) = split_operands(args);
@@ -254,7 +254,7 @@ fn one_job(args: &[String], name: &str) -> Result<Option<usize>> {
     match ids.first() {
         Some(id) => Ok(Some(*id)),
         None => {
-            eprintln!("rush: {}: current: no such job", name);
+            eprintln!("oslo: {}: current: no such job", name);
             Ok(None)
         }
     }
@@ -278,7 +278,7 @@ fn select(
         match jobs.lookup(operand) {
             Some(id) => out.push(id),
             None => {
-                eprintln!("rush: {}: {}: no such job", name, operand);
+                eprintln!("oslo: {}: {}: no such job", name, operand);
                 return Err(NO_SUCH_JOB);
             }
         }

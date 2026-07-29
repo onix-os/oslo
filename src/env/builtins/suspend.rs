@@ -18,7 +18,7 @@ pub fn builtin_suspend(env: &mut Environment, args: &[String]) -> Result<i32> {
             "-f" => force = true,
             "--" => break,
             other => {
-                eprintln!("rush: suspend: {}: invalid option", other);
+                eprintln!("oslo: suspend: {}: invalid option", other);
                 eprintln!("suspend: usage: suspend [-f]");
                 return Ok(2);
             }
@@ -28,11 +28,11 @@ pub fn builtin_suspend(env: &mut Environment, args: &[String]) -> Result<i32> {
     if !env.monitor() {
         // bash's own wording, and its status. A shell run from a script has no job control, so
         // this is the answer `bash -c suspend` gives too.
-        eprintln!("rush: suspend: cannot suspend: no job control");
+        eprintln!("oslo: suspend: cannot suspend: no job control");
         return Ok(1);
     }
     if is_login_shell(env) && !force {
-        eprintln!("rush: suspend: cannot suspend a login shell");
+        eprintln!("oslo: suspend: cannot suspend a login shell");
         return Ok(1);
     }
 
@@ -41,7 +41,7 @@ pub fn builtin_suspend(env: &mut Environment, args: &[String]) -> Result<i32> {
     match kill(Pid::from_raw(0), Signal::SIGSTOP) {
         Ok(()) => Ok(0),
         Err(errno) => {
-            eprintln!("rush: suspend: cannot suspend: {}", errno);
+            eprintln!("oslo: suspend: cannot suspend: {}", errno);
             Ok(1)
         }
     }
@@ -75,7 +75,7 @@ mod tests {
     fn a_login_shell_is_refused_until_forced() {
         let mut env = Environment::new();
         env.set_option(ShellOption::Monitor, true);
-        env.shell_name = "-rush".to_string();
+        env.shell_name = "-oslo".to_string();
         assert_eq!(builtin_suspend(&mut env, &argv(&["suspend"])).unwrap(), 1);
     }
 

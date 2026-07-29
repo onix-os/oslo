@@ -4,15 +4,15 @@
 //! (`pipefail`, `posix`); `shopt` holds the rest (`autocd`, `globstar`, `nullglob`, …), and the
 //! two are separate namespaces that happen to be bridged by `shopt -o`, which reads and writes
 //! the *`set -o`* set. `shopt -s errexit` is an error and `set -o autocd` is an error; only
-//! `shopt -so errexit` works. rush keeps them separate for the same reason: merging them would
+//! `shopt -so errexit` works. oslo keeps them separate for the same reason: merging them would
 //! make `set -o globstar` succeed, which is a spelling no other shell accepts.
 //!
-//! # What rush promises about a shopt option
+//! # What oslo promises about a shopt option
 //!
 //! Every option here is one of two kinds, and the difference is the whole design:
 //!
-//! * [`Support::Hook`] — rush implements both states, and `shopt -s`/`-u` really switch it.
-//! * [`Support::Fixed`] — rush behaves as if the option were permanently on or permanently off.
+//! * [`Support::Hook`] — oslo implements both states, and `shopt -s`/`-u` really switch it.
+//! * [`Support::Fixed`] — oslo behaves as if the option were permanently on or permanently off.
 //!   Asking for the state it is already in succeeds and does nothing; asking for the other one
 //!   *fails, loudly*. `shopt -s globstar` returning 0 while `**` kept meaning `*` would be a lie
 //!   that only shows up as a wrong file list, which is exactly the failure mode a shell must not
@@ -28,11 +28,11 @@ use std::sync::atomic::{AtomicU32, Ordering};
 
 const USAGE: &str = "shopt: usage: shopt [-pqsu] [-o] [optname ...]";
 
-/// How much of an option rush actually implements. See the module docs.
+/// How much of an option oslo actually implements. See the module docs.
 enum Support {
     /// Switchable: the hook is called with the new state.
     Hook(fn(bool)),
-    /// Not switchable: rush's behaviour is this state, always.
+    /// Not switchable: oslo's behaviour is this state, always.
     Fixed(bool),
 }
 
@@ -59,9 +59,9 @@ const fn fixed(name: &'static str, state: bool, because: &'static str) -> ShoptO
     }
 }
 
-/// The options rush can answer for, in the alphabetical order bash lists them in.
+/// The options oslo can answer for, in the alphabetical order bash lists them in.
 ///
-/// Every `Fixed` entry is a claim about rush's behaviour that has been checked against the code
+/// Every `Fixed` entry is a claim about oslo's behaviour that has been checked against the code
 /// that implements it — `expand_aliases` against the unconditional alias substitution in
 /// `exec::simple`, the glob options against `expand::glob`, `interactive_comments` against the
 /// lexer. A claim that stops being true belongs in the same commit as the change that broke it.
@@ -70,7 +70,7 @@ const OPTIONS: &[ShoptOption] = &[
     hook("autocd", crate::exec::simple::set_autocd),
     fixed("cdspell", false, "cd does not correct spelling"),
     fixed("dotglob", false, "a leading dot is never matched by a wildcard"),
-    fixed("expand_aliases", true, "rush expands aliases in every shell, not only interactive ones"),
+    fixed("expand_aliases", true, "oslo expands aliases in every shell, not only interactive ones"),
     fixed("extglob", false, "the extended pattern operators are not implemented"),
     fixed("failglob", false, "an unmatched pattern is left alone, never an error"),
     fixed("globstar", false, "`**` is an ordinary `*` and cannot cross a `/`"),
@@ -145,7 +145,7 @@ pub fn builtin_shopt(env: &mut Environment, args: &[String]) -> Result<i32> {
                 'q' => flags.quiet = true,
                 'o' => flags.bridge = true,
                 other => {
-                    eprintln!("rush: shopt: -{}: invalid option", other);
+                    eprintln!("oslo: shopt: -{}: invalid option", other);
                     eprintln!("{}", USAGE);
                     return Ok(2);
                 }
@@ -186,7 +186,7 @@ fn list_all(flags: &Flags) -> i32 {
 /// One named option: set it, or report it.
 fn one(flags: &Flags, name: &str) -> i32 {
     let Some(index) = OPTIONS.iter().position(|o| o.name == name) else {
-        eprintln!("rush: shopt: {}: invalid shell option name", name);
+        eprintln!("oslo: shopt: {}: invalid shell option name", name);
         eprintln!("{}", USAGE);
         return 1;
     };
@@ -209,13 +209,13 @@ fn one(flags: &Flags, name: &str) -> i32 {
         Support::Fixed(state) if state == wanted => 0,
         Support::Fixed(state) => {
             eprintln!(
-                "rush: shopt: {}: cannot be turned {}: {}",
+                "oslo: shopt: {}: cannot be turned {}: {}",
                 name,
                 if wanted { "on" } else { "off" },
                 OPTIONS[index].because
             );
             eprintln!(
-                "rush: shopt: {} is permanently {} in this shell",
+                "oslo: shopt: {} is permanently {} in this shell",
                 name,
                 on_off(state)
             );
@@ -240,7 +240,7 @@ fn bridged(env: &mut Environment, flags: &Flags, names: &[String]) -> i32 {
     let mut status = 0;
     for name in names {
         let Some(option) = ShellOption::from_name(name) else {
-            eprintln!("rush: shopt: {}: invalid option name", name);
+            eprintln!("oslo: shopt: {}: invalid option name", name);
             status = 1;
             continue;
         };
@@ -298,11 +298,11 @@ mod tests {
         assert_eq!(run(&mut env, &["shopt", "-q", "autocd"]), 1);
     }
 
-    /// The rule this builtin exists to keep: an option rush does not implement must not report
+    /// The rule this builtin exists to keep: an option oslo does not implement must not report
     /// success when asked to turn it on. `shopt -s globstar` returning 0 would mean every later
     /// `**` silently matched the wrong files.
     #[test]
-    fn an_option_rush_cannot_honour_is_refused_not_faked() {
+    fn an_option_oslo_cannot_honour_is_refused_not_faked() {
         let mut env = Environment::new();
         assert_eq!(run(&mut env, &["shopt", "-s", "globstar"]), 1);
         assert_eq!(run(&mut env, &["shopt", "-q", "globstar"]), 1);

@@ -115,7 +115,7 @@ pub(crate) fn place_child(child: Pid, pgid: Option<Pid>) -> Pid {
 /// [`join_group_in_child`] for a *foreground* job, which only moves when job control is on.
 ///
 /// A foreground command must stay in the shell's process group when there is no job control,
-/// because that group is what the tty driver signals: a `rush -c 'sleep 100'` whose `sleep` had
+/// because that group is what the tty driver signals: a `oslo -c 'sleep 100'` whose `sleep` had
 /// been moved out of it would go on sleeping through Ctrl-C. bash makes the same distinction, and
 /// it is why a script's execution path is unchanged by R7.1.
 pub(crate) fn join_foreground_group(pgid: Option<Pid>) {
@@ -194,7 +194,7 @@ mod tests {
     use super::{job_control_active, leave_job_control, place_child, shell_pgid};
     use nix::unistd::Pid;
 
-    /// The default for every non-interactive rush — a script, `-c`, and the test binaries — is
+    /// The default for every non-interactive oslo — a script, `-c`, and the test binaries — is
     /// that nothing in this module touches the terminal.
     #[test]
     fn job_control_is_off_until_a_repl_asks_for_it() {

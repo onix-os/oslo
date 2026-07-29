@@ -10,13 +10,13 @@ mod common;
 use std::io::Write;
 use std::process::{Command, Stdio};
 
-/// Feed `lines` to an interactive rush and return `(stdout, stderr)`.
+/// Feed `lines` to an interactive oslo and return `(stdout, stderr)`.
 ///
 /// `-i` forces the REPL even though stdin is a pipe, which is what makes this scriptable. `HOME`
-/// points at a scratch directory so the developer's own `~/.rush_history` neither leaks into the
+/// points at a scratch directory so the developer's own `~/.oslo_history` neither leaks into the
 /// event numbering nor gets written to.
 fn repl(dir: &std::path::Path, lines: &str) -> (String, String) {
-    let mut child = Command::new(common::rush_bin())
+    let mut child = Command::new(common::oslo_bin())
         .arg("-i")
         .current_dir(dir)
         .env("HOME", dir)
@@ -24,14 +24,14 @@ fn repl(dir: &std::path::Path, lines: &str) -> (String, String) {
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()
-        .expect("spawn rush -i");
+        .expect("spawn oslo -i");
     child
         .stdin
         .take()
         .expect("stdin")
         .write_all(lines.as_bytes())
         .expect("write script");
-    let out = child.wait_with_output().expect("wait for rush");
+    let out = child.wait_with_output().expect("wait for oslo");
     (
         String::from_utf8_lossy(&out.stdout).into_owned(),
         String::from_utf8_lossy(&out.stderr).into_owned(),
@@ -119,7 +119,7 @@ fn history_records_the_expanded_line_not_the_reference() {
         "each !! re-runs the stored expansion: {stdout:?}"
     );
 
-    let saved = std::fs::read_to_string(dir.path().join(".rush_history")).expect("history file");
+    let saved = std::fs::read_to_string(dir.path().join(".oslo_history")).expect("history file");
     assert!(
         !saved.contains("!!"),
         "the raw reference must never be written to the history file: {saved:?}"

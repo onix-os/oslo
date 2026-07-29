@@ -1,32 +1,32 @@
 //! `[[ ... ]]` conversion.
 //!
-//! rush has no dedicated node for extended tests, so the expression tree is lowered onto
+//! oslo has no dedicated node for extended tests, so the expression tree is lowered onto
 //! constructs it already evaluates: `&&`/`||` become an and-or list, `!` becomes a negated
 //! pipeline, and each leaf predicate becomes a call to the `[[` builtin.
 
 use super::words::{single_command, single_word};
-use crate::ast as rush_ast;
+use crate::ast as oslo_ast;
 use crate::error::Result;
 use brush_parser::ast;
 
-pub(super) fn convert_extended_test(expr: &ast::ExtendedTestExpr) -> Result<rush_ast::Command> {
+pub(super) fn convert_extended_test(expr: &ast::ExtendedTestExpr) -> Result<oslo_ast::Command> {
     Ok(single_command(extended_test_to_and_or(expr)?))
 }
 
-fn extended_test_to_and_or(expr: &ast::ExtendedTestExpr) -> Result<rush_ast::AndOrList> {
+fn extended_test_to_and_or(expr: &ast::ExtendedTestExpr) -> Result<oslo_ast::AndOrList> {
     match expr {
         ast::ExtendedTestExpr::Parenthesized(inner) => extended_test_to_and_or(inner),
         ast::ExtendedTestExpr::And(l, r) => {
             let mut left = extended_test_to_and_or(l)?;
             let right = extended_test_to_and_or(r)?;
-            left.rest.push((rush_ast::AndOrOp::And, right.first));
+            left.rest.push((oslo_ast::AndOrOp::And, right.first));
             left.rest.extend(right.rest);
             Ok(left)
         }
         ast::ExtendedTestExpr::Or(l, r) => {
             let mut left = extended_test_to_and_or(l)?;
             let right = extended_test_to_and_or(r)?;
-            left.rest.push((rush_ast::AndOrOp::Or, right.first));
+            left.rest.push((oslo_ast::AndOrOp::Or, right.first));
             left.rest.extend(right.rest);
             Ok(left)
         }
@@ -38,17 +38,17 @@ fn extended_test_to_and_or(expr: &ast::ExtendedTestExpr) -> Result<rush_ast::And
                 list.first.negated = !list.first.negated;
                 Ok(list)
             } else {
-                let grouped = rush_ast::Command::Compound {
-                    kind: rush_ast::CompoundCommand::Group(rush_ast::CommandList {
-                        items: vec![rush_ast::ListItem {
+                let grouped = oslo_ast::Command::Compound {
+                    kind: oslo_ast::CompoundCommand::Group(oslo_ast::CommandList {
+                        items: vec![oslo_ast::ListItem {
                             and_or: list,
-                            op: rush_ast::ListOp::Sequential,
+                            op: oslo_ast::ListOp::Sequential,
                         }],
                     }),
                     redirections: Vec::new(),
                 };
-                Ok(rush_ast::AndOrList {
-                    first: rush_ast::Pipeline {
+                Ok(oslo_ast::AndOrList {
+                    first: oslo_ast::Pipeline {
                         negated: true,
                         timed: false,
                         commands: vec![grouped],
@@ -60,7 +60,7 @@ fn extended_test_to_and_or(expr: &ast::ExtendedTestExpr) -> Result<rush_ast::And
         ast::ExtendedTestExpr::UnaryTest(pred, word) => {
             let op = unary_predicate_op(pred);
             Ok(bracket_and_or(
-                vec![rush_ast::Word::from_literal(op), single_word(word)?],
+                vec![oslo_ast::Word::from_literal(op), single_word(word)?],
                 false,
             ))
         }
@@ -69,7 +69,7 @@ fn extended_test_to_and_or(expr: &ast::ExtendedTestExpr) -> Result<rush_ast::And
             Ok(bracket_and_or(
                 vec![
                     single_word(left)?,
-                    rush_ast::Word::from_literal(op),
+                    oslo_ast::Word::from_literal(op),
                     single_word(right)?,
                 ],
                 negate,
@@ -82,16 +82,16 @@ fn extended_test_to_and_or(expr: &ast::ExtendedTestExpr) -> Result<rush_ast::And
 ///
 /// `negate` sets the pipeline's `!`, which is how the negative predicates (`!=`) are expressed —
 /// so the builtin only has to implement the positive comparisons.
-fn bracket_and_or(args: Vec<rush_ast::Word>, negate: bool) -> rush_ast::AndOrList {
-    let mut words = vec![rush_ast::Word::from_literal("[[")];
+fn bracket_and_or(args: Vec<oslo_ast::Word>, negate: bool) -> oslo_ast::AndOrList {
+    let mut words = vec![oslo_ast::Word::from_literal("[[")];
     words.extend(args);
-    words.push(rush_ast::Word::from_literal("]]"));
+    words.push(oslo_ast::Word::from_literal("]]"));
 
-    rush_ast::AndOrList {
-        first: rush_ast::Pipeline {
+    oslo_ast::AndOrList {
+        first: oslo_ast::Pipeline {
             negated: negate,
             timed: false,
-            commands: vec![rush_ast::Command::Simple(rush_ast::SimpleCommand {
+            commands: vec![oslo_ast::Command::Simple(oslo_ast::SimpleCommand {
                 assignments: Vec::new(),
                 words,
                 redirections: Vec::new(),

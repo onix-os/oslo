@@ -32,7 +32,7 @@ pub fn builtin_kill(_env: &mut Environment, args: &[String]) -> Result<i32> {
     // error, never a silent fallback to TERM.
     let spec = inv.spec.unwrap_or("TERM");
     let Some(signum) = signals::parse_spec(spec) else {
-        eprintln!("rush: kill: {spec}: invalid signal specification");
+        eprintln!("oslo: kill: {spec}: invalid signal specification");
         return Ok(1);
     };
 
@@ -47,9 +47,9 @@ pub fn builtin_kill(_env: &mut Environment, args: &[String]) -> Result<i32> {
         match operand.parse::<i32>() {
             Ok(pid) => match send(pid, signum) {
                 Ok(()) => any_succeeded = true,
-                Err(e) => eprintln!("rush: kill: ({operand}) - {}", e.desc()),
+                Err(e) => eprintln!("oslo: kill: ({operand}) - {}", e.desc()),
             },
-            Err(_) => eprintln!("rush: kill: `{operand}': not a pid or valid job spec"),
+            Err(_) => eprintln!("oslo: kill: `{operand}': not a pid or valid job spec"),
         }
     }
 
@@ -103,7 +103,7 @@ fn parse_args(rest: &[String]) -> Option<Invocation<'_>> {
 
 fn usage() -> i32 {
     eprintln!(
-        "rush: kill: usage: kill [-s sigspec | -n signum | -sigspec] pid | jobspec ... or kill -l [sigspec]"
+        "oslo: kill: usage: kill [-s sigspec | -n signum | -sigspec] pid | jobspec ... or kill -l [sigspec]"
     );
     2
 }
@@ -121,7 +121,7 @@ fn list(specs: &[String]) -> i32 {
         match describe(spec) {
             Some(line) => println!("{line}"),
             None => {
-                eprintln!("rush: kill: {spec}: invalid signal specification");
+                eprintln!("oslo: kill: {spec}: invalid signal specification");
                 status = 1;
             }
         }

@@ -58,7 +58,7 @@ pub fn builtin_umask(_env: &mut Environment, args: &[String]) -> Result<i32> {
                 'S' => symbolic = true,
                 'p' => as_command = true,
                 _ => {
-                    eprintln!("rush: umask: -{c}: invalid option");
+                    eprintln!("oslo: umask: -{c}: invalid option");
                     eprintln!("umask: usage: umask [-p] [-S] [mode]");
                     return Ok(2);
                 }
@@ -79,7 +79,7 @@ pub fn builtin_umask(_env: &mut Environment, args: &[String]) -> Result<i32> {
             Ok(0)
         }
         Err(e) => {
-            eprintln!("rush: umask: {e}");
+            eprintln!("oslo: umask: {e}");
             Ok(1)
         }
     }

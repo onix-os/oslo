@@ -254,7 +254,7 @@ fn anonymous_file() -> Result<File> {
     use nix::sys::memfd::{MemFdCreateFlag, memfd_create};
     // ENOSYS below Linux 3.17, and blocked by some seccomp policies; fall back rather than making
     // heredocs a kernel-version feature.
-    if let Ok(fd) = memfd_create(c"rush-heredoc", MemFdCreateFlag::MFD_CLOEXEC) {
+    if let Ok(fd) = memfd_create(c"oslo-heredoc", MemFdCreateFlag::MFD_CLOEXEC) {
         return Ok(File::from(fd));
     }
     unlinked_temp_file()
@@ -272,7 +272,7 @@ fn unlinked_temp_file() -> Result<File> {
     // retry rather than clobbering it, since `create_new` guarantees we never open someone else's.
     for _ in 0..64 {
         let path = dir.join(format!(
-            "rush-heredoc-{}-{}",
+            "oslo-heredoc-{}-{}",
             std::process::id(),
             SEQ.fetch_add(1, Ordering::Relaxed)
         ));

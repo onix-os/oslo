@@ -1,14 +1,15 @@
-# rush
+# oslo
 
-A POSIX-compatible shell in Rust, with Lua scripting and fish-style interactive features.
+**O**nix **S**hell in **L**ua (**O**) — a POSIX-compatible shell in Rust, with Lua scripting
+and fish-style interactive features. Linux only.
 
 ```sh
-rush                      # interactive REPL when stdin is a terminal, else read stdin
-rush script.sh arg1 arg2  # run a script
-rush -c 'echo hello'      # run a command
-rush -s < script.sh       # read the program from standard input
-rush --lua-script init.lua
-rush --help               # -c -s -i -l -e -x --version --help --
+oslo                      # interactive REPL when stdin is a terminal, else read stdin
+oslo script.sh arg1 arg2  # run a script
+oslo -c 'echo hello'      # run a command
+oslo -s < script.sh       # read the program from standard input
+oslo --lua-script init.lua
+oslo --help               # -c -s -i -l -e -x --version --help --
 ```
 
 ## Status
@@ -43,41 +44,41 @@ Builtins, by what they act on:
 
 ## Lua
 
-`~/.config/rush/init.lua` is loaded at startup.
+`~/.config/oslo/init.lua` is loaded at startup.
 
 ```lua
-rush.set_prompt(function()
-  return rush.get_pwd() .. " ❯ "
+oslo.set_prompt(function()
+  return oslo.get_pwd() .. " ❯ "
 end)
 
-rush.set_alias("gs", "git status")
-rush.exec("echo from lua")
-rush.set_var("EDITOR", "nvim")
+oslo.set_alias("gs", "git status")
+oslo.exec("echo from lua")
+oslo.set_var("EDITOR", "nvim")
 
-rush.register_builtin("hello", function(argv)
+oslo.register_builtin("hello", function(argv)
   print("hello, " .. (argv[2] or "world"))
   return 0
 end)
 ```
 
-Available: `rush.exec`, `rush.get_var`, `rush.set_var`, `rush.get_pwd`, `rush.set_alias`,
-`rush.get_alias`, `rush.set_prompt`, `rush.register_builtin`.
+Available: `oslo.exec`, `oslo.get_var`, `oslo.set_var`, `oslo.get_pwd`, `oslo.set_alias`,
+`oslo.get_alias`, `oslo.set_prompt`, `oslo.register_builtin`.
 
-`rush.register_builtin(name, fn)` makes `name` a builtin, ahead of `PATH` and overriding any
+`oslo.register_builtin(name, fn)` makes `name` a builtin, ahead of `PATH` and overriding any
 builtin of the same name. The callback receives argv as a table with `argv[1]` set to the
 builtin's own name. Its return value is the exit status: no return value or `true` is 0, `false`
 is 1, a number is that number. A Lua error is reported on stderr and the builtin exits 1.
 
-Two limits worth knowing. The rest of the `rush.*` API is unavailable *inside* such a callback —
-the shell state is already borrowed by the evaluator running it, so `rush.exec` and friends raise
-an error there rather than deadlocking. And there is no right prompt: `rush.set_right_prompt`
+Two limits worth knowing. The rest of the `oslo.*` API is unavailable *inside* such a callback —
+the shell state is already borrowed by the evaluator running it, so `oslo.exec` and friends raise
+an error there rather than deadlocking. And there is no right prompt: `oslo.set_right_prompt`
 existed but nothing ever drew what it returned, so it was removed rather than left as an API that
 silently does nothing.
 
 ## Interactive
 
 Syntax highlighting (valid commands green, unknown red), history hints, a completion dropdown
-with descriptions, and a git-aware prompt. History is kept in `~/.rush_history`.
+with descriptions, and a git-aware prompt. History is kept in `~/.oslo_history`.
 
 ## Building
 
@@ -90,12 +91,13 @@ make install   # install to $PREFIX/bin (default ~/.local/bin)
 ```
 
 The minimum supported Rust version is 1.88 (edition 2024 plus let-chains); CI checks it on every
-push, alongside a verify matrix over Linux and macOS.
+push, alongside the verify gate. oslo targets Linux and only Linux — it uses /proc, memfd and
+Linux signal numbers directly rather than routing around them.
 
 ## Installing
 
 ```sh
-make install                 # builds --release and installs to ~/.local/bin/rush
+make install                 # builds --release and installs to ~/.local/bin/oslo
 make install PREFIX=/usr/local   # or anywhere else
 make uninstall               # removes it again (same PREFIX)
 ```
@@ -103,13 +105,32 @@ make uninstall               # removes it again (same PREFIX)
 `PREFIX` defaults to `$HOME/.local`, so the binary lands in `$HOME/.local/bin` — make sure that
 directory is on your `PATH`. `DESTDIR` is honoured for staged/packaging installs.
 
+Released binaries are statically linked against musl (`x86_64-unknown-linux-musl` and
+`aarch64-unknown-linux-musl`), so they depend on no system libc and run on any Linux of the same
+architecture — which matters for a login shell, since a shell that cannot start because its libc
+moved is a shell that locks you out. `make install` builds against the host's libc instead; to
+build a static one yourself:
+
+```sh
+rustup target add x86_64-unknown-linux-musl
+sudo apt-get install -y musl-tools          # compiles mlua's vendored Lua for musl
+CC_x86_64_unknown_linux_musl=musl-gcc \
+RUSTFLAGS="-C target-feature=+crt-static" \
+  cargo build --release --target x86_64-unknown-linux-musl --bin oslo
+```
+
+Do not also set the target's *linker* to `musl-gcc`. It builds and looks right, and produces a
+binary that records a dynamic loader path from the build host and segfaults anywhere else; leaving
+the linker alone lets rustc use the musl it ships. `readelf -l oslo | grep interpreter` should
+print nothing.
+
 Check it works before going further:
 
 ```sh
-~/.local/bin/rush -c 'echo ok'
+~/.local/bin/oslo -c 'echo ok'
 ```
 
-### Using rush as your login shell
+### Using oslo as your login shell
 
 Read [Known gaps](#known-gaps) first. A login shell that cannot parse your startup files locks
 you out of your own account, and the recovery path (another terminal, or single-user mode) is
@@ -119,14 +140,14 @@ A shell may only be a login shell if it is listed in `/etc/shells`:
 
 ```sh
 sudo make install PREFIX=/usr/local            # system-wide, so it survives $HOME being unmounted
-echo /usr/local/bin/rush | sudo tee -a /etc/shells
-chsh -s /usr/local/bin/rush
+echo /usr/local/bin/oslo | sudo tee -a /etc/shells
+chsh -s /usr/local/bin/oslo
 ```
 
 `chsh` refuses any path not in `/etc/shells`, which is the check that stops you from setting a
 shell that does not exist. Log out and back in for the change to take effect.
 
-Before you commit to it, run rush as a non-login shell for a while — start it from your current
+Before you commit to it, run oslo as a non-login shell for a while — start it from your current
 shell, or set it as your terminal emulator's command — so that a breakage costs you a window
 instead of a session.
 
@@ -162,27 +183,27 @@ contain** — `redirects.rs`, `quoting.rs`, `conditionals.rs` — never for thei
   conversion, or an exit status never propagated to `main`, leaves the environment looking
   perfectly correct while the shell is visibly broken.
 - **Differential** — `tests/differential_tests.rs` runs every script in `tests/corpus/` through
-  both rush and bash and compares stdout and exit status (stderr by shape only, since diagnostic
+  both oslo and bash and compares stdout and exit status (stderr by shape only, since diagnostic
   wording should differ). Each script names its oracle on the first line, `# mode: posix` or
   `# mode: bash`, and **both** shells are run in that mode; giving only bash the `--posix` was a
-  harness bug that judged 304 cases against a mode rush was not in. It is a ratchet:
-  `tests/differential/expected_fail.rs` names each case rush still gets wrong along with the
+  harness bug that judged 304 cases against a mode oslo was not in. It is a ratchet:
+  `tests/differential/expected_fail.rs` names each case oslo still gets wrong along with the
   finding that explains it, and the suite fails both when an unlisted case diverges *and* when a
   listed case starts passing. Closing a bug means deleting a line there.
 
   Bash is a moving specification, so a case may add `# needs-bash: 5.3` under its mode line. Four
   behaviours changed between 5.2 and 5.3 — whether a failing special builtin is fatal, `cd`'s
-  status for too many operands, and two column widths — and rush follows 5.3. Against an older
-  oracle those cases are skipped and counted rather than blamed on rush, and the suite prints the
+  status for too many operands, and two column widths — and oslo follows 5.3. Against an older
+  oracle those cases are skipped and counted rather than blamed on oslo, and the suite prints the
   oracle's version and the skip list on every run so a CI image that ages cannot quietly stop
-  testing them. The oracle must be bash 4 or newer; macOS ships 3.2, so CI installs a current one.
+  testing them. The oracle must be bash 4 or newer.
 - **Fuzz replay** — `cargo test --manifest-path fuzz/Cargo.toml --lib` runs `tests/corpus/` and
   `fuzz/seeds/` through the three `cargo-fuzz` targets on stable, with no nightly and no
   libFuzzer. `fuzz/known/` is the second ratchet, in the same two directions: an input that still
   crashes or hangs the shell lives there with a note, and the suite fails the day it stops
   reproducing. It is empty today. `fuzz/README.md` covers running the fuzzer proper.
 
-The line editor is covered without a pty: `RushHelper` is public, so `tests/interactive_tests.rs`
+The line editor is covered without a pty: `OsloHelper` is public, so `tests/interactive_tests.rs`
 and `src/interactive/tests.rs` call `complete`, `hint`, `highlight` and `input_status` directly
 against temporary directories.
 
@@ -200,7 +221,7 @@ main.rs          script, -c, stdin and REPL entry points
 cli.rs           argv parsing for the binary
 lexer/           hand-written POSIX scanner (word re-lexing for the adapter)
 parser/
-  brush_adapter  brush-parser AST -> rush AST  (the only parsing path)
+  brush_adapter  brush-parser AST -> oslo AST  (the only parsing path)
 ast/             the shared AST
 expand/          parameter expansion, globbing, IFS splitting, arithmetic
 exec/            fork/exec, pipelines, redirections, job control
@@ -210,7 +231,7 @@ interactive/     rustyline helper: completion, highlighting, dropdown, prompt
 ```
 
 Parsing goes through [`brush-parser`](https://crates.io/crates/brush-parser), a spec-compliant
-bash parser, and `brush_adapter` translates its AST into rush's simpler one. That is the only
+bash parser, and `brush_adapter` translates its AST into oslo's simpler one. That is the only
 path: input brush or the adapter rejects becomes a syntax error with a position, and the shell
 exits 2. There used to be a second, hand-written parser used as a fallback, which had no
 here-document support and therefore executed heredoc *bodies* as commands; it is gone. The
@@ -242,7 +263,7 @@ this list and a row in the ratchet, which is worth it for a bug and not for an a
   `/dev/fd/N` implementation is not written.
 - `coproc` and `select` are likewise refused by name. Both need machinery (job control, and a
   prompt plus `REPLY`) out of proportion to how often scripts use them.
-- A failing *special* builtin does not exit a POSIX-mode shell. `rush --posix -c 'export
+- A failing *special* builtin does not exit a POSIX-mode shell. `oslo --posix -c 'export
   BAD-NAME=1; echo alive'` prints `alive`; `bash --posix` stops at the `export`. The narrower
   POSIX rule that a failed *variable assignment* is fatal does hold — `readonly r=1; r=2` ends the
   shell under `--posix` and does not outside it, as in bash.
@@ -251,7 +272,7 @@ this list and a row in the ratchet, which is worth it for a bug and not for an a
   `${@^^}`) do work on a whole array and on the positional parameters; the list-valued
   `${a[@]:-default}` family is still rejected instead of evaluated.
 - `shopt` exists, but `autocd` is the only option it can switch. Every other option it knows
-  reports the state rush actually has and *fails* when asked for the other one, so
+  reports the state oslo actually has and *fails* when asked for the other one, so
   `shopt -s globstar` is an error rather than a lie: `**` still behaves as `*`.
 - The command hash table only holds what an explicit `hash name` put there. `hash -r`, the
   reporting and the completion cache are all wired; the `PATH` search itself does not record

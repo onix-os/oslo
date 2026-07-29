@@ -166,7 +166,7 @@ fn eval_arith(env: &mut Environment, expr: &str) -> Option<i64> {
     match crate::expand::arithmetic::eval_arithmetic(env, expr) {
         Ok(value) => Some(value),
         Err(e) => {
-            eprintln!("rush: ((: {}", e);
+            eprintln!("oslo: ((: {}", e);
             None
         }
     }

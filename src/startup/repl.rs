@@ -7,21 +7,21 @@
 use crate::absorb_loop_control;
 use crate::expand_history;
 use crate::startup::{history, lua_init, rc};
-use rush::Environment;
-use rush::LuaEngine;
-use rush::env::builtins::run_exit_trap;
-use rush::env::options::ShellOption;
-use rush::error::ShellError;
-use rush::exec::{JobManager, eval_command_list};
-use rush::interactive::{InputStatus, RushHelper};
-use rush::parser::parse_bash_script;
+use oslo::Environment;
+use oslo::LuaEngine;
+use oslo::env::builtins::run_exit_trap;
+use oslo::env::options::ShellOption;
+use oslo::error::ShellError;
+use oslo::exec::{JobManager, eval_command_list};
+use oslo::interactive::{InputStatus, OsloHelper};
+use oslo::parser::parse_bash_script;
 use rustyline::error::ReadlineError;
 use rustyline::history::{History, SearchDirection};
 use rustyline::{Editor, history::FileHistory};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
-type Repl = Editor<RushHelper, FileHistory>;
+type Repl = Editor<OsloHelper, FileHistory>;
 
 /// One trip round the prompt.
 enum Input {
@@ -42,7 +42,7 @@ pub fn run_repl() -> ! {
     // Everything downstream that behaves differently for a person than for a script — the job
     // notice, whether a background job keeps the terminal's stdin — reads this.
     // (Addressed by path rather than a re-export: `exec::mod` is being edited elsewhere.)
-    rush::exec::pipeline::set_interactive(true);
+    oslo::exec::pipeline::set_interactive(true);
 
     let mut interactive_env = Environment::new();
     // A REPL is interactive and reads its program from the terminal: `$-` says so with `i` and
@@ -51,7 +51,7 @@ pub fn run_repl() -> ! {
     interactive_env.set_option(ShellOption::StdinInput, true);
     history::register(&mut interactive_env);
 
-    // `.rushrc` runs before anything else reads a variable, so a `HISTSIZE=` or `PS1=` in it is
+    // `.oslorc` runs before anything else reads a variable, so a `HISTSIZE=` or `PS1=` in it is
     // in force for this session rather than for the next one.
     if let Some(status) = rc::load_startup_files(&mut interactive_env, true) {
         std::process::exit(run_exit_trap(&mut interactive_env, status));
@@ -61,7 +61,7 @@ pub fn run_repl() -> ! {
     let lua = match LuaEngine::new() {
         Ok(lua) => lua,
         Err(e) => {
-            eprintln!("rush: lua: {}", e);
+            eprintln!("oslo: lua: {}", e);
             std::process::exit(1);
         }
     };
@@ -74,9 +74,9 @@ pub fn run_repl() -> ! {
 
     let settings = history::settings(&env_struct.lock().unwrap());
     let mut rl = build_editor(&settings);
-    let mut helper = RushHelper::new(Arc::clone(&env_struct));
+    let mut helper = OsloHelper::new(Arc::clone(&env_struct));
     // R9.10 needs a real `PS2`, and rustyline draws no prompt on a continuation row of its own
-    // multi-line editor. `RushHelper` exposes the switch for exactly this: with editor multi-line
+    // multi-line editor. `OsloHelper` exposes the switch for exactly this: with editor multi-line
     // off, an unfinished line comes back from `readline` and `read_command` below asks for the
     // next one under `PS2`, the way every POSIX shell does.
     helper.set_editor_multiline(false);
@@ -87,7 +87,7 @@ pub fn run_repl() -> ! {
         match rl.load_history(path) {
             Ok(()) => {}
             Err(ReadlineError::Io(e)) if e.kind() == std::io::ErrorKind::NotFound => {}
-            Err(e) => eprintln!("rush: {}: {}", path.display(), e),
+            Err(e) => eprintln!("oslo: {}: {}", path.display(), e),
         }
     }
     publish_history(&rl);
@@ -96,7 +96,7 @@ pub fn run_repl() -> ! {
     jobs.setup_signals();
 
     println!(
-        "rush {} - POSIX Compatible Shell with Lua & Fish-style Features",
+        "oslo {} - POSIX Compatible Shell with Lua & Fish-style Features",
         env!("CARGO_PKG_VERSION")
     );
     println!("Type 'exit' or Ctrl-D to exit.");
@@ -154,7 +154,7 @@ pub fn run_repl() -> ! {
                         // An interactive shell survives what would kill a script: the error
                         // becomes `$?` (1, or 2 for a syntax error) and the prompt comes back.
                         last_status = err.failure_status();
-                        eprintln!("rush: {}", err);
+                        eprintln!("oslo: {}", err);
                     }
                 }
             }
@@ -223,7 +223,7 @@ fn read_command(
             }
             Err(ReadlineError::Eof) => return Input::Eof,
             Err(err) => {
-                eprintln!("rush: {}", err);
+                eprintln!("oslo: {}", err);
                 return Input::Fatal;
             }
         };
@@ -263,7 +263,7 @@ fn read_command(
         if is_complete(&buffer) {
             // The frecency table is fed from here rather than from the editor's `validate`,
             // because with editor multi-line off (which is what `PS2` costs) `validate` never
-            // sees a multi-line command whole — see `RushHelper::record_command_use`.
+            // sees a multi-line command whole — see `OsloHelper::record_command_use`.
             if let Some(helper) = rl.helper() {
                 helper.record_command_use(&buffer);
             }
@@ -281,9 +281,9 @@ fn read_command(
 /// The body of a here-document is **data**, and history expansion rewrites a line before it is
 /// parsed — so `cat > note <<EOF` followed by a line containing `!` would silently write some
 /// earlier command into the file instead of what was typed. bash does not expand there, and
-/// [`rush::interactive::syntax::opens_here_document`] exists precisely to tell "unfinished
+/// [`oslo::interactive::syntax::opens_here_document`] exists precisely to tell "unfinished
 /// because a document is open" from "unfinished because a quote is open". It had no callers at
-/// all, so every heredoc body typed at rush's prompt was being rewritten (PLAN C8).
+/// all, so every heredoc body typed at oslo's prompt was being rewritten (PLAN C8).
 ///
 /// One bit of state, given a name because it is the bit that decides whether a typed line is a
 /// command or data, and because the loop that owns it needs a terminal to exercise.
@@ -303,7 +303,7 @@ impl HeredocTracker {
     /// the cost is a `!!` that has to be typed out in full, against a `!` inside a heredoc
     /// quietly becoming somebody else's command.
     fn observe(&mut self, line: &str) {
-        self.0 |= rush::interactive::syntax::opens_here_document(line);
+        self.0 |= oslo::interactive::syntax::opens_here_document(line);
     }
 }
 
@@ -315,7 +315,7 @@ impl HeredocTracker {
 /// and the loop can never disagree about whether a line is finished.
 fn is_complete(source: &str) -> bool {
     !matches!(
-        rush::interactive::syntax::classify(source),
+        oslo::interactive::syntax::classify(source),
         InputStatus::Incomplete
     )
 }
@@ -358,7 +358,7 @@ fn remember(rl: &mut Repl, file: &Option<PathBuf>, text: &str, secret: bool) {
     if let Some(path) = file
         && let Err(e) = rl.append_history(path)
     {
-        eprintln!("rush: {}: {}", path.display(), e);
+        eprintln!("oslo: {}: {}", path.display(), e);
     }
 }
 
@@ -419,12 +419,12 @@ mod tests {
     /// on the line that happened to parse on its own.
     #[test]
     fn a_multi_line_command_feeds_the_frecency_table() {
-        use rush::Environment;
-        use rush::interactive::RushHelper;
+        use oslo::Environment;
+        use oslo::interactive::OsloHelper;
         use std::sync::{Arc, Mutex};
 
         // Not interactive, so the table is in memory and no file in `$HOME` is touched.
-        let helper = RushHelper::new(Arc::new(Mutex::new(Environment::new())));
+        let helper = OsloHelper::new(Arc::new(Mutex::new(Environment::new())));
         assert_eq!(helper.frecency_score("zzrepl_a"), 0.0);
         assert_eq!(helper.frecency_score("zzrepl_b"), 0.0);
 

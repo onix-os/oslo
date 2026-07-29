@@ -57,7 +57,7 @@ fn exec_passes_the_exit_status_of_the_replacement() {
 /// `-a` renames argv[0], which is how a multi-call binary is told which personality to be.
 #[test]
 fn exec_can_override_argv0() {
-    assert_out("exec -a rushtest sh -c 'echo $0'", "rushtest");
+    assert_out("exec -a oslotest sh -c 'echo $0'", "oslotest");
 }
 
 /// A command that cannot be found ends a non-interactive shell with 127, rather than carrying on
@@ -289,12 +289,12 @@ fn declare_p_prints_a_readable_declaration() {
 #[test]
 fn declare_x_exports() {
     assert_out(
-        "declare -x RUSHDECL=v; env | grep '^RUSHDECL='",
-        "RUSHDECL=v",
+        "declare -x OSLODECL=v; env | grep '^OSLODECL='",
+        "OSLODECL=v",
     );
 }
 
-/// An attribute rush cannot represent is refused rather than silently downgraded to a scalar.
+/// An attribute oslo cannot represent is refused rather than silently downgraded to a scalar.
 /// `-A` is the one PLAN.md defers on purpose: associative arrays are a second value shape, and
 /// building an *indexed* array for `declare -A` would answer `${m[key]}` with element 0.
 #[test]

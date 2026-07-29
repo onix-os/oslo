@@ -465,7 +465,7 @@ mod tests {
     }
 
     /// The nesting limit exists to keep a hostile expression from overflowing the stack, so the
-    /// limit itself has to fit on a stack rush might actually get. A 1 MiB thread is half what
+    /// limit itself has to fit on a stack oslo might actually get. A 1 MiB thread is half what
     /// Rust gives a spawned thread by default, so the limit holds with room to spare.
     ///
     /// Without this the invariant was only ever checked against whatever stack the test runner

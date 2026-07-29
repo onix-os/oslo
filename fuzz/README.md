@@ -1,10 +1,10 @@
-# Fuzzing rush
+# Fuzzing oslo
 
 Three `cargo-fuzz` targets over the parsers that read text nobody vetted:
 
 | Target | Entry point | Why it is here |
 |---|---|---|
-| `fuzz_parse` | `brush_adapter::parse_bash_script` | The only parser rush has. Every script, `eval`, `source` and alias body arrives through it. |
+| `fuzz_parse` | `brush_adapter::parse_bash_script` | The only parser oslo has. Every script, `eval`, `source` and alias body arrives through it. |
 | `fuzz_lexer` | `Lexer` and `parse_single_word` | Quoting, `$`-forms, ANSI-C escapes. Also called on array literals and alias bodies, which are data. |
 | `fuzz_arith` | `eval_arithmetic` | PLAN.md R3.5: proof that the Round 1 overflow guards and the Round 3 lexer/parser/eval split hold together. |
 

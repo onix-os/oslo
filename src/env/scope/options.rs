@@ -10,7 +10,7 @@
 //! * the named ones ([`Environment::errexit`], [`Environment::nounset`], …) for the options that
 //!   have behaviour attached, because a reader of the call site should not have to know what
 //!   `ShellOption::NoClobber` is;
-//! * [`Environment::option`] for anything else, including options rush only stores.
+//! * [`Environment::option`] for anything else, including options oslo only stores.
 //!
 //! Nothing here *acts* on an option. Storage and behaviour are deliberately separate: `set -x`
 //! must be accepted, reported by `$-` and listed by `set -o` whether or not the tracing code

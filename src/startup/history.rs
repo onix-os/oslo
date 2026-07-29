@@ -11,8 +11,8 @@
 //! after every line, and the builtin reads that. The alternative — teaching the library about
 //! the editor — would put rustyline in the dependency path of every `Environment`.
 
-use rush::Environment;
-use rush::error::Result;
+use oslo::Environment;
+use oslo::error::Result;
 use std::path::PathBuf;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -35,12 +35,12 @@ pub struct Settings {
 /// Read `$HISTFILE` and `$HISTSIZE`.
 ///
 /// An explicitly *empty* `HISTFILE` disables the file, which is the documented way to run a
-/// session that leaves no trace; an unset one falls back to `~/.rush_history`.
+/// session that leaves no trace; an unset one falls back to `~/.oslo_history`.
 pub fn settings(env: &Environment) -> Settings {
     let file = match env.get_var("HISTFILE") {
         Some("") => None,
         Some(path) => Some(PathBuf::from(path)),
-        None => home(env).map(|h| h.join(".rush_history")),
+        None => home(env).map(|h| h.join(".oslo_history")),
     };
     Settings {
         file,
@@ -120,14 +120,14 @@ fn builtin_history(_env: &mut Environment, args: &[String]) -> Result<i32> {
             CLEAR_REQUESTED.store(true, Ordering::SeqCst);
         }
         Some(other) if other.starts_with('-') && other.len() > 1 => {
-            eprintln!("rush: history: {}: invalid option", other);
+            eprintln!("oslo: history: {}: invalid option", other);
             eprintln!("history: usage: history [n] | history -c");
             return Ok(2);
         }
         Some(count) => match count.parse::<usize>() {
             Ok(n) => print_entries(&entries, n),
             Err(_) => {
-                eprintln!("rush: history: {}: numeric argument required", count);
+                eprintln!("oslo: history: {}: numeric argument required", count);
                 return Ok(1);
             }
         },

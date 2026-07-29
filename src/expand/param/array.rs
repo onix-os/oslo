@@ -15,7 +15,7 @@
 //! sliced *characters* out of the space-joined arguments.
 //!
 //! What is still missing errors instead of guessing: the `${a[@]:-d}` family has list semantics
-//! rush does not have yet, and answering it with the first element or an empty string would be
+//! oslo does not have yet, and answering it with the first element or an empty string would be
 //! the quiet wrong answer this shell is being audited for.
 
 use super::{Target, operators, origin_of};
@@ -227,8 +227,8 @@ mod tests {
     /// Expand `${name[sub]<op>}` over an array of `values`, as a list of field texts.
     fn fields(values: &[&str], sub: Subscript, op: ParamExpansion) -> Result<Vec<String>, String> {
         let mut env = Environment::new();
-        env.set_array("rush_arr", ShellArray::from_values(values.to_vec()));
-        expand_array_ref(&mut env, "rush_arr", &sub, &op, true)
+        env.set_array("oslo_arr", ShellArray::from_values(values.to_vec()));
+        expand_array_ref(&mut env, "oslo_arr", &sub, &op, true)
             .map(|fields| fields.iter().map(|f| field_text(f)).collect())
             .map_err(|e| e.to_string())
     }
@@ -271,10 +271,10 @@ mod tests {
         let mut env = Environment::new();
         let mut array = ShellArray::from_values(["a", "b", "c"]);
         array.remove(1);
-        env.set_array("rush_sparse", array);
+        env.set_array("oslo_sparse", array);
         let got = expand_array_ref(
             &mut env,
-            "rush_sparse",
+            "oslo_sparse",
             &Subscript::All,
             &ParamExpansion::Indirect,
             true,
@@ -292,11 +292,11 @@ mod tests {
     #[test]
     fn a_subscript_is_evaluated_as_arithmetic() {
         let mut env = Environment::new();
-        env.set_array("rush_ar2", ShellArray::from_values(["x", "y", "z"]));
-        env.set_var("rush_i", "1", false);
-        let sub = Subscript::Index(Word::from_literal("rush_i+1"));
+        env.set_array("oslo_ar2", ShellArray::from_values(["x", "y", "z"]));
+        env.set_var("oslo_i", "1", false);
+        let sub = Subscript::Index(Word::from_literal("oslo_i+1"));
         let got =
-            expand_array_ref(&mut env, "rush_ar2", &sub, &ParamExpansion::Normal, true).unwrap();
+            expand_array_ref(&mut env, "oslo_ar2", &sub, &ParamExpansion::Normal, true).unwrap();
         assert_eq!(field_text(&got[0]), "z");
     }
 
@@ -309,8 +309,8 @@ mod tests {
         assert_eq!(got, Ok(vec![String::new()]));
     }
 
-    /// The forms rush does not implement must say so rather than answer something plausible.
-    /// `${a[@]:-d}` is list-valued in bash and rush has no list semantics for it yet.
+    /// The forms oslo does not implement must say so rather than answer something plausible.
+    /// `${a[@]:-d}` is list-valued in bash and oslo has no list semantics for it yet.
     #[test]
     fn an_unimplemented_whole_array_operator_is_an_error() {
         let op = ParamExpansion::DefaultValue {
@@ -401,10 +401,10 @@ mod tests {
         let mut env = Environment::new();
         let mut array = ShellArray::from_values(["x", "y", "z"]);
         array.remove(1);
-        env.set_array("rush_sparse_slice", array);
+        env.set_array("oslo_sparse_slice", array);
         let got = expand_array_ref(
             &mut env,
-            "rush_sparse_slice",
+            "oslo_sparse_slice",
             &Subscript::All,
             &slice("1", None),
             true,
@@ -418,9 +418,9 @@ mod tests {
     #[test]
     fn a_scalar_slices_and_maps_as_one_element() {
         let mut env = Environment::new();
-        env.set_var("rush_scalar", "solo", false);
+        env.set_var("oslo_scalar", "solo", false);
         let mut text = |op: &ParamExpansion| {
-            expand_array_ref(&mut env, "rush_scalar", &Subscript::All, op, true)
+            expand_array_ref(&mut env, "oslo_scalar", &Subscript::All, op, true)
                 .unwrap()
                 .iter()
                 .map(|f| field_text(f))

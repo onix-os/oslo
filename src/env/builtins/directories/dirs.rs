@@ -57,7 +57,7 @@ fn parse_options(args: &[String]) -> std::result::Result<Options, i32> {
             continue;
         }
         let Some(flags) = arg.strip_prefix('-').filter(|rest| !rest.is_empty()) else {
-            eprintln!("rush: dirs: {arg}: invalid number");
+            eprintln!("oslo: dirs: {arg}: invalid number");
             eprintln!("{DIRS_USAGE}");
             return Err(2);
         };
@@ -69,7 +69,7 @@ fn parse_options(args: &[String]) -> std::result::Result<Options, i32> {
                 // `-v` is `-p` plus the indices, so it wins over a preceding `-p`.
                 'v' => options.layout = Layout::Numbered,
                 other => {
-                    eprintln!("rush: dirs: -{other}: invalid number");
+                    eprintln!("oslo: dirs: -{other}: invalid number");
                     eprintln!("{DIRS_USAGE}");
                     return Err(2);
                 }
@@ -97,7 +97,7 @@ pub fn builtin_dirs(env: &mut Environment, args: &[String]) -> Result<i32> {
 
     if let Some(spec) = options.index {
         let Some(index) = resolve_index(&spec, entries.len()) else {
-            eprintln!("rush: dirs: directory stack empty");
+            eprintln!("oslo: dirs: directory stack empty");
             return Ok(1);
         };
         println!("{}", present(env, &entries[index], options.long));

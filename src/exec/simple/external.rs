@@ -21,7 +21,7 @@ use std::path::{Path, PathBuf};
 ///
 /// The three failure cases are kept apart because a shell reports them with different exit
 /// statuses, and callers of a script read those numbers: 127 means "no such command, maybe a
-/// typo or a missing package", 126 means "it is there and I could not run it". rush used to
+/// typo or a missing package", 126 means "it is there and I could not run it". oslo used to
 /// collapse both onto 127 — and, for a directory, onto a silent `cd` with status 0 (PLAN R5.13).
 pub(crate) enum Lookup {
     /// An executable file, already resolved to a path.
@@ -104,7 +104,7 @@ pub(crate) fn run_external(
                 }
 
                 let _ = nix::unistd::execv(&c_path, &c_args);
-                eprintln!("rush: exec failed for {}", cmd_name);
+                eprintln!("oslo: exec failed for {}", cmd_name);
                 std::process::exit(126);
             }
             Ok(ForkResult::Parent { child }) => {
@@ -165,12 +165,12 @@ fn wait_for_child(child: Pid, cmd_name: &str, words: &[String]) -> i32 {
 /// Without a table entry the process stayed stopped with nothing in the shell able to name it,
 /// which made Ctrl-Z a way of leaking a process rather than parking one.
 ///
-/// The notice is bash's `[1]+  Stopped   cmd`; the older `rush: cmd: stopped (SIGTSTP)` wording is
+/// The notice is bash's `[1]+  Stopped   cmd`; the older `oslo: cmd: stopped (SIGTSTP)` wording is
 /// kept for a shell without job control, where there is no job number to quote and no `fg` that
 /// could act on it.
 fn remember_stopped(child: Pid, cmd_name: &str, words: &[String]) {
     if !job::job_control_active() {
-        eprintln!("rush: {}: stopped", cmd_name);
+        eprintln!("oslo: {}: stopped", cmd_name);
         return;
     }
     let label = words.join(" ");
@@ -232,7 +232,7 @@ mod tests {
     }
 
     /// The four outcomes a command word can have. `/tmp` and `/etc/hosts` stand in for "a
-    /// directory" and "a file nobody may execute"; both exist on every unix rush targets.
+    /// directory" and "a file nobody may execute"; both exist on every unix oslo targets.
     #[test]
     fn path_operands_are_classified_by_why_they_cannot_run() {
         assert!(matches!(look_up_command("/bin/sh"), Lookup::Program(_)));
@@ -242,7 +242,7 @@ mod tests {
             Lookup::NotExecutable
         ));
         assert!(matches!(
-            look_up_command("/nonexistent/rush-test"),
+            look_up_command("/nonexistent/oslo-test"),
             Lookup::NotFound
         ));
     }
@@ -253,7 +253,7 @@ mod tests {
     fn a_bare_word_never_resolves_to_a_directory() {
         assert!(matches!(look_up_command("sh"), Lookup::Program(_)));
         assert!(matches!(
-            look_up_command("rush-no-such-command"),
+            look_up_command("oslo-no-such-command"),
             Lookup::NotFound
         ));
     }

@@ -250,7 +250,7 @@ impl JobTable {
     ///
     /// Forgetting on read is the *POSIX* rule, and it is a real fork in behaviour: `bash --posix`
     /// answers the second `wait $p` with 127 while default bash answers with the status again.
-    /// rush follows the POSIX side, which is also the oracle the differential corpus runs against.
+    /// oslo follows the POSIX side, which is also the oracle the differential corpus runs against.
     pub fn take_status(&mut self, pid: Pid) -> Option<i32> {
         let index = self.statuses.iter().position(|(p, _)| *p == pid)?;
         Some(self.statuses.remove(index).1)
@@ -374,7 +374,7 @@ fn forget_children(n: usize) {
 
 /// Collect every child that has ended or stopped since the last command, and report what changed.
 ///
-/// R7.4: this is what keeps `sleep 0 &` from leaving a `[rush] <defunct>` entry behind for the
+/// R7.4: this is what keeps `sleep 0 &` from leaving a `[oslo] <defunct>` entry behind for the
 /// rest of the session. It never blocks — `WNOHANG` — so a still-running job costs one syscall.
 ///
 /// Each known pid is asked about *by name* rather than with a single `waitpid(-1)`. Both collect

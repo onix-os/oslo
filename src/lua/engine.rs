@@ -1,4 +1,4 @@
-//! The `rush.*` table: what an `init.lua` can reach.
+//! The `oslo.*` table: what an `init.lua` can reach.
 
 use crate::env::Environment;
 use crate::error::{Result, ShellError};
@@ -12,7 +12,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 /// its interpreter and is neither `Send` nor `Sync`, while the registry stores
 /// `Arc<dyn Fn … + Send + Sync>` so that `Environment` stays sendable. The closure therefore
 /// captures only the name and looks the callback back up through here.
-const BUILTIN_KEY_PREFIX: &str = "rush_builtin_";
+const BUILTIN_KEY_PREFIX: &str = "oslo_builtin_";
 
 thread_local! {
     /// The interpreter a builtin registered on this thread should call back into.
@@ -24,7 +24,7 @@ thread_local! {
     static ACTIVE_LUA: RefCell<Option<Lua>> = const { RefCell::new(None) };
 }
 
-/// Take the shell state for the duration of one `rush.*` call.
+/// Take the shell state for the duration of one `oslo.*` call.
 ///
 /// `try_lock`, not `lock`: the interpreter runs *inside* the evaluator when a Lua-registered
 /// builtin executes, and the evaluator is already holding this mutex. `lock` there is a hang —
@@ -33,8 +33,8 @@ thread_local! {
 fn borrow_env(env: &Mutex<Environment>) -> LuaResult<MutexGuard<'_, Environment>> {
     env.try_lock().map_err(|_| {
         mlua::Error::runtime(
-            "rush: shell state is busy; the rush.* API cannot be used from inside a builtin \
-             registered with rush.register_builtin",
+            "oslo: shell state is busy; the oslo.* API cannot be used from inside a builtin \
+             registered with oslo.register_builtin",
         )
     })
 }
@@ -64,7 +64,7 @@ fn status_from_lua(value: LuaValue) -> i32 {
 /// callback sees the same argv a native builtin does.
 fn call_lua_builtin(name: &str, args: &[String]) -> i32 {
     let Some(lua) = ACTIVE_LUA.with(|slot| slot.borrow().clone()) else {
-        eprintln!("rush: {}: no Lua interpreter on this thread", name);
+        eprintln!("oslo: {}: no Lua interpreter on this thread", name);
         return 127;
     };
     let key = format!("{}{}", BUILTIN_KEY_PREFIX, name);
@@ -76,7 +76,7 @@ fn call_lua_builtin(name: &str, args: &[String]) -> i32 {
     match call() {
         Ok(value) => status_from_lua(value),
         Err(err) => {
-            eprintln!("rush: {}: {}", name, err);
+            eprintln!("oslo: {}: {}", name, err);
             1
         }
     }
@@ -111,13 +111,13 @@ impl LuaEngine {
 
     pub fn setup_bindings(&self, env: Arc<Mutex<Environment>>) -> Result<()> {
         let globals = self.lua.globals();
-        let rush_table = self.lua.create_table()?;
+        let oslo_table = self.lua.create_table()?;
 
         // Published before anything can be registered, so a builtin registered by the very
         // script that is being loaded can already find its way back here.
         ACTIVE_LUA.with(|slot| *slot.borrow_mut() = Some(self.lua.clone()));
 
-        // rush.exec(cmd_string)
+        // oslo.exec(cmd_string)
         let env_exec = Arc::clone(&env);
         let exec_fn = self.lua.create_function(move |_, cmd_str: String| {
             let mut env_guard = borrow_env(&env_exec)?;
@@ -126,17 +126,17 @@ impl LuaEngine {
                 .map_err(|e| e.into_lua_err())?;
             Ok(status)
         })?;
-        rush_table.set("exec", exec_fn)?;
+        oslo_table.set("exec", exec_fn)?;
 
-        // rush.get_var(name)
+        // oslo.get_var(name)
         let env_get = Arc::clone(&env);
         let get_var_fn = self.lua.create_function(move |_, name: String| {
             let env_guard = borrow_env(&env_get)?;
             Ok(env_guard.get_param(&name))
         })?;
-        rush_table.set("get_var", get_var_fn)?;
+        oslo_table.set("get_var", get_var_fn)?;
 
-        // rush.set_var(name, val)
+        // oslo.set_var(name, val)
         let env_set = Arc::clone(&env);
         let set_var_fn = self
             .lua
@@ -145,9 +145,9 @@ impl LuaEngine {
                 env_guard.set_var(&name, &val, true);
                 Ok(())
             })?;
-        rush_table.set("set_var", set_var_fn)?;
+        oslo_table.set("set_var", set_var_fn)?;
 
-        // rush.get_pwd()
+        // oslo.get_pwd()
         let get_pwd_fn = self.lua.create_function(|_, ()| {
             let pwd = std::env::current_dir()
                 .unwrap_or_default()
@@ -155,9 +155,9 @@ impl LuaEngine {
                 .to_string();
             Ok(pwd)
         })?;
-        rush_table.set("get_pwd", get_pwd_fn)?;
+        oslo_table.set("get_pwd", get_pwd_fn)?;
 
-        // rush.set_alias(name, target)
+        // oslo.set_alias(name, target)
         let env_alias = Arc::clone(&env);
         let set_alias_fn =
             self.lua
@@ -166,21 +166,21 @@ impl LuaEngine {
                     env_guard.set_alias(&name, &target);
                     Ok(())
                 })?;
-        rush_table.set("set_alias", set_alias_fn)?;
+        oslo_table.set("set_alias", set_alias_fn)?;
 
-        // rush.get_alias(name)
+        // oslo.get_alias(name)
         let env_get_alias = Arc::clone(&env);
         let get_alias_fn = self.lua.create_function(move |_, name: String| {
             let env_guard = borrow_env(&env_get_alias)?;
             Ok(env_guard.get_alias(&name).map(|s| s.to_string()))
         })?;
-        rush_table.set("get_alias", get_alias_fn)?;
+        oslo_table.set("get_alias", get_alias_fn)?;
 
-        // rush.register_builtin(name, callback)
+        // oslo.register_builtin(name, callback)
         //
         // The callback is stored and run (PLAN R9.8). Until this round it was *dropped* and the
         // stub `|_, _| Ok(0)` registered under the name instead, which is worse than doing
-        // nothing: `rush.register_builtin('ls', …)` made `ls /` print nothing and exit 0.
+        // nothing: `oslo.register_builtin('ls', …)` made `ls /` print nothing and exit 0.
         let env_builtin = Arc::clone(&env);
         let register_fn =
             self.lua
@@ -188,7 +188,7 @@ impl LuaEngine {
                     let name = name.trim().to_string();
                     if name.is_empty() {
                         return Err(mlua::Error::runtime(
-                            "rush.register_builtin: the builtin name must not be empty",
+                            "oslo.register_builtin: the builtin name must not be empty",
                         ));
                     }
                     // Registered with the interpreter first: if this fails there is no name in
@@ -201,28 +201,28 @@ impl LuaEngine {
                     });
                     Ok(())
                 })?;
-        rush_table.set("register_builtin", register_fn)?;
+        oslo_table.set("register_builtin", register_fn)?;
 
-        // rush.set_prompt(callback)
+        // oslo.set_prompt(callback)
         let set_prompt_fn = self.lua.create_function(|lua, func: LuaFunction| {
-            lua.set_named_registry_value("rush_prompt_fn", func)?;
+            lua.set_named_registry_value("oslo_prompt_fn", func)?;
             Ok(())
         })?;
-        rush_table.set("set_prompt", set_prompt_fn)?;
+        oslo_table.set("set_prompt", set_prompt_fn)?;
 
-        // There is deliberately no `rush.set_right_prompt` (PLAN R9.7). It was registered, and
+        // There is deliberately no `oslo.set_right_prompt` (PLAN R9.7). It was registered, and
         // `render_right_prompt` had no caller anywhere, so a script that set one saw nothing.
         // Drawing it means writing the string at `width - len` and restoring the cursor before
         // handing the line over — and rustyline repaints from the prompt to end-of-line on every
         // keystroke, erasing it again. Advertising an API that cannot work is worse than not
         // having one; if it comes back it comes back with a line editor that supports it.
 
-        globals.set("rush", rush_table)?;
+        globals.set("oslo", oslo_table)?;
         Ok(())
     }
 
     pub fn eval_script(&self, script: &str) -> Result<()> {
-        self.eval_named(script, "=(rush lua)")
+        self.eval_named(script, "=(oslo lua)")
     }
 
     pub fn load_file(&self, path: &str) -> Result<()> {
@@ -244,7 +244,7 @@ impl LuaEngine {
     pub fn render_prompt(&self) -> Option<String> {
         if let Ok(func) = self
             .lua
-            .named_registry_value::<LuaFunction>("rush_prompt_fn")
+            .named_registry_value::<LuaFunction>("oslo_prompt_fn")
         {
             func.call::<String>(()).ok()
         } else {

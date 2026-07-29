@@ -199,7 +199,7 @@ fn break_does_not_escape_a_function_into_the_callers_loop() {
 // --- R8.10: case fallthrough and re-test ---
 
 /// `;&` runs the *next* branch's body without consulting its pattern. Executing it as `;;` — as
-/// rush did — silently skipped every branch the script chained onto the match.
+/// oslo did — silently skipped every branch the script chained onto the match.
 #[test]
 fn semicolon_ampersand_falls_through_to_the_next_branch() {
     assert_out(

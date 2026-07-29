@@ -3,13 +3,13 @@
 //! Split out of the rustyline glue so that the interesting part — which candidates, spelled how —
 //! can be called from a test with no terminal attached.
 
-use super::RushHelper;
+use super::OsloHelper;
 use super::command_index::CommandIndex;
 use super::dropdown::CompletionCandidate;
 use super::words::{Quote, Word, current_word, quote_replacement, unquote};
 use std::fs;
 
-impl RushHelper {
+impl OsloHelper {
     /// The candidates for the word at `pos`, together with the byte offset they replace from.
     ///
     /// Every replacement is already quoted for the context it lands in: the old code handed
