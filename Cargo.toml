@@ -37,9 +37,8 @@ brush-parser = "0.4.0"
 [dev-dependencies]
 tempfile = "3.17"
 
-# The vendored parser is a path dependency, which would otherwise make it a workspace member and
-# so a target of `cargo fmt --all` and the 600-line file limit. Neither applies to a dependency
-# whose source is upstream's: reformatting it would bury the one-rule patch in noise.
+# A one-package workspace, stated explicitly so `cargo fmt --all` and the 600-line limit apply
+# to this crate and nothing else. `fuzz/` declares its own empty [workspace] to stay out.
 [workspace]
 
 

@@ -43,8 +43,14 @@ jobs:
           echo "sed:   $(sed --version 2>/dev/null | head -1 || echo 'BSD sed (no --version)')"
           echo "cargo: $(cargo --version)"
           echo "PROJECT_NAME parsed by the Makefile: '$(make -s print-name)'"
+      # Failures are re-emitted as ::error:: annotations, not just written to the log. Job logs
+      # need admin rights on this repository; annotations are visible to anyone who can see the
+      # run, so a red build stays diagnosable by whoever is actually looking at it.
       - name: fmt-check
-        run: make fmt-check
+        run: |
+          make fmt-check && exit 0
+          cargo fmt --all -- --check 2>&1 | head -60 | while IFS= read -r l; do echo "::error::fmt: $l"; done
+          exit 1
       - name: check-loc
         run: make check-loc
       - name: check-readme
@@ -52,7 +58,12 @@ jobs:
       - name: check
         run: make check
       - name: test
-        run: make test
+        run: |
+          set -o pipefail
+          cargo test --all-targets 2>&1 | tee /tmp/test.log && exit 0
+          grep -E '^(test .* FAILED|failures:|thread .* panicked|assertion|  left:|  right:|diverge)' /tmp/test.log \
+            | head -60 | while IFS= read -r l; do echo "::error::test: $l"; done
+          exit 1
       - name: clippy
         run: make clippy
       - name: rustdoc
