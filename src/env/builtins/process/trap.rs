@@ -15,7 +15,7 @@
 //! * a condition the system does not name is an error with status 1, not a silently ignored
 //!   operand. A trap that was never installed is a cleanup that will never happen.
 
-use super::handlers::{self, DEFAULT_ACTION, Disposition};
+use super::handlers::{self, DEFAULT_ACTION};
 use super::signals;
 use crate::env::scope::Environment;
 use crate::error::Result;
@@ -35,6 +35,22 @@ enum Condition {
 
 impl Condition {
     /// The key the trap table stores this condition under.
+    /// How a listing spells this condition: `EXIT`, or a signal named the way the current mode
+    /// names it.
+    ///
+    /// The spelling is part of the interface, not decoration — `trap` output is fed back to
+    /// `eval` and grepped by save-and-restore wrappers — and bash prints it two ways: `SIGINT`
+    /// normally, bare `INT` under `set -o posix`. Following only the first broke every
+    /// posix-mode script, which is how the corpus caught it. `EXIT` carries no prefix either way.
+    fn display_name(&self, posix: bool) -> String {
+        match self {
+            Condition::Exit => "EXIT".to_string(),
+            Condition::Signal { name, .. } if posix => name.to_string(),
+            Condition::Signal { name, .. } => format!("SIG{name}"),
+            Condition::Unsupported(name) => name.to_string(),
+        }
+    }
+
     fn key(&self) -> &str {
         match self {
             Condition::Exit => "EXIT",
@@ -157,7 +173,7 @@ fn list(env: &Environment, conditions: &[String]) -> i32 {
     let mut wanted: Vec<Condition> = Vec::new();
 
     if conditions.is_empty() {
-        for key in env.get_traps().keys() {
+        for key in env.listable_traps().keys() {
             if let Some(condition) = resolve(key) {
                 wanted.push(condition);
             }
@@ -175,13 +191,20 @@ fn list(env: &Environment, conditions: &[String]) -> i32 {
     }
 
     wanted.sort_by_key(Condition::order);
+    // Read from the *listable* view, not from `disposition`: in a subshell the inherited handlers
+    // no longer run, so `disposition` correctly answers Default for them — and listing them is
+    // exactly what `saved=$(trap)` needs. The two questions have different answers here.
+    let listable = env.listable_traps();
     for condition in wanted {
-        let text = match handlers::disposition(env, condition.key()) {
-            Disposition::Default => continue,
-            Disposition::Ignore => String::new(),
-            Disposition::Run(text) => text.to_string(),
+        let text = match listable.get(condition.key()).map(String::as_str) {
+            None | Some(DEFAULT_ACTION) => continue,
+            Some(text) => text.to_string(),
         };
-        println!("trap -- {} {}", single_quote(&text), condition.key());
+        println!(
+            "trap -- {} {}",
+            single_quote(&text),
+            condition.display_name(env.posix())
+        );
     }
     status
 }

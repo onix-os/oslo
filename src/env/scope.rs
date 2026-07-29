@@ -5,6 +5,7 @@ mod options;
 mod registry;
 #[cfg(test)]
 mod tests;
+mod traps;
 
 use crate::ast::Command;
 use crate::env::nesting::{DepthGuard, MAX_FUNCTION_DEPTH, MAX_SCRIPT_DEPTH};
@@ -65,6 +66,13 @@ pub struct Environment {
     /// dispatcher in `exec::simple` and `type`; see the `registry` submodule.
     builtins: BuiltinRegistry,
     signal_traps: HashMap<String, String>,
+    /// Traps this shell inherited and then reset because it is a subshell.
+    ///
+    /// POSIX resets a subshell's traps to their default *action*, but carves out command
+    /// substitution so that `saved=$(trap)` — the save-and-restore idiom — still reports what the
+    /// parent had. Keeping the strings here separates the two: nothing ever *runs* from this map,
+    /// and [`Self::listable_traps`] is the only thing that reads it.
+    inherited_traps: HashMap<String, String>,
     readonly_vars: HashSet<String>,
     dir_stack: Vec<PathBuf>,
     scope_stack: Vec<ScopeFrame>,
@@ -121,6 +129,7 @@ impl Environment {
             functions: HashMap::new(),
             builtins: BuiltinRegistry::default(),
             signal_traps: HashMap::new(),
+            inherited_traps: HashMap::new(),
             readonly_vars: HashSet::new(),
             dir_stack: Vec::new(),
             scope_stack: Vec::new(),
@@ -175,7 +184,9 @@ impl Environment {
     /// invoking shell's pid, and `$!`, which bash inherits into a subshell.
     pub fn enter_subshell(&mut self) {
         self.current_pid = std::process::id();
-        self.signal_traps.clear();
+        // Moved rather than dropped: the actions stop applying, but `$(trap)` still has to be
+        // able to report them. See [`Self::inherited_traps`].
+        self.inherited_traps = std::mem::take(&mut self.signal_traps);
     }
 
     /// Whether this environment belongs to a forked subshell rather than the top-level shell.
@@ -305,21 +316,6 @@ impl Environment {
 
     pub fn get_dir_stack(&self) -> &[PathBuf] {
         &self.dir_stack
-    }
-
-    pub fn set_trap(&mut self, sig: &str, handler: &str) {
-        self.signal_traps
-            .insert(sig.to_uppercase(), handler.to_string());
-    }
-
-    pub fn get_trap(&self, sig: &str) -> Option<&str> {
-        self.signal_traps
-            .get(&sig.to_uppercase())
-            .map(|s| s.as_str())
-    }
-
-    pub fn get_traps(&self) -> &HashMap<String, String> {
-        &self.signal_traps
     }
 
     /// Run `name` as a builtin, or `None` if it is not one.
