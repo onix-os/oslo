@@ -106,8 +106,58 @@ pub fn expand_param(
         }
     }
 
+    if let Some(fields) = payload_fields(env, name, expansion_type, in_quotes)? {
+        return Ok(fields);
+    }
+
     let text = expand_to_string(env, name, expansion_type)?;
     Ok(vec![vec![Run::new(text, origin)]])
+}
+
+/// The fields a `${x-word}` or `${x+word}` payload contributes, when the payload is what wins.
+///
+/// These two operators are the only ones whose operand becomes the expansion's *result* rather
+/// than a pattern, a subscript or a message — so the result can be more than one field.
+/// `${1+"$@"}` is the reason this exists: it is the pre-POSIX way to forward arguments, still what
+/// modernish's own diagnostics are written with, and collapsing it to a single string joined the
+/// arguments on a space and then re-split that join on `IFS`. `printf '%s\n' ${1+"$@"}` printed
+/// one line per *word* instead of one per argument.
+///
+/// `${x:=word}` is deliberately not here: it has to persist a single string, and routing it
+/// through the fields path would leave the two halves of the operator disagreeing about what it
+/// assigned.
+fn payload_fields(
+    env: &mut Environment,
+    name: &str,
+    expansion_type: &ParamExpansion,
+    in_quotes: bool,
+) -> Result<Option<Vec<Field>>> {
+    let value = Target::Param(name).value(env);
+    let payload = match expansion_type {
+        ParamExpansion::UseAlternative {
+            alternative,
+            test_null,
+        } if operators::is_present(&value, *test_null) => alternative,
+        ParamExpansion::DefaultValue {
+            default,
+            assign_if_unset: false,
+            test_null,
+        } if !operators::is_present(&value, *test_null) => default,
+        _ => return Ok(None),
+    };
+
+    let mut fields = crate::expand::word::expand_word_fields_in(env, payload, in_quotes)?;
+    if !in_quotes {
+        // Unquoted, the payload's own literal text is part of an expansion result, and POSIX
+        // splits results: `IFS=:; ${x-a:b}` is two fields. Only the payload's *quoted* runs are
+        // exempt, and those already carry `Origin::Quoted`.
+        for run in fields.iter_mut().flatten() {
+            if run.origin == Origin::Literal {
+                run.origin = Origin::Expanded;
+            }
+        }
+    }
+    Ok(Some(fields))
 }
 
 /// Where an expansion's output came from, which decides whether it may be field-split.
