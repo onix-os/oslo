@@ -384,7 +384,41 @@ fn forget_children(n: usize) {
 /// is outstanding — but the library is also used from test binaries that evaluate scripts on
 /// several threads at once, where `-1` reaped another thread's child and left its `waitpid` with
 /// `ECHILD`. Naming the pids makes the safety local instead of global.
+/// Reap children this shell never started, which only PID 1 has.
+///
+/// A double-forked process is reparented to init when its parent exits, and init is the only thing
+/// that can reap it. An `/bin/sh` serving as an initramfs init that skips this fills the process
+/// table with zombies — measured in the Alpine VM, which reported one left behind after every
+/// double fork.
+///
+/// Gated on being process 1 rather than done unconditionally, and that is not caution about cost:
+/// `waitpid(-1)` reaps *any* child, so an ordinary shell doing it could consume the status that a
+/// `wait $pid` was about to read. Init has no such caller, and no other process inherits orphans.
+///
+/// A status that turns out to belong to a known job is still recorded, so `$!` and `jobs` stay
+/// right if the sweep gets there first.
+fn reap_orphans_as_init() {
+    if nix::unistd::getpid().as_raw() != 1 {
+        return;
+    }
+    with_jobs(|jobs| {
+        loop {
+            match waitpid(Pid::from_raw(-1), Some(WaitPidFlag::WNOHANG)) {
+                // Nothing has exited yet; the remaining children are still running.
+                Ok(WaitStatus::StillAlive) => break,
+                Ok(status) => jobs.record(status),
+                Err(nix::errno::Errno::EINTR) => continue,
+                // ECHILD: no children at all, which is the normal state for an idle init.
+                Err(_) => break,
+            }
+        }
+    });
+}
+
 pub fn reap_background_jobs() {
+    // Orphans first, and *before* the early return below: as PID 1 there are children to reap even
+    // when this shell started none of its own, which is exactly the case that early return skips.
+    reap_orphans_as_init();
     if LIVE_CHILDREN.load(Ordering::SeqCst) == 0 {
         return;
     }

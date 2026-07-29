@@ -213,18 +213,25 @@ from the coreutils the differential corpus was written against. The rootfs *is* 
 
 It earned its keep on the first boot, with three findings:
 
-* **`$(case …)` does not parse.** `echo $(case a in a) echo hit;; esac)` is a syntax error: the
-  substitution scanner reads the case pattern's `)` as its own closing paren. bash handles it, and
-  it is ordinary shell — the highest-value thing left to fix.
+* **`$(case …)` does not parse — and it is brush's, not ours.** `echo $(case a in a) echo hit;; esac)`
+  is a syntax error while the same body parses standalone, so the first guess was that oslo's own
+  word scanner was counting the pattern's `)` as the substitution's closer. Making that scanner
+  `case`-aware changed nothing, because brush is the parser and oslo's lexer only re-lexes word text
+  *after* it: the diagnostic was brush's all along, and the speculative fix was reverted rather than
+  left in as complexity that buys nothing. This joins `for ((;;))` as a limit that needs a grammar
+  patch upstream — the second time that has come up, which is the argument for sending both.
 * **Process substitution needs `/dev/fd`,** which a minirootfs does not ship. `cat <(echo x)` fails
   with "can't open /dev/fd/3" until `/dev/fd -> /proc/self/fd` exists. bash has the same
   dependency, so the VM's `/init` creates it as a real init would — but it is worth knowing that
   `<(…)` is not available in an environment that has not set that up.
-* **PID 1 does not reap reparented orphans.** A double-forked orphan is reparented to init; oslo
-  reaps the jobs it started, at command boundaries, but never calls `waitpid(-1)` for children it
-  does not know about. The VM reports `ORPHANS-AT-BOUNDARY:1` — one zombie left even after init
-  reaches a boundary. Harmless for a login shell and wrong for an init, which is precisely the
-  distinction only a VM can draw.
+* **PID 1 did not reap reparented orphans — fixed.** A double-forked orphan is reparented to init,
+  and only init can reap it; oslo reaped the jobs it started, by pid, and skipped the sweep entirely
+  when it had no children of its own — which is exactly an idle init's state. It now calls
+  `waitpid(-1, WNOHANG)` at command boundaries, **gated on being process 1**: that is not caution
+  about cost but about correctness, since reaping any child in an ordinary shell could consume the
+  status a `wait $pid` was about to read. A reaped status that turns out to belong to a known job is
+  still recorded, so `$!` and `jobs` stay right if the sweep gets there first. The VM now reports
+  `ORPHANS-AT-BOUNDARY:0`.
 
 Two expectations of mine were wrong rather than the shell: `/proc/1/comm` reads `init` because the
 kernel takes `comm` from the file named to `execve` — the script — so `/proc/1/exe` is the check
