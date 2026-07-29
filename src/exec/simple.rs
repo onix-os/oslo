@@ -1,29 +1,68 @@
 //! Evaluating a simple command.
 //!
-//! Expansion, alias substitution, command-prefix assignments, then dispatch to a builtin, a
-//! shell function, or an external binary.
+//! Expansion, alias substitution, command-prefix assignments, then command search: the order in
+//! which a word becomes an alias, a function, a builtin or a program on PATH. Running the
+//! program once it has been found is the `external` submodule's job.
+
+mod external;
+mod trace;
 
 use crate::ast::*;
 use crate::env::Environment;
+use crate::env::scope::is_special_builtin;
 use crate::error::{Result, ShellError};
 use crate::exec::pipeline::eval_command;
 use crate::exec::redirect::RedirectGuard;
+use crate::exec::simple::external::{Lookup, look_up_command, run_external};
 use crate::expand::{expand_word, expand_word_to_string};
 use crate::lexer::Lexer;
-use nix::sys::wait::{WaitPidFlag, WaitStatus, waitpid};
-use nix::unistd::{ForkResult, fork};
-use std::ffi::CString;
-use std::os::unix::ffi::OsStrExt;
+use std::sync::atomic::{AtomicBool, Ordering};
+
+/// Whether a command word that names a directory should be treated as `cd` to it.
+///
+/// bash's `shopt -s autocd`, and off for the same reason bash has it off: in a script `build`
+/// means "run the build command", and silently changing directory instead makes every later
+/// relative path in that script resolve somewhere else, with status 0 to say all is well
+/// (PLAN R5.13). Process-global rather than a field on [`Environment`], like
+/// [`crate::exec::pipeline::set_interactive`]: it is a property of the invocation, and a forked
+/// child inherits it as it stands.
+///
+/// autocd is a `shopt` option, and `shopt` still does not exist — `set -o` (PLAN R6.1) covers
+/// only the POSIX option set, which autocd is not part of. [`set_autocd`] stays the hook a
+/// future `shopt` will call, and the `RUSH_AUTOCD` shell variable is how a user opts in today.
+static AUTOCD: AtomicBool = AtomicBool::new(false);
+
+/// Whether this shell is in POSIX mode, which decides only one thing here: whether a special
+/// builtin is found before a shell function, as POSIX 2.9.1.1 requires and bash does only
+/// under `--posix`.
+static POSIX_MODE: AtomicBool = AtomicBool::new(false);
+
+/// Enable or disable autocd: whether a command word naming a directory means `cd` to it.
+///
+/// Off by default, and effective only in an interactive shell. This is the hook `shopt -s
+/// autocd` will call once `shopt` exists; the `set -o` table in `crate::env::options` does not
+/// carry it, because bash does not either.
+pub fn set_autocd(yes: bool) {
+    AUTOCD.store(yes, Ordering::Relaxed);
+}
+
+/// Declare whether this shell is in POSIX mode (`--posix`, `set -o posix`).
+pub fn set_posix_mode(yes: bool) {
+    POSIX_MODE.store(yes, Ordering::Relaxed);
+}
+
+/// Whether this shell is in POSIX mode; see [`set_posix_mode`].
+pub fn posix_mode() -> bool {
+    POSIX_MODE.load(Ordering::Relaxed)
+}
 
 pub(crate) fn eval_simple_command(env: &mut Environment, simple: &SimpleCommand) -> Result<i32> {
+    // R6.5: a signal that arrived while the previous command ran is handled *between* commands,
+    // where the trap body can run ordinary shell code. See `run_pending_traps`.
+    crate::env::builtins::run_pending_traps(env)?;
+
     if simple.words.is_empty() {
-        for assign in &simple.assignments {
-            // Assignment RHS is *not* field-split or globbed (POSIX 2.9.1), so `x=*.rs` stores the
-            // literal pattern and `x=$(printf 'a\nb')` keeps its newline.
-            let val_str = expand_word_to_string(env, &assign.value)?;
-            env.set_var(&assign.name, &val_str, false);
-        }
-        return Ok(apply_wordless_redirections(env, &simple.redirections));
+        return apply_assignments_only(env, simple);
     }
 
     let mut words = Vec::new();
@@ -32,11 +71,7 @@ pub(crate) fn eval_simple_command(env: &mut Environment, simple: &SimpleCommand)
     }
 
     if words.is_empty() {
-        for assign in &simple.assignments {
-            let val_str = expand_word_to_string(env, &assign.value)?;
-            env.set_var(&assign.name, &val_str, false);
-        }
-        return Ok(apply_wordless_redirections(env, &simple.redirections));
+        return apply_assignments_only(env, simple);
     }
 
     let raw_name = words[0].trim().to_string();
@@ -73,6 +108,8 @@ pub(crate) fn eval_simple_command(env: &mut Environment, simple: &SimpleCommand)
         }
     }
 
+    trace::trace_command(env, &prefix_assignments, &words);
+
     // `FOO=bar cmd` exports FOO for the duration of `cmd` only.
     //
     // The scope is pushed only when there is something to put in it. Pushing unconditionally
@@ -91,77 +128,198 @@ pub(crate) fn eval_simple_command(env: &mut Environment, simple: &SimpleCommand)
     result
 }
 
-/// Dispatch an already-expanded command: builtin, then function, then external binary.
+/// Run a command that has no command word: `x=1`, or `x=1 $empty`.
+///
+/// Shared by the two paths that reach it — assignments written with no word at all, and
+/// assignments whose word expanded to nothing — because they have to agree about the two things
+/// that are easy to get subtly different: the assignment is still performed, and `set -x` still
+/// traces it.
+fn apply_assignments_only(env: &mut Environment, simple: &SimpleCommand) -> Result<i32> {
+    let mut assignments = Vec::with_capacity(simple.assignments.len());
+    for assign in &simple.assignments {
+        // Assignment RHS is *not* field-split or globbed (POSIX 2.9.1), so `x=*.rs` stores the
+        // literal pattern and `x=$(printf 'a\nb')` keeps its newline.
+        let value = expand_word_to_string(env, &assign.value)?;
+        // Applied before the next one is expanded, not batched at the end: POSIX 2.9.1 evaluates
+        // assignments left to right and makes each visible to the next, so `a=1 b=${a}2` sets
+        // `b` to `12`.
+        env.set_var(&assign.name, &value, false);
+        assignments.push((assign.name.clone(), value));
+    }
+    trace::trace_command(env, &assignments, &[]);
+    Ok(apply_wordless_redirections(env, &simple.redirections))
+}
+
+/// Dispatch an already-expanded command word.
+///
+/// POSIX 2.9.1.1 command search, and the order matters at every step:
+///
+/// 1. **alias** — done by the caller, before the word is even split.
+/// 2. **special builtin**, in POSIX mode only. POSIX puts `export`, `eval`, `set`, `.` and the
+///    rest ahead of functions; bash follows that only under `--posix`, where it goes further and
+///    refuses to *define* such a function at all.
+/// 3. **function**. This is the step rush skipped: `is_builtin` was consulted first, so
+///    `echo() { … }`, `cd() { … }` and `test() { … }` could be defined but never called, and
+///    `type echo` insisted it was a builtin. Wrapping a builtin is how a shell script overrides
+///    behaviour it does not control, and silently ignoring the wrapper runs the original.
+/// 4. **regular builtin**.
+/// 5. **PATH**, or a path operand — see the `external` submodule.
 fn run_command_word(
     env: &mut Environment,
     cmd_name: &str,
     words: &[String],
     redirections: &[Redirection],
 ) -> Result<i32> {
-    let cmd_name = cmd_name.to_string();
-    let clean_cmd_name = cmd_name.trim();
-    if env.is_builtin(clean_cmd_name) {
-        let mut guard = RedirectGuard::new();
-        if let Err(e) = guard.apply(env, redirections) {
-            return Ok(report_redirect_failure(&e));
-        }
+    let name = cmd_name.trim();
 
-        return execute_builtin(env, clean_cmd_name, words);
+    if posix_mode() && is_special_builtin(name) && env.is_builtin(name) {
+        return run_builtin(env, name, words, redirections);
     }
 
-    if let Some(func_body) = env.get_function(&cmd_name).cloned() {
-        // Checked before anything is set up, so a refused call has nothing to unwind. `f() { f; }`
-        // recurses through the whole evaluator; without this the stack overflows and Rust aborts
-        // the process outright, status 134 and a core dump.
-        env.enter_function()?;
-        let res = call_function(env, &func_body, words, redirections);
-        env.exit_function();
-
-        // `return` unwinds to here and becomes the function's exit status. `break`/`continue`
-        // are also absorbed: they must not escape into a loop in the caller.
-        return match res {
-            Err(ShellError::Return(code)) => Ok(code),
-            Err(ShellError::Break(_)) | Err(ShellError::Continue(_)) => Ok(0),
-            other => other,
-        };
+    if let Some(func_body) = env.get_function(name).cloned() {
+        return call_function_command(env, &func_body, words, redirections);
     }
 
-    let path = match which::which(&cmd_name) {
-        Ok(p) => p,
-        Err(_) => {
-            if words.len() == 1 && std::path::Path::new(&cmd_name).is_dir() {
-                return crate::env::builtins::builtin_cd(env, &["cd".to_string(), cmd_name]);
-            }
-            eprintln!("rush: {}: command not found", cmd_name);
-            return Ok(127);
-        }
+    if env.is_builtin(name) {
+        return run_builtin(env, name, words, redirections);
+    }
+
+    run_program(env, name, words, redirections)
+}
+
+/// Apply the command's redirections and run it as a builtin.
+///
+/// A builtin never sees its own redirections, so the one thing decided here is how long they
+/// last. `exec > "$log" 2>&1` — `exec` with no command word — is the form POSIX says applies to
+/// the shell itself from then on, so its guard must not restore anything; every other builtin
+/// gets the ordinary guard that puts the descriptors back when the command ends.
+fn run_builtin(
+    env: &mut Environment,
+    name: &str,
+    words: &[String],
+    redirections: &[Redirection],
+) -> Result<i32> {
+    let mut guard = if crate::env::builtins::exec_makes_redirections_permanent(name, words) {
+        RedirectGuard::for_exec()
+    } else {
+        RedirectGuard::new()
     };
-
-    // Both conversions take the raw bytes: a resolved path is an `OsStr`, not necessarily UTF-8
-    // (a PATH entry can be any byte string), and `to_str().unwrap()` aborted the shell on one.
-    let c_path = exec_cstring(path.as_os_str().as_bytes());
-    let c_args: Vec<CString> = words.iter().map(|w| exec_cstring(w.as_bytes())).collect();
-
-    unsafe {
-        match fork() {
-            Ok(ForkResult::Child) => {
-                // Before anything else, and in particular before `execv`: the program about to
-                // replace this process must not inherit the shell's own signal policy.
-                crate::exec::job::reset_signals_for_child();
-
-                let mut guard = RedirectGuard::new();
-                if let Err(e) = guard.apply(env, redirections) {
-                    std::process::exit(report_redirect_failure(&e));
-                }
-
-                let _ = nix::unistd::execv(&c_path, &c_args);
-                eprintln!("rush: exec failed for {}", cmd_name);
-                std::process::exit(126);
-            }
-            Ok(ForkResult::Parent { child }) => Ok(wait_for_child(child, &cmd_name)),
-            Err(e) => Err(ShellError::ExecutionError(format!("Fork failed: {}", e))),
-        }
+    if let Err(e) = guard.apply(env, redirections) {
+        return Ok(report_redirect_failure(&e));
     }
+    execute_builtin(env, name, words)
+}
+
+/// Call a shell function, absorbing the control flow that must not escape it.
+fn call_function_command(
+    env: &mut Environment,
+    body: &Command,
+    words: &[String],
+    redirections: &[Redirection],
+) -> Result<i32> {
+    // Checked before anything is set up, so a refused call has nothing to unwind. `f() { f; }`
+    // recurses through the whole evaluator; without this the stack overflows and Rust aborts
+    // the process outright, status 134 and a core dump.
+    env.enter_function()?;
+    let res = call_function(env, body, words, redirections);
+    env.exit_function();
+
+    // `return` unwinds to here and becomes the function's exit status. `break`/`continue`
+    // are also absorbed: they must not escape into a loop in the caller.
+    match res {
+        Err(ShellError::Return(code)) => Ok(code),
+        Err(ShellError::Break(_)) | Err(ShellError::Continue(_)) => Ok(0),
+        other => other,
+    }
+}
+
+/// Run an external program, or explain why the word does not name one.
+///
+/// The statuses are the ones a caller reads: 127 for "no such command", 126 for "found it,
+/// cannot run it". rush used to report 127 for a non-executable file and, for a directory,
+/// nothing at all — it changed directory and returned 0 (PLAN R5.13).
+fn run_program(
+    env: &mut Environment,
+    cmd_name: &str,
+    words: &[String],
+    redirections: &[Redirection],
+) -> Result<i32> {
+    match look_up_command(cmd_name) {
+        Lookup::Program(path) => run_external(env, &path, cmd_name, words, redirections),
+        Lookup::Directory => match try_autocd(env, cmd_name, words) {
+            Some(result) => result,
+            None => report_unrunnable(env, redirections, cmd_name, "Is a directory", 126),
+        },
+        Lookup::NotExecutable => {
+            report_unrunnable(env, redirections, cmd_name, "Permission denied", 126)
+        }
+        // A bare word is a PATH search, so a directory of that name in the *current* directory
+        // was never a candidate; it only becomes one if autocd is on. bash reports the same
+        // "command not found" and 127 here even with `shopt -s autocd` set, as long as the shell
+        // is not interactive.
+        Lookup::NotFound => match try_autocd(env, cmd_name, words) {
+            Some(result) => result,
+            None => report_unrunnable(env, redirections, cmd_name, "command not found", 127),
+        },
+    }
+}
+
+/// Report a command word that could not be run, with the command's own redirections in force.
+///
+/// The diagnostic belongs to the *command*, not to the shell, so it goes wherever the command
+/// pointed its stderr: `nosuchcommand 2>/dev/null` is silent in every shell, and that is the
+/// shape of every feature probe written before `command -v` existed. rush printed to the shell's
+/// own stderr instead, so a script full of such probes filled the terminal with noise it had
+/// explicitly asked to discard.
+fn report_unrunnable(
+    env: &mut Environment,
+    redirections: &[Redirection],
+    cmd_name: &str,
+    reason: &str,
+    status: i32,
+) -> Result<i32> {
+    let mut guard = RedirectGuard::new();
+    if let Err(e) = guard.apply(env, redirections) {
+        // The redirection failed too. That is the failure the user has to fix first, and it is
+        // the one bash reports here as well.
+        return Ok(report_redirect_failure(&e));
+    }
+    eprintln!("rush: {}: {}", cmd_name, reason);
+    Ok(status)
+}
+
+/// `cd` to `cmd_name` if this shell is allowed to guess that is what was meant.
+///
+/// `None` — the overwhelmingly common answer — leaves the caller to report the real failure.
+/// Three conditions, all required: the shell is interactive (a person is there to see the
+/// directory change and to have meant it), autocd is switched on, and the command is a bare
+/// word with no arguments, since `build --release` is unambiguously not a `cd`.
+fn try_autocd(env: &mut Environment, cmd_name: &str, words: &[String]) -> Option<Result<i32>> {
+    if words.len() != 1 || !autocd_enabled(env) {
+        return None;
+    }
+    if !std::path::Path::new(cmd_name).is_dir() {
+        return None;
+    }
+    Some(crate::env::builtins::builtin_cd(
+        env,
+        &["cd".to_string(), cmd_name.to_string()],
+    ))
+}
+
+/// Whether autocd may fire: interactive *and* opted in.
+///
+/// The interactive half is not configurable, in bash either — `bash -O autocd -c 'somedir'`
+/// still reports `command not found`. A script's meaning must not depend on which directories
+/// happen to exist beside it.
+fn autocd_enabled(env: &Environment) -> bool {
+    if !crate::exec::pipeline::is_interactive() {
+        return false;
+    }
+    AUTOCD.load(Ordering::Relaxed)
+        || env
+            .get_var("RUSH_AUTOCD")
+            .is_some_and(|v| !v.is_empty() && v != "0")
 }
 
 /// Run a shell function body with its own positional parameters and variable scope.
@@ -188,38 +346,6 @@ fn call_function(
     env.pop_scope();
     env.set_positional(old_pos);
     res
-}
-
-/// Wait for a foreground child and turn its wait status into an exit status.
-///
-/// `WUNTRACED` is not optional now that children are started with SIGTSTP at `SIG_DFL`
-/// ([`crate::exec::job::reset_signals_for_child`]). Ctrl-Z stops the child, and a plain
-/// `waitpid` — which only reports *termination* — would then block the shell forever on a
-/// process nobody can resume, turning a suspend into a hang. Reporting the stop instead returns
-/// the prompt; the process stays stopped until job control (`fg`/`bg`) can adopt it.
-///
-/// `EINTR` is retried rather than reported: a trapped signal arriving mid-wait says nothing
-/// about how the command ended.
-///
-/// A non-interactive bash *does* block on a stopped child — `bash -c 'sh -c "kill -STOP $$"'`
-/// never returns — so this is a deliberate divergence from the oracle, in the one direction
-/// where the oracle's behaviour is indistinguishable from a deadlock.
-fn wait_for_child(child: nix::unistd::Pid, cmd_name: &str) -> i32 {
-    loop {
-        match waitpid(child, Some(WaitPidFlag::WUNTRACED)) {
-            Ok(WaitStatus::Exited(_, code)) => return code,
-            // A shell reports a signal death as 128 + the signal number, which is how `$?` tells
-            // `kill -9` (137) apart from an exit status of 9.
-            Ok(WaitStatus::Signaled(_, sig, _)) => return 128 + sig as i32,
-            Ok(WaitStatus::Stopped(_, sig)) => {
-                eprintln!("rush: {}: stopped ({})", cmd_name, sig);
-                return 128 + sig as i32;
-            }
-            Ok(_) => continue,
-            Err(nix::errno::Errno::EINTR) => continue,
-            Err(_) => return 1,
-        }
-    }
 }
 
 /// Report a redirection failure and hand back the status the failed command takes on.
@@ -259,20 +385,6 @@ fn apply_wordless_redirections(env: &mut Environment, redirections: &[Redirectio
     }
 }
 
-/// Turn user-controlled bytes into an argv entry for `execv`, dropping any NUL bytes.
-///
-/// argv entries are NUL-terminated, so an embedded NUL cannot reach `execv` under any encoding —
-/// the only question is what the shell does about it. bash keeps NULs out of shell strings in the
-/// first place (command substitution and `read` both drop them), so dropping here reproduces the
-/// argument bash would have built. What it must never do is what the previous
-/// `CString::new(..).unwrap()` did: kill the whole shell, exit 101, over one byte of input data.
-fn exec_cstring(bytes: &[u8]) -> CString {
-    let stripped: Vec<u8> = bytes.iter().copied().filter(|b| *b != 0).collect();
-    // NUL-free by construction, so this cannot fail; the fallback keeps the exec path free of
-    // panicking calls even if that ever stops being true.
-    CString::new(stripped).unwrap_or_default()
-}
-
 /// Split an alias body into argv entries.
 ///
 /// Lexed and expanded the same way as any other command words, so a quoted alias body such as
@@ -296,55 +408,37 @@ fn expand_alias(env: &mut Environment, alias: &str) -> Result<Vec<String>> {
     Ok(out)
 }
 
-fn execute_builtin(env: &mut Environment, cmd_name: &str, words: &[String]) -> Result<i32> {
-    match cmd_name {
-        "cd" => crate::env::builtins::builtin_cd(env, words),
-        "echo" => crate::env::builtins::builtin_echo(env, words),
-        "pwd" => crate::env::builtins::builtin_pwd(env, words),
-        "export" => crate::env::builtins::builtin_export(env, words),
-        "unset" => crate::env::builtins::builtin_unset(env, words),
-        "set" => crate::env::builtins::builtin_set(env, words),
-        "shift" => crate::env::builtins::builtin_shift(env, words),
-        "exit" => crate::env::builtins::builtin_exit(env, words),
-        "break" => crate::env::builtins::builtin_break(env, words),
-        "continue" => crate::env::builtins::builtin_continue(env, words),
-        "return" => crate::env::builtins::builtin_return(env, words),
-        "alias" => crate::env::builtins::builtin_alias(env, words),
-        "unalias" => crate::env::builtins::builtin_unalias(env, words),
-        "type" => crate::env::builtins::builtin_type(env, words),
-        "eval" => crate::env::builtins::builtin_eval(env, words),
-        "source" | "." => crate::env::builtins::builtin_source(env, words),
-        "read" => crate::env::builtins::builtin_read(env, words),
-        "local" => crate::env::builtins::builtin_local(env, words),
-        "pushd" => crate::env::builtins::builtin_pushd(env, words),
-        "popd" => crate::env::builtins::builtin_popd(env, words),
-        "dirs" => crate::env::builtins::builtin_dirs(env, words),
-        "readonly" => crate::env::builtins::builtin_readonly(env, words),
-        "test" | "[" => crate::env::builtins::builtin_test(env, words),
-        "[[" => crate::env::builtins::builtin_extended_test(env, words),
-
-        "trap" => crate::env::builtins::builtin_trap(env, words),
-        "umask" => crate::env::builtins::builtin_umask(env, words),
-        "wait" => crate::env::builtins::builtin_wait(env, words),
-        "kill" => crate::env::builtins::builtin_kill(env, words),
-        "true" => Ok(0),
-        "false" => Ok(1),
-        _ => {
-            if let Some(res) = env.exec_custom_builtin(cmd_name, words) {
-                res
-            } else {
-                Ok(0)
-            }
+/// Run `cmd_name` as a builtin, assuming redirections are already in place.
+///
+/// The only dispatcher, and it owns no list of its own: it asks the registry. The `match` that
+/// used to be here named 30 builtins and their functions a second time, so the registry could
+/// hold a *different* implementation for a name and never be consulted — which is exactly what
+/// made `rush.register_builtin('echo', …)` do nothing (PLAN R5.6, R9.8) — while the `_` arm
+/// answered `Ok(0)` for anything unlisted, turning a name that was a builtin only according to
+/// `is_builtin` into a command that silently succeeded without doing anything.
+///
+/// Public to the crate so `command` and `builtin` (PLAN R5.7) can reach a builtin without
+/// re-entering command search.
+pub(crate) fn execute_builtin(
+    env: &mut Environment,
+    cmd_name: &str,
+    words: &[String],
+) -> Result<i32> {
+    match env.exec_custom_builtin(cmd_name, words) {
+        Some(result) => result,
+        // Only reachable from a caller that dispatched without asking `is_builtin` first, which
+        // is a bug here rather than in the user's script — but it is still the user who gets the
+        // message, so it says what a shell says about a name it cannot run.
+        None => {
+            eprintln!("rush: {}: not a shell builtin", cmd_name);
+            Ok(127)
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::exec_cstring;
     use crate::env::Environment;
-    use std::ffi::{CString, OsStr};
-    use std::os::unix::ffi::OsStrExt;
 
     /// Run a snippet in a fresh environment and hand back the environment to inspect.
     ///
@@ -409,27 +503,45 @@ mod tests {
         assert_eq!(run("rush_p1=a:b true").get_var("rush_p1"), None);
     }
 
+    /// A function must be found before the builtin of the same name (PLAN R5.6). Asserted on a
+    /// side effect rather than on stdout, because the unit-test harness captures the shell's
+    /// `println!` but not what a builtin writes; if the wrapper never ran, the variable is unset.
     #[test]
-    fn plain_argument_is_unchanged() {
-        assert_eq!(exec_cstring(b"hello"), CString::new("hello").unwrap());
-        assert_eq!(exec_cstring(b""), CString::new("").unwrap());
+    fn a_function_shadows_a_regular_builtin() {
+        let env = run("cd() { rush_shadow=called; }\ncd /nonexistent-dir");
+        assert_eq!(env.get_var("rush_shadow"), Some("called"));
     }
 
+    /// …including the ones whose names the dispatcher used to hardcode.
     #[test]
-    fn embedded_nul_is_dropped_not_fatal() {
-        assert_eq!(exec_cstring(b"a\0b"), CString::new("ab").unwrap());
-        assert_eq!(exec_cstring(b"\0\0"), CString::new("").unwrap());
-        assert_eq!(exec_cstring(b"a\0"), CString::new("a").unwrap());
-        assert_eq!(exec_cstring(b"\0a"), CString::new("a").unwrap());
+    fn a_function_shadows_echo_and_test() {
+        let env = run("echo() { rush_shadow_echo=1; }\necho hi");
+        assert_eq!(env.get_var("rush_shadow_echo"), Some("1"));
+        let env = run("test() { rush_shadow_test=1; }\ntest -f /etc/hosts");
+        assert_eq!(env.get_var("rush_shadow_test"), Some("1"));
     }
 
-    /// A PATH entry — and therefore a resolved binary path — need not be UTF-8.
+    /// POSIX mode is the only mode in which a special builtin outranks a function. The flag is
+    /// process-global, so it is restored before the assertion that would otherwise leak it into
+    /// every later test in this binary.
     #[test]
-    fn non_utf8_path_survives() {
-        let raw = b"/b\xffn/echo";
-        assert_eq!(
-            exec_cstring(OsStr::from_bytes(raw).as_bytes()).as_bytes(),
-            raw
-        );
+    fn posix_mode_puts_special_builtins_ahead_of_functions() {
+        let env = run("export() { rush_shadow_export=1; }\nexport rush_ignored=x");
+        assert_eq!(env.get_var("rush_shadow_export"), Some("1"));
+
+        super::set_posix_mode(true);
+        let env = run("export() { rush_shadow_export2=1; }\nexport rush_special=y");
+        super::set_posix_mode(false);
+        assert_eq!(env.get_var("rush_shadow_export2"), None);
+        assert_eq!(env.get_var("rush_special"), Some("y"));
+    }
+
+    /// Every builtin now dispatches through the registry, so a name the registry does not have
+    /// is not a builtin at all — it used to reach the `_` arm and return 0 without running.
+    #[test]
+    fn an_unregistered_name_is_not_a_builtin() {
+        let env = Environment::new();
+        assert!(!env.is_builtin("rush-not-a-builtin"));
+        assert!(env.is_builtin("type"));
     }
 }

@@ -7,6 +7,7 @@
 //! previous implementation recognised three forms and silently started a REPL for everything
 //! else, so `rush --version` read the caller's stdin and exited 0.
 
+use rush::env::options::ShellOption;
 use std::fmt::Write as _;
 
 /// Where the shell's input comes from.
@@ -36,9 +37,9 @@ pub struct Invocation {
     pub login: bool,
     /// Single-letter `set` options given on the command line, e.g. `ex` for `-e -x`.
     ///
-    /// Accepted and recorded rather than acted on: `Environment` has nowhere to put shell
-    /// options yet (PLAN R6.1). Recording them keeps `rush -e script.sh` from being rejected
-    /// outright, which is the difference that matters to a caller.
+    /// Letters only, in the order they were written, deduplicated. `main` turns each one into a
+    /// [`ShellOption`] on the new shell's `Environment`; the letters that are not options at all
+    /// (`-c`, `-i`, `-l`, `-s`) are handled by the fields above and never appear here.
     pub set_options: String,
 }
 
@@ -66,11 +67,7 @@ pub fn usage() -> String {
     let _ = writeln!(s, "  -l                act as a login shell");
     let _ = writeln!(
         s,
-        "  -e                exit on error (recorded, not yet honoured)"
-    );
-    let _ = writeln!(
-        s,
-        "  -x                trace commands (recorded, not yet honoured)"
+        "  -e -u -x ...      set a shell option, as `set` does (see `set -o`)"
     );
     let _ = writeln!(s, "  --lua-script FILE run a Lua script, then exit");
     let _ = writeln!(s, "  --version         print the version, then exit");
@@ -178,7 +175,10 @@ pub fn parse(argv: &[String]) -> Result<Invocation, Exit> {
                 's' => read_stdin = true,
                 'i' => force_interactive = true,
                 'l' => login = true,
-                letter @ ('e' | 'x') => {
+                // Any letter `set` would accept means the same thing here, so
+                // `rush -f script.sh` starts with globbing off rather than being rejected.
+                // The table in `rush::env::options` is the only list of them.
+                letter if ShellOption::from_letter(letter).is_some() => {
                     if !set_options.contains(letter) {
                         set_options.push(letter);
                     }

@@ -202,8 +202,15 @@ fn test_function_local_scope() {
     assert_eq!(env.get_param("GLOBAL_VAR"), Some("outer".to_string()));
 }
 
+/// A command word naming a directory is a *failed command*, not a `cd` (PLAN R5.13).
+///
+/// This test used to assert the opposite — status 0 — which is the bug: a script whose first
+/// line is `build` would change directory instead of reporting that `build` does not exist, and
+/// every relative path after it would resolve somewhere the author never intended. autocd is an
+/// interactive convenience, gated on both an interactive shell and an explicit opt-in
+/// (`rush::exec::simple::set_autocd`), and these tests are neither.
 #[test]
-fn test_auto_cd() {
+fn test_auto_cd_is_off_outside_an_interactive_shell() {
     let orig_dir = std::env::current_dir().unwrap();
     let _guard = TEST_DIR_MUTEX.lock().unwrap();
     let mut env = Environment::new();
@@ -212,7 +219,13 @@ fn test_auto_cd() {
     let _ = std::fs::create_dir_all(&test_dir);
 
     let status = run_cmd(&mut env, test_dir.to_str().unwrap());
-    assert_eq!(status, 0);
+    // 126, not 127: the name resolves to something that exists and cannot be executed.
+    assert_eq!(status, 126);
+    assert_eq!(
+        std::env::current_dir().unwrap(),
+        orig_dir,
+        "the working directory must not have moved"
+    );
 
     let _ = std::env::set_current_dir(&orig_dir);
     let _ = std::fs::remove_dir_all(&test_dir);

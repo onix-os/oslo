@@ -10,6 +10,10 @@
 //! [`set_interactive`] (whether there is a person watching). Subshells and command
 //! substitutions live in other modules but must use these, or the same status bug reappears
 //! once per fork site.
+//!
+//! `set -e` is decided here too, in [`eval_and_or_list`], because that is the only place that
+//! knows which command of a list POSIX makes it answerable for. Constructs whose *conditions* are
+//! exempt reach in through `suspend_errexit`.
 
 use crate::ast::*;
 use crate::env::Environment;
@@ -21,6 +25,7 @@ use nix::fcntl::{OFlag, open};
 use nix::sys::stat::Mode;
 use nix::sys::wait::{WaitStatus, waitpid};
 use nix::unistd::{ForkResult, Pid, close, dup2, fork, pipe};
+use std::cell::Cell;
 use std::os::fd::{AsRawFd, IntoRawFd};
 use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 
@@ -89,6 +94,55 @@ pub fn wait_for_status(pid: Pid) -> i32 {
         // cannot run or account for a command.
         _ => 127,
     }
+}
+
+thread_local! {
+    /// How many enclosing constructs have suspended `set -e`.
+    ///
+    /// A counter rather than a field on [`Environment`] because the exemption is a property of
+    /// the *evaluation in progress*, not of a scope: a function called from a condition runs
+    /// exempt (`set -e; f || true` runs all of `f`) even though it has its own variable scope,
+    /// and the same function called normally does not. Dynamic extent is exactly what a counter
+    /// around a `?`-bearing call expresses.
+    ///
+    /// `fork` copies it as it stands, which is what makes `if (false; echo x); then` print `x`:
+    /// the subshell inherits the exemption its parent was under.
+    ///
+    /// Thread-local, not a plain `static`: the test binaries evaluate scripts on several threads
+    /// at once, and one test's condition context must not exempt another's.
+    static ERREXIT_SUSPENDED: Cell<u32> = const { Cell::new(0) };
+}
+
+/// A live suspension of `set -e`; errexit resumes when this is dropped.
+///
+/// Returned rather than taking a closure so a caller can hold it across a `?` — the counter is
+/// restored on the unwind path too, which is the whole reason it is a guard and not a pair of
+/// calls.
+pub(crate) struct ErrExitSuspension {
+    // Not `Send`: the counter it decrements is the *creating* thread's.
+    _not_send: std::marker::PhantomData<*const ()>,
+}
+
+impl Drop for ErrExitSuspension {
+    fn drop(&mut self) {
+        ERREXIT_SUSPENDED.with(|d| d.set(d.get().saturating_sub(1)));
+    }
+}
+
+/// Exempt everything evaluated while the returned guard lives from `set -e`.
+///
+/// The POSIX exemptions (2.9.1): the condition of `if`/`elif`/`while`/`until`, every command of an
+/// and-or list but the last, and anything under `!`. They nest, so this counts rather than sets.
+pub(crate) fn suspend_errexit() -> ErrExitSuspension {
+    ERREXIT_SUSPENDED.with(|d| d.set(d.get() + 1));
+    ErrExitSuspension {
+        _not_send: std::marker::PhantomData,
+    }
+}
+
+/// Whether an enclosing construct has exempted the command about to be judged.
+fn errexit_suspended() -> bool {
+    ERREXIT_SUSPENDED.with(|d| d.get()) > 0
 }
 
 pub fn eval_command_list(env: &mut Environment, cmd_list: &CommandList) -> Result<i32> {
@@ -173,35 +227,51 @@ fn announce_background_job(child: Pid) {
 }
 
 pub fn eval_and_or_list(env: &mut Environment, and_or: &AndOrList) -> Result<i32> {
-    let mut status = run_and_record(env, &and_or.first)?;
+    // Only the *last* pipeline of the chain is judged by `set -e`: POSIX exempts "any command of
+    // an AND-OR list other than the last", and a short-circuited chain therefore never fails the
+    // shell at all — `set -e; false && echo no` carries on, because the only command that ran was
+    // an exempt one. A lone pipeline is its own last, so `set -e; false` still aborts.
+    let last = and_or.rest.len();
+    let mut status = run_and_record(env, &and_or.first, last == 0)?;
 
-    for (op, next_pipeline) in &and_or.rest {
-        match op {
-            AndOrOp::And => {
-                if status == 0 {
-                    status = run_and_record(env, next_pipeline)?;
-                }
-            }
-            AndOrOp::Or => {
-                if status != 0 {
-                    status = run_and_record(env, next_pipeline)?;
-                }
-            }
+    for (i, (op, next_pipeline)) in and_or.rest.iter().enumerate() {
+        let run = match op {
+            AndOrOp::And => status == 0,
+            AndOrOp::Or => status != 0,
+        };
+        if run {
+            status = run_and_record(env, next_pipeline, i + 1 == last)?;
         }
     }
 
     Ok(status)
 }
 
-/// Run one pipeline and publish its status as `$?` before anything else can read it.
+/// Run one pipeline, publish its status as `$?`, and let `set -e` judge it if it is judgeable.
 ///
 /// `$?` used to be written once per top-level list item, so the right-hand side of an and-or list
 /// saw the status from *before* the list started: `true; false || echo $?` printed 0. Every
 /// pipeline is a command whose status POSIX makes visible to the next one, and the and-or
 /// operators are exactly where that is observable.
-fn run_and_record(env: &mut Environment, pipeline: &Pipeline) -> Result<i32> {
+///
+/// `judged` says whether this pipeline is the last of its and-or chain. When it is not, the
+/// exemption covers the whole evaluation — not just this pipeline's own status — so that a
+/// function on the left of `||` runs to its end instead of dying inside.
+fn run_and_record(env: &mut Environment, pipeline: &Pipeline, judged: bool) -> Result<i32> {
+    if !judged {
+        let _exempt = suspend_errexit();
+        let status = eval_pipeline(env, pipeline)?;
+        env.last_status = status;
+        return Ok(status);
+    }
+
     let status = eval_pipeline(env, pipeline)?;
     env.last_status = status;
+    // `! cmd` is exempt whichever way it comes out, so `set -e; ! true` does not end the shell
+    // even though the pipeline reports 1.
+    if status != 0 && !pipeline.negated && env.errexit() && !errexit_suspended() {
+        return Err(ShellError::Exit(status));
+    }
     Ok(status)
 }
 
@@ -210,15 +280,28 @@ pub fn eval_pipeline(env: &mut Environment, pipeline: &Pipeline) -> Result<i32> 
         return Ok(0);
     }
 
+    // R6.2: a pipeline under `!` is exempt from `set -e`, and so is everything it reaches —
+    // `set -e; ! f` runs `f` to its end rather than dying at the first failing command in it.
+    let _exempt = pipeline.negated.then(suspend_errexit);
+    let status = run_stages(env, pipeline)?;
+
+    Ok(if pipeline.negated {
+        i32::from(status == 0)
+    } else {
+        status
+    })
+}
+
+/// Run the pipeline's stages and report the status the pipeline itself has, before `!` is applied.
+///
+/// With `pipefail` that is the rightmost stage that failed, not the rightmost stage: the option
+/// exists so that `generate | filter` cannot report success when `generate` died.
+fn run_stages(env: &mut Environment, pipeline: &Pipeline) -> Result<i32> {
     if pipeline.commands.len() == 1 {
         let status = eval_command(env, &pipeline.commands[0])?;
         // R4.10: a one-command pipeline still has a stage vector, as bash's `PIPESTATUS` does.
         env.set_pipeline_status(vec![status]);
-        return Ok(if pipeline.negated {
-            if status == 0 { 1 } else { 0 }
-        } else {
-            status
-        });
+        return Ok(status);
     }
 
     let num_cmds = pipeline.commands.len();
@@ -282,14 +365,24 @@ pub fn eval_pipeline(env: &mut Environment, pipeline: &Pipeline) -> Result<i32> 
         // R4.3: exactly one `waitpid` per child, inside `wait_for_status`.
         stage_statuses.push(wait_for_status(pid));
     }
-    let final_status = *stage_statuses.last().unwrap_or(&0);
+    let final_status = pipeline_status(env, &stage_statuses);
     env.set_pipeline_status(stage_statuses);
+    Ok(final_status)
+}
 
-    Ok(if pipeline.negated {
-        if final_status == 0 { 1 } else { 0 }
-    } else {
-        final_status
-    })
+/// The status a pipeline reports, given what each of its stages returned.
+///
+/// R6.4: `set -o pipefail` swaps "the last stage" for "the rightmost stage that failed", so
+/// `false | true` reports 1 while `true | false | true` still reports the 1 in the middle. Without
+/// the option the leftmost stages are invisible, which is the default POSIX rule.
+fn pipeline_status(env: &Environment, stages: &[i32]) -> i32 {
+    if env.pipefail() {
+        // Rightmost, not first: `exit 3 | exit 4` is 4 in bash, the failure closest to the output.
+        if let Some(failed) = stages.iter().rev().find(|s| **s != 0) {
+            return *failed;
+        }
+    }
+    stages.last().copied().unwrap_or(0)
 }
 
 pub fn eval_command(env: &mut Environment, command: &Command) -> Result<i32> {
@@ -342,4 +435,62 @@ fn assignment_only_status(env: &mut Environment, simple: &SimpleCommand) -> Resu
         return Ok(status);
     }
     Ok(env.take_substitution_status().unwrap_or(0))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{errexit_suspended, pipeline_status, suspend_errexit};
+    use crate::env::Environment;
+    use crate::env::options::ShellOption;
+
+    fn env_with_pipefail(on: bool) -> Environment {
+        let mut env = Environment::new();
+        env.set_option(ShellOption::PipeFail, on);
+        env
+    }
+
+    /// The POSIX default: the stages to the left of the last one cannot be seen at all.
+    #[test]
+    fn without_pipefail_only_the_last_stage_decides() {
+        let env = env_with_pipefail(false);
+        assert_eq!(pipeline_status(&env, &[1, 0]), 0);
+        assert_eq!(pipeline_status(&env, &[0, 3]), 3);
+        assert_eq!(pipeline_status(&env, &[4, 5, 0]), 0);
+    }
+
+    /// Rightmost, not first: `(exit 3) | (exit 4)` is 4, the failure nearest the output.
+    #[test]
+    fn pipefail_reports_the_rightmost_failure() {
+        let env = env_with_pipefail(true);
+        assert_eq!(pipeline_status(&env, &[1, 0]), 1);
+        assert_eq!(pipeline_status(&env, &[3, 4, 0]), 4);
+        assert_eq!(pipeline_status(&env, &[0, 5, 0]), 5);
+        assert_eq!(pipeline_status(&env, &[0, 0, 0]), 0);
+        assert_eq!(pipeline_status(&env, &[0, 0, 6]), 6);
+    }
+
+    /// An empty stage vector is not a failure; a pipeline with no commands reports success.
+    #[test]
+    fn no_stages_is_zero_either_way() {
+        assert_eq!(pipeline_status(&env_with_pipefail(true), &[]), 0);
+        assert_eq!(pipeline_status(&env_with_pipefail(false), &[]), 0);
+    }
+
+    /// The exemptions nest — `if f; then` inside `g || true` — so the flag has to be a count.
+    /// Setting a bool instead is how `set -e` comes back on halfway through a condition.
+    #[test]
+    fn errexit_suspensions_nest_and_unwind() {
+        assert!(!errexit_suspended());
+        let outer = suspend_errexit();
+        {
+            let _inner = suspend_errexit();
+            assert!(errexit_suspended());
+        }
+        assert!(
+            errexit_suspended(),
+            "the outer suspension is still in force"
+        );
+        drop(outer);
+        assert!(!errexit_suspended());
+    }
 }

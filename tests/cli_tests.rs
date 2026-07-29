@@ -178,10 +178,27 @@ fn a_syntax_error_from_stdin_exits_two() {
     assert_eq!(status_of(&out), 2);
 }
 
+/// The invocation's own flags are part of `$-`, which is how a script tells how it was started.
+#[test]
+fn dollar_dash_reports_the_invocation_and_the_command_line_options() {
+    let out = rush(&["-fu", "-c", "echo \"[$-]\""]);
+    assert_eq!(status_of(&out), 0, "stderr: {}", stderr_of(&out));
+    // `f` and `u` from the command line, `c` because the program came from `-c`.
+    assert_eq!(stdout_of(&out), "[fuc]\n");
+}
+
+/// An option letter `set` would refuse is refused here too, with the same usage status.
+#[test]
+fn an_unknown_command_line_option_is_still_rejected() {
+    let out = rush(&["-Z", "-c", "echo ran"]);
+    assert_eq!(status_of(&out), 2);
+    assert!(stdout_of(&out).is_empty());
+}
+
 #[test]
 fn recorded_set_options_do_not_prevent_a_script_from_running() {
-    // -e and -x are accepted and recorded; Round 6 gives them meaning. Until then they must at
-    // least not be mistaken for a script name or an unknown option.
+    // -e and -x reach the shell's option set (PLAN R6.1) and must not be mistaken for a script
+    // name or an unknown option. Their *behaviour* arrives with R6.2/R6.3.
     let out = rush(&["-ex", "-c", "echo ran"]);
     assert_eq!(status_of(&out), 0, "stderr: {}", stderr_of(&out));
     assert_eq!(stdout_of(&out), "ran\n");

@@ -1,11 +1,18 @@
+mod options;
+mod registry;
+#[cfg(test)]
+mod tests;
+
 use crate::ast::Command;
 use crate::env::nesting::{DepthGuard, MAX_FUNCTION_DEPTH, MAX_SCRIPT_DEPTH};
+use crate::env::options::ShellOptions;
 use crate::error::Result;
+use registry::BuiltinRegistry;
 use std::collections::{HashMap, HashSet};
 use std::env;
 use std::path::PathBuf;
 
-pub type BuiltinFn = fn(&mut Environment, &[String]) -> Result<i32>;
+pub use registry::{BuiltinFn, is_special_builtin};
 
 /// Whether `name` is a valid shell variable name: `[A-Za-z_][A-Za-z0-9_]*`.
 ///
@@ -93,7 +100,9 @@ pub struct Environment {
     substitution_status: Option<i32>,
     aliases: HashMap<String, String>,
     functions: HashMap<String, Command>,
-    custom_builtins: HashMap<String, BuiltinFn>,
+    /// Every builtin this shell has. The one list consulted by [`Self::is_builtin`], the
+    /// dispatcher in `exec::simple` and `type`; see the `registry` submodule.
+    builtins: BuiltinRegistry,
     signal_traps: HashMap<String, String>,
     readonly_vars: HashSet<String>,
     dir_stack: Vec<PathBuf>,
@@ -108,6 +117,9 @@ pub struct Environment {
     function_depth: DepthGuard,
     /// How deep the current `source`/`eval` chain is.
     script_depth: DepthGuard,
+    /// The `set -e`/`set -o pipefail` options. Read through the accessors in the `options`
+    /// submodule, which is where the whole option API lives.
+    options: ShellOptions,
 }
 
 impl Default for Environment {
@@ -142,7 +154,7 @@ impl Environment {
             substitution_status: None,
             aliases,
             functions: HashMap::new(),
-            custom_builtins: HashMap::new(),
+            builtins: BuiltinRegistry::default(),
             signal_traps: HashMap::new(),
             readonly_vars: HashSet::new(),
             dir_stack: Vec::new(),
@@ -150,6 +162,7 @@ impl Environment {
             loop_depth: 0,
             function_depth: DepthGuard::new(MAX_FUNCTION_DEPTH),
             script_depth: DepthGuard::new(MAX_SCRIPT_DEPTH),
+            options: ShellOptions::default(),
         };
 
         crate::env::builtins::register_default_builtins(&mut env_struct);
@@ -336,16 +349,21 @@ impl Environment {
         &self.signal_traps
     }
 
+    /// Run `name` as a builtin, or `None` if it is not one.
+    ///
+    /// The only way a builtin is ever invoked. A caller that has already asked
+    /// [`Self::is_builtin`] still goes through here rather than through a name-to-function
+    /// `match` of its own: the second list is what let `register_custom_builtin("echo", …)`
+    /// register a function nothing would ever call (PLAN R5.6, R9.8).
     pub fn exec_custom_builtin(&mut self, name: &str, args: &[String]) -> Option<Result<i32>> {
-        self.custom_builtins
-            .get(name)
-            .copied()
-            .map(|func| func(self, args))
+        self.builtins.lookup(name).map(|func| func(self, args))
     }
 
     pub fn get_var(&self, name: &str) -> Option<&str> {
         match name {
-            "?" | "$" | "!" | "#" | "*" | "@" => None,
+            // `$-` joins the list: it is computed from the option bitset, and a variable of that
+            // name (which no assignment can create, but `environ` can carry) must not shadow it.
+            "?" | "$" | "!" | "#" | "*" | "@" | "-" => None,
             _ => self.vars.get(name).map(|(v, _)| v.as_str()),
         }
     }
@@ -365,6 +383,7 @@ impl Environment {
             "$" => Some(self.pid.to_string()),
             "!" => self.last_bg_pid.map(|p| p.to_string()),
             "#" => Some(self.positional.len().to_string()),
+            "-" => Some(self.option_flags()),
             "0" => Some(self.shell_name.clone()),
             // Only the forms that genuinely need a single string reach here: `"$@"` and `$@` are
             // resolved as a *field list* in `expand::param`, because collapsing them to one string
@@ -480,12 +499,18 @@ impl Environment {
         &self.functions
     }
 
+    /// Register `name` as a builtin, replacing any earlier one.
+    ///
+    /// The single point of entry: whatever is registered here is what `is_builtin`, the
+    /// dispatcher, completion and `type` will all report and run.
     pub fn register_custom_builtin(&mut self, name: &str, func: BuiltinFn) {
-        self.custom_builtins.insert(name.to_string(), func);
+        self.builtins.register(name, func);
     }
 
-    pub fn get_builtin(&self, name: &str) -> Option<&BuiltinFn> {
-        self.custom_builtins.get(name)
+    /// The implementation registered for `name`, if any. Prefer [`Self::exec_custom_builtin`]:
+    /// this exists for callers that need to know a builtin is callable without calling it.
+    pub fn get_builtin(&self, name: &str) -> Option<BuiltinFn> {
+        self.builtins.lookup(name)
     }
 
     /// Every registered builtin name.
@@ -493,107 +518,16 @@ impl Environment {
     /// The single source of truth for completion and `type`, so adding a builtin does not
     /// require remembering to update a list somewhere else.
     pub fn builtin_names(&self) -> impl Iterator<Item = &str> {
-        self.custom_builtins.keys().map(String::as_str)
+        self.builtins.names()
     }
 
+    /// Whether `name` is a builtin — that is, whether it is in the registry.
+    ///
+    /// This used to be a `matches!` over a hand-written list that had drifted from both the
+    /// registry and the dispatcher's own `match` (PLAN R5.6): `type` called `set` an external
+    /// command while the shell ran it as a builtin, and a name in the list with no
+    /// implementation dispatched to `Ok(0)` — a command that silently did nothing.
     pub fn is_builtin(&self, name: &str) -> bool {
-        let trimmed = name.trim();
-        matches!(
-            trimmed,
-            "cd" | "pwd"
-                | "echo"
-                | "export"
-                | "unset"
-                | "alias"
-                | "unalias"
-                | "exit"
-                | "break"
-                | "continue"
-                | "return"
-                | "eval"
-                | "source"
-                | "."
-                | "read"
-                | "local"
-                | "pushd"
-                | "popd"
-                | "dirs"
-                | "readonly"
-                | "test"
-                | "["
-                | "[["
-                | "trap"
-                | "umask"
-                | "wait"
-                | "kill"
-                | "true"
-                | "false"
-        ) || self.custom_builtins.contains_key(trimmed)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::{Environment, is_valid_identifier};
-
-    #[test]
-    fn identifier_rules_match_posix_names() {
-        for ok in ["a", "_", "_x9", "FOO_BAR", "x1"] {
-            assert!(is_valid_identifier(ok), "{ok} should be a valid name");
-        }
-        for bad in ["", "=1", "1a", "a b", "a-b", "a=b", "a\0", "é", "$x"] {
-            assert!(!is_valid_identifier(bad), "{bad:?} should be rejected");
-        }
-    }
-
-    /// Each of these reached `env::set_var`/`remove_var` before R1.7 and aborted the shell.
-    #[test]
-    fn unrepresentable_assignments_are_refused_not_fatal() {
-        let mut env = Environment::new();
-        assert!(!env.set_var("=1", "x", true));
-        assert!(!env.set_var("", "x", true));
-        assert!(!env.set_var("a=b", "x", true));
-        assert_eq!(env.get_var("=1"), None);
-
-        // A NUL cannot survive the trip through `environ`, so the whole assignment is refused
-        // rather than silently truncated at the NUL.
-        assert!(!env.set_var("NUL_TEST", "a\0b", true));
-        assert_eq!(env.get_var("NUL_TEST"), None);
-    }
-
-    #[test]
-    fn exporting_a_nul_bearing_value_is_refused() {
-        let mut env = Environment::new();
-        // Not exported, so this never touches `environ` — the value only becomes a problem when
-        // `export` tries to publish it.
-        env.vars
-            .insert("NUL_EXPORT".to_string(), ("a\0b".to_string(), false));
-        assert!(!env.export_var("NUL_EXPORT"));
-        assert!(!env.get_exported_vars().contains_key("NUL_EXPORT"));
-    }
-
-    #[test]
-    fn unset_of_an_impossible_name_is_a_no_op() {
-        let mut env = Environment::new();
-        env.unset_var("=1");
-        env.unset_var("");
-    }
-
-    /// A rejected `local` must not be recorded in the scope frame: `pop_scope` would then hand
-    /// the same impossible name to `remove_var` and abort at function exit instead.
-    #[test]
-    fn rejected_local_does_not_poison_the_scope_frame() {
-        let mut env = Environment::new();
-        env.push_scope();
-        assert!(!env.set_local_var("=1", "x"));
-        assert!(!env.set_local_exported_var("BAD\0NAME", "x"));
-        env.pop_scope();
-    }
-
-    #[test]
-    fn valid_unexported_assignment_still_works() {
-        let mut env = Environment::new();
-        assert!(env.set_var("PLAIN_TEST", "value", false));
-        assert_eq!(env.get_var("PLAIN_TEST"), Some("value"));
+        self.builtins.contains(name)
     }
 }

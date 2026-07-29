@@ -2,11 +2,15 @@
 //!
 //! `break` and `continue` arrive here as errors unwinding from the loop body; each loop peels
 //! one level off the requested depth and either stops or re-raises.
+//!
+//! Conditions are run through `eval_condition`, never through `eval_command_list` directly:
+//! POSIX exempts the condition of an `if`/`elif`/`while`/`until` from `set -e`, and a condition
+//! that aborted the shell when it answered "no" would make `set -e` unusable.
 
 use crate::ast::*;
 use crate::env::Environment;
 use crate::error::{Result, ShellError};
-use crate::exec::pipeline::{eval_command_list, status_of, wait_for_status};
+use crate::exec::pipeline::{eval_command_list, status_of, suspend_errexit, wait_for_status};
 use crate::expand::{expand_word, expand_word_to_string};
 use nix::unistd::{ForkResult, fork};
 
@@ -51,6 +55,17 @@ fn run_loop_body(env: &mut Environment, body: &CommandList, status: &mut i32) ->
     }
 }
 
+/// Evaluate a construct's condition, with `set -e` suspended for its whole extent.
+///
+/// R6.2: POSIX 2.9.1 exempts "the compound list following the `while`, `until`, `if` or `elif`
+/// reserved word" from errexit, and the exemption is dynamic — it covers functions and subshells
+/// the condition calls, so `set -e; f() { false; echo reached; }; if f; then` prints `reached`.
+/// Asking the question is not the same as failing at it.
+fn eval_condition(env: &mut Environment, condition: &CommandList) -> Result<i32> {
+    let _exempt = suspend_errexit();
+    eval_command_list(env, condition)
+}
+
 /// Shared driver for `while` and `until`, which differ only in how they read the condition.
 ///
 /// The loop counter is entered and exited around the whole construct rather than around the body
@@ -65,7 +80,7 @@ fn eval_conditional_loop(
     env.enter_loop();
 
     let result = loop {
-        let cond = match eval_command_list(env, condition) {
+        let cond = match eval_condition(env, condition) {
             Ok(c) => c,
             Err(e) => break Err(e),
         };
@@ -95,13 +110,13 @@ pub(crate) fn eval_compound_command(
             elif_branches,
             else_branch,
         } => {
-            let cond_status = eval_command_list(env, condition)?;
+            let cond_status = eval_condition(env, condition)?;
             if cond_status == 0 {
                 return eval_command_list(env, then_branch);
             }
 
             for (elif_cond, elif_body) in elif_branches {
-                let elif_status = eval_command_list(env, elif_cond)?;
+                let elif_status = eval_condition(env, elif_cond)?;
                 if elif_status == 0 {
                     return eval_command_list(env, elif_body);
                 }

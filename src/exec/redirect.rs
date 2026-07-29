@@ -77,15 +77,13 @@ impl RedirectGuard {
                     })?;
                     dup2(file.as_raw_fd(), target_fd)?;
                 }
-                RedirectKind::Output | RedirectKind::Clobber => {
-                    let file = OpenOptions::new()
-                        .write(true)
-                        .create(true)
-                        .truncate(true)
-                        .open(&target_str)
-                        .map_err(|e| {
-                            ShellError::ExecutionError(format!("{}: {}", target_str, e))
-                        })?;
+                // `>` and `>|` differ in exactly one situation, and only when `set -C` is on.
+                RedirectKind::Output => {
+                    let file = open_for_output(&target_str, env.noclobber())?;
+                    dup2(file.as_raw_fd(), target_fd)?;
+                }
+                RedirectKind::Clobber => {
+                    let file = open_for_output(&target_str, false)?;
                     dup2(file.as_raw_fd(), target_fd)?;
                 }
                 RedirectKind::Append => {
@@ -138,6 +136,50 @@ impl RedirectGuard {
             }
         }
         Ok(())
+    }
+}
+
+/// Open the target of `>` or `>|`, honouring `set -C` when `refuse_existing` says to.
+///
+/// With noclobber off this is a plain create-or-truncate. With it on, `>` must not destroy a file
+/// that is already there — the whole point of the option is that a mistyped `> notes` cannot eat
+/// the file. `create_new` is what enforces it, rather than a `Path::exists` test followed by an
+/// open: between the test and the open another process can create the file, and the check that
+/// loses that race silently truncates exactly the data the option exists to protect.
+///
+/// Two things noclobber deliberately does *not* refuse:
+///
+/// * anything that is not a regular file. `cmd > /dev/null` and `cmd > /dev/tty` have nothing to
+///   overwrite, and POSIX scopes the restriction to regular files for that reason.
+/// * `>|`, which is the escape hatch — see the caller.
+fn open_for_output(path: &str, refuse_existing: bool) -> Result<File> {
+    if !refuse_existing {
+        return OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(true)
+            .open(path)
+            .map_err(|e| ShellError::ExecutionError(format!("{}: {}", path, e)));
+    }
+
+    match OpenOptions::new().write(true).create_new(true).open(path) {
+        Ok(file) => Ok(file),
+        Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {
+            // `symlink_metadata` is wrong here: `> link-to-dev-null` follows the link in every
+            // shell, so the question is what the *target* is.
+            let regular = std::fs::metadata(path).is_ok_and(|m| m.is_file());
+            if regular {
+                return Err(ShellError::ExecutionError(format!(
+                    "{}: cannot overwrite existing file",
+                    path
+                )));
+            }
+            OpenOptions::new()
+                .write(true)
+                .open(path)
+                .map_err(|e| ShellError::ExecutionError(format!("{}: {}", path, e)))
+        }
+        Err(e) => Err(ShellError::ExecutionError(format!("{}: {}", path, e))),
     }
 }
 
@@ -324,6 +366,35 @@ mod tests {
             Err(nix::errno::Errno::EBADF),
             "fd {opened} was left open with nothing to restore it to"
         );
+    }
+
+    /// `set -C` is the difference between `>` and `>|`, and it applies to regular files only.
+    #[test]
+    fn noclobber_refuses_only_an_existing_regular_file() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let fresh = dir.path().join("fresh");
+        let fresh = fresh.to_str().unwrap();
+
+        // Nothing there yet: `>` creates it even under noclobber.
+        open_for_output(fresh, true).expect("creating a new file is always allowed");
+        // Now it exists, so `>` must refuse and `>|` must not.
+        let err = open_for_output(fresh, true).expect_err("noclobber must refuse");
+        assert!(err.to_string().contains("cannot overwrite"), "{err}");
+        open_for_output(fresh, false).expect("`>|` overrides noclobber");
+
+        // Not a regular file, so there is nothing for the option to protect.
+        open_for_output("/dev/null", true).expect("/dev/null is exempt");
+    }
+
+    /// The refusal must not be a read-then-open: the file has to be created by the same syscall
+    /// that would have truncated it, or a racing creator's data is destroyed anyway.
+    #[test]
+    fn noclobber_truncates_nothing_when_it_refuses() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("data");
+        std::fs::write(&path, b"payload").expect("write");
+        let _ = open_for_output(path.to_str().unwrap(), true).expect_err("noclobber must refuse");
+        assert_eq!(std::fs::read(&path).expect("read"), b"payload");
     }
 
     /// The pre-exec child never restores anything, so it must not spend syscalls building a save

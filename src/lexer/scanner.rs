@@ -398,6 +398,11 @@ pub(super) fn is_var_name_char(ch: char) -> bool {
     ch.is_alphanumeric() || ch == '_'
 }
 
+/// The one-character parameters that follow `$` without braces.
+///
+/// `-` is one of them: `$-` is the set of shell options, not a literal dash. It used to fall
+/// through to the "not an expansion" arm, so `case "$-" in *e*)` compared the two characters
+/// `$-` against the pattern.
 pub(super) fn is_special_param(ch: char) -> bool {
-    matches!(ch, '?' | '$' | '!' | '#' | '*' | '@' | '0'..='9')
+    matches!(ch, '?' | '$' | '!' | '#' | '*' | '@' | '-' | '0'..='9')
 }

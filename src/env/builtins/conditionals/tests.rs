@@ -1,0 +1,315 @@
+//! One table, both builtins.
+//!
+//! The failures R5.1–R5.3 describe were all "plausible answer, wrong answer, status 0", which a
+//! test asserting `assert!(result.is_ok())` cannot see. So every case here pins the *exit status*
+//! — 0 true, 1 false, 2 syntax error — and the shared table runs each expression through `[` and
+//! `[[` so the two forms cannot drift apart again.
+//!
+//! Every expected status was taken from `bash --posix -c`.
+
+use super::{builtin_extended_test, builtin_test};
+use crate::env::scope::Environment;
+
+/// Run `[ words… ]` and return its exit status.
+fn bracket(words: &[&str]) -> i32 {
+    let mut env = Environment::new();
+    let mut argv = vec!["[".to_string()];
+    argv.extend(words.iter().map(|w| w.to_string()));
+    argv.push("]".to_string());
+    builtin_test(&mut env, &argv).expect("test builtin must not unwind")
+}
+
+/// Run `[[ words… ]]` and return its exit status.
+fn double_bracket(words: &[&str]) -> i32 {
+    let mut env = Environment::new();
+    let mut argv = vec!["[[".to_string()];
+    argv.extend(words.iter().map(|w| w.to_string()));
+    argv.push("]]".to_string());
+    builtin_extended_test(&mut env, &argv).expect("extended test builtin must not unwind")
+}
+
+/// Expressions that mean the same thing in both forms. `(words, status)`.
+const SHARED: &[(&[&str], i32)] = &[
+    // Bare strings.
+    (&[], 1),
+    (&["x"], 0),
+    (&[""], 1),
+    // String length.
+    (&["-z", ""], 0),
+    (&["-z", "x"], 1),
+    (&["-n", "x"], 0),
+    (&["-n", ""], 1),
+    // String comparison.
+    (&["a", "=", "a"], 0),
+    (&["a", "=", "b"], 1),
+    (&["a", "!=", "b"], 0),
+    (&["a", "!=", "a"], 1),
+    (&["a", "<", "b"], 0),
+    (&["b", "<", "a"], 1),
+    (&["a", ">", "b"], 1),
+    (&["b", ">", "a"], 0),
+    // Arithmetic comparison.
+    (&["3", "-eq", "3"], 0),
+    (&["3", "-ne", "3"], 1),
+    (&["3", "-gt", "2"], 0),
+    (&["2", "-ge", "3"], 1),
+    (&["2", "-lt", "3"], 0),
+    (&["3", "-le", "3"], 0),
+    (&["-1", "-lt", "0"], 0),
+    // Blanks and a leading `+` are accepted.
+    (&[" 3 ", "-eq", "3"], 0),
+    (&["+3", "-eq", "3"], 0),
+    // R5.3: a non-numeric operand is an error, never a silent zero.
+    //
+    // Deliberate divergence for `[[ ]]`: bash runs `[[ ]]`'s arithmetic operands through the
+    // arithmetic evaluator, so `[[ abc -eq 0 ]]` reads `abc` as an unset variable and is true.
+    // R5.3 specifies one shared evaluator that reports `integer expected` in both forms, which is
+    // the safer answer for the far more common case of a variable holding a non-number.
+    (&["abc", "-eq", "0"], 2),
+    (&["1", "-eq", "abc"], 2),
+    (&["", "-eq", "0"], 2),
+    (&["0x10", "-eq", "16"], 2),
+    (&["abc", "-gt", "0"], 2),
+    // R5.1/R5.3: an operator that does not exist is a syntax error, not `false`.
+    (&["-q", "x"], 2),
+    (&["a", "-qq", "b"], 2),
+    (&["a", "-lte", "b"], 2),
+    // File predicates that need no fixture.
+    (&["-d", "/"], 0),
+    (&["-e", "/"], 0),
+    (&["-f", "/"], 1),
+    (&["-e", "/nonexistent-rush-xyz"], 1),
+    (&["-f", "/nonexistent-rush-xyz"], 1),
+    (&["-d", "/nonexistent-rush-xyz"], 1),
+    (&["-x", "/nonexistent-rush-xyz"], 1),
+    (&["-s", "/nonexistent-rush-xyz"], 1),
+    (&["-L", "/nonexistent-rush-xyz"], 1),
+    (&["-p", "/nonexistent-rush-xyz"], 1),
+    (&["-t", "not-a-number"], 1),
+];
+
+#[test]
+fn shared_expressions_agree_in_both_forms() {
+    for (words, expected) in SHARED {
+        assert_eq!(
+            bracket(words),
+            *expected,
+            "[ {} ] should exit {}",
+            words.join(" "),
+            expected
+        );
+        assert_eq!(
+            double_bracket(words),
+            *expected,
+            "[[ {} ]] should exit {}",
+            words.join(" "),
+            expected
+        );
+    }
+}
+
+/// R5.1: the connectives, the parentheses, and the garbage that must not be true.
+///
+/// These are `[`-only because `[[ ]]`'s connectives never reach the builtin — the parser lowers
+/// them to shell `&&`/`||`/`!`.
+const POSIX_GRAMMAR: &[(&[&str], i32)] = &[
+    // R5.1: four-or-more operands used to be unconditionally true.
+    (&["-f", "/nope-a", "-a", "-f", "/nope-b"], 1),
+    (&["-z", "", "-o", "-z", "x"], 0),
+    (&["-n", "x", "-a", "-n", "y"], 0),
+    (&["-n", "", "-o", "-n", ""], 1),
+    (&["x", "-a", "y"], 0),
+    (&["", "-a", "x"], 1),
+    (&["", "-o", "x"], 0),
+    (&["x", "-a", "y", "-a", "z"], 0),
+    (&["", "-o", "", "-o", "x"], 0),
+    // `-a` binds tighter than `-o`: false AND false OR true.
+    (&["x", "-a", "", "-o", "y"], 0),
+    // R5.2: `!` negates at every arity.
+    (&["!", "-f", "/nonexistent-rush-xyz"], 0),
+    (&["!", "-d", "/"], 1),
+    (&["!", "a", "=", "a"], 1),
+    (&["!", "a", "=", "b"], 0),
+    (&["!", "!", "a", "=", "a"], 0),
+    (&["!", "-z", ""], 1),
+    (&["!", ""], 0),
+    (&["!", "x"], 1),
+    (&["!"], 0),
+    // `!` in an operand slot is data, not an operator.
+    (&["-f", "-a"], 1),
+    (&["!", "-a"], 1),
+    // Parentheses.
+    (&["(", "a", "=", "a", ")"], 0),
+    (&["(", "a", "=", "b", ")"], 1),
+    (&["(", "a", ")"], 0),
+    (&["(", "", ")"], 1),
+    (&["(", "a", "=", "b", ")", "-o", "(", "c", "=", "c", ")"], 0),
+    (&["(", "a", "=", "b", ")", "-a", "(", "c", "=", "c", ")"], 1),
+    (&["!", "(", "a", "=", "b", ")"], 0),
+    // `test` is decimal-only, so `010` is ten. (`[[ ]]` in bash would read it as octal, since it
+    // runs arithmetic operands through the arithmetic evaluator; rush shares one evaluator.)
+    (&["010", "-eq", "10"], 0),
+    (&["010", "-eq", "8"], 1),
+    // Single words that look like operators but sit alone.
+    (&["="], 0),
+    (&["-z"], 0),
+    (&["-a"], 0),
+    // R5.1: unparseable input exits 2 rather than reporting a truth value.
+    (&["a", "b"], 2),
+    (&["a", "b", "c"], 2),
+    (&["a", "b", "c", "d", "e"], 2),
+    (&["x", "-a"], 2),
+    (&["a", "="], 2),
+    (&["!", "x", "="], 2),
+    (&["(", ")"], 2),
+    (&["(", "a", "=", "a"], 2),
+    (&["a", "=", "a", ")"], 2),
+    (&["1", "-eq", "1", "-a"], 2),
+    // `-a`/`-o` do not short-circuit: the far side's error still surfaces.
+    (&["1", "-eq", "1", "-o", "abc", "-eq", "1"], 2),
+    (&["0", "-eq", "1", "-a", "abc", "-eq", "1"], 2),
+];
+
+#[test]
+fn posix_grammar_matches_bash() {
+    for (words, expected) in POSIX_GRAMMAR {
+        assert_eq!(
+            bracket(words),
+            *expected,
+            "[ {} ] should exit {}",
+            words.join(" "),
+            expected
+        );
+    }
+}
+
+/// The one operator whose meaning depends on the form: `==` globs only inside `[[ ]]`.
+#[test]
+fn double_equals_is_a_pattern_only_in_the_extended_form() {
+    assert_eq!(bracket(&["abc", "==", "a*"]), 1);
+    assert_eq!(double_bracket(&["abc", "==", "a*"]), 0);
+
+    assert_eq!(bracket(&["abc", "==", "abc"]), 0);
+    assert_eq!(double_bracket(&["abc", "==", "abc"]), 0);
+
+    // `=` is literal in both.
+    assert_eq!(bracket(&["abc", "=", "a*"]), 1);
+    assert_eq!(double_bracket(&["abc", "=", "a*"]), 1);
+}
+
+#[test]
+fn extended_form_rejects_more_than_three_operands() {
+    assert_eq!(double_bracket(&["a", "=", "a", "-a", "b", "=", "b"]), 2);
+}
+
+#[test]
+fn bracket_without_a_closing_bracket_is_an_error() {
+    let mut env = Environment::new();
+    let argv = vec!["[".to_string(), "a".to_string()];
+    assert_eq!(builtin_test(&mut env, &argv).unwrap(), 2);
+}
+
+#[test]
+fn test_name_needs_no_closing_bracket() {
+    let mut env = Environment::new();
+    let argv = vec![
+        "test".to_string(),
+        "a".to_string(),
+        "=".to_string(),
+        "a".to_string(),
+    ];
+    assert_eq!(builtin_test(&mut env, &argv).unwrap(), 0);
+}
+
+#[test]
+fn extended_form_knows_about_shell_variables() {
+    let mut env = Environment::new();
+    env.set_var("RUSH_TEST_V", "set", false);
+    let argv = vec![
+        "[[".to_string(),
+        "-v".to_string(),
+        "RUSH_TEST_V".to_string(),
+        "]]".to_string(),
+    ];
+    assert_eq!(builtin_extended_test(&mut env, &argv).unwrap(), 0);
+
+    let argv = vec![
+        "[[".to_string(),
+        "-v".to_string(),
+        "RUSH_TEST_UNSET".to_string(),
+        "]]".to_string(),
+    ];
+    assert_eq!(builtin_extended_test(&mut env, &argv).unwrap(), 1);
+}
+
+/// R5.3: `-r` asks the kernel. `stat()` succeeds on a mode-000 file the caller cannot open, so
+/// the old implementation called it readable.
+#[test]
+fn readability_uses_access_not_stat() {
+    if nix::unistd::geteuid().is_root() {
+        return; // root can read anything; the distinction is invisible.
+    }
+
+    let dir = scratch_dir("access");
+    let unreadable = dir.join("locked");
+    std::fs::write(&unreadable, b"secret").unwrap();
+    set_mode(&unreadable, 0o000);
+
+    let path = unreadable.to_str().unwrap();
+    assert_eq!(bracket(&["-r", path]), 1, "mode-000 file is not readable");
+    assert_eq!(double_bracket(&["-r", path]), 1);
+    // …but it still exists, which is what `stat` was actually answering.
+    assert_eq!(bracket(&["-e", path]), 0);
+
+    set_mode(&unreadable, 0o644);
+    assert_eq!(bracket(&["-r", path]), 0);
+
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+/// The file predicates `test` used to answer `false` to unconditionally.
+#[test]
+fn file_predicates_have_real_answers_in_both_forms() {
+    let dir = scratch_dir("files");
+    let empty = dir.join("empty");
+    let full = dir.join("full");
+    std::fs::write(&empty, b"").unwrap();
+    std::fs::write(&full, b"content\n").unwrap();
+    set_mode(&full, 0o755);
+
+    let cases: &[(&[&str], i32)] = &[
+        (&["-s", full.to_str().unwrap()], 0),
+        (&["-s", empty.to_str().unwrap()], 1),
+        (&["-x", full.to_str().unwrap()], 0),
+        (&["-x", empty.to_str().unwrap()], 1),
+        (&["-w", full.to_str().unwrap()], 0),
+        (&["-d", dir.to_str().unwrap()], 0),
+        (&["-O", full.to_str().unwrap()], 0),
+        (&[full.to_str().unwrap(), "-ef", full.to_str().unwrap()], 0),
+        (&[full.to_str().unwrap(), "-ef", empty.to_str().unwrap()], 1),
+    ];
+
+    for (words, expected) in cases {
+        assert_eq!(bracket(words), *expected, "[ {} ]", words.join(" "));
+        assert_eq!(
+            double_bracket(words),
+            *expected,
+            "[[ {} ]]",
+            words.join(" ")
+        );
+    }
+
+    std::fs::remove_dir_all(&dir).ok();
+}
+
+fn scratch_dir(tag: &str) -> std::path::PathBuf {
+    let dir = std::env::temp_dir().join(format!("rush-cond-{}-{}", tag, std::process::id()));
+    std::fs::remove_dir_all(&dir).ok();
+    std::fs::create_dir_all(&dir).unwrap();
+    dir
+}
+
+fn set_mode(path: &std::path::Path, mode: u32) {
+    use std::os::unix::fs::PermissionsExt;
+    std::fs::set_permissions(path, std::fs::Permissions::from_mode(mode)).unwrap();
+}

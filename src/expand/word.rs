@@ -15,9 +15,9 @@
 //! defect behind five separate wrong answers, which is why the representation lives here rather
 //! than being reconstructed by each consumer.
 
-use crate::ast::{Word, WordPart};
+use crate::ast::{ParamExpansion, Word, WordPart};
 use crate::env::Environment;
-use crate::error::Result;
+use crate::error::{Result, ShellError};
 use crate::expand::arithmetic::eval_arithmetic;
 use crate::expand::brace::expand_braces;
 use crate::expand::fields::{ifs_of, split_field};
@@ -170,7 +170,10 @@ pub fn expand_word_part(
         WordPart::Variable {
             name,
             expansion_type,
-        } => expand_param(env, name, expansion_type, in_quotes)?,
+        } => {
+            check_nounset(env, name, expansion_type)?;
+            expand_param(env, name, expansion_type, in_quotes)?
+        }
         WordPart::Arithmetic(expr) => single(eval_arithmetic(env, expr)?.to_string(), produced),
         WordPart::CommandSubstitution(cmd) => {
             let output = crate::exec::eval_command_substitution(env, cmd)?;
@@ -178,6 +181,46 @@ pub fn expand_word_part(
             single(output.trim_end_matches('\n').to_string(), produced)
         }
     })
+}
+
+/// `set -u`: refuse to expand a parameter that was never set.
+///
+/// The point of the option is to turn a typo into a diagnostic instead of an empty string, so the
+/// check has to happen *before* [`expand_param`] hands back `""`. Three families are exempt, and
+/// each for a reason a script relies on:
+///
+/// * `${x-d}`, `${x:=d}`, `${x+alt}`, `${x?msg}` — every operator whose whole job is to say what
+///   an unset parameter means. `${x-default}` under `set -u` is the standard way to *read* a
+///   possibly-unset variable, and erroring on it would leave no way to do so at all.
+/// * `$@` and `$*` with no positional parameters. bash stopped treating an empty argument list as
+///   unset in 4.4, and `set -u; f() { echo "$@"; }` is far too common to break.
+/// * a parameter that is set but empty. `nounset` tests for *unset*, not for null; that is the
+///   difference between `${x-d}` and `${x:-d}`, and it applies here too.
+fn check_nounset(env: &Environment, name: &str, expansion_type: &ParamExpansion) -> Result<()> {
+    if !env.nounset() || matches!(name, "@" | "*") {
+        return Ok(());
+    }
+    if matches!(
+        expansion_type,
+        ParamExpansion::DefaultValue { .. }
+            | ParamExpansion::UseAlternative { .. }
+            | ParamExpansion::ErrorIfUnset { .. }
+    ) {
+        return Ok(());
+    }
+    if env.get_param(name).is_some() {
+        return Ok(());
+    }
+    // bash names a positional parameter with its `$`, an ordinary variable without one, and
+    // scripts grep for the "unbound variable" wording.
+    let subject = if name.chars().all(|c| c.is_ascii_digit()) {
+        format!("${name}")
+    } else {
+        name.to_string()
+    };
+    Err(ShellError::ExpansionError(format!(
+        "{subject}: unbound variable"
+    )))
 }
 
 /// Expand to exactly one string, skipping field splitting and globbing.
@@ -206,12 +249,19 @@ pub fn expand_word(env: &mut Environment, word: &Word) -> Result<Vec<String>> {
     let mut out = Vec::new();
     // Brace expansion runs first and is the only step that yields whole *words*: `a{1,2}` is two
     // words, each of which then goes through the rest of the pipeline on its own.
+    // `set -f` switches pathname expansion off wholesale, so the field's own text is the answer.
+    // Read once per word rather than per field: an expansion cannot change the option mid-word.
+    let glob = !env.noglob();
     for word in expand_braces(word) {
         let fields = expand_word_fields(env, &word)?;
         let ifs = ifs_of(env);
         for field in fields {
             for split in split_field(&ifs, field) {
-                out.extend(expand_glob(&split));
+                if glob {
+                    out.extend(expand_glob(&split));
+                } else {
+                    out.push(field_text(&split));
+                }
             }
         }
     }
@@ -325,6 +375,70 @@ mod tests {
         env.unset_var("RUSH_NO_SUCH_VAR");
         let w = word(vec![WordPart::Variable {
             name: "RUSH_NO_SUCH_VAR".into(),
+            expansion_type: crate::ast::ParamExpansion::Normal,
+        }]);
+        assert!(expand_word(&mut env, &w).unwrap().is_empty());
+    }
+
+    /// `set -f` must not merely fail to match — it must never consult the filesystem at all, so
+    /// the pattern survives verbatim even where it *would* have matched.
+    #[test]
+    fn noglob_leaves_the_pattern_alone() {
+        let mut env = Environment::new();
+        // Unit tests run in the crate root, where `Cargo.*` really does match two files.
+        let w = word(vec![WordPart::Literal("Cargo.*".into())]);
+        assert_eq!(expand_word(&mut env, &w).unwrap().len(), 2);
+        env.set_option(crate::env::options::ShellOption::NoGlob, true);
+        assert_eq!(expand_word(&mut env, &w).unwrap(), vec!["Cargo.*"]);
+    }
+
+    #[test]
+    fn nounset_rejects_an_unset_parameter() {
+        let mut env = Environment::new();
+        env.set_option(crate::env::options::ShellOption::NoUnset, true);
+        let w = word(vec![WordPart::Variable {
+            name: "RUSH_NO_SUCH_VAR".into(),
+            expansion_type: crate::ast::ParamExpansion::Normal,
+        }]);
+        let err = expand_word(&mut env, &w).unwrap_err().to_string();
+        assert!(err.contains("unbound variable"), "{err}");
+    }
+
+    /// The exemptions matter more than the rule: `${x-default}` is how a script reads a
+    /// possibly-unset variable *under* `set -u`, and `"$@"` with no arguments is not an error.
+    #[test]
+    fn nounset_exempts_the_defaulting_operators_and_the_argument_list() {
+        let mut env = Environment::new();
+        env.set_option(crate::env::options::ShellOption::NoUnset, true);
+        env.set_positional(Vec::new());
+
+        let defaulted = word(vec![WordPart::Variable {
+            name: "RUSH_NO_SUCH_VAR".into(),
+            expansion_type: crate::ast::ParamExpansion::DefaultValue {
+                default: Word {
+                    parts: vec![WordPart::Literal("d".into())],
+                },
+                assign_if_unset: false,
+                test_null: false,
+            },
+        }]);
+        assert_eq!(expand_word(&mut env, &defaulted).unwrap(), vec!["d"]);
+
+        let args = word(vec![WordPart::DoubleQuoted(vec![WordPart::Variable {
+            name: "@".into(),
+            expansion_type: crate::ast::ParamExpansion::Normal,
+        }])]);
+        assert!(expand_word(&mut env, &args).unwrap().is_empty());
+    }
+
+    /// nounset tests for *unset*, not for null: `x=; echo $x` is silent even under `set -u`.
+    #[test]
+    fn nounset_accepts_a_variable_that_is_set_but_empty() {
+        let mut env = Environment::new();
+        env.set_var("RUSH_EMPTY_VAR", "", false);
+        env.set_option(crate::env::options::ShellOption::NoUnset, true);
+        let w = word(vec![WordPart::Variable {
+            name: "RUSH_EMPTY_VAR".into(),
             expansion_type: crate::ast::ParamExpansion::Normal,
         }]);
         assert!(expand_word(&mut env, &w).unwrap().is_empty());

@@ -4,6 +4,8 @@ mod cli;
 
 use cli::{Action, Invocation};
 use rush::env::Environment;
+use rush::env::builtins::run_exit_trap;
+use rush::env::options::ShellOption;
 use rush::error::{Result, ShellError};
 use rush::exec::{JobManager, eval_command_list};
 use rush::interactive::RushHelper;
@@ -69,6 +71,7 @@ fn run_program(invocation: &Invocation, script: &str) -> ! {
     let mut env = Environment::new();
     env.shell_name = invocation.name.clone();
     env.set_positional(invocation.positional.clone());
+    apply_invocation_options(&mut env, invocation);
 
     // Parsing is kept out of `run_string` so the two kinds of failure stay distinguishable. A
     // script that does not parse never runs at all and exits 2; anything that goes wrong later
@@ -81,10 +84,34 @@ fn run_program(invocation: &Invocation, script: &str) -> ! {
         }
     };
 
-    match absorb_loop_control(eval_command_list(&mut env, &ast)) {
+    let status = match absorb_loop_control(eval_command_list(&mut env, &ast)) {
         // The shell's exit status is that of the last command it ran.
-        Ok(status) => std::process::exit(status),
-        Err(e) => handle_exit_error(e),
+        Ok(status) => status,
+        Err(e) => exit_error_status(e),
+    };
+    // R6.5: every way out of a script converges here, so a cleanup handler that fires on a clean
+    // finish also fires on `exit 3` and on a fatal error.
+    std::process::exit(run_exit_trap(&mut env, status));
+}
+
+/// Put the invocation's own flags into the option set, so `$-` describes this shell.
+///
+/// The two halves are different in kind: `-e`/`-x` are ordinary options a script could also set,
+/// while `c` and `s` say where the program came from and no `set` command can change them. Both
+/// live in the same bitset because `$-` reports both.
+fn apply_invocation_options(env: &mut Environment, invocation: &Invocation) {
+    for letter in invocation.set_options.chars() {
+        if let Some(option) = ShellOption::from_letter(letter) {
+            env.set_option(option, true);
+        }
+    }
+    match invocation.action {
+        Action::Command(_) => env.set_option(ShellOption::CommandString, true),
+        Action::Stdin => env.set_option(ShellOption::StdinInput, true),
+        _ => {}
+    }
+    if invocation.force_interactive {
+        env.set_option(ShellOption::Interactive, true);
     }
 }
 
@@ -99,10 +126,13 @@ fn run_lua_script(path: &str) -> ! {
     std::process::exit(0);
 }
 
-/// End a non-interactive shell that could not finish its script.
-fn handle_exit_error(err: ShellError) -> ! {
+/// The status a non-interactive shell ends with after it could not finish its script.
+///
+/// Returns rather than exiting: the EXIT trap still has to run, because `trap 'rm -f "$tmp"' EXIT`
+/// exists precisely for the runs that go wrong.
+fn exit_error_status(err: ShellError) -> i32 {
     match err {
-        ShellError::Exit(code) => std::process::exit(code),
+        ShellError::Exit(code) => code,
         // Everything else aborted the script mid-flight. `ShellError::fatal_exit_status` decides
         // what that is worth — deliberately *not* the status the same error produces elsewhere:
         // inside a subshell or a pipeline stage it is just a failed command, worth 1, and an
@@ -110,7 +140,7 @@ fn handle_exit_error(err: ShellError) -> ! {
         e => {
             let status = e.fatal_exit_status();
             eprintln!("rush: {}", e);
-            std::process::exit(status);
+            status
         }
     }
 }
@@ -133,7 +163,12 @@ fn run_repl() -> ! {
     // (Addressed by path rather than a re-export: `exec::mod` is being edited elsewhere.)
     rush::exec::pipeline::set_interactive(true);
 
-    let env_struct = Arc::new(Mutex::new(Environment::new()));
+    let mut interactive_env = Environment::new();
+    // A REPL is interactive and reads its program from the terminal: `$-` says so with `i` and
+    // `s`, which is how a sourced script tells an interactive shell from a batch one.
+    interactive_env.set_option(ShellOption::Interactive, true);
+    interactive_env.set_option(ShellOption::StdinInput, true);
+    let env_struct = Arc::new(Mutex::new(interactive_env));
     let lua = LuaEngine::new().expect("Failed to initialize Lua engine");
     let _ = lua.setup_bindings(Arc::clone(&env_struct));
 
@@ -205,6 +240,12 @@ fn run_repl() -> ! {
                         if let Some(ref path) = history_path {
                             let _ = rl.save_history(path);
                         }
+                        // R6.5: `exit` from the prompt is still a shell ending, so the EXIT trap
+                        // fires here too. A REPL that skipped it would leave behind exactly the
+                        // temp files an interactive session accumulates most of.
+                        let mut env_guard = env_struct.lock().unwrap();
+                        let code = run_exit_trap(&mut env_guard, code);
+                        drop(env_guard);
                         std::process::exit(code);
                     }
                     Err(err) => {
@@ -232,5 +273,10 @@ fn run_repl() -> ! {
     if let Some(ref path) = history_path {
         let _ = rl.save_history(path);
     }
+    // End of input (Ctrl-D) is the other way a REPL ends, and POSIX makes no distinction: the
+    // EXIT trap fires on both.
+    let mut env_guard = env_struct.lock().unwrap();
+    let last_status = run_exit_trap(&mut env_guard, last_status);
+    drop(env_guard);
     std::process::exit(last_status);
 }

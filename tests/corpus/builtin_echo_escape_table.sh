@@ -1,0 +1,12 @@
+# mode: bash
+echo -e 'a\tb\nc'
+echo -e 'bell:\a back:\b form:\f vtab:\v'
+echo -e 'oct:\0101 hex:\x41 esc:\e[0m'
+echo -e 'partial:\x4 wide:\x41A quad:\01234'
+echo -e 'unknown:\q eight:\8 nohex:\xZ'
+echo -e 'stop:\chidden'
+echo -ne 'joined'
+echo -en '-and-more\n'
+echo -E 'raw:\t'
+echo -eE 'last-wins:\t'
+echo -Ee 'last-wins:\t'
