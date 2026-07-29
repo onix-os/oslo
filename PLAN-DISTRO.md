@@ -156,11 +156,25 @@ reaped. The shell no longer reads `/proc` anywhere — `times` uses `getrusage(2
 hostname `gethostname(2)` — so a root without `/proc` mounted is no longer a special case. True
 PID-1 behaviour could not be exercised here: `unshare -p` needs privileges this sandbox refuses.
 
-**Still open: process substitution**, now the *only* parser gap, and it accounts for all 74
-remaining rejections — 10% of the real scripts on this machine. It was deferred as "not POSIX",
-which is true and, on this evidence, not the right test for a distro that intends oslo to be its
-only shell. C1 is done (every Round A defect has a corpus case); C2, a Lua corpus with
-expected-output oracles, is not started.
+**Process substitution is implemented**, and the sweep is now **739 of 740**. The one rejection
+left is the C-source-in-a-quoted-string false positive above.
+
+`<(cmd)` and `>(cmd)` run the body on a pipe and hand over `/dev/fd/N`. Three things decided the
+design, each of which is a way it silently fails otherwise: the descriptor has to outlive
+*expansion* (the program opens the path only once every word is expanded, so it is closed after
+the command, on every exit path); the child must not keep the end the caller was named by, or a
+`<(…)` reader never sees EOF and `cat <(echo hi)` hangs; and the descriptor must survive `exec`,
+which means clearing the `O_CLOEXEC` Rust sets on every fd it opens.
+
+Verified against bash on 13 forms — both directions, two at once, nesting, redirect targets,
+inside `$( )`, a failing body, and `head -1 <(yes)` for the SIGPIPE path. No descriptor leak over
+60 substitutions, no zombies.
+
+Known gap: `for f in <(echo a)` is still a parse error. bash accepts a process substitution in a
+`for` word list; it did not appear in any of the 740 scripts.
+
+C1 is done (every Round A defect has a corpus case); C2, a Lua corpus with expected-output
+oracles, is not started.
 
 ## Sequencing
 
