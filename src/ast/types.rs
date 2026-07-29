@@ -367,10 +367,28 @@ pub enum ListOp {
     Newline,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Eq)]
 pub struct ListItem {
     pub and_or: AndOrList,
     pub op: ListOp,
+    /// Line in the source this item starts on, 1-based, or 0 when it did not come from a file.
+    ///
+    /// Carried so `$LINENO` can answer. It is per *list item* — per statement — because that is
+    /// the granularity POSIX describes and the one a `die() { echo "$0:$LINENO"; }` helper wants:
+    /// the line of the command being run, not of some sub-expression inside it.
+    pub line: u32,
+}
+
+/// Equality is *structural*: where a command was written is not part of what it is.
+///
+/// Hand-written rather than derived so that `line` stays out of it. Two items that run the same
+/// commands are the same command whether they came from line 3 or line 30 — which is what the
+/// unparse round-trip test asserts, since re-emitting a script legitimately moves everything onto
+/// different lines.
+impl PartialEq for ListItem {
+    fn eq(&self, other: &Self) -> bool {
+        self.and_or == other.and_or && self.op == other.op
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]

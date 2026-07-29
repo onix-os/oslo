@@ -43,6 +43,7 @@ fn extended_test_to_and_or(expr: &ast::ExtendedTestExpr) -> Result<oslo_ast::And
                         items: vec![oslo_ast::ListItem {
                             and_or: list,
                             op: oslo_ast::ListOp::Sequential,
+                            line: 0,
                         }],
                     }),
                     redirections: Vec::new(),

@@ -89,12 +89,21 @@ pub(super) fn convert_compound_list(list: &ast::CompoundList) -> Result<oslo_ast
 /// The separator is what distinguishes `sleep 10 &` from `sleep 10;` — dropping it silently
 /// turns every background job into a foreground one.
 fn convert_list_item(item: &ast::CompoundListItem) -> Result<oslo_ast::ListItem> {
+    // brush records where each node came from; this is the only place that reads it, and it is
+    // what lets `$LINENO` name a real line instead of being empty.
+    let line = {
+        use brush_parser::ast::SourceLocation as _;
+        item.0
+            .location()
+            .map(|span| span.start.line as u32)
+            .unwrap_or(0)
+    };
     let and_or = convert_and_or(&item.0)?;
     let op = match item.1 {
         ast::SeparatorOperator::Async => oslo_ast::ListOp::Background,
         ast::SeparatorOperator::Sequence => oslo_ast::ListOp::Sequential,
     };
-    Ok(oslo_ast::ListItem { and_or, op })
+    Ok(oslo_ast::ListItem { and_or, op, line })
 }
 
 fn convert_and_or(and_or: &ast::AndOrList) -> Result<oslo_ast::AndOrList> {

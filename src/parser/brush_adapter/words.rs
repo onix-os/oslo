@@ -20,6 +20,7 @@ pub(super) fn single_command_list(cmd: oslo_ast::Command) -> oslo_ast::CommandLi
                 rest: Vec::new(),
             },
             op: oslo_ast::ListOp::Sequential,
+            line: 0,
         }],
     }
 }
@@ -31,6 +32,7 @@ pub(super) fn single_command(and_or: oslo_ast::AndOrList) -> oslo_ast::Command {
             items: vec![oslo_ast::ListItem {
                 and_or,
                 op: oslo_ast::ListOp::Sequential,
+                line: 0,
             }],
         }),
         redirections: Vec::new(),

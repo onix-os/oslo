@@ -40,16 +40,32 @@ Ordered by what breaks first when a distro is built on this.
 `$RANDOM` and `$SECONDS` are bash-isms rather than POSIX, and are listed here only so the decision
 to skip them is on the record.
 
-### Round A status
+### Round A status — done
 
-Done and verified against bash: **A1** (`-n` now parses without executing, per command so
-`set -n` mid-script also stops, ignored when interactive per POSIX), **A2** (`set -a` exports,
-decided in `set_var` so `read`/`for`/`${v:=}` are covered, and `set +a` stops it), **A3** (EXIT
-traps now run in all four subshell forms: `( )`, `$( )`, a pipeline stage, and `&`), **A6**
-(`$UID`/`$EUID`/`$PPID`, unexported like bash, and an inherited value still wins).
+All seven closed and verified against bash. Re-running the ~60-idiom probe now leaves one
+difference, `$0` under `-c`, which is the two shells reporting their own names.
 
-Still open: **A4**, **A5** (`$LINENO` needs line numbers on the AST, the largest of these),
-**A7** (builtin `printf`).
+* **A1** `-n` parses without executing, checked per command so `set -n` mid-script also stops, and
+  ignored when interactive per POSIX.
+* **A2** `set -a` exports, decided in `set_var` so `read`, `for` variables and `${v:=}` are all
+  covered; `set +a` stops it.
+* **A3** EXIT traps run in all four subshell forms — `( )`, `$( )`, a pipeline stage, `&` — each
+  of which had its own `process::exit`.
+* **A4** `$(trap)` reports inherited traps. A subshell keeps the trap *strings* for listing while
+  resetting the *actions*, which is the distinction POSIX's command-substitution carve-out needs.
+  The listing also matches bash's spelling in both modes: `SIGINT` normally, bare `INT` under
+  `set -o posix` — following only the first broke every posix-mode script, and the corpus caught it.
+* **A5** `$LINENO`, from brush's own source spans through a `line` on `ListItem`. Matches bash in
+  functions, loops and `if` branches. Position is excluded from AST equality: where a command was
+  written is not part of what it is, and re-emitting a script legitimately moves it.
+* **A6** `$UID`/`$EUID`/`$PPID`, unexported like bash, with an inherited value still winning.
+* **A7** `printf` is built in — 31 differential cases against bash at zero differences, including
+  `%b` vs `%s` escape handling, `%q` in bash's backslash form, C's `e+03` exponent, and length
+  modifiers (`%zb` is `%b`, not an error).
+
+Found while doing it, still open: bash lists signals that were **ignored on entry** (`trap` shows
+`trap -- '' INT` for a shell started with SIGINT already ignored); oslo does not track the
+disposition it inherited, so it lists nothing for those.
 
 ## Round B — Lua is not yet a language you can write the system in
 
