@@ -86,7 +86,7 @@ fn push_escape(out: &mut Vec<u8>, chars: &[char], i: usize) -> usize {
 ///
 /// The result is bytes rather than a `String` because `\xHH` above 0x7f denotes one raw byte,
 /// which UTF-8 would silently widen to two.
-fn expand_escapes(text: &str) -> (Vec<u8>, bool) {
+pub(super) fn expand_escapes(text: &str) -> (Vec<u8>, bool) {
     let chars: Vec<char> = text.chars().collect();
     let mut out = Vec::with_capacity(text.len());
     let mut i = 0;

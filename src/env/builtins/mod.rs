@@ -49,7 +49,7 @@ pub use directories::{builtin_cd, builtin_dirs, builtin_popd, builtin_pushd, bui
 pub use exec::builtin_exec;
 pub use getopts::builtin_getopts;
 pub use hash::builtin_hash;
-pub use io::{builtin_echo, builtin_read};
+pub use io::{builtin_echo, builtin_printf, builtin_read};
 pub use jobs::{builtin_bg, builtin_disown, builtin_fg, builtin_jobs, builtin_wait};
 pub use r#let::builtin_let;
 pub use mapfile::builtin_mapfile;
@@ -93,6 +93,7 @@ pub fn register_default_builtins(env: &mut Environment) {
     env.register_custom_builtin("cd", builtin_cd);
     env.register_custom_builtin("pwd", builtin_pwd);
     env.register_custom_builtin("echo", builtin_echo);
+    env.register_custom_builtin("printf", builtin_printf);
     env.register_custom_builtin("export", builtin_export);
     env.register_custom_builtin("unset", builtin_unset);
     env.register_custom_builtin("set", builtin_set);

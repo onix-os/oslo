@@ -132,9 +132,12 @@ fn builtin_forces_the_builtin_over_a_function() {
     );
 }
 
+/// `builtin` only reaches builtins. `cat` rather than `printf`: `printf` used to be external and
+/// was the example here, until it became a builtin and quietly turned this into a test that
+/// `builtin printf` *works* — which is a different claim.
 #[test]
 fn builtin_refuses_an_external_command() {
-    let r = run("builtin printf hi");
+    let r = run("builtin cat /dev/null");
     assert_eq!(r.status, 1);
     assert!(!r.stderr.is_empty());
 }

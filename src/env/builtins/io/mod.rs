@@ -6,10 +6,12 @@
 //! variables, and [`read`] owns the option grammar that connects them.
 
 mod echo;
+mod printf;
 #[allow(clippy::module_inception)]
 mod read;
 mod read_input;
 mod read_split;
 
 pub use echo::builtin_echo;
+pub use printf::builtin_printf;
 pub use read::builtin_read;
