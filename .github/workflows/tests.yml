@@ -36,6 +36,14 @@ jobs:
       # `make verify` as one step reports only "the gate failed". Splitting it means the run
       # summary alone names the stage, which matters because reading job logs needs admin rights
       # on this repository and the person debugging a red build usually does not have them.
+      # The differential corpus is only as good as its oracle, and macOS ships bash 3.2 for
+      # licensing reasons — old enough that the suite refuses to run against it. Homebrew's bash
+      # is current, so put it ahead of /bin/bash rather than letting the whole corpus go untested.
+      - name: Use a current bash as the oracle (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew list bash >/dev/null 2>&1 || brew install bash
+          echo "$(brew --prefix)/bin" >> "$GITHUB_PATH"
       - name: Toolchain and environment
         run: |
           echo "make:  $(make --version | head -1)"
@@ -57,6 +65,15 @@ jobs:
         run: make check-readme
       - name: check
         run: make check
+      # Run before the full suite purely to surface the corpus summary. libtest captures stdout on
+      # success, so without --nocapture the "N cases skipped, the oracle is bash X.Y" line never
+      # reaches the log — and a runner image whose bash falls behind would quietly stop exercising
+      # cases with nothing turning red. Re-running these three tests costs about three seconds.
+      - name: differential corpus (oracle report)
+        run: |
+          cargo test --test differential_tests -- --nocapture 2>&1 | tee /tmp/diff.log
+          grep -E 'differential corpus vs|needs bash' /tmp/diff.log \
+            | while IFS= read -r l; do echo "::notice::$l"; done
       - name: test
         run: |
           set -o pipefail

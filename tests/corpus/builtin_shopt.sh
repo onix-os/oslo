@@ -1,4 +1,8 @@
 # mode: bash
+# needs-bash: 5.3
+# The name column is as wide as the longest option bash knows, so it grew from 15 to 20 when 5.3
+# added longer option names. rush pads to 20; against 5.2 every line here differs by five spaces.
+#
 # `shopt` is a namespace of its own: `set -o` cannot reach these, and `-o` is the bridge.
 shopt globstar
 shopt nullglob

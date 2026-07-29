@@ -59,6 +59,34 @@ struct Case {
     name: String,
     oracle: Oracle,
     script: String,
+    /// Lowest bash `(major, minor)` that arbitrates this case, from a `# needs-bash: 5.3` header.
+    ///
+    /// Bash is a moving specification, not a fixed one: three of its behaviours changed between
+    /// 5.2 and 5.3, and rush follows the newer answer. Running those cases against an older oracle
+    /// compares rush to a bash that has since been corrected, so the case is skipped and counted
+    /// rather than reported as a rush defect. This is deliberately *not* a third escape hatch
+    /// alongside `EXPECTED_FAIL` and `KNOWN_DIVERGENT` — it says "this runner's oracle is too old
+    /// to answer", which is a fact about the machine, and the count is printed so a CI image that
+    /// silently ages cannot quietly stop testing things.
+    needs_bash: Option<(u32, u32)>,
+}
+
+/// Reads a `# needs-bash: 5.3` line out of a script's leading comment block.
+fn parse_needs_bash(name: &str, script: &str) -> Option<(u32, u32)> {
+    let raw = script
+        .lines()
+        .take_while(|l| l.starts_with('#') || l.trim().is_empty())
+        .find_map(|l| l.trim().strip_prefix("# needs-bash:"))?
+        .trim();
+    let (major, minor) = raw.split_once('.').unwrap_or_else(|| {
+        panic!("{name}: `# needs-bash:` wants a major.minor version, found {raw:?}")
+    });
+    let parse = |s: &str, which| {
+        s.trim()
+            .parse()
+            .unwrap_or_else(|_| panic!("{name}: `# needs-bash:` {which} is not a number: {raw:?}"))
+    };
+    Some((parse(major, "major"), parse(minor, "minor")))
 }
 
 fn corpus_dir() -> PathBuf {
@@ -81,10 +109,12 @@ fn load_corpus() -> Vec<Case> {
                     "{name}: first line must be `# mode: posix` or `# mode: bash`, found {other:?}"
                 ),
             };
+            let needs_bash = parse_needs_bash(&name, &script);
             Case {
                 name,
                 oracle,
                 script,
+                needs_bash,
             }
         })
         .collect();
@@ -275,28 +305,35 @@ fn run_all(cases: &[Case]) -> Vec<(String, Verdict)> {
     })
 }
 
+/// The oracle's `(major, minor)`, asserting it is new enough to arbitrate anything at all.
+///
 /// The corpus uses constructs bash grew in 4.x (`${v^^}`, `&>`), so an ancient oracle would
 /// report differences that say nothing about rush. macOS ships bash 3.2 for licensing reasons —
-/// fail with the reason rather than with 40 mystery divergences.
-fn assert_oracle_is_usable() {
+/// fail with the reason rather than with 40 mystery divergences. The minor version matters too:
+/// it decides which cases carry a `# needs-bash:` line this runner cannot honour.
+fn oracle_version() -> (u32, u32) {
     let out = Command::new("bash")
-        .args(["-c", "echo ${BASH_VERSINFO[0]}"])
+        .args(["-c", "echo ${BASH_VERSINFO[0]}.${BASH_VERSINFO[1]}"])
         .output()
         .expect("bash must be on PATH: it is this suite's oracle");
-    let major: u32 = String::from_utf8_lossy(&out.stdout)
-        .trim()
-        .parse()
-        .unwrap_or(0);
+    let text = String::from_utf8_lossy(&out.stdout).trim().to_owned();
+    let version = text
+        .split_once('.')
+        .and_then(|(a, b)| Some((a.parse().ok()?, b.parse().ok()?)));
+    let (major, minor) = version.unwrap_or_else(|| {
+        panic!("could not read the oracle's version from `bash --version` output {text:?}")
+    });
     assert!(
         major >= 4,
-        "the oracle must be bash 4 or newer (found major version {major}); \
+        "the oracle must be bash 4 or newer (found {major}.{minor}); \
          on macOS install a current bash and put it ahead of /bin/bash on PATH"
     );
+    (major, minor)
 }
 
 #[test]
 fn corpus_matches_bash() {
-    assert_oracle_is_usable();
+    let oracle = oracle_version();
 
     let cases = load_corpus();
     assert!(
@@ -311,9 +348,17 @@ fn corpus_matches_bash() {
         .collect();
     let divergent: BTreeSet<&str> = KNOWN_DIVERGENT.iter().map(|(file, _)| *file).collect();
 
+    let mut too_new_for_oracle: Vec<String> = Vec::new();
     let cases: Vec<Case> = cases
         .into_iter()
         .filter(|c| !divergent.contains(c.name.as_str()))
+        .filter(|c| match c.needs_bash {
+            Some(want) if want > oracle => {
+                too_new_for_oracle.push(format!("{} (needs bash {}.{})", c.name, want.0, want.1));
+                false
+            }
+            _ => true,
+        })
         .collect();
 
     let mut unexpected_failures = Vec::new();
@@ -358,16 +403,35 @@ fn corpus_matches_bash() {
             unexpected_passes.join("\n")
         ));
     }
+    // Printed on success as well as failure, and always naming the oracle. A runner image whose
+    // bash falls behind stops exercising cases without any test turning red, so the only defence
+    // is that the number is visible in every run.
+    let skipped = if too_new_for_oracle.is_empty() {
+        String::new()
+    } else {
+        format!(
+            "\n{} case(s) skipped — the oracle is bash {}.{}:\n  {}",
+            too_new_for_oracle.len(),
+            oracle.0,
+            oracle.1,
+            too_new_for_oracle.join("\n  ")
+        )
+    };
+
     assert!(
         report.is_empty(),
-        "{report}\n({matched} matching, {still_failing} known-failing, \
-         {} skipped as known-divergent)\n",
+        "{report}\n(oracle bash {}.{}: {matched} matching, {still_failing} known-failing, \
+         {} known-divergent){skipped}\n",
+        oracle.0,
+        oracle.1,
         divergent.len()
     );
 
     eprintln!(
-        "differential corpus: {matched} matching bash, {still_failing} known-failing, \
-         {} known-divergent",
+        "differential corpus vs bash {}.{}: {matched} matching, {still_failing} known-failing, \
+         {} known-divergent{skipped}",
+        oracle.0,
+        oracle.1,
         divergent.len()
     );
 }

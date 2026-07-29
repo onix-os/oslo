@@ -1,4 +1,8 @@
 # mode: posix
+# needs-bash: 5.3
+# bash 5.2 prints `status=1` and `STILL_ALIVE` and exits 0 here — it did not treat this as the
+# fatal case POSIX describes. 5.3 does. rush follows 5.3, so 5.2 cannot arbitrate this one.
+#
 # POSIX 2.8.1: a *special* builtin that hits a utility error makes a non-interactive shell exit.
 # `export` is one, so neither shell prints the sentinel.
 #
