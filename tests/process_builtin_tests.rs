@@ -86,6 +86,11 @@ fn signal_zero_probes_without_signalling() {
 /// which one actually arrived — the old code sent TERM for all of them.
 #[test]
 fn named_signals_are_delivered_by_name() {
+    // Signal *numbers* are not portable and only the name is: 10 is `SIGUSR1` on Linux and
+    // `SIGBUS` on macOS, so a hardcoded `-10` here tested nothing on Linux and killed the victim
+    // with a bus error on macOS. `SIGHUP` is 1 everywhere, which is why `-n 1` can stay literal.
+    let usr1 = format!("-{}", nix::sys::signal::Signal::SIGUSR1 as i32);
+
     for (spec, expected) in [
         ("-HUP", 41),
         ("-USR1", 42),
@@ -93,7 +98,7 @@ fn named_signals_are_delivered_by_name() {
         ("-SIGHUP", 41),
         ("-s USR1", 42),
         ("-n 1", 41),
-        ("-10", 42),
+        (usr1.as_str(), 42),
     ] {
         let mut victim = spawn_victim();
         settle();
