@@ -33,8 +33,30 @@ jobs:
           key: cargo-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
           restore-keys: |
             cargo-${{ runner.os }}-
-      - name: Verify
-        run: make verify
+      # `make verify` as one step reports only "the gate failed". Splitting it means the run
+      # summary alone names the stage, which matters because reading job logs needs admin rights
+      # on this repository and the person debugging a red build usually does not have them.
+      - name: Toolchain and environment
+        run: |
+          echo "make:  $(make --version | head -1)"
+          echo "bash:  $(bash --version | head -1)"
+          echo "sed:   $(sed --version 2>/dev/null | head -1 || echo 'BSD sed (no --version)')"
+          echo "cargo: $(cargo --version)"
+          echo "PROJECT_NAME parsed by the Makefile: '$(make -s print-name)'"
+      - name: fmt-check
+        run: make fmt-check
+      - name: check-loc
+        run: make check-loc
+      - name: check-readme
+        run: make check-readme
+      - name: check
+        run: make check
+      - name: test
+        run: make test
+      - name: clippy
+        run: make clippy
+      - name: rustdoc
+        run: make rustdoc
 
   # Cargo.toml claims rust-version = 1.88; this job is what makes the claim true.
   msrv:

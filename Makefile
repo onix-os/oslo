@@ -17,7 +17,7 @@ $(info ------------------------------------------)
 $(info Project: $(PROJECT_NAME) v$(PROJECT_VERSION))
 $(info ------------------------------------------)
 
-.PHONY: build b compile c run r example test t check check-all test-all check-loc check-readme clippy rustdoc fmt fmt-check clean verify install uninstall release help h
+.PHONY: build b compile c run r example test t check check-all test-all check-loc check-readme print-name clippy rustdoc fmt fmt-check clean verify install uninstall release help h
 
 build:
 	@$(CARGO) build
@@ -66,6 +66,12 @@ test-all:
 
 clean:
 	@$(CARGO) clean
+
+# Echoes the name the Makefile parsed out of PROJECT. CI prints this because a portability
+# difference in the sed above yields an empty name, which trips the $(error) at the top of this
+# file before any target runs — a failure that looks like nothing at all in a run summary.
+print-name:
+	@echo '$(PROJECT_NAME)'
 
 check-loc:
 	@./scripts/check-loc.sh
