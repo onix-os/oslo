@@ -125,9 +125,11 @@ pub(super) fn eval_unary(env: &Environment, op: &str, target: &str) -> TestResul
         "-k" => mode_bits() & 0o1000 != 0,
         "-O" => fs::metadata(path).is_ok_and(|m| m.uid() == nix::unistd::geteuid().as_raw()),
         "-G" => fs::metadata(path).is_ok_and(|m| m.gid() == nix::unistd::getegid().as_raw()),
-        // "modified since last read": mtime strictly after atime.
+        // "modified since last read": bash's test.c asks `atime <= mtime`, so a file whose two
+        // stamps are identical — every freshly written file that nothing has read — counts as
+        // modified. A strict `>` reported those as already-read.
         "-N" => fs::metadata(path)
-            .is_ok_and(|m| (m.mtime(), m.mtime_nsec()) > (m.atime(), m.atime_nsec())),
+            .is_ok_and(|m| (m.mtime(), m.mtime_nsec()) >= (m.atime(), m.atime_nsec())),
         // A non-numeric fd is not an error, just never a terminal.
         "-t" => target
             .trim()
@@ -136,9 +138,14 @@ pub(super) fn eval_unary(env: &Environment, op: &str, target: &str) -> TestResul
         "-z" => target.is_empty(),
         "-n" => !target.is_empty(),
         "-v" => env.get_param(target).is_some(),
-        // `-o` needs a `set -o` option table and `-R` needs namerefs; neither exists yet, and a
-        // never-set option is what bash reports for every option this shell does not implement.
-        "-o" | "-R" => false,
+        // `-o NAME` reads the same table `set -o` writes, so `[[ -o errexit ]]` cannot disagree
+        // with `set -o` about whether errexit is on. An unknown name is false, not an error —
+        // that is what bash answers, and it is what makes `[[ -o pipefail ]] || ...` portable to
+        // shells lacking the option.
+        "-o" => crate::env::options::ShellOption::from_name(target).is_some_and(|o| env.option(o)),
+        // `-R` needs namerefs, which this shell does not have; false is what bash answers for a
+        // variable that is set but not a nameref, and no variable here is ever one.
+        "-R" => false,
         other => {
             return Err(TestError::new(format!(
                 "{}: unary operator expected",

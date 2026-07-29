@@ -1,0 +1,11 @@
+# mode: posix
+# R7.3: the `jobs` line is bash's, column for column. The state is padded to 27 so the command
+# starts in column 34, and a job still running detached keeps the `&` the user typed — rush used
+# to pad to 24 and drop the `&`, which is three columns and two characters of drift from every
+# other shell. Only the Running state is asserted: `Done` is spelled differently by `bash --posix`
+# (`Done(5)`) and by default bash (`Exit 5`).
+sleep 1 &
+jobs
+echo "status=$?"
+kill %1 2>/dev/null
+wait 2>/dev/null

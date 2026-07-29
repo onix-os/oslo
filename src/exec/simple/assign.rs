@@ -1,0 +1,189 @@
+//! Performing an assignment.
+//!
+//! Four shapes reach here — `name=v`, `name[i]=v`, `name=(…)` and any of them with `+=` — and the
+//! rules they share are the ones that are easy to get subtly different, which is why they live in
+//! one place:
+//!
+//! * the right-hand side is **not** field-split and **not** globbed (POSIX 2.9.1), so `x=*.rs`
+//!   stores the pattern and `x=$(printf 'a\nb')` keeps its newline;
+//! * an *array literal's* elements are the opposite — each element is a word that expands to as
+//!   many fields as it wants, so `a=($list)` and `a=(*.c)` are how a script builds an array;
+//! * a subscript is arithmetic, evaluated when the assignment runs.
+
+use crate::ast::{ArrayElement, Assignment, AssignmentTarget, AssignmentValue};
+use crate::env::Environment;
+use crate::env::scope::ShellArray;
+use crate::error::{Result, ShellError};
+use crate::expand::arithmetic::eval_arithmetic;
+use crate::expand::{expand_word, expand_word_to_string};
+
+/// Apply one assignment to the shell's own variables.
+///
+/// The `String` handed back is what `set -x` traces; an array literal traces as the elements it
+/// expanded to, which is the information a reader of the trace actually wants.
+pub(super) fn apply_assignment(env: &mut Environment, assign: &Assignment) -> Result<String> {
+    match (&assign.target, &assign.value) {
+        (AssignmentTarget::Name(name), AssignmentValue::Scalar(word)) => {
+            let value = expand_word_to_string(env, word)?;
+            if assign.append {
+                // `x+=b` on an *array* appends an element, as bash does; on a scalar it
+                // concatenates. Which one it is depends on what the name already holds.
+                if env.get_array(name).is_some() {
+                    env.append_array_element(name, &value);
+                    return Ok(value);
+                }
+                let value = format!("{}{}", env.get_var(name).unwrap_or_default(), value);
+                env.set_var(name, &value, false);
+                return Ok(value);
+            }
+            env.set_var(name, &value, false);
+            Ok(value)
+        }
+
+        (AssignmentTarget::Element { name, index }, AssignmentValue::Scalar(word)) => {
+            let index = eval_subscript(env, index)?;
+            let mut value = expand_word_to_string(env, word)?;
+            if assign.append {
+                let existing = env.get_array(name).and_then(|a| a.get(index)).unwrap_or("");
+                value = format!("{existing}{value}");
+            }
+            env.set_array_element(name, index, &value);
+            Ok(value)
+        }
+
+        (AssignmentTarget::Name(name), AssignmentValue::Array(elements)) => {
+            let array = build_array(env, name, elements, assign.append)?;
+            // Parenthesised for the `set -x` trace: `+ a=(1 2)` reads as a list, where the bare
+            // `1 2` would look like a scalar holding a space.
+            let joined = format!("({})", array.joined(" "));
+            // Inside a function `a=(…)` is still global unless `local`/`declare` said otherwise,
+            // which is what `set_array` does; `set_local_array` is the declaration builtins' path.
+            env.set_array(name, array);
+            Ok(joined)
+        }
+
+        // `a[0]=(1 2)` — bash rejects this too ("cannot assign list to array member"). Refusing is
+        // the point: silently storing the source text is what this round exists to remove.
+        (AssignmentTarget::Element { name, .. }, AssignmentValue::Array(_)) => Err(
+            ShellError::ExpansionError(format!("{name}: cannot assign a list to an array element")),
+        ),
+    }
+}
+
+/// Build the array an `a=(…)` or `a+=(…)` literal denotes.
+///
+/// Unindexed elements go to the next free index, so `a=(x [5]=y z)` puts `z` at 6 — bash's rule,
+/// and the reason the running index is taken from the array rather than from the element count.
+fn build_array(
+    env: &mut Environment,
+    name: &str,
+    elements: &[ArrayElement],
+    append: bool,
+) -> Result<ShellArray> {
+    let mut array = if append {
+        env.get_array(name).cloned().unwrap_or_default()
+    } else {
+        ShellArray::default()
+    };
+
+    for element in elements {
+        match &element.index {
+            Some(index) => {
+                let index = eval_subscript(env, index)?;
+                array.set(index, expand_word_to_string(env, &element.value)?);
+            }
+            // Not `expand_word_to_string`: an element of an array literal is an ordinary word in
+            // list context, so `a=($list)` splits and `a=(*.c)` globs, both into separate
+            // elements. That is the difference between an array literal and a scalar assignment.
+            None => {
+                for field in expand_word(env, &element.value)? {
+                    array.push(field);
+                }
+            }
+        }
+    }
+
+    Ok(array)
+}
+
+/// Evaluate a subscript as arithmetic: `a[i+1]=x` writes where `i+1` points when it runs.
+fn eval_subscript(env: &mut Environment, word: &crate::ast::Word) -> Result<i64> {
+    let text = expand_word_to_string(env, word)?;
+    let text = text.trim();
+    if text.is_empty() {
+        return Err(ShellError::ExpansionError(
+            "bad array subscript".to_string(),
+        ));
+    }
+    eval_arithmetic(env, text)
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::env::Environment;
+
+    /// Run a snippet and report what `name` ended up holding, elements joined by a space.
+    fn array_of(src: &str, name: &str) -> String {
+        let mut env = Environment::new();
+        let script = crate::parser::parse_bash_script(src).expect("parse");
+        crate::exec::eval_command_list(&mut env, &script).expect("exec");
+        env.get_array(name)
+            .map(|a| a.joined(" "))
+            .unwrap_or_else(|| format!("<not an array: {:?}>", env.get_var(name)))
+    }
+
+    #[test]
+    fn an_array_literal_stores_its_elements() {
+        assert_eq!(array_of("rush_x1=(1 2 3)", "rush_x1"), "1 2 3");
+        assert_eq!(array_of("rush_x2=()", "rush_x2"), "");
+    }
+
+    /// The elements are words in list context: an unquoted expansion splits into several.
+    #[test]
+    fn an_unquoted_element_splits_into_several() {
+        let src = "rush_l='a b c'\nrush_x3=($rush_l)";
+        assert_eq!(array_of(src, "rush_x3"), "a b c");
+        // …and a quoted one does not.
+        let src = "rush_l='a b c'\nrush_x4=(\"$rush_l\" d)";
+        assert_eq!(array_of(src, "rush_x4"), "a b c d");
+    }
+
+    #[test]
+    fn an_explicit_index_moves_the_running_position() {
+        let mut env = Environment::new();
+        let script = crate::parser::parse_bash_script("rush_x5=(a [5]=b c)").expect("parse");
+        crate::exec::eval_command_list(&mut env, &script).expect("exec");
+        let array = env.get_array("rush_x5").expect("an array");
+        assert_eq!(array.indices().collect::<Vec<_>>(), vec![0, 5, 6]);
+    }
+
+    #[test]
+    fn append_extends_an_array_and_concatenates_a_scalar() {
+        assert_eq!(array_of("rush_x6=(a b)\nrush_x6+=(c)", "rush_x6"), "a b c");
+        let mut env = Environment::new();
+        let script = crate::parser::parse_bash_script("rush_x7=a\nrush_x7+=b").expect("parse");
+        crate::exec::eval_command_list(&mut env, &script).expect("exec");
+        assert_eq!(env.get_var("rush_x7"), Some("ab"));
+    }
+
+    /// An element assignment must write the element, not a variable whose name contains brackets.
+    #[test]
+    fn an_element_assignment_writes_an_element() {
+        assert_eq!(array_of("rush_x8[2]=y", "rush_x8"), "y");
+        let mut env = Environment::new();
+        let script = crate::parser::parse_bash_script("rush_x9[2]=y").expect("parse");
+        crate::exec::eval_command_list(&mut env, &script).expect("exec");
+        assert_eq!(env.get_var("rush_x9[2]"), None);
+        assert_eq!(env.get_array("rush_x9").unwrap().get(2), Some("y"));
+    }
+
+    /// The subscript is arithmetic, evaluated when the assignment runs.
+    #[test]
+    fn a_subscript_is_arithmetic() {
+        let src = "rush_i=1\nrush_xa[rush_i+1]=z";
+        let mut env = Environment::new();
+        let script = crate::parser::parse_bash_script(src).expect("parse");
+        crate::exec::eval_command_list(&mut env, &script).expect("exec");
+        assert_eq!(env.get_array("rush_xa").unwrap().get(2), Some("z"));
+    }
+}

@@ -18,28 +18,55 @@
 //! empty string that fallback used to produce is what hid nine unimplemented operators.
 
 use super::quoting::parse_word_source;
-use crate::ast::{ParamExpansion, ReplaceScope, WordPart};
+use crate::ast::{ParamExpansion, Subscript, WordPart};
 use crate::error::Result;
-use scan::{Nesting, find_param_operator, split_top_level};
+use operators::operator_expansion;
+use scan::{find_param_operator, split_name_subscript};
 
+mod operators;
 mod scan;
 
 /// Turn the raw body of a `${…}` into the word part it denotes.
 pub(super) fn parse_braced_body(content: &str) -> Result<WordPart> {
-    if let Some(part) = prefix_form(content) {
+    if let Some(part) = prefix_form(content)? {
         return Ok(part);
     }
 
     let Some((idx, op)) = find_param_operator(content) else {
-        return Ok(WordPart::Variable {
-            name: content.to_string(),
-            expansion_type: ParamExpansion::Normal,
-        });
+        return reference(content, ParamExpansion::Normal);
     };
 
-    Ok(WordPart::Variable {
-        name: content[..idx].to_string(),
-        expansion_type: operator_expansion(op, &content[idx + op.len()..])?,
+    reference(
+        &content[..idx],
+        operator_expansion(op, &content[idx + op.len()..])?,
+    )
+}
+
+/// Build the reference `name` denotes, which is an array element whenever it has a subscript.
+///
+/// The one place `a[1]` stops being a name: it used to be handed to the expander whole, which
+/// looked up a *variable literally called* `a[1]` — so `m[x]=1; echo ${m[x]}` appeared to work
+/// only because the assignment had created a variable of that same odd name.
+fn reference(name: &str, expansion_type: ParamExpansion) -> Result<WordPart> {
+    let Some((name, subscript)) = split_name_subscript(name) else {
+        return Ok(WordPart::Variable {
+            name: name.to_string(),
+            expansion_type,
+        });
+    };
+    Ok(WordPart::ArrayRef {
+        name: name.to_string(),
+        subscript: parse_subscript(subscript)?,
+        expansion_type,
+    })
+}
+
+/// `[@]`, `[*]`, or an arithmetic index.
+fn parse_subscript(text: &str) -> Result<Subscript> {
+    Ok(match text {
+        "@" => Subscript::All,
+        "*" => Subscript::Joined,
+        _ => Subscript::Index(parse_word_source(text)?),
     })
 }
 
@@ -49,114 +76,25 @@ pub(super) fn parse_braced_body(content: &str) -> Result<WordPart> {
 /// special parameter, so the marker only counts when a name follows it.
 ///
 /// `${!prefix*}` — bash's name-listing form — reaches here as the name `prefix*`, which is not a
-/// parameter name and so becomes a `bad substitution` error rather than a wrong answer.
-fn prefix_form(content: &str) -> Option<WordPart> {
+/// parameter name and so becomes a `bad substitution` error rather than a wrong answer. `${!a[@]}`
+/// does *not*: a subscripted `!` is the list of indices in use, which the expander implements.
+fn prefix_form(content: &str) -> Result<Option<WordPart>> {
     let mut chars = content.chars();
-    let expansion_type = match chars.next()? {
-        '#' => ParamExpansion::Length,
-        '!' => ParamExpansion::Indirect,
-        _ => return None,
+    let expansion_type = match chars.next() {
+        Some('#') => ParamExpansion::Length,
+        Some('!') => ParamExpansion::Indirect,
+        _ => return Ok(None),
     };
     let name = chars.as_str();
     if name.is_empty() {
-        return None;
+        return Ok(None);
     }
-    Some(WordPart::Variable {
-        name: name.to_string(),
-        expansion_type,
-    })
-}
-
-/// Build the expansion for `op` from the text that follows it.
-///
-/// Every operand stays a [`crate::ast::Word`]: `${x:-$HOME}` has to expand its default, and
-/// `${v/$sep/-}` has to expand its pattern, both at use time rather than here.
-fn operator_expansion(op: &str, rest: &str) -> Result<ParamExpansion> {
-    Ok(match op {
-        // A substring operand is arithmetic, so parentheses nest and `${v:(-1)}` splits correctly.
-        ":" => {
-            let (offset, length) = split_top_level(rest, ':', Nesting::Arithmetic);
-            ParamExpansion::Substring {
-                offset: parse_word_source(offset)?,
-                length: length.map(parse_word_source).transpose()?,
-            }
-        }
-
-        // `${v/pat}` with no second `/` deletes the match, so an absent replacement is empty
-        // rather than an error. Parentheses are ordinary pattern data here, unlike above.
-        "/" | "//" | "/#" | "/%" => {
-            let (pattern, replacement) = split_top_level(rest, '/', Nesting::Expansion);
-            ParamExpansion::Replace {
-                pattern: parse_word_source(pattern)?,
-                replacement: parse_word_source(replacement.unwrap_or(""))?,
-                scope: match op {
-                    "//" => ReplaceScope::All,
-                    "/#" => ReplaceScope::Prefix,
-                    "/%" => ReplaceScope::Suffix,
-                    _ => ReplaceScope::First,
-                },
-            }
-        }
-
-        // The optional operand selects which characters are eligible; absent means all of them.
-        "^" | "^^" | "," | ",," => ParamExpansion::CaseConvert {
-            pattern: if rest.is_empty() {
-                None
-            } else {
-                Some(parse_word_source(rest)?)
-            },
-            upper: op.starts_with('^'),
-            all: op.chars().count() == 2,
-        },
-
-        _ => {
-            let arg = parse_word_source(rest)?;
-            // A leading `:` is not a different operator, only a different notion of "absent":
-            // the `:` forms treat a set-but-empty parameter as unset, the colon-less ones do not.
-            let test_null = op.starts_with(':');
-            match op.strip_prefix(':').unwrap_or(op) {
-                "-" => ParamExpansion::DefaultValue {
-                    default: arg,
-                    assign_if_unset: false,
-                    test_null,
-                },
-                "=" => ParamExpansion::DefaultValue {
-                    default: arg,
-                    assign_if_unset: true,
-                    test_null,
-                },
-                "+" => ParamExpansion::UseAlternative {
-                    alternative: arg,
-                    test_null,
-                },
-                "?" => ParamExpansion::ErrorIfUnset {
-                    message: arg,
-                    test_null,
-                },
-                "%%" => ParamExpansion::RemoveSuffix {
-                    pattern: arg,
-                    longest: true,
-                },
-                "%" => ParamExpansion::RemoveSuffix {
-                    pattern: arg,
-                    longest: false,
-                },
-                "##" => ParamExpansion::RemovePrefix {
-                    pattern: arg,
-                    longest: true,
-                },
-                _ => ParamExpansion::RemovePrefix {
-                    pattern: arg,
-                    longest: false,
-                },
-            }
-        }
-    })
+    reference(name, expansion_type).map(Some)
 }
 
 #[cfg(test)]
 mod tests {
-    use crate::ast::{ParamExpansion, ReplaceScope, Word, WordPart};
+    use crate::ast::{ParamExpansion, ReplaceScope, Subscript, Word, WordPart};
     use crate::lexer::{Lexer, Token};
 
     fn one_part(src: &str) -> WordPart {
@@ -504,5 +442,79 @@ mod tests {
     fn an_unknown_operator_is_left_as_a_bad_name() {
         assert_eq!(op_of("${v@Q}", "v@Q"), ParamExpansion::Normal);
         assert_eq!(op_of("${a b}", "a b"), ParamExpansion::Normal);
+    }
+
+    // --- R8.1: array subscripts ---
+
+    /// The name, subscript and operator of a `${name[sub]…}`.
+    fn ref_of(src: &str) -> (String, Subscript, ParamExpansion) {
+        match one_part(src) {
+            WordPart::ArrayRef {
+                name,
+                subscript,
+                expansion_type,
+            } => (name, subscript, expansion_type),
+            other => panic!("expected an array reference from {src:?}, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn a_subscript_splits_from_the_name() {
+        assert_eq!(
+            ref_of("${a[1]}"),
+            (
+                "a".into(),
+                Subscript::Index(lit("1")),
+                ParamExpansion::Normal
+            )
+        );
+        assert_eq!(
+            ref_of("${a[@]}"),
+            ("a".into(), Subscript::All, ParamExpansion::Normal)
+        );
+        assert_eq!(
+            ref_of("${a[*]}"),
+            ("a".into(), Subscript::Joined, ParamExpansion::Normal)
+        );
+    }
+
+    /// `${#a[@]}` is the element count and `${!a[@]}` the index list, so both prefix operators
+    /// have to survive the split rather than swallowing the subscript into the name.
+    #[test]
+    fn the_prefix_operators_keep_the_subscript() {
+        assert_eq!(
+            ref_of("${#a[@]}"),
+            ("a".into(), Subscript::All, ParamExpansion::Length)
+        );
+        assert_eq!(
+            ref_of("${!a[@]}"),
+            ("a".into(), Subscript::All, ParamExpansion::Indirect)
+        );
+    }
+
+    /// The subscript is arithmetic, and arithmetic is full of characters the operator table also
+    /// claims. `${a[i-1]}` is one element, not `${a[i}` defaulted to `1]`.
+    #[test]
+    fn arithmetic_inside_a_subscript_is_not_an_operator() {
+        let (name, subscript, op) = ref_of("${a[i-1]}");
+        assert_eq!(name, "a");
+        assert_eq!(subscript, Subscript::Index(lit("i-1")));
+        assert_eq!(op, ParamExpansion::Normal);
+    }
+
+    /// An operator after the subscript still applies to the element.
+    #[test]
+    fn an_operator_after_a_subscript_still_parses() {
+        let (name, subscript, op) = ref_of("${a[0]:-d}");
+        assert_eq!(name, "a");
+        assert_eq!(subscript, Subscript::Index(lit("0")));
+        assert!(matches!(op, ParamExpansion::DefaultValue { .. }));
+    }
+
+    /// An unterminated subscript is not a subscript: it stays part of the name, which the
+    /// expander then rejects instead of guessing at what was meant.
+    #[test]
+    fn an_unterminated_subscript_stays_a_bad_name() {
+        assert_eq!(op_of("${a[1}", "a[1"), ParamExpansion::Normal);
     }
 }

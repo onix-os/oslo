@@ -48,6 +48,13 @@ pub(super) fn find_param_operator(content: &str) -> Option<(usize, &'static str)
             '}' | ')' if depth > 0 => {
                 depth -= 1;
             }
+            // An array subscript is part of the *name*, and its contents are arithmetic — which
+            // shares almost every character with the operator table. Without this, `${a[i-1]}`
+            // would split on the `-` and ask for `${a[i}` defaulted to `1]`.
+            '[' if depth == 0 => {
+                k = skip_subscript(&chars, k);
+                continue;
+            }
             // At offset 0 there would be no name left, and `#`/`!` there are the prefix forms.
             _ if depth == 0 && k > 0 => {
                 if let Some(op) = PARAM_OPERATORS
@@ -63,6 +70,17 @@ pub(super) fn find_param_operator(content: &str) -> Option<(usize, &'static str)
     }
 
     None
+}
+
+/// Split `a[expr]` into the array name and the raw subscript, or `None` if there is no subscript.
+///
+/// The *first* `[` opens it, so `a[b[0]]` is the array `a` subscripted by `b[0]`. A body with no
+/// closing bracket is not a subscript at all: it stays part of the name and the expander rejects
+/// it, which is how `${a[1}` becomes a diagnostic instead of a silent empty string.
+pub(super) fn split_name_subscript(name: &str) -> Option<(&str, &str)> {
+    let body = name.strip_suffix(']')?;
+    let open = body.find('[')?;
+    Some((&body[..open], &body[open + 1..]))
 }
 
 /// What counts as a nested group when looking for an operand separator.
@@ -112,6 +130,30 @@ pub(super) fn split_top_level(rest: &str, sep: char, nesting: Nesting) -> (&str,
     (rest, None)
 }
 
+/// Index just past the `[…]` subscript that starts at `k`, or just past the `[` if it never
+/// closes — an unterminated subscript is a name the expander will reject, not a reason to loop.
+///
+/// Brackets nest so that `${a[b[0]]}` is one subscript: bash evaluates the body as arithmetic,
+/// and arithmetic can index another array.
+fn skip_subscript(chars: &[(usize, char)], k: usize) -> usize {
+    let mut depth = 0usize;
+    let mut i = k;
+    while i < chars.len() {
+        match chars[i].1 {
+            '[' => depth += 1,
+            ']' => {
+                depth -= 1;
+                if depth == 0 {
+                    return i + 1;
+                }
+            }
+            _ => {}
+        }
+        i += 1;
+    }
+    k + 1
+}
+
 /// Index just past the quoted run that starts at `k`.
 fn skip_quoted(chars: &[(usize, char)], k: usize) -> usize {
     let closer = chars[k].1;
@@ -129,7 +171,30 @@ fn skip_quoted(chars: &[(usize, char)], k: usize) -> usize {
 
 #[cfg(test)]
 mod tests {
-    use super::{Nesting, find_param_operator, split_top_level};
+    use super::{Nesting, find_param_operator, split_name_subscript, split_top_level};
+
+    /// A subscript belongs to the name: its contents are arithmetic, and `-`, `+`, `%`, `#`, `^`
+    /// and `,` are all operators in the table.
+    #[test]
+    fn a_subscript_is_not_operator_territory() {
+        assert_eq!(find_param_operator("a[i-1]"), None);
+        assert_eq!(find_param_operator("a[@]"), None);
+        assert_eq!(find_param_operator("a[b[0]]"), None);
+        // An operator *after* the subscript is still ours.
+        assert_eq!(find_param_operator("a[0]#x"), Some((4, "#")));
+        assert_eq!(find_param_operator("a[i+1]%%.x"), Some((6, "%%")));
+        // An unterminated subscript must not loop; the whole body stays a (bad) name.
+        assert_eq!(find_param_operator("a[1"), None);
+    }
+
+    #[test]
+    fn a_name_splits_from_its_subscript() {
+        assert_eq!(split_name_subscript("a[1]"), Some(("a", "1")));
+        assert_eq!(split_name_subscript("a[@]"), Some(("a", "@")));
+        assert_eq!(split_name_subscript("a[b[0]]"), Some(("a", "b[0]")));
+        assert_eq!(split_name_subscript("plain"), None);
+        assert_eq!(split_name_subscript("a[1"), None);
+    }
 
     /// The leftmost operator wins, and a longer one beats the shorter it starts with.
     #[test]

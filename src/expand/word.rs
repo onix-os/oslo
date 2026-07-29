@@ -22,7 +22,7 @@ use crate::expand::arithmetic::eval_arithmetic;
 use crate::expand::brace::expand_braces;
 use crate::expand::fields::{ifs_of, split_field};
 use crate::expand::glob::expand_glob;
-use crate::expand::param::expand_param;
+use crate::expand::param::{expand_array_ref, expand_param};
 use crate::expand::tilde::expand_tilde;
 
 /// Where the characters in a [`Run`] came from.
@@ -174,6 +174,14 @@ pub fn expand_word_part(
             check_nounset(env, name, expansion_type)?;
             expand_param(env, name, expansion_type, in_quotes)?
         }
+        // `"${a[@]}"` is the one other part that can be several fields, or none. Its own module
+        // enforces `set -u`, because "unset" for an element means an index that was never
+        // assigned rather than a name that does not exist.
+        WordPart::ArrayRef {
+            name,
+            subscript,
+            expansion_type,
+        } => expand_array_ref(env, name, subscript, expansion_type, in_quotes)?,
         WordPart::Arithmetic(expr) => single(eval_arithmetic(env, expr)?.to_string(), produced),
         WordPart::CommandSubstitution(cmd) => {
             let output = crate::exec::eval_command_substitution(env, cmd)?;

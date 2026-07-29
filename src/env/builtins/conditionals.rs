@@ -10,6 +10,7 @@
 //! outcome in which an unrecognised operator quietly becomes an answer.
 
 mod grammar;
+mod matching;
 mod operators;
 
 use crate::env::scope::Environment;
@@ -43,7 +44,8 @@ pub fn builtin_test(env: &mut Environment, args: &[String]) -> Result<i32> {
 ///
 /// The difference from [`builtin_test`] that matters is `==`: inside `[[ ]]` an unquoted
 /// right-hand side is a glob *pattern*, so `[[ abc == a* ]]` is true. The adapter picks `==`
-/// (pattern) or `=` (literal) based on whether the operand was quoted in the source.
+/// (pattern) or `=` (literal) based on whether the operand was quoted in the source, and picks
+/// between the two `=~` spellings the same way — see the `matching` submodule.
 pub fn builtin_extended_test(env: &mut Environment, args: &[String]) -> Result<i32> {
     // Strip the `[[` / `]]` bookends the adapter adds.
     let mut expr: &[String] = args.get(1..).unwrap_or(&[]);
@@ -55,6 +57,13 @@ pub fn builtin_extended_test(env: &mut Environment, args: &[String]) -> Result<i
         0 => Ok(false),
         1 => Ok(!expr[0].is_empty()),
         2 => operators::eval_unary(env, &expr[0], &expr[1]),
+        // `=~` is routed before the shared table because it is the one operator that *writes*:
+        // it publishes `BASH_REMATCH`, so it needs `&mut Environment`, which the POSIX `test`
+        // grammar sharing `eval_binary` does not have. That split is also the enforcement of
+        // `=~` being `[[ ]]`-only.
+        3 if matching::is_regex_op(&expr[1]) => {
+            matching::eval_regex_match(env, &expr[0], &expr[1], &expr[2])
+        }
         3 => operators::eval_binary(Mode::Extended, &expr[0], &expr[1], &expr[2]),
         _ => Err(TestError::new("too many arguments")),
     };

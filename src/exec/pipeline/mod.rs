@@ -15,19 +15,24 @@
 //! knows which command of a list POSIX makes it answerable for. Constructs whose *conditions* are
 //! exempt reach in through `suspend_errexit`.
 
+mod describe;
+mod interrupt;
+mod jobs;
+mod timing;
+
 use crate::ast::*;
 use crate::env::Environment;
 use crate::error::{Result, ShellError};
 use crate::exec::compound::{eval_compound_command, flush_stdout};
+use crate::exec::job;
 use crate::exec::redirect::RedirectGuard;
 use crate::exec::simple::{eval_simple_command, report_redirect_failure};
-use nix::fcntl::{OFlag, open};
-use nix::sys::stat::Mode;
-use nix::sys::wait::{WaitStatus, waitpid};
+use interrupt::ListFrame;
+use nix::sys::wait::{WaitPidFlag, WaitStatus, waitpid};
 use nix::unistd::{ForkResult, Pid, close, dup2, fork, pipe};
 use std::cell::Cell;
 use std::os::fd::{AsRawFd, IntoRawFd};
-use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, Ordering};
 
 /// Whether this shell is talking to a person.
 ///
@@ -36,13 +41,6 @@ use std::sync::atomic::{AtomicBool, AtomicU32, Ordering};
 /// when it starts the REPL; a `-c` command or a script leaves it false, which is what keeps the
 /// job notice out of `x=$(cmd &)`.
 static INTERACTIVE: AtomicBool = AtomicBool::new(false);
-
-/// Job numbers for the `[n] pid` notice, in the order jobs were started.
-///
-/// A placeholder for the real job table (Round 7): a counter cannot recycle numbers when a job
-/// finishes the way bash does, but it does produce bash's *shape*, which is what the notice is
-/// judged on until `jobs`/`fg`/`bg` exist.
-static NEXT_JOB_NUMBER: AtomicU32 = AtomicU32::new(1);
 
 /// Declare whether the shell is interactive. Called once, by `main`.
 pub fn set_interactive(yes: bool) {
@@ -83,16 +81,39 @@ pub fn report_error_status(err: ShellError) -> i32 {
 
 /// Reap `pid` and turn its wait status into the number a shell reports for it.
 ///
-/// One `waitpid` call, then a `match` on the bound result. Asking twice — once per `if let` arm —
-/// cannot work: the second call has no child left to reap, so the `Signaled` arm never fires and
-/// a killed child reports as though it had exited cleanly.
+/// One `waitpid` call per iteration, then a `match` on the bound result. Asking twice — once per
+/// `if let` arm — cannot work: the second call has no child left to reap, so the `Signaled` arm
+/// never fires and a killed child reports as though it had exited cleanly.
+///
+/// R7.6: `EINTR` is now a normal outcome rather than an impossible one. The SIGINT handler is
+/// installed without `SA_RESTART`, so a keystroke arriving while the shell waits fails the wait
+/// instead of restarting it — and a signal says nothing about how the child ended, so the only
+/// correct response is to ask again.
+///
+/// R7.2: `WUNTRACED`, for the same reason [`crate::exec::simple`] uses it — a child stopped by
+/// Ctrl-Z reports *termination* to nobody, so a plain `waitpid` would block the shell forever on
+/// a process only `fg` could revive.
 pub fn wait_for_status(pid: Pid) -> i32 {
-    match waitpid(pid, None) {
-        Ok(WaitStatus::Exited(_, code)) => code,
-        Ok(WaitStatus::Signaled(_, sig, _)) => 128 + sig as i32,
-        // Nothing was reaped, so there is no status to report: 127 is what a shell says when it
-        // cannot run or account for a command.
-        _ => 127,
+    wait_for_child(pid).0
+}
+
+/// [`wait_for_status`], plus whether the child *stopped* rather than ended.
+///
+/// The two are indistinguishable from the status alone — both report 128 + the signal — and a
+/// pipeline has to tell them apart: a stopped job goes into the job table for `fg` to find, while
+/// a killed one is simply over.
+fn wait_for_child(pid: Pid) -> (i32, bool) {
+    loop {
+        return match waitpid(pid, Some(WaitPidFlag::WUNTRACED)) {
+            Ok(WaitStatus::Exited(_, code)) => (code, false),
+            Ok(WaitStatus::Signaled(_, sig, _)) => (128 + sig as i32, false),
+            Ok(WaitStatus::Stopped(_, sig)) => (128 + sig as i32, true),
+            Ok(WaitStatus::StillAlive) => continue,
+            Err(nix::errno::Errno::EINTR) => continue,
+            // Nothing was reaped, so there is no status to report: 127 is what a shell says when
+            // it cannot run or account for a command.
+            _ => (127, false),
+        };
     }
 }
 
@@ -145,12 +166,32 @@ fn errexit_suspended() -> bool {
     ERREXIT_SUSPENDED.with(|d| d.get()) > 0
 }
 
+/// Run a command list, and absorb an interrupt that unwound all the way out of it.
+///
+/// The two responsibilities are split so that the *frame* — which knows whether this is the
+/// outermost list in this process — is entered and left exactly once, on every path including the
+/// error one. See the `interrupt` submodule for why the outermost frame is where a Ctrl-C
+/// stops being an unwind and becomes a status.
 pub fn eval_command_list(env: &mut Environment, cmd_list: &CommandList) -> Result<i32> {
+    let frame = ListFrame::enter();
+    frame.absorb(run_list_items(env, cmd_list))
+}
+
+fn run_list_items(env: &mut Environment, cmd_list: &CommandList) -> Result<i32> {
     let mut last_status = 0;
 
     for item in &cmd_list.items {
+        // R7.4: a command boundary is the one moment the shell is provably not waiting for a
+        // foreground child, which is what makes reaping every finished background job here safe.
+        job::reap_background_jobs();
+        // R7.2: and the one moment a Ctrl-C can be acted on when nothing has entered the kernel —
+        // `while true; do :; done` never blocks, so polling is the only way out of it.
+        if job::interrupt_pending() {
+            return Err(interrupt::raise(env));
+        }
+
         if item.op == ListOp::Background {
-            spawn_background(env, &item.and_or)?;
+            jobs::spawn_background(env, &item.and_or)?;
             // Starting a job always succeeds from the list's point of view; the job's own status
             // is collected later by `wait`.
             last_status = 0;
@@ -161,69 +202,6 @@ pub fn eval_command_list(env: &mut Environment, cmd_list: &CommandList) -> Resul
     }
 
     Ok(last_status)
-}
-
-/// Start `and_or` in the background and record it as `$!`.
-fn spawn_background(env: &mut Environment, and_or: &AndOrList) -> Result<()> {
-    // R4.1: the parent's buffered output must not be duplicated by the fork.
-    flush_stdout();
-    unsafe {
-        match fork() {
-            Ok(ForkResult::Child) => {
-                // R4.7: same fresh signal state every forked child gets.
-                crate::exec::job::reset_signals_for_child();
-                // R4.1: a background child is this shell in another process — it keeps
-                // the environment `fork` copied instead of rebuilding one.
-                env.enter_subshell();
-                detach_stdin();
-                let res = status_of(eval_and_or_list(env, and_or));
-                flush_stdout();
-                std::process::exit(res);
-            }
-            Ok(ForkResult::Parent { child }) => {
-                env.last_bg_pid = Some(child.as_raw() as u32);
-                announce_background_job(child);
-                Ok(())
-            }
-            Err(e) => Err(ShellError::ExecutionError(format!("Fork failed: {}", e))),
-        }
-    }
-}
-
-/// Give a background child `/dev/null` for stdin.
-///
-/// Without job control there is no second process group to keep it off the terminal, so a
-/// background `read` competes with the shell for the user's keystrokes and swallows the ones it
-/// wins. POSIX asks for exactly this substitution when job control is off. An interactive shell
-/// with job control (Round 7) will instead put the job in its own group and leave stdin alone.
-///
-/// Called between `fork` and any exec, where only async-signal-safe calls are legal: `open`,
-/// `dup2` and `close` all are.
-fn detach_stdin() {
-    if is_interactive() {
-        return;
-    }
-    if let Ok(fd) = open("/dev/null", OFlag::O_RDONLY, Mode::empty()) {
-        // Errors are unreportable here and leaving the inherited descriptor is no worse than
-        // failing to start the job.
-        let _ = dup2(fd, 0);
-        if fd != 0 {
-            let _ = close(fd);
-        }
-    }
-}
-
-/// Tell the user a job started — but only if there is a user, and never on stdout.
-///
-/// `println!` here was captured verbatim by every `$( )` containing a `&`, so
-/// `x=$(sleep 0 & echo done)` came back as `[bg] 3881847 done`. A non-interactive shell prints
-/// no notice at all, which is what bash does and what the corpus compares against.
-fn announce_background_job(child: Pid) {
-    if !is_interactive() {
-        return;
-    }
-    let job = NEXT_JOB_NUMBER.fetch_add(1, Ordering::Relaxed);
-    eprintln!("[{}] {}", job, child);
 }
 
 pub fn eval_and_or_list(env: &mut Environment, and_or: &AndOrList) -> Result<i32> {
@@ -275,7 +253,31 @@ fn run_and_record(env: &mut Environment, pipeline: &Pipeline, judged: bool) -> R
     Ok(status)
 }
 
+/// Run a pipeline, and — if the `time` keyword prefixed it — report how long it took.
+///
+/// R8.7: `timed` was parsed and dropped, so `time sleep 0.2` printed nothing and reported 0. The
+/// timing is strictly additive: the pipeline's status, its stdout and its `$?` are whatever they
+/// would have been untimed, and the report goes to stderr so that `x=$(time cmd)` still captures
+/// `cmd`'s output alone.
 pub fn eval_pipeline(env: &mut Environment, pipeline: &Pipeline) -> Result<i32> {
+    if !pipeline.timed {
+        return run_pipeline(env, pipeline);
+    }
+
+    let timer = timing::Timer::start();
+    let result = run_pipeline(env, pipeline);
+    // Stopped on the error path too: bash prints the three lines for `time exit 3` and *then*
+    // exits 3, and `exit`/`return`/`break` all reach here as errors carrying their status.
+    //
+    // The flush is not cosmetic. stdout is buffered and stderr is not, so `time echo hi >f 2>&1`
+    // would otherwise record the timing above the output it timed.
+    flush_stdout();
+    timer.report();
+    result
+}
+
+/// Everything `time` measures: the stages, and the `!` applied to what they returned.
+fn run_pipeline(env: &mut Environment, pipeline: &Pipeline) -> Result<i32> {
     if pipeline.commands.is_empty() {
         return Ok(0);
     }
@@ -314,11 +316,19 @@ fn run_stages(env: &mut Environment, pipeline: &Pipeline) -> Result<i32> {
     }
 
     let mut pids = Vec::new();
+    // R7.1: every stage of a foreground pipeline shares one process group, led by the first
+    // stage. That is what makes Ctrl-C reach the whole pipe and only the pipe — `kill(-pgid)` is
+    // how the tty driver delivers it — and what lets Ctrl-Z stop all of it at once.
+    let mut pgid: Option<Pid> = None;
 
     for (idx, cmd) in pipeline.commands.iter().enumerate() {
         unsafe {
             match fork() {
                 Ok(ForkResult::Child) => {
+                    // Before the signal reset, and before any of this stage's own work: the
+                    // parent is about to hand the terminal to this group, and a stage that had
+                    // not joined it yet would be a background process reading from the tty.
+                    job::join_foreground_group(pgid);
                     // R4.7: a stage is a new process running commands, so it gets a fresh signal
                     // state — otherwise the Rust runtime's inherited `SIG_IGN` for SIGPIPE turns
                     // `while :; do echo x; done | head -1` from an instant death on the closed
@@ -346,6 +356,9 @@ fn run_stages(env: &mut Environment, pipeline: &Pipeline) -> Result<i32> {
                     std::process::exit(status);
                 }
                 Ok(ForkResult::Parent { child }) => {
+                    // The same `setpgid` the child just made, from the other side: whichever
+                    // process is scheduled first, the group exists before anyone signals it.
+                    pgid = job::place_foreground_child(child, pgid).or(pgid);
                     pids.push(child);
                 }
                 Err(e) => return Err(ShellError::ExecutionError(format!("Fork failed: {}", e))),
@@ -358,12 +371,26 @@ fn run_stages(env: &mut Environment, pipeline: &Pipeline) -> Result<i32> {
         let _ = close(p.1.into_raw_fd());
     }
 
+    // R7.1: the pipeline is the foreground job now, so it — not the shell — owns the terminal
+    // until it is done. The handover and the take-back are both `tcsetpgrp` calls made from a
+    // process that is no longer the foreground group, so both go through the SIGTTOU block.
+    if let Some(pgid) = pgid {
+        job::give_terminal_to(pgid);
+    }
+
     // R4.10: every stage's status is kept, not just the last one, so `false | true` leaves a
     // trace of the failure for `PIPESTATUS` (Round 8) and `pipefail` (Round 6) to read.
     let mut stage_statuses = Vec::with_capacity(pids.len());
-    for pid in pids {
-        // R4.3: exactly one `waitpid` per child, inside `wait_for_status`.
-        stage_statuses.push(wait_for_status(pid));
+    let mut stopped = false;
+    for pid in &pids {
+        // R4.3: exactly one `waitpid` per child, inside `wait_for_child`.
+        let (status, was_stopped) = wait_for_child(*pid);
+        stopped |= was_stopped;
+        stage_statuses.push(status);
+    }
+    job::reclaim_terminal();
+    if stopped && let Some(pgid) = pgid {
+        jobs::remember_stopped_pipeline(pgid, &pids, pipeline);
     }
     let final_status = pipeline_status(env, &stage_statuses);
     env.set_pipeline_status(stage_statuses);

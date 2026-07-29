@@ -62,6 +62,37 @@ fn unsupported(construct: &str) -> ShellError {
     ShellError::SyntaxError(format!("{} is not supported yet", construct))
 }
 
+/// A construct rush's parser cannot even *reach*, recognised from the source text.
+///
+/// `select` is absent from brush 0.4's grammar entirely, so it surfaces as a bare "syntax error
+/// at line N col M" pointing at the `in` — a diagnostic that reads like a typo in the user's
+/// script rather than a gap in the shell. Callers that hold a parse error can offer this instead:
+/// [`ShellError::SyntaxError`] naming `select`, with the same non-zero status.
+///
+/// Deliberately conservative. It only fires when a line *begins* with the keyword followed by a
+/// name, so `echo select` and `x=select` are untouched; a false positive here would replace a
+/// truthful diagnostic with a misleading one.
+pub(super) fn unreachable_construct(script: &str) -> Option<ShellError> {
+    let names_a_variable = |rest: &str| {
+        let name = rest.trim_start();
+        let head = name
+            .split([' ', '\t', ';', '\n'])
+            .next()
+            .unwrap_or_default();
+        !head.is_empty()
+            && head.starts_with(|c: char| c.is_ascii_alphabetic() || c == '_')
+            && head.chars().all(|c| c.is_ascii_alphanumeric() || c == '_')
+    };
+
+    script
+        .lines()
+        .map(|line| line.trim_start())
+        .filter_map(|line| line.strip_prefix("select"))
+        .filter(|rest| rest.starts_with([' ', '\t']))
+        .find(|rest| names_a_variable(rest))
+        .map(|_| unsupported("select"))
+}
+
 pub(super) fn convert_compound_command(
     compound: &ast::CompoundCommand,
 ) -> Result<rush_ast::Command> {
@@ -99,15 +130,23 @@ pub(super) fn convert_compound_command(
             }
         }
         ast::CompoundCommand::CaseClause(case_clause) => convert_case_clause(case_clause)?,
-        // These parse but have no representation in rush's AST. Naming the construct matters:
-        // this diagnostic is now the whole of the user's feedback, where it used to be swallowed
-        // by a fallback parser that reinterpreted the entire program.
-        ast::CompoundCommand::Arithmetic(_) => {
-            return Err(unsupported("((...)) arithmetic command"));
+        // The expression text is carried through unparsed on purpose: parameters and command
+        // substitutions inside it are expanded when the command runs, not now.
+        ast::CompoundCommand::Arithmetic(arith) => {
+            rush_ast::CompoundCommand::Arithmetic(arith.expr.value.clone())
         }
-        ast::CompoundCommand::ArithmeticForClause(_) => {
-            return Err(unsupported("for ((...)) arithmetic loop"));
+        ast::CompoundCommand::ArithmeticForClause(for_clause) => {
+            rush_ast::CompoundCommand::ArithmeticFor {
+                init: expr_text(for_clause.initializer.as_ref()),
+                cond: expr_text(for_clause.condition.as_ref()),
+                step: expr_text(for_clause.updater.as_ref()),
+                body: convert_compound_list(&for_clause.body.list)?,
+            }
         }
+        // `coproc` parses but has no representation in rush's AST, and cannot get one until there
+        // are arrays to publish the descriptors in and job control to manage the child. Naming
+        // the construct matters: this diagnostic is the whole of the user's feedback, where it
+        // used to be swallowed by a fallback parser that ran the body inline and synchronously.
         ast::CompoundCommand::Coprocess(_) => return Err(unsupported("coproc")),
     };
 
@@ -167,10 +206,51 @@ fn convert_case_clause(case_clause: &ast::CaseClauseCommand) -> Result<rush_ast:
             None => rush_ast::CommandList::default(),
         };
 
-        items.push(rush_ast::CaseItem { patterns, body });
+        // The terminator is part of the program, not punctuation: `;&` and `;;&` select different
+        // branches from `;;`, and collapsing all three made a fallthrough chain run one branch.
+        let post_action = match case.post_action {
+            ast::CaseItemPostAction::ExitCase => rush_ast::CaseAction::ExitCase,
+            ast::CaseItemPostAction::UnconditionallyExecuteNextCaseItem => {
+                rush_ast::CaseAction::FallThrough
+            }
+            ast::CaseItemPostAction::ContinueEvaluatingCases => {
+                rush_ast::CaseAction::ContinueMatching
+            }
+        };
+
+        items.push(rush_ast::CaseItem {
+            patterns,
+            body,
+            post_action,
+        });
     }
 
     Ok(rush_ast::CompoundCommand::Case { word, items })
+}
+
+/// brush stores each section of a `for ((…))` head as raw, unexpanded text; rush keeps it that
+/// way so the shell's own expansions run over it at loop time.
+///
+/// A section holding nothing but space is *absent*, not "the expression 0": brush hands back
+/// `Some(" ")` for the middle of `for (( ; ; ))`, and evaluating that as a condition would end
+/// the loop before its first iteration instead of running it forever.
+///
+/// Note that brush 0.4 cannot parse the unspaced `for ((;;))` at all — its tokenizer reads `;;`
+/// as the `case` terminator, and the grammar wants two `;` operators.
+fn expr_text(expr: Option<&ast::UnexpandedArithmeticExpr>) -> Option<String> {
+    expr.map(|e| e.value.clone())
+        .filter(|text| !text.trim().is_empty())
+}
+
+/// `<(cmd)` / `>(cmd)` used as a *word*.
+///
+/// The same error the redirect-target form has always raised. Until this file returned it, a
+/// process substitution in argument position was deleted from argv and nothing said so: `cat
+/// <(echo hi)` ran `cat` with no arguments and exited 0, and `diff <(a) <(b)` reported a false
+/// success — a wrong answer with a passing status, which is the worst shape a shell bug can take.
+/// The `/dev/fd/N` implementation is deferred; refusing is what makes the gap visible.
+fn process_substitution_unsupported() -> ShellError {
+    ShellError::SyntaxError("process substitution is not supported".to_string())
 }
 
 /// Convert `[[ ... ]]` into equivalent `test` commands.
@@ -197,9 +277,13 @@ pub(super) fn convert_simple_command(
                 ast::CommandPrefixOrSuffixItem::IoRedirect(redir) => {
                     redirections.extend(convert_redirect(redir)?);
                 }
-                // Process substitution is not representable in rush's AST.
-                ast::CommandPrefixOrSuffixItem::Word(_)
-                | ast::CommandPrefixOrSuffixItem::ProcessSubstitution(..) => {}
+                // brush's prefix grammar admits only assignments and redirections, but the item
+                // enum is shared with the suffix. If one ever arrives it is an argument, and
+                // dropping it would change the command being run.
+                ast::CommandPrefixOrSuffixItem::Word(w) => words.extend(convert_word(w)),
+                ast::CommandPrefixOrSuffixItem::ProcessSubstitution(..) => {
+                    return Err(process_substitution_unsupported());
+                }
             }
         }
     }
@@ -226,7 +310,9 @@ pub(super) fn convert_simple_command(
                 ast::CommandPrefixOrSuffixItem::IoRedirect(redir) => {
                     redirections.extend(convert_redirect(redir)?);
                 }
-                ast::CommandPrefixOrSuffixItem::ProcessSubstitution(..) => {}
+                ast::CommandPrefixOrSuffixItem::ProcessSubstitution(..) => {
+                    return Err(process_substitution_unsupported());
+                }
             }
         }
     }
@@ -238,13 +324,105 @@ pub(super) fn convert_simple_command(
     })
 }
 
+/// Convert one `name=value`, `name[i]=value`, `name=(…)` or any of their `+=` forms.
+///
+/// The shape is preserved rather than flattened. Both halves used to be turned into text:
+/// `a=(1 2 3)` kept only the first word of `(1 2 3)`, so `echo "$a"` printed the source
+/// parentheses, and `a[1]=x` became a variable *literally named* `a[1]` — which looked like it
+/// worked only because `${a[1]}` was mangled into the same odd name on the way back out.
 fn convert_assignment(assign: &ast::Assignment) -> rush_ast::Assignment {
-    let value = convert_words_from_str(&assign.value.to_string())
+    let target = match &assign.name {
+        ast::AssignmentName::VariableName(name) => rush_ast::AssignmentTarget::Name(name.clone()),
+        ast::AssignmentName::ArrayElementName(name, index) => rush_ast::AssignmentTarget::Element {
+            name: name.clone(),
+            index: single_word_from_str(index),
+        },
+    };
+
+    let value = match &assign.value {
+        ast::AssignmentValue::Scalar(word) => {
+            rush_ast::AssignmentValue::Scalar(single_word_from_str(word.as_ref()))
+        }
+        ast::AssignmentValue::Array(elements) => rush_ast::AssignmentValue::Array(
+            elements
+                .iter()
+                .flat_map(|(index, value)| convert_array_element(index.as_ref(), value))
+                .collect(),
+        ),
+    };
+
+    rush_ast::Assignment {
+        target,
+        value,
+        append: assign.append,
+    }
+}
+
+/// One element of an array literal.
+///
+/// An unindexed element may still expand to several words — `a=($list)` and `a=(*.c)` both do —
+/// so it becomes one [`rush_ast::ArrayElement`] per word rather than being forced into one. An
+/// *indexed* element (`[3]=x`) is a single value by construction.
+fn convert_array_element(
+    index: Option<&brush_parser::ast::Word>,
+    value: &ast::Word,
+) -> Vec<rush_ast::ArrayElement> {
+    match index {
+        Some(index) => vec![rush_ast::ArrayElement {
+            index: Some(single_word_from_str(index.as_ref())),
+            value: single_word_from_str(value.as_ref()),
+        }],
+        None => convert_words_from_str(value.as_ref())
+            .into_iter()
+            .map(|value| rush_ast::ArrayElement { index: None, value })
+            .collect(),
+    }
+}
+
+/// Re-lex `text` as one word, which is what every assignment operand is.
+fn single_word_from_str(text: &str) -> rush_ast::Word {
+    convert_words_from_str(text)
         .into_iter()
         .next()
-        .unwrap_or_else(|| rush_ast::Word::from_literal(""));
-    rush_ast::Assignment {
-        name: assign.name.to_string(),
-        value,
+        .unwrap_or_else(|| rush_ast::Word::from_literal(""))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::unreachable_construct;
+
+    /// The shapes a `select` loop is actually written in.
+    #[test]
+    fn select_is_recognised_from_the_source() {
+        for script in [
+            "select x in a b; do echo $x; done",
+            "  select choice in one two\ndo\n  echo $choice\ndone",
+            "echo start\nselect\tx in a; do :; done",
+        ] {
+            assert!(
+                unreachable_construct(script).is_some_and(|e| e.to_string().contains("select")),
+                "{script:?} should be recognised as select"
+            );
+        }
+    }
+
+    /// A false positive would replace a truthful diagnostic with a misleading one, so the check
+    /// has to stay blind to every ordinary use of the word.
+    #[test]
+    fn ordinary_uses_of_the_word_are_not_recognised() {
+        for script in [
+            "echo select",
+            "x=select",
+            "selection=1",
+            "select",
+            "for w in select; do echo $w; done",
+            "grep select file",
+            "select 'x' in a",
+        ] {
+            assert!(
+                unreachable_construct(script).is_none(),
+                "{script:?} must not be reported as select"
+            );
+        }
     }
 }

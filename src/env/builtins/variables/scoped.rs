@@ -2,7 +2,8 @@
 
 use super::options;
 use super::quoting::single_quoted;
-use crate::env::scope::{Environment, is_valid_identifier};
+use crate::env::builtins::arrays::array_elements;
+use crate::env::scope::{Environment, array_literal_body, is_valid_identifier};
 use crate::error::Result;
 
 const LOCAL_USAGE: &str = "usage: local [-irx] name[=value] ...";
@@ -39,7 +40,13 @@ pub fn builtin_local(env: &mut Environment, args: &[String]) -> Result<i32> {
             status = 1;
             continue;
         }
-        let assigned = if opts.has('x') {
+        // `local a=(1 2)` arrives here as the eight characters `a=(1 2)`, because an assignment
+        // written after a command word is an ordinary argument. Storing them would make `a` the
+        // string `(1 2)`.
+        let assigned = if let Some(body) = value.and_then(array_literal_body) {
+            let array = array_elements(env, body)?;
+            env.set_local_array(name, array)
+        } else if opts.has('x') {
             env.set_local_exported_var(name, value.unwrap_or_default())
         } else {
             env.set_local_var(name, value.unwrap_or_default())
@@ -85,9 +92,17 @@ pub fn builtin_readonly(env: &mut Environment, args: &[String]) -> Result<i32> {
         }
         // A refused assignment must not leave the name read-only: the user would then be unable
         // to set it at all, with nothing to show for it.
-        if let Some(value) = assigned
-            && !env.set_var(name, value, false)
-        {
+        let stored = match assigned.and_then(array_literal_body) {
+            Some(body) => {
+                let array = array_elements(env, body)?;
+                env.set_array(name, array)
+            }
+            None => match assigned {
+                Some(value) => env.set_var(name, value, false),
+                None => true,
+            },
+        };
+        if !stored {
             status = 1;
             continue;
         }

@@ -286,11 +286,21 @@ fn declare_x_exports() {
 }
 
 /// An attribute rush cannot represent is refused rather than silently downgraded to a scalar.
+/// `-A` is the one PLAN.md defers on purpose: associative arrays are a second value shape, and
+/// building an *indexed* array for `declare -A` would answer `${m[key]}` with element 0.
 #[test]
 fn declare_refuses_an_unsupported_attribute() {
-    let r = run("declare -a arr");
+    let r = run("declare -A assoc");
     assert_eq!(r.status, 2);
     assert!(!r.stderr.is_empty());
+    let r = run("declare -i n=1");
+    assert_eq!(r.status, 2);
+}
+
+/// `declare -a`, by contrast, now works: it makes an empty indexed array.
+#[test]
+fn declare_a_makes_an_empty_array() {
+    assert_out("declare -a arr; echo \"${#arr[@]}\"", "0");
 }
 
 #[test]

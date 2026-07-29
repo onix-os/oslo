@@ -427,10 +427,52 @@ fn extended_test_negation_negates_the_pipeline() {
 }
 
 #[test]
-fn unsupported_predicate_is_an_error_not_a_silent_true() {
-    // `=~` needs a regex engine. It must surface as a syntax error rather than being
-    // converted into something that always succeeds.
-    assert!(parse_bash_script("[[ abc =~ a.c ]]").is_err());
+fn regex_match_lowers_to_the_pattern_operator() {
+    assert_eq!(
+        test_invocations("[[ abc =~ a.c ]]"),
+        vec![vec![
+            "[[".to_string(),
+            "abc".into(),
+            "=~".into(),
+            "a.c".into(),
+            "]]".into()
+        ]]
+    );
+}
+
+#[test]
+fn quoted_regex_operand_lowers_to_the_literal_operator() {
+    // Same distinction the `==`/`=` pair draws: quoting the right operand turns off its special
+    // meaning, so `[[ abc =~ "a.c" ]]` is false where the unquoted form is true.
+    assert_eq!(
+        test_invocations(r#"[[ abc =~ "a.c" ]]"#),
+        vec![vec![
+            "[[".to_string(),
+            "abc".into(),
+            "=~lit".into(),
+            "a.c".into(),
+            "]]".into()
+        ]]
+    );
+}
+
+#[test]
+fn every_unary_predicate_has_a_flag() {
+    // These used to be `unsupported test predicate` syntax errors while `[ -o errexit ]` answered
+    // correctly — one predicate, two verdicts, decided by which bracket was typed.
+    for (source, flag) in [
+        ("[[ -o errexit ]]", "-o"),
+        ("[[ -t 1 ]]", "-t"),
+        ("[[ -N f ]]", "-N"),
+        ("[[ -G f ]]", "-G"),
+        ("[[ -O f ]]", "-O"),
+        ("[[ -u f ]]", "-u"),
+        ("[[ -g f ]]", "-g"),
+        ("[[ -k f ]]", "-k"),
+        ("[[ -R v ]]", "-R"),
+    ] {
+        assert_eq!(test_invocations(source)[0][1], flag, "{}", source);
+    }
 }
 
 // --- general ----------------------------------------------------------
@@ -439,7 +481,7 @@ fn unsupported_predicate_is_an_error_not_a_silent_true() {
 fn assignments_and_words_are_separated() {
     let cmd = only_simple("FOO=bar baz qux");
     assert_eq!(cmd.assignments.len(), 1);
-    assert_eq!(cmd.assignments[0].name, "FOO");
+    assert_eq!(cmd.assignments[0].name(), "FOO");
     assert_eq!(cmd.words.len(), 2);
 }
 

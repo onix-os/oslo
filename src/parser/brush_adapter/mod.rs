@@ -13,9 +13,17 @@
 //!
 //! - Here-document bodies are carried through verbatim; parameter expansion inside an unquoted
 //!   heredoc is not applied (`brush`'s `requires_expansion` flag is recorded but unused).
-//! - `case` fallthrough (`;&`, `;;&`) is parsed but executed as `;;`, because
-//!   [`crate::ast::CaseItem`] has nowhere to record the post-action.
-//! - Process substitution (`<(cmd)`, `>(cmd)`) is not representable and is dropped.
+//! - Process substitution (`<(cmd)`, `>(cmd)`) is not representable, and is refused by name
+//!   wherever it appears — as a redirect target and as a word. It used to be *dropped* from a
+//!   word position, so `cat <(echo hi)` ran `cat` with no arguments and exited 0.
+//! - `coproc` and `select` are refused by name rather than approximated; `select` is not in
+//!   brush 0.4's grammar at all, so it is recognised from the source text (`unreachable_construct`
+//!   in `commands.rs`) to keep the diagnostic from reading like a typo near `in`.
+//! - `for ((;;))` written without spaces is a parse error: brush 0.4's tokenizer reads the `;;`
+//!   as the `case` terminator while its grammar wants two `;` operators. `for (( ; ; ))` works.
+//! - `time -p` is carried as plain `time`: [`crate::ast::Pipeline`] records *that* a pipeline is
+//!   timed, not which of bash's two report formats was asked for, so `-p` gets the default
+//!   three-line form instead of POSIX's single-space one. The measurement itself is identical.
 //! - `[[ ... ]]` becomes calls to the `[[` builtin, with `&&`, `||` and `!` expressed using the
 //!   shell's own and-or lists and pipeline negation. `=~` is rejected: there is no regex engine,
 //!   and approximating it would be worse than refusing.
@@ -47,9 +55,12 @@ pub fn parse_bash_script(script: &str) -> Result<rush_ast::CommandList> {
 
     match parser.parse_program() {
         Ok(prog) => convert_program(&prog),
-        // brush's own message already names the position; wrapping it in more prose would only
-        // bury the line and column the user needs.
-        Err(e) => Err(ShellError::SyntaxError(e.to_string())),
+        // R8.6: a construct brush's grammar does not have at all fails at whatever token follows
+        // it, so `select x in a b` reads as a typo near `in`. Name the construct when we can
+        // recognise it; otherwise brush's own message already carries the position, and wrapping
+        // it in more prose would only bury the line and column the user needs.
+        Err(e) => Err(commands::unreachable_construct(script)
+            .unwrap_or_else(|| ShellError::SyntaxError(e.to_string()))),
     }
 }
 
@@ -108,6 +119,10 @@ fn convert_pipeline(pipe: &ast::Pipeline) -> Result<rush_ast::Pipeline> {
     }
     Ok(rush_ast::Pipeline {
         negated: pipe.bang,
+        // R8.7: brush records the keyword and rush used to read only `bang` and `seq`, so `time`
+        // was accepted and then silently discarded. `-p` is flattened into the same flag; see the
+        // known gap above.
+        timed: pipe.timed.is_some(),
         commands,
     })
 }

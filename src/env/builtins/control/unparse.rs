@@ -11,8 +11,9 @@
 //! therefore preserved from the tree (`'a  b'` stays single-quoted) rather than re-derived.
 
 use crate::ast::{
-    AndOrList, AndOrOp, CaseItem, Command, CommandList, CompoundCommand, ListOp, ParamExpansion,
-    Pipeline, RedirectKind, Redirection, SimpleCommand, Word, WordPart,
+    AndOrList, AndOrOp, Assignment, AssignmentTarget, AssignmentValue, CaseItem, Command,
+    CommandList, CompoundCommand, ListOp, ParamExpansion, Pipeline, RedirectKind, Redirection,
+    SimpleCommand, Subscript, Word, WordPart,
 };
 
 const INDENT: &str = "    ";
@@ -193,13 +194,37 @@ fn format_compound(kind: &CompoundCommand, depth: usize) -> Vec<String> {
         }
         CompoundCommand::Case { word, items } => {
             lines.push(format!("{pad}case {} in ", format_word(word)));
-            for CaseItem { patterns, body } in items {
+            for CaseItem {
+                patterns,
+                body,
+                post_action,
+            } in items
+            {
                 let pats: Vec<String> = patterns.iter().map(format_word).collect();
                 lines.push(format!("{pad}{INDENT}{})", pats.join(" | ")));
                 lines.extend(format_list(body, depth + 2, false));
-                lines.push(format!("{pad}{INDENT};;"));
+                // The terminator the branch was written with: `;&` and `;;&` select different
+                // branches from `;;`, so printing `;;` for all three would not re-parse.
+                lines.push(format!("{pad}{INDENT}{}", post_action.terminator()));
             }
             lines.push(format!("{pad}esac"));
+        }
+        CompoundCommand::Arithmetic(expr) => lines.push(format!("{pad}(( {expr} ))")),
+        CompoundCommand::ArithmeticFor {
+            init,
+            cond,
+            step,
+            body,
+        } => {
+            let section = |e: &Option<String>| e.clone().unwrap_or_default();
+            lines.push(format!(
+                "{pad}for (( {}; {}; {} )); do",
+                section(init),
+                section(cond),
+                section(step)
+            ));
+            lines.extend(format_list(body, depth + 1, true));
+            lines.push(format!("{pad}done"));
         }
         CompoundCommand::Subshell(list) => {
             lines.push(format!("{pad}( {} )", joined(list, depth)));
@@ -232,11 +257,34 @@ fn joined(list: &CommandList, depth: usize) -> String {
 fn format_simple(simple: &SimpleCommand) -> String {
     let mut parts: Vec<String> = Vec::new();
     for a in &simple.assignments {
-        parts.push(format!("{}={}", a.name, format_word(&a.value)));
+        parts.push(format_assignment(a));
     }
     parts.extend(simple.words.iter().map(format_word));
     parts.extend(simple.redirections.iter().map(format_redirect));
     parts.join(" ")
+}
+
+/// Render an assignment back to source, in whichever of its four shapes it has.
+fn format_assignment(a: &Assignment) -> String {
+    let target = match &a.target {
+        AssignmentTarget::Name(name) => name.clone(),
+        AssignmentTarget::Element { name, index } => format!("{name}[{}]", format_word(index)),
+    };
+    let op = if a.append { "+=" } else { "=" };
+    let value = match &a.value {
+        AssignmentValue::Scalar(word) => format_word(word),
+        AssignmentValue::Array(elements) => {
+            let rendered: Vec<String> = elements
+                .iter()
+                .map(|e| match &e.index {
+                    Some(index) => format!("[{}]={}", format_word(index), format_word(&e.value)),
+                    None => format_word(&e.value),
+                })
+                .collect();
+            format!("({})", rendered.join(" "))
+        }
+    };
+    format!("{target}{op}{value}")
 }
 
 fn format_redirect(r: &Redirection) -> String {
@@ -282,9 +330,30 @@ fn format_part(part: &WordPart) -> String {
             name,
             expansion_type,
         } => format_param(name, expansion_type),
+        // A subscripted reference has to stay braced even in the plain case: `$a[0]` re-parses as
+        // `$a` followed by the literal `[0]`.
+        WordPart::ArrayRef {
+            name,
+            subscript,
+            expansion_type,
+        } => {
+            let subscripted = format!("{name}[{}]", format_subscript(subscript));
+            match expansion_type {
+                ParamExpansion::Normal => format!("${{{subscripted}}}"),
+                other => format_param(&subscripted, other),
+            }
+        }
         WordPart::CommandSubstitution(src) => format!("$({src})"),
         WordPart::Arithmetic(src) => format!("$(({src}))"),
         WordPart::Tilde(rest) => format!("~{rest}"),
+    }
+}
+
+fn format_subscript(subscript: &Subscript) -> String {
+    match subscript {
+        Subscript::All => "@".to_string(),
+        Subscript::Joined => "*".to_string(),
+        Subscript::Index(word) => format_word(word),
     }
 }
 

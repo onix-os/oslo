@@ -132,6 +132,14 @@ pub fn builtin_unset(env: &mut Environment, args: &[String]) -> Result<i32> {
 
     let mut status = 0;
     for name in &args[opts.operands..] {
+        // `unset 'a[1]'` drops one element and leaves the rest of the array where it was.
+        if let Some(result) = crate::env::builtins::arrays::unset_element(env, name) {
+            if let Err(e) = result {
+                eprintln!("rush: unset: {}", e);
+                status = 1;
+            }
+            continue;
+        }
         if !is_valid_identifier(name) {
             super::not_an_identifier("unset", name);
             status = 1;

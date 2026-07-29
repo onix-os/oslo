@@ -4,7 +4,7 @@
 //!
 //! The first is that an *operand is a word, not a string*. `${x:-$HOME}` has to expand its
 //! default and `${x:=$y}` has to persist the expanded text, so every payload arrives as a
-//! [`Word`] and is expanded here, with quote removal, at the moment the operator needs it.
+//! [`crate::ast::Word`] and is expanded here, with quote removal, when the operator needs it.
 //!
 //! The second is that an unrecognised `${...}` body is an **error**. The lexer hands anything it
 //! cannot parse through as a parameter *name*; looking that up would answer `""` for every form
@@ -12,13 +12,62 @@
 //! separate unimplemented operators went unnoticed. Rejecting a body that is not a name turns
 //! that fallback into a diagnostic instead.
 
+mod array;
+mod operators;
 mod pattern;
 
-use crate::ast::{ParamExpansion, ReplaceScope, Word};
+use crate::ast::ParamExpansion;
 use crate::env::Environment;
 use crate::error::{Result, ShellError};
-use crate::expand::arithmetic::eval_arithmetic;
-use crate::expand::word::{Field, Origin, Run, expand_word_to_string};
+use crate::expand::word::{Field, Origin, Run};
+
+pub use array::expand_array_ref;
+
+/// What an expansion reads from, and what the assigning `${x:=v}` forms write back to.
+///
+/// A scalar and an array element differ in exactly those two operations; every operator in
+/// `operators` is written against this rather than against a variable name, so `${a[0]%.c}`
+/// cannot drift away from `${v%.c}`.
+pub(crate) enum Target<'a> {
+    /// A parameter by name: a variable, a positional, or a special parameter.
+    Param(&'a str),
+    /// One element of an indexed array, with its subscript already evaluated.
+    Element { name: &'a str, index: i64 },
+}
+
+impl Target<'_> {
+    /// The value as it stands, or `None` when the parameter or element does not exist.
+    fn value(&self, env: &Environment) -> Option<String> {
+        match self {
+            Self::Param(name) => env.get_param(name),
+            Self::Element { name, index } => env
+                .get_array(name)
+                .and_then(|array| array.get(*index))
+                .map(str::to_string),
+        }
+    }
+
+    /// Persist `text` — what `${x:=v}` does. An element assignment writes the element, not the
+    /// whole variable, so `${a[2]:=x}` leaves the rest of the array alone.
+    fn assign(&self, env: &mut Environment, text: &str) {
+        match self {
+            Self::Param(name) => {
+                env.set_var(name, text, false);
+            }
+            Self::Element { name, index } => {
+                env.set_array_element(name, *index, text);
+            }
+        }
+    }
+
+    /// How the reference is named in a diagnostic — as the script wrote it.
+    fn display(&self) -> String {
+        match self {
+            Self::Param(name) => (*name).to_string(),
+            Self::Element { name, index } => format!("{name}[{index}]"),
+        }
+    }
+}
 
 /// Expand one parameter reference into the fields it contributes.
 ///
@@ -30,11 +79,7 @@ pub fn expand_param(
     expansion_type: &ParamExpansion,
     in_quotes: bool,
 ) -> Result<Vec<Field>> {
-    let origin = if in_quotes {
-        Origin::Quoted
-    } else {
-        Origin::Expanded
-    };
+    let origin = origin_of(in_quotes);
 
     // `$@` and `$*` are the only parameters that can be more than one field, and only `$@` keeps
     // them apart. Every other form has a single string as its value, so it takes the path below.
@@ -46,7 +91,16 @@ pub fn expand_param(
     Ok(vec![vec![Run::new(text, origin)]])
 }
 
-/// The single string a `${...}` reference stands for.
+/// Where an expansion's output came from, which decides whether it may be field-split.
+fn origin_of(in_quotes: bool) -> Origin {
+    if in_quotes {
+        Origin::Quoted
+    } else {
+        Origin::Expanded
+    }
+}
+
+/// The single string a `${name<op>}` reference stands for.
 fn expand_to_string(
     env: &mut Environment,
     name: &str,
@@ -57,164 +111,7 @@ fn expand_to_string(
             "${{{name}}}: bad substitution"
         )));
     }
-
-    let val = env.get_param(name);
-    let text = match expansion_type {
-        ParamExpansion::Normal => val.unwrap_or_default(),
-
-        // `${#@}` and `${#*}` count the positionals rather than measuring the string they would
-        // have joined into. `${#}` never reaches here: it is `$#`, a plain reference.
-        ParamExpansion::Length => match name {
-            "@" | "*" => env.get_positional().len().to_string(),
-            // Characters, not bytes — `${#v}` on a UTF-8 value must not report its encoding.
-            _ => val.map_or_else(|| "0".to_string(), |v| v.chars().count().to_string()),
-        },
-
-        ParamExpansion::DefaultValue {
-            default,
-            assign_if_unset,
-            test_null,
-        } => {
-            if is_present(&val, *test_null) {
-                val.unwrap_or_default()
-            } else {
-                let text = expand_word_to_string(env, default)?;
-                // Assigning the *expanded* text is the whole point: `${x:=$y}` used to persist
-                // the two characters `$y` into `x`.
-                if *assign_if_unset {
-                    env.set_var(name, &text, false);
-                }
-                text
-            }
-        }
-
-        ParamExpansion::UseAlternative {
-            alternative,
-            test_null,
-        } => {
-            if is_present(&val, *test_null) {
-                expand_word_to_string(env, alternative)?
-            } else {
-                String::new()
-            }
-        }
-
-        ParamExpansion::ErrorIfUnset { message, test_null } => {
-            if is_present(&val, *test_null) {
-                val.unwrap_or_default()
-            } else {
-                let msg = expand_word_to_string(env, message)?;
-                let msg = if msg.is_empty() {
-                    "parameter null or not set".to_string()
-                } else {
-                    msg
-                };
-                return Err(ShellError::ExpansionError(format!("{name}: {msg}")));
-            }
-        }
-
-        ParamExpansion::RemovePrefix {
-            pattern: word,
-            longest,
-        } => {
-            let pat = expand_word_to_string(env, word)?;
-            let value = val.unwrap_or_default();
-            pattern::remove_prefix(&value, &pat, *longest)
-        }
-
-        ParamExpansion::RemoveSuffix {
-            pattern: word,
-            longest,
-        } => {
-            let pat = expand_word_to_string(env, word)?;
-            let value = val.unwrap_or_default();
-            pattern::remove_suffix(&value, &pat, *longest)
-        }
-
-        ParamExpansion::Substring { offset, length } => {
-            let start = eval_operand(env, offset)?;
-            let count = match length {
-                Some(word) => Some(eval_operand(env, word)?),
-                None => None,
-            };
-            let value = val.unwrap_or_default();
-            pattern::substring(&value, start, count)
-                .map_err(|n| ShellError::ExpansionError(format!("{n}: substring expression < 0")))?
-        }
-
-        ParamExpansion::Replace {
-            pattern: pat_word,
-            replacement,
-            scope,
-        } => {
-            let pat = expand_word_to_string(env, pat_word)?;
-            let rep = expand_word_to_string(env, replacement)?;
-            let value = val.unwrap_or_default();
-            match scope {
-                ReplaceScope::First => pattern::replace(&value, &pat, &rep, false),
-                ReplaceScope::All => pattern::replace(&value, &pat, &rep, true),
-                ReplaceScope::Prefix => pattern::replace_prefix(&value, &pat, &rep),
-                ReplaceScope::Suffix => pattern::replace_suffix(&value, &pat, &rep),
-            }
-        }
-
-        ParamExpansion::CaseConvert {
-            pattern: selector,
-            upper,
-            all,
-        } => {
-            let selector = match selector {
-                Some(word) => Some(expand_word_to_string(env, word)?),
-                None => None,
-            };
-            let value = val.unwrap_or_default();
-            pattern::convert_case(&value, selector.as_deref(), *upper, *all)
-        }
-
-        // `${!name}` reads `name`'s value and expands *that* parameter. Only the second lookup
-        // may come up empty: bash makes a `name` that does not *hold a name* a fatal expansion
-        // error, and it names a different culprit depending on which step failed.
-        ParamExpansion::Indirect => match val {
-            None => {
-                return Err(ShellError::ExpansionError(format!(
-                    "{name}: invalid indirect expansion"
-                )));
-            }
-            // An empty value lands here too, which is why the message quotes nothing.
-            Some(target) if !is_param_name(&target) => {
-                return Err(ShellError::ExpansionError(format!(
-                    "{target}: invalid variable name"
-                )));
-            }
-            Some(target) => env.get_param(&target).unwrap_or_default(),
-        },
-    };
-
-    Ok(text)
-}
-
-/// Whether the parameter counts as "set" for the `${x-d}` family.
-///
-/// The `:` forms treat a set-but-empty parameter as absent, the colon-less ones test only for
-/// unset — which is the entire difference between `x=; ${x:-d}` (`d`) and `x=; ${x-d}` (empty).
-fn is_present(val: &Option<String>, test_null: bool) -> bool {
-    match val {
-        Some(v) => !(test_null && v.is_empty()),
-        None => false,
-    }
-}
-
-/// A substring operand is an arithmetic expression, so `${v:i+1:n-1}` works.
-///
-/// An absent operand is 0 rather than an error: `${v: }` is degenerate but not fatal, and the
-/// arithmetic evaluator rejects an empty expression.
-fn eval_operand(env: &mut Environment, word: &Word) -> Result<i64> {
-    let text = expand_word_to_string(env, word)?;
-    let text = text.trim();
-    if text.is_empty() {
-        return Ok(0);
-    }
-    eval_arithmetic(env, text)
+    operators::apply(env, &Target::Param(name), expansion_type)
 }
 
 /// Can `name` be looked up as a parameter at all?

@@ -86,6 +86,12 @@ const SHARED: &[(&[&str], i32)] = &[
     (&["-L", "/nonexistent-rush-xyz"], 1),
     (&["-p", "/nonexistent-rush-xyz"], 1),
     (&["-t", "not-a-number"], 1),
+    // `-o` on a name no shell option has is false, not an error: that is what bash answers, and
+    // it is what lets `[ -o pipefail ] || ...` run on a shell without the option.
+    (&["-o", "no-such-option"], 1),
+    (&["-o", ""], 1),
+    // Nothing here is a nameref, so `-R` is false for a set variable too.
+    (&["-R", "PATH"], 1),
 ];
 
 #[test]
@@ -240,6 +246,55 @@ fn extended_form_knows_about_shell_variables() {
         "]]".to_string(),
     ];
     assert_eq!(builtin_extended_test(&mut env, &argv).unwrap(), 1);
+}
+
+/// R8.8: `-o` reads the live option table, so it cannot disagree with `set -o`.
+///
+/// The old implementation answered `false` for every name, which made `[[ -o errexit ]]` a
+/// plausible-looking "errexit is off" no matter what `set -e` had done.
+#[test]
+fn shell_option_predicate_tracks_the_option_table() {
+    use crate::env::options::ShellOption;
+
+    let mut env = Environment::new();
+    let ask = |env: &mut Environment, name: &str| {
+        let argv: Vec<String> = ["[[", "-o", name, "]]"]
+            .iter()
+            .map(|s| s.to_string())
+            .collect();
+        builtin_extended_test(env, &argv).expect("[[ must not unwind")
+    };
+
+    assert_eq!(ask(&mut env, "errexit"), 1);
+    env.set_option(ShellOption::ErrExit, true);
+    assert_eq!(ask(&mut env, "errexit"), 0);
+    // Only the named option moved.
+    assert_eq!(ask(&mut env, "nounset"), 1);
+
+    // `test`/`[` reads the same table.
+    env.set_option(ShellOption::NoUnset, true);
+    let argv: Vec<String> = ["[", "-o", "nounset", "]"]
+        .iter()
+        .map(|s| s.to_string())
+        .collect();
+    assert_eq!(builtin_test(&mut env, &argv).unwrap(), 0);
+}
+
+/// R8.8: `-N` is "modified since last read", which bash defines as `atime <= mtime` — inclusive.
+#[test]
+fn modified_since_last_read_counts_an_untouched_file() {
+    let dir = scratch_dir("newer");
+    let file = dir.join("fresh");
+    std::fs::write(&file, b"x").expect("write fixture");
+
+    let path = file.to_string_lossy().to_string();
+    // Freshly written and never read: atime == mtime, and bash says true.
+    assert_eq!(bracket(&["-N", &path]), 0);
+    assert_eq!(double_bracket(&["-N", &path]), 0);
+
+    assert_eq!(bracket(&["-N", "/nonexistent-rush-xyz"]), 1);
+
+    std::fs::remove_dir_all(&dir).ok();
 }
 
 /// R5.3: `-r` asks the kernel. `stat()` succeeds on a mode-000 file the caller cannot open, so

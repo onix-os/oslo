@@ -4,6 +4,7 @@
 //! which a word becomes an alias, a function, a builtin or a program on PATH. Running the
 //! program once it has been found is the `external` submodule's job.
 
+mod assign;
 mod external;
 mod trace;
 
@@ -100,11 +101,22 @@ pub(crate) fn eval_simple_command(env: &mut Environment, simple: &SimpleCommand)
     // `export FOO=bar` must reach `export`, not be applied behind its back.
     let mut prefix_assignments = Vec::new();
     for assign in &simple.assignments {
-        let val_str = expand_word_to_string(env, &assign.value)?;
+        // A prefix assignment lasts exactly as long as the command, and rush undoes it by
+        // restoring a *scalar* from the scope frame. `a=(1 2) cmd` and `a[1]=x cmd` have no such
+        // undo, so they are refused rather than left behind after the command finishes.
+        let (AssignmentTarget::Name(name), AssignmentValue::Scalar(value)) =
+            (&assign.target, &assign.value)
+        else {
+            return Err(ShellError::SyntaxError(format!(
+                "{}: an array assignment cannot be a command prefix",
+                assign.name()
+            )));
+        };
+        let val_str = expand_word_to_string(env, value)?;
         if is_declaration {
-            words.push(format!("{}={}", assign.name, val_str));
+            words.push(format!("{}={}", name, val_str));
         } else {
-            prefix_assignments.push((assign.name.clone(), val_str));
+            prefix_assignments.push((name.clone(), val_str));
         }
     }
 
@@ -137,14 +149,11 @@ pub(crate) fn eval_simple_command(env: &mut Environment, simple: &SimpleCommand)
 fn apply_assignments_only(env: &mut Environment, simple: &SimpleCommand) -> Result<i32> {
     let mut assignments = Vec::with_capacity(simple.assignments.len());
     for assign in &simple.assignments {
-        // Assignment RHS is *not* field-split or globbed (POSIX 2.9.1), so `x=*.rs` stores the
-        // literal pattern and `x=$(printf 'a\nb')` keeps its newline.
-        let value = expand_word_to_string(env, &assign.value)?;
         // Applied before the next one is expanded, not batched at the end: POSIX 2.9.1 evaluates
         // assignments left to right and makes each visible to the next, so `a=1 b=${a}2` sets
-        // `b` to `12`.
-        env.set_var(&assign.name, &value, false);
-        assignments.push((assign.name.clone(), value));
+        // `b` to `12`. What each shape means is `assign`'s business.
+        let value = assign::apply_assignment(env, assign)?;
+        assignments.push((assign.name().to_string(), value));
     }
     trace::trace_command(env, &assignments, &[]);
     Ok(apply_wordless_redirections(env, &simple.redirections))

@@ -195,3 +195,160 @@ fn break_does_not_escape_a_function_into_the_callers_loop() {
         "1\n2\n3",
     );
 }
+
+// --- R8.10: case fallthrough and re-test ---
+
+/// `;&` runs the *next* branch's body without consulting its pattern. Executing it as `;;` — as
+/// rush did — silently skipped every branch the script chained onto the match.
+#[test]
+fn semicolon_ampersand_falls_through_to_the_next_branch() {
+    assert_out(
+        "case a in a) echo one;& b) echo two;; c) echo three;; esac",
+        "one\ntwo",
+    );
+}
+
+#[test]
+fn fallthrough_chains_through_several_branches() {
+    assert_out(
+        "case a in a) echo one;& b) echo two;& c) echo three;; esac",
+        "one\ntwo\nthree",
+    );
+}
+
+/// A branch reached by fallthrough runs even though its own pattern does not match.
+#[test]
+fn a_branch_reached_by_fallthrough_ignores_its_own_pattern() {
+    assert_out("case a in a) echo one;& zzz) echo two;; esac", "one\ntwo");
+}
+
+/// `;&` on the last branch has nothing to fall into and simply ends the case.
+#[test]
+fn fallthrough_on_the_last_branch_ends_the_case() {
+    assert_out("case a in a) echo one;& esac; echo after", "one\nafter");
+}
+
+/// `;;&` keeps testing the remaining patterns, so several branches can run — but only the ones
+/// that actually match.
+#[test]
+fn double_semicolon_ampersand_keeps_matching() {
+    assert_out(
+        "case abc in a*) echo first;;& *c) echo second;;& zzz) echo third;; esac",
+        "first\nsecond",
+    );
+}
+
+#[test]
+fn re_test_stops_at_the_first_branch_that_ends_with_a_plain_terminator() {
+    assert_out(
+        "case abc in a*) echo first;;& *c) echo second;; ab*) echo third;; esac",
+        "first\nsecond",
+    );
+}
+
+/// The status of a `case` is the status of the last body it ran, not of the failed match that
+/// followed it.
+#[test]
+fn re_test_reports_the_status_of_the_last_body_that_ran() {
+    assert_out("case a in a) true;;& zzz) false;; esac; echo $?", "0");
+    assert_out("case a in a) false;;& zzz) true;; esac; echo $?", "1");
+}
+
+#[test]
+fn a_case_that_matches_nothing_is_still_a_success() {
+    assert_out("case a in b) echo no;; esac; echo $?", "0");
+}
+
+// --- R8.2: `(( expr ))` as a command ---
+
+/// The construct exists to have side effects on the shell that ran it. Approximating it as a
+/// subshell — which is what the deleted fallback parser did — lost every assignment.
+#[test]
+fn an_arithmetic_command_assigns_in_the_current_shell() {
+    assert_out("x=5; ((x++)); echo $x", "6");
+    assert_out("((y = 7)); echo $y", "7");
+    assert_out("n=0; for i in a b c; do ((n++)); done; echo $n", "3");
+}
+
+/// The status is inverted with respect to the value: non-zero is success.
+#[test]
+fn the_status_of_an_arithmetic_command_is_inverted() {
+    assert_out("((1)); echo $?", "0");
+    assert_out("((0)); echo $?", "1");
+    assert_out("((-1)); echo $?", "0");
+    assert_out("if ((3 > 5)); then echo yes; else echo no; fi", "no");
+}
+
+#[test]
+fn an_arithmetic_command_drives_a_while_loop() {
+    assert_out(
+        "i=0; while ((i < 3)); do echo $i; ((i += 1)); done",
+        "0\n1\n2",
+    );
+}
+
+/// A bad expression fails the command, not the shell: bash reports it, leaves `$?` at 1, and
+/// carries on — unlike `$(( … ))` in a word, which is fatal.
+#[test]
+fn a_bad_arithmetic_command_does_not_stop_the_script() {
+    let r = run("((1 +)); echo after=$?");
+    assert_eq!(r.out(), "after=1", "stderr: {}", r.stderr);
+    assert!(!r.stderr.is_empty(), "the failure must be reported");
+}
+
+// --- R8.3: `for ((init; cond; step))` ---
+
+#[test]
+fn an_arithmetic_for_loop_counts() {
+    assert_out("for ((i = 0; i < 3; i++)); do echo $i; done", "0\n1\n2");
+}
+
+/// A condition that is false at the start means zero iterations, not one.
+#[test]
+fn an_arithmetic_for_loop_can_run_zero_times() {
+    assert_out(
+        "for ((i = 5; i < 3; i++)); do echo $i; done; echo done",
+        "done",
+    );
+}
+
+/// An absent condition is *true*. Reading it as the empty expression, and so as 0, would turn the
+/// idiomatic infinite loop into a no-op.
+#[test]
+fn an_absent_condition_loops_until_something_breaks_it() {
+    assert_out(
+        "n=0; for (( ; ; )); do ((n++)); ((n >= 3)) && break; done; echo $n",
+        "3",
+    );
+}
+
+/// `continue` still runs the step expression; if it did not, a counting loop would spin forever.
+#[test]
+fn continue_in_an_arithmetic_for_loop_still_steps() {
+    assert_out(
+        "for ((i = 0; i < 5; i++)); do ((i == 2)) && continue; echo $i; done",
+        "0\n1\n3\n4",
+    );
+}
+
+#[test]
+fn break_leaves_an_arithmetic_for_loop_with_a_successful_status() {
+    assert_out(
+        "for ((i = 0; ; i++)); do echo $i; ((i >= 2)) && break; done; echo st=$?",
+        "0\n1\n2\nst=0",
+    );
+}
+
+#[test]
+fn break_two_escapes_a_nested_arithmetic_for_loop() {
+    assert_out(
+        "for ((a = 0; a < 3; a++)); do for ((b = 0; b < 3; b++)); do ((b == 1)) && break 2; echo $a.$b; done; done",
+        "0.0",
+    );
+}
+
+/// The loop variable keeps whatever the step last wrote, exactly as in bash.
+#[test]
+fn the_loop_variable_survives_the_loop() {
+    assert_out("for ((i = 0; i < 3; i++)); do :; done; echo $i", "3");
+}

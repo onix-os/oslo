@@ -13,6 +13,7 @@ pub(super) fn single_command_list(cmd: rush_ast::Command) -> rush_ast::CommandLi
             and_or: rush_ast::AndOrList {
                 first: rush_ast::Pipeline {
                     negated: false,
+                    timed: false,
                     commands: vec![cmd],
                 },
                 rest: Vec::new(),

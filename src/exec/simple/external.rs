@@ -8,10 +8,11 @@
 use crate::ast::Redirection;
 use crate::env::Environment;
 use crate::error::{Result, ShellError};
+use crate::exec::job;
 use crate::exec::redirect::RedirectGuard;
 use crate::exec::simple::report_redirect_failure;
 use nix::sys::wait::{WaitPidFlag, WaitStatus, waitpid};
-use nix::unistd::{ForkResult, fork};
+use nix::unistd::{ForkResult, Pid, fork};
 use std::ffi::CString;
 use std::os::unix::ffi::OsStrExt;
 use std::path::{Path, PathBuf};
@@ -81,6 +82,11 @@ pub(crate) fn run_external(
     unsafe {
         match fork() {
             Ok(ForkResult::Child) => {
+                // R7.1: a foreground command is a job of its own, so it leads its own process
+                // group. Done first: the parent is about to hand the terminal to that group, and
+                // until this call lands the child is a background process as far as the tty
+                // driver is concerned.
+                job::join_foreground_group(None);
                 // Before anything else, and in particular before `execv`: the program about to
                 // replace this process must not inherit the shell's own signal policy.
                 crate::exec::job::reset_signals_for_child();
@@ -96,7 +102,21 @@ pub(crate) fn run_external(
                 eprintln!("rush: exec failed for {}", cmd_name);
                 std::process::exit(126);
             }
-            Ok(ForkResult::Parent { child }) => Ok(wait_for_child(child, cmd_name)),
+            Ok(ForkResult::Parent { child }) => {
+                // `None` when job control is off, which is when the child is still in the
+                // shell's own group and there is no terminal to hand anywhere.
+                let pgid = job::place_foreground_child(child, None);
+                // R7.1: while the job runs, it owns the terminal — that is what makes Ctrl-C
+                // reach it instead of the shell, and what lets it read from the tty at all.
+                if let Some(pgid) = pgid {
+                    job::give_terminal_to(pgid);
+                }
+                let status = wait_for_child(child, cmd_name, words);
+                // Taken back with SIGTTOU blocked: at this moment the shell is not the foreground
+                // group, so an unguarded `tcsetpgrp` would stop the shell itself.
+                job::reclaim_terminal();
+                Ok(status)
+            }
             Err(e) => Err(ShellError::ExecutionError(format!("Fork failed: {}", e))),
         }
     }
@@ -116,7 +136,7 @@ pub(crate) fn run_external(
 /// A non-interactive bash *does* block on a stopped child — `bash -c 'sh -c "kill -STOP $$"'`
 /// never returns — so this is a deliberate divergence from the oracle, in the one direction
 /// where the oracle's behaviour is indistinguishable from a deadlock.
-fn wait_for_child(child: nix::unistd::Pid, cmd_name: &str) -> i32 {
+fn wait_for_child(child: Pid, cmd_name: &str, words: &[String]) -> i32 {
     loop {
         match waitpid(child, Some(WaitPidFlag::WUNTRACED)) {
             Ok(WaitStatus::Exited(_, code)) => return code,
@@ -124,13 +144,41 @@ fn wait_for_child(child: nix::unistd::Pid, cmd_name: &str) -> i32 {
             // `kill -9` (137) apart from an exit status of 9.
             Ok(WaitStatus::Signaled(_, sig, _)) => return 128 + sig as i32,
             Ok(WaitStatus::Stopped(_, sig)) => {
-                eprintln!("rush: {}: stopped ({})", cmd_name, sig);
+                remember_stopped(child, cmd_name, words);
                 return 128 + sig as i32;
             }
             Ok(_) => continue,
             Err(nix::errno::Errno::EINTR) => continue,
             Err(_) => return 1,
         }
+    }
+}
+
+/// Park a suspended foreground command in the job table so `fg` and `bg` can reach it.
+///
+/// R7.2: this is where [`crate::exec::job::JobState::Stopped`] comes from for a single command.
+/// Without a table entry the process stayed stopped with nothing in the shell able to name it,
+/// which made Ctrl-Z a way of leaking a process rather than parking one.
+///
+/// The notice is bash's `[1]+  Stopped   cmd`; the older `rush: cmd: stopped (SIGTSTP)` wording is
+/// kept for a shell without job control, where there is no job number to quote and no `fg` that
+/// could act on it.
+fn remember_stopped(child: Pid, cmd_name: &str, words: &[String]) {
+    if !job::job_control_active() {
+        eprintln!("rush: {}: stopped", cmd_name);
+        return;
+    }
+    let label = words.join(" ");
+    let line = job::with_jobs(|jobs| {
+        let id = jobs.add_stopped(child, vec![child], label);
+        // Reported here, so the reaper must not repeat it at the next command boundary.
+        if let Some(entry) = jobs.get_mut(id) {
+            entry.notified = true;
+        }
+        jobs.get(id).map(|entry| job::describe(entry, '+'))
+    });
+    if let Some(line) = line {
+        eprintln!("{}", line);
     }
 }
 

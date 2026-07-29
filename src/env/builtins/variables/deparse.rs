@@ -11,8 +11,9 @@
 //! string builder instead of an indentation engine.
 
 use crate::ast::{
-    AndOrList, AndOrOp, Command, CommandList, CompoundCommand, ListOp, ParamExpansion, Pipeline,
-    RedirectKind, Redirection, ReplaceScope, SimpleCommand, Word, WordPart,
+    AndOrList, AndOrOp, Assignment, AssignmentTarget, AssignmentValue, Command, CommandList,
+    CompoundCommand, ListOp, ParamExpansion, Pipeline, RedirectKind, Redirection, ReplaceScope,
+    SimpleCommand, Subscript, Word, WordPart,
 };
 
 /// Render `name` and `body` as a definition a shell can parse again.
@@ -206,14 +207,34 @@ impl Deparser {
                 for item in items {
                     let patterns: Vec<String> = item.patterns.iter().map(word).collect();
                     let body = self.list(&item.body);
+                    // The branch's own terminator, not a blanket `;;`: `;&` and `;;&` are
+                    // different programs, and this text has to re-parse to the same tree.
+                    let end = item.post_action.terminator();
                     if body.is_empty() {
-                        parts.push(format!("{}) ;;", patterns.join("|")));
+                        parts.push(format!("{}) {end}", patterns.join("|")));
                     } else {
-                        parts.push(format!("{}) {};;", patterns.join("|"), body));
+                        parts.push(format!("{}) {}{end}", patterns.join("|"), body));
                     }
                 }
                 parts.push("esac".to_string());
                 parts.join(" ")
+            }
+            CompoundCommand::Arithmetic(expr) => format!("(( {} ))", expr),
+            CompoundCommand::ArithmeticFor {
+                init,
+                cond,
+                step,
+                body,
+            } => {
+                let section = |e: &Option<String>| e.clone().unwrap_or_default();
+                let body = self.terminated(body);
+                format!(
+                    "for (( {}; {}; {} )); do {} done",
+                    section(init),
+                    section(cond),
+                    section(step),
+                    body
+                )
             }
             CompoundCommand::Subshell(list) => {
                 let body = self.list(list);
@@ -227,11 +248,7 @@ impl Deparser {
     }
 
     fn simple(&mut self, simple: &SimpleCommand) -> String {
-        let mut parts: Vec<String> = simple
-            .assignments
-            .iter()
-            .map(|a| format!("{}={}", a.name, word(&a.value)))
-            .collect();
+        let mut parts: Vec<String> = simple.assignments.iter().map(assignment).collect();
         parts.extend(simple.words.iter().map(word));
         for redirection in &simple.redirections {
             let rendered = self.redirection(redirection);
@@ -300,9 +317,50 @@ fn part(p: &WordPart, in_quotes: bool) -> String {
             name,
             expansion_type,
         } => parameter(name, expansion_type),
+        // Always braced, like every other reference here: `$a[0]` would read back as `$a`
+        // followed by the literal `[0]`.
+        WordPart::ArrayRef {
+            name,
+            subscript,
+            expansion_type,
+        } => parameter(
+            &format!("{}[{}]", name, subscript_text(subscript)),
+            expansion_type,
+        ),
         WordPart::CommandSubstitution(s) => format!("$({})", s),
         WordPart::Arithmetic(s) => format!("$(({}))", s),
         WordPart::Tilde(s) => format!("~{}", s),
+    }
+}
+
+/// Render an assignment, in whichever of its four shapes it has.
+fn assignment(a: &Assignment) -> String {
+    let target = match &a.target {
+        AssignmentTarget::Name(name) => name.clone(),
+        AssignmentTarget::Element { name, index } => format!("{}[{}]", name, word(index)),
+    };
+    let op = if a.append { "+=" } else { "=" };
+    let value = match &a.value {
+        AssignmentValue::Scalar(w) => word(w),
+        AssignmentValue::Array(elements) => {
+            let rendered: Vec<String> = elements
+                .iter()
+                .map(|e| match &e.index {
+                    Some(index) => format!("[{}]={}", word(index), word(&e.value)),
+                    None => word(&e.value),
+                })
+                .collect();
+            format!("({})", rendered.join(" "))
+        }
+    };
+    format!("{}{}{}", target, op, value)
+}
+
+fn subscript_text(subscript: &Subscript) -> String {
+    match subscript {
+        Subscript::All => "@".to_string(),
+        Subscript::Joined => "*".to_string(),
+        Subscript::Index(w) => word(w),
     }
 }
 

@@ -11,6 +11,7 @@
 //!
 //! [`Environment::builtin_names`]: crate::env::Environment::builtin_names
 
+pub(crate) mod arrays;
 mod builtin;
 mod colon;
 mod command;
@@ -22,6 +23,7 @@ mod exec;
 mod getopts;
 mod hash;
 mod io;
+mod jobs;
 mod r#let;
 mod process;
 mod spawn;
@@ -43,10 +45,9 @@ pub use exec::builtin_exec;
 pub use getopts::builtin_getopts;
 pub use hash::builtin_hash;
 pub use io::{builtin_echo, builtin_read};
+pub use jobs::{builtin_bg, builtin_disown, builtin_fg, builtin_jobs, builtin_wait};
 pub use r#let::builtin_let;
-pub use process::{
-    builtin_kill, builtin_trap, builtin_umask, builtin_wait, run_exit_trap, run_pending_traps,
-};
+pub use process::{builtin_kill, builtin_trap, builtin_umask, run_exit_trap, run_pending_traps};
 pub use times::builtin_times;
 pub use ulimit::builtin_ulimit;
 pub use variables::{
@@ -106,6 +107,12 @@ pub fn register_default_builtins(env: &mut Environment) {
     env.register_custom_builtin("umask", builtin_umask);
     env.register_custom_builtin("wait", builtin_wait);
     env.register_custom_builtin("kill", builtin_kill);
+
+    // Job control. `wait` is registered above but belongs with these: all five read one table.
+    env.register_custom_builtin("jobs", builtin_jobs);
+    env.register_custom_builtin("fg", builtin_fg);
+    env.register_custom_builtin("bg", builtin_bg);
+    env.register_custom_builtin("disown", builtin_disown);
 
     // POSIX's null command. Registered like any other builtin rather than special-cased in the
     // parser, because `:` really is one — `while :; do` and `: ${x:=default}` are ordinary

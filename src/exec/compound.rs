@@ -37,6 +37,11 @@ enum LoopStep {
 ///
 /// `break n` / `continue n` for `n > 1` are re-raised with the depth decremented, so each
 /// enclosing loop peels off one level.
+///
+/// A `break` or `continue` that this loop consumes also *sets* the running status to 0, because
+/// it is itself the last command the body executed and it succeeded. Leaving the previous
+/// iteration's status in place made `for ((i=0; ; i++)); do echo $i; ((i>=2)) && break; done`
+/// report 1 — the status of the `&&` test that was false last time round.
 fn run_loop_body(env: &mut Environment, body: &CommandList, status: &mut i32) -> LoopStep {
     match eval_command_list(env, body) {
         Ok(st) => {
@@ -46,11 +51,17 @@ fn run_loop_body(env: &mut Environment, body: &CommandList, status: &mut i32) ->
         Err(ShellError::Break(depth)) if depth > 1 => {
             LoopStep::Unwind(ShellError::Break(depth - 1))
         }
-        Err(ShellError::Break(_)) => LoopStep::Stop,
+        Err(ShellError::Break(_)) => {
+            *status = 0;
+            LoopStep::Stop
+        }
         Err(ShellError::Continue(depth)) if depth > 1 => {
             LoopStep::Unwind(ShellError::Continue(depth - 1))
         }
-        Err(ShellError::Continue(_)) => LoopStep::Next,
+        Err(ShellError::Continue(_)) => {
+            *status = 0;
+            LoopStep::Next
+        }
         Err(e) => LoopStep::Unwind(e),
     }
 }
@@ -92,6 +103,129 @@ fn eval_conditional_loop(
             LoopStep::Next => {}
             LoopStep::Stop => break Ok(status),
             LoopStep::Unwind(e) => break Err(e),
+        }
+    };
+
+    env.exit_loop();
+    result
+}
+
+/// Does `subject` match any of `patterns`?
+///
+/// Neither the subject nor the patterns are field-split or pathname-expanded; `expand_word` would
+/// glob `f*` against the working directory instead of leaving it as a pattern to match against.
+fn any_pattern_matches(env: &mut Environment, patterns: &[Word], subject: &str) -> Result<bool> {
+    for pat_word in patterns {
+        let pat_str = expand_word_to_string(env, pat_word)?;
+        let matches = glob::Pattern::new(&pat_str)
+            .map(|p| p.matches(subject))
+            .unwrap_or(pat_str == subject);
+        if matches {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+/// `case … esac`, including bash's two fallthrough terminators.
+///
+/// The branches are walked by index rather than with a `for`, because `;&` has to reach the
+/// *next* branch and run its body without consulting its patterns — `forced` is that carry. `;;&`
+/// leaves `forced` clear and simply keeps testing, which is the "re-test" half of the feature.
+///
+/// The status is that of the last body actually run, so a `;;&` chain whose later patterns all
+/// fail still reports what the branch that did match returned.
+fn eval_case(env: &mut Environment, word: &Word, items: &[CaseItem]) -> Result<i32> {
+    let subject = expand_word_to_string(env, word)?;
+
+    let mut status = 0;
+    let mut forced = false;
+
+    for item in items {
+        if !forced && !any_pattern_matches(env, &item.patterns, &subject)? {
+            continue;
+        }
+
+        status = eval_command_list(env, &item.body)?;
+        match item.post_action {
+            CaseAction::ExitCase => return Ok(status),
+            CaseAction::FallThrough => forced = true,
+            CaseAction::ContinueMatching => forced = false,
+        }
+    }
+
+    Ok(status)
+}
+
+/// Evaluate one arithmetic expression for a command-level construct.
+///
+/// A bad expression is the *command's* failure, not the shell's: bash prints the diagnostic,
+/// leaves `$?` at 1 and runs the next command, unlike `$(( … ))` in a word, which is fatal.
+/// `None` means "already reported"; callers turn it into status 1 and stop.
+fn eval_arith(env: &mut Environment, expr: &str) -> Option<i64> {
+    match crate::expand::arithmetic::eval_arithmetic(env, expr) {
+        Ok(value) => Some(value),
+        Err(e) => {
+            eprintln!("rush: ((: {}", e);
+            None
+        }
+    }
+}
+
+/// `(( expr ))` — evaluated in the *current* shell, so its assignments survive.
+///
+/// The status is inverted with respect to the value: a non-zero result is success. That is what
+/// makes `while (( i < n ))` and `if (( x ))` read the way arithmetic conditions are written, and
+/// it is the same convention the `let` builtin uses.
+fn eval_arithmetic_command(env: &mut Environment, expr: &str) -> i32 {
+    match eval_arith(env, expr) {
+        Some(value) => i32::from(value == 0),
+        None => 1,
+    }
+}
+
+/// `for ((init; cond; step)) do … done`.
+///
+/// Every section is optional, and an absent condition means *true* — `for ((;;))` is the
+/// idiomatic infinite loop, not a loop that never runs. The step runs after `continue` as well as
+/// after a normal iteration, which is what keeps `continue` from wedging a counting loop.
+fn eval_arithmetic_for(
+    env: &mut Environment,
+    init: Option<&str>,
+    cond: Option<&str>,
+    step: Option<&str>,
+    body: &CommandList,
+) -> Result<i32> {
+    if let Some(expr) = init
+        && eval_arith(env, expr).is_none()
+    {
+        return Ok(1);
+    }
+
+    let mut status = 0;
+    env.enter_loop();
+
+    let result = loop {
+        // An absent condition is true, which is why this is not `unwrap_or(1)` on a value: there
+        // is nothing to evaluate, so nothing can fail either.
+        if let Some(expr) = cond {
+            match eval_arith(env, expr) {
+                Some(0) => break Ok(status),
+                Some(_) => {}
+                None => break Ok(1),
+            }
+        }
+
+        match run_loop_body(env, body, &mut status) {
+            LoopStep::Next => {}
+            LoopStep::Stop => break Ok(status),
+            LoopStep::Unwind(e) => break Err(e),
+        }
+
+        if let Some(expr) = step
+            && eval_arith(env, expr).is_none()
+        {
+            break Ok(1);
         }
     };
 
@@ -165,32 +299,14 @@ pub(crate) fn eval_compound_command(
             env.exit_loop();
             result
         }
-        CompoundCommand::Case { word, items } => {
-            // Neither the subject nor the patterns are field-split or pathname-expanded here;
-            // `expand_word` would glob `f*` against the working directory instead of leaving it
-            // as a pattern to match against.
-            let expanded = expand_word_to_string(env, word)?;
-
-            for item in items {
-                let mut matched = false;
-                for pat_word in &item.patterns {
-                    let pat_str = expand_word_to_string(env, pat_word)?;
-                    if glob::Pattern::new(&pat_str)
-                        .map(|p| p.matches(&expanded))
-                        .unwrap_or(pat_str == expanded)
-                    {
-                        matched = true;
-                        break;
-                    }
-                }
-
-                if matched {
-                    return eval_command_list(env, &item.body);
-                }
-            }
-
-            Ok(0)
-        }
+        CompoundCommand::Case { word, items } => eval_case(env, word, items),
+        CompoundCommand::Arithmetic(expr) => Ok(eval_arithmetic_command(env, expr)),
+        CompoundCommand::ArithmeticFor {
+            init,
+            cond,
+            step,
+            body,
+        } => eval_arithmetic_for(env, init.as_deref(), cond.as_deref(), step.as_deref(), body),
         CompoundCommand::Subshell(body) => {
             // Anything this shell has buffered would be duplicated by the fork and printed twice.
             flush_stdout();
@@ -223,5 +339,101 @@ pub(crate) fn eval_compound_command(
             }
         }
         CompoundCommand::Group(body) => eval_command_list(env, body),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::parser::parse_bash_script;
+
+    /// Run `src` in one environment and hand back the status, so a test can then ask what the
+    /// script left behind. In-process on purpose: the point of `(( ))` is that its side effects
+    /// land in *this* shell, and a forked child would hide a regression.
+    fn run(env: &mut Environment, src: &str) -> i32 {
+        let list = parse_bash_script(src).unwrap_or_else(|e| panic!("{src}: {e}"));
+        eval_command_list(env, &list).unwrap_or_else(|e| panic!("{src}: {e}"))
+    }
+
+    fn status(src: &str) -> i32 {
+        run(&mut Environment::new(), src)
+    }
+
+    /// Non-zero is success. Getting this backwards makes every `if (( ))` take the wrong branch.
+    #[test]
+    fn the_arithmetic_command_status_is_inverted() {
+        assert_eq!(status("((1))"), 0);
+        assert_eq!(status("((0))"), 1);
+        assert_eq!(status("((5 > 3))"), 0);
+        assert_eq!(status("((3 > 5))"), 1);
+        assert_eq!(status("((-1))"), 0);
+    }
+
+    /// The whole reason the construct exists: no fork, so the assignment is still there after.
+    #[test]
+    fn arithmetic_assignments_stay_in_the_current_environment() {
+        let mut env = Environment::new();
+        env.set_var("x", "5", false);
+        assert_eq!(run(&mut env, "((x++))"), 0);
+        assert_eq!(env.get_var("x"), Some("6"));
+        assert_eq!(run(&mut env, "((x *= 3))"), 0);
+        assert_eq!(env.get_var("x"), Some("18"));
+    }
+
+    /// A bad expression is the command's failure, not the shell's, so the next command runs.
+    #[test]
+    fn a_bad_expression_fails_the_command_only() {
+        let mut env = Environment::new();
+        assert_eq!(run(&mut env, "((1 +)); ((marker = 9))"), 0);
+        assert_eq!(env.get_var("marker"), Some("9"));
+    }
+
+    /// An absent condition is *true*; reading it as the empty expression would make the loop a
+    /// no-op instead of the idiomatic infinite loop.
+    #[test]
+    fn an_arithmetic_for_loop_with_no_condition_runs_until_it_breaks() {
+        let mut env = Environment::new();
+        run(
+            &mut env,
+            "for (( ; ; )); do ((n++)); ((n >= 4)) && break; done",
+        );
+        assert_eq!(env.get_var("n"), Some("4"));
+    }
+
+    #[test]
+    fn an_arithmetic_for_loop_steps_after_continue() {
+        let mut env = Environment::new();
+        run(
+            &mut env,
+            "for ((i = 0; i < 4; i++)); do ((i == 1)) && continue; ((seen++)); done",
+        );
+        assert_eq!(
+            env.get_var("i"),
+            Some("4"),
+            "the step must run after continue"
+        );
+        assert_eq!(env.get_var("seen"), Some("3"));
+    }
+
+    /// `;&` reaches the next branch without testing its pattern; `;;&` keeps testing.
+    #[test]
+    fn case_terminators_select_different_branches() {
+        let mut env = Environment::new();
+        run(
+            &mut env,
+            "case a in a) hit=1;& zzz) fell=1;; esac; case abc in a*) first=1;;& *c) second=1;; esac",
+        );
+        assert_eq!(env.get_var("hit"), Some("1"));
+        assert_eq!(env.get_var("fell"), Some("1"), ";& must ignore the pattern");
+        assert_eq!(env.get_var("first"), Some("1"));
+        assert_eq!(env.get_var("second"), Some("1"), ";;& must keep matching");
+    }
+
+    /// A `;;&` chain reports the last body that actually ran, not the failed match after it.
+    #[test]
+    fn a_case_reports_the_status_of_the_last_body_it_ran() {
+        assert_eq!(status("case a in a) false;;& zzz) true;; esac"), 1);
+        assert_eq!(status("case a in a) true;;& zzz) false;; esac"), 0);
+        assert_eq!(status("case a in zzz) false;; esac"), 0);
     }
 }

@@ -2,7 +2,14 @@
 
 mod cli;
 
+// History expansion belongs to the *binary's* prompt, never to the library: it rewrites a line
+// before it is parsed, so reaching it from `-c` or a script would let data turn into a different
+// command. Declaring it here rather than from `interactive::mod` is what makes that unreachable.
+#[path = "interactive/history_expand.rs"]
+mod history_expand;
+
 use cli::{Action, Invocation};
+use history_expand::Expansion;
 use rush::env::Environment;
 use rush::env::builtins::run_exit_trap;
 use rush::env::options::ShellOption;
@@ -157,6 +164,30 @@ fn absorb_loop_control(result: Result<i32>) -> Result<i32> {
     }
 }
 
+/// Resolve `!`/`^` history references in a line typed at the prompt.
+///
+/// `None` means the line must not run: a reference that cannot be resolved is a mistake, and bash
+/// answers it by discarding the line, printing the reason, and leaving `$?` untouched — nothing
+/// ran, so nothing should have changed. A rewritten line is echoed to stderr first, because the
+/// user has to be able to see what `!!` turned into before it takes effect.
+fn expand_history(line: &str, history: &[String]) -> Option<String> {
+    match history_expand::expand(line, history) {
+        Ok(Expansion::Unchanged) => Some(line.to_string()),
+        Ok(Expansion::Expanded(expanded)) => {
+            eprintln!("{}", expanded);
+            // `^a^b` can leave nothing behind; an empty line is not a command.
+            if expanded.trim().is_empty() {
+                return None;
+            }
+            Some(expanded)
+        }
+        Err(err) => {
+            eprintln!("rush: {}", err);
+            None
+        }
+    }
+}
+
 fn run_repl() -> ! {
     // Everything downstream that behaves differently for a person than for a script — the job
     // notice, whether a background job keeps the terminal's stdin — reads this.
@@ -182,8 +213,16 @@ fn run_repl() -> ! {
         }
     }
 
+    // History is added by hand below, not automatically: what belongs in the history is the line
+    // *after* history expansion, so that `!!` recalls the command it stood for rather than itself.
+    // Repeats are kept rather than folded into the previous entry. rustyline drops a consecutive
+    // duplicate by default, which would silently renumber every later event and make `!-2` point
+    // one line too far back — bash's default `HISTCONTROL` keeps them, and `!n` only means
+    // anything if the numbering agrees.
     let config = rustyline::Config::builder()
-        .auto_add_history(true)
+        .auto_add_history(false)
+        .history_ignore_dups(false)
+        .expect("history duplicate policy")
         .completion_type(rustyline::CompletionType::Circular)
         .build();
 
@@ -223,11 +262,17 @@ fn run_repl() -> ! {
                     continue;
                 }
 
-                let _ = rl.add_history_entry(trimmed);
+                // Owned so the immutable borrow of the editor ends before the entry is added.
+                let history: Vec<String> = rl.history().iter().cloned().collect();
+                let Some(line) = expand_history(trimmed, &history) else {
+                    continue;
+                };
+
+                let _ = rl.add_history_entry(&line);
 
                 let mut env_guard = env_struct.lock().unwrap();
                 let res = absorb_loop_control(
-                    parse_bash_script(trimmed)
+                    parse_bash_script(&line)
                         .and_then(|ast| eval_command_list(&mut env_guard, &ast)),
                 );
                 drop(env_guard);

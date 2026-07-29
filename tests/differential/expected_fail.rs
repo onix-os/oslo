@@ -46,15 +46,16 @@ pub const EXPECTED_FAIL: &[(&str, &str, &str)] = &[
     // both stored and run — the EXIT handler on every exit path, signals at command boundaries.
 
     // --- Round 7: job control ---
-    ("builtin_wait_status.sh", "R7.5", "wait discards the child's status"),
+    // Empty for `wait` (R7.5): a pid operand reports the child's own status, a signalled child
+    // reports 128 + signo, an unknown pid is 127, and `-n` and `%n` operands work. What remains
+    // in Round 7 needs a pty and is covered by the job-control integration tests instead.
 
     // --- Round 8: missing language features ---
-    ("arith_command.sh", "R8.2", "((expr)) is rejected by the adapter"),
-    ("redir_heredoc_fallback_not_executed.sh", "R8.2", "((expr)) is rejected, so the whole script is a syntax error — the heredoc body is never run either way"),
-    ("arith_while_condition.sh", "R8.2", "((expr)) is rejected by the adapter"),
-    ("arith_for_loop.sh", "R8.3", "for ((;;)) is rejected by the adapter"),
-    ("syntax_unsupported_process_substitution.sh", "R8.4", "a process substitution argument is deleted from argv"),
-    ("control_case_fallthrough.sh", "R8.10", ";& behaves as ;;"),
+    ("array_whole_operators.sh", "R8.1", "an operator applied to a whole array — `${a[@]:1}` slicing, `${a[@]#pat}` element-wise — is rejected loudly instead of evaluated; every other array form matches bash"),
+    ("arith_for_unspaced_sections.sh", "R8.3", "brush 0.4 tokenizes the `;;` in `for ((;;))` as the case terminator, so the idiomatic unspaced infinite loop is a parse error; `for (( ; ; ))` works"),
+    ("syntax_unsupported_process_substitution.sh", "R8.4", "process substitution is refused by name (step 1); the `/dev/fd/N` implementation is step 2 and deferred"),
+    ("syntax_unsupported_coproc.sh", "R8.5", "coproc is refused by name and deliberately not implemented — it needs job control; bash runs the body and exits 0"),
+    ("syntax_unsupported_select.sh", "R8.6", "select is refused by name and deliberately not implemented — it needs a prompt, PS3 and REPLY; bash runs the loop and reads EOF"),
 
     // --- divergences the audit did not enumerate ---
     ("redir_heredoc.sh", "UNFILED", "an unquoted heredoc body is not parameter-expanded"),

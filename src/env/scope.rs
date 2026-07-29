@@ -1,3 +1,5 @@
+mod array;
+mod frames;
 mod options;
 mod registry;
 #[cfg(test)]
@@ -7,11 +9,13 @@ use crate::ast::Command;
 use crate::env::nesting::{DepthGuard, MAX_FUNCTION_DEPTH, MAX_SCRIPT_DEPTH};
 use crate::env::options::ShellOptions;
 use crate::error::Result;
+use frames::ScopeFrame;
 use registry::BuiltinRegistry;
 use std::collections::{HashMap, HashSet};
 use std::env;
 use std::path::PathBuf;
 
+pub use array::{ShellArray, array_literal_body};
 pub use registry::{BuiltinFn, is_special_builtin};
 
 /// Whether `name` is a valid shell variable name: `[A-Za-z_][A-Za-z0-9_]*`.
@@ -84,6 +88,9 @@ fn environ_remove(name: &str) {
 
 pub struct Environment {
     vars: HashMap<String, (String, bool)>, // (value, is_exported)
+    /// Indexed arrays, in the same namespace as [`Self::vars`]: a name is a scalar or an array,
+    /// never both. See the `array` submodule for why the two tables stay separate.
+    arrays: HashMap<String, ShellArray>,
     positional: Vec<String>,
     pub last_status: i32,
     pub pid: u32,
@@ -93,8 +100,8 @@ pub struct Environment {
     /// keeps reporting the *invoking* shell (POSIX; `bash -c 'echo $$; (echo $$)'` prints one
     /// number twice), so job control and `$BASHPID` need the real one kept separately.
     current_pid: u32,
-    /// Exit status of every stage of the most recent pipeline, left to right. Stored, not yet
-    /// exposed: `PIPESTATUS` needs arrays (Round 8), `pipefail` (Round 6) reads the same vector.
+    /// Exit status of every stage of the most recent pipeline, left to right. Published as the
+    /// `PIPESTATUS` array by [`Self::set_pipeline_status`]; `pipefail` reads the same vector.
     pipeline_status: Vec<i32>,
     /// Exit status of the last command substitution, until something consumes it.
     substitution_status: Option<i32>,
@@ -106,7 +113,7 @@ pub struct Environment {
     signal_traps: HashMap<String, String>,
     readonly_vars: HashSet<String>,
     dir_stack: Vec<PathBuf>,
-    scope_stack: Vec<HashMap<String, Option<(String, bool)>>>,
+    scope_stack: Vec<ScopeFrame>,
     /// How many loops are currently executing in this shell.
     ///
     /// `break` and `continue` unwind as errors, which would abandon the rest of the enclosing
@@ -144,6 +151,7 @@ impl Environment {
 
         let mut env_struct = Self {
             vars,
+            arrays: HashMap::new(),
             positional: Vec::new(),
             last_status: 0,
             pid,
@@ -198,7 +206,16 @@ impl Environment {
 
     /// Record every stage of a pipeline's exit status, left to right. A one-command pipeline
     /// records a single status, as bash's `PIPESTATUS` does.
+    ///
+    /// Publishing `PIPESTATUS` here rather than synthesising it during expansion keeps one copy
+    /// of the numbers: `${PIPESTATUS[0]}` and `set -o pipefail` cannot disagree about what the
+    /// last pipeline did. Written directly into the array table, bypassing the readonly check —
+    /// this is the shell recording its own state, not a user assignment.
     pub fn set_pipeline_status(&mut self, statuses: Vec<i32>) {
+        self.arrays.insert(
+            "PIPESTATUS".to_string(),
+            ShellArray::from_values(statuses.iter().map(i32::to_string)),
+        );
         self.pipeline_status = statuses;
     }
 
@@ -254,66 +271,6 @@ impl Environment {
         self.script_depth.exit()
     }
 
-    pub fn push_scope(&mut self) {
-        self.scope_stack.push(HashMap::new());
-    }
-
-    pub fn pop_scope(&mut self) {
-        if let Some(frame) = self.scope_stack.pop() {
-            for (k, orig_val) in frame {
-                match orig_val {
-                    Some((val, is_exp)) => {
-                        self.vars.insert(k.clone(), (val.clone(), is_exp));
-                        if is_exp {
-                            environ_set(&k, &val);
-                        } else {
-                            // The variable existed but was not exported. If it was exported
-                            // temporarily inside this scope, the process environment still
-                            // holds it and would leak into every later child.
-                            environ_remove(&k);
-                        }
-                    }
-                    None => {
-                        self.vars.remove(&k);
-                        environ_remove(&k);
-                    }
-                }
-            }
-        }
-    }
-
-    /// Remember `name`'s current value in the innermost scope so [`Self::pop_scope`] restores it.
-    fn save_for_restore(&mut self, name: &str) {
-        if let Some(top_frame) = self.scope_stack.last_mut()
-            && !top_frame.contains_key(name)
-        {
-            top_frame.insert(name.to_string(), self.vars.get(name).cloned());
-        }
-    }
-
-    /// Set `name` in the innermost scope. `false` if the assignment was refused.
-    pub fn set_local_var(&mut self, name: &str, value: &str) -> bool {
-        // Checked before `save_for_restore`: a name recorded in the frame is passed to
-        // `environ_remove` when the scope pops, so an unusable one must never get in there.
-        if reject_unrepresentable(name, value) {
-            return false;
-        }
-        self.save_for_restore(name);
-        self.set_var(name, value, false)
-    }
-
-    /// Set a variable that is exported for the lifetime of the innermost scope only.
-    ///
-    /// This is what a command-prefix assignment (`FOO=bar cmd`) needs: `cmd` must see `FOO` in
-    /// its environment, and the shell must not.
-    pub fn set_local_exported_var(&mut self, name: &str, value: &str) -> bool {
-        if reject_unrepresentable(name, value) {
-            return false;
-        }
-        self.save_for_restore(name);
-        self.set_var(name, value, true)
-    }
-
     pub fn set_readonly(&mut self, name: &str) {
         self.readonly_vars.insert(name.to_string());
     }
@@ -359,12 +316,19 @@ impl Environment {
         self.builtins.lookup(name).map(|func| func(self, args))
     }
 
+    /// A variable's value as a single string.
+    ///
+    /// An array answers with its element 0, because in bash `$a` and `${a[0]}` are the same
+    /// reference: `a=(1 2 3); echo "$a"` prints `1`.
     pub fn get_var(&self, name: &str) -> Option<&str> {
         match name {
             // `$-` joins the list: it is computed from the option bitset, and a variable of that
             // name (which no assignment can create, but `environ` can carry) must not shadow it.
             "?" | "$" | "!" | "#" | "*" | "@" | "-" => None,
-            _ => self.vars.get(name).map(|(v, _)| v.as_str()),
+            _ => match self.vars.get(name) {
+                Some((v, _)) => Some(v.as_str()),
+                None => self.arrays.get(name).and_then(|a| a.get(0)),
+            },
         }
     }
 
@@ -402,6 +366,11 @@ impl Environment {
     }
 
     /// Assign `name=value`. `false` if the variable is read-only or unrepresentable.
+    ///
+    /// A scalar assignment to a name that already holds an array writes **element 0**, which is
+    /// what bash does: `a=(1 2 3); a=4` leaves `${a[@]}` as `4 2 3`. Deciding that here rather
+    /// than in the assignment code means `read a`, a `for a in …` loop variable and `${a:=x}` all
+    /// agree about it for free.
     pub fn set_var(&mut self, name: &str, value: &str, export: bool) -> bool {
         if self.is_readonly(name) {
             eprintln!("rush: {}: is read only", name);
@@ -409,6 +378,10 @@ impl Environment {
         }
         if reject_unrepresentable(name, value) {
             return false;
+        }
+        if let Some(array) = self.arrays.get_mut(name) {
+            array.set(0, value);
+            return true;
         }
         let is_exp = export || self.vars.get(name).map(|(_, exp)| *exp).unwrap_or(false);
         self.vars
@@ -419,7 +392,19 @@ impl Environment {
         true
     }
 
+    /// Remove `name` entirely, in whichever shape it has. `unset a` drops the whole array, not
+    /// just its element 0.
     pub fn unset_var(&mut self, name: &str) {
+        self.vars.remove(name);
+        self.arrays.remove(name);
+        environ_remove(name);
+    }
+
+    /// Forget any *scalar* under `name`, leaving the array table alone.
+    ///
+    /// Used by the array store when a name changes shape; not public, because outside that
+    /// transition "unset" always means [`Self::unset_var`].
+    fn drop_scalar(&mut self, name: &str) {
         self.vars.remove(name);
         environ_remove(name);
     }

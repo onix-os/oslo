@@ -14,9 +14,35 @@ pub enum WordPart {
         name: String,
         expansion_type: ParamExpansion,
     },
+    /// `${name[subscript]}` — a reference into an indexed array.
+    ///
+    /// A separate variant rather than an `Option<Subscript>` on [`WordPart::Variable`] so that
+    /// every consumer has to decide what a subscript means for it. The two are otherwise the same
+    /// reference, and the operators in [`ParamExpansion`] apply to both.
+    ArrayRef {
+        name: String,
+        subscript: Subscript,
+        expansion_type: ParamExpansion,
+    },
     CommandSubstitution(String),
     Arithmetic(String),
     Tilde(String),
+}
+
+/// What sits between the brackets of an array reference.
+///
+/// `[@]` and `[*]` differ exactly as `"$@"` and `"$*"` do: the first is one field per element,
+/// the second is one field with the elements joined by IFS. Anything else is an arithmetic
+/// expression naming a single element, which is why it is a [`Word`] — `${a[i+1]}` has to expand
+/// `i` before it can be evaluated.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Subscript {
+    /// `[@]` — every element, kept apart under quoting.
+    All,
+    /// `[*]` — every element, joined by the first character of IFS.
+    Joined,
+    /// `[expr]` — one element, selected by an arithmetic expression.
+    Index(Word),
 }
 
 /// The operator inside a `${...}`, with its operand still unexpanded.
@@ -104,10 +130,67 @@ impl Word {
     }
 }
 
+/// What an assignment writes to.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AssignmentTarget {
+    /// `name=…`.
+    Name(String),
+    /// `name[expr]=…` — one element of an indexed array. The subscript is arithmetic and is
+    /// evaluated when the assignment runs, so `a[i+1]=x` writes where `i+1` points *then*.
+    Element { name: String, index: Word },
+}
+
+impl AssignmentTarget {
+    /// The variable being written to, without its subscript.
+    pub fn name(&self) -> &str {
+        match self {
+            Self::Name(name) => name,
+            Self::Element { name, .. } => name,
+        }
+    }
+}
+
+/// One element of an array literal: `(a b)` or `([2]=a [5]=b)`, which may be mixed.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ArrayElement {
+    /// An explicit `[index]=`, evaluated as arithmetic. `None` means "the next free index".
+    pub index: Option<Word>,
+    pub value: Word,
+}
+
+/// The right-hand side of an assignment.
+///
+/// An array literal is *not* a word: `a=(1 2 3)` is three elements, and flattening it to the
+/// source text `(1 2 3)` is what made `echo "$a"` print the parentheses.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum AssignmentValue {
+    Scalar(Word),
+    Array(Vec<ArrayElement>),
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Assignment {
-    pub name: String,
-    pub value: Word,
+    pub target: AssignmentTarget,
+    pub value: AssignmentValue,
+    /// `+=` — append to the existing value rather than replacing it. For an array literal that
+    /// means appending elements after the highest index in use.
+    pub append: bool,
+}
+
+impl Assignment {
+    /// A plain `name=value` assignment, which is what almost every caller builds.
+    pub fn scalar(name: &str, value: Word) -> Self {
+        Self {
+            target: AssignmentTarget::Name(name.to_string()),
+            value: AssignmentValue::Scalar(value),
+            append: false,
+        }
+    }
+
+    /// The variable this assignment writes to, without any subscript.
+    pub fn name(&self) -> &str {
+        self.target.name()
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -176,6 +259,27 @@ pub enum CompoundCommand {
         word: Word,
         items: Vec<CaseItem>,
     },
+    /// `(( expr ))` — an arithmetic expression evaluated as a *command*.
+    ///
+    /// The expression is kept as source text, not as a parsed tree: POSIX expands parameters and
+    /// command substitutions over it before any of it is arithmetic, so it cannot be parsed until
+    /// it runs. `crate::expand::arithmetic` owns that whole pipeline, and reusing it here is what
+    /// makes `(( x += 1 ))` and `$(( x += 1 ))` agree.
+    ///
+    /// This is *not* a [`CompoundCommand::Subshell`]: `(( x++ ))` must leave `x` incremented in
+    /// the shell that ran it, which is the entire reason the construct exists.
+    Arithmetic(String),
+    /// `for ((init; cond; step)) do … done`.
+    ///
+    /// Each section is optional and independently so — `for ((;;))` is the idiomatic infinite
+    /// loop — hence three `Option`s rather than one struct with empty strings, which would make
+    /// "absent" and "the empty expression" indistinguishable.
+    ArithmeticFor {
+        init: Option<String>,
+        cond: Option<String>,
+        step: Option<String>,
+        body: CommandList,
+    },
     Subshell(CommandList),
     Group(CommandList),
 }
@@ -184,11 +288,49 @@ pub enum CompoundCommand {
 pub struct CaseItem {
     pub patterns: Vec<Word>,
     pub body: CommandList,
+    /// What to do once this branch's body has run.
+    pub post_action: CaseAction,
+}
+
+/// What `case` does after running the body of a branch that matched.
+///
+/// Recorded per branch rather than inferred, because the three terminators are three different
+/// programs: dropping the distinction made `;&` and `;;&` behave as `;;`, which silently skipped
+/// the branches the script was relying on running.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum CaseAction {
+    /// `;;` — leave the `case`.
+    #[default]
+    ExitCase,
+    /// `;&` — run the *next* branch's body without testing its patterns at all.
+    FallThrough,
+    /// `;;&` — carry on testing the remaining branches' patterns, as if this one had not matched.
+    ContinueMatching,
+}
+
+impl CaseAction {
+    /// The source terminator this action was written as.
+    ///
+    /// Shared by the two function printers so that what they emit re-parses to the same tree.
+    pub fn terminator(self) -> &'static str {
+        match self {
+            Self::ExitCase => ";;",
+            Self::FallThrough => ";&",
+            Self::ContinueMatching => ";;&",
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Pipeline {
     pub negated: bool,
+    /// The `time` keyword prefixed this pipeline: report `real`/`user`/`sys` once it finishes.
+    ///
+    /// A property of the pipeline rather than of a command, because that is what `time` measures:
+    /// `time a | b` times the whole pipe, not `a`. It changes nothing about what the pipeline
+    /// runs, what it writes to stdout, or the status it reports — see
+    /// [`crate::exec::pipeline::eval_pipeline`].
+    pub timed: bool,
     pub commands: Vec<Command>,
 }
 

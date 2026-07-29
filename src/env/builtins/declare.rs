@@ -8,15 +8,20 @@
 //! is not, which is exactly `declare`'s "local inside a function, global outside" contract.
 //! `-g` opts out by writing globally either way.
 //!
+//! `-a` declares an indexed array, and `name=(…)` builds one whether or not `-a` was given —
+//! bash infers the attribute from the literal, and so does this.
+//!
 //! Attributes rush cannot represent are **refused**, not ignored. `declare -i n` in bash makes
-//! every later assignment to `n` an arithmetic evaluation, and `declare -a` makes an array
-//! (Round 8); accepting either and quietly producing a plain scalar is the "plausible wrong
-//! answer with status 0" failure mode this shell is being audited for, so they exit 2 with a
-//! diagnostic instead.
+//! every later assignment to `n` an arithmetic evaluation, and `declare -A` makes an
+//! *associative* array, which PLAN.md defers deliberately: a second value shape nothing else in
+//! the shell understands would buy far less than indexed arrays do. Accepting either and quietly
+//! producing a plain scalar is the "plausible wrong answer with status 0" failure mode this shell
+//! is being audited for, so they exit 2 with a diagnostic instead.
 //!
 //! [`Environment::set_local_var`]: crate::env::Environment::set_local_var
 
-use crate::env::scope::{Environment, is_valid_identifier};
+use super::arrays::array_elements;
+use crate::env::scope::{Environment, ShellArray, array_literal_body, is_valid_identifier};
 use crate::error::Result;
 
 /// What the option letters asked for.
@@ -27,9 +32,11 @@ struct Attributes {
     global: bool,
     print: bool,
     functions: bool,
+    /// `-a`: the name is an indexed array, even if no value is given.
+    indexed: bool,
 }
 
-/// `declare [-fFgprx] [name[=value] …]`, and `typeset`, its other name.
+/// `declare [-afFgprx] [name[=value] …]`, and `typeset`, its other name.
 pub fn builtin_declare(env: &mut Environment, args: &[String]) -> Result<i32> {
     let name = args.first().map(String::as_str).unwrap_or("declare");
     let mut attrs = Attributes::default();
@@ -54,6 +61,14 @@ pub fn builtin_declare(env: &mut Environment, args: &[String]) -> Result<i32> {
                 // rush has no way to render an AST back to source that would not be a guess at
                 // what the author wrote. Both therefore report the name only, as `-F` does.
                 (false, 'f' | 'F') => attrs.functions = true,
+                (false, 'a') => attrs.indexed = true,
+                // The one attribute that is deferred rather than merely missing: PLAN.md's "Not
+                // doing" table keeps associative arrays out of this round on purpose, so say that
+                // rather than declaring an *indexed* array and letting `m[key]=v` write element 0.
+                (false, 'A') => {
+                    eprintln!("rush: {}: -A: associative arrays are not supported", name);
+                    return Ok(2);
+                }
                 // Every remaining letter names an attribute this shell has no representation
                 // for. Saying so beats declaring a scalar and calling it an array.
                 (plus, c) => {
@@ -77,15 +92,15 @@ pub fn builtin_declare(env: &mut Environment, args: &[String]) -> Result<i32> {
 
     let mut status = 0;
     for operand in operands {
-        if !apply(env, operand, &attrs, name) {
+        if !apply(env, operand, &attrs, name)? {
             status = 1;
         }
     }
     Ok(status)
 }
 
-/// Declare one `name` or `name=value`; `false` if it was refused.
-fn apply(env: &mut Environment, operand: &str, attrs: &Attributes, builtin: &str) -> bool {
+/// Declare one `name` or `name=value`; `Ok(false)` if it was refused.
+fn apply(env: &mut Environment, operand: &str, attrs: &Attributes, builtin: &str) -> Result<bool> {
     let (name, value) = match operand.split_once('=') {
         Some((name, value)) => (name, Some(value)),
         None => (operand, None),
@@ -93,10 +108,17 @@ fn apply(env: &mut Environment, operand: &str, attrs: &Attributes, builtin: &str
 
     if !is_valid_identifier(name) {
         eprintln!("rush: {}: `{}': not a valid identifier", builtin, operand);
-        return false;
+        return Ok(false);
     }
 
-    if let Some(value) = value {
+    // `name=(…)` is an array however it was spelled: bash infers `-a` from the literal, and the
+    // alternative here is storing the parentheses as a scalar — which is what used to happen.
+    if let Some(body) = value.and_then(array_literal_body) {
+        let array = array_elements(env, body)?;
+        if !assign_array(env, name, array, attrs) {
+            return Ok(false);
+        }
+    } else if let Some(value) = value {
         // Without `-g` this is `local` inside a function and a plain assignment outside, which is
         // what `set_local_var` already decides based on whether a scope frame exists.
         let assigned = if attrs.global {
@@ -105,18 +127,33 @@ fn apply(env: &mut Environment, operand: &str, attrs: &Attributes, builtin: &str
             env.set_local_var(name, value)
         };
         if !assigned {
-            return false;
+            return Ok(false);
         }
+    } else if attrs.indexed {
+        // `declare -a name` with no value makes an *empty* array, which is what `${#name[@]}`
+        // answering 0 rather than an error depends on.
+        env.declare_array(name);
     }
 
-    if attrs.export && !env.export_var(name) {
-        return false;
+    // An array cannot live in `environ`, so `-x` on one is a no-op rather than a way to export
+    // the parentheses. bash exports nothing here either.
+    if attrs.export && env.get_array(name).is_none() && !env.export_var(name) {
+        return Ok(false);
     }
     if attrs.readonly {
         // Last, so that `declare -r x=1` gets its value in before the variable is frozen.
         env.set_readonly(name);
     }
-    true
+    Ok(true)
+}
+
+/// Store an array, honouring `declare`'s "local inside a function, global outside" rule.
+fn assign_array(env: &mut Environment, name: &str, array: ShellArray, attrs: &Attributes) -> bool {
+    if attrs.global {
+        env.set_array(name, array)
+    } else {
+        env.set_local_array(name, array)
+    }
 }
 
 /// `declare -p [name…]` — print declarations in a form the shell could read back.
@@ -146,12 +183,23 @@ fn print_variables(env: &mut Environment, names: &[String]) -> i32 {
         for (name, value) in &all {
             render(env, name, value);
         }
+        let mut arrays: Vec<String> = env.array_names().map(str::to_string).collect();
+        arrays.sort();
+        for name in &arrays {
+            println!("{}", render_array(env, name));
+        }
         return 0;
     }
 
     for name in names {
         // A `name=value` operand is a declaration even under `-p`; only bare names are queries.
         let name = name.split_once('=').map(|(n, _)| n).unwrap_or(name);
+        // An array is checked first: `get_var` answers with its element 0, which would print a
+        // scalar declaration for something that is not one.
+        if env.get_array(name).is_some() {
+            println!("{}", render_array(env, name));
+            continue;
+        }
         match env.get_var(name).map(str::to_string) {
             Some(value) => render(env, name, &value),
             None => {
@@ -161,6 +209,27 @@ fn print_variables(env: &mut Environment, names: &[String]) -> i32 {
         }
     }
     status
+}
+
+/// One `declare -a name=([i]="…" …)` line, in bash's shape.
+///
+/// The indices are printed even for a dense array, because they are the only way to see a hole:
+/// `a=(1 2 3); unset 'a[1]'` prints `[0]` and `[2]`, and a positional rendering could not.
+fn render_array(env: &Environment, name: &str) -> String {
+    let Some(array) = env.get_array(name) else {
+        return String::new();
+    };
+    let flags = if env.is_readonly(name) { "-ar" } else { "-a" };
+    // bash prints a declared-but-empty array as a bare `declare -a name`, with no `=()`.
+    if array.is_empty() {
+        return format!("declare {} {}", flags, name);
+    }
+    let body: Vec<String> = array
+        .indices()
+        .zip(array.values())
+        .map(|(index, value)| format!("[{}]=\"{}\"", index, escape(value)))
+        .collect();
+    format!("declare {} {}=({})", flags, name, body.join(" "))
 }
 
 /// `declare -f`/`-F` — report shell functions.
@@ -257,20 +326,46 @@ mod tests {
     }
 
     /// An attribute with no representation in this shell is refused, not silently downgraded to
-    /// a plain scalar.
+    /// a plain scalar. `-A` is the deliberate one: PLAN.md defers associative arrays, so it must
+    /// say so rather than build an indexed array that would answer `${m[key]}` with element 0.
     #[test]
     fn an_unrepresentable_attribute_is_refused() {
         let mut env = Environment::new();
         assert_eq!(
-            builtin_declare(&mut env, &argv(&["declare", "-a", "rush_d6"])).unwrap(),
+            builtin_declare(&mut env, &argv(&["declare", "-A", "rush_d6"])).unwrap(),
             2
         );
         assert_eq!(env.get_var("rush_d6"), None);
+        assert!(env.get_array("rush_d6").is_none());
         assert_eq!(
             builtin_declare(&mut env, &argv(&["declare", "-i", "rush_d7=1"])).unwrap(),
             2
         );
         assert_eq!(env.get_var("rush_d7"), None);
+    }
+
+    /// `-a` declares an array even with no value, so `${#name[@]}` is 0 rather than an error.
+    #[test]
+    fn the_array_attribute_creates_an_empty_array() {
+        let mut env = Environment::new();
+        assert_eq!(
+            builtin_declare(&mut env, &argv(&["declare", "-a", "rush_d8"])).unwrap(),
+            0
+        );
+        assert_eq!(env.get_array("rush_d8").map(|a| a.len()), Some(0));
+    }
+
+    /// A `name=(…)` operand is an array whether or not `-a` was given — the shape decides.
+    #[test]
+    fn a_literal_operand_builds_an_array() {
+        let mut env = Environment::new();
+        builtin_declare(&mut env, &argv(&["declare", "rush_d9=(1 2 3)"])).unwrap();
+        assert_eq!(
+            env.get_array("rush_d9").map(|a| a.joined(" ")),
+            Some("1 2 3".into())
+        );
+        // …and it is not the source text, which is what used to be stored.
+        assert_eq!(env.get_var("rush_d9"), Some("1"));
     }
 
     #[test]
