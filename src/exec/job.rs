@@ -28,7 +28,9 @@ mod resume;
 mod signals;
 mod table;
 
-pub use control::{init_job_control, job_control_active, shell_pgid};
+pub use control::{
+    enable_job_control, init_job_control, job_control_active, leave_job_control, shell_pgid,
+};
 pub use report::describe;
 pub use resume::{continue_in_background, foreground_job};
 pub use signals::{

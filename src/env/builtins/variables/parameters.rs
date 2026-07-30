@@ -2,7 +2,7 @@
 
 use super::deparse::function_definition;
 use super::quoting::quote_minimal;
-use crate::env::options::{SetError, SetListing, parse_set_args};
+use crate::env::options::{SetError, SetListing, ShellOption, parse_set_args};
 use crate::env::scope::{Environment, is_valid_identifier};
 use crate::error::{Result, ShellError};
 
@@ -48,6 +48,13 @@ pub fn builtin_set(env: &mut Environment, args: &[String]) -> Result<i32> {
 
     for (option, on) in parsed.changes {
         env.set_option(option, on);
+        // `-m` is the one option that has to *do* something rather than be remembered: job control
+        // means owning the terminal and leading a process group, and neither happens by reading a
+        // flag later. Without this a script's `set -m` got the half of job control that needs no
+        // terminal — separate process groups — while `fg` and `bg` answered `no job control`.
+        if option == ShellOption::Monitor {
+            apply_monitor(on);
+        }
     }
     for listing in parsed.listings {
         let text = match listing {
@@ -63,6 +70,19 @@ pub fn builtin_set(env: &mut Environment, args: &[String]) -> Result<i32> {
     }
 
     Ok(0)
+}
+
+/// Turn job control on or off to match `set -m` / `set +m`.
+///
+/// Silent about failure on purpose. `set -m` with no controlling terminal — a script in a
+/// pipeline, a cron job — is legal and simply has nothing to claim; bash accepts it too and the
+/// option stays recorded either way, so `set -o` still reports what the script asked for.
+fn apply_monitor(on: bool) {
+    if on {
+        crate::exec::job::enable_job_control();
+    } else {
+        crate::exec::job::leave_job_control();
+    }
 }
 
 /// Print every shell variable as `name=value`, sorted, quoted only where quoting is needed.

@@ -44,8 +44,35 @@ target=x86_64-unknown-linux-musl
 # The linker is deliberately left alone: pointing it at musl-gcc yields a binary that records the
 # *build host's* loader path and dies on any other machine. Only the C compiler for mlua's
 # vendored Lua is set. See README's "Installing" section.
-: "${CC_x86_64_unknown_linux_musl:=musl-gcc}"
+if [ -z "${CC_x86_64_unknown_linux_musl:-}" ]; then
+    # Debian and Alpine call the wrapper `musl-gcc`; a nixpkgs cross toolchain
+    # (`nix shell nixpkgs#pkgsCross.musl64.stdenv.cc`) calls it by its full target triple, and
+    # ships no `musl-gcc` at all. Neither name is more correct, so try both before giving up.
+    for cc in musl-gcc x86_64-linux-musl-gcc x86_64-unknown-linux-musl-gcc; do
+        if command -v "$cc" >/dev/null 2>&1; then
+            CC_x86_64_unknown_linux_musl=$cc
+            break
+        fi
+    done
+fi
+if [ -z "${CC_x86_64_unknown_linux_musl:-}" ]; then
+    echo "no musl C compiler found; mlua's vendored Lua cannot be built for musl." >&2
+    echo "try: nix shell nixpkgs#pkgsCross.musl64.stdenv.cc   (or install musl-tools)" >&2
+    exit 1
+fi
 export CC_x86_64_unknown_linux_musl
+echo "musl cc: $CC_x86_64_unknown_linux_musl"
+
+# The Rust side needs a musl `std`, and the toolchain on `$PATH` may not be the one that has it —
+# a nixpkgs `rustc` ships only the targets nixpkgs built it with, while the rustup toolchain
+# beside it may have had `rustup target add x86_64-unknown-linux-musl` run against it. Without
+# this check the failure is thirty lines of "can't find crate for `core`", which names neither
+# the cause nor the fix.
+if [ ! -d "$(rustc --print target-libdir --target "$target" 2>/dev/null)" ]; then
+    echo "rustc ($(command -v rustc)) has no std for $target." >&2
+    echo "try: rustup target add $target   (and make sure rustup's shims come first on PATH)" >&2
+    exit 1
+fi
 RUSTFLAGS="-C target-feature=+crt-static" \
     cargo build --release --locked --target "$target" --bin oslo --manifest-path "$here/Cargo.toml"
 binary="$here/target/$target/release/oslo"
@@ -68,6 +95,18 @@ if [ ! -f vmlinuz-virt ]; then
     say "fetching the Alpine virt kernel"
     curl -sfLO "$mirror/netboot/vmlinuz-virt"
 fi
+# modernish is the external conformance oracle: a POSIX-shell library whose whole install ritual
+# is a battery of probes for known shell bugs, each with a name. It is a *second opinion* — its
+# expectations were written against a dozen real shells, not against bash, and not by us.
+#
+# Fetched on the host and baked into the image because the VM has no network: the initramfs is a
+# bare minirootfs with no interface configured, and giving it one would mean a DHCP client and a
+# resolver in a test that is otherwise hermetic.
+if [ ! -f modernish.tar.gz ]; then
+    say "fetching modernish (the conformance oracle)"
+    curl -sfL -o modernish.tar.gz \
+        https://github.com/modernish/modernish/archive/refs/heads/master.tar.gz
+fi
 
 # ---------------------------------------------------------------- assemble the root
 say "assembling the root filesystem"
@@ -85,7 +124,12 @@ grep -q '^/bin/oslo$' root/etc/shells 2>/dev/null || echo /bin/oslo >>root/etc/s
 # The suite. Written in shell on purpose: it is the thing under test, and a Lua suite would only
 # prove the Lua half. `/init` runs as PID 1.
 cp "$here/scripts/alpine-vm-suite.sh" root/vm-suite.sh
-chmod +x root/vm-suite.sh
+cp "$here/scripts/alpine-vm-jobs.sh" root/vm-jobs.sh
+chmod +x root/vm-suite.sh root/vm-jobs.sh
+
+mkdir -p root/opt
+tar -xzf modernish.tar.gz -C root/opt
+mv root/opt/modernish-master root/opt/modernish
 
 if $interactive; then
     cat >root/init <<'INIT'
@@ -108,12 +152,22 @@ else
 export PATH=/usr/bin:/usr/sbin:/bin:/sbin
 mount -t proc proc /proc 2>/dev/null
 mount -t sysfs sys /sys 2>/dev/null
+# devtmpfs so that /dev/ttyS0 exists as a real device node. The job-control suite needs to *open*
+# the console as a controlling terminal, which /dev/console cannot be made to be.
+mount -t devtmpfs dev /dev 2>/dev/null
 # `<(cmd)` names `/dev/fd/N`, which is a symlink to /proc/self/fd that a minirootfs does not ship.
 # Creating it is part of bringing a system up; without it process substitution cannot work in any
 # shell, bash included.
 ln -sf /proc/self/fd /dev/fd
 /vm-suite.sh
 echo "VM-SUITE-EXIT:$?"
+
+# Job control needs a *controlling terminal*, which init does not have: the kernel hands PID 1
+# /dev/console, and console is deliberately not claimable as a ctty. `setsid -c` starts a new
+# session with /dev/ttyS0 as its controlling terminal, which is the only way to reach `tcsetpgrp`,
+# `fg`, `bg` and the terminal's foreground process group from inside the VM.
+setsid -c /bin/sh /vm-jobs.sh </dev/ttyS0 >/dev/ttyS0 2>&1
+echo "VM-JOBS-EXIT:$?"
 # Reaping happens at a command boundary, and this is one: a shell as init cannot reap while it is
 # blocked in a foreground command, so the check belongs here rather than inside the suite.
 sh -c '(sleep 0.1 &) ; exit 0'
@@ -150,10 +204,15 @@ log=$work/boot.log
 timeout 300 qemu-system-x86_64 "${qemu_args[@]}" 2>&1 | tee "$log" || true
 
 say "result"
-sed -n '/VM-SUITE-BEGIN/,/VM-SUITE-EXIT/p' "$log" | sed 's/\r$//'
+sed -n '/VM-SUITE-BEGIN/,/VM-JOBS-EXIT/p' "$log" | sed 's/\r$//'
 code=$(grep -oE 'VM-SUITE-EXIT:[0-9]+' "$log" | tail -1 | cut -d: -f2)
+jobs_code=$(grep -oE 'VM-JOBS-EXIT:[0-9]+' "$log" | tail -1 | cut -d: -f2)
 if [ -z "$code" ]; then
     echo "the suite never reported: oslo did not get far enough as PID 1" >&2
     exit 1
 fi
-exit "$code"
+if [ -z "$jobs_code" ]; then
+    echo "the job-control suite never reported; it needs setsid and /dev/ttyS0" >&2
+    exit 1
+fi
+exit $((code + jobs_code))

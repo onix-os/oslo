@@ -41,8 +41,26 @@ pub fn init_job_control() {
     if !crate::exec::pipeline::is_interactive() {
         return;
     }
+    enable_job_control();
+}
+
+/// Turn job control on without asking whether the shell is interactive: `set -m`.
+///
+/// POSIX makes `-m` an option a *script* can set, and bash honours it — `set -m` in a script gives
+/// each job its own process group and makes `fg`, `bg` and `%1` work. oslo enabled job control
+/// only from the REPL, so a script that said `set -m` got half of it: jobs did land in their own
+/// process groups, but nothing owned the terminal, so `bg` answered `no job control` and left the
+/// job stopped forever. Found by running the job-control suite in the Alpine VM, which is the only
+/// place a shell that is not a REPL still has a controlling terminal.
+///
+/// Returns whether job control is on afterwards. It stays off when there is no terminal to claim,
+/// which is not an error: `set -m` in a pipeline is legal and simply cannot do anything.
+pub fn enable_job_control() -> bool {
+    if job_control_active() {
+        return true;
+    }
     let Some(fd) = duplicate_terminal() else {
-        return;
+        return false;
     };
 
     let shell = getpid();
@@ -50,15 +68,16 @@ pub fn init_job_control() {
     // is trying to reach; anything else and job control stays off.
     if getpgrp() != shell && setpgid(shell, shell).is_err() {
         close_raw(fd);
-        return;
+        return false;
     }
     if super::signals::without_sigttou(|| set_foreground(fd, shell)).is_err() {
         close_raw(fd);
-        return;
+        return false;
     }
 
     SHELL_PGID.store(shell.as_raw(), Ordering::SeqCst);
     TERMINAL_FD.store(fd, Ordering::SeqCst);
+    true
 }
 
 /// Whether this process arbitrates the terminal — the one question every caller here asks first.
@@ -80,7 +99,7 @@ pub fn shell_pgid() -> Pid {
 ///
 /// Reached from [`super::reset_signals_for_child`], so every fork site in the shell gets it
 /// without having to remember.
-pub(crate) fn leave_job_control() {
+pub fn leave_job_control() {
     let fd = TERMINAL_FD.swap(NO_JOB_CONTROL, Ordering::SeqCst);
     if fd != NO_JOB_CONTROL {
         close_raw(fd);

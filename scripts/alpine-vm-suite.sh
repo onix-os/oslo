@@ -74,6 +74,32 @@ LUA
 check "Lua runs and captures" "$(/bin/sh /tmp/t.lua fromvm)" "captured=Linux status=0
 argv=fromvm"
 
+echo "-- an outside opinion: modernish's shell-bug probes"
+# modernish is a POSIX-shell library whose initialisation is a battery of named probes for known
+# shell bugs, written against a dozen real shells and not against bash. Running it here rather
+# than only on the build host is the point: musl's libc, busybox's utilities, and a shell that is
+# also PID 1. It found five real defects in oslo the day it was first pointed at it.
+#
+# `MSH_SHELL` names the shell under test; without it modernish goes looking for a "good" one.
+MSH_SHELL=/bin/oslo
+export MSH_SHELL
+if [ -x /opt/modernish/bin/modernish ] || [ -f /opt/modernish/bin/modernish ]; then
+    # The fatal battery, on its own. It exits on the first bug it finds and prints the parent pid
+    # when it finds none, which is the whole contract — see lib/modernish/adj/fatal.sh.
+    ftl=$(cd /opt/modernish && MSH_AUX=lib/modernish/adj DEFPATH=$PATH /bin/sh -c \
+        'command . "$MSH_AUX/fatal.sh"' 2>/dev/null)
+    if [ "$ftl" = "$$" ] || [ -n "$ftl" ] && [ "$ftl" != "fatalbug" ]; then
+        ok "modernish finds no fatal shell bugs"
+    else
+        no "modernish reports a fatal shell bug (probe output [$ftl])"
+    fi
+    # Then full initialisation, which runs the capability probes on top of the fatal ones.
+    init=$(/bin/sh /opt/modernish/bin/modernish -c 'echo INIT-OK' 2>&1 | tail -1)
+    check "modernish initialises on oslo" "$init" "INIT-OK"
+else
+    no "modernish is missing from the image"
+fi
+
 echo "-- a real script from the image parses"
 parsed=0; failed=0
 for f in /etc/profile /etc/profile.d/*.sh /lib/rc/sh/*.sh; do
