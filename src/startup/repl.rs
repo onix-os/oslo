@@ -150,6 +150,11 @@ pub fn run_repl() -> ! {
                 eof_count = 0;
                 remember(&mut rl, &settings.file, &text, secret);
 
+                // Handed the command as typed, which is what a `precmd` hook is for: logging it,
+                // timing it, or setting a title from it.
+                lua.fire_hook("precmd", vec![LuaEngine::hook_arg(&text)]);
+                let before = current_directory();
+
                 let res = match mode {
                     // A Lua line leaves `$?` where it was unless it asked otherwise: `oslo.exit`
                     // is the way to choose a status, and a chunk that merely printed something
@@ -173,6 +178,16 @@ pub fn run_repl() -> ! {
                 if history::take_clear_request() {
                     let _ = rl.clear_history();
                     publish_history(&rl);
+                }
+
+                // Fired before the status is acted on, so a `cd` hook sees the directory the
+                // command left behind even when that command was the last one of the session.
+                let after = current_directory();
+                if after != before {
+                    lua.fire_hook("cd", vec![LuaEngine::hook_arg(&after)]);
+                }
+                if let Ok(status) = res {
+                    lua.fire_hook("postcmd", vec![LuaEngine::hook_status(status)]);
                 }
 
                 match res {
@@ -420,6 +435,13 @@ fn primary_prompt(
         return mode.fallback_prompt().to_string();
     }
     rc::ps1(&mut env_struct.lock().unwrap(), last_status)
+}
+
+/// Where the shell is now, for the `cd` hook to compare against.
+fn current_directory() -> String {
+    std::env::current_dir()
+        .map(|p| p.to_string_lossy().into_owned())
+        .unwrap_or_default()
 }
 
 /// Run one Lua line typed at the prompt.

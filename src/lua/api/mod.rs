@@ -24,6 +24,9 @@ mod json;
 mod path;
 mod re;
 mod run;
+mod shell;
+
+pub(crate) use shell::handlers as hook_handlers;
 pub(crate) mod util;
 
 use util::{put, text};
@@ -40,6 +43,7 @@ pub fn install(interp: &Rc<Interp>, registry: &Registry, env: Arc<Mutex<Environm
     variables(&mut oslo, &env);
     filesystem(&mut oslo, &env);
     shell(&mut oslo, registry, &env);
+    shell::install(&mut oslo, registry, &env);
     interp.set_global("oslo", Value::table(oslo));
 }
 

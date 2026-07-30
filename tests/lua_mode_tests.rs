@@ -169,3 +169,59 @@ fn a_lua_line_is_not_rewritten_by_history_expansion() {
     let out = typed("print('a!b')\n", &[("OSLO_DEFAULT_MODE", "lua")]);
     assert!(out.contains("a!b"), "{out}");
 }
+
+#[test]
+fn a_precmd_hook_sees_each_command_as_typed() {
+    let out = typed(
+        "=oslo.on.precmd(function(c) print('PRE ' .. c) end)\necho hi\n",
+        &[],
+    );
+    assert!(out.contains("PRE echo hi"), "{out}");
+    // The command still runs; a hook observes, it does not intercept.
+    assert!(out.contains("\nhi"), "{out}");
+}
+
+#[test]
+fn a_postcmd_hook_is_handed_the_status() {
+    let out = typed(
+        "=oslo.on.postcmd(function(s) print('POST ' .. s) end)\nfalse\n",
+        &[],
+    );
+    assert!(out.contains("POST 1"), "{out}");
+}
+
+#[test]
+fn a_cd_hook_fires_only_when_the_directory_changed() {
+    let out = typed(
+        "=oslo.on.cd(function(d) print('CD ' .. d) end)\necho not a cd\ncd /tmp\n",
+        &[],
+    );
+    assert!(out.contains("CD /tmp"), "{out}");
+    assert_eq!(out.matches("CD ").count(), 1, "{out}");
+}
+
+/// A handler written inline still has to be removable, which is the whole reason `oslo.on.*`
+/// returns a handle rather than taking a name.
+#[test]
+fn a_hook_handle_removes_the_handler_it_stands_for() {
+    let out = typed(
+        "=h = oslo.on.precmd(function(c) print('PRE ' .. c) end)\necho one\n=h:remove()\necho two\n",
+        &[],
+    );
+    assert!(out.contains("PRE echo one"), "{out}");
+    assert!(!out.contains("PRE echo two"), "{out}");
+}
+
+/// One broken hook must not disable the others, or silently stop the command from running.
+#[test]
+fn a_failing_hook_is_reported_and_the_rest_still_run() {
+    let out = typed(
+        "=oslo.on.precmd(function() error('broken') end)\n\
+         =oslo.on.precmd(function() print('SECOND') end)\n\
+         echo ran\n",
+        &[],
+    );
+    assert!(out.contains("broken"), "{out}");
+    assert!(out.contains("SECOND"), "{out}");
+    assert!(out.contains("\nran"), "{out}");
+}

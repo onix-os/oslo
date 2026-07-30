@@ -1,0 +1,196 @@
+//! What a script can ask *about* the shell, and what it can ask the shell to call back into.
+//!
+//! Two groups that belong together because both are about the session rather than about doing
+//! something: introspection (`oslo.interactive`, `oslo.user`, `oslo.exit_code`) and hooks
+//! (`oslo.on.precmd`).
+//!
+//! **Hooks are named setters, not an event bus.** `oslo.on.precmd(fn)` returns a handle and
+//! `handle:remove()` takes it off again. A general `on("precmd", fn)` bus reads better right up
+//! to the point where you want to remove a handler: Hilbish's `bait` needs the *identical*
+//! function reference back, so any handler written inline — which is nearly all of them — can
+//! never be removed at all.
+
+use super::util::{list, native, ok, put, record, text};
+use crate::env::Environment;
+use crate::lua::engine::{Registry, borrow_env};
+use crate::lua::eval::value::{Table, Value};
+use crate::lua::eval::{LuaError, Value as V};
+use std::rc::Rc;
+use std::sync::{Arc, Mutex};
+
+/// Registry key prefix under which a hook's handlers live.
+pub(crate) const HOOK_PREFIX: &str = "hook:";
+
+/// The hooks a script may attach to, and what each one is handed.
+///
+/// A fixed list rather than an open set: a name that is never fired is indistinguishable from a
+/// typo, and `oslo.on.precmb(fn)` silently doing nothing for ever is the failure mode this
+/// avoids.
+pub(crate) const HOOKS: [&str; 3] = ["precmd", "postcmd", "cd"];
+
+/// Add the introspection fields, `oslo.opts` and `oslo.on` to the `oslo` table.
+pub fn install(oslo: &mut Table, registry: &Registry, env: &Arc<Mutex<Environment>>) {
+    facts(oslo, env);
+    oslo.set(Value::str("on"), hooks(registry));
+}
+
+fn facts(oslo: &mut Table, env: &Arc<Mutex<Environment>>) {
+    oslo.set(Value::str("version"), Value::str(env!("CARGO_PKG_VERSION")));
+
+    // Read at call time, not at startup: a script that changes `$USER` or `hostname` mid-session
+    // should see what it changed, and a value frozen at startup is a lie that is hard to spot.
+    let env_user = Arc::clone(env);
+    put(oslo, "user", move |_, _| {
+        let guard = borrow_env(&env_user)?;
+        ok(
+            match guard.get_var("USER").or_else(|| guard.get_var("LOGNAME")) {
+                Some(name) => Value::str(name),
+                None => Value::Nil,
+            },
+        )
+    });
+
+    put(oslo, "host", |_, _| {
+        ok(match nix::unistd::gethostname() {
+            Ok(name) => Value::str(name.to_string_lossy()),
+            Err(_) => Value::Nil,
+        })
+    });
+
+    let env_interactive = Arc::clone(env);
+    put(oslo, "interactive", move |_, _| {
+        let guard = borrow_env(&env_interactive)?;
+        ok(Value::Bool(
+            guard
+                .options()
+                .is_set(crate::env::options::ShellOption::Interactive),
+        ))
+    });
+
+    let env_login = Arc::clone(env);
+    put(oslo, "login", move |_, _| {
+        let guard = borrow_env(&env_login)?;
+        // A login shell is one invoked with a `-` in front of its name, which is what `$0` keeps.
+        ok(Value::Bool(guard.shell_name.starts_with('-')))
+    });
+
+    // oslo.exit_code() -> $? — the status of the last command, whichever language ran it.
+    let env_status = Arc::clone(env);
+    put(oslo, "exit_code", move |_, _| {
+        ok(Value::int(borrow_env(&env_status)?.last_status as i64))
+    });
+
+    // oslo.pid() and oslo.ppid(), which a script needs to name itself in a lock file or a log.
+    put(oslo, "pid", |_, _| {
+        ok(Value::int(std::process::id() as i64))
+    });
+    put(oslo, "ppid", |_, _| {
+        ok(Value::int(nix::unistd::getppid().as_raw() as i64))
+    });
+
+    // oslo.opts — the knobs the config needs, as a plain table.
+    //
+    // A table rather than getters because a config file's natural shape is assignment, and
+    // because the values are read by the *shell* rather than by Lua: they live in shell variables
+    // so that `$OSLO_TOGGLE_KEY` set from either language means the same thing.
+    let env_opts = Arc::clone(env);
+    let mut opts = Table::new();
+    let env_set = Arc::clone(&env_opts);
+    put(&mut opts, "set", move |_, args| {
+        let name = text(&args, 1, "oslo.opts.set")?;
+        let value = text(&args, 2, "oslo.opts.set")?;
+        // Namespaced on the way in, so `oslo.opts.set("toggle_key", …)` is `$OSLO_TOGGLE_KEY` and
+        // a script cannot reach an unrelated variable through it.
+        borrow_env(&env_set)?.set_var(&option_var(&name), &value, false);
+        ok(Value::Bool(true))
+    });
+    put(&mut opts, "get", move |_, args| {
+        let name = text(&args, 1, "oslo.opts.get")?;
+        ok(match borrow_env(&env_opts)?.get_var(&option_var(&name)) {
+            Some(value) => Value::str(value),
+            None => Value::Nil,
+        })
+    });
+    put(&mut opts, "names", |_, _| {
+        ok(list(
+            ["toggle_key", "default_mode"].into_iter().map(Value::str),
+        ))
+    });
+    oslo.set(Value::str("opts"), Value::table(opts));
+}
+
+/// The shell variable an option name maps to.
+fn option_var(name: &str) -> String {
+    format!("OSLO_{}", name.trim().to_ascii_uppercase())
+}
+
+/// `oslo.on` — one setter per hook, each returning a handle that can remove itself.
+fn hooks(registry: &Registry) -> Value {
+    let mut on = Table::new();
+    for name in HOOKS {
+        let registry = Rc::clone(registry);
+        let key = format!("{HOOK_PREFIX}{name}");
+        put(&mut on, name, move |_, args| {
+            let Some(handler @ Value::Function(_)) = args.first() else {
+                return Err(LuaError::new(format!(
+                    "oslo.on.{name}: the argument must be a function"
+                )));
+            };
+            let id = append(&registry, &key, handler.clone());
+            ok(handle(&registry, &key, id))
+        });
+    }
+    Value::table(on)
+}
+
+/// Add a handler to a hook's list, answering its position.
+fn append(registry: &Registry, key: &str, handler: Value) -> i64 {
+    let mut slots = registry.borrow_mut();
+    let entry = slots.entry(key.to_string()).or_insert_with(|| {
+        let table = Table::new();
+        Value::table(table)
+    });
+    let Value::Table(list) = entry else {
+        return 0;
+    };
+    let next = list.borrow().length() + 1;
+    list.borrow_mut().set(Value::int(next), handler);
+    next
+}
+
+/// The handle a hook setter returns: `handle:remove()` and nothing else.
+///
+/// A handle rather than the function itself, so a handler written inline can still be taken off
+/// again — which is the whole reason this is not a `on(name, fn)` bus.
+fn handle(registry: &Registry, key: &str, id: i64) -> Value {
+    let registry = Rc::clone(registry);
+    let key = key.to_string();
+    record(vec![(
+        "remove",
+        native("hook handle", move |_, _| {
+            if let Some(Value::Table(list)) = registry.borrow().get(&key) {
+                // Replaced with `false` rather than removed, so every other handle's position
+                // stays valid — shifting the list would silently re-point them at their
+                // neighbours.
+                list.borrow_mut().set(Value::int(id), Value::Bool(false));
+            }
+            ok(Value::Bool(true))
+        }),
+    )])
+}
+
+/// Every handler currently attached to `name`, in the order they were added.
+pub(crate) fn handlers(registry: &Registry, name: &str) -> Vec<Value> {
+    let key = format!("{HOOK_PREFIX}{name}");
+    let Some(V::Table(list)) = registry.borrow().get(&key).cloned() else {
+        return Vec::new();
+    };
+    // Removed handlers are `false` in the list rather than gaps, so they are skipped here.
+    let attached = list.borrow();
+    attached
+        .sequence()
+        .iter()
+        .filter(|v| matches!(v, V::Function(_)))
+        .cloned()
+        .collect()
+}

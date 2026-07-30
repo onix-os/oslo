@@ -219,6 +219,29 @@ impl LuaEngine {
         Ok(())
     }
 
+    /// Run everything attached to a hook, in the order it was attached.
+    ///
+    /// A handler that fails is reported and the rest still run. One broken `precmd` silently
+    /// disabling every other one — or, worse, stopping the command that was about to run — is
+    /// how a config file becomes impossible to debug.
+    pub fn fire_hook(&self, name: &str, args: Vec<Value>) {
+        for handler in crate::lua::api::hook_handlers(&self.registry, name) {
+            if let Err(e) = self.interp.call(&handler, args.clone()) {
+                eprintln!("oslo: {name} hook: {e}");
+            }
+        }
+    }
+
+    /// A string argument for a hook, so callers do not need the value type.
+    pub fn hook_arg(text: &str) -> Value {
+        Value::str(text)
+    }
+
+    /// A number argument for a hook.
+    pub fn hook_status(status: i32) -> Value {
+        Value::int(status as i64)
+    }
+
     pub fn render_prompt(&self) -> Option<String> {
         let prompt = self.registry.borrow().get(PROMPT_KEY).cloned()?;
         match self.interp.call(&prompt, Vec::new()) {

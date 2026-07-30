@@ -281,6 +281,33 @@ fn load_compiles_a_string_into_a_callable_chunk() {
 }
 
 #[test]
+fn the_shell_can_describe_itself() {
+    let out = lua(r#"
+        print(oslo.version ~= nil, type(oslo.host()), oslo.pid() > 0, oslo.ppid() > 0)
+        -- A script run from a file is neither interactive nor a login shell.
+        print(oslo.interactive(), oslo.login())
+        oslo.exec("false")
+        print(oslo.exit_code())
+        -- The script's own exit status is `$?` as it leaves it, so this puts it back to 0.
+        oslo.exec("true")
+    "#);
+    assert_eq!(out, "true\tstring\ttrue\ttrue\nfalse\tfalse\n1");
+}
+
+#[test]
+fn options_are_shell_variables_under_a_namespace() {
+    // One home for each setting, so `$OSLO_TOGGLE_KEY` set from either language means the same
+    // thing — and so `oslo.opts.set` cannot reach an unrelated variable.
+    let out = lua(r#"
+        oslo.opts.set("toggle_key", "f2")
+        print(oslo.opts.get("toggle_key"), oslo.get_var("OSLO_TOGGLE_KEY"))
+        print(oslo.opts.get("never_set"))
+        print(#oslo.opts.names() > 0)
+    "#);
+    assert_eq!(out, "f2\tf2\nnil\ntrue");
+}
+
+#[test]
 fn a_required_module_receives_its_own_name_as_varargs() {
     let dir = tempfile::tempdir().expect("tempdir");
     std::fs::write(dir.path().join("named.lua"), "return {who = ...}\n").unwrap();
