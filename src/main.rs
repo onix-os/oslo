@@ -46,8 +46,55 @@ fn restore_default_sigpipe() {
 }
 
 fn main() {
+    // Before any thread exists, as the safety note on the function requires.
     restore_default_sigpipe();
 
+    // The shell runs on a stack oslo chose rather than one it inherited; see
+    // [`oslo::INTERPRETER_STACK`]. `main` itself does nothing afterwards but wait.
+    //
+    // Signals need care, and getting it wrong is subtle. `kill` directed at a *process* is
+    // delivered to any one thread that is not blocking it, so with `main` merely parked in
+    // `join` the kernel was free to hand it there — and `kill -USR1 $$` would then return to the
+    // shell before its own trap had run, printing the next command's output first. Blocking
+    // everything here and unblocking on the worker leaves exactly one candidate thread, which is
+    // what restores the single-threaded ordering the rest of the shell is written against.
+    let inherited = block_every_signal();
+    let worker = std::thread::Builder::new()
+        .name("oslo".to_string())
+        .stack_size(oslo::INTERPRETER_STACK)
+        .spawn(move || {
+            // Anything raised in the gap is merely pending, and arrives the moment this returns.
+            restore_signal_mask(&inherited);
+            dispatch();
+        })
+        .expect("oslo: cannot start");
+    if worker.join().is_err() {
+        // The worker panicked and has already printed its message.
+        std::process::exit(2);
+    }
+}
+
+/// Block every signal on the calling thread, answering the mask that was in force.
+fn block_every_signal() -> nix::sys::signal::SigSet {
+    let mut previous = nix::sys::signal::SigSet::empty();
+    let _ = nix::sys::signal::pthread_sigmask(
+        nix::sys::signal::SigmaskHow::SIG_SETMASK,
+        Some(&nix::sys::signal::SigSet::all()),
+        Some(&mut previous),
+    );
+    previous
+}
+
+/// Put a saved mask back, so the shell starts with whatever its caller handed it.
+fn restore_signal_mask(mask: &nix::sys::signal::SigSet) {
+    let _ = nix::sys::signal::pthread_sigmask(
+        nix::sys::signal::SigmaskHow::SIG_SETMASK,
+        Some(mask),
+        None,
+    );
+}
+
+fn dispatch() {
     let args: Vec<String> = env::args().collect();
 
     let invocation = match cli::parse(&args) {
