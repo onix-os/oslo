@@ -105,7 +105,17 @@ ln -sf /proc/self/fd /dev/fd
 # ttyS0 even without this, so it is belt-and-braces rather than the fix it was first written as.)
 stty intr ^C susp ^Z </dev/ttyS0
 echo "CONSOLE-READY"
-exec setsid -c /bin/oslo -i </dev/ttyS0 >/dev/ttyS0 2>&1
+# **Not `exec`**, and this is the whole reason ^Z works here. The kernel discards SIGTSTP, SIGTTIN
+# and SIGTTOU sent to an *orphaned* process group, and `will_become_orphaned_pgrp()` counts a job
+# as orphaned when its parent is PID 1 (`is_global_init(p->real_parent)`). With `exec`, the
+# interactive shell *was* PID 1, so every job it started was in such a group and ^Z did nothing —
+# for a full afternoon that read as a shell bug. ^C was unaffected because SIGINT is not a stop
+# signal, and that asymmetry was the clue.
+#
+# A real system never has this shape: getty, login or sshd always sits between init and a login
+# shell. Keeping the shell a child of init is what makes this VM resemble one.
+setsid -c /bin/oslo -i </dev/ttyS0 >/dev/ttyS0 2>&1
+poweroff -f
 INIT
 elif $interactive; then
     cat >root/init <<'INIT'
@@ -227,29 +237,32 @@ if [ "$mode" = console ]; then
             fail=1
         }
 
-    say "typing ^Z at a running foreground job"
-    # UNRESOLVED, and reported rather than asserted. ^Z stops the job correctly on a real pty —
-    # `script -qec 'oslo -i' /dev/null` gives `[1]+ Stopped`, status 148, and a job-table entry —
-    # but on qemu's serial console the job runs to completion as though no SIGTSTP was ever
-    # delivered. `stty -a` on ttyS0 reports `susp = ^Z`, and ^C on the same console does work, so
-    # it is not a missing control character and not the shell's signal dispositions.
-    #
-    # It is not asserted because the harness cannot yet tell a shell bug from a serial-console
-    # one, and a red test that means "we do not know" trains people to ignore red tests. What it
-    # can do honestly is run the sequence and print what happened.
+    say "typing ^Z, then bg and kill"
     send $'sleep 60\n'
     sleep 3
     send $'\032'
     sleep 2
     send $'echo SUSP\'\'STATUS=$?\n'
-    if await 'SUSPSTATUS=148' 15; then
+    if await 'SUSPSTATUS=148' 20; then
         echo "  ok    ^Z stops the foreground job and reports 128+SIGTSTP"
     else
-        echo "  UNRESOLVED  ^Z did not stop the job on this serial console"
-        echo "              (it does on a pty; see the comment in $0 and PLAN-DISTRO.md)"
+        echo "  FAIL  ^Z did not stop the job"
+        fail=1
     fi
-    send $'\003'
+    send $'jobs\n'
+    await 'Stopped' 15 && echo "  ok    jobs lists it as stopped" || {
+        echo "  FAIL  the stopped job is not in the job table"
+        fail=1
+    }
+    send $'bg\n'
     sleep 2
+    send $'kill %1\n'
+    sleep 2
+    send $'echo STILL\'\'ALIVE\n'
+    await 'STILLALIVE' 20 && echo "  ok    the shell survives ^Z, bg and kill %1" || {
+        echo "  FAIL  the shell did not survive the job-control sequence"
+        fail=1
+    }
 
     say "the terminal is still sane"
     send $'echo DO\'\'NE\n'

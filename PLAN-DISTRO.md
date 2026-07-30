@@ -341,13 +341,23 @@ test can send; it is a byte in the terminal's input queue that the line discipli
 signal for the foreground process group, and only the far end of the line can put it there. With
 `-nographic` that far end is the harness's own stdin to qemu, driven through a fifo.
 
-`^C` passes there. **`^Z` is unresolved** and is reported rather than asserted: it stops the job
-correctly on a real pty (`script -qec 'oslo -i' /dev/null` gives `[1]+ Stopped`, status 148, and a
-job-table entry), but on qemu's serial console the job runs to completion as though no SIGTSTP were
-delivered. `stty -a` on ttyS0 reports `susp = ^Z`, and `^C` on that same console works, so it is
-neither a missing control character nor the shell's signal dispositions. The harness cannot yet
-tell a shell bug from a serial-console one, and a red test meaning "we do not know" teaches people
-to ignore red tests.
+`^C` and `^Z` both pass there, and getting `^Z` to pass was the most instructive hour of the round.
+
+It failed at first, and looked exactly like a shell bug: the job ran to completion as though no
+SIGTSTP had been delivered, while `^C` on the same console worked. `stty -a` reported `susp = ^Z`.
+Instrumenting the job showed it had its own process group, held the terminal (`tpgid` equal to its
+own `pgrp`), and had SIGTSTP at `SIG_DFL` with nothing blocked. Every ingredient was correct.
+
+The cause was the harness. The kernel discards SIGTSTP, SIGTTIN and SIGTTOU sent to an *orphaned*
+process group, and `will_become_orphaned_pgrp()` counts a job as orphaned when its parent is PID 1
+(`is_global_init(p->real_parent)`). The console harness `exec`d the interactive shell as PID 1, so
+every job it started was in such a group. SIGINT is not a stop signal and was unaffected — that
+asymmetry was the clue, and it is worth remembering the next time one signal works and another
+does not.
+
+Dropping the `exec`, so the shell is a *child* of init, fixes it: `[1]+ Stopped`, status 148, the
+job in the table, and the terminal reclaimed afterwards. A real system never has the other shape —
+getty, login or sshd always sits between init and a login shell.
 
 ### Still open from this round
 
@@ -358,7 +368,6 @@ to ignore red tests.
   command position; two blanks work. Same class as the above, and likelier to bite — apostrophes in
   prose are common.
 * Alias substitution is not tokenizer-level (above).
-* `^Z` on a serial console (above).
 
 ## A real distro, not a minirootfs
 
