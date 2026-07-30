@@ -16,7 +16,7 @@ use oslo::env::builtins::run_exit_trap;
 use oslo::env::options::ShellOption;
 use oslo::error::{Result, ShellError};
 use oslo::exec::eval_command_list;
-use oslo::parser::parse_bash_script;
+use oslo::parser::parse_with_aliases;
 use startup::language::{self, Language};
 use std::env;
 use std::fs;
@@ -109,7 +109,7 @@ fn run_program(invocation: &Invocation, script: &str) -> ! {
     // Parsing is kept out of `run_string` so the two kinds of failure stay distinguishable. A
     // script that does not parse never runs at all and exits 2; anything that goes wrong later
     // happened *during* execution, and gets the 127 below.
-    let ast = match parse_bash_script(script) {
+    let ast = match parse_with_aliases(script, &|n| env.get_alias(n).map(str::to_string)) {
         Ok(ast) => ast,
         Err(e) => {
             eprintln!("oslo: {}", e);

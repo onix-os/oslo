@@ -15,6 +15,8 @@
 
 mod heredoc;
 
+pub(crate) use heredoc::heredoc_delimiters;
+
 use crate::error::{Result, ShellError};
 use heredoc::strip_heredoc_bodies;
 

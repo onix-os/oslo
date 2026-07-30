@@ -10,17 +10,37 @@ use common::{assert_out, run};
 
 #[test]
 fn multi_word_alias_expands_to_multiple_arguments() {
-    assert_out("alias e='echo one two'; e", "one two");
+    assert_out("alias e='echo one two'\ne", "one two");
 }
 
 #[test]
 fn alias_arguments_are_appended() {
-    assert_out("alias e='echo prefix'; e suffix", "prefix suffix");
+    assert_out("alias e='echo prefix'\ne suffix", "prefix suffix");
 }
 
 #[test]
 fn alias_body_keeps_quoted_grouping() {
-    assert_out(r#"alias e='echo "a  b"'; e"#, "a  b");
+    assert_out("alias e='echo \"a  b\"'\ne", "a  b");
+}
+
+/// A definition and its use on the *same* line: bash answers `e: command not found`, because an
+/// alias is not available until the next command is read. These three tests used to be written
+/// this way and passed only because oslo expanded aliases after parsing.
+#[test]
+fn an_alias_is_not_available_on_the_line_that_defines_it() {
+    let r = run("alias e='echo hi'; e");
+    assert_ne!(r.status, 0, "stdout: {}", r.stdout);
+    assert!(r.stderr.contains("not found"), "stderr: {}", r.stderr);
+}
+
+/// The reason alias substitution moved ahead of the parser: an alias body is source text, and may
+/// open a construct the word it replaced could not.
+#[test]
+fn an_alias_may_open_a_compound_command() {
+    assert_out(
+        "alias forever='while :; do'\nn=0\nforever\n  n=$((n+1))\n  [ $n -ge 3 ] && break\ndone\necho $n",
+        "3",
+    );
 }
 
 #[test]

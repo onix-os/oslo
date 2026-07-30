@@ -23,7 +23,6 @@ use crate::exec::pipeline::eval_command;
 use crate::exec::redirect::RedirectGuard;
 use crate::exec::simple::external::{Lookup, look_up_command, run_external};
 use crate::expand::{expand_word, expand_word_to_string};
-use crate::lexer::Lexer;
 pub(crate) fn eval_simple_command(env: &mut Environment, simple: &SimpleCommand) -> Result<i32> {
     // Any `<(cmd)` in this command's words opens a pipe during expansion; it has to stay open
     // until the command has run and be closed afterwards, whichever way the command ends. The
@@ -54,19 +53,10 @@ fn eval_simple_command_inner(env: &mut Environment, simple: &SimpleCommand) -> R
         return apply_assignments_only(env, simple);
     }
 
-    let raw_name = words[0].trim().to_string();
-
-    // Alias expansion replaces the command word with the alias body, which may itself be several
-    // words: `alias ll='ls -la'` has to become argv `["ls", "-la"]`, not the single argv[0]
-    // `"ls -la"`. Expanded once, not recursively, so a self-referential alias terminates.
-    if let Some(alias) = env.get_alias(&raw_name).map(|s| s.to_string()) {
-        let expanded = expand_alias(env, &alias)?;
-        if !expanded.is_empty() {
-            let mut rebuilt = expanded;
-            rebuilt.extend_from_slice(&words[1..]);
-            words = rebuilt;
-        }
-    }
+    // Aliases are *not* expanded here. Substitution happens on the source text before it is
+    // parsed — see [`crate::parser::alias`] — because an alias body is source, not a list of
+    // arguments, and only a pre-parse pass can let `alias forever='while :; do'` work. Doing it
+    // in both places would also expand twice: `alias ls='ls -F'` would have become `ls -F -F`.
 
     let cmd_name = words[0].trim().to_string();
     words[0] = cmd_name.clone();
@@ -359,33 +349,6 @@ fn apply_wordless_redirections(env: &mut Environment, redirections: &[Redirectio
         Ok(()) => 0,
         Err(e) => report_redirect_failure(&e),
     }
-}
-
-/// Split an alias body into argv entries.
-///
-/// Lexed and expanded the same way as any other command words, so a quoted alias body such as
-/// `alias g='grep --color "a b"'` keeps its argument grouping instead of being split on spaces.
-fn expand_alias(env: &mut Environment, alias: &str) -> Result<Vec<String>> {
-    // bash substitutes an alias body into the command line and then expands the line, so the
-    // body's brace groups are expanded like anyone else's. Here the body is lexed directly, and
-    // brace expansion runs ahead of the lexer, so it has to be applied to the text first.
-    let alias = &crate::expand::brace::expand_braces_in_line(alias);
-    let mut lexer = Lexer::new(alias);
-    let mut out = Vec::new();
-
-    loop {
-        match lexer.next() {
-            Ok(crate::lexer::Token::Word(w)) => out.extend(expand_word(env, &w)?),
-            Ok(crate::lexer::Token::Eof) => break,
-            // The alias body contains operators (`alias x='a | b'`), which cannot be represented
-            // as a flat argv. Fall back to whitespace splitting rather than dropping them.
-            Ok(_) | Err(_) => {
-                return Ok(alias.split_whitespace().map(str::to_string).collect());
-            }
-        }
-    }
-
-    Ok(out)
 }
 
 /// Run `cmd_name` as a builtin, assuming redirections are already in place.

@@ -14,7 +14,7 @@ use oslo::env::options::ShellOption;
 use oslo::error::ShellError;
 use oslo::exec::{JobManager, eval_command_list};
 use oslo::interactive::{InputStatus, OsloHelper};
-use oslo::parser::parse_bash_script;
+use oslo::parser::parse_with_aliases;
 use rustyline::error::ReadlineError;
 use rustyline::history::{History, SearchDirection};
 use rustyline::{Editor, history::FileHistory};
@@ -127,7 +127,7 @@ pub fn run_repl() -> ! {
 
                 let mut env_guard = env_struct.lock().unwrap();
                 let res = absorb_loop_control(
-                    parse_bash_script(&text)
+                    parse_with_aliases(&text, &|n| env_guard.get_alias(n).map(str::to_string))
                         .and_then(|ast| eval_command_list(&mut env_guard, &ast)),
                 );
                 drop(env_guard);

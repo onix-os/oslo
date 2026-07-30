@@ -14,7 +14,8 @@ pub fn eval_command_substitution(env: &mut Environment, cmd_str: &str) -> Result
     // Parse before forking. In the child the only channel back to the caller is an exit status,
     // so a parse failure there could not be reported as one — it used to `unwrap`, printing a
     // Rust panic on stderr while the parent went on to exit 0.
-    let ast = crate::parser::parse_bash_script(cmd_str)?;
+    let ast =
+        crate::parser::parse_with_aliases(cmd_str, &|n| env.get_alias(n).map(str::to_string))?;
 
     let (reader, writer) =
         pipe().map_err(|e| ShellError::ExecutionError(format!("Pipe failed: {}", e)))?;

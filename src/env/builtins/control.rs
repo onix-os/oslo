@@ -120,15 +120,16 @@ pub fn builtin_eval(env: &mut Environment, args: &[String]) -> Result<i32> {
     // `x='eval "$x"'; eval "$x"` recurses through the parser and the evaluator with no function
     // call to bound it, so `eval` carries the same nesting counter `source` does.
     env.enter_nested_script()?;
-    let result = match crate::parser::parse_bash_script(&code) {
-        Ok(ast) => eval_command_list(env, &ast),
-        // A syntax error in evaluated text is the *builtin's* failure, not the script's: bash
-        // reports it, gives `eval` status 2, and carries on with the next command.
-        Err(e) => {
-            eprintln!("oslo: eval: {}", e);
-            Ok(2)
-        }
-    };
+    let result =
+        match crate::parser::parse_with_aliases(&code, &|n| env.get_alias(n).map(str::to_string)) {
+            Ok(ast) => eval_command_list(env, &ast),
+            // A syntax error in evaluated text is the *builtin's* failure, not the script's: bash
+            // reports it, gives `eval` status 2, and carries on with the next command.
+            Err(e) => {
+                eprintln!("oslo: eval: {}", e);
+                Ok(2)
+            }
+        };
     env.exit_nested_script();
     result
 }
@@ -152,7 +153,9 @@ pub fn builtin_source(env: &mut Environment, args: &[String]) -> Result<i32> {
     // counter is entered only after the file is known to be readable, so a missing file still
     // costs nothing, and exited on every path out so a `return` cannot leave it drifting.
     env.enter_nested_script()?;
-    let result = match crate::parser::parse_bash_script(&content) {
+    let result = match crate::parser::parse_with_aliases(&content, &|n| {
+        env.get_alias(n).map(str::to_string)
+    }) {
         Ok(ast) => eval_command_list(env, &ast),
         // As with `eval`: the sourced file failing to parse leaves `source` with status 2 and
         // the calling script still running.

@@ -40,7 +40,7 @@ pub(super) fn strip_heredoc_bodies(input: &str) -> String {
 }
 
 /// The delimiters a line opens here-documents for, in the order they will be read.
-pub(super) fn heredoc_delimiters(line: &str) -> Vec<(String, bool)> {
+pub(crate) fn heredoc_delimiters(line: &str) -> Vec<(String, bool)> {
     let chars: Vec<char> = line.chars().collect();
     let mut found = Vec::new();
     let mut i = 0;

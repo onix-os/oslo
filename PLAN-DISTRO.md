@@ -367,7 +367,6 @@ getty, login or sshd always sits between init and a login shell.
   `include_space: true`, where the first blank starts a token and the `#` after it is no longer in
   command position; two blanks work. Same class as the above, and likelier to bite — apostrophes in
   prose are common.
-* Alias substitution is not tokenizer-level (above).
 
 ## A real distro, not a minirootfs
 
@@ -401,6 +400,49 @@ Three things about the *test* are worth keeping, because each was a bug in it fi
   had already passed by comparing one empty string against another.
 * The runlevel check compared against the wrong constant and passed for the wrong reason until the
   first real run.
+
+## Alias substitution, moved ahead of the parser
+
+oslo substituted aliases at *execution* time, replacing a simple command's first word with the
+alias body. That is enough for `alias ll='ls -la'` and wrong for everything else, because an alias
+body is not a list of arguments — it is **source text**. `alias forever='while :; do'` is a real
+idiom, and expanding it after parsing cannot work: by then the `done` at the other end has already
+been a syntax error.
+
+[`crate::parser::alias`] now does it where POSIX puts it, on the text before it is parsed, and the
+executor no longer expands aliases at all. Doing both would expand twice — `alias ls='ls -F'`
+would have become `ls -F -F`.
+
+What the pass has to know, each item learned from something that broke:
+
+* **Command position.** Only the first word of a simple command. Reserved words that introduce a
+  command list reopen it; `case` patterns and a `for`/`select` word list do not.
+* **Where a word list ends.** A `for` list ends at the `;` or newline before its `do`, but a
+  `case` pattern list survives both. Treating them alike swallowed the `DO` in modernish's
+  `LOOP for i in 1 to 10; DO … DONE`, which then left the list open for the rest of the file.
+* **What is not command text.** `$(( … ))` is arithmetic and `${ … }` is a parameter expansion;
+  neither holds commands. Scanning into them turned `$(( n + 1 ))` into `$(( echo BAD + 1 ))` for
+  anyone with an alias called `n`. `$( … )` *is* shell text, and aliases do apply there.
+* **Definitions in the text itself.** A script may define an alias and use it further down, which
+  bash allows by parsing one command at a time. oslo parses a whole unit at once, so the scanner
+  reads `alias name=value` as it walks and honours it from the *following* line — which is exactly
+  where bash starts honouring it, and why `alias x=y; x` finds no `x` in either shell.
+* **Here-document bodies are data**, as ever.
+
+### What it unblocked, and what it found
+
+modernish's `sys/base/mktemp` — the module whose retry loop opens with `forever do` — now loads,
+as do `var/arith` and full initialisation. Getting there turned up a **seventh** defect: `let` did
+not accept `--` as an end-of-options marker, so every arithmetic test modernish makes (it aliases
+`let` to `let --`, precisely so an expression may begin with a minus) died as an unparseable
+expression. That bug was invisible until aliases started working.
+
+Three earlier corpus tests had to change: they used `alias e='…'; e` on one line, which bash
+answers with `e: command not found`. They passed only because oslo expanded aliases after parsing.
+
+modernish's *regression suite* still does not complete — it now fails much deeper, in modernish's
+own signal-name cache (`_Msh_sigCache: unbound variable`). That is progress rather than a
+regression: with the pass disabled, modernish no longer initialises at all.
 
 ## Out of scope, deliberately
 
