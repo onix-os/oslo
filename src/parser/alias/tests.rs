@@ -146,6 +146,28 @@ fn heredoc_bodies_are_data() {
 fn a_function_definition_is_not_substituted() {
     assert_eq!(with(&[("ll", "ls -la")], "ll() { :; }"), "ll() { :; }");
     assert_eq!(with(&[("ll", "ls -la")], "ll () { :; }"), "ll () { :; }");
+    assert_eq!(
+        with(&[("ll", "ls -la")], "ll (  ) { :; }"),
+        "ll (  ) { :; }"
+    );
+}
+
+/// A word followed by a *non-empty* subshell is a command with a subshell after it, not a function
+/// definition. modernish's `alias not='! '` is used as `not (readonly foo; …)`, and reading that
+/// as a definition of a function called `not` left the text a syntax error — which is exactly what
+/// it is until the alias expands.
+#[test]
+fn a_word_before_a_subshell_is_still_substituted() {
+    // Compared on words: the body brings its own trailing blank, so the spacing is not preserved
+    // exactly. What matters is that `not` became `!` and the subshell survived.
+    let a = &[("not", "! "), ("ll", "ls -la")];
+    let words = |s: String| s.split_whitespace().map(str::to_string).collect::<Vec<_>>();
+    assert_eq!(words(with(a, "not (exit 0)")), ["!", "(exit", "0)"]);
+    assert_eq!(
+        words(with(a, "true && not (exit 0)")),
+        ["true", "&&", "!", "(exit", "0)"]
+    );
+    assert_eq!(words(with(a, "not ( : )")), ["!", "(", ":", ")"]);
 }
 
 /// A redirection operand is a filename.

@@ -53,10 +53,22 @@ pub(super) fn word_end(chars: &[char], start: usize) -> usize {
 /// Whether the next non-blank characters are `()`, which makes the word a function's name.
 pub(super) fn is_function_definition(chars: &[char], from: usize) -> bool {
     let mut i = from;
-    while i < chars.len() && (chars[i] == ' ' || chars[i] == '\t') {
-        i += 1;
+    let skip_blanks = |i: &mut usize| {
+        while *i < chars.len() && matches!(chars[*i], ' ' | '\t') {
+            *i += 1;
+        }
+    };
+    skip_blanks(&mut i);
+    if chars.get(i) != Some(&'(') {
+        return false;
     }
-    chars.get(i) == Some(&'(')
+    // The parens must be *empty*. Requiring only the `(` read `not (cmd)` as a definition of a
+    // function called `not`, so modernish's `alias not='! '` was never substituted and
+    // `not (readonly foo; …)` stayed a syntax error — which is what the raw text is until the
+    // alias expands.
+    i += 1;
+    skip_blanks(&mut i);
+    chars.get(i) == Some(&')')
 }
 
 /// Whether a word can be an alias name at all.
@@ -151,11 +163,6 @@ pub(super) fn unquote(value: &str) -> String {
     out
 }
 
-/// Copy a balanced `open`/`close` run through untouched, quotes and all.
-///
-/// `from` points at the first `open`. Returns the index just past the matching close, or the
-/// end of the text when it is never closed — an unterminated construct is a syntax error the
-/// parser will report, and this pass must not hang on it.
 /// A balanced `open`/`close` run being copied through, which may span lines.
 ///
 /// Resumable because a command substitution is routinely written across several lines, and the
