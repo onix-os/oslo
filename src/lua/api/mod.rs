@@ -20,7 +20,9 @@ use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
 mod fs;
+mod json;
 mod path;
+mod re;
 mod run;
 pub(crate) mod util;
 
@@ -32,6 +34,8 @@ pub fn install(interp: &Rc<Interp>, registry: &Registry, env: Arc<Mutex<Environm
     run::install(interp, &mut oslo, &env);
     oslo.set(Value::str("fs"), fs::build());
     oslo.set(Value::str("path"), path::build());
+    oslo.set(Value::str("json"), json::build());
+    oslo.set(Value::str("re"), re::build());
     commands(&mut oslo, &env);
     variables(&mut oslo, &env);
     filesystem(&mut oslo, &env);

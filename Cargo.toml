@@ -32,6 +32,10 @@ rustyline = "15.0"
 # `[[ str =~ ere ]]` needs a real POSIX-ERE engine. Approximating it with globs would make every
 # validation idiom (`=~ ^[0-9]+$`) answer plausibly and wrongly.
 regex = "1"
+# JSON is a core capability rather than a library a user can install: a C module cannot load into
+# a static binary, which rules out lua-cjson and every Lua JSON parser that wraps it. `serde_json`
+# is pure Rust, so it works where those cannot. See PLAN-LUA.md.
+serde_json = "1"
 which = "7.0"
 thiserror = "2.0"
 

@@ -13,6 +13,7 @@
 
 mod base;
 mod math;
+mod module;
 mod os;
 pub mod pattern;
 mod string;
@@ -50,6 +51,7 @@ pub fn install(interp: &Interp) {
     table::install(interp);
     math::install(interp);
     os::install(interp);
+    module::install(interp);
     stub::install(interp);
 
     // `_G` is the global table itself, which scripts use for reflection and for deliberate

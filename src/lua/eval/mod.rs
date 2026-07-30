@@ -101,7 +101,13 @@ impl LuaError {
     ///
     /// This is what `pcall` hands back, and scripts parse it — `message:match(":(%d+):")` to find
     /// the line is a common idiom, and `error("x")` reaching a handler as a bare `x` breaks it.
-    pub fn value_string(&self, chunk: &str) -> String {
+    ///
+    /// A chunk recorded on the error wins over `current`. An error raised inside a `require`d
+    /// module has already unwound past it by the time `pcall` renders this, so the interpreter is
+    /// back on the outer chunk — and naming *that* file with the module's line number is worse
+    /// than naming neither.
+    pub fn value_string(&self, current: &str) -> String {
+        let chunk = self.chunk.as_deref().unwrap_or(current);
         match self.line {
             Some(line) => format!("{chunk}:{line}: {}", self.message),
             None => self.message.clone(),
