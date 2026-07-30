@@ -208,18 +208,21 @@ fn expansions_that_are_not_command_text_are_left_alone() {
     assert_eq!(with(a, "(( n = 1 ))"), "(( n = 1 ))");
 }
 
-/// A command substitution, by contrast, *is* shell text, and bash expands aliases inside one.
+/// A command substitution *is* shell text, but this pass must not rewrite it: its body is kept as
+/// source and parsed — through this same pass — when the substitution runs. Substituting here as
+/// well applied every alias twice, which turned modernish's `alias let='let --'` into
+/// `let -- -- "…"` and killed every arithmetic test it makes.
 #[test]
-fn command_substitutions_are_shell_text() {
-    assert_eq!(with(&[("ll", "ls -la")], "echo $(ll)"), "echo $(ls -la)");
+fn command_substitutions_are_left_for_their_own_parse() {
+    let a = &[("ll", "ls -la")];
+    assert_eq!(with(a, "echo $(ll)"), "echo $(ll)");
+    assert_eq!(with(a, "echo $( ll )"), "echo $( ll )");
+    assert_eq!(with(a, "echo `ll`"), "echo `ll`");
+    assert_eq!(with(a, "x=$(ll); ll"), "x=$(ll); ls -la");
+    // Nesting and quoting inside must not confuse the copy.
     assert_eq!(
-        with(&[("ll", "ls -la")], "echo $( ll )"),
-        "echo $( ls -la )"
-    );
-    // ...but the name must still be in command position inside it.
-    assert_eq!(
-        with(&[("ll", "ls -la")], "echo $(echo ll)"),
-        "echo $(echo ll)"
+        with(a, "echo $(echo $(ll) \")\")"),
+        "echo $(echo $(ll) \")\")"
     );
 }
 
@@ -257,5 +260,42 @@ fn a_for_word_list_ends_at_the_separator() {
     assert_eq!(
         with(a, "case $x in\n  ll) :; ;;\nesac"),
         "case $x in\n  ll) :; ;;\nesac"
+    );
+}
+
+/// A trailing backslash inside an expansion used to push the copy index one past the end of the
+/// text, and slicing with it **panicked the shell**. modernish's signal module contains one.
+#[test]
+fn a_trailing_backslash_in_an_expansion_does_not_panic() {
+    unchanged("echo $(cmd \\");
+    unchanged("echo ${x\\");
+    unchanged("echo $(( 1 \\");
+    unchanged("echo $(\"a\\");
+    unchanged("x=$(a|b\\");
+    // The real shape it came from: a `\\|` inside a command substitution near the end of input.
+    unchanged("c=${c:-x}${n}\\|${s}$(f \\");
+}
+
+/// A command substitution written across lines is still one construct. The copy used to stop at
+/// the end of the line, so the rest of its body was scanned as ordinary text — and since that body
+/// is parsed again when the substitution runs, every alias in it was substituted twice. modernish
+/// builds its signal table inside exactly such a substitution, and `alias let='let --'` became
+/// `let -- --`.
+#[test]
+fn a_multiline_command_substitution_is_copied_whole() {
+    let a = &[("let", "let --"), ("ll", "ls -la")];
+    let source = "o=$(\n\ti=0\n\twhile let \"(i+=1)<4\"; do\n\t\tll\n\tdone\n)\nll\n";
+    assert_eq!(
+        with(a, source),
+        "o=$(\n\ti=0\n\twhile let \"(i+=1)<4\"; do\n\t\tll\n\tdone\n)\nls -la\n"
+    );
+    // The same for `${ … }` and for an arithmetic expansion.
+    assert_eq!(
+        with(a, "x=${v:-\n  ll\n}\nll\n"),
+        "x=${v:-\n  ll\n}\nls -la\n"
+    );
+    assert_eq!(
+        with(a, "x=$((\n 1 +\n 1 ))\nll\n"),
+        "x=$((\n 1 +\n 1 ))\nls -la\n"
     );
 }

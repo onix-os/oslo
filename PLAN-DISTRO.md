@@ -444,6 +444,50 @@ modernish's *regression suite* still does not complete — it now fails much dee
 own signal-name cache (`_Msh_sigCache: unbound variable`). That is progress rather than a
 regression: with the pass disabled, modernish no longer initialises at all.
 
+## Chasing modernish deeper: SIGPIPE, and three bugs in the alias pass
+
+Following `_Msh_sigCache: unbound variable` — the wall the alias work left modernish at — took the
+oracle several modules further and turned up four more defects. Three of them were in the alias
+pass itself, which is worth stating plainly: it shipped with them.
+
+* **A command substitution was substituted twice.** Its body is kept as source in the AST and
+  parsed *again*, through the same pass, when it runs. modernish's `alias let='let --'` therefore
+  became `let -- --`, and every arithmetic test it makes died. `$( … )` and backquotes are now
+  copied through untouched and left for their own parse; the aliases in them still apply, at the
+  point where the body is actually parsed.
+* **…and a multi-line one was substituted anyway**, because the copy stopped at the end of the
+  line. The rest of the body was then scanned as ordinary text. The copy is resumable across lines
+  now, which is what a `$( … )` spanning six lines — as modernish's signal table does — requires.
+* **A trailing backslash panicked the shell.** `balanced_end` pushed its index one past the end and
+  the caller sliced with it. A shell may not panic; the index is bounded and the shapes that
+  triggered it are in the tests.
+
+The fourth is oslo's, and it is the serious one:
+
+* **SIGPIPE was ignored.** The Rust runtime sets `SIG_IGN` before `main` so that a write to a
+  closed pipe surfaces as `EPIPE` rather than killing the process. For a shell that is a hang:
+  `oslo -c 'while :; do echo x; done' | head -1` **ran for ever**, where bash exits at once, and
+  `… | head` is one of the most common things anyone types. It also made `kill -s PIPE $$` a no-op.
+  Children already had `SIG_DFL` restored, which is why `yes | head` worked and hid it.
+
+  The fix is in the *binary*, not the library: the test binary links the library and would
+  otherwise arm itself to die on any write to a closed pipe.
+
+  modernish detects this exactly (`WRN_NOSIGPIPE`) and refuses to load `var/loop` on such a shell,
+  warning that "a pipeline such as `foo | head -n 10` never ends". It was right.
+
+### Where the suite stands now
+
+modernish initialises, loads its modules, builds its signal table and gets into `var/loop`. The
+regression suite is now blocked by **brush's one-blank comment bug** — `adj/cap/BUG_TRAPFNEXI.sh`
+line 7 is `\t# Store this subshell's PID in $REPLY.`, a comment indented by exactly one tab
+containing an apostrophe, inside `$( )`. That is the second file in the same codebase to hit it,
+which is a good deal more evidence than the 92-script distro sweep produced, and it moves that gap
+from "unquantified" to "the next thing in the way".
+
+Still open and unfixed: `printf`/`echo` do not report write errors (`printf x > /dev/full` exits 0
+where bash exits 1). modernish calls this `BUG_PUTIOERR`.
+
 ## Out of scope, deliberately
 
 Process substitution, `coproc` and `select` stay refused-by-name — none appears in POSIX `sh`, and

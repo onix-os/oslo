@@ -30,8 +30,8 @@ mod scan;
 
 use super::nesting::heredoc_delimiters;
 use scan::{
-    Quote, copy_balanced, is_assignment, is_function_definition, is_plain_name, split_words,
-    unquote, word_end,
+    Balance, Quote, is_assignment, is_function_definition, is_plain_name, split_words, unquote,
+    word_end,
 };
 use std::collections::HashMap;
 
@@ -76,8 +76,10 @@ pub fn substitute(source: &str, lookup: &dyn Fn(&str) -> Option<String>) -> Stri
         escaped: false,
         cmd_pos: true,
         check_next_word: false,
+        after_assignment: false,
         line: 0,
         active: Vec::new(),
+        pending: None,
         cases: Vec::new(),
         word_list: false,
     };
@@ -96,9 +98,13 @@ struct Scanner<'a> {
     cmd_pos: bool,
     /// Set when the alias just substituted ended with a blank.
     check_next_word: bool,
+    /// Whether the word just emitted was an assignment prefix (`name=…`).
+    after_assignment: bool,
     line: usize,
     /// The names currently being expanded, innermost last.
     active: Vec<String>,
+    /// A `$( … )`, `${ … }` or backquoted run being copied through, possibly across lines.
+    pending: Option<Balance>,
     /// The `case` constructs currently open, innermost last.
     cases: Vec<Case>,
     /// Inside a `for`/`select` word list, which runs until `do`.
@@ -116,7 +122,7 @@ impl Scanner<'_> {
 
             // Computed before the line is rewritten, and only outside quotes: inside a multi-line
             // string a `<<` is text. Same approximation the nesting scan makes.
-            let heredocs = if self.quote == Quote::None {
+            let heredocs = if self.quote == Quote::None && self.pending.is_none() {
                 heredoc_delimiters(line)
             } else {
                 Vec::new()
@@ -130,7 +136,7 @@ impl Scanner<'_> {
             // quoted string or continued by a backslash, where it is just a character. Without
             // this, `cat <<EOF` left `cmd_pos` false and the first command *after* the heredoc
             // was never considered for substitution.
-            if self.quote == Quote::None && !self.escaped {
+            if self.quote == Quote::None && !self.escaped && self.pending.is_none() {
                 // A `for` list ends at the newline; a `case` pattern list does not.
                 self.word_list = false;
                 if !self.in_case_patterns() {
@@ -139,7 +145,9 @@ impl Scanner<'_> {
                 }
             }
             // A line's alias definitions take effect on the next line, never on this one.
-            self.record_definitions(line);
+            if self.pending.is_none() {
+                self.record_definitions(line);
+            }
             index += 1;
 
             for (delimiter, strip_tabs) in heredocs {
@@ -168,6 +176,16 @@ impl Scanner<'_> {
     fn feed(&mut self, text: &str) {
         let chars: Vec<char> = text.chars().collect();
         let mut i = 0;
+        // A construct left open by the previous line carries on here, still copied verbatim.
+        if let Some(mut balance) = self.pending.take() {
+            match balance.consume(&mut self.out, &chars, 0) {
+                Some(next) => i = next,
+                None => {
+                    self.pending = Some(balance);
+                    return;
+                }
+            }
+        }
         while i < chars.len() {
             let c = chars[i];
 
@@ -248,7 +266,10 @@ impl Scanner<'_> {
                 '(' => {
                     // `(( … ))` in command position is an arithmetic command, not two subshells.
                     if self.cmd_pos && chars.get(i + 1) == Some(&'(') {
-                        i = copy_balanced(&mut self.out, &chars, i, '(', ')');
+                        match self.copy_run(&chars, i, '(', ')') {
+                            Some(after) => i = after,
+                            None => return,
+                        }
                         self.cmd_pos = false;
                         self.check_next_word = false;
                     } else {
@@ -269,23 +290,30 @@ impl Scanner<'_> {
                     self.cmd_pos = true;
                     self.check_next_word = false;
                 }
-                // `$` opens something that is not always command text, and reading it as such is
-                // how `alias n=…` came to rewrite `$(( n + 1 ))` into `$(( echo BAD + 1 ))`.
+                // Everything `$` opens is copied through untouched, for two different reasons.
                 //
-                //   * `$(( … ))` is arithmetic — no word in it is a command.
-                //   * `${ … }` is a parameter expansion — likewise.
-                //   * `$( … )` *is* shell text, so scanning carries on into it.
+                // `$(( … ))` is arithmetic and `${ … }` is a parameter expansion: neither holds
+                // commands, and scanning into them rewrote `$(( n + 1 ))` into
+                // `$(( echo BAD + 1 ))` for anyone with an alias called `n`.
+                //
+                // `$( … )` *is* shell text, but it is not this pass's to rewrite: the body is
+                // kept as source in the AST and parsed — through this same pass — when the
+                // substitution runs. Substituting here as well applied every alias **twice**, so
+                // modernish's `alias let='let --'` turned `let "(i+=1)<4"` into `let -- -- "…"`
+                // and every arithmetic test in it died. Backticks are the same story.
                 '$' => {
-                    if chars.get(i + 1) == Some(&'(') && chars.get(i + 2) == Some(&'(') {
+                    if let Some(&next) = chars.get(i + 1)
+                        && (next == '(' || next == '{')
+                    {
                         self.out.push('$');
-                        i = copy_balanced(&mut self.out, &chars, i + 1, '(', ')');
-                    } else if chars.get(i + 1) == Some(&'{') {
-                        self.out.push('$');
-                        i = copy_balanced(&mut self.out, &chars, i + 1, '{', '}');
-                    } else if chars.get(i + 1) == Some(&'(') {
-                        self.out.push_str("$(");
-                        i += 2;
-                        self.cmd_pos = true;
+                        let close = if next == '(' { ')' } else { '}' };
+                        match self.copy_run(&chars, i + 1, next, close) {
+                            Some(after) => i = after,
+                            None => return,
+                        }
+                        // `LC_ALL=$(locale) cmd` still has `cmd` as its command word, so an
+                        // assignment prefix keeps the position across the expansion glued to it.
+                        self.cmd_pos = self.after_assignment;
                         self.check_next_word = false;
                     } else {
                         // Part of an ordinary word: `$foo`, `$1`, a bare `$`.
@@ -296,7 +324,25 @@ impl Scanner<'_> {
                         self.check_next_word = false;
                     }
                 }
-                '&' | '|' | '`' | '\n' => {
+                // A backquoted command is re-parsed when it runs, exactly like `$( … )`.
+                '`' => {
+                    self.out.push(c);
+                    i += 1;
+                    while i < chars.len() {
+                        let c = chars[i];
+                        self.out.push(c);
+                        i += 1;
+                        if c == '\\' && i < chars.len() {
+                            self.out.push(chars[i]);
+                            i += 1;
+                        } else if c == '`' {
+                            break;
+                        }
+                    }
+                    self.cmd_pos = false;
+                    self.check_next_word = false;
+                }
+                '&' | '|' | '\n' => {
                     self.out.push(c);
                     self.word_list = false;
                     self.cmd_pos = !self.in_case_patterns();
@@ -314,7 +360,10 @@ impl Scanner<'_> {
                     let end = word_end(&chars, i);
                     let word: String = chars[i..end].iter().collect();
                     i = end;
-                    if !self.try_substitute(&word, &chars, i) {
+                    // A word that stopped at an expansion is only part of a word: `ll${x}` is not
+                    // the alias `ll`, and substituting it would rewrite half a word.
+                    let partial = chars.get(end) == Some(&'$');
+                    if partial || !self.try_substitute(&word, &chars, i) {
                         self.out.push_str(&word);
                         self.after_word(&word);
                     }
@@ -385,8 +434,21 @@ impl Scanner<'_> {
         }
         // A command prefix is not the command: in `LC_ALL=C sort`, `sort` is still the command
         // word, and an alias for it must still be found.
+        self.after_assignment = is_assignment(word);
         self.cmd_pos =
-            !self.in_word_context() && (INTRODUCERS.contains(&word) || is_assignment(word));
+            !self.in_word_context() && (INTRODUCERS.contains(&word) || self.after_assignment);
+    }
+
+    /// Copy a balanced run through, remembering it when it does not close on this line.
+    fn copy_run(&mut self, chars: &[char], from: usize, open: char, close: char) -> Option<usize> {
+        let mut balance = Balance::new(open, close);
+        match balance.consume(&mut self.out, chars, from) {
+            Some(after) => Some(after),
+            None => {
+                self.pending = Some(balance);
+                None
+            }
+        }
     }
 
     /// Whether the scanner is somewhere that holds *words* rather than commands.

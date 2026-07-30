@@ -33,6 +33,14 @@ pub(super) fn word_end(chars: &[char], start: usize) -> usize {
                 '\'' => quote = Quote::Single,
                 '"' => quote = Quote::Double,
                 '\\' => i += 1,
+                // A word *ends* at an expansion, so that the scanner's own `$` handling copies
+                // it through — that copy is the one that can span lines. Splitting the word at
+                // `(` instead, as this did first, left `x=$` and a bare `(`, and the `ll` inside
+                // was then read as a command and substituted twice over.
+                //
+                // The caller must not substitute a word that stopped here: `ll${x}` is not the
+                // alias `ll`, however much its first two characters look like one.
+                '$' if matches!(chars.get(i + 1), Some('(') | Some('{')) => return i,
                 ' ' | '\t' | ';' | '&' | '|' | '(' | ')' | '<' | '>' | '#' | '`' => return i,
                 _ => {}
             },
@@ -148,54 +156,84 @@ pub(super) fn unquote(value: &str) -> String {
 /// `from` points at the first `open`. Returns the index just past the matching close, or the
 /// end of the text when it is never closed — an unterminated construct is a syntax error the
 /// parser will report, and this pass must not hang on it.
-pub(super) fn copy_balanced(
-    out: &mut String,
-    chars: &[char],
-    from: usize,
+/// A balanced `open`/`close` run being copied through, which may span lines.
+///
+/// Resumable because a command substitution is routinely written across several lines, and the
+/// scanner reads a line at a time. A copy that stopped at the end of the line left the rest of the
+/// substitution's body to be scanned as ordinary text — and since that body is *also* parsed when
+/// the substitution runs, every alias in it was substituted twice.
+pub(super) struct Balance {
     open: char,
     close: char,
-) -> usize {
-    let mut depth = 0usize;
-    let mut i = from;
-    let mut quote = Quote::None;
-    while i < chars.len() {
-        let c = chars[i];
-        out.push(c);
-        i += 1;
-        match quote {
-            Quote::Single => {
-                if c == '\'' {
-                    quote = Quote::None;
-                }
-                continue;
-            }
-            Quote::Double => {
-                if c == '"' {
-                    quote = Quote::None;
-                } else if c == '\\' && i < chars.len() {
-                    out.push(chars[i]);
-                    i += 1;
-                }
-                continue;
-            }
-            Quote::None => {}
-        }
-        match c {
-            '\'' => quote = Quote::Single,
-            '"' => quote = Quote::Double,
-            '\\' if i < chars.len() => {
-                out.push(chars[i]);
-                i += 1;
-            }
-            c if c == open => depth += 1,
-            c if c == close => {
-                depth -= 1;
-                if depth == 0 {
-                    return i;
-                }
-            }
-            _ => {}
+    depth: usize,
+    quote: Quote,
+    escaped: bool,
+}
+
+impl Balance {
+    pub(super) fn new(open: char, close: char) -> Self {
+        Self {
+            open,
+            close,
+            depth: 0,
+            quote: Quote::None,
+            escaped: false,
         }
     }
-    i
+
+    /// Copy from `from` until the run closes, appending to `out`.
+    ///
+    /// `Some(i)` is the index just past the closing character; `None` means the line ended first
+    /// and this `Balance` must be kept and resumed on the next one.
+    pub(super) fn consume(
+        &mut self,
+        out: &mut String,
+        chars: &[char],
+        from: usize,
+    ) -> Option<usize> {
+        let mut i = from;
+        while i < chars.len() {
+            let c = chars[i];
+            out.push(c);
+            i += 1;
+            if self.escaped {
+                self.escaped = false;
+                continue;
+            }
+            match self.quote {
+                Quote::Single => {
+                    if c == '\'' {
+                        self.quote = Quote::None;
+                    }
+                    continue;
+                }
+                Quote::Double => {
+                    match c {
+                        '"' => self.quote = Quote::None,
+                        // Bounded by the loop rather than by skipping ahead: a backslash as the
+                        // last character of a line must not push the index past the end, which
+                        // panicked the shell when the caller sliced with it.
+                        '\\' => self.escaped = true,
+                        _ => {}
+                    }
+                    continue;
+                }
+                Quote::None => {}
+            }
+            match c {
+                '\'' => self.quote = Quote::Single,
+                '"' => self.quote = Quote::Double,
+                '\\' => self.escaped = true,
+                c if c == self.open => self.depth += 1,
+                c if c == self.close => {
+                    self.depth -= 1;
+                    if self.depth == 0 {
+                        return Some(i);
+                    }
+                }
+                _ => {}
+            }
+        }
+        None
+    }
 }
