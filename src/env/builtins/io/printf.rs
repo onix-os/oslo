@@ -17,7 +17,6 @@
 use crate::env::builtins::io::echo::expand_escapes;
 use crate::env::scope::Environment;
 use crate::error::Result;
-use std::io::Write;
 
 /// `printf FORMAT [ARGUMENT]...`
 pub fn builtin_printf(_env: &mut Environment, args: &[String]) -> Result<i32> {
@@ -54,10 +53,12 @@ pub fn builtin_printf(_env: &mut Environment, args: &[String]) -> Result<i32> {
         }
     }
 
-    let mut stdout = std::io::stdout().lock();
-    let _ = stdout.write_all(&out);
-    let _ = stdout.flush();
-    Ok(status)
+    // A write failure outranks a formatting one: if the output never arrived, the status has to
+    // say so whatever the format string did.
+    match super::write_stdout("printf", &out) {
+        0 => Ok(status),
+        failed => Ok(failed),
+    }
 }
 
 /// One pass over the format. `next` indexes the next unconsumed argument.

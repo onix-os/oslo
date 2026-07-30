@@ -598,8 +598,32 @@ and `a#b` must not become comments, and neither must a quoted `'#'`.
 With that fixed, modernish's regression suite executes and reports results — `builtin.t`, `io.t`,
 `isset.t`, `loop_cond.t` and the rest, with real per-test verdicts rather than a parse failure.
 That is the oracle finally pointed at oslo properly, and the findings it produces are the next
-round's work. Several are already recognisable: `BUG_PUTIOERR` (write errors unreported, known),
-`select` (deliberately unimplemented), and `isset -x` on an unset exported variable.
+round's work. Already recognisable: `select` (deliberately unimplemented), `isset -x` on an unset
+exported variable, and `LINENO wrongly detected`.
+
+One of them is already fixed. **`BUG_PUTIOERR`: `echo` and `printf` discarded the result of their
+write.** `printf x > /dev/full` exited 0 where bash exits 1, so a script had no way to learn its
+output never arrived. Both now report it, with bash's wording and status.
+
+Writing straight to descriptor 1 rather than through `std::io::stdout()` is part of the fix, not an
+optimisation: that handle is globally buffered, and on a failed write the bytes *stay* in the
+buffer. `printf x > /dev/full` printed `x` on the terminal when the runtime flushed at exit, by
+which time the shell had restored the descriptor.
+
+### Still open: a hang in modernish's LOOP
+
+The suite now stops at `loop_cond.t` test 013, which is the first to use modernish's own `LOOP`
+construct. That machinery runs a generator process feeding the loop over descriptor 8
+(`IFS= read -r _loop_i <&8`), and under oslo it blocks. Fixing `BUG_PUTIOERR` did not release it,
+so it is not the write-error path modernish warned about; it is something in the descriptor or
+process handling underneath. That is where the next round starts.
+
+Worth separating from it: a script that does `use var/loop` and then uses `LOOP` **in the same
+parse unit** cannot work, and that is the documented limitation rather than a new bug. `use`
+defines its aliases by sourcing a module at *runtime*, long after the whole file was parsed and
+alias-substituted. bash gets away with it by parsing one command at a time. Inside the test suite
+this does not arise, because `run.sh` loads the modules and the `.t` files are separate parse
+units.
 
 ## Out of scope, deliberately
 

@@ -139,8 +139,7 @@ pub fn builtin_echo(_env: &mut Environment, args: &[String]) -> Result<i32> {
         output.push(b'\n');
     }
 
-    let _ = nix::unistd::write(unsafe { std::os::fd::BorrowedFd::borrow_raw(1) }, &output);
-    Ok(0)
+    Ok(super::write_stdout("echo", &output))
 }
 
 #[cfg(test)]
