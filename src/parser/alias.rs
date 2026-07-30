@@ -235,7 +235,8 @@ impl Scanner<'_> {
                     self.quote = Quote::Double;
                     i += 1;
                 }
-                // The rest of the line is a comment. A `#` only starts one at the start of a word.
+                // The rest of the line is a comment. Only reachable at the start of a word: a `#`
+                // inside one is consumed by `word_end` along with the rest of it.
                 '#' => {
                     self.out.extend(&chars[i..]);
                     return;

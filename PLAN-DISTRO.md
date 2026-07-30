@@ -629,13 +629,41 @@ Reaping is now `WNOHANG`, with anything still running retried the next time a su
 finishes. The one-line reproducer is `exec 8< <(yes); echo reached` — bash prints `reached`, oslo
 printed nothing.
 
+### `LOOP find`: a `#` inside a word is not a comment
+
+`LOOP find` then died with `not: command not found`, which looked like yet another alias-position
+case. It was, but not where the eval was: modernish parses the loop's arguments with
+
+```sh
+while let $# && not str begin $1 '-' && not str eq $1 '(' && not str eq $1 '!'; do
+```
+
+`word_end` treated `#` as a word terminator, so `$#` split into the word `$` and a bare `#` — and
+the scanner's comment arm then copied the whole rest of the line verbatim. Every alias after a
+`$#` on the same line went unsubstituted.
+
+A `#` only begins a comment at the *start* of a word; inside one it is an ordinary character,
+which is also what makes `a#b` a single word. Removing it from the terminator set fixes both, and
+leaves the comment arm reachable only where a comment can actually begin.
+
 ### Where the suite reaches now
 
-`io.t` has dropped off the failure list entirely: fixing `BUG_PUTIOERR` closed it. `loop_cond.t`
-runs past the hang. What remains is a further alias gap — `not: command not found` inside
-modernish's `LOOP find`, where the loop's generated text is `eval`ed — and the recognisable
-findings from before: `select` (deliberately unimplemented), `isset -x` on an unset exported
-variable, and `LINENO wrongly detected`.
+`io.t` has dropped off the failure list entirely — fixing `BUG_PUTIOERR` closed it — and the suite
+now runs through `builtin.t`, `isset.t`, `loop_cond.t`, `match.t` and into `posparam.t`.
+
+Four of the findings are new and are oslo's, all in pattern matching:
+
+* `match.t` 002: a backslash-escaped `*` still matches as a metacharacter.
+* `match.t` 016: a backslash-escaped `]` inside a bracket pattern.
+* `match.t` 018/019: bracket patterns over the full ASCII range, and their negations.
+
+The rest are already known: `select` (deliberately unimplemented), `isset -x` on an unset exported
+variable, `LINENO wrongly detected`, and `QUOTEFAIL` on weird filenames.
+
+`posparam.t` is not a test failure but oslo's **nesting guard** refusing to parse it:
+`59 unmatched openers, at most 16 are parseable`. That guard has produced five earlier false
+positives, every one found by running a real script rather than by a test. This is the sixth, and
+it is the next thing to fix.
 
 Worth separating from it: a script that does `use var/loop` and then uses `LOOP` **in the same
 parse unit** cannot work, and that is the documented limitation rather than a new bug. `use`

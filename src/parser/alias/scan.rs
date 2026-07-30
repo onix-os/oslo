@@ -41,7 +41,12 @@ pub(super) fn word_end(chars: &[char], start: usize) -> usize {
                 // The caller must not substitute a word that stopped here: `ll${x}` is not the
                 // alias `ll`, however much its first two characters look like one.
                 '$' if matches!(chars.get(i + 1), Some('(') | Some('{')) => return i,
-                ' ' | '\t' | ';' | '&' | '|' | '(' | ')' | '<' | '>' | '#' | '`' => return i,
+                // `#` is deliberately absent: it only begins a comment at the *start* of a word,
+                // so inside one it is an ordinary character. Ending the word at it split `$#`
+                // into `$` and a comment, and the scanner then copied the rest of the line
+                // verbatim — so every alias after a `$#` on that line went unsubstituted.
+                // Leaving it in the word is also what makes `a#b` one word, as it is in bash.
+                ' ' | '\t' | ';' | '&' | '|' | '(' | ')' | '<' | '>' | '`' => return i,
                 _ => {}
             },
         }

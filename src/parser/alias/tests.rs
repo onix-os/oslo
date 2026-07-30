@@ -348,3 +348,26 @@ fn a_comment_inside_a_copied_construct_is_not_shell() {
     // A quoted `#` is data, not a comment.
     assert_eq!(with(a, "v=$(echo '#')\nll\n"), "v=$(echo '#')\nls -la\n");
 }
+
+/// A `#` only begins a comment at the *start* of a word. Ending a word at one split `$#` into `$`
+/// and a comment, so the scanner copied the rest of the line verbatim and every alias after it was
+/// left alone. modernish's `LOOP find` parses its arguments with
+/// `while let $# && not str begin $1 '-'; do`, and the `not` after the `$#` never expanded.
+#[test]
+fn a_hash_inside_a_word_is_not_a_comment() {
+    let a = &[("not", "! "), ("ll", "ls -la")];
+    assert_eq!(with(a, ": $# && ll"), ": $# && ls -la");
+    // `not` expands to `! ` with a trailing blank, so the spacing is not preserved exactly.
+    assert_eq!(
+        with(a, "while : && not x; do ll; done")
+            .split_whitespace()
+            .collect::<Vec<_>>(),
+        ["while", ":", "&&", "!", "x;", "do", "ls", "-la;", "done"]
+    );
+    assert_eq!(with(a, "echo a#b && ll"), "echo a#b && ls -la");
+    assert_eq!(with(a, "echo ${v#p} && ll"), "echo ${v#p} && ls -la");
+    // A `#` that does begin a word still starts a comment, and the rest of the line is text.
+    assert_eq!(with(a, "echo hi # ll"), "echo hi # ll");
+    assert_eq!(with(a, "# ll"), "# ll");
+    assert_eq!(with(a, "ll # ll"), "ls -la # ll");
+}
