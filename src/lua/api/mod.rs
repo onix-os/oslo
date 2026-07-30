@@ -19,9 +19,11 @@ use crate::lua::eval::{Interp, LuaError};
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
+mod convert;
 mod fs;
 mod json;
 mod path;
+mod proc;
 mod re;
 mod run;
 mod shell;
@@ -39,6 +41,22 @@ pub fn install(interp: &Rc<Interp>, registry: &Registry, env: Arc<Mutex<Environm
     oslo.set(Value::str("path"), path::build());
     oslo.set(Value::str("json"), json::build());
     oslo.set(Value::str("re"), re::build());
+    oslo.set(Value::str("proc"), proc::build_proc());
+    oslo.set(Value::str("job"), proc::build_job());
+
+    // The converters, plus `from_json` as an alias for `oslo.json.decode` — the same function
+    // under the name the rest of the `from_*` family has.
+    let converters = convert::build();
+    if let (Value::Table(into), Value::Table(json)) = (&converters, &oslo.get(&Value::str("json")))
+    {
+        let decode = json.borrow().get(&Value::str("decode"));
+        into.borrow_mut().set(Value::str("from_json"), decode);
+    }
+    if let Value::Table(into) = &converters {
+        for (name, f) in into.borrow().pairs() {
+            oslo.set(name, f);
+        }
+    }
     commands(&mut oslo, &env);
     variables(&mut oslo, &env);
     filesystem(&mut oslo, &env);

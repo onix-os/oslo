@@ -281,6 +281,82 @@ fn load_compiles_a_string_into_a_callable_chunk() {
 }
 
 #[test]
+fn from_columns_reads_another_programs_table() {
+    let out = lua(r#"
+        local rows = oslo.from_columns("a 1 x\nb 2 y\n", {"name", "n", "tag"})
+        print(#rows, rows[2].name, rows[2].n, rows[2].tag)
+        -- With no header each line is a list of fields, split on runs of whitespace the way awk
+        -- does: a leading indent produces no empty first field.
+        local bare = oslo.from_columns("  a   b  \n")
+        print(#bare, #bare[1], bare[1][1], bare[1][2])
+    "#);
+    assert_eq!(out, "2\tb\t2\ty\n1\t2\ta\tb");
+}
+
+/// A command that puts a whole command line in its last column — `ps` does — must not lose it.
+#[test]
+fn from_columns_keeps_a_trailing_column_whole() {
+    let out = lua(r#"
+        local rows = oslo.from_columns("123 oslo -c echo hi\n", {"pid", "command"})
+        print(rows[1].pid, rows[1].command)
+    "#);
+    assert_eq!(out, "123\toslo -c echo hi");
+}
+
+#[test]
+fn from_pairs_reads_the_key_value_output_half_the_system_speaks() {
+    let out = lua(r#"
+        local os_release = oslo.from_pairs('NAME="Alpine Linux"\nID=alpine\n')
+        print(os_release.NAME, os_release.ID)
+        -- A different separator, for the commands that use one.
+        local colons = oslo.from_pairs("a: 1\nb: 2\n", ":")
+        print(colons.a, colons.b)
+    "#);
+    assert_eq!(out, "Alpine Linux\talpine\n1\t2");
+}
+
+#[test]
+fn from_lines_does_not_invent_a_trailing_empty_one() {
+    let out = lua(r#"
+        print(#oslo.from_lines("a\nb\n"), #oslo.from_lines("a\nb"), #oslo.from_lines(""))
+    "#);
+    assert_eq!(out, "2\t2\t0");
+}
+
+/// `oslo.from_json` is the same function as `oslo.json.decode`, not a second parser.
+#[test]
+fn from_json_is_the_json_decoder_under_the_family_name() {
+    let out = lua(r#"
+        print(oslo.from_json == oslo.json.decode, oslo.from_json('{"a":1}').a)
+    "#);
+    assert_eq!(out, "true\t1");
+}
+
+#[test]
+fn proc_names_signals_rather_than_numbering_them() {
+    let out = lua(r#"
+        print(oslo.proc.alive(oslo.pid()), oslo.proc.alive(2147483))
+        print(oslo.proc.signal_number("TERM"), oslo.proc.signal_number("sigterm"))
+        print(#oslo.proc.signals() > 10)
+        -- A typo is refused, not quietly turned into SIGTERM.
+        local ok, err = pcall(oslo.proc.kill, oslo.pid(), "NOTASIGNAL")
+        print(ok, err:find("no signal") ~= nil)
+    "#);
+    assert_eq!(out, "true\tfalse\n15\t15\ntrue\nfalse\ttrue");
+}
+
+#[test]
+fn the_job_table_is_the_shells_own() {
+    let out = lua(r#"
+        print(#oslo.job.list())
+        -- Naming a job that does not exist answers rather than raising.
+        local ok, err = oslo.job.foreground(99)
+        print(ok, err ~= nil)
+    "#);
+    assert_eq!(out, "0\nnil\ttrue");
+}
+
+#[test]
 fn the_shell_can_describe_itself() {
     let out = lua(r#"
         print(oslo.version ~= nil, type(oslo.host()), oslo.pid() > 0, oslo.ppid() > 0)
