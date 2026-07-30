@@ -360,6 +360,39 @@ to ignore red tests.
 * Alias substitution is not tokenizer-level (above).
 * `^Z` on a serial console (above).
 
+## A real distro, not a minirootfs
+
+`scripts/alpine-distro-vm.sh` boots an Alpine userland with **OpenRC** — Alpine's init system,
+written almost entirely in POSIX shell by people who have never heard of oslo — with oslo as
+`/bin/sh`. `make vm-distro`.
+
+It came up. `openrc sysinit`, `openrc boot` and `openrc default` all returned 0, and the services
+that ran are real ones: mounting `/dev/pts` and `/dev/shm`, checking and remounting filesystems,
+configuring kernel parameters, creating user login records, cleaning `/tmp`, setting the hostname,
+loading modules, setting the clock from hardware, starting syslog. `rc-status` lists 49 services.
+OpenRC's whole shell runtime under `/usr/libexec/rc/sh` parses, and sourcing `functions.sh` defines
+the helpers every service calls.
+
+**92 shell scripts in the image parse, none rejected** — every `/etc/init.d/*` service, OpenRC's
+runtime, and `alpine-conf`'s 22 `setup-*` tools, which are among the densest POSIX shell any distro
+ships. The minirootfs VM had found two.
+
+The image is built by layering packages onto the cached minirootfs with `tar` rather than
+bootstrapping with `apk`, because `apk` wants to chown and mknod and this runs as an ordinary user
+(and user namespaces are restricted on the machine this was written on). Extraction gets the files,
+which is all a boot test needs.
+
+Three things about the *test* are worth keeping, because each was a bug in it first:
+
+* The parse sweep **walks the filesystem** instead of using a list of globs. The first version
+  missed OpenRC's entire runtime — Alpine had moved it from `/lib/rc/sh` to `/usr/libexec/rc/sh` —
+  and reported "all parse" with total confidence.
+* The sweep **asserts it is not vacuous**: it fails if it finds fewer than 50 scripts, and it feeds
+  `sh -n` a known-bad script and fails if that is accepted. Three checks in the job-control suite
+  had already passed by comparing one empty string against another.
+* The runlevel check compared against the wrong constant and passed for the wrong reason until the
+  first real run.
+
 ## Out of scope, deliberately
 
 Process substitution, `coproc` and `select` stay refused-by-name — none appears in POSIX `sh`, and

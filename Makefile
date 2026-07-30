@@ -20,7 +20,7 @@ $(info ------------------------------------------)
 $(info Project: $(PROJECT_NAME) v$(PROJECT_VERSION))
 $(info ------------------------------------------)
 
-.PHONY: build b compile c run r example test t check check-all test-all check-loc check-readme print-name clippy rustdoc fmt fmt-check clean verify install uninstall release help h
+.PHONY: build b compile c run r example test t check check-all test-all check-loc check-readme print-name clippy rustdoc fmt fmt-check clean verify vm vm-distro install uninstall release help h
 
 build:
 	@$(CARGO) build
@@ -85,6 +85,15 @@ check-readme:
 # check-all/test-all are deliberately absent: the crate declares no [features], so they are
 # byte-identical reruns of check/test and only slow the gate down. Add them back the day a
 # [features] section appears.
+# The two VMs are deliberately *not* in `verify`: each needs a musl toolchain, qemu and the
+# network, and takes minutes. They answer questions a checkout cannot — whether the release
+# artifact runs as PID 1 on a foreign userland, and whether a distro's own init system runs on it.
+vm:
+	bash scripts/alpine-vm.sh
+
+vm-distro:
+	bash scripts/alpine-distro-vm.sh
+
 verify: fmt-check check-loc check-readme check test clippy rustdoc
 
 install:
@@ -129,6 +138,8 @@ help:
 	@echo "  check-readme Fail if the README names a file that does not exist"
 	@echo "  clean        Remove Cargo build artifacts"
 	@echo "  verify       Run the full local gate"
+	@echo "  vm           Boot oslo as PID 1 in an Alpine minirootfs and run its suites"
+	@echo "  vm-distro    Boot a real Alpine userland with oslo as /bin/sh and run OpenRC"
 	@echo "  install      Install the release binary into \$$PREFIX/bin ($(PREFIX)/bin)"
 	@echo "  uninstall    Remove the installed binary from \$$PREFIX/bin"
 	@echo "  release      Release a new version"

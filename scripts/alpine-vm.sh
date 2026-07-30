@@ -30,7 +30,7 @@ set -euo pipefail
 
 here=$(cd -- "$(dirname -- "$0")/.." && pwd)
 work=${OSLO_VM_WORK:-/tmp/oslo-alpine-vm}
-mirror=https://dl-cdn.alpinelinux.org/alpine/latest-stable/releases/x86_64
+. "$here/scripts/alpine-vm-common.sh"
 mode=suite
 case "${1:-}" in
 --shell) mode=shell ;;
@@ -47,66 +47,12 @@ interactive=false
 mkdir -p "$work"
 cd "$work"
 
-say() { printf '\n== %s\n' "$*"; }
-
-# ---------------------------------------------------------------- the static binary
 say "building the static musl binary"
-target=x86_64-unknown-linux-musl
-# Alpine is musl, so this is not an optimisation — a glibc build cannot execute there.
-# The linker is deliberately left alone: pointing it at musl-gcc yields a binary that records the
-# *build host's* loader path and dies on any other machine. Only the C compiler for mlua's
-# vendored Lua is set. See README's "Installing" section.
-if [ -z "${CC_x86_64_unknown_linux_musl:-}" ]; then
-    # Debian and Alpine call the wrapper `musl-gcc`; a nixpkgs cross toolchain
-    # (`nix shell nixpkgs#pkgsCross.musl64.stdenv.cc`) calls it by its full target triple, and
-    # ships no `musl-gcc` at all. Neither name is more correct, so try both before giving up.
-    for cc in musl-gcc x86_64-linux-musl-gcc x86_64-unknown-linux-musl-gcc; do
-        if command -v "$cc" >/dev/null 2>&1; then
-            CC_x86_64_unknown_linux_musl=$cc
-            break
-        fi
-    done
-fi
-if [ -z "${CC_x86_64_unknown_linux_musl:-}" ]; then
-    echo "no musl C compiler found; mlua's vendored Lua cannot be built for musl." >&2
-    echo "try: nix shell nixpkgs#pkgsCross.musl64.stdenv.cc   (or install musl-tools)" >&2
-    exit 1
-fi
-export CC_x86_64_unknown_linux_musl
-echo "musl cc: $CC_x86_64_unknown_linux_musl"
-
-# The Rust side needs a musl `std`, and the toolchain on `$PATH` may not be the one that has it —
-# a nixpkgs `rustc` ships only the targets nixpkgs built it with, while the rustup toolchain
-# beside it may have had `rustup target add x86_64-unknown-linux-musl` run against it. Without
-# this check the failure is thirty lines of "can't find crate for `core`", which names neither
-# the cause nor the fix.
-if [ ! -d "$(rustc --print target-libdir --target "$target" 2>/dev/null)" ]; then
-    echo "rustc ($(command -v rustc)) has no std for $target." >&2
-    echo "try: rustup target add $target   (and make sure rustup's shims come first on PATH)" >&2
-    exit 1
-fi
-RUSTFLAGS="-C target-feature=+crt-static" \
-    cargo build --release --locked --target "$target" --bin oslo --manifest-path "$here/Cargo.toml"
-binary="$here/target/$target/release/oslo"
-[ -x "$binary" ] || binary="${CARGO_TARGET_DIR:-$here/target}/$target/release/oslo"
-
-if readelf -l "$binary" | grep -q 'program interpreter'; then
-    echo "the binary is not static; it cannot run on Alpine" >&2
-    exit 1
-fi
+binary=$(build_static_oslo)
 
 # ---------------------------------------------------------------- Alpine pieces, cached
-rootfs_tar=$(ls alpine-minirootfs-*-x86_64.tar.gz 2>/dev/null | head -1 || true)
-if [ -z "$rootfs_tar" ]; then
-    say "fetching the Alpine minirootfs"
-    rootfs_tar=$(curl -sf "$mirror/latest-releases.yaml" |
-        grep -m1 -oE 'alpine-minirootfs-[0-9.]+-x86_64\.tar\.gz')
-    curl -sfLO "$mirror/$rootfs_tar"
-fi
-if [ ! -f vmlinuz-virt ]; then
-    say "fetching the Alpine virt kernel"
-    curl -sfLO "$mirror/netboot/vmlinuz-virt"
-fi
+rootfs_tar=$(fetch_minirootfs)
+fetch_kernel
 # modernish is the external conformance oracle: a POSIX-shell library whose whole install ritual
 # is a battery of probes for known shell bugs, each with a name. It is a *second opinion* — its
 # expectations were written against a dozen real shells, not against bash, and not by us.
@@ -210,22 +156,11 @@ INIT
 fi
 chmod +x root/init
 
-(cd root && find . | cpio -o -H newc --quiet | gzip -9) >initramfs.gz
-say "initramfs: $(du -h initramfs.gz | cut -f1)"
+pack_initramfs root initramfs.gz
 
 # ---------------------------------------------------------------- boot
 say "booting"
-qemu_args=(
-    -kernel vmlinuz-virt
-    -initrd initramfs.gz
-    -m 512M
-    -no-reboot
-    -nographic
-    # `rdinit` rather than `init`: there is no switch_root here, the initramfs *is* the system.
-    -append "console=ttyS0 rdinit=/init panic=1 loglevel=3"
-)
-command -v kvm >/dev/null 2>&1 && qemu_args+=(-enable-kvm)
-[ -w /dev/kvm ] && qemu_args+=(-enable-kvm)
+qemu_args_for initramfs.gz
 
 if $interactive; then
     exec qemu-system-x86_64 "${qemu_args[@]}"
