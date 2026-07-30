@@ -22,7 +22,32 @@ use std::env;
 use std::fs;
 use std::io::Read;
 
+/// Undo the Rust runtime's `SIG_IGN` for SIGPIPE, which a shell must not have.
+///
+/// Rust ignores SIGPIPE before `main` so that a write to a closed pipe surfaces as an `EPIPE`
+/// error rather than killing the process. For an ordinary program that is a kindness; for a shell
+/// it is a hang. `oslo -c 'while :; do echo x; done' | head -1` ran for ever, because nothing ever
+/// told the loop that its reader had gone — bash exits immediately. It also made `kill -s PIPE $$`
+/// a no-op, which is how modernish detects the condition and why it refuses to load `var/loop`
+/// on such a shell.
+///
+/// Children already got `SIG_DFL` back (see [`oslo::exec::JobManager`]); this is the shell's own
+/// disposition, and it has to be set here rather than in the library because the test binary links
+/// the library and would arm *itself* to die on any write to a closed pipe.
+fn restore_default_sigpipe() {
+    // Safety: called before any thread is started and before anything is written, and `signal(2)`
+    // with `SIG_DFL` touches nothing but this process's own disposition table.
+    unsafe {
+        let _ = nix::sys::signal::signal(
+            nix::sys::signal::Signal::SIGPIPE,
+            nix::sys::signal::SigHandler::SigDfl,
+        );
+    }
+}
+
 fn main() {
+    restore_default_sigpipe();
+
     let args: Vec<String> = env::args().collect();
 
     let invocation = match cli::parse(&args) {
