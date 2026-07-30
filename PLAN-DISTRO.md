@@ -569,11 +569,37 @@ more defect in oslo's alias pass:
   it expands, which is what bash reports for the raw file too. A function definition needs an
   *empty* paren pair; requiring the `)` fixes it. modernish aliases `not` to `! `.
 
-The suite now stops at `builtin.t` with a syntax error at end of input. That one is *not* the
-alias pass: substituting the file with modernish's real 15-alias table produces text that parses.
-It is something in how modernish preprocesses a test file before sourcing it — its
-`_Msh_tmp_doHashbangPreload` rewrites the `#! use …` headers — and that is where the next round
-should start.
+### The `builtin.t` blocker, and what it was
+
+The suite then stopped at `builtin.t` with a syntax error at end of input. Substituting that file
+with the 15 aliases a bare modernish defines produced text that parsed, which is what made it look
+like a preprocessing problem. It was not: `run.sh` defines two more aliases of its own —
+`alias TEST='{ testFn() {'` and `alias ENDT='}; doTest; }'` — and `builtin.t` is built entirely out
+of them. With those in the table the failure reproduced, and the substituted output showed
+substitution *stopping dead* at line 109 and copying everything after it verbatim.
+
+The cause was a comment, again, one level up from brush's. `Balance` — the resumable copier that
+carries a `$( … )` through untouched — tracked quotes but knew nothing about comments. Line 94 of
+`builtin.t` is
+
+```sh
+command times foo bar >/dev/null	# many shells don't check for no arguments here; oh well
+```
+
+One apostrophe. `Balance` read it as opening a single-quoted string, swallowed the rest of the
+construct, never saw the `)` that closed it, and every alias after that point went unsubstituted.
+
+`Balance` now recognises a comment at a word boundary and copies the rest of the line without
+reading it as shell. Getting the word-boundary test right matters in both directions: `${v#pat}`
+and `a#b` must not become comments, and neither must a quoted `'#'`.
+
+### The suite runs
+
+With that fixed, modernish's regression suite executes and reports results — `builtin.t`, `io.t`,
+`isset.t`, `loop_cond.t` and the rest, with real per-test verdicts rather than a parse failure.
+That is the oracle finally pointed at oslo properly, and the findings it produces are the next
+round's work. Several are already recognisable: `BUG_PUTIOERR` (write errors unreported, known),
+`select` (deliberately unimplemented), and `isset -x` on an unset exported variable.
 
 ## Out of scope, deliberately
 
