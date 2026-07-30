@@ -158,9 +158,10 @@ pub fn eval_var(interp: &Interp, var: &Var, scope: &Rc<Scope>) -> LuaResult<Valu
 /// The fall-through to globals is what lets Lua's own stdlib live in `_G` while a `local print`
 /// shadows it — and it is the same shape the shell-variable bridge will hang off later.
 pub fn lookup(interp: &Interp, name: &str, scope: &Rc<Scope>) -> Value {
-    scope
-        .get(name)
-        .unwrap_or_else(|| interp.globals.borrow().get(&Value::str(name)))
+    // Through `Interp::global`, not straight into the table: a name that is not a Lua global may
+    // still be a shell variable, and that fall-through is what makes the two languages share one
+    // namespace.
+    scope.get(name).unwrap_or_else(|| interp.global(name))
 }
 
 fn eval_prefix(interp: &Interp, prefix: &Prefix, scope: &Rc<Scope>) -> LuaResult<Value> {

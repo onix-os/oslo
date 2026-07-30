@@ -101,7 +101,7 @@ fn exec_stmt(interp: &Interp, statement: &Stmt, scope: &Rc<Scope>) -> LuaResult<
             let head = parts.remove(0);
             if parts.is_empty() {
                 if !scope.set(&head, function.clone()) {
-                    interp.set_global(&head, function);
+                    interp.set_script_global(&head, function);
                 }
                 return Ok(Flow::Normal);
             }
@@ -293,7 +293,7 @@ fn assign(interp: &Interp, target: &Var, value: Value, scope: &Rc<Scope>) -> Lua
             let text = name.token().to_string();
             // A local anywhere up the chain wins; otherwise this is a global.
             if !scope.set(&text, value.clone()) {
-                interp.set_global(&text, value);
+                interp.set_script_global(&text, value);
             }
             Ok(())
         }

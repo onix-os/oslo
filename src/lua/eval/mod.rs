@@ -165,8 +165,21 @@ pub enum Flow {
 /// the interpreter that is still part-way through the outer call. With `&mut self` that second
 /// entry is unreachable — the borrow is already out — and the honest workarounds are a raw
 /// pointer or a second interpreter that cannot see the first one's globals.
+/// The shell's variables, as seen from Lua.
+///
+/// Implemented by the host so that the evaluator can stay independent of `Environment`: running
+/// Lua with no shell attached — a unit test, `oslo --lua-script` before startup — simply has no
+/// host, and globals behave exactly as Lua's own.
+pub trait Globals {
+    fn get(&self, name: &str) -> Option<String>;
+    fn set(&self, name: &str, value: &str);
+    fn unset(&self, name: &str);
+}
+
 pub struct Interp {
     pub globals: Rc<RefCell<Table>>,
+    /// The shell's variables, when a shell is attached. See [`Interp::set_script_global`].
+    host: RefCell<Option<Rc<dyn Globals>>>,
     /// Chunk name used in diagnostics — a path, or `-c`.
     chunk: RefCell<String>,
     /// The line of the statement currently running.
@@ -198,6 +211,7 @@ impl Interp {
     pub fn new(chunk: impl Into<String>) -> Self {
         let interp = Interp {
             globals: Rc::new(RefCell::new(Table::new())),
+            host: RefCell::new(None),
             chunk: RefCell::new(chunk.into()),
             line: Cell::new(0),
             depth: Cell::new(0),
@@ -242,14 +256,64 @@ impl Interp {
         self.varargs.replace(values)
     }
 
-    /// Read a global.
-    pub fn global(&self, name: &str) -> Value {
-        self.globals.borrow().get(&Value::str(name))
+    /// Attach the shell's variables, making Lua globals and shell variables one namespace.
+    pub fn set_host(&self, host: Rc<dyn Globals>) {
+        *self.host.borrow_mut() = Some(host);
     }
 
-    /// Write a global.
+    /// Read a global.
+    ///
+    /// `_G` first, the shell second. The order is the whole safety argument: a shell script that
+    /// sets `type=deploy` or `print=/usr/bin/lpr` must not break `type()` and `print()` in Lua,
+    /// and putting the standard library first means it cannot.
+    pub fn global(&self, name: &str) -> Value {
+        let own = self.globals.borrow().get(&Value::str(name));
+        if !matches!(own, Value::Nil) {
+            return own;
+        }
+        match self.host.borrow().as_ref().and_then(|h| h.get(name)) {
+            Some(value) => Value::str(value),
+            None => Value::Nil,
+        }
+    }
+
+    /// Write a global from the host: always `_G`, never the shell.
+    ///
+    /// This is how the standard library is installed. Routing `print` through the shell's
+    /// variables would export a function as a string and make `env` unreadable.
     pub fn set_global(&self, name: &str, value: Value) {
         self.globals.borrow_mut().set(Value::str(name), value);
+    }
+
+    /// Write a global from a *script*, which is where the two namespaces meet.
+    ///
+    /// A string lands in the shell, so `name = "world"` in Lua is `$name` in shell on the next
+    /// line. Anything else — a table, a function — stays in `_G`, because a shell variable can
+    /// only hold a string and flattening one to `table: 0x55f…` loses it.
+    ///
+    /// Each name lives in exactly one of the two. Writing a string clears any `_G` entry and
+    /// writing a non-string clears the shell variable, so a name that changes type moves rather
+    /// than leaving a stale copy for the *other* lookup order to find later.
+    pub fn set_script_global(&self, name: &str, value: Value) {
+        let host = self.host.borrow();
+        let Some(host) = host.as_ref() else {
+            return self.set_global(name, value);
+        };
+        match &value {
+            Value::Str(text) => {
+                self.globals.borrow_mut().set(Value::str(name), Value::Nil);
+                host.set(name, text);
+            }
+            // `x = nil` removes the name from both homes, which is what "unset" means in each.
+            Value::Nil => {
+                self.globals.borrow_mut().set(Value::str(name), Value::Nil);
+                host.unset(name);
+            }
+            _ => {
+                host.unset(name);
+                self.globals.borrow_mut().set(Value::str(name), value);
+            }
+        }
     }
 
     /// Run a parsed chunk, returning whatever it returned.

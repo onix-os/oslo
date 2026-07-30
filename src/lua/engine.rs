@@ -93,6 +93,37 @@ pub(crate) fn call_lua_builtin(name: &str, args: &[String]) -> i32 {
     }
 }
 
+/// The shell's variables, as the evaluator's global namespace.
+///
+/// This is what makes `export one=two` in shell readable as `one` in Lua on the next line, and
+/// `name = "world"` in Lua readable as `$name` in shell. One namespace, two spellings.
+///
+/// A busy lock is answered as "not set" rather than by blocking. The only way to reach here with
+/// the mutex held is from inside a Lua-registered builtin, which is already running *because* the
+/// evaluator holds it — blocking would be a deadlock with no output at all, where a nil is a
+/// wrong answer the reader can see.
+struct ShellGlobals {
+    env: Arc<Mutex<Environment>>,
+}
+
+impl eval::Globals for ShellGlobals {
+    fn get(&self, name: &str) -> Option<String> {
+        self.env.try_lock().ok()?.get_param(name)
+    }
+
+    fn set(&self, name: &str, value: &str) {
+        if let Ok(mut env) = self.env.try_lock() {
+            env.set_var(name, value, true);
+        }
+    }
+
+    fn unset(&self, name: &str) {
+        if let Ok(mut env) = self.env.try_lock() {
+            env.unset_var(name);
+        }
+    }
+}
+
 pub struct LuaEngine {
     /// `Rc` because the shell reaches back in through [`ACTIVE`] while a call is still running.
     interp: Rc<Interp>,
@@ -122,6 +153,9 @@ impl LuaEngine {
         ACTIVE.with(|slot| {
             *slot.borrow_mut() = Some((Rc::clone(&self.interp), Rc::clone(&self.registry)))
         });
+        self.interp.set_host(Rc::new(ShellGlobals {
+            env: Arc::clone(&env),
+        }));
         crate::lua::api::install(&self.interp, &self.registry, env);
         Ok(())
     }
