@@ -460,6 +460,48 @@ fn random_stays_inside_the_range_it_was_given() {
 }
 
 #[test]
+fn os_date_formats_the_directives_a_script_uses() {
+    // A fixed timestamp, so the assertion is about the arithmetic and not about today.
+    returns("os.date('%Y-%m-%d', 1709164800)", "2024-02-29");
+    returns("os.date('%H:%M:%S', 1709210096)", "12:34:56");
+    // The day of the year has to count the leap day that came before it.
+    returns("os.date('%j', 1709164800)", "060");
+    returns("os.date('%Y%%', 0)", "1970%");
+    // An unknown directive survives rather than vanishing.
+    returns("os.date('%A', 0)", "%A");
+}
+
+#[test]
+fn the_two_shell_out_routes_refuse_and_say_what_to_use() {
+    // Real Lua runs both through `/bin/sh` — someone else's shell, from inside this one, and
+    // nothing at all on a system where oslo is the only shell installed.
+    for call in ["os.execute('ls')", "io.popen('ls')"] {
+        let source = format!("local ok, err = pcall(function() return {call} end) return err");
+        let message = eval_to_string(&source).unwrap();
+        assert!(message.contains("/bin/sh"), "for {call}: {message}");
+        assert!(message.contains("oslo.run"), "for {call}: {message}");
+    }
+    // With no argument `os.execute()` asks whether a shell is available, and one is.
+    returns("os.execute()", "true");
+}
+
+#[test]
+fn os_tmpname_points_at_the_call_that_is_not_a_race() {
+    let message =
+        eval_to_string("local ok, err = pcall(function() return os.tmpname() end) return err")
+            .unwrap();
+    assert!(message.contains("oslo.fs.mktemp"), "{message}");
+}
+
+#[test]
+fn os_getenv_reads_the_real_environment() {
+    // SAFETY: the test process, before anything else reads this name.
+    unsafe { std::env::set_var("OSLO_EVAL_TEST_VAR", "present") };
+    returns("os.getenv('OSLO_EVAL_TEST_VAR')", "present");
+    returns("os.getenv('OSLO_DEFINITELY_UNSET_VAR_ZZ')", "nil");
+}
+
+#[test]
 fn incomplete_input_is_distinguishable_from_a_syntax_error() {
     assert!(eval::is_complete("return 1"));
     assert!(!eval::is_complete("if true then"));

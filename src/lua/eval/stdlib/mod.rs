@@ -13,6 +13,7 @@
 
 mod base;
 mod math;
+mod os;
 pub mod pattern;
 mod string;
 mod stub;
@@ -48,6 +49,7 @@ pub fn install(interp: &Interp) {
     string::install(interp);
     table::install(interp);
     math::install(interp);
+    os::install(interp);
     stub::install(interp);
 
     // `_G` is the global table itself, which scripts use for reflection and for deliberate
@@ -74,6 +76,14 @@ pub fn arg_str(args: &[Value], n: usize, function: &str) -> LuaResult<String> {
             "bad argument #{n} to '{function}' (string expected, got {})",
             other.type_name()
         ))),
+    }
+}
+
+/// Argument `n` as a string, or `None` when it was absent or nil.
+pub fn opt_str(args: &[Value], n: usize, function: &str) -> LuaResult<Option<String>> {
+    match args.get(n - 1) {
+        None | Some(Value::Nil) => Ok(None),
+        _ => arg_str(args, n, function).map(Some),
     }
 }
 

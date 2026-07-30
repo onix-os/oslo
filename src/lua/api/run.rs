@@ -21,10 +21,11 @@
 //! rather than bare names because `ls()` resolving to a command would mean your own Lua function
 //! stops being called the day someone installs a binary with its name.
 
+use super::util::native;
 use crate::env::Environment;
 use crate::exec::argv::{Capture, Outcome};
 use crate::lua::engine::borrow_env;
-use crate::lua::eval::value::{Function, Table, Value};
+use crate::lua::eval::value::{Table, Value};
 use crate::lua::eval::{Interp, LuaError, LuaResult};
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
@@ -189,14 +190,4 @@ fn result_table(outcome: &Outcome) -> Value {
         table.set(Value::str("signal"), Value::int(signal as i64));
     }
     Value::table(table)
-}
-
-fn native(
-    name: &'static str,
-    f: impl Fn(&Interp, Vec<Value>) -> LuaResult<Vec<Value>> + 'static,
-) -> Value {
-    Value::Function(Rc::new(Function::Native {
-        name,
-        call: Box::new(f),
-    }))
 }

@@ -84,6 +84,80 @@ pub fn install(interp: &Interp) {
         "utf8",
         refusing("utf8", &["char", "codepoint", "len", "offset", "codes"]),
     );
+
+    io(interp);
+}
+
+/// `io`, with the parts a shell script actually uses and pointers for the rest.
+///
+/// `io.write` and `io.read` are here because they are how a Lua script talks to the terminal.
+/// File *handles* are not: they need `__close` and a userdata type this evaluator does not have,
+/// and `oslo.fs.read`/`.write`/`.lines` cover what a shell script does with a file anyway.
+///
+/// `io.popen` is refused by name rather than left nil, because in real Lua it runs a command
+/// through `/bin/sh` — someone else's shell, from inside this one, and nothing at all on a system
+/// where oslo is the only shell installed.
+fn io(interp: &Interp) {
+    let library = module(vec![
+        ("write", native("io.write", write)),
+        ("read", native("io.read", read)),
+        (
+            "popen",
+            native("io.popen", |_: &Interp, _: Vec<Value>| {
+                Err(LuaError::new(
+                    "io.popen runs its argument through /bin/sh, which is not this shell; \
+                     use oslo.run{..., capture = true}",
+                ))
+            }),
+        ),
+        ("open", missing("io.open")),
+        ("close", missing("io.close")),
+        ("lines", missing("io.lines")),
+        ("input", missing("io.input")),
+        ("output", missing("io.output")),
+    ]);
+    interp.set_global("io", library);
+}
+
+/// `io.write` — the arguments, concatenated, with no separator and no newline.
+fn write(interp: &Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
+    use std::io::Write;
+    let mut line = String::new();
+    for value in &args {
+        line.push_str(&super::super::ops::tostring(interp, value)?);
+    }
+    std::io::stdout()
+        .lock()
+        .write_all(line.as_bytes())
+        .map_err(|e| LuaError::new(format!("io.write: {e}")))?;
+    Ok(Vec::new())
+}
+
+/// `io.read` — one line from standard input, or nil at end of file.
+///
+/// Only the `"l"`/`"*l"` format, which is what every prompt-a-user script uses. `"n"` and `"a"`
+/// would each need their own answer about what happens at EOF, and neither has come up.
+fn read(_: &Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
+    if let Some(Value::Str(format)) = args.first()
+        && !matches!(&**format, "l" | "*l" | "L" | "*L")
+    {
+        return Err(LuaError::new(format!(
+            "io.read({format:?}) is not implemented in oslo's Lua; only line reads are"
+        )));
+    }
+    let mut line = String::new();
+    match std::io::BufRead::read_line(&mut std::io::stdin().lock(), &mut line) {
+        Ok(0) => Ok(vec![Value::Nil]),
+        // `L` keeps the newline, `l` drops it.
+        Ok(_) => {
+            let keep = matches!(args.first(), Some(Value::Str(f)) if matches!(&**f, "L" | "*L"));
+            if !keep {
+                line.truncate(line.trim_end_matches('\n').len());
+            }
+            Ok(vec![Value::str(line)])
+        }
+        Err(e) => Err(LuaError::new(format!("io.read: {e}"))),
+    }
 }
 
 /// `debug.traceback` — the message, and a note that frames are not walkable here.
