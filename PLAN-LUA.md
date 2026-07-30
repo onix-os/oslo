@@ -75,7 +75,7 @@ The asymmetry this fixes, measured before the decision:
 | Scope | Full system-scripting stack, not just a config layer. |
 | Lua parser | **`full_moon` v1 with the `lua54` feature.** Pure Rust, maintained, the parser behind StyLua and selene — and already a production dependency in the maintainer's `os-tools`, where it walks the AST with its `Visitor` trait. Same relationship brush-parser has to the shell. |
 | Modules | `require` and `dofile` are ours to write: read file → `full_moon` parse → evaluate → cache in `package.loaded`. Nothing about this needed a VM. `package.path` drops `./?.lua`; `cpath` is emptied, because a static binary cannot `dlopen` a `.so` and advertising the path turns "not found" into a loader error. |
-| Batteries in Rust | `oslo.http` and `oslo.json` are core capabilities, not libraries. C modules cannot load in a static binary — which rules out luasocket, cqueues, lua-cjson and every Lua HTTP client built on them — so the things people reach for most have to come from us. Faster and safer there anyway. |
+| Batteries in Rust | `oslo.json` is a core capability, not a library: C modules cannot load in a static binary, which rules out lua-cjson and every Lua JSON parser built on it. **`oslo.http` was originally in this row and has since been dropped — see below.** |
 | Lua version | 5.4 syntax, including the integer/float distinction. |
 | Regex | Expose the `regex` crate we already carry for `[[ =~ ]]`, as `oslo.re`. Lua patterns stay available because they are part of Lua. |
 | JSON | Yes, `serde_json`. Works on static musl; `lua-cjson` cannot. |
@@ -127,7 +127,7 @@ Found by audit, each verified against the tree.
 | Result tables, never raising | `{status, ok, out, err, signal}`; `out`/`err` absent rather than empty when uncaptured |
 | Streaming | `oslo.lines{…}` |
 | Namespaces | `oslo.fs`, `.path`, `.re`, `.json`, `.proc`, `.job`, plus `sh` |
-| Batteries in Rust | `oslo.json` on `serde_json`; `oslo.re` on the `regex` crate already carried for `[[ =~ ]]`; `oslo.http` on `ureq` + `rustls` + `rustls-graviola` |
+| Batteries in Rust | `oslo.json` on `serde_json`; `oslo.re` on the `regex` crate already carried for `[[ =~ ]]` |
 | Modules | `require`, `dofile`, `loadfile`, `load`, `package.*`; no `./?.lua`, empty `cpath` |
 | Variable sharing | `Interp::set_script_global` and `engine::ShellGlobals`; `_G` first, shell second |
 | Prompt modes | `src/startup/mode.rs`; Shift+Tab (configurable via `$OSLO_TOGGLE_KEY`), `$OSLO_DEFAULT_MODE`, `!`/`=` one-line escapes, `$OSLO_MODE` published |
@@ -142,30 +142,39 @@ on the Rust stack, so against the repo's 1 MiB convention the honest limit was a
 now reserves its own 16 MiB stack (`crate::INTERPRETER_STACK`) and the limit is 200 — real Lua's
 own ceiling on nested C calls — verified against that exact stack.
 
-## `oslo.http`, and the TLS question it raised
+## `oslo.http`: built, then dropped
 
-HTTPS means TLS, and the TLS providers everyone uses — `ring`, `aws-lc-rs`, `boring` — all compile
-C or assembly, which would have put a C toolchain straight back into the build oslo had just got
-rid of. It looked like "batteries in Rust" and "no C in the binary" could not both hold.
+**Decision: there is no `oslo.http`. `sh.curl(…)` is the answer.** It was written, it worked, and
+it came back out. The investigation is kept here because the finding is worth having and the
+question will come round again.
 
-They can. **`rustls-graviola`** is a pure-Rust provider written by rustls's own author, and with it
-`cargo tree -e build --target x86_64-unknown-linux-musl` reports **no build dependencies at all**
-for the whole of oslo. The recorded risk: graviola is young (v0.4) where `ring` and `aws-lc-rs`
-are what the ecosystem runs on. Provenance is about as good as a young crypto crate gets; that is
-not the same as being battle-tested.
+HTTPS means TLS, and the providers everyone uses — `ring`, `aws-lc-rs`, `boring` — all compile C
+or assembly, which would have put a C toolchain straight back into the build the Lua round had
+just removed. That looked like a dead end.
 
-**Certificates are curl's, exactly.** Nothing is bundled. A root store compiled into the binary
-keeps trusting an authority after it has been distrusted — Symantec, Camerfirma and Entrust have
-all been pulled — and cannot learn a new one without a rebuild. The precedence is curl's, and so
-are the names, so anything already configured for curl works here untold: `cacert`/`capath` on the
-request, then `$CURL_CA_BUNDLE`, `$SSL_CERT_FILE`, `$SSL_CERT_DIR`, then the distribution paths. A
-machine with none gets an error naming every path that was tried, because "certificate verify
-failed" alone is indistinguishable from a network fault.
+It is not one. **`rustls-graviola`** is a pure-Rust provider by rustls's own author, and with it
+`cargo tree -e build --target x86_64-unknown-linux-musl` reports no build dependencies at all for
+the whole of oslo. A real HTTPS request worked. So "batteries in Rust" and "no C in the binary"
+*can* both hold.
 
-Two further curl behaviours, both deliberate: a 404 is an *answer* (`status = 404`, `ok = false`,
-body intact) rather than a failure to get one, matching curl without `--fail`; and `insecure =
-true` is `-k`, per-request with no global form, because the global form is the one that gets set
-during an afternoon of debugging and stays there.
+The price was **rustc 1.89**: `graviola` needs it, oslo's MSRV is 1.88, and CI's MSRV job caught
+it. One release is not much — but it is a permanent floor raised so that a shell can do something
+`curl` already does, on a machine that in practice has `curl` on it. The argv model makes the
+alternative a single line with no quoting hazard:
+
+```lua
+local r = sh.curl("-fsSL", url)          -- or oslo.run{"curl", "-fsSL", url, capture = true}
+if r.ok then print(r.out) end
+```
+
+That also inherits curl's certificate handling, its proxy support, its redirect rules and its
+security updates, none of which oslo would then have to track. The reasons to revisit would be a
+machine with no `curl`, or wanting a request that never shells out at all.
+
+Two design answers from the removed version, kept because they would apply again: certificates
+followed curl exactly (`cacert`/`capath`, then `$CURL_CA_BUNDLE`, `$SSL_CERT_FILE`,
+`$SSL_CERT_DIR`, then the distribution paths, with nothing bundled), and a 404 was an *answer*
+(`status = 404`, `ok = false`, body intact) rather than a failure to get one.
 
 ## Still open
 
