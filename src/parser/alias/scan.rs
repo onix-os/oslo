@@ -175,6 +175,8 @@ pub(super) struct Balance {
     depth: usize,
     quote: Quote,
     escaped: bool,
+    /// Whether a `#` here would begin a comment, which is true at a word boundary.
+    at_word_start: bool,
 }
 
 impl Balance {
@@ -185,7 +187,13 @@ impl Balance {
             depth: 0,
             quote: Quote::None,
             escaped: false,
+            at_word_start: true,
         }
+    }
+
+    /// Tell the balance that a new line is beginning, so a `#` on it can start a comment.
+    pub(super) fn start_line(&mut self) {
+        self.at_word_start = true;
     }
 
     /// Copy from `from` until the run closes, appending to `out`.
@@ -201,10 +209,20 @@ impl Balance {
         let mut i = from;
         while i < chars.len() {
             let c = chars[i];
+            // A comment runs to the end of the line, and nothing in it is shell. Without this a
+            // lone apostrophe in one — `# many shells don't check for no arguments here` — opened
+            // a quote that swallowed the rest of the construct, so the `)` that closed it was
+            // never seen and everything after it went unsubstituted. modernish's `builtin.t` has
+            // exactly that comment inside a `$( … )`.
+            if self.quote == Quote::None && !self.escaped && c == '#' && self.at_word_start {
+                out.extend(&chars[i..]);
+                return None;
+            }
             out.push(c);
             i += 1;
-            if self.escaped {
-                self.escaped = false;
+            let was_escaped = std::mem::take(&mut self.escaped);
+            self.at_word_start = matches!(c, ' ' | '\t' | ';' | '&' | '|' | '(' | ')');
+            if was_escaped {
                 continue;
             }
             match self.quote {

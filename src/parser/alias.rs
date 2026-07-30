@@ -178,6 +178,8 @@ impl Scanner<'_> {
         let mut i = 0;
         // A construct left open by the previous line carries on here, still copied verbatim.
         if let Some(mut balance) = self.pending.take() {
+            // A new line begins at a word boundary, so a `#` on it can start a comment.
+            balance.start_line();
             match balance.consume(&mut self.out, &chars, 0) {
                 Some(next) => i = next,
                 None => {

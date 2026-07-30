@@ -321,3 +321,30 @@ fn a_multiline_command_substitution_is_copied_whole() {
         "x=$((\n 1 +\n 1 ))\nls -la\n"
     );
 }
+
+/// A comment inside a `$( … )` being copied through is not shell. A lone apostrophe in one opened
+/// a quote that swallowed the rest of the construct, so the `)` closing it was never seen and
+/// every alias after it went unsubstituted. modernish's `builtin.t` carries exactly that comment.
+#[test]
+fn a_comment_inside_a_copied_construct_is_not_shell() {
+    let a = &[("ll", "ls -la")];
+    let source = "v=$(\n\t: # many shells don't check here\n\techo hi\n)\nll\n";
+    assert_eq!(
+        with(a, source),
+        "v=$(\n\t: # many shells don't check here\n\techo hi\n)\nls -la\n"
+    );
+    // An unbalanced paren or double quote in a comment is just as harmless.
+    let source = "v=$(\n\t: # a stray ( and a \"\n\techo hi\n)\nll\n";
+    assert_eq!(
+        with(a, source),
+        "v=$(\n\t: # a stray ( and a \"\n\techo hi\n)\nls -la\n"
+    );
+    // A `#` that is not at a word boundary is not a comment, and `${v#pat}` must survive.
+    assert_eq!(with(a, "v=$(echo a#b)\nll\n"), "v=$(echo a#b)\nls -la\n");
+    assert_eq!(
+        with(a, "v=$(echo ${x#y})\nll\n"),
+        "v=$(echo ${x#y})\nls -la\n"
+    );
+    // A quoted `#` is data, not a comment.
+    assert_eq!(with(a, "v=$(echo '#')\nll\n"), "v=$(echo '#')\nls -la\n");
+}
