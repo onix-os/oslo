@@ -540,11 +540,40 @@ let mut parser = brush_parser::Parser::new(Cursor::new("$( #'\n)\n".as_bytes()),
 assert!(parser.parse_program().is_ok());   // fails on 0.4.0
 ```
 
-`tests/corpus/comment_in_command_substitution.sh` carries the case, listed in `EXPECTED_FAIL`
-under the new `BRUSH` id — a divergence that lives in the parser oslo depends on rather than in
-oslo, and therefore closes only by an upstream fix, a workaround ahead of the parser, or
-vendoring. Listing it rather than merely writing it down means the ratchet says so the day it
-starts working.
+**Fixed upstream**, by [reubeno/brush#1253](https://github.com/reubeno/brush/pull/1253): blanks
+accumulated by `include_space` are there to reproduce the construct's original text, so a `#`
+following nothing but those blanks still begins a comment. One clause on the existing condition,
+narrowing the guard rather than reordering the arms, because `started_token()` is doing real work
+there (`a#b` is one word).
+
+Until that lands in a release, `Cargo.toml` points `brush-parser` at the fork branch carrying it.
+The ratchet did its job the moment the dependency moved: `comment_in_command_substitution.sh`
+started matching bash and the suite failed until its `EXPECTED_FAIL` line was deleted.
+
+## On the fork, and what it opened up
+
+`brush-parser` is pinned to `bresilla/brush` branch `fix/comment-after-odd-blanks-in-subst` until
+PR #1253 lands in a release. That branch is upstream `main` plus the one commit. Nothing in
+`src/parser/brush_adapter/` needed changing, `make verify` is green, and both VMs still pass.
+
+Worth knowing: upstream `main` does **not** fix the other two gaps. `$(case …)` (brush #1052) and
+unspaced `for ((;;))` both still fail, so their `EXPECTED_FAIL` rows stay.
+
+With the parser fixed, modernish's regression suite now *starts* — it prints its banner and begins
+sourcing test files, where before it died in the capability probes. Getting that far turned up one
+more defect in oslo's alias pass:
+
+* **A word before a non-empty subshell was read as a function definition.** The check for
+  `name ()` only required the `(`, so `not (readonly foo; …)` looked like a definition of a
+  function called `not` and the alias was left alone — leaving text that is a syntax error until
+  it expands, which is what bash reports for the raw file too. A function definition needs an
+  *empty* paren pair; requiring the `)` fixes it. modernish aliases `not` to `! `.
+
+The suite now stops at `builtin.t` with a syntax error at end of input. That one is *not* the
+alias pass: substituting the file with modernish's real 15-alias table produces text that parses.
+It is something in how modernish preprocesses a test file before sourcing it — its
+`_Msh_tmp_doHashbangPreload` rewrites the `#! use …` headers — and that is where the next round
+should start.
 
 ## Out of scope, deliberately
 

@@ -68,19 +68,14 @@ pub const EXPECTED_FAIL: &[(&str, &str, &str)] = &[
     ("syntax_unsupported_coproc.sh", "R8.5", "coproc is refused by name and deliberately not implemented — it needs job control; bash runs the body and exits 0"),
     ("syntax_unsupported_select.sh", "R8.6", "select is refused by name and deliberately not implemented — it needs a prompt, PS3 and REPLY; bash runs the loop and reads EOF"),
 
-    // --- brush-parser 0.4.0 tokenizer ---
-    // A comment inside `$( … )` is only recognised when the number of blanks before its `#` is
-    // *even*. `consume_nested_construct` tokenises the body with `include_space: true`, and in
-    // that mode the blank branch appends to the token when none is started and delimits when one
-    // is — so blanks alternate, and after an odd number a token is in progress. The `#` arm sits
-    // *after* the "we have a token in progress" arm, so it never runs and the comment's text is
-    // tokenised as shell. An apostrophe in it then opens a quote that never closes.
-    //
-    // Not oslo's to fix without vendoring brush, and the same trade as `arith_for_unspaced_
-    // sections.sh` above. It is listed here rather than merely written down so that the ratchet
-    // says so the day it starts working. A standalone reproducer against brush-parser alone —
-    // no oslo — is in PLAN-DISTRO.md.
-    ("comment_in_command_substitution.sh", "BRUSH", "a comment inside $( ) preceded by an odd number of blanks is tokenised as shell, so a quote in it is unterminated"),
+    // --- brush-parser tokenizer ---
+    // Empty: the comment-after-an-odd-number-of-blanks bug is fixed. A comment inside `$( … )`
+    // was only recognised when an *even* number of blanks preceded its `#`, because
+    // `consume_nested_construct` tokenises with `include_space: true` and a blank there appends to
+    // the token when none is started but delimits when one is. The `#` arm sits after the "token
+    // in progress" arm, so after an odd blank the `#` was appended instead and a quote in the
+    // comment's text was never closed. Fixed upstream by reubeno/brush#1253; oslo tracks the fork
+    // branch until that lands in a release. `comment_in_command_substitution.sh` now matches bash.
 
     // --- divergences the audit did not enumerate ---
     // Empty: `robust_special_builtin_failure.sh` closed with R11's C4. It needed three things at
