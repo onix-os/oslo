@@ -125,6 +125,49 @@ fn pipe_failed(e: nix::Error) -> ShellError {
     ShellError::ExecutionError(format!("Pipe failed: {e}"))
 }
 
+/// Start `argv` with its stdout on a pipe, and hand back the child and the read end.
+///
+/// The caller reads as the command writes, which is the difference between `for line in
+/// oslo.lines{"journalctl", "-f"}` working and hanging: capture buffers everything and answers
+/// when the command ends, and a command that never ends never answers.
+pub fn spawn_reading(
+    env: &mut Environment,
+    argv: &[String],
+) -> Result<(nix::unistd::Pid, OwnedFd)> {
+    if argv.is_empty() {
+        return Err(ShellError::ExecutionError(
+            "oslo.lines: the command list is empty".to_string(),
+        ));
+    }
+    let (reader, writer) = pipe_pair()?;
+    flush_stdout();
+
+    // Safety: as elsewhere in this file — the child rearranges its own descriptors and then runs
+    // the command, never returning here.
+    match unsafe { fork() } {
+        Ok(ForkResult::Child) => {
+            crate::exec::job::reset_signals_for_child();
+            let _ = close(reader.into_raw_fd());
+            let _ = dup2(writer.as_raw_fd(), 1);
+            let _ = close(writer.into_raw_fd());
+            env.enter_subshell();
+            let status = status_of(crate::exec::simple::run_argv(env, argv));
+            flush_stdout();
+            finish_child(status);
+        }
+        Ok(ForkResult::Parent { child }) => {
+            let _ = close(writer.into_raw_fd());
+            Ok((child, reader))
+        }
+        Err(e) => Err(ShellError::ExecutionError(format!("Fork failed: {e}"))),
+    }
+}
+
+/// Reap a child started by [`spawn_reading`], once its output has run out.
+pub fn reap(child: nix::unistd::Pid) -> i32 {
+    wait(child).0
+}
+
 thread_local! {
     /// How the last external command ended, when a signal ended it.
     ///

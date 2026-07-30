@@ -114,15 +114,50 @@ Found by audit, each verified against the tree.
 
 ---
 
+## Built
+
+| Decision | Where |
+|---|---|
+| Pure-Rust runtime, mlua deleted | `src/lua/eval/` — values, scopes, operators, expressions, statements, stdlib. Nothing in the dependency tree compiles C; a static musl binary builds with no C toolchain present. |
+| `full_moon` front end | `Cargo.toml`; `eval::parse` |
+| Glue subset plus metatables | `eval/ops.rs` — `__index`, `__newindex`, `__call`, `__eq`, `__lt`, `__concat`, `__tostring`, `__pairs` |
+| Present and erroring | `eval/stdlib/stub.rs` — `coroutine`, `utf8`, most of `debug` and `io` |
+| Lua patterns | `eval/stdlib/pattern.rs`, a translation of `lstrlib.c`'s matcher |
+| Argv call model | `oslo.run{…}`, `oslo.pipe(…)`, `sh.*` — `src/exec/argv.rs`, `lua/api/run.rs` |
+| Result tables, never raising | `{status, ok, out, err, signal}`; `out`/`err` absent rather than empty when uncaptured |
+| Streaming | `oslo.lines{…}` |
+| Namespaces | `oslo.fs`, `.path`, `.re`, `.json`, `.proc`, `.job`, plus `sh` |
+| Batteries in Rust | `oslo.json` on `serde_json`; `oslo.re` on the `regex` crate already carried for `[[ =~ ]]` |
+| Modules | `require`, `dofile`, `loadfile`, `load`, `package.*`; no `./?.lua`, empty `cpath` |
+| Variable sharing | `Interp::set_script_global` and `engine::ShellGlobals`; `_G` first, shell second |
+| Prompt modes | `src/startup/mode.rs`; Shift+Tab (configurable via `$OSLO_TOGGLE_KEY`), `$OSLO_DEFAULT_MODE`, `!`/`=` one-line escapes, `$OSLO_MODE` published |
+| Incomplete input at the prompt | `eval::is_complete`, asking `full_moon` where the error is rather than string-matching `<eof>` |
+| Hooks | `oslo.on.precmd`/`.postcmd`/`.cd`, each returning a removable handle |
+| Introspection and options | `oslo.version`, `.user()`, `.host()`, `.interactive()`, `.login()`, `.exit_code()`, `.pid()`, `.ppid()`, `oslo.opts` |
+| Converters | `oslo.from_lines`, `.from_columns`, `.from_pairs`, `.from_json` |
+| `os.execute` / `io.popen` | Refused by name, pointing at `oslo.run` — they route through `/bin/sh`, which is not this shell |
+
+The evaluator recursion limit needed a decision it did not have: a tree-walker puts Lua recursion
+on the Rust stack, so against the repo's 1 MiB convention the honest limit was about *fifty*. oslo
+now reserves its own 16 MiB stack (`crate::INTERPRETER_STACK`) and the limit is 200 — real Lua's
+own ceiling on nested C calls — verified against that exact stack.
+
 ## Still open
 
-Short list. Everything else above is settled.
-
-1. **Incomplete-input detection.** The `<eof>` trick above is Lua's own `load()` talking. With our
-   own evaluator the parser tells us directly — easier, but it has to be designed in rather than
-   borrowed.
-2. **Depth limit** for a Lua-registered builtin that invokes itself.
-3. **The built-in tools themselves** — deliberately deferred. Each gets designed on its own terms,
+1. **`oslo.http` needs a decision that conflicts with another one.** HTTPS means TLS, and every
+   mature Rust TLS stack compiles C or assembly: `ring`, `aws-lc-rs` and `boring` all do. So
+   "batteries in Rust" and "no C in the binary" cannot both hold for HTTP as things stand. The
+   options are: accept C for the TLS provider; take a young pure-Rust provider; ship
+   plaintext-only HTTP; or leave it out. Not chosen here.
+2. **History is not tagged with its mode.** The mode a line was typed in is not recorded, so
+   recalling a Lua line while in shell mode runs it as shell. rustyline's history holds plain
+   strings, so tagging needs either a side table or a marker in the stored text — a visible
+   design choice rather than an implementation detail.
+3. **Depth limit** for a Lua-registered builtin that invokes itself. The evaluator's own limit
+   does not see a round trip that leaves through the shell and comes back.
+4. **The built-in tools themselves** — deliberately deferred. Each gets designed on its own terms,
    aiming past POSIX rather than cloning it.
-4. **Migration of the existing corpus.** The 10 Lua cases and the API tests are written against
-   `oslo.exec`/`oslo.capture`, which are being replaced.
+5. **Migration of the existing corpus.** The 10 Lua cases still exercise `oslo.exec`/`oslo.capture`
+   rather than the argv model. Both still work, so this is tidying rather than a gap.
+6. **Per-command output parsers** (`sh.df()` returning a table). The generic converters are in;
+   the per-tool ones are not.

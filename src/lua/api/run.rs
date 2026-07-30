@@ -75,7 +75,63 @@ pub fn install(interp: &Rc<Interp>, oslo: &mut Table, env: &Arc<Mutex<Environmen
         }),
     );
 
+    // oslo.lines{...} -> an iterator over the command's output, a line at a time
+    //
+    // The other half of the streaming decision. `capture = true` holds the whole output in
+    // memory, which is right for `uname -r` and wrong for `cargo build` — and impossible for
+    // `journalctl -f`, which never ends and therefore never answers.
+    let env_lines = Arc::clone(env);
+    oslo.set(
+        Value::str("lines"),
+        native("oslo.lines", move |_, args| {
+            let request = Request::from_lua(args.first(), "lines")?;
+            let mut guard = borrow_env(&env_lines)?;
+            let (child, reader) = crate::exec::argv::spawn_reading(&mut guard, &request.argv)
+                .map_err(|e| LuaError::new(format!("oslo.lines: {e}")))?;
+            drop(guard);
+            Ok(vec![line_reader(child, reader)])
+        }),
+    );
+
     interp.set_global("sh", sugar(env));
+}
+
+/// The iterator `oslo.lines` returns: one line per call, nil at the end.
+///
+/// The child is reaped when its output runs out, so a loop that runs to completion leaves no
+/// zombie. A loop abandoned part-way does — the iterator is a plain function with no `__close`
+/// for this evaluator to call, so there is nowhere to put the cleanup. `oslo.run{…, capture =
+/// true}` is the form with no such edge.
+fn line_reader(child: nix::unistd::Pid, reader: std::os::fd::OwnedFd) -> Value {
+    use std::cell::RefCell;
+    use std::io::BufRead;
+
+    let source = RefCell::new(Some(std::io::BufReader::new(std::fs::File::from(reader))));
+    native("lines iterator", move |_, _| {
+        let mut slot = source.borrow_mut();
+        let Some(buffered) = slot.as_mut() else {
+            return Ok(vec![Value::Nil]);
+        };
+        let mut line = String::new();
+        match buffered.read_line(&mut line) {
+            Ok(0) => {
+                // Dropped before the wait, so the child sees its reader go away rather than
+                // blocking on a pipe nobody will drain.
+                *slot = None;
+                crate::exec::argv::reap(child);
+                Ok(vec![Value::Nil])
+            }
+            Ok(_) => {
+                line.truncate(line.trim_end_matches('\n').len());
+                Ok(vec![Value::str(line)])
+            }
+            Err(e) => {
+                *slot = None;
+                crate::exec::argv::reap(child);
+                Err(LuaError::new(format!("oslo.lines: {e}")))
+            }
+        }
+    })
 }
 
 /// The `sh` table: any name on it becomes that command.

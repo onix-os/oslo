@@ -224,6 +224,37 @@ fn a_signalled_command_reports_the_signal_apart_from_the_status() {
     assert_eq!(exited, "130\tnil");
 }
 
+/// `oslo.lines` reads as the command writes, which is the point: capture holds everything in
+/// memory and answers when the command ends, and a command that never ends never answers.
+#[test]
+fn lines_streams_a_commands_output() {
+    let out = lua(r#"
+        local seen = {}
+        for line in oslo.lines{"printf", "a\nb\nc\n"} do
+            seen[#seen + 1] = line
+        end
+        print(#seen, table.concat(seen, ","))
+    "#);
+    assert_eq!(out, "3\ta,b,c");
+}
+
+/// A stream longer than a pipe buffer must not deadlock, and the loop must be able to stop early.
+#[test]
+fn lines_handles_more_output_than_a_pipe_holds() {
+    let out = lua(r#"
+        local n = 0
+        for _ in oslo.lines{"sh", "-c", "i=0; while [ $i -lt 5000 ]; do echo line; i=$((i+1)); done"} do
+            n = n + 1
+        end
+        print(n)
+        -- Stopping early is allowed; the command is simply left to finish or be killed by EPIPE.
+        local first
+        for line in oslo.lines{"printf", "x\ny\n"} do first = line break end
+        print(first)
+    "#);
+    assert_eq!(out, "5000\nx");
+}
+
 #[test]
 fn an_empty_argv_is_refused_rather_than_silently_doing_nothing() {
     let err = lua_error("oslo.run{}");
