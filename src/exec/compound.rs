@@ -51,21 +51,29 @@ fn run_loop_body(env: &mut Environment, body: &CommandList, status: &mut i32) ->
             *status = st;
             LoopStep::Next
         }
-        Err(ShellError::Break(depth)) if depth > 1 => {
-            LoopStep::Unwind(ShellError::Break(depth - 1))
-        }
-        Err(ShellError::Break(_)) => {
+        Err(e) => classify_unwind(e, status),
+    }
+}
+
+/// Decide what an error escaping a loop's body *or* its condition means to this loop.
+///
+/// `break n` / `continue n` for `n > 1` are re-raised with the depth decremented, so each
+/// enclosing loop peels off one level. Anything else escapes untouched.
+fn classify_unwind(error: ShellError, status: &mut i32) -> LoopStep {
+    match error {
+        ShellError::Break(depth) if depth > 1 => LoopStep::Unwind(ShellError::Break(depth - 1)),
+        ShellError::Break(_) => {
             *status = 0;
             LoopStep::Stop
         }
-        Err(ShellError::Continue(depth)) if depth > 1 => {
+        ShellError::Continue(depth) if depth > 1 => {
             LoopStep::Unwind(ShellError::Continue(depth - 1))
         }
-        Err(ShellError::Continue(_)) => {
+        ShellError::Continue(_) => {
             *status = 0;
             LoopStep::Next
         }
-        Err(e) => LoopStep::Unwind(e),
+        e => LoopStep::Unwind(e),
     }
 }
 
@@ -94,9 +102,20 @@ fn eval_conditional_loop(
     env.enter_loop();
 
     let result = loop {
+        // A `break` in the *condition* belongs to this loop just as much as one in the body.
+        // POSIX puts the condition inside the loop, and the idiom it enables is real: modernish
+        // writes its option parsers as `while case ${1-} in (-x) ...;; (*) break;; esac; do shift;
+        // done`. Letting the error escape here unwound past the loop and out of the enclosing
+        // function, so every statement after such a loop was silently skipped.
         let cond = match eval_condition(env, condition) {
             Ok(c) => c,
-            Err(e) => break Err(e),
+            Err(e) => match classify_unwind(e, &mut status) {
+                // `while continue` re-asks the question, which is what bash does — and loops
+                // forever if the answer never changes.
+                LoopStep::Next => continue,
+                LoopStep::Stop => break Ok(status),
+                LoopStep::Unwind(e) => break Err(e),
+            },
         };
         if (cond == 0) != run_while_zero {
             break Ok(status);
