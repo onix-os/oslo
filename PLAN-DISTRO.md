@@ -610,13 +610,32 @@ optimisation: that handle is globally buffered, and on a failed write the bytes 
 buffer. `printf x > /dev/full` printed `x` on the terminal when the runtime flushed at exit, by
 which time the shell had restored the descriptor.
 
-### Still open: a hang in modernish's LOOP
+### The LOOP hang: the shell waited for a process substitution
 
-The suite now stops at `loop_cond.t` test 013, which is the first to use modernish's own `LOOP`
-construct. That machinery runs a generator process feeding the loop over descriptor 8
-(`IFS= read -r _loop_i <&8`), and under oslo it blocks. Fixing `BUG_PUTIOERR` did not release it,
-so it is not the write-error path modernish warned about; it is something in the descriptor or
-process handling underneath. That is where the next round starts.
+`loop_cond.t` test 013 is the first to use modernish's own `LOOP`, and it hung. The machinery runs
+a generator feeding the loop over descriptor 8, set up with `exec 8< <( … )`.
+
+Every piece tested in isolation matched bash — the redirection dance, the nested blocks, reading
+`<&8`, even the generator's own output byte for byte. What all those tests had in common was a
+*finite* generator, and that is what hid it: modernish's generator is **endless by design**. It
+emits `let i+=1 'i<=3'` for ever and stops when the consumer closes the descriptor.
+
+`procsub::finish` closed the shell's copy of the pipe and then **waited** for the child. With
+`exec 8< <( … )` the read end lives on in descriptor 8, so the generator never ends and the wait
+never returns. bash does not wait for a process substitution's child, and neither can this: the
+child is asynchronous by definition.
+
+Reaping is now `WNOHANG`, with anything still running retried the next time a substitution
+finishes. The one-line reproducer is `exec 8< <(yes); echo reached` — bash prints `reached`, oslo
+printed nothing.
+
+### Where the suite reaches now
+
+`io.t` has dropped off the failure list entirely: fixing `BUG_PUTIOERR` closed it. `loop_cond.t`
+runs past the hang. What remains is a further alias gap — `not: command not found` inside
+modernish's `LOOP find`, where the loop's generated text is `eval`ed — and the recognisable
+findings from before: `select` (deliberately unimplemented), `isset -x` on an unset exported
+variable, and `LINENO wrongly detected`.
 
 Worth separating from it: a script that does `use var/loop` and then uses `LOOP` **in the same
 parse unit** cannot work, and that is the documented limitation rather than a new bug. `use`

@@ -26,8 +26,22 @@ use crate::error::{Result, ShellError};
 use crate::exec::compound::flush_stdout;
 use crate::exec::pipeline::status_of;
 use nix::fcntl::{FcntlArg, FdFlag, fcntl};
+use nix::sys::wait::{WaitPidFlag, WaitStatus, waitpid};
 use nix::unistd::{ForkResult, Pid, close, dup2, fork, pipe};
 use std::os::fd::{IntoRawFd, RawFd};
+use std::sync::Mutex;
+
+/// Children of process substitutions that have ended their command but not yet been reaped.
+///
+/// A substitution's child is **asynchronous**, and blocking on one is a deadlock waiting to
+/// happen: `exec 8< <(generator)` copies the read end into descriptor 8, so the generator is
+/// *meant* to go on running after the `exec` finishes. modernish's `LOOP` is built exactly that
+/// way — an endless generator feeding the loop over descriptor 8, which stops when the consumer
+/// closes it — and waiting for that child never returned. bash does not wait for one either.
+///
+/// They are still reaped, just never waited on: every attempt is `WNOHANG`, and anything still
+/// running is tried again the next time a substitution finishes.
+static UNREAPED: Mutex<Vec<Pid>> = Mutex::new(Vec::new());
 
 /// One running substitution: the descriptor the caller was given, and the child feeding it.
 pub struct Substitution {
@@ -95,17 +109,31 @@ pub fn open(
     }
 }
 
-/// Close every descriptor and reap every child in `open`.
+/// Close every descriptor in `open` and reap what can be reaped without blocking.
 ///
 /// Closing before reaping is not tidiness: a `>(cmd)` child is *reading* from the pipe, and only
-/// the last writer closing gives it EOF. Waiting first would deadlock against a child that is
+/// the last writer closing gives it EOF. Reaping first would deadlock against a child that is
 /// waiting for us.
+///
+/// Reaping never blocks: a substitution's child is asynchronous, and `exec 8< <(gen)` keeps one
+/// running on purpose. See the `UNREAPED` list above.
 pub fn finish(open: &mut Vec<Substitution>) {
     for sub in open.iter() {
         let _ = close(sub.fd);
     }
-    for sub in open.drain(..) {
-        let _ = nix::sys::wait::waitpid(sub.child, None);
+    let mut unreaped = UNREAPED.lock().unwrap_or_else(|e| e.into_inner());
+    unreaped.extend(open.drain(..).map(|sub| sub.child));
+    unreaped.retain(|child| !collect(*child));
+}
+
+/// Whether `child` is gone — reaped now, or already reaped by someone else.
+///
+/// A forked subshell inherits this list but not the children, so its `waitpid` answers `ECHILD`;
+/// treating that as "gone" is what keeps the list from growing in every subshell.
+fn collect(child: Pid) -> bool {
+    match waitpid(child, Some(WaitPidFlag::WNOHANG)) {
+        Ok(WaitStatus::StillAlive) => false,
+        Ok(_) | Err(_) => true,
     }
 }
 
