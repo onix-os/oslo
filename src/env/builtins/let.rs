@@ -9,9 +9,17 @@ use crate::env::scope::Environment;
 use crate::error::Result;
 use crate::expand::arithmetic::eval_arithmetic;
 
-/// `let expr [expr…]`.
+/// `let [--] expr [expr…]`.
 pub fn builtin_let(env: &mut Environment, args: &[String]) -> Result<i32> {
-    let exprs = &args[1.min(args.len())..];
+    let mut exprs = &args[1.min(args.len())..];
+    // `--` ends the options, as it does for every bash builtin. `let` has no options of its own,
+    // which is exactly why the marker matters: `let -- "-1 < 0"` is how a script passes an
+    // expression that begins with a minus without it being read as one. modernish writes every
+    // arithmetic test as `alias let='let --'`, so without this its whole init dies on
+    // "Unexpected end of arithmetic expression".
+    if exprs.first().map(String::as_str) == Some("--") {
+        exprs = &exprs[1..];
+    }
     if exprs.is_empty() {
         eprintln!("oslo: let: expression expected");
         return Ok(1);
@@ -83,5 +91,19 @@ mod tests {
     fn no_expression_at_all_is_a_usage_error() {
         let mut env = Environment::new();
         assert_eq!(run(&mut env, &[]), 1);
+    }
+
+    /// `--` ends the options. modernish aliases `let` to `let --`, so every arithmetic test it
+    /// makes arrives this way; before this, each one died as an unparseable expression.
+    #[test]
+    fn a_double_dash_ends_the_options() {
+        let mut env = Environment::new();
+        assert_eq!(run(&mut env, &["--", "1 + 1"]), 0);
+        assert_eq!(run(&mut env, &["--", "0"]), 1);
+        assert_eq!(run(&mut env, &["--", "-1 < 0"]), 0);
+        // `--` on its own leaves no expression, which is the usage error bash reports.
+        assert_eq!(run(&mut env, &["--"]), 1);
+        // A second `--` is an expression, not another marker, as in bash.
+        assert_eq!(run(&mut env, &["--", "--"]), 1);
     }
 }
