@@ -6,7 +6,8 @@
 
 use crate::absorb_loop_control;
 use crate::expand_history;
-use crate::startup::{history, lua_init, rc};
+use crate::startup::mode::{Line, Mode, ToggleRequest};
+use crate::startup::{history, lua_init, mode, rc};
 use oslo::Environment;
 use oslo::LuaEngine;
 use oslo::env::builtins::run_exit_trap;
@@ -25,8 +26,13 @@ type Repl = Editor<OsloHelper, FileHistory>;
 
 /// One trip round the prompt.
 enum Input {
-    /// A complete command, and whether the user asked for it not to be remembered.
-    Command { text: String, secret: bool },
+    /// A complete command, the language to run it in, and whether the user asked for it not to be
+    /// remembered.
+    Command {
+        text: String,
+        mode: Mode,
+        secret: bool,
+    },
     /// Nothing to run: a blank line, or a history reference that did not resolve.
     Nothing,
     /// Ctrl-C. The partial command is dropped and the prompt comes back.
@@ -74,6 +80,18 @@ pub fn run_repl() -> ! {
 
     let settings = history::settings(&env_struct.lock().unwrap());
     let mut rl = build_editor(&settings);
+
+    // The mode the prompt is reading, and the flag the toggle key sets. Both live for the whole
+    // session: switching language is a property of the session, not of one line.
+    let mut current = mode::starting_mode(&env_struct.lock().unwrap());
+    let toggle = ToggleRequest::new();
+    if let Some(key) = mode::toggle_key(&env_struct.lock().unwrap()) {
+        rl.bind_sequence(
+            key,
+            rustyline::EventHandler::Conditional(Box::new(toggle.clone())),
+        );
+    }
+
     let mut helper = OsloHelper::new(Arc::clone(&env_struct));
     // R9.10 needs a real `PS2`, and rustyline draws no prompt on a continuation row of its own
     // multi-line editor. `OsloHelper` exposes the switch for exactly this: with editor multi-line
@@ -105,7 +123,14 @@ pub fn run_repl() -> ! {
     let mut eof_count = 0usize;
 
     loop {
-        match read_command(&mut rl, &env_struct, &lua, last_status) {
+        match read_command(
+            &mut rl,
+            &env_struct,
+            &lua,
+            last_status,
+            &mut current,
+            &toggle,
+        ) {
             Input::Nothing | Input::Interrupted => continue,
             Input::Fatal => break,
             Input::Eof => {
@@ -121,16 +146,27 @@ pub fn run_repl() -> ! {
                     }
                 }
             }
-            Input::Command { text, secret } => {
+            Input::Command { text, mode, secret } => {
                 eof_count = 0;
                 remember(&mut rl, &settings.file, &text, secret);
 
-                let mut env_guard = env_struct.lock().unwrap();
-                let res = absorb_loop_control(
-                    parse_with_aliases(&text, &|n| env_guard.get_alias(n).map(str::to_string))
-                        .and_then(|ast| eval_command_list(&mut env_guard, &ast)),
-                );
-                drop(env_guard);
+                let res = match mode {
+                    // A Lua line leaves `$?` where it was unless it asked otherwise: `oslo.exit`
+                    // is the way to choose a status, and a chunk that merely printed something
+                    // has not run a command.
+                    Mode::Lua => run_lua_line(&lua, &text, last_status),
+                    Mode::Shell => {
+                        let mut env_guard = env_struct.lock().unwrap();
+                        let res = absorb_loop_control(
+                            parse_with_aliases(&text, &|n| {
+                                env_guard.get_alias(n).map(str::to_string)
+                            })
+                            .and_then(|ast| eval_command_list(&mut env_guard, &ast)),
+                        );
+                        drop(env_guard);
+                        res
+                    }
+                };
 
                 // `history -c` cannot reach the editor from inside a builtin, so it leaves a
                 // request behind and the loop carries it out.
@@ -203,19 +239,26 @@ fn read_command(
     env_struct: &Arc<Mutex<Environment>>,
     lua: &LuaEngine,
     last_status: i32,
+    current: &mut Mode,
+    toggle: &ToggleRequest,
 ) -> Input {
     let mut buffer = String::new();
     let mut secret = false;
     let mut heredoc = HeredocTracker::default();
+    // The language *this* command is being read in. It follows `current` until a `!` or `=`
+    // prefix sends one line the other way; a continuation line never re-decides.
+    let mut reading = *current;
+    // Carried across a toggle, so switching language mid-command does not lose what was typed.
+    let mut typed = String::new();
 
     loop {
         let prompt = if buffer.is_empty() {
-            primary_prompt(env_struct, lua, last_status)
+            primary_prompt(env_struct, lua, last_status, *current)
         } else {
             rc::ps2(&mut env_struct.lock().unwrap())
         };
 
-        let raw = match rl.readline(&prompt) {
+        let raw = match rl.readline_with_initial(&prompt, (&typed, "")) {
             Ok(raw) => raw,
             Err(ReadlineError::Interrupted) => {
                 println!("^C");
@@ -227,6 +270,15 @@ fn read_command(
                 return Input::Fatal;
             }
         };
+        typed.clear();
+
+        // The toggle key accepts the line to hand control back here; nothing was submitted.
+        if toggle.take() {
+            *current = current.other();
+            reading = *current;
+            typed = raw;
+            continue;
+        }
 
         if buffer.is_empty() {
             if raw.trim().is_empty() {
@@ -246,7 +298,23 @@ fn read_command(
             raw.as_str()
         };
 
-        let expanded = if heredoc.expands_history() {
+        // `=` and `!` are read once, off the first line. They send this one command the other way
+        // without touching the mode the prompt goes back to.
+        let line = if buffer.is_empty() {
+            match mode::classify(*current, line) {
+                Line::Normal(text) => text,
+                Line::OneOff { mode, text } => {
+                    reading = mode;
+                    text
+                }
+            }
+        } else {
+            line
+        };
+
+        // History expansion belongs to shell syntax. In Lua a `!` is `~=`'s other half and a
+        // string may hold anything; rewriting a Lua line against the history would corrupt it.
+        let expanded = if reading == Mode::Shell && heredoc.expands_history() {
             // Owned so the immutable borrow of the editor ends before the entry is added.
             let previous: Vec<String> = history_entries(rl);
             match expand_history(line, &previous) {
@@ -260,7 +328,7 @@ fn read_command(
         heredoc.observe(&expanded);
 
         buffer.push_str(&expanded);
-        if is_complete(&buffer) {
+        if is_complete(&buffer, reading) {
             // The frecency table is fed from here rather than from the editor's `validate`,
             // because with editor multi-line off (which is what `PS2` costs) `validate` never
             // sees a multi-line command whole — see `OsloHelper::record_command_use`.
@@ -269,6 +337,7 @@ fn read_command(
             }
             return Input::Command {
                 text: buffer,
+                mode: reading,
                 secret,
             };
         }
@@ -311,26 +380,58 @@ impl HeredocTracker {
 ///
 /// A *syntax error* counts as complete: it is the executor's job to report it, and asking for
 /// another line would leave the user unable to get the prompt back with no way to see why. The
-/// three-way answer comes from the same classifier the editor's validator uses, so the prompt
-/// and the loop can never disagree about whether a line is finished.
-fn is_complete(source: &str) -> bool {
-    !matches!(
-        oslo::interactive::syntax::classify(source),
-        InputStatus::Incomplete
-    )
+/// shell's three-way answer comes from the same classifier the editor's validator uses, so the
+/// prompt and the loop can never disagree about whether a line is finished.
+///
+/// Lua answers through its own parser rather than through Lua's `<eof>`-in-the-message trick,
+/// which is all the reference implementation's C API can expose. Having our own parser means
+/// asking it directly.
+fn is_complete(source: &str, mode: Mode) -> bool {
+    match mode {
+        Mode::Lua => oslo::lua::eval::is_complete(source),
+        Mode::Shell => !matches!(
+            oslo::interactive::syntax::classify(source),
+            InputStatus::Incomplete
+        ),
+    }
 }
 
 fn primary_prompt(
     env_struct: &Arc<Mutex<Environment>>,
     lua: &LuaEngine,
     last_status: i32,
+    mode: Mode,
 ) -> String {
+    // Published before the prompt is drawn, so a `PS1` or a Lua prompt function can say which
+    // language it is prompting for.
+    env_struct
+        .lock()
+        .unwrap()
+        .set_var("OSLO_MODE", mode.name(), false);
+
     // A Lua prompt is an explicit choice by the user and outranks `PS1`, which in turn outranks
     // the built-in default.
     if let Some(p) = lua.render_prompt() {
         return p;
     }
+    // `PS1` is the shell's prompt and describes a shell line; drawing it over a Lua prompt would
+    // say `oslo$` in front of something that is not a shell command.
+    if mode == Mode::Lua {
+        return mode.fallback_prompt().to_string();
+    }
     rc::ps1(&mut env_struct.lock().unwrap(), last_status)
+}
+
+/// Run one Lua line typed at the prompt.
+///
+/// A chunk that merely printed something has not run a command, so `$?` stays where it was;
+/// `oslo.exit(n)` is how a script chooses a status, and it ends the shell rather than setting one.
+fn run_lua_line(lua: &LuaEngine, text: &str, last_status: i32) -> Result<i32, ShellError> {
+    match lua.eval_script(text) {
+        Ok(()) => Ok(last_status),
+        Err(ShellError::Lua(e)) if e.exit.is_some() => Err(ShellError::Exit(e.exit.unwrap_or(0))),
+        Err(e) => Err(e),
+    }
 }
 
 /// `$IGNOREEOF`: how many end-of-file characters to ignore before ending the shell.
@@ -382,7 +483,7 @@ fn publish_history(rl: &Repl) {
 
 #[cfg(test)]
 mod tests {
-    use super::{HeredocTracker, is_complete};
+    use super::{HeredocTracker, Mode, is_complete};
 
     /// The command line that opens a here-document is still a command, so it is expanded; every
     /// line after it is body, so none of them are.
@@ -435,28 +536,40 @@ mod tests {
 
     #[test]
     fn an_unfinished_compound_command_asks_for_more() {
-        assert!(!is_complete("for i in 1 2 3; do"));
-        assert!(!is_complete("if true; then"));
-        assert!(!is_complete("while true; do echo hi"));
-        assert!(!is_complete("case x in"));
-        assert!(!is_complete("echo hi |"));
-        assert!(!is_complete("echo \"unterminated"));
-        assert!(!is_complete("x=$(echo hi"));
+        assert!(!is_complete("for i in 1 2 3; do", Mode::Shell));
+        assert!(!is_complete("if true; then", Mode::Shell));
+        assert!(!is_complete("while true; do echo hi", Mode::Shell));
+        assert!(!is_complete("case x in", Mode::Shell));
+        assert!(!is_complete("echo hi |", Mode::Shell));
+        assert!(!is_complete("echo \"unterminated", Mode::Shell));
+        assert!(!is_complete("x=$(echo hi", Mode::Shell));
     }
 
     #[test]
     fn a_finished_command_runs() {
-        assert!(is_complete("echo hi"));
-        assert!(is_complete("for i in 1 2 3; do echo $i; done"));
-        assert!(is_complete("if true; then echo y; fi"));
+        assert!(is_complete("echo hi", Mode::Shell));
+        assert!(is_complete("for i in 1 2 3; do echo $i; done", Mode::Shell));
+        assert!(is_complete("if true; then echo y; fi", Mode::Shell));
+    }
+
+    /// Lua asks its own parser, rather than string-matching `<eof>` in an error message the way
+    /// the reference implementation's C API forces it to.
+    #[test]
+    fn lua_mode_continues_an_unfinished_chunk() {
+        assert!(!is_complete("if true then", Mode::Lua));
+        assert!(!is_complete("local t = {", Mode::Lua));
+        assert!(!is_complete("function f(", Mode::Lua));
+        assert!(is_complete("print(1)", Mode::Lua));
+        // A real mistake never becomes valid, so asking for another line would wedge the prompt.
+        assert!(is_complete("x = = 2", Mode::Lua));
     }
 
     #[test]
     fn a_real_syntax_error_is_not_a_continuation() {
         // Otherwise a typo would wedge the prompt: every further line is also an error, and
         // there is no way back to PS1.
-        assert!(is_complete("echo )"));
-        assert!(is_complete("fi"));
-        assert!(is_complete("done"));
+        assert!(is_complete("echo )", Mode::Shell));
+        assert!(is_complete("fi", Mode::Shell));
+        assert!(is_complete("done", Mode::Shell));
     }
 }
