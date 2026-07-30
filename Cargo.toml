@@ -16,6 +16,10 @@ path = "src/lib.rs"
 
 [dependencies]
 mlua = { version = "0.10", features = ["lua54", "vendored", "async"] }
+# The Lua front end, in the same relationship to Lua that brush-parser has to the shell: it parses
+# and nothing else. Evaluation is oslo's own, in `src/lua/eval/`, so that both languages run on one
+# Rust core. `full_moon` is the parser behind StyLua and selene.
+full_moon = { version = "1", features = ["lua54"] }
 # `resource` is what `ulimit` reads and sets limits through, and what `times` reads getrusage(2)
 # through. Without it both had to parse /proc by hand.
 nix = { version = "0.29", features = [
