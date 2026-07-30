@@ -14,16 +14,10 @@
 # the terminal's input queue, which only the far end of the line can do — so that half is driven
 # from the host, by `scripts/alpine-vm.sh --console`, which owns qemu's stdin.
 echo "VM-JOBS-BEGIN"
-# A watchdog, because every check below can block: `wait` on a job the shell has lost track of,
-# `fg` on a job that never gets the terminal back. Without it a hang shows up as qemu being killed
-# by the outer `timeout`, with no output flushed and nothing to say which check it was.
-(
-    sleep 90
-    echo "VM-JOBS-WATCHDOG-FIRED: a check blocked; the last 'ok' above names it"
-    kill -9 $$ 2>/dev/null
-) &
-watchdog=$!
-
+# Nothing in this file may start a background job of its own, and that is not a style rule. A
+# watchdog started as `( sleep 90; ... ) &` becomes job **%1**, so the `bg %1` below resumed the
+# watchdog and left the job under test stopped — a self-inflicted failure that read exactly like a
+# broken `bg`. The time limit therefore lives in `/init`, outside this shell's job table.
 fails=0
 ok() { echo "  ok    $1"; }
 no() { echo "  FAIL  $1"; fails=$((fails + 1)); }
@@ -81,10 +75,14 @@ sleep 1
 check "the job really stopped" "$(state_of "$bgpid")" "T"
 # The shell notices a stop only at a job-table update, which `jobs` performs.
 jobs | grep -qi "stopped" && ok "jobs reports a stopped job" || no "jobs does not report the stop"
-bg %1 >/dev/null 2>&1
+# Not `bgerr=$(bg %1 2>&1)`: a command substitution forks, and a forked child renounces job
+# control on purpose — so `bg` there answers "no job control" no matter how healthy the shell is.
+# The diagnostic has to be collected without a subshell between it and the job table.
+bg %1 2>/tmp/bg.err
 sleep 1
 state=$(state_of "$bgpid")
 present "the job still exists after bg" "$state"
+[ -s /tmp/bg.err ] && echo "  (bg said: $(cat /tmp/bg.err))"
 if [ "$state" = "S" ] || [ "$state" = "R" ]; then
     ok "bg resumed it"
 else
@@ -104,16 +102,29 @@ check "the shell is the foreground group when idle" "$tpgid" "$shpgid"
 # ...and during a foreground job the terminal must belong to *that job's* group, not the shell's.
 # The child has to read both for us: by the time the shell can look, the job has already finished
 # and the shell has taken the terminal back.
-fg_report=$(sh -c 'echo "$(sed -n "s/.*) //p" /proc/self/stat | cut -d" " -f3) $(sed -n "s/.*) //p" /proc/self/stat | cut -d" " -f6)' 2>/dev/null)
-fg_pgid=${fg_report% *}
-fg_tpgid=${fg_report#* }
+#
+# Written to a file rather than read through `$( )`, and that distinction is the whole test. A
+# command substitution is not a *job* — no shell gives one its own process group or hands it the
+# terminal — so probing through one would have compared the shell's own group against itself and
+# called it a pass.
+cat >/tmp/fgprobe.sh <<'PROBE'
+read -r line </proc/self/stat
+set -- ${line#*") "}
+echo "$3 $6"
+PROBE
+sh /tmp/fgprobe.sh >/tmp/fg.out 2>/dev/null
+read -r fg_pgid fg_tpgid </tmp/fg.out
 present "a foreground child reports its pgid" "$fg_pgid"
 if [ -n "$fg_pgid" ] && [ "$fg_pgid" != "$shpgid" ]; then
     ok "a foreground job gets its own process group"
 else
     no "a foreground job shares the shell's group ($fg_pgid = $shpgid)"
 fi
-check "the terminal belongs to the foreground job" "$fg_tpgid" "$fg_pgid"
+if [ -n "$fg_tpgid" ] && [ "$fg_tpgid" = "$fg_pgid" ]; then
+    ok "the terminal belongs to the foreground job while it runs"
+else
+    no "the terminal was on group [$fg_tpgid] while group [$fg_pgid] ran in the foreground"
+fi
 
 echo "-- signals to the foreground group"
 # This is what the tty driver does on Ctrl-C: signal the whole foreground process group. Doing it
@@ -139,8 +150,6 @@ check "wait on a clean job is 0" "$?" "0"
 (exit 7) &
 wait $!
 check "wait reports a job's own status" "$?" "7"
-
-kill "$watchdog" 2>/dev/null
 
 echo
 if [ "$fails" -eq 0 ]; then echo "JOBS ALL PASSED"; else echo "JOBS $fails FAILED"; fi

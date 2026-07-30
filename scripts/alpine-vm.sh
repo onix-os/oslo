@@ -21,16 +21,28 @@
 #     would not start at all. That is a feature of this test: it proves the release artifact runs
 #     on a system that shares nothing with the build host.
 #
-# Usage: scripts/alpine-vm.sh [--shell]
-#   (no args)  build, boot, run the suite, print the result, exit non-zero on failure
+# Usage: scripts/alpine-vm.sh [--shell | --console]
+#   (no args)  build, boot, run both suites, print the result, exit non-zero on failure
 #   --shell    boot to an interactive oslo prompt instead, for poking around by hand
+#   --console  boot to an interactive oslo and *type at it from the host*: the only way to test
+#              the characters, Ctrl-C and Ctrl-Z, that only a terminal driver can produce
 set -euo pipefail
 
 here=$(cd -- "$(dirname -- "$0")/.." && pwd)
 work=${OSLO_VM_WORK:-/tmp/oslo-alpine-vm}
 mirror=https://dl-cdn.alpinelinux.org/alpine/latest-stable/releases/x86_64
+mode=suite
+case "${1:-}" in
+--shell) mode=shell ;;
+--console) mode=console ;;
+"") ;;
+*)
+    echo "usage: $0 [--shell | --console]" >&2
+    exit 2
+    ;;
+esac
 interactive=false
-[ "${1:-}" = "--shell" ] && interactive=true
+[ "$mode" = shell ] && interactive=true
 
 mkdir -p "$work"
 cd "$work"
@@ -131,16 +143,35 @@ mkdir -p root/opt
 tar -xzf modernish.tar.gz -C root/opt
 mv root/opt/modernish-master root/opt/modernish
 
-if $interactive; then
+if [ "$mode" = console ]; then
     cat >root/init <<'INIT'
 #!/bin/oslo
 export PATH=/usr/bin:/usr/sbin:/bin:/sbin
 mount -t proc proc /proc 2>/dev/null
 mount -t sysfs sys /sys 2>/dev/null
+mount -t devtmpfs dev /dev 2>/dev/null
+ln -sf /proc/self/fd /dev/fd
+# `setsid -c` on /dev/ttyS0, not `exec /bin/oslo -i` on the console: only a *controlling terminal*
+# turns a typed ^C into a SIGINT for the foreground process group, and /dev/console can never be
+# one. This is what makes the characters the host types below reach the tty driver at all.
+# Set the control characters explicitly, as a getty would, so the test measures the shell rather
+# than whatever this console happened to boot with. (`stty -a` reports `intr = ^C; susp = ^Z` on
+# ttyS0 even without this, so it is belt-and-braces rather than the fix it was first written as.)
+stty intr ^C susp ^Z </dev/ttyS0
+echo "CONSOLE-READY"
+exec setsid -c /bin/oslo -i </dev/ttyS0 >/dev/ttyS0 2>&1
+INIT
+elif $interactive; then
+    cat >root/init <<'INIT'
+#!/bin/oslo
+export PATH=/usr/bin:/usr/sbin:/bin:/sbin
+mount -t proc proc /proc 2>/dev/null
+mount -t sysfs sys /sys 2>/dev/null
+mount -t devtmpfs dev /dev 2>/dev/null
 ln -sf /proc/self/fd /dev/fd
 echo
 echo "oslo is PID 1 and /bin/sh here. 'poweroff -f' to leave."
-exec /bin/oslo -i
+exec setsid -c /bin/oslo -i </dev/ttyS0 >/dev/ttyS0 2>&1
 INIT
 else
     cat >root/init <<'INIT'
@@ -166,7 +197,7 @@ echo "VM-SUITE-EXIT:$?"
 # /dev/console, and console is deliberately not claimable as a ctty. `setsid -c` starts a new
 # session with /dev/ttyS0 as its controlling terminal, which is the only way to reach `tcsetpgrp`,
 # `fg`, `bg` and the terminal's foreground process group from inside the VM.
-setsid -c /bin/sh /vm-jobs.sh </dev/ttyS0 >/dev/ttyS0 2>&1
+timeout 120 setsid -c /bin/sh /vm-jobs.sh </dev/ttyS0 >/dev/ttyS0 2>&1
 echo "VM-JOBS-EXIT:$?"
 # Reaping happens at a command boundary, and this is one: a shell as init cannot reap while it is
 # blocked in a foreground command, so the check belongs here rather than inside the suite.
@@ -198,6 +229,106 @@ command -v kvm >/dev/null 2>&1 && qemu_args+=(-enable-kvm)
 
 if $interactive; then
     exec qemu-system-x86_64 "${qemu_args[@]}"
+fi
+
+if [ "$mode" = console ]; then
+    # ---------------------------------------------------------------- typing at it
+    #
+    # The last part of job control that nothing else can reach: the characters. A ^C is not a
+    # signal a test can send — it is a byte in the terminal's *input* queue that the line
+    # discipline turns into a SIGINT for whatever process group the terminal considers foreground.
+    # Only the far end of the line can put it there, and with `-nographic` that far end is this
+    # script's stdin to qemu.
+    #
+    # The fifo is held open on fd 9 for the whole run. Without that, qemu sees EOF the moment the
+    # first `printf` finishes and the guest's console read returns nothing for ever after.
+    console_in=$work/console.in
+    log=$work/console.log
+    rm -f "$console_in" "$log"
+    mkfifo "$console_in"
+    timeout 240 qemu-system-x86_64 "${qemu_args[@]}" <"$console_in" >"$log" 2>&1 &
+    qemu_pid=$!
+    exec 9>"$console_in"
+
+    # Wait for text to appear in the log, or give up. Polling a file rather than reading a pipe
+    # because the same bytes have to stay readable afterwards for the assertions.
+    await() {
+        local want=$1 limit=${2:-30} waited=0
+        while [ "$waited" -lt "$limit" ]; do
+            grep -q "$want" "$log" 2>/dev/null && return 0
+            sleep 1
+            waited=$((waited + 1))
+        done
+        return 1
+    }
+    send() { printf '%s' "$1" >&9; }
+
+    if ! await CONSOLE-READY 90; then
+        echo "the VM never reached a console prompt" >&2
+        kill "$qemu_pid" 2>/dev/null || true
+        sed -n '$p' "$log" >&2
+        exit 1
+    fi
+    sleep 2
+
+    # Markers are spelled with a `''` in what is *typed* so that the terminal's echo of the typed
+    # line cannot be mistaken for the command's output — the shell prints `MARKER1`, the echo shows
+    # `MARK''ER1`. Without that every `await` matches its own keystrokes and proves nothing.
+    send $'echo MARK\'\'ER1\n'
+    await MARKER1 20 || {
+        echo "the console never answered" >&2
+        exit 1
+    }
+
+    say "typing ^C at a running foreground job"
+    send $'sleep 60\n'
+    sleep 3
+    send $'\003'
+    sleep 2
+    send $'echo INT\'\'STATUS=$?\n'
+    await 'INTSTATUS=130' 20 && echo "  ok    ^C interrupts the foreground job and reports 130" ||
+        {
+            echo "  FAIL  ^C did not interrupt the job"
+            fail=1
+        }
+
+    say "typing ^Z at a running foreground job"
+    # UNRESOLVED, and reported rather than asserted. ^Z stops the job correctly on a real pty —
+    # `script -qec 'oslo -i' /dev/null` gives `[1]+ Stopped`, status 148, and a job-table entry —
+    # but on qemu's serial console the job runs to completion as though no SIGTSTP was ever
+    # delivered. `stty -a` on ttyS0 reports `susp = ^Z`, and ^C on the same console does work, so
+    # it is not a missing control character and not the shell's signal dispositions.
+    #
+    # It is not asserted because the harness cannot yet tell a shell bug from a serial-console
+    # one, and a red test that means "we do not know" trains people to ignore red tests. What it
+    # can do honestly is run the sequence and print what happened.
+    send $'sleep 60\n'
+    sleep 3
+    send $'\032'
+    sleep 2
+    send $'echo SUSP\'\'STATUS=$?\n'
+    if await 'SUSPSTATUS=148' 15; then
+        echo "  ok    ^Z stops the foreground job and reports 128+SIGTSTP"
+    else
+        echo "  UNRESOLVED  ^Z did not stop the job on this serial console"
+        echo "              (it does on a pty; see the comment in $0 and PLAN-DISTRO.md)"
+    fi
+    send $'\003'
+    sleep 2
+
+    say "the terminal is still sane"
+    send $'echo DO\'\'NE\n'
+    await 'DONE' 20 && echo "  ok    the terminal still accepts input" || {
+        echo "  FAIL  the terminal is wedged"
+        fail=1
+    }
+
+    send $'poweroff -f\n'
+    sleep 3
+    exec 9>&-
+    kill "$qemu_pid" 2>/dev/null || true
+    wait "$qemu_pid" 2>/dev/null || true
+    exit "${fail:-0}"
 fi
 
 log=$work/boot.log

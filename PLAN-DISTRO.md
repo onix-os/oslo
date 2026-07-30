@@ -279,26 +279,86 @@ A1 and A2 first and alone: A1 is a correctness *and* safety defect, and it is a 
 C3's cheap sweep. A3–A7 are independent of each other. B1/B2 unblock every other Lua item. C
 follows whatever has landed.
 
-## Still open: an external oracle, and the pty paths
+## Done: the external oracle, and the terminal paths
 
-Both belong in the Alpine VM, in one invocation — it has a console and a throwaway filesystem,
-which is what each of them needs.
+Both now run in the Alpine VM, in one invocation, and `scripts/alpine-vm.sh` exits non-zero if
+either regresses.
 
-* **An oracle nobody here wrote.** Every test in this repo encodes one person's reading of POSIX,
-  including its blind spots — twice in one session a hand-written probe was wrong and the shell was
-  right. [modernish](https://github.com/modernish/modernish) is the candidate: its capability probe
-  ran a long way under oslo on the host, through its whole bug-detection phase (`BUG_TRAPFNEXI`,
-  `BUG_LOOPRET3`, `BUG_LNNONEG` and the rest), and stopped on the sandbox's missing `/dev/tty`
-  rather than on anything oslo did. Its `BUG_*` names are a ready-made conformance checklist.
+### The oracle: modernish, baked into the image
 
-  Run it with `--prefix` pointed at a scratch directory. `install.sh -n` is **not** a dry run — it
-  installed 298 files outside the repo when that was assumed. Inside the VM the question does not
-  arise, which is the better reason to run it there.
+[modernish](https://github.com/modernish/modernish) is a POSIX-shell library whose initialisation
+*is* a battery of named probes for known shell bugs, written against a dozen real shells by someone
+with no stake in this one. That is the whole point of using it: every other test here encodes one
+reading of POSIX, and twice in this project a hand-written probe was wrong while the shell was
+right.
 
-* **The pty-dependent paths.** Job control, Ctrl-C, Ctrl-Z, `fg`/`bg`, terminal handoff: verified by
-  hand, never automated, and therefore the parts most likely to regress unnoticed. The VM boots to a
-  console, so they are testable there without a pty harness on the host.
-  `scripts/alpine-vm.sh --shell` already drops into an interactive oslo inside it.
+It is fetched on the host and unpacked into `/opt/modernish` at image-assembly time, because the VM
+has no network. (`install.sh -n` is **not** a dry run — it wrote 298 files outside the repo when
+that was assumed. Not installing at all avoids the question.)
+
+Pointed at oslo, it refused to initialise. Five real defects came out of getting it to run, each
+now fixed and covered by a differential-corpus case:
+
+| what it found | why it mattered |
+|---|---|
+| `command -v if` did not report reserved words | modernish treats this as **fatal** and will not start |
+| `${1+"$@"}` joined the arguments and re-split the join on `IFS` | the pre-POSIX argument-forwarding idiom, silently mangled |
+| **quoting was dropped from every shell pattern** | `case $x in "$expected")` matched *anything* when `$expected` held a `*` |
+| `[[ ]]` field-split and globbed its operands | `[[ $x == "a b" ]]` was `too many arguments`; an empty operand shifted the operator into the operand slot |
+| `break` in a loop's *condition* unwound past the loop | took the rest of the enclosing function with it — modernish writes every option parser as `while case … esac; do shift; done` |
+
+The pattern one is the serious defect of the group and was not on anyone's list. Fixing it meant
+routing `case`, `[[ ]]` and the `${v#p}` family through the quote-aware matcher pathname expansion
+already had, which also retired the `glob` crate: there is now one pattern dialect, not two.
+
+modernish's fatal battery and full initialisation both pass, on musl and busybox, with oslo as
+PID 1. Its *regression suite* does not run yet, and the blocker is not oslo: `sys/base/mktemp`
+uses `forever do … done`, where `forever` is an alias whose body opens a compound command. oslo
+substitutes aliases at execution time, on the command word only, so an alias can replace a command
+but cannot contribute syntax. POSIX puts alias substitution in the tokenizer. Real-world POSIX
+scripts almost never need this — it is a modernish idiom — so it is recorded rather than scheduled.
+
+### The terminal paths
+
+`scripts/alpine-vm-jobs.sh` runs under `setsid -c` on `/dev/ttyS0`, which is the only way a shell
+that is not a REPL still has a *controlling terminal*. Init cannot supply one: the kernel hands
+PID 1 `/dev/console`, which can never be claimed as a ctty. It covers process groups under `set -m`,
+`jobs`/`bg`, the terminal's foreground process group during and after a foreground job, group
+signals, and `wait` statuses — 20 checks, all passing.
+
+Two things it found:
+
+* **`set -m` did nothing in a script.** Job control was enabled only from the REPL, so a script
+  that said `set -m` got the half that needs no terminal — separate process groups — while `bg`
+  answered `no job control` and left the job stopped for ever. `set -m` now turns job control on
+  wherever there is a terminal to claim, as bash does.
+* **Three earlier checks were passing vacuously.** busybox's `ps` has neither `-o pgid` nor `-p`,
+  so each comparison read the empty string and matched it against another empty string. They read
+  `/proc/PID/stat` now, and every reading is asserted non-empty before it is compared.
+
+`scripts/alpine-vm.sh --console` covers the last piece — the *characters*. A `^C` is not a signal a
+test can send; it is a byte in the terminal's input queue that the line discipline turns into a
+signal for the foreground process group, and only the far end of the line can put it there. With
+`-nographic` that far end is the harness's own stdin to qemu, driven through a fifo.
+
+`^C` passes there. **`^Z` is unresolved** and is reported rather than asserted: it stops the job
+correctly on a real pty (`script -qec 'oslo -i' /dev/null` gives `[1]+ Stopped`, status 148, and a
+job-table entry), but on qemu's serial console the job runs to completion as though no SIGTSTP were
+delivered. `stty -a` on ttyS0 reports `susp = ^Z`, and `^C` on that same console works, so it is
+neither a missing control character nor the shell's signal dispositions. The harness cannot yet
+tell a shell bug from a serial-console one, and a red test meaning "we do not know" teaches people
+to ignore red tests.
+
+### Still open from this round
+
+* `$(case …)` — brush #1052. Workaround: backticks.
+* A comment indented by *exactly one* blank inside `$( )` is not recognised as a comment, so an
+  apostrophe in it is a parse error. brush's nested-construct tokenizer runs with
+  `include_space: true`, where the first blank starts a token and the `#` after it is no longer in
+  command position; two blanks work. Same class as the above, and likelier to bite — apostrophes in
+  prose are common.
+* Alias substitution is not tokenizer-level (above).
+* `^Z` on a serial console (above).
 
 ## Out of scope, deliberately
 
