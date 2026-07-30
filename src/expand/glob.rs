@@ -13,9 +13,10 @@
 //! against one directory's entries, and every match is spelled by appending to the literal text
 //! the pattern itself used.
 //!
-//! The pattern dialect itself lives in [`compile`], because `case`, `[[ ]]` and `${v#p}` need the
-//! same one and none of them is about paths. What stays here is what only a path has: the `/`
-//! that splits a pattern into components, and the leading dot a component may not match blindly.
+//! The pattern dialect itself lives in the `compile` submodule, because `case`, `[[ ]]` and
+//! `${v#p}` need the same one and none of them is about paths. What stays here is what only a
+//! path has: the `/` that splits a pattern into components, and the leading dot a component may
+//! not match blindly.
 
 mod compile;
 
