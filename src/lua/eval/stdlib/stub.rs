@@ -19,7 +19,7 @@ use super::{module, native};
 fn missing(name: &'static str) -> Value {
     native(
         name,
-        move |_: &mut Interp, _: Vec<Value>| -> LuaResult<Vec<Value>> {
+        move |_: &Interp, _: Vec<Value>| -> LuaResult<Vec<Value>> {
             Err(LuaError::new(format!(
                 "{name} is not implemented in oslo's Lua"
             )))
@@ -42,7 +42,7 @@ fn refusing(namespace: &str, names: &[&'static str]) -> Value {
     )
 }
 
-pub fn install(interp: &mut Interp) {
+pub fn install(interp: &Interp) {
     // Coroutines need the interpreter to be suspendable mid-call, which a tree-walker running on
     // the Rust stack cannot be without either threads or a bytecode VM. Both were considered and
     // declined; see PLAN-LUA.md.
@@ -87,7 +87,7 @@ pub fn install(interp: &mut Interp) {
 }
 
 /// `debug.traceback` — the message, and a note that frames are not walkable here.
-fn traceback(_: &mut Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
+fn traceback(_: &Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
     let message = match args.first() {
         Some(Value::Str(s)) => s.to_string(),
         Some(Value::Nil) | None => String::new(),

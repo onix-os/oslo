@@ -8,35 +8,67 @@
 //! so `local ok, err = oslo.cd(p)` reads the way `io.open` does. A raised error is reserved for a
 //! caller mistake (a missing argument, a name that cannot exist), which is a bug in the script
 //! rather than a condition it should handle.
+//!
+//! Nothing here reimplements shell behaviour. `oslo.cd` runs the `cd` builtin and `oslo.glob`
+//! calls the shell's own globber, so the two interfaces cannot drift apart.
 
 use crate::env::Environment;
-use crate::lua::engine::{BUILTIN_KEY_PREFIX, borrow_env, call_lua_builtin};
-use mlua::prelude::*;
+use crate::lua::engine::{BUILTIN_KEY_PREFIX, PROMPT_KEY, Registry, borrow_env, call_lua_builtin};
+use crate::lua::eval::value::{Table, Value};
+use crate::lua::eval::{Interp, LuaError, LuaResult};
+use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
 /// Build the `oslo` table and install it as a global.
-pub fn install(lua: &Lua, env: Arc<Mutex<Environment>>) -> LuaResult<()> {
-    let oslo = lua.create_table()?;
-    commands(lua, &oslo, &env)?;
-    variables(lua, &oslo, &env)?;
-    filesystem(lua, &oslo, &env)?;
-    shell(lua, &oslo, &env)?;
-    lua.globals().set("oslo", oslo)?;
-    Ok(())
+pub fn install(interp: &Rc<Interp>, registry: &Registry, env: Arc<Mutex<Environment>>) {
+    let mut oslo = Table::new();
+    commands(&mut oslo, &env);
+    variables(&mut oslo, &env);
+    filesystem(&mut oslo, &env);
+    shell(&mut oslo, registry, &env);
+    interp.set_global("oslo", Value::table(oslo));
+}
+
+/// Wrap a Rust function and put it in the table under `name`.
+fn put(
+    table: &mut Table,
+    name: &'static str,
+    f: impl Fn(&Interp, Vec<Value>) -> LuaResult<Vec<Value>> + 'static,
+) {
+    table.set(
+        Value::str(name),
+        Value::Function(Rc::new(crate::lua::eval::value::Function::Native {
+            name,
+            call: Box::new(f),
+        })),
+    );
+}
+
+/// Argument `n` as a string, refusing anything that is not one.
+fn text(args: &[Value], n: usize, function: &str) -> LuaResult<String> {
+    match args.get(n - 1) {
+        Some(Value::Str(s)) => Ok(s.to_string()),
+        Some(Value::Number(x)) => Ok(x.to_string()),
+        other => Err(LuaError::new(format!(
+            "oslo.{function}: argument #{n} must be a string, got {}",
+            other.map_or("no value", Value::type_name)
+        ))),
+    }
 }
 
 /// Running shell commands: `exec` for the side effect, `capture` for the output.
-fn commands(lua: &Lua, oslo: &LuaTable, env: &Arc<Mutex<Environment>>) -> LuaResult<()> {
+fn commands(oslo: &mut Table, env: &Arc<Mutex<Environment>>) {
     // oslo.exec(cmd) -> status. Output goes wherever the shell's output goes.
     let env_exec = Arc::clone(env);
-    oslo.set(
-        "exec",
-        lua.create_function(move |_, cmd: String| {
-            let mut guard = borrow_env(&env_exec)?;
-            let ast = crate::parser::parse_bash_script(&cmd).map_err(|e| e.into_lua_err())?;
-            crate::exec::eval_command_list(&mut guard, &ast).map_err(|e| e.into_lua_err())
-        })?,
-    )?;
+    put(oslo, "exec", move |_, args| {
+        let cmd = text(&args, 1, "exec")?;
+        let mut guard = borrow_env(&env_exec)?;
+        let ast = crate::parser::parse_bash_script(&cmd)
+            .map_err(|e| LuaError::new(format!("oslo.exec: {e}")))?;
+        let status = crate::exec::eval_command_list(&mut guard, &ast)
+            .map_err(|e| LuaError::new(format!("oslo.exec: {e}")))?;
+        Ok(vec![Value::int(status as i64)])
+    });
 
     // oslo.capture(cmd) -> { out = string, status = number }
     //
@@ -57,61 +89,59 @@ fn commands(lua: &Lua, oslo: &LuaTable, env: &Arc<Mutex<Environment>>) -> LuaRes
     // Trailing newlines are stripped, matching `$(cmd)`: the shell's own capture does it, and a
     // Lua script comparing against "x" should not have to remember the command printed "x\n".
     let env_capture = Arc::clone(env);
-    oslo.set(
-        "capture",
-        lua.create_function(move |lua, cmd: String| {
-            let mut guard = borrow_env(&env_capture)?;
-            let captured = crate::exec::eval_command_substitution(&mut guard, &cmd);
-            // The substitution records its own child's status separately — `last_status` is the
-            // shell's, which a capture does not touch, so reading that gave every command 0.
-            let status = guard
-                .take_substitution_status()
-                .unwrap_or(guard.last_status);
-            drop(guard);
-            let result = lua.create_table()?;
-            match captured {
-                Ok(out) => {
-                    result.set("out", out.trim_end_matches('\n'))?;
-                    result.set("status", status)?;
-                }
-                Err(e) => {
-                    result.set("out", "")?;
-                    result.set("status", e.failure_status())?;
-                }
+    put(oslo, "capture", move |_, args| {
+        let cmd = text(&args, 1, "capture")?;
+        let mut guard = borrow_env(&env_capture)?;
+        let captured = crate::exec::eval_command_substitution(&mut guard, &cmd);
+        // The substitution records its own child's status separately — `last_status` is the
+        // shell's, which a capture does not touch, so reading that gave every command 0.
+        let status = guard
+            .take_substitution_status()
+            .unwrap_or(guard.last_status);
+        drop(guard);
+
+        let mut result = Table::new();
+        match captured {
+            Ok(out) => {
+                result.set(Value::str("out"), Value::str(out.trim_end_matches('\n')));
+                result.set(Value::str("status"), Value::int(status as i64));
             }
-            Ok(result)
-        })?,
-    )?;
-    Ok(())
+            Err(e) => {
+                result.set(Value::str("out"), Value::str(""));
+                result.set(Value::str("status"), Value::int(e.failure_status() as i64));
+            }
+        }
+        Ok(vec![Value::table(result)])
+    });
 }
 
 /// Shell and environment variables.
-fn variables(lua: &Lua, oslo: &LuaTable, env: &Arc<Mutex<Environment>>) -> LuaResult<()> {
+fn variables(oslo: &mut Table, env: &Arc<Mutex<Environment>>) {
     let env_get = Arc::clone(env);
-    oslo.set(
-        "get_var",
-        lua.create_function(move |_, name: String| Ok(borrow_env(&env_get)?.get_param(&name)))?,
-    )?;
+    put(oslo, "get_var", move |_, args| {
+        let name = text(&args, 1, "get_var")?;
+        Ok(vec![match borrow_env(&env_get)?.get_param(&name) {
+            Some(value) => Value::str(value),
+            None => Value::Nil,
+        }])
+    });
 
     let env_set = Arc::clone(env);
-    oslo.set(
-        "set_var",
-        lua.create_function(move |_, (name, value): (String, String)| {
-            borrow_env(&env_set)?.set_var(&name, &value, true);
-            Ok(())
-        })?,
-    )?;
+    put(oslo, "set_var", move |_, args| {
+        let name = text(&args, 1, "set_var")?;
+        let value = text(&args, 2, "set_var")?;
+        borrow_env(&env_set)?.set_var(&name, &value, true);
+        Ok(Vec::new())
+    });
 
     // oslo.unset(name) -> true. The other half of set_var; without it a script could create a
     // variable and never remove one.
     let env_unset = Arc::clone(env);
-    oslo.set(
-        "unset",
-        lua.create_function(move |_, name: String| {
-            borrow_env(&env_unset)?.unset_var(&name);
-            Ok(true)
-        })?,
-    )?;
+    put(oslo, "unset", move |_, args| {
+        let name = text(&args, 1, "unset")?;
+        borrow_env(&env_unset)?.unset_var(&name);
+        Ok(vec![Value::Bool(true)])
+    });
 
     // oslo.env() -> { NAME = value, ... }, the exported environment as one table.
     //
@@ -119,31 +149,25 @@ fn variables(lua: &Lua, oslo: &LuaTable, env: &Arc<Mutex<Environment>>) -> LuaRe
     // not iterate the environment, filter it, or copy it. Exported names only: those are what a
     // child process would see, which is the question a script is usually asking.
     let env_all = Arc::clone(env);
-    oslo.set(
-        "env",
-        lua.create_function(move |lua, ()| {
-            let guard = borrow_env(&env_all)?;
-            let table = lua.create_table()?;
-            for (name, value) in guard.exported_vars() {
-                table.set(name, value)?;
-            }
-            Ok(table)
-        })?,
-    )?;
-    Ok(())
+    put(oslo, "env", move |_, _| {
+        let guard = borrow_env(&env_all)?;
+        let mut table = Table::new();
+        for (name, value) in guard.exported_vars() {
+            table.set(Value::str(name), Value::str(value));
+        }
+        Ok(vec![Value::table(table)])
+    });
 }
 
 /// The working directory and pathname expansion.
-fn filesystem(lua: &Lua, oslo: &LuaTable, env: &Arc<Mutex<Environment>>) -> LuaResult<()> {
-    oslo.set(
-        "get_pwd",
-        lua.create_function(|_, ()| {
-            Ok(std::env::current_dir()
+fn filesystem(oslo: &mut Table, env: &Arc<Mutex<Environment>>) {
+    put(oslo, "get_pwd", |_, _| {
+        Ok(vec![Value::str(
+            std::env::current_dir()
                 .unwrap_or_default()
-                .to_string_lossy()
-                .to_string())
-        })?,
-    )?;
+                .to_string_lossy(),
+        )])
+    });
 
     // oslo.cd(path) -> true, or nil + message.
     //
@@ -151,18 +175,19 @@ fn filesystem(lua: &Lua, oslo: &LuaTable, env: &Arc<Mutex<Environment>>) -> LuaR
     // `$OLDPWD` and the directory stack agree with it afterwards — a Lua script that moved the
     // process without telling the shell would leave `pwd` reporting the old directory.
     let env_cd = Arc::clone(env);
-    oslo.set(
-        "cd",
-        lua.create_function(move |_, path: String| {
-            let mut guard = borrow_env(&env_cd)?;
-            let args = vec!["cd".to_string(), path.clone()];
-            match crate::env::builtins::builtin_cd(&mut guard, &args) {
-                Ok(0) => Ok((Some(true), None)),
-                Ok(_) => Ok((None, Some(format!("cd: {}: cannot change directory", path)))),
-                Err(e) => Ok((None, Some(e.to_string()))),
-            }
-        })?,
-    )?;
+    put(oslo, "cd", move |_, args| {
+        let path = text(&args, 1, "cd")?;
+        let mut guard = borrow_env(&env_cd)?;
+        let argv = vec!["cd".to_string(), path.clone()];
+        Ok(match crate::env::builtins::builtin_cd(&mut guard, &argv) {
+            Ok(0) => vec![Value::Bool(true)],
+            Ok(_) => vec![
+                Value::Nil,
+                Value::str(format!("cd: {path}: cannot change directory")),
+            ],
+            Err(e) => vec![Value::Nil, Value::str(e.to_string())],
+        })
+    });
 
     // oslo.glob(pattern) -> { "a", "b", ... }, in the shell's own sorted order.
     //
@@ -170,53 +195,48 @@ fn filesystem(lua: &Lua, oslo: &LuaTable, env: &Arc<Mutex<Environment>>) -> LuaR
     // meant shelling out. An empty table for no matches, never the pattern itself: returning the
     // unmatched pattern is a shell convention that has surprised people for forty years, and Lua
     // code checking `#matches == 0` is what a caller will naturally write.
-    oslo.set(
-        "glob",
-        lua.create_function(|lua, pattern: String| {
-            let table = lua.create_table()?;
-            // One unquoted run, which is what makes every metacharacter in the string live —
-            // the caller passed a pattern, not a word that might have been quoted.
-            let field = [crate::expand::Run::new(
-                pattern.clone(),
-                crate::expand::Origin::Literal,
-            )];
-            let matches = crate::expand::glob::expand_glob(&field);
-            // `expand_glob` yields the pattern back when nothing matched, the way an unquoted word
-            // does in a command line. Here that would be a lie, so it becomes an empty table.
-            let matches = if matches == vec![pattern.clone()] {
-                Vec::new()
-            } else {
-                matches
-            };
-            for (i, path) in matches.into_iter().enumerate() {
-                table.set(i + 1, path)?;
-            }
-            Ok(table)
-        })?,
-    )?;
-    Ok(())
+    put(oslo, "glob", |_, args| {
+        let pattern = text(&args, 1, "glob")?;
+        // One unquoted run, which is what makes every metacharacter in the string live — the
+        // caller passed a pattern, not a word that might have been quoted.
+        let field = [crate::expand::Run::new(
+            pattern.clone(),
+            crate::expand::Origin::Literal,
+        )];
+        let matches = crate::expand::glob::expand_glob(&field);
+        // `expand_glob` yields the pattern back when nothing matched, the way an unquoted word
+        // does in a command line. Here that would be a lie, so it becomes an empty table.
+        let matches = if matches == vec![pattern] {
+            Vec::new()
+        } else {
+            matches
+        };
+        let mut table = Table::new();
+        for (i, path) in matches.into_iter().enumerate() {
+            table.set(Value::int(i as i64 + 1), Value::str(path));
+        }
+        Ok(vec![Value::table(table)])
+    });
 }
 
 /// Aliases, builtins, the prompt, and the shell's exit status.
-fn shell(lua: &Lua, oslo: &LuaTable, env: &Arc<Mutex<Environment>>) -> LuaResult<()> {
+fn shell(oslo: &mut Table, registry: &Registry, env: &Arc<Mutex<Environment>>) {
     let env_alias = Arc::clone(env);
-    oslo.set(
-        "set_alias",
-        lua.create_function(move |_, (name, target): (String, String)| {
-            borrow_env(&env_alias)?.set_alias(&name, &target);
-            Ok(())
-        })?,
-    )?;
+    put(oslo, "set_alias", move |_, args| {
+        let name = text(&args, 1, "set_alias")?;
+        let target = text(&args, 2, "set_alias")?;
+        borrow_env(&env_alias)?.set_alias(&name, &target);
+        Ok(Vec::new())
+    });
 
     let env_get_alias = Arc::clone(env);
-    oslo.set(
-        "get_alias",
-        lua.create_function(move |_, name: String| {
-            Ok(borrow_env(&env_get_alias)?
-                .get_alias(&name)
-                .map(str::to_string))
-        })?,
-    )?;
+    put(oslo, "get_alias", move |_, args| {
+        let name = text(&args, 1, "get_alias")?;
+        Ok(vec![match borrow_env(&env_get_alias)?.get_alias(&name) {
+            Some(target) => Value::str(target),
+            None => Value::Nil,
+        }])
+    });
 
     // oslo.exit(code) -> never returns.
     //
@@ -224,12 +244,13 @@ fn shell(lua: &Lua, oslo: &LuaTable, env: &Arc<Mutex<Environment>>) -> LuaResult
     // choose an exit status was `oslo.exec("exit 3")`, which is a shell command pretending to be
     // a language feature. `os.exit` would leave the shell's own cleanup — the EXIT trap, the
     // flush — unrun, so this goes through the shell's exit path instead.
-    oslo.set(
-        "exit",
-        lua.create_function(|_, code: Option<i32>| -> LuaResult<()> {
-            Err(crate::error::ShellError::Exit(code.unwrap_or(0)).into_lua_err())
-        })?,
-    )?;
+    put(oslo, "exit", |_, args| {
+        let code = match args.first() {
+            Some(v) => v.as_number().map(|n| n.as_float() as i32).unwrap_or(0),
+            None => 0,
+        };
+        Err(LuaError::exit_request(code))
+    });
 
     // oslo.register_builtin(name, callback)
     //
@@ -237,34 +258,43 @@ fn shell(lua: &Lua, oslo: &LuaTable, env: &Arc<Mutex<Environment>>) -> LuaResult
     // registered under the name instead, which is worse than doing nothing:
     // `oslo.register_builtin('ls', …)` made `ls /` print nothing and exit 0.
     let env_builtin = Arc::clone(env);
-    oslo.set(
-        "register_builtin",
-        lua.create_function(move |lua, (name, func): (String, LuaFunction)| {
-            let name = name.trim().to_string();
-            if name.is_empty() {
-                return Err(mlua::Error::runtime(
-                    "oslo.register_builtin: the builtin name must not be empty",
-                ));
-            }
-            // Registered with the interpreter first: if this fails there is no name in the
-            // shell's registry pointing at a callback that is not there.
-            lua.set_named_registry_value(&format!("{}{}", BUILTIN_KEY_PREFIX, name), func)?;
-            let mut guard = borrow_env(&env_builtin)?;
-            let key = name.clone();
-            guard.register_dynamic_builtin(&name, move |_env, args| {
-                Ok(call_lua_builtin(&key, args))
-            });
-            Ok(())
-        })?,
-    )?;
+    let registry_builtin = Rc::clone(registry);
+    put(oslo, "register_builtin", move |_, args| {
+        let name = text(&args, 1, "register_builtin")?.trim().to_string();
+        if name.is_empty() {
+            return Err(LuaError::new(
+                "oslo.register_builtin: the builtin name must not be empty",
+            ));
+        }
+        let Some(callback @ Value::Function(_)) = args.get(1) else {
+            return Err(LuaError::new(
+                "oslo.register_builtin: the second argument must be a function",
+            ));
+        };
+        // Stored first: if the shell registration fails there is no name in the registry
+        // pointing at a callback that is not there.
+        registry_builtin
+            .borrow_mut()
+            .insert(format!("{BUILTIN_KEY_PREFIX}{name}"), callback.clone());
 
-    oslo.set(
-        "set_prompt",
-        lua.create_function(|lua, func: LuaFunction| {
-            lua.set_named_registry_value("oslo_prompt_fn", func)?;
-            Ok(())
-        })?,
-    )?;
+        let mut guard = borrow_env(&env_builtin)?;
+        let key = name.clone();
+        guard.register_dynamic_builtin(&name, move |_env, args| Ok(call_lua_builtin(&key, args)));
+        Ok(Vec::new())
+    });
+
+    let registry_prompt = Rc::clone(registry);
+    put(oslo, "set_prompt", move |_, args| {
+        let Some(f @ Value::Function(_)) = args.first() else {
+            return Err(LuaError::new(
+                "oslo.set_prompt: the argument must be a function",
+            ));
+        };
+        registry_prompt
+            .borrow_mut()
+            .insert(PROMPT_KEY.to_string(), f.clone());
+        Ok(Vec::new())
+    });
 
     // There is deliberately no `oslo.set_right_prompt` (PLAN R9.7). It was registered, and
     // `render_right_prompt` had no caller anywhere, so a script that set one saw nothing.
@@ -272,5 +302,4 @@ fn shell(lua: &Lua, oslo: &LuaTable, env: &Arc<Mutex<Environment>>) -> LuaResult
     // handing the line over — and rustyline repaints from the prompt to end-of-line on every
     // keystroke, erasing it again. Advertising an API that cannot work is worse than not having
     // one; if it comes back it comes back with a line editor that supports it.
-    Ok(())
 }

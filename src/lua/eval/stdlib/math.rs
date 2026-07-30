@@ -9,7 +9,7 @@ use super::super::{Interp, LuaError, LuaResult};
 use super::{arg, arg_int, module, native};
 use std::cell::Cell;
 
-pub fn install(interp: &mut Interp) {
+pub fn install(interp: &Interp) {
     let library = module(vec![
         ("floor", native("math.floor", floor)),
         ("ceil", native("math.ceil", ceil)),
@@ -51,19 +51,19 @@ fn number(args: &[Value], function: &str) -> LuaResult<Number> {
 
 /// Wrap an `f64 -> f64` as a Lua function, since most of the library is exactly that.
 fn float1(name: &'static str, f: fn(f64) -> f64) -> Value {
-    native(name, move |_: &mut Interp, args: Vec<Value>| {
+    native(name, move |_: &Interp, args: Vec<Value>| {
         Ok(vec![Value::float(f(number(&args, name)?.as_float()))])
     })
 }
 
-fn floor(_: &mut Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
+fn floor(_: &Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
     Ok(vec![match number(&args, "floor")? {
         Number::Int(i) => Value::int(i),
         Number::Float(f) => integral(f.floor()),
     }])
 }
 
-fn ceil(_: &mut Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
+fn ceil(_: &Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
     Ok(vec![match number(&args, "ceil")? {
         Number::Int(i) => Value::int(i),
         Number::Float(f) => integral(f.ceil()),
@@ -79,7 +79,7 @@ fn integral(f: f64) -> Value {
     }
 }
 
-fn abs(_: &mut Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
+fn abs(_: &Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
     Ok(vec![match number(&args, "abs")? {
         // Wrapping, as Lua's integer arithmetic does throughout: `math.abs(math.mininteger)` is
         // `math.mininteger`, because the positive value has no representation.
@@ -88,15 +88,15 @@ fn abs(_: &mut Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
     }])
 }
 
-fn max(interp: &mut Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
+fn max(interp: &Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
     extremum(interp, args, "max")
 }
 
-fn min(interp: &mut Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
+fn min(interp: &Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
     extremum(interp, args, "min")
 }
 
-fn extremum(_: &mut Interp, args: Vec<Value>, which: &str) -> LuaResult<Vec<Value>> {
+fn extremum(_: &Interp, args: Vec<Value>, which: &str) -> LuaResult<Vec<Value>> {
     if args.is_empty() {
         return Err(LuaError::new(format!(
             "bad argument #1 to '{which}' (number expected, got no value)"
@@ -125,7 +125,7 @@ fn extremum(_: &mut Interp, args: Vec<Value>, which: &str) -> LuaResult<Vec<Valu
     Ok(vec![best])
 }
 
-fn log(_: &mut Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
+fn log(_: &Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
     let x = number(&args, "log")?.as_float();
     Ok(vec![Value::float(match args.get(1) {
         Some(Value::Nil) | None => x.ln(),
@@ -140,7 +140,7 @@ fn log(_: &mut Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
     })])
 }
 
-fn fmod(_: &mut Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
+fn fmod(_: &Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
     let x = number(&args, "fmod")?.as_float();
     let y = arg(&args, 2)
         .as_number()
@@ -150,13 +150,13 @@ fn fmod(_: &mut Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
     Ok(vec![Value::float(x % y)])
 }
 
-fn modf(_: &mut Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
+fn modf(_: &Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
     let x = number(&args, "modf")?.as_float();
     let whole = x.trunc();
     Ok(vec![integral(whole), Value::float(x - whole)])
 }
 
-fn tointeger(_: &mut Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
+fn tointeger(_: &Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
     Ok(vec![match arg(&args, 1) {
         Value::Number(n) => n.as_int().map(Value::int).unwrap_or(Value::Nil),
         // A string is not converted: `math.tointeger("3")` is nil in 5.4, unlike the arithmetic
@@ -165,7 +165,7 @@ fn tointeger(_: &mut Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
     }])
 }
 
-fn subtype(_: &mut Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
+fn subtype(_: &Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
     Ok(vec![match arg(&args, 1) {
         Value::Number(Number::Int(_)) => Value::str("integer"),
         Value::Number(Number::Float(_)) => Value::str("float"),
@@ -193,7 +193,7 @@ fn next_random() -> u64 {
     })
 }
 
-fn random(_: &mut Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
+fn random(_: &Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
     let raw = next_random();
     match args.len() {
         // No arguments: a float in [0, 1).
@@ -215,7 +215,7 @@ fn random(_: &mut Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
     }
 }
 
-fn randomseed(_: &mut Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
+fn randomseed(_: &Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
     let seed = match args.first() {
         Some(v) => v.as_number().map(|n| n.as_float() as i64).unwrap_or(0),
         // Lua 5.4 seeds from something varying when called with no argument.

@@ -12,7 +12,7 @@ use full_moon::ast::{Block, Expression, LastStmt, Stmt, Var};
 use std::rc::Rc;
 
 /// Run every statement in a block, in the scope given.
-pub fn exec_block(interp: &mut Interp, block: &Block, scope: &Rc<Scope>) -> LuaResult<Flow> {
+pub fn exec_block(interp: &Interp, block: &Block, scope: &Rc<Scope>) -> LuaResult<Flow> {
     for statement in block.stmts() {
         match exec_stmt(interp, statement, scope)? {
             Flow::Normal => {}
@@ -40,7 +40,12 @@ pub fn exec_block(interp: &mut Interp, block: &Block, scope: &Rc<Scope>) -> LuaR
     }
 }
 
-fn exec_stmt(interp: &mut Interp, statement: &Stmt, scope: &Rc<Scope>) -> LuaResult<Flow> {
+fn exec_stmt(interp: &Interp, statement: &Stmt, scope: &Rc<Scope>) -> LuaResult<Flow> {
+    // Per statement is the granularity Lua itself reports at, and it is what lets a native
+    // function — `error`, or any `oslo.*` call — say which line raised it.
+    if let Some(position) = full_moon::node::Node::start_position(statement) {
+        interp.set_line(position.line());
+    }
     match statement {
         Stmt::LocalAssignment(local) => {
             let values = value_list(interp, local.expressions().iter(), scope)?;
@@ -265,7 +270,7 @@ fn with_self(function: Value) -> Value {
 
 /// Evaluate a comma-separated expression list, expanding only the last one.
 fn value_list<'a>(
-    interp: &mut Interp,
+    interp: &Interp,
     expressions: impl Iterator<Item = &'a Expression>,
     scope: &Rc<Scope>,
 ) -> LuaResult<Vec<Value>> {
@@ -282,7 +287,7 @@ fn value_list<'a>(
 }
 
 /// Write to an assignment target: a bare name, or a field of something.
-fn assign(interp: &mut Interp, target: &Var, value: Value, scope: &Rc<Scope>) -> LuaResult<()> {
+fn assign(interp: &Interp, target: &Var, value: Value, scope: &Rc<Scope>) -> LuaResult<()> {
     match target {
         Var::Name(name) => {
             let text = name.token().to_string();
@@ -328,7 +333,7 @@ fn assign(interp: &mut Interp, target: &Var, value: Value, scope: &Rc<Scope>) ->
 
 /// Follow one suffix while locating an assignment target.
 fn step(
-    interp: &mut Interp,
+    interp: &Interp,
     current: Value,
     suffix: &full_moon::ast::Suffix,
     scope: &Rc<Scope>,
@@ -348,7 +353,7 @@ fn step(
 
 /// A numeric-for bound, as a float, with Lua's error wording.
 fn number(
-    interp: &mut Interp,
+    interp: &Interp,
     expression: &Expression,
     scope: &Rc<Scope>,
     what: &str,
@@ -361,7 +366,7 @@ fn number(
 }
 
 /// Whether a for-loop bound is an integer, deciding what the loop variable binds as.
-fn is_int(interp: &mut Interp, expression: &Expression, scope: &Rc<Scope>) -> bool {
+fn is_int(interp: &Interp, expression: &Expression, scope: &Rc<Scope>) -> bool {
     matches!(
         expr::eval(interp, expression, scope)
             .ok()

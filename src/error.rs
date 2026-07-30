@@ -23,7 +23,7 @@ pub enum ShellError {
     Io(#[from] std::io::Error),
 
     #[error("Lua error: {0}")]
-    Lua(#[from] mlua::Error),
+    Lua(#[from] crate::lua::eval::LuaError),
 
     #[error("POSIX error: {0}")]
     Nix(#[from] nix::Error),

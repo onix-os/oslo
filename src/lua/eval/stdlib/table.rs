@@ -4,7 +4,7 @@ use super::super::value::{Table, Value};
 use super::super::{Interp, LuaError, LuaResult, ops};
 use super::{arg, arg_int, arg_str, arg_table, module, native};
 
-pub fn install(interp: &mut Interp) {
+pub fn install(interp: &Interp) {
     let unpack_fn = native("table.unpack", unpack);
     let library = module(vec![
         ("insert", native("table.insert", insert)),
@@ -21,7 +21,7 @@ pub fn install(interp: &mut Interp) {
     interp.set_global("unpack", unpack_fn);
 }
 
-fn insert(_: &mut Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
+fn insert(_: &Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
     let t = arg_table(&args, 1, "insert")?;
     let length = t.borrow().length();
     match args.len() {
@@ -49,7 +49,7 @@ fn insert(_: &mut Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
     Ok(Vec::new())
 }
 
-fn remove(_: &mut Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
+fn remove(_: &Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
     let t = arg_table(&args, 1, "remove")?;
     let length = t.borrow().length();
     let position = match args.get(1) {
@@ -77,7 +77,7 @@ fn remove(_: &mut Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
     Ok(vec![removed])
 }
 
-fn concat(interp: &mut Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
+fn concat(interp: &Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
     let t = arg_table(&args, 1, "concat")?;
     let separator = match args.get(1) {
         Some(Value::Nil) | None => String::new(),
@@ -116,7 +116,7 @@ fn concat(interp: &mut Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
     Ok(vec![Value::str(out)])
 }
 
-fn sort(interp: &mut Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
+fn sort(interp: &Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
     let t = arg_table(&args, 1, "sort")?;
     let comparator = arg(&args, 2);
     let length = t.borrow().length();
@@ -136,7 +136,7 @@ fn sort(interp: &mut Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
 }
 
 fn merge_sort(
-    interp: &mut Interp,
+    interp: &Interp,
     items: &mut Vec<Value>,
     comparator: &Value,
 ) -> LuaResult<Vec<Value>> {
@@ -164,7 +164,7 @@ fn merge_sort(
 }
 
 /// `a < b`, through the script's comparator when it gave one.
-fn less(interp: &mut Interp, comparator: &Value, a: &Value, b: &Value) -> LuaResult<bool> {
+fn less(interp: &Interp, comparator: &Value, a: &Value, b: &Value) -> LuaResult<bool> {
     if matches!(comparator, Value::Nil) {
         return ops::compare(interp, "<", a, b);
     }
@@ -174,7 +174,7 @@ fn less(interp: &mut Interp, comparator: &Value, a: &Value, b: &Value) -> LuaRes
         .is_some_and(Value::truthy))
 }
 
-fn unpack(_: &mut Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
+fn unpack(_: &Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
     let t = arg_table(&args, 1, "unpack")?;
     let from = match args.get(1) {
         Some(Value::Nil) | None => 1,
@@ -192,7 +192,7 @@ fn unpack(_: &mut Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
         .collect())
 }
 
-fn pack(_: &mut Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
+fn pack(_: &Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
     let mut table = Table::new();
     let n = args.len();
     for (i, value) in args.into_iter().enumerate() {

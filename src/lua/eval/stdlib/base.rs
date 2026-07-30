@@ -6,7 +6,7 @@ use super::{arg, arg_int, arg_str, arg_table, native};
 use std::io::Write;
 use std::rc::Rc;
 
-pub fn install(interp: &mut Interp) {
+pub fn install(interp: &Interp) {
     interp.set_global("print", native("print", print));
     interp.set_global("type", native("type", lua_type));
     interp.set_global("tostring", native("tostring", tostring));
@@ -27,7 +27,7 @@ pub fn install(interp: &mut Interp) {
     interp.set_global("getmetatable", native("getmetatable", getmetatable));
 }
 
-fn print(interp: &mut Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
+fn print(interp: &Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
     let mut line = String::new();
     for (i, value) in args.iter().enumerate() {
         if i > 0 {
@@ -46,19 +46,19 @@ fn print(interp: &mut Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
     Ok(Vec::new())
 }
 
-fn lua_type(_: &mut Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
+fn lua_type(_: &Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
     if args.is_empty() {
         return Err(LuaError::new("bad argument #1 to 'type' (value expected)"));
     }
     Ok(vec![Value::str(args[0].type_name())])
 }
 
-fn tostring(interp: &mut Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
+fn tostring(interp: &Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
     let text = ops::tostring(interp, &arg(&args, 1))?;
     Ok(vec![Value::str(text)])
 }
 
-fn tonumber(_: &mut Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
+fn tonumber(_: &Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
     let value = arg(&args, 1);
     // With a base, the argument is a string of digits in that base and nothing else — notably
     // `tonumber("10", 2)` is 2, while `tonumber("10")` is 10.
@@ -83,7 +83,7 @@ fn tonumber(_: &mut Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
     }])
 }
 
-fn ipairs(_: &mut Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
+fn ipairs(_: &Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
     let table = arg(&args, 1);
     if matches!(table, Value::Nil) {
         return Err(LuaError::new(
@@ -103,7 +103,7 @@ fn ipairs(_: &mut Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
     Ok(vec![step, table, Value::int(0)])
 }
 
-fn pairs(interp: &mut Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
+fn pairs(interp: &Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
     let table = arg(&args, 1);
     // `__pairs` lets a table define its own iteration; Lua 5.4 still honours it.
     if let Some(handler) = ops::metamethod(&table, "__pairs") {
@@ -129,7 +129,7 @@ fn pairs(interp: &mut Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
     Ok(vec![step, Value::Table(t), Value::Nil])
 }
 
-fn next(_: &mut Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
+fn next(_: &Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
     let t = arg_table(&args, 1, "next")?;
     let entries = t.borrow().pairs();
     let key = arg(&args, 2);
@@ -147,14 +147,14 @@ fn next(_: &mut Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
     })
 }
 
-fn error(_: &mut Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
+fn error(_: &Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
     // Real Lua propagates the error *value*, so `error({code = 2})` is catchable as a table. This
     // evaluator carries a message only; a non-string is rendered rather than preserved, which is
     // the one place `pcall` is lossy. Recorded in PLAN-LUA.md.
     Err(LuaError::new(arg(&args, 1).to_display()))
 }
 
-fn assert(_: &mut Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
+fn assert(_: &Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
     if arg(&args, 1).truthy() {
         return Ok(args);
     }
@@ -164,7 +164,7 @@ fn assert(_: &mut Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
     }))
 }
 
-fn pcall(interp: &mut Interp, mut args: Vec<Value>) -> LuaResult<Vec<Value>> {
+fn pcall(interp: &Interp, mut args: Vec<Value>) -> LuaResult<Vec<Value>> {
     if args.is_empty() {
         return Err(LuaError::new("bad argument #1 to 'pcall' (value expected)"));
     }
@@ -175,11 +175,17 @@ fn pcall(interp: &mut Interp, mut args: Vec<Value>) -> LuaResult<Vec<Value>> {
             out.extend(values);
             Ok(out)
         }
-        Err(e) => Ok(vec![Value::Bool(false), Value::str(e.to_string())]),
+        // An `oslo.exit` request is not a failure and must not be caught: `pcall(oslo.exit)` has
+        // to end the shell, or a script could accidentally trap its own exit.
+        Err(e) if e.exit.is_some() => Err(e),
+        Err(e) => Ok(vec![
+            Value::Bool(false),
+            Value::str(e.value_string(&interp.chunk_name())),
+        ]),
     }
 }
 
-fn xpcall(interp: &mut Interp, mut args: Vec<Value>) -> LuaResult<Vec<Value>> {
+fn xpcall(interp: &Interp, mut args: Vec<Value>) -> LuaResult<Vec<Value>> {
     if args.len() < 2 {
         return Err(LuaError::new(
             "bad argument #2 to 'xpcall' (value expected)",
@@ -193,11 +199,15 @@ fn xpcall(interp: &mut Interp, mut args: Vec<Value>) -> LuaResult<Vec<Value>> {
             out.extend(values);
             Ok(out)
         }
+        Err(e) if e.exit.is_some() => Err(e),
         Err(e) => {
             // The handler runs after unwinding rather than at the point of the error, so it cannot
             // see the failing frame's locals. Only `debug.traceback` would notice, and that is a
             // stub here anyway.
-            let handled = interp.call(&handler, vec![Value::str(e.to_string())])?;
+            let handled = interp.call(
+                &handler,
+                vec![Value::str(e.value_string(&interp.chunk_name()))],
+            )?;
             let mut out = vec![Value::Bool(false)];
             out.extend(handled);
             Ok(out)
@@ -205,7 +215,7 @@ fn xpcall(interp: &mut Interp, mut args: Vec<Value>) -> LuaResult<Vec<Value>> {
     }
 }
 
-fn select(_: &mut Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
+fn select(_: &Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
     let rest = &args[1.min(args.len())..];
     if let Value::Str(s) = arg(&args, 1)
         && &*s == "#"
@@ -231,23 +241,23 @@ fn select(_: &mut Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
     Ok(rest.get(n as usize - 1..).unwrap_or_default().to_vec())
 }
 
-fn rawget(_: &mut Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
+fn rawget(_: &Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
     let t = arg_table(&args, 1, "rawget")?;
     let value = t.borrow().get(&arg(&args, 2));
     Ok(vec![value])
 }
 
-fn rawset(_: &mut Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
+fn rawset(_: &Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
     let t = arg_table(&args, 1, "rawset")?;
     t.borrow_mut().set(arg(&args, 2), arg(&args, 3));
     Ok(vec![Value::Table(t)])
 }
 
-fn rawequal(_: &mut Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
+fn rawequal(_: &Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
     Ok(vec![Value::Bool(arg(&args, 1).lua_eq(&arg(&args, 2)))])
 }
 
-fn rawlen(_: &mut Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
+fn rawlen(_: &Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
     Ok(vec![match arg(&args, 1) {
         Value::Table(t) => Value::Number(Number::Int(t.borrow().length())),
         Value::Str(s) => Value::int(s.len() as i64),
@@ -260,7 +270,7 @@ fn rawlen(_: &mut Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
     }])
 }
 
-fn setmetatable(_: &mut Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
+fn setmetatable(_: &Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
     let t = arg_table(&args, 1, "setmetatable")?;
     match arg(&args, 2) {
         Value::Nil => t.borrow_mut().metatable = None,
@@ -275,7 +285,7 @@ fn setmetatable(_: &mut Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
     Ok(vec![Value::Table(t)])
 }
 
-fn getmetatable(_: &mut Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
+fn getmetatable(_: &Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
     let Value::Table(t) = arg(&args, 1) else {
         return Ok(vec![Value::Nil]);
     };

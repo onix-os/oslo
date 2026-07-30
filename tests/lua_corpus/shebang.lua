@@ -7,8 +7,8 @@
 -- test — which is what this corpus is for.
 print("shebang did not reach the parser")
 -- The shebang is blanked rather than removed, so line numbers still point at the source. An
--- error reports its own line, which is how that is visible without the `debug` library (mlua
--- does not load it).
+-- error reports its own line, which is how that is visible without walking a traceback. The
+-- expected line below is 12, so this comment has to stay two lines long.
 local _, message = pcall(function() error("mark") end)
 print("error reports line " .. message:match(":(%d+):"))
 --[[ expect

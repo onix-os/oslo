@@ -33,25 +33,44 @@ pub mod value;
 pub use scope::{Closure, Scope};
 pub use value::{Number, Table, Value};
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 /// A Lua error: the message, where it happened, and the call stack under it.
 #[derive(Debug, Clone)]
 pub struct LuaError {
     pub message: String,
+    /// What the source was called — a path, or `-c`. Stamped as the error leaves the chunk.
+    pub chunk: Option<String>,
     /// Source line, when the AST node carried one.
     pub line: Option<usize>,
     /// Innermost frame last, for the traceback.
     pub frames: Vec<String>,
+    /// Set when this is `oslo.exit(n)` rather than a failure.
+    ///
+    /// An exit travels as an error because unwinding is the only way out of a call that is
+    /// several Lua frames deep. It is deliberately *not* catchable: `pcall` re-raises it, so
+    /// `pcall(oslo.exit)` ends the shell rather than reporting a caught error, which is what
+    /// "never returns" has to mean.
+    pub exit: Option<i32>,
 }
 
 impl LuaError {
     pub fn new(message: impl Into<String>) -> Self {
         LuaError {
             message: message.into(),
+            chunk: None,
             line: None,
             frames: Vec::new(),
+            exit: None,
+        }
+    }
+
+    /// A request to end the shell with `status`, dressed as an error so that it unwinds.
+    pub fn exit_request(status: i32) -> Self {
+        LuaError {
+            exit: Some(status),
+            ..LuaError::new(format!("exit {status}"))
         }
     }
 
@@ -70,12 +89,28 @@ impl LuaError {
         self
     }
 
-    /// The message a user sees, with the traceback the plan calls for.
-    pub fn report(&self, chunk: &str) -> String {
-        let mut out = match self.line {
+    /// Name the source this came out of, if it is not already named.
+    pub fn in_chunk(mut self, chunk: impl Into<String>) -> Self {
+        if self.chunk.is_none() {
+            self.chunk = Some(chunk.into());
+        }
+        self
+    }
+
+    /// The error as Lua's own *value*: `chunk:line: message`.
+    ///
+    /// This is what `pcall` hands back, and scripts parse it — `message:match(":(%d+):")` to find
+    /// the line is a common idiom, and `error("x")` reaching a handler as a bare `x` breaks it.
+    pub fn value_string(&self, chunk: &str) -> String {
+        match self.line {
             Some(line) => format!("{chunk}:{line}: {}", self.message),
-            None => format!("{chunk}: {}", self.message),
-        };
+            None => self.message.clone(),
+        }
+    }
+
+    /// The message a user sees, with the traceback the plan calls for.
+    pub fn report(&self) -> String {
+        let mut out = self.to_string();
         if !self.frames.is_empty() {
             out.push_str("\nstack traceback:");
             for frame in self.frames.iter().rev() {
@@ -87,11 +122,18 @@ impl LuaError {
     }
 }
 
+impl std::error::Error for LuaError {}
+
 impl std::fmt::Display for LuaError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self.line {
-            Some(line) => write!(f, "{}: {}", line, self.message),
-            None => f.write_str(&self.message),
+        // Lua's own `file:line: message`, with each part dropped when it is not known — a syntax
+        // error has a chunk but no line, and an error raised before any chunk was named has
+        // neither.
+        match (&self.chunk, self.line) {
+            (Some(chunk), Some(line)) => write!(f, "{chunk}:{line}: {}", self.message),
+            (Some(chunk), None) => write!(f, "{chunk}: {}", self.message),
+            (None, Some(line)) => write!(f, "{line}: {}", self.message),
+            (None, None) => f.write_str(&self.message),
         }
     }
 }
@@ -109,15 +151,29 @@ pub enum Flow {
 }
 
 /// The interpreter: global state plus whatever the host attaches to it.
+///
+/// Every method takes `&self`, with the mutable parts behind `Cell`/`RefCell`. That is not a
+/// stylistic choice — it is what makes the two interfaces re-entrant with each other. A Lua
+/// script calls `oslo.exec("build")`, the shell runs `build`, and `build` turns out to be a
+/// builtin the same script registered with `oslo.register_builtin`: control has to come back into
+/// the interpreter that is still part-way through the outer call. With `&mut self` that second
+/// entry is unreachable — the borrow is already out — and the honest workarounds are a raw
+/// pointer or a second interpreter that cannot see the first one's globals.
 pub struct Interp {
     pub globals: Rc<RefCell<Table>>,
-    /// Chunk name used in diagnostics.
-    pub chunk: String,
+    /// Chunk name used in diagnostics — a path, or `-c`.
+    chunk: RefCell<String>,
+    /// The line of the statement currently running.
+    ///
+    /// Tracked on the interpreter rather than threaded through every function because that is the
+    /// only place a *native* function can read it from: `error("x")` is Rust code with no view of
+    /// the AST, and it still has to produce `script.lua:12: x`.
+    line: Cell<usize>,
     /// Call depth, to turn runaway recursion into an error rather than a stack overflow that
     /// aborts the whole shell.
-    depth: usize,
+    depth: Cell<usize>,
     /// Varargs of the function currently running, for `...`.
-    pub varargs: Vec<Value>,
+    varargs: RefCell<Vec<Value>>,
 }
 
 /// Deep enough for any real script, shallow enough to unwind before the Rust stack gives out.
@@ -134,15 +190,50 @@ const MAX_DEPTH: usize = 200;
 
 impl Interp {
     pub fn new(chunk: impl Into<String>) -> Self {
-        let globals = Rc::new(RefCell::new(Table::new()));
-        let mut interp = Interp {
-            globals,
-            chunk: chunk.into(),
-            depth: 0,
-            varargs: Vec::new(),
+        let interp = Interp {
+            globals: Rc::new(RefCell::new(Table::new())),
+            chunk: RefCell::new(chunk.into()),
+            line: Cell::new(0),
+            depth: Cell::new(0),
+            varargs: RefCell::new(Vec::new()),
         };
-        stdlib::install(&mut interp);
+        stdlib::install(&interp);
         interp
+    }
+
+    /// What diagnostics call the source currently running.
+    pub fn chunk_name(&self) -> String {
+        self.chunk.borrow().clone()
+    }
+
+    /// Name the source about to run, so its errors point at the right file.
+    pub fn set_chunk(&self, name: impl Into<String>) {
+        *self.chunk.borrow_mut() = name.into();
+    }
+
+    /// The line currently executing.
+    pub fn line(&self) -> usize {
+        self.line.get()
+    }
+
+    /// Record the line about to execute.
+    pub fn set_line(&self, line: usize) {
+        self.line.set(line);
+    }
+
+    /// The varargs of the function currently running, for `...`.
+    pub fn varargs(&self) -> Vec<Value> {
+        self.varargs.borrow().clone()
+    }
+
+    /// Give the chunk itself a `...`, which is how a script reads its own arguments.
+    pub fn set_varargs(&self, values: Vec<Value>) {
+        *self.varargs.borrow_mut() = values;
+    }
+
+    /// Replace the varargs for the duration of a call, answering what was there before.
+    fn swap_varargs(&self, values: Vec<Value>) -> Vec<Value> {
+        self.varargs.replace(values)
     }
 
     /// Read a global.
@@ -156,16 +247,18 @@ impl Interp {
     }
 
     /// Run a parsed chunk, returning whatever it returned.
-    pub fn run_ast(&mut self, ast: &full_moon::ast::Ast) -> LuaResult<Vec<Value>> {
+    pub fn run_ast(&self, ast: &full_moon::ast::Ast) -> LuaResult<Vec<Value>> {
         let scope = Scope::root();
-        match stmt::exec_block(self, ast.nodes(), &scope)? {
+        let outcome =
+            stmt::exec_block(self, ast.nodes(), &scope).map_err(|e| e.at(self.line.get()));
+        match outcome? {
             Flow::Return(values) => Ok(values),
             _ => Ok(Vec::new()),
         }
     }
 
     /// Call any callable with `args`.
-    pub fn call(&mut self, callee: &Value, args: Vec<Value>) -> LuaResult<Vec<Value>> {
+    pub fn call(&self, callee: &Value, args: Vec<Value>) -> LuaResult<Vec<Value>> {
         let Value::Function(f) = callee else {
             // Before giving up, Lua consults `__call`, which is what makes callable tables work.
             if let Value::Table(t) = callee
@@ -181,23 +274,28 @@ impl Interp {
             )));
         };
 
-        self.depth += 1;
-        if self.depth > MAX_DEPTH {
-            self.depth -= 1;
+        self.depth.set(self.depth.get() + 1);
+        if self.depth.get() > MAX_DEPTH {
+            self.depth.set(self.depth.get() - 1);
             return Err(LuaError::new("stack overflow: too many nested calls"));
         }
+        let caller_line = self.line.get();
         let result = match &**f {
             value::Function::Native { call, name } => {
                 call(self, args).map_err(|e| e.in_frame(format!("in function '{name}'")))
             }
             value::Function::Lua(closure) => self.call_closure(closure, args),
         };
-        self.depth -= 1;
+        // Stamped before the caller's line is restored, so the error carries the line it actually
+        // happened on rather than the line of the outermost call that led there.
+        let result = result.map_err(|e| e.at(self.line.get()));
+        self.line.set(caller_line);
+        self.depth.set(self.depth.get() - 1);
         result
     }
 
     /// Bind arguments into a fresh scope and run a Lua function's body.
-    fn call_closure(&mut self, closure: &Closure, args: Vec<Value>) -> LuaResult<Vec<Value>> {
+    fn call_closure(&self, closure: &Closure, args: Vec<Value>) -> LuaResult<Vec<Value>> {
         let scope = Scope::child(&closure.captured);
         let mut args = args.into_iter();
         for name in &closure.params {
@@ -206,16 +304,15 @@ impl Interp {
             scope.declare(Rc::clone(name), args.next().unwrap_or(Value::Nil));
         }
 
-        let saved = std::mem::take(&mut self.varargs);
-        self.varargs = if closure.varargs {
+        let saved = self.swap_varargs(if closure.varargs {
             args.collect()
         } else {
             Vec::new()
-        };
+        });
 
         let body = Rc::clone(&closure.body);
         let outcome = stmt::exec_block(self, body.block(), &scope);
-        self.varargs = saved;
+        self.swap_varargs(saved);
 
         match outcome? {
             Flow::Return(values) => Ok(values),
@@ -227,7 +324,7 @@ impl Interp {
 /// Parse and run `source`, the whole front-to-back path.
 pub fn run(source: &str, chunk: &str) -> LuaResult<Vec<Value>> {
     let ast = parse(source)?;
-    let mut interp = Interp::new(chunk);
+    let interp = Interp::new(chunk);
     interp.run_ast(&ast)
 }
 

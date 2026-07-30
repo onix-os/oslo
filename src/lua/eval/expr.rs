@@ -25,16 +25,12 @@ pub fn line_of(token: &TokenReference) -> usize {
 ///
 /// A call in this position is truncated to its first result, and to nil when it returned nothing —
 /// which is Lua's rule, not a convenience.
-pub fn eval(interp: &mut Interp, expr: &Expression, scope: &Rc<Scope>) -> LuaResult<Value> {
+pub fn eval(interp: &Interp, expr: &Expression, scope: &Rc<Scope>) -> LuaResult<Value> {
     Ok(first(eval_multi(interp, expr, scope)?))
 }
 
 /// Evaluate an expression to all the values it produces.
-pub fn eval_multi(
-    interp: &mut Interp,
-    expr: &Expression,
-    scope: &Rc<Scope>,
-) -> LuaResult<Vec<Value>> {
+pub fn eval_multi(interp: &Interp, expr: &Expression, scope: &Rc<Scope>) -> LuaResult<Vec<Value>> {
     match expr {
         Expression::Number(token) => {
             let text = token.token().to_string();
@@ -53,7 +49,7 @@ pub fn eval_multi(
                 "false" => Value::Bool(false),
                 // `...` is the only symbol that is plural, and it is the reason `eval_multi`
                 // exists at all.
-                "..." => return Ok(interp.varargs.clone()),
+                "..." => return Ok(interp.varargs()),
                 other => {
                     return Err(
                         LuaError::new(format!("unexpected symbol '{other}'")).at(line_of(token))
@@ -97,7 +93,7 @@ pub fn eval_multi(
 
 /// Binary operators, with `and`/`or` short-circuiting before either side is forced.
 fn binary(
-    interp: &mut Interp,
+    interp: &Interp,
     lhs: &Expression,
     op: &str,
     rhs: &Expression,
@@ -141,7 +137,7 @@ fn binary(
 }
 
 /// A variable reference: a bare name, or a prefix with `.`/`[]` suffixes.
-pub fn eval_var(interp: &mut Interp, var: &Var, scope: &Rc<Scope>) -> LuaResult<Value> {
+pub fn eval_var(interp: &Interp, var: &Var, scope: &Rc<Scope>) -> LuaResult<Value> {
     match var {
         Var::Name(name) => Ok(lookup(interp, &name.token().to_string(), scope)),
         Var::Expression(expression) => {
@@ -167,7 +163,7 @@ pub fn lookup(interp: &Interp, name: &str, scope: &Rc<Scope>) -> Value {
         .unwrap_or_else(|| interp.globals.borrow().get(&Value::str(name)))
 }
 
-fn eval_prefix(interp: &mut Interp, prefix: &Prefix, scope: &Rc<Scope>) -> LuaResult<Value> {
+fn eval_prefix(interp: &Interp, prefix: &Prefix, scope: &Rc<Scope>) -> LuaResult<Value> {
     match prefix {
         Prefix::Name(name) => Ok(lookup(interp, &name.token().to_string(), scope)),
         Prefix::Expression(expression) => eval(interp, expression, scope),
@@ -177,7 +173,7 @@ fn eval_prefix(interp: &mut Interp, prefix: &Prefix, scope: &Rc<Scope>) -> LuaRe
 
 /// Walk `.field`, `[key]`, `(args)` and `:method(args)` left to right.
 fn apply_suffixes(
-    interp: &mut Interp,
+    interp: &Interp,
     mut current: Value,
     suffixes: impl Iterator<Item = impl std::borrow::Borrow<Suffix>>,
     scope: &Rc<Scope>,
@@ -224,7 +220,7 @@ fn apply_suffixes(
 }
 
 /// The argument list of a call, in any of Lua's three spellings.
-fn eval_args(interp: &mut Interp, args: &FunctionArgs, scope: &Rc<Scope>) -> LuaResult<Vec<Value>> {
+fn eval_args(interp: &Interp, args: &FunctionArgs, scope: &Rc<Scope>) -> LuaResult<Vec<Value>> {
     match args {
         FunctionArgs::Parentheses { arguments, .. } => {
             let mut out = Vec::new();
@@ -249,7 +245,7 @@ fn eval_args(interp: &mut Interp, args: &FunctionArgs, scope: &Rc<Scope>) -> Lua
 
 /// `{ 1, 2, x = 3, [k] = v }`.
 fn table_constructor(
-    interp: &mut Interp,
+    interp: &Interp,
     ctor: &TableConstructor,
     scope: &Rc<Scope>,
 ) -> LuaResult<Value> {

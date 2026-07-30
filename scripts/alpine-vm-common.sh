@@ -15,30 +15,13 @@ say() { printf '\n== %s\n' "$*"; }
 #
 # Alpine is musl, so this is not an optimisation — a glibc build cannot execute there. The linker
 # is deliberately left alone: pointing it at musl-gcc yields a binary that records the *build
-# host's* loader path and dies on any other machine. Only the C compiler for mlua's vendored Lua
-# is set. See README's "Installing" section.
+# host's* loader path and dies on any other machine. See README's "Installing" section.
+#
+# No C toolchain is needed. It used to be, for mlua's vendored Lua; oslo evaluates Lua in Rust now,
+# and nothing left in the dependency tree compiles C.
 #
 # Echoes the path to the binary.
 build_static_oslo() {
-    if [ -z "${CC_x86_64_unknown_linux_musl:-}" ]; then
-        # Debian and Alpine call the wrapper `musl-gcc`; a nixpkgs cross toolchain
-        # (`nix shell nixpkgs#pkgsCross.musl64.stdenv.cc`) calls it by its full target triple and
-        # ships no `musl-gcc` at all. Neither name is more correct, so try both before giving up.
-        for cc in musl-gcc x86_64-linux-musl-gcc x86_64-unknown-linux-musl-gcc; do
-            if command -v "$cc" >/dev/null 2>&1; then
-                CC_x86_64_unknown_linux_musl=$cc
-                break
-            fi
-        done
-    fi
-    if [ -z "${CC_x86_64_unknown_linux_musl:-}" ]; then
-        echo "no musl C compiler found; mlua's vendored Lua cannot be built for musl." >&2
-        echo "try: nix shell nixpkgs#pkgsCross.musl64.stdenv.cc   (or install musl-tools)" >&2
-        exit 1
-    fi
-    export CC_x86_64_unknown_linux_musl
-    echo "musl cc: $CC_x86_64_unknown_linux_musl" >&2
-
     # The Rust side needs a musl `std`, and the toolchain on `$PATH` may not be the one that has
     # it — a nixpkgs `rustc` ships only the targets nixpkgs built it with, while the rustup
     # toolchain beside it may have had `rustup target add` run against it. Without this check the

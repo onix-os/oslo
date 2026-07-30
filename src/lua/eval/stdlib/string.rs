@@ -9,7 +9,7 @@ use super::super::{Interp, LuaError, LuaResult, ops};
 use super::pattern::{self, Capture};
 use super::{arg, arg_int, arg_str, module, native};
 
-pub fn install(interp: &mut Interp) {
+pub fn install(interp: &Interp) {
     let library = module(vec![
         ("len", native("string.len", len)),
         ("sub", native("string.sub", sub)),
@@ -42,11 +42,11 @@ fn absolute(index: i64, len: usize) -> i64 {
     }
 }
 
-fn len(_: &mut Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
+fn len(_: &Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
     Ok(vec![Value::int(arg_str(&args, 1, "len")?.len() as i64)])
 }
 
-fn sub(_: &mut Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
+fn sub(_: &Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
     let s = arg_str(&args, 1, "sub")?;
     let bytes = s.as_bytes();
     let n = bytes.len();
@@ -63,15 +63,15 @@ fn sub(_: &mut Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
     Ok(vec![from_bytes(&bytes[start as usize - 1..end as usize])])
 }
 
-fn upper(_: &mut Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
+fn upper(_: &Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
     Ok(vec![Value::str(arg_str(&args, 1, "upper")?.to_uppercase())])
 }
 
-fn lower(_: &mut Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
+fn lower(_: &Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
     Ok(vec![Value::str(arg_str(&args, 1, "lower")?.to_lowercase())])
 }
 
-fn rep(_: &mut Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
+fn rep(_: &Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
     let s = arg_str(&args, 1, "rep")?;
     let count = arg_int(&args, 2, "rep")?;
     if count <= 0 {
@@ -91,13 +91,13 @@ fn rep(_: &mut Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
     Ok(vec![Value::str(parts.join(&separator))])
 }
 
-fn reverse(_: &mut Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
+fn reverse(_: &Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
     let mut bytes = arg_str(&args, 1, "reverse")?.into_bytes();
     bytes.reverse();
     Ok(vec![from_bytes(&bytes)])
 }
 
-fn byte(_: &mut Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
+fn byte(_: &Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
     let s = arg_str(&args, 1, "byte")?;
     let bytes = s.as_bytes();
     let n = bytes.len();
@@ -119,7 +119,7 @@ fn byte(_: &mut Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
         .collect())
 }
 
-fn char(_: &mut Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
+fn char(_: &Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
     let mut bytes = Vec::with_capacity(args.len());
     for i in 1..=args.len() {
         let code = arg_int(&args, i, "char")?;
@@ -134,7 +134,7 @@ fn char(_: &mut Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
 }
 
 /// `string.format`, the `%` directives Lua supports.
-fn format(interp: &mut Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
+fn format(interp: &Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
     let spec = arg_str(&args, 1, "format")?;
     let mut out = String::new();
     let mut chars = spec.chars().peekable();
@@ -172,7 +172,7 @@ fn format(interp: &mut Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
 
 /// One `%` directive's value, before width and alignment are applied.
 fn render(
-    interp: &mut Interp,
+    interp: &Interp,
     conversion: char,
     args: &[Value],
     n: usize,
@@ -332,7 +332,7 @@ fn subject(args: &[Value], function: &str) -> LuaResult<(String, String, usize)>
     Ok((s, p, init.saturating_sub(1)))
 }
 
-fn find(_: &mut Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
+fn find(_: &Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
     let (s, p, init) = subject(&args, "find")?;
     if init > s.len() {
         return Ok(vec![Value::Nil]);
@@ -361,7 +361,7 @@ fn find(_: &mut Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
     })
 }
 
-fn lua_match(_: &mut Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
+fn lua_match(_: &Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
     let (s, p, init) = subject(&args, "match")?;
     if init > s.len() {
         return Ok(vec![Value::Nil]);
@@ -377,7 +377,7 @@ fn lua_match(_: &mut Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
     })
 }
 
-fn gmatch(_: &mut Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
+fn gmatch(_: &Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
     let s = arg_str(&args, 1, "gmatch")?;
     let p = arg_str(&args, 2, "gmatch")?;
     let cursor = std::cell::Cell::new(0usize);
@@ -400,7 +400,7 @@ fn gmatch(_: &mut Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
     })])
 }
 
-fn gsub(interp: &mut Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
+fn gsub(interp: &Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
     let s = arg_str(&args, 1, "gsub")?;
     let p = arg_str(&args, 2, "gsub")?;
     let replacement = arg(&args, 3);
@@ -441,7 +441,7 @@ fn gsub(interp: &mut Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
 
 /// Apply one replacement — a string with `%n` references, a table lookup, or a function call.
 fn substitute(
-    interp: &mut Interp,
+    interp: &Interp,
     replacement: &Value,
     captures: &[Capture],
     whole: &[u8],

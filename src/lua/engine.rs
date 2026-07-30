@@ -1,27 +1,34 @@
-//! The `oslo.*` table: what an `init.lua` can reach.
+//! Owning the Lua interpreter, and the bridge back from the shell into it.
 
 use crate::env::Environment;
 use crate::error::{Result, ShellError};
-use mlua::prelude::*;
+use crate::lua::eval::value::Value;
+use crate::lua::eval::{self, Interp, LuaResult};
 use std::cell::RefCell;
+use std::collections::HashMap;
+use std::rc::Rc;
 use std::sync::{Arc, Mutex, MutexGuard};
 
-/// Where a Lua-registered builtin's callback is kept, keyed by builtin name.
+/// Values the host holds on a script's behalf.
 ///
-/// It cannot live in the closure that ends up in the builtin registry: `LuaFunction` is tied to
-/// its interpreter and is neither `Send` nor `Sync`, while the registry stores
-/// `Arc<dyn Fn … + Send + Sync>` so that `Environment` stays sendable. The closure therefore
-/// captures only the name and looks the callback back up through here.
-pub(crate) const BUILTIN_KEY_PREFIX: &str = "oslo_builtin_";
+/// The prompt function and every `oslo.register_builtin` callback live here rather than in a Lua
+/// global, so a script cannot overwrite one by choosing an unlucky variable name — and so that
+/// `pairs(_G)` does not walk the shell's internals.
+pub(crate) type Registry = Rc<RefCell<HashMap<String, Value>>>;
+
+/// Registry key under which `oslo.set_prompt` stores its function.
+pub(crate) const PROMPT_KEY: &str = "prompt";
+
+/// Prefix for the registry keys holding builtin callbacks.
+pub(crate) const BUILTIN_KEY_PREFIX: &str = "builtin:";
 
 thread_local! {
-    /// The interpreter a builtin registered on this thread should call back into.
+    /// The interpreter and registry a builtin registered on this thread should call back into.
     ///
-    /// A `Lua` handle is a cheap clone of the same state, so this is the interpreter
-    /// [`LuaEngine::setup_bindings`] was called on — not a second one. Per-thread because Lua
-    /// itself is per-thread; a builtin invoked from a thread that never ran `setup_bindings`
-    /// finds nothing here and says so rather than reaching into another thread's state.
-    static ACTIVE_LUA: RefCell<Option<Lua>> = const { RefCell::new(None) };
+    /// Per-thread because the interpreter is: a builtin invoked from a thread that never ran
+    /// [`LuaEngine::setup_bindings`] finds nothing here and says so, rather than reaching into
+    /// another thread's state.
+    static ACTIVE: RefCell<Option<(Rc<Interp>, Registry)>> = const { RefCell::new(None) };
 }
 
 /// Take the shell state for the duration of one `oslo.*` call.
@@ -32,7 +39,7 @@ thread_local! {
 /// what happened.
 pub(crate) fn borrow_env(env: &Mutex<Environment>) -> LuaResult<MutexGuard<'_, Environment>> {
     env.try_lock().map_err(|_| {
-        mlua::Error::runtime(
+        eval::LuaError::new(
             "oslo: shell state is busy; the oslo.* API cannot be used from inside a builtin \
              registered with oslo.register_builtin",
         )
@@ -44,15 +51,13 @@ pub(crate) fn borrow_env(env: &Mutex<Environment>) -> LuaResult<MutexGuard<'_, E
 /// Modelled on how a shell reads a command's result rather than on Lua's own truthiness: no
 /// return value at all is success (the common case — a builtin that just printed something),
 /// `false` is failure, and a number is the status the script asked for.
-fn status_from_lua(value: LuaValue) -> i32 {
+fn status_from_lua(value: Option<&Value>) -> i32 {
     match value {
-        LuaValue::Nil => 0,
-        LuaValue::Boolean(true) => 0,
-        LuaValue::Boolean(false) => 1,
-        LuaValue::Integer(n) => n as i32,
-        LuaValue::Number(n) => n as i32,
-        LuaValue::String(s) => s.to_str().ok().and_then(|t| t.parse().ok()).unwrap_or(0),
-        _ => 0,
+        None | Some(Value::Nil) | Some(Value::Bool(true)) => 0,
+        Some(Value::Bool(false)) => 1,
+        Some(Value::Number(n)) => n.as_float() as i32,
+        Some(Value::Str(s)) => s.parse().unwrap_or(0),
+        Some(_) => 0,
     }
 }
 
@@ -63,33 +68,37 @@ fn status_from_lua(value: LuaValue) -> i32 {
 /// written in Rust uses to report a bad invocation. `args[0]` is the builtin's own name, so the
 /// callback sees the same argv a native builtin does.
 pub(crate) fn call_lua_builtin(name: &str, args: &[String]) -> i32 {
-    let Some(lua) = ACTIVE_LUA.with(|slot| slot.borrow().clone()) else {
+    let Some((interp, registry)) = ACTIVE.with(|slot| slot.borrow().clone()) else {
         eprintln!("oslo: {}: no Lua interpreter on this thread", name);
         return 127;
     };
     let key = format!("{}{}", BUILTIN_KEY_PREFIX, name);
-    let call = || -> LuaResult<LuaValue> {
-        let func: LuaFunction = lua.named_registry_value(&key)?;
-        let argv = lua.create_sequence_from(args.iter().map(String::as_str))?;
-        func.call::<LuaValue>(argv)
+    let Some(callback) = registry.borrow().get(&key).cloned() else {
+        eprintln!("oslo: {}: no Lua callback registered", name);
+        return 127;
     };
-    match call() {
-        Ok(value) => status_from_lua(value),
-        Err(err) => {
-            eprintln!("oslo: {}: {}", name, err);
+
+    // Argv reaches the callback as one table, which is the `function(argv)` shape the API has
+    // always documented.
+    let mut argv = eval::Table::new();
+    for (i, arg) in args.iter().enumerate() {
+        argv.set(Value::int(i as i64 + 1), Value::str(arg));
+    }
+    match interp.call(&callback, vec![Value::table(argv)]) {
+        Ok(values) => status_from_lua(values.first()),
+        Err(e) => {
+            eprintln!("oslo: {}: {}", name, e);
             1
         }
     }
 }
 
 pub struct LuaEngine {
+    /// `Rc` because the shell reaches back in through [`ACTIVE`] while a call is still running.
+    interp: Rc<Interp>,
+    registry: Registry,
     /// Arguments passed to the chunk as `...`; see [`LuaEngine::set_script_args`].
-    script_args: RefCell<Vec<String>>,
-    lua: Lua,
-    pub prompt_fn: Option<LuaFunction>,
-    pub precmd_fn: Option<LuaFunction>,
-    pub postcmd_fn: Option<LuaFunction>,
-    pub cd_fn: Option<LuaFunction>,
+    script_args: RefCell<Vec<Value>>,
 }
 
 impl Default for LuaEngine {
@@ -100,27 +109,25 @@ impl Default for LuaEngine {
 
 impl LuaEngine {
     pub fn new() -> Result<Self> {
-        let lua = Lua::new();
-
         Ok(Self {
-            lua,
+            interp: Rc::new(Interp::new("=(oslo lua)")),
+            registry: Rc::new(RefCell::new(HashMap::new())),
             script_args: RefCell::new(Vec::new()),
-            prompt_fn: None,
-            precmd_fn: None,
-            postcmd_fn: None,
-            cd_fn: None,
         })
     }
 
     pub fn setup_bindings(&self, env: Arc<Mutex<Environment>>) -> Result<()> {
         // Published before anything can be registered, so a builtin registered by the very
         // script that is being loaded can already find its way back here.
-        ACTIVE_LUA.with(|slot| *slot.borrow_mut() = Some(self.lua.clone()));
-        crate::lua::api::install(&self.lua, env).map_err(ShellError::Lua)
+        ACTIVE.with(|slot| {
+            *slot.borrow_mut() = Some((Rc::clone(&self.interp), Rc::clone(&self.registry)))
+        });
+        crate::lua::api::install(&self.interp, &self.registry, env);
+        Ok(())
     }
 
     pub fn eval_script(&self, script: &str) -> Result<()> {
-        self.eval_named(script, "=(oslo lua)")
+        self.run(script, "(oslo lua)")
     }
 
     pub fn load_file(&self, path: &str) -> Result<()> {
@@ -130,68 +137,64 @@ impl LuaEngine {
 
     /// Run Lua source under `name`.
     ///
-    /// Naming the chunk is what makes a traceback out of `init.lua` — including one raised inside
-    /// a builtin registered there — point at the user's script. Lua's default chunk name is the
-    /// first line of the source, which for a chunk loaded from a string is the Rust call site.
+    /// Naming the chunk is what makes a traceback out of `init.lua` point at the user's script,
+    /// and it is also what `pcall` hands the script: `error("x")` on line 12 is caught as
+    /// `init.lua:12: x`, which is the form Lua code parses with `message:match(":(%d+):")`.
     pub fn eval_as(&self, source: &str, name: &str) -> Result<()> {
-        self.eval_named(source, &format!("@{}", name))
+        self.run(source, name)
     }
 
     /// Publish a script's arguments the way every Lua interpreter does.
     ///
-    /// `arg[0]` is the script, `arg[1..n]` its arguments — and the same list is passed to the
-    /// chunk so `...` works too. Without this a Lua program could not read its own argv at all:
-    /// `oslo build.lua release` gave the script `arg == nil`, which makes Lua a configuration
-    /// language rather than a scripting one.
+    /// `arg[0]` is the script, `arg[1..n]` its arguments — and the same list becomes the chunk's
+    /// `...`. Without this a Lua program could not read its own argv at all: `oslo build.lua
+    /// release` gave the script `arg == nil`, which makes Lua a configuration language rather
+    /// than a scripting one.
     ///
-    /// `arg[-1]` is the interpreter, matching `lua`'s own convention, so a script that re-executes
-    /// itself can find the shell it is running under.
+    /// `arg[-1]` is the interpreter, matching `lua`'s own convention, so a script that
+    /// re-executes itself can find the shell it is running under.
     pub fn set_script_args(&self, script: &str, args: &[String]) -> Result<()> {
-        let table = self.lua.create_table().map_err(ShellError::Lua)?;
-        table
-            .set(
-                -1i32,
+        let mut table = eval::Table::new();
+        table.set(
+            Value::int(-1),
+            Value::str(
                 std::env::current_exe()
                     .map(|p| p.to_string_lossy().into_owned())
                     .unwrap_or_else(|_| "oslo".to_string()),
-            )
-            .map_err(ShellError::Lua)?;
-        table.set(0i32, script).map_err(ShellError::Lua)?;
+            ),
+        );
+        table.set(Value::int(0), Value::str(script));
         for (i, value) in args.iter().enumerate() {
-            table
-                .set(i as i32 + 1, value.as_str())
-                .map_err(ShellError::Lua)?;
+            table.set(Value::int(i as i64 + 1), Value::str(value));
         }
-        self.lua
-            .globals()
-            .set("arg", table)
-            .map_err(ShellError::Lua)?;
+        self.interp.set_global("arg", Value::table(table));
         self.script_args
-            .replace(args.iter().map(String::from).collect());
+            .replace(args.iter().map(Value::str).collect());
         Ok(())
     }
 
-    fn eval_named(&self, script: &str, chunk_name: &str) -> Result<()> {
-        // `call` rather than `exec`, so the arguments reach the chunk's `...` as well as `arg`.
-        // With no arguments set this is exactly what `exec` did.
-        // `Variadic`, not `Vec`: a `Vec` converts to a single Lua *table* argument, so `...`
-        // would be one table rather than the arguments themselves.
-        let args = mlua::Variadic::from_iter(self.script_args.borrow().iter().cloned());
-        self.lua
-            .load(script)
-            .set_name(chunk_name)
-            .call::<()>(args)
-            .map_err(ShellError::Lua)
+    fn run(&self, source: &str, name: &str) -> Result<()> {
+        // Both failures are named here: a chunk that does not parse and one that fails part-way
+        // through are equally useless as `Lua error: attempt to call a nil value` with no file.
+        let ast = eval::parse(source).map_err(|e| ShellError::Lua(e.in_chunk(name)))?;
+        self.interp.set_chunk(name);
+        self.interp.set_varargs(self.script_args.borrow().clone());
+        self.interp
+            .run_ast(&ast)
+            .map_err(|e| ShellError::Lua(e.in_chunk(name)))?;
+        Ok(())
     }
 
     pub fn render_prompt(&self) -> Option<String> {
-        if let Ok(func) = self
-            .lua
-            .named_registry_value::<LuaFunction>("oslo_prompt_fn")
-        {
-            func.call::<String>(()).ok()
-        } else {
-            None
+        let prompt = self.registry.borrow().get(PROMPT_KEY).cloned()?;
+        match self.interp.call(&prompt, Vec::new()) {
+            // Anything but a string is not a prompt. Rendering `nil` or a table's address into
+            // the line the user types on is worse than falling back to the shell's default.
+            Ok(values) => match values.first() {
+                Some(Value::Str(s)) => Some(s.to_string()),
+                _ => None,
+            },
+            Err(_) => None,
         }
     }
 }

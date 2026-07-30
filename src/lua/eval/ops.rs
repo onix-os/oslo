@@ -31,12 +31,7 @@ pub fn metamethod(value: &Value, name: &str) -> Option<Value> {
 }
 
 /// Try a binary metamethod on either operand, in Lua's order: left first, then right.
-fn binary_meta(
-    interp: &mut Interp,
-    name: &str,
-    lhs: &Value,
-    rhs: &Value,
-) -> Option<LuaResult<Value>> {
+fn binary_meta(interp: &Interp, name: &str, lhs: &Value, rhs: &Value) -> Option<LuaResult<Value>> {
     let handler = metamethod(lhs, name).or_else(|| metamethod(rhs, name))?;
     Some(
         interp
@@ -52,7 +47,7 @@ fn binary_meta(
 }
 
 /// The arithmetic operators.
-pub fn arith(interp: &mut Interp, op: &str, lhs: &Value, rhs: &Value) -> LuaResult<Value> {
+pub fn arith(interp: &Interp, op: &str, lhs: &Value, rhs: &Value) -> LuaResult<Value> {
     // Strings coerce to numbers in arithmetic — `"10" + 1` is 11 in Lua, a wart it keeps for
     // compatibility and that scripts in the wild do rely on.
     if let (Some(a), Some(b)) = (lhs.as_number(), rhs.as_number()) {
@@ -152,7 +147,7 @@ fn numeric(op: &str, a: Number, b: Number) -> LuaResult<Value> {
 }
 
 /// Unary minus, `#`, `not` and `~`.
-pub fn unary(interp: &mut Interp, op: &str, operand: &Value) -> LuaResult<Value> {
+pub fn unary(interp: &Interp, op: &str, operand: &Value) -> LuaResult<Value> {
     match op {
         "not" => Ok(Value::Bool(!operand.truthy())),
         "-" => {
@@ -192,7 +187,7 @@ pub fn unary(interp: &mut Interp, op: &str, operand: &Value) -> LuaResult<Value>
 }
 
 /// `==`, honouring `__eq` only when both sides are tables and raw equality failed.
-pub fn equals(interp: &mut Interp, lhs: &Value, rhs: &Value) -> LuaResult<bool> {
+pub fn equals(interp: &Interp, lhs: &Value, rhs: &Value) -> LuaResult<bool> {
     if lhs.lua_eq(rhs) {
         return Ok(true);
     }
@@ -205,7 +200,7 @@ pub fn equals(interp: &mut Interp, lhs: &Value, rhs: &Value) -> LuaResult<bool> 
 }
 
 /// `<` and `<=`.
-pub fn compare(interp: &mut Interp, op: &str, lhs: &Value, rhs: &Value) -> LuaResult<bool> {
+pub fn compare(interp: &Interp, op: &str, lhs: &Value, rhs: &Value) -> LuaResult<bool> {
     // Numbers compare numerically, strings lexicographically, and the two never compare with each
     // other — `1 < "2"` is an error in Lua, not a coercion.
     if let (Value::Number(a), Value::Number(b)) = (lhs, rhs) {
@@ -227,7 +222,7 @@ pub fn compare(interp: &mut Interp, op: &str, lhs: &Value, rhs: &Value) -> LuaRe
 }
 
 /// `..`, which joins strings and numbers and defers everything else to `__concat`.
-pub fn concat(interp: &mut Interp, lhs: &Value, rhs: &Value) -> LuaResult<Value> {
+pub fn concat(interp: &Interp, lhs: &Value, rhs: &Value) -> LuaResult<Value> {
     let joinable = |v: &Value| matches!(v, Value::Str(_) | Value::Number(_));
     if joinable(lhs) && joinable(rhs) {
         return Ok(Value::str(format!(
@@ -247,7 +242,7 @@ pub fn concat(interp: &mut Interp, lhs: &Value, rhs: &Value) -> LuaResult<Value>
 }
 
 /// `t[k]`, following `__index` chains.
-pub fn index(interp: &mut Interp, target: &Value, key: &Value) -> LuaResult<Value> {
+pub fn index(interp: &Interp, target: &Value, key: &Value) -> LuaResult<Value> {
     match target {
         Value::Table(t) => {
             let raw = t.borrow().get(key);
@@ -281,7 +276,7 @@ pub fn index(interp: &mut Interp, target: &Value, key: &Value) -> LuaResult<Valu
 }
 
 /// `t[k] = v`, following `__newindex`.
-pub fn set_index(interp: &mut Interp, target: &Value, key: Value, value: Value) -> LuaResult<()> {
+pub fn set_index(interp: &Interp, target: &Value, key: Value, value: Value) -> LuaResult<()> {
     let Value::Table(t) = target else {
         return Err(LuaError::new(format!(
             "attempt to index a {} value",
@@ -317,7 +312,7 @@ pub fn set_index(interp: &mut Interp, target: &Value, key: Value, value: Value) 
 }
 
 /// `tostring`, honouring `__tostring`.
-pub fn tostring(interp: &mut Interp, value: &Value) -> LuaResult<String> {
+pub fn tostring(interp: &Interp, value: &Value) -> LuaResult<String> {
     if let Some(handler) = metamethod(value, "__tostring") {
         let result = one(interp.call(&handler, vec![value.clone()])?)?;
         return Ok(result.to_display());

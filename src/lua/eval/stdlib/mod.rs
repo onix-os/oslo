@@ -25,7 +25,7 @@ use std::rc::Rc;
 /// Wrap a Rust function as a Lua value.
 pub fn native(
     name: &'static str,
-    call: impl Fn(&mut Interp, Vec<Value>) -> LuaResult<Vec<Value>> + 'static,
+    call: impl Fn(&Interp, Vec<Value>) -> LuaResult<Vec<Value>> + 'static,
 ) -> Value {
     Value::Function(Rc::new(Function::Native {
         name,
@@ -43,7 +43,7 @@ pub fn module(entries: Vec<(&'static str, Value)>) -> Value {
 }
 
 /// Populate the globals of a fresh interpreter.
-pub fn install(interp: &mut Interp) {
+pub fn install(interp: &Interp) {
     base::install(interp);
     string::install(interp);
     table::install(interp);

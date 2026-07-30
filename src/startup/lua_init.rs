@@ -57,26 +57,15 @@ pub fn load_init_lua(lua: &LuaEngine, path: &Path) {
 
 /// The status `oslo.exit(n)` asked for, if that is what ended the script.
 ///
-/// The request travels as a `ShellError::Exit` wrapped by mlua, and mlua nests: a callback error
-/// carries its cause, which may itself be wrapped with context. Walking the chain is what makes
-/// `oslo.exit` work from inside a function, a `pcall`-free callback, or a registered builtin,
-/// rather than only at the top level of a script.
+/// The request travels as an error because unwinding is the only way out of a call several Lua
+/// frames deep, and the status rides on the error itself rather than being recovered from a
+/// message. That is what makes `oslo.exit` work from inside a function, a callback, or a
+/// registered builtin, rather than only at the top level of a script.
 fn requested_exit(err: &ShellError) -> Option<i32> {
-    let ShellError::Lua(lua_err) = err else {
-        return None;
-    };
-    fn walk(e: &mlua::Error) -> Option<i32> {
-        match e {
-            mlua::Error::CallbackError { cause, .. } => walk(cause),
-            mlua::Error::WithContext { cause, .. } => walk(cause),
-            mlua::Error::ExternalError(inner) => match inner.downcast_ref::<ShellError>() {
-                Some(ShellError::Exit(code)) => Some(*code),
-                _ => None,
-            },
-            _ => None,
-        }
+    match err {
+        ShellError::Lua(lua_err) => lua_err.exit,
+        _ => None,
     }
-    walk(lua_err)
 }
 
 /// Blank out a leading `#!` line so Lua can parse the source.

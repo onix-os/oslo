@@ -149,11 +149,12 @@ build a static one yourself:
 
 ```sh
 rustup target add x86_64-unknown-linux-musl
-sudo apt-get install -y musl-tools          # compiles mlua's vendored Lua for musl
-CC_x86_64_unknown_linux_musl=musl-gcc \
 RUSTFLAGS="-C target-feature=+crt-static" \
   cargo build --release --target x86_64-unknown-linux-musl --bin oslo
 ```
+
+No C compiler is involved. Nothing in the dependency tree compiles C — Lua included, since oslo
+evaluates it in Rust rather than binding to the reference implementation.
 
 Do not also set the target's *linker* to `musl-gcc`. It builds and looks right, and produces a
 binary that records a dynamic loader path from the build host and segfaults anywhere else; leaving
@@ -274,7 +275,8 @@ ast/             the shared AST
 expand/          parameter expansion, globbing, IFS splitting, arithmetic
 exec/            fork/exec, pipelines, redirections, job control
 env/             variables, scopes, aliases, functions, builtins
-lua/             mlua bindings
+lua/             the Lua interface
+  eval/          oslo's own Lua evaluator (full_moon parses; this runs)
 interactive/     rustyline helper: completion, highlighting, dropdown, prompt
 ```
 

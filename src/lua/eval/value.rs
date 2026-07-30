@@ -263,8 +263,7 @@ pub enum Function {
 ///
 /// Boxed rather than a plain `fn` pointer because several are closures over state — `pairs`
 /// captures its snapshot, `gmatch` its cursor.
-pub type NativeFn =
-    Box<dyn Fn(&mut super::Interp, Vec<Value>) -> Result<Vec<Value>, super::LuaError>>;
+pub type NativeFn = Box<dyn Fn(&super::Interp, Vec<Value>) -> Result<Vec<Value>, super::LuaError>>;
 
 impl fmt::Debug for Function {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
