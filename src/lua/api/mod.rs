@@ -19,9 +19,12 @@ use crate::lua::eval::{Interp, LuaError, LuaResult};
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
+mod run;
+
 /// Build the `oslo` table and install it as a global.
 pub fn install(interp: &Rc<Interp>, registry: &Registry, env: Arc<Mutex<Environment>>) {
     let mut oslo = Table::new();
+    run::install(interp, &mut oslo, &env);
     commands(&mut oslo, &env);
     variables(&mut oslo, &env);
     filesystem(&mut oslo, &env);

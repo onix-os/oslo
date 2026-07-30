@@ -144,10 +144,19 @@ pub(crate) fn run_external(
 fn wait_for_child(child: Pid, cmd_name: &str, words: &[String]) -> i32 {
     loop {
         match waitpid(child, Some(WaitPidFlag::WUNTRACED)) {
-            Ok(WaitStatus::Exited(_, code)) => return code,
+            Ok(WaitStatus::Exited(_, code)) => {
+                crate::exec::argv::note_signal(None);
+                return code;
+            }
             // A shell reports a signal death as 128 + the signal number, which is how `$?` tells
             // `kill -9` (137) apart from an exit status of 9.
-            Ok(WaitStatus::Signaled(_, sig, _)) => return 128 + sig as i32,
+            Ok(WaitStatus::Signaled(_, sig, _)) => {
+                // Recorded, not just folded into the status: `128 + n` cannot tell a program
+                // killed by signal `n` from one that called `exit(128 + n)`, and a caller that
+                // captured this command's output is about to be asked which it was.
+                crate::exec::argv::note_signal(Some(sig as i32));
+                return 128 + sig as i32;
+            }
             Ok(WaitStatus::Stopped(_, sig)) => {
                 remember_stopped(child, cmd_name, words);
                 return 128 + sig as i32;

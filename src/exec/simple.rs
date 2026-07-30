@@ -142,6 +142,22 @@ fn apply_assignments_only(env: &mut Environment, simple: &SimpleCommand) -> Resu
     Ok(apply_wordless_redirections(env, &simple.redirections))
 }
 
+/// Run an argv that is already expanded, as Lua's `oslo.run` hands it over.
+///
+/// This is the whole point of the argv call model: no word, no quoting, no glob and no field
+/// splitting stand between the caller's list and the command. `oslo.run{"rm", name}` cannot
+/// misbehave for a `name` with a space or a `*` in it, where `oslo.exec("rm " .. name)` can.
+///
+/// Everything past this point is shared with the shell — the same command search, the same
+/// builtins, the same functions — so `sh.cd("/tmp")` moves the shell exactly as `cd /tmp` does.
+pub fn run_argv(env: &mut Environment, argv: &[String]) -> Result<i32> {
+    let Some(name) = argv.first() else {
+        return Ok(0);
+    };
+    crate::env::builtins::run_pending_traps(env)?;
+    run_command_word(env, name, argv, &[])
+}
+
 /// Dispatch an already-expanded command word.
 ///
 /// POSIX 2.9.1.1 command search, and the order matters at every step:

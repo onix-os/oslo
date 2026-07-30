@@ -4,6 +4,7 @@
 //! [`simple`] runs one command, [`compound`] handles control flow, [`substitution`] captures
 //! `$(...)`, [`redirect`] applies redirections, and [`job`] holds job-control state.
 
+pub mod argv;
 pub mod compound;
 pub mod job;
 pub mod pipeline;
