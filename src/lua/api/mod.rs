@@ -21,6 +21,7 @@ use std::sync::{Arc, Mutex};
 
 mod convert;
 mod fs;
+mod http;
 mod json;
 mod path;
 mod proc;
@@ -40,6 +41,7 @@ pub fn install(interp: &Rc<Interp>, registry: &Registry, env: Arc<Mutex<Environm
     oslo.set(Value::str("fs"), fs::build());
     oslo.set(Value::str("path"), path::build());
     oslo.set(Value::str("json"), json::build());
+    oslo.set(Value::str("http"), http::build());
     oslo.set(Value::str("re"), re::build());
     oslo.set(Value::str("proc"), proc::build_proc());
     oslo.set(Value::str("job"), proc::build_job());

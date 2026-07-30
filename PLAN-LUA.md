@@ -127,7 +127,7 @@ Found by audit, each verified against the tree.
 | Result tables, never raising | `{status, ok, out, err, signal}`; `out`/`err` absent rather than empty when uncaptured |
 | Streaming | `oslo.lines{…}` |
 | Namespaces | `oslo.fs`, `.path`, `.re`, `.json`, `.proc`, `.job`, plus `sh` |
-| Batteries in Rust | `oslo.json` on `serde_json`; `oslo.re` on the `regex` crate already carried for `[[ =~ ]]` |
+| Batteries in Rust | `oslo.json` on `serde_json`; `oslo.re` on the `regex` crate already carried for `[[ =~ ]]`; `oslo.http` on `ureq` + `rustls` + `rustls-graviola` |
 | Modules | `require`, `dofile`, `loadfile`, `load`, `package.*`; no `./?.lua`, empty `cpath` |
 | Variable sharing | `Interp::set_script_global` and `engine::ShellGlobals`; `_G` first, shell second |
 | Prompt modes | `src/startup/mode.rs`; Shift+Tab (configurable via `$OSLO_TOGGLE_KEY`), `$OSLO_DEFAULT_MODE`, `!`/`=` one-line escapes, `$OSLO_MODE` published |
@@ -142,22 +142,42 @@ on the Rust stack, so against the repo's 1 MiB convention the honest limit was a
 now reserves its own 16 MiB stack (`crate::INTERPRETER_STACK`) and the limit is 200 — real Lua's
 own ceiling on nested C calls — verified against that exact stack.
 
+## `oslo.http`, and the TLS question it raised
+
+HTTPS means TLS, and the TLS providers everyone uses — `ring`, `aws-lc-rs`, `boring` — all compile
+C or assembly, which would have put a C toolchain straight back into the build oslo had just got
+rid of. It looked like "batteries in Rust" and "no C in the binary" could not both hold.
+
+They can. **`rustls-graviola`** is a pure-Rust provider written by rustls's own author, and with it
+`cargo tree -e build --target x86_64-unknown-linux-musl` reports **no build dependencies at all**
+for the whole of oslo. The recorded risk: graviola is young (v0.4) where `ring` and `aws-lc-rs`
+are what the ecosystem runs on. Provenance is about as good as a young crypto crate gets; that is
+not the same as being battle-tested.
+
+**Certificates are curl's, exactly.** Nothing is bundled. A root store compiled into the binary
+keeps trusting an authority after it has been distrusted — Symantec, Camerfirma and Entrust have
+all been pulled — and cannot learn a new one without a rebuild. The precedence is curl's, and so
+are the names, so anything already configured for curl works here untold: `cacert`/`capath` on the
+request, then `$CURL_CA_BUNDLE`, `$SSL_CERT_FILE`, `$SSL_CERT_DIR`, then the distribution paths. A
+machine with none gets an error naming every path that was tried, because "certificate verify
+failed" alone is indistinguishable from a network fault.
+
+Two further curl behaviours, both deliberate: a 404 is an *answer* (`status = 404`, `ok = false`,
+body intact) rather than a failure to get one, matching curl without `--fail`; and `insecure =
+true` is `-k`, per-request with no global form, because the global form is the one that gets set
+during an afternoon of debugging and stays there.
+
 ## Still open
 
-1. **`oslo.http` needs a decision that conflicts with another one.** HTTPS means TLS, and every
-   mature Rust TLS stack compiles C or assembly: `ring`, `aws-lc-rs` and `boring` all do. So
-   "batteries in Rust" and "no C in the binary" cannot both hold for HTTP as things stand. The
-   options are: accept C for the TLS provider; take a young pure-Rust provider; ship
-   plaintext-only HTTP; or leave it out. Not chosen here.
-2. **History is not tagged with its mode.** The mode a line was typed in is not recorded, so
+1. **History is not tagged with its mode.** The mode a line was typed in is not recorded, so
    recalling a Lua line while in shell mode runs it as shell. rustyline's history holds plain
    strings, so tagging needs either a side table or a marker in the stored text — a visible
    design choice rather than an implementation detail.
-3. **Depth limit** for a Lua-registered builtin that invokes itself. The evaluator's own limit
+2. **Depth limit** for a Lua-registered builtin that invokes itself. The evaluator's own limit
    does not see a round trip that leaves through the shell and comes back.
-4. **The built-in tools themselves** — deliberately deferred. Each gets designed on its own terms,
+3. **The built-in tools themselves** — deliberately deferred. Each gets designed on its own terms,
    aiming past POSIX rather than cloning it.
-5. **Migration of the existing corpus.** The 10 Lua cases still exercise `oslo.exec`/`oslo.capture`
+4. **Migration of the existing corpus.** The 10 Lua cases still exercise `oslo.exec`/`oslo.capture`
    rather than the argv model. Both still work, so this is tidying rather than a gap.
-6. **Per-command output parsers** (`sh.df()` returning a table). The generic converters are in;
+5. **Per-command output parsers** (`sh.df()` returning a table). The generic converters are in;
    the per-tool ones are not.

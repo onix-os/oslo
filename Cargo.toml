@@ -36,6 +36,21 @@ regex = "1"
 # a static binary, which rules out lua-cjson and every Lua JSON parser that wraps it. `serde_json`
 # is pure Rust, so it works where those cannot. See PLAN-LUA.md.
 serde_json = "1"
+# HTTP, for the same reason as JSON: a C module cannot load into a static binary, so every Lua
+# HTTP client — all of which wrap luasocket or curl — is unavailable. See PLAN-LUA.md.
+#
+# The TLS provider is the part worth explaining. `ring` and `aws-lc-rs`, which rustls uses by
+# default, both compile C and assembly, and that would put a C toolchain back in the build oslo
+# just got rid of. `rustls-graviola` is a pure-Rust provider by rustls's own author, and with it
+# the whole stack has *no build-time dependencies at all* for the musl target — verified with
+# `cargo tree -e build --target x86_64-unknown-linux-musl`, which comes back empty.
+ureq = { version = "3", default-features = false, features = ["rustls-no-provider"] }
+rustls = { version = "0.23", default-features = false, features = ["std", "tls12"] }
+rustls-graviola = "0.4"
+# No bundled root store: certificates come from the system, exactly as curl's do. See
+# `src/lua/api/http/certs.rs`.
+rustls-pemfile = "2"
+rustls-pki-types = "1"
 which = "7.0"
 thiserror = "2.0"
 
