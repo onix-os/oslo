@@ -11,6 +11,11 @@
 //! `UNFILED` is not a plan ID: it marks a divergence the audit did not enumerate. Those are
 //! genuine bugs with no scheduled owner yet.
 //!
+//! `BRUSH` marks a divergence that lives in the parser oslo depends on rather than in oslo. The
+//! distinction matters when reading the list: those rows cannot be closed by changing oslo, only
+//! by an upstream fix, a workaround ahead of the parser, or vendoring — and each is a decision
+//! rather than a bug to schedule.
+//!
 //! `KNOWN_DIVERGENT` is the escape hatch for cases where bash is not a valid oracle at all.
 //! Entries there are skipped, never compared, and each one needs a reason. Keep the two lists
 //! separate: "we are wrong" and "the comparison is meaningless" are different claims.
@@ -62,6 +67,20 @@ pub const EXPECTED_FAIL: &[(&str, &str, &str)] = &[
     ("arith_for_unspaced_sections.sh", "R8.3", "`for ((;;))` with no space between the section separators is a syntax error; `for (( ; ; ))` works"),
     ("syntax_unsupported_coproc.sh", "R8.5", "coproc is refused by name and deliberately not implemented — it needs job control; bash runs the body and exits 0"),
     ("syntax_unsupported_select.sh", "R8.6", "select is refused by name and deliberately not implemented — it needs a prompt, PS3 and REPLY; bash runs the loop and reads EOF"),
+
+    // --- brush-parser 0.4.0 tokenizer ---
+    // A comment inside `$( … )` is only recognised when the number of blanks before its `#` is
+    // *even*. `consume_nested_construct` tokenises the body with `include_space: true`, and in
+    // that mode the blank branch appends to the token when none is started and delimits when one
+    // is — so blanks alternate, and after an odd number a token is in progress. The `#` arm sits
+    // *after* the "we have a token in progress" arm, so it never runs and the comment's text is
+    // tokenised as shell. An apostrophe in it then opens a quote that never closes.
+    //
+    // Not oslo's to fix without vendoring brush, and the same trade as `arith_for_unspaced_
+    // sections.sh` above. It is listed here rather than merely written down so that the ratchet
+    // says so the day it starts working. A standalone reproducer against brush-parser alone —
+    // no oslo — is in PLAN-DISTRO.md.
+    ("comment_in_command_substitution.sh", "BRUSH", "a comment inside $( ) preceded by an odd number of blanks is tokenised as shell, so a quote in it is unterminated"),
 
     // --- divergences the audit did not enumerate ---
     // Empty: `robust_special_builtin_failure.sh` closed with R11's C4. It needed three things at

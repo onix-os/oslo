@@ -475,8 +475,8 @@ fn failure_lists_name_real_corpus_files() {
         );
         assert!(seen.insert(*file), "EXPECTED_FAIL lists {file} twice");
         assert!(
-            id.starts_with('R') || *id == "UNFILED",
-            "{file}: {id} is not a PLAN.md finding ID"
+            id.starts_with('R') || *id == "UNFILED" || *id == "BRUSH",
+            "{file}: {id} is not a PLAN.md finding ID, UNFILED, or BRUSH"
         );
     }
     for (file, why) in KNOWN_DIVERGENT {

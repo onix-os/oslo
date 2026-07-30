@@ -362,11 +362,8 @@ getty, login or sshd always sits between init and a login shell.
 ### Still open from this round
 
 * `$(case …)` — brush #1052. Workaround: backticks.
-* A comment indented by *exactly one* blank inside `$( )` is not recognised as a comment, so an
-  apostrophe in it is a parse error. brush's nested-construct tokenizer runs with
-  `include_space: true`, where the first blank starts a token and the `#` after it is no longer in
-  command position; two blanks work. Same class as the above, and likelier to bite — apostrophes in
-  prose are common.
+* A comment inside `$( )` is only recognised when the number of blanks before its `#` is **even**.
+  See "The brush comment bug" below; it is now the thing blocking modernish's regression suite.
 
 ## A real distro, not a minirootfs
 
@@ -487,6 +484,67 @@ from "unquantified" to "the next thing in the way".
 
 Still open and unfixed: `printf`/`echo` do not report write errors (`printf x > /dev/full` exits 0
 where bash exits 1). modernish calls this `BUG_PUTIOERR`.
+
+## The brush comment bug, minimised
+
+The gap that now blocks modernish's regression suite, reduced to seven bytes:
+
+```sh
+$( #'
+)
+```
+
+bash accepts it. brush-parser 0.4.0 answers `unterminated single quote at 1,5`.
+
+**The rule is parity, not "one blank".** Inside `$( … )`, a comment is recognised only when the
+number of blanks before its `#` is *even* — zero and two work, one and three do not, and tabs and
+spaces count alike:
+
+| blanks before `#` | 0 | 1 | 2 | 3 | 4 | 5 |
+|---|---|---|---|---|---|---|
+| parses | yes | **no** | yes | **no** | yes | **no** |
+
+The comment also has to contain an *odd* number of quotes, or an unbalanced `(`, `)` or backquote —
+`# it's the shell's` has two apostrophes and they pair up harmlessly. That is a trap when writing a
+test for it, and it caught the first version of the corpus case here.
+
+Only `$( … )` is affected. The same comment at top level, or inside backquotes, is fine.
+
+**Why.** `consume_nested_construct` tokenises the body with `include_space: true`. In that mode the
+blank branch *appends* to the token when none is started and *delimits* when one is, so blanks
+alternate; after an odd number a token is in progress. The `#` arm sits after the
+"we have a token in progress" arm, so it never runs, and the comment's text is tokenised as shell:
+
+```rust
+// brush-parser-0.4.0/src/tokenizer.rs, next_token_until()
+} else if state.unquoted() && is_blank(c) {
+    if state.started_token() {
+        result = state.delimit_current_token(...)?;   // even blank: closes the token
+    } else if include_space {
+        state.append_char(c);                         // odd blank: *starts* one
+    }
+    ...
+}
+...
+else if !state.token_is_operator && (state.started_token() || ...) {
+    state.append_char(c);                             // the `#` lands here
+} else if c == '#' {                                  // ...so this never runs
+```
+
+**A reproducer with no oslo in it** — `brush-parser` as the only dependency — is kept in the
+scratchpad rather than the repo, since it is not oslo's code:
+
+```rust
+let opts = brush_parser::ParserOptions::default();
+let mut parser = brush_parser::Parser::new(Cursor::new("$( #'\n)\n".as_bytes()), &opts);
+assert!(parser.parse_program().is_ok());   // fails on 0.4.0
+```
+
+`tests/corpus/comment_in_command_substitution.sh` carries the case, listed in `EXPECTED_FAIL`
+under the new `BRUSH` id — a divergence that lives in the parser oslo depends on rather than in
+oslo, and therefore closes only by an upstream fix, a workaround ahead of the parser, or
+vendoring. Listing it rather than merely writing it down means the ratchet says so the day it
+starts working.
 
 ## Out of scope, deliberately
 
