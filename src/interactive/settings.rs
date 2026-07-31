@@ -76,6 +76,14 @@ impl Source {
 pub struct Suggest {
     /// The sources to try, in order. Empty turns suggestions off entirely.
     pub sources: Vec<Source>,
+    /// The key that takes the whole ghost suggestion, e.g. `"right"`.
+    ///
+    /// The action was always bindable through `oslo.keys`, but not under the name the suggestion
+    /// settings use — so a config that wrote `oslo.suggest.accept = "right"`, which is how fish
+    /// spells it, silently bound nothing.
+    pub accept: Option<String>,
+    /// The key that takes one word of it.
+    pub accept_word: Option<String>,
 }
 
 impl Default for Suggest {
@@ -84,6 +92,8 @@ impl Default for Suggest {
         // anything that can be ranked.
         Suggest {
             sources: vec![Source::History, Source::Completion, Source::Path],
+            accept: None,
+            accept_word: None,
         }
     }
 }
@@ -161,6 +171,12 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
                 }
             }
             settings.suggest.sources = sources;
+        }
+        if let Value::Str(key) = table.get(&Value::str("accept")) {
+            settings.suggest.accept = Some(key.to_string());
+        }
+        if let Value::Str(key) = table.get(&Value::str("accept_word")) {
+            settings.suggest.accept_word = Some(key.to_string());
         }
     }
 
@@ -259,6 +275,18 @@ mod tests {
         assert!(!off.completion.show_kind);
         let (absent, _) = settings_from("oslo = { completion = {} }");
         assert!(absent.completion.show_kind);
+    }
+
+    /// `oslo.suggest.accept = "right"` is how fish spells it, and it used to bind nothing.
+    #[test]
+    fn the_suggestion_keys_are_read_under_their_own_names() {
+        let (settings, problems) =
+            settings_from("oslo = { suggest = { accept = 'right', accept_word = 'alt-right' } }");
+        assert!(problems.is_empty(), "{problems:?}");
+        assert_eq!(settings.suggest.accept.as_deref(), Some("right"));
+        assert_eq!(settings.suggest.accept_word.as_deref(), Some("alt-right"));
+        // Naming them does not disturb the sources.
+        assert_eq!(settings.suggest.sources, Suggest::default().sources);
     }
 
     #[test]

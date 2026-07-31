@@ -28,6 +28,11 @@ pub enum Action {
     Complete,
 }
 
+/// The action a name stands for, for callers outside `oslo.keys` that bind by name.
+pub fn action(name: &str) -> Option<Action> {
+    Action::parse(name)
+}
+
 impl Action {
     fn parse(name: &str) -> Option<Action> {
         match name {

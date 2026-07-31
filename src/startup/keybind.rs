@@ -21,6 +21,29 @@ pub fn apply(rl: &mut Repl, env_struct: &Arc<Mutex<Environment>>, toggle: &Toggl
         eprintln!("oslo: {problem}");
     }
 
+    // `oslo.suggest.accept` / `.accept_word` name the same actions `oslo.keys` can bind, under the
+    // names the suggestion settings use. Applied first so an explicit `oslo.keys` entry on the same
+    // key still wins: a later, more specific statement beats a general one.
+    for (key, action) in [
+        (settings.suggest.accept.as_deref(), "accept-suggestion"),
+        (
+            settings.suggest.accept_word.as_deref(),
+            "accept-suggestion-word",
+        ),
+    ] {
+        let Some(key) = key else { continue };
+        match oslo::interactive::keys::parse_key(key) {
+            Some(event) => {
+                if let Some(command) =
+                    oslo::interactive::keys::action(action).and_then(|a| a.command())
+                {
+                    rl.bind_sequence(event, rustyline::EventHandler::Simple(command));
+                }
+            }
+            None => eprintln!("oslo: oslo.suggest: '{key}' is not a key name"),
+        }
+    }
+
     let mut toggle_bound = false;
     for (event, action) in bindings {
         match action.command() {
