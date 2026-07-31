@@ -47,25 +47,27 @@ impl CompletionCandidate {
         }
     }
 
-    pub fn icon(&self) -> &'static str {
-        if let Some(ref k) = self.kind {
-            match k.as_str() {
-                "subcommand" => "🏷️ ",
-                "flag" => "🚩 ",
-                "dir" => "📁 ",
-                "file" => "📄 ",
-                "builtin" => "⚡ ",
-                "variable" => "💲 ",
-                _ => "⚙️ ",
-            }
-        } else if self.display.starts_with('-') {
-            "🚩 "
-        } else if self.display.ends_with('/') {
-            "📁 "
-        } else if self.display.starts_with('$') {
-            "💲 "
-        } else {
-            "⚙️ "
+    /// The word the kind badge spells, or `None` for a candidate with no kind.
+    ///
+    /// Replaces an emoji icon per kind. Two reasons it went: an emoji is two cells wide in some
+    /// terminals and one in others, so a column of them cannot be laid out reliably; and a glyph
+    /// has to be learned, where ` builtin ` is already the word. The badge is drawn as a coloured
+    /// pill, which is what carries the "this is a kind" reading that the icon was there for.
+    pub fn badge(&self) -> Option<&str> {
+        match self.kind.as_deref() {
+            Some("dir") | Some("directory") => Some("dir"),
+            Some("file") => Some("file"),
+            Some("builtin") => Some("builtin"),
+            Some("command") => Some("command"),
+            Some("variable") => Some("variable"),
+            Some("history") => Some("history"),
+            Some("alias") => Some("alias"),
+            Some("flag") | Some("option") => Some("option"),
+            Some("subcommand") => Some("subcmd"),
+            // A kind nothing has claimed is still a kind; showing it is how the next one gets
+            // noticed rather than silently drawn as blank.
+            Some(other) if !other.is_empty() => Some(other),
+            _ => None,
         }
     }
 }
@@ -90,6 +92,7 @@ impl DropdownMenu {
     pub fn select_interactive(
         candidates: Vec<CompletionCandidate>,
         indent_cols: usize,
+        typed: &str,
     ) -> Option<CompletionCandidate> {
         if candidates.is_empty() {
             return None;
@@ -118,6 +121,7 @@ impl DropdownMenu {
                 menu.max_visible,
                 menu.indent_cols,
                 terminal_cols(),
+                typed,
             );
             let _ = write!(stdout, "{}", rendered);
             let _ = stdout.flush();

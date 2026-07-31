@@ -1,0 +1,324 @@
+//! The colours the prompt draws with, and where they come from.
+//!
+//! One [`Theme`], read from `oslo.theme` in the config, used by three places that previously each
+//! carried their own hardcoded escapes: the dropdown, the syntax highlighter and the prompt.
+//!
+//! **Merged, not replaced.** A config that writes `oslo.theme = { syntax = { command = "cyan" } }`
+//! means "make commands cyan", not "discard every other colour". A whole-table assignment is the
+//! natural way to write one field and it must not silently blank the other forty — so every field
+//! is an `Option` layered over [`Theme::default`], and only what the config names is overridden.
+
+pub mod color;
+mod from_lua;
+
+pub use color::{Color, Depth, Style};
+pub use from_lua::read_lua_theme;
+
+use std::sync::RwLock;
+
+/// The theme in force.
+///
+/// Process-wide rather than threaded through the helper, because the three consumers are reached
+/// from rustyline callbacks that own no state of ours. Written once when the config loads and read
+/// on every keystroke, which is what `RwLock` is for.
+static THEME: RwLock<Option<Theme>> = RwLock::new(None);
+
+/// The colour depth in force, decided once.
+static DEPTH: RwLock<Option<Depth>> = RwLock::new(None);
+
+/// Read the theme. Cheap enough for a keystroke: a read lock and a clone of a plain struct.
+pub fn current() -> Theme {
+    THEME
+        .read()
+        .ok()
+        .and_then(|t| t.clone())
+        .unwrap_or_default()
+}
+
+/// Install a theme, replacing whatever was there.
+pub fn install(theme: Theme) {
+    if let Ok(mut slot) = THEME.write() {
+        *slot = Some(theme);
+    }
+}
+
+/// The colour depth, detected on first use.
+///
+/// Cached because `$TERM` and `$COLORTERM` do not change during a session, and because this is
+/// read once per styled span — several hundred times for one redraw of a full dropdown.
+pub fn depth() -> Depth {
+    if let Ok(slot) = DEPTH.read()
+        && let Some(depth) = *slot
+    {
+        return depth;
+    }
+    let detected = Depth::detect();
+    if let Ok(mut slot) = DEPTH.write() {
+        *slot = Some(detected);
+    }
+    detected
+}
+
+/// Force a depth, for tests and for a config that knows better than the environment.
+pub fn set_depth(depth: Depth) {
+    if let Ok(mut slot) = DEPTH.write() {
+        *slot = Some(depth);
+    }
+}
+
+/// Everything the interactive layer draws with.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Theme {
+    pub syntax: Syntax,
+    pub pager: Pager,
+    pub prompt: Prompt,
+}
+
+/// Colours for the line as it is typed.
+///
+/// The names are fish's, because they are the ones people already have in a config somewhere and
+/// because the set is a good specification of how deep highlighting should go. `builtin`,
+/// `function` and `keyword` fall back to `command` when a theme leaves them out, which is what
+/// keeps a two-line theme from looking half-finished.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Syntax {
+    pub command: Style,
+    pub builtin: Style,
+    pub function: Style,
+    pub keyword: Style,
+    /// A command name that resolves to nothing. fish's most useful colour.
+    pub error: Style,
+    pub param: Style,
+    /// A parameter that names a file which exists.
+    pub valid_path: Style,
+    pub option: Style,
+    pub quote: Style,
+    pub escape: Style,
+    pub operator: Style,
+    pub redirection: Style,
+    /// `;` and `&`.
+    pub end: Style,
+    pub comment: Style,
+    pub variable: Style,
+    pub autosuggestion: Style,
+    pub match_bracket: Style,
+}
+
+impl Default for Syntax {
+    fn default() -> Self {
+        let basic = |index: u8| {
+            Style::fg(Color::Basic {
+                index,
+                bright: false,
+            })
+        };
+        let bright = |index: u8| {
+            Style::fg(Color::Basic {
+                index,
+                bright: true,
+            })
+        };
+        Syntax {
+            command: basic(2),
+            builtin: Style {
+                bold: true,
+                ..basic(2)
+            },
+            function: basic(2),
+            keyword: basic(5),
+            error: Style {
+                underline: true,
+                ..basic(1)
+            },
+            param: Style::default(),
+            // Underline rather than a colour: it has to compose with whatever colour the
+            // parameter already has, and a second colour would fight with it.
+            valid_path: Style {
+                underline: true,
+                ..Style::default()
+            },
+            option: basic(6),
+            quote: basic(3),
+            escape: basic(5),
+            operator: basic(6),
+            redirection: basic(4),
+            end: bright(0),
+            comment: bright(0),
+            variable: basic(4),
+            autosuggestion: bright(0),
+            match_bracket: Style {
+                bold: true,
+                ..Style::default()
+            },
+        }
+    }
+}
+
+/// Colours for the completion dropdown.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Pager {
+    pub border: Style,
+    pub text: Style,
+    pub text_sel: Style,
+    pub sel_bg: Option<Color>,
+    /// The part of a candidate the user has already typed.
+    pub match_: Style,
+    pub desc: Style,
+    pub desc_sel: Style,
+    pub scroll: Style,
+    /// The pill, one entry per completion kind.
+    pub kind: KindColors,
+}
+
+impl Default for Pager {
+    fn default() -> Self {
+        Pager {
+            border: Style::fg(Color::Indexed(240)),
+            text: Style::default(),
+            text_sel: Style {
+                bold: true,
+                ..Style::fg(Color::Basic {
+                    index: 7,
+                    bright: true,
+                })
+            },
+            sel_bg: Some(Color::Indexed(62)),
+            match_: Style {
+                bold: true,
+                ..Style::fg(Color::Basic {
+                    index: 6,
+                    bright: true,
+                })
+            },
+            desc: Style::fg(Color::Indexed(245)),
+            desc_sel: Style::fg(Color::Indexed(252)),
+            scroll: Style::fg(Color::Indexed(240)),
+            kind: KindColors::default(),
+        }
+    }
+}
+
+/// The pill colours, by completion kind.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct KindColors {
+    pub command: Style,
+    pub builtin: Style,
+    pub file: Style,
+    pub dir: Style,
+    pub variable: Style,
+    pub history: Style,
+    pub alias: Style,
+    /// Anything a theme has no entry for.
+    pub other: Style,
+}
+
+impl Default for KindColors {
+    fn default() -> Self {
+        // Dark text on a coloured field, which is what makes a pill read as a pill rather than as
+        // coloured words. Indexed rather than 24-bit so the default theme looks the same on a
+        // 256-colour terminal as on a modern one.
+        let pill = |bg: u8| Style {
+            fg: Some(Color::Indexed(233)),
+            bg: Some(Color::Indexed(bg)),
+            ..Style::default()
+        };
+        KindColors {
+            command: pill(140),
+            builtin: pill(79),
+            file: pill(245),
+            dir: pill(75),
+            variable: pill(215),
+            history: pill(79),
+            alias: pill(140),
+            other: pill(245),
+        }
+    }
+}
+
+impl KindColors {
+    /// The pill for a `CompletionCandidate::kind`.
+    pub fn for_kind(&self, kind: &str) -> Style {
+        match kind {
+            "command" => self.command,
+            "builtin" => self.builtin,
+            "file" => self.file,
+            "dir" | "directory" => self.dir,
+            "variable" => self.variable,
+            "history" => self.history,
+            "alias" => self.alias,
+            _ => self.other,
+        }
+    }
+}
+
+/// Colours the built-in prompt draws with, when no Lua prompt has replaced it.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Prompt {
+    pub cwd: Style,
+    pub git: Style,
+    pub ok: Style,
+    pub failed: Style,
+}
+
+impl Default for Prompt {
+    fn default() -> Self {
+        let basic = |index: u8| {
+            Style::fg(Color::Basic {
+                index,
+                bright: false,
+            })
+        };
+        Prompt {
+            cwd: Style {
+                bold: true,
+                ..basic(4)
+            },
+            git: basic(2),
+            ok: Style {
+                bold: true,
+                ..basic(2)
+            },
+            failed: Style {
+                bold: true,
+                ..basic(1)
+            },
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_default_theme_paints_something_for_every_role() {
+        let theme = Theme::default();
+        set_depth(Depth::Ansi256);
+        // Not exhaustive by field name — the point is that no role is left silently plain except
+        // the ones that are meant to be.
+        assert!(!theme.syntax.command.is_plain());
+        assert!(!theme.syntax.error.is_plain());
+        assert!(!theme.pager.border.is_plain());
+        assert!(!theme.pager.kind.command.is_plain());
+        // `param` is deliberately plain: an ordinary argument takes the terminal's own colour.
+        assert!(theme.syntax.param.is_plain());
+    }
+
+    #[test]
+    fn an_unknown_kind_still_gets_a_pill() {
+        let kinds = KindColors::default();
+        assert_eq!(kinds.for_kind("nonesuch"), kinds.other);
+        assert_eq!(kinds.for_kind("dir"), kinds.dir);
+        // Both spellings, since the completer says `dir` and a Lua theme may say `directory`.
+        assert_eq!(kinds.for_kind("directory"), kinds.dir);
+    }
+
+    #[test]
+    fn installing_a_theme_replaces_the_current_one() {
+        let mut theme = Theme::default();
+        theme.syntax.command = Style::fg(Color::Indexed(99));
+        install(theme.clone());
+        assert_eq!(current().syntax.command, Style::fg(Color::Indexed(99)));
+        install(Theme::default());
+    }
+}

@@ -13,6 +13,7 @@ mod hinting;
 pub mod prompt;
 pub mod spec;
 pub mod syntax;
+pub mod theme;
 pub mod words;
 
 #[cfg(test)]
@@ -192,7 +193,10 @@ impl Completer for OsloHelper {
         let indent_cols =
             dropdown::visible_len(&prompt_str) + dropdown::visible_len(&line[..start]);
 
-        match DropdownMenu::select_interactive(candidates, indent_cols) {
+        // What the user has typed of this word, so the dropdown can show which part of each
+        // candidate is already theirs.
+        let typed = &line[start..pos];
+        match DropdownMenu::select_interactive(candidates, indent_cols, typed) {
             Some(selected) => {
                 self.record_accepted(&selected);
                 Ok((start, vec![Self::to_pair(selected)]))

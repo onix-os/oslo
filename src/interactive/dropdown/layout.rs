@@ -20,14 +20,21 @@ const MIN_DESC_COLS: usize = 8;
 const LABEL_FLOOR: usize = 12;
 /// A description column asks for this much even when the descriptions are shorter.
 const DESC_PREFERRED: usize = 25;
+/// A badge narrower than this cannot spell the shortest kind (` dir `), so it is dropped whole.
+const MIN_BADGE_COLS: usize = 5;
 
 /// The column widths a dropdown is drawn at, after clamping to the terminal.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct DropdownLayout {
     /// Left indent actually used — the requested indent, reduced until a box still fits.
     pub indent: usize,
-    /// Width of the label column, icon included.
+    /// Width of the label column.
     pub label_w: usize,
+    /// Width of the kind badge column; 0 when badges do not fit or no candidate has a kind.
+    ///
+    /// Dropped before the description is, because a description says what a thing *is* and the
+    /// badge only says what *kind* of thing it is — which the description usually implies anyway.
+    pub badge_w: usize,
     /// Width of the description column; 0 when descriptions do not fit at all.
     pub desc_w: usize,
     /// Visible width of every row, indent excluded.
@@ -43,6 +50,25 @@ impl DropdownLayout {
 
     pub fn has_desc(&self) -> bool {
         self.desc_w > 0
+    }
+
+    pub fn has_badge(&self) -> bool {
+        self.badge_w > 0
+    }
+
+    /// Chrome cells for this layout, badge column included.
+    fn overhead(&self) -> usize {
+        let base = if self.desc_w > 0 {
+            OVERHEAD_WITH_DESC
+        } else {
+            OVERHEAD_NO_DESC
+        };
+        // The badge costs its own width plus the space that separates it from the label.
+        base + if self.badge_w > 0 {
+            self.badge_w + 1
+        } else {
+            0
+        }
     }
 }
 
@@ -61,10 +87,18 @@ pub fn compute_layout(
 
     let natural_label = candidates
         .iter()
-        .map(|c| display_width(c.icon()) + display_width(&c.display))
+        .map(|c| display_width(&c.display))
         .max()
         .unwrap_or(0)
         .max(LABEL_FLOOR);
+    // Every badge in a dropdown is the same width, so the pills line up into a column rather than
+    // ragging along the labels. The widest kind present sets it.
+    let natural_badge = candidates
+        .iter()
+        .filter_map(|c| c.badge())
+        .map(|b| display_width(b) + 2)
+        .max()
+        .unwrap_or(0);
     let natural_desc = candidates
         .iter()
         .map(|c| display_width(c.description.as_deref().unwrap_or("")))
@@ -83,18 +117,31 @@ pub fn compute_layout(
         0
     };
 
+    let mut badge_w = if natural_badge >= MIN_BADGE_COLS {
+        natural_badge
+    } else {
+        0
+    };
+    // The badge is the first thing to go: it is decoration over information the label and
+    // description already carry, so it must never be the reason a description is cut.
+    let badge_cost = |w: usize| if w > 0 { w + 1 } else { 0 };
+    if label_w + desc_w + badge_cost(badge_w) + OVERHEAD_WITH_DESC > avail {
+        badge_w = 0;
+    }
+
     if desc_w > 0 {
         // A label column that eats the row leaves no room for the text explaining it, so a long
         // label is ellipsised before the description is squeezed to nothing.
         label_w = label_w.min((avail * 3 / 5).max(MIN_LABEL_COLS));
     }
 
-    if desc_w > 0 && label_w + desc_w + OVERHEAD_WITH_DESC > avail {
-        let for_desc = avail.saturating_sub(label_w + OVERHEAD_WITH_DESC);
+    let chrome = OVERHEAD_WITH_DESC + badge_cost(badge_w);
+    if desc_w > 0 && label_w + desc_w + chrome > avail {
+        let for_desc = avail.saturating_sub(label_w + chrome);
         if for_desc >= MIN_DESC_COLS {
             desc_w = for_desc;
         } else {
-            let for_label = avail.saturating_sub(MIN_DESC_COLS + OVERHEAD_WITH_DESC);
+            let for_label = avail.saturating_sub(MIN_DESC_COLS + chrome);
             if for_label >= MIN_LABEL_COLS {
                 label_w = for_label;
                 desc_w = MIN_DESC_COLS;
@@ -105,21 +152,20 @@ pub fn compute_layout(
     }
 
     if desc_w == 0 {
-        label_w = label_w.min(avail.saturating_sub(OVERHEAD_NO_DESC)).max(1);
+        label_w = label_w
+            .min(avail.saturating_sub(OVERHEAD_NO_DESC + badge_cost(badge_w)))
+            .max(1);
     }
 
-    let box_w = if desc_w > 0 {
-        label_w + desc_w + OVERHEAD_WITH_DESC
-    } else {
-        label_w + OVERHEAD_NO_DESC
-    };
-
-    DropdownLayout {
+    let mut layout = DropdownLayout {
         indent,
         label_w,
+        badge_w,
         desc_w,
-        box_w,
-    }
+        box_w: 0,
+    };
+    layout.box_w = label_w + desc_w + layout.overhead();
+    layout
 }
 
 #[cfg(test)]

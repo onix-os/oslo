@@ -435,7 +435,7 @@ mod in_process {
             ),
         ];
         let (rendered, lines) =
-            oslo::interactive::dropdown::render_vertical_dropdown(&candidates, 0, 8, 0);
+            oslo::interactive::dropdown::render_vertical_dropdown(&candidates, 0, 8, 0, "");
         assert!(rendered.contains("cargo"));
         assert!(rendered.contains("cd"));
         assert_eq!(lines, 4);
