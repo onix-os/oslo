@@ -129,7 +129,12 @@ pub(super) fn compile_items(chars: &[(char, bool)]) -> (Vec<Item>, bool) {
 fn parse_class(chars: &[(char, bool)], start: usize) -> Option<(Item, usize)> {
     let mut i = start + 1;
     let mut negated = false;
-    if let Some(&(ch, _)) = chars.get(i)
+    // `globs` — the flag saying this character is still an active metacharacter — is what decides
+    // it, exactly as it does for `]` below. A *quoted* `!` is a member and not a negation:
+    // `[\!a]` is the set containing `!` and `a`, so `a` matches it. Ignoring the flag here read
+    // that as "anything but `a`" and answered the opposite of bash on every one of them.
+    if let Some(&(ch, globs)) = chars.get(i)
+        && globs
         && (ch == '!' || ch == '^')
     {
         negated = true;
@@ -342,5 +347,21 @@ mod tests {
         assert!(ShellPattern::from_unquoted("").matches(""));
         assert!(!ShellPattern::from_unquoted("").matches("x"));
         assert!(ShellPattern::from_unquoted("*").matches(""));
+    }
+
+    /// A *quoted* `!` or `^` is a member of the class, not a negation. `[\!a]` is the set
+    /// containing `!` and `a`, so `a` matches — oslo used to answer the opposite, which is
+    /// "anything but `a`", and got it backwards on every pattern written that way.
+    #[test]
+    fn a_quoted_negation_marker_is_a_member() {
+        assert!(ShellPattern::from_unquoted("[\\!a]").matches("a"));
+        assert!(ShellPattern::from_unquoted("[\\!a]").matches("!"));
+        assert!(!ShellPattern::from_unquoted("[\\!a]").matches("b"));
+        assert!(ShellPattern::from_unquoted("[\\^a]").matches("a"));
+
+        // Unquoted, it still negates.
+        assert!(ShellPattern::from_unquoted("[!a]").matches("b"));
+        assert!(!ShellPattern::from_unquoted("[!a]").matches("a"));
+        assert!(ShellPattern::from_unquoted("[^a]").matches("b"));
     }
 }
