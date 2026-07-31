@@ -213,7 +213,10 @@ impl Hinter for OsloHelper {
             return Some(h);
         }
 
+        // Then a command name being typed, and finally a path — fish's three sources, in fish's
+        // order. Each answers for a position the others cannot see.
         self.command_hint(line, pos)
+            .or_else(|| self.path_hint(line, pos))
     }
 }
 

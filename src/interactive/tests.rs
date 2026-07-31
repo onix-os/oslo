@@ -399,3 +399,65 @@ fn a_name_that_is_both_a_builtin_and_a_file_is_offered_once() {
         "{names:?}"
     );
 }
+
+// ------------------------------------------------------------- path suggestions
+
+/// fish's third autosuggestion source: the argument, which neither history nor the command index
+/// can answer for.
+#[test]
+fn a_path_argument_is_suggested_from_the_filesystem() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("notes.txt"), b"x").unwrap();
+    std::fs::create_dir(dir.path().join("build")).unwrap();
+
+    let h = helper(Environment::new());
+    let base = dir.path().display().to_string();
+
+    let line = format!("cat {base}/not");
+    assert_eq!(
+        h.path_hint(&line, line.len()).as_deref(),
+        Some("es.txt"),
+        "no suggestion for {line}"
+    );
+
+    // A directory is suggested with its trailing slash, so the next keystroke continues into it.
+    let line = format!("ls {base}/bui");
+    assert_eq!(h.path_hint(&line, line.len()).as_deref(), Some("ld/"));
+}
+
+/// A bare word at the start of a line is a command to look up, not a file in the working
+/// directory — suggesting `./notes.txt` for `no` would be nonsense.
+///
+/// Absolute paths throughout: `set_current_dir` is process-wide, and this binary runs its tests on
+/// sixteen threads at once, so changing the working directory here would move it under every
+/// other test that happened to be running.
+#[test]
+fn a_command_word_is_never_suggested_as_a_path() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("notes.txt"), b"x").unwrap();
+    let base = dir.path().display().to_string();
+    let h = helper(Environment::new());
+
+    // In command position, even a stem that names a real file suggests nothing as a path.
+    let line = format!("{base}/not");
+    assert_eq!(h.path_hint(&line, line.len()), None);
+
+    // The same stem as an argument is fair game.
+    let line = format!("cat {base}/not");
+    assert_eq!(h.path_hint(&line, line.len()).as_deref(), Some("es.txt"));
+}
+
+/// Every argument would otherwise suggest `.git`, which is never what was meant.
+#[test]
+fn a_dotfile_is_only_suggested_once_the_dot_is_typed() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join(".hidden"), b"x").unwrap();
+    let base = dir.path().display().to_string();
+    let h = helper(Environment::new());
+
+    let line = format!("cat {base}/");
+    assert_eq!(h.path_hint(&line, line.len()), None);
+
+    let line = format!("cat {base}/.hid");
+    assert_eq!(h.path_hint(&line, line.len()).as_deref(), Some("den"));
+}
