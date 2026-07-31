@@ -11,6 +11,7 @@ pub mod frecency_store;
 pub mod highlight;
 mod hinting;
 pub mod prompt;
+pub mod settings;
 pub mod spec;
 pub mod syntax;
 pub mod theme;
@@ -219,17 +220,21 @@ impl Hinter for OsloHelper {
             return None;
         }
 
-        // History wins: a line the user has actually run is a better guess than any name we could
-        // rank, and it is what makes the suggestion feel like a memory rather than a directory
-        // listing.
-        if let Some(h) = self.history_hinter.hint(line, pos, ctx) {
-            return Some(h);
+        // The order is `oslo.suggest.sources`, defaulting to fish's: history, then completions,
+        // then paths. Each answers for a position the others cannot see, and an empty list turns
+        // suggestions off entirely.
+        for source in settings::current().suggest.sources {
+            let found = match source {
+                settings::Source::History => self.history_hinter.hint(line, pos, ctx),
+                settings::Source::Completion => self.command_hint(line, pos),
+                settings::Source::Path => self.path_hint(line, pos),
+            };
+            if found.is_some() {
+                return found;
+            }
         }
 
-        // Then a command name being typed, and finally a path — fish's three sources, in fish's
-        // order. Each answers for a position the others cannot see.
-        self.command_hint(line, pos)
-            .or_else(|| self.path_hint(line, pos))
+        None
     }
 }
 

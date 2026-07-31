@@ -12,6 +12,7 @@
 //! * [`lua_init`] — the optional `init.lua` layer, and what happens when it is broken.
 //! * [`repl`] — the interactive loop that uses all three.
 
+pub mod config;
 pub mod history;
 pub mod language;
 pub mod lua_init;

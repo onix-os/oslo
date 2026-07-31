@@ -102,6 +102,10 @@ impl DropdownMenu {
         }
 
         let mut menu = Self::new(candidates, indent_cols);
+        // `oslo.completion.max_rows`.
+        menu.max_visible = menu
+            .max_visible
+            .min(crate::interactive::settings::current().completion.max_rows);
 
         let stdin = io::stdin();
         let orig_termios = tcgetattr(&stdin).ok()?;

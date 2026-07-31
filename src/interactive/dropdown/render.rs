@@ -61,6 +61,7 @@ pub fn render_vertical_dropdown_at_width(
     let indent = " ".repeat(layout.indent);
     let theme = theme::current();
     let depth = theme::depth();
+    let settings = crate::interactive::settings::current();
 
     let mut out = String::new();
 
@@ -96,12 +97,12 @@ pub fn render_vertical_dropdown_at_width(
         // rest of each candidate adds.
         out.push_str(&paint_match(&label, typed, selected, &theme, depth, row_bg));
 
-        if layout.has_badge() {
+        if layout.has_badge() && settings.completion.show_kind {
             out.push_str(&on_row(Style::default()).paint(" ", depth));
             out.push_str(&badge_cell(cand, layout.badge_w, &theme, depth));
         }
 
-        if layout.has_desc() {
+        if layout.has_desc() && settings.completion.descriptions {
             let desc = pad_to_width(
                 &truncate_to_width(cand.description.as_deref().unwrap_or(""), layout.desc_w),
                 layout.desc_w,

@@ -7,7 +7,7 @@
 use crate::absorb_loop_control;
 use crate::expand_history;
 use crate::startup::mode::{Line, Mode, ToggleRequest};
-use crate::startup::{history, lua_init, mode, prompt, rc};
+use crate::startup::{config, history, lua_init, mode, prompt, rc};
 use oslo::Environment;
 use oslo::LuaEngine;
 use oslo::env::builtins::run_exit_trap;
@@ -71,11 +71,17 @@ pub fn run_repl() -> ! {
             std::process::exit(1);
         }
     };
-    if lua_init::install_bindings(&lua, Arc::clone(&env_struct)) {
-        let init_path = lua_init::init_lua_path(&env_struct.lock().unwrap());
-        if let Some(path) = init_path {
-            lua_init::load_init_lua(&lua, &path);
-        }
+    // The lock is taken and released *before* the config runs. Holding it across `load_config`
+    // is a deadlock in disguise: `borrow_env` uses `try_lock`, so every `oslo.*` call in the
+    // config fails with "shell state is busy" and the whole file silently does nothing.
+    let config = lua_init::config_path(&env_struct.lock().unwrap());
+    if lua_init::install_bindings(&lua, Arc::clone(&env_struct))
+        && let Some(path) = config
+    {
+        lua_init::load_config(&lua, &path);
+        // The theme is read after the config has run, so `oslo.theme = {…}` in it takes effect
+        // before the first prompt is drawn rather than after the first command.
+        config::apply(&lua);
     }
 
     let settings = history::settings(&env_struct.lock().unwrap());

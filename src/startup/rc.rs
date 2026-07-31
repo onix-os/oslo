@@ -5,13 +5,12 @@
 //! and script shells read no configuration at all. Two files fix that, and they are deliberately
 //! different in kind:
 //!
-//! * `~/.oslorc` is *shell* syntax, sourced by an interactive shell through the ordinary
-//!   `source` builtin — so an alias, a function and a `PS1=` in it behave exactly as the same
-//!   lines typed at the prompt would.
-//! * `$ENV` is POSIX's own hook, and its value is subject to parameter expansion before use,
+//! * `~/.oslorc` is **Lua**, and is loaded by [`super::lua_init`] rather than sourced here. It
+//!   used to be shell syntax; one config file in one language is the decision, and the shell
+//!   half of it is gone.
+//! * `$ENV` is POSIX's own hook and stays *shell* syntax, because POSIX defines it that way and
+//!   oslo has to be a real `/bin/sh`. Its value is subject to parameter expansion before use,
 //!   which is why it goes through the expander rather than being taken literally.
-//!
-//! `init.lua` remains an extra layer on top, not the only one.
 
 use oslo::Environment;
 use oslo::env::builtins::builtin_source;
@@ -32,14 +31,11 @@ pub type ExitRequest = Option<i32>;
 /// case), and one that fails half way through leaves the shell running with whatever it managed
 /// to set — a broken rc file must not cost you your shell.
 pub fn load_startup_files(env: &mut Environment, interactive: bool) -> ExitRequest {
-    let mut sourced: Vec<PathBuf> = Vec::new();
+    let sourced: Vec<PathBuf> = Vec::new();
 
-    if interactive && let Some(rc) = oslorc_path(env) {
-        if let Some(status) = source_if_present(env, &rc) {
-            return Some(status);
-        }
-        sourced.push(rc);
-    }
+    // `~/.oslorc` is **Lua** and is loaded by `super::lua_init`, not sourced here — see
+    // `config_path`. What remains in this function is POSIX's own hook.
+    let _ = interactive;
 
     if let Some(path) = env_file(env)
         && !sourced.contains(&path)
@@ -49,18 +45,6 @@ pub fn load_startup_files(env: &mut Environment, interactive: bool) -> ExitReque
     }
 
     None
-}
-
-/// `$HOME/.oslorc`, when `$HOME` says anything usable.
-fn oslorc_path(env: &Environment) -> Option<PathBuf> {
-    let home = env
-        .get_var("HOME")
-        .map(str::to_string)
-        .or_else(|| std::env::var("HOME").ok())?;
-    if home.is_empty() {
-        return None;
-    }
-    Some(PathBuf::from(home).join(".oslorc"))
 }
 
 /// The file `$ENV` names, after parameter expansion, or `None` when the variable is unset,

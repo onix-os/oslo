@@ -266,6 +266,21 @@ impl LuaEngine {
         }
     }
 
+    /// Read `oslo.theme` as it stands, and what was wrong with it.
+    pub fn read_theme(&self) -> (crate::interactive::theme::Theme, Vec<String>) {
+        let oslo = self.interp.global("oslo");
+        let theme = match &oslo {
+            Value::Table(table) => table.borrow().get(&Value::str("theme")),
+            _ => Value::Nil,
+        };
+        crate::interactive::theme::read_lua_theme(&theme)
+    }
+
+    /// Read `oslo.completion`, `oslo.suggest` and `oslo.history` as they stand.
+    pub fn read_settings(&self) -> (crate::interactive::settings::Settings, Vec<String>) {
+        crate::interactive::settings::read_lua_settings(&self.interp.global("oslo"))
+    }
+
     pub fn render_prompt(&self) -> Option<String> {
         let prompt = self.registry.borrow().get(PROMPT_KEY).cloned()?;
         match self.interp.call(&prompt, Vec::new()) {
