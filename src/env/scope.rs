@@ -80,6 +80,16 @@ pub struct Environment {
     /// and [`Self::listable_traps`] is the only thing that reads it.
     inherited_traps: HashMap<String, String>,
     readonly_vars: HashSet<String>,
+    /// Names `export` was told about before they existed.
+    ///
+    /// `export V` with no value must mark `V` for export and leave it **unset** — bash gives an
+    /// empty `${V+set}` and no `V=` in `env`, and a later `V=1` is then exported. Creating it
+    /// empty instead, which is what this used to do, makes it answer "set" to every test that asks
+    /// and puts a spurious `V=` in the environment of every child.
+    ///
+    /// So the intention is recorded here rather than in `vars`, and [`Self::set_var`] consults it
+    /// when the name is finally assigned.
+    pending_exports: HashSet<String>,
     dir_stack: Vec<PathBuf>,
     scope_stack: Vec<ScopeFrame>,
     /// How many loops are currently executing in this shell.
@@ -138,6 +148,7 @@ impl Environment {
             signal_traps: HashMap::new(),
             inherited_traps: HashMap::new(),
             readonly_vars: HashSet::new(),
+            pending_exports: HashSet::new(),
             dir_stack: Vec::new(),
             scope_stack: Vec::new(),
             loop_depth: 0,
@@ -416,8 +427,13 @@ impl Environment {
         // at the `name=value` site: POSIX applies it to *any* assignment, so `read`, a `for` loop
         // variable and `${v:=x}` are all covered by deciding it once. The idiom it exists for is
         // `set -a; . /etc/os-release`, which before this exported nothing at all.
-        let is_exp =
-            export || self.allexport() || self.vars.get(name).map(|(_, exp)| *exp).unwrap_or(false);
+        // A pending `export V` is honoured here, and spent: from now on the variable itself
+        // carries the flag, so the intention has nothing left to record.
+        let was_pending = self.pending_exports.remove(name);
+        let is_exp = export
+            || was_pending
+            || self.allexport()
+            || self.vars.get(name).map(|(_, exp)| *exp).unwrap_or(false);
         self.vars
             .insert(name.to_string(), (value.to_string(), is_exp));
         if is_exp {
@@ -455,6 +471,8 @@ impl Environment {
     pub fn unset_var(&mut self, name: &str) {
         self.vars.remove(name);
         self.arrays.remove(name);
+        // `unset` undoes a pending `export` too, or `export V; unset V; V=1` would still export.
+        self.pending_exports.remove(name);
         environ_remove(name);
     }
 
@@ -485,8 +503,8 @@ impl Environment {
             if reject_unrepresentable(name, "") {
                 return false;
             }
-            self.vars.insert(name.to_string(), ("".to_string(), true));
-            environ_set(name, "");
+            // Recorded, not created. See `pending_exports`.
+            self.pending_exports.insert(name.to_string());
         }
         true
     }
