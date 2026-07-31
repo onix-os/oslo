@@ -657,8 +657,19 @@ Four of the findings are new and are oslo's, all in pattern matching:
 * `match.t` 016: a backslash-escaped `]` inside a bracket pattern.
 * `match.t` 018/019: bracket patterns over the full ASCII range, and their negations.
 
-The rest are already known: `select` (deliberately unimplemented), `isset -x` on an unset exported
-variable, `LINENO wrongly detected`, and `QUOTEFAIL` on weird filenames.
+The rest are already known: `select` (deliberately unimplemented), `LINENO wrongly detected`, and
+`QUOTEFAIL` on weird filenames.
+
+**`isset -x` is now located, not just observed.** `export V` with no value must mark `V` for export
+and leave it *unset* — bash gives empty for `${V+set}` and no `V=` in `env`. oslo reports it as set:
+`Scope::export_var` (`src/env/scope.rs:484-489`) takes the not-yet-existing branch and does
+`vars.insert(name, ("", true))` plus `environ_set(name, "")`, which creates it with an empty value
+rather than recording an intention to export.
+
+The fix is not a one-liner and should not be attempted casually: the variable has to be *marked*
+without being *created*, so `V=1` later still exports it. That means a set of pending exports
+alongside `vars`, consulted by `set_var` — a change to the environment model, with `environ`
+consistency and the `export -n`/`unset` paths to keep in step. Next item.
 
 `posparam.t` was refused by oslo's **nesting guard** — `59 unmatched openers, at most 16 are
 parseable`. **Fixed.** The allowance already grew with input size, for the documented reason that
