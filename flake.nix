@@ -5,14 +5,20 @@
     nixpkgs.url = "github:NixOS/nixpkgs?rev=4c1018dae018162ec878d42fec712642d214fdfa";
     flake-utils.url = "github:numtide/flake-utils";
     nixgl.url = "github:nix-community/nixGL";
+    # Rust with extra targets. nixpkgs' plain `rustc` ships only the host's std, so a
+    # `--target x86_64-unknown-linux-musl` build fails on `cfg-if` with "can't find crate for
+    # core" — nothing to do with the code. The static musl binary is what oslo releases, so the
+    # target has to be buildable in the dev shell, not only in CI.
+    rust-overlay.url = "github:oxalica/rust-overlay";
   };
 
   outputs =
-    { nixpkgs, flake-utils, nixgl, ... }:
+    { nixpkgs, flake-utils, nixgl, rust-overlay, ... }:
     flake-utils.lib.eachDefaultSystem (
       system:
       let
         overlays = [
+          rust-overlay.overlays.default
           (final: prev: {
             xorg = prev.xorg // {
               libX11 = final.libx11;
@@ -73,11 +79,13 @@
       {
         devShells.default = pkgs.mkShell {
           packages = [
-            pkgs.rustc
-            pkgs.cargo
-            pkgs.rustfmt
-            pkgs.clippy
-            pkgs.rust-analyzer
+            # One toolchain, with the musl target, replacing the separate rustc/cargo/rustfmt/
+            # clippy derivations — mixing a targeted rustc with an untargeted cargo is how you get
+            # a std that exists but cannot be found.
+            (pkgs.rust-bin.stable.latest.default.override {
+              targets = [ "x86_64-unknown-linux-musl" ];
+              extensions = [ "rust-src" "rust-analyzer" "clippy" "rustfmt" ];
+            })
             pkgs.git-cliff
             pkgs.clang
             pkgs.mold
