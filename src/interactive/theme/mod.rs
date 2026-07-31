@@ -230,7 +230,7 @@ impl Default for KindColors {
             command: pill(140),
             builtin: pill(79),
             file: pill(245),
-            dir: pill(75),
+            dir: pill(241),
             variable: pill(215),
             history: pill(79),
             alias: pill(140),
