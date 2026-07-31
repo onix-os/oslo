@@ -49,6 +49,10 @@ pub fn run_repl() -> ! {
     // notice, whether a background job keeps the terminal's stdin — reads this.
     // (Addressed by path rather than a re-export: `exec::mod` is being edited elsewhere.)
     oslo::exec::pipeline::set_interactive(true);
+    // Semantic marks (OSC 133), so a terminal or multiplexer can see where each command's output
+    // starts and stops. oslo only declares the boundaries; folding them is the job of whatever
+    // owns the grid. See `oslo::interactive::marks`.
+    oslo::interactive::marks::enable(true);
 
     let mut interactive_env = Environment::new();
     // A REPL is interactive and reads its program from the terminal: `$-` says so with `i` and
@@ -153,6 +157,9 @@ pub fn run_repl() -> ! {
                 // Handed the command as typed, which is what a `precmd` hook is for: logging it,
                 // timing it, or setting a title from it.
                 lua.fire_hook("precmd", vec![LuaEngine::hook_arg(&text)]);
+                // Everything after this belongs to the command, not to the prompt.
+                print!("{}", oslo::interactive::marks::output_start());
+                let _ = std::io::Write::flush(&mut std::io::stdout());
                 let before = current_directory();
 
                 let res = match mode {
@@ -186,6 +193,13 @@ pub fn run_repl() -> ! {
                 if after != before {
                     lua.fire_hook("cd", vec![LuaEngine::hook_arg(&after)]);
                 }
+                // The command is over and its status is known: close the block before anything
+                // else prints, so nothing that follows lands inside it.
+                print!(
+                    "{}",
+                    oslo::interactive::marks::command_end(res.as_ref().copied().unwrap_or(1))
+                );
+                let _ = std::io::Write::flush(&mut std::io::stdout());
                 if let Ok(status) = res {
                     lua.fire_hook("postcmd", vec![LuaEngine::hook_status(status)]);
                 }
@@ -272,6 +286,11 @@ fn read_command(
         } else {
             rc::ps2(&mut env_struct.lock().unwrap())
         };
+
+        // Written before the prompt rather than inside it: the line editor measures the prompt
+        // string to know where the line starts, and an OSC in there is counted as visible width.
+        print!("{}", oslo::interactive::marks::prompt_start());
+        let _ = std::io::Write::flush(&mut std::io::stdout());
 
         let raw = match rl.readline_with_initial(&prompt, (&typed, "")) {
             Ok(raw) => raw,
