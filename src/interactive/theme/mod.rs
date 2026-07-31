@@ -165,6 +165,13 @@ pub struct Pager {
     pub text: Style,
     pub text_sel: Style,
     pub sel_bg: Option<Color>,
+    /// The background a kind badge takes **on the selected row only**.
+    ///
+    /// One colour for whichever kind is selected, rather than each kind keeping its own: the
+    /// selected row is already marked out by `sel_bg`, and a badge that kept its usual colour
+    /// there reads as a second, competing highlight. This is the same job IRIS does by inverting
+    /// the pill — a different treatment for the row you are on.
+    pub kind_sel: Option<Color>,
     /// The part of a candidate the user has already typed.
     pub match_: Style,
     pub desc: Style,
@@ -186,7 +193,8 @@ impl Default for Pager {
                     bright: true,
                 })
             },
-            sel_bg: Some(Color::Indexed(62)),
+            sel_bg: Some(Color::Indexed(238)),
+            kind_sel: Some(Color::Indexed(242)),
             match_: Style {
                 bold: true,
                 ..Style::fg(Color::Basic {
@@ -230,7 +238,7 @@ impl Default for KindColors {
             command: pill(140),
             builtin: pill(79),
             file: pill(245),
-            dir: pill(241),
+            dir: pill(240),
             variable: pill(215),
             history: pill(79),
             alias: pill(140),

@@ -94,7 +94,7 @@ pub fn render_vertical_dropdown_at_width(
 
         if layout.has_badge() && settings.completion.show_kind {
             out.push_str(&on_row(Style::default()).paint(" ", depth));
-            out.push_str(&badge_cell(cand, layout.badge_w, &theme, depth));
+            out.push_str(&badge_cell(cand, layout.badge_w, selected, &theme, depth));
         }
 
         if layout.has_desc() && settings.completion.descriptions {
@@ -194,6 +194,7 @@ fn matching_prefix(label: &str, typed: &str) -> usize {
 fn badge_cell(
     cand: &CompletionCandidate,
     width: usize,
+    selected: bool,
     theme: &theme::Theme,
     depth: theme::Depth,
 ) -> String {
@@ -204,11 +205,16 @@ fn badge_cell(
     };
     let text = truncate_to_width(word, width.saturating_sub(2));
     let inner = format!(" {} ", pad_to_width(&text, width.saturating_sub(2)));
-    theme
+    let mut style = theme
         .pager
         .kind
-        .for_kind(cand.kind.as_deref().unwrap_or(""))
-        .paint(&inner, depth)
+        .for_kind(cand.kind.as_deref().unwrap_or(""));
+    // On the selected row every kind takes one colour. Keeping the usual per-kind background
+    // there would put a second highlight inside the row that is already highlighted.
+    if selected && theme.pager.kind_sel.is_some() {
+        style.bg = theme.pager.kind_sel;
+    }
+    style.paint(&inner, depth)
 }
 
 #[cfg(test)]
@@ -444,6 +450,36 @@ mod tests {
         // Selection 9 is on the second page: cmd8..=cmd15.
         assert!(rendered.contains("cmd9"));
         assert!(!rendered.contains("cmd0 "));
+    }
+
+    /// On the selected row every badge takes one colour, so there is not a second highlight
+    /// inside the row that is already highlighted.
+    #[test]
+    fn the_selected_rows_badge_takes_its_own_colour() {
+        crate::interactive::theme::set_depth(crate::interactive::theme::Depth::Ansi256);
+        let candidates = vec![kinded("a", "dir", None), kinded("b", "dir", None)];
+        let (rendered, _) = render_vertical_dropdown_at_width(&candidates, 0, 8, 0, 80, "");
+        let theme = crate::interactive::theme::current();
+        let selected = theme.pager.kind_sel.expect("a selected-badge colour");
+        let ordinary = theme.pager.kind.dir.bg.expect("a dir colour");
+        assert_ne!(
+            selected, ordinary,
+            "the two must differ or the test proves nothing"
+        );
+
+        // Both kinds are `dir`, so the only difference between the rows is the selection.
+        let rows: Vec<&str> = rendered.lines().filter(|l| l.contains("dir")).collect();
+        assert_eq!(rows.len(), 2, "{rows:?}");
+        assert!(
+            rows[0].contains("48;5;242"),
+            "selected badge: {:?}",
+            rows[0]
+        );
+        assert!(
+            rows[1].contains("48;5;240"),
+            "unselected badge: {:?}",
+            rows[1]
+        );
     }
 
     /// Every unselected row carries the background, which is now the only thing that says where

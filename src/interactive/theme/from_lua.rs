@@ -161,12 +161,13 @@ fn read_pager(table: &crate::lua::eval::Table, into: &mut Pager, problems: &mut 
 
     // `bg` and `sel_bg` are bare colours rather than styles: they are the row's background and
     // nothing else.
-    for (name, slot) in [("bg", 0), ("sel_bg", 1)] {
+    for (name, slot) in [("bg", 0), ("sel_bg", 1), ("kind_sel", 2)] {
         if let Value::Str(text) = table.get(&Value::str(name)) {
-            match Color::parse(&text) {
-                Some(colour) if slot == 0 => into.bg = Some(colour),
-                Some(colour) => into.sel_bg = Some(colour),
-                None => problems.push(format!("{p}.{name}: '{text}' is not a colour")),
+            match (Color::parse(&text), slot) {
+                (Some(colour), 0) => into.bg = Some(colour),
+                (Some(colour), 1) => into.sel_bg = Some(colour),
+                (Some(colour), _) => into.kind_sel = Some(colour),
+                (None, _) => problems.push(format!("{p}.{name}: '{text}' is not a colour")),
             }
         }
     }
