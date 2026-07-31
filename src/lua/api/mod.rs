@@ -29,6 +29,7 @@ pub(crate) mod prompt;
 mod re;
 mod run;
 mod shell;
+pub(crate) mod tools;
 
 pub(crate) use shell::handlers as hook_handlers;
 pub(crate) mod util;

@@ -1,0 +1,237 @@
+//! Per-command output parsers: `sh.df()` and friends, answering rows instead of text.
+//!
+//! The shape these follow is written up in `docs/built-in-tools.md`. The short version: a tool
+//! answers in text when a pipe asks and in a table when Lua asks, and the fields carry **values,
+//! not renderings** — `free` is a byte count, `free_human` is `"4.2G"`. A config that wants to
+//! compare needs the number; one that wants to draw wants the string; making each config derive
+//! one from the other is how they end up disagreeing.
+//!
+//! These parse the external tool's output rather than reimplementing it. That is the honest
+//! starting point: `df` on this machine knows about this machine's filesystems, and a reimplementation
+//! would be a second source of truth to keep in step. What the parser buys is that the *caller*
+//! never has to `awk` a column out of text whose layout shifts with the mount point's length.
+
+use crate::lua::eval::value::{Table, Value};
+use std::cell::RefCell;
+use std::rc::Rc;
+
+/// A byte count as something readable: `4.2G`, `918M`, `512B`.
+fn human(bytes: u64) -> String {
+    const UNITS: [&str; 6] = ["B", "K", "M", "G", "T", "P"];
+    let mut value = bytes as f64;
+    let mut unit = 0;
+    while value >= 1024.0 && unit + 1 < UNITS.len() {
+        value /= 1024.0;
+        unit += 1;
+    }
+    if unit == 0 {
+        format!("{bytes}B")
+    } else if value < 10.0 {
+        format!("{value:.1}{}", UNITS[unit])
+    } else {
+        format!("{value:.0}{}", UNITS[unit])
+    }
+}
+
+/// One filesystem, as `df -P` describes it.
+#[derive(Debug, PartialEq, Eq)]
+pub struct Filesystem {
+    pub source: String,
+    pub size: u64,
+    pub used: u64,
+    pub free: u64,
+    pub capacity: u8,
+    pub mount: String,
+}
+
+/// Parse `df -P` output.
+///
+/// `-P` is the POSIX format, which guarantees one filesystem per line and a fixed column order —
+/// without it the source is wrapped onto its own line when it is long, and every field shifts.
+///
+/// **The mount point is taken as the rest of the line, not as a field.** It is the last column and
+/// it may contain spaces, so splitting on whitespace and taking element six loses `/mnt/my disk`.
+/// This is the bug that makes `df | awk '{print $6}'` wrong on exactly the machines where it
+/// matters, and not having it is most of the reason this parser exists.
+pub fn parse_df(output: &str) -> Vec<Filesystem> {
+    let mut out = Vec::new();
+    for line in output.lines().skip(1) {
+        let mut fields = line.split_whitespace();
+        let Some(source) = fields.next() else {
+            continue;
+        };
+        let numbers: Vec<&str> = fields.by_ref().take(4).collect();
+        if numbers.len() < 4 {
+            continue;
+        }
+        // Blocks are 1024 bytes under `-P`, which is what POSIX fixes them at.
+        let block = |s: &str| s.parse::<u64>().ok().map(|n| n * 1024);
+        let (Some(size), Some(used), Some(free)) =
+            (block(numbers[0]), block(numbers[1]), block(numbers[2]))
+        else {
+            continue;
+        };
+        let capacity = numbers[3].trim_end_matches('%').parse::<u8>().unwrap_or(0);
+        // Everything left on the line, spaces included.
+        let mount = fields.collect::<Vec<_>>().join(" ");
+        if mount.is_empty() {
+            continue;
+        }
+        out.push(Filesystem {
+            source: source.to_string(),
+            size,
+            used,
+            free,
+            capacity,
+            mount,
+        });
+    }
+    out
+}
+
+/// Turn one filesystem into the table Lua sees.
+pub fn filesystem_row(fs: &Filesystem) -> Value {
+    let mut t = Table::new();
+    let mut set = |key: &str, value: Value| t.set(Value::str(key), value);
+    set("source", Value::str(&fs.source));
+    set("mount", Value::str(&fs.mount));
+    set("size", Value::int(fs.size as i64));
+    set("size_human", Value::str(human(fs.size)));
+    set("used", Value::int(fs.used as i64));
+    set("used_human", Value::str(human(fs.used)));
+    set("free", Value::int(fs.free as i64));
+    set("free_human", Value::str(human(fs.free)));
+    set("capacity", Value::int(fs.capacity as i64));
+    Value::Table(Rc::new(RefCell::new(t)))
+}
+
+/// The tools that answer in rows, and the function that produces them.
+///
+/// Returns `None` for every other name, which is what makes `sh.<anything>` still run the external
+/// program. Adding a tool is one arm here plus its parser.
+/// Whether this command has a row answer at all.
+///
+/// Asked before the tool runs, so `sh.df` can be handed back as a *function* rather than as the
+/// rows themselves — `sh.df()` has to be a call, not an index that already did the work.
+pub fn answers_in_rows(command: &str) -> bool {
+    matches!(command, "df")
+}
+
+pub fn row_answer(
+    command: &str,
+    env: &std::sync::Arc<std::sync::Mutex<crate::env::Environment>>,
+) -> Option<Value> {
+    match command {
+        "df" => {
+            // `-P` is the POSIX format: one filesystem per line, fixed column order. Asked for
+            // explicitly rather than trusting the default, which wraps a long source onto its own
+            // line and shifts every field after it.
+            let out = capture(env, &["df", "-P"])?;
+            Some(df_rows(&out))
+        }
+        _ => None,
+    }
+}
+
+/// Run a command and answer its standard output, or `None` if it could not run.
+fn capture(
+    env: &std::sync::Arc<std::sync::Mutex<crate::env::Environment>>,
+    argv: &[&str],
+) -> Option<String> {
+    let mut guard = env.lock().ok()?;
+    let words: Vec<String> = argv.iter().map(|s| s.to_string()).collect();
+    let outcome = crate::exec::argv::run(
+        &mut guard,
+        &words,
+        crate::exec::argv::Capture {
+            stdout: true,
+            stderr: false,
+        },
+    )
+    .ok()?;
+    outcome.out
+}
+
+/// The list of rows `sh.df()` answers.
+pub fn df_rows(output: &str) -> Value {
+    let mut list = Table::new();
+    for (i, fs) in parse_df(output).iter().enumerate() {
+        list.set(Value::int(i as i64 + 1), filesystem_row(fs));
+    }
+    Value::Table(Rc::new(RefCell::new(list)))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const SAMPLE: &str = "\
+Filesystem     1024-blocks      Used Available Capacity Mounted on
+/dev/sda1         10485760   5242880   5242880      50% /
+tmpfs                65536         0     65536       0% /dev/shm
+/dev/sdb1          1048576    524288    524288      50% /mnt/my disk
+";
+
+    #[test]
+    fn sizes_read_the_way_df_h_reads() {
+        assert_eq!(human(0), "0B");
+        assert_eq!(human(4300), "4.2K");
+        assert_eq!(human(10 * 1024 * 1024 * 1024), "10G");
+    }
+
+    /// The reason this parser exists: a mount point may contain spaces, so it is the rest of the
+    /// line rather than a field. `df | awk '{print $6}'` gets `/mnt/my` and drops the rest.
+    #[test]
+    fn a_mount_point_with_spaces_survives() {
+        let rows = parse_df(SAMPLE);
+        assert_eq!(rows.len(), 3);
+        assert_eq!(rows[2].mount, "/mnt/my disk");
+        assert_eq!(rows[2].source, "/dev/sdb1");
+    }
+
+    /// Blocks are 1024 bytes under `-P`, and the fields carry byte counts rather than renderings.
+    #[test]
+    fn the_numbers_are_bytes_not_blocks() {
+        let rows = parse_df(SAMPLE);
+        assert_eq!(rows[0].size, 10 * 1024 * 1024 * 1024);
+        assert_eq!(rows[0].free, 5 * 1024 * 1024 * 1024);
+        assert_eq!(rows[0].capacity, 50);
+        assert_eq!(rows[1].used, 0);
+    }
+
+    /// A line that is not a filesystem is skipped rather than producing a row of zeroes — a
+    /// wrapped source line, or the blank line some implementations end with.
+    #[test]
+    fn unparseable_lines_are_skipped() {
+        assert!(parse_df("Filesystem 1024-blocks Used Available Capacity Mounted on\n").is_empty());
+        assert!(parse_df("").is_empty());
+        // A source on its own line, which is what `-P` exists to prevent, contributes nothing
+        // rather than half a row.
+        assert!(parse_df("header\n/dev/very-long-name-here\n").is_empty());
+    }
+
+    #[test]
+    fn a_row_carries_both_the_number_and_the_string() {
+        let rows = parse_df(SAMPLE);
+        let Value::Table(row) = filesystem_row(&rows[0]) else {
+            panic!("a row is a table")
+        };
+        let row = row.borrow();
+        let int = |k: &str| row.get(&Value::str(k)).as_number().and_then(|n| n.as_int());
+        let text = |k: &str| match row.get(&Value::str(k)) {
+            Value::Str(s) => Some(s.to_string()),
+            _ => None,
+        };
+        assert_eq!(int("free"), Some(5 * 1024 * 1024 * 1024));
+        assert_eq!(text("free_human").as_deref(), Some("5.0G"));
+        assert_eq!(text("mount").as_deref(), Some("/"));
+    }
+
+    #[test]
+    fn the_row_list_is_a_lua_sequence() {
+        let Value::Table(list) = df_rows(SAMPLE) else {
+            panic!("a list is a table")
+        };
+        assert_eq!(list.borrow().sequence().len(), 3);
+    }
+}
