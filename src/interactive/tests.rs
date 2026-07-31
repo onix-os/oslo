@@ -461,3 +461,78 @@ fn a_dotfile_is_only_suggested_once_the_dot_is_typed() {
     let line = format!("cat {base}/.hid");
     assert_eq!(h.path_hint(&line, line.len()).as_deref(), Some("den"));
 }
+
+// ------------------------------------------------------------- badge and description
+
+/// A description must never restate the badge beside it.
+///
+/// `examples/  [ dir ]  Directory` is the same fact written twice, and it costs the width the
+/// name could have used. IRIS's rule is the one followed here: where the *kind* is the whole
+/// story the badge carries it alone; only a kind that leaves something unsaid gets both.
+#[test]
+fn a_candidate_does_not_repeat_its_kind_in_its_description() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::create_dir(dir.path().join("examples")).unwrap();
+    std::fs::write(dir.path().join("notes.txt"), b"x").unwrap();
+
+    let h = helper(Environment::new());
+    let line = format!("cat {}/", dir.path().display());
+    let (_, candidates) = h.candidates(&line, line.len());
+    assert!(!candidates.is_empty(), "no candidates for {line}");
+
+    for candidate in &candidates {
+        let Some(description) = candidate.description.as_deref() else {
+            continue;
+        };
+        let kind = candidate.kind.as_deref().unwrap_or("");
+        assert!(
+            !description.to_lowercase().contains(kind),
+            "{:?} describes itself as {description:?}, which its {kind:?} badge already says",
+            candidate.display
+        );
+    }
+}
+
+/// A file or directory says everything it has to say in its badge, so the description column is
+/// left out entirely — which is what gives the names the width back.
+#[test]
+fn file_and_directory_candidates_carry_no_description() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::create_dir(dir.path().join("build")).unwrap();
+    std::fs::write(dir.path().join("readme"), b"x").unwrap();
+
+    let h = helper(Environment::new());
+    let line = format!("cat {}/", dir.path().display());
+    let (_, candidates) = h.candidates(&line, line.len());
+
+    let kinds: Vec<&str> = candidates
+        .iter()
+        .filter_map(|c| c.kind.as_deref())
+        .collect();
+    assert!(kinds.contains(&"dir"), "{kinds:?}");
+    assert!(kinds.contains(&"file"), "{kinds:?}");
+    assert!(
+        candidates.iter().all(|c| c.description.is_none()),
+        "{:?}",
+        candidates
+            .iter()
+            .map(|c| (&c.display, &c.description))
+            .collect::<Vec<_>>()
+    );
+}
+
+/// A description that says something the badge cannot is still shown — the rule is about
+/// redundancy, not about suppressing descriptions.
+#[test]
+fn a_description_that_adds_something_survives() {
+    let h = helper(Environment::new());
+    let candidates = h.candidates("git comm", 8).1;
+    let commit = candidates
+        .iter()
+        .find(|c| c.display == "commit")
+        .expect("git commit should be offered");
+    assert!(
+        commit.description.is_some(),
+        "a subcommand's description is not implied by its badge: {commit:?}"
+    );
+}

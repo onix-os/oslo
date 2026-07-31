@@ -58,7 +58,8 @@ impl OsloHelper {
                     } else {
                         quote_replacement(&value, quote)
                     },
-                    description: Some("Environment variable".to_string()),
+                    // As above: the ` variable ` badge already says this.
+                    description: None,
                     kind: Some("variable".to_string()),
                 });
             }
@@ -234,7 +235,13 @@ impl OsloHelper {
             out.push(CompletionCandidate {
                 display,
                 replacement: quote_replacement(&value, word.quote),
-                description: Some(if is_dir { "Directory" } else { "File" }.to_string()),
+                // No description. The badge already says `dir` or `file`, and "Directory"
+                // beside a ` dir ` badge is the same fact written twice — it also forces the
+                // description column to exist for a listing that has nothing to put in it,
+                // taking width from the names. This is IRIS's rule: where the *kind* is the
+                // whole story the tag carries it alone, and only a kind that leaves something
+                // unsaid (an alias, and what it expands to) gets both.
+                description: None,
                 kind: Some(if is_dir { "dir" } else { "file" }.to_string()),
             });
         }
