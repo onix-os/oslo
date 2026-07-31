@@ -16,7 +16,6 @@ use rustyline::Context;
 use rustyline::highlight::Highlighter;
 use rustyline::hint::Hinter;
 use rustyline::history::{History, MemHistory};
-use std::borrow::Cow;
 use std::fs;
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
@@ -405,10 +404,23 @@ fn colouring_never_changes_the_text_it_colours() {
     }
 }
 
+/// An empty line has no syntax to paint, but it still gets the right prompt.
+///
+/// This used to assert `Cow::Borrowed("")`, which pinned a real bug: rustyline draws the prompt and
+/// calls `highlight` with `""`, so returning the line untouched meant the right prompt appeared
+/// only after the first keystroke. With no right prompt set there is still nothing to add.
 #[test]
-fn an_empty_line_is_returned_untouched() {
+fn an_empty_line_carries_the_right_prompt_and_nothing_else() {
     let h = helper(Environment::new());
-    assert!(matches!(h.highlight("", 0), Cow::Borrowed("")));
+    assert_eq!(
+        strip_ansi(&h.highlight("", 0)),
+        "",
+        "no right prompt, nothing added"
+    );
+
+    h.set_right_prompt(Some("RIGHT".to_string()), 4);
+    let drawn = h.highlight("", 0);
+    assert!(drawn.contains("RIGHT"), "{drawn:?}");
 }
 
 #[test]

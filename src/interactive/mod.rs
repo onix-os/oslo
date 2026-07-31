@@ -242,8 +242,12 @@ impl Hinter for OsloHelper {
 
 impl Highlighter for OsloHelper {
     fn highlight<'l>(&self, line: &'l str, _pos: usize) -> Cow<'l, str> {
+        // An empty line still gets the right prompt. Returning `Cow::Borrowed(line)` here is what
+        // made it appear only after the first keystroke: rustyline draws the prompt, calls this
+        // with `""`, and got nothing back — so the right prompt existed but was invisible until
+        // you typed. There is no syntax to paint, but there is still a line to decorate.
         if line.is_empty() {
-            return Cow::Borrowed(line);
+            return Cow::Owned(self.right_prompt_only(line));
         }
 
         let (path, builtins, functions) = {
@@ -296,7 +300,22 @@ impl Highlighter for OsloHelper {
     }
 }
 
-impl OsloHelper {}
+impl OsloHelper {
+    /// The right prompt on its own, for a line with no syntax to paint.
+    fn right_prompt_only(&self, line: &str) -> String {
+        let Ok(slot) = self.right_prompt.lock() else {
+            return line.to_string();
+        };
+        let Some((right, left_width)) = slot.as_ref() else {
+            return line.to_string();
+        };
+        let used = left_width + prompt::printed_width(line);
+        format!(
+            "{line}{}",
+            prompt::right_prompt_escape(right, used, dropdown::terminal_cols())
+        )
+    }
+}
 
 impl Validator for OsloHelper {
     fn validate(&self, ctx: &mut ValidationContext<'_>) -> rustyline::Result<ValidationResult> {

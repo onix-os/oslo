@@ -291,6 +291,8 @@ impl KindColors {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Prompt {
     pub cwd: Style,
+    pub host: Style,
+    pub user: Style,
     pub git: Style,
     pub ok: Style,
     pub failed: Style,
@@ -312,6 +314,11 @@ impl Default for Prompt {
                 bold: true,
                 ..basic(4)
             },
+            host: Style {
+                bold: true,
+                ..basic(5)
+            },
+            user: basic(6),
             git: basic(2),
             ok: Style {
                 bold: true,

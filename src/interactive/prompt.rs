@@ -94,13 +94,12 @@ pub fn render_default_left_prompt(last_status: i32) -> String {
     let theme = theme::current();
     let depth = theme::depth();
 
-    let pwd = tilde(
-        &env::current_dir()
-            .map(|p| p.display().to_string())
-            .unwrap_or_else(|_| "/".to_string()),
-    );
-
-    let mut out = theme.prompt.cwd.paint(&pwd, depth);
+    // Who and where you are logged in, rather than which directory you are in. The directory moves
+    // constantly and is on the right; the host and user do not move and are what you check before
+    // running something destructive.
+    let mut out = theme.prompt.host.paint(&hostname(), depth);
+    out.push_str(&theme.prompt.aside.paint(" | ", depth));
+    out.push_str(&theme.prompt.user.paint(&username(), depth));
     if let Some(branch) = git_branch() {
         out.push_str(&theme.prompt.git.paint(&format!(" ({branch})"), depth));
     }
@@ -113,6 +112,33 @@ pub fn render_default_left_prompt(last_status: i32) -> String {
     out.push_str(&arrow.paint("❯", depth));
     out.push(' ');
     out
+}
+
+/// This machine's name, short — everything before the first dot.
+///
+/// A fully qualified name is most of the prompt's width on a machine that has one, and the part
+/// that identifies it to a person is the first label.
+fn hostname() -> String {
+    nix::unistd::gethostname()
+        .ok()
+        .and_then(|h| h.into_string().ok())
+        .map(|h| h.split('.').next().unwrap_or(&h).to_string())
+        .unwrap_or_else(|| "?".to_string())
+}
+
+/// Who you are. `$USER` first, then the password database, because `$USER` is what `su` updates
+/// and the uid is what it does not.
+fn username() -> String {
+    env::var("USER")
+        .ok()
+        .filter(|u| !u.is_empty())
+        .or_else(|| {
+            nix::unistd::User::from_uid(nix::unistd::getuid())
+                .ok()
+                .flatten()
+                .map(|u| u.name)
+        })
+        .unwrap_or_else(|| "?".to_string())
 }
 
 /// A duration worth mentioning, or `None`.
@@ -135,32 +161,6 @@ fn notable_duration(elapsed: Duration) -> Option<String> {
     })
 }
 
-/// The clock, as `HH:MM`, from the system time.
-///
-/// Computed by hand rather than pulled from a date library: the shell needs four digits and a
-/// colon, and a dependency that knows about leap seconds and the Gregorian calendar is a great
-/// deal of machinery for that. The offset from UTC comes from `$TZ`-aware `localtime` only if one
-/// is available; without it this is UTC, which is stated rather than hidden.
-fn clock() -> String {
-    let secs = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0) as i64;
-    let local = secs + local_offset_seconds();
-    let minutes = local.rem_euclid(86400) / 60;
-    format!("{:02}:{:02}", minutes / 60, minutes % 60)
-}
-
-/// Seconds east of UTC, via `localtime_r`, or zero when it cannot be asked.
-fn local_offset_seconds() -> i64 {
-    let now = unsafe { nix::libc::time(std::ptr::null_mut()) };
-    let mut tm: nix::libc::tm = unsafe { std::mem::zeroed() };
-    // Safety: `localtime_r` writes one `tm` through the pointer, which is a live local, and reads
-    // one `time_t` through the other.
-    let result = unsafe { nix::libc::localtime_r(&now, &mut tm) };
-    if result.is_null() { 0 } else { tm.tm_gmtoff }
-}
-
 /// The right prompt oslo draws when a config has not asked for its own.
 ///
 /// It shows what the left prompt cannot: the *number* behind a failing status — the left arrow only
@@ -169,20 +169,35 @@ fn local_offset_seconds() -> i64 {
 pub fn render_default_right_prompt(last_status: i32, elapsed: Option<Duration>) -> String {
     let theme = theme::current();
     let depth = theme::depth();
-    let mut parts = Vec::new();
+    // The mirror of the left prompt's `❯`, opening the right side the way that one closes the
+    // left. It takes the same colour, so the pair reads as one frame around the line you type.
+    let arrow = if last_status == 0 {
+        theme.prompt.ok
+    } else {
+        theme.prompt.failed
+    };
+    let mut parts = vec![arrow.paint("❮", depth)];
 
+    // The status number, which the left arrow's colour cannot carry.
     if last_status != 0 {
         parts.push(
             theme
                 .prompt
                 .failed
-                .paint(&format!("✘ {last_status}"), depth),
+                .paint(&format!("({last_status})"), depth),
         );
     }
     if let Some(took) = elapsed.and_then(notable_duration) {
         parts.push(theme.prompt.aside.paint(&took, depth));
     }
-    parts.push(theme.prompt.aside.paint(&clock(), depth));
+    // The directory lives here rather than on the left: it is what changes on every `cd`, and on
+    // the right it does not push the command you are typing further and further across.
+    let pwd = tilde(
+        &env::current_dir()
+            .map(|p| p.display().to_string())
+            .unwrap_or_else(|_| "/".to_string()),
+    );
+    parts.push(theme.prompt.cwd.paint(&pwd, depth));
     parts.join(&theme.prompt.aside.paint("  ", depth))
 }
 
@@ -347,15 +362,18 @@ mod right_prompt_tests {
             0,
             Some(Duration::from_millis(3)),
         ));
-        assert!(!quiet.contains('✘'), "{quiet:?}");
         assert!(
-            !quiet.contains('s'),
+            quiet.starts_with('❮'),
+            "the mirror of the left arrow: {quiet:?}"
+        );
+        assert!(!quiet.contains('('), "no status on a success: {quiet:?}");
+        assert!(
+            !quiet.contains("ms") && !quiet.contains("0.0s"),
             "no duration for a quick command: {quiet:?}"
         );
-        assert_eq!(quiet.trim().len(), 5, "just HH:MM: {quiet:?}");
 
         let failed = plain(&render_default_right_prompt(7, None));
-        assert!(failed.contains("✘ 7"), "{failed:?}");
+        assert!(failed.contains("(7)"), "{failed:?}");
 
         let slow = plain(&render_default_right_prompt(
             0,
