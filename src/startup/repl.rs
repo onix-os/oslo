@@ -159,6 +159,9 @@ pub fn run_repl() -> ! {
                             Mode::Shell => history_db::MODE_SHELL,
                         },
                     );
+                    // `$HISTSIZE` bounds the table as well as the editor's copy, or the file
+                    // grows without limit while the shell politely forgets.
+                    db.trim(settings.max_size.max(1));
                 }
 
                 // Handed the command as typed, which is what a `precmd` hook is for: logging it,
@@ -191,6 +194,11 @@ pub fn run_repl() -> ! {
                 // request behind and the loop carries it out.
                 if history::take_clear_request() {
                     let _ = rl.clear_history();
+                    // The database is the history now, so `history -c` has to reach it too —
+                    // clearing only the editor's copy would put every line back on the next start.
+                    if let Some(db) = &db {
+                        db.clear();
+                    }
                     publish_history(&rl);
                 }
 
