@@ -114,12 +114,18 @@ pub fn filesystem_row(fs: &Filesystem) -> Value {
 /// Asked before the tool runs, so `sh.df` can be handed back as a *function* rather than as the
 /// rows themselves — `sh.df()` has to be a call, not an index that already did the work.
 pub fn answers_in_rows(command: &str) -> bool {
-    matches!(command, "df" | "env" | "ls")
+    matches!(command, "df" | "env" | "ls" | "ps" | "stat")
 }
 
+/// A tool's arguments are the words it was called with, exactly as `oslo.run` takes them.
+///
+/// `sh.stat("a b")` passes one argument holding a space, because there is no shell parse in the
+/// middle — the same property that makes `oslo.run{"rm", name}` safe. A tool that ignores its
+/// arguments (`df`, `env`) simply does not read them.
 pub fn row_answer(
     command: &str,
     env: &std::sync::Arc<std::sync::Mutex<crate::env::Environment>>,
+    args: &[String],
 ) -> Option<Value> {
     match command {
         "df" => {
@@ -132,9 +138,99 @@ pub fn row_answer(
         "env" => Some(env_rows(env)),
         // `ls` answers the current directory. An argument-taking form is the next step and is
         // deliberately not guessed at here.
-        "ls" => Some(ls_rows(".")),
+        "ls" => Some(ls_rows(args.first().map(String::as_str).unwrap_or("."))),
+        "ps" => Some(ps_rows()),
+        "stat" => Some(stat_rows(args)),
         _ => None,
     }
+}
+
+/// `sh.ps()` — the processes on this machine, read from `/proc`.
+///
+/// Read directly rather than parsed out of `ps` output: the column set `ps` prints differs between
+/// implementations and between invocations, so a parser would be guessing at which machine it is
+/// on. `/proc` is the same everywhere oslo runs, which is Linux.
+fn ps_rows() -> Value {
+    let mut list = Table::new();
+    let Ok(entries) = std::fs::read_dir("/proc") else {
+        return Value::Table(Rc::new(RefCell::new(list)));
+    };
+    let mut found: Vec<(i64, String, String)> = Vec::new();
+    for entry in entries.flatten() {
+        let name = entry.file_name().to_string_lossy().into_owned();
+        let Ok(pid) = name.parse::<i64>() else {
+            continue;
+        };
+        // `comm` is the process name; `cmdline` is the full argv with NUL separators. A kernel
+        // thread has an empty `cmdline`, which is how it is told apart from a process.
+        let comm = std::fs::read_to_string(format!("/proc/{pid}/comm"))
+            .map(|s| s.trim_end().to_string())
+            .unwrap_or_default();
+        let cmdline = std::fs::read(format!("/proc/{pid}/cmdline"))
+            .map(|b| {
+                String::from_utf8_lossy(&b)
+                    .split('\0')
+                    .filter(|s| !s.is_empty())
+                    .collect::<Vec<_>>()
+                    .join(" ")
+            })
+            .unwrap_or_default();
+        if comm.is_empty() {
+            continue;
+        }
+        found.push((pid, comm, cmdline));
+    }
+    found.sort_by_key(|(pid, _, _)| *pid);
+    for (i, (pid, comm, cmdline)) in found.iter().enumerate() {
+        let mut row = Table::new();
+        row.set(Value::str("pid"), Value::int(*pid));
+        row.set(Value::str("name"), Value::str(comm));
+        row.set(Value::str("cmdline"), Value::str(cmdline));
+        row.set(Value::str("is_kernel"), Value::Bool(cmdline.is_empty()));
+        list.set(
+            Value::int(i as i64 + 1),
+            Value::Table(Rc::new(RefCell::new(row))),
+        );
+    }
+    Value::Table(Rc::new(RefCell::new(list)))
+}
+
+/// `sh.stat(path, …)` — one row per path.
+///
+/// A path that cannot be stat'd contributes a row with `exists = false` rather than being dropped:
+/// a caller asking about five paths wants five answers, and a short list would silently misalign
+/// with the list it asked about.
+fn stat_rows(paths: &[String]) -> Value {
+    let mut list = Table::new();
+    for (i, path) in paths.iter().enumerate() {
+        let mut row = Table::new();
+        row.set(Value::str("path"), Value::str(path));
+        match std::fs::symlink_metadata(path) {
+            Ok(meta) => {
+                use std::os::unix::fs::MetadataExt;
+                row.set(Value::str("exists"), Value::Bool(true));
+                row.set(Value::str("size"), Value::int(meta.len() as i64));
+                row.set(Value::str("size_human"), Value::str(human(meta.len())));
+                row.set(Value::str("mode"), Value::int(meta.mode() as i64));
+                row.set(Value::str("uid"), Value::int(meta.uid() as i64));
+                row.set(Value::str("gid"), Value::int(meta.gid() as i64));
+                row.set(Value::str("mtime"), Value::int(meta.mtime()));
+                row.set(Value::str("is_dir"), Value::Bool(meta.is_dir()));
+                row.set(
+                    Value::str("is_symlink"),
+                    Value::Bool(meta.file_type().is_symlink()),
+                );
+            }
+            Err(_) => {
+                row.set(Value::str("exists"), Value::Bool(false));
+            }
+        }
+        list.set(
+            Value::int(i as i64 + 1),
+            Value::Table(Rc::new(RefCell::new(row))),
+        );
+    }
+    Value::Table(Rc::new(RefCell::new(list)))
 }
 
 /// `sh.env()` — the environment as rows, answered from the shell rather than from `env`'s text.
