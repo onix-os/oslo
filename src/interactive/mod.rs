@@ -56,6 +56,11 @@ pub struct OsloHelper {
     ///
     /// See [`OsloHelper::set_editor_multiline`].
     editor_multiline: bool,
+    /// The right prompt to draw, and how many cells the left prompt took.
+    ///
+    /// Set once per prompt cycle by the REPL and drawn by `highlight`, which is the only seam
+    /// where a cursor move is free — see [`prompt::right_prompt_escape`].
+    right_prompt: Mutex<Option<(String, usize)>>,
 }
 
 impl OsloHelper {
@@ -79,6 +84,7 @@ impl OsloHelper {
             frecency,
             menu: interactive,
             editor_multiline: true,
+            right_prompt: Mutex::new(None),
         }
     }
 
@@ -86,6 +92,13 @@ impl OsloHelper {
     ///
     /// With it off, `complete` returns the whole candidate list instead of the one the user
     /// picked — the shape a test wants.
+    /// Give the helper the right prompt for this line, and the left prompt's width.
+    pub fn set_right_prompt(&self, right: Option<String>, left_width: usize) {
+        if let Ok(mut slot) = self.right_prompt.lock() {
+            *slot = right.map(|text| (text, left_width));
+        }
+    }
+
     pub fn set_menu(&mut self, enabled: bool) {
         self.menu = enabled;
     }
@@ -252,7 +265,21 @@ impl Highlighter for OsloHelper {
             // colours of. See `highlight::MAX_PATH_CHECKS`.
             check_paths: line.len() <= 512,
         };
-        Cow::Owned(highlight::paint(line, &ctx))
+        let mut painted = highlight::paint(line, &ctx);
+
+        // The right prompt rides here rather than in the prompt string: `compute_layout` measures
+        // the raw line and never this, so a cursor move costs nothing in rustyline's arithmetic.
+        if let Ok(slot) = self.right_prompt.lock()
+            && let Some((right, left_width)) = slot.as_ref()
+        {
+            let used = left_width + prompt::printed_width(line);
+            painted.push_str(&prompt::right_prompt_escape(
+                right,
+                used,
+                dropdown::terminal_cols(),
+            ));
+        }
+        Cow::Owned(painted)
     }
 
     fn highlight_hint<'h>(&self, hint: &'h str) -> Cow<'h, str> {

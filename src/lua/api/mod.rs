@@ -24,6 +24,7 @@ mod fs;
 mod json;
 mod path;
 mod proc;
+pub(crate) mod prompt;
 mod re;
 mod run;
 mod shell;
@@ -38,7 +39,12 @@ pub fn install(interp: &Rc<Interp>, registry: &Registry, env: Arc<Mutex<Environm
     let mut oslo = Table::new();
     run::install(interp, &mut oslo, &env);
     oslo.set(Value::str("fs"), fs::build());
-    oslo.set(Value::str("path"), path::build());
+    let mut paths = path::build();
+    if let Value::Table(table) = &mut paths {
+        prompt::shorten(&mut table.borrow_mut());
+    }
+    oslo.set(Value::str("path"), paths);
+    prompt::install(&mut oslo, registry);
     oslo.set(Value::str("json"), json::build());
     oslo.set(Value::str("re"), re::build());
     oslo.set(Value::str("proc"), proc::build_proc());

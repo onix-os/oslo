@@ -16,5 +16,6 @@ pub mod history;
 pub mod language;
 pub mod lua_init;
 pub mod mode;
+pub mod prompt;
 pub mod rc;
 pub mod repl;

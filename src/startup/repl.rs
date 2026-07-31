@@ -7,7 +7,7 @@
 use crate::absorb_loop_control;
 use crate::expand_history;
 use crate::startup::mode::{Line, Mode, ToggleRequest};
-use crate::startup::{history, lua_init, mode, rc};
+use crate::startup::{history, lua_init, mode, prompt, rc};
 use oslo::Environment;
 use oslo::LuaEngine;
 use oslo::env::builtins::run_exit_trap;
@@ -268,10 +268,20 @@ fn read_command(
 
     loop {
         let prompt = if buffer.is_empty() {
-            primary_prompt(env_struct, lua, last_status, *current)
+            prompt::primary_prompt(env_struct, lua, last_status, *current)
         } else {
-            rc::ps2(&mut env_struct.lock().unwrap())
+            lua.render("prompt.continuation")
+                .unwrap_or_else(|| rc::ps2(&mut env_struct.lock().unwrap()))
         };
+
+        // The right prompt is handed to the helper rather than concatenated: it is drawn from
+        // the highlighter, which is the only place a cursor move does not confuse rustyline.
+        if let Some(helper) = rl.helper() {
+            helper.set_right_prompt(
+                lua.render("prompt.right"),
+                oslo::interactive::prompt::printed_width(&prompt),
+            );
+        }
 
         let raw = match rl.readline_with_initial(&prompt, (&typed, "")) {
             Ok(raw) => raw,
@@ -409,32 +419,6 @@ fn is_complete(source: &str, mode: Mode) -> bool {
             InputStatus::Incomplete
         ),
     }
-}
-
-fn primary_prompt(
-    env_struct: &Arc<Mutex<Environment>>,
-    lua: &LuaEngine,
-    last_status: i32,
-    mode: Mode,
-) -> String {
-    // Published before the prompt is drawn, so a `PS1` or a Lua prompt function can say which
-    // language it is prompting for.
-    env_struct
-        .lock()
-        .unwrap()
-        .set_var("OSLO_MODE", mode.name(), false);
-
-    // A Lua prompt is an explicit choice by the user and outranks `PS1`, which in turn outranks
-    // the built-in default.
-    if let Some(p) = lua.render_prompt() {
-        return p;
-    }
-    // `PS1` is the shell's prompt and describes a shell line; drawing it over a Lua prompt would
-    // say `oslo$` in front of something that is not a shell command.
-    if mode == Mode::Lua {
-        return mode.fallback_prompt().to_string();
-    }
-    rc::ps1(&mut env_struct.lock().unwrap(), last_status)
 }
 
 /// Where the shell is now, for the `cd` hook to compare against.

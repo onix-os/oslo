@@ -242,6 +242,30 @@ impl LuaEngine {
         Value::int(status as i64)
     }
 
+    /// Render one of the prompts, or `None` when the config set none.
+    ///
+    /// A string is used as written and a function is called, so a prompt that never changes need
+    /// not be a closure.
+    pub fn render(&self, key: &str) -> Option<String> {
+        let value = self.registry.borrow().get(key).cloned()?;
+        if let Value::Str(text) = &value {
+            return Some(text.to_string());
+        }
+        match self.interp.call(&value, Vec::new()) {
+            Ok(values) => match values.first() {
+                Some(Value::Str(s)) => Some(s.to_string()),
+                Some(Value::Number(n)) => Some(n.to_string()),
+                _ => None,
+            },
+            Err(e) => {
+                // Reported rather than swallowed: a prompt function that raises leaves the shell
+                // silently drawing its default, which looks exactly like the config not loading.
+                eprintln!("oslo: {key}: {e}");
+                None
+            }
+        }
+    }
+
     pub fn render_prompt(&self) -> Option<String> {
         let prompt = self.registry.borrow().get(PROMPT_KEY).cloned()?;
         match self.interp.call(&prompt, Vec::new()) {
