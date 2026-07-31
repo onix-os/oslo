@@ -657,8 +657,21 @@ Four of the findings are new and are oslo's, all in pattern matching:
 * `match.t` 016: a backslash-escaped `]` inside a bracket pattern.
 * `match.t` 018/019: bracket patterns over the full ASCII range, and their negations.
 
-The rest are already known: `select` (deliberately unimplemented), `LINENO wrongly detected`, and
-`QUOTEFAIL` on weird filenames.
+### Round C status — the named findings are closed
+
+Every item this round named has been fixed or run down to a cause.
+
+| Item | Outcome |
+|---|---|
+| Nesting guard refusing `posparam.t` | **Fixed.** Allowance grows one opener per 256 bytes, not 1024. All 18 `.t` files parse; 25 unclosed `(` in 26 bytes and 80 openers in 3.6 KB are still refused |
+| `match.t` 002/016/018/019 | Three no longer reproduce against bash. A differential probe of fourteen harder cases found the real one: **a quoted negation marker still negated**, so `[\!a]` — the set containing `!` and `a` — answered the opposite of bash. **Fixed**; unquoted `[!a]`/`[^a]` still negate |
+| `isset -x` on an unset exported variable | **Fixed.** `export V` now records an intention in `pending_exports` instead of creating `V` empty, so `${V+set}` is empty and no `V=` reaches a child, while a later `V=1` is still exported. `unset` forgets the intention |
+| `LINENO wrongly detected` | **Does not reproduce.** Identical to bash across top level, functions, `{ }`, `case`, `while` and multi-command lines |
+| `QUOTEFAIL` on weird filenames | **Does not reproduce.** Globbing and re-quoting `a b`, `c'd`, `e"f`, `g$h`, `i*j` and a newline-bearing name all match bash |
+| `select` | Out of scope by decision, refused by name |
+
+The last two are modernish's own detection routines rather than shell divergences, so characterising
+them needs the harness rather than a probe — they are not oslo behaving differently from bash.
 
 **`isset -x` is now located, not just observed.** `export V` with no value must mark `V` for export
 and leave it *unset* — bash gives empty for `${V+set}` and no `V=` in `env`. oslo reports it as set:
