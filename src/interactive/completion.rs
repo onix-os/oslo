@@ -9,6 +9,34 @@ use super::dropdown::CompletionCandidate;
 use super::words::{Quote, Word, current_word, quote_replacement, unquote};
 use std::fs;
 
+/// Whether `candidate` starts with what the user typed.
+///
+/// `oslo.completion.case_sensitive` decides. It defaults to off, so typing `RE` offers `README.md`
+/// — which is what a shell that completes filenames on a case-insensitive muscle memory should do.
+/// The setting was read from the config and then ignored, so turning it on did nothing at all.
+///
+/// Case folding is per character rather than by lowercasing the whole string: allocating a String
+/// per candidate would mean thousands of allocations per keystroke on a large `$PATH`.
+///
+/// The flag is a parameter rather than read from the process-global settings here, so the tests
+/// can exercise both answers without racing each other — the settings are shared, and the test
+/// binary is multi-threaded.
+fn matches_prefix(candidate: &str, typed: &str, case_sensitive: bool) -> bool {
+    if case_sensitive {
+        return candidate.starts_with(typed);
+    }
+    let mut wanted = typed.chars().flat_map(char::to_lowercase);
+    let mut have = candidate.chars().flat_map(char::to_lowercase);
+    loop {
+        match (wanted.next(), have.next()) {
+            (None, _) => return true,
+            (Some(_), None) => return false,
+            (Some(a), Some(b)) if a == b => {}
+            (Some(_), Some(_)) => return false,
+        }
+    }
+}
+
 impl OsloHelper {
     /// The candidates for the word at `pos`, together with the byte offset they replace from.
     ///
@@ -44,10 +72,17 @@ impl OsloHelper {
         (word.start, out)
     }
 
+    /// `oslo.completion.case_sensitive`, read once per completion rather than per candidate.
+    fn case_sensitive(&self) -> bool {
+        crate::interactive::settings::current()
+            .completion
+            .case_sensitive
+    }
+
     fn variable_candidates(&self, prefix: &str, quote: Quote, out: &mut Vec<CompletionCandidate>) {
         let env = self.env.lock().unwrap();
         for name in env.get_all_vars().keys() {
-            if name.starts_with(prefix) {
+            if matches_prefix(name, prefix, self.case_sensitive()) {
                 let value = format!("${}", name);
                 out.push(CompletionCandidate {
                     display: value.clone(),
@@ -77,12 +112,12 @@ impl OsloHelper {
             let env = self.env.lock().unwrap();
             let mut names: Vec<(String, &str, Option<String>)> = Vec::new();
             for b in env.builtin_names() {
-                if b.starts_with(stem) {
+                if matches_prefix(b, stem, self.case_sensitive()) {
                     names.push((b.to_string(), "builtin", None));
                 }
             }
             for (name, target) in env.get_aliases() {
-                if name.starts_with(stem) {
+                if matches_prefix(name, stem, self.case_sensitive()) {
                     // What it expands to travels with it: that is the one thing about an alias
                     // its name does not tell you, and it is why aliases keep a second column
                     // where a directory does not.
@@ -90,7 +125,7 @@ impl OsloHelper {
                 }
             }
             for f in env.get_functions().keys() {
-                if f.starts_with(stem) {
+                if matches_prefix(f, stem, self.case_sensitive()) {
                     names.push((f.clone(), "function", None));
                 }
             }
@@ -104,7 +139,7 @@ impl OsloHelper {
         }
         // The index is shared, not rebuilt: this used to `read_dir` all of `$PATH` per keystroke.
         for name in CommandIndex::executables(&path).iter() {
-            if name.starts_with(stem) {
+            if matches_prefix(name, stem, self.case_sensitive()) {
                 out.push(self.command_candidate(word, name.clone(), "command"));
             }
         }
@@ -219,7 +254,7 @@ impl OsloHelper {
         };
         for entry in entries.flatten() {
             let name = entry.file_name().to_string_lossy().into_owned();
-            if !name.starts_with(prefix) {
+            if !matches_prefix(&name, prefix, self.case_sensitive()) {
                 continue;
             }
             // A dotfile only shows up when it was asked for, as in bash.
@@ -259,5 +294,36 @@ impl OsloHelper {
                 detail: None,
             });
         }
+    }
+}
+
+#[cfg(test)]
+mod case_tests {
+    use super::matches_prefix;
+
+    /// The setting was read from the config and then ignored, so turning it on changed nothing.
+    #[test]
+    fn case_sensitivity_actually_decides_the_match() {
+        assert!(matches_prefix("README.md", "RE", false));
+        assert!(
+            matches_prefix("README.md", "re", false),
+            "off means insensitive"
+        );
+        assert!(!matches_prefix("README.md", "xy", false));
+
+        assert!(matches_prefix("README.md", "RE", true));
+        assert!(
+            !matches_prefix("README.md", "re", true),
+            "turning it on must matter"
+        );
+    }
+
+    /// The typed text running past the candidate is not a prefix of it.
+    #[test]
+    fn a_longer_typed_word_is_not_a_prefix() {
+        assert!(!matches_prefix("ls", "lsof", false));
+        assert!(matches_prefix("lsof", "ls", false));
+        // An empty prefix matches everything, which is what bare Tab does.
+        assert!(matches_prefix("anything", "", false));
     }
 }
