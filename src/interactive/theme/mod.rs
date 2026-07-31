@@ -176,9 +176,31 @@ pub struct Pager {
     pub match_: Style,
     pub desc: Style,
     pub desc_sel: Style,
+    /// Every info column after the description: a file's size, a directory's entry count, what an
+    /// alias expands to, and anything `oslo.completion.columns` adds.
+    ///
+    /// Dimmer than the description on purpose. These columns annotate a candidate where the
+    /// description explains it, and a row with four equally loud columns is a row nothing stands
+    /// out in — the label is what the eye is looking for.
+    pub extra: Style,
+    pub extra_sel: Style,
     pub scroll: Style,
     /// The pill, one entry per completion kind.
     pub kind: KindColors,
+}
+
+impl Pager {
+    /// The style for info column `col`. Column 0 is the description; the rest share one style,
+    /// because a theme that had to name a colour per column would break the moment a config added
+    /// one more.
+    pub fn column(&self, col: usize, selected: bool) -> Style {
+        match (col, selected) {
+            (0, false) => self.desc,
+            (0, true) => self.desc_sel,
+            (_, false) => self.extra,
+            (_, true) => self.extra_sel,
+        }
+    }
 }
 
 impl Default for Pager {
@@ -204,6 +226,8 @@ impl Default for Pager {
             },
             desc: Style::fg(Color::Indexed(245)),
             desc_sel: Style::fg(Color::Indexed(252)),
+            extra: Style::fg(Color::Indexed(242)),
+            extra_sel: Style::fg(Color::Indexed(248)),
             scroll: Style::fg(Color::Indexed(240)),
             kind: KindColors::default(),
         }

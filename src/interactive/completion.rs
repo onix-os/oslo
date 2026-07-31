@@ -61,6 +61,8 @@ impl OsloHelper {
                     // As above: the ` variable ` badge already says this.
                     description: None,
                     kind: Some("variable".to_string()),
+                    path: None,
+                    detail: None,
                 });
             }
         }
@@ -68,44 +70,47 @@ impl OsloHelper {
 
     fn command_candidates(&self, word: &Word<'_>, out: &mut Vec<CompletionCandidate>) {
         let stem = word.stem.as_str();
+        // Kind and detail are decided here, where the environment is already locked. An alias is
+        // its own kind rather than a `builtin`: they behave differently, and lumping them meant
+        // the badge told you `builtin` about something you had defined yourself a minute earlier.
         let (path, shell_names) = {
             let env = self.env.lock().unwrap();
-            let mut names: Vec<(String, bool)> = Vec::new();
+            let mut names: Vec<(String, &str, Option<String>)> = Vec::new();
             for b in env.builtin_names() {
                 if b.starts_with(stem) {
-                    names.push((b.to_string(), true));
+                    names.push((b.to_string(), "builtin", None));
                 }
             }
-            for a in env.get_aliases().keys() {
-                if a.starts_with(stem) {
-                    names.push((a.clone(), true));
+            for (name, target) in env.get_aliases() {
+                if name.starts_with(stem) {
+                    // What it expands to travels with it: that is the one thing about an alias
+                    // its name does not tell you, and it is why aliases keep a second column
+                    // where a directory does not.
+                    names.push((name.clone(), "alias", Some(target.clone())));
                 }
             }
             for f in env.get_functions().keys() {
                 if f.starts_with(stem) {
-                    names.push((f.clone(), true));
+                    names.push((f.clone(), "function", None));
                 }
             }
             (env.get_var("PATH").unwrap_or_default().to_string(), names)
         };
 
-        for (name, builtin) in shell_names {
-            out.push(self.command_candidate(word, name, builtin));
+        for (name, kind, detail) in shell_names {
+            let mut candidate = self.command_candidate(word, name, kind);
+            candidate.detail = detail;
+            out.push(candidate);
         }
         // The index is shared, not rebuilt: this used to `read_dir` all of `$PATH` per keystroke.
         for name in CommandIndex::executables(&path).iter() {
             if name.starts_with(stem) {
-                out.push(self.command_candidate(word, name.clone(), false));
+                out.push(self.command_candidate(word, name.clone(), "command"));
             }
         }
     }
 
-    fn command_candidate(
-        &self,
-        word: &Word<'_>,
-        name: String,
-        builtin: bool,
-    ) -> CompletionCandidate {
+    fn command_candidate(&self, word: &Word<'_>, name: String, kind: &str) -> CompletionCandidate {
         let description = self
             .spec_registry
             .find_spec(&name)
@@ -114,7 +119,9 @@ impl OsloHelper {
             display: name.clone(),
             replacement: quote_replacement(&name, word.quote),
             description,
-            kind: Some(if builtin { "builtin" } else { "command" }.to_string()),
+            kind: Some(kind.to_string()),
+            path: None,
+            detail: None,
         }
     }
 
@@ -177,6 +184,8 @@ impl OsloHelper {
             replacement: quote_replacement(name, word.quote),
             description: Some(description.to_string()),
             kind: Some(kind.to_string()),
+            path: None,
+            detail: None,
         }
     }
 
@@ -243,6 +252,11 @@ impl OsloHelper {
                 // unsaid (an alias, and what it expands to) gets both.
                 description: None,
                 kind: Some(if is_dir { "dir" } else { "file" }.to_string()),
+                // The path the entry was read from, not one rebuilt from the typed text: a
+                // `~/` stem reads from `$HOME` and would `stat` a directory literally named
+                // `~` if the display were re-joined instead.
+                path: Some(entry.path().to_string_lossy().into_owned()),
+                detail: None,
             });
         }
     }

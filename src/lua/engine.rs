@@ -281,6 +281,14 @@ impl LuaEngine {
         crate::interactive::settings::read_lua_settings(&self.interp.global("oslo"))
     }
 
+    /// Install `oslo.completion.columns` as the dropdown's column provider.
+    ///
+    /// Called after the config has run, for the same reason the theme is read then rather than
+    /// pushed in as it goes: a config may set the function, change its mind, and set another.
+    pub fn install_column_provider(&self) {
+        crate::lua::columns::install(&self.interp);
+    }
+
     pub fn render_prompt(&self) -> Option<String> {
         let prompt = self.registry.borrow().get(PROMPT_KEY).cloned()?;
         match self.interp.call(&prompt, Vec::new()) {

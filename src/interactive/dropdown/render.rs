@@ -5,6 +5,7 @@
 //! used after wrapping — or the cursor lands above the prompt and the redraw eats the scrollback.
 
 use super::CompletionCandidate;
+use super::columns::columns_for_rows;
 use super::layout::compute_layout;
 use super::width::{FALLBACK_COLS, pad_to_width, physical_rows, terminal_cols, truncate_to_width};
 use crate::interactive::theme::{self, Style};
@@ -55,7 +56,11 @@ pub fn render_vertical_dropdown_at_width(
     let visible = &candidates[start..end];
 
     let cols = if cols == 0 { FALLBACK_COLS } else { cols };
-    let layout = compute_layout(visible, indent_cols, cols);
+    // Computed here, for the visible slice and nothing else. A size column means a `stat` per row,
+    // which is fifteen syscalls a frame — and would be three thousand if it were done when the
+    // candidates were collected. See `super::columns`.
+    let cells = columns_for_rows(visible);
+    let layout = compute_layout(visible, &cells, indent_cols, cols);
     let indent = " ".repeat(layout.indent);
     let theme = theme::current();
     let depth = theme::depth();
@@ -97,18 +102,20 @@ pub fn render_vertical_dropdown_at_width(
             out.push_str(&badge_cell(cand, layout.badge_w, selected, &theme, depth));
         }
 
-        if layout.has_desc() && settings.completion.descriptions {
-            let desc = pad_to_width(
-                &truncate_to_width(cand.description.as_deref().unwrap_or(""), layout.desc_w),
-                layout.desc_w,
-            );
-            let style = if selected {
-                theme.pager.desc_sel
-            } else {
-                theme.pager.desc
-            };
-            out.push_str(&on_row(Style::default()).paint("  ", depth));
-            out.push_str(&on_row(style).paint(&desc, depth));
+        // The description is the first info column; everything after it is what the kind — or the
+        // config — had left to say. They differ only in colour: the description is the loudest of
+        // them because it is the one that explains the candidate rather than annotating it.
+        // `descriptions` is honoured where the columns are built, not here: it removes the
+        // description and lets the columns after it move left, which the layout must already know
+        // about by the time it is sizing anything.
+        if !layout.columns.is_empty() {
+            for (col, width) in layout.columns.iter().copied().enumerate() {
+                let text = cells[i].get(col).map(String::as_str).unwrap_or("");
+                let text = pad_to_width(&truncate_to_width(text, width), width);
+                let style = theme.pager.column(col, selected);
+                out.push_str(&on_row(Style::default()).paint("  ", depth));
+                out.push_str(&on_row(style).paint(&text, depth));
+            }
         }
         out.push_str(&on_row(Style::default()).paint(" ", depth));
         // Cleared to the end of the row so a shorter line does not leave the previous frame's
@@ -229,7 +236,19 @@ mod tests {
             replacement: display.to_string(),
             description: desc.map(str::to_string),
             kind: Some(kind.to_string()),
+            path: None,
+            detail: None,
         }
+    }
+
+    /// A file candidate whose size the info column can report.
+    fn sized_file(name: &str, bytes: &[u8]) -> (tempfile::TempDir, CompletionCandidate) {
+        let dir = tempfile::tempdir().expect("a temp dir");
+        let path = dir.path().join(name);
+        std::fs::write(&path, bytes).expect("write");
+        let mut cand = kinded(name, "file", None);
+        cand.path = Some(path.to_string_lossy().into_owned());
+        (dir, cand)
     }
 
     /// Strip every escape, leaving what the user actually sees.
@@ -505,5 +524,48 @@ mod tests {
         let (rendered, lines) = render_vertical_dropdown_at_width(&candidates, 0, 0, 0, 80, "");
         assert_eq!(lines, 1);
         assert!(rendered.contains("cargo"));
+    }
+
+    /// The third column: a file says how big it is, and it is drawn without the description
+    /// column having anything in it.
+    #[test]
+    fn a_file_row_carries_its_size() {
+        let (_dir, cand) = sized_file("Cargo.toml", &[b'x'; 4300]);
+        let (out, _) = render_vertical_dropdown_at_width(&[cand], 0, 5, 0, 120, "");
+        assert!(plain(&out).contains("4.2K"), "{:?}", plain(&out));
+    }
+
+    /// An alias says what it expands to, which is the one thing its name does not tell you.
+    #[test]
+    fn an_alias_row_carries_its_expansion() {
+        let mut cand = kinded("gst", "alias", None);
+        cand.detail = Some("git status --short".to_string());
+        let (out, _) = render_vertical_dropdown_at_width(&[cand], 0, 5, 0, 120, "");
+        let plain = plain(&out);
+        assert!(plain.contains("git status --short"), "{plain:?}");
+        assert!(
+            plain.contains("alias"),
+            "the badge still names the kind: {plain:?}"
+        );
+    }
+
+    /// Whatever the columns say, the row still fits. This is the invariant the whole layout
+    /// exists for, and an extra column is a new way to break it.
+    #[test]
+    fn extra_columns_never_widen_a_row_past_the_screen() {
+        let (_dir, file) = sized_file("a-rather-long-file-name.toml", &[b'x'; 4300]);
+        let mut alias = kinded("gst", "alias", Some("a description of some length"));
+        alias.detail = Some("git status --short --branch --untracked-files=all".to_string());
+        let candidates = vec![file, alias];
+        for cols in [12usize, 20, 40, 60, 80, 120, 200] {
+            let (out, _) = render_vertical_dropdown_at_width(&candidates, 0, 5, 8, cols, "");
+            for row in plain(&out).lines().filter(|l| !l.is_empty()) {
+                assert!(
+                    display_width(row) <= cols,
+                    "{cols} columns, row of {}: {row:?}",
+                    display_width(row)
+                );
+            }
+        }
     }
 }

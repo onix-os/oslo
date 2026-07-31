@@ -15,10 +15,15 @@
 //! [`render_vertical_dropdown_at_width`] takes the column count as an argument rather than
 //! querying it, so the whole layout is testable at 80 columns with no terminal attached.
 
+mod columns;
 mod layout;
 mod render;
 mod width;
 
+pub use columns::{
+    Facts, Provider, builtin_columns, columns_for, facts_for, human_age, human_mode, human_size,
+    set_provider,
+};
 pub use layout::{DropdownLayout, compute_layout};
 pub use render::{MAX_ROWS, render_vertical_dropdown, render_vertical_dropdown_at_width};
 pub use width::{
@@ -35,6 +40,19 @@ pub struct CompletionCandidate {
     pub replacement: String,
     pub description: Option<String>,
     pub kind: Option<String>,
+    /// The file this candidate names, when it names one.
+    ///
+    /// Carried rather than reconstructed: `replacement` is *quoted*, so working back to a path
+    /// would mean unquoting it — and getting that wrong turns a `stat` of `My File.txt` into a
+    /// `stat` of `My\ File.txt`, which simply is not there. The completer already knows the path
+    /// it built, so it hands it over.
+    pub path: Option<String>,
+    /// A fact the completer already knew and the renderer would have to guess.
+    ///
+    /// What an alias expands to, mainly. It is captured here rather than looked up at render time
+    /// because the renderer has no environment: it is handed a list and a width, and reaching back
+    /// into the shell from inside a draw would put a lock on the frame path.
+    pub detail: Option<String>,
 }
 
 impl CompletionCandidate {
@@ -44,6 +62,8 @@ impl CompletionCandidate {
             replacement,
             description,
             kind: None,
+            path: None,
+            detail: None,
         }
     }
 
@@ -64,6 +84,7 @@ impl CompletionCandidate {
             Some("alias") => Some("alias"),
             Some("flag") | Some("option") => Some("option"),
             Some("subcommand") => Some("subcmd"),
+            Some("function") => Some("func"),
             // A kind nothing has claimed is still a kind; showing it is how the next one gets
             // noticed rather than silently drawn as blank.
             Some(other) if !other.is_empty() => Some(other),

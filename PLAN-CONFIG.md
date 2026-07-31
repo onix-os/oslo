@@ -198,6 +198,11 @@ oslo.completion = {
   sort       = "frecency",                 -- or "alpha"
 }
 
+-- what each row shows after the label; nil falls back to the built-in columns for that kind
+oslo.completion.columns = function(c)
+  if c.kind == "file" then return { c.description, c.size_human, c.age, c.mode_human } end
+end
+
 -- a completion of your own, for one command
 oslo.completion.for_command("git", function(argv, current)
   if #argv == 1 then return { "add", "commit", "push", "status" } end
@@ -249,7 +254,9 @@ Most of the right-hand column above does not exist yet. `oslo.alias`, `oslo.set_
 | Autosuggestions | history → completion → path, order from `oslo.suggest.sources` |
 | Prompt | `oslo.prompt.left/right/continuation`, plus `oslo.style`, `oslo.git.branch/root`, `oslo.path.shorten/home` |
 | Right prompt | Drawn from the *highlighter*, verified on a real pty |
-| Settings | `interactive/settings.rs` — `oslo.completion`, `oslo.suggest`, `oslo.history`, `oslo.keys` |
+| Settings | `interactive/settings.rs` — `oslo.completion`, `oslo.suggest`, `oslo.history`, `oslo.keys`, pre-created as empty tables so `oslo.completion.max_rows = 5` is an assignment and not an index of nil |
+| Info columns | `dropdown/columns.rs` — file → size, dir → entry count, alias → expansion. Computed at render time for the *visible* rows, so a `stat` per row is ~15 a frame and not 3,000 |
+| Columns from Lua | `lua/columns.rs` — `oslo.completion.columns` returns a list per candidate; the layout fits however many there are, and the candidate carries every fact raw *and* rendered |
 | Keys | `interactive/keys.rs` — named keys and named actions, both reported when unreadable |
 
 ### The right prompt, resolved
