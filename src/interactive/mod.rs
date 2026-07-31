@@ -5,7 +5,7 @@
 //! behaviour was reachable without a pty and that is precisely why it was all wrong.
 
 pub mod command_index;
-mod completion;
+pub mod completion;
 pub mod dropdown;
 pub mod frecency_store;
 pub mod highlight;

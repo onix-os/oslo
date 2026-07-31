@@ -37,6 +37,50 @@ fn matches_prefix(candidate: &str, typed: &str, case_sensitive: bool) -> bool {
     }
 }
 
+/// A hook a config installs to complete one command itself.
+///
+/// Handed the words typed so far and the word being completed; answers the candidates, or `None`
+/// to fall through to oslo's own. Registered per command name by `oslo.completion.for_command`.
+pub type CommandCompleter =
+    std::rc::Rc<dyn Fn(&str, &[&str], &str) -> Option<Vec<(String, Option<String>)>>>;
+
+thread_local! {
+    /// Thread-local rather than global: the hook calls Lua, which is not `Send`, and only the
+    /// editor's thread completes anything.
+    static FOR_COMMAND: std::cell::RefCell<Option<CommandCompleter>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// Install the hook `oslo.completion.for_command` describes. `None` removes it.
+pub fn set_command_completer(hook: Option<CommandCompleter>) {
+    FOR_COMMAND.with(|slot| *slot.borrow_mut() = hook);
+}
+
+/// Ask the config to complete this command, if it wants to.
+fn config_candidates(
+    command: &str,
+    prior: &[&str],
+    current: &str,
+) -> Option<Vec<CompletionCandidate>> {
+    // Cloned out of the cell before calling: the hook runs Lua, and Lua can complete another word,
+    // which would come back through here and panic on the outstanding borrow.
+    let hook = FOR_COMMAND.with(|slot| slot.borrow().clone())?;
+    let answers = hook(command, prior, current)?;
+    Some(
+        answers
+            .into_iter()
+            .map(|(display, description)| CompletionCandidate {
+                replacement: display.clone(),
+                display,
+                description,
+                kind: Some("option".to_string()),
+                path: None,
+                detail: None,
+            })
+            .collect(),
+    )
+}
+
 impl OsloHelper {
     /// The candidates for the word at `pos`, together with the byte offset they replace from.
     ///
@@ -51,6 +95,16 @@ impl OsloHelper {
             self.variable_candidates(prefix, word.quote, &mut out);
         } else if word.command_position {
             self.command_candidates(&word, &mut out);
+        } else if let Some(from_config) = word
+            .prior_words
+            .first()
+            .map(|w| unquote(w))
+            .and_then(|cmd| config_candidates(&cmd, &word.prior_words, word.stem.as_str()))
+        {
+            // A config that answers for this command replaces oslo's own candidates rather than
+            // adding to them: `oslo.completion.for_command("git", …)` means the config knows git
+            // better than the built-in spec does, and mixing the two would offer both.
+            out = from_config;
         } else {
             self.spec_candidates(&word, &mut out);
             if out.is_empty() {

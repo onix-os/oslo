@@ -289,6 +289,11 @@ impl LuaEngine {
         crate::lua::columns::install(&self.interp);
     }
 
+    /// Install `oslo.completion.for_command`, the per-command completion hook.
+    pub fn install_command_completer(&self) {
+        crate::lua::columns::install_command_completer(&self.interp);
+    }
+
     pub fn render_prompt(&self) -> Option<String> {
         let prompt = self.registry.borrow().get(PROMPT_KEY).cloned()?;
         match self.interp.call(&prompt, Vec::new()) {

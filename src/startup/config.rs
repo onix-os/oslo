@@ -27,4 +27,5 @@ pub fn apply(lua: &LuaEngine) {
     // Installed rather than read: unlike a theme, this one is a *function*, and it has to be
     // called once per visible row on every frame the dropdown draws.
     lua.install_column_provider();
+    lua.install_command_completer();
 }

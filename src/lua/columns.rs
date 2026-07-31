@@ -164,6 +164,89 @@ pub fn install(interp: &Rc<Interp>) {
     )));
 }
 
+/// Install `oslo.completion.for_command` as the per-command completion hook.
+///
+/// One table of `name -> function`, rather than a call that registers each: a config is read once
+/// and the table is what it leaves behind, which is the same shape `oslo.keys` uses.
+///
+/// ```lua
+/// oslo.completion.for_command = {
+///   git = function(argv, current)
+///     if #argv == 1 then return { "add", "commit", "push", "status" } end
+///   end,
+/// }
+/// ```
+pub fn install_command_completer(interp: &Rc<Interp>) {
+    let Value::Table(oslo) = interp.global("oslo") else {
+        crate::interactive::completion::set_command_completer(None);
+        return;
+    };
+    let table = match oslo.borrow().get(&Value::str("completion")) {
+        Value::Table(completion) => completion.borrow().get(&Value::str("for_command")),
+        _ => Value::Nil,
+    };
+    let Value::Table(table) = table else {
+        crate::interactive::completion::set_command_completer(None);
+        return;
+    };
+
+    let interp = Rc::clone(interp);
+    let complained = std::cell::Cell::new(false);
+    crate::interactive::completion::set_command_completer(Some(Rc::new(
+        move |command: &str, prior: &[&str], current: &str| {
+            let function = table.borrow().get(&Value::str(command));
+            if !matches!(function, Value::Function(_)) {
+                return None;
+            }
+            let argv = Table::new();
+            let argv = Rc::new(RefCell::new(argv));
+            for (i, word) in prior.iter().enumerate() {
+                argv.borrow_mut()
+                    .set(Value::int(i as i64 + 1), Value::str(word));
+            }
+            let args = vec![Value::Table(argv), Value::str(current)];
+            match interp.call(&function, args) {
+                Ok(values) => to_candidates(&values),
+                Err(e) => {
+                    // Reported once: this runs on every Tab, and a raising hook would otherwise
+                    // scroll the same message past the prompt.
+                    if !complained.replace(true) {
+                        eprintln!("oslo: completion.for_command.{command}: {e}");
+                    }
+                    None
+                }
+            }
+        },
+    )));
+}
+
+/// A returned list of candidates: either bare strings, or `{name, description}` pairs.
+fn to_candidates(values: &[Value]) -> Option<Vec<(String, Option<String>)>> {
+    let Some(Value::Table(table)) = values.first() else {
+        return None;
+    };
+    let mut out = Vec::new();
+    for value in table.borrow().sequence() {
+        match value {
+            Value::Str(s) => out.push((s.to_string(), None)),
+            Value::Table(pair) => {
+                let pair = pair.borrow();
+                let name = match pair.get(&Value::int(1)) {
+                    Value::Str(s) => s.to_string(),
+                    _ => continue,
+                };
+                let description = match pair.get(&Value::int(2)) {
+                    Value::Str(s) => Some(s.to_string()),
+                    _ => None,
+                };
+                out.push((name, description));
+            }
+            _ => {}
+        }
+    }
+    Some(out)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
