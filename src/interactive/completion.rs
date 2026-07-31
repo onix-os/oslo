@@ -60,7 +60,15 @@ impl OsloHelper {
 
         // Frecency first, name second. Without the first key this is alphabetical, which is how
         // `exit` came to suggest `exitsnoop-bpfcc`.
+        // `oslo.completion.sort`. Frecency first, name second — without the first key this is
+        // alphabetical, which is how `exit` came to suggest `exitsnoop-bpfcc`. A config that
+        // prefers a predictable order can ask for `alpha` and get name only.
+        let by_name = crate::interactive::settings::current().completion.sort
+            == crate::interactive::settings::Sort::Alpha;
         out.sort_by(|a, b| {
+            if by_name {
+                return a.display.cmp(&b.display);
+            }
             let sa = self.frecency.score(&a.display);
             let sb = self.frecency.score(&b.display);
             sb.partial_cmp(&sa)

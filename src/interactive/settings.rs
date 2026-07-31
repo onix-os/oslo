@@ -35,6 +35,18 @@ pub struct Completion {
     pub show_kind: bool,
     /// Whether a candidate must match the typed case.
     pub case_sensitive: bool,
+    /// How candidates are ordered: by how often they are used, or by name.
+    pub sort: Sort,
+}
+
+/// `oslo.completion.sort`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Sort {
+    /// Most-used first, name as the tie-break. Without this, `exit` suggests `exitsnoop-bpfcc`.
+    #[default]
+    Frecency,
+    /// Name only, ignoring how often anything has been used.
+    Alpha,
 }
 
 impl Default for Completion {
@@ -45,6 +57,7 @@ impl Default for Completion {
             descriptions: true,
             show_kind: true,
             case_sensitive: false,
+            sort: Sort::default(),
         }
     }
 }
@@ -150,6 +163,15 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
             "case_sensitive",
             &mut settings.completion.case_sensitive,
         );
+        if let Value::Str(name) = table.get(&Value::str("sort")) {
+            match name.as_ref() {
+                "frecency" | "frequency" => settings.completion.sort = Sort::Frecency,
+                "alpha" | "alphabetical" | "name" => settings.completion.sort = Sort::Alpha,
+                other => problems.push(format!(
+                    "oslo.completion.sort: '{other}' is not an order; use 'frecency' or 'alpha'"
+                )),
+            }
+        }
     }
 
     if let Value::Table(table) = oslo.get(&Value::str("suggest")) {
@@ -275,6 +297,23 @@ mod tests {
         assert!(!off.completion.show_kind);
         let (absent, _) = settings_from("oslo = { completion = {} }");
         assert!(absent.completion.show_kind);
+    }
+
+    #[test]
+    fn the_completion_order_is_read_and_a_typo_is_named() {
+        let (alpha, problems) = settings_from("oslo = { completion = { sort = 'alpha' } }");
+        assert!(problems.is_empty(), "{problems:?}");
+        assert_eq!(alpha.completion.sort, Sort::Alpha);
+        assert_eq!(Settings::default().completion.sort, Sort::Frecency);
+
+        let (kept, problems) = settings_from("oslo = { completion = { sort = 'vibes' } }");
+        assert_eq!(problems.len(), 1, "{problems:?}");
+        assert!(problems[0].contains("vibes"));
+        assert_eq!(
+            kept.completion.sort,
+            Sort::Frecency,
+            "a typo keeps the default"
+        );
     }
 
     /// `oslo.suggest.accept = "right"` is how fish spells it, and it used to bind nothing.
