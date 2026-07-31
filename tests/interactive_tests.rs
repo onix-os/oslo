@@ -9,7 +9,7 @@
 //! actually parse.
 
 use oslo::env::Environment;
-use oslo::interactive::highlight::{self, TokenType};
+
 use oslo::interactive::{DEFAULT_PS2, InputStatus, OsloHelper, extract_current_word};
 use oslo::parser::parse_bash_script;
 use rustyline::Context;
@@ -413,37 +413,44 @@ fn an_empty_line_is_returned_untouched() {
 
 #[test]
 fn a_ghost_hint_is_drawn_dim() {
+    // Whatever the theme calls `autosuggestion`; the default is bright black.
+    oslo::interactive::theme::set_depth(oslo::interactive::theme::Depth::Ansi16);
     let h = helper(Environment::new());
     assert_eq!(h.highlight_hint("lo world"), "\x1b[90mlo world\x1b[0m");
 }
 
+/// The lexer is the half that needs no shell, so it is the half an integration test can pin
+/// exactly. Resolution — builtin vs command vs error — is unit-tested where the context can be
+/// faked; here the point is that each span comes out with the right lexical role.
 #[test]
-fn tokenize_for_highlight_classifies_each_span() {
-    let toks: Vec<(String, TokenType)> =
-        highlight::tokenize_for_highlight("echo \"a b\" $HOME | wc -l")
-            .into_iter()
-            // The runs of whitespace between the spans are `Plain` and carry no information.
-            .filter(|(text, _)| !text.trim().is_empty())
-            .collect();
+fn the_lexer_gives_every_span_its_role() {
+    use oslo::interactive::highlight::{Role, lex};
+
+    let spans: Vec<(String, Role)> = lex("echo \"a b\" $HOME | wc -l")
+        .into_iter()
+        .filter(|s| !s.text.trim().is_empty())
+        .map(|s| (s.text, s.role))
+        .collect();
 
     let want = [
-        ("echo", TokenType::Command),
-        ("\"a b\"", TokenType::String),
-        ("$HOME", TokenType::Variable),
-        ("|", TokenType::Operator),
+        ("echo", Role::CommandWord),
+        ("\"a b\"", Role::Quote),
+        ("$HOME", Role::Variable),
+        ("|", Role::Operator),
         // The word after a pipe is a command again, not an argument.
-        ("wc", TokenType::Command),
-        ("-l", TokenType::Flag),
+        ("wc", Role::CommandWord),
+        ("-l", Role::Word),
     ];
-    assert_eq!(toks.len(), want.len(), "{toks:?}");
-    for (got, (text, kind)) in toks.iter().zip(want) {
-        assert_eq!((got.0.as_str(), &got.1), (text, &kind));
+    assert_eq!(spans.len(), want.len(), "{spans:?}");
+    for (got, (text, role)) in spans.iter().zip(want) {
+        assert_eq!((got.0.as_str(), got.1), (text, role));
     }
 }
 
 #[test]
 fn an_unterminated_quote_colours_the_rest_of_the_line() {
-    let toks = highlight::tokenize_for_highlight("echo \"a b");
-    let (text, kind) = toks.last().unwrap();
-    assert_eq!((text.as_str(), kind), ("\"a b", &TokenType::String));
+    use oslo::interactive::highlight::{Role, lex};
+    let spans = lex("echo \"a b");
+    let last = spans.last().unwrap();
+    assert_eq!((last.text.as_str(), last.role), ("\"a b", Role::Quote));
 }

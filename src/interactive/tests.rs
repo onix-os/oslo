@@ -336,16 +336,41 @@ fn a_warm_keystroke_does_not_walk_path() {
     );
 }
 
+/// A command that resolves and one that does not must not be painted the same, whatever the
+/// theme says they should be painted *as*. Asserting the escape itself would pin the default
+/// theme rather than the behaviour.
 #[test]
-fn highlighting_marks_unknown_commands_red_and_known_ones_green() {
+fn highlighting_tells_a_real_command_from_an_unknown_one() {
     let dir = tempfile::tempdir().unwrap();
     make_exe(dir.path(), "zzreal");
     let h = helper(env_with_path(dir.path()));
+    crate::interactive::theme::set_depth(crate::interactive::theme::Depth::Ansi256);
 
-    assert!(h.highlight("zzreal -x", 9).contains("\x1b[1;32mzzreal"));
-    assert!(h.highlight("zzfake -x", 9).contains("\x1b[1;31mzzfake"));
-    // Builtins resolve without any file existing.
-    assert!(h.highlight("cd /tmp", 7).contains("\x1b[1;32mcd"));
+    let theme = crate::interactive::theme::current();
+    let depth = crate::interactive::theme::depth();
+    let command = theme.syntax.command.open(depth);
+    let error = theme.syntax.error.open(depth);
+    let builtin = theme.syntax.builtin.open(depth);
+    assert_ne!(command, error, "a real and a missing command look the same");
+
+    assert!(
+        h.highlight("zzreal -x", 9)
+            .contains(&format!("{command}zzreal")),
+        "{:?}",
+        h.highlight("zzreal -x", 9)
+    );
+    assert!(
+        h.highlight("zzfake -x", 9)
+            .contains(&format!("{error}zzfake")),
+        "{:?}",
+        h.highlight("zzfake -x", 9)
+    );
+    // Builtins resolve without any file existing, and take their own colour.
+    assert!(
+        h.highlight("cd /tmp", 7).contains(&format!("{builtin}cd")),
+        "{:?}",
+        h.highlight("cd /tmp", 7)
+    );
 }
 
 // ------------------------------------------------------------- spec-driven completion

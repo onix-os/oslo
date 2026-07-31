@@ -26,7 +26,6 @@ pub use words::{Quote, Word, current_word, extract_current_word};
 use crate::env::Environment;
 use dropdown::{CompletionCandidate, DropdownMenu};
 use frecency_store::FrecencyStore;
-use highlight::TokenType;
 use rustyline::completion::{Completer, Pair};
 use rustyline::highlight::Highlighter;
 use rustyline::hint::{Hinter, HistoryHinter};
@@ -34,7 +33,7 @@ use rustyline::validate::{ValidationContext, ValidationResult, Validator};
 use rustyline::{Context, Helper};
 use spec::SpecRegistry;
 use std::borrow::Cow;
-use std::collections::HashMap;
+use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 
 /// Completion kinds worth remembering.
@@ -57,12 +56,6 @@ pub struct OsloHelper {
     ///
     /// See [`OsloHelper::set_editor_multiline`].
     editor_multiline: bool,
-    /// `which` answers for the line being drawn, keyed by the line's hash.
-    ///
-    /// Only path-like names reach it — a bare name is answered by [`command_index`] — but
-    /// `highlight` runs on every refresh, so even one `stat` per token per keystroke is worth
-    /// spending a hash lookup to avoid.
-    which_cache: Mutex<(u64, HashMap<String, bool>)>,
 }
 
 impl OsloHelper {
@@ -86,7 +79,6 @@ impl OsloHelper {
             frecency,
             menu: interactive,
             editor_multiline: true,
-            which_cache: Mutex::new((0, HashMap::new())),
         }
     }
 
@@ -231,66 +223,43 @@ impl Highlighter for OsloHelper {
             return Cow::Borrowed(line);
         }
 
-        let path = self
-            .env
-            .lock()
-            .unwrap()
-            .get_var("PATH")
-            .unwrap_or_default()
-            .to_string();
+        let (path, builtins, functions) = {
+            let env = self.env.lock().unwrap();
+            let path = env.get_var("PATH").unwrap_or_default().to_string();
+            // Snapshotted rather than queried per word: the closures below are called once per
+            // command word, and each would otherwise take the environment lock again while this
+            // one is still held.
+            let builtins: HashSet<String> = env.builtin_names().map(str::to_string).collect();
+            let functions: HashSet<String> = env
+                .get_functions()
+                .keys()
+                .chain(env.get_aliases().keys())
+                .cloned()
+                .collect();
+            (path, builtins, functions)
+        };
 
-        let mut out = String::with_capacity(line.len() * 2);
-        for (tok, kind) in highlight::tokenize_for_highlight(line) {
-            match kind {
-                TokenType::Command => {
-                    let valid = self.command_is_runnable(&tok, &path, line);
-                    let colour = if valid { "1;32" } else { "1;31" };
-                    out.push_str(&format!("\x1b[{}m{}\x1b[0m", colour, tok));
-                }
-                TokenType::Flag => out.push_str(&format!("\x1b[36m{}\x1b[0m", tok)),
-                TokenType::String => out.push_str(&format!("\x1b[33m{}\x1b[0m", tok)),
-                TokenType::Variable => out.push_str(&format!("\x1b[35m{}\x1b[0m", tok)),
-                TokenType::Operator => out.push_str(&format!("\x1b[1;37m{}\x1b[0m", tok)),
-                TokenType::Plain => out.push_str(&tok),
-            }
-        }
-
-        Cow::Owned(out)
+        let is_builtin = |name: &str| builtins.contains(name);
+        let is_function = |name: &str| functions.contains(name);
+        let ctx = highlight::Context {
+            path: &path,
+            is_builtin: &is_builtin,
+            is_function: &is_function,
+            // A line long enough to make the syscalls add up is one nobody is reading the
+            // colours of. See `highlight::MAX_PATH_CHECKS`.
+            check_paths: line.len() <= 512,
+        };
+        Cow::Owned(highlight::paint(line, &ctx))
     }
 
     fn highlight_hint<'h>(&self, hint: &'h str) -> Cow<'h, str> {
-        // Render fish-style ghost suggestion text in dim gray
-        Cow::Owned(format!("\x1b[90m{}\x1b[0m", hint))
+        // The ghost suggestion, in whatever the theme calls `autosuggestion`.
+        let theme = theme::current();
+        Cow::Owned(theme.syntax.autosuggestion.paint(hint, theme::depth()))
     }
 }
 
-impl OsloHelper {
-    /// Whether a command token names something the shell could run, memoised per line.
-    fn command_is_runnable(&self, name: &str, path: &str, line: &str) -> bool {
-        let key = line_key(line);
-        let mut cache = self.which_cache.lock().unwrap();
-        if cache.0 != key {
-            *cache = (key, HashMap::new());
-        }
-        if let Some(&known) = cache.1.get(name) {
-            return known;
-        }
-        drop(cache);
-
-        let answer = {
-            let env = self.env.lock().unwrap();
-            highlight::command_resolves(name, path, |n| {
-                env.is_builtin(n) || env.get_alias(n).is_some() || env.get_function(n).is_some()
-            })
-        };
-
-        let mut cache = self.which_cache.lock().unwrap();
-        if cache.0 == key {
-            cache.1.insert(name.to_string(), answer);
-        }
-        answer
-    }
-}
+impl OsloHelper {}
 
 impl Validator for OsloHelper {
     fn validate(&self, ctx: &mut ValidationContext<'_>) -> rustyline::Result<ValidationResult> {
@@ -316,11 +285,3 @@ impl Validator for OsloHelper {
 }
 
 impl Helper for OsloHelper {}
-
-/// A cheap identity for the line being highlighted. Collisions only cost a stale colour.
-fn line_key(line: &str) -> u64 {
-    use std::hash::{Hash, Hasher};
-    let mut hasher = std::collections::hash_map::DefaultHasher::new();
-    line.hash(&mut hasher);
-    hasher.finish()
-}
