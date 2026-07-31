@@ -150,7 +150,7 @@ fn next(_: &Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
 fn error(_: &Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
     // Real Lua propagates the error *value*, so `error({code = 2})` is catchable as a table. This
     // evaluator carries a message only; a non-string is rendered rather than preserved, which is
-    // the one place `pcall` is lossy. Recorded in PLAN-LUA.md.
+    // the one place `pcall` is lossy. Recorded in PLAN.md.
     Err(LuaError::new(arg(&args, 1).to_display()))
 }
 

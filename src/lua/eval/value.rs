@@ -11,7 +11,7 @@
 //! **Tables are shared, mutable and cyclic.** `a = {}; b = a; b.x = 1` must be visible through
 //! `a`, and `t.self = t` is legal Lua. That is `Rc<RefCell<…>>`, and it means reference cycles
 //! leak. Real Lua collects them with a tracing GC; oslo does not have one, which is a deliberate
-//! limit recorded in PLAN-LUA.md rather than an oversight. A shell script's tables are small and
+//! limit recorded in PLAN.md rather than an oversight. A shell script's tables are small and
 //! short-lived, and the alternative is writing a garbage collector.
 
 use std::cell::RefCell;

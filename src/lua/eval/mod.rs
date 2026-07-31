@@ -9,7 +9,7 @@
 //!
 //! It is not a complete Lua 5.4. Coroutines, weak tables, `__gc` and `__close` are out, and so is
 //! a tracing garbage collector — reference cycles leak. That is a recorded decision, not an
-//! oversight; see PLAN-LUA.md.
+//! oversight; see PLAN.md.
 //!
 //! What matters is *how* the missing parts fail. Everything unimplemented is **present and
 //! erroring**, never absent:

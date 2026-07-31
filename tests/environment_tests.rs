@@ -154,7 +154,7 @@ fn readonly_is_enforced() {
     assert_eq!(r.out(), "1");
 }
 
-// --- `export NAME` with no value: marked for export, still unset (PLAN-DISTRO round C) ---
+// --- `export NAME` with no value: marked for export, still unset (PLAN.md round C) ---
 
 /// `export V` with no value marks `V` for export and leaves it **unset**.
 ///

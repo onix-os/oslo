@@ -208,7 +208,7 @@ scripts/alpine-vm.sh --shell    # boot to an interactive oslo prompt in there in
 Needs `qemu-system-x86_64`, `cpio` and network access on the first run (the Alpine minirootfs and
 kernel are cached afterwards). Alpine because it is musl and busybox: the static release binary has
 to run where no glibc exists, and every utility in the image is a different implementation from the
-ones the differential corpus compares against. See `PLAN-DISTRO.md` for what it found.
+ones the differential corpus compares against. See `PLAN.md` for what it found.
 
 ## File length
 
