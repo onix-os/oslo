@@ -17,6 +17,7 @@ pub mod settings;
 pub mod spec;
 pub mod syntax;
 pub mod theme;
+pub mod vi;
 pub mod words;
 
 #[cfg(test)]

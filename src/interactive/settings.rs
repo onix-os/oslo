@@ -16,12 +16,30 @@ pub struct Settings {
     pub completion: Completion,
     pub suggest: Suggest,
     pub history: History,
+    /// `oslo.vi`: whether vi mode is on, and the cursor for each mode.
+    pub vi: Vi,
     /// `oslo.keys`: key name to action name, both as written.
     ///
     /// Kept as strings rather than resolved here because binding needs rustyline types, and this
     /// module is meant to be readable without one. [`super::keys`] turns them into bindings and
     /// reports the ones it does not recognise.
     pub keys: Vec<(String, String)>,
+}
+
+/// `oslo.vi` — vi mode, on fish's model.
+///
+/// ```lua
+/// oslo.vi = {
+///   enabled = true,
+///   cursor_insert = "line",     -- fish's names, so a config need not be translated
+///   cursor_normal = "block",
+///   cursor_replace = "underscore",
+/// }
+/// ```
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Vi {
+    pub enabled: bool,
+    pub cursors: super::vi::Cursors,
 }
 
 /// `oslo.completion`.
@@ -151,6 +169,15 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
     };
     let oslo = oslo.borrow();
 
+    if let Value::Table(table) = oslo.get(&Value::str("vi")) {
+        let table = table.borrow();
+        flag(&table, "enabled", &mut settings.vi.enabled);
+        let c = &mut settings.vi.cursors;
+        cursor(&table, "cursor_insert", &mut c.insert, &mut problems);
+        cursor(&table, "cursor_normal", &mut c.normal, &mut problems);
+        cursor(&table, "cursor_replace", &mut c.replace, &mut problems);
+    }
+
     if let Value::Table(table) = oslo.get(&Value::str("completion")) {
         let table = table.borrow();
         if let Some(n) = number(&table, "max_rows") {
@@ -258,6 +285,28 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
 
 fn number(table: &crate::lua::eval::Table, name: &str) -> Option<i64> {
     table.get(&Value::str(name)).as_number()?.as_int()
+}
+
+/// A cursor-shape field, left alone when the config does not mention it.
+///
+/// A name nothing answers to is reported rather than silently ignored: a cursor that quietly keeps
+/// its default looks exactly like oslo not reading the config at all.
+fn cursor(
+    table: &crate::lua::eval::Table,
+    name: &str,
+    slot: &mut super::vi::Cursor,
+    problems: &mut Vec<String>,
+) {
+    let Value::Str(text) = table.get(&Value::str(name)) else {
+        return;
+    };
+    match super::vi::Cursor::parse(&text) {
+        Some(cursor) => *slot = cursor,
+        None => problems.push(format!(
+            "oslo.vi.{name}: '{text}' is not a cursor; \
+             use block, line or underscore, optionally followed by blink"
+        )),
+    }
 }
 
 /// A boolean field, left alone when the config does not mention it.

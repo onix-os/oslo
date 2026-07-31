@@ -270,6 +270,13 @@ fn build_editor(settings: &history::Settings) -> Repl {
         // Honoured for anything rustyline adds itself; `history::is_secret` covers the entries
         // this file adds by hand, which is all of them.
         .history_ignore_space(true)
+        // `oslo.vi.enabled`. Read here rather than toggled later because the keymap is fixed when
+        // the editor is built.
+        .edit_mode(if oslo::interactive::settings::current().vi.enabled {
+            rustyline::EditMode::Vi
+        } else {
+            rustyline::EditMode::Emacs
+        })
         // `List`, not `Circular`, and the reason is the dropdown.
         //
         // oslo's completer opens its own menu, waits for a choice, and returns that one candidate
