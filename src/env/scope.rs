@@ -231,6 +231,16 @@ impl Environment {
         self.substitution_status = Some(status);
     }
 
+    /// The status of the last command substitution, without consuming it.
+    ///
+    /// Distinct from [`Environment::take_substitution_status`] because two callers want the same
+    /// number for different reasons and must not steal it from each other: an assignment-only
+    /// command *reports* it and is done with it, while word expansion only needs to know it in
+    /// order to update `$?` mid-word.
+    pub fn peek_substitution_status(&self) -> Option<i32> {
+        self.substitution_status
+    }
+
     /// Take the status of the last command substitution, clearing it.
     ///
     /// What an assignment-only command reports (POSIX: `x=$(exit 5)` leaves `$?` at 5). Consumed

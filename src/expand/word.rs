@@ -207,6 +207,22 @@ pub fn expand_word_part(
         }
         WordPart::CommandSubstitution(cmd) => {
             let output = crate::exec::eval_command_substitution(env, cmd)?;
+
+            // A substitution is a command that ran, so `$?` *later in the same word* reports it:
+            // `echo "[$(exit 7)] $?"` prints `[] 7` in bash, because the word's expansions happen
+            // left to right and each substitution updates the status as it finishes. oslo recorded
+            // the status but never published it, so the `$?` beside it read whatever the previous
+            // *command* left — always the wrong number, and silently so.
+            //
+            // Not under `--posix`: bash 5.3 stopped doing it there, leaving `$?` as the previous
+            // command's, and oslo follows the newer answer. `tests/corpus/command_v_keywords.sh`
+            // is the case that separates the two, and is gated on 5.3 for exactly this reason.
+            if !env.posix()
+                && let Some(status) = env.peek_substitution_status()
+            {
+                env.last_status = status;
+            }
+
             // Trailing newlines are stripped per POSIX.
             single(output.trim_end_matches('\n').to_string(), produced)
         }
