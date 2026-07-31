@@ -114,7 +114,7 @@ pub fn filesystem_row(fs: &Filesystem) -> Value {
 /// Asked before the tool runs, so `sh.df` can be handed back as a *function* rather than as the
 /// rows themselves — `sh.df()` has to be a call, not an index that already did the work.
 pub fn answers_in_rows(command: &str) -> bool {
-    matches!(command, "df")
+    matches!(command, "df" | "env" | "ls")
 }
 
 pub fn row_answer(
@@ -129,8 +129,77 @@ pub fn row_answer(
             let out = capture(env, &["df", "-P"])?;
             Some(df_rows(&out))
         }
+        "env" => Some(env_rows(env)),
+        // `ls` answers the current directory. An argument-taking form is the next step and is
+        // deliberately not guessed at here.
+        "ls" => Some(ls_rows(".")),
         _ => None,
     }
+}
+
+/// `sh.env()` — the environment as rows, answered from the shell rather than from `env`'s text.
+///
+/// Parsing `env` output is impossible in general: a value may contain a newline or an `=`, and
+/// nothing in the text distinguishes that from the next variable. The shell already holds the
+/// pairs, so it hands them over rather than rendering and re-reading them.
+fn env_rows(env: &std::sync::Arc<std::sync::Mutex<crate::env::Environment>>) -> Value {
+    let mut list = Table::new();
+    let Ok(guard) = env.lock() else {
+        return Value::Table(Rc::new(RefCell::new(list)));
+    };
+    let mut pairs: Vec<(String, String)> = guard
+        .get_all_vars()
+        .iter()
+        .map(|(k, v)| (k.clone(), v.clone()))
+        .collect();
+    // Sorted, because table iteration has no order and a script that prints them should not
+    // produce a different listing on every run.
+    pairs.sort();
+    for (i, (name, value)) in pairs.iter().enumerate() {
+        let mut row = Table::new();
+        row.set(Value::str("name"), Value::str(name));
+        row.set(Value::str("value"), Value::str(value));
+        list.set(
+            Value::int(i as i64 + 1),
+            Value::Table(Rc::new(RefCell::new(row))),
+        );
+    }
+    Value::Table(Rc::new(RefCell::new(list)))
+}
+
+/// `sh.ls()` — a directory as rows.
+///
+/// The text form of `ls` is genuinely ambiguous for a filename containing a newline, which is a
+/// legal filename. Rows have no such problem.
+fn ls_rows(dir: &str) -> Value {
+    let mut list = Table::new();
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return Value::Table(Rc::new(RefCell::new(list)));
+    };
+    let mut names: Vec<(String, std::fs::Metadata)> = entries
+        .flatten()
+        .filter_map(|e| {
+            let name = e.file_name().to_string_lossy().into_owned();
+            e.metadata().ok().map(|m| (name, m))
+        })
+        .collect();
+    names.sort_by(|a, b| a.0.cmp(&b.0));
+    for (i, (name, meta)) in names.iter().enumerate() {
+        let mut row = Table::new();
+        row.set(Value::str("name"), Value::str(name));
+        row.set(Value::str("size"), Value::int(meta.len() as i64));
+        row.set(Value::str("size_human"), Value::str(human(meta.len())));
+        row.set(Value::str("is_dir"), Value::Bool(meta.is_dir()));
+        row.set(
+            Value::str("mode"),
+            Value::int(std::os::unix::fs::MetadataExt::mode(meta) as i64),
+        );
+        list.set(
+            Value::int(i as i64 + 1),
+            Value::Table(Rc::new(RefCell::new(row))),
+        );
+    }
+    Value::Table(Rc::new(RefCell::new(list)))
 }
 
 /// Run a command and answer its standard output, or `None` if it could not run.
