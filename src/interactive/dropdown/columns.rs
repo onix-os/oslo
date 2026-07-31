@@ -143,11 +143,32 @@ pub fn builtin_columns(cand: &CompletionCandidate, facts: &Facts) -> Vec<String>
             (None, _) => String::new(),
         },
         Some("file") => facts.size.map(human_size).unwrap_or_default(),
+        // Where the program actually is, which is what `type` would tell you and what the name
+        // alone cannot: `ls` in `~/bin` shadowing `/usr/bin/ls` looks identical in the listing
+        // until this column says otherwise.
+        Some("command") => where_is(&cand.display).unwrap_or_default(),
         // The one place the completer knew something the renderer could not work out for itself.
         Some("alias") => cand.detail.clone().unwrap_or_default(),
         _ => String::new(),
     };
     vec![description, extra]
+}
+
+/// The directory the first `$PATH` match for `name` lives in.
+///
+/// Walked here rather than carried on the candidate because the command index keeps only names —
+/// and walking is affordable *because this runs for visible rows only*. Fifteen rows against a
+/// ten-entry `$PATH` is a hundred and fifty `stat`s a frame; doing it when the candidates were
+/// collected would be that many times three thousand.
+fn where_is(name: &str) -> Option<String> {
+    let path = std::env::var("PATH").ok()?;
+    for dir in path.split(':').filter(|d| !d.is_empty()) {
+        let candidate = std::path::Path::new(dir).join(name);
+        if nix::unistd::access(&candidate, nix::unistd::AccessFlags::X_OK).is_ok() {
+            return Some(dir.to_string());
+        }
+    }
+    None
 }
 
 /// A hook that decides a candidate's columns, replacing [`builtin_columns`] entirely.
@@ -267,6 +288,24 @@ mod tests {
         assert_eq!(ago(86400 * 3), "3d");
         assert_eq!(ago(86400 * 60), "2mo");
         assert_eq!(ago(86400 * 800), "2y");
+    }
+
+    /// A command says where it lives, which is the one thing its name cannot: two `ls` entries in
+    /// a listing are indistinguishable until the column names the directory.
+    #[test]
+    fn a_command_says_which_directory_it_came_from() {
+        let mut sh = cand("command");
+        sh.display = "sh".to_string();
+        let column = builtin_columns(&sh, &Facts::default())[1].clone();
+        assert!(
+            column.starts_with('/'),
+            "a command on $PATH names its directory, got {column:?}"
+        );
+
+        // Something that is not on `$PATH` says nothing rather than guessing.
+        let mut absent = cand("command");
+        absent.display = "definitely-not-a-program-anywhere".to_string();
+        assert_eq!(builtin_columns(&absent, &Facts::default())[1], "");
     }
 
     /// A kind whose name already tells the whole story adds nothing; a kind that leaves something
