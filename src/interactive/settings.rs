@@ -37,6 +37,11 @@ pub struct Completion {
     pub case_sensitive: bool,
     /// How candidates are ordered: by how often they are used, or by name.
     pub sort: Sort,
+    /// The kinds of candidate offered at all. `None` means every kind, which is the default.
+    ///
+    /// Kept as the kind strings the candidates already carry, so adding a kind does not mean
+    /// touching an enum here as well.
+    pub sources: Option<Vec<String>>,
 }
 
 /// `oslo.completion.sort`.
@@ -58,6 +63,7 @@ impl Default for Completion {
             show_kind: true,
             case_sensitive: false,
             sort: Sort::default(),
+            sources: None,
         }
     }
 }
@@ -163,6 +169,22 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
             "case_sensitive",
             &mut settings.completion.case_sensitive,
         );
+        if let Value::Table(list) = table.get(&Value::str("sources")) {
+            let mut kinds = Vec::new();
+            for value in list.borrow().sequence() {
+                if let Value::Str(name) = value {
+                    let name = match name.as_ref() {
+                        "directory" => "dir",
+                        "function" | "func" => "function",
+                        other => other,
+                    };
+                    if !kinds.iter().any(|k: &String| k == name) {
+                        kinds.push(name.to_string());
+                    }
+                }
+            }
+            settings.completion.sources = Some(kinds);
+        }
         if let Value::Str(name) = table.get(&Value::str("sort")) {
             match name.as_ref() {
                 "frecency" | "frequency" => settings.completion.sort = Sort::Frecency,
@@ -297,6 +319,24 @@ mod tests {
         assert!(!off.completion.show_kind);
         let (absent, _) = settings_from("oslo = { completion = {} }");
         assert!(absent.completion.show_kind);
+    }
+
+    /// An empty list is a real answer — "offer nothing" — and must not read as "offer everything".
+    #[test]
+    fn the_completion_sources_are_read_including_an_empty_list() {
+        let (all, _) = settings_from("oslo = { completion = {} }");
+        assert_eq!(all.completion.sources, None, "unset means every kind");
+
+        let (some, problems) =
+            settings_from("oslo = { completion = { sources = {'command', 'dir'} } }");
+        assert!(problems.is_empty(), "{problems:?}");
+        assert_eq!(
+            some.completion.sources.as_deref(),
+            Some(["command".to_string(), "dir".to_string()].as_slice())
+        );
+
+        let (none, _) = settings_from("oslo = { completion = { sources = {} } }");
+        assert_eq!(none.completion.sources.as_deref(), Some([].as_slice()));
     }
 
     #[test]

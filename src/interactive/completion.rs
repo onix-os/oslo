@@ -60,6 +60,17 @@ impl OsloHelper {
 
         // Frecency first, name second. Without the first key this is alphabetical, which is how
         // `exit` came to suggest `exitsnoop-bpfcc`.
+        // `oslo.completion.sources`: drop the kinds the config did not ask for. Applied after the
+        // builders rather than inside them, so a kind is filtered by the name it already carries
+        // and adding a new kind needs no change here.
+        if let Some(wanted) = &crate::interactive::settings::current().completion.sources {
+            out.retain(|c| {
+                c.kind
+                    .as_deref()
+                    .is_some_and(|k| wanted.iter().any(|w| w == k))
+            });
+        }
+
         // `oslo.completion.sort`. Frecency first, name second — without the first key this is
         // alphabetical, which is how `exit` came to suggest `exitsnoop-bpfcc`. A config that
         // prefers a predictable order can ask for `alpha` and get name only.
