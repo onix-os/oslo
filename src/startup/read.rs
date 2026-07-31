@@ -1,0 +1,219 @@
+//! Reading one command from the line editor.
+//!
+//! Split from [`super::repl`] because reading and running are separate concerns and only one of
+//! them is hard. Running a command is a call; *reading* one means a continuation prompt when the
+//! line is unfinished, a here-document body that must go in exactly as typed, two languages to
+//! choose between, and a key that hands control back by accepting the line.
+
+use crate::expand_history;
+use crate::startup::mode::{self, Line, Mode, ToggleRequest};
+use crate::startup::repl::{Repl, history_entries};
+use crate::startup::{history, prompt, rc};
+use oslo::Environment;
+use oslo::LuaEngine;
+use oslo::interactive::InputStatus;
+use rustyline::error::ReadlineError;
+use std::sync::{Arc, Mutex};
+
+/// One trip round the prompt.
+pub(super) enum Input {
+    /// A complete command, the language to run it in, and whether the user asked for it not to be
+    /// remembered.
+    Command {
+        text: String,
+        mode: Mode,
+        secret: bool,
+    },
+    /// Nothing to run: a blank line, or a history reference that did not resolve.
+    Nothing,
+    /// Ctrl-C. The partial command is dropped and the prompt comes back.
+    Interrupted,
+    /// End of input. `$IGNOREEOF` may ask for this to be ignored.
+    Eof,
+    /// The editor failed. Unlike an end of input this is never ignored: retrying would print the
+    /// same error forever.
+    Fatal,
+}
+
+/// Read one complete command, continuing onto further lines while the parser wants more.
+///
+/// This is where `PS2` earns its keep: a command that is not finished gets the continuation
+/// prompt, instead of the hard syntax error `for i in 1 2 3` used to produce the moment you
+/// pressed Enter.
+pub(super) fn read_command(
+    rl: &mut Repl,
+    env_struct: &Arc<Mutex<Environment>>,
+    lua: &LuaEngine,
+    last_status: i32,
+    current: &mut Mode,
+    toggle: &ToggleRequest,
+) -> Input {
+    let mut buffer = String::new();
+    let mut secret = false;
+    let mut heredoc = HeredocTracker::default();
+    // The language *this* command is being read in. It follows `current` until a `!` or `=`
+    // prefix sends one line the other way; a continuation line never re-decides.
+    let mut reading = *current;
+    // Carried across a toggle, so switching language mid-command does not lose what was typed.
+    let mut typed = String::new();
+
+    loop {
+        let prompt = if buffer.is_empty() {
+            prompt::primary_prompt(env_struct, lua, last_status, *current)
+        } else {
+            lua.render("prompt.continuation")
+                .unwrap_or_else(|| rc::ps2(&mut env_struct.lock().unwrap()))
+        };
+
+        // The right prompt is handed to the helper rather than concatenated: it is drawn from
+        // the highlighter, which is the only place a cursor move does not confuse rustyline.
+        if let Some(helper) = rl.helper() {
+            helper.set_right_prompt(
+                lua.render("prompt.right"),
+                oslo::interactive::prompt::printed_width(&prompt),
+            );
+        }
+
+        // Written before the prompt rather than inside it, for the same reason the right prompt is
+        // not concatenated: the line editor measures the prompt string to know where the line
+        // starts, and an OSC in there is counted as visible width.
+        print!("{}", oslo::interactive::marks::prompt_start());
+        let _ = std::io::Write::flush(&mut std::io::stdout());
+
+        let raw = match rl.readline_with_initial(&prompt, (&typed, "")) {
+            Ok(raw) => raw,
+            Err(ReadlineError::Interrupted) => {
+                println!("^C");
+                return Input::Interrupted;
+            }
+            Err(ReadlineError::Eof) => return Input::Eof,
+            Err(err) => {
+                eprintln!("oslo: {}", err);
+                return Input::Fatal;
+            }
+        };
+        typed.clear();
+
+        // The toggle key accepts the line to hand control back here; nothing was submitted.
+        if toggle.take() {
+            *current = current.other();
+            reading = *current;
+            typed = raw;
+            continue;
+        }
+
+        if buffer.is_empty() {
+            if raw.trim().is_empty() {
+                return Input::Nothing;
+            }
+            // The leading space that asks for a line not to be remembered is a property of the
+            // line *as typed*, so it has to be read before anything trims or rewrites it.
+            secret = history::is_secret(&raw);
+        }
+
+        // Only the first line is trimmed. A continuation line goes in exactly as typed, because
+        // the body of a here-document is data: `cat <<EOF` followed by an indented line must keep
+        // its indentation.
+        let line = if buffer.is_empty() {
+            raw.trim()
+        } else {
+            raw.as_str()
+        };
+
+        // `=` and `!` are read once, off the first line. They send this one command the other way
+        // without touching the mode the prompt goes back to.
+        let line = if buffer.is_empty() {
+            match mode::classify(*current, line) {
+                Line::Normal(text) => text,
+                Line::OneOff { mode, text } => {
+                    reading = mode;
+                    text
+                }
+            }
+        } else {
+            line
+        };
+
+        // History expansion belongs to shell syntax. In Lua a `!` is `~=`'s other half and a
+        // string may hold anything; rewriting a Lua line against the history would corrupt it.
+        let expanded = if reading == Mode::Shell && heredoc.expands_history() {
+            // Owned so the immutable borrow of the editor ends before the entry is added.
+            let previous: Vec<String> = history_entries(rl);
+            match expand_history(line, &previous) {
+                Some(expanded) => expanded,
+                None => return Input::Nothing,
+            }
+        } else {
+            line.to_string()
+        };
+        // Observed on the expanded text, which is what actually goes into the buffer.
+        heredoc.observe(&expanded);
+
+        buffer.push_str(&expanded);
+        if is_complete(&buffer, reading) {
+            // The frecency table is fed from here rather than from the editor's `validate`,
+            // because with editor multi-line off (which is what `PS2` costs) `validate` never
+            // sees a multi-line command whole — see `OsloHelper::record_command_use`.
+            if let Some(helper) = rl.helper() {
+                helper.record_command_use(&buffer);
+            }
+            return Input::Command {
+                text: buffer,
+                mode: reading,
+                secret,
+            };
+        }
+        buffer.push('\n');
+    }
+}
+
+/// Whether the line about to be read is the body of a here-document.
+///
+/// The body of a here-document is **data**, and history expansion rewrites a line before it is
+/// parsed — so `cat > note <<EOF` followed by a line containing `!` would silently write some
+/// earlier command into the file instead of what was typed. bash does not expand there, and
+/// [`oslo::interactive::syntax::opens_here_document`] exists precisely to tell "unfinished
+/// because a document is open" from "unfinished because a quote is open". It had no callers at
+/// all, so every heredoc body typed at oslo's prompt was being rewritten (PLAN C8).
+///
+/// One bit of state, given a name because it is the bit that decides whether a typed line is a
+/// command or data, and because the loop that owns it needs a terminal to exercise.
+#[derive(Default)]
+pub(super) struct HeredocTracker(bool);
+
+impl HeredocTracker {
+    /// Whether history expansion may rewrite the next line.
+    pub(super) fn expands_history(&self) -> bool {
+        !self.0
+    }
+
+    /// Take account of a line that has been accepted into the buffer.
+    ///
+    /// Only ever turns the bit on. A document whose delimiter arrives part-way through an
+    /// unfinished command leaves the rest of that command unexpanded too — the safe direction:
+    /// the cost is a `!!` that has to be typed out in full, against a `!` inside a heredoc
+    /// quietly becoming somebody else's command.
+    pub(super) fn observe(&mut self, line: &str) {
+        self.0 |= oslo::interactive::syntax::opens_here_document(line);
+    }
+}
+
+/// Whether the parser is satisfied with what has been typed so far.
+///
+/// A *syntax error* counts as complete: it is the executor's job to report it, and asking for
+/// another line would leave the user unable to get the prompt back with no way to see why. The
+/// shell's three-way answer comes from the same classifier the editor's validator uses, so the
+/// prompt and the loop can never disagree about whether a line is finished.
+///
+/// Lua answers through its own parser rather than through Lua's `<eof>`-in-the-message trick,
+/// which is all the reference implementation's C API can expose. Having our own parser means
+/// asking it directly.
+pub(super) fn is_complete(source: &str, mode: Mode) -> bool {
+    match mode {
+        Mode::Lua => oslo::lua::eval::is_complete(source),
+        Mode::Shell => !matches!(
+            oslo::interactive::syntax::classify(source),
+            InputStatus::Incomplete
+        ),
+    }
+}

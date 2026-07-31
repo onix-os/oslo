@@ -1,0 +1,363 @@
+//! Colouring the line being typed, to the depth fish does it.
+//!
+//! Two stages, and the split is the point. [`lex`] is purely lexical — no `$PATH`, no filesystem,
+//! no terminal — so the hard part is testable without any of them. [`classify`] then answers the
+//! questions only the shell can: is this word a builtin, a function, a real command or nothing at
+//! all, and does that parameter name a file which exists.
+//!
+//! **The two most useful colours are the ones that need the disk.** fish's `error` marks a command
+//! that resolves to nothing *as it is typed*, and `valid_path` marks a parameter that names a real
+//! file. Both are a lookup per word per keystroke, which is exactly the cost the command index was
+//! built to avoid — so `error` goes through that index, and `valid_path` is capped (see
+//! [`Context::check_paths`]).
+
+mod lex;
+
+pub use lex::{Role, Span, lex};
+
+use super::command_index::CommandIndex;
+use super::theme::{self, Style};
+
+/// What a span is finally coloured as. One variant per role in `theme::Syntax`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TokenType {
+    Command,
+    Builtin,
+    Function,
+    Keyword,
+    /// A command name that resolves to nothing.
+    Error,
+    Param,
+    /// A parameter that names a file which exists.
+    ValidPath,
+    Option,
+    Quote,
+    Escape,
+    Operator,
+    Redirection,
+    End,
+    Comment,
+    Variable,
+    Plain,
+}
+
+impl TokenType {
+    /// The style this token takes from a theme.
+    pub fn style(self, syntax: &theme::Syntax) -> Style {
+        match self {
+            TokenType::Command => syntax.command,
+            TokenType::Builtin => syntax.builtin,
+            TokenType::Function => syntax.function,
+            TokenType::Keyword => syntax.keyword,
+            TokenType::Error => syntax.error,
+            TokenType::Param => syntax.param,
+            TokenType::ValidPath => syntax.valid_path,
+            TokenType::Option => syntax.option,
+            TokenType::Quote => syntax.quote,
+            TokenType::Escape => syntax.escape,
+            TokenType::Operator => syntax.operator,
+            TokenType::Redirection => syntax.redirection,
+            TokenType::End => syntax.end,
+            TokenType::Comment => syntax.comment,
+            TokenType::Variable => syntax.variable,
+            TokenType::Plain => Style::default(),
+        }
+    }
+}
+
+/// What the shell knows, for the questions the lexer cannot answer.
+pub struct Context<'a> {
+    /// The shell's `$PATH`.
+    pub path: &'a str,
+    /// Answers for builtins — which the command index does not track, because they exist without
+    /// any file existing.
+    pub is_builtin: &'a dyn Fn(&str) -> bool,
+    /// Answers for shell functions and aliases, for the same reason.
+    pub is_function: &'a dyn Fn(&str) -> bool,
+    /// Whether to `stat` parameters to find the ones that name real files.
+    ///
+    /// Off for a long line: this is a syscall per word per keystroke, and the point at which it
+    /// stops being free is a line long enough that nobody is reading the colours anyway.
+    pub check_paths: bool,
+}
+
+/// The most words `valid_path` will `stat` on one line.
+///
+/// A cap rather than a cache: the answer changes when the filesystem does, so a cache would need
+/// invalidating on something nothing watches. Eight covers every line anybody types at a prompt,
+/// and a line with forty words is one where the colour is not what you are looking at.
+const MAX_PATH_CHECKS: usize = 8;
+
+/// Resolve every span into its final token type.
+pub fn classify(spans: &[Span], ctx: &Context<'_>) -> Vec<(String, TokenType)> {
+    let mut out = Vec::with_capacity(spans.len());
+    let mut checked = 0usize;
+
+    for span in spans {
+        let token = match span.role {
+            Role::CommandWord => command_token(&span.text, ctx),
+            Role::Keyword => TokenType::Keyword,
+            Role::Word => {
+                if span.text.starts_with('-') && span.text.len() > 1 {
+                    TokenType::Option
+                } else if ctx.check_paths && checked < MAX_PATH_CHECKS {
+                    // Counted whether or not the file turned out to exist: the cap is on the
+                    // syscalls, not on the hits.
+                    checked += 1;
+                    if names_an_existing_file(&span.text) {
+                        TokenType::ValidPath
+                    } else {
+                        TokenType::Param
+                    }
+                } else {
+                    TokenType::Param
+                }
+            }
+            Role::Quote => TokenType::Quote,
+            Role::Escape => TokenType::Escape,
+            Role::Variable => TokenType::Variable,
+            Role::Redirection => TokenType::Redirection,
+            Role::Operator => TokenType::Operator,
+            Role::End => TokenType::End,
+            Role::Comment => TokenType::Comment,
+            Role::Plain => TokenType::Plain,
+        };
+        out.push((span.text.clone(), token));
+    }
+    out
+}
+
+/// Which of the four "this is the thing being run" colours a command word takes.
+fn command_token(name: &str, ctx: &Context<'_>) -> TokenType {
+    if name.is_empty() {
+        return TokenType::Plain;
+    }
+    // A word still being typed is not yet wrong. Marking it red on the first keystroke and green
+    // on the last makes the whole line flicker, which is what fish avoids by only colouring a
+    // command once it is complete — here, once something resolves.
+    if (ctx.is_builtin)(name) {
+        return TokenType::Builtin;
+    }
+    if (ctx.is_function)(name) {
+        return TokenType::Function;
+    }
+    if name.contains('/') {
+        // A path, not a lookup: `./configure`, `/usr/bin/env`.
+        return if which::which(name).is_ok() {
+            TokenType::Command
+        } else {
+            TokenType::Error
+        };
+    }
+    if CommandIndex::contains(ctx.path, name) {
+        TokenType::Command
+    } else {
+        TokenType::Error
+    }
+}
+
+/// Whether a parameter names something that is actually there.
+fn names_an_existing_file(word: &str) -> bool {
+    if word.is_empty() || word.starts_with('-') {
+        return false;
+    }
+    // `~` is not expanded by the lexer, so it is expanded here — a path a user typed with a tilde
+    // is exactly the kind that does exist and would otherwise never light up.
+    let expanded = match word.strip_prefix('~') {
+        Some(rest) if rest.is_empty() || rest.starts_with('/') => match std::env::var("HOME") {
+            Ok(home) if !home.is_empty() => format!("{home}{rest}"),
+            _ => return false,
+        },
+        _ => word.to_string(),
+    };
+    std::fs::symlink_metadata(&expanded).is_ok()
+}
+
+/// Paint a line with the current theme.
+pub fn paint(line: &str, ctx: &Context<'_>) -> String {
+    let theme = theme::current();
+    let depth = theme::depth();
+    let mut out = String::with_capacity(line.len() * 2);
+    for (text, token) in classify(&lex(line), ctx) {
+        out.push_str(&token.style(&theme.syntax).paint(&text, depth));
+    }
+    out
+}
+
+/// Whether a command name in the line resolves to something runnable.
+///
+/// `path` is the shell's `$PATH`; `known` answers for builtins, aliases and functions, which the
+/// index does not track because they change without any file changing.
+pub fn command_resolves(name: &str, path: &str, known: impl FnOnce(&str) -> bool) -> bool {
+    if name.is_empty() {
+        return false;
+    }
+    if known(name) {
+        return true;
+    }
+    if name.contains('/') {
+        return which::which(name).is_ok();
+    }
+    CommandIndex::contains(path, name)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A context that answers from fixed sets, so classification is testable with no shell.
+    fn ctx<'a>(
+        builtins: &'a dyn Fn(&str) -> bool,
+        functions: &'a dyn Fn(&str) -> bool,
+        check_paths: bool,
+    ) -> Context<'a> {
+        Context {
+            path: "/nonexistent-zz",
+            is_builtin: builtins,
+            is_function: functions,
+            check_paths,
+        }
+    }
+
+    fn kinds(line: &str, ctx: &Context<'_>) -> Vec<(String, TokenType)> {
+        classify(&lex(line), ctx)
+            .into_iter()
+            .filter(|(_, t)| *t != TokenType::Plain)
+            .collect()
+    }
+
+    #[test]
+    fn a_command_resolves_to_one_of_four_colours() {
+        let builtins = |n: &str| n == "cd";
+        let functions = |n: &str| n == "deploy";
+        let c = ctx(&builtins, &functions, false);
+
+        assert_eq!(kinds("cd /tmp", &c)[0].1, TokenType::Builtin);
+        assert_eq!(kinds("deploy now", &c)[0].1, TokenType::Function);
+        // Nothing resolves it, so it is wrong — fish's most useful colour.
+        assert_eq!(kinds("nosuchcmd-zz x", &c)[0].1, TokenType::Error);
+        assert_eq!(kinds("if true; then fi", &c)[0].1, TokenType::Keyword);
+    }
+
+    /// An absolute path that is not there is as wrong as a name that is not there.
+    #[test]
+    fn a_path_command_is_checked_as_a_path() {
+        let no = |_: &str| false;
+        let c = ctx(&no, &no, false);
+        assert_eq!(kinds("/nonexistent-zz/prog x", &c)[0].1, TokenType::Error);
+        assert_eq!(kinds("/bin/sh -c x", &c)[0].1, TokenType::Command);
+    }
+
+    #[test]
+    fn options_and_parameters_are_told_apart() {
+        let no = |_: &str| false;
+        let c = ctx(&no, &no, false);
+        let seen = kinds("cmd -l --long plain", &c);
+        assert_eq!(seen[1].1, TokenType::Option);
+        assert_eq!(seen[2].1, TokenType::Option);
+        assert_eq!(seen[3].1, TokenType::Param);
+        // A bare `-` is a parameter, not an option: it means stdin to half the tools there are.
+        assert_eq!(kinds("cmd -", &c)[1].1, TokenType::Param);
+    }
+
+    /// The colour that tells you the file you named is really there.
+    #[test]
+    fn a_parameter_naming_a_real_file_is_marked() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let file = dir.path().join("here.txt");
+        std::fs::write(&file, b"x").expect("write");
+        let no = |_: &str| false;
+        let c = ctx(&no, &no, true);
+
+        let line = format!(
+            "cmd {} {}",
+            file.display(),
+            dir.path().join("gone").display()
+        );
+        let seen = kinds(&line, &c);
+        assert_eq!(seen[1].1, TokenType::ValidPath);
+        assert_eq!(seen[2].1, TokenType::Param);
+    }
+
+    /// A syscall per word per keystroke is exactly what the command index exists to avoid, so the
+    /// number of them is bounded rather than left to the length of the line.
+    #[test]
+    fn path_checking_is_capped_and_can_be_turned_off() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let mut names = Vec::new();
+        for i in 0..12 {
+            let f = dir.path().join(format!("f{i}"));
+            std::fs::write(&f, b"x").expect("write");
+            names.push(f.display().to_string());
+        }
+        let no = |_: &str| false;
+
+        let line = format!("cmd {}", names.join(" "));
+        let capped = kinds(&line, &ctx(&no, &no, true));
+        let marked = capped
+            .iter()
+            .filter(|(_, t)| *t == TokenType::ValidPath)
+            .count();
+        assert!(
+            marked <= MAX_PATH_CHECKS,
+            "{marked} paths checked, cap is {MAX_PATH_CHECKS}"
+        );
+
+        // And off entirely, nothing is stat'd.
+        let off = kinds(&line, &ctx(&no, &no, false));
+        assert!(off.iter().all(|(_, t)| *t != TokenType::ValidPath));
+    }
+
+    #[test]
+    fn every_lexical_role_reaches_a_colour() {
+        let no = |_: &str| false;
+        let c = ctx(&no, &no, false);
+        let seen = kinds(r#"echo "q" $V >f 2>&1 | wc; true & # note"#, &c);
+        let types: Vec<TokenType> = seen.iter().map(|(_, t)| *t).collect();
+        for wanted in [
+            TokenType::Quote,
+            TokenType::Variable,
+            TokenType::Redirection,
+            TokenType::Operator,
+            TokenType::End,
+            TokenType::Comment,
+        ] {
+            assert!(types.contains(&wanted), "{wanted:?} missing from {seen:?}");
+        }
+    }
+
+    #[test]
+    fn painting_reassembles_the_line_once_the_escapes_are_stripped() {
+        theme::set_depth(theme::Depth::Ansi16);
+        let no = |_: &str| false;
+        let line = "echo 'a b' $HOME | wc -l";
+        let painted = paint(line, &ctx(&no, &no, false));
+        let stripped: String = {
+            let mut out = String::new();
+            let mut chars = painted.chars();
+            while let Some(ch) = chars.next() {
+                if ch != '\x1b' {
+                    out.push(ch);
+                    continue;
+                }
+                for c in chars.by_ref() {
+                    if c.is_ascii_alphabetic() {
+                        break;
+                    }
+                }
+            }
+            out
+        };
+        assert_eq!(stripped, line);
+    }
+
+    #[test]
+    fn a_builtin_resolves_without_touching_the_disk() {
+        assert!(command_resolves("cd", "/nonexistent", |n| n == "cd"));
+        assert!(!command_resolves(
+            "definitely-not-a-command",
+            "/nonexistent",
+            |_| false
+        ));
+    }
+}

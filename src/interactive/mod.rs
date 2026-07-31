@@ -10,10 +10,13 @@ pub mod dropdown;
 pub mod frecency_store;
 pub mod highlight;
 mod hinting;
+pub mod keys;
 pub mod marks;
 pub mod prompt;
+pub mod settings;
 pub mod spec;
 pub mod syntax;
+pub mod theme;
 pub mod words;
 
 #[cfg(test)]
@@ -26,7 +29,6 @@ pub use words::{Quote, Word, current_word, extract_current_word};
 use crate::env::Environment;
 use dropdown::{CompletionCandidate, DropdownMenu};
 use frecency_store::FrecencyStore;
-use highlight::TokenType;
 use rustyline::completion::{Completer, Pair};
 use rustyline::highlight::Highlighter;
 use rustyline::hint::{Hinter, HistoryHinter};
@@ -34,7 +36,7 @@ use rustyline::validate::{ValidationContext, ValidationResult, Validator};
 use rustyline::{Context, Helper};
 use spec::SpecRegistry;
 use std::borrow::Cow;
-use std::collections::HashMap;
+use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 
 /// Completion kinds worth remembering.
@@ -57,12 +59,11 @@ pub struct OsloHelper {
     ///
     /// See [`OsloHelper::set_editor_multiline`].
     editor_multiline: bool,
-    /// `which` answers for the line being drawn, keyed by the line's hash.
+    /// The right prompt to draw, and how many cells the left prompt took.
     ///
-    /// Only path-like names reach it — a bare name is answered by [`command_index`] — but
-    /// `highlight` runs on every refresh, so even one `stat` per token per keystroke is worth
-    /// spending a hash lookup to avoid.
-    which_cache: Mutex<(u64, HashMap<String, bool>)>,
+    /// Set once per prompt cycle by the REPL and drawn by `highlight`, which is the only seam
+    /// where a cursor move is free — see [`prompt::right_prompt_escape`].
+    right_prompt: Mutex<Option<(String, usize)>>,
 }
 
 impl OsloHelper {
@@ -86,7 +87,7 @@ impl OsloHelper {
             frecency,
             menu: interactive,
             editor_multiline: true,
-            which_cache: Mutex::new((0, HashMap::new())),
+            right_prompt: Mutex::new(None),
         }
     }
 
@@ -94,6 +95,13 @@ impl OsloHelper {
     ///
     /// With it off, `complete` returns the whole candidate list instead of the one the user
     /// picked — the shape a test wants.
+    /// Give the helper the right prompt for this line, and the left prompt's width.
+    pub fn set_right_prompt(&self, right: Option<String>, left_width: usize) {
+        if let Ok(mut slot) = self.right_prompt.lock() {
+            *slot = right.map(|text| (text, left_width));
+        }
+    }
+
     pub fn set_menu(&mut self, enabled: bool) {
         self.menu = enabled;
     }
@@ -193,7 +201,10 @@ impl Completer for OsloHelper {
         let indent_cols =
             dropdown::visible_len(&prompt_str) + dropdown::visible_len(&line[..start]);
 
-        match DropdownMenu::select_interactive(candidates, indent_cols) {
+        // What the user has typed of this word, so the dropdown can show which part of each
+        // candidate is already theirs.
+        let typed = &line[start..pos];
+        match DropdownMenu::select_interactive(candidates, indent_cols, typed) {
             Some(selected) => {
                 self.record_accepted(&selected);
                 Ok((start, vec![Self::to_pair(selected)]))
@@ -211,14 +222,21 @@ impl Hinter for OsloHelper {
             return None;
         }
 
-        // History wins: a line the user has actually run is a better guess than any name we could
-        // rank, and it is what makes the suggestion feel like a memory rather than a directory
-        // listing.
-        if let Some(h) = self.history_hinter.hint(line, pos, ctx) {
-            return Some(h);
+        // The order is `oslo.suggest.sources`, defaulting to fish's: history, then completions,
+        // then paths. Each answers for a position the others cannot see, and an empty list turns
+        // suggestions off entirely.
+        for source in settings::current().suggest.sources {
+            let found = match source {
+                settings::Source::History => self.history_hinter.hint(line, pos, ctx),
+                settings::Source::Completion => self.command_hint(line, pos),
+                settings::Source::Path => self.path_hint(line, pos),
+            };
+            if found.is_some() {
+                return found;
+            }
         }
 
-        self.command_hint(line, pos)
+        None
     }
 }
 
@@ -228,66 +246,57 @@ impl Highlighter for OsloHelper {
             return Cow::Borrowed(line);
         }
 
-        let path = self
-            .env
-            .lock()
-            .unwrap()
-            .get_var("PATH")
-            .unwrap_or_default()
-            .to_string();
+        let (path, builtins, functions) = {
+            let env = self.env.lock().unwrap();
+            let path = env.get_var("PATH").unwrap_or_default().to_string();
+            // Snapshotted rather than queried per word: the closures below are called once per
+            // command word, and each would otherwise take the environment lock again while this
+            // one is still held.
+            let builtins: HashSet<String> = env.builtin_names().map(str::to_string).collect();
+            let functions: HashSet<String> = env
+                .get_functions()
+                .keys()
+                .chain(env.get_aliases().keys())
+                .cloned()
+                .collect();
+            (path, builtins, functions)
+        };
 
-        let mut out = String::with_capacity(line.len() * 2);
-        for (tok, kind) in highlight::tokenize_for_highlight(line) {
-            match kind {
-                TokenType::Command => {
-                    let valid = self.command_is_runnable(&tok, &path, line);
-                    let colour = if valid { "1;32" } else { "1;31" };
-                    out.push_str(&format!("\x1b[{}m{}\x1b[0m", colour, tok));
-                }
-                TokenType::Flag => out.push_str(&format!("\x1b[36m{}\x1b[0m", tok)),
-                TokenType::String => out.push_str(&format!("\x1b[33m{}\x1b[0m", tok)),
-                TokenType::Variable => out.push_str(&format!("\x1b[35m{}\x1b[0m", tok)),
-                TokenType::Operator => out.push_str(&format!("\x1b[1;37m{}\x1b[0m", tok)),
-                TokenType::Plain => out.push_str(&tok),
-            }
+        let is_builtin = |name: &str| builtins.contains(name);
+        let is_function = |name: &str| functions.contains(name);
+        let ctx = highlight::Context {
+            path: &path,
+            is_builtin: &is_builtin,
+            is_function: &is_function,
+            // A line long enough to make the syscalls add up is one nobody is reading the
+            // colours of. See `highlight::MAX_PATH_CHECKS`.
+            check_paths: line.len() <= 512,
+        };
+        let mut painted = highlight::paint(line, &ctx);
+
+        // The right prompt rides here rather than in the prompt string: `compute_layout` measures
+        // the raw line and never this, so a cursor move costs nothing in rustyline's arithmetic.
+        if let Ok(slot) = self.right_prompt.lock()
+            && let Some((right, left_width)) = slot.as_ref()
+        {
+            let used = left_width + prompt::printed_width(line);
+            painted.push_str(&prompt::right_prompt_escape(
+                right,
+                used,
+                dropdown::terminal_cols(),
+            ));
         }
-
-        Cow::Owned(out)
+        Cow::Owned(painted)
     }
 
     fn highlight_hint<'h>(&self, hint: &'h str) -> Cow<'h, str> {
-        // Render fish-style ghost suggestion text in dim gray
-        Cow::Owned(format!("\x1b[90m{}\x1b[0m", hint))
+        // The ghost suggestion, in whatever the theme calls `autosuggestion`.
+        let theme = theme::current();
+        Cow::Owned(theme.syntax.autosuggestion.paint(hint, theme::depth()))
     }
 }
 
-impl OsloHelper {
-    /// Whether a command token names something the shell could run, memoised per line.
-    fn command_is_runnable(&self, name: &str, path: &str, line: &str) -> bool {
-        let key = line_key(line);
-        let mut cache = self.which_cache.lock().unwrap();
-        if cache.0 != key {
-            *cache = (key, HashMap::new());
-        }
-        if let Some(&known) = cache.1.get(name) {
-            return known;
-        }
-        drop(cache);
-
-        let answer = {
-            let env = self.env.lock().unwrap();
-            highlight::command_resolves(name, path, |n| {
-                env.is_builtin(n) || env.get_alias(n).is_some() || env.get_function(n).is_some()
-            })
-        };
-
-        let mut cache = self.which_cache.lock().unwrap();
-        if cache.0 == key {
-            cache.1.insert(name.to_string(), answer);
-        }
-        answer
-    }
-}
+impl OsloHelper {}
 
 impl Validator for OsloHelper {
     fn validate(&self, ctx: &mut ValidationContext<'_>) -> rustyline::Result<ValidationResult> {
@@ -313,11 +322,3 @@ impl Validator for OsloHelper {
 }
 
 impl Helper for OsloHelper {}
-
-/// A cheap identity for the line being highlighted. Collisions only cost a stale colour.
-fn line_key(line: &str) -> u64 {
-    use std::hash::{Hash, Hasher};
-    let mut hasher = std::collections::hash_map::DefaultHasher::new();
-    line.hash(&mut hasher);
-    hasher.finish()
-}

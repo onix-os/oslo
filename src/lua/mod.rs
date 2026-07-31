@@ -1,4 +1,5 @@
 pub mod api;
+pub mod columns;
 pub mod engine;
 pub mod eval;
 

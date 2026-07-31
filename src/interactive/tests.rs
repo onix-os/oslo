@@ -336,16 +336,41 @@ fn a_warm_keystroke_does_not_walk_path() {
     );
 }
 
+/// A command that resolves and one that does not must not be painted the same, whatever the
+/// theme says they should be painted *as*. Asserting the escape itself would pin the default
+/// theme rather than the behaviour.
 #[test]
-fn highlighting_marks_unknown_commands_red_and_known_ones_green() {
+fn highlighting_tells_a_real_command_from_an_unknown_one() {
     let dir = tempfile::tempdir().unwrap();
     make_exe(dir.path(), "zzreal");
     let h = helper(env_with_path(dir.path()));
+    crate::interactive::theme::set_depth(crate::interactive::theme::Depth::Ansi256);
 
-    assert!(h.highlight("zzreal -x", 9).contains("\x1b[1;32mzzreal"));
-    assert!(h.highlight("zzfake -x", 9).contains("\x1b[1;31mzzfake"));
-    // Builtins resolve without any file existing.
-    assert!(h.highlight("cd /tmp", 7).contains("\x1b[1;32mcd"));
+    let theme = crate::interactive::theme::current();
+    let depth = crate::interactive::theme::depth();
+    let command = theme.syntax.command.open(depth);
+    let error = theme.syntax.error.open(depth);
+    let builtin = theme.syntax.builtin.open(depth);
+    assert_ne!(command, error, "a real and a missing command look the same");
+
+    assert!(
+        h.highlight("zzreal -x", 9)
+            .contains(&format!("{command}zzreal")),
+        "{:?}",
+        h.highlight("zzreal -x", 9)
+    );
+    assert!(
+        h.highlight("zzfake -x", 9)
+            .contains(&format!("{error}zzfake")),
+        "{:?}",
+        h.highlight("zzfake -x", 9)
+    );
+    // Builtins resolve without any file existing, and take their own colour.
+    assert!(
+        h.highlight("cd /tmp", 7).contains(&format!("{builtin}cd")),
+        "{:?}",
+        h.highlight("cd /tmp", 7)
+    );
 }
 
 // ------------------------------------------------------------- spec-driven completion
@@ -372,5 +397,142 @@ fn a_name_that_is_both_a_builtin_and_a_file_is_offered_once() {
         names.iter().filter(|n| *n == "echo").count(),
         1,
         "{names:?}"
+    );
+}
+
+// ------------------------------------------------------------- path suggestions
+
+/// fish's third autosuggestion source: the argument, which neither history nor the command index
+/// can answer for.
+#[test]
+fn a_path_argument_is_suggested_from_the_filesystem() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("notes.txt"), b"x").unwrap();
+    std::fs::create_dir(dir.path().join("build")).unwrap();
+
+    let h = helper(Environment::new());
+    let base = dir.path().display().to_string();
+
+    let line = format!("cat {base}/not");
+    assert_eq!(
+        h.path_hint(&line, line.len()).as_deref(),
+        Some("es.txt"),
+        "no suggestion for {line}"
+    );
+
+    // A directory is suggested with its trailing slash, so the next keystroke continues into it.
+    let line = format!("ls {base}/bui");
+    assert_eq!(h.path_hint(&line, line.len()).as_deref(), Some("ld/"));
+}
+
+/// A bare word at the start of a line is a command to look up, not a file in the working
+/// directory — suggesting `./notes.txt` for `no` would be nonsense.
+///
+/// Absolute paths throughout: `set_current_dir` is process-wide, and this binary runs its tests on
+/// sixteen threads at once, so changing the working directory here would move it under every
+/// other test that happened to be running.
+#[test]
+fn a_command_word_is_never_suggested_as_a_path() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join("notes.txt"), b"x").unwrap();
+    let base = dir.path().display().to_string();
+    let h = helper(Environment::new());
+
+    // In command position, even a stem that names a real file suggests nothing as a path.
+    let line = format!("{base}/not");
+    assert_eq!(h.path_hint(&line, line.len()), None);
+
+    // The same stem as an argument is fair game.
+    let line = format!("cat {base}/not");
+    assert_eq!(h.path_hint(&line, line.len()).as_deref(), Some("es.txt"));
+}
+
+/// Every argument would otherwise suggest `.git`, which is never what was meant.
+#[test]
+fn a_dotfile_is_only_suggested_once_the_dot_is_typed() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join(".hidden"), b"x").unwrap();
+    let base = dir.path().display().to_string();
+    let h = helper(Environment::new());
+
+    let line = format!("cat {base}/");
+    assert_eq!(h.path_hint(&line, line.len()), None);
+
+    let line = format!("cat {base}/.hid");
+    assert_eq!(h.path_hint(&line, line.len()).as_deref(), Some("den"));
+}
+
+// ------------------------------------------------------------- badge and description
+
+/// A description must never restate the badge beside it.
+///
+/// `examples/  [ dir ]  Directory` is the same fact written twice, and it costs the width the
+/// name could have used. IRIS's rule is the one followed here: where the *kind* is the whole
+/// story the badge carries it alone; only a kind that leaves something unsaid gets both.
+#[test]
+fn a_candidate_does_not_repeat_its_kind_in_its_description() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::create_dir(dir.path().join("examples")).unwrap();
+    std::fs::write(dir.path().join("notes.txt"), b"x").unwrap();
+
+    let h = helper(Environment::new());
+    let line = format!("cat {}/", dir.path().display());
+    let (_, candidates) = h.candidates(&line, line.len());
+    assert!(!candidates.is_empty(), "no candidates for {line}");
+
+    for candidate in &candidates {
+        let Some(description) = candidate.description.as_deref() else {
+            continue;
+        };
+        let kind = candidate.kind.as_deref().unwrap_or("");
+        assert!(
+            !description.to_lowercase().contains(kind),
+            "{:?} describes itself as {description:?}, which its {kind:?} badge already says",
+            candidate.display
+        );
+    }
+}
+
+/// A file or directory says everything it has to say in its badge, so the description column is
+/// left out entirely — which is what gives the names the width back.
+#[test]
+fn file_and_directory_candidates_carry_no_description() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::create_dir(dir.path().join("build")).unwrap();
+    std::fs::write(dir.path().join("readme"), b"x").unwrap();
+
+    let h = helper(Environment::new());
+    let line = format!("cat {}/", dir.path().display());
+    let (_, candidates) = h.candidates(&line, line.len());
+
+    let kinds: Vec<&str> = candidates
+        .iter()
+        .filter_map(|c| c.kind.as_deref())
+        .collect();
+    assert!(kinds.contains(&"dir"), "{kinds:?}");
+    assert!(kinds.contains(&"file"), "{kinds:?}");
+    assert!(
+        candidates.iter().all(|c| c.description.is_none()),
+        "{:?}",
+        candidates
+            .iter()
+            .map(|c| (&c.display, &c.description))
+            .collect::<Vec<_>>()
+    );
+}
+
+/// A description that says something the badge cannot is still shown — the rule is about
+/// redundancy, not about suppressing descriptions.
+#[test]
+fn a_description_that_adds_something_survives() {
+    let h = helper(Environment::new());
+    let candidates = h.candidates("git comm", 8).1;
+    let commit = candidates
+        .iter()
+        .find(|c| c.display == "commit")
+        .expect("git commit should be offered");
+    assert!(
+        commit.description.is_some(),
+        "a subcommand's description is not implied by its badge: {commit:?}"
     );
 }

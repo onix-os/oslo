@@ -242,6 +242,53 @@ impl LuaEngine {
         Value::int(status as i64)
     }
 
+    /// Render one of the prompts, or `None` when the config set none.
+    ///
+    /// A string is used as written and a function is called, so a prompt that never changes need
+    /// not be a closure.
+    pub fn render(&self, key: &str) -> Option<String> {
+        let value = self.registry.borrow().get(key).cloned()?;
+        if let Value::Str(text) = &value {
+            return Some(text.to_string());
+        }
+        match self.interp.call(&value, Vec::new()) {
+            Ok(values) => match values.first() {
+                Some(Value::Str(s)) => Some(s.to_string()),
+                Some(Value::Number(n)) => Some(n.to_string()),
+                _ => None,
+            },
+            Err(e) => {
+                // Reported rather than swallowed: a prompt function that raises leaves the shell
+                // silently drawing its default, which looks exactly like the config not loading.
+                eprintln!("oslo: {key}: {e}");
+                None
+            }
+        }
+    }
+
+    /// Read `oslo.theme` as it stands, and what was wrong with it.
+    pub fn read_theme(&self) -> (crate::interactive::theme::Theme, Vec<String>) {
+        let oslo = self.interp.global("oslo");
+        let theme = match &oslo {
+            Value::Table(table) => table.borrow().get(&Value::str("theme")),
+            _ => Value::Nil,
+        };
+        crate::interactive::theme::read_lua_theme(&theme)
+    }
+
+    /// Read `oslo.completion`, `oslo.suggest` and `oslo.history` as they stand.
+    pub fn read_settings(&self) -> (crate::interactive::settings::Settings, Vec<String>) {
+        crate::interactive::settings::read_lua_settings(&self.interp.global("oslo"))
+    }
+
+    /// Install `oslo.completion.columns` as the dropdown's column provider.
+    ///
+    /// Called after the config has run, for the same reason the theme is read then rather than
+    /// pushed in as it goes: a config may set the function, change its mind, and set another.
+    pub fn install_column_provider(&self) {
+        crate::lua::columns::install(&self.interp);
+    }
+
     pub fn render_prompt(&self) -> Option<String> {
         let prompt = self.registry.borrow().get(PROMPT_KEY).cloned()?;
         match self.interp.call(&prompt, Vec::new()) {
