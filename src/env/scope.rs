@@ -82,13 +82,10 @@ pub struct Environment {
     readonly_vars: HashSet<String>,
     /// Names `export` was told about before they existed.
     ///
-    /// `export V` with no value must mark `V` for export and leave it **unset** — bash gives an
-    /// empty `${V+set}` and no `V=` in `env`, and a later `V=1` is then exported. Creating it
-    /// empty instead, which is what this used to do, makes it answer "set" to every test that asks
-    /// and puts a spurious `V=` in the environment of every child.
-    ///
-    /// So the intention is recorded here rather than in `vars`, and [`Self::set_var`] consults it
-    /// when the name is finally assigned.
+    /// `export V` with no value marks `V` for export and leaves it **unset**: bash gives an empty
+    /// `${V+set}` and no `V=` in `env`, and a later `V=1` is exported. Creating it empty instead
+    /// made it answer "set" to every test, and put a spurious `V=` in every child's environment.
+    /// [`Self::set_var`] spends the intention when the name is finally assigned.
     pending_exports: HashSet<String>,
     dir_stack: Vec<PathBuf>,
     scope_stack: Vec<ScopeFrame>,
@@ -427,8 +424,7 @@ impl Environment {
         // at the `name=value` site: POSIX applies it to *any* assignment, so `read`, a `for` loop
         // variable and `${v:=x}` are all covered by deciding it once. The idiom it exists for is
         // `set -a; . /etc/os-release`, which before this exported nothing at all.
-        // A pending `export V` is honoured here, and spent: from now on the variable itself
-        // carries the flag, so the intention has nothing left to record.
+        // A pending `export V` is honoured and spent here; the variable carries the flag now.
         let was_pending = self.pending_exports.remove(name);
         let is_exp = export
             || was_pending
