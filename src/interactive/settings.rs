@@ -36,10 +36,22 @@ pub struct Settings {
 ///   cursor_replace = "underscore",
 /// }
 /// ```
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Vi {
     pub enabled: bool,
     pub cursors: super::vi::Cursors,
+}
+
+impl Default for Vi {
+    fn default() -> Self {
+        // On by default. Emacs bindings are still the shell tradition, but oslo's are the ones a
+        // user has to opt *out* of — `oslo.vi = { enabled = false }` — because a vi user who has
+        // to discover a setting before the arrow keys behave has already had a bad first minute.
+        Vi {
+            enabled: true,
+            cursors: super::vi::Cursors::default(),
+        }
+    }
 }
 
 /// `oslo.completion`.
