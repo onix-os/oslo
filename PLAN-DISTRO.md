@@ -660,10 +660,22 @@ Four of the findings are new and are oslo's, all in pattern matching:
 The rest are already known: `select` (deliberately unimplemented), `isset -x` on an unset exported
 variable, `LINENO wrongly detected`, and `QUOTEFAIL` on weird filenames.
 
-`posparam.t` is not a test failure but oslo's **nesting guard** refusing to parse it:
-`59 unmatched openers, at most 16 are parseable`. That guard has produced five earlier false
-positives, every one found by running a real script rather than by a test. This is the sixth, and
-it is the next thing to fix.
+`posparam.t` was refused by oslo's **nesting guard** — `59 unmatched openers, at most 16 are
+parseable`. **Fixed.** The allowance already grew with input size, for the documented reason that
+this scan is approximate and its error rate grows with the file; it grew too slowly. One extra
+opener per 256 bytes rather than per 1024 lets `posparam.t` through, and **all 18 `.t` files now
+parse** — the guard refuses none of them. It still refuses what it exists for: 25 unclosed `(` in
+26 bytes, and 80 openers inside a 3.6 KB file. That was the sixth false positive this guard has
+produced on a real script, every one found by running something rather than by a test.
+
+Of the four pattern-matching findings, three no longer reproduce against bash — escaped `*`,
+escaped `]` inside a bracket, and full-range brackets with their negations all agree. A
+differential probe of fourteen harder cases found one that did not, and it was oslo's: **a quoted
+negation marker was still negating.** `[\!a]` is the set containing `!` and `a`, so `a` matches
+it; oslo read it as "anything but `a`" and answered the opposite on every pattern written that way.
+The class parser checked the character without checking the flag saying whether it was still an
+active metacharacter — the flag the same function already consults for `]`. **Fixed**, with the
+unquoted `[!a]` and `[^a]` still negating.
 
 Worth separating from it: a script that does `use var/loop` and then uses `LOOP` **in the same
 parse unit** cannot work, and that is the documented limitation rather than a new bug. `use`
