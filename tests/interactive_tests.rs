@@ -427,11 +427,11 @@ fn an_empty_line_carries_the_right_prompt_and_nothing_else() {
 fn a_ghost_hint_is_drawn_in_the_autosuggestion_colour() {
     let h = helper(Environment::new());
 
-    // Colour 238 where the terminal can say it, which is the default.
+    // Colour 240 where the terminal can say it, which is the default.
     oslo::interactive::theme::set_depth(oslo::interactive::theme::Depth::Ansi256);
     assert_eq!(
         h.highlight_hint("lo world"),
-        "\x1b[38;5;238mlo world\x1b[0m"
+        "\x1b[38;5;240mlo world\x1b[0m"
     );
 
     // On sixteen colours it degrades to whatever grey is nearest. Pinned rather than left
