@@ -238,8 +238,18 @@ fn reserve_rows(wanted: usize, reserved: &mut usize) -> String {
 }
 
 /// Draw `rendered` below the cursor and come back to it. No arithmetic to get wrong.
+///
+/// The `\x1b[J` at the end is not decoration. Each row clears its own tail with `\x1b[K`, which
+/// handles a row getting *shorter*, but nothing clears the rows below the last one drawn — and the
+/// reserved height only ever grows, so a frame is never given fewer rows than the tallest one so
+/// far. Page through a listing whose last page is shorter than the one before it and the previous
+/// page's leftover rows stay on screen underneath, looking like candidates that are still there.
+///
+/// Erasing to the end of the screen from the last drawn row is safe because everything below it
+/// belongs to this menu: the rows were reserved by `reserve_rows`, and `erase_below` clears the
+/// same region when the menu closes.
 fn draw_below(rendered: &str) -> String {
-    format!("\x1b7{rendered}\x1b8")
+    format!("\x1b7{rendered}\x1b[J\x1b8")
 }
 
 /// Erase everything from one row below the prompt to the end of the screen.
@@ -286,6 +296,26 @@ mod frame_tests {
         assert!(
             !frame.contains("A"),
             "a cursor-up count survived: {frame:?}"
+        );
+    }
+
+    /// A frame erases below its last row, or a shorter page leaves the previous one's tail on
+    /// screen. The reserved height only grows, so this is the *only* thing that clears them.
+    #[test]
+    fn a_shorter_frame_erases_what_the_taller_one_left() {
+        let tall = draw_below("r1\r\nr2\r\nr3\r\nr4");
+        let short = draw_below("r1\r\nr2");
+        for frame in [&tall, &short] {
+            assert!(frame.contains("\x1b[J"), "no erase-below: {frame:?}");
+            // After the content, not before it, or it would wipe the rows just drawn.
+            let erase = frame.find("\x1b[J").expect("present");
+            let last_row = frame.rfind("r2").expect("present");
+            assert!(erase > last_row, "erase came before the content: {frame:?}");
+        }
+        // Still bracketed by save/restore, so the cursor ends where it started.
+        assert!(
+            short.starts_with("\x1b7") && short.ends_with("\x1b8"),
+            "{short:?}"
         );
     }
 
