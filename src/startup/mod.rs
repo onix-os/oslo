@@ -14,6 +14,7 @@
 
 pub mod config;
 pub mod history;
+pub mod history_db;
 pub mod keybind;
 pub mod language;
 pub mod lua_init;

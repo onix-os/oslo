@@ -7,7 +7,7 @@
 use crate::absorb_loop_control;
 use crate::startup::mode::{Mode, ToggleRequest};
 use crate::startup::read::{Input, read_command};
-use crate::startup::{config, history, keybind, lua_init, mode, rc};
+use crate::startup::{config, history, history_db, keybind, lua_init, mode, rc};
 use oslo::Environment;
 use oslo::LuaEngine;
 use oslo::env::builtins::run_exit_trap;
@@ -69,6 +69,14 @@ pub fn run_repl() -> ! {
     }
 
     let settings = history::settings(&env_struct.lock().unwrap());
+    // The database keeps the language each line was typed in, which a flat file cannot: recalling
+    // a Lua line while the prompt is in shell mode has to run it as Lua. `$HISTFILE` still works
+    // and still gets appended to, so nothing that reads it breaks.
+    let db = history_db::database_path(
+        std::env::var("XDG_DATA_HOME").ok().as_deref(),
+        std::env::var("HOME").ok().as_deref(),
+    )
+    .and_then(|path| history_db::History::open(&path));
     let mut rl = build_editor(&settings);
 
     // The mode the prompt is reading, and the flag the toggle key sets. Both live for the whole
@@ -91,6 +99,13 @@ pub fn run_repl() -> ! {
             Ok(()) => {}
             Err(ReadlineError::Io(e)) if e.kind() == std::io::ErrorKind::NotFound => {}
             Err(e) => eprintln!("oslo: {}: {}", path.display(), e),
+        }
+    }
+    // Seeded from the database when there is one, so a session started on a machine with no
+    // `$HISTFILE` still has its history back.
+    if let Some(db) = &db {
+        for entry in db.recent(settings.max_size.max(1)) {
+            let _ = rl.add_history_entry(&entry.line);
         }
     }
     publish_history(&rl);
@@ -134,6 +149,17 @@ pub fn run_repl() -> ! {
             Input::Command { text, mode, secret } => {
                 eof_count = 0;
                 remember(&mut rl, &settings.file, &text, secret);
+                if let Some(db) = &db
+                    && !secret
+                {
+                    db.append(
+                        &text,
+                        match mode {
+                            Mode::Lua => history_db::MODE_LUA,
+                            Mode::Shell => history_db::MODE_SHELL,
+                        },
+                    );
+                }
 
                 // Handed the command as typed, which is what a `precmd` hook is for: logging it,
                 // timing it, or setting a title from it.
