@@ -92,7 +92,16 @@ pub struct Syntax {
     /// A parameter that names a file which exists.
     pub valid_path: Style,
     pub option: Style,
-    pub quote: Style,
+    /// A glob metacharacter: `*`, `?`, `[…]`.
+    pub glob: Style,
+    /// A bare number.
+    pub number: Style,
+    /// The `NAME=` of an assignment.
+    pub assignment: Style,
+    /// `'…'` — literal throughout.
+    pub single_quote: Style,
+    /// The literal parts of `"…"`. What expands inside it takes the variable colour instead.
+    pub double_quote: Style,
     pub escape: Style,
     pub operator: Style,
     pub redirection: Style,
@@ -138,7 +147,30 @@ impl Default for Syntax {
                 ..Style::default()
             },
             option: basic(6),
-            quote: basic(3),
+            // Bright magenta: a glob is the one thing in a line that can turn one word into
+            // fifty, and it should be impossible to miss.
+            glob: Style {
+                bold: true,
+                ..Style::fg(Color::Basic {
+                    index: 5,
+                    bright: true,
+                })
+            },
+            number: Style::fg(Color::Basic {
+                index: 6,
+                bright: true,
+            }),
+            assignment: Style::fg(Color::Basic {
+                index: 2,
+                bright: true,
+            }),
+            // Two yellows: a single-quoted string is inert and takes the plainer one, a
+            // double-quoted one still expands and is brighter to say so.
+            single_quote: basic(3),
+            double_quote: Style::fg(Color::Basic {
+                index: 3,
+                bright: true,
+            }),
             escape: basic(5),
             operator: basic(6),
             redirection: basic(4),

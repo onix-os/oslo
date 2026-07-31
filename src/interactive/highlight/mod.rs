@@ -31,7 +31,11 @@ pub enum TokenType {
     /// A parameter that names a file which exists.
     ValidPath,
     Option,
-    Quote,
+    SingleQuote,
+    DoubleQuote,
+    Glob,
+    Number,
+    Assignment,
     Escape,
     Operator,
     Redirection,
@@ -53,7 +57,11 @@ impl TokenType {
             TokenType::Param => syntax.param,
             TokenType::ValidPath => syntax.valid_path,
             TokenType::Option => syntax.option,
-            TokenType::Quote => syntax.quote,
+            TokenType::Glob => syntax.glob,
+            TokenType::Number => syntax.number,
+            TokenType::Assignment => syntax.assignment,
+            TokenType::SingleQuote => syntax.single_quote,
+            TokenType::DoubleQuote => syntax.double_quote,
             TokenType::Escape => syntax.escape,
             TokenType::Operator => syntax.operator,
             TokenType::Redirection => syntax.redirection,
@@ -113,7 +121,11 @@ pub fn classify(spans: &[Span], ctx: &Context<'_>) -> Vec<(String, TokenType)> {
                     TokenType::Param
                 }
             }
-            Role::Quote => TokenType::Quote,
+            Role::Glob => TokenType::Glob,
+            Role::Number => TokenType::Number,
+            Role::Assignment => TokenType::Assignment,
+            Role::SingleQuote => TokenType::SingleQuote,
+            Role::DoubleQuote => TokenType::DoubleQuote,
             Role::Escape => TokenType::Escape,
             Role::Variable => TokenType::Variable,
             Role::Redirection => TokenType::Redirection,
@@ -315,7 +327,7 @@ mod tests {
         let seen = kinds(r#"echo "q" $V >f 2>&1 | wc; true & # note"#, &c);
         let types: Vec<TokenType> = seen.iter().map(|(_, t)| *t).collect();
         for wanted in [
-            TokenType::Quote,
+            TokenType::DoubleQuote,
             TokenType::Variable,
             TokenType::Redirection,
             TokenType::Operator,

@@ -133,7 +133,27 @@ fn read_syntax(table: &crate::lua::eval::Table, into: &mut Syntax, problems: &mu
     field(table, "param", p, &mut into.param, problems);
     field(table, "valid_path", p, &mut into.valid_path, problems);
     field(table, "option", p, &mut into.option, problems);
-    field(table, "quote", p, &mut into.quote, problems);
+    // `quote` sets both, so a config written before they were split still works and still means
+    // what it meant. Naming either one on its own then overrides that half.
+    // A sentinel no config can write, so "was `quote` named at all?" is answerable — comparing
+    // against the current value cannot tell a config that set it to the default from one that did
+    // not set it, and that is exactly the case the back-compat needs to get right.
+    let sentinel = Style {
+        bold: true,
+        dim: true,
+        italic: true,
+        underline: true,
+        reverse: true,
+        ..Style::default()
+    };
+    let mut both = sentinel;
+    field(table, "quote", p, &mut both, problems);
+    if both != sentinel {
+        into.single_quote = both;
+        into.double_quote = both;
+    }
+    field(table, "single_quote", p, &mut into.single_quote, problems);
+    field(table, "double_quote", p, &mut into.double_quote, problems);
     field(table, "escape", p, &mut into.escape, problems);
     field(table, "operator", p, &mut into.operator, problems);
     field(table, "redirection", p, &mut into.redirection, problems);
@@ -224,7 +244,7 @@ mod tests {
         );
         // Untouched, and still the default rather than blank.
         assert_eq!(theme.pager.bg, Pager::default().bg);
-        assert_eq!(theme.syntax.quote, Syntax::default().quote);
+        assert_eq!(theme.syntax.single_quote, Syntax::default().single_quote);
     }
 
     #[test]
@@ -234,13 +254,14 @@ mod tests {
                                   error = { fg = '#ff0000', bold = true, underline = true } } }",
         );
         assert!(problems.is_empty(), "{problems:?}");
-        assert_eq!(
-            theme.syntax.quote,
-            Style::fg(Color::Basic {
-                index: 3,
-                bright: false
-            })
-        );
+        // `quote` still sets both halves, so a config written before they were split keeps
+        // meaning what it meant.
+        let yellow = Style::fg(Color::Basic {
+            index: 3,
+            bright: false,
+        });
+        assert_eq!(theme.syntax.single_quote, yellow);
+        assert_eq!(theme.syntax.double_quote, yellow);
         assert_eq!(theme.syntax.error.fg, Some(Color::Rgb(0xff, 0, 0)));
         assert!(theme.syntax.error.bold && theme.syntax.error.underline);
     }

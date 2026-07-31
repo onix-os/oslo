@@ -446,7 +446,7 @@ fn the_lexer_gives_every_span_its_role() {
 
     let want = [
         ("echo", Role::CommandWord),
-        ("\"a b\"", Role::Quote),
+        ("\"a b\"", Role::DoubleQuote),
         ("$HOME", Role::Variable),
         ("|", Role::Operator),
         // The word after a pipe is a command again, not an argument.
@@ -464,5 +464,8 @@ fn an_unterminated_quote_colours_the_rest_of_the_line() {
     use oslo::interactive::highlight::{Role, lex};
     let spans = lex("echo \"a b");
     let last = spans.last().unwrap();
-    assert_eq!((last.text.as_str(), last.role), ("\"a b", Role::Quote));
+    assert_eq!(
+        (last.text.as_str(), last.role),
+        ("\"a b", Role::DoubleQuote)
+    );
 }

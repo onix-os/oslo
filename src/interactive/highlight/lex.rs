@@ -21,10 +21,19 @@ pub enum Role {
     Keyword,
     /// Any other word. Still to be resolved into option/valid path/plain parameter.
     Word,
-    /// `'…'` or `"…"`, quotes included.
-    Quote,
+    /// `'…'`, quotes included. Literal throughout, so it is never split.
+    SingleQuote,
+    /// The literal parts of a `"…"` string. What expands inside it is lit separately.
+    DoubleQuote,
     /// A `\x` escape.
     Escape,
+    /// A glob metacharacter: `*`, `?`, `[…]`. Lit apart from the word it sits in, because whether
+    /// a word will expand is the thing you most want to know before pressing Enter.
+    Glob,
+    /// A bare number: `2` in `sleep 2`, `644` in `chmod 644`.
+    Number,
+    /// The `NAME=` of an assignment, without the value.
+    Assignment,
     /// `$name`, `${name}`, `$(…)`.
     Variable,
     /// `>`, `>>`, `2>`, `<`, `<<`, `<<<`, `&>`.
@@ -90,9 +99,22 @@ pub fn lex(line: &str) -> Vec<Span> {
             continue;
         }
 
-        if ch == '\'' || ch == '"' {
+        if ch == '\'' {
+            // Single quotes take nothing back: everything inside is literal, so it is one span.
             let len = quoted_len(rest, ch);
-            push(&mut spans, &rest[..len], Role::Quote);
+            push(&mut spans, &rest[..len], Role::SingleQuote);
+            i += len;
+            command_position = false;
+            continue;
+        }
+
+        if ch == '"' {
+            // A double-quoted string still expands, so the `$var` inside it is lit as a variable
+            // rather than swallowed by the string's colour. This is the single biggest difference
+            // between a shell prompt that looks syntax-aware and one that looks like a text box —
+            // `"$HOME/bin"` is two different things and should read as two.
+            let len = quoted_len(rest, ch);
+            push_double_quoted(&mut spans, &rest[..len]);
             i += len;
             command_position = false;
             continue;
@@ -149,7 +171,14 @@ pub fn lex(line: &str) -> Vec<Span> {
         } else {
             Role::Word
         };
-        push(&mut spans, word, role);
+        if role == Role::Word {
+            // An ordinary word is broken down further: a glob metacharacter, a bare number and
+            // the `NAME=` of an assignment each get their own colour, so `chmod 644 *.rs` reads
+            // as three different kinds of thing rather than one grey run.
+            push_word(&mut spans, word);
+        } else {
+            push(&mut spans, word, role);
+        }
         i += end;
         // A keyword does not consume the command position: `if grep …` still has `grep` as the
         // command. Nor does an assignment prefix.
@@ -167,6 +196,92 @@ fn starts_word(spans: &[Span]) -> bool {
             span.role,
             Role::Plain | Role::Operator | Role::End | Role::Redirection
         ),
+    }
+}
+
+/// Split an ordinary word into the parts worth colouring differently.
+///
+/// Globs first, because whether a word is going to *expand* is the thing you most want to know
+/// before pressing Enter — `rm *.rs` and `rm '*.rs'` differ by one character and by everything.
+fn push_word(spans: &mut Vec<Span>, word: &str) {
+    if let Some(eq) = assignment_split(word) {
+        push(spans, &word[..eq + 1], Role::Assignment);
+        if eq + 1 < word.len() {
+            push_word(spans, &word[eq + 1..]);
+        }
+        return;
+    }
+    if !word.is_empty() && word.bytes().all(|b| b.is_ascii_digit()) {
+        push(spans, word, Role::Number);
+        return;
+    }
+    let mut at = 0;
+    while at < word.len() {
+        let next = word[at..]
+            .find(['*', '?', '[', ']'])
+            .map(|n| at + n)
+            .unwrap_or(word.len());
+        if next > at {
+            push(spans, &word[at..next], Role::Word);
+        }
+        if next < word.len() {
+            let len = word[next..].chars().next().map(char::len_utf8).unwrap_or(1);
+            push(spans, &word[next..next + len], Role::Glob);
+            at = next + len;
+        } else {
+            at = next;
+        }
+    }
+}
+
+/// Where the `=` of a `NAME=value` word is, if it is one.
+///
+/// A *word*, not a command-position assignment: `--opt=value` and `FOO=bar` both read better with
+/// the name apart from the value, and the shell's own rule about which is an assignment is about
+/// where the word sits rather than how it looks.
+fn assignment_split(word: &str) -> Option<usize> {
+    let eq = word.find('=')?;
+    if eq == 0 {
+        return None;
+    }
+    let name = &word[..eq];
+    name.bytes()
+        .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
+        .then_some(eq)
+}
+
+/// Split a double-quoted string into its literal parts and the expansions inside it.
+fn push_double_quoted(spans: &mut Vec<Span>, text: &str) {
+    let mut at = 0;
+    let bytes = text.as_bytes();
+    while at < text.len() {
+        if bytes[at] == b'\\' {
+            // An escape inside a double quote hides the next character from expansion.
+            let len = text[at..]
+                .chars()
+                .take(2)
+                .map(char::len_utf8)
+                .sum::<usize>()
+                .max(1);
+            push(spans, &text[at..at + len], Role::Escape);
+            at += len;
+            continue;
+        }
+        if bytes[at] == b'$' {
+            let len = variable_len(&text[at..]);
+            if len > 1 {
+                push(spans, &text[at..at + len], Role::Variable);
+                at += len;
+                continue;
+            }
+        }
+        // Everything up to the next thing worth colouring, as one span.
+        let next = text[at + 1..]
+            .find(['$', '\\'])
+            .map(|n| at + 1 + n)
+            .unwrap_or(text.len());
+        push(spans, &text[at..next], Role::DoubleQuote);
+        at = next;
     }
 }
 
@@ -411,10 +526,15 @@ mod tests {
     /// error — deciding the line is incomplete is the validator's job, not the highlighter's.
     #[test]
     fn an_unclosed_quote_runs_to_the_end_rather_than_failing() {
-        assert_eq!(roles("echo 'abc")[1], ("'abc".into(), Role::Quote));
-        assert_eq!(roles("echo \"a b")[1], ("\"a b".into(), Role::Quote));
-        // A backslash inside double quotes escapes the quote that would have closed them.
-        assert_eq!(roles(r#"echo "a\"b""#)[1].0, r#""a\"b""#);
+        assert_eq!(roles("echo 'abc")[1], ("'abc".into(), Role::SingleQuote));
+        assert_eq!(roles("echo \"a b")[1], ("\"a b".into(), Role::DoubleQuote));
+        // A backslash inside double quotes escapes the quote that would have closed them. The
+        // string is split at the escape now, so the pieces are what to check.
+        let pieces: String = roles(r#"echo "a\"b""#)[1..]
+            .iter()
+            .map(|(text, _)| text.as_str())
+            .collect();
+        assert_eq!(pieces, r#""a\"b""#);
     }
 
     #[test]
