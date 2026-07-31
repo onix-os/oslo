@@ -240,7 +240,17 @@ fn build_editor(settings: &history::Settings) -> Repl {
         // Honoured for anything rustyline adds itself; `history::is_secret` covers the entries
         // this file adds by hand, which is all of them.
         .history_ignore_space(true)
-        .completion_type(rustyline::CompletionType::Circular)
+        // `List`, not `Circular`, and the reason is the dropdown.
+        //
+        // oslo's completer opens its own menu, waits for a choice, and returns that one candidate
+        // already decided. Under `Circular` rustyline then starts a *second* selection loop over
+        // that single candidate: it inserts it, waits for a key, and reads Tab as "next" — which
+        // with one candidate wraps to the index past the end, whose meaning is *restore the
+        // original line*. So accepting a completion and then pressing Tab silently deleted it.
+        //
+        // `List` applies a lone candidate and returns immediately, leaving Tab to start a fresh
+        // completion, which is what the menu having already asked makes correct.
+        .completion_type(rustyline::CompletionType::List)
         .build();
     Editor::with_config(config).expect("Failed to initialize line editor")
 }
