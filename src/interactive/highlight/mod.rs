@@ -27,6 +27,8 @@ pub enum TokenType {
     Keyword,
     /// A command name that resolves to nothing.
     Error,
+    /// A command that runs what follows it as another user.
+    Danger,
     Param,
     /// A parameter that names a file which exists.
     ValidPath,
@@ -57,6 +59,7 @@ impl TokenType {
             TokenType::Param => syntax.param,
             TokenType::ValidPath => syntax.valid_path,
             TokenType::Option => syntax.option,
+            TokenType::Danger => syntax.danger,
             TokenType::Glob => syntax.glob,
             TokenType::Number => syntax.number,
             TokenType::Assignment => syntax.assignment,
@@ -140,6 +143,14 @@ pub fn classify(spans: &[Span], ctx: &Context<'_>) -> Vec<(String, TokenType)> {
 }
 
 /// Which of the four "this is the thing being run" colours a command word takes.
+/// Commands that run what follows them as somebody else.
+///
+/// Deliberately short. Every entry here changes what every later word on the line is able to do,
+/// which is what earns the loudest colour in the theme; a list that also held `rm` and `dd` would
+/// spend that colour on things that are merely destructive, and a warning shown constantly is a
+/// warning nobody reads.
+const RUNS_AS_ANOTHER_USER: &[&str] = &["sudo", "doas", "su", "pkexec", "run0"];
+
 fn command_token(name: &str, ctx: &Context<'_>) -> TokenType {
     if name.is_empty() {
         return TokenType::Plain;
@@ -147,6 +158,12 @@ fn command_token(name: &str, ctx: &Context<'_>) -> TokenType {
     // A word still being typed is not yet wrong. Marking it red on the first keystroke and green
     // on the last makes the whole line flicker, which is what fish avoids by only colouring a
     // command once it is complete — here, once something resolves.
+    // Checked before anything else, and by name rather than by what it resolves to: the point is
+    // that the *rest of the line* runs as another user, which is true whether or not this machine
+    // happens to have the program installed. A `sudo` that does not resolve is still a warning.
+    if RUNS_AS_ANOTHER_USER.contains(&name) {
+        return TokenType::Danger;
+    }
     if (ctx.is_builtin)(name) {
         return TokenType::Builtin;
     }

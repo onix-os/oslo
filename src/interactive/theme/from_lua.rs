@@ -130,6 +130,10 @@ fn read_syntax(table: &crate::lua::eval::Table, into: &mut Syntax, problems: &mu
 
     field(table, "keyword", p, &mut into.keyword, problems);
     field(table, "error", p, &mut into.error, problems);
+    field(table, "danger", p, &mut into.danger, problems);
+    field(table, "glob", p, &mut into.glob, problems);
+    field(table, "number", p, &mut into.number, problems);
+    field(table, "assignment", p, &mut into.assignment, problems);
     field(table, "param", p, &mut into.param, problems);
     field(table, "valid_path", p, &mut into.valid_path, problems);
     field(table, "option", p, &mut into.option, problems);

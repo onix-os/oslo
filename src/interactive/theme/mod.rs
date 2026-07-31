@@ -88,6 +88,8 @@ pub struct Syntax {
     pub keyword: Style,
     /// A command name that resolves to nothing. fish's most useful colour.
     pub error: Style,
+    /// A command that runs what follows it as another user: `sudo`, `doas`, `su`.
+    pub danger: Style,
     pub param: Style,
     /// A parameter that names a file which exists.
     pub valid_path: Style,
@@ -115,12 +117,7 @@ pub struct Syntax {
 
 impl Default for Syntax {
     fn default() -> Self {
-        let basic = |index: u8| {
-            Style::fg(Color::Basic {
-                index,
-                bright: false,
-            })
-        };
+        let rgb = |r: u8, g: u8, b: u8| Style::fg(Color::Rgb(r, g, b));
         let bright = |index: u8| {
             Style::fg(Color::Basic {
                 index,
@@ -128,16 +125,28 @@ impl Default for Syntax {
             })
         };
         Syntax {
-            command: basic(2),
+            // **RGB, not the sixteen ANSI slots.** A palette tool like pywal remaps what
+            // `basic(2)` means, so a theme built on the slots changes colour whenever the wallpaper
+            // does. These are absolute: red stays red. Only the *syntax* palette is pinned this
+            // way — the prompt and pager deliberately keep the slots, so they still follow the
+            // terminal's scheme.
+            command: rgb(0x50, 0xfa, 0x7b),
             builtin: Style {
                 bold: true,
-                ..basic(2)
+                ..rgb(0x50, 0xfa, 0x7b)
             },
-            function: basic(2),
-            keyword: basic(5),
+            function: rgb(0x8b, 0xe9, 0xfd),
+            keyword: rgb(0xff, 0x79, 0xc6),
             error: Style {
                 underline: true,
-                ..basic(1)
+                ..rgb(0xff, 0x55, 0x55)
+            },
+            // A command that runs everything after it as another user. Black on red, because it
+            // is the one word in a line whose presence changes what every other word can do.
+            danger: Style {
+                bold: true,
+                bg: Some(Color::Rgb(0xff, 0x55, 0x55)),
+                ..rgb(0x00, 0x00, 0x00)
             },
             param: Style::default(),
             // Underline rather than a colour: it has to compose with whatever colour the
@@ -146,37 +155,29 @@ impl Default for Syntax {
                 underline: true,
                 ..Style::default()
             },
-            option: basic(6),
-            // Bright magenta: a glob is the one thing in a line that can turn one word into
-            // fifty, and it should be impossible to miss.
+            option: rgb(0xff, 0xb8, 0x6c),
+            // A glob is the one thing in a line that can turn one word into fifty, and it should
+            // be impossible to miss.
             glob: Style {
                 bold: true,
-                ..Style::fg(Color::Basic {
-                    index: 5,
-                    bright: true,
-                })
+                ..rgb(0xff, 0x79, 0xc6)
             },
-            number: Style::fg(Color::Basic {
-                index: 6,
-                bright: true,
-            }),
-            assignment: Style::fg(Color::Basic {
-                index: 2,
-                bright: true,
-            }),
+            number: rgb(0xbd, 0x93, 0xf9),
+            assignment: rgb(0x50, 0xfa, 0x7b),
             // Two yellows: a single-quoted string is inert and takes the plainer one, a
             // double-quoted one still expands and is brighter to say so.
-            single_quote: basic(3),
-            double_quote: Style::fg(Color::Basic {
-                index: 3,
-                bright: true,
-            }),
-            escape: basic(5),
-            operator: basic(6),
-            redirection: basic(4),
-            end: bright(0),
-            comment: bright(0),
-            variable: basic(4),
+            single_quote: rgb(0xd8, 0xdf, 0x6e),
+            double_quote: rgb(0xf1, 0xfa, 0x8c),
+            escape: rgb(0xff, 0x79, 0xc6),
+            operator: rgb(0x8b, 0xe9, 0xfd),
+            redirection: rgb(0xff, 0xb8, 0x6c),
+            end: rgb(0x62, 0x72, 0xa4),
+            comment: rgb(0x62, 0x72, 0xa4),
+            variable: rgb(0xbd, 0x93, 0xf9),
+            // The one exception to the RGB rule, and it is about *dimness* rather than hue: the
+            // ghost suggestion has to read as not-yet-text at every colour depth, and
+            // `#6272a4` degrades to plain white on a sixteen-colour terminal — which looks like
+            // something you typed. Bright black is the slot that is dim everywhere.
             autosuggestion: bright(0),
             match_bracket: Style {
                 bold: true,
