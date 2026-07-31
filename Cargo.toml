@@ -56,7 +56,7 @@ tracing-subscriber = "0.3"
 # brush's tokenizer takes the longest match and fuses them into the single `;;` that ends a `case`
 # item, so the arithmetic-for rule never sees the two `;` it asks for. That is a loud syntax error
 # rather than a wrong answer — see tests/differential/expected_fail.rs.
-brush-parser = { git = "https://github.com/bresilla/brush", branch = "fix/comment-after-odd-blanks-in-subst" }
+brush-parser = { git = "https://github.com/bresilla/brush", branch = "oslo-integration" }
 
 [dev-dependencies]
 tempfile = "3.17"

@@ -85,7 +85,7 @@ dependencies = [
 [[package]]
 name = "brush-parser"
 version = "0.4.0"
-source = "git+https://github.com/bresilla/brush?branch=fix%2Fcomment-after-odd-blanks-in-subst#edbe7775a03e355309d2f73708e783de281164bf"
+source = "git+https://github.com/bresilla/brush?branch=oslo-integration#b7d8c541f1b55f4746173300a177919ae99b049f"
 dependencies = [
  "bon",
  "cached",
