@@ -10,6 +10,7 @@ pub mod dropdown;
 pub mod frecency_store;
 pub mod highlight;
 mod hinting;
+pub mod keys;
 pub mod prompt;
 pub mod settings;
 pub mod spec;

@@ -1,0 +1,47 @@
+//! Applying `oslo.keys` to the line editor.
+//!
+//! Split from `repl` because it is the one place the editor's key map is touched, and because the
+//! language toggle needs a different kind of binding from everything else: rustyline has no
+//! command that hands control back to the caller, so the toggle is a conditional handler that sets
+//! a flag the loop reads.
+
+use super::mode::{self, ToggleRequest};
+use super::repl::Repl;
+use oslo::Environment;
+use std::sync::{Arc, Mutex};
+
+/// Apply `oslo.keys`, plus the language toggle.
+///
+/// The toggle is bound last so a config that puts something else on the same key wins: the config
+/// is a later, more specific statement than the default.
+pub fn apply(rl: &mut Repl, env_struct: &Arc<Mutex<Environment>>, toggle: &ToggleRequest) {
+    let settings = oslo::interactive::settings::current();
+    let (bindings, problems) = oslo::interactive::keys::resolve(&settings.keys);
+    for problem in problems {
+        eprintln!("oslo: {problem}");
+    }
+
+    let mut toggle_bound = false;
+    for (event, action) in bindings {
+        match action.command() {
+            Some(command) => {
+                rl.bind_sequence(event, rustyline::EventHandler::Simple(command));
+            }
+            // The toggle hands control back to this loop, which no editor command can do.
+            None => {
+                rl.bind_sequence(
+                    event,
+                    rustyline::EventHandler::Conditional(Box::new(toggle.clone())),
+                );
+                toggle_bound = true;
+            }
+        }
+    }
+
+    if !toggle_bound && let Some(key) = mode::toggle_key(&env_struct.lock().unwrap()) {
+        rl.bind_sequence(
+            key,
+            rustyline::EventHandler::Conditional(Box::new(toggle.clone())),
+        );
+    }
+}

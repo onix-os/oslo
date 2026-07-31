@@ -237,32 +237,68 @@ Most of the right-hand column above does not exist yet. `oslo.alias`, `oslo.set_
 
 ---
 
+## Built
+
+| Decision | Where |
+|---|---|
+| `~/.oslorc` is Lua | `startup/lua_init.rs`; `rc.rs` no longer sources it. Search order: `$XDG_CONFIG_HOME/oslo/config.lua`, `…/config`, `~/.oslorc` — first that exists |
+| Lua theme table | `interactive/theme/` — roles, colour parsing (name/hex/256), degradation to 256/16/none, merge-not-replace reading with per-path diagnostics |
+| Badges, no icons | `dropdown/render.rs` — kind as a coloured pill, column-aligned; the emoji icons are gone |
+| Match highlighting | The typed prefix in the match colour, case-insensitively, on a character boundary |
+| Syntax to fish's depth | `interactive/highlight/` — 16 token types, split into a lexer (no disk) and a classifier (needs the shell) |
+| Autosuggestions | history → completion → path, order from `oslo.suggest.sources` |
+| Prompt | `oslo.prompt.left/right/continuation`, plus `oslo.style`, `oslo.git.branch/root`, `oslo.path.shorten/home` |
+| Right prompt | Drawn from the *highlighter*, verified on a real pty |
+| Settings | `interactive/settings.rs` — `oslo.completion`, `oslo.suggest`, `oslo.history`, `oslo.keys` |
+| Keys | `interactive/keys.rs` — named keys and named actions, both reported when unreadable |
+
+### The right prompt, resolved
+
+The plan called it *a hypothesis, not a plan*, and the first attempt was wrong. Putting the right
+prompt in the **prompt string** corrupts rustyline's cursor arithmetic: it counts a CSI sequence as
+zero width but has no idea that `\x1b[76G` *moves* the cursor, so the right prompt's own characters
+get added to the column it thinks the line starts at. Measured, a six-cell prompt came out as
+eleven.
+
+The seam that works is the **highlighter**. `compute_layout` measures the raw line and never the
+string `highlight` returns, so a cursor move there costs nothing; and `refresh_line` clears the old
+rows *before* it writes and never after, so the drawing survives each redraw. Verified under a pty:
+
+```
+L> ^[[1;32mecho^[[0m ^[7^[[76GRIGHT^[8^[[90mhi^[[0m ^M^[[8C
+```
+
+The cursor lands at column 8 — correct for `L> ` plus `echo h` — so the right prompt did not
+disturb it, and the ghost hint still draws at the cursor.
+
+## Settled provisionally
+
+The goal was to implement the plan, not to re-open it, so the questions below were answered the
+least-surprising way and are **free to change**. None of them was a maintainer decision.
+
+1. **`$ENV` stays POSIX shell.** POSIX defines it as shell syntax and oslo has to be a real
+   `/bin/sh`; `~/.oslorc` going Lua does not change what `$ENV` is.
+2. **`init.lua` is gone**, not kept as a fallback — the project rule is no legacy shims, and
+   `~/.config/oslo/config.lua` is the same place under a name that matches the others.
+3. **Config is interactive-only**, as bash's rc is. A theme has nothing to do in a script.
+4. **`valid_path` is capped at 8 lookups per line** and off past 512 characters, rather than
+   cached: the answer changes when the filesystem does, and nothing watches that.
+5. **Colour degradation is automatic** from `$COLORTERM`/`$TERM`, with `$NO_COLOR` winning.
+6. **A theme value may be** `"green"`, `"#61ffca"`, `"240"`, or a table with
+   `fg`/`bg`/`bold`/`dim`/`italic`/`underline`/`reverse`.
+7. **`oslo.theme` merges.** Naming one colour keeps the other forty.
+
 ## Open
 
 Not decided. Each changes what gets built.
 
-1. **POSIX `$ENV`.** POSIX says an interactive shell sources `$ENV`, and it is shell syntax by
-   definition. oslo has to be a real `/bin/sh`. Does `$ENV` survive as the shell-syntax hook while
-   `~/.oslorc` is Lua, or does the shell-syntax path go entirely?
-2. **`~/.config/oslo/init.lua`.** It exists and is already Lua. Does it become
-   `$XDG_CONFIG_HOME/oslo/config`, stay as a second file, or get read as a fallback? If more than
-   one exists, which wins, and is it "first found" or "all of them, in order"?
-3. **Non-interactive shells.** bash reads no rc for `sh -c`. Does `~/.oslorc` load for `-c` and for
-   scripts, or only at a prompt? A Lua config that sets a theme has nothing to do in a script, but
-   one that defines aliases does.
-4. **The right prompt is not free.** rustyline has no support for it, and it repaints from the
-   prompt to end-of-line on every keystroke, which erases anything drawn to the right. The one
-   seam that survives a repaint is the `highlight(line, pos)` hook, whose return value rustyline
-   redraws each time — a right prompt could be appended there with save-cursor / move-to-column /
-   restore. **That is a hypothesis, not a plan.** It has to be proved on a real terminal before
-   the API is advertised, because advertising a prompt that flickers or eats the line is worse
-   than not having one. Whether to spend that before or after the rest of the round is open.
-5. **`valid_path` costs a `stat` per parameter per keystroke.** fish does it. oslo's command index
-   exists precisely because a `$PATH` walk per keystroke was too slow. The same question applies
-   here and the answer is probably a cache, but it needs measuring rather than assuming.
-6. **What a theme value may be.** `"green"`, `"#61ffca"`, `{fg=…, bg=…, bold=…, underline=…}` —
-   and what happens on a terminal that has 16 colours rather than 24-bit. Fish degrades; oslo has
-   no policy.
-7. **Whether `oslo.theme` is assign-once or merge.** Setting `oslo.theme = {syntax = {…}}` in a
-   config would drop every pager colour if it replaces rather than merges. Fish has no such
-   problem because its variables are flat.
+Still genuinely undone, rather than decided one way:
+
+1. **`oslo.completion.for_command`** — a Lua completion for one command. The dropdown reads its
+   candidates from Rust only; there is no hook for a config to add its own.
+2. **`oslo.completion.sources` and `.sort`** are read but not acted on. `case_sensitive` likewise.
+3. **`oslo.history` is read but not wired** to the editor: `size` and `file` still come from
+   `$HISTSIZE` and `$HISTFILE`.
+4. **`oslo.suggest.accept` / `.accept_word`** — the keys that take a suggestion are bindable
+   through `oslo.keys`, but not under those names.
+5. **Abbreviations** remain out of scope, as decided.

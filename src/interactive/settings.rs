@@ -16,6 +16,12 @@ pub struct Settings {
     pub completion: Completion,
     pub suggest: Suggest,
     pub history: History,
+    /// `oslo.keys`: key name to action name, both as written.
+    ///
+    /// Kept as strings rather than resolved here because binding needs rustyline types, and this
+    /// module is meant to be readable without one. [`super::keys`] turns them into bindings and
+    /// reports the ones it does not recognise.
+    pub keys: Vec<(String, String)>,
 }
 
 /// `oslo.completion`.
@@ -158,6 +164,23 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
         }
     }
 
+    if let Value::Table(table) = oslo.get(&Value::str("keys")) {
+        for (key, action) in table.borrow().pairs() {
+            match (&key, &action) {
+                (Value::Str(key), Value::Str(action)) => {
+                    settings.keys.push((key.to_string(), action.to_string()));
+                }
+                _ => problems.push(
+                    "oslo.keys: every entry must be a key name mapped to an action name"
+                        .to_string(),
+                ),
+            }
+        }
+        // Table iteration has no order, and a binding that depends on which of two entries was
+        // applied last is one that behaves differently between runs.
+        settings.keys.sort();
+    }
+
     if let Value::Table(table) = oslo.get(&Value::str("history")) {
         let table = table.borrow();
         if let Some(n) = number(&table, "size") {
@@ -270,6 +293,23 @@ mod tests {
         assert_eq!(tiny.completion.max_rows, 1);
         let (huge, _) = settings_from("oslo = { completion = { max_rows = 9999 } }");
         assert_eq!(huge.completion.max_rows, super::super::dropdown::MAX_ROWS);
+    }
+
+    #[test]
+    fn key_bindings_are_read_in_a_stable_order() {
+        let (settings, problems) = settings_from(
+            "oslo = { keys = { ['ctrl-l'] = 'clear-screen', ['shift-tab'] = 'toggle-language' } }",
+        );
+        assert!(problems.is_empty(), "{problems:?}");
+        // Sorted, because table iteration has no order and a binding that depends on it would
+        // behave differently between runs.
+        assert_eq!(
+            settings.keys,
+            vec![
+                ("ctrl-l".to_string(), "clear-screen".to_string()),
+                ("shift-tab".to_string(), "toggle-language".to_string()),
+            ]
+        );
     }
 
     #[test]

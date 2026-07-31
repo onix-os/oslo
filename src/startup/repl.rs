@@ -7,7 +7,7 @@
 use crate::absorb_loop_control;
 use crate::expand_history;
 use crate::startup::mode::{Line, Mode, ToggleRequest};
-use crate::startup::{config, history, lua_init, mode, prompt, rc};
+use crate::startup::{config, history, keybind, lua_init, mode, prompt, rc};
 use oslo::Environment;
 use oslo::LuaEngine;
 use oslo::env::builtins::run_exit_trap;
@@ -22,7 +22,7 @@ use rustyline::{Editor, history::FileHistory};
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
-type Repl = Editor<OsloHelper, FileHistory>;
+pub type Repl = Editor<OsloHelper, FileHistory>;
 
 /// One trip round the prompt.
 enum Input {
@@ -91,12 +91,7 @@ pub fn run_repl() -> ! {
     // session: switching language is a property of the session, not of one line.
     let mut current = mode::starting_mode(&env_struct.lock().unwrap());
     let toggle = ToggleRequest::new();
-    if let Some(key) = mode::toggle_key(&env_struct.lock().unwrap()) {
-        rl.bind_sequence(
-            key,
-            rustyline::EventHandler::Conditional(Box::new(toggle.clone())),
-        );
-    }
+    keybind::apply(&mut rl, &env_struct, &toggle);
 
     let mut helper = OsloHelper::new(Arc::clone(&env_struct));
     // R9.10 needs a real `PS2`, and rustyline draws no prompt on a continuation row of its own
