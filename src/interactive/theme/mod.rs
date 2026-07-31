@@ -294,6 +294,9 @@ pub struct Prompt {
     pub git: Style,
     pub ok: Style,
     pub failed: Style,
+    /// The clock and the duration in the right prompt. Dim on purpose: they are there to be
+    /// glanced at, not read, and a right prompt that competes with the command is a nuisance.
+    pub aside: Style,
 }
 
 impl Default for Prompt {
@@ -317,6 +320,10 @@ impl Default for Prompt {
             failed: Style {
                 bold: true,
                 ..basic(1)
+            },
+            aside: Style {
+                dim: true,
+                ..basic(7)
             },
         }
     }

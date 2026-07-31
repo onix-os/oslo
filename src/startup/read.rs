@@ -68,10 +68,15 @@ pub(super) fn read_command(
         // The right prompt is handed to the helper rather than concatenated: it is drawn from
         // the highlighter, which is the only place a cursor move does not confuse rustyline.
         if let Some(helper) = rl.helper() {
-            helper.set_right_prompt(
-                lua.render("prompt.right"),
-                oslo::interactive::prompt::printed_width(&prompt),
-            );
+            // A config's own right prompt wins; otherwise oslo draws one. There used to be none at
+            // all unless a config asked, which meant the machinery existed and nobody saw it.
+            let right = lua.render("prompt.right").or_else(|| {
+                Some(oslo::interactive::prompt::render_default_right_prompt(
+                    last_status,
+                    super::repl::last_command_duration(),
+                ))
+            });
+            helper.set_right_prompt(right, oslo::interactive::prompt::printed_width(&prompt));
         }
 
         // Written before the prompt rather than inside it, for the same reason the right prompt is

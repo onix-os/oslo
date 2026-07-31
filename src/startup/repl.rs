@@ -171,6 +171,7 @@ pub fn run_repl() -> ! {
                 print!("{}", oslo::interactive::marks::output_start());
                 let _ = std::io::Write::flush(&mut std::io::stdout());
                 let before = current_directory();
+                let started = std::time::Instant::now();
 
                 let res = match mode {
                     // A Lua line leaves `$?` where it was unless it asked otherwise: `oslo.exit`
@@ -208,6 +209,7 @@ pub fn run_repl() -> ! {
                 if after != before {
                     lua.fire_hook("cd", vec![LuaEngine::hook_arg(&after)]);
                 }
+                note_command_duration(started.elapsed());
                 // The command is over and its status is known: close the block before anything
                 // else prints, so nothing that follows lands inside it.
                 print!(
@@ -329,6 +331,24 @@ fn remember(rl: &mut Repl, file: &Option<PathBuf>, text: &str, secret: bool) {
     {
         eprintln!("oslo: {}: {}", path.display(), e);
     }
+}
+
+thread_local! {
+    /// How long the command before this prompt took, for the right prompt to mention.
+    ///
+    /// Thread-local rather than threaded through `read_command`: the duration is a property of the
+    /// session's last command, and every caller that wants it is on the REPL's own thread.
+    static LAST_DURATION: std::cell::Cell<Option<std::time::Duration>> =
+        const { std::cell::Cell::new(None) };
+}
+
+/// How long the last command took, if one has run.
+pub(super) fn last_command_duration() -> Option<std::time::Duration> {
+    LAST_DURATION.get()
+}
+
+fn note_command_duration(elapsed: std::time::Duration) {
+    LAST_DURATION.set(Some(elapsed));
 }
 
 pub(super) fn history_entries(rl: &Repl) -> Vec<String> {

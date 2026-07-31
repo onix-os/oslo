@@ -14,6 +14,7 @@
 use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 
 use super::theme;
 
@@ -112,6 +113,77 @@ pub fn render_default_left_prompt(last_status: i32) -> String {
     out.push_str(&arrow.paint("❯", depth));
     out.push(' ');
     out
+}
+
+/// A duration worth mentioning, or `None`.
+///
+/// Short commands are the overwhelming majority and saying `3ms` after each of them is noise, so
+/// nothing is shown below the threshold. The number that *is* shown is the one you would have
+/// wanted before you knew you wanted it — which is the whole argument for a duration in a prompt
+/// rather than a `time` you have to remember to type.
+fn notable_duration(elapsed: Duration) -> Option<String> {
+    const WORTH_SAYING: Duration = Duration::from_millis(500);
+    if elapsed < WORTH_SAYING {
+        return None;
+    }
+    let secs = elapsed.as_secs_f64();
+    Some(if secs < 60.0 {
+        format!("{secs:.1}s")
+    } else {
+        let whole = elapsed.as_secs();
+        format!("{}m{:02}s", whole / 60, whole % 60)
+    })
+}
+
+/// The clock, as `HH:MM`, from the system time.
+///
+/// Computed by hand rather than pulled from a date library: the shell needs four digits and a
+/// colon, and a dependency that knows about leap seconds and the Gregorian calendar is a great
+/// deal of machinery for that. The offset from UTC comes from `$TZ`-aware `localtime` only if one
+/// is available; without it this is UTC, which is stated rather than hidden.
+fn clock() -> String {
+    let secs = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0) as i64;
+    let local = secs + local_offset_seconds();
+    let minutes = local.rem_euclid(86400) / 60;
+    format!("{:02}:{:02}", minutes / 60, minutes % 60)
+}
+
+/// Seconds east of UTC, via `localtime_r`, or zero when it cannot be asked.
+fn local_offset_seconds() -> i64 {
+    let now = unsafe { nix::libc::time(std::ptr::null_mut()) };
+    let mut tm: nix::libc::tm = unsafe { std::mem::zeroed() };
+    // Safety: `localtime_r` writes one `tm` through the pointer, which is a live local, and reads
+    // one `time_t` through the other.
+    let result = unsafe { nix::libc::localtime_r(&now, &mut tm) };
+    if result.is_null() { 0 } else { tm.tm_gmtoff }
+}
+
+/// The right prompt oslo draws when a config has not asked for its own.
+///
+/// It shows what the left prompt cannot: the *number* behind a failing status — the left arrow only
+/// goes red — how long the last command took when that is worth saying, and the time. A successful,
+/// quick command leaves only the clock, so the line stays quiet until it has something to report.
+pub fn render_default_right_prompt(last_status: i32, elapsed: Option<Duration>) -> String {
+    let theme = theme::current();
+    let depth = theme::depth();
+    let mut parts = Vec::new();
+
+    if last_status != 0 {
+        parts.push(
+            theme
+                .prompt
+                .failed
+                .paint(&format!("✘ {last_status}"), depth),
+        );
+    }
+    if let Some(took) = elapsed.and_then(notable_duration) {
+        parts.push(theme.prompt.aside.paint(&took, depth));
+    }
+    parts.push(theme.prompt.aside.paint(&clock(), depth));
+    parts.join(&theme.prompt.aside.paint("  ", depth))
 }
 
 /// The escape that draws a right prompt, or empty when there is no room for one.
@@ -244,5 +316,69 @@ mod tests {
         assert_eq!(right_prompt_escape("", 0, 80), "");
         // With room, it is drawn.
         assert!(!right_prompt_escape("12:34", 10, 80).is_empty());
+    }
+}
+
+#[cfg(test)]
+mod right_prompt_tests {
+    use super::{notable_duration, render_default_right_prompt};
+    use std::time::Duration;
+
+    /// Short commands are the overwhelming majority; saying `3ms` after each is noise.
+    #[test]
+    fn only_a_duration_worth_saying_is_said() {
+        assert_eq!(notable_duration(Duration::from_millis(3)), None);
+        assert_eq!(notable_duration(Duration::from_millis(499)), None);
+        assert_eq!(
+            notable_duration(Duration::from_millis(1300)).as_deref(),
+            Some("1.3s")
+        );
+        assert_eq!(
+            notable_duration(Duration::from_secs(75)).as_deref(),
+            Some("1m15s")
+        );
+    }
+
+    /// A quick success leaves only the clock — the line stays quiet until it has something to
+    /// report. A failure shows the *number*, which the left prompt's arrow cannot.
+    #[test]
+    fn the_right_prompt_reports_only_what_is_worth_reporting() {
+        let quiet = plain(&render_default_right_prompt(
+            0,
+            Some(Duration::from_millis(3)),
+        ));
+        assert!(!quiet.contains('✘'), "{quiet:?}");
+        assert!(
+            !quiet.contains('s'),
+            "no duration for a quick command: {quiet:?}"
+        );
+        assert_eq!(quiet.trim().len(), 5, "just HH:MM: {quiet:?}");
+
+        let failed = plain(&render_default_right_prompt(7, None));
+        assert!(failed.contains("✘ 7"), "{failed:?}");
+
+        let slow = plain(&render_default_right_prompt(
+            0,
+            Some(Duration::from_secs(3)),
+        ));
+        assert!(slow.contains("3.0s"), "{slow:?}");
+    }
+
+    /// Strip the styling, leaving what is on screen.
+    fn plain(text: &str) -> String {
+        let mut out = String::new();
+        let mut chars = text.chars();
+        while let Some(c) = chars.next() {
+            if c == '\x1b' {
+                for c in chars.by_ref() {
+                    if c.is_ascii_alphabetic() {
+                        break;
+                    }
+                }
+            } else {
+                out.push(c);
+            }
+        }
+        out
     }
 }
