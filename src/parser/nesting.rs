@@ -69,7 +69,18 @@ const MAX_UNMATCHED_OPENERS: usize = 16;
 /// So the allowance grows with the input: strict where the hang was measured, generous where the
 /// approximation is unreliable and the hang is not a realistic risk.
 fn unmatched_allowance(input: &str) -> usize {
-    MAX_UNMATCHED_OPENERS + input.len() / 1024
+    // One extra opener per 256 bytes, not per 1024. The rate is set by the *approximation's* error
+    // rate, which is what grows with the file, and 1024 was too tight to hold: modernish's
+    // `posparam.t` — 16 KB of shell that bash and dash both run — scanned as 40 unmatched against
+    // an allowance of 31, and was refused. That is the sixth false positive this guard has
+    // produced on a real script, and every one was found by running something rather than by a
+    // test.
+    //
+    // It does not weaken what the guard is for. The backtracking blowup was measured on *short*
+    // pathological input — 25 unclosed `(` in 26 bytes costs 15.9 s — and at 256 bytes per opener
+    // that input still gets an allowance of 16. A file large enough for this to matter is one the
+    // parser is making progress through rather than backtracking over.
+    MAX_UNMATCHED_OPENERS + input.len() / 256
 }
 
 /// Refuse input whose nesting would overflow the stack inside the parser, or whose unmatched
@@ -330,7 +341,9 @@ fn next_is_command_position(c: char, word: &str, was_cmd_pos: bool) -> bool {
 #[cfg(test)]
 mod tests {
     use super::heredoc::{heredoc_delimiters, strip_heredoc_bodies};
-    use super::{MAX_INPUT_NESTING, MAX_UNMATCHED_OPENERS, check_nesting, scan_nesting};
+    use super::{
+        MAX_INPUT_NESTING, MAX_UNMATCHED_OPENERS, check_nesting, scan_nesting, unmatched_allowance,
+    };
 
     fn max_nesting_depth(input: &str) -> usize {
         scan_nesting(input).max_depth
@@ -433,7 +446,6 @@ mod tests {
     /// The A2 hang: 25 unmatched `(` made brush backtrack for minutes at 100% CPU.
     #[test]
     fn unmatched_openers_are_refused_before_the_parser_backtracks() {
-        let n = MAX_UNMATCHED_OPENERS + 1;
         for opener in [
             "(",
             "{ ",
@@ -441,6 +453,15 @@ mod tests {
             "while true; do ",
             "case $x in ",
         ] {
+            // One more than *this script's* allowance, not one more than the floor. The allowance
+            // grows with the input, so a long opener repeated enough times pays for its own extra
+            // room — `while true; do ` seventeen times is 256 bytes, which buys exactly one. The
+            // contract under test is "more than the allowance is refused", so the test has to ask
+            // for the allowance rather than assume the floor.
+            let mut n = MAX_UNMATCHED_OPENERS + 1;
+            while n <= unmatched_allowance(&format!("{}x", opener.repeat(n))) {
+                n += 1;
+            }
             let script = format!("{}x", opener.repeat(n));
             assert_eq!(unmatched(&script), n, "{script}");
             let err = check_nesting(&script).expect_err("must be refused");
