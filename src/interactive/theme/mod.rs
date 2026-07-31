@@ -118,12 +118,6 @@ pub struct Syntax {
 impl Default for Syntax {
     fn default() -> Self {
         let rgb = |r: u8, g: u8, b: u8| Style::fg(Color::Rgb(r, g, b));
-        let bright = |index: u8| {
-            Style::fg(Color::Basic {
-                index,
-                bright: true,
-            })
-        };
         Syntax {
             // **RGB, not the sixteen ANSI slots.** A palette tool like pywal remaps what
             // `basic(2)` means, so a theme built on the slots changes colour whenever the wallpaper
@@ -174,11 +168,11 @@ impl Default for Syntax {
             end: rgb(0x62, 0x72, 0xa4),
             comment: rgb(0x62, 0x72, 0xa4),
             variable: rgb(0xbd, 0x93, 0xf9),
-            // The one exception to the RGB rule, and it is about *dimness* rather than hue: the
-            // ghost suggestion has to read as not-yet-text at every colour depth, and
-            // `#6272a4` degrades to plain white on a sixteen-colour terminal — which looks like
-            // something you typed. Bright black is the slot that is dim everywhere.
-            autosuggestion: bright(0),
+            // Colour 238, an explicit index rather than the bright-black slot: a ghost has to
+            // sit *behind* the text you are typing, and asking for a specific grey is the only way
+            // to say how far behind. It degrades to bright black on a sixteen-colour terminal,
+            // which keeps it dim there too.
+            autosuggestion: Style::fg(Color::Indexed(238)),
             match_bracket: Style {
                 bold: true,
                 ..Style::default()

@@ -424,11 +424,21 @@ fn an_empty_line_carries_the_right_prompt_and_nothing_else() {
 }
 
 #[test]
-fn a_ghost_hint_is_drawn_dim() {
-    // Whatever the theme calls `autosuggestion`; the default is bright black.
-    oslo::interactive::theme::set_depth(oslo::interactive::theme::Depth::Ansi16);
+fn a_ghost_hint_is_drawn_in_the_autosuggestion_colour() {
     let h = helper(Environment::new());
-    assert_eq!(h.highlight_hint("lo world"), "\x1b[90mlo world\x1b[0m");
+
+    // Colour 238 where the terminal can say it, which is the default.
+    oslo::interactive::theme::set_depth(oslo::interactive::theme::Depth::Ansi256);
+    assert_eq!(
+        h.highlight_hint("lo world"),
+        "\x1b[38;5;238mlo world\x1b[0m"
+    );
+
+    // On sixteen colours it degrades to whatever grey is nearest. Pinned rather than left
+    // implicit, because naming an exact grey means accepting whatever the sixteen-slot palette
+    // rounds it to.
+    oslo::interactive::theme::set_depth(oslo::interactive::theme::Depth::Ansi16);
+    assert_eq!(h.highlight_hint("lo world"), "\x1b[37mlo world\x1b[0m");
 }
 
 /// The lexer is the half that needs no shell, so it is the half an integration test can pin
