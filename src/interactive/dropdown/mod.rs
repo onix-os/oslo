@@ -115,6 +115,8 @@ impl DropdownMenu {
         let _ = tcsetattr(&stdin, SetArg::TCSANOW, &raw_termios);
 
         let mut stdout = io::stdout();
+        // Rows currently reserved below the prompt. See the comment in the loop.
+        let mut reserved = 0usize;
 
         let selected = loop {
             // The width is re-queried every frame: the terminal can be resized while the menu is
@@ -127,16 +129,21 @@ impl DropdownMenu {
                 terminal_cols(),
                 typed,
             );
-            let _ = write!(stdout, "{}", rendered);
+            // **Reserve the rows before drawing into them.** Drawing first and walking back up
+            // afterwards is what ate the prompt: near the bottom of the screen the newlines make
+            // the terminal *scroll*, so the cursor ends up fewer rows down than were printed, and
+            // moving up by the full count lands above the prompt — where the erase then removes
+            // it. Pressing the arrow keys made it worse each frame.
+            //
+            // Printing the newlines first makes any scroll happen while the cursor is still ours
+            // to account for: after moving back up the same number, the prompt is wherever the
+            // scroll left it, and every frame after this one is a redraw in place.
+            let _ = write!(stdout, "{}", reserve_rows(num_lines, &mut reserved));
+            let _ = write!(stdout, "{}", draw_below(&rendered));
             let _ = stdout.flush();
 
             let mut buf = [0u8; 3];
             let n = io::stdin().read(&mut buf).unwrap_or(0);
-
-            // Walk back over the *physical* rows the dropdown occupied, then erase below the
-            // prompt. `num_lines` already accounts for any wrapping.
-            let _ = write!(stdout, "\x1b[{}A\r\x1b[J", num_lines);
-            let _ = stdout.flush();
 
             if n == 0 {
                 break None;
@@ -179,7 +186,95 @@ impl DropdownMenu {
             }
         };
 
+        // Erase what was drawn, from one row below the prompt to the end of the screen. `\x1b[B`
+        // rather than a newline: the reserved rows already exist, and a newline at the bottom of
+        // the screen would scroll again.
+        let _ = write!(stdout, "{}", erase_below(reserved));
+        let _ = stdout.flush();
+
         let _ = tcsetattr(&stdin, SetArg::TCSANOW, &orig_termios);
         selected
+    }
+}
+
+/// Make room below the prompt for `wanted` rows, given how many are already reserved.
+///
+/// **This is the fix for the menu eating the prompt.** The old loop drew first and walked back up
+/// afterwards; near the bottom of the screen the newlines make the terminal *scroll*, so the
+/// cursor ends up fewer rows down than were printed and moving up by the full count lands above
+/// the prompt — where the erase then removes it. Holding an arrow key made it worse every frame.
+///
+/// Printing the newlines *first* makes any scroll happen while the cursor is still ours to
+/// account for: moving back up the same number returns to the prompt wherever the scroll left it,
+/// and every frame after that is a redraw into rows that already exist.
+fn reserve_rows(wanted: usize, reserved: &mut usize) -> String {
+    if wanted <= *reserved {
+        return String::new();
+    }
+    let extra = wanted - *reserved;
+    *reserved = wanted;
+    format!("{}\x1b[{extra}A", "\n".repeat(extra))
+}
+
+/// Draw `rendered` below the cursor and come back to it. No arithmetic to get wrong.
+fn draw_below(rendered: &str) -> String {
+    format!("\x1b7{rendered}\x1b8")
+}
+
+/// Erase everything from one row below the prompt to the end of the screen.
+///
+/// `\x1b[B` rather than a newline: the reserved rows already exist, and a newline at the bottom of
+/// the screen would scroll again — which is the whole class of bug this avoids.
+fn erase_below(reserved: usize) -> String {
+    if reserved == 0 {
+        return String::new();
+    }
+    "\x1b7\x1b[B\r\x1b[J\x1b8".to_string()
+}
+
+#[cfg(test)]
+mod frame_tests {
+    use super::*;
+
+    /// The rows are reserved before anything is drawn into them, and only the shortfall is added.
+    #[test]
+    fn rows_are_reserved_once_and_only_grown() {
+        let mut reserved = 0;
+        // Four rows: print four newlines, then come back up four.
+        assert_eq!(reserve_rows(4, &mut reserved), "\n\n\n\n\x1b[4A");
+        assert_eq!(reserved, 4);
+        // The same height again asks for nothing: the rows are already there.
+        assert_eq!(reserve_rows(4, &mut reserved), "");
+        // A taller menu adds only the difference.
+        assert_eq!(reserve_rows(6, &mut reserved), "\n\n\x1b[2A");
+        assert_eq!(reserved, 6);
+        // A shorter one keeps what it has rather than giving rows back, which would scroll again.
+        assert_eq!(reserve_rows(2, &mut reserved), "");
+        assert_eq!(reserved, 6);
+    }
+
+    /// Every frame is drawn between a save and a restore, so the cursor ends where it started and
+    /// no count has to be right for the prompt to survive.
+    #[test]
+    fn a_frame_saves_and_restores_rather_than_counting_rows_back() {
+        let frame = draw_below("ROWS");
+        assert!(frame.starts_with("\x1b7"), "{frame:?}");
+        assert!(frame.ends_with("\x1b8"), "{frame:?}");
+        assert!(frame.contains("ROWS"));
+        // The old approach walked back up by a row count. Nothing does that any more.
+        assert!(
+            !frame.contains("A"),
+            "a cursor-up count survived: {frame:?}"
+        );
+    }
+
+    #[test]
+    fn erasing_moves_down_a_row_rather_than_printing_a_newline() {
+        let erase = erase_below(3);
+        assert!(erase.contains("\x1b[B"), "{erase:?}");
+        assert!(!erase.contains('\n'), "a newline would scroll: {erase:?}");
+        assert!(erase.contains("\x1b[J"), "{erase:?}");
+        // Nothing was drawn, so there is nothing to erase.
+        assert_eq!(erase_below(0), "");
     }
 }

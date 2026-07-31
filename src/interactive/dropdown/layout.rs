@@ -8,10 +8,10 @@ use super::CompletionCandidate;
 use super::width::{FALLBACK_COLS, display_width};
 
 /// Cells an item row spends on chrome when it has a description column:
-/// `│` ` ` ` ▶ ` label ` ` ` ` desc ` ` ` ` `│`.
-pub(super) const OVERHEAD_WITH_DESC: usize = 10;
-/// Cells an item row spends on chrome without one: `│` ` ` ` ▶ ` label ` ` ` ` `│`.
-pub(super) const OVERHEAD_NO_DESC: usize = 8;
+/// ` ▶ ` label `  ` desc ` `. There is no border; the row's background is what marks it out.
+pub(super) const OVERHEAD_WITH_DESC: usize = 6;
+/// Cells an item row spends on chrome without one: ` ▶ ` label ` `.
+pub(super) const OVERHEAD_NO_DESC: usize = 4;
 /// A label column narrower than this is not worth drawing; drop the description instead.
 const MIN_LABEL_COLS: usize = 6;
 /// A description column narrower than this says nothing; drop the column instead.
@@ -225,7 +225,9 @@ mod tests {
         // A genuinely tiny terminal keeps the label and gives up the description entirely.
         let tiny = compute_layout(&c, 10, 16);
         assert!(!tiny.has_desc());
-        assert_eq!(tiny.indent, 2);
+        // The indent is given up only as far as it must be: a smaller box now fits, because the
+        // border no longer costs four cells a row.
+        assert_eq!(tiny.indent, 6);
         assert!(tiny.row_width() <= 16, "{tiny:?}");
     }
 

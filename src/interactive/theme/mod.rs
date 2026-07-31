@@ -157,7 +157,11 @@ impl Default for Syntax {
 /// Colours for the completion dropdown.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Pager {
-    pub border: Style,
+    /// The background every unselected row is drawn on.
+    ///
+    /// This is what makes the menu read as a block rather than as loose text: there is no border
+    /// and no caption, so the colour is the only thing saying where it starts and stops.
+    pub bg: Option<Color>,
     pub text: Style,
     pub text_sel: Style,
     pub sel_bg: Option<Color>,
@@ -173,7 +177,7 @@ pub struct Pager {
 impl Default for Pager {
     fn default() -> Self {
         Pager {
-            border: Style::fg(Color::Indexed(240)),
+            bg: Some(Color::Indexed(236)),
             text: Style::default(),
             text_sel: Style {
                 bold: true,
@@ -298,7 +302,7 @@ mod tests {
         // the ones that are meant to be.
         assert!(!theme.syntax.command.is_plain());
         assert!(!theme.syntax.error.is_plain());
-        assert!(!theme.pager.border.is_plain());
+        assert!(theme.pager.bg.is_some());
         assert!(!theme.pager.kind.command.is_plain());
         // `param` is deliberately plain: an ordinary argument takes the terminal's own colour.
         assert!(theme.syntax.param.is_plain());

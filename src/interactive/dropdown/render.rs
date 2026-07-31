@@ -6,9 +6,7 @@
 
 use super::CompletionCandidate;
 use super::layout::compute_layout;
-use super::width::{
-    FALLBACK_COLS, display_width, pad_to_width, physical_rows, terminal_cols, truncate_to_width,
-};
+use super::width::{FALLBACK_COLS, pad_to_width, physical_rows, terminal_cols, truncate_to_width};
 use crate::interactive::theme::{self, Style};
 
 /// The most candidates shown at once; beyond this the list pages.
@@ -65,11 +63,6 @@ pub fn render_vertical_dropdown_at_width(
 
     let mut out = String::new();
 
-    out.push_str("\r\n");
-    let title = format!(" Suggestions ({}/{}) ", selected_idx + 1, candidates.len());
-    let counter = format!(" ({}/{}) ", selected_idx + 1, candidates.len());
-    out.push_str(&border_row(&indent, &title, &counter, layout.box_w, true));
-
     for (i, cand) in visible.iter().enumerate() {
         let selected = start + i == selected_idx;
         let label = pad_to_width(
@@ -79,12 +72,14 @@ pub fn render_vertical_dropdown_at_width(
 
         out.push_str("\r\n");
         out.push_str(&indent);
-        out.push_str(&theme.pager.border.paint("│", depth));
-        out.push(' ');
 
-        // The row background runs from the marker to the closing border, so a selected row reads
-        // as one bar rather than as separately coloured columns.
-        let row_bg = if selected { theme.pager.sel_bg } else { None };
+        // The whole row takes a background, which is the only thing marking the menu out now that
+        // there is no border around it.
+        let row_bg = if selected {
+            theme.pager.sel_bg
+        } else {
+            theme.pager.bg
+        };
         let on_row = |style: Style| Style {
             bg: row_bg.or(style.bg),
             ..style
@@ -116,58 +111,14 @@ pub fn render_vertical_dropdown_at_width(
             out.push_str(&on_row(style).paint(&desc, depth));
         }
         out.push_str(&on_row(Style::default()).paint(" ", depth));
-        out.push(' ');
-        out.push_str(&theme.pager.border.paint("│", depth));
+        // Cleared to the end of the row so a shorter line does not leave the previous frame's
+        // background hanging past it.
         out.push_str("\x1b[K");
     }
 
-    out.push_str("\r\n");
-    out.push_str(&border_row(
-        &indent,
-        " Tab/Enter to select ",
-        " Tab ",
-        layout.box_w,
-        false,
-    ));
-
     // Every row is exactly `row_width()` wide, so one wrap count covers all of them.
-    let rows = visible.len() + 2;
+    let rows = visible.len();
     (out, rows * physical_rows(layout.row_width(), cols))
-}
-
-/// Top or bottom border, exactly `box_w` cells wide including both corners, with `text` inlaid
-/// after the left corner.
-///
-/// A box too narrow for `text` falls back to `short` — an intact `(3/12)` tells you more than a
-/// chopped `Suggestions (3…` — and only then to a hard truncation.
-fn border_row(indent: &str, text: &str, short: &str, box_w: usize, top: bool) -> String {
-    let theme = theme::current();
-    let depth = theme::depth();
-    let (left, right) = if top {
-        ("╭─", "╮")
-    } else {
-        ("╰─", "╯")
-    };
-    // The caption takes the scroll colour, the rule itself the border colour.
-    let caption = theme.pager.scroll;
-    // `╭─` is 2 cells and the closing corner 1.
-    let budget = box_w.saturating_sub(3);
-    let text = if display_width(text) <= budget {
-        text.to_string()
-    } else if display_width(short) <= budget {
-        short.to_string()
-    } else {
-        truncate_to_width(text, budget)
-    };
-    let fill = budget - display_width(&text);
-    format!(
-        "{}{}{}{}{}",
-        indent,
-        theme.pager.border.paint(left, depth),
-        caption.paint(&text, depth),
-        theme.pager.border.paint(&"─".repeat(fill), depth),
-        theme.pager.border.paint(right, depth)
-    ) + "\x1b[K"
 }
 
 /// A label with the already-typed prefix in the match colour.
@@ -262,6 +213,9 @@ fn badge_cell(
 
 #[cfg(test)]
 mod tests {
+    use super::super::width::display_width;
+    use super::*;
+
     /// Build a candidate with a kind, which is what the badge column reads.
     fn kinded(display: &str, kind: &str, desc: Option<&str>) -> CompletionCandidate {
         CompletionCandidate {
@@ -313,7 +267,7 @@ mod tests {
         let candidates = vec![kinded("a", "dir", None), kinded("bbbbbb", "variable", None)];
         let (rendered, _) = render_vertical_dropdown_at_width(&candidates, 0, 8, 0, 100, "");
         let seen = plain(&rendered);
-        let rows: Vec<&str> = seen.lines().filter(|l| l.contains('│')).collect();
+        let rows: Vec<&str> = seen.lines().filter(|l| !l.trim().is_empty()).collect();
         assert_eq!(rows.len(), 2, "{rows:?}");
         let at = |row: &str, needle: &str| row.find(needle);
         assert_eq!(at(rows[0], "dir").map(|i| i > 0), Some(true), "{rows:?}");
@@ -334,7 +288,7 @@ mod tests {
         let candidates = vec![kinded("y", "command", Some("a command")), plainish];
         let (rendered, _) = render_vertical_dropdown_at_width(&candidates, 0, 8, 0, 100, "");
         let seen = plain(&rendered);
-        let rows: Vec<&str> = seen.lines().filter(|l| l.contains('│')).collect();
+        let rows: Vec<&str> = seen.lines().filter(|l| !l.trim().is_empty()).collect();
         assert_eq!(display_width(rows[0]), display_width(rows[1]), "{rows:?}");
     }
 
@@ -364,8 +318,6 @@ mod tests {
         // A multi-byte prefix lands on a character boundary, not inside one.
         assert_eq!(matching_prefix("ändern", "än"), 3);
     }
-
-    use super::*;
 
     fn cand(display: &str, desc: Option<&str>) -> CompletionCandidate {
         CompletionCandidate::new(
@@ -400,7 +352,7 @@ mod tests {
             assert!(w <= 80, "row of {w} cells overflows an 80-column terminal");
         }
         // Nothing wrapped, so the cursor walks back exactly the rows that were drawn.
-        assert_eq!(lines, 8);
+        assert_eq!(lines, 6);
     }
 
     #[test]
@@ -412,10 +364,11 @@ mod tests {
         ];
         let (rendered, _) = render_vertical_dropdown_at_width(&candidates, 0, 8, 4, 80, "");
         let widths = row_widths(&rendered);
-        assert_eq!(widths.len(), 5);
+        // Three candidates, three rows: there is no border above or below them any more.
+        assert_eq!(widths.len(), 3);
         assert!(
             widths.iter().all(|w| *w == widths[0]),
-            "border and item rows disagree: {widths:?}"
+            "rows disagree: {widths:?}"
         );
     }
 
@@ -429,7 +382,7 @@ mod tests {
                 "row of {w} cells overflows: indent was not clamped"
             );
         }
-        assert_eq!(lines, 5);
+        assert_eq!(lines, 3);
     }
 
     #[test]
@@ -457,7 +410,7 @@ mod tests {
             for w in row_widths(&rendered) {
                 assert!(w <= cols, "row of {w} cells at {cols} columns");
             }
-            assert_eq!(lines, 4, "at {cols} columns");
+            assert_eq!(lines, 2, "at {cols} columns");
         }
     }
 
@@ -465,23 +418,42 @@ mod tests {
     fn wrapped_rows_are_counted_as_the_physical_rows_they_occupy() {
         // Below the width any box fits in, the rows do wrap — and the count must say so, or the
         // cursor-up walks too few rows and paints over the prompt.
+        // Four columns: narrower than the chrome alone, so every row must wrap. Six used to be
+        // enough to force this and no longer is — the border went, and with it four cells of
+        // overhead per row.
         let candidates = vec![cand("cargo", None); 2];
-        let (rendered, lines) = render_vertical_dropdown_at_width(&candidates, 0, 8, 0, 6, "");
+        let (rendered, lines) = render_vertical_dropdown_at_width(&candidates, 0, 8, 0, 4, "");
         let widths = row_widths(&rendered);
-        let expected: usize = widths.iter().map(|w| physical_rows(*w, 6)).sum();
+        let expected: usize = widths.iter().map(|w| physical_rows(*w, 4)).sum();
         assert_eq!(lines, expected);
         assert!(lines > widths.len(), "wrapping was not accounted for");
     }
 
+    /// There is no border and no caption: the menu is marked out by its background alone.
     #[test]
-    fn the_header_keeps_the_counter_when_the_title_will_not_fit() {
+    fn the_menu_has_no_border_or_caption() {
         let candidates: Vec<_> = (0..20).map(|i| cand(&format!("cmd{i}"), None)).collect();
         let (rendered, lines) = render_vertical_dropdown_at_width(&candidates, 9, 8, 0, 80, "");
+        for drawn in ['│', '╭', '╮', '╰', '╯', '─'] {
+            assert!(!rendered.contains(drawn), "{drawn} survived: {rendered:?}");
+        }
+        assert!(!rendered.contains("Suggestions"), "{rendered:?}");
+        assert!(!rendered.contains("Tab/Enter"), "{rendered:?}");
+        // Only the rows themselves, with no chrome above or below them.
+        assert_eq!(lines, 8);
         // Selection 9 is on the second page: cmd8..=cmd15.
         assert!(rendered.contains("cmd9"));
         assert!(!rendered.contains("cmd0 "));
-        assert_eq!(lines, 10);
-        assert!(rendered.contains("(10/20)"), "counter was lost: {rendered}");
+    }
+
+    /// Every unselected row carries the background, which is now the only thing that says where
+    /// the menu is.
+    #[test]
+    fn every_row_is_drawn_on_the_background() {
+        crate::interactive::theme::set_depth(crate::interactive::theme::Depth::Ansi256);
+        let candidates = vec![cand("one", None), cand("two", None)];
+        let (rendered, _) = render_vertical_dropdown_at_width(&candidates, 0, 8, 0, 80, "");
+        assert!(rendered.contains("48;5;236"), "no background: {rendered:?}");
     }
 
     #[test]
@@ -495,7 +467,7 @@ mod tests {
     fn a_zero_max_visible_still_shows_one_row() {
         let candidates = vec![cand("cargo", None); 3];
         let (rendered, lines) = render_vertical_dropdown_at_width(&candidates, 0, 0, 0, 80, "");
-        assert_eq!(lines, 3);
+        assert_eq!(lines, 1);
         assert!(rendered.contains("cargo"));
     }
 }

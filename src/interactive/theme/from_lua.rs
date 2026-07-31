@@ -152,7 +152,6 @@ fn read_syntax(table: &crate::lua::eval::Table, into: &mut Syntax, problems: &mu
 
 fn read_pager(table: &crate::lua::eval::Table, into: &mut Pager, problems: &mut Vec<String>) {
     let p = "oslo.theme.pager";
-    field(table, "border", p, &mut into.border, problems);
     field(table, "text", p, &mut into.text, problems);
     field(table, "text_sel", p, &mut into.text_sel, problems);
     field(table, "match", p, &mut into.match_, problems);
@@ -160,11 +159,15 @@ fn read_pager(table: &crate::lua::eval::Table, into: &mut Pager, problems: &mut 
     field(table, "desc_sel", p, &mut into.desc_sel, problems);
     field(table, "scroll", p, &mut into.scroll, problems);
 
-    // `sel_bg` is a bare colour rather than a style: it is the row's background and nothing else.
-    if let Value::Str(text) = table.get(&Value::str("sel_bg")) {
-        match Color::parse(&text) {
-            Some(colour) => into.sel_bg = Some(colour),
-            None => problems.push(format!("{p}.sel_bg: '{text}' is not a colour")),
+    // `bg` and `sel_bg` are bare colours rather than styles: they are the row's background and
+    // nothing else.
+    for (name, slot) in [("bg", 0), ("sel_bg", 1)] {
+        if let Value::Str(text) = table.get(&Value::str(name)) {
+            match Color::parse(&text) {
+                Some(colour) if slot == 0 => into.bg = Some(colour),
+                Some(colour) => into.sel_bg = Some(colour),
+                None => problems.push(format!("{p}.{name}: '{text}' is not a colour")),
+            }
         }
     }
 
@@ -219,7 +222,7 @@ mod tests {
             })
         );
         // Untouched, and still the default rather than blank.
-        assert_eq!(theme.pager.border, Pager::default().border);
+        assert_eq!(theme.pager.bg, Pager::default().bg);
         assert_eq!(theme.syntax.quote, Syntax::default().quote);
     }
 
