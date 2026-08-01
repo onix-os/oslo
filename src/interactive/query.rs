@@ -22,9 +22,14 @@ use std::time::{Duration, Instant};
 
 /// How long to wait for a reply before giving up.
 ///
-/// Generous enough for a terminal over a slow link, short enough that a shell which will never get
-/// an answer still starts promptly. This is paid once per session, not per prompt.
-const DEADLINE: Duration = Duration::from_millis(120);
+/// **This is dead time on a terminal that will never answer**, and it is paid before the first
+/// prompt is drawn — so it is the whole of the shell's perceived startup cost on any terminal
+/// without `OSC 11`. It was 120ms, which is long enough to feel like the shell is thinking.
+///
+/// A terminal that does answer does so as fast as it can write to a pty: under a millisecond
+/// locally, a few over a slow link. 20ms is many times either, and the read already stops early
+/// at the first byte that cannot belong to a reply.
+const DEADLINE: Duration = Duration::from_millis(20);
 
 /// What the terminal said its background is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -38,11 +43,30 @@ pub enum Background {
 /// `None` when it did not answer, which is not an error and is the common case on a terminal that
 /// does not implement `OSC 11`. The caller keeps its default.
 pub fn background() -> Option<Background> {
+    // `$COLORFGBG` is the same answer without asking, and costs nothing. Terminals that set it
+    // (rxvt, konsole, and anything that inherited the convention) let the whole exchange be
+    // skipped — no escape written, no reply waited for.
+    if let Some(background) = from_colorfgbg(std::env::var("COLORFGBG").ok().as_deref()) {
+        return Some(background);
+    }
     if !nix::unistd::isatty(0).unwrap_or(false) || !nix::unistd::isatty(1).unwrap_or(false) {
         return None;
     }
     let reply = ask("\x1b]11;?\x1b\\")?;
     parse_background(&reply)
+}
+
+/// Read `$COLORFGBG`, whose last field is the background's ANSI colour number.
+///
+/// `0`-`6` and `8` are the dark half of the sixteen; `7` and `9`-`15` are the light half. That is
+/// the same split every editor that reads this variable uses, and it is what vim's `background`
+/// detection has done for decades.
+fn from_colorfgbg(value: Option<&str>) -> Option<Background> {
+    let number: u8 = value?.rsplit(';').next()?.trim().parse().ok()?;
+    Some(match number {
+        0..=6 | 8 => Background::Dark,
+        _ => Background::Light,
+    })
 }
 
 /// Write `question` and read what comes back, in raw mode, up to [`DEADLINE`].
@@ -148,6 +172,23 @@ pub fn parse_background(reply: &str) -> Option<Background> {
 
 #[cfg(test)]
 mod tests {
+    use super::{Background, from_colorfgbg};
+
+    /// The last field is the background, and the dark half of the sixteen colours is 0-6 and 8.
+    #[test]
+    fn colorfgbg_answers_without_asking_the_terminal() {
+        assert_eq!(from_colorfgbg(Some("15;0")), Some(Background::Dark));
+        assert_eq!(from_colorfgbg(Some("0;15")), Some(Background::Light));
+        assert_eq!(from_colorfgbg(Some("15;8")), Some(Background::Dark));
+        assert_eq!(from_colorfgbg(Some("0;7")), Some(Background::Light));
+        // Three fields: some terminals put the cursor colour in the middle.
+        assert_eq!(from_colorfgbg(Some("15;default;0")), Some(Background::Dark));
+        // Nothing usable means fall through to asking, not a guess.
+        assert_eq!(from_colorfgbg(None), None);
+        assert_eq!(from_colorfgbg(Some("")), None);
+        assert_eq!(from_colorfgbg(Some("15;default")), None);
+    }
+
     use super::*;
 
     /// Terminals differ on how many hex digits they send per channel, so each is scaled to its own
