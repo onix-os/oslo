@@ -122,11 +122,23 @@ impl OsloHelper {
         }
     }
 
+    /// The language the prompt is reading **now**, not the one the line started in.
+    ///
+    /// The distinction is the whole bug: `prompt_context` is set once, when the line begins, and
+    /// the language toggle cannot reach it — it runs from a key handler that has no way back to
+    /// this helper. So the toggle updates the row, and the row is what this has to read.
+    ///
+    /// Getting this wrong was invisible until it was fatal: the highlighter passes this value to
+    /// `note_row`, which writes it back to the row. Reading the stale one meant every keystroke
+    /// after a toggle quietly reset the language to whatever the line had started as, and the next
+    /// redraw put `sh` back over the `lua` you had just switched to.
     fn language(&self) -> String {
-        self.prompt_context
-            .lock()
-            .map(|c| c.0.clone())
-            .unwrap_or_else(|_| "sh".to_string())
+        prompt::language().unwrap_or_else(|| {
+            self.prompt_context
+                .lock()
+                .map(|c| c.0.clone())
+                .unwrap_or_else(|_| "sh".to_string())
+        })
     }
 
     fn last_status(&self) -> i32 {
