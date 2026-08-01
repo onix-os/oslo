@@ -151,9 +151,26 @@ impl ToggleRequest {
 }
 
 impl ConditionalEventHandler for ToggleRequest {
-    fn handle(&self, _: &Event, _: RepeatCount, _: bool, _: &EventContext) -> Option<Cmd> {
+    fn handle(&self, _: &Event, _: RepeatCount, _: bool, ctx: &EventContext) -> Option<Cmd> {
+        // **In place.** This used to accept the line so the read loop could rebuild the prompt in
+        // the other language, which meant changing language cost a row, a fresh prompt, and the
+        // line you had typed being carried across by hand. Nothing about switching language needs
+        // any of that: the line is untouched, only the word in the prompt changes.
+        //
+        // So the language is switched where the prompt keeps it and the prompt is redrawn, the
+        // same way a vi mode change is. The read loop asks the prompt which language it ended up
+        // in once the line is submitted.
         self.0.store(true, Ordering::SeqCst);
-        Some(Cmd::AcceptLine)
+        oslo::interactive::prompt::toggle_language();
+        let cursor = oslo::interactive::prompt::printed_width(&ctx.line()[..ctx.pos()]);
+        let mut out = std::io::stdout();
+        let _ = std::io::Write::write_all(
+            &mut out,
+            oslo::interactive::prompt::repaint(cursor).as_bytes(),
+        );
+        let _ = std::io::Write::flush(&mut out);
+        // Declined: the key changed the prompt, not the line.
+        None
     }
 }
 

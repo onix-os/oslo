@@ -115,7 +115,10 @@ pub(super) fn read_command(
         let raw = match rl.readline_with_initial(&prompt, (&typed, "")) {
             Ok(raw) => raw,
             Err(ReadlineError::Interrupted) => {
-                println!("^C");
+                // No `^C` echoed. The keystroke was the user's instruction to abandon the line,
+                // and they know they pressed it — printing it back spends a row saying so, which
+                // is a row the next prompt could have had. The editor has already moved off the
+                // abandoned line, so there is nothing to write here at all.
                 return Input::Interrupted;
             }
             Err(ReadlineError::Eof) => return Input::Eof,
@@ -126,12 +129,21 @@ pub(super) fn read_command(
         };
         typed.clear();
 
-        // The toggle key accepts the line to hand control back here; nothing was submitted.
-        if toggle.take() {
-            *current = current.other();
-            reading = *current;
-            typed = raw;
-            continue;
+        // The toggle key repaints the prompt in place rather than submitting, so by the time a
+        // line comes back the prompt may be showing the other language. That is the answer for
+        // *this* line and for the ones after it: what you see above the cursor is what runs.
+        if toggle.take()
+            && let Some(language) = oslo::interactive::prompt::language()
+        {
+            {
+                let switched = if language == "lua" {
+                    Mode::Lua
+                } else {
+                    Mode::Shell
+                };
+                *current = switched;
+                reading = switched;
+            }
         }
 
         if buffer.is_empty() {

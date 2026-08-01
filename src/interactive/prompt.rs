@@ -283,6 +283,28 @@ pub fn note_row(language: &str, status: i32, prompt_width: usize) {
 /// **Not the end of the line.** Restoring to the end was the first version's bug: with the cursor
 /// anywhere but the end, every mode change dragged it to the right, which looks like the block
 /// jumping a slot and makes everything typed afterwards land in the wrong place.
+/// Switch the language the prompt shows, answering the one now in force.
+///
+/// The prompt is the only place the language is written down between keystrokes, so the toggle
+/// changes it here and repaints. It used to accept the line to hand control back to the read
+/// loop, which cost a row and a fresh prompt every time you changed your mind about what you were
+/// typing — and the thing you had already typed had to be carried across by hand.
+pub fn toggle_language() -> String {
+    let Ok(mut slot) = ROW.lock() else {
+        return "sh".to_string();
+    };
+    let Some(row) = slot.as_mut() else {
+        return "sh".to_string();
+    };
+    row.language = if row.language == "sh" { "lua" } else { "sh" }.to_string();
+    row.language.clone()
+}
+
+/// The language the prompt is currently showing.
+pub fn language() -> Option<String> {
+    ROW.lock().ok()?.as_ref().map(|row| row.language.clone())
+}
+
 pub fn repaint(line_cursor: usize) -> String {
     let Ok(slot) = ROW.lock() else {
         return String::new();

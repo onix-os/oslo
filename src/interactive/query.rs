@@ -26,10 +26,18 @@ use std::time::{Duration, Instant};
 /// prompt is drawn — so it is the whole of the shell's perceived startup cost on any terminal
 /// without `OSC 11`. It was 120ms, which is long enough to feel like the shell is thinking.
 ///
-/// A terminal that does answer does so as fast as it can write to a pty: under a millisecond
-/// locally, a few over a slow link. 20ms is many times either, and the read already stops early
-/// at the first byte that cannot belong to a reply.
-const DEADLINE: Duration = Duration::from_millis(20);
+/// **A terminal that answers only costs its own round-trip**, because the read returns the moment
+/// the reply is complete. The deadline is therefore paid only by terminals that never answer, and
+/// being generous is free for everyone else. Cutting it to 20ms to save that case was a bad trade
+/// made against the wrong baseline: it was measured on a pty where nothing answers at all.
+///
+/// Worse, giving up too early does not merely lose the answer. The reply still arrives, by which
+/// point the terminal is out of raw mode and echoing again — so it is *printed*, and the session
+/// opens with `^[]11;rgb:0d0d/1212/0f0f^[\` across the top of the screen.
+///
+/// So: long enough that a terminal which intends to answer is not cut off. `$COLORFGBG` skips the
+/// exchange entirely for anyone who wants neither the wait nor the question.
+const DEADLINE: Duration = Duration::from_millis(100);
 
 /// What the terminal said its background is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
