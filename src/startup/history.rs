@@ -11,6 +11,15 @@
 //! after every line, and the builtin reads that. The alternative — teaching the library about
 //! the editor — would put rustyline in the dependency path of every `Environment`.
 
+/// How many jobs `\j` in a `$PS1` reports.
+///
+/// Zero, and honestly so: [`crate::exec::job::JobManager`] installs the signal handlers but keeps
+/// no table of running jobs, so there is nothing to count. Reporting zero is what a shell with no
+/// background jobs would say anyway; when job tracking arrives this is the one place to change.
+pub fn job_count() -> usize {
+    0
+}
+
 use oslo::Environment;
 use oslo::error::Result;
 use std::path::PathBuf;

@@ -21,6 +21,7 @@ use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
 mod convert;
+pub(crate) mod external;
 mod fs;
 mod json;
 mod path;

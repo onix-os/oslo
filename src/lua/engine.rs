@@ -262,6 +262,10 @@ impl LuaEngine {
         if crate::lua::api::segment::is_segment_list(&value) {
             return self.render_segments(&value, ctx);
         }
+        // A prompt produced by another program — starship, hexe, anything that prints one.
+        if let Some(spec) = crate::lua::api::external::spec_of(&value) {
+            return crate::lua::api::external::render(&spec, ctx);
+        }
         match self.interp.call(&value, Vec::new()) {
             Ok(values) => match values.first() {
                 Some(Value::Str(s)) => Some(s.to_string()),

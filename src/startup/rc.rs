@@ -173,6 +173,58 @@ fn decode_escapes(env: &Environment, raw: &str) -> String {
                 let base = pwd.rsplit('/').next().unwrap_or(&pwd);
                 out.push_str(if base.is_empty() { &pwd } else { base });
             }
+            // The clock escapes. Local time, not UTC: a prompt showing the wrong hour is worse
+            // than one showing none, and `localtime_r` is where the system keeps the answer.
+            Some('t') => out.push_str(&clock("%H:%M:%S")),
+            Some('T') => out.push_str(&clock("%I:%M:%S")),
+            Some('@') => out.push_str(&clock("%I:%M %p")),
+            Some('A') => out.push_str(&clock("%H:%M")),
+            Some('d') => out.push_str(&clock("%a %b %e")),
+            // `\D{...}` takes a strftime format of its own.
+            Some('D') => {
+                let mut format = String::new();
+                if chars.as_str().starts_with('{') {
+                    chars.next();
+                    for c in chars.by_ref() {
+                        if c == '}' {
+                            break;
+                        }
+                        format.push(c);
+                    }
+                }
+                out.push_str(&clock(if format.is_empty() { "%X" } else { &format }));
+            }
+            // Which line of history this will be. bash counts from one.
+            Some('!') | Some('#') => {
+                out.push_str(&(oslo::interactive::recall::len() + 1).to_string())
+            }
+            // Jobs the shell is tracking.
+            Some('j') => out.push_str(&crate::startup::history::job_count().to_string()),
+            // The terminal's basename, as bash reports it.
+            Some('l') => out.push_str(
+                &nix::unistd::ttyname(std::io::stdin())
+                    .ok()
+                    .and_then(|p| p.file_name().map(|n| n.to_string_lossy().into_owned()))
+                    .unwrap_or_default(),
+            ),
+            Some('v') | Some('V') => out.push_str(env!("CARGO_PKG_VERSION")),
+            // `\nnn` is an octal byte, which is how a prompt reaches a character it cannot type.
+            Some(d @ '0'..='7') => {
+                let mut digits = String::from(d);
+                while digits.len() < 3 {
+                    match chars.clone().next() {
+                        Some(next @ '0'..='7') => {
+                            chars.next();
+                            digits.push(next);
+                        }
+                        _ => break,
+                    }
+                }
+                match u8::from_str_radix(&digits, 8) {
+                    Ok(byte) => out.push(byte as char),
+                    Err(_) => out.push_str(&digits),
+                }
+            }
             // `\[` and `\]` bracket non-printing runs so bash can measure the prompt's width.
             // rustyline measures it itself, so the markers are dropped rather than emitted:
             // passing them through would print two stray control characters.
@@ -184,6 +236,33 @@ fn decode_escapes(env: &Environment, raw: &str) -> String {
         }
     }
     out
+}
+
+/// The current local time, formatted.
+///
+/// Local rather than UTC — the rest of oslo's date handling refuses timezones on the grounds that a
+/// plausible-but-wrong timestamp is worse than none, which is right for a *script*. A prompt clock
+/// is the opposite case: it is read at a glance and only useful if it agrees with the wall.
+fn clock(format: &str) -> String {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0);
+    let mut tm: nix::libc::tm = unsafe { std::mem::zeroed() };
+    // SAFETY: `now` is a valid `time_t` and `tm` is owned here for the whole call.
+    if unsafe { nix::libc::localtime_r(&now, &mut tm) }.is_null() {
+        return String::new();
+    }
+    let mut out = vec![0u8; 128];
+    let c_format = match std::ffi::CString::new(format) {
+        Ok(f) => f,
+        Err(_) => return String::new(),
+    };
+    // SAFETY: a buffer this call owns, its own length, and a NUL-terminated format.
+    let written =
+        unsafe { nix::libc::strftime(out.as_mut_ptr().cast(), out.len(), c_format.as_ptr(), &tm) };
+    out.truncate(written);
+    String::from_utf8(out).unwrap_or_default()
 }
 
 fn user_name(env: &Environment) -> String {

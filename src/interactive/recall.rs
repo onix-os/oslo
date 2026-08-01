@@ -39,6 +39,13 @@ pub fn clear() {
     }
 }
 
+/// How many lines are remembered, in every language.
+///
+/// What `\!` in a `$PS1` counts: the number the next command will be given.
+pub fn len() -> usize {
+    REMEMBERED.lock().map(|all| all.len()).unwrap_or(0)
+}
+
 /// Whether nothing at all has been remembered, in any language.
 ///
 /// Distinguishes "this language has no history" from "there is no history" — the first means a
