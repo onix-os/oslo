@@ -167,6 +167,9 @@ pub(super) fn read_command(
                 };
                 *current = switched;
                 reading = switched;
+                // The editor's history is refilled for the language now being typed: recalling a
+                // shell command at a Lua prompt offers a line that cannot run.
+                super::recall::load_history_for(rl, switched);
             }
             // What was typed goes back into the new prompt's line, so changing language never
             // costs the command.

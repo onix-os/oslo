@@ -7,6 +7,7 @@
 use crate::absorb_loop_control;
 use crate::startup::mode::{Mode, ToggleRequest};
 use crate::startup::read::{Input, read_command};
+use crate::startup::recall::{load_history_for, remember_history, seed_history};
 use crate::startup::{config, history, history_db, keybind, lua_init, mode, rc};
 use oslo::Environment;
 use oslo::LuaEngine;
@@ -122,10 +123,10 @@ pub fn run_repl() -> ! {
     // Seeded from the database when there is one, so a session started on a machine with no
     // `$HISTFILE` still has its history back.
     if let Some(db) = &db {
-        for entry in db.recent(settings.max_size.max(1)) {
-            let _ = rl.add_history_entry(&entry.line);
-        }
+        let entries = db.recent(settings.max_size.max(1));
+        seed_history(entries.iter().map(|e| (e.line.clone(), e.mode.clone())));
     }
+    load_history_for(&mut rl, current);
     publish_history(&rl);
 
     let mut jobs = JobManager::new();
@@ -167,6 +168,11 @@ pub fn run_repl() -> ! {
             Input::Command { text, mode, secret } => {
                 eof_count = 0;
                 remember(&mut rl, &settings.file, &text, secret);
+                if !secret {
+                    // Kept alongside the editor's own copy so a later language switch, which
+                    // refills that copy from scratch, still finds this line.
+                    remember_history(&text, mode);
+                }
                 if let Some(db) = &db
                     && !secret
                 {
