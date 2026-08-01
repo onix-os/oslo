@@ -244,17 +244,18 @@ struct Row {
     /// The language segment, so the prompt can be rebuilt for the right one.
     language: String,
     status: i32,
-    /// Cells from the start of the row to the cursor.
-    cursor: usize,
+    /// Cells the prompt itself occupies, so the cursor column can be worked out from a position
+    /// within the line.
+    prompt_width: usize,
 }
 
 /// Record the row, for [`repaint`]. Called by the highlighter on every redraw.
-pub fn note_row(language: &str, status: i32, cursor: usize) {
+pub fn note_row(language: &str, status: i32, prompt_width: usize) {
     if let Ok(mut slot) = ROW.lock() {
         *slot = Some(Row {
             language: language.to_string(),
             status,
-            cursor,
+            prompt_width,
         });
     }
 }
@@ -276,7 +277,13 @@ pub fn note_row(language: &str, status: i32, cursor: usize) {
 /// `I`, `N` and `R` are one cell each — so the line and the hint after it are untouched, and
 /// rustyline's idea of the row stays true. `\r` to the start, write, `\r` and forward to wherever
 /// the cursor was.
-pub fn repaint() -> String {
+/// `line_cursor` is how many cells into the *line* the cursor sits; the prompt's own width is
+/// added here. The caller gets it from the line and byte position the editor hands over.
+///
+/// **Not the end of the line.** Restoring to the end was the first version's bug: with the cursor
+/// anywhere but the end, every mode change dragged it to the right, which looks like the block
+/// jumping a slot and makes everything typed afterwards land in the wrong place.
+pub fn repaint(line_cursor: usize) -> String {
     let Ok(slot) = ROW.lock() else {
         return String::new();
     };
@@ -284,10 +291,11 @@ pub fn repaint() -> String {
         return String::new();
     };
     let left = render_default_left_prompt(row.status, &row.language);
+    let cursor = row.prompt_width + line_cursor;
     let mut out = format!("\r{left}");
     out.push('\r');
-    if row.cursor > 0 {
-        out.push_str(&format!("\x1b[{}C", row.cursor));
+    if cursor > 0 {
+        out.push_str(&format!("\x1b[{cursor}C"));
     }
     out
 }

@@ -322,7 +322,7 @@ impl Highlighter for OsloHelper {
             // Recorded so the vi-mode handler can draw this row again when the mode changes.
             // rustyline will not repaint a prompt and cannot be asked to, so oslo keeps enough to
             // do it itself. See `prompt::repaint`.
-            prompt::note_row(&self.language(), self.last_status(), used);
+            prompt::note_row(&self.language(), self.last_status(), *left_width);
         }
         Cow::Owned(painted)
     }

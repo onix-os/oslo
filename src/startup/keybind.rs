@@ -44,11 +44,15 @@ impl ConditionalEventHandler for ViCursor {
         // `prompt::repaint`. Without this the letter sat there saying `I` while the cursor had
         // already become a block, which is worse than showing nothing.
         if let Some(escape) = vi::observe(mode, &self.cursors) {
+            // Where the cursor *actually* is, not where the line ends: the editor hands over the
+            // line and the byte position, so the column is exact. Using the end of the line
+            // instead dragged the cursor right on every mode change.
+            let cursor = oslo::interactive::prompt::printed_width(&ctx.line()[..ctx.pos()]);
             let mut out = std::io::stdout();
             let _ = out.write_all(escape.as_bytes());
             // The row after the cursor shape, so the prompt and the cursor agree in one frame
             // rather than flickering between two.
-            let _ = out.write_all(oslo::interactive::prompt::repaint().as_bytes());
+            let _ = out.write_all(oslo::interactive::prompt::repaint(cursor).as_bytes());
             let _ = out.flush();
         }
         // Declined on purpose: this handler observes, it does not bind.
@@ -64,7 +68,14 @@ fn key_char(event: &Event) -> Option<char> {
     let Event::KeySeq(keys) = event else {
         return None;
     };
-    match keys.first()?.0 {
+    let key = keys.first()?;
+    // Only an unmodified key. Ctrl-R arrives as `Char('r')` with a modifier, and reading it as a
+    // bare `r` would have it answered by whatever `r` means — a real confusion now that the
+    // insert-starting keys are matched on the character alone.
+    if key.1 != rustyline::Modifiers::NONE {
+        return None;
+    }
+    match key.0 {
         rustyline::KeyCode::Char(c) => Some(c),
         rustyline::KeyCode::Esc => Some('\x1b'),
         _ => None,
@@ -105,8 +116,10 @@ pub fn apply(rl: &mut Repl, env_struct: &Arc<Mutex<Environment>>, toggle: &Toggl
         // The prompt is drawn before any key is pressed, so the starting shape has to be written
         // by hand — otherwise the first line of the session has whatever cursor the terminal had.
         let mut out = std::io::stdout();
-        let _ = out.write_all(settings.vi.cursors.insert.escape().as_bytes());
-        let _ = out.flush();
+        if std::io::IsTerminal::is_terminal(&out) {
+            let _ = out.write_all(settings.vi.cursors.insert.escape().as_bytes());
+            let _ = out.flush();
+        }
     }
 
     let (bindings, problems) = oslo::interactive::keys::resolve(&settings.keys);

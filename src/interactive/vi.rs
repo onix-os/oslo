@@ -170,12 +170,27 @@ pub fn after_key(now: Mode, key: Option<char>) -> Mode {
     match (now, key) {
         // Esc leaves insert or replace for normal.
         (Mode::Insert | Mode::Replace, '\x1b') => Mode::Normal,
-        // The keys that start inserting. `c` and `s` take an object first, so they are not here:
-        // guessing insert on `c` would flicker on every `cw`.
-        (Mode::Normal, 'i' | 'I' | 'a' | 'A' | 'o' | 'O' | 'C' | 'S') => Mode::Insert,
+        // Every key the editor's own vi keymap answers by setting insert mode, and no others.
+        //
+        // `c` and `s` belong here even though they take a motion, because the editor switches to
+        // insert *the moment it sees the operator* and only then reads the motion. And it reads
+        // that motion straight off the input, never through the key map — so the argument to
+        // `cw`, `dw`, `fx` or `ra` is not a keystroke this ever sees. There is no key here that
+        // could be somebody's argument, which is why this list needs no exceptions.
+        (Mode::Normal, 'i' | 'I' | 'a' | 'A' | 'o' | 'O' | 'c' | 'C' | 's' | 'S') => Mode::Insert,
         (Mode::Normal, 'R') => Mode::Replace,
         _ => now,
     }
+}
+
+/// Forget everything remembered about the line that just ended.
+///
+/// The line editor starts every line in insert mode, but nothing told this module that — so after
+/// leaving a line in normal mode the *next* prompt was drawn saying `N` while the editor was
+/// already back in insert. That is the other half of the inconsistency, and the half that survived
+/// until you typed something.
+pub fn reset() {
+    MODE.store(Mode::Insert.code(), Ordering::Relaxed);
 }
 
 /// Record the mode, answering the cursor escape to write when it has changed.
@@ -184,13 +199,43 @@ pub fn after_key(now: Mode, key: Option<char>) -> Mode {
 /// writes nothing at all. A cursor escape on every keypress would be harmless but is a great many
 /// bytes to send for no reason.
 pub fn observe(mode: Mode, cursors: &Cursors) -> Option<&'static str> {
-    let previous = MODE.swap(mode.code(), Ordering::Relaxed);
-    (previous != mode.code()).then(|| cursors.for_mode(mode).escape())
+    let previous = Mode::from_code(MODE.swap(mode.code(), Ordering::Relaxed));
+    escape_for_change(previous, mode, cursors)
+}
+
+/// The escape a move from `previous` to `next` calls for, if any.
+///
+/// Separate from [`observe`] so the rule can be tested without touching the process-wide mode —
+/// a test that flips those globals races every other test that reads them, and the prompt reads
+/// them on every render.
+fn escape_for_change(previous: Mode, next: Mode, cursors: &Cursors) -> Option<&'static str> {
+    (previous != next).then(|| cursors.for_mode(next).escape())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The keys that start inserting are exactly the ones the editor's own keymap answers that
+    /// way. `c` and `s` are in because the editor switches on the operator and reads the motion
+    /// off the input afterwards, so the motion never reaches this.
+    #[test]
+    fn the_insert_starting_keys_match_the_editors_own() {
+        for key in ['i', 'I', 'a', 'A', 'o', 'O', 'c', 'C', 's', 'S'] {
+            assert_eq!(after_key(Mode::Normal, Some(key)), Mode::Insert, "{key}");
+        }
+        // An operator that does not insert, and a motion, both leave normal mode alone.
+        for key in ['d', 'y', 'w', '0', 'x'] {
+            assert_eq!(after_key(Mode::Normal, Some(key)), Mode::Normal, "{key}");
+        }
+        assert_eq!(after_key(Mode::Normal, Some('R')), Mode::Replace);
+        assert_eq!(after_key(Mode::Insert, Some('\x1b')), Mode::Normal);
+        assert_eq!(after_key(Mode::Replace, Some('\x1b')), Mode::Normal);
+        // Esc in normal mode is already there.
+        assert_eq!(after_key(Mode::Normal, Some('\x1b')), Mode::Normal);
+        // A typed letter in insert mode is text, not a command.
+        assert_eq!(after_key(Mode::Insert, Some('i')), Mode::Insert);
+    }
 
     /// fish's vocabulary, so a config written for fish reads the same here.
     #[test]
@@ -221,21 +266,24 @@ mod tests {
     #[test]
     fn the_cursor_is_only_redrawn_when_the_mode_changes() {
         let cursors = Cursors::default();
-        set_enabled(true);
-        MODE.store(Mode::Insert.code(), Ordering::Relaxed);
 
         assert_eq!(
-            observe(Mode::Insert, &cursors),
+            escape_for_change(Mode::Insert, Mode::Insert, &cursors),
             None,
             "no change, no escape"
         );
-        assert_eq!(observe(Mode::Normal, &cursors), Some("\x1b[2 q"));
-        assert_eq!(observe(Mode::Normal, &cursors), None);
-        assert_eq!(observe(Mode::Insert, &cursors), Some("\x1b[6 q"));
-        assert_eq!(mode(), Some(Mode::Insert));
-
-        set_enabled(false);
-        assert_eq!(mode(), None, "off means there is no mode to report");
+        assert_eq!(
+            escape_for_change(Mode::Insert, Mode::Normal, &cursors),
+            Some("\x1b[2 q")
+        );
+        assert_eq!(
+            escape_for_change(Mode::Normal, Mode::Insert, &cursors),
+            Some("\x1b[6 q")
+        );
+        assert_eq!(
+            escape_for_change(Mode::Normal, Mode::Replace, &cursors),
+            Some("\x1b[4 q")
+        );
     }
 
     /// The prompt needs a short name, as fish's `fish_mode_prompt` shows.

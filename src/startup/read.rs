@@ -58,6 +58,20 @@ pub(super) fn read_command(
     let mut typed = String::new();
 
     loop {
+        // Every line starts in insert mode as far as the editor is concerned, so the mode this
+        // module remembers has to start there too. Before the prompt is *rendered*, not after:
+        // leaving a line in normal mode otherwise drew the next prompt saying `N` while the editor
+        // was already back in insert, and it stayed wrong until the first keystroke.
+        oslo::interactive::vi::reset();
+        // The shape too: the terminal is still drawing whatever the last line ended in, and a
+        // block cursor over a line you are typing into says normal mode when it is insert.
+        // Only to a terminal: a cursor-shape escape written down a pipe is not a cursor shape,
+        // it is two stray bytes in somebody's output.
+        let settings = oslo::interactive::settings::current();
+        if settings.vi.enabled && std::io::IsTerminal::is_terminal(&std::io::stdout()) {
+            print!("{}", settings.vi.cursors.insert.escape());
+        }
+
         let prompt = if buffer.is_empty() {
             prompt::primary_prompt(env_struct, lua, last_status, *current)
         } else {
