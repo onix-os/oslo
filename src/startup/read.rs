@@ -77,6 +77,9 @@ pub(super) fn read_command(
                 ))
             });
             helper.set_right_prompt(right, oslo::interactive::prompt::printed_width(&prompt));
+            // What this prompt is for, so a vi-mode repaint rebuilds the same one rather than
+            // guessing at the language or the status.
+            helper.set_prompt_context(reading.name(), last_status);
         }
 
         // Written before the prompt rather than inside it, for the same reason the right prompt is
