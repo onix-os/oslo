@@ -381,13 +381,31 @@ use std::sync::RwLock;
 
 static SETTINGS: RwLock<Option<Settings>> = RwLock::new(None);
 
+/// `--vi` / `--no-vi`, which outrank whatever a config says.
+///
+/// Kept apart from [`Settings`] rather than folded into it because the config is read *after* the
+/// command line and would otherwise overwrite the flag. A flag the user typed on this invocation
+/// should beat a file they wrote once, which is the whole reason for having it.
+static VI_OVERRIDE: RwLock<Option<bool>> = RwLock::new(None);
+
+/// Force vi mode on or off for this session, or `None` to leave the config in charge.
+pub fn force_vi(on: Option<bool>) {
+    if let Ok(mut slot) = VI_OVERRIDE.write() {
+        *slot = on;
+    }
+}
+
 /// The settings in force.
 pub fn current() -> Settings {
-    SETTINGS
+    let mut settings = SETTINGS
         .read()
         .ok()
         .and_then(|s| s.clone())
-        .unwrap_or_default()
+        .unwrap_or_default();
+    if let Some(on) = VI_OVERRIDE.read().ok().and_then(|s| *s) {
+        settings.vi.enabled = on;
+    }
+    settings
 }
 
 pub fn install(settings: Settings) {

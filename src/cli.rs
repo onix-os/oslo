@@ -32,6 +32,10 @@ pub struct Invocation {
     pub positional: Vec<String>,
     /// `-i`: be interactive even when stdin is not a terminal.
     pub force_interactive: bool,
+    /// `--vi` / `--no-vi`: force the line editor's mode, overriding `oslo.vi.enabled`.
+    ///
+    /// `None` — the normal case — leaves the config in charge.
+    pub vi: Option<bool>,
     /// `-l`: behave as a login shell.
     pub login: bool,
     /// Single-letter `set` options given on the command line, e.g. `ex` for `-e -x`.
@@ -106,6 +110,10 @@ pub fn usage() -> String {
         s,
         "  --sh              run the program as shell (normally detected)"
     );
+    let _ = writeln!(
+        s,
+        "  --vi, --no-vi     force vi key bindings on or off (see oslo.vi.enabled)"
+    );
     let _ = writeln!(s, "  --version         print the version, then exit");
     let _ = writeln!(s, "  --help            print this message, then exit");
     let _ = writeln!(s, "  --                end of options");
@@ -141,6 +149,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, Exit> {
     let mut name = argv.first().cloned().unwrap_or_else(|| "oslo".to_string());
     let mut command: Option<String> = None;
     let mut force_language: Option<Language> = None;
+    let mut vi: Option<bool> = None;
     let mut read_stdin = false;
     let mut force_interactive = false;
     let mut login = false;
@@ -186,6 +195,9 @@ pub fn parse(argv: &[String]) -> Result<Invocation, Exit> {
                 }
                 "lua" => force_language = Some(Language::Lua),
                 "sh" => force_language = Some(Language::Shell),
+                // Both spellings: the editing mode is vi, but everyone calls the editor vim.
+                "vi" | "vim" => vi = Some(true),
+                "no-vi" | "no-vim" => vi = Some(false),
                 other => match long_option(other) {
                     Some(option) => {
                         if !long_options.contains(&option) {
@@ -285,6 +297,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, Exit> {
         login,
         set_options,
         force_language,
+        vi,
         long_options,
     })
 }
@@ -484,6 +497,20 @@ mod tests {
 
         let sh = parse_args(&["--sh", "script"]).expect("parse");
         assert_eq!(sh.force_language, Some(Language::Shell));
+    }
+    /// The flag beats the config, and both spellings work.
+    #[test]
+    fn vi_can_be_forced_on_or_off() {
+        assert_eq!(parse_args(&[]).expect("parse").vi, None, "config decides");
+        assert_eq!(parse_args(&["--no-vi"]).expect("parse").vi, Some(false));
+        assert_eq!(parse_args(&["--no-vim"]).expect("parse").vi, Some(false));
+        assert_eq!(parse_args(&["--vi"]).expect("parse").vi, Some(true));
+        assert_eq!(parse_args(&["--vim"]).expect("parse").vi, Some(true));
+        // Last one wins, as with every other repeated flag.
+        assert_eq!(
+            parse_args(&["--vi", "--no-vi"]).expect("parse").vi,
+            Some(false)
+        );
     }
 
     /// The flag it replaced must not linger as a silently-accepted no-op.

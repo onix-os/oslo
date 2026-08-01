@@ -109,6 +109,10 @@ fn dispatch() {
         }
     };
 
+    // Before anything reads the settings, and before the config is loaded — the flag is meant to
+    // beat the config, so it is installed first and applied on top of it.
+    oslo::interactive::settings::force_vi(invocation.vi);
+
     match invocation.action {
         // `-c` is the POSIX interface and is always shell: every `sh -c` idiom in the world
         // depends on that, and `--lua` is there for the caller who wants otherwise.

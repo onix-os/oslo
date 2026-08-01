@@ -303,6 +303,17 @@ fn build_editor(settings: &history::Settings) -> Repl {
         } else {
             rustyline::EditMode::Emacs
         })
+        // **How long Esc waits for a second byte.** rustyline's default is to wait *forever*:
+        // Esc is also the first byte of every arrow key and function key, so with no timeout the
+        // editor cannot tell "the user pressed Esc" from "a sequence is arriving" until the next
+        // byte turns up. In vi mode that means Esc appears to do nothing until you press
+        // something else — which is why leaving insert mode felt like it took two presses. It
+        // took one; the first just could not be acted on yet.
+        //
+        // 25ms is far longer than a terminal takes to write the rest of a sequence, which it
+        // sends in one burst, and far shorter than a person can notice. fish's `fish_escape_delay`
+        // defaults to the same order for the same reason.
+        .keyseq_timeout(Some(25))
         // `List`, not `Circular`, and the reason is the dropdown.
         //
         // oslo's completer opens its own menu, waits for a choice, and returns that one candidate
