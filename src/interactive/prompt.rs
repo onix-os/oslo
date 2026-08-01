@@ -18,6 +18,10 @@ use std::time::Duration;
 
 use super::theme;
 
+// The row-tracking half now lives in `super::row`; re-exported so callers keep one name for
+// "the prompt" rather than having to know which half a function is in.
+pub use super::row::{language, note_row, repaint, toggle_language};
+
 /// The branch the working directory is on, or a short hash when detached.
 pub fn git_branch() -> Option<String> {
     let head = git_root()?.join(".git/HEAD");
@@ -89,6 +93,29 @@ pub fn shorten(path: &str, keep: usize) -> String {
         .join("/")
 }
 
+/// Every language the prompt segment can show.
+///
+/// The list exists so the prompt's width can be *measured* rather than assumed. Add a language
+/// here and the prompt keeps its width automatically; hard-coding a number instead would put the
+/// shifting bug back the first time a name of a different length appeared.
+pub const LANGUAGES: [&str; 2] = ["sh", "lua"];
+
+/// The width the built-in left prompt is held to, in cells.
+///
+/// **Measured, not guessed.** Every language is rendered and the widest wins, so switching between
+/// them cannot move the line. This matters more than it looks: the line editor is told the
+/// prompt's width once, when the line starts, and every piece of arithmetic it does afterwards —
+/// where the cursor is, where the hint goes, where a wrapped row breaks — comes off that number.
+/// It has no way to be told the prompt changed size. So the prompt must not change size, and the
+/// only honest way to promise that is to measure.
+pub fn measured_width(last_status: i32) -> usize {
+    LANGUAGES
+        .iter()
+        .map(|language| printed_width(&render_default_left_prompt_unpadded(last_status, language)))
+        .max()
+        .unwrap_or(0)
+}
+
 /// The built-in left prompt, used when no Lua one is set.
 /// `user@host | N | sh ❯`
 ///
@@ -101,6 +128,30 @@ pub fn shorten(path: &str, keep: usize) -> String {
 /// The directory and the branch are on the *right*, because both change constantly and would
 /// otherwise push the command you are typing further and further across the screen.
 pub fn render_default_left_prompt(last_status: i32, language: &str) -> String {
+    let prompt = render_left_prompt_unpadded(last_status, language);
+    // Held to the measured width, padded after the arrow so the segments stay against the left
+    // edge and only the gap before the line changes.
+    let mut out = prompt;
+    for _ in printed_width(&out)..measured_width(last_status) {
+        out.push(' ');
+    }
+    out
+}
+
+fn render_left_prompt_unpadded(last_status: i32, language: &str) -> String {
+    let prompt = render_default_left_prompt_unpadded(last_status, language);
+    // Held to the measured width. The padding goes on the end, after the arrow, so the segments
+    // stay hard against the left edge and only the gap before the line grows.
+    let width = printed_width(&prompt);
+    let target = measured_width(last_status);
+    let mut out = prompt;
+    for _ in width..target {
+        out.push(' ');
+    }
+    out
+}
+
+fn render_default_left_prompt_unpadded(last_status: i32, language: &str) -> String {
     let theme = theme::current();
     let depth = theme::depth();
     let bar = theme.prompt.aside.paint(" | ", depth);
@@ -227,101 +278,6 @@ pub fn render_default_right_prompt(last_status: i32, elapsed: Option<Duration>) 
     parts.join(&theme.prompt.aside.paint("  ", depth))
 }
 
-/// What is currently on the prompt's row, so it can be drawn again without the line editor.
-///
-/// rustyline hands its prompt over once and never redraws it, and a key handler cannot ask it to —
-/// `EventContext` carries a `&dyn Refresher` while `refresh_prompt_and_line` wants `&mut`. So when
-/// the vi mode changes there is no way to make rustyline repaint, and a mode letter in the prompt
-/// would sit there saying `I` while the cursor said otherwise.
-///
-/// oslo repaints the row itself instead. The highlighter runs on every line change and knows
-/// everything needed — the language, the line, and where the cursor sits — so it leaves a copy
-/// here, and [`repaint`] writes it out again with whatever the mode is *now*.
-static ROW: std::sync::Mutex<Option<Row>> = std::sync::Mutex::new(None);
-
-#[derive(Clone)]
-struct Row {
-    /// The language segment, so the prompt can be rebuilt for the right one.
-    language: String,
-    status: i32,
-    /// Cells the prompt itself occupies, so the cursor column can be worked out from a position
-    /// within the line.
-    prompt_width: usize,
-}
-
-/// Record the row, for [`repaint`]. Called by the highlighter on every redraw.
-pub fn note_row(language: &str, status: i32, prompt_width: usize) {
-    if let Ok(mut slot) = ROW.lock() {
-        *slot = Some(Row {
-            language: language.to_string(),
-            status,
-            prompt_width,
-        });
-    }
-}
-
-/// Draw the prompt row again, with the vi mode as it stands now.
-///
-/// Returns the escapes to write, or empty when there is nothing recorded — the first prompt of a
-/// session, before anything has been highlighted.
-///
-/// **Only the prompt is rewritten — never the line, and nothing is erased.**
-///
-/// That restraint is the whole of it. The first attempt cleared the row and redrew prompt *and*
-/// line from the highlighter's snapshot, which broke the ghost suggestion and the completion
-/// dropdown outright: rustyline draws prompt, line, *and hint*, and the snapshot has no hint in
-/// it. The row came back without one while rustyline still believed it was there, so every later
-/// refresh measured against a row that no longer matched.
-///
-/// Overwriting just the prompt is safe because a prompt's width does not change with the mode —
-/// `I`, `N` and `R` are one cell each — so the line and the hint after it are untouched, and
-/// rustyline's idea of the row stays true. `\r` to the start, write, `\r` and forward to wherever
-/// the cursor was.
-/// `line_cursor` is how many cells into the *line* the cursor sits; the prompt's own width is
-/// added here. The caller gets it from the line and byte position the editor hands over.
-///
-/// **Not the end of the line.** Restoring to the end was the first version's bug: with the cursor
-/// anywhere but the end, every mode change dragged it to the right, which looks like the block
-/// jumping a slot and makes everything typed afterwards land in the wrong place.
-/// Switch the language the prompt shows, answering the one now in force.
-///
-/// The prompt is the only place the language is written down between keystrokes, so the toggle
-/// changes it here and repaints. It used to accept the line to hand control back to the read
-/// loop, which cost a row and a fresh prompt every time you changed your mind about what you were
-/// typing — and the thing you had already typed had to be carried across by hand.
-pub fn toggle_language() -> String {
-    let Ok(mut slot) = ROW.lock() else {
-        return "sh".to_string();
-    };
-    let Some(row) = slot.as_mut() else {
-        return "sh".to_string();
-    };
-    row.language = if row.language == "sh" { "lua" } else { "sh" }.to_string();
-    row.language.clone()
-}
-
-/// The language the prompt is currently showing.
-pub fn language() -> Option<String> {
-    ROW.lock().ok()?.as_ref().map(|row| row.language.clone())
-}
-
-pub fn repaint(line_cursor: usize) -> String {
-    let Ok(slot) = ROW.lock() else {
-        return String::new();
-    };
-    let Some(row) = slot.as_ref() else {
-        return String::new();
-    };
-    let left = render_default_left_prompt(row.status, &row.language);
-    let cursor = row.prompt_width + line_cursor;
-    let mut out = format!("\r{left}");
-    out.push('\r');
-    if cursor > 0 {
-        out.push_str(&format!("\x1b[{cursor}C"));
-    }
-    out
-}
-
 /// The escape that draws a right prompt, or empty when there is no room for one.
 ///
 /// **Where this goes matters, and the obvious place is wrong.** Putting it in the prompt string
@@ -434,6 +390,28 @@ mod tests {
 
     /// Drawn flush with the right edge, and returning the cursor to where it was so that whatever
     /// is written next — the ghost hint — still lands at the cursor.
+    /// Every language draws the prompt at the same width, so toggling cannot move the line.
+    ///
+    /// `sh` is two cells and `lua` is three. Without holding the width, switching shifted the
+    /// typed line, the ghost hint and the dropdown indent one cell sideways.
+    #[test]
+    fn the_prompt_is_the_same_width_in_every_language() {
+        for status in [0, 1] {
+            let widths: Vec<usize> = LANGUAGES
+                .iter()
+                .map(|l| printed_width(&render_default_left_prompt(status, l)))
+                .collect();
+            assert!(
+                widths.windows(2).all(|w| w[0] == w[1]),
+                "languages must render the same width, got {widths:?}"
+            );
+            assert_eq!(widths[0], measured_width(status));
+        }
+        // And the padding is on the end: the prompt still reads the same up to the arrow.
+        assert!(render_default_left_prompt(0, "sh").contains("sh"));
+        assert!(render_default_left_prompt(0, "lua").contains("lua"));
+    }
+
     #[test]
     fn a_right_prompt_is_drawn_flush_right_and_restores_the_cursor() {
         let escape = right_prompt_escape("12:34", 10, 80);

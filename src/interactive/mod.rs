@@ -14,6 +14,7 @@ pub mod keys;
 pub mod marks;
 pub mod prompt;
 pub mod query;
+pub mod row;
 pub mod settings;
 pub mod spec;
 pub mod syntax;
