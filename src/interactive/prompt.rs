@@ -244,19 +244,16 @@ struct Row {
     /// The language segment, so the prompt can be rebuilt for the right one.
     language: String,
     status: i32,
-    /// The painted line, exactly as the highlighter produced it.
-    painted: String,
     /// Cells from the start of the row to the cursor.
     cursor: usize,
 }
 
 /// Record the row, for [`repaint`]. Called by the highlighter on every redraw.
-pub fn note_row(language: &str, status: i32, painted: &str, cursor: usize) {
+pub fn note_row(language: &str, status: i32, cursor: usize) {
     if let Ok(mut slot) = ROW.lock() {
         *slot = Some(Row {
             language: language.to_string(),
             status,
-            painted: painted.to_string(),
             cursor,
         });
     }
@@ -267,9 +264,18 @@ pub fn note_row(language: &str, status: i32, painted: &str, cursor: usize) {
 /// Returns the escapes to write, or empty when there is nothing recorded — the first prompt of a
 /// session, before anything has been highlighted.
 ///
-/// `\r` then erase-to-end then rewrite: no save/restore, for the reason given on
-/// [`right_prompt_escape`], and no cursor-up, because a prompt and its line are one row until the
-/// line wraps. A wrapped line repaints its last row only, which is where the cursor is.
+/// **Only the prompt is rewritten — never the line, and nothing is erased.**
+///
+/// That restraint is the whole of it. The first attempt cleared the row and redrew prompt *and*
+/// line from the highlighter's snapshot, which broke the ghost suggestion and the completion
+/// dropdown outright: rustyline draws prompt, line, *and hint*, and the snapshot has no hint in
+/// it. The row came back without one while rustyline still believed it was there, so every later
+/// refresh measured against a row that no longer matched.
+///
+/// Overwriting just the prompt is safe because a prompt's width does not change with the mode —
+/// `I`, `N` and `R` are one cell each — so the line and the hint after it are untouched, and
+/// rustyline's idea of the row stays true. `\r` to the start, write, `\r` and forward to wherever
+/// the cursor was.
 pub fn repaint() -> String {
     let Ok(slot) = ROW.lock() else {
         return String::new();
@@ -278,7 +284,7 @@ pub fn repaint() -> String {
         return String::new();
     };
     let left = render_default_left_prompt(row.status, &row.language);
-    let mut out = format!("\r\x1b[K{left}{}", row.painted);
+    let mut out = format!("\r{left}");
     out.push('\r');
     if row.cursor > 0 {
         out.push_str(&format!("\x1b[{}C", row.cursor));
