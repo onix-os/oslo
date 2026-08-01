@@ -96,22 +96,54 @@ pub fn repaint(line: &str, line_cursor: usize) -> String {
     let width = super::prompt::printed_width(&left);
     let moved = width != row.prompt_width;
     row.prompt_width = width;
-    let cursor = width + line_cursor;
-    let mut out = format!("\r{left}");
-    // **The line moves with the prompt.** `lua` is a cell wider than `sh`, so when the width
-    // changes the text has to be written again in its new place: the editor lays the row out
-    // against the width it was given when the line started and will not do it. Left alone, the
-    // old text stays where it was and the row reads as two overlapping lines.
+
+    // **A row is not always one row.** Everything below is in absolute cells from the first cell of
+    // the prompt, converted to a row and a column at the end.
     //
-    // Only when the width actually changed, so an ordinary vi mode change stays the cheap
-    // prompt-only repaint it has always been.
-    if moved {
-        out.push_str(line);
-        out.push_str("\x1b[K");
+    // This used to assume a single line: `\r` then a forward move. On a line long enough to wrap,
+    // `\r` homes the row the cursor happens to be on — the *last* one — so the prompt was redrawn
+    // in the middle of the typed text, and the forward move was a column count larger than the
+    // terminal, which clamps to the edge. That is the corruption that appears only once a line is
+    // long enough, which is why short test lines never showed it.
+    let cols = super::dropdown::terminal_cols().max(1);
+    let cursor_cell = width + line_cursor;
+    let end_cell = width + super::prompt::printed_width(line);
+
+    let mut out = String::new();
+    // Up to the row the prompt starts on. The cursor is wherever the editor last left it, which is
+    // at `cursor_cell`.
+    let cursor_row = cursor_cell / cols;
+    if cursor_row > 0 {
+        out.push_str(&format!("\x1b[{cursor_row}A"));
     }
     out.push('\r');
-    if cursor > 0 {
-        out.push_str(&format!("\x1b[{cursor}C"));
+    out.push_str(&left);
+
+    // The line moves with the prompt: `lua` is a cell wider than `sh`, so a width change means the
+    // text has to be written again in its new place. The editor lays the row out against the width
+    // it was given when the line started and will not redraw it.
+    if moved {
+        out.push_str(line);
+        // Only to the end of the last row the text occupies; erasing further would take rows that
+        // are not ours.
+        out.push_str("\x1b[K");
+    }
+
+    // Back to the cursor, as a row and a column rather than a single forward move.
+    let target_row = cursor_cell / cols;
+    let target_col = cursor_cell % cols;
+    // Where the writing above left the cursor: after the prompt, or after the line if it was
+    // redrawn.
+    let drawn_cell = if moved { end_cell } else { width };
+    let drawn_row = drawn_cell / cols;
+    if target_row > drawn_row {
+        out.push_str(&format!("\x1b[{}B", target_row - drawn_row));
+    } else if drawn_row > target_row {
+        out.push_str(&format!("\x1b[{}A", drawn_row - target_row));
+    }
+    out.push('\r');
+    if target_col > 0 {
+        out.push_str(&format!("\x1b[{target_col}C"));
     }
     out
 }
