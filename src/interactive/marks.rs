@@ -112,6 +112,71 @@ pub fn title(text: &str) -> String {
     format!("\x1b]0;{clean}\x1b\\")
 }
 
+/// `OSC 52` — put `text` on the system clipboard.
+///
+/// The one way a shell can reach the clipboard **through the terminal**, which means it works over
+/// SSH where `xsel` and `wl-copy` cannot: the bytes travel up the same connection the session
+/// does, and the terminal at the far end does the pasting.
+///
+/// Write-only by design. Reading back is supported almost nowhere, and a terminal that does
+/// support it usually asks the user first — so a `paste` built on this would work on one machine
+/// in ten and hang on the rest.
+///
+/// Not gated on [`enabled`]: unlike a title or a prompt mark, this is something the user asked for
+/// explicitly, and refusing it because stdout is a pipe would be surprising.
+pub fn clipboard(text: &str) -> String {
+    format!("\x1b]52;c;{}\x1b\\", base64(text.as_bytes()))
+}
+
+/// Base64, RFC 4648, which is what `OSC 52` carries.
+///
+/// Written out rather than pulled in: it is twenty lines, and a dependency for twenty lines is a
+/// dependency to audit, to keep current, and to explain in a build that has none.
+fn base64(bytes: &[u8]) -> String {
+    const ALPHABET: &[u8] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    let mut out = String::with_capacity(bytes.len().div_ceil(3) * 4);
+    for chunk in bytes.chunks(3) {
+        let b = [
+            chunk[0],
+            chunk.get(1).copied().unwrap_or(0),
+            chunk.get(2).copied().unwrap_or(0),
+        ];
+        let n = (u32::from(b[0]) << 16) | (u32::from(b[1]) << 8) | u32::from(b[2]);
+        for i in 0..4 {
+            // A group short of three bytes pads rather than encoding what it did not have.
+            if i <= chunk.len() {
+                out.push(ALPHABET[(n >> (18 - i * 6)) as usize & 0x3f] as char);
+            } else {
+                out.push('=');
+            }
+        }
+    }
+    out
+}
+
+/// `OSC 8` — `text`, clickable, pointing at `url`.
+///
+/// Only ever wrapped around text oslo itself prints: a path in a diagnostic, a file in a listing.
+/// It cannot make `ls` or `cargo` output clickable, because oslo never sees those bytes.
+///
+/// A terminal that does not know `OSC 8` shows `text` and drops the rest, so this is safe to emit
+/// unconditionally — which is why it is gated on [`enabled`] only to keep it out of scripts.
+pub fn hyperlink(url: &str, text: &str) -> String {
+    if !enabled() {
+        return text.to_string();
+    }
+    format!("\x1b]8;;{url}\x1b\\{text}\x1b]8;;\x1b\\")
+}
+
+/// A `file://` URL for a path on this machine, for [`hyperlink`].
+pub fn file_url(path: &str) -> String {
+    let host = nix::unistd::gethostname()
+        .ok()
+        .and_then(|h| h.into_string().ok())
+        .unwrap_or_default();
+    format!("file://{host}{}", percent_encode(path))
+}
+
 /// `OSC 133 ; A` — a new prompt, and a new block, begins here.
 pub fn prompt_start() -> String {
     if !enabled() {
@@ -188,6 +253,46 @@ mod tests {
         assert!(osc.starts_with("\x1b]7;file://"), "{osc:?}");
         assert!(osc.ends_with("\x1b\\"), "{osc:?}");
         ENABLED.store(false, Ordering::Relaxed);
+    }
+
+    /// Checked against the RFC 4648 vectors, because a base64 that is wrong by one pad character
+    /// puts silently corrupted text on the clipboard — which is worse than putting none there.
+    #[test]
+    fn base64_matches_the_rfc_vectors() {
+        assert_eq!(base64(b""), "");
+        assert_eq!(base64(b"f"), "Zg==");
+        assert_eq!(base64(b"fo"), "Zm8=");
+        assert_eq!(base64(b"foo"), "Zm9v");
+        assert_eq!(base64(b"foob"), "Zm9vYg==");
+        assert_eq!(base64(b"fooba"), "Zm9vYmE=");
+        assert_eq!(base64(b"foobar"), "Zm9vYmFy");
+        // Bytes that are not text at all still encode.
+        assert_eq!(base64(&[0xff, 0x00, 0xff]), "/wD/");
+    }
+
+    #[test]
+    fn the_clipboard_sequence_carries_the_encoded_text() {
+        assert_eq!(clipboard("foo"), "\x1b]52;c;Zm9v\x1b\\");
+        // Not gated on a terminal: copying is something the user asked for by name.
+        assert!(!clipboard("x").is_empty());
+    }
+
+    /// A terminal that does not know `OSC 8` shows the text and drops the rest, so the text has to
+    /// be there in full either way.
+    #[test]
+    fn a_hyperlink_wraps_its_text_without_altering_it() {
+        ENABLED.store(true, Ordering::Relaxed);
+        let link = hyperlink("file://h/etc/foo", "/etc/foo");
+        assert!(
+            link.starts_with("\x1b]8;;file://h/etc/foo\x1b\\"),
+            "{link:?}"
+        );
+        assert!(link.contains("/etc/foo"));
+        assert!(link.ends_with("\x1b]8;;\x1b\\"), "{link:?}");
+        ENABLED.store(false, Ordering::Relaxed);
+
+        // With marks off — a script — it is the bare text and nothing else.
+        assert_eq!(hyperlink("file://h/x", "/x"), "/x");
     }
 
     /// A control character in a title would end the sequence early and spill the rest onto the

@@ -18,6 +18,7 @@ mod colon;
 mod command;
 mod conditionals;
 mod control;
+mod copy;
 mod declare;
 mod directories;
 mod exec;
@@ -126,6 +127,9 @@ pub fn register_default_builtins(env: &mut Environment) {
     env.register_custom_builtin("kill", builtin_kill);
 
     // Job control. `wait` is registered above but belongs with these: all five read one table.
+    // `OSC 52` to the terminal, so it works over SSH where a clipboard helper cannot.
+    env.register_custom_builtin("copy", copy::builtin_copy);
+
     env.register_custom_builtin("jobs", builtin_jobs);
     env.register_custom_builtin("fg", builtin_fg);
     env.register_custom_builtin("bg", builtin_bg);
