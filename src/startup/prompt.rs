@@ -10,6 +10,49 @@ use oslo::Environment;
 use oslo::LuaEngine;
 use std::sync::{Arc, Mutex};
 
+/// The facts a prompt segment is drawn from, gathered once.
+///
+/// Everything here the shell already knows; a segment looking each of them up itself would run
+/// `git` once per segment per keystroke.
+fn context(last_status: i32, mode: Mode) -> oslo::lua::context::Context {
+    oslo::lua::context::Context {
+        status: last_status,
+        duration_ms: super::repl::last_command_duration().map(|d| d.as_millis() as u64),
+        cwd: super::repl::cwd(),
+        branch: oslo::interactive::prompt::git_branch(),
+        user: whoami(),
+        host: hostname(),
+        language: mode.name().to_string(),
+        vimode: oslo::interactive::vi::mode().map(|m| m.name().to_string()),
+        cols: oslo::interactive::dropdown::terminal_cols(),
+        jobs: 0,
+        continuation: false,
+    }
+}
+
+/// Who is logged in, `$USER` first because that is what `su` updates.
+fn whoami() -> String {
+    std::env::var("USER")
+        .ok()
+        .filter(|u| !u.is_empty())
+        .or_else(|| {
+            nix::unistd::User::from_uid(nix::unistd::getuid())
+                .ok()
+                .flatten()
+                .map(|u| u.name)
+        })
+        .unwrap_or_else(|| "?".to_string())
+}
+
+/// This machine's short name — everything before the first dot.
+fn hostname() -> String {
+    nix::unistd::gethostname()
+        .ok()
+        .and_then(|h| h.into_string().ok())
+        .map(|h| h.split('.').next().unwrap_or(&h).to_string())
+        .unwrap_or_else(|| "?".to_string())
+}
+
 pub fn primary_prompt(
     env_struct: &Arc<Mutex<Environment>>,
     lua: &LuaEngine,
@@ -25,7 +68,7 @@ pub fn primary_prompt(
 
     // A Lua prompt is an explicit choice by the user and outranks `PS1`, which in turn outranks
     // the built-in default.
-    lua.render("prompt.left")
+    lua.render_with("prompt.left", &context(last_status, mode))
         .or_else(|| lua.render_prompt())
         .unwrap_or_else(|| {
             // Both languages get the *same* prompt, with the language as one of its segments —

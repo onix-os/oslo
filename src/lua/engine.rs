@@ -2,6 +2,7 @@
 
 use crate::env::Environment;
 use crate::error::{Result, ShellError};
+use crate::lua::context::Context;
 use crate::lua::eval::value::Value;
 use crate::lua::eval::{self, Interp, LuaResult};
 use std::cell::RefCell;
@@ -244,12 +245,22 @@ impl LuaEngine {
 
     /// Render one of the prompts, or `None` when the config set none.
     ///
-    /// A string is used as written and a function is called, so a prompt that never changes need
-    /// not be a closure.
+    /// Three shapes, in the order a config is likely to reach for them: a **string** used as
+    /// written, so a prompt that never changes need not be a closure; a **function** called for its
+    /// return value; and a **list of segments**, which is the one that can be measured, styled and
+    /// degraded piece by piece — see the `segment` module for the shape of one.
     pub fn render(&self, key: &str) -> Option<String> {
+        self.render_with(key, &Context::default())
+    }
+
+    /// As [`render`](Self::render), with the facts a segment's `render(ctx)` is given.
+    pub fn render_with(&self, key: &str, ctx: &Context) -> Option<String> {
         let value = self.registry.borrow().get(key).cloned()?;
         if let Value::Str(text) = &value {
             return Some(text.to_string());
+        }
+        if crate::lua::api::segment::is_segment_list(&value) {
+            return self.render_segments(&value, ctx);
         }
         match self.interp.call(&value, Vec::new()) {
             Ok(values) => match values.first() {
@@ -287,6 +298,51 @@ impl LuaEngine {
     /// pushed in as it goes: a config may set the function, change its mind, and set another.
     pub fn install_column_provider(&self) {
         crate::lua::columns::install(&self.interp);
+    }
+
+    /// Render a list of segments into one string, dropping the least important until it fits.
+    fn render_segments(&self, list: &Value, ctx: &Context) -> Option<String> {
+        use crate::lua::api::segment;
+        let Value::Table(table) = list else {
+            return None;
+        };
+        let count = table.borrow().length();
+        let ctx_value = ctx.to_lua();
+        let mut pieces = Vec::new();
+        for i in 1..=count {
+            let seg = table.borrow().get(&Value::int(i));
+            let (name, priority) = segment::describe(&seg);
+            let Some(render) = segment::render_fn(&seg) else {
+                continue;
+            };
+            let produced = match self.interp.call(&render, vec![ctx_value.clone()]) {
+                Ok(values) => values.first().cloned().unwrap_or(Value::Nil),
+                Err(e) => {
+                    // Named, because with several segments "the prompt failed" does not say which.
+                    eprintln!("oslo: prompt: segment '{name}': {e}");
+                    continue;
+                }
+            };
+            let text = segment::spans_to_text(&produced, &|body, style| {
+                crate::lua::api::prompt::style_named(style)
+                    .paint(body, crate::interactive::theme::depth())
+            });
+            if text.is_empty() {
+                continue;
+            }
+            let width = crate::interactive::prompt::printed_width(&text);
+            pieces.push(segment::Rendered {
+                name,
+                priority,
+                text,
+                width,
+            });
+        }
+        // Half the terminal at most: a prompt wider than that leaves no room to type, which is the
+        // thing the prompt exists to serve.
+        let budget = ctx.cols.max(20) / 2;
+        let kept = segment::fit(pieces, budget);
+        Some(kept.into_iter().map(|p| p.text).collect())
     }
 
     /// Install `oslo.completion.for_command`, the per-command completion hook.

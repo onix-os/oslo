@@ -35,6 +35,9 @@ pub fn install(oslo: &mut Table, registry: &Registry) {
         ))
     });
     oslo.set(Value::str("git"), git());
+    // The fine-grained shape: a prompt as a list of named, prioritised pieces rather than one
+    // opaque string. See `super::segment`.
+    oslo.set(Value::str("segment"), super::segment::constructor());
 }
 
 /// The `oslo.prompt` table.
@@ -104,6 +107,28 @@ fn key_for(field: &str) -> Option<&'static str> {
 }
 
 /// A style written as `oslo.style(text, "green")` or `oslo.style(text, {fg = …, bold = true})`.
+/// A span's `style`, which is a *name*.
+///
+/// Two vocabularies, because both are worth having. A dotted name — `prompt.user`, `prompt.git` —
+/// is a **theme slot**: it follows whatever colour scheme is loaded, which is the whole point of
+/// naming styles rather than writing colours into the prompt. Anything else is parsed as a colour,
+/// so `"cyan"` or `"#8be9fd"` works without the config having to define a theme first.
+pub fn style_named(name: &str) -> Style {
+    let theme = theme::current();
+    match name {
+        "prompt.cwd" => theme.prompt.cwd,
+        "prompt.host" => theme.prompt.host,
+        "prompt.user" => theme.prompt.user,
+        "prompt.git" => theme.prompt.git,
+        "prompt.ok" => theme.prompt.ok,
+        "prompt.failed" => theme.prompt.failed,
+        "prompt.aside" => theme.prompt.aside,
+        // An unknown dotted name is a typo, not a colour: `prompt.usr` should not silently paint
+        // nothing *and* not be mistaken for a colour called "prompt.usr".
+        other => Color::parse(other).map(Style::fg).unwrap_or_default(),
+    }
+}
+
 fn style_from(value: Option<&Value>) -> Style {
     match value {
         Some(Value::Str(name)) => Color::parse(name).map(Style::fg).unwrap_or_default(),

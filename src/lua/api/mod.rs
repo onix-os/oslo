@@ -28,6 +28,7 @@ mod proc;
 pub(crate) mod prompt;
 mod re;
 mod run;
+pub(crate) mod segment;
 mod shell;
 pub(crate) mod tools;
 
