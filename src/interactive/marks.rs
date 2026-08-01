@@ -260,12 +260,18 @@ pub fn command_end(status: i32) -> String {
 
 #[cfg(test)]
 mod tests {
+    /// `ENABLED` is one process-wide flag and these tests set it both ways. Run in parallel they
+    /// flip it under each other, which showed up as a mark test failing at random — the same
+    /// hazard that has bitten the settings and theme tests. One at a time.
+    static SERIAL: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
     use super::*;
 
     /// Marks are off unless a person is looking at a terminal. A script's output must never carry
     /// escape sequences the shell invented.
     #[test]
     fn nothing_is_emitted_without_a_terminal() {
+        let _guard = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
         enable(false);
         assert_eq!(prompt_start(), "");
         assert_eq!(output_start(), "");
@@ -276,6 +282,7 @@ mod tests {
     /// they arrive next to each other.
     #[test]
     fn one_block_carries_one_id_through_all_three_marks() {
+        let _guard = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
         ENABLED.store(true, Ordering::Relaxed);
         NEXT_ID.store(7, Ordering::Relaxed);
 
@@ -297,6 +304,7 @@ mod tests {
     /// something else, and those are exactly the directories nobody tests with.
     #[test]
     fn a_working_directory_is_percent_encoded() {
+        let _guard = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
         ENABLED.store(true, Ordering::Relaxed);
         let osc = working_directory("/home/u/my dir/a#b");
         assert!(osc.contains("/home/u/my%20dir/a%23b"), "{osc:?}");
@@ -311,6 +319,7 @@ mod tests {
     /// There is no escaping mechanism in this sequence, so it is replaced.
     #[test]
     fn a_notification_cannot_be_split_by_its_own_text() {
+        let _guard = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
         ENABLED.store(true, Ordering::Relaxed);
         let osc = notify("oslo", "make; rm -rf /");
         assert_eq!(osc, "\x1b]777;notify;oslo;make, rm -rf /\x1b\\");
@@ -345,6 +354,7 @@ mod tests {
     /// be there in full either way.
     #[test]
     fn a_hyperlink_wraps_its_text_without_altering_it() {
+        let _guard = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
         ENABLED.store(true, Ordering::Relaxed);
         let link = hyperlink("file://h/etc/foo", "/etc/foo");
         assert!(
@@ -363,6 +373,7 @@ mod tests {
     /// screen as text.
     #[test]
     fn a_title_carries_no_control_characters() {
+        let _guard = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
         ENABLED.store(true, Ordering::Relaxed);
         let osc = title("build\x07 done\nnow");
         assert_eq!(osc, "\x1b]0;build donenow\x1b\\");
@@ -373,6 +384,7 @@ mod tests {
     /// swallowed along with whatever text followed it.
     #[test]
     fn every_mark_is_a_terminated_osc() {
+        let _guard = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
         ENABLED.store(true, Ordering::Relaxed);
         for mark in [prompt_start(), output_start(), command_end(0)] {
             assert!(mark.starts_with("\x1b]133;"), "{mark:?}");

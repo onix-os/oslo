@@ -292,8 +292,9 @@ pub fn right_prompt_escape(right: &str, used: usize, cols: usize) -> String {
         return String::new();
     }
     let right_w = printed_width(right);
-    // Two columns of gap, so the text being typed never touches it.
-    if used + right_w + 2 > cols {
+    // Two columns of gap so the text being typed never touches it, and one more on the right that
+    // is never written to at all — see the gap calculation below for why that last one matters.
+    if used + right_w + 3 > cols {
         return String::new();
     }
     // Move right, draw, move back — **not** save/restore.
@@ -306,10 +307,18 @@ pub fn right_prompt_escape(right: &str, used: usize, cols: usize) -> String {
     //
     // The gap is `cols - right_w - used`: from the cursor's column to the first cell of the right
     // prompt. Coming back is that gap plus the text just drawn.
-    let gap = cols - right_w - used;
-    // The last cell written is the final column, which leaves most terminals in a deferred-wrap
-    // state. `\r` settles that — the cursor is unambiguously at column 1 afterwards — and the
-    // forward move puts it back, rather than trusting the terminal to agree about where it was.
+    // **The final column is left empty on purpose.**
+    //
+    // Writing into it leaves the terminal in a deferred-wrap state: the cursor is notionally past
+    // the edge, and what happens next is up to the implementation. Most defer, and the `\r` below
+    // settles it harmlessly. Some wrap *eagerly* — the cursor is already on the next row before
+    // the `\r` arrives, so `\r` homes that row instead, the forward move lands there, and the
+    // ghost hint rustyline writes next is drawn a row down. That is the "new lines of garbage"
+    // this used to produce, and it appears only on terminals that wrap eagerly, which is why it
+    // never showed up in testing here.
+    //
+    // One unwritten column costs nothing and removes the question entirely.
+    let gap = cols - right_w - used - 1;
     let home = used;
     if home == 0 {
         format!("\x1b[{gap}C{right}\r")
@@ -405,11 +414,25 @@ mod tests {
     #[test]
     fn a_right_prompt_is_drawn_flush_right_and_restores_the_cursor() {
         let escape = right_prompt_escape("12:34", 10, 80);
-        // From column 11 to column 76 is 65 cells forward; `12:34` then ends on column 80.
-        assert!(escape.starts_with("\x1b[65C"), "{escape:?}");
+        // From column 11, 64 cells forward, and `12:34` then ends on column 79 — one short of the
+        // edge. The final column is deliberately never written: see the gap calculation.
+        assert!(escape.starts_with("\x1b[64C"), "{escape:?}");
         assert!(escape.contains("12:34"), "{escape:?}");
-        // Back to where it started, via column 1 — see the comment on the deferred wrap.
+        // Back to where it started, via column 1.
         assert!(escape.ends_with("\r\x1b[10C"), "{escape:?}");
+
+        // The last cell written is never the last column, whatever the width.
+        for cols in [40usize, 60, 80, 100, 200] {
+            let escape = right_prompt_escape("12:34", 10, cols);
+            let Some(rest) = escape.strip_prefix("\x1b[") else {
+                continue;
+            };
+            let gap: usize = rest[..rest.find('C').unwrap()].parse().unwrap();
+            assert!(
+                10 + gap + 5 < cols,
+                "right prompt reaches the final column at {cols}: gap {gap}"
+            );
+        }
 
         // **No save/restore.** There is one DECSC slot per terminal and it is shared with the
         // dropdown and with any multiplexer hosting the session; a restore could land wherever
