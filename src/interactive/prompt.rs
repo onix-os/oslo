@@ -128,27 +128,10 @@ pub fn measured_width(last_status: i32) -> usize {
 /// The directory and the branch are on the *right*, because both change constantly and would
 /// otherwise push the command you are typing further and further across the screen.
 pub fn render_default_left_prompt(last_status: i32, language: &str) -> String {
-    let prompt = render_left_prompt_unpadded(last_status, language);
-    // Held to the measured width, padded after the arrow so the segments stay against the left
-    // edge and only the gap before the line changes.
-    let mut out = prompt;
-    for _ in printed_width(&out)..measured_width(last_status) {
-        out.push(' ');
-    }
-    out
-}
-
-fn render_left_prompt_unpadded(last_status: i32, language: &str) -> String {
-    let prompt = render_default_left_prompt_unpadded(last_status, language);
-    // Held to the measured width. The padding goes on the end, after the arrow, so the segments
-    // stay hard against the left edge and only the gap before the line grows.
-    let width = printed_width(&prompt);
-    let target = measured_width(last_status);
-    let mut out = prompt;
-    for _ in width..target {
-        out.push(' ');
-    }
-    out
+    // Its natural width, whatever that is. `lua` really is a cell wider than `sh`, and the line
+    // moves with it — see the toggle in `startup::mode`, which reopens the editor so the new
+    // width is the one it lays the row out against.
+    render_default_left_prompt_unpadded(last_status, language)
 }
 
 fn render_default_left_prompt_unpadded(last_status: i32, language: &str) -> String {
@@ -390,22 +373,18 @@ mod tests {
 
     /// Drawn flush with the right edge, and returning the cursor to where it was so that whatever
     /// is written next — the ghost hint — still lands at the cursor.
-    /// Every language draws the prompt at the same width, so toggling cannot move the line.
-    ///
-    /// `sh` is two cells and `lua` is three. Without holding the width, switching shifted the
-    /// typed line, the ghost hint and the dropdown indent one cell sideways.
+    /// `measured_width` really is the widest the prompt gets, whichever language it shows.
     #[test]
-    fn the_prompt_is_the_same_width_in_every_language() {
+    fn the_measured_width_covers_every_language() {
         for status in [0, 1] {
             let widths: Vec<usize> = LANGUAGES
                 .iter()
                 .map(|l| printed_width(&render_default_left_prompt(status, l)))
                 .collect();
-            assert!(
-                widths.windows(2).all(|w| w[0] == w[1]),
-                "languages must render the same width, got {widths:?}"
-            );
-            assert_eq!(widths[0], measured_width(status));
+            // The prompt is its natural width in each language — `lua` really is a cell wider
+            // than `sh`. What keeps the line from being left behind is that the row is redrawn,
+            // not that the prompt is padded.
+            assert_eq!(*widths.iter().max().unwrap(), measured_width(status));
         }
         // And the padding is on the end: the prompt still reads the same up to the arrow.
         assert!(render_default_left_prompt(0, "sh").contains("sh"));

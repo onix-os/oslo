@@ -15,6 +15,16 @@ use oslo::interactive::InputStatus;
 use rustyline::error::ReadlineError;
 use std::sync::{Arc, Mutex};
 
+/// How wide the terminal is, defaulting to the usual 80 when it cannot be asked.
+fn terminal_width() -> usize {
+    nix::ioctl_read_bad!(tiocgwinsz, nix::libc::TIOCGWINSZ, nix::libc::winsize);
+    let mut size: nix::libc::winsize = unsafe { std::mem::zeroed() };
+    match unsafe { tiocgwinsz(1, &mut size) } {
+        Ok(_) if size.ws_col > 0 => size.ws_col as usize,
+        _ => 80,
+    }
+}
+
 /// One trip round the prompt.
 pub(super) enum Input {
     /// A complete command, the language to run it in, and whether the user asked for it not to be
@@ -132,10 +142,24 @@ pub(super) fn read_command(
         // The toggle key repaints the prompt in place rather than submitting, so by the time a
         // line comes back the prompt may be showing the other language. That is the answer for
         // *this* line and for the ones after it: what you see above the cursor is what runs.
-        if toggle.take()
-            && let Some(language) = oslo::interactive::prompt::language()
-        {
-            {
+        if toggle.take() {
+            // Accepting the line to change the prompt's width cost a row. Take it back: step up
+            // onto the row just vacated and clear it, so the new prompt lands where the old one
+            // was and switching language looks like the prompt changing rather than the shell
+            // starting again.
+            //
+            // Only when that row is certainly one row. A line long enough to have wrapped
+            // occupies several, and moving up one would land in the middle of it — so a wrapped
+            // line keeps the newline rather than being redrawn wrong.
+            let cols = terminal_width();
+            let one_row = oslo::interactive::prompt::measured_width(last_status)
+                + oslo::interactive::prompt::printed_width(&raw)
+                < cols;
+            if one_row {
+                print!("\x1b[1A\r\x1b[K");
+                let _ = std::io::Write::flush(&mut std::io::stdout());
+            }
+            if let Some(language) = oslo::interactive::prompt::language() {
                 let switched = if language == "lua" {
                     Mode::Lua
                 } else {
@@ -144,6 +168,10 @@ pub(super) fn read_command(
                 *current = switched;
                 reading = switched;
             }
+            // What was typed goes back into the new prompt's line, so changing language never
+            // costs the command.
+            typed = raw;
+            continue;
         }
 
         if buffer.is_empty() {

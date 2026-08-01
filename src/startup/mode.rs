@@ -151,26 +151,19 @@ impl ToggleRequest {
 }
 
 impl ConditionalEventHandler for ToggleRequest {
-    fn handle(&self, _: &Event, _: RepeatCount, _: bool, ctx: &EventContext) -> Option<Cmd> {
-        // **In place.** This used to accept the line so the read loop could rebuild the prompt in
-        // the other language, which meant changing language cost a row, a fresh prompt, and the
-        // line you had typed being carried across by hand. Nothing about switching language needs
-        // any of that: the line is untouched, only the word in the prompt changes.
+    fn handle(&self, _: &Event, _: RepeatCount, _: bool, _: &EventContext) -> Option<Cmd> {
+        // **The prompt genuinely changes width** — `lua` is a cell wider than `sh` — so the line
+        // has to move with it. Repainting the prompt alone cannot do that: the line editor is
+        // told the prompt's size once, when the line starts, and lays out the row, the cursor and
+        // the ghost hint against that number for as long as the line lives. Redraw a wider prompt
+        // under it and everything after it is off by a cell.
         //
-        // So the language is switched where the prompt keeps it and the prompt is redrawn, the
-        // same way a vi mode change is. The read loop asks the prompt which language it ended up
-        // in once the line is submitted.
+        // So the line is accepted, which ends that layout, and the read loop immediately opens a
+        // new one with the other language's prompt and the text carried across. The row it cost
+        // is taken back in `read_command` — see the cursor move there.
         self.0.store(true, Ordering::SeqCst);
         oslo::interactive::prompt::toggle_language();
-        let cursor = oslo::interactive::prompt::printed_width(&ctx.line()[..ctx.pos()]);
-        let mut out = std::io::stdout();
-        let _ = std::io::Write::write_all(
-            &mut out,
-            oslo::interactive::prompt::repaint(cursor).as_bytes(),
-        );
-        let _ = std::io::Write::flush(&mut out);
-        // Declined: the key changed the prompt, not the line.
-        None
+        Some(Cmd::AcceptLine)
     }
 }
 
