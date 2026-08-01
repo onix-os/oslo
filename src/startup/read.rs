@@ -82,7 +82,17 @@ pub(super) fn read_command(
         // Written before the prompt rather than inside it, for the same reason the right prompt is
         // not concatenated: the line editor measures the prompt string to know where the line
         // starts, and an OSC in there is counted as visible width.
-        print!("{}", oslo::interactive::marks::prompt_start());
+        // The title goes back to the directory now that nothing is running, and the working
+        // directory is (re)announced — the first prompt of a session is the only chance to tell
+        // the terminal where it started.
+        print!(
+            "{}{}{}",
+            oslo::interactive::marks::working_directory(&crate::startup::repl::cwd()),
+            oslo::interactive::marks::title(&oslo::interactive::prompt::tilde(
+                &crate::startup::repl::cwd()
+            )),
+            oslo::interactive::marks::prompt_start()
+        );
         let _ = std::io::Write::flush(&mut std::io::stdout());
 
         let raw = match rl.readline_with_initial(&prompt, (&typed, "")) {

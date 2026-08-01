@@ -59,6 +59,59 @@ fn advance() -> u64 {
     NEXT_ID.fetch_add(1, Ordering::Relaxed)
 }
 
+/// `OSC 7` — where the shell is now.
+///
+/// A `file://host/path` URL, which is what makes a terminal open a new tab or split in the
+/// directory you were in rather than in `$HOME`. Read by kitty, foot, WezTerm, Ghostty and every
+/// multiplexer that cares — it is the highest-value sequence a shell emits and costs one write per
+/// `cd`.
+///
+/// The path is percent-encoded, because a URL is not a path: a directory with a space, a `#` or a
+/// `%` in it produces a URL that means something else entirely, and directories like that are
+/// exactly the ones nobody tests with.
+pub fn working_directory(path: &str) -> String {
+    if !enabled() {
+        return String::new();
+    }
+    let host = nix::unistd::gethostname()
+        .ok()
+        .and_then(|h| h.into_string().ok())
+        .unwrap_or_default();
+    format!("\x1b]7;file://{host}{}\x1b\\", percent_encode(path))
+}
+
+/// Percent-encode the parts of a path a URL cannot carry literally.
+///
+/// Unreserved characters (RFC 3986) plus `/`, which is the path separator and must stay literal.
+fn percent_encode(path: &str) -> String {
+    let mut out = String::with_capacity(path.len());
+    for byte in path.bytes() {
+        match byte {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~' | b'/' => {
+                out.push(byte as char)
+            }
+            other => out.push_str(&format!("%{other:02X}")),
+        }
+    }
+    out
+}
+
+/// `OSC 0` — the window and tab title.
+///
+/// Set to the command while one is running and to the directory when the shell is idle, which is
+/// fish's behaviour: a row of tabs then says what each one is *doing*, not merely where it is.
+///
+/// A multiplexer that names its own panes will fight this, and the last writer wins. That is why
+/// it is a setting rather than unconditional.
+pub fn title(text: &str) -> String {
+    if !enabled() {
+        return String::new();
+    }
+    // Control characters would end the sequence early and leave the rest as text on screen.
+    let clean: String = text.chars().filter(|c| !c.is_control()).collect();
+    format!("\x1b]0;{clean}\x1b\\")
+}
+
 /// `OSC 133 ; A` — a new prompt, and a new block, begins here.
 pub fn prompt_start() -> String {
     if !enabled() {
@@ -120,6 +173,30 @@ mod tests {
         assert_eq!(prompt_start(), "\x1b]133;A;aid=8\x1b\\");
         assert_eq!(output_start(), "\x1b]133;C;aid=8\x1b\\");
 
+        ENABLED.store(false, Ordering::Relaxed);
+    }
+
+    /// A URL is not a path. A directory with a space or a `#` in it makes a URL that means
+    /// something else, and those are exactly the directories nobody tests with.
+    #[test]
+    fn a_working_directory_is_percent_encoded() {
+        ENABLED.store(true, Ordering::Relaxed);
+        let osc = working_directory("/home/u/my dir/a#b");
+        assert!(osc.contains("/home/u/my%20dir/a%23b"), "{osc:?}");
+        // Slashes stay literal, or the path stops being a path.
+        assert!(!osc.contains("%2F"), "{osc:?}");
+        assert!(osc.starts_with("\x1b]7;file://"), "{osc:?}");
+        assert!(osc.ends_with("\x1b\\"), "{osc:?}");
+        ENABLED.store(false, Ordering::Relaxed);
+    }
+
+    /// A control character in a title would end the sequence early and spill the rest onto the
+    /// screen as text.
+    #[test]
+    fn a_title_carries_no_control_characters() {
+        ENABLED.store(true, Ordering::Relaxed);
+        let osc = title("build\x07 done\nnow");
+        assert_eq!(osc, "\x1b]0;build donenow\x1b\\");
         ENABLED.store(false, Ordering::Relaxed);
     }
 

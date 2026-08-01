@@ -167,6 +167,9 @@ pub fn run_repl() -> ! {
                 // Handed the command as typed, which is what a `precmd` hook is for: logging it,
                 // timing it, or setting a title from it.
                 lua.fire_hook("precmd", vec![LuaEngine::hook_arg(&text)]);
+                // The title says what is running while it runs, and goes back to the directory
+                // when the prompt returns. A row of tabs then says what each is *doing*.
+                announce(&oslo::interactive::marks::title(&title_for_command(&text)));
                 // Everything after this belongs to the command, not to the prompt.
                 print!("{}", oslo::interactive::marks::output_start());
                 let _ = std::io::Write::flush(&mut std::io::stdout());
@@ -208,6 +211,9 @@ pub fn run_repl() -> ! {
                 let after = current_directory();
                 if after != before {
                     lua.fire_hook("cd", vec![LuaEngine::hook_arg(&after)]);
+                    // The terminal is told too, so a new split or tab opens here rather than in
+                    // `$HOME`. One write, only when the directory actually changed.
+                    announce(&oslo::interactive::marks::working_directory(&after));
                 }
                 note_command_duration(started.elapsed());
                 // The command is over and its status is known: close the block before anything
@@ -292,7 +298,39 @@ fn build_editor(settings: &history::Settings) -> Repl {
     Editor::with_config(config).expect("Failed to initialize line editor")
 }
 
+/// Write a terminal sequence, if there is one to write.
+///
+/// Empty when the sequence is disabled, which is every script and every `-c`, so this is the one
+/// place that has to know the difference.
+fn announce(sequence: &str) {
+    if sequence.is_empty() {
+        return;
+    }
+    print!("{sequence}");
+    let _ = std::io::Write::flush(&mut std::io::stdout());
+}
+
+/// The title to show while `text` runs: the command, shortened to its first word and trimmed.
+///
+/// The first word rather than the whole line, because a title bar is narrow and `cargo` in a tab
+/// is more use than the first forty characters of a `for` loop.
+fn title_for_command(text: &str) -> String {
+    let first = text.split_whitespace().next().unwrap_or("");
+    if first.is_empty() {
+        current_directory()
+    } else {
+        format!(
+            "{first} — {}",
+            oslo::interactive::prompt::tilde(&current_directory())
+        )
+    }
+}
+
 /// Where the shell is now, for the `cd` hook to compare against.
+pub(super) fn cwd() -> String {
+    current_directory()
+}
+
 fn current_directory() -> String {
     std::env::current_dir()
         .map(|p| p.to_string_lossy().into_owned())
