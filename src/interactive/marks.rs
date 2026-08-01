@@ -20,11 +20,12 @@
 //! | `OSC 133 ; C ; aid=<n> ST` | just before the command runs | output starts here |
 //! | `OSC 133 ; D ; <status> ; aid=<n> ST` | once it has finished | command end, with its exit status |
 //!
-//! `B` — "the prompt ends and typing starts" — is deliberately **not** emitted. It would have to
-//! be written between the prompt and the cursor, which means inside the string handed to the line
-//! editor, and the editor measures that string to work out where the line begins. An `OSC` in
-//! there is counted as visible width and the cursor arithmetic is wrong from the first keystroke.
-//! `A`..`C` already delimits the prompt, which is what a folding implementation needs.
+//! `B` — "the prompt ends and typing starts" — *is* emitted, but not from the prompt string. It
+//! has to sit between the prompt and the cursor, and the line editor measures the prompt to work
+//! out where the line begins, so an `OSC` in there is counted as visible width and the cursor
+//! arithmetic is wrong from the first keystroke. The seam is the **highlighter**: rustyline writes
+//! the prompt, then whatever `highlight` returned, and measures only the raw line. A mark prepended
+//! there lands in exactly the right place and costs nothing.
 //!
 //! `aid` is oslo's addition to the standard three: it makes each block nameable, so a reader can
 //! match a `D` to the `A` that opened it without relying on them being adjacent in the stream.
@@ -216,6 +217,24 @@ pub fn prompt_start() -> String {
         return String::new();
     }
     format!("\x1b]133;A;aid={}\x1b\\", advance())
+}
+
+/// `OSC 133 ; B` — the prompt ends here and what you type begins.
+///
+/// This has to sit *between* the prompt and the cursor, which is why it was left out for so long:
+/// putting it in the prompt string means the line editor measures it, counts its bytes as visible
+/// cells, and puts the cursor in the wrong column from the first keystroke. fish has an open bug
+/// on exactly that shape.
+///
+/// The seam is the **highlighter**. rustyline writes `prompt` followed by whatever `highlight`
+/// returned, and measures only the raw line — never the painted one. So a mark prepended to the
+/// painted line lands in precisely the right place and costs nothing in the arithmetic. This is
+/// the same property the right prompt already relies on.
+pub fn input_start() -> String {
+    if !enabled() {
+        return String::new();
+    }
+    format!("\x1b]133;B;aid={}\x1b\\", current_id().saturating_sub(1))
 }
 
 /// `OSC 133 ; C` — everything after this is the command's output.

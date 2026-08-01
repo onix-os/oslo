@@ -278,7 +278,11 @@ impl Highlighter for OsloHelper {
             // colours of. See `highlight::MAX_PATH_CHECKS`.
             check_paths: line.len() <= 512,
         };
-        let mut painted = highlight::paint(line, &ctx);
+        // `OSC 133;B` goes first, so it lands between the prompt and the typed text — which is
+        // where it means anything. rustyline measures the *raw* line and never this, so the mark
+        // costs nothing in the cursor arithmetic. See `marks::input_start`.
+        let mut painted = marks::input_start();
+        painted.push_str(&highlight::paint(line, &ctx));
 
         // The right prompt rides here rather than in the prompt string: `compute_layout` measures
         // the raw line and never this, so a cursor move costs nothing in rustyline's arithmetic.
@@ -305,15 +309,17 @@ impl Highlighter for OsloHelper {
 impl OsloHelper {
     /// The right prompt on its own, for a line with no syntax to paint.
     fn right_prompt_only(&self, line: &str) -> String {
+        // The input mark belongs on an empty line too — that is the line you are about to type on.
+        let mark = marks::input_start();
         let Ok(slot) = self.right_prompt.lock() else {
-            return line.to_string();
+            return format!("{mark}{line}");
         };
         let Some((right, left_width)) = slot.as_ref() else {
-            return line.to_string();
+            return format!("{mark}{line}");
         };
         let used = left_width + prompt::printed_width(line);
         format!(
-            "{line}{}",
+            "{mark}{line}{}",
             prompt::right_prompt_escape(right, used, dropdown::terminal_cols())
         )
     }
