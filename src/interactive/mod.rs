@@ -268,6 +268,34 @@ impl Hinter for OsloHelper {
 }
 
 impl Highlighter for OsloHelper {
+    /// The prompt, re-rendered for whichever language the prompt is *now* reading.
+    ///
+    /// **This is what makes an in-place language switch stick.** The editor keeps the prompt
+    /// string it was handed when the line started and writes that same string on every redraw —
+    /// so a repaint that changed the language was reverted by the next keystroke, a completion,
+    /// or anything else that refreshed the row. Rendering it here instead means every redraw is
+    /// already correct and there is nothing to fight.
+    ///
+    /// Only the built-in prompt is rebuilt. A prompt from a Lua config is that config's business
+    /// and is passed through untouched.
+    fn highlight_prompt<'b, 's: 'b, 'p: 'b>(
+        &'s self,
+        prompt: &'p str,
+        _default: bool,
+    ) -> Cow<'b, str> {
+        let Some(language) = prompt::language() else {
+            return Cow::Borrowed(prompt);
+        };
+        let rebuilt = prompt::render_default_left_prompt(self.last_status(), &language);
+        // Only when it really is the built-in prompt: same width means same layout, and the
+        // editor's arithmetic is measured off the string it was given.
+        if prompt::printed_width(&rebuilt) == prompt::printed_width(prompt) {
+            Cow::Owned(rebuilt)
+        } else {
+            Cow::Borrowed(prompt)
+        }
+    }
+
     fn highlight<'l>(&self, line: &'l str, _pos: usize) -> Cow<'l, str> {
         // An empty line still gets the right prompt. Returning `Cow::Borrowed(line)` here is what
         // made it appear only after the first keystroke: rustyline draws the prompt, calls this

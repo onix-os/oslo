@@ -128,10 +128,21 @@ pub fn measured_width(last_status: i32) -> usize {
 /// The directory and the branch are on the *right*, because both change constantly and would
 /// otherwise push the command you are typing further and further across the screen.
 pub fn render_default_left_prompt(last_status: i32, language: &str) -> String {
-    // Its natural width, whatever that is. `lua` really is a cell wider than `sh`, and the line
-    // moves with it — see the toggle in `startup::mode`, which reopens the editor so the new
-    // width is the one it lays the row out against.
-    render_default_left_prompt_unpadded(last_status, language)
+    // Held to one width across every language, and the reason is not cosmetic.
+    //
+    // The editor measures the prompt string it is handed *once*, when the line starts, and lays
+    // out the row, the cursor and the ghost hint against that number for as long as the line
+    // lives. It cannot be told the prompt changed size. So a language whose name is a cell wider
+    // can be *drawn* — see `highlight_prompt` — only if it occupies the same cells; otherwise
+    // every redraw puts the text a cell away from where the editor believes it is.
+    //
+    // The width is measured across the languages rather than hard-coded, so adding one cannot
+    // quietly reintroduce the shifting.
+    let mut out = render_default_left_prompt_unpadded(last_status, language);
+    for _ in printed_width(&out)..measured_width(last_status) {
+        out.push(' ');
+    }
+    out
 }
 
 fn render_default_left_prompt_unpadded(last_status: i32, language: &str) -> String {
