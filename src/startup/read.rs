@@ -106,6 +106,19 @@ pub(super) fn read_command(
             helper.set_prompt_context(reading.name(), last_status);
         }
 
+        // What this row *is*, recorded before the editor is entered rather than from inside the
+        // highlighter. The highlighter only reaches its own `note_row` on some paths, so anything
+        // that redraws the prompt — the vi mode letter, the language toggle — found nothing
+        // recorded and silently did nothing at all. Here it is unconditional: a prompt is about to
+        // be drawn, and this is what it says.
+        {
+            oslo::interactive::prompt::note_row(
+                reading.name(),
+                last_status,
+                oslo::interactive::prompt::printed_width(&prompt),
+            );
+        }
+
         // Written before the prompt rather than inside it, for the same reason the right prompt is
         // not concatenated: the line editor measures the prompt string to know where the line
         // starts, and an OSC in there is counted as visible width.

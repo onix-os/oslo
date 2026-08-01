@@ -52,7 +52,8 @@ impl ConditionalEventHandler for ViCursor {
             let _ = out.write_all(escape.as_bytes());
             // The row after the cursor shape, so the prompt and the cursor agree in one frame
             // rather than flickering between two.
-            let _ = out.write_all(oslo::interactive::prompt::repaint(cursor).as_bytes());
+            let _ =
+                out.write_all(oslo::interactive::prompt::repaint(ctx.line(), cursor).as_bytes());
             let _ = out.flush();
         }
         // Declined on purpose: this handler observes, it does not bind.

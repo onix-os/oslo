@@ -151,19 +151,22 @@ impl ToggleRequest {
 }
 
 impl ConditionalEventHandler for ToggleRequest {
-    fn handle(&self, _: &Event, _: RepeatCount, _: bool, _: &EventContext) -> Option<Cmd> {
-        // **The prompt genuinely changes width** — `lua` is a cell wider than `sh` — so the line
-        // has to move with it. Repainting the prompt alone cannot do that: the line editor is
-        // told the prompt's size once, when the line starts, and lays out the row, the cursor and
-        // the ghost hint against that number for as long as the line lives. Redraw a wider prompt
-        // under it and everything after it is off by a cell.
-        //
-        // So the line is accepted, which ends that layout, and the read loop immediately opens a
-        // new one with the other language's prompt and the text carried across. The row it cost
-        // is taken back in `read_command` — see the cursor move there.
+    fn handle(&self, _: &Event, _: RepeatCount, _: bool, ctx: &EventContext) -> Option<Cmd> {
+        // **Declined, not accepted.** This used to answer `AcceptLine` so the read loop could
+        // reopen the editor with the other language's prompt. That put the switch behind the line
+        // validator and a round of the read loop, either of which can decide the line is not
+        // ready — so the key did nothing at all some of the time. A key that changes language has
+        // to work on the first press, every time.
         self.0.store(true, Ordering::SeqCst);
         oslo::interactive::prompt::toggle_language();
-        Some(Cmd::AcceptLine)
+        let cursor = oslo::interactive::prompt::printed_width(&ctx.line()[..ctx.pos()]);
+        let mut out = std::io::stdout();
+        let _ = std::io::Write::write_all(
+            &mut out,
+            oslo::interactive::prompt::repaint(ctx.line(), cursor).as_bytes(),
+        );
+        let _ = std::io::Write::flush(&mut out);
+        None
     }
 }
 

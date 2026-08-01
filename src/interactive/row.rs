@@ -85,16 +85,30 @@ pub fn language() -> Option<String> {
     ROW.lock().ok()?.as_ref().map(|row| row.language.clone())
 }
 
-pub fn repaint(line_cursor: usize) -> String {
-    let Ok(slot) = ROW.lock() else {
+pub fn repaint(line: &str, line_cursor: usize) -> String {
+    let Ok(mut slot) = ROW.lock() else {
         return String::new();
     };
-    let Some(row) = slot.as_ref() else {
+    let Some(row) = slot.as_mut() else {
         return String::new();
     };
     let left = render_default_left_prompt(row.status, &row.language);
-    let cursor = row.prompt_width + line_cursor;
+    let width = super::prompt::printed_width(&left);
+    let moved = width != row.prompt_width;
+    row.prompt_width = width;
+    let cursor = width + line_cursor;
     let mut out = format!("\r{left}");
+    // **The line moves with the prompt.** `lua` is a cell wider than `sh`, so when the width
+    // changes the text has to be written again in its new place: the editor lays the row out
+    // against the width it was given when the line started and will not do it. Left alone, the
+    // old text stays where it was and the row reads as two overlapping lines.
+    //
+    // Only when the width actually changed, so an ordinary vi mode change stays the cheap
+    // prompt-only repaint it has always been.
+    if moved {
+        out.push_str(line);
+        out.push_str("\x1b[K");
+    }
     out.push('\r');
     if cursor > 0 {
         out.push_str(&format!("\x1b[{cursor}C"));
