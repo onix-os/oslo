@@ -35,6 +35,17 @@ impl OsloHelper {
         }
         let stem = word.stem.as_str();
 
+        // **Only in shell.** Everything below offers a *command* — a builtin, an alias, a shell
+        // function, something on `$PATH`. None of those are Lua, so at a Lua prompt `l` was being
+        // answered with `ls`: a suggestion that cannot run in the language being typed, which is
+        // worse than no suggestion at all.
+        //
+        // History still suggests here, and it is filtered by language too — see
+        // `startup::recall`. So a Lua prompt suggests Lua you have actually written.
+        if super::prompt::language().is_some_and(|language| language != "sh") {
+            return None;
+        }
+
         let env = self.env.lock().unwrap();
         let path = env.get_var("PATH").unwrap_or_default().to_string();
         let is_shell_name = |n: &str| {
