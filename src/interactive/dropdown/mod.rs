@@ -159,8 +159,11 @@ impl DropdownMenu {
             // Printing the newlines first makes any scroll happen while the cursor is still ours
             // to account for: after moving back up the same number, the prompt is wherever the
             // scroll left it, and every frame after this one is a redraw in place.
+            // Where the cursor is: past the prompt and whatever of the word has been typed. Coming
+            // back is a *move* rather than a terminal restore, so the column has to be known.
+            let column = indent_cols + display_width(typed);
             let _ = write!(stdout, "{}", reserve_rows(num_lines, &mut reserved));
-            let _ = write!(stdout, "{}", draw_below(&rendered));
+            let _ = write!(stdout, "{}", draw_below(&rendered, num_lines, column));
             let _ = stdout.flush();
 
             let mut buf = [0u8; 3];
@@ -210,7 +213,11 @@ impl DropdownMenu {
         // Erase what was drawn, from one row below the prompt to the end of the screen. `\x1b[B`
         // rather than a newline: the reserved rows already exist, and a newline at the bottom of
         // the screen would scroll again.
-        let _ = write!(stdout, "{}", erase_below(reserved));
+        let _ = write!(
+            stdout,
+            "{}",
+            erase_below(reserved, indent_cols + display_width(typed))
+        );
         let _ = stdout.flush();
 
         let _ = tcsetattr(&stdin, SetArg::TCSANOW, &orig_termios);
@@ -248,19 +255,42 @@ fn reserve_rows(wanted: usize, reserved: &mut usize) -> String {
 /// Erasing to the end of the screen from the last drawn row is safe because everything below it
 /// belongs to this menu: the rows were reserved by `reserve_rows`, and `erase_below` clears the
 /// same region when the menu closes.
-fn draw_below(rendered: &str) -> String {
-    format!("\x1b7{rendered}\x1b[J\x1b8")
+/// `rows` is how many physical rows `rendered` occupies, and `column` the cursor's column when the
+/// menu opened — both needed because coming back is done by *moving*, not by restoring.
+///
+/// **No `\x1b7`/`\x1b8`.** There is one save slot per terminal and it is shared with everything
+/// drawing on it, including whatever multiplexer is hosting the session. A restore then lands
+/// wherever somebody else's save left the cursor, which is why opening this menu could throw the
+/// prompt back to column 1. Relative motion has no shared state to lose.
+fn draw_below(rendered: &str, rows: usize, column: usize) -> String {
+    // Every row begins with `\r\n`, so after drawing the cursor sits at column 1, `rows` below
+    // where it started.
+    let mut out = format!("{rendered}\x1b[J");
+    if rows > 0 {
+        out.push_str(&format!("\x1b[{rows}A"));
+    }
+    out.push('\r');
+    if column > 0 {
+        out.push_str(&format!("\x1b[{column}C"));
+    }
+    out
 }
 
 /// Erase everything from one row below the prompt to the end of the screen.
 ///
 /// `\x1b[B` rather than a newline: the reserved rows already exist, and a newline at the bottom of
 /// the screen would scroll again — which is the whole class of bug this avoids.
-fn erase_below(reserved: usize) -> String {
+fn erase_below(reserved: usize, column: usize) -> String {
     if reserved == 0 {
         return String::new();
     }
-    "\x1b7\x1b[B\r\x1b[J\x1b8".to_string()
+    // Down one, clear to the end of the screen, back up, and back along to where the cursor was.
+    // Moving rather than restoring, for the reason given on `draw_below`.
+    let mut out = String::from("\x1b[B\r\x1b[J\x1b[A\r");
+    if column > 0 {
+        out.push_str(&format!("\x1b[{column}C"));
+    }
+    out
 }
 
 #[cfg(test)]
@@ -284,27 +314,31 @@ mod frame_tests {
         assert_eq!(reserved, 6);
     }
 
-    /// Every frame is drawn between a save and a restore, so the cursor ends where it started and
-    /// no count has to be right for the prompt to survive.
+    /// A frame comes back by *moving*, never by restoring.
+    ///
+    /// `\x1b7`/`\x1b8` is one slot per terminal, shared with the right prompt and with any
+    /// multiplexer hosting the session. Opening this menu used to throw the prompt back to column
+    /// 1, because the restore landed wherever somebody else's save had left the cursor.
     #[test]
-    fn a_frame_saves_and_restores_rather_than_counting_rows_back() {
-        let frame = draw_below("ROWS");
-        assert!(frame.starts_with("\x1b7"), "{frame:?}");
-        assert!(frame.ends_with("\x1b8"), "{frame:?}");
+    fn a_frame_moves_back_rather_than_restoring() {
+        let frame = draw_below("\r\nROWS", 1, 19);
         assert!(frame.contains("ROWS"));
-        // The old approach walked back up by a row count. Nothing does that any more.
-        assert!(
-            !frame.contains("A"),
-            "a cursor-up count survived: {frame:?}"
-        );
+        assert!(!frame.contains("\x1b7"), "a save survived: {frame:?}");
+        assert!(!frame.contains("\x1b8"), "a restore survived: {frame:?}");
+        // Up over the rows it drew, then back along to the cursor's column.
+        assert!(frame.contains("\x1b[1A"), "{frame:?}");
+        assert!(frame.ends_with("\r\x1b[19C"), "{frame:?}");
+
+        // At column 1 there is nothing to move along.
+        assert!(draw_below("\r\nROWS", 1, 0).ends_with('\r'));
     }
 
     /// A frame erases below its last row, or a shorter page leaves the previous one's tail on
     /// screen. The reserved height only grows, so this is the *only* thing that clears them.
     #[test]
     fn a_shorter_frame_erases_what_the_taller_one_left() {
-        let tall = draw_below("r1\r\nr2\r\nr3\r\nr4");
-        let short = draw_below("r1\r\nr2");
+        let tall = draw_below("r1\r\nr2\r\nr3\r\nr4", 4, 19);
+        let short = draw_below("r1\r\nr2", 2, 19);
         for frame in [&tall, &short] {
             assert!(frame.contains("\x1b[J"), "no erase-below: {frame:?}");
             // After the content, not before it, or it would wipe the rows just drawn.
@@ -312,20 +346,21 @@ mod frame_tests {
             let last_row = frame.rfind("r2").expect("present");
             assert!(erase > last_row, "erase came before the content: {frame:?}");
         }
-        // Still bracketed by save/restore, so the cursor ends where it started.
-        assert!(
-            short.starts_with("\x1b7") && short.ends_with("\x1b8"),
-            "{short:?}"
-        );
+        // Each comes back up by the rows it actually drew.
+        assert!(tall.contains("\x1b[4A"), "{tall:?}");
+        assert!(short.contains("\x1b[2A"), "{short:?}");
     }
 
     #[test]
     fn erasing_moves_down_a_row_rather_than_printing_a_newline() {
-        let erase = erase_below(3);
+        let erase = erase_below(3, 19);
         assert!(erase.contains("\x1b[B"), "{erase:?}");
         assert!(!erase.contains('\n'), "a newline would scroll: {erase:?}");
         assert!(erase.contains("\x1b[J"), "{erase:?}");
+        // Back up to the prompt's row and along to where the cursor was — no restore.
+        assert!(erase.ends_with("\x1b[A\r\x1b[19C"), "{erase:?}");
+        assert!(!erase.contains("\x1b7"), "{erase:?}");
         // Nothing was drawn, so there is nothing to erase.
-        assert_eq!(erase_below(0), "");
+        assert_eq!(erase_below(0, 19), "");
     }
 }
