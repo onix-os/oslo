@@ -219,7 +219,9 @@ pub fn run_repl() -> ! {
                     // `$HOME`. One write, only when the directory actually changed.
                     announce(&oslo::interactive::marks::working_directory(&after));
                 }
-                note_command_duration(started.elapsed());
+                let elapsed = started.elapsed();
+                note_command_duration(elapsed);
+                announce(&slow_command_notice(&text, elapsed, &res));
                 // The command is over and its status is known: close the block before anything
                 // else prints, so nothing that follows lands inside it.
                 print!(
@@ -300,6 +302,34 @@ fn build_editor(settings: &history::Settings) -> Repl {
         .completion_type(rustyline::CompletionType::List)
         .build();
     Editor::with_config(config).expect("Failed to initialize line editor")
+}
+
+/// A notification for a command that ran long enough to be worth one, or nothing.
+///
+/// The threshold is `oslo.notify.after`, in seconds, and `0` turns it off. There is deliberately no
+/// check for whether the terminal is focused: reporting focus needs a mode the shell would have to
+/// enable and then read replies for, and getting that wrong costs stray characters at the prompt —
+/// a worse failure than a notification you did not need.
+fn slow_command_notice(
+    text: &str,
+    elapsed: std::time::Duration,
+    result: &Result<i32, ShellError>,
+) -> String {
+    let after = oslo::interactive::settings::current().notify.after;
+    if after == 0 || elapsed.as_secs() < after {
+        return String::new();
+    }
+    let status = result.as_ref().copied().unwrap_or(1);
+    let outcome = if status == 0 {
+        "finished".to_string()
+    } else {
+        format!("failed ({status})")
+    };
+    let took = oslo::interactive::prompt::notable_duration(elapsed)
+        .unwrap_or_else(|| format!("{}s", elapsed.as_secs()));
+    // The first word, as the title bar gets: a notification is narrow too.
+    let what = text.split_whitespace().next().unwrap_or("command");
+    oslo::interactive::marks::notify(what, &format!("{outcome} after {took}"))
 }
 
 /// Write a terminal sequence, if there is one to write.

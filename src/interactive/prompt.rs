@@ -147,7 +147,7 @@ fn username() -> String {
 /// nothing is shown below the threshold. The number that *is* shown is the one you would have
 /// wanted before you knew you wanted it — which is the whole argument for a duration in a prompt
 /// rather than a `time` you have to remember to type.
-fn notable_duration(elapsed: Duration) -> Option<String> {
+pub fn notable_duration(elapsed: Duration) -> Option<String> {
     const WORTH_SAYING: Duration = Duration::from_millis(500);
     if elapsed < WORTH_SAYING {
         return None;

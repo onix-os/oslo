@@ -18,12 +18,33 @@ pub struct Settings {
     pub history: History,
     /// `oslo.vi`: whether vi mode is on, and the cursor for each mode.
     pub vi: Vi,
+    /// `oslo.notify`: when a finished command is worth a desktop notification.
+    pub notify: Notify,
     /// `oslo.keys`: key name to action name, both as written.
     ///
     /// Kept as strings rather than resolved here because binding needs rustyline types, and this
     /// module is meant to be readable without one. [`super::keys`] turns them into bindings and
     /// reports the ones it does not recognise.
     pub keys: Vec<(String, String)>,
+}
+
+/// `oslo.notify` — a desktop notification when a slow command finishes.
+///
+/// ```lua
+/// oslo.notify = { after = 10 }   -- seconds; 0 turns it off
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Notify {
+    /// Seconds a command must run before finishing is worth telling you about. `0` never notifies.
+    pub after: u64,
+}
+
+impl Default for Notify {
+    fn default() -> Self {
+        // Ten seconds: long enough that you have looked away, short enough to catch a test run.
+        // A notification for something you sat and watched is noise, and noise gets muted.
+        Notify { after: 10 }
+    }
 }
 
 /// `oslo.vi` — vi mode, on fish's model.
@@ -180,6 +201,12 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
         return (settings, problems);
     };
     let oslo = oslo.borrow();
+
+    if let Value::Table(table) = oslo.get(&Value::str("notify"))
+        && let Some(n) = number(&table.borrow(), "after")
+    {
+        settings.notify.after = n.max(0) as u64;
+    }
 
     if let Value::Table(table) = oslo.get(&Value::str("vi")) {
         let table = table.borrow();

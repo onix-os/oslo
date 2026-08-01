@@ -168,6 +168,27 @@ pub fn hyperlink(url: &str, text: &str) -> String {
     format!("\x1b]8;;{url}\x1b\\{text}\x1b]8;;\x1b\\")
 }
 
+/// `OSC 777` — a desktop notification.
+///
+/// The `notify;title;body` form, which is what urxvt introduced and what kitty, Ghostty, WezTerm
+/// and foot all read. `OSC 9` is the shorter iTerm2 spelling and carries a body only; 777 is used
+/// here because a notification with no title is one you cannot tell apart from any other.
+///
+/// Semicolons in the text would end the field early and split the message across the wrong fields,
+/// so they are replaced rather than escaped — there is no escaping mechanism in this sequence.
+pub fn notify(title: &str, body: &str) -> String {
+    if !enabled() {
+        return String::new();
+    }
+    let clean = |s: &str| -> String {
+        s.chars()
+            .map(|c| if c == ';' { ',' } else { c })
+            .filter(|c| !c.is_control())
+            .collect()
+    };
+    format!("\x1b]777;notify;{};{}\x1b\\", clean(title), clean(body))
+}
+
 /// A path, printed clickable when the terminal is listening and plain when it is not.
 ///
 /// The shape a diagnostic wants: `eprintln!("oslo: {}: {e}", marks::path(p))` reads the same as
@@ -264,6 +285,18 @@ mod tests {
         assert!(!osc.contains("%2F"), "{osc:?}");
         assert!(osc.starts_with("\x1b]7;file://"), "{osc:?}");
         assert!(osc.ends_with("\x1b\\"), "{osc:?}");
+        ENABLED.store(false, Ordering::Relaxed);
+    }
+
+    /// A semicolon in the text would end the field early and shift the rest into the wrong one.
+    /// There is no escaping mechanism in this sequence, so it is replaced.
+    #[test]
+    fn a_notification_cannot_be_split_by_its_own_text() {
+        ENABLED.store(true, Ordering::Relaxed);
+        let osc = notify("oslo", "make; rm -rf /");
+        assert_eq!(osc, "\x1b]777;notify;oslo;make, rm -rf /\x1b\\");
+        // And a control character cannot terminate it early either.
+        assert_eq!(notify("a\x07b", "c\nd"), "\x1b]777;notify;ab;cd\x1b\\");
         ENABLED.store(false, Ordering::Relaxed);
     }
 
