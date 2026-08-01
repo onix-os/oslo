@@ -66,6 +66,27 @@ pub fn set_depth(depth: Depth) {
     }
 }
 
+/// What the terminal said its background is, once it has been asked.
+static BACKGROUND: RwLock<Option<super::query::Background>> = RwLock::new(None);
+
+/// Record the terminal's background, so the palette can suit it.
+///
+/// This changes what [`Syntax::default`] *is*, rather than installing a theme — and that ordering
+/// is the whole point. The config is read afterwards and merged over the default, so a config that
+/// names three colours still gets the light palette for the other twenty, and its own three still
+/// win. Installing a theme here instead would be overwritten wholesale the moment the config was
+/// read, which is exactly what happened on the first attempt.
+pub fn set_background(background: super::query::Background) {
+    if let Ok(mut slot) = BACKGROUND.write() {
+        *slot = Some(background);
+    }
+}
+
+/// The terminal's background, if it was asked and answered.
+pub fn background() -> Option<super::query::Background> {
+    BACKGROUND.read().ok().and_then(|b| *b)
+}
+
 /// Everything the interactive layer draws with.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Theme {
@@ -115,8 +136,71 @@ pub struct Syntax {
     pub match_bracket: Style,
 }
 
+impl Syntax {
+    /// The palette for a light terminal.
+    ///
+    /// The dark defaults are tuned for a near-black background and become unreadable on white —
+    /// `#50fa7b` on white is a pale green nobody can see. These are the same *roles* at darker
+    /// values, so the meaning of each colour is unchanged and only its lightness moves.
+    ///
+    /// Reached only when the terminal actually answers `OSC 11` and says it is light. A terminal
+    /// that stays silent keeps the dark palette, which is the safer guess.
+    pub fn for_light_background() -> Syntax {
+        let rgb = |r: u8, g: u8, b: u8| Style::fg(Color::Rgb(r, g, b));
+        Syntax {
+            command: rgb(0x1a, 0x7f, 0x37),
+            builtin: Style {
+                bold: true,
+                ..rgb(0x1a, 0x7f, 0x37)
+            },
+            function: rgb(0x0a, 0x69, 0x8c),
+            keyword: rgb(0xa6, 0x1c, 0x7b),
+            error: Style {
+                underline: true,
+                ..rgb(0xcf, 0x22, 0x2e)
+            },
+            danger: Style {
+                bold: true,
+                bg: Some(Color::Rgb(0xcf, 0x22, 0x2e)),
+                ..rgb(0xff, 0xff, 0xff)
+            },
+            param: Style::default(),
+            valid_path: Style {
+                underline: true,
+                ..Style::default()
+            },
+            option: rgb(0xa8, 0x54, 0x00),
+            glob: Style {
+                bold: true,
+                ..rgb(0xa6, 0x1c, 0x7b)
+            },
+            number: rgb(0x69, 0x39, 0xb8),
+            variable: rgb(0x69, 0x39, 0xb8),
+            assignment: rgb(0x1a, 0x7f, 0x37),
+            single_quote: rgb(0x87, 0x6d, 0x0b),
+            double_quote: rgb(0xa8, 0x8a, 0x0e),
+            escape: rgb(0xa6, 0x1c, 0x7b),
+            operator: rgb(0x0a, 0x69, 0x8c),
+            redirection: rgb(0xa8, 0x54, 0x00),
+            end: rgb(0x6e, 0x77, 0x81),
+            comment: rgb(0x6e, 0x77, 0x81),
+            // Light in both palettes, and for the same reason: it has to read as not-yet-text.
+            autosuggestion: Style::fg(Color::Indexed(250)),
+            match_bracket: Style {
+                bold: true,
+                ..Style::default()
+            },
+        }
+    }
+}
+
 impl Default for Syntax {
     fn default() -> Self {
+        // A light terminal gets the light palette as its *starting point*, so a config's own
+        // colours are still merged over the top of it rather than over an unreadable one.
+        if background() == Some(super::query::Background::Light) {
+            return Syntax::for_light_background();
+        }
         let rgb = |r: u8, g: u8, b: u8| Style::fg(Color::Rgb(r, g, b));
         Syntax {
             // **RGB, not the sixteen ANSI slots.** A palette tool like pywal remaps what

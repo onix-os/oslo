@@ -33,6 +33,12 @@ pub fn run_repl() -> ! {
     // starts and stops. oslo only declares the boundaries; folding them is the job of whatever
     // owns the grid. See `oslo::interactive::marks`.
     oslo::interactive::marks::enable(true);
+    // Asked once, before anything is drawn: the terminal's background decides whether the syntax
+    // palette should be the dark one. A terminal that does not answer leaves the default standing
+    // — see `oslo::interactive::query` for why the *silence* is the case worth engineering for.
+    if let Some(background) = oslo::interactive::query::background() {
+        oslo::interactive::theme::set_background(background);
+    }
 
     let mut interactive_env = Environment::new();
     // A REPL is interactive and reads its program from the terminal: `$-` says so with `i` and
