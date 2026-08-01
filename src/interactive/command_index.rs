@@ -147,8 +147,14 @@ fn scan(path: &str) -> HashSet<String> {
 /// The permission bit is checked, not just "is it a file": `$PATH` directories are full of
 /// data files, and offering `pkgconfig` as a command is noise.
 fn is_executable(entry: &fs::DirEntry) -> bool {
-    // `metadata` follows symlinks, which is what we want: a dangling link is not runnable.
-    let Ok(meta) = entry.metadata() else {
+    // **`DirEntry::metadata` does not follow symlinks** — it is `lstat`, whatever this comment
+    // used to claim. So every symlinked command was reported as not a file and left out of the
+    // index: `ls` and `cat` are links to `coreutils`, which is most of what a person types. They
+    // ran fine, but the highlighter drew them red as unknown and completion offered nothing.
+    //
+    // `fs::metadata` on the path is the one that follows, which is what is wanted here: a link to
+    // a real executable is runnable, and a dangling one is not.
+    let Ok(meta) = fs::metadata(entry.path()) else {
         return false;
     };
     meta.is_file() && meta.permissions().mode() & 0o111 != 0
@@ -158,6 +164,27 @@ fn is_executable(entry: &fs::DirEntry) -> bool {
 mod tests {
     use super::*;
     use std::io::Write;
+
+    /// A symlinked command counts. Most of coreutils is symlinks — `ls` and `cat` both point at
+    /// `coreutils` — and leaving them out marked the commonest commands unknown.
+    #[test]
+    fn a_symlink_to_an_executable_is_runnable() {
+        let _guard = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
+        let dir = tempfile::tempdir().unwrap();
+        make_exe(dir.path(), "coreutils");
+        std::os::unix::fs::symlink("coreutils", dir.path().join("ls")).unwrap();
+        // A link going nowhere is not runnable, and must not be offered.
+        std::os::unix::fs::symlink("gone", dir.path().join("dangling")).unwrap();
+
+        invalidate();
+        let names = CommandIndex::executables(dir.path().to_str().unwrap());
+        assert!(names.contains("ls"), "a symlinked command is runnable");
+        assert!(names.contains("coreutils"));
+        assert!(
+            !names.contains("dangling"),
+            "a dangling link is not runnable"
+        );
+    }
 
     /// The cache is one global slot; two tests using different `$PATH`s would evict each other.
     static SERIAL: Mutex<()> = Mutex::new(());
