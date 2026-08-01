@@ -225,11 +225,26 @@ pub fn right_prompt_escape(right: &str, used: usize, cols: usize) -> String {
     if used + right_w + 2 > cols {
         return String::new();
     }
-    let column = cols - right_w + 1;
-    // Save, jump to the column that ends it flush with the screen edge, draw, restore — so the
-    // cursor is physically where it started and the hint drawn after this lands in the right
-    // place.
-    format!("\x1b7\x1b[{column}G{right}\x1b8")
+    // Move right, draw, move back — **not** save/restore.
+    //
+    // `\x1b7`/`\x1b8` (DECSC/DECRC) has exactly one slot per terminal, and it is shared with
+    // everything else drawing on it: oslo's own completion dropdown uses it, and a multiplexer
+    // hosting the session may too. Whoever saves last wins, so a restore can land wherever
+    // somebody else's save left it — which shows up as a right prompt that jumps, duplicates, or
+    // strands debris a row up. Relative motion has no shared state to lose.
+    //
+    // The gap is `cols - right_w - used`: from the cursor's column to the first cell of the right
+    // prompt. Coming back is that gap plus the text just drawn.
+    let gap = cols - right_w - used;
+    // The last cell written is the final column, which leaves most terminals in a deferred-wrap
+    // state. `\r` settles that — the cursor is unambiguously at column 1 afterwards — and the
+    // forward move puts it back, rather than trusting the terminal to agree about where it was.
+    let home = used;
+    if home == 0 {
+        format!("\x1b[{gap}C{right}\r")
+    } else {
+        format!("\x1b[{gap}C{right}\r\x1b[{home}C")
+    }
 }
 
 /// How many cells a string occupies once its escape sequences are discounted.
@@ -301,10 +316,21 @@ mod tests {
     #[test]
     fn a_right_prompt_is_drawn_flush_right_and_restores_the_cursor() {
         let escape = right_prompt_escape("12:34", 10, 80);
-        // 80 - 5 + 1: the last cell of `12:34` falls on column 80.
-        assert!(escape.starts_with("\x1b7\x1b[76G"), "{escape:?}");
-        assert!(escape.ends_with("\x1b8"), "{escape:?}");
+        // From column 11 to column 76 is 65 cells forward; `12:34` then ends on column 80.
+        assert!(escape.starts_with("\x1b[65C"), "{escape:?}");
         assert!(escape.contains("12:34"), "{escape:?}");
+        // Back to where it started, via column 1 — see the comment on the deferred wrap.
+        assert!(escape.ends_with("\r\x1b[10C"), "{escape:?}");
+
+        // **No save/restore.** There is one DECSC slot per terminal and it is shared with the
+        // dropdown and with any multiplexer hosting the session; a restore could land wherever
+        // somebody else's save left it, which is what made the right prompt jump and duplicate.
+        assert!(!escape.contains("\x1b7"), "{escape:?}");
+        assert!(!escape.contains("\x1b8"), "{escape:?}");
+
+        // A prompt at column 1 needs no move back, only the `\r`.
+        let at_start = right_prompt_escape("12:34", 0, 80);
+        assert!(at_start.ends_with("\r"), "{at_start:?}");
     }
 
     /// A prompt is mostly colour escapes, so measuring it as plain text would push the right
@@ -317,8 +343,9 @@ mod tests {
         // And a coloured right prompt is positioned by its cells, not its bytes.
         let plain = right_prompt_escape("12:34", 0, 80);
         let painted = right_prompt_escape("\x1b[90m12:34\x1b[0m", 0, 80);
-        let column = |s: &str| s.split('G').next().map(str::to_string);
-        assert_eq!(column(&plain), column(&painted));
+        // The leading forward move, which is what carries the position.
+        let moved = |s: &str| s.split('C').next().map(str::to_string);
+        assert_eq!(moved(&plain), moved(&painted));
     }
 
     /// A right prompt that would collide with what is being typed is worse than none — that
