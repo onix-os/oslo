@@ -168,6 +168,18 @@ pub fn hyperlink(url: &str, text: &str) -> String {
     format!("\x1b]8;;{url}\x1b\\{text}\x1b]8;;\x1b\\")
 }
 
+/// A path, printed clickable when the terminal is listening and plain when it is not.
+///
+/// The shape a diagnostic wants: `eprintln!("oslo: {}: {e}", marks::path(p))` reads the same as
+/// before and gains a link for free. A config file named in an error is exactly the thing you want
+/// to open next.
+pub fn path(path: &str) -> String {
+    if !enabled() {
+        return path.to_string();
+    }
+    hyperlink(&file_url(path), path)
+}
+
 /// A `file://` URL for a path on this machine, for [`hyperlink`].
 pub fn file_url(path: &str) -> String {
     let host = nix::unistd::gethostname()

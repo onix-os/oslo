@@ -98,7 +98,11 @@ pub fn run_repl() -> ! {
         match rl.load_history(path) {
             Ok(()) => {}
             Err(ReadlineError::Io(e)) if e.kind() == std::io::ErrorKind::NotFound => {}
-            Err(e) => eprintln!("oslo: {}: {}", path.display(), e),
+            Err(e) => eprintln!(
+                "oslo: {}: {}",
+                oslo::interactive::marks::path(&path.display().to_string()),
+                e
+            ),
         }
     }
     // Seeded from the database when there is one, so a session started on a machine with no
@@ -374,7 +378,11 @@ fn remember(rl: &mut Repl, file: &Option<PathBuf>, text: &str, secret: bool) {
     if let Some(path) = file
         && let Err(e) = rl.append_history(path)
     {
-        eprintln!("oslo: {}: {}", path.display(), e);
+        eprintln!(
+            "oslo: {}: {}",
+            oslo::interactive::marks::path(&path.display().to_string()),
+            e
+        );
     }
 }
 

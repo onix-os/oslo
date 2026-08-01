@@ -85,7 +85,11 @@ fn source_if_present(env: &mut Environment, path: &std::path::Path) -> ExitReque
         Ok(_) => None,
         Err(ShellError::Exit(code)) => Some(code),
         Err(e) => {
-            eprintln!("oslo: {}: {}", path.display(), e);
+            eprintln!(
+                "oslo: {}: {}",
+                oslo::interactive::marks::path(&path.display().to_string()),
+                e
+            );
             None
         }
     }
