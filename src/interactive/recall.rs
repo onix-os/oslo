@@ -72,7 +72,17 @@ pub fn suggest(line: &str) -> Option<String> {
     };
     all.iter()
         .rev()
-        .find(|(candidate, l)| l == &language && candidate.starts_with(line) && candidate != line)
+        .find(|(candidate, l)| {
+            l == &language
+                && candidate.starts_with(line)
+                && candidate != line
+                // **Never a multi-line entry.** A command continued over several lines is
+                // remembered as one entry with newlines in it, and a suggestion is drawn as ghost
+                // text on the row you are typing on. Printing it raw does exactly what the bytes
+                // say: the terminal breaks the line and the rest of the entry appears as extra
+                // rows under the prompt, stuck to whatever was already there.
+                && !candidate.contains('\n')
+        })
         .map(|(candidate, _)| candidate[line.len()..].to_string())
 }
 
@@ -80,9 +90,36 @@ pub fn suggest(line: &str) -> Option<String> {
 mod tests {
     use super::*;
 
+    /// The remembered set is one process-wide store and these tests replace it wholesale, so they
+    /// cannot run beside each other.
+    static SERIAL: Mutex<()> = Mutex::new(());
+
+    /// `suggest` answers for the language the prompt is showing, so a test has to say what that is.
+    fn prompt_in(language: &str) {
+        crate::interactive::row::note_row(language, 0, 0, true);
+    }
+
+    /// A remembered command spanning several lines is never offered as ghost text: it would be
+    /// drawn literally, breaking the row and leaving its tail underneath the prompt.
+    #[test]
+    fn a_multi_line_entry_is_never_suggested() {
+        let _guard = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
+        prompt_in("sh");
+        seed(vec![
+            ("ll\nls\nks".to_string(), "sh".to_string()),
+            ("llama".to_string(), "sh".to_string()),
+        ]);
+        // The single-line entry is still offered; the multi-line one is passed over.
+        assert_eq!(suggest("ll"), Some("ama".to_string()));
+        seed(vec![("ll\nls".to_string(), "sh".to_string())]);
+        assert_eq!(suggest("ll"), None);
+        seed(Vec::new());
+    }
+
     /// A suggestion never crosses languages, whichever way round they were typed.
     #[test]
     fn a_suggestion_stays_in_its_own_language() {
+        let _guard = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
         seed(vec![
             ("echo one".to_string(), "sh".to_string()),
             ("echo two".to_string(), "lua".to_string()),
