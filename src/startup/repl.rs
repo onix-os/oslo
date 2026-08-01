@@ -75,6 +75,14 @@ pub fn run_repl() -> ! {
     }
 
     let settings = history::settings(&env_struct.lock().unwrap());
+    // Start walking `$PATH` now, in the background. Whatever is left to do here — opening the
+    // history database, building the editor, reading the config — is time the scan gets for free,
+    // and it is the difference between the first Tab being instant and it being the one keystroke
+    // that visibly stalls.
+    if let Some(path) = env_struct.lock().unwrap().get_var("PATH") {
+        oslo::interactive::command_index::warm(path.to_string());
+    }
+
     // The database keeps the language each line was typed in, which a flat file cannot: recalling
     // a Lua line while the prompt is in shell mode has to run it as Lua. `$HISTFILE` still works
     // and still gets appended to, so nothing that reads it breaks.

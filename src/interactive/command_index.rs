@@ -29,6 +29,22 @@ pub fn invalidate() {
     GENERATION.fetch_add(1, Ordering::Relaxed);
 }
 
+/// Build the cache now, on a thread of its own, so the first Tab does not pay for it.
+///
+/// Reading 113 directories and 3373 executables costs about 10ms warm and a great deal more from a
+/// cold page cache — and it was being paid on the first keystroke that wanted a completion, which
+/// is the one moment the shell is being watched. The work is the same; it just happens while you
+/// are still reading the prompt.
+///
+/// Detached on purpose: nothing waits for it. If the first Tab arrives before it finishes, the two
+/// meet at the cache's own lock and the second one to arrive uses what the first built — the
+/// existing behaviour, at its existing cost, which is the worst this can do.
+pub fn warm(path: String) {
+    std::thread::spawn(move || {
+        let _ = CommandIndex::executables(&path);
+    });
+}
+
 #[derive(PartialEq, Eq)]
 struct Key {
     generation: u64,
