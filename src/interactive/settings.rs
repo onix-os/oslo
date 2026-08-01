@@ -20,6 +20,11 @@ pub struct Settings {
     pub vi: Vi,
     /// `oslo.notify`: when a finished command is worth a desktop notification.
     pub notify: Notify,
+    /// `oslo.dirs`: the directories `@name` reaches.
+    ///
+    /// Sorted, because table iteration has no order and a diagnostic that named them in a
+    /// different order each run would be maddening to compare.
+    pub dirs: Vec<(String, String)>,
     /// `oslo.keys`: key name to action name, both as written.
     ///
     /// Kept as strings rather than resolved here because binding needs rustyline types, and this
@@ -201,6 +206,19 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
         return (settings, problems);
     };
     let oslo = oslo.borrow();
+
+    if let Value::Table(table) = oslo.get(&Value::str("dirs")) {
+        for (key, value) in table.borrow().pairs() {
+            match (&key, &value) {
+                (Value::Str(name), Value::Str(path)) => {
+                    settings.dirs.push((name.to_string(), path.to_string()));
+                }
+                _ => problems
+                    .push("oslo.dirs: every entry must be a name mapped to a path".to_string()),
+            }
+        }
+        settings.dirs.sort();
+    }
 
     if let Value::Table(table) = oslo.get(&Value::str("notify"))
         && let Some(n) = number(&table.borrow(), "after")

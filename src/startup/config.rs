@@ -22,6 +22,16 @@ pub fn apply(lua: &LuaEngine) {
     for problem in problems {
         eprintln!("oslo: {problem}");
     }
+    // `@name` is read on the expansion path, so the table is handed over rather than looked up:
+    // a word expansion must not reach into the settings to find out what `@work` means.
+    oslo::expand::sugar::set_named_dirs(
+        settings
+            .dirs
+            .iter()
+            .map(|(name, path)| (name.clone(), path.clone()))
+            .collect(),
+    );
+
     oslo::interactive::settings::install(settings);
 
     // Installed rather than read: unlike a theme, this one is a *function*, and it has to be
