@@ -88,6 +88,20 @@ pub fn apply(rl: &mut Repl, env_struct: &Arc<Mutex<Environment>>, toggle: &Toggl
                 cursors: settings.vi.cursors,
             })),
         );
+        // **Tab completes in normal mode too.** rustyline's vi keymap leaves Tab unbound there, so
+        // pressing it did nothing whatsoever — and since nothing happens, the natural response is
+        // to press it again, which is how "the dropdown needs five presses" was really "you were
+        // in normal mode and the first four did nothing".
+        //
+        // Safe to bind: Tab is not a vi command. Nothing is being taken away.
+        rl.bind_sequence(
+            Event::KeySeq(vec![rustyline::KeyEvent(
+                rustyline::KeyCode::Tab,
+                rustyline::Modifiers::NONE,
+            )]),
+            rustyline::EventHandler::Simple(Cmd::Complete),
+        );
+
         // The prompt is drawn before any key is pressed, so the starting shape has to be written
         // by hand — otherwise the first line of the session has whatever cursor the terminal had.
         let mut out = std::io::stdout();
