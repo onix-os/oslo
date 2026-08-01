@@ -109,18 +109,10 @@ pub fn render_default_left_prompt(last_status: i32, language: &str) -> String {
     out.push_str(&theme.prompt.aside.paint("@", depth));
     out.push_str(&theme.prompt.host.paint(&hostname(), depth));
 
-    // Only when vi mode is on. An emacs-keymap shell has nothing to say here, and a segment that
-    // always reads the same is a segment that costs width for nothing.
-    if let Some(mode) = super::vi::mode() {
-        out.push_str(&bar);
-        let style = match mode {
-            super::vi::Mode::Insert => theme.prompt.ok,
-            super::vi::Mode::Normal => theme.prompt.host,
-            super::vi::Mode::Replace => theme.prompt.failed,
-        };
-        out.push_str(&style.paint(mode.name(), depth));
-    }
-
+    // The vi mode is deliberately *not* here. The prompt string is handed to the line editor once
+    // and never redrawn, so a mode letter in it would still say `I` after you pressed Esc — which
+    // is worse than no letter, because it is confidently wrong. It lives in the right prompt
+    // instead, which the highlighter redraws on every keystroke. See `render_default_right_prompt`.
     out.push_str(&bar);
     out.push_str(&theme.prompt.git.paint(language, depth));
 
@@ -198,6 +190,20 @@ pub fn render_default_right_prompt(last_status: i32, elapsed: Option<Duration>) 
         theme.prompt.failed
     };
     let mut parts = vec![arrow.paint("❮", depth)];
+
+    // The vi mode, here rather than in the left prompt, because **this side is redrawn on every
+    // keystroke**. rustyline hands the prompt string over once and never asks for it again, and a
+    // custom key handler cannot force a repaint — `EventContext` holds only a `&dyn Refresher`
+    // while `refresh_prompt_and_line` needs `&mut`. The highlighter is the one seam that runs per
+    // keystroke, and the right prompt is drawn from it, so a mode letter here is live.
+    if let Some(mode) = super::vi::mode() {
+        let style = match mode {
+            super::vi::Mode::Insert => theme.prompt.ok,
+            super::vi::Mode::Normal => theme.prompt.host,
+            super::vi::Mode::Replace => theme.prompt.failed,
+        };
+        parts.push(style.paint(mode.name(), depth));
+    }
 
     // The status number, which the left arrow's colour cannot carry.
     if last_status != 0 {
