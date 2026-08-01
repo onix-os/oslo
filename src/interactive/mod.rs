@@ -14,6 +14,7 @@ pub mod keys;
 pub mod marks;
 pub mod prompt;
 pub mod query;
+pub mod recall;
 pub mod row;
 pub mod settings;
 pub mod spec;
@@ -266,7 +267,11 @@ impl Hinter for OsloHelper {
         // suggestions off entirely.
         for source in settings::current().suggest.sources {
             let found = match source {
-                settings::Source::History => self.history_hinter.hint(line, pos, ctx),
+                // oslo's own, not the editor's: the editor holds one history and it is still the
+                // other language's until the line ends. See `recall::suggest`.
+                settings::Source::History => {
+                    recall::suggest(line).or_else(|| self.history_hinter.hint(line, pos, ctx))
+                }
                 settings::Source::Completion => self.command_hint(line, pos),
                 settings::Source::Path => self.path_hint(line, pos),
             };
