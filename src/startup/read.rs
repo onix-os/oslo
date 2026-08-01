@@ -7,7 +7,7 @@
 
 use crate::expand_history;
 use crate::startup::mode::{self, Line, Mode, ToggleRequest};
-use crate::startup::repl::{Repl, history_entries};
+use crate::startup::repl::Repl;
 use crate::startup::{history, prompt, rc};
 use oslo::Environment;
 use oslo::LuaEngine;
@@ -105,10 +105,18 @@ pub(super) fn read_command(
         // recorded and silently did nothing at all. Here it is unconditional: a prompt is about to
         // be drawn, and this is what it says.
         {
+            // Whether what is about to be drawn is oslo's own prompt. A `$PS1`, a Lua prompt or
+            // the continuation prompt is not, and must not be redrawn as one.
+            let builtin = prompt
+                == oslo::interactive::prompt::render_default_left_prompt(
+                    last_status,
+                    reading.name(),
+                );
             oslo::interactive::prompt::note_row(
                 reading.name(),
                 last_status,
                 oslo::interactive::prompt::printed_width(&prompt),
+                builtin,
             );
         }
 
@@ -162,8 +170,6 @@ pub(super) fn read_command(
             };
             *current = switched;
             reading = switched;
-            // Recall follows the language: a shell command at a Lua prompt cannot run.
-            super::recall::load_history_for(rl, switched);
         }
 
         if buffer.is_empty() {
@@ -201,8 +207,10 @@ pub(super) fn read_command(
         // History expansion belongs to shell syntax. In Lua a `!` is `~=`'s other half and a
         // string may hold anything; rewriting a Lua line against the history would corrupt it.
         let expanded = if reading == Mode::Shell && heredoc.expands_history() {
-            // Owned so the immutable borrow of the editor ends before the entry is added.
-            let previous: Vec<String> = history_entries(rl);
+            // **Only this language's lines.** The editor's history holds both, and `!!` expanding
+            // to a Lua line at a shell prompt produces something that cannot run — the same
+            // crossing the ghost suggestion and the arrow keys were fixed for.
+            let previous: Vec<String> = oslo::interactive::recall::for_language(reading.name());
             match expand_history(line, &previous) {
                 Some(expanded) => expanded,
                 None => return Input::Nothing,

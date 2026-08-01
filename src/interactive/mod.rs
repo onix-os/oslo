@@ -123,25 +123,6 @@ impl OsloHelper {
         }
     }
 
-    /// The language the prompt is reading **now**, not the one the line started in.
-    ///
-    /// The distinction is the whole bug: `prompt_context` is set once, when the line begins, and
-    /// the language toggle cannot reach it — it runs from a key handler that has no way back to
-    /// this helper. So the toggle updates the row, and the row is what this has to read.
-    ///
-    /// Getting this wrong was invisible until it was fatal: the highlighter passes this value to
-    /// `note_row`, which writes it back to the row. Reading the stale one meant every keystroke
-    /// after a toggle quietly reset the language to whatever the line had started as, and the next
-    /// redraw put `sh` back over the `lua` you had just switched to.
-    fn language(&self) -> String {
-        prompt::language().unwrap_or_else(|| {
-            self.prompt_context
-                .lock()
-                .map(|c| c.0.clone())
-                .unwrap_or_else(|_| "sh".to_string())
-        })
-    }
-
     fn last_status(&self) -> i32 {
         self.prompt_context.lock().map(|c| c.1).unwrap_or(0)
     }
@@ -269,9 +250,16 @@ impl Hinter for OsloHelper {
             let found = match source {
                 // oslo's own, not the editor's: the editor holds one history and it is still the
                 // other language's until the line ends. See `recall::suggest`.
-                settings::Source::History => {
-                    recall::suggest(line).or_else(|| self.history_hinter.hint(line, pos, ctx))
-                }
+                // oslo's own set, not the editor's. The editor's history is the complete record —
+                // both languages — because that is what `$HISTFILE` must receive, so filtering it
+                // there would corrupt the file. The suggestion therefore reads the
+                // language-filtered set directly, and falls back to the editor's hinter only when
+                // nothing has been remembered at all, where there is no language to cross.
+                settings::Source::History => recall::suggest(line).or_else(|| {
+                    recall::is_empty()
+                        .then(|| self.history_hinter.hint(line, pos, ctx))
+                        .flatten()
+                }),
                 settings::Source::Completion => self.command_hint(line, pos),
                 settings::Source::Path => self.path_hint(line, pos),
             };
@@ -373,10 +361,10 @@ impl Highlighter for OsloHelper {
                 used,
                 dropdown::terminal_cols(),
             ));
-            // Recorded so the vi-mode handler can draw this row again when the mode changes.
-            // rustyline will not repaint a prompt and cannot be asked to, so oslo keeps enough to
-            // do it itself. See `prompt::repaint`.
-            prompt::note_row(&self.language(), self.last_status(), *left_width);
+            // The row is recorded by the read loop before the editor is entered — see
+            // `startup::read`. It used to be recorded here too, from inside one guarded branch of
+            // the highlighter, which meant it was usually never recorded at all *and* that this
+            // wrote a stale language back over the live one on every keystroke.
         }
         Cow::Owned(painted)
     }

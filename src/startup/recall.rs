@@ -6,14 +6,15 @@
 //! editor is given only the half that matches whichever prompt is up.
 
 use super::mode::Mode;
-use super::repl::Repl;
 
-/// Load the lines read from the database, newest first as the query returns them.
+/// Load the lines read from the database, which returns them **oldest first**.
+///
+/// It was reversed here on the assumption that the query hands back newest first. It does not —
+/// `History::recent` reverses its own `ORDER BY id DESC` before returning — so this put the whole
+/// recalled set backwards: the first Up offered the oldest command in the database instead of the
+/// most recent one.
 pub(super) fn seed_history(entries: impl Iterator<Item = (String, String)>) {
-    // Reversed: the database hands back newest first, history reads oldest first.
-    let mut all: Vec<(String, String)> = entries.collect();
-    all.reverse();
-    oslo::interactive::recall::seed(all);
+    oslo::interactive::recall::seed(entries.collect());
 }
 
 /// Remember a line typed this session, so a later language switch still finds it.
@@ -21,14 +22,15 @@ pub(super) fn remember_history(line: &str, mode: Mode) {
     oslo::interactive::recall::remember(line, mode.name());
 }
 
-/// Refill the editor's history with the lines belonging to `mode`, and nothing else.
-///
-/// The suggestion no longer depends on this — it reads the same set directly, so it is right the
-/// instant the language changes. This keeps the *editor's* own recall honest: the arrow keys and
-/// `Ctrl-R` walk the editor's history, and it should hold what the prompt is reading.
-pub(super) fn load_history_for(rl: &mut Repl, mode: Mode) {
-    let _ = rl.clear_history();
-    for line in oslo::interactive::recall::for_language(mode.name()) {
-        let _ = rl.add_history_entry(&line);
-    }
-}
+// There was a `load_history_for` here that cleared the editor's history and refilled it with one
+// language. It is gone, and both reasons matter.
+//
+// It **corrupted `$HISTFILE`**: the editor counts entries added since the last clear and appends
+// exactly those on the next `append_history`, so re-seeding N lines made the following command
+// write all N to the file again — once at startup and again on every language toggle.
+//
+// And it was never the right mechanism: the language can change mid-line, from a key handler that
+// cannot reach the editor at all. Everything that must follow the language — the ghost suggestion,
+// the Up/Down walk, history expansion — reads [`oslo::interactive::recall`] directly instead, which
+// is correct the instant the prompt changes. The editor's own history stays the complete record,
+// which is what `$HISTFILE` should receive.

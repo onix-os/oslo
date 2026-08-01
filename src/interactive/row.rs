@@ -27,15 +27,23 @@ struct Row {
     /// Cells the prompt itself occupies, so the cursor column can be worked out from a position
     /// within the line.
     prompt_width: usize,
+    /// Whether the prompt on the row is oslo's built-in one.
+    ///
+    /// Only the built-in prompt has anything that changes mid-line — the vi mode letter and the
+    /// language — so only it is ever worth redrawing. A `$PS1`, a Lua `prompt.left` or the `PS2`
+    /// continuation prompt is somebody else's text, and rebuilding the row would replace it with
+    /// oslo's own.
+    builtin: bool,
 }
 
 /// Record the row, for [`repaint`]. Called by the highlighter on every redraw.
-pub fn note_row(language: &str, status: i32, prompt_width: usize) {
+pub fn note_row(language: &str, status: i32, prompt_width: usize, builtin: bool) {
     if let Ok(mut slot) = ROW.lock() {
         *slot = Some(Row {
             language: language.to_string(),
             status,
             prompt_width,
+            builtin,
         });
     }
 }
@@ -92,6 +100,15 @@ pub fn repaint(line: &str, line_cursor: usize) -> String {
     let Some(row) = slot.as_mut() else {
         return String::new();
     };
+    // **Nothing to redraw unless the prompt is ours.** `repaint` rebuilds the row from the
+    // built-in prompt; on a row showing `$PS1`, a Lua `prompt.left` or the `PS2` continuation
+    // prompt that would overwrite the real prompt with oslo's, and — because the recorded width
+    // then disagrees — also rewrite the line at the wrong column and erase the ghost hint and the
+    // right prompt with it. Those prompts have no mode letter and no language segment, so there is
+    // nothing a repaint could usefully change.
+    if !row.builtin {
+        return String::new();
+    }
     let left = render_default_left_prompt(row.status, &row.language);
     let width = super::prompt::printed_width(&left);
     let moved = width != row.prompt_width;

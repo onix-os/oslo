@@ -110,7 +110,15 @@ impl ConditionalEventHandler for HistoryWalk {
         // Walked back past the start: the line the user was typing. The editor keeps no copy of it
         // for us, so it comes back empty rather than wrong.
         if depth == 0 {
-            return Some(Cmd::Replace(rustyline::Movement::WholeLine, None));
+            // `Some("")`, not `None`. A command returned from a binding is treated as repeatable
+            // and rewritten before it runs: `Replace(mvt, None)` has the *last inserted text*
+            // substituted for the `None`, so this cleared the line and then pasted the last thing
+            // typed back into it. Saying explicitly that the replacement is empty leaves nothing
+            // to substitute.
+            return Some(Cmd::Replace(
+                rustyline::Movement::WholeLine,
+                Some(String::new()),
+            ));
         }
         let line = lines.get(lines.len() - depth)?.clone();
         // Already showing it — a second Down at the newest entry should not flicker.

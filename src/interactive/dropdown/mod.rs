@@ -32,7 +32,7 @@ pub use width::{
 };
 
 use nix::sys::termios::{LocalFlags, SetArg, tcgetattr, tcsetattr};
-use std::io::{self, Read, Write};
+use std::io::{self, Write};
 
 #[derive(Debug, Clone)]
 pub struct CompletionCandidate {
@@ -98,6 +98,68 @@ pub struct DropdownMenu {
     pub selected_index: usize,
     pub max_visible: usize,
     pub indent_cols: usize,
+}
+
+/// Read whatever keys are waiting, straight from the terminal.
+///
+/// **Not `io::stdin()`.** That goes through Rust's own 8KiB buffered reader: asking it for three
+/// bytes issues one `read(2)` for up to 8192 and parks everything past the third in a private
+/// buffer. The line editor reads the terminal through its own reader and never looks there, so
+/// those bytes were lost to it outright — and the *next* time this menu opened, the leftovers came
+/// back instantly as a keypress, which is a dropdown that appears and vanishes in the same frame.
+///
+/// Reading the descriptor directly takes exactly what is there and leaves nothing behind.
+fn read_keys(buf: &mut [u8]) -> usize {
+    // One byte first. Reading a blockful and keeping what it wants is what lost the keys typed
+    // *behind* a Tab: those bytes were consumed here and never reached the line editor.
+    if read_byte(&mut buf[..1]) == 0 {
+        return 0;
+    }
+    if buf[0] != 27 {
+        return 1;
+    }
+    // An escape. Either the user pressed Esc, or an arrow key is arriving as `ESC [ A` — which a
+    // terminal writes in one go. Wait briefly for the rest: long enough that a real sequence is
+    // never split, short enough that a bare Esc closes the menu without a pause.
+    if !waiting(25) || read_byte(&mut buf[1..2]) != 1 {
+        return 1;
+    }
+    // Only a real introducer means more is coming. Anything else is a key the user typed straight
+    // after Esc, and reading further would eat more of what they typed — the menu takes the Esc,
+    // and one character is the most that can be lost.
+    if buf[1] != b'[' && buf[1] != b'O' {
+        return 1;
+    }
+    if waiting(25) && read_byte(&mut buf[2..3]) == 1 {
+        return 3;
+    }
+    2
+}
+
+/// One byte from the terminal, retrying if a signal interrupts.
+fn read_byte(buf: &mut [u8]) -> usize {
+    loop {
+        // SAFETY: a one-byte slice this call owns, read from the terminal's own descriptor.
+        let n = unsafe { nix::libc::read(0, buf.as_mut_ptr().cast(), buf.len()) };
+        if n >= 0 {
+            return n as usize;
+        }
+        // A window resize, most likely — not the user closing the menu.
+        if std::io::Error::last_os_error().kind() != std::io::ErrorKind::Interrupted {
+            return 0;
+        }
+    }
+}
+
+/// Whether another byte is already waiting, within `ms`.
+fn waiting(ms: i32) -> bool {
+    let mut fds = nix::libc::pollfd {
+        fd: 0,
+        events: nix::libc::POLLIN,
+        revents: 0,
+    };
+    // SAFETY: one descriptor, its own length, and a timeout — nothing borrowed beyond the call.
+    unsafe { nix::libc::poll(&mut fds, 1, ms) > 0 }
 }
 
 impl DropdownMenu {
@@ -166,8 +228,8 @@ impl DropdownMenu {
             let _ = write!(stdout, "{}", draw_below(&rendered, num_lines, column));
             let _ = stdout.flush();
 
-            let mut buf = [0u8; 3];
-            let n = io::stdin().read(&mut buf).unwrap_or(0);
+            let mut buf = [0u8; 8];
+            let n = read_keys(&mut buf);
 
             if n == 0 {
                 break None;
@@ -189,7 +251,7 @@ impl DropdownMenu {
                     }
                     _ => break None,
                 }
-            } else if n == 3 && buf[0] == 27 && buf[1] == 91 {
+            } else if n >= 3 && buf[0] == 27 && buf[1] == 91 {
                 match buf[2] {
                     65 => {
                         // Up Arrow

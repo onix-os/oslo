@@ -28,6 +28,17 @@ pub fn remember(line: &str, language: &str) {
     }
 }
 
+/// Forget everything remembered, in every language.
+///
+/// `history -c` means "forget the history", and a shell that went on suggesting and recalling the
+/// lines it had just been told to forget would be lying — the same reason `hash -r` invalidates the
+/// command index.
+pub fn clear() {
+    if let Ok(mut all) = REMEMBERED.lock() {
+        all.clear();
+    }
+}
+
 /// Whether nothing at all has been remembered, in any language.
 ///
 /// Distinguishes "this language has no history" from "there is no history" — the first means a

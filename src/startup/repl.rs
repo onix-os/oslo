@@ -7,7 +7,7 @@
 use crate::absorb_loop_control;
 use crate::startup::mode::{Mode, ToggleRequest};
 use crate::startup::read::{Input, read_command};
-use crate::startup::recall::{load_history_for, remember_history, seed_history};
+use crate::startup::recall::{remember_history, seed_history};
 use crate::startup::{config, history, history_db, keybind, lua_init, mode, rc};
 use oslo::Environment;
 use oslo::LuaEngine;
@@ -126,7 +126,6 @@ pub fn run_repl() -> ! {
         let entries = db.recent(settings.max_size.max(1));
         seed_history(entries.iter().map(|e| (e.line.clone(), e.mode.clone())));
     }
-    load_history_for(&mut rl, current);
     publish_history(&rl);
 
     let mut jobs = JobManager::new();
@@ -222,11 +221,14 @@ pub fn run_repl() -> ! {
                 // request behind and the loop carries it out.
                 if history::take_clear_request() {
                     let _ = rl.clear_history();
-                    // The database is the history now, so `history -c` has to reach it too —
-                    // clearing only the editor's copy would put every line back on the next start.
+                    // Every copy, or the ones left behind go on answering. The database, because
+                    // clearing only the editor's would put every line back on the next start; and
+                    // oslo's own recall set, which is what the ghost suggestion, the Up/Down walk
+                    // and history expansion all read — those kept offering the cleared commands.
                     if let Some(db) = &db {
                         db.clear();
                     }
+                    oslo::interactive::recall::clear();
                     publish_history(&rl);
                 }
 
