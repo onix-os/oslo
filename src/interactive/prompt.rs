@@ -109,18 +109,10 @@ pub fn render_default_left_prompt(last_status: i32, language: &str) -> String {
     out.push_str(&theme.prompt.aside.paint("@", depth));
     out.push_str(&theme.prompt.host.paint(&hostname(), depth));
 
-    // The mode letter. rustyline never redraws a prompt, so oslo repaints this line itself the
-    // moment the mode changes — see `repaint` below and its caller in the key handler.
-    if let Some(mode) = super::vi::mode() {
-        out.push_str(&bar);
-        let style = match mode {
-            super::vi::Mode::Insert => theme.prompt.ok,
-            super::vi::Mode::Normal => theme.prompt.host,
-            super::vi::Mode::Replace => theme.prompt.failed,
-        };
-        out.push_str(&style.paint(mode.name(), depth));
-    }
-
+    // The vi mode is deliberately *not* here. The prompt string is handed to the line editor once
+    // and never redrawn, so a mode letter in it would still say `I` after you pressed Esc — which
+    // is worse than no letter, because it is confidently wrong. It lives in the right prompt
+    // instead, which the highlighter redraws on every keystroke. See `render_default_right_prompt`.
     out.push_str(&bar);
     out.push_str(&theme.prompt.git.paint(language, depth));
 
@@ -199,6 +191,20 @@ pub fn render_default_right_prompt(last_status: i32, elapsed: Option<Duration>) 
     };
     let mut parts = vec![arrow.paint("❮", depth)];
 
+    // The vi mode, here rather than in the left prompt, because **this side is redrawn on every
+    // keystroke**. rustyline hands the prompt string over once and never asks for it again, and a
+    // custom key handler cannot force a repaint — `EventContext` holds only a `&dyn Refresher`
+    // while `refresh_prompt_and_line` needs `&mut`. The highlighter is the one seam that runs per
+    // keystroke, and the right prompt is drawn from it, so a mode letter here is live.
+    if let Some(mode) = super::vi::mode() {
+        let style = match mode {
+            super::vi::Mode::Insert => theme.prompt.ok,
+            super::vi::Mode::Normal => theme.prompt.host,
+            super::vi::Mode::Replace => theme.prompt.failed,
+        };
+        parts.push(style.paint(mode.name(), depth));
+    }
+
     // The status number, which the left arrow's colour cannot carry.
     if last_status != 0 {
         parts.push(
@@ -225,65 +231,6 @@ pub fn render_default_right_prompt(last_status: i32, elapsed: Option<Duration>) 
     );
     parts.push(theme.prompt.cwd.paint(&pwd, depth));
     parts.join(&theme.prompt.aside.paint("  ", depth))
-}
-
-/// What is currently on the prompt's row, so it can be drawn again without the line editor.
-///
-/// rustyline hands its prompt over once and never redraws it, and a key handler cannot ask it to —
-/// `EventContext` carries a `&dyn Refresher` while `refresh_prompt_and_line` wants `&mut`. So when
-/// the vi mode changes there is no way to make rustyline repaint, and a mode letter in the prompt
-/// would sit there saying `I` while the cursor said otherwise.
-///
-/// oslo repaints the row itself instead. The highlighter runs on every line change and knows
-/// everything needed — the language, the line, and where the cursor sits — so it leaves a copy
-/// here, and [`repaint`] writes it out again with whatever the mode is *now*.
-static ROW: std::sync::Mutex<Option<Row>> = std::sync::Mutex::new(None);
-
-#[derive(Clone)]
-struct Row {
-    /// The language segment, so the prompt can be rebuilt for the right one.
-    language: String,
-    status: i32,
-    /// The painted line, exactly as the highlighter produced it.
-    painted: String,
-    /// Cells from the start of the row to the cursor.
-    cursor: usize,
-}
-
-/// Record the row, for [`repaint`]. Called by the highlighter on every redraw.
-pub fn note_row(language: &str, status: i32, painted: &str, cursor: usize) {
-    if let Ok(mut slot) = ROW.lock() {
-        *slot = Some(Row {
-            language: language.to_string(),
-            status,
-            painted: painted.to_string(),
-            cursor,
-        });
-    }
-}
-
-/// Draw the prompt row again, with the vi mode as it stands now.
-///
-/// Returns the escapes to write, or empty when there is nothing recorded — the first prompt of a
-/// session, before anything has been highlighted.
-///
-/// `\r` then erase-to-end then rewrite: no save/restore, for the reason given on
-/// [`right_prompt_escape`], and no cursor-up, because a prompt and its line are one row until the
-/// line wraps. A wrapped line repaints its last row only, which is where the cursor is.
-pub fn repaint() -> String {
-    let Ok(slot) = ROW.lock() else {
-        return String::new();
-    };
-    let Some(row) = slot.as_ref() else {
-        return String::new();
-    };
-    let left = render_default_left_prompt(row.status, &row.language);
-    let mut out = format!("\r\x1b[K{left}{}", row.painted);
-    out.push('\r');
-    if row.cursor > 0 {
-        out.push_str(&format!("\x1b[{}C", row.cursor));
-    }
-    out
 }
 
 /// The escape that draws a right prompt, or empty when there is no room for one.

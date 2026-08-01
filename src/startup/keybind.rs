@@ -39,16 +39,9 @@ impl ConditionalEventHandler for ViCursor {
         // everything else leaves the mode alone, and a key that is mispredicted corrects itself on
         // the very next keystroke because the real mode is read again then.
         let mode = vi::after_key(now, key_char(event));
-        // The mode changed, so the prompt is now wrong. rustyline will not redraw it and cannot be
-        // asked to, so oslo draws the row again itself from what the highlighter recorded — see
-        // `prompt::repaint`. Without this the letter sat there saying `I` while the cursor had
-        // already become a block, which is worse than showing nothing.
         if let Some(escape) = vi::observe(mode, &self.cursors) {
             let mut out = std::io::stdout();
             let _ = out.write_all(escape.as_bytes());
-            // The row after the cursor shape, so the prompt and the cursor agree in one frame
-            // rather than flickering between two.
-            let _ = out.write_all(oslo::interactive::prompt::repaint().as_bytes());
             let _ = out.flush();
         }
         // Declined on purpose: this handler observes, it does not bind.

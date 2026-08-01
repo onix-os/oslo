@@ -66,8 +66,6 @@ pub struct OsloHelper {
     /// Set once per prompt cycle by the REPL and drawn by `highlight`, which is the only seam
     /// where a cursor move is free — see [`prompt::right_prompt_escape`].
     right_prompt: Mutex<Option<(String, usize)>>,
-    /// The language and status this prompt was drawn for, so a repaint rebuilds the same one.
-    prompt_context: Mutex<(String, i32)>,
 }
 
 impl OsloHelper {
@@ -92,7 +90,6 @@ impl OsloHelper {
             menu: interactive,
             editor_multiline: true,
             right_prompt: Mutex::new(None),
-            prompt_context: Mutex::new(("sh".to_string(), 0)),
         }
     }
 
@@ -109,27 +106,6 @@ impl OsloHelper {
 
     pub fn set_menu(&mut self, enabled: bool) {
         self.menu = enabled;
-    }
-
-    /// Which language this prompt is reading, and the status it was drawn with.
-    ///
-    /// Both are set by the REPL each time round, so a repaint rebuilds the same prompt rather than
-    /// guessing at one.
-    pub fn set_prompt_context(&self, language: &str, last_status: i32) {
-        if let Ok(mut slot) = self.prompt_context.lock() {
-            *slot = (language.to_string(), last_status);
-        }
-    }
-
-    fn language(&self) -> String {
-        self.prompt_context
-            .lock()
-            .map(|c| c.0.clone())
-            .unwrap_or_else(|_| "sh".to_string())
-    }
-
-    fn last_status(&self) -> i32 {
-        self.prompt_context.lock().map(|c| c.1).unwrap_or(0)
     }
 
     /// Whether unterminated input is continued inside the editor.
@@ -319,10 +295,6 @@ impl Highlighter for OsloHelper {
                 used,
                 dropdown::terminal_cols(),
             ));
-            // Recorded so the vi-mode handler can draw this row again when the mode changes.
-            // rustyline will not repaint a prompt and cannot be asked to, so oslo keeps enough to
-            // do it itself. See `prompt::repaint`.
-            prompt::note_row(&self.language(), self.last_status(), &painted, used);
         }
         Cow::Owned(painted)
     }
