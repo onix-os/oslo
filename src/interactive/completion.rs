@@ -94,7 +94,16 @@ impl OsloHelper {
         if let Some(prefix) = word.stem.strip_prefix('$') {
             self.variable_candidates(prefix, word.quote, &mut out);
         } else if word.command_position {
-            self.command_candidates(&word, &mut out);
+            // **Only in shell.** A command name is a shell answer: a builtin, an alias, a function,
+            // something on `$PATH`. At a Lua prompt none of them can run, and offering them is the
+            // same mistake the ghost suggestion used to make — `l` answered with `ls` in a language
+            // that has no `ls`.
+            //
+            // Paths, variables and config-supplied candidates are left alone: those are still
+            // meaningful in Lua, and this is the one source that is not.
+            if super::prompt::language().is_none_or(|language| language == "sh") {
+                self.command_candidates(&word, &mut out);
+            }
         } else if let Some(from_config) = word
             .prior_words
             .first()

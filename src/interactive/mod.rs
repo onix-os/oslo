@@ -322,6 +322,14 @@ impl Highlighter for OsloHelper {
             return Cow::Owned(self.right_prompt_only(line));
         }
 
+        // **Shell syntax is only shell's.** Painting a Lua line with it marked `local` and `print`
+        // red as unknown commands, and quoted Lua strings as shell words — telling you a correct
+        // line is wrong. The row still gets its right prompt; it just is not coloured as something
+        // it is not.
+        if prompt::language().is_some_and(|language| language != "sh") {
+            return Cow::Owned(self.right_prompt_only(line));
+        }
+
         let (path, builtins, functions) = {
             let env = self.env.lock().unwrap();
             let path = env.get_var("PATH").unwrap_or_default().to_string();
