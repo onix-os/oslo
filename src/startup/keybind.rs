@@ -61,6 +61,76 @@ impl ConditionalEventHandler for ViCursor {
     }
 }
 
+/// Walks oslo's own history instead of the editor's, so recall follows the language.
+///
+/// The editor holds one history and it is refilled only when the read loop regains control — that
+/// is, after Enter. The language can change in the middle of a line, so until the line ends the
+/// editor is still holding the other language's history and Up recalls a shell command at a Lua
+/// prompt. It cannot be fixed by swapping that history: the toggle runs from inside `readline`,
+/// which already holds the only mutable borrow of the editor.
+///
+/// So Up and Down are answered here, from the same set the suggestion reads, filtered by the
+/// language the prompt is showing *now*.
+struct HistoryWalk {
+    back: bool,
+}
+
+impl ConditionalEventHandler for HistoryWalk {
+    fn handle(&self, _: &Event, _: RepeatCount, _: bool, ctx: &EventContext) -> Option<Cmd> {
+        let language = oslo::interactive::prompt::language()?;
+        let lines = oslo::interactive::recall::for_language(&language);
+        if lines.is_empty() {
+            // Nothing remembered at all — no database, first ever session — so let the editor
+            // answer as it always did. But if other languages have history and this one does not,
+            // answering with theirs is the very thing this handler exists to prevent.
+            return if oslo::interactive::recall::is_empty() {
+                None
+            } else {
+                Some(Cmd::Noop)
+            };
+        }
+        let mut walk = WALK.lock().ok()?;
+        // **A walk belongs to one language.** Switching in the middle of one starts a new walk
+        // rather than carrying the old position across: the two histories have nothing to do with
+        // each other, and a position three back in Lua means nothing in shell. Without this,
+        // toggling mid-walk left a stale depth behind and the next Up recalled the wrong entry or
+        // nothing at all.
+        let depth = match walk.as_ref() {
+            Some((walked, depth)) if walked == &language => *depth,
+            _ => 0,
+        };
+        // A walk that has not started begins just past the newest entry, so the first Up lands on
+        // it. The depth counts back from the end: 1 is the newest.
+        let depth = if self.back {
+            (depth + 1).min(lines.len())
+        } else {
+            depth.saturating_sub(1)
+        };
+        *walk = Some((language.clone(), depth));
+        // Walked back past the start: the line the user was typing. The editor keeps no copy of it
+        // for us, so it comes back empty rather than wrong.
+        if depth == 0 {
+            return Some(Cmd::Replace(rustyline::Movement::WholeLine, None));
+        }
+        let line = lines.get(lines.len() - depth)?.clone();
+        // Already showing it — a second Down at the newest entry should not flicker.
+        if line == ctx.line() {
+            return Some(Cmd::Noop);
+        }
+        Some(Cmd::Replace(rustyline::Movement::WholeLine, Some(line)))
+    }
+}
+
+/// Forget where a history walk had got to. Called when a new line starts.
+pub fn reset_history_walk() {
+    if let Ok(mut walk) = WALK.lock() {
+        *walk = None;
+    }
+}
+
+/// Shared so Up and Down walk the same position, with the language that position belongs to.
+static WALK: Mutex<Option<(String, usize)>> = Mutex::new(None);
+
 /// The character a key event carries, if it is a plain one.
 ///
 /// Esc arrives as its own key code rather than as a character, so it is reported as `\x1b` — which
@@ -121,6 +191,24 @@ pub fn apply(rl: &mut Repl, env_struct: &Arc<Mutex<Environment>>, toggle: &Toggl
             let _ = out.write_all(settings.vi.cursors.insert.escape().as_bytes());
             let _ = out.flush();
         }
+    }
+
+    // Up and Down before `oslo.keys`, so a config can still take them.
+    for (code, back) in [
+        (rustyline::KeyCode::Up, true),
+        (rustyline::KeyCode::Down, false),
+        (rustyline::KeyCode::Char('p'), true),
+        (rustyline::KeyCode::Char('n'), false),
+    ] {
+        let modifiers = if matches!(code, rustyline::KeyCode::Char(_)) {
+            rustyline::Modifiers::CTRL
+        } else {
+            rustyline::Modifiers::NONE
+        };
+        rl.bind_sequence(
+            Event::KeySeq(vec![rustyline::KeyEvent(code, modifiers)]),
+            rustyline::EventHandler::Conditional(Box::new(HistoryWalk { back })),
+        );
     }
 
     let (bindings, problems) = oslo::interactive::keys::resolve(&settings.keys);

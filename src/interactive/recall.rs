@@ -28,6 +28,14 @@ pub fn remember(line: &str, language: &str) {
     }
 }
 
+/// Whether nothing at all has been remembered, in any language.
+///
+/// Distinguishes "this language has no history" from "there is no history" — the first means a
+/// recall key should do nothing, the second that it should fall through to the editor's own.
+pub fn is_empty() -> bool {
+    REMEMBERED.lock().map(|all| all.is_empty()).unwrap_or(true)
+}
+
 /// Every line typed in `language`, oldest first.
 pub fn for_language(language: &str) -> Vec<String> {
     let Ok(all) = REMEMBERED.lock() else {

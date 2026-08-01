@@ -63,6 +63,9 @@ pub(super) fn read_command(
         // leaving a line in normal mode otherwise drew the next prompt saying `N` while the editor
         // was already back in insert, and it stayed wrong until the first keystroke.
         oslo::interactive::vi::reset();
+        // A new line is a new walk through the history: whatever the last one had scrolled back
+        // to belongs to the line that is now finished.
+        super::keybind::reset_history_walk();
         // The shape too: the terminal is still drawing whatever the last line ended in, and a
         // block cursor over a line you are typing into says normal mode when it is insert.
         // Only to a terminal: a cursor-shape escape written down a pipe is not a cursor shape,
