@@ -199,7 +199,7 @@ impl Completer for OsloHelper {
             return Ok((start, candidates.into_iter().map(Self::to_pair).collect()));
         }
 
-        let prompt_str = prompt::render_default_left_prompt(0);
+        let prompt_str = prompt::render_default_left_prompt(0, "sh");
         let indent_cols =
             dropdown::visible_len(&prompt_str) + dropdown::visible_len(&line[..start]);
 

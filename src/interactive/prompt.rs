@@ -90,19 +90,40 @@ pub fn shorten(path: &str, keep: usize) -> String {
 }
 
 /// The built-in left prompt, used when no Lua one is set.
-pub fn render_default_left_prompt(last_status: i32) -> String {
+/// `user@host | N | sh ❯`
+///
+/// Three segments, each answering a question the others cannot: **who and where** you are logged
+/// in, **which editing mode** the keyboard is in, and **which language** the line will be read as.
+/// The last matters more in oslo than in any other shell — the same characters mean different
+/// things in shell and in Lua, and mistaking one for the other is the mistake this prompt exists
+/// to prevent.
+///
+/// The directory and the branch are on the *right*, because both change constantly and would
+/// otherwise push the command you are typing further and further across the screen.
+pub fn render_default_left_prompt(last_status: i32, language: &str) -> String {
     let theme = theme::current();
     let depth = theme::depth();
+    let bar = theme.prompt.aside.paint(" | ", depth);
 
-    // Who and where you are logged in, rather than which directory you are in. The directory moves
-    // constantly and is on the right; the host and user do not move and are what you check before
-    // running something destructive.
-    let mut out = theme.prompt.host.paint(&hostname(), depth);
-    out.push_str(&theme.prompt.aside.paint(" | ", depth));
-    out.push_str(&theme.prompt.user.paint(&username(), depth));
-    if let Some(branch) = git_branch() {
-        out.push_str(&theme.prompt.git.paint(&format!(" ({branch})"), depth));
+    let mut out = theme.prompt.user.paint(&username(), depth);
+    out.push_str(&theme.prompt.aside.paint("@", depth));
+    out.push_str(&theme.prompt.host.paint(&hostname(), depth));
+
+    // Only when vi mode is on. An emacs-keymap shell has nothing to say here, and a segment that
+    // always reads the same is a segment that costs width for nothing.
+    if let Some(mode) = super::vi::mode() {
+        out.push_str(&bar);
+        let style = match mode {
+            super::vi::Mode::Insert => theme.prompt.ok,
+            super::vi::Mode::Normal => theme.prompt.host,
+            super::vi::Mode::Replace => theme.prompt.failed,
+        };
+        out.push_str(&style.paint(mode.name(), depth));
     }
+
+    out.push_str(&bar);
+    out.push_str(&theme.prompt.git.paint(language, depth));
+
     let arrow = if last_status == 0 {
         theme.prompt.ok
     } else {
@@ -189,6 +210,11 @@ pub fn render_default_right_prompt(last_status: i32, elapsed: Option<Duration>) 
     }
     if let Some(took) = elapsed.and_then(notable_duration) {
         parts.push(theme.prompt.aside.paint(&took, depth));
+    }
+    // The branch sits with the directory, because they answer the same question — *where* you are
+    // — and separating them meant reading both ends of the line to know it.
+    if let Some(branch) = git_branch() {
+        parts.push(theme.prompt.git.paint(&format!("({branch})"), depth));
     }
     // The directory lives here rather than on the left: it is what changes on every `cd`, and on
     // the right it does not push the command you are typing further and further across.
@@ -393,7 +419,14 @@ mod right_prompt_tests {
             quiet.starts_with('❮'),
             "the mirror of the left arrow: {quiet:?}"
         );
-        assert!(!quiet.contains('('), "no status on a success: {quiet:?}");
+        // No *status* on a success. Checked as "a paren followed by a digit" rather than as any
+        // paren, because the git branch lives here too and `(develop)` is not an exit code.
+        assert!(
+            !quiet
+                .match_indices('(')
+                .any(|(i, _)| quiet[i + 1..].starts_with(|c: char| c.is_ascii_digit())),
+            "no status on a success: {quiet:?}"
+        );
         assert!(
             !quiet.contains("ms") && !quiet.contains("0.0s"),
             "no duration for a quick command: {quiet:?}"

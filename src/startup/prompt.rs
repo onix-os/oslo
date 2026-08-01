@@ -28,10 +28,15 @@ pub fn primary_prompt(
     lua.render("prompt.left")
         .or_else(|| lua.render_prompt())
         .unwrap_or_else(|| {
-            // `PS1` is the shell's prompt and describes a shell line; drawing it over a Lua
-            // prompt would say `oslo$` in front of something that is not a shell command.
+            // Both languages get the *same* prompt, with the language as one of its segments —
+            // `you@host | N | lua ❯`. A separate `lua>` used to be the only signal, which meant
+            // switching language threw away the branch, the mode and the directory as well.
+            //
+            // `PS1` still wins for shell lines, because that is what `PS1` is. It cannot win for
+            // Lua ones: it describes a shell prompt, and drawing `oslo$` in front of something
+            // that is not a shell command is exactly the confusion this segment exists to stop.
             if mode == Mode::Lua {
-                mode.fallback_prompt().to_string()
+                oslo::interactive::prompt::render_default_left_prompt(last_status, mode.name())
             } else {
                 rc::ps1(&mut env_struct.lock().unwrap(), last_status)
             }

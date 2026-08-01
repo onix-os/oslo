@@ -102,7 +102,9 @@ fn source_if_present(env: &mut Environment, path: &std::path::Path) -> ExitReque
 pub fn ps1(env: &mut Environment, last_status: i32) -> String {
     match env.get_var("PS1").map(str::to_string) {
         Some(raw) => expand_prompt(env, &raw),
-        None => render_default_left_prompt(last_status),
+        // The shell language's own name for the segment. A `PS1` that the user wrote wins
+        // above; this is the default, and it says which language the line will be read as.
+        None => render_default_left_prompt(last_status, "sh"),
     }
 }
 

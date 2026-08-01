@@ -48,13 +48,9 @@ impl Mode {
         }
     }
 
-    /// The default prompt for this mode, when the user has set none.
-    pub fn fallback_prompt(self) -> &'static str {
-        match self {
-            Mode::Shell => "oslo$ ",
-            Mode::Lua => "lua> ",
-        }
-    }
+    // There was a `fallback_prompt` here, giving Lua its own `lua> `. It is gone because both
+    // languages now share one prompt with the language as a segment — a separate prompt meant
+    // switching language also threw away the branch, the vi mode and the directory.
 }
 
 /// What the user typed, once the prefixes have been read off it.

@@ -414,7 +414,7 @@ mod in_process {
     /// this binary changes it either — the cwd tests all live in `process_global`.
     #[test]
     fn test_interactive_prompt() {
-        let left = oslo::interactive::prompt::render_default_left_prompt(0);
+        let left = oslo::interactive::prompt::render_default_left_prompt(0, "sh");
         assert!(!left.is_empty());
         // The right prompt was deleted in PLAN R9.7: nothing ever drew it, so this assertion was
         // the only thing keeping its renderer alive.
