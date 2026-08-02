@@ -3,6 +3,9 @@ name: release
 on:
   release:
     types: [created]
+  # So a binary can be built and downloaded without cutting a release — for testing a fix on a
+  # machine that is not this one, which is most of why anybody wants a build.
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -65,14 +68,42 @@ jobs:
       - name: Smoke test
         run: |
           bin="./target/${{ matrix.target }}/release/oslo"
+
           out="$("$bin" -c 'echo ok' </dev/null)"
-          test "$out" = "ok" || { echo "smoke test printed '$out', expected 'ok'" >&2; exit 1; }
-          lua="$(mktemp)"; echo 'print("lua " .. _VERSION)' > "$lua"
-          "$bin" --lua-script "$lua" </dev/null | grep -q 'lua Lua 5.4' \
-            || { echo "Lua did not start in the static binary" >&2; exit 1; }
+          test "$out" = "ok" || { echo "shell printed '$out', expected 'ok'" >&2; exit 1; }
+
+          # Lua, by the two routes that reach it. `--lua-script` used to be here and is not a flag
+          # oslo has ever had, so this step failed on every release — it had simply never run,
+          # because the repository had no remote when it was written.
+          "$bin" --lua -c 'print("lua " .. _VERSION)' </dev/null | grep -q 'lua Lua 5.4' \
+            || { echo "Lua did not start via --lua -c" >&2; exit 1; }
+
+          lua="$(mktemp --suffix=.lua)"; echo 'print("lua " .. _VERSION)' > "$lua"
+          "$bin" "$lua" </dev/null | grep -q 'lua Lua 5.4' \
+            || { echo "a .lua file was not detected as Lua" >&2; exit 1; }
+
+          # The structured pipeline, since it is the part most likely to be broken by a build
+          # difference rather than by a code change.
+          rows="$("$bin" -c "printf 'a\nb\n' | lines | length" </dev/null)"
+          test "$rows" = "2" || { echo "structured pipeline printed '$rows', expected 2" >&2; exit 1; }
       - name: Package
-        run: tar -C "target/${{ matrix.target }}/release" -czf "${{ matrix.artifact }}.tar.gz" oslo
-      - name: Upload artifact
+        run: |
+          tar -C "target/${{ matrix.target }}/release" -czf "${{ matrix.artifact }}.tar.gz" oslo
+          sha256sum "${{ matrix.artifact }}.tar.gz" > "${{ matrix.artifact }}.tar.gz.sha256"
+      # Downloadable from the run itself, so a manual build is useful without a release.
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: |
+            ${{ matrix.artifact }}.tar.gz
+            ${{ matrix.artifact }}.tar.gz.sha256
+          if-no-files-found: error
+      # And attached to the release, when there is one.
+      - name: Attach to the release
+        if: github.event_name == 'release'
         uses: softprops/action-gh-release@v2
         with:
-          files: ${{ matrix.artifact }}.tar.gz
+          files: |
+            ${{ matrix.artifact }}.tar.gz
+            ${{ matrix.artifact }}.tar.gz.sha256
