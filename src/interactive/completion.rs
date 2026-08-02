@@ -73,7 +73,12 @@ fn config_candidates(
                 replacement: display.clone(),
                 display,
                 description,
-                kind: Some("option".to_string()),
+                // **No kind, rather than a wrong one.** This was hardcoded to `option`, so a
+                // config completing branches, files or hosts had all of them labelled options —
+                // in the one column the user reads to tell them apart. The hook does not report a
+                // kind, so the honest answer is that none is known; widening it to carry one is a
+                // change to the Lua signature, not a change here.
+                kind: None,
                 path: None,
                 detail: None,
             })
@@ -242,13 +247,48 @@ impl OsloHelper {
         }
     }
 
+    /// The command a name really stands for, following aliases.
+    ///
+    /// Transitive, because aliases chain — `alias g=git`, `alias gc='git commit'` — and bounded,
+    /// because they can also loop: `alias a=b` with `alias b=a` is legal to write and must not
+    /// hang the shell on Tab.
+    ///
+    /// Only the *first word* of an expansion matters here: `alias gc='git commit'` completes as
+    /// `git`, which is right for offering `git`'s options even if it means the subcommand path is
+    /// not followed. Getting the head right is most of the value; the rest can come later.
+    fn resolve_head(&self, name: &str) -> String {
+        let Ok(env) = self.env.lock() else {
+            return name.to_string();
+        };
+        let mut current = name.to_string();
+        for _ in 0..16 {
+            let Some(expansion) = env.get_alias(&current) else {
+                break;
+            };
+            let Some(first) = expansion.split_whitespace().next() else {
+                break;
+            };
+            if first == current {
+                // `alias ls='ls --color'` — the classic self-reference. It expands to itself, so
+                // the answer is already right and following it again would not terminate.
+                break;
+            }
+            current = first.to_string();
+        }
+        current
+    }
+
     fn spec_candidates(&self, word: &Word<'_>, out: &mut Vec<CompletionCandidate>) {
         // `prior_words` holds this command's words only, so `ls | git comm<TAB>` looks up `git`
         // and not `ls`.
         let Some((primary, rest)) = word.prior_words.split_first() else {
             return;
         };
-        let Some(spec) = self.spec_registry.find_spec(&unquote(primary)) else {
+        // Through the alias table first. Everyone aliases `git`, and `g comm<TAB>` offering
+        // nothing is a gap the shell has no excuse for: the alias table is already loaded and this
+        // function is already holding the environment.
+        let head = self.resolve_head(&unquote(primary));
+        let Some(spec) = self.spec_registry.find_spec(&head) else {
             return;
         };
 
