@@ -4,6 +4,8 @@
 
 mod common;
 
+use oslo::Environment;
+
 use common::{assert_out, run};
 
 // --- aliases ---
@@ -150,4 +152,33 @@ fn local_without_a_value_still_scopes() {
 fn readonly_is_enforced() {
     let r = run("readonly R=1; R=2; echo $R");
     assert_eq!(r.out(), "1");
+}
+
+// --- `export NAME` with no value: marked for export, still unset (PLAN.md round C) ---
+
+/// `export V` with no value marks `V` for export and leaves it **unset**.
+///
+/// bash gives an empty `${V+set}` and no `V=` in a child's environment; oslo used to create it
+/// empty, so every `${V+set}` answered "set" and every child saw a spurious `V=`. A later
+/// assignment must still be exported, which is the whole reason the intention is recorded.
+#[test]
+fn exporting_a_name_that_does_not_exist_yet_does_not_create_it() {
+    let mut env = Environment::new();
+    assert!(env.export_var("PENDING_ONE"));
+    assert!(env.get_var("PENDING_ONE").is_none(), "must still be unset");
+
+    // Assigning later honours the pending export.
+    assert!(env.set_var("PENDING_ONE", "1", false));
+    assert_eq!(env.get_var("PENDING_ONE"), Some("1"));
+    assert!(env.exported_vars().iter().any(|(n, _)| n == "PENDING_ONE"));
+}
+
+/// `unset` undoes the intention, or `export V; unset V; V=1` would still export.
+#[test]
+fn unsetting_forgets_a_pending_export() {
+    let mut env = Environment::new();
+    assert!(env.export_var("PENDING_TWO"));
+    env.unset_var("PENDING_TWO");
+    assert!(env.set_var("PENDING_TWO", "9", false));
+    assert!(!env.exported_vars().iter().any(|(n, _)| n == "PENDING_TWO"));
 }

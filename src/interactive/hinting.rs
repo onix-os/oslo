@@ -1,6 +1,11 @@
 //! The ghost suggestion shown past the cursor.
 //!
-//! Two things were wrong with it. It only fired at column zero, so `true && ec` suggested
+//! Three sources, in fish's order: **history, then completions, then file paths.** History is a
+//! line the user has actually run, which is a better guess than anything that can be ranked;
+//! completions answer for a command name being typed; and paths answer for the argument after it,
+//! which is the case the other two cannot see at all.
+//!
+//! Two things were wrong with it before. It only fired at column zero, so `true && ec` suggested
 //! nothing; and it sorted alphabetically, so typing `exit` suggested `exitsnoop-bpfcc` — a
 //! command the user has never run, ahead of the one they were plainly typing.
 
@@ -29,6 +34,17 @@ impl OsloHelper {
             return None;
         }
         let stem = word.stem.as_str();
+
+        // **Only in shell.** Everything below offers a *command* — a builtin, an alias, a shell
+        // function, something on `$PATH`. None of those are Lua, so at a Lua prompt `l` was being
+        // answered with `ls`: a suggestion that cannot run in the language being typed, which is
+        // worse than no suggestion at all.
+        //
+        // History still suggests here, and it is filtered by language too — see
+        // `startup::recall`. So a Lua prompt suggests Lua you have actually written.
+        if super::prompt::language().is_some_and(|language| language != "sh") {
+            return None;
+        }
 
         let env = self.env.lock().unwrap();
         let path = env.get_var("PATH").unwrap_or_default().to_string();
@@ -77,6 +93,75 @@ impl OsloHelper {
         }
 
         best.map(|b| b.name[stem.len()..].to_string())
+    }
+}
+
+impl OsloHelper {
+    /// The completion of a *path* being typed, or `None`.
+    ///
+    /// fish's third source, and the one that covers the argument rather than the command. Only
+    /// for a word that is not in command position: a bare name at the start of a line is a command
+    /// to look up, not a file in the current directory, and suggesting `./notes.txt` when someone
+    /// typed `no` would be nonsense.
+    pub fn path_hint(&self, line: &str, pos: usize) -> Option<String> {
+        let word = current_word(line, pos);
+        if word.command_position || word.stem.is_empty() {
+            return None;
+        }
+
+        // Split what was typed into the directory to look in and the stem to match. A trailing
+        // `/` means the directory itself is complete and every entry in it is a candidate.
+        let typed = word.stem.as_str();
+        let (dir, stem) = match typed.rfind('/') {
+            Some(cut) => (&typed[..=cut], &typed[cut + 1..]),
+            None => ("", typed),
+        };
+        // Only once there is something to match on. Listing a directory on the keystroke that
+        // begins a word would fire for every argument of every command.
+        if stem.is_empty() && dir.is_empty() {
+            return None;
+        }
+
+        let expanded = expand_tilde(dir);
+        let base = if expanded.is_empty() { "." } else { &expanded };
+        let mut best: Option<String> = None;
+        for entry in std::fs::read_dir(base).ok()?.flatten() {
+            let name = entry.file_name().to_string_lossy().into_owned();
+            if !name.starts_with(stem) || name.len() == stem.len() {
+                continue;
+            }
+            // A dotfile is only offered once the user has typed the dot, the same rule globbing
+            // follows — otherwise every argument suggests `.git`.
+            if name.starts_with('.') && !stem.starts_with('.') {
+                continue;
+            }
+            let suffix = if entry.file_type().is_ok_and(|t| t.is_dir()) {
+                "/"
+            } else {
+                ""
+            };
+            let candidate = format!("{name}{suffix}");
+            // Shortest wins: it is the least presumptuous completion, and the one the user is
+            // most likely already heading for.
+            if best
+                .as_ref()
+                .is_none_or(|b| (candidate.len(), &candidate) < (b.len(), b))
+            {
+                best = Some(candidate);
+            }
+        }
+        best.map(|name| name[stem.len()..].to_string())
+    }
+}
+
+/// A leading `~`, so a path typed with one can still be suggested.
+fn expand_tilde(dir: &str) -> String {
+    match dir.strip_prefix('~') {
+        Some(rest) if rest.is_empty() || rest.starts_with('/') => match std::env::var("HOME") {
+            Ok(home) if !home.is_empty() => format!("{home}{rest}"),
+            _ => dir.to_string(),
+        },
+        _ => dir.to_string(),
     }
 }
 

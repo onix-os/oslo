@@ -45,7 +45,7 @@ check "process substitution" "$(cat <(echo procsub))" "procsub"
 check "builtin printf, no coreutils here" "$(printf '%05d|%s' 42 x)" "00042|x"
 check "arithmetic" "$((6 * 7))" "42"
 # `case` inside `$( )` is deliberately avoided here: it does not parse yet — the substitution
-# scanner reads a case pattern's `)` as its own closing paren. Found by this VM; see PLAN-DISTRO.
+# scanner reads a case pattern's `)` as its own closing paren. Found by this VM; see PLAN.md.
 if [ -n "$LINENO" ]; then ok "\$LINENO is set"; else no "\$LINENO is empty"; fi
 check "\$UID is root in a VM" "$UID" "0"
 

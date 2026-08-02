@@ -15,6 +15,7 @@ pub mod brace;
 pub mod fields;
 pub mod glob;
 pub mod param;
+pub mod sugar;
 pub mod tilde;
 pub mod word;
 

@@ -18,6 +18,7 @@
 mod describe;
 mod interrupt;
 mod jobs;
+mod structured;
 mod timing;
 
 use crate::ast::*;
@@ -325,6 +326,23 @@ fn run_pipeline(env: &mut Environment, pipeline: &Pipeline) -> Result<i32> {
 /// With `pipefail` that is the rightmost stage that failed, not the rightmost stage: the option
 /// exists so that `generate | filter` cannot report success when `generate` died.
 fn run_stages(env: &mut Environment, pipeline: &Pipeline) -> Result<i32> {
+    // **The one new branch.** The planner decides, before any stage runs, whether any edge of this
+    // pipeline carries structured rows. Until a structured tool exists it answers no for every
+    // pipeline ever written, and the rest of this function is reached exactly as it always was.
+    //
+    // Deliberately a question asked here rather than a check scattered through the stages: there
+    // is one place where the byte path can be left, and it is this line.
+    if let Some(sinks) = structured::structured_sinks(pipeline) {
+        // Nothing takes this path yet — the tools that would are the next stage of the work. It is
+        // wired now, with the corpus proving it is never reached, so that the commit which adds
+        // the first structured tool is small and its blast radius is already measured.
+        return structured::run(env, pipeline, &sinks, run_byte_stages);
+    }
+    run_byte_stages(env, pipeline)
+}
+
+/// The pipeline as oslo has always run it: one process per stage, bytes on every descriptor.
+fn run_byte_stages(env: &mut Environment, pipeline: &Pipeline) -> Result<i32> {
     if pipeline.commands.len() == 1 {
         let status = eval_command(env, &pipeline.commands[0])?;
         // R4.10: a one-command pipeline still has a stage vector, as bash's `PIPESTATUS` does.

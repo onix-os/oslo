@@ -12,8 +12,10 @@
 //! [`leave_job_control`], reached from [`super::reset_signals_for_child`].
 
 use nix::fcntl::{FcntlArg, fcntl};
+use nix::sys::termios::{SetArg, Termios, tcgetattr, tcsetattr};
 use nix::unistd::{Pid, getpgrp, getpid, isatty, setpgid, tcsetpgrp};
 use std::os::fd::{BorrowedFd, RawFd};
+use std::sync::Mutex;
 use std::sync::atomic::{AtomicI32, Ordering};
 
 /// A dup of the controlling terminal, or `-1` when this process is not doing job control.
@@ -161,9 +163,50 @@ pub(crate) fn give_terminal_to(pgid: Pid) {
     if fd == NO_JOB_CONTROL {
         return;
     }
+    // Remember how the terminal is set up before letting go of it. Handing it over is the only
+    // moment the shell can be sure the modes are still its own — see `reclaim_terminal`.
+    if pgid != shell_pgid() {
+        remember_terminal_modes(fd);
+    }
     super::signals::without_sigttou(|| {
         let _ = set_foreground(fd, pgid);
     });
+}
+
+/// The terminal's settings as they were before the last foreground job got them.
+static SAVED_MODES: Mutex<Option<Termios>> = Mutex::new(None);
+
+fn remember_terminal_modes(fd: RawFd) {
+    let borrowed = unsafe { BorrowedFd::borrow_raw(fd) };
+    if let Ok(modes) = tcgetattr(borrowed)
+        && let Ok(mut slot) = SAVED_MODES.lock()
+    {
+        *slot = Some(modes);
+    }
+}
+
+/// Put the terminal back the way the shell had it.
+///
+/// **A program that dies badly does not tidy up.** A killed TUI, a crashed editor, a visualiser
+/// stopped with Ctrl-C — any of them can leave the terminal with echo off, in raw mode, or on the
+/// alternate screen. The shell then reads the *broken* state as its starting point and restores
+/// that after every line, so the damage outlives the program that caused it and "my terminal is
+/// broken until I run `reset`" becomes the shell's fault.
+///
+/// Only the modes, not the screen: a program that switched to the alternate screen and did not
+/// switch back has lost the user's scrollback either way, and issuing the escape here would erase
+/// output the shell did not write.
+fn restore_terminal_modes(fd: RawFd) {
+    let Ok(slot) = SAVED_MODES.lock() else {
+        return;
+    };
+    let Some(modes) = slot.as_ref() else {
+        return;
+    };
+    let borrowed = unsafe { BorrowedFd::borrow_raw(fd) };
+    // `TCSADRAIN`, not `TCSANOW`: whatever the job last wrote should reach the screen before the
+    // settings change under it.
+    let _ = tcsetattr(borrowed, SetArg::TCSADRAIN, modes);
 }
 
 /// Take the terminal back once a foreground job has stopped or finished.
@@ -175,6 +218,10 @@ pub(crate) fn reclaim_terminal() {
         return;
     }
     give_terminal_to(shell_pgid());
+    let fd = TERMINAL_FD.load(Ordering::SeqCst);
+    if fd != NO_JOB_CONTROL {
+        restore_terminal_modes(fd);
+    }
 }
 
 /// `tcsetpgrp` on a borrowed descriptor.

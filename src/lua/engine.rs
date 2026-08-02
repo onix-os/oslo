@@ -2,6 +2,7 @@
 
 use crate::env::Environment;
 use crate::error::{Result, ShellError};
+use crate::lua::context::Context;
 use crate::lua::eval::value::Value;
 use crate::lua::eval::{self, Interp, LuaResult};
 use std::cell::RefCell;
@@ -29,6 +30,60 @@ thread_local! {
     /// [`LuaEngine::setup_bindings`] finds nothing here and says so, rather than reaching into
     /// another thread's state.
     static ACTIVE: RefCell<Option<(Rc<Interp>, Registry)>> = const { RefCell::new(None) };
+}
+
+/// The interpreter on this thread, if there is one, as a handle that can outlive the borrow.
+pub fn interpreter_handle() -> Option<Rc<Interp>> {
+    ACTIVE.with(|slot| slot.borrow().as_ref().map(|(interp, _)| Rc::clone(interp)))
+}
+
+/// Borrow the interpreter on this thread, if there is one.
+///
+/// The same reach-back the hooks use, for callers that need more than one call against the same
+/// interpreter — a filter evaluating one parsed expression against every row, for instance.
+pub fn with_interpreter<T>(f: impl FnOnce(&Interp) -> T) -> Option<T> {
+    let (interp, _) = ACTIVE.with(|slot| slot.borrow().clone())?;
+    Some(f(&interp))
+}
+
+/// Call a Lua value with whatever interpreter is on this thread.
+///
+/// The same reach-back `ask_hook_here` uses, for callers that hold a function rather than a hook
+/// name — a key binding written in the config, for instance, which the editor holds directly.
+pub fn call_here(f: &Value, args: Vec<Value>) -> LuaResult<Vec<Value>> {
+    let Some((interp, _)) = ACTIVE.with(|slot| slot.borrow().clone()) else {
+        return Err(eval::LuaError::new(
+            "no Lua interpreter on this thread".to_string(),
+        ));
+    };
+    interp.call(f, args)
+}
+
+/// Fire an answering hook using whatever interpreter is on this thread.
+///
+/// The executor is a long way from the place the engine is owned — `run_simple` has no route back
+/// to `repl` — but the interpreter is already parked on this thread for exactly this kind of
+/// reach-back. `None` when there is no interpreter (a non-interactive shell, a script) or when no
+/// handler answered, and the caller then does what it did before.
+pub fn ask_hook_here(name: &str, args: Vec<Value>) -> Option<i32> {
+    let (interp, registry) = ACTIVE.with(|slot| slot.borrow().clone())?;
+    ask_hook_on(&interp, &registry, name, args)
+}
+
+fn ask_hook_on(interp: &Interp, registry: &Registry, name: &str, args: Vec<Value>) -> Option<i32> {
+    for handler in crate::lua::api::hook_handlers(registry, name) {
+        match interp.call(&handler, args.clone()) {
+            Ok(values) => {
+                if let Some(Value::Number(n)) = values.first() {
+                    return n.as_int().map(|i| i as i32);
+                }
+            }
+            // Reported and skipped, as with any other hook: one broken handler must not stop the
+            // others, and must not turn a missing command into a silent success.
+            Err(e) => eprintln!("oslo: {name} hook: {e}"),
+        }
+    }
+    None
 }
 
 /// Take the shell state for the duration of one `oslo.*` call.
@@ -232,6 +287,18 @@ impl LuaEngine {
         }
     }
 
+    /// Fire a hook that can *answer*, returning the first status a handler gave.
+    ///
+    /// [`fire_hook`](Self::fire_hook) is for telling the config something happened. This is for
+    /// asking it a question — `command-not-found` is one: a handler that installs the package and
+    /// runs the command has a status to report, and one that only prints advice has none.
+    ///
+    /// The first handler to return a number wins and the rest are skipped, which is what makes a
+    /// chain of handlers behave: the one that resolved the situation ends it.
+    pub fn ask_hook(&self, name: &str, args: Vec<Value>) -> Option<i32> {
+        ask_hook_on(&self.interp, &self.registry, name, args)
+    }
+
     /// A string argument for a hook, so callers do not need the value type.
     pub fn hook_arg(text: &str) -> Value {
         Value::str(text)
@@ -240,6 +307,117 @@ impl LuaEngine {
     /// A number argument for a hook.
     pub fn hook_status(status: i32) -> Value {
         Value::int(status as i64)
+    }
+
+    /// Render one of the prompts, or `None` when the config set none.
+    ///
+    /// Three shapes, in the order a config is likely to reach for them: a **string** used as
+    /// written, so a prompt that never changes need not be a closure; a **function** called for its
+    /// return value; and a **list of segments**, which is the one that can be measured, styled and
+    /// degraded piece by piece — see the `segment` module for the shape of one.
+    pub fn render(&self, key: &str) -> Option<String> {
+        self.render_with(key, &Context::default())
+    }
+
+    /// As [`render`](Self::render), with the facts a segment's `render(ctx)` is given.
+    pub fn render_with(&self, key: &str, ctx: &Context) -> Option<String> {
+        let value = self.registry.borrow().get(key).cloned()?;
+        if let Value::Str(text) = &value {
+            return Some(text.to_string());
+        }
+        if crate::lua::api::segment::is_segment_list(&value) {
+            return self.render_segments(&value, ctx);
+        }
+        // A prompt produced by another program — starship, hexe, anything that prints one.
+        if let Some(spec) = crate::lua::api::external::spec_of(&value) {
+            return crate::lua::api::external::render(&spec, ctx);
+        }
+        match self.interp.call(&value, Vec::new()) {
+            Ok(values) => match values.first() {
+                Some(Value::Str(s)) => Some(s.to_string()),
+                Some(Value::Number(n)) => Some(n.to_string()),
+                _ => None,
+            },
+            Err(e) => {
+                // Reported rather than swallowed: a prompt function that raises leaves the shell
+                // silently drawing its default, which looks exactly like the config not loading.
+                eprintln!("oslo: {key}: {e}");
+                None
+            }
+        }
+    }
+
+    /// Read `oslo.theme` as it stands, and what was wrong with it.
+    pub fn read_theme(&self) -> (crate::interactive::theme::Theme, Vec<String>) {
+        let oslo = self.interp.global("oslo");
+        let theme = match &oslo {
+            Value::Table(table) => table.borrow().get(&Value::str("theme")),
+            _ => Value::Nil,
+        };
+        crate::interactive::theme::read_lua_theme(&theme)
+    }
+
+    /// Read `oslo.completion`, `oslo.suggest` and `oslo.history` as they stand.
+    pub fn read_settings(&self) -> (crate::interactive::settings::Settings, Vec<String>) {
+        crate::interactive::settings::read_lua_settings(&self.interp.global("oslo"))
+    }
+
+    /// Install `oslo.completion.columns` as the dropdown's column provider.
+    ///
+    /// Called after the config has run, for the same reason the theme is read then rather than
+    /// pushed in as it goes: a config may set the function, change its mind, and set another.
+    pub fn install_column_provider(&self) {
+        crate::lua::columns::install(&self.interp);
+    }
+
+    /// Render a list of segments into one string, dropping the least important until it fits.
+    fn render_segments(&self, list: &Value, ctx: &Context) -> Option<String> {
+        use crate::lua::api::segment;
+        let Value::Table(table) = list else {
+            return None;
+        };
+        let count = table.borrow().length();
+        let ctx_value = ctx.to_lua();
+        let mut pieces = Vec::new();
+        for i in 1..=count {
+            let seg = table.borrow().get(&Value::int(i));
+            let (name, priority) = segment::describe(&seg);
+            let Some(render) = segment::render_fn(&seg) else {
+                continue;
+            };
+            let produced = match self.interp.call(&render, vec![ctx_value.clone()]) {
+                Ok(values) => values.first().cloned().unwrap_or(Value::Nil),
+                Err(e) => {
+                    // Named, because with several segments "the prompt failed" does not say which.
+                    eprintln!("oslo: prompt: segment '{name}': {e}");
+                    continue;
+                }
+            };
+            let text = segment::spans_to_text(&produced, &|body, style| {
+                crate::lua::api::prompt::style_named(style)
+                    .paint(body, crate::interactive::theme::depth())
+            });
+            if text.is_empty() {
+                continue;
+            }
+            let width = crate::interactive::prompt::printed_width(&text);
+            pieces.push(segment::Rendered {
+                name,
+                priority,
+                text,
+                width,
+            });
+        }
+        // Half the terminal at most: a prompt wider than that leaves no room to type, which is the
+        // thing the prompt exists to serve.
+        let budget = ctx.cols.max(20) / 2;
+        let kept = segment::fit(pieces, budget);
+        Some(kept.into_iter().map(|p| p.text).collect())
+    }
+
+    /// Install `oslo.completion.for_command`, the per-command completion hook.
+    pub fn install_command_completer(&self) {
+        crate::lua::columns::install_command_completer(&self.interp);
     }
 
     pub fn render_prompt(&self) -> Option<String> {

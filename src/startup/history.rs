@@ -11,6 +11,15 @@
 //! after every line, and the builtin reads that. The alternative — teaching the library about
 //! the editor — would put rustyline in the dependency path of every `Environment`.
 
+/// How many jobs `\j` in a `$PS1` reports.
+///
+/// Zero, and honestly so: [`crate::exec::job::JobManager`] installs the signal handlers but keeps
+/// no table of running jobs, so there is nothing to count. Reporting zero is what a shell with no
+/// background jobs would say anyway; when job tracking arrives this is the one place to change.
+pub fn job_count() -> usize {
+    0
+}
+
 use oslo::Environment;
 use oslo::error::Result;
 use std::path::PathBuf;
@@ -32,19 +41,42 @@ pub struct Settings {
     pub max_size: usize,
 }
 
-/// Read `$HISTFILE` and `$HISTSIZE`.
+/// Read `$HISTFILE` and `$HISTSIZE`, and `oslo.history` where the config set it.
 ///
-/// An explicitly *empty* `HISTFILE` disables the file, which is the documented way to run a
-/// session that leaves no trace; an unset one falls back to `~/.oslo_history`.
+/// An explicitly *empty* `HISTFILE` disables the file, which is the documented way to run a session
+/// that leaves no trace; an unset one falls back to `~/.oslo_history`.
+///
+/// **The environment wins.** `HISTSIZE=50 oslo` has to mean fifty for the same reason every other
+/// shell variable outranks a config file: it is the setting you can make for one invocation without
+/// editing anything. `oslo.history` fills in what the environment did not say — which until now it
+/// did not do at all, having been parsed, validated, tested and then read by nothing.
 pub fn settings(env: &Environment) -> Settings {
+    let configured = oslo::interactive::settings::current().history;
+
     let file = match env.get_var("HISTFILE") {
         Some("") => None,
         Some(path) => Some(PathBuf::from(path)),
-        None => home(env).map(|h| h.join(".oslo_history")),
+        None => match configured.file.as_deref() {
+            Some("") => None,
+            Some(path) => Some(PathBuf::from(expand_tilde(env, path))),
+            None => home(env).map(|h| h.join(".oslo_history")),
+        },
     };
-    Settings {
-        file,
-        max_size: histsize(env.get_var("HISTSIZE")),
+    let max_size = match env.get_var("HISTSIZE") {
+        Some(value) => histsize(Some(value)),
+        None => configured.size.unwrap_or(DEFAULT_HISTSIZE),
+    };
+    Settings { file, max_size }
+}
+
+/// `~/h` as a path, since a config writes a path the way a person says one.
+fn expand_tilde(env: &Environment, path: &str) -> String {
+    let Some(rest) = path.strip_prefix('~') else {
+        return path.to_string();
+    };
+    match home(env) {
+        Some(home) => format!("{}{rest}", home.display()),
+        None => path.to_string(),
     }
 }
 
@@ -148,6 +180,35 @@ fn print_entries(entries: &[String], count: usize) {
 
 #[cfg(test)]
 mod tests {
+    /// `oslo.history` is read when the environment says nothing, and yields to it when it does.
+    ///
+    /// The whole table was parsed, validated and covered by tests while nothing read it — a
+    /// setting that is only *accepted* is worse than one that is refused, because the config looks
+    /// right and does nothing.
+    #[test]
+    fn the_config_fills_in_what_the_environment_leaves_unsaid() {
+        use oslo::interactive::settings::{History, Settings as Interactive, install};
+
+        install(Interactive {
+            history: History {
+                size: Some(42),
+                file: None,
+                ..History::default()
+            },
+            ..Interactive::default()
+        });
+
+        let mut env = Environment::new();
+        env.unset_var("HISTSIZE");
+        assert_eq!(settings(&env).max_size, 42, "the config is read");
+
+        // And the environment still wins, so `HISTSIZE=7 oslo` means seven.
+        env.set_var("HISTSIZE", "7", false);
+        assert_eq!(settings(&env).max_size, 7);
+
+        install(Interactive::default());
+    }
+
     use super::*;
 
     #[test]

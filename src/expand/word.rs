@@ -326,6 +326,17 @@ pub fn expand_word(env: &mut Environment, word: &Word) -> Result<Vec<String>> {
             }
         }
     }
+    // `=command` and `@name`, last and only at a prompt. Last because they answer with a path, and
+    // a path that has just been produced must not then be globbed or split again; interactive-only
+    // because `echo =foo` in a script has to print `=foo` the way every other `/bin/sh` does.
+    if env.interactive() {
+        for field in &mut out {
+            let expanded = crate::expand::sugar::expand_field(env, field);
+            if &expanded != field {
+                *field = expanded;
+            }
+        }
+    }
     Ok(out)
 }
 

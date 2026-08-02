@@ -48,13 +48,9 @@ impl Mode {
         }
     }
 
-    /// The default prompt for this mode, when the user has set none.
-    pub fn fallback_prompt(self) -> &'static str {
-        match self {
-            Mode::Shell => "oslo$ ",
-            Mode::Lua => "lua> ",
-        }
-    }
+    // There was a `fallback_prompt` here, giving Lua its own `lua> `. It is gone because both
+    // languages now share one prompt with the language as a segment — a separate prompt meant
+    // switching language also threw away the branch, the vi mode and the directory.
 }
 
 /// What the user typed, once the prefixes have been read off it.
@@ -155,9 +151,22 @@ impl ToggleRequest {
 }
 
 impl ConditionalEventHandler for ToggleRequest {
-    fn handle(&self, _: &Event, _: RepeatCount, _: bool, _: &EventContext) -> Option<Cmd> {
+    fn handle(&self, _: &Event, _: RepeatCount, _: bool, ctx: &EventContext) -> Option<Cmd> {
+        // **Declined, not accepted.** This used to answer `AcceptLine` so the read loop could
+        // reopen the editor with the other language's prompt. That put the switch behind the line
+        // validator and a round of the read loop, either of which can decide the line is not
+        // ready — so the key did nothing at all some of the time. A key that changes language has
+        // to work on the first press, every time.
         self.0.store(true, Ordering::SeqCst);
-        Some(Cmd::AcceptLine)
+        oslo::interactive::prompt::toggle_language();
+        let cursor = oslo::interactive::prompt::printed_width(&ctx.line()[..ctx.pos()]);
+        let mut out = std::io::stdout();
+        let _ = std::io::Write::write_all(
+            &mut out,
+            oslo::interactive::prompt::repaint(ctx.line(), cursor).as_bytes(),
+        );
+        let _ = std::io::Write::flush(&mut out);
+        None
     }
 }
 

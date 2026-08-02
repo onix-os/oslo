@@ -6,8 +6,87 @@
 use super::OsloHelper;
 use super::command_index::CommandIndex;
 use super::dropdown::CompletionCandidate;
+use super::matching::{MATCHERS, Match, matches_ignoring_case};
 use super::words::{Quote, Word, current_word, quote_replacement, unquote};
 use std::fs;
+
+/// Whether `candidate` starts with what the user typed.
+///
+/// `oslo.completion.case_sensitive` decides. It defaults to off, so typing `RE` offers `README.md`
+/// — which is what a shell that completes filenames on a case-insensitive muscle memory should do.
+/// The setting was read from the config and then ignored, so turning it on did nothing at all.
+///
+/// Case folding is per character rather than by lowercasing the whole string: allocating a String
+/// per candidate would mean thousands of allocations per keystroke on a large `$PATH`.
+///
+/// The flag is a parameter rather than read from the process-global settings here, so the tests
+/// can exercise both answers without racing each other — the settings are shared, and the test
+/// binary is multi-threaded.
+fn matches_prefix(candidate: &str, typed: &str, case_sensitive: bool) -> bool {
+    // The pass currently being tried, when the caller is walking the chain. Set around one
+    // builder's run rather than threaded through every call site: the builders are recursive and
+    // the alternative is an extra argument on a dozen functions that only two of them care about.
+    if let Some(matcher) = MATCHER.with(|slot| slot.get()) {
+        return matcher.matches(candidate, typed);
+    }
+    if case_sensitive {
+        return candidate.starts_with(typed);
+    }
+    matches_ignoring_case(candidate, typed)
+}
+
+thread_local! {
+    static MATCHER: std::cell::Cell<Option<Match>> = const { std::cell::Cell::new(None) };
+}
+
+/// A hook a config installs to complete one command itself.
+///
+/// Handed the words typed so far and the word being completed; answers the candidates, or `None`
+/// to fall through to oslo's own. Registered per command name by `oslo.completion.for_command`.
+pub type CommandCompleter =
+    std::rc::Rc<dyn Fn(&str, &[&str], &str) -> Option<Vec<(String, Option<String>)>>>;
+
+thread_local! {
+    /// Thread-local rather than global: the hook calls Lua, which is not `Send`, and only the
+    /// editor's thread completes anything.
+    static FOR_COMMAND: std::cell::RefCell<Option<CommandCompleter>> =
+        const { std::cell::RefCell::new(None) };
+}
+
+/// Install the hook `oslo.completion.for_command` describes. `None` removes it.
+pub fn set_command_completer(hook: Option<CommandCompleter>) {
+    FOR_COMMAND.with(|slot| *slot.borrow_mut() = hook);
+}
+
+/// Ask the config to complete this command, if it wants to.
+fn config_candidates(
+    command: &str,
+    prior: &[&str],
+    current: &str,
+) -> Option<Vec<CompletionCandidate>> {
+    // Cloned out of the cell before calling: the hook runs Lua, and Lua can complete another word,
+    // which would come back through here and panic on the outstanding borrow.
+    let hook = FOR_COMMAND.with(|slot| slot.borrow().clone())?;
+    let answers = hook(command, prior, current)?;
+    Some(
+        answers
+            .into_iter()
+            .map(|(display, description)| CompletionCandidate {
+                replacement: display.clone(),
+                display,
+                description,
+                // **No kind, rather than a wrong one.** This was hardcoded to `option`, so a
+                // config completing branches, files or hosts had all of them labelled options —
+                // in the one column the user reads to tell them apart. The hook does not report a
+                // kind, so the honest answer is that none is known; widening it to carry one is a
+                // change to the Lua signature, not a change here.
+                kind: None,
+                path: None,
+                detail: None,
+            })
+            .collect(),
+    )
+}
 
 impl OsloHelper {
     /// The candidates for the word at `pos`, together with the byte offset they replace from.
@@ -22,7 +101,37 @@ impl OsloHelper {
         if let Some(prefix) = word.stem.strip_prefix('$') {
             self.variable_candidates(prefix, word.quote, &mut out);
         } else if word.command_position {
-            self.command_candidates(&word, &mut out);
+            // **Only in shell.** A command name is a shell answer: a builtin, an alias, a function,
+            // something on `$PATH`. At a Lua prompt none of them can run, and offering them is the
+            // same mistake the ghost suggestion used to make — `l` answered with `ls` in a language
+            // that has no `ls`.
+            //
+            // Paths, variables and config-supplied candidates are left alone: those are still
+            // meaningful in Lua, and this is the one source that is not.
+            if super::prompt::language().is_none_or(|language| language == "sh") {
+                // Each way of matching in turn, stopping at the first that finds anything. An
+                // exact match must never arrive diluted with looser ones.
+                for matcher in MATCHERS {
+                    self.command_candidates_with(&word, matcher, &mut out);
+                    if !out.is_empty() {
+                        break;
+                    }
+                    if self.case_sensitive() {
+                        // The config asked for exactness; the looser passes are not wanted.
+                        break;
+                    }
+                }
+            }
+        } else if let Some(from_config) = word
+            .prior_words
+            .first()
+            .map(|w| unquote(w))
+            .and_then(|cmd| config_candidates(&cmd, &word.prior_words, word.stem.as_str()))
+        {
+            // A config that answers for this command replaces oslo's own candidates rather than
+            // adding to them: `oslo.completion.for_command("git", …)` means the config knows git
+            // better than the built-in spec does, and mixing the two would offer both.
+            out = from_config;
         } else {
             self.spec_candidates(&word, &mut out);
             if out.is_empty() {
@@ -32,7 +141,26 @@ impl OsloHelper {
 
         // Frecency first, name second. Without the first key this is alphabetical, which is how
         // `exit` came to suggest `exitsnoop-bpfcc`.
+        // `oslo.completion.sources`: drop the kinds the config did not ask for. Applied after the
+        // builders rather than inside them, so a kind is filtered by the name it already carries
+        // and adding a new kind needs no change here.
+        if let Some(wanted) = &crate::interactive::settings::current().completion.sources {
+            out.retain(|c| {
+                c.kind
+                    .as_deref()
+                    .is_some_and(|k| wanted.iter().any(|w| w == k))
+            });
+        }
+
+        // `oslo.completion.sort`. Frecency first, name second — without the first key this is
+        // alphabetical, which is how `exit` came to suggest `exitsnoop-bpfcc`. A config that
+        // prefers a predictable order can ask for `alpha` and get name only.
+        let by_name = crate::interactive::settings::current().completion.sort
+            == crate::interactive::settings::Sort::Alpha;
         out.sort_by(|a, b| {
+            if by_name {
+                return a.display.cmp(&b.display);
+            }
             let sa = self.frecency.score(&a.display);
             let sb = self.frecency.score(&b.display);
             sb.partial_cmp(&sa)
@@ -44,10 +172,17 @@ impl OsloHelper {
         (word.start, out)
     }
 
+    /// `oslo.completion.case_sensitive`, read once per completion rather than per candidate.
+    fn case_sensitive(&self) -> bool {
+        crate::interactive::settings::current()
+            .completion
+            .case_sensitive
+    }
+
     fn variable_candidates(&self, prefix: &str, quote: Quote, out: &mut Vec<CompletionCandidate>) {
         let env = self.env.lock().unwrap();
         for name in env.get_all_vars().keys() {
-            if name.starts_with(prefix) {
+            if matches_prefix(name, prefix, self.case_sensitive()) {
                 let value = format!("${}", name);
                 out.push(CompletionCandidate {
                     display: value.clone(),
@@ -58,8 +193,11 @@ impl OsloHelper {
                     } else {
                         quote_replacement(&value, quote)
                     },
-                    description: Some("Environment variable".to_string()),
+                    // As above: the ` variable ` badge already says this.
+                    description: None,
                     kind: Some("variable".to_string()),
+                    path: None,
+                    detail: None,
                 });
             }
         }
@@ -67,44 +205,47 @@ impl OsloHelper {
 
     fn command_candidates(&self, word: &Word<'_>, out: &mut Vec<CompletionCandidate>) {
         let stem = word.stem.as_str();
+        // Kind and detail are decided here, where the environment is already locked. An alias is
+        // its own kind rather than a `builtin`: they behave differently, and lumping them meant
+        // the badge told you `builtin` about something you had defined yourself a minute earlier.
         let (path, shell_names) = {
             let env = self.env.lock().unwrap();
-            let mut names: Vec<(String, bool)> = Vec::new();
+            let mut names: Vec<(String, &str, Option<String>)> = Vec::new();
             for b in env.builtin_names() {
-                if b.starts_with(stem) {
-                    names.push((b.to_string(), true));
+                if matches_prefix(b, stem, self.case_sensitive()) {
+                    names.push((b.to_string(), "builtin", None));
                 }
             }
-            for a in env.get_aliases().keys() {
-                if a.starts_with(stem) {
-                    names.push((a.clone(), true));
+            for (name, target) in env.get_aliases() {
+                if matches_prefix(name, stem, self.case_sensitive()) {
+                    // What it expands to travels with it: that is the one thing about an alias
+                    // its name does not tell you, and it is why aliases keep a second column
+                    // where a directory does not.
+                    names.push((name.clone(), "alias", Some(target.clone())));
                 }
             }
             for f in env.get_functions().keys() {
-                if f.starts_with(stem) {
-                    names.push((f.clone(), true));
+                if matches_prefix(f, stem, self.case_sensitive()) {
+                    names.push((f.clone(), "function", None));
                 }
             }
             (env.get_var("PATH").unwrap_or_default().to_string(), names)
         };
 
-        for (name, builtin) in shell_names {
-            out.push(self.command_candidate(word, name, builtin));
+        for (name, kind, detail) in shell_names {
+            let mut candidate = self.command_candidate(word, name, kind);
+            candidate.detail = detail;
+            out.push(candidate);
         }
         // The index is shared, not rebuilt: this used to `read_dir` all of `$PATH` per keystroke.
         for name in CommandIndex::executables(&path).iter() {
-            if name.starts_with(stem) {
-                out.push(self.command_candidate(word, name.clone(), false));
+            if matches_prefix(name, stem, self.case_sensitive()) {
+                out.push(self.command_candidate(word, name.clone(), "command"));
             }
         }
     }
 
-    fn command_candidate(
-        &self,
-        word: &Word<'_>,
-        name: String,
-        builtin: bool,
-    ) -> CompletionCandidate {
+    fn command_candidate(&self, word: &Word<'_>, name: String, kind: &str) -> CompletionCandidate {
         let description = self
             .spec_registry
             .find_spec(&name)
@@ -113,8 +254,53 @@ impl OsloHelper {
             display: name.clone(),
             replacement: quote_replacement(&name, word.quote),
             description,
-            kind: Some(if builtin { "builtin" } else { "command" }.to_string()),
+            kind: Some(kind.to_string()),
+            path: None,
+            detail: None,
         }
+    }
+
+    /// The command a name really stands for, following aliases.
+    ///
+    /// Transitive, because aliases chain — `alias g=git`, `alias gc='git commit'` — and bounded,
+    /// because they can also loop: `alias a=b` with `alias b=a` is legal to write and must not
+    /// hang the shell on Tab.
+    ///
+    /// Only the *first word* of an expansion matters here: `alias gc='git commit'` completes as
+    /// `git`, which is right for offering `git`'s options even if it means the subcommand path is
+    /// not followed. Getting the head right is most of the value; the rest can come later.
+    fn resolve_head(&self, name: &str) -> String {
+        let Ok(env) = self.env.lock() else {
+            return name.to_string();
+        };
+        let mut current = name.to_string();
+        for _ in 0..16 {
+            let Some(expansion) = env.get_alias(&current) else {
+                break;
+            };
+            let Some(first) = expansion.split_whitespace().next() else {
+                break;
+            };
+            if first == current {
+                // `alias ls='ls --color'` — the classic self-reference. It expands to itself, so
+                // the answer is already right and following it again would not terminate.
+                break;
+            }
+            current = first.to_string();
+        }
+        current
+    }
+
+    /// Command candidates found one particular way. See [`Match`].
+    fn command_candidates_with(
+        &self,
+        word: &Word<'_>,
+        matcher: Match,
+        out: &mut Vec<CompletionCandidate>,
+    ) {
+        MATCHER.with(|slot| slot.set(Some(matcher)));
+        self.command_candidates(word, out);
+        MATCHER.with(|slot| slot.set(None));
     }
 
     fn spec_candidates(&self, word: &Word<'_>, out: &mut Vec<CompletionCandidate>) {
@@ -123,7 +309,11 @@ impl OsloHelper {
         let Some((primary, rest)) = word.prior_words.split_first() else {
             return;
         };
-        let Some(spec) = self.spec_registry.find_spec(&unquote(primary)) else {
+        // Through the alias table first. Everyone aliases `git`, and `g comm<TAB>` offering
+        // nothing is a gap the shell has no excuse for: the alias table is already loaded and this
+        // function is already holding the environment.
+        let head = self.resolve_head(&unquote(primary));
+        let Some(spec) = self.spec_registry.find_spec(&head) else {
             return;
         };
 
@@ -176,6 +366,8 @@ impl OsloHelper {
             replacement: quote_replacement(name, word.quote),
             description: Some(description.to_string()),
             kind: Some(kind.to_string()),
+            path: None,
+            detail: None,
         }
     }
 
@@ -209,7 +401,7 @@ impl OsloHelper {
         };
         for entry in entries.flatten() {
             let name = entry.file_name().to_string_lossy().into_owned();
-            if !name.starts_with(prefix) {
+            if !matches_prefix(&name, prefix, self.case_sensitive()) {
                 continue;
             }
             // A dotfile only shows up when it was asked for, as in bash.
@@ -234,9 +426,96 @@ impl OsloHelper {
             out.push(CompletionCandidate {
                 display,
                 replacement: quote_replacement(&value, word.quote),
-                description: Some(if is_dir { "Directory" } else { "File" }.to_string()),
+                // No description. The badge already says `dir` or `file`, and "Directory"
+                // beside a ` dir ` badge is the same fact written twice — it also forces the
+                // description column to exist for a listing that has nothing to put in it,
+                // taking width from the names. This is IRIS's rule: where the *kind* is the
+                // whole story the tag carries it alone, and only a kind that leaves something
+                // unsaid (an alias, and what it expands to) gets both.
+                description: None,
                 kind: Some(if is_dir { "dir" } else { "file" }.to_string()),
+                // The path the entry was read from, not one rebuilt from the typed text: a
+                // `~/` stem reads from `$HOME` and would `stat` a directory literally named
+                // `~` if the display were re-joined instead.
+                path: Some(entry.path().to_string_lossy().into_owned()),
+                detail: None,
             });
         }
+    }
+}
+
+#[cfg(test)]
+mod case_tests {
+    use super::matches_prefix;
+    use super::{MATCHERS, Match};
+
+    /// Each way of matching, and the case each one exists for.
+    #[test]
+    fn a_matcher_answers_what_it_is_for() {
+        assert!(Match::Exact.matches("README.md", "REA"));
+        assert!(
+            !Match::Exact.matches("README.md", "rea"),
+            "exact means exact"
+        );
+
+        assert!(Match::Ignoring.matches("README.md", "rea"));
+        assert!(!Match::Ignoring.matches("README.md", "xyz"));
+
+        // The case everyone describes as "zsh just knew".
+        assert!(Match::Pieces.matches("/usr/share/bin", "/u/s/b"));
+        assert!(Match::Pieces.matches("foo-bar-baz", "f-b"));
+        assert!(Match::Pieces.matches("some_long_name", "s_l_n"));
+        assert!(!Match::Pieces.matches("/usr/share/bin", "/u/z/b"));
+    }
+
+    /// Piece matching only applies when a separator was typed. Without that guard it is a plain
+    /// prefix test wearing another name, tried a second time for nothing.
+    #[test]
+    fn piece_matching_needs_a_separator() {
+        assert!(
+            !Match::Pieces.matches("foo-bar", "foo"),
+            "no separator typed"
+        );
+        assert!(Match::Pieces.matches("foo-bar", "foo-b"));
+    }
+
+    /// More pieces than the candidate has cannot match, whatever they say.
+    #[test]
+    fn more_pieces_than_the_candidate_has_never_matches() {
+        assert!(!Match::Pieces.matches("/usr/bin", "/u/s/b/x"));
+    }
+
+    /// Exactness first. A list mixing an exact hit with looser ones is worse than either alone.
+    #[test]
+    fn the_chain_tries_exactness_first() {
+        assert_eq!(MATCHERS[0], Match::Exact);
+        assert_eq!(MATCHERS[1], Match::Ignoring);
+        assert_eq!(MATCHERS[2], Match::Pieces);
+    }
+
+    /// The setting was read from the config and then ignored, so turning it on changed nothing.
+    #[test]
+    fn case_sensitivity_actually_decides_the_match() {
+        assert!(matches_prefix("README.md", "RE", false));
+        assert!(
+            matches_prefix("README.md", "re", false),
+            "off means insensitive"
+        );
+        assert!(!matches_prefix("README.md", "xy", false));
+
+        assert!(matches_prefix("README.md", "RE", true));
+        assert!(
+            !matches_prefix("README.md", "re", true),
+            "turning it on must matter"
+        );
+    }
+
+    /// The typed text running past the candidate is not a prefix of it.
+    #[test]
+    fn a_longer_typed_word_is_not_a_prefix() {
+        assert!(!matches_prefix("ls", "lsof", false));
+        assert!(matches_prefix("lsof", "ls", false));
+        // An empty prefix matches everything, which is what bare Tab does.
+        assert!(matches_prefix("anything", "", false));
     }
 }

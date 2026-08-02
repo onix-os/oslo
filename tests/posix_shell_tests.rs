@@ -414,7 +414,7 @@ mod in_process {
     /// this binary changes it either — the cwd tests all live in `process_global`.
     #[test]
     fn test_interactive_prompt() {
-        let left = oslo::interactive::prompt::render_default_left_prompt(0);
+        let left = oslo::interactive::prompt::render_default_left_prompt(0, "sh");
         assert!(!left.is_empty());
         // The right prompt was deleted in PLAN R9.7: nothing ever drew it, so this assertion was
         // the only thing keeping its renderer alive.
@@ -435,9 +435,10 @@ mod in_process {
             ),
         ];
         let (rendered, lines) =
-            oslo::interactive::dropdown::render_vertical_dropdown(&candidates, 0, 8, 0);
+            oslo::interactive::dropdown::render_vertical_dropdown(&candidates, 0, 8, 0, "");
         assert!(rendered.contains("cargo"));
         assert!(rendered.contains("cd"));
-        assert_eq!(lines, 4);
+        // Two candidates, two rows: the menu has no border above or below them.
+        assert_eq!(lines, 2);
     }
 }

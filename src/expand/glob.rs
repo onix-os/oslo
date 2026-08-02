@@ -32,6 +32,29 @@ enum Component {
     /// `a[b` lands here too: an unterminated class is not an error in a shell, it is text.
     Literal(String),
     Pattern(Vec<Item>),
+    /// `**` — every directory below this point, including this one.
+    ///
+    /// A separate component rather than a pattern that happens to contain two stars, because it is
+    /// the one piece that spans *several* path components: `src/**/mod.rs` has to look at `src`,
+    /// `src/a`, `src/a/b` and so on. A pattern matches within one component and cannot express
+    /// that however many stars it has.
+    Globstar,
+}
+
+/// Whether `**` crosses a `/`.
+///
+/// Off by default and switched by `shopt -s globstar`, which is bash's arrangement and worth
+/// copying exactly: a script written before `globstar` existed may contain `**` meaning `*`, and
+/// silently giving it a whole directory tree instead is the kind of change that deletes files.
+static GLOBSTAR: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// `shopt -s globstar` / `shopt -u globstar`.
+pub fn set_globstar(on: bool) {
+    GLOBSTAR.store(on, std::sync::atomic::Ordering::Relaxed);
+}
+
+fn globstar_enabled() -> bool {
+    GLOBSTAR.load(std::sync::atomic::Ordering::Relaxed)
 }
 
 /// Expand one field against the filesystem, or yield its literal text when it matches nothing.
@@ -46,9 +69,12 @@ pub fn expand_glob(field: &[Run]) -> Vec<String> {
         .collect();
 
     let (components, trailing_slash) = split_components(&chars);
+    // A field with nothing that globs is its own text. `**` counts: it is the one wildcard that is
+    // not a `Pattern`, and leaving it out here made `**/mod.rs` expand to itself while
+    // `a/**/*.rs` — which has a `Pattern` elsewhere — worked.
     if !components
         .iter()
-        .any(|c| matches!(c, Component::Pattern(_)))
+        .any(|c| matches!(c, Component::Pattern(_) | Component::Globstar))
     {
         return vec![field_text(field)];
     }
@@ -90,6 +116,14 @@ fn split_components(chars: &[(char, bool)]) -> (Vec<Component>, bool) {
 
 /// Compile one component, remembering whether anything in it actually globs.
 fn compile(chars: &[(char, bool)]) -> Component {
+    // `**` alone in a component, unquoted, **and only when `globstar` is on**. Off by default,
+    // exactly as bash has it: POSIX says two adjacent stars mean no more than one, and a script
+    // written against that must keep getting it. `a**b` is an ordinary pattern either way, and a
+    // quoted `"**"` is literal text — the flag says whether the character globs at all.
+    if globstar_enabled() && chars.len() == 2 && chars.iter().all(|(c, globs)| *c == '*' && *globs)
+    {
+        return Component::Globstar;
+    }
     let (items, has_metacharacter) = compile_items(chars);
     if has_metacharacter {
         return Component::Pattern(items);
@@ -138,6 +172,26 @@ fn walk(components: &[Component], trailing_slash: bool) -> Vec<String> {
                         next.push(finish(path, trailing_slash));
                     }
                 }
+                // `**` stands for this directory and every directory below it, so the walk
+                // branches: the rest of the pattern is tried against each of them in turn. A
+                // symbolic link is not followed — a link pointing at an ancestor would otherwise
+                // make the walk endless, and no amount of depth limiting makes that correct.
+                Component::Globstar => {
+                    for path in descend(base) {
+                        if last {
+                            if !trailing_slash || is_dir(&path) {
+                                next.push(finish(path, trailing_slash));
+                            }
+                        } else if path.is_empty() {
+                            // The walk started at the working directory, so the next component
+                            // continues from nothing. Joining a `/` here would make it absolute
+                            // and send the rest of the pattern looking at the root of the disk.
+                            next.push(String::new());
+                        } else {
+                            next.push(path + "/");
+                        }
+                    }
+                }
                 Component::Pattern(items) => {
                     for name in read_names(base) {
                         if !matches(items, &name) {
@@ -162,6 +216,39 @@ fn walk(components: &[Component], trailing_slash: bool) -> Vec<String> {
         }
     }
     current
+}
+
+/// `base` and every directory beneath it, deepest last.
+///
+/// The starting point is included, which is what makes `src/**/mod.rs` find `src/mod.rs` as well as
+/// `src/a/mod.rs` — bash's `globstar` behaves the same way, and a `**` that skipped its own
+/// directory would surprise anyone who has used it.
+fn descend(base: &str) -> Vec<String> {
+    let mut out = Vec::new();
+    let start = base.trim_end_matches('/').to_string();
+    out.push(start.clone());
+    let mut frontier = vec![start];
+    while let Some(dir) = frontier.pop() {
+        let prefix = if dir.is_empty() {
+            String::new()
+        } else {
+            format!("{dir}/")
+        };
+        for name in read_names(&prefix) {
+            let path = format!("{prefix}{name}");
+            // `symlink_metadata`, not `metadata`: a link to an ancestor makes this walk endless,
+            // and following one is never what `**` was asked to do.
+            let Ok(meta) = std::fs::symlink_metadata(&path) else {
+                continue;
+            };
+            if meta.is_dir() {
+                out.push(path.clone());
+                frontier.push(path);
+            }
+        }
+    }
+    out.sort();
+    out
 }
 
 fn finish(path: String, trailing_slash: bool) -> String {
@@ -195,7 +282,52 @@ fn is_dir(path: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{Component, Item, compile, expand_glob, matches};
+    /// `**` crosses directories; `*` never does.
+    ///
+    /// Written against a real tree because that is the only thing the walker talks to, and the
+    /// component logic is where the interesting mistakes live.
+    #[test]
+    fn globstar_crosses_directories() {
+        let _guard = GLOBSTAR_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let dir = tempfile::tempdir().expect("tempdir");
+        let root = dir.path();
+        fs::create_dir_all(root.join("a/b/c")).expect("dirs");
+        for path in ["mod.rs", "a/mod.rs", "a/b/mod.rs", "a/b/c/other.rs"] {
+            fs::write(root.join(path), "").expect("file");
+        }
+        let previous = std::env::current_dir().expect("cwd");
+        std::env::set_current_dir(root).expect("cd");
+        set_globstar(true);
+
+        let found = expand_glob(&[Run::new("**/mod.rs", Origin::Literal)]);
+
+        set_globstar(false);
+        std::env::set_current_dir(previous).expect("cd back");
+
+        assert_eq!(
+            found,
+            vec!["a/b/mod.rs", "a/mod.rs", "mod.rs"],
+            "`**` includes the directory it starts in, as bash's globstar does"
+        );
+    }
+
+    /// Quoting turns it off, like every other metacharacter — even with `globstar` on.
+    #[test]
+    fn a_quoted_globstar_is_literal_text() {
+        let _guard = GLOBSTAR_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        set_globstar(true);
+        assert_eq!(
+            expand_glob(&[Run::new("**/nothing.rs", Origin::Quoted)]),
+            vec!["**/nothing.rs"]
+        );
+        set_globstar(false);
+    }
+
+    use super::{Component, Item, compile, expand_glob, matches, set_globstar};
+
+    /// `globstar` is one process-wide flag, so a test that turns it on cannot run beside one that
+    /// depends on it being off.
+    static GLOBSTAR_LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
     use crate::expand::word::{Origin, Run};
     use std::fs;
     use std::path::{Path, PathBuf};
@@ -205,7 +337,7 @@ mod tests {
         let chars: Vec<(char, bool)> = text.chars().map(|c| (c, true)).collect();
         match compile(&chars) {
             Component::Pattern(items) => items,
-            Component::Literal(_) => Vec::new(),
+            Component::Literal(_) | Component::Globstar => Vec::new(),
         }
     }
 
@@ -305,6 +437,7 @@ mod tests {
     /// R2.12: `**` is an ordinary `*` unless globstar is on, which POSIX has no way to turn on.
     #[test]
     fn a_double_star_is_not_globstar() {
+        let _guard = GLOBSTAR_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         assert_eq!(pattern("**"), pattern("*"));
         assert_eq!(pattern("a***b"), pattern("a*b"));
     }
@@ -340,6 +473,7 @@ mod tests {
 
     #[test]
     fn a_star_does_not_cross_a_directory_boundary() {
+        let _guard = GLOBSTAR_LOCK.lock().unwrap_or_else(|e| e.into_inner());
         let dir = scratch("separator");
         fs::create_dir(dir.join("d")).unwrap();
         fs::write(dir.join("d/a1"), "").unwrap();

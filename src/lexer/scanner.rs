@@ -245,6 +245,17 @@ impl<'a> Lexer<'a> {
     }
 }
 
+/// How far through a `case` a raw scan is, so a pattern's `)` can be told from a real closer.
+#[derive(PartialEq, Eq)]
+enum CaseAt {
+    /// Seen `case`, waiting for `in`.
+    AwaitingIn,
+    /// A pattern may start here; the next `)` ends it.
+    Pattern,
+    /// Inside an arm's commands, until `;;`.
+    Body,
+}
+
 /// Raw, quote-aware scanning of bracketed constructs.
 ///
 /// These copy source text verbatim rather than decomposing it into [`crate::ast::WordPart`]s: a
@@ -267,8 +278,49 @@ impl Lexer<'_> {
 
         let mut out = String::new();
         let mut level = 1usize;
+        // How far through each open `case` this scan is, innermost last. Only meaningful for a
+        // command substitution: a case pattern ends in `)`, which is otherwise indistinguishable
+        // from the `)` closing the substitution, so `$(case a in a) echo Y;; esac)` stopped at
+        // `$(case a in a` and the rest came back as literal text. Same mistake brush made in two
+        // of its own scanners; this is oslo's copy of it.
+        let mut cases: Vec<CaseAt> = Vec::new();
+        let counting_cases = open == '(';
+        let mut word = String::new();
 
         while let Some(ch) = self.current_char() {
+            if counting_cases {
+                // A word ends here, so decide what it was before acting on `ch`.
+                if !(ch.is_ascii_alphanumeric() || ch == '_') {
+                    match word.as_str() {
+                        "case" => cases.push(CaseAt::AwaitingIn),
+                        "in" if cases.last() == Some(&CaseAt::AwaitingIn) => {
+                            *cases.last_mut().unwrap() = CaseAt::Pattern;
+                        }
+                        "esac" => {
+                            cases.pop();
+                        }
+                        _ => {}
+                    }
+                    word.clear();
+                } else {
+                    word.push(ch);
+                }
+                // `;;` ends an arm and a new pattern may follow.
+                if ch == ';' && self.peek_char() == Some(';') && cases.last() == Some(&CaseAt::Body)
+                {
+                    *cases.last_mut().unwrap() = CaseAt::Pattern;
+                }
+                if cases.last() == Some(&CaseAt::Pattern) && (ch == close || ch == open) {
+                    // Part of the pattern, not of this scan's brackets.
+                    if ch == close {
+                        *cases.last_mut().unwrap() = CaseAt::Body;
+                    }
+                    self.advance();
+                    out.push(ch);
+                    continue;
+                }
+            }
+
             // A nested expansion is followed into whatever brackets *this* scan is counting, so
             // the `}` in `${x:-$(echo })}` belongs to the substitution and not to the operand.
             if ch == '$' && self.copy_dollar_group(&mut out, depth)? {
@@ -450,4 +502,48 @@ pub(super) fn is_var_name_char(ch: char) -> bool {
 /// `$-` against the pattern.
 pub(super) fn is_special_param(ch: char) -> bool {
     matches!(ch, '?' | '$' | '!' | '#' | '*' | '@' | '-' | '0'..='9')
+}
+
+#[cfg(test)]
+mod case_substitution_tests {
+    use crate::lexer::Lexer;
+
+    fn word_of(src: &str) -> String {
+        let mut lexer = Lexer::new(src);
+        match lexer.next() {
+            Ok(crate::lexer::Token::Word(w)) => format!("{w:?}"),
+            other => format!("{other:?}"),
+        }
+    }
+
+    /// A case pattern ends in `)`, which the raw scan used to read as the `)` closing the
+    /// substitution — so `$(case a in a) …)` stopped at `$(case a in a` and the rest of the
+    /// command came back as literal text. brush had the same bug in two of its own scanners.
+    #[test]
+    fn a_case_pattern_does_not_close_a_command_substitution() {
+        // The whole construct has to survive as one word, both spellings of the pattern.
+        for src in [
+            "$(case a in a) echo Y;; esac)",
+            "$(case a in (a) echo P;; esac)",
+            "$(case a in a) case b in b) echo IN;; esac;; esac)",
+            "$(case b in a) echo N;; *) echo D;; esac)",
+        ] {
+            let word = word_of(src);
+            assert!(word.contains("esac"), "{src} lost its tail: {word}");
+        }
+    }
+
+    /// And the things that must keep working: a real closer still closes.
+    #[test]
+    fn ordinary_substitutions_are_unaffected() {
+        for src in [
+            "$(echo hi)",
+            "$(echo $(echo deep))",
+            "$(echo \"a)b\")",
+            "${v:-$(echo d)}",
+        ] {
+            let word = word_of(src);
+            assert!(!word.starts_with("Err"), "{src} failed to lex: {word}");
+        }
+    }
 }

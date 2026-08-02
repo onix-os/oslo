@@ -138,10 +138,11 @@ fn env_is_expanded_before_it_is_read() {
     assert_eq!(out(&o).trim_end(), "expanded");
 }
 
+/// `~/.oslorc` is **Lua** — it used to be shell syntax, and that is the change.
 #[test]
 fn oslorc_is_read_by_an_interactive_shell_only() {
     let dir = tempfile::tempdir().unwrap();
-    std::fs::write(dir.path().join(".oslorc"), "MARK=from-oslorc\n").unwrap();
+    std::fs::write(dir.path().join(".oslorc"), "MARK = 'from-oslorc'\n").unwrap();
 
     let interactive = repl("echo $MARK\n", &[("HISTFILE", "")], dir.path());
     assert!(
@@ -161,16 +162,53 @@ fn oslorc_is_read_by_an_interactive_shell_only() {
 #[test]
 fn an_alias_from_oslorc_is_visible_at_the_prompt() {
     let dir = tempfile::tempdir().unwrap();
-    std::fs::write(dir.path().join(".oslorc"), "alias hi='echo aliased'\n").unwrap();
+    std::fs::write(
+        dir.path().join(".oslorc"),
+        "oslo.set_alias('hi', 'echo aliased')\n",
+    )
+    .unwrap();
 
     let o = repl("hi\n", &[("HISTFILE", "")], dir.path());
     assert!(out(&o).contains("aliased"), "{:?}", out(&o));
 }
 
+/// An existing shell-syntax `.oslorc` fails loudly rather than half-working. That is the whole
+/// migration story: a Lua syntax error names the line, where a file that silently applied its
+/// first two commands and dropped the rest would be far harder to notice.
+#[test]
+fn a_shell_syntax_oslorc_is_refused_by_name() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::write(dir.path().join(".oslorc"), "alias hi='echo aliased'\n").unwrap();
+
+    let o = repl("echo alive\n", &[("HISTFILE", "")], dir.path());
+    assert!(
+        out(&o).contains("alive"),
+        "the shell must still start: {:?}",
+        out(&o)
+    );
+    let diagnostic = err(&o);
+    assert!(
+        diagnostic.contains(".oslorc"),
+        "the diagnostic must name the file: {diagnostic:?}"
+    );
+}
+
+/// The XDG location, which is the other name for the same file.
+#[test]
+fn a_config_under_xdg_is_read_too() {
+    let dir = tempfile::tempdir().unwrap();
+    let config = dir.path().join(".config/oslo/config.lua");
+    std::fs::create_dir_all(config.parent().unwrap()).unwrap();
+    std::fs::write(&config, "oslo.set_alias('hi', 'echo xdg-alias')\n").unwrap();
+
+    let o = repl("hi\n", &[("HISTFILE", "")], dir.path());
+    assert!(out(&o).contains("xdg-alias"), "{:?}", out(&o));
+}
+
 #[test]
 fn a_broken_oslorc_reports_and_leaves_the_shell_usable() {
     let dir = tempfile::tempdir().unwrap();
-    std::fs::write(dir.path().join(".oslorc"), "if then fi\nMARK=late\n").unwrap();
+    std::fs::write(dir.path().join(".oslorc"), "this is not lua(((\n").unwrap();
 
     let o = repl("echo alive\n", &[("HISTFILE", "")], dir.path());
     assert!(out(&o).contains("alive"), "{:?}", out(&o));
@@ -418,29 +456,29 @@ fn history_is_a_builtin_even_in_a_script() {
 // ----------------------------------------------------------------------------- R9.9: the Lua layer
 
 #[test]
-fn a_broken_init_lua_is_reported_and_the_shell_still_starts() {
+fn a_broken_config_is_reported_and_the_shell_still_starts() {
     let dir = tempfile::tempdir().unwrap();
-    let init = dir.path().join(".config/oslo/init.lua");
+    let init = dir.path().join(".config/oslo/config.lua");
     std::fs::create_dir_all(init.parent().unwrap()).unwrap();
     std::fs::write(&init, "this is not lua(((\n").unwrap();
 
     let o = repl("echo alive\n", &[("HISTFILE", "")], dir.path());
     assert!(
         out(&o).contains("alive"),
-        "a broken init.lua must not stop the shell: {:?}",
+        "a broken config must not stop the shell: {:?}",
         out(&o)
     );
     let diagnostic = err(&o);
     assert!(
-        diagnostic.contains("init.lua"),
+        diagnostic.contains("config.lua"),
         "the diagnostic must name the user's file: {diagnostic:?}"
     );
 }
 
 #[test]
-fn a_working_init_lua_still_applies() {
+fn a_working_config_still_applies() {
     let dir = tempfile::tempdir().unwrap();
-    let init = dir.path().join(".config/oslo/init.lua");
+    let init = dir.path().join(".config/oslo/config.lua");
     std::fs::create_dir_all(init.parent().unwrap()).unwrap();
     std::fs::write(&init, "oslo.set_alias('hi', 'echo lua-alias')\n").unwrap();
 

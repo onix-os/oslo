@@ -16,17 +16,23 @@ use crate::env::Environment;
 use crate::lua::engine::{BUILTIN_KEY_PREFIX, PROMPT_KEY, Registry, borrow_env, call_lua_builtin};
 use crate::lua::eval::value::{Table, Value};
 use crate::lua::eval::{Interp, LuaError};
+use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
 mod convert;
+pub(crate) mod external;
 mod fs;
 mod json;
 mod path;
 mod proc;
+pub(crate) mod prompt;
 mod re;
 mod run;
+pub(crate) mod segment;
 mod shell;
+pub(crate) mod tool;
+pub(crate) mod tools;
 
 pub(crate) use shell::handlers as hook_handlers;
 pub(crate) mod util;
@@ -38,7 +44,24 @@ pub fn install(interp: &Rc<Interp>, registry: &Registry, env: Arc<Mutex<Environm
     let mut oslo = Table::new();
     run::install(interp, &mut oslo, &env);
     oslo.set(Value::str("fs"), fs::build());
-    oslo.set(Value::str("path"), path::build());
+    let mut paths = path::build();
+    if let Value::Table(table) = &mut paths {
+        prompt::shorten(&mut table.borrow_mut());
+    }
+    oslo.set(Value::str("path"), paths);
+    prompt::install(&mut oslo, registry);
+    tool::install(&mut oslo);
+    // The settings tables exist before the config runs, empty, so that
+    // `oslo.completion.max_rows = 5` is an assignment rather than an attempt to index nil. Every
+    // one of these is read back after the config by walking the table, so an empty one that the
+    // user never touches is indistinguishable from an absent one — which is what makes leaving
+    // them here free.
+    for name in ["completion", "suggest", "history", "keys"] {
+        oslo.set(
+            Value::str(name),
+            Value::Table(Rc::new(RefCell::new(Table::new()))),
+        );
+    }
     oslo.set(Value::str("json"), json::build());
     oslo.set(Value::str("re"), re::build());
     oslo.set(Value::str("proc"), proc::build_proc());

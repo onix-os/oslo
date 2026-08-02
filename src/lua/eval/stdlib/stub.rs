@@ -45,7 +45,7 @@ fn refusing(namespace: &str, names: &[&'static str]) -> Value {
 pub fn install(interp: &Interp) {
     // Coroutines need the interpreter to be suspendable mid-call, which a tree-walker running on
     // the Rust stack cannot be without either threads or a bytecode VM. Both were considered and
-    // declined; see PLAN-LUA.md.
+    // declined; see PLAN.md.
     interp.set_global(
         "coroutine",
         refusing(

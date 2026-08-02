@@ -11,6 +11,7 @@
 //!
 //! [`Environment::builtin_names`]: crate::env::Environment::builtin_names
 
+mod abbr;
 pub(crate) mod arrays;
 mod builtin;
 mod caller;
@@ -18,6 +19,7 @@ mod colon;
 mod command;
 mod conditionals;
 mod control;
+mod copy;
 mod declare;
 mod directories;
 mod exec;
@@ -124,6 +126,15 @@ pub fn register_default_builtins(env: &mut Environment) {
     env.register_custom_builtin("umask", builtin_umask);
     env.register_custom_builtin("wait", builtin_wait);
     env.register_custom_builtin("kill", builtin_kill);
+
+    // `OSC 52` to the terminal, so it works over SSH where a clipboard helper cannot.
+    env.register_custom_builtin("copy", copy::builtin_copy);
+    env.register_custom_builtin("abbr", abbr::builtin_abbr);
+    // The directory ring: where you have been, and how to walk it. Separate from `pushd`/`popd`,
+    // which are explicit and which scripts rely on.
+    env.register_custom_builtin("prevd", directories::ring::builtin_prevd);
+    env.register_custom_builtin("nextd", directories::ring::builtin_nextd);
+    env.register_custom_builtin("dirh", directories::ring::builtin_dirh);
 
     // Job control. `wait` is registered above but belongs with these: all five read one table.
     env.register_custom_builtin("jobs", builtin_jobs);

@@ -4,15 +4,26 @@
 //! — each one delegates to a module that can be called directly from a test, because none of this
 //! behaviour was reachable without a pty and that is precisely why it was all wrong.
 
+pub mod abbr;
 pub mod command_index;
-mod completion;
+pub mod completion;
 pub mod dropdown;
+pub mod editor;
 pub mod frecency_store;
 pub mod highlight;
 mod hinting;
+pub mod keys;
+pub mod marks;
+pub mod matching;
 pub mod prompt;
+pub mod query;
+pub mod recall;
+pub mod row;
+pub mod settings;
 pub mod spec;
 pub mod syntax;
+pub mod theme;
+pub mod vi;
 pub mod words;
 
 #[cfg(test)]
@@ -25,7 +36,6 @@ pub use words::{Quote, Word, current_word, extract_current_word};
 use crate::env::Environment;
 use dropdown::{CompletionCandidate, DropdownMenu};
 use frecency_store::FrecencyStore;
-use highlight::TokenType;
 use rustyline::completion::{Completer, Pair};
 use rustyline::highlight::Highlighter;
 use rustyline::hint::{Hinter, HistoryHinter};
@@ -33,7 +43,7 @@ use rustyline::validate::{ValidationContext, ValidationResult, Validator};
 use rustyline::{Context, Helper};
 use spec::SpecRegistry;
 use std::borrow::Cow;
-use std::collections::HashMap;
+use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 
 /// Completion kinds worth remembering.
@@ -56,12 +66,13 @@ pub struct OsloHelper {
     ///
     /// See [`OsloHelper::set_editor_multiline`].
     editor_multiline: bool,
-    /// `which` answers for the line being drawn, keyed by the line's hash.
+    /// The right prompt to draw, and how many cells the left prompt took.
     ///
-    /// Only path-like names reach it — a bare name is answered by [`command_index`] — but
-    /// `highlight` runs on every refresh, so even one `stat` per token per keystroke is worth
-    /// spending a hash lookup to avoid.
-    which_cache: Mutex<(u64, HashMap<String, bool>)>,
+    /// Set once per prompt cycle by the REPL and drawn by `highlight`, which is the only seam
+    /// where a cursor move is free — see [`prompt::right_prompt_escape`].
+    right_prompt: Mutex<Option<(String, usize)>>,
+    /// The language and status this prompt was drawn for, so a repaint rebuilds the same one.
+    prompt_context: Mutex<(String, i32)>,
 }
 
 impl OsloHelper {
@@ -85,7 +96,8 @@ impl OsloHelper {
             frecency,
             menu: interactive,
             editor_multiline: true,
-            which_cache: Mutex::new((0, HashMap::new())),
+            right_prompt: Mutex::new(None),
+            prompt_context: Mutex::new(("sh".to_string(), 0)),
         }
     }
 
@@ -93,8 +105,29 @@ impl OsloHelper {
     ///
     /// With it off, `complete` returns the whole candidate list instead of the one the user
     /// picked — the shape a test wants.
+    /// Give the helper the right prompt for this line, and the left prompt's width.
+    pub fn set_right_prompt(&self, right: Option<String>, left_width: usize) {
+        if let Ok(mut slot) = self.right_prompt.lock() {
+            *slot = right.map(|text| (text, left_width));
+        }
+    }
+
     pub fn set_menu(&mut self, enabled: bool) {
         self.menu = enabled;
+    }
+
+    /// Which language this prompt is reading, and the status it was drawn with.
+    ///
+    /// Both are set by the REPL each time round, so a repaint rebuilds the same prompt rather than
+    /// guessing at one.
+    pub fn set_prompt_context(&self, language: &str, last_status: i32) {
+        if let Ok(mut slot) = self.prompt_context.lock() {
+            *slot = (language.to_string(), last_status);
+        }
+    }
+
+    fn last_status(&self) -> i32 {
+        self.prompt_context.lock().map(|c| c.1).unwrap_or(0)
     }
 
     /// Whether unterminated input is continued inside the editor.
@@ -188,11 +221,14 @@ impl Completer for OsloHelper {
             return Ok((start, candidates.into_iter().map(Self::to_pair).collect()));
         }
 
-        let prompt_str = prompt::render_default_left_prompt(0);
+        let prompt_str = prompt::render_default_left_prompt(0, "sh");
         let indent_cols =
             dropdown::visible_len(&prompt_str) + dropdown::visible_len(&line[..start]);
 
-        match DropdownMenu::select_interactive(candidates, indent_cols) {
+        // What the user has typed of this word, so the dropdown can show which part of each
+        // candidate is already theirs.
+        let typed = &line[start..pos];
+        match DropdownMenu::select_interactive(candidates, indent_cols, typed) {
             Some(selected) => {
                 self.record_accepted(&selected);
                 Ok((start, vec![Self::to_pair(selected)]))
@@ -210,81 +246,155 @@ impl Hinter for OsloHelper {
             return None;
         }
 
-        // History wins: a line the user has actually run is a better guess than any name we could
-        // rank, and it is what makes the suggestion feel like a memory rather than a directory
-        // listing.
-        if let Some(h) = self.history_hinter.hint(line, pos, ctx) {
-            return Some(h);
+        // The order is `oslo.suggest.sources`, defaulting to fish's: history, then completions,
+        // then paths. Each answers for a position the others cannot see, and an empty list turns
+        // suggestions off entirely.
+        for source in settings::current().suggest.sources {
+            let found = match source {
+                // oslo's own, not the editor's: the editor holds one history and it is still the
+                // other language's until the line ends. See `recall::suggest`.
+                // oslo's own set, not the editor's. The editor's history is the complete record —
+                // both languages — because that is what `$HISTFILE` must receive, so filtering it
+                // there would corrupt the file. The suggestion therefore reads the
+                // language-filtered set directly, and falls back to the editor's hinter only when
+                // nothing has been remembered at all, where there is no language to cross.
+                settings::Source::History => recall::suggest(line).or_else(|| {
+                    recall::is_empty()
+                        .then(|| self.history_hinter.hint(line, pos, ctx))
+                        .flatten()
+                }),
+                settings::Source::Completion => self.command_hint(line, pos),
+                settings::Source::Path => self.path_hint(line, pos),
+            };
+            if found.is_some() {
+                return found;
+            }
         }
 
-        self.command_hint(line, pos)
+        None
     }
 }
 
 impl Highlighter for OsloHelper {
+    /// The prompt, re-rendered for whichever language the prompt is *now* reading.
+    ///
+    /// **This is what makes an in-place language switch stick.** The editor keeps the prompt
+    /// string it was handed when the line started and writes that same string on every redraw —
+    /// so a repaint that changed the language was reverted by the next keystroke, a completion,
+    /// or anything else that refreshed the row. Rendering it here instead means every redraw is
+    /// already correct and there is nothing to fight.
+    ///
+    /// Only the built-in prompt is rebuilt. A prompt from a Lua config is that config's business
+    /// and is passed through untouched.
+    fn highlight_prompt<'b, 's: 'b, 'p: 'b>(
+        &'s self,
+        prompt: &'p str,
+        _default: bool,
+    ) -> Cow<'b, str> {
+        let Some(language) = prompt::language() else {
+            return Cow::Borrowed(prompt);
+        };
+        let rebuilt = prompt::render_default_left_prompt(self.last_status(), &language);
+        // Only when it really is the built-in prompt: same width means same layout, and the
+        // editor's arithmetic is measured off the string it was given.
+        if prompt::printed_width(&rebuilt) == prompt::printed_width(prompt) {
+            Cow::Owned(rebuilt)
+        } else {
+            Cow::Borrowed(prompt)
+        }
+    }
+
     fn highlight<'l>(&self, line: &'l str, _pos: usize) -> Cow<'l, str> {
+        // An empty line still gets the right prompt. Returning `Cow::Borrowed(line)` here is what
+        // made it appear only after the first keystroke: rustyline draws the prompt, calls this
+        // with `""`, and got nothing back — so the right prompt existed but was invisible until
+        // you typed. There is no syntax to paint, but there is still a line to decorate.
         if line.is_empty() {
-            return Cow::Borrowed(line);
+            return Cow::Owned(self.right_prompt_only(line));
         }
 
-        let path = self
-            .env
-            .lock()
-            .unwrap()
-            .get_var("PATH")
-            .unwrap_or_default()
-            .to_string();
-
-        let mut out = String::with_capacity(line.len() * 2);
-        for (tok, kind) in highlight::tokenize_for_highlight(line) {
-            match kind {
-                TokenType::Command => {
-                    let valid = self.command_is_runnable(&tok, &path, line);
-                    let colour = if valid { "1;32" } else { "1;31" };
-                    out.push_str(&format!("\x1b[{}m{}\x1b[0m", colour, tok));
-                }
-                TokenType::Flag => out.push_str(&format!("\x1b[36m{}\x1b[0m", tok)),
-                TokenType::String => out.push_str(&format!("\x1b[33m{}\x1b[0m", tok)),
-                TokenType::Variable => out.push_str(&format!("\x1b[35m{}\x1b[0m", tok)),
-                TokenType::Operator => out.push_str(&format!("\x1b[1;37m{}\x1b[0m", tok)),
-                TokenType::Plain => out.push_str(&tok),
-            }
+        // **Shell syntax is only shell's.** Painting a Lua line with it marked `local` and `print`
+        // red as unknown commands, and quoted Lua strings as shell words — telling you a correct
+        // line is wrong. The row still gets its right prompt; it just is not coloured as something
+        // it is not.
+        if prompt::language().is_some_and(|language| language != "sh") {
+            return Cow::Owned(self.right_prompt_only(line));
         }
 
-        Cow::Owned(out)
+        let (path, builtins, functions) = {
+            let env = self.env.lock().unwrap();
+            let path = env.get_var("PATH").unwrap_or_default().to_string();
+            // Snapshotted rather than queried per word: the closures below are called once per
+            // command word, and each would otherwise take the environment lock again while this
+            // one is still held.
+            let builtins: HashSet<String> = env.builtin_names().map(str::to_string).collect();
+            let functions: HashSet<String> = env
+                .get_functions()
+                .keys()
+                .chain(env.get_aliases().keys())
+                .cloned()
+                .collect();
+            (path, builtins, functions)
+        };
+
+        let is_builtin = |name: &str| builtins.contains(name);
+        let is_function = |name: &str| functions.contains(name);
+        let ctx = highlight::Context {
+            path: &path,
+            is_builtin: &is_builtin,
+            is_function: &is_function,
+            // A line long enough to make the syscalls add up is one nobody is reading the
+            // colours of. See `highlight::MAX_PATH_CHECKS`.
+            check_paths: line.len() <= 512,
+        };
+        // `OSC 133;B` goes first, so it lands between the prompt and the typed text — which is
+        // where it means anything. rustyline measures the *raw* line and never this, so the mark
+        // costs nothing in the cursor arithmetic. See `marks::input_start`.
+        let mut painted = marks::input_start();
+        painted.push_str(&highlight::paint(line, &ctx));
+
+        // The right prompt rides here rather than in the prompt string: `compute_layout` measures
+        // the raw line and never this, so a cursor move costs nothing in rustyline's arithmetic.
+        if let Ok(slot) = self.right_prompt.lock()
+            && let Some((right, left_width)) = slot.as_ref()
+        {
+            let used = left_width + prompt::printed_width(line);
+            painted.push_str(&prompt::right_prompt_escape(
+                right,
+                used,
+                dropdown::terminal_cols(),
+            ));
+            // The row is recorded by the read loop before the editor is entered — see
+            // `startup::read`. It used to be recorded here too, from inside one guarded branch of
+            // the highlighter, which meant it was usually never recorded at all *and* that this
+            // wrote a stale language back over the live one on every keystroke.
+        }
+        Cow::Owned(painted)
     }
 
     fn highlight_hint<'h>(&self, hint: &'h str) -> Cow<'h, str> {
-        // Render fish-style ghost suggestion text in dim gray
-        Cow::Owned(format!("\x1b[90m{}\x1b[0m", hint))
+        // The ghost suggestion, in whatever the theme calls `autosuggestion`.
+        let theme = theme::current();
+        Cow::Owned(theme.syntax.autosuggestion.paint(hint, theme::depth()))
     }
 }
 
 impl OsloHelper {
-    /// Whether a command token names something the shell could run, memoised per line.
-    fn command_is_runnable(&self, name: &str, path: &str, line: &str) -> bool {
-        let key = line_key(line);
-        let mut cache = self.which_cache.lock().unwrap();
-        if cache.0 != key {
-            *cache = (key, HashMap::new());
-        }
-        if let Some(&known) = cache.1.get(name) {
-            return known;
-        }
-        drop(cache);
-
-        let answer = {
-            let env = self.env.lock().unwrap();
-            highlight::command_resolves(name, path, |n| {
-                env.is_builtin(n) || env.get_alias(n).is_some() || env.get_function(n).is_some()
-            })
+    /// The right prompt on its own, for a line with no syntax to paint.
+    fn right_prompt_only(&self, line: &str) -> String {
+        // The input mark belongs on an empty line too — that is the line you are about to type on.
+        let mark = marks::input_start();
+        let Ok(slot) = self.right_prompt.lock() else {
+            return format!("{mark}{line}");
         };
-
-        let mut cache = self.which_cache.lock().unwrap();
-        if cache.0 == key {
-            cache.1.insert(name.to_string(), answer);
-        }
-        answer
+        let Some((right, left_width)) = slot.as_ref() else {
+            return format!("{mark}{line}");
+        };
+        let used = left_width + prompt::printed_width(line);
+        format!(
+            "{mark}{line}{}",
+            prompt::right_prompt_escape(right, used, dropdown::terminal_cols())
+        )
     }
 }
 
@@ -312,11 +422,3 @@ impl Validator for OsloHelper {
 }
 
 impl Helper for OsloHelper {}
-
-/// A cheap identity for the line being highlighted. Collisions only cost a stale colour.
-fn line_key(line: &str) -> u64 {
-    use std::hash::{Hash, Hasher};
-    let mut hasher = std::collections::hash_map::DefaultHasher::new();
-    line.hash(&mut hasher);
-    hasher.finish()
-}

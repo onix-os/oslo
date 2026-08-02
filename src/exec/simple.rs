@@ -274,7 +274,39 @@ fn run_program(
         // is not interactive.
         Lookup::NotFound => match autocd::try_autocd(env, cmd_name, words) {
             Some(result) => result,
-            None => report_unrunnable(env, redirections, cmd_name, "command not found", 127),
+            // Before giving up, ask the config. A distribution's package manager is the obvious
+            // handler — "nvim is in package neovim", or install it and run it — and a handler that
+            // resolved the situation answers with the status to report. Everyone else bolts this
+            // on as a shell function; here it is a hook.
+            None => match crate::lua::engine::ask_hook_here(
+                "command-not-found",
+                vec![crate::lua::eval::value::Value::str(cmd_name)],
+            ) {
+                Some(status) => Ok(status),
+                None => {
+                    // Nobody handled it, so say what a person needs next: the name that was
+                    // probably meant. Only when the shell is interactive — a script's stderr is
+                    // read by machines, and bash says exactly "command not found" there.
+                    let hint = if env.interactive() {
+                        let path = env.get_var("PATH").unwrap_or_default().to_string();
+                        crate::interactive::command_index::nearest(&path, cmd_name)
+                    } else {
+                        None
+                    };
+                    match hint {
+                        Some(near) => report_unrunnable(
+                            env,
+                            redirections,
+                            cmd_name,
+                            &format!("command not found; did you mean {near}?"),
+                            127,
+                        ),
+                        None => {
+                            report_unrunnable(env, redirections, cmd_name, "command not found", 127)
+                        }
+                    }
+                }
+            },
         },
     }
 }

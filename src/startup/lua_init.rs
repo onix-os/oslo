@@ -11,16 +11,43 @@ use oslo::error::ShellError;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
-/// Where an interactive shell looks for its Lua layer.
-pub fn init_lua_path(env: &Environment) -> Option<PathBuf> {
+/// Where an interactive shell looks for its config, in order. The first that exists is used.
+///
+/// Three names for one file rather than three files that all load: a config split across places
+/// is a config nobody can find the whole of, and "which one won" is the question that follows.
+///
+/// `~/.oslorc` is Lua. It used to be shell syntax sourced through the `source` builtin; anyone
+/// with an old one gets a Lua syntax error, which is loud and points at the line — the loudest
+/// available way to say the format changed, and better than half of it silently working.
+pub fn config_paths(env: &Environment) -> Vec<PathBuf> {
     let home = env
         .get_var("HOME")
         .map(str::to_string)
-        .or_else(|| std::env::var("HOME").ok())?;
-    if home.is_empty() {
-        return None;
+        .or_else(|| std::env::var("HOME").ok())
+        .unwrap_or_default();
+
+    let xdg = env
+        .get_var("XDG_CONFIG_HOME")
+        .map(str::to_string)
+        .or_else(|| std::env::var("XDG_CONFIG_HOME").ok())
+        .filter(|x| !x.is_empty())
+        .map(PathBuf::from)
+        .or_else(|| (!home.is_empty()).then(|| PathBuf::from(&home).join(".config")));
+
+    let mut paths = Vec::new();
+    if let Some(xdg) = xdg {
+        paths.push(xdg.join("oslo/config.lua"));
+        paths.push(xdg.join("oslo/config"));
     }
-    Some(PathBuf::from(home).join(".config/oslo/init.lua"))
+    if !home.is_empty() {
+        paths.push(PathBuf::from(&home).join(".oslorc"));
+    }
+    paths
+}
+
+/// The config file this shell will actually read, if there is one.
+pub fn config_path(env: &Environment) -> Option<PathBuf> {
+    config_paths(env).into_iter().find(|p| p.is_file())
 }
 
 /// Wire the `oslo.*` table into `lua`, reporting a failure instead of swallowing it.
@@ -37,10 +64,11 @@ pub fn install_bindings(lua: &LuaEngine, env: Arc<Mutex<Environment>>) -> bool {
     }
 }
 
-/// Run `init.lua` if there is one, reporting a broken one as `oslo: <path>: <error>`.
+/// Run the config if there is one, reporting a broken one as `oslo: <path>: <error>`.
 ///
-/// The shell carries on with its defaults afterwards either way.
-pub fn load_init_lua(lua: &LuaEngine, path: &Path) {
+/// The shell carries on with its defaults afterwards either way: a config that fails half way
+/// leaves whatever it managed to set, and a broken one must not cost you your shell.
+pub fn load_config(lua: &LuaEngine, path: &Path) {
     if !path.is_file() {
         return;
     }
@@ -51,7 +79,11 @@ pub fn load_init_lua(lua: &LuaEngine, path: &Path) {
         return;
     };
     if let Err(e) = lua.load_file(text) {
-        eprintln!("oslo: {}: {}", path.display(), e);
+        eprintln!(
+            "oslo: {}: {}",
+            oslo::interactive::marks::path(&path.display().to_string()),
+            e
+        );
     }
 }
 

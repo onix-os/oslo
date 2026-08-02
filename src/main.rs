@@ -45,9 +45,41 @@ fn restore_default_sigpipe() {
     }
 }
 
+/// Report how many structured pipeline edges this run planned, when asked.
+///
+/// The differential corpus runs oslo as a subprocess, so the in-process counter is not visible to
+/// it. With `OSLO_AUDIT_STRUCTURED=1` the count is written to stderr as the process ends, and the
+/// corpus asserts it is zero for every POSIX script — which is what turns "structure cannot affect
+/// a script written before oslo existed" into a test rather than a promise.
+fn report_structured_audit() {
+    if std::env::var("OSLO_AUDIT_STRUCTURED").is_err() {
+        return;
+    }
+    extern "C" fn report() {
+        // `eprintln!` is not signal-safe, but `atexit` handlers run on a normal return from the
+        // process rather than from a handler, so this is an ordinary write.
+        eprintln!(
+            "oslo-audit: structured-edges={}",
+            oslo::data::entered_structured_path()
+        );
+    }
+    // Registered rather than called at the end of `main`: nearly every path out of this shell is a
+    // `process::exit` from somewhere deeper, and a report that only fires on one of them would
+    // give a clean answer for the wrong reason.
+    // SAFETY: `report` is `extern "C"`, takes nothing, returns nothing, and touches only an
+    // atomic and stderr.
+    unsafe {
+        nix::libc::atexit(report);
+    }
+}
+
 fn main() {
     // Before any thread exists, as the safety note on the function requires.
     restore_default_sigpipe();
+    report_structured_audit();
+    // The names that can carry structure. Declared once, here, for every mode the shell runs in —
+    // a script and a prompt must agree about what `df` is.
+    oslo::data::tools::register_all();
 
     // The shell runs on a stack oslo chose rather than one it inherited; see
     // [`oslo::INTERPRETER_STACK`]. `main` itself does nothing afterwards but wait.
@@ -108,6 +140,10 @@ fn dispatch() {
             std::process::exit(exit.status);
         }
     };
+
+    // Before anything reads the settings, and before the config is loaded — the flag is meant to
+    // beat the config, so it is installed first and applied on top of it.
+    oslo::interactive::settings::force_vi(invocation.vi);
 
     match invocation.action {
         // `-c` is the POSIX interface and is always shell: every `sh -c` idiom in the world
