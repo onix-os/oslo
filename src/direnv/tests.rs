@@ -134,6 +134,36 @@ fn an_alias_a_directory_defined_leaves_with_it() {
     );
 }
 
+/// `PATH` is not special-cased, and that is the point worth pinning.
+///
+/// It is an exported variable like any other, so extending it in a `.env.lua` and having the
+/// extension disappear on the way out falls out of the same diff that handles everything else.
+/// What makes it more than bookkeeping is that restoring it goes through `set_var`, which flushes
+/// the command-location cache — so a tool that was only on the project's `PATH` stops resolving the
+/// instant you leave, rather than still being found through a stale hash.
+#[test]
+fn a_path_a_project_added_does_not_follow_you_out() {
+    let store = tempfile::tempdir().expect("temp dir");
+    let project = tempfile::tempdir().expect("temp dir");
+    let elsewhere = tempfile::tempdir().expect("temp dir");
+    let path = rc_in(project.path(), find::NAME, "PATH=/opt/acme/bin:/usr/bin\n");
+
+    let env = shell();
+    env.lock().unwrap().set_var("PATH", "/usr/bin", true);
+    let mut direnv = Direnv::new(store.path().to_str(), None);
+    direnv.permissions().allow(&path).expect("allow");
+
+    direnv.arrive(&env, project.path(), &mut pairs_into(&env));
+    assert_eq!(var(&env, "PATH").as_deref(), Some("/opt/acme/bin:/usr/bin"));
+
+    direnv.arrive(&env, elsewhere.path(), &mut pairs_into(&env));
+    assert_eq!(
+        var(&env, "PATH").as_deref(),
+        Some("/usr/bin"),
+        "the project's directory must come back off the front"
+    );
+}
+
 /// The whole point: arriving sets, leaving restores.
 #[test]
 fn arriving_loads_and_leaving_puts_everything_back() {
