@@ -40,21 +40,18 @@ fn usage() -> i32 {
     eprintln!(
         "usage: direnv allow|deny|reload|status|prune|edit [path]\n\
          \n\
-         A directory's .envrc, .env and .env.lua are inert until allowed. Allowing is a statement\n\
-         about the file's *contents*, so editing it revokes the allowance; denying is a statement\n\
-         about the path, and survives any edit."
+         A directory's .env.lua is inert until allowed. Allowing is a statement about the file's\n\
+         *contents*, so editing it revokes the allowance; denying is a statement about the path,\n\
+         and survives any edit."
     );
     2
 }
 
-/// The rc files a path argument refers to, or the ones that apply here.
-fn targets(argument: Option<&String>) -> Vec<PathBuf> {
+/// The file a path argument refers to, or the one that applies here.
+fn target(argument: Option<&String>) -> Option<PathBuf> {
     let here = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
     let Some(argument) = argument else {
-        return find::applicable(&here)
-            .into_iter()
-            .map(|rc| rc.path)
-            .collect();
+        return find::applicable(&here).map(|rc| rc.path);
     };
     let path = Path::new(argument);
     let path = if path.is_absolute() {
@@ -62,24 +59,21 @@ fn targets(argument: Option<&String>) -> Vec<PathBuf> {
     } else {
         here.join(path)
     };
-    // A directory names its rc files; a file names itself.
+    // A directory names its file; a file names itself.
     if path.is_dir() {
-        return find::applicable(&path)
-            .into_iter()
-            .map(|rc| rc.path)
-            .collect();
+        return find::applicable(&path).map(|rc| rc.path);
     }
-    vec![path]
+    Some(path)
 }
 
 fn permit(argument: Option<&String>, allow: bool) -> i32 {
-    let found = targets(argument);
-    if found.is_empty() {
-        eprintln!("direnv: no .envrc, .env or .env.lua here");
+    let Some(path) = target(argument) else {
+        eprintln!("direnv: no .env.lua here or above");
         return 1;
-    }
+    };
+    let path = &path;
     let mut status = 0;
-    for path in &found {
+    {
         let outcome = direnv::with(|direnv| {
             let store = direnv.permissions();
             let result = if allow {
@@ -135,17 +129,16 @@ fn status() -> i32 {
             }
             None => println!("loaded: nothing"),
         }
-        let found = find::applicable(&here);
-        if found.is_empty() {
-            println!("found: nothing here or above");
-        }
-        for rc in &found {
-            let state = match direnv.permissions().status(&rc.path) {
-                Status::Allowed => "allowed",
-                Status::Denied => "denied",
-                Status::NotAllowed => "not allowed — run `direnv allow`",
-            };
-            println!("found: {} ({state})", rc.path.display());
+        match find::applicable(&here) {
+            None => println!("found: nothing here or above"),
+            Some(rc) => {
+                let state = match direnv.permissions().status(&rc.path) {
+                    Status::Allowed => "allowed",
+                    Status::Denied => "denied",
+                    Status::NotAllowed => "not allowed — run `direnv allow`",
+                };
+                println!("found: {} ({state})", rc.path.display());
+            }
         }
         let (allowed, denied) = direnv.permissions().count();
         println!("remembered: {allowed} allowed, {denied} denied");
@@ -169,11 +162,11 @@ fn prune() -> i32 {
 }
 
 fn edit(env: &mut Environment, argument: Option<&String>) -> i32 {
-    let found = targets(argument);
-    let Some(path) = found.first() else {
-        eprintln!("direnv: no .envrc, .env or .env.lua here");
+    let Some(path) = target(argument) else {
+        eprintln!("direnv: no .env.lua here or above");
         return 1;
     };
+    let path = &path;
     let editor = env
         .get_var("VISUAL")
         .or_else(|| env.get_var("EDITOR"))

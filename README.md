@@ -222,9 +222,15 @@ passing, so a stale entry cannot survive. 999 unit tests alongside.
 
 ## Directory environments
 
-`direnv`, built in. `.envrc`, `.env` and `.env.lua` are found by walking up, nearest ancestor wins,
-and **leaving puts everything back** — including variables the file unset, and variables that had no
-value before and end up with none again rather than with an empty one.
+A `.env.lua` in a project, found by walking up from where you are, nearest ancestor wins. **Leaving
+puts everything back** — including variables the file unset, and variables that had no value before
+and end up with none again rather than with an empty one.
+
+```lua
+-- .env.lua
+oslo.set_var("DATABASE_URL", "postgres://localhost/app_dev", true)
+oslo.keys["ctrl-t"] = function() return { text = "cargo test" } end
+```
 
 ```sh
 direnv allow      # trust this file, as it stands right now
@@ -237,22 +243,13 @@ Allowing hashes the file's **contents**, so editing it revokes the allowance; de
 the **path**, so a refusal survives every edit. Both take effect where you stand, not on the next
 `cd`.
 
-`.envrc` runs on oslo's own evaluator — no bash, no subprocess, no serialised diff in your
-environment. No direnv stdlib either, because there is Lua: `use` and friends are whatever your
-config says they are.
+**Lua, and only Lua.** `.envrc` and `.env` were both supported for a while and both are gone:
+`.envrc` meant either shipping direnv's 1,400-line stdlib or failing on every real file that says
+`use flake`, and `.env` is a second grammar for what one Lua line already says. There is no bash
+subprocess and no serialised diff in your environment — oslo *is* the shell.
 
-```lua
-oslo.register_builtin("use", function(args)
-  if args[2] == "flake" then oslo.set_var("IN_FLAKE", "1", true) end
-  return 0
-end)
-oslo.register_builtin("export_alias", function(args)
-  oslo.set_alias(args[2], args[3]); return 0
-end)
-```
-
-`.env.lua` is the interesting one: a directory that sets a keybinding, or a red prompt because it is
-production. What an rc file prints is grouped under it, repeats collapsed with a count.
+Because it is Lua, a directory can set more than variables: a keybinding, an alias, a red prompt
+because it is production. Whatever it prints is grouped under it, repeats collapsed with a count.
 
 ## Configuration
 

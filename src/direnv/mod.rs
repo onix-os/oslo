@@ -1,4 +1,4 @@
-//! Directory environments: `.envrc`, `.env` and `.env.lua`.
+//! Directory environments: one `.env.lua` per project.
 //!
 //! `direnv`, built in. See `docs/research/direnv.md` for what was read and what was deliberately not
 //! copied; the short version is that most of direnv's machinery exists because it is an external
@@ -22,74 +22,26 @@
 
 pub mod allow;
 pub mod diff;
-pub mod dotenv;
 pub mod find;
+mod handle;
+
+pub use handle::{install, installed, request_reload, take_reload_request, with};
 
 use crate::env::Environment;
 use allow::{Allow, Status};
 use diff::Diff;
-use find::{Kind, Rc};
+use find::Rc;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
-use std::sync::Mutex;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Mutex, MutexGuard};
 use std::time::SystemTime;
-
-/// The shell's one directory-environment state.
-///
-/// A process global, like the tracking store, because two callers need it and neither owns the
-/// other: the read loop drives the lifecycle on every `cd`, and the `direnv` builtin reads and
-/// writes the allow list. Threading it through the builtin signature would change every builtin's
-/// type for the sake of one of them.
-static STATE: Mutex<Option<Direnv>> = Mutex::new(None);
-
-/// Hand the shell its directory-environment state. Called once at startup.
-pub fn install(direnv: Direnv) {
-    if let Ok(mut slot) = STATE.lock() {
-        *slot = Some(direnv);
-    }
-}
-
-/// Do something with the state, if this shell has any.
-///
-/// Answers `None` in a script: a non-interactive shell has no directory environment at all, for the
-/// same reason it has no tracking store. A script's environment comes from whoever ran it, and a
-/// file in the working directory silently changing it would make scripts depend on where they are
-/// invoked from.
-pub fn with<T>(f: impl FnOnce(&mut Direnv) -> T) -> Option<T> {
-    let mut slot = STATE.lock().ok()?;
-    slot.as_mut().map(f)
-}
-
-/// Whether this shell has a directory environment at all.
-pub fn installed() -> bool {
-    STATE.lock().map(|slot| slot.is_some()).unwrap_or(false)
-}
-
-/// Set when a decision was made that the loaded state does not reflect yet.
-///
-/// The `direnv` builtin cannot do the reloading itself: running `.env.lua` needs the Lua engine,
-/// which belongs to the read loop and not to a builtin's arguments. So it leaves a request behind
-/// and the loop carries it out at the end of the command — the same shape `history -c` already uses
-/// for the same reason.
-static RELOAD: AtomicBool = AtomicBool::new(false);
-
-/// Ask the read loop to bring the environment into line before the next prompt.
-pub fn request_reload() {
-    RELOAD.store(true, Ordering::Relaxed);
-}
-
-/// Take the pending request, if there is one.
-pub fn take_reload_request() -> bool {
-    RELOAD.swap(false, Ordering::Relaxed)
-}
 
 /// What is loaded right now, if anything.
 struct Loaded {
     /// The directory the rc files live in.
     owner: PathBuf,
-    /// Every file that was loaded, with the stamp it had — so an edit reloads it.
-    watches: Vec<(PathBuf, Stamp)>,
+    /// The file as it was when it was read, so an edit reloads it.
+    watch: (PathBuf, Stamp),
     /// What to undo on the way out.
     undo: Diff,
 }
@@ -174,19 +126,22 @@ impl Direnv {
 
     /// Bring the environment into line with `dir`. The whole feature, from the caller's side.
     ///
-    /// `run` evaluates one `.envrc` or `.env.lua` and reports what went wrong. It is a callback
-    /// rather than something this module does, because running shell needs the executor and running
-    /// Lua needs the engine, and neither belongs to a module about directories. It is called
-    /// *inside* the before/after snapshot, which is what makes a variable an `.envrc` exports part
-    /// of the undo record — evaluating outside the window would set variables nothing could unset.
+    /// `run` evaluates the `.env.lua` and reports what went wrong. A callback rather than something
+    /// this module does, because running Lua needs the engine and that belongs to the read loop.
+    ///
+    /// **The environment lock is not held while it runs, and must not be.** The file's whole job is
+    /// to call `oslo.set_var` and friends, and those take the same lock with `try_lock` — holding it
+    /// here made every one of them fail with "shell state is busy" while the load reported success.
+    /// So the lock is taken twice, briefly, for the before and after snapshots, and released around
+    /// the call in between.
     pub fn arrive(
         &mut self,
-        env: &mut Environment,
+        env: &Mutex<Environment>,
         dir: &Path,
-        run: &mut dyn FnMut(&mut Environment, &Rc) -> Result<(), String>,
+        run: &mut dyn FnMut(&Rc) -> Result<(), String>,
     ) -> Vec<Event> {
-        let rcs = find::applicable(dir);
-        let owner = find::owner(&rcs);
+        let rc = find::applicable(dir);
+        let owner = rc.as_ref().and_then(find::owner);
 
         // Standing in the same environment, with nothing edited: the overwhelmingly common case.
         if !self.stale
@@ -204,11 +159,11 @@ impl Direnv {
         if let Some(event) = self.unload(env) {
             events.push(event);
         }
-        if rcs.is_empty() {
+        let Some(rc) = rc else {
             return events;
-        }
+        };
 
-        events.extend(self.load(env, &rcs, run));
+        events.extend(self.load(env, &rc, run));
         events
     }
 
@@ -217,23 +172,23 @@ impl Direnv {
         let Some(loaded) = &self.loaded else {
             return false;
         };
-        loaded
-            .watches
-            .iter()
-            .any(|(path, when)| stamp(path) != *when)
+        let (path, when) = &loaded.watch;
+        stamp(path) != *when
     }
 
     /// Put back everything the loaded environment changed.
-    fn unload(&mut self, env: &mut Environment) -> Option<Event> {
+    fn unload(&mut self, env: &Mutex<Environment>) -> Option<Event> {
         let loaded = self.loaded.take()?;
+        let mut guard = lock(env)?;
         for (name, value) in loaded.undo.to_apply() {
             match value {
                 Some(value) => {
-                    env.set_var(name, value, true);
+                    guard.set_var(name, value, true);
                 }
-                None => env.unset_var(name),
+                None => guard.unset_var(name),
             }
         }
+        drop(guard);
         Some(Event::Unloaded {
             owner: loaded.owner,
         })
@@ -242,70 +197,60 @@ impl Direnv {
     /// Check the gate, then read.
     fn load(
         &mut self,
-        env: &mut Environment,
-        rcs: &[Rc],
-        run: &mut dyn FnMut(&mut Environment, &Rc) -> Result<(), String>,
+        env: &Mutex<Environment>,
+        rc: &Rc,
+        run: &mut dyn FnMut(&Rc) -> Result<(), String>,
     ) -> Vec<Event> {
-        for rc in rcs {
-            match self.allow.status(&rc.path) {
-                Status::Denied => {
-                    return vec![Event::Denied {
-                        path: rc.path.clone(),
-                    }];
-                }
-                Status::NotAllowed => {
-                    // Reported once per path. Returning here rather than loading the *other* files
-                    // is deliberate: `.envrc` and `.env.lua` in one directory are one statement of
-                    // intent, and loading half of it would produce an environment the author never
-                    // described.
-                    if self.told.contains(&rc.path) {
-                        return Vec::new();
-                    }
-                    self.told.push(rc.path.clone());
-                    return vec![Event::Blocked {
-                        path: rc.path.clone(),
-                    }];
-                }
-                Status::Allowed => {}
+        match self.allow.status(&rc.path) {
+            Status::Denied => {
+                return vec![Event::Denied {
+                    path: rc.path.clone(),
+                }];
             }
+            Status::NotAllowed => {
+                // Reported once per path. A warning printed on every prompt is a warning nobody
+                // reads, which is the worst outcome for a warning about running someone's code.
+                if self.told.contains(&rc.path) {
+                    return Vec::new();
+                }
+                self.told.push(rc.path.clone());
+                return vec![Event::Blocked {
+                    path: rc.path.clone(),
+                }];
+            }
+            Status::Allowed => {}
         }
 
-        let before = snapshot(env);
-        let watches = rcs
-            .iter()
-            .map(|rc| (rc.path.clone(), stamp(&rc.path)))
-            .collect();
-        let mut failures = Vec::new();
-        for rc in rcs {
-            let outcome = match rc.kind {
-                Kind::Dotenv => apply_dotenv(env, rc),
-                // Shell and Lua are the caller's to run.
-                Kind::Shell | Kind::Lua => run(env, rc),
-            };
-            // **A file that failed half way still had its first half take effect**, so the diff is
-            // taken over everything regardless and the failure is reported beside it. Discarding
-            // the load here would leave those variables set with nothing recorded to unset them.
-            if let Err(problem) = outcome {
-                failures.push(Event::Failed {
-                    path: rc.path.clone(),
-                    problem,
-                });
-            }
-        }
-        let after = snapshot(env);
+        let Some(before) = lock(env).map(|guard| snapshot(&guard)) else {
+            return Vec::new();
+        };
+        let watch = (rc.path.clone(), stamp(&rc.path));
+        // No lock held here. See the note on `arrive`.
+        let outcome = run(rc);
+        let Some(after) = lock(env).map(|guard| snapshot(&guard)) else {
+            return Vec::new();
+        };
+        // **A file that failed half way still had its first half take effect**, so the diff is
+        // taken regardless and the failure reported beside it. Discarding the load here would
+        // leave those variables set with nothing recorded to unset them.
         let undo = Diff::between(&before, &after).reverse();
 
-        let Some(owner) = find::owner(rcs) else {
-            return failures;
+        let Some(owner) = find::owner(rc) else {
+            return Vec::new();
         };
         let vars = undo.len();
         self.loaded = Some(Loaded {
             owner: owner.clone(),
-            watches,
+            watch,
             undo,
         });
         let mut events = vec![Event::Loaded { owner, vars }];
-        events.extend(failures);
+        if let Err(problem) = outcome {
+            events.push(Event::Failed {
+                path: rc.path.clone(),
+                problem,
+            });
+        }
         events
     }
 }
@@ -313,6 +258,14 @@ impl Direnv {
 /// Every exported variable, which is what a directory environment is about.
 fn snapshot(env: &Environment) -> BTreeMap<String, String> {
     env.exported_vars().into_iter().collect()
+}
+
+/// The environment, or `None` if another holder has poisoned or is holding the lock.
+///
+/// A directory environment that cannot reach the shell state does nothing at all, which is the only
+/// safe direction: half-applying it would leave variables set with no record of how to remove them.
+fn lock(env: &Mutex<Environment>) -> Option<MutexGuard<'_, Environment>> {
+    env.lock().ok()
 }
 
 /// What a file looked like when it was read: when it changed, and how long it was.
@@ -332,32 +285,6 @@ fn stamp(path: &Path) -> Stamp {
     }
 }
 
-/// Read a `.env` into the environment. The only kind this module can read by itself.
-fn apply_dotenv(env: &mut Environment, rc: &Rc) -> Result<(), String> {
-    let source = std::fs::read_to_string(&rc.path).map_err(|e| e.to_string())?;
-    for (name, value) in dotenv::parse(&source) {
-        env.set_var(&name, &value, true);
-    }
-    Ok(())
-}
-
-/// The rc files of a kind the caller has to evaluate, in load order.
-///
-/// `.envrc` needs the shell executor and `.env.lua` needs the Lua engine; neither belongs to this
-/// module, so it reports what to run and the read loop runs it.
-pub fn needs_evaluating(dir: &Path, allow: &Allow) -> Vec<Rc> {
-    let rcs = find::applicable(dir);
-    if rcs
-        .iter()
-        .any(|rc| allow.status(&rc.path) != Status::Allowed)
-    {
-        return Vec::new();
-    }
-    rcs.into_iter()
-        .filter(|rc| matches!(rc.kind, Kind::Shell | Kind::Lua))
-        .collect()
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -370,13 +297,33 @@ mod tests {
     /// snapshot — the diff then records no change, unload has nothing to undo, and the failure
     /// looks like a bug in this module rather than crosstalk between tests. It cost an afternoon
     /// once already; the `OSLO_T_` prefix is the cheap fix.
-    fn shell() -> Environment {
-        Environment::new()
+    fn shell() -> Mutex<Environment> {
+        Mutex::new(Environment::new())
     }
 
-    /// These tests use `.env` files only, which this module reads itself, so nothing needs running.
-    fn nothing(_: &mut Environment, _: &Rc) -> Result<(), String> {
-        Ok(())
+    /// Read a variable the way a caller outside the lock would.
+    fn var(env: &Mutex<Environment>, name: &str) -> Option<String> {
+        env.lock().unwrap().get_var(name).map(str::to_string)
+    }
+
+    /// A stand-in for the Lua engine, which the library cannot reach from here.
+    ///
+    /// Reads the file as `NAME=VALUE` lines and exports them. These tests are about the lifecycle —
+    /// what loads, what unloads, what the allow gate refuses — and none of that depends on which
+    /// language did the setting. The real evaluator is exercised through the pty harness.
+    /// Built per test so it can reach the same environment the loader is diffing, taking the lock
+    /// itself — which is exactly what a real `.env.lua` does through `oslo.set_var`.
+    fn pairs_into(env: &Mutex<Environment>) -> impl FnMut(&Rc) -> Result<(), String> + '_ {
+        move |rc: &Rc| {
+            let source = std::fs::read_to_string(&rc.path).map_err(|e| e.to_string())?;
+            let mut guard = env.lock().map_err(|_| "locked".to_string())?;
+            for line in source.lines() {
+                if let Some((name, value)) = line.trim().split_once('=') {
+                    guard.set_var(name.trim(), value.trim(), true);
+                }
+            }
+            Ok(())
+        }
     }
 
     fn rc_in(dir: &Path, name: &str, body: &str) -> PathBuf {
@@ -390,21 +337,25 @@ mod tests {
     fn an_unallowed_file_is_not_read_and_is_reported_once() {
         let store = tempfile::tempdir().expect("temp dir");
         let project = tempfile::tempdir().expect("temp dir");
-        rc_in(project.path(), ".env", "SECRET=leaked\n");
+        rc_in(project.path(), find::NAME, "SECRET=leaked\n");
 
         let mut direnv = Direnv::new(store.path().to_str(), None);
-        let mut env = shell();
+        let env = shell();
 
-        let events = direnv.arrive(&mut env, project.path(), &mut nothing);
+        let events = direnv.arrive(&env, project.path(), &mut pairs_into(&env));
         assert!(matches!(events.as_slice(), [Event::Blocked { .. }]));
-        assert_eq!(env.get_var("SECRET"), None, "refused means not read");
+        assert_eq!(
+            var(&env, "SECRET").as_deref(),
+            None,
+            "refused means not read"
+        );
 
         // The second arrival says nothing: a warning shown on every prompt is a warning nobody
         // reads, which is the worst outcome for this particular warning.
         direnv.loaded = None;
         assert!(
             direnv
-                .arrive(&mut env, project.path(), &mut nothing)
+                .arrive(&env, project.path(), &mut pairs_into(&env))
                 .is_empty()
         );
     }
@@ -415,23 +366,34 @@ mod tests {
         let store = tempfile::tempdir().expect("temp dir");
         let project = tempfile::tempdir().expect("temp dir");
         let elsewhere = tempfile::tempdir().expect("temp dir");
-        let path = rc_in(project.path(), ".env", "DATABASE_URL=postgres://local\n");
+        let path = rc_in(
+            project.path(),
+            find::NAME,
+            "DATABASE_URL=postgres://local\n",
+        );
 
         let mut direnv = Direnv::new(store.path().to_str(), None);
         direnv.permissions().allow(&path).expect("allow");
-        let mut env = shell();
-        env.set_var("EDITOR", "vim", true);
+        let env = shell();
+        env.lock().unwrap().set_var("EDITOR", "vim", true);
 
-        direnv.arrive(&mut env, project.path(), &mut nothing);
-        assert_eq!(env.get_var("DATABASE_URL"), Some("postgres://local"));
-
-        direnv.arrive(&mut env, elsewhere.path(), &mut nothing);
+        direnv.arrive(&env, project.path(), &mut pairs_into(&env));
         assert_eq!(
-            env.get_var("DATABASE_URL"),
+            var(&env, "DATABASE_URL").as_deref(),
+            Some("postgres://local")
+        );
+
+        direnv.arrive(&env, elsewhere.path(), &mut pairs_into(&env));
+        assert_eq!(
+            var(&env, "DATABASE_URL").as_deref(),
             None,
             "leaving must remove it, not blank it"
         );
-        assert_eq!(env.get_var("EDITOR"), Some("vim"), "and touch nothing else");
+        assert_eq!(
+            var(&env, "EDITOR").as_deref(),
+            Some("vim"),
+            "and touch nothing else"
+        );
     }
 
     /// Moving straight from one project to another must not merge them.
@@ -440,20 +402,20 @@ mod tests {
         let store = tempfile::tempdir().expect("temp dir");
         let first = tempfile::tempdir().expect("temp dir");
         let second = tempfile::tempdir().expect("temp dir");
-        let one = rc_in(first.path(), ".env", "ONLY_IN_FIRST=1\n");
-        let two = rc_in(second.path(), ".env", "ONLY_IN_SECOND=2\n");
+        let one = rc_in(first.path(), find::NAME, "ONLY_IN_FIRST=1\n");
+        let two = rc_in(second.path(), find::NAME, "ONLY_IN_SECOND=2\n");
 
         let mut direnv = Direnv::new(store.path().to_str(), None);
         direnv.permissions().allow(&one).expect("allow");
         direnv.permissions().allow(&two).expect("allow");
-        let mut env = shell();
+        let env = shell();
 
-        direnv.arrive(&mut env, first.path(), &mut nothing);
-        direnv.arrive(&mut env, second.path(), &mut nothing);
+        direnv.arrive(&env, first.path(), &mut pairs_into(&env));
+        direnv.arrive(&env, second.path(), &mut pairs_into(&env));
 
-        assert_eq!(env.get_var("ONLY_IN_SECOND"), Some("2"));
+        assert_eq!(var(&env, "ONLY_IN_SECOND").as_deref(), Some("2"));
         assert_eq!(
-            env.get_var("ONLY_IN_FIRST"),
+            var(&env, "ONLY_IN_FIRST").as_deref(),
             None,
             "unload has to happen before load, or the two environments merge"
         );
@@ -464,20 +426,20 @@ mod tests {
     fn staying_put_does_no_work() {
         let store = tempfile::tempdir().expect("temp dir");
         let project = tempfile::tempdir().expect("temp dir");
-        let path = rc_in(project.path(), ".env", "OSLO_T_STAY=1\n");
+        let path = rc_in(project.path(), find::NAME, "OSLO_T_STAY=1\n");
 
         let mut direnv = Direnv::new(store.path().to_str(), None);
         direnv.permissions().allow(&path).expect("allow");
-        let mut env = shell();
+        let env = shell();
 
         assert!(
             !direnv
-                .arrive(&mut env, project.path(), &mut nothing)
+                .arrive(&env, project.path(), &mut pairs_into(&env))
                 .is_empty()
         );
         assert!(
             direnv
-                .arrive(&mut env, project.path(), &mut nothing)
+                .arrive(&env, project.path(), &mut pairs_into(&env))
                 .is_empty(),
             "a second arrival in the same place is not a reload"
         );
@@ -493,25 +455,25 @@ mod tests {
     fn denying_what_is_loaded_unloads_it() {
         let store = tempfile::tempdir().expect("temp dir");
         let project = tempfile::tempdir().expect("temp dir");
-        let path = rc_in(project.path(), ".env", "OSLO_T_DENY=1\n");
+        let path = rc_in(project.path(), find::NAME, "OSLO_T_DENY=1\n");
 
         let mut direnv = Direnv::new(store.path().to_str(), None);
         direnv.permissions().allow(&path).expect("allow");
-        let mut env = shell();
-        direnv.arrive(&mut env, project.path(), &mut nothing);
-        assert_eq!(env.get_var("OSLO_T_DENY"), Some("1"));
+        let env = shell();
+        direnv.arrive(&env, project.path(), &mut pairs_into(&env));
+        assert_eq!(var(&env, "OSLO_T_DENY").as_deref(), Some("1"));
 
         direnv.permissions().deny(&path).expect("deny");
         direnv.invalidate();
 
         // Standing in the very same directory, which the early-return would otherwise skip.
-        let events = direnv.arrive(&mut env, project.path(), &mut nothing);
+        let events = direnv.arrive(&env, project.path(), &mut pairs_into(&env));
         assert!(
             events.iter().any(|e| matches!(e, Event::Unloaded { .. })),
             "the record has to survive long enough to be undone: {events:?}"
         );
         assert_eq!(
-            env.get_var("OSLO_T_DENY"),
+            var(&env, "OSLO_T_DENY").as_deref(),
             None,
             "a denied environment must not stay applied"
         );
@@ -522,18 +484,22 @@ mod tests {
     fn allowing_loads_without_moving() {
         let store = tempfile::tempdir().expect("temp dir");
         let project = tempfile::tempdir().expect("temp dir");
-        let path = rc_in(project.path(), ".env", "OSLO_T_NOW=1\n");
+        let path = rc_in(project.path(), find::NAME, "OSLO_T_NOW=1\n");
 
         let mut direnv = Direnv::new(store.path().to_str(), None);
-        let mut env = shell();
-        direnv.arrive(&mut env, project.path(), &mut nothing);
-        assert_eq!(env.get_var("OSLO_T_NOW"), None, "blocked until allowed");
+        let env = shell();
+        direnv.arrive(&env, project.path(), &mut pairs_into(&env));
+        assert_eq!(
+            var(&env, "OSLO_T_NOW").as_deref(),
+            None,
+            "blocked until allowed"
+        );
 
         direnv.permissions().allow(&path).expect("allow");
         direnv.invalidate();
-        direnv.arrive(&mut env, project.path(), &mut nothing);
+        direnv.arrive(&env, project.path(), &mut pairs_into(&env));
         assert_eq!(
-            env.get_var("OSLO_T_NOW"),
+            var(&env, "OSLO_T_NOW").as_deref(),
             Some("1"),
             "`direnv allow` has to work where you already are"
         );
@@ -546,15 +512,15 @@ mod tests {
         let project = tempfile::tempdir().expect("temp dir");
         let deep = project.path().join("src/inner");
         std::fs::create_dir_all(&deep).expect("mkdir");
-        let path = rc_in(project.path(), ".env", "OSLO_T_DEEP=1\n");
+        let path = rc_in(project.path(), find::NAME, "OSLO_T_DEEP=1\n");
 
         let mut direnv = Direnv::new(store.path().to_str(), None);
         direnv.permissions().allow(&path).expect("allow");
-        let mut env = shell();
+        let env = shell();
 
-        direnv.arrive(&mut env, project.path(), &mut nothing);
-        assert!(direnv.arrive(&mut env, &deep, &mut nothing).is_empty());
-        assert_eq!(env.get_var("OSLO_T_DEEP"), Some("1"));
+        direnv.arrive(&env, project.path(), &mut pairs_into(&env));
+        assert!(direnv.arrive(&env, &deep, &mut pairs_into(&env)).is_empty());
+        assert_eq!(var(&env, "OSLO_T_DEEP").as_deref(), Some("1"));
     }
 
     /// Editing an allowed file revokes it, so the next arrival must refuse rather than reload.
@@ -562,30 +528,34 @@ mod tests {
     fn an_edit_revokes_and_the_environment_comes_back_out() {
         let store = tempfile::tempdir().expect("temp dir");
         let project = tempfile::tempdir().expect("temp dir");
-        let path = rc_in(project.path(), ".env", "OSLO_T_EDIT_A=1\n");
+        let path = rc_in(project.path(), find::NAME, "OSLO_T_EDIT_A=1\n");
 
         let mut direnv = Direnv::new(store.path().to_str(), None);
         direnv.permissions().allow(&path).expect("allow");
-        let mut env = shell();
-        direnv.arrive(&mut env, project.path(), &mut nothing);
-        assert_eq!(env.get_var("OSLO_T_EDIT_A"), Some("1"));
+        let env = shell();
+        direnv.arrive(&env, project.path(), &mut pairs_into(&env));
+        assert_eq!(var(&env, "OSLO_T_EDIT_A").as_deref(), Some("1"));
 
         // Rewrite it. The mtime moves, so the next arrival re-checks, and the hash no longer matches.
         std::thread::sleep(std::time::Duration::from_millis(10));
-        rc_in(project.path(), ".env", "OSLO_T_EDIT_A=1\nOSLO_T_EDIT_B=2\n");
+        rc_in(
+            project.path(),
+            find::NAME,
+            "OSLO_T_EDIT_A=1\nOSLO_T_EDIT_B=2\n",
+        );
 
-        let events = direnv.arrive(&mut env, project.path(), &mut nothing);
+        let events = direnv.arrive(&env, project.path(), &mut pairs_into(&env));
         assert!(
             events.iter().any(|e| matches!(e, Event::Blocked { .. })),
             "an edited file has to be allowed again: {events:?}"
         );
         assert_eq!(
-            env.get_var("OSLO_T_EDIT_A"),
+            var(&env, "OSLO_T_EDIT_A").as_deref(),
             None,
             "and the old values come back out"
         );
         assert_eq!(
-            env.get_var("OSLO_T_EDIT_B"),
+            var(&env, "OSLO_T_EDIT_B").as_deref(),
             None,
             "the new ones never went in"
         );

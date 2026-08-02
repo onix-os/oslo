@@ -1,21 +1,20 @@
 //! Running the directory environment, which is the half [`oslo::direnv`] cannot do itself.
 //!
 //! That module owns the lifecycle — what applies, whether it is allowed, and what to undo on the
-//! way out — but two of the three file types need an evaluator it has no business holding. `.envrc`
-//! is shell and needs the executor; `.env.lua` is Lua and needs the engine. Both live up here, so
-//! this is where they are run and where the result is reported.
+//! way out — but running the file needs the Lua engine, which belongs to the read loop and not to a
+//! module about directories. So this is where a `.env.lua` is actually run, and where the result is
+//! reported.
 
 mod report;
 
 use oslo::Environment;
 use oslo::LuaEngine;
-use oslo::direnv::find::{Kind, Rc};
+use oslo::direnv::find::Rc;
 use oslo::direnv::{self, Direnv, Event};
-use oslo::exec::eval_command_list;
-use oslo::parser::parse_with_aliases;
 use std::io::{Read, Seek, Write};
 use std::os::fd::{AsRawFd, FromRawFd};
 use std::path::Path;
+use std::sync::Mutex;
 
 /// Give an interactive shell its directory environment.
 ///
@@ -34,16 +33,11 @@ pub(super) fn start() {
 /// The rc file's own output is captured and printed *under* the line naming the file, rather than
 /// being left to land above a summary that does not mention it. On a real `.envrc` that is the
 /// difference between eight loose `command not found` lines and one labelled block.
-pub(super) fn arrive(env: &mut Environment, lua: &LuaEngine, dir: &Path) {
+pub(super) fn arrive(env: &Mutex<Environment>, lua: &LuaEngine, dir: &Path) {
     let mut said = String::new();
     let events = direnv::with(|state| {
-        state.arrive(env, dir, &mut |env, rc| {
-            let (outcome, output) = capturing(|| match rc.kind {
-                Kind::Shell => source_shell(env, rc),
-                Kind::Lua => source_lua(lua, rc),
-                // Read by the module itself; never handed here.
-                Kind::Dotenv => Ok(()),
-            });
+        state.arrive(env, dir, &mut |rc| {
+            let (outcome, output) = capturing(|| source_lua(lua, rc));
             said.push_str(&output);
             outcome
         })
@@ -108,32 +102,6 @@ fn capturing<T>(f: impl FnOnce() -> T) -> (T, String) {
             // file nobody will read.
             std::panic::resume_unwind(panic)
         }
-    }
-}
-
-/// Run an `.envrc` on oslo's own evaluator.
-///
-/// **Not a subshell, and not bash.** direnv runs `.envrc` under a bash it spawns, then diffs the
-/// environment that comes back — it has no other option, being a separate process. Running it here
-/// means an `.envrc` is written in the same shell the user is typing into, and that `export FOO=1`
-/// simply *is* an export, with no round trip to serialise it through.
-///
-/// The cost is that an `.envrc` written for the real direnv will use its stdlib — `use flake`,
-/// `layout python`, `export_alias` — and those are functions oslo does not have. They fail as
-/// unknown commands, loudly, which is the honest outcome: the alternative is a half-supported
-/// stdlib where `layout python` silently does nothing and the user hunts for why their virtualenv
-/// is missing.
-fn source_shell(env: &mut Environment, rc: &Rc) -> Result<(), String> {
-    let source = std::fs::read_to_string(&rc.path).map_err(|e| e.to_string())?;
-    let ast = parse_with_aliases(&source, &|name| env.get_alias(name).map(str::to_string))
-        .map_err(|e| e.to_string())?;
-    match eval_command_list(env, &ast) {
-        Ok(0) => Ok(()),
-        // A non-zero status from an rc file is worth saying: it is how a `use flake` that oslo
-        // cannot run announces itself, and swallowing it is how a directory environment silently
-        // half-applies.
-        Ok(status) => Err(format!("exited with status {status}")),
-        Err(problem) => Err(problem.to_string()),
     }
 }
 

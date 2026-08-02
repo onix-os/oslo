@@ -1,6 +1,6 @@
 # Directory environments
 
-`direnv`, built in, plus a third file type it does not have.
+One `.env.lua` per project — direnv's mechanism, without direnv's file formats.
 
 Read against direnv at `b00e451` (Go, ~5.6k LOC in `internal/cmd`, plus a 1.4k-line `stdlib.sh`).
 
@@ -20,7 +20,7 @@ keep state between invocations. So:
 
 Five of direnv's mechanisms are a workaround for not being the shell. Reproducing them here would be
 cargo-culting. What must be reproduced exactly is the part that is *not* incidental: the security
-model, the load/unload lifecycle, and the file-precedence rules.
+model and the load/unload lifecycle.
 
 ## The security model, copied exactly
 
@@ -43,17 +43,21 @@ direnv's design, which we take verbatim:
 
 We keep all of it, including the asymmetry and the check order.
 
-## Files, in precedence order
+## One file: `.env.lua`
 
 Found by walking **up** from the current directory to the root, nearest wins — direnv's rule.
 
-1. **`.envrc`** — shell. direnv runs this under bash; oslo runs it under oslo, which is the whole
-   point of building it in. Same language as everything else in the shell.
-2. **`.env`** — plain `KEY=value`, no execution. direnv's `dotenv`.
-3. **`.env.lua`** — *ours, not direnv's.* Lua, and the reason this feature is worth building rather
-   than shelling out to the real direnv.
+`.envrc` and `.env` were both implemented here and both were removed, on purpose:
 
-All three load if present, in that order, so `.env.lua` can override `.envrc`.
+* **`.envrc` is shell**, and a real one is written against direnv's 1,400-line `stdlib.sh`. Ours ran
+  the file on oslo's own evaluator, which is elegant and useless: every `use flake`, `layout python`
+  and `export_alias` failed as an unknown command. The choice was to ship a stdlib nobody asked us
+  to maintain, or to advertise compatibility we do not have. Neither is worth a file type.
+* **`.env` is a second grammar** — 179 lines of parser — for something one Lua line already says.
+  It is genuinely useful as *interop*, since docker-compose and Rails generate it, but that belongs
+  in a `oslo.dotenv(path)` helper a `.env.lua` can call, not in a file the shell hunts for.
+
+What is left is one name, one language, and no precedence rule to remember.
 
 ## `.env.lua`, and why it is the interesting one
 
@@ -84,27 +88,25 @@ loaded: Option<{ path, hash, diff, watches, restore }>
 
 On every directory change, and only on a directory change:
 
-1. Find the nearest rc file for the new directory.
-2. If it is the same file, unchanged (mtime of every watched file), do nothing at all. This is the
-   common case — most `cd`s are within one project — and it must cost nothing.
-3. If a different rc applies, or none: **unload** the current one by applying the reverse diff and
-   the recorded restores.
-4. If a new rc applies: check deny, then allow, then load it and record the diff.
+1. Find the nearest `.env.lua` for the new directory.
+2. If it is the same file, unchanged (mtime *and* size — mtime granularity is a second on some
+   filesystems), do nothing at all. This is the common case — most `cd`s are within one project —
+   and it must cost nothing.
+3. If a different file applies, or none: **unload** the current one by applying the reverse diff.
+4. If a new one applies: check deny, then allow, then load it and record the diff.
 
 Unload before load, always, so moving between two projects never leaves the first one's variables
 behind. direnv gets this right by construction and it is the bug most hand-rolled versions have.
 
 ## What we are not building
 
-* **`stdlib.sh`'s 1.4k lines of `layout_*` helpers** — `layout_python`, `layout_go`, `layout_ruby`,
-  `layout_pipenv`, twenty more. These are recipes, not mechanism, and every one of them is a
-  guess about somebody's toolchain that goes stale. `PATH_add`, `dotenv`, `source_env`, `source_up`
-  and `watch_file` are the load-bearing ones; those we provide.
-* **`use nix` / `use flake`** — a whole subsystem with its own cache. Nothing stops an `.envrc` from
-  calling `nix` itself.
+* **`stdlib.sh` entirely** — `PATH_add`, `layout_python`, `use flake`, forty more. These are
+  recipes, not mechanism, and each is a guess about somebody's toolchain that goes stale. In a
+  `.env.lua` they are ordinary Lua functions you write once and keep.
 * **The nine shell hooks** — no foreign shell to hook.
 * **`direnv export` / `direnv dump`** — the protocol exists to cross a process boundary we do not
   have.
+* **`.envrc` and `.env`** — see above.
 
 ## Commands
 

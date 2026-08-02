@@ -114,10 +114,7 @@ pub fn run_repl() -> ! {
     // The directory environment for wherever the shell was started, which is a directory the user
     // walked into as much as any other — `cd` is not the only way to arrive somewhere.
     environments::start();
-    {
-        let mut env_guard = env_struct.lock().unwrap();
-        environments::arrive(&mut env_guard, &lua, std::path::Path::new(&here));
-    }
+    environments::arrive(&env_struct, &lua, std::path::Path::new(&here));
     let mut rl = build_editor(&settings);
 
     // The mode the prompt is reading, and the flag the toggle key sets. Both live for the whole
@@ -271,19 +268,15 @@ pub fn run_repl() -> ! {
                 // leaves a request and this carries it out — before the directory check below, so
                 // that allowing and then `cd`-ing does not do the work twice.
                 if oslo::direnv::take_reload_request() {
-                    let mut env_guard = env_struct.lock().unwrap();
                     let here = current_directory();
-                    environments::arrive(&mut env_guard, &lua, std::path::Path::new(&here));
+                    environments::arrive(&env_struct, &lua, std::path::Path::new(&here));
                 }
 
                 let after = current_directory();
                 if after != before {
                     // Before the `cd` hook, so a Lua hook that reads an environment variable sees
                     // the one this directory sets rather than the one the last directory did.
-                    {
-                        let mut env_guard = env_struct.lock().unwrap();
-                        environments::arrive(&mut env_guard, &lua, std::path::Path::new(&after));
-                    }
+                    environments::arrive(&env_struct, &lua, std::path::Path::new(&after));
                     lua.fire_hook("cd", vec![LuaEngine::hook_arg(&after)]);
                     // The terminal is told too, so a new split or tab opens here rather than in
                     // `$HOME`. One write, only when the directory actually changed.
