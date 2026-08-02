@@ -59,6 +59,10 @@ tracing-subscriber = "0.3"
 brush-parser = { git = "https://github.com/bresilla/brush", branch = "oslo-integration" }
 turso = "0.7.2"
 tokio = { version = "1.53.1", features = ["rt", "macros"] }
+# The allow list for directory environments is keyed by a hash of the rc file's path *and* its
+# contents, which is what makes editing an allowed file revoke it. Pure Rust, so it does not cost
+# the static musl build a C toolchain.
+sha2 = "0.11.0"
 
 [dev-dependencies]
 tempfile = "3.17"

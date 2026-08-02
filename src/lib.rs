@@ -14,6 +14,7 @@ pub const INTERPRETER_STACK: usize = 16 * 1024 * 1024;
 
 pub mod ast;
 pub mod data;
+pub mod direnv;
 pub mod env;
 pub mod error;
 pub mod exec;
