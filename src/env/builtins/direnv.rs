@@ -92,7 +92,8 @@ fn permit(argument: Option<&String>, allow: bool) -> i32 {
             direnv.tell_again(path);
             // Either way the loaded state is now stale: an allow means there is something to load,
             // a deny means what is loaded should not be. The next prompt does the work.
-            direnv.forget();
+            direnv.invalidate();
+            direnv::request_reload();
             result
         });
         match outcome {
@@ -117,7 +118,8 @@ fn permit(argument: Option<&String>, allow: bool) -> i32 {
 /// variables with no record of how to remove them. Forgetting is enough — the next directory check
 /// finds no loaded state, so it loads, and the load takes its own snapshot.
 fn reload(_env: &mut Environment) -> i32 {
-    direnv::with(|direnv| direnv.forget());
+    direnv::with(|direnv| direnv.invalidate());
+    direnv::request_reload();
     println!("direnv: reloading");
     0
 }
@@ -184,7 +186,8 @@ fn edit(env: &mut Environment, argument: Option<&String>) -> i32 {
             // so here saves the next `cd` being a confusing refusal.
             direnv::with(|direnv| {
                 direnv.tell_again(path);
-                direnv.forget();
+                direnv.invalidate();
+                direnv::request_reload();
             });
             println!(
                 "direnv: {} edited; run `direnv allow` to trust it",

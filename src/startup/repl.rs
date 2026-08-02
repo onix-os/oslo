@@ -266,6 +266,16 @@ pub fn run_repl() -> ! {
 
                 // Fired before the status is acted on, so a `cd` hook sees the directory the
                 // command left behind even when that command was the last one of the session.
+                // A `direnv allow` or `deny` cannot reload itself: running `.env.lua` needs the
+                // Lua engine, which lives here and not in a builtin's arguments. So the builtin
+                // leaves a request and this carries it out — before the directory check below, so
+                // that allowing and then `cd`-ing does not do the work twice.
+                if oslo::direnv::take_reload_request() {
+                    let mut env_guard = env_struct.lock().unwrap();
+                    let here = current_directory();
+                    environments::arrive(&mut env_guard, &lua, std::path::Path::new(&here));
+                }
+
                 let after = current_directory();
                 if after != before {
                     // Before the `cd` hook, so a Lua hook that reads an environment variable sees

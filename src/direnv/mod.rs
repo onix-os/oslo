@@ -32,6 +32,7 @@ use find::{Kind, Rc};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::SystemTime;
 
 /// The shell's one directory-environment state.
@@ -65,6 +66,24 @@ pub fn installed() -> bool {
     STATE.lock().map(|slot| slot.is_some()).unwrap_or(false)
 }
 
+/// Set when a decision was made that the loaded state does not reflect yet.
+///
+/// The `direnv` builtin cannot do the reloading itself: running `.env.lua` needs the Lua engine,
+/// which belongs to the read loop and not to a builtin's arguments. So it leaves a request behind
+/// and the loop carries it out at the end of the command — the same shape `history -c` already uses
+/// for the same reason.
+static RELOAD: AtomicBool = AtomicBool::new(false);
+
+/// Ask the read loop to bring the environment into line before the next prompt.
+pub fn request_reload() {
+    RELOAD.store(true, Ordering::Relaxed);
+}
+
+/// Take the pending request, if there is one.
+pub fn take_reload_request() -> bool {
+    RELOAD.swap(false, Ordering::Relaxed)
+}
+
 /// What is loaded right now, if anything.
 struct Loaded {
     /// The directory the rc files live in.
@@ -79,6 +98,9 @@ struct Loaded {
 pub struct Direnv {
     allow: Allow,
     loaded: Option<Loaded>,
+    /// Set when a decision has made the loaded state wrong, so the next [`Direnv::arrive`] does the
+    /// work again even though the directory has not changed.
+    stale: bool,
     /// Paths already reported as needing `direnv allow`, so the notice is printed once rather than
     /// on every prompt. direnv prints on every hook fire; that is noise, and noise gets ignored,
     /// which is the last thing a security prompt should be.
@@ -111,6 +133,7 @@ impl Direnv {
         Direnv {
             allow: Allow::new(xdg_data, home),
             loaded: None,
+            stale: false,
             told: Vec::new(),
         }
     }
@@ -138,11 +161,14 @@ impl Direnv {
         self.told.retain(|told| told != path);
     }
 
-    /// Drop whatever is loaded without touching the environment.
+    /// Mark the loaded state as no longer reflecting the decisions on record.
     ///
-    /// For `direnv reload`, which wants the next directory check to do the work again from scratch.
-    pub fn forget(&mut self) {
-        self.loaded = None;
+    /// **Not `loaded = None`.** Dropping the record is what an early version did, and it leaks: the
+    /// undo diff is the only thing that knows how to take the variables back out, so forgetting it
+    /// after `direnv deny` would leave a denied environment applied with no way to remove it. The
+    /// record is kept and merely marked stale, so the next arrival unloads properly first.
+    pub fn invalidate(&mut self) {
+        self.stale = true;
         self.told.clear();
     }
 
@@ -163,12 +189,14 @@ impl Direnv {
         let owner = find::owner(&rcs);
 
         // Standing in the same environment, with nothing edited: the overwhelmingly common case.
-        if let Some(loaded) = &self.loaded
+        if !self.stale
+            && let Some(loaded) = &self.loaded
             && owner.as_deref() == Some(loaded.owner.as_path())
             && !self.changed_underneath()
         {
             return Vec::new();
         }
+        self.stale = false;
 
         let mut events = Vec::new();
         // Unload before load, always. Moving from one project to another must not carry anything
@@ -452,6 +480,62 @@ mod tests {
                 .arrive(&mut env, project.path(), &mut nothing)
                 .is_empty(),
             "a second arrival in the same place is not a reload"
+        );
+    }
+
+    /// Denying a *loaded* environment must take its variables back out.
+    ///
+    /// The bug this pins: an early version dropped the loaded record on a decision, and the undo
+    /// diff is the only thing that knows how to remove the variables — so a denied environment
+    /// stayed applied with nothing able to unload it. Marking the record stale instead means the
+    /// next arrival unloads properly first.
+    #[test]
+    fn denying_what_is_loaded_unloads_it() {
+        let store = tempfile::tempdir().expect("temp dir");
+        let project = tempfile::tempdir().expect("temp dir");
+        let path = rc_in(project.path(), ".env", "OSLO_T_DENY=1\n");
+
+        let mut direnv = Direnv::new(store.path().to_str(), None);
+        direnv.permissions().allow(&path).expect("allow");
+        let mut env = shell();
+        direnv.arrive(&mut env, project.path(), &mut nothing);
+        assert_eq!(env.get_var("OSLO_T_DENY"), Some("1"));
+
+        direnv.permissions().deny(&path).expect("deny");
+        direnv.invalidate();
+
+        // Standing in the very same directory, which the early-return would otherwise skip.
+        let events = direnv.arrive(&mut env, project.path(), &mut nothing);
+        assert!(
+            events.iter().any(|e| matches!(e, Event::Unloaded { .. })),
+            "the record has to survive long enough to be undone: {events:?}"
+        );
+        assert_eq!(
+            env.get_var("OSLO_T_DENY"),
+            None,
+            "a denied environment must not stay applied"
+        );
+    }
+
+    /// Allowing takes effect where you are standing, not on the next `cd`.
+    #[test]
+    fn allowing_loads_without_moving() {
+        let store = tempfile::tempdir().expect("temp dir");
+        let project = tempfile::tempdir().expect("temp dir");
+        let path = rc_in(project.path(), ".env", "OSLO_T_NOW=1\n");
+
+        let mut direnv = Direnv::new(store.path().to_str(), None);
+        let mut env = shell();
+        direnv.arrive(&mut env, project.path(), &mut nothing);
+        assert_eq!(env.get_var("OSLO_T_NOW"), None, "blocked until allowed");
+
+        direnv.permissions().allow(&path).expect("allow");
+        direnv.invalidate();
+        direnv.arrive(&mut env, project.path(), &mut nothing);
+        assert_eq!(
+            env.get_var("OSLO_T_NOW"),
+            Some("1"),
+            "`direnv allow` has to work where you already are"
         );
     }
 
