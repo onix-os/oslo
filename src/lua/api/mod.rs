@@ -193,6 +193,50 @@ fn variables(oslo: &mut Table, env: &Arc<Mutex<Environment>>) {
 
 /// The working directory and pathname expansion.
 fn filesystem(oslo: &mut Table, env: &Arc<Mutex<Environment>>) {
+    // oslo.path_add(dir, [var]) — put `dir` on the front of `$PATH`, or of the named variable.
+    //
+    // The single most common thing a `.env.lua` does, and spelling it by hand is both wordy and
+    // easy to get subtly wrong: forgetting the separator, or appending rather than prepending so
+    // the project's own tool loses to the system one. Relative paths resolve against the current
+    // directory, because a directory environment saying `./bin` means *its* bin.
+    //
+    // Idempotent: a directory already on the front is not added twice, so a reload does not grow
+    // the variable each time.
+    let env_path_add = Arc::clone(env);
+    put(oslo, "path_add", move |_, args| {
+        let dir = text(&args, 1, "oslo.path_add")?;
+        let name = match args.get(1) {
+            Some(Value::Str(name)) => name.to_string(),
+            _ => "PATH".to_string(),
+        };
+        let dir: String = dir.to_string();
+        let joined = match std::path::Path::new(&dir).is_absolute() {
+            true => std::path::PathBuf::from(&dir),
+            false => std::env::current_dir().unwrap_or_default().join(&dir),
+        };
+        // Normalised lexically, not with `canonicalize`: the directory may not exist yet (a build
+        // tree that has not been made), and canonicalising would fail there and also resolve
+        // symlinks the user wrote deliberately. `components()` drops the `.` in `./bin`, which is
+        // what makes `path_add("bin")` and `path_add("./bin")` the same entry — without it the
+        // idempotence check below compares two spellings of one directory and adds it twice.
+        let absolute = joined
+            .components()
+            .collect::<std::path::PathBuf>()
+            .to_string_lossy()
+            .to_string();
+        let mut guard = borrow_env(&env_path_add)?;
+        let current = guard.get_var(&name).unwrap_or_default().to_string();
+        if current.split(':').any(|entry| entry == absolute) {
+            return Ok(vec![Value::str(current)]);
+        }
+        let joined = match current.is_empty() {
+            true => absolute,
+            false => format!("{absolute}:{current}"),
+        };
+        guard.set_var(&name, &joined, true);
+        Ok(vec![Value::str(joined)])
+    });
+
     put(oslo, "get_pwd", |_, _| {
         Ok(vec![Value::str(
             std::env::current_dir()

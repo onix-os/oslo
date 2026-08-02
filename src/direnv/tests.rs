@@ -134,6 +134,46 @@ fn an_alias_a_directory_defined_leaves_with_it() {
     );
 }
 
+/// A shell-local variable that a directory exports must come back *local*, not vanish.
+///
+/// The snapshot used to be `exported_vars()` alone, which cannot tell "was not here" from "was here
+/// but local". So a variable you had set without exporting, that a `.env.lua` then exported, was
+/// removed entirely on the way out — the directory environment quietly deleting something it did
+/// not create.
+#[test]
+fn a_local_variable_the_directory_exported_comes_back_local() {
+    let store = tempfile::tempdir().expect("temp dir");
+    let project = tempfile::tempdir().expect("temp dir");
+    let elsewhere = tempfile::tempdir().expect("temp dir");
+    let path = rc_in(project.path(), find::NAME, "OSLO_T_LOCAL=exported\n");
+
+    let env = shell();
+    // Set, but deliberately not exported.
+    env.lock().unwrap().set_var("OSLO_T_LOCAL", "mine", false);
+    let mut direnv = Direnv::new(store.path().to_str(), None);
+    direnv.permissions().allow(&path).expect("allow");
+
+    direnv.arrive(&env, project.path(), &mut pairs_into(&env));
+    assert_eq!(var(&env, "OSLO_T_LOCAL").as_deref(), Some("exported"));
+
+    direnv.arrive(&env, elsewhere.path(), &mut pairs_into(&env));
+    assert_eq!(
+        var(&env, "OSLO_T_LOCAL").as_deref(),
+        Some("mine"),
+        "the value has to come back"
+    );
+    let exported = env
+        .lock()
+        .unwrap()
+        .exported_vars()
+        .into_iter()
+        .any(|(name, _)| name == "OSLO_T_LOCAL");
+    assert!(
+        !exported,
+        "and it has to come back shell-local, not exported"
+    );
+}
+
 /// `PATH` is not special-cased, and that is the point worth pinning.
 ///
 /// It is an exported variable like any other, so extending it in a `.env.lua` and having the

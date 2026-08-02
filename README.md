@@ -228,8 +228,9 @@ and end up with none again rather than with an empty one.
 
 ```lua
 -- .env.lua
-oslo.set_var("DATABASE_URL", "postgres://localhost/app_dev", true)
-oslo.keys["ctrl-t"] = function() return { text = "cargo test" } end
+oslo.set_var("DATABASE_URL", "postgres://localhost/app_dev")
+oslo.set_alias("t", "cargo test")
+oslo.path_add("./bin")          -- prepended, idempotent, gone when you leave
 ```
 
 ```sh

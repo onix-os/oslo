@@ -26,17 +26,17 @@ use std::collections::BTreeMap;
 ///
 /// Sorted, so that reporting it is stable and two diffs of the same change compare equal.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub struct Diff {
+pub struct Diff<V = String> {
     /// `name -> (before, after)`, where `None` on either side means the variable did not exist.
     ///
     /// That distinction is load-bearing: restoring `FOO` to `Some("")` leaves an empty variable,
     /// which `[ -n "$FOO" ]` reads differently from the `None` that was there before.
-    changes: BTreeMap<String, (Option<String>, Option<String>)>,
+    changes: BTreeMap<String, (Option<V>, Option<V>)>,
 }
 
-impl Diff {
+impl<V: Clone + PartialEq> Diff<V> {
     /// The difference between two snapshots, keeping only what moved.
-    pub fn between(before: &BTreeMap<String, String>, after: &BTreeMap<String, String>) -> Diff {
+    pub fn between(before: &BTreeMap<String, V>, after: &BTreeMap<String, V>) -> Diff<V> {
         let mut changes = BTreeMap::new();
         for (name, old) in before {
             match after.get(name) {
@@ -58,7 +58,7 @@ impl Diff {
     }
 
     /// The same change, backwards. Applying this undoes it.
-    pub fn reverse(&self) -> Diff {
+    pub fn reverse(&self) -> Diff<V> {
         Diff {
             changes: self
                 .changes
@@ -86,11 +86,11 @@ impl Diff {
         self.changes.keys().map(String::as_str).collect()
     }
 
-    /// Every change as `(name, value_to_apply)`, where `None` means unset it.
-    pub fn to_apply(&self) -> Vec<(&str, Option<&str>)> {
+    /// Every change as `(name, value_to_apply)`, where `None` means remove it.
+    pub fn to_apply(&self) -> Vec<(&str, Option<&V>)> {
         self.changes
             .iter()
-            .map(|(name, (_, after))| (name.as_str(), after.as_deref()))
+            .map(|(name, (_, after))| (name.as_str(), after.as_ref()))
             .collect()
     }
 }
@@ -98,6 +98,14 @@ impl Diff {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// `to_apply` hands back borrowed values; these read better compared as owned strings.
+    fn applied(diff: &Diff<String>) -> Vec<(&str, Option<&str>)> {
+        diff.to_apply()
+            .into_iter()
+            .map(|(name, value)| (name, value.map(String::as_str)))
+            .collect()
+    }
 
     fn env(pairs: &[(&str, &str)]) -> BTreeMap<String, String> {
         pairs
@@ -118,11 +126,11 @@ mod tests {
         let diff = Diff::between(&before, &after);
 
         assert_eq!(
-            diff.to_apply(),
+            applied(&diff),
             vec![("DATABASE_URL", Some("postgres://local"))]
         );
         assert_eq!(
-            diff.reverse().to_apply(),
+            applied(&diff.reverse()),
             vec![("DATABASE_URL", None)],
             "leaving must remove it, not blank it"
         );
@@ -135,8 +143,8 @@ mod tests {
         let after = env(&[]);
         let diff = Diff::between(&before, &after);
 
-        assert_eq!(diff.to_apply(), vec![("EDITOR", None)]);
-        assert_eq!(diff.reverse().to_apply(), vec![("EDITOR", Some("vim"))]);
+        assert_eq!(applied(&diff), vec![("EDITOR", None)]);
+        assert_eq!(applied(&diff.reverse()), vec![("EDITOR", Some("vim"))]);
     }
 
     /// Only what moved is recorded, so anything changed by hand while standing there survives.

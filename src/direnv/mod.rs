@@ -42,14 +42,14 @@ struct Loaded {
     owner: PathBuf,
     /// The file as it was when it was read, so an edit reloads it.
     watch: (PathBuf, Stamp),
-    /// The variables to put back on the way out.
-    undo: Diff,
+    /// The variables to put back on the way out, each with the export flag it had.
+    undo: Diff<(String, bool)>,
     /// The aliases to put back on the way out.
     ///
     /// Separate from `undo` rather than merged into it because an alias and a variable can share a
     /// name and mean different things — `ls` is a perfectly good alias and a perfectly good
     /// variable, and one map would have them overwrite each other.
-    aliases: Diff,
+    aliases: Diff<String>,
 }
 
 /// The shell's directory-environment state.
@@ -186,10 +186,18 @@ impl Direnv {
     fn unload(&mut self, env: &Mutex<Environment>) -> Option<Event> {
         let loaded = self.loaded.take()?;
         let mut guard = lock(env)?;
-        for (name, value) in loaded.undo.to_apply() {
-            match value {
-                Some(value) => {
-                    guard.set_var(name, value, true);
+        for (name, was) in loaded.undo.to_apply() {
+            match was {
+                // The export flag is restored with the value. A variable that was shell-local
+                // before the directory exported it has to come back local, or leaving would hand
+                // every later child a variable that was never in its environment.
+                Some((value, exported)) => {
+                    // Unset first. `set_var`'s export flag is OR'd with whatever the variable
+                    // already carries, so setting it to `false` on a currently-exported variable
+                    // does nothing — the only way back to shell-local is to clear the entry and
+                    // write it again.
+                    guard.unset_var(name);
+                    guard.set_var(name, value, *exported);
                 }
                 None => guard.unset_var(name),
             }
@@ -273,9 +281,14 @@ impl Direnv {
 ///
 /// Taken as one call so both halves are read under the same lock, which is what makes the before
 /// and after snapshots describe the same instant.
-fn shell_state(env: &Environment) -> (BTreeMap<String, String>, BTreeMap<String, String>) {
+type Vars = BTreeMap<String, (String, bool)>;
+
+fn shell_state(env: &Environment) -> (Vars, BTreeMap<String, String>) {
     (
-        env.exported_vars().into_iter().collect(),
+        env.all_vars()
+            .into_iter()
+            .map(|(name, value, exported)| (name, (value, exported)))
+            .collect(),
         env.get_aliases().clone().into_iter().collect(),
     )
 }
