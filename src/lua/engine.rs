@@ -32,6 +32,33 @@ thread_local! {
     static ACTIVE: RefCell<Option<(Rc<Interp>, Registry)>> = const { RefCell::new(None) };
 }
 
+/// Fire an answering hook using whatever interpreter is on this thread.
+///
+/// The executor is a long way from the place the engine is owned — `run_simple` has no route back
+/// to `repl` — but the interpreter is already parked on this thread for exactly this kind of
+/// reach-back. `None` when there is no interpreter (a non-interactive shell, a script) or when no
+/// handler answered, and the caller then does what it did before.
+pub fn ask_hook_here(name: &str, args: Vec<Value>) -> Option<i32> {
+    let (interp, registry) = ACTIVE.with(|slot| slot.borrow().clone())?;
+    ask_hook_on(&interp, &registry, name, args)
+}
+
+fn ask_hook_on(interp: &Interp, registry: &Registry, name: &str, args: Vec<Value>) -> Option<i32> {
+    for handler in crate::lua::api::hook_handlers(registry, name) {
+        match interp.call(&handler, args.clone()) {
+            Ok(values) => {
+                if let Some(Value::Number(n)) = values.first() {
+                    return n.as_int().map(|i| i as i32);
+                }
+            }
+            // Reported and skipped, as with any other hook: one broken handler must not stop the
+            // others, and must not turn a missing command into a silent success.
+            Err(e) => eprintln!("oslo: {name} hook: {e}"),
+        }
+    }
+    None
+}
+
 /// Take the shell state for the duration of one `oslo.*` call.
 ///
 /// `try_lock`, not `lock`: the interpreter runs *inside* the evaluator when a Lua-registered
@@ -231,6 +258,18 @@ impl LuaEngine {
                 eprintln!("oslo: {name} hook: {e}");
             }
         }
+    }
+
+    /// Fire a hook that can *answer*, returning the first status a handler gave.
+    ///
+    /// [`fire_hook`](Self::fire_hook) is for telling the config something happened. This is for
+    /// asking it a question — `command-not-found` is one: a handler that installs the package and
+    /// runs the command has a status to report, and one that only prints advice has none.
+    ///
+    /// The first handler to return a number wins and the rest are skipped, which is what makes a
+    /// chain of handlers behave: the one that resolved the situation ends it.
+    pub fn ask_hook(&self, name: &str, args: Vec<Value>) -> Option<i32> {
+        ask_hook_on(&self.interp, &self.registry, name, args)
     }
 
     /// A string argument for a hook, so callers do not need the value type.

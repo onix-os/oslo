@@ -26,7 +26,7 @@ pub(crate) const HOOK_PREFIX: &str = "hook:";
 /// A fixed list rather than an open set: a name that is never fired is indistinguishable from a
 /// typo, and `oslo.on.precmb(fn)` silently doing nothing for ever is the failure mode this
 /// avoids.
-pub(crate) const HOOKS: [&str; 3] = ["precmd", "postcmd", "cd"];
+pub(crate) const HOOKS: [&str; 4] = ["precmd", "postcmd", "cd", "command-not-found"];
 
 /// Add the introspection fields, `oslo.opts` and `oslo.on` to the `oslo` table.
 pub fn install(oslo: &mut Table, registry: &Registry, env: &Arc<Mutex<Environment>>) {

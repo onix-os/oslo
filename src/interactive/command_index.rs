@@ -119,6 +119,63 @@ impl CommandIndex {
     }
 }
 
+/// The runnable name most like `name`, if one is close enough to be worth suggesting.
+///
+/// Costs nothing to offer: the index of every executable on `$PATH` is already built and cached
+/// for the completion dropdown, so this is a walk over data the shell is holding anyway.
+///
+/// "Close enough" is deliberately strict — one edit for a short name, two for a long one. A shell
+/// that guesses wildly is worse than one that says nothing, because a wrong suggestion is read as
+/// a fact and typed out.
+pub fn nearest(path: &str, name: &str) -> Option<String> {
+    if name.len() < 2 {
+        return None;
+    }
+    let budget = if name.len() <= 4 { 1 } else { 2 };
+    let names = CommandIndex::executables(path);
+    let mut best: Option<(usize, &String)> = None;
+    for candidate in names.iter() {
+        // A candidate wildly different in length cannot be within budget, and skipping it here
+        // avoids the quadratic work for most of the three thousand entries.
+        if candidate.len().abs_diff(name.len()) > budget {
+            continue;
+        }
+        let distance = edit_distance(name, candidate, budget)?;
+        if distance <= budget && best.is_none_or(|(d, _)| distance < d) {
+            best = Some((distance, candidate));
+        }
+    }
+    best.map(|(_, name)| name.clone())
+}
+
+/// Levenshtein distance, abandoning once it cannot come in under `budget`.
+///
+/// Returns `Some(distance)` always; the `Option` is for the caller's `?` convenience on an empty
+/// index. Rows are kept as two vectors rather than a matrix because only the previous one matters.
+fn edit_distance(a: &str, b: &str, budget: usize) -> Option<usize> {
+    let a: Vec<char> = a.chars().collect();
+    let b: Vec<char> = b.chars().collect();
+    let mut previous: Vec<usize> = (0..=b.len()).collect();
+    let mut current = vec![0usize; b.len() + 1];
+    for (i, ca) in a.iter().enumerate() {
+        current[0] = i + 1;
+        let mut row_best = current[0];
+        for (j, cb) in b.iter().enumerate() {
+            let cost = usize::from(ca != cb);
+            current[j + 1] = (previous[j] + cost)
+                .min(previous[j + 1] + 1)
+                .min(current[j] + 1);
+            row_best = row_best.min(current[j + 1]);
+        }
+        // Every later row is at least this good, so a row that is already over budget settles it.
+        if row_best > budget {
+            return Some(budget + 1);
+        }
+        std::mem::swap(&mut previous, &mut current);
+    }
+    Some(previous[b.len()])
+}
+
 fn stamps(path: &str) -> Vec<Option<SystemTime>> {
     path.split(':')
         .map(|dir| fs::metadata(dir).and_then(|m| m.modified()).ok())
@@ -164,6 +221,28 @@ fn is_executable(entry: &fs::DirEntry) -> bool {
 mod tests {
     use super::*;
     use std::io::Write;
+
+    /// A near-miss is offered; a wild guess is not.
+    ///
+    /// A wrong suggestion is worse than none, because it is read as a fact and typed out.
+    #[test]
+    fn only_a_close_name_is_suggested() {
+        let _guard = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
+        let dir = tempfile::tempdir().unwrap();
+        for name in ["cargo", "grep", "systemctl"] {
+            make_exe(dir.path(), name);
+        }
+        invalidate();
+        let path = dir.path().to_str().unwrap();
+
+        // One letter out, and one letter missing.
+        assert_eq!(nearest(path, "cargi").as_deref(), Some("cargo"));
+        assert_eq!(nearest(path, "systemctf").as_deref(), Some("systemctl"));
+        // Nothing like anything here.
+        assert_eq!(nearest(path, "zzzzzz"), None);
+        // A short name gets one edit of leeway, not two: `ls` must not suggest `cd`.
+        assert_eq!(nearest(path, "xy"), None);
+    }
 
     /// A symlinked command counts. Most of coreutils is symlinks — `ls` and `cat` both point at
     /// `coreutils` — and leaving them out marked the commonest commands unknown.
