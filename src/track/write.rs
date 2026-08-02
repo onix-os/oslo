@@ -55,7 +55,7 @@ impl Track {
     /// session still needs a `dir_id` to be attributed to, and the visit statement only runs when
     /// the directory *changes*.
     pub fn prime(&self, at: &Visit<'_>) -> bool {
-        if !self.writable || redact::is_excluded(at.path, self.home.as_deref()) {
+        if !self.writable || redact::is_excluded(at.path) {
             self.forget_current();
             return false;
         }
@@ -76,13 +76,13 @@ impl Track {
         if !self.writable {
             return false;
         }
-        let here_excluded = redact::is_excluded(step.ran_in.path, self.home.as_deref());
+        let here_excluded = redact::is_excluded(step.ran_in.path);
         // Leaving an excluded directory for one worth remembering is still a real arrival, so the
         // two halves are gated separately rather than the whole step being dropped.
         let moved_to = step
             .moved_to
             .filter(|to| to.path != step.ran_in.path)
-            .filter(|to| !redact::is_excluded(to.path, self.home.as_deref()));
+            .filter(|to| !redact::is_excluded(to.path));
         if here_excluded && moved_to.is_none() {
             return false;
         }

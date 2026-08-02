@@ -64,11 +64,21 @@ impl Track {
         };
         let sql = format!(
             "SELECT path, visits, last_visit FROM dir \
-             WHERE base >= ?1 AND base < ?2 AND path <> ?3 \
+             WHERE base >= ?1 AND base < ?2 AND path <> ?3 AND path <> ?6 \
              ORDER BY {} DESC, length(path) ASC LIMIT ?5",
             score_sql("?4")
         );
-        self.candidates(&sql, (needle, upper, exclude, now(), limit as i64))
+        self.candidates(
+            &sql,
+            (
+                needle,
+                upper,
+                exclude,
+                now(),
+                limit as i64,
+                self.not_a_target(),
+            ),
+        )
     }
 
     /// The best-scoring remembered directories, for the tiers no index can serve.
@@ -80,11 +90,23 @@ impl Track {
     pub fn directories_ranked(&self, exclude: &str, limit: usize) -> Vec<Candidate> {
         let sql = format!(
             "SELECT path, visits, last_visit FROM dir \
-             WHERE path <> ?1 \
+             WHERE path <> ?1 AND path <> ?4 \
              ORDER BY {} DESC, length(path) ASC LIMIT ?3",
             score_sql("?2")
         );
-        self.candidates(&sql, (exclude, now(), limit as i64))
+        self.candidates(&sql, (exclude, now(), limit as i64, self.not_a_target()))
+    }
+
+    /// The one remembered path that is never a jump destination, as a bind.
+    ///
+    /// `$HOME` is recorded like anywhere else — what you run there is worth suggesting — but `cd`
+    /// with no operand already goes there, so offering it as a frecency candidate wins nothing.
+    /// Empty when there is no `$HOME` to compare against, which no real path equals.
+    fn not_a_target(&self) -> String {
+        self.home
+            .as_deref()
+            .map(|home| home.trim_end_matches('/').to_string())
+            .unwrap_or_default()
     }
 
     /// The line to suggest for `typed` in `dir`, or `None`.
@@ -147,6 +169,50 @@ impl Track {
 mod tests {
     use super::super::db::fixture::*;
     use super::super::db::{Run, Step, Visit};
+
+    /// Being worth remembering and being worth jumping to are different questions.
+    ///
+    /// The design excludes `$HOME` from the store outright (Privacy and size, item 6, agreeing with
+    /// zoxide's default). Its stated reason — "your home directory is never a jump target" — is an
+    /// argument about *candidates*, and applying it at write time also throws away every command
+    /// run at home, silently killing directory-aware suggestion where many people spend the day.
+    /// So the row is written and only the jump is refused.
+    #[test]
+    fn home_is_remembered_but_never_jumped_to() {
+        let (_dir, track) = store_with_home("/home/u");
+        track.record(&ran("/home/u", "cargo run --example home", 0));
+        track.record(&ran("/home/u/src", "cargo run --example child", 0));
+
+        assert_eq!(
+            track.suggestion_here("/home/u", SH, "cargo run --ex"),
+            Some("cargo run --example home".to_string()),
+            "what you run at home is still suggested at home"
+        );
+
+        let ranked: Vec<String> = track
+            .directories_ranked("/elsewhere", 10)
+            .into_iter()
+            .map(|found| found.path)
+            .collect();
+        assert!(
+            !ranked.iter().any(|path| path == "/home/u"),
+            "`cd` with no operand already goes home, so it is not a frecency candidate: {ranked:?}"
+        );
+        assert!(
+            ranked.iter().any(|path| path == "/home/u/src"),
+            "but its children are ordinary directories: {ranked:?}"
+        );
+
+        let named: Vec<String> = track
+            .directories_named("u", "/elsewhere", 10)
+            .into_iter()
+            .map(|found| found.path)
+            .collect();
+        assert!(
+            !named.iter().any(|path| path == "/home/u"),
+            "and naming it does not reach it either: {named:?}"
+        );
+    }
 
     /// The same line in two directories is two rows, and that difference is the whole feature.
     #[test]

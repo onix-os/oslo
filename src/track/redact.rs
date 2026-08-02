@@ -373,22 +373,13 @@ const EXCLUDED_COMPONENTS: &[&str] = &[".git", "node_modules"];
 /// Whether a directory must be kept out of the store entirely — not merely out of `run`.
 ///
 /// This is the design's directory exclusion list (`docs/research/smart-cd.md`, Privacy and size,
-/// item 6): `$HOME` itself, `/tmp`, and anything under a `node_modules` or `.git` component. Note
-/// which of those are subtrees and which are not — the design spells out "anything under" for the
-/// two components and names the other two as directories, and the difference is the difference
-/// between excluding `/tmp` and excluding everybody who builds in it.
-///
-/// `$HOME` is excluded as itself for the reason the design gives and zoxide's default agrees with:
-/// it is never a jump target, because `cd` with no operand already goes there. Its children are the
-/// ordinary case and are recorded.
-pub fn is_excluded(path: &str, home: Option<&str>) -> bool {
+/// item 6) minus `$HOME`, which the directory queries refuse as a *jump target* while still
+/// recording what was run there — see `super::query::Track::directories_ranked`. Note which of these
+/// are subtrees and which are not — the design spells out "anything under" for the two components
+/// and names the other as a directory, and the difference is the difference between excluding
+/// `/tmp` and excluding everybody who builds in it.
+pub fn is_excluded(path: &str) -> bool {
     let path = path.trim_end_matches('/');
-    if let Some(home) = home {
-        let home = home.trim_end_matches('/');
-        if !home.is_empty() && path == home {
-            return true;
-        }
-    }
     if EXCLUDED_DIRS.contains(&path) {
         return true;
     }
@@ -540,19 +531,25 @@ mod tests {
 
     #[test]
     fn whole_subtrees_stay_out_of_the_store() {
-        let home = Some("/home/u");
-        assert!(is_excluded("/home/u", home), "$HOME is never a jump target");
-        assert!(is_excluded("/home/u/", home), "with or without the slash");
-        assert!(!is_excluded("/home/u/src", home), "but its children are");
-        assert!(is_excluded("/w/p/node_modules/react/lib", None));
-        assert!(is_excluded("/w/p/.git/refs", None));
-        assert!(!is_excluded("/w/p/src", home));
+        assert!(is_excluded("/w/p/node_modules/react/lib"));
+        assert!(is_excluded("/w/p/.git/refs"));
+        assert!(!is_excluded("/w/p/src"));
         assert!(
-            !is_excluded("/w/p/gitignore", None),
+            !is_excluded("/w/p/gitignore"),
             "a component is matched whole, not as a prefix"
         );
-        // No home to compare against is not a match against the empty string.
-        assert!(!is_excluded("/", Some("")));
+    }
+
+    /// `$HOME` is deliberately *not* on the exclusion list, though the design puts it there.
+    ///
+    /// Excluding it at write time throws away every command run at home, which kills the
+    /// directory-aware suggestion in the one directory many people spend the day in. Keeping it out
+    /// of *jump candidates* is the part that was actually wanted, and that is enforced in the
+    /// directory queries — see `query::tests::home_is_remembered_but_never_jumped_to`.
+    #[test]
+    fn home_itself_is_still_written_down() {
+        assert!(!is_excluded("/home/u"));
+        assert!(!is_excluded("/home/u/src"));
     }
 
     /// `/tmp` is on the design's exclusion list as a *directory*, next to two entries that say
@@ -562,12 +559,12 @@ mod tests {
     /// quietly never learns anything.
     #[test]
     fn a_build_tree_under_tmp_is_ordinary_work() {
-        assert!(is_excluded("/tmp", None));
-        assert!(is_excluded("/tmp/", None), "with or without the slash");
-        assert!(!is_excluded("/tmp/build-xyz", None));
-        assert!(!is_excluded("/tmp/scratch/src", None));
-        assert!(!is_excluded("/tmpfoo", None), "a prefix is not a component");
+        assert!(is_excluded("/tmp"));
+        assert!(is_excluded("/tmp/"), "with or without the slash");
+        assert!(!is_excluded("/tmp/build-xyz"));
+        assert!(!is_excluded("/tmp/scratch/src"));
+        assert!(!is_excluded("/tmpfoo"), "a prefix is not a component");
         // And the component rules still reach inside it.
-        assert!(is_excluded("/tmp/p/node_modules/react", None));
+        assert!(is_excluded("/tmp/p/node_modules/react"));
     }
 }

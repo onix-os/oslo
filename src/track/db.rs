@@ -364,6 +364,17 @@ pub(super) mod fixture {
         (dir, track)
     }
 
+    /// The same store, told where home is.
+    ///
+    /// `Track::open` reads `$HOME` from the environment, and setting an environment variable in a
+    /// test is a process-global write racing every other test on the libtest thread pool. This
+    /// hands the value over directly instead.
+    pub fn store_with_home(home: &str) -> (tempfile::TempDir, Track) {
+        let (dir, mut track) = store();
+        track.home = Some(home.to_string());
+        (dir, track)
+    }
+
     /// A step that ran `argv` in `at` and went nowhere.
     pub fn ran(at: &'static str, argv: &'static str, status: i32) -> Step<'static> {
         Step {
