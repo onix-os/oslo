@@ -38,7 +38,7 @@ pub(crate) mod tools;
 pub(crate) use shell::handlers as hook_handlers;
 pub(crate) mod util;
 
-use util::{put, text};
+use util::{native, put, text};
 
 /// Build the `oslo` table and install it as a global.
 pub fn install(interp: &Rc<Interp>, registry: &Registry, env: Arc<Mutex<Environment>>) {
@@ -114,7 +114,57 @@ pub fn install(interp: &Rc<Interp>, registry: &Registry, env: Arc<Mutex<Environm
     oslo.set(Value::str("sys"), Value::table(system));
     oslo.set(Value::str("ui"), Value::table(ui));
     oslo.set(Value::str("direnv"), direnv::build(&env));
-    interp.set_global("oslo", Value::table(oslo));
+    let oslo = Value::table(oslo);
+    publish(interp, &oslo);
+    interp.set_global("oslo", oslo);
+}
+
+/// Make every `oslo.X` table `require`-able as `oslo.X`.
+///
+/// **This is what makes them libraries rather than fields on a global.** A namespace you can only
+/// reach by indexing a global is a naming convention; a module you can `require` is a thing with a
+/// name, that can be aliased locally, shadowed by one of your own in `~/.config/oslo/lua`, and
+/// depended on by a library that never mentions `oslo` at all:
+///
+/// ```lua
+/// local ui = require "oslo.ui"
+/// local env = require "oslo.env"
+/// ```
+///
+/// Registered in `package.preload` rather than on disk, so the lookup never touches the filesystem
+/// and a user's own `oslo/ui.lua` cannot shadow the built-in by accident — `preload` wins.
+fn publish(interp: &Rc<Interp>, oslo: &Value) {
+    let Value::Table(table) = oslo else { return };
+    let Value::Table(package) = interp.global("package") else {
+        return;
+    };
+    let Value::Table(preload) = package.borrow().get(&Value::str("preload")) else {
+        return;
+    };
+    // Only the tables. A function on `oslo` is not a module, and registering one would make
+    // `require "oslo.glob"` answer with something that is not what `require` promises.
+    let entries: Vec<(String, Value)> = table
+        .borrow()
+        .pairs()
+        .into_iter()
+        .filter_map(|(name, value)| match (&name, &value) {
+            (Value::Str(name), Value::Table(_)) => Some((name.to_string(), value.clone())),
+            _ => None,
+        })
+        .collect();
+    for (name, value) in entries {
+        let module = value.clone();
+        preload.borrow_mut().set(
+            Value::str(format!("oslo.{name}")),
+            native("preload", move |_, _| Ok(vec![module.clone()])),
+        );
+    }
+    // `require "oslo"` answers with the whole thing, so a script can take the lot in one line.
+    let whole = oslo.clone();
+    preload.borrow_mut().set(
+        Value::str("oslo"),
+        native("preload", move |_, _| Ok(vec![whole.clone()])),
+    );
 }
 
 /// Fold everything in `additions` into the table already on `oslo` under `name`.

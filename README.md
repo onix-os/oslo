@@ -254,11 +254,11 @@ the **path**, and survives every edit. Both take effect where you stand, not on 
 oslo.direnv.nix_develop()
 ```
 
-direnv's `use flake` is `eval "$(nix print-dev-env …)"` — a hundred kilobytes of generated bash.
-This reads `--json` instead. The catch, and why it is built in rather than left as a recipe: the two
-forms do **not** carry the same variables. `nix` withholds `HOME` and four others from the shell
-form because setting them would wreck the shell you are in — `HOME` in a derivation is
-`/homeless-shelter` — and `--json` applies no such filter.
+direnv's `use flake` is `eval "$(nix print-dev-env …)"` — 100KB of generated bash. This reads
+`--json` instead. Why it is built in rather than left as a recipe: the two forms do **not** carry
+the same variables. `nix` withholds `HOME` and four others from the shell form because setting them
+would wreck the shell you are in — `HOME` in a derivation is `/homeless-shelter` — and `--json`
+applies no such filter.
 
 **Lua, and only Lua.** `.envrc` and `.env` were both supported for a while and both are gone:
 `.envrc` meant either shipping direnv's 1,400-line stdlib or failing on every real file that says

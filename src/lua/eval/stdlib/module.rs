@@ -19,6 +19,23 @@ use super::{arg_str, module, native, opt_str};
 use std::rc::Rc;
 
 /// Where a module is looked for, in order. Notably not the working directory.
+/// Where a user's own Lua libraries live, ahead of the system ones.
+///
+/// Without this there is no way to *write* a library for oslo — only to call the ones built in,
+/// which makes `oslo.ui` a namespace rather than something you can extend. `~/.config/oslo/lua` is
+/// beside the config that requires from it, so a config and its modules travel together.
+///
+/// Still no `./?.lua`, for the reason above: the working directory is not yours.
+fn user_path(home: Option<&str>, xdg: Option<&str>) -> Option<String> {
+    let base = match xdg.filter(|dir| !dir.is_empty()) {
+        Some(dir) => std::path::PathBuf::from(dir),
+        None => std::path::PathBuf::from(home.filter(|h| !h.is_empty())?).join(".config"),
+    };
+    let lua = base.join("oslo/lua");
+    let lua = lua.to_string_lossy();
+    Some(format!("{lua}/?.lua;{lua}/?/init.lua"))
+}
+
 const DEFAULT_PATH: &str = "/usr/local/share/lua/5.4/?.lua;/usr/local/share/lua/5.4/?/init.lua;\
      /usr/share/lua/5.4/?.lua;/usr/share/lua/5.4/?/init.lua";
 
@@ -28,7 +45,7 @@ pub fn install(interp: &Interp) {
         // `preload` lets a host register a module before anything asks for it, and is the only
         // way to provide one that has no file.
         ("preload", Value::table(Table::new())),
-        ("path", Value::str(DEFAULT_PATH)),
+        ("path", Value::str(search_path())),
         ("cpath", Value::str("")),
     ]);
     interp.set_global("package", package);
@@ -37,6 +54,16 @@ pub fn install(interp: &Interp) {
     interp.set_global("dofile", native("dofile", dofile));
     interp.set_global("loadfile", native("loadfile", loadfile));
     interp.set_global("load", native("load", load));
+}
+
+/// `package.path`: the user's own library directory first, then the system ones.
+fn search_path() -> String {
+    let home = std::env::var("HOME").ok();
+    let xdg = std::env::var("XDG_CONFIG_HOME").ok();
+    match user_path(home.as_deref(), xdg.as_deref()) {
+        Some(mine) => format!("{mine};{DEFAULT_PATH}"),
+        None => DEFAULT_PATH.to_string(),
+    }
 }
 
 /// A field of the `package` table.
