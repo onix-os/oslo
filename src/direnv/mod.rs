@@ -37,8 +37,8 @@ use std::time::SystemTime;
 struct Loaded {
     /// The directory the rc files live in.
     owner: PathBuf,
-    /// Every file that was loaded, with the mtime it had — so an edit reloads it.
-    watches: Vec<(PathBuf, Option<SystemTime>)>,
+    /// Every file that was loaded, with the stamp it had — so an edit reloads it.
+    watches: Vec<(PathBuf, Stamp)>,
     /// What to undo on the way out.
     undo: Diff,
 }
@@ -131,9 +131,8 @@ impl Direnv {
             return events;
         }
 
-        match self.load(env, &rcs) {
-            Some(event) => events.push(event),
-            None => {}
+        if let Some(event) = self.load(env, &rcs) {
+            events.push(event);
         }
         events
     }
@@ -146,7 +145,7 @@ impl Direnv {
         loaded
             .watches
             .iter()
-            .any(|(path, when)| mtime(path) != *when)
+            .any(|(path, when)| stamp(path) != *when)
     }
 
     /// Put back everything the loaded environment changed.
@@ -194,7 +193,7 @@ impl Direnv {
         let before = snapshot(env);
         let watches = rcs
             .iter()
-            .map(|rc| (rc.path.clone(), mtime(&rc.path)))
+            .map(|rc| (rc.path.clone(), stamp(&rc.path)))
             .collect();
         for rc in rcs {
             apply(env, rc);
@@ -218,8 +217,21 @@ fn snapshot(env: &Environment) -> BTreeMap<String, String> {
     env.exported_vars().into_iter().collect()
 }
 
-fn mtime(path: &Path) -> Option<SystemTime> {
-    std::fs::metadata(path).and_then(|m| m.modified()).ok()
+/// What a file looked like when it was read: when it changed, and how long it was.
+///
+/// **Not the mtime alone.** Its granularity is one second on some filesystems, and editors that
+/// write through a temporary file can even preserve it — so an rc file edited and re-entered
+/// quickly would be reloaded without being re-checked against the allow list, which is the one
+/// failure this whole module exists to prevent. The length is free from the same `stat` and closes
+/// the common case. A file edited to the same length within the mtime granularity still slips
+/// through, and the hash check on the next genuine reload is what catches that.
+type Stamp = (Option<SystemTime>, Option<u64>);
+
+fn stamp(path: &Path) -> Stamp {
+    match std::fs::metadata(path) {
+        Ok(meta) => (meta.modified().ok(), Some(meta.len())),
+        Err(_) => (None, None),
+    }
 }
 
 /// Read one rc file into the environment.
@@ -263,6 +275,14 @@ pub fn needs_evaluating(dir: &Path, allow: &Allow) -> Vec<Rc> {
 mod tests {
     use super::*;
 
+    /// **Every test here must use variable names no other test uses.**
+    ///
+    /// `set_var(.., export: true)` calls `environ_set`, which writes the *process* environment so
+    /// that children inherit it. libtest runs these in parallel and `Environment::new()` snapshots
+    /// that process environment, so one test exporting `A` puts `A` in another test's *before*
+    /// snapshot — the diff then records no change, unload has nothing to undo, and the failure
+    /// looks like a bug in this module rather than crosstalk between tests. It cost an afternoon
+    /// once already; the `OSLO_T_` prefix is the cheap fix.
     fn shell() -> Environment {
         Environment::new()
     }
@@ -348,7 +368,7 @@ mod tests {
     fn staying_put_does_no_work() {
         let store = tempfile::tempdir().expect("temp dir");
         let project = tempfile::tempdir().expect("temp dir");
-        let path = rc_in(project.path(), ".env", "A=1\n");
+        let path = rc_in(project.path(), ".env", "OSLO_T_STAY=1\n");
 
         let mut direnv = Direnv::new(store.path().to_str(), None);
         direnv.permissions().allow(&path).expect("allow");
@@ -368,7 +388,7 @@ mod tests {
         let project = tempfile::tempdir().expect("temp dir");
         let deep = project.path().join("src/inner");
         std::fs::create_dir_all(&deep).expect("mkdir");
-        let path = rc_in(project.path(), ".env", "A=1\n");
+        let path = rc_in(project.path(), ".env", "OSLO_T_DEEP=1\n");
 
         let mut direnv = Direnv::new(store.path().to_str(), None);
         direnv.permissions().allow(&path).expect("allow");
@@ -376,7 +396,7 @@ mod tests {
 
         direnv.arrive(&mut env, project.path());
         assert!(direnv.arrive(&mut env, &deep).is_empty());
-        assert_eq!(env.get_var("A"), Some("1"));
+        assert_eq!(env.get_var("OSLO_T_DEEP"), Some("1"));
     }
 
     /// Editing an allowed file revokes it, so the next arrival must refuse rather than reload.
@@ -384,24 +404,32 @@ mod tests {
     fn an_edit_revokes_and_the_environment_comes_back_out() {
         let store = tempfile::tempdir().expect("temp dir");
         let project = tempfile::tempdir().expect("temp dir");
-        let path = rc_in(project.path(), ".env", "A=1\n");
+        let path = rc_in(project.path(), ".env", "OSLO_T_EDIT_A=1\n");
 
         let mut direnv = Direnv::new(store.path().to_str(), None);
         direnv.permissions().allow(&path).expect("allow");
         let mut env = shell();
         direnv.arrive(&mut env, project.path());
-        assert_eq!(env.get_var("A"), Some("1"));
+        assert_eq!(env.get_var("OSLO_T_EDIT_A"), Some("1"));
 
         // Rewrite it. The mtime moves, so the next arrival re-checks, and the hash no longer matches.
         std::thread::sleep(std::time::Duration::from_millis(10));
-        rc_in(project.path(), ".env", "A=1\nB=2\n");
+        rc_in(project.path(), ".env", "OSLO_T_EDIT_A=1\nOSLO_T_EDIT_B=2\n");
 
         let events = direnv.arrive(&mut env, project.path());
         assert!(
             events.iter().any(|e| matches!(e, Event::Blocked { .. })),
             "an edited file has to be allowed again: {events:?}"
         );
-        assert_eq!(env.get_var("A"), None, "and the old values come back out");
-        assert_eq!(env.get_var("B"), None, "the new ones never went in");
+        assert_eq!(
+            env.get_var("OSLO_T_EDIT_A"),
+            None,
+            "and the old values come back out"
+        );
+        assert_eq!(
+            env.get_var("OSLO_T_EDIT_B"),
+            None,
+            "the new ones never went in"
+        );
     }
 }

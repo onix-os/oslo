@@ -19,7 +19,7 @@
 //! statement about a place.
 //!
 //! Tokens are empty files named by the hash. There is no format, so there is nothing to parse
-//! wrongly, and a token whose file has gone is garbage the [`prune`] sweep can drop.
+//! wrongly, and a token whose file has gone is garbage the [`Allow::prune`] sweep can drop.
 
 use sha2::{Digest, Sha256};
 use std::path::{Path, PathBuf};
