@@ -1,6 +1,13 @@
 //! `cd` and `pwd`: the option matrix in front of the shared change-directory helper.
+//!
+//! [`builtin_cd`] is a ladder, and the order of its rungs is the whole safety argument. Options,
+//! arity, `$HOME`, `$OLDPWD` and the directory ring are settled first and answer directly; then the
+//! operand is tried as what it says it is, against the filesystem, through `CDPATH`. Only when that
+//! has already failed is a remembered directory of that name considered, in [`super::jump`], and
+//! only in a shell that has a store. So every POSIX case is decided before anything clever exists,
+//! and the clever part can only ever turn an error into a success — never a success into a surprise.
 
-use super::chdir::{PathMode, change_directory, logical_pwd};
+use super::chdir::{PathMode, attempt_directory, logical_pwd, report_failure};
 use crate::env::scope::Environment;
 use crate::error::Result;
 use std::env;
@@ -63,6 +70,11 @@ pub fn builtin_cd(env: &mut Environment, args: &[String]) -> Result<i32> {
     // `cd -` announces where it went, because the destination came from the environment rather
     // than from anything visible in the script.
     let mut announce = false;
+    // Whether a failure may be answered by a remembered directory. Only an operand the user typed
+    // as a name is a candidate: `$HOME`, `$OLDPWD` and a ring entry are places the shell itself
+    // chose, and if one of those has gone, guessing at a replacement would be a lie about where it
+    // was sending you.
+    let mut named = false;
     let target = match operands.first().map(String::as_str) {
         None => match env.get_var("HOME").map(str::to_string) {
             Some(home) if !home.is_empty() => home,
@@ -99,20 +111,31 @@ pub fn builtin_cd(env: &mut Environment, args: &[String]) -> Result<i32> {
                 }
             }
         }
-        Some(operand) => operand.to_string(),
+        Some(operand) => {
+            named = true;
+            operand.to_string()
+        }
     };
 
-    match change_directory(env, &target, mode, "cd") {
-        Some(destination) => {
+    match attempt_directory(env, &target, mode) {
+        Ok(destination) => {
             if announce {
                 println!("{destination}");
             }
-            // Remembered *after* the move succeeded, so a failed `cd` does not appear in the
-            // history of places you have been.
-            super::ring::record(&destination);
             Ok(0)
         }
-        None => Ok(1),
+        Err(e) => {
+            // A jump always says where it went, for the same reason `cd -` does: the destination
+            // came from something the user cannot see on the line they typed.
+            if named && let Some(destination) = super::jump::jump(env, &target, mode) {
+                println!("{destination}");
+                return Ok(0);
+            }
+            // Nothing else worked, so the original failure is the answer — the same message from
+            // the same place it has always come from.
+            report_failure("cd", &target, &e);
+            Ok(1)
+        }
     }
 }
 

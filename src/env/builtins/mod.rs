@@ -130,10 +130,9 @@ pub fn register_default_builtins(env: &mut Environment) {
     // `OSC 52` to the terminal, so it works over SSH where a clipboard helper cannot.
     env.register_custom_builtin("copy", copy::builtin_copy);
     env.register_custom_builtin("abbr", abbr::builtin_abbr);
-    // The directory ring: where you have been, and how to walk it. Separate from `pushd`/`popd`,
+    // The directory ring: where you have been. Walking it is `cd -` and `cd -N`, so the only
+    // builtin left is the one that shows you the numbers those take. Separate from `pushd`/`popd`,
     // which are explicit and which scripts rely on.
-    env.register_custom_builtin("prevd", directories::ring::builtin_prevd);
-    env.register_custom_builtin("nextd", directories::ring::builtin_nextd);
     env.register_custom_builtin("dirh", directories::ring::builtin_dirh);
 
     // Job control. `wait` is registered above but belongs with these: all five read one table.

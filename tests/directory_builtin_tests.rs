@@ -102,6 +102,73 @@ fn cd_dash_returns_to_oldpwd_and_announces_it() {
     assert_eq!(r.out(), format!("{want}\n{want}"));
 }
 
+// --- what a script gets, which is what it always got ---
+
+/// A script has no store to consult, so there is nothing for `cd` to be clever with: the
+/// diagnostic and the status are the ones POSIX asks for and the shell has always given.
+#[test]
+fn cd_to_a_missing_directory_fails_with_one_and_says_so() {
+    let (_dir, base) = scratch();
+    let r = run_in(&base, "cd nosuchplace; echo \"$?\"; pwd");
+    assert_eq!(r.out(), format!("1\n{}", base.display()));
+    assert!(
+        r.err().starts_with("oslo: cd: nosuchplace: "),
+        "stderr was {:?}",
+        r.stderr
+    );
+}
+
+/// `cd ""` is a usage mistake rather than a missing directory, and keeps its own wording.
+#[test]
+fn cd_to_the_empty_string_is_a_null_directory() {
+    let (_dir, base) = scratch();
+    let r = run_in(&base, "cd ''; echo \"$?\"; pwd");
+    assert_eq!(r.out(), format!("1\n{}", base.display()));
+    assert_eq!(r.err(), "oslo: cd: null directory");
+}
+
+/// `root` is a word `cd` knows, but only once the filesystem has said no. A directory of that
+/// name is a directory, and it wins — which is what saves anyone who has one.
+#[test]
+fn a_directory_named_root_is_just_a_directory() {
+    let (_dir, base) = scratch();
+    let r = run_in(&base, "mkdir root; cd root; pwd");
+    assert_eq!(
+        r.out(),
+        format!("{}/root", base.display()),
+        "stderr: {}",
+        r.stderr
+    );
+}
+
+/// `prevd` and `nextd` are gone: `cd -` and `cd -N` reach every entry of the ring between them,
+/// and walking it with a cursor set `$PWD` behind `$OLDPWD`'s back.
+#[test]
+fn walking_the_ring_forwards_is_no_longer_a_builtin() {
+    let (_dir, base) = scratch();
+    let r = run_in(&base, "prevd; echo \"$?\"; nextd; echo \"$?\"");
+    assert_eq!(r.out(), "127\n127", "stderr: {}", r.stderr);
+}
+
+/// The ring is "where the shell has been", so it is written by the move rather than by `cd`.
+/// Recorded from `cd`'s own arm it silently omitted every `pushd`, and `cd -2` then counted back
+/// through a history with holes in it.
+#[test]
+fn every_builtin_that_moves_the_shell_enters_the_ring() {
+    let (_dir, base) = scratch();
+    let r = run_in(&base, "mkdir a b; cd a; pushd ../b >/dev/null; cd ..; dirh");
+    assert_eq!(
+        r.lines(),
+        vec![
+            format!("0  {}", base.display()),
+            format!("1  {}/b", base.display()),
+            format!("2  {}/a", base.display()),
+        ],
+        "stderr: {}",
+        r.stderr
+    );
+}
+
 // --- CDPATH ---
 
 #[test]
