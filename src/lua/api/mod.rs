@@ -24,6 +24,7 @@ mod convert;
 pub(crate) mod external;
 mod fs;
 mod json;
+mod nix;
 mod path;
 mod proc;
 pub(crate) mod prompt;
@@ -84,6 +85,7 @@ pub fn install(interp: &Rc<Interp>, registry: &Registry, env: Arc<Mutex<Environm
     variables(&mut oslo, &env);
     filesystem(&mut oslo, &env);
     shell(&mut oslo, registry, &env);
+    nix::install(&mut oslo, &env);
     shell::install(&mut oslo, registry, &env);
     interp.set_global("oslo", Value::table(oslo));
 }

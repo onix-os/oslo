@@ -234,10 +234,10 @@ oslo.path_add("./bin")          -- prepended, idempotent, gone when you leave
 oslo.set_prompt(function() return "PRODUCTION> " end)
 ```
 
-Variables, aliases, `PATH` and the prompt all come back on the way out — a variable that was
-shell-local before the directory exported it comes back *local*, not deleted. Keybindings
-deliberately do not: a key that means different things in different directories, with nothing on
-screen to say so, is worse than not having the feature.
+Variables, aliases, `PATH` and the prompt all come back on the way out — one that was shell-local
+before the directory exported it comes back *local*, not deleted. Keybindings deliberately do not:
+a key meaning different things in different directories, with nothing on screen to say so, is worse
+than not having the feature.
 
 ```sh
 direnv allow      # trust this file, as it stands right now
@@ -247,8 +247,18 @@ direnv status     # what is loaded, what was found, whether it is trusted
 
 Nothing is read until allowed, because `git clone` then `cd` is otherwise arbitrary code execution.
 Allowing hashes the file's **contents**, so editing it revokes the allowance; denying hashes only
-the **path**, so a refusal survives every edit. Both take effect where you stand, not on the next
-`cd`.
+the **path**, and survives every edit. Both take effect where you stand, not on the next `cd`.
+
+```lua
+-- a Nix flake's dev shell, without entering one
+oslo.nix_develop()
+```
+
+direnv's `use flake` is `eval "$(nix print-dev-env …)"` — a hundred kilobytes of generated bash.
+This reads `--json` instead. The catch, and why it is built in rather than left as a recipe: the two
+forms do **not** carry the same variables. `nix` withholds `HOME` and four others from the shell
+form because setting them would wreck the shell you are in — `HOME` in a derivation is
+`/homeless-shelter` — and `--json` applies no such filter.
 
 **Lua, and only Lua.** `.envrc` and `.env` were both supported for a while and both are gone:
 `.envrc` meant either shipping direnv's 1,400-line stdlib or failing on every real file that says
