@@ -284,21 +284,10 @@ Every `.rs` file is under 600 lines, enforced by `scripts/check-loc.sh`.
 
 ## Known gaps
 
-Reproducible against the binary, and all but the last are differences from bash.
-
-- **`for ((;;))`** is a syntax error when the separators touch — write `for (( ; ; ))`. The cause is
-  upstream in brush's tokenizer, which fuses the two `;` into the `;;` that ends a `case` item.
-- **Process substitution** needs `/dev/fd`, so it fails in an initramfs without it. So does bash.
-- **`coproc` and `select`** are refused by name rather than half-implemented.
-- **A failing special builtin** does not exit a POSIX-mode shell, though a failed readonly
-  assignment does.
-- **Arrays are indexed only.** `declare -A` says so rather than pretending.
-- **`shopt`** switches `autocd` and `globstar`; the rest report the state oslo actually has and
-  *fail* when asked for the other one — an error rather than a lie.
-- **A structured tool cannot read the shell's own stdin.** `df | where …` works; `cat x.json |
-  oslo -c 'from json | …'` does not — structure is assembled inside one pipeline. Use
-  `oslo -c 'cat x.json | from json | …'`.
-- No `SECONDS`, `RANDOM`, `LINENO`, `/dev/tcp` or restricted mode.
+`for ((;;))` with touching separators, process substitution without `/dev/fd`, `coproc`, `select`,
+associative arrays, and a structured tool reading the shell's own stdin. Each one is listed with its
+cause and its workaround in [docs/known-gaps.md](docs/known-gaps.md), most of them pinned by a test
+that fails if the gap ever closes.
 
 ## Licence
 
