@@ -270,31 +270,18 @@ impl Hinter for OsloHelper {
                 settings::Source::Path => self.path_hint(line, pos),
             };
             if found.is_some() {
-                // A prefix answer withdraws any fuzzy offer: the accept key must extend the line,
-                // not replace it, and a stale offer left in the slot would do the latter.
-                recall::withdraw_fuzzy();
                 return found;
             }
         }
 
-        // Last, and only when everything that could continue the line has come back empty.
-        //
-        // Drawn with a marker rather than as bare grey text, because it is not the same kind of
-        // thing: a prefix suggestion continues what you typed and can be accepted without reading,
-        // while this one *replaces* it. `crne` offering `cargo run --example xyz` shares no
-        // characters with what is on the line, and grey text implying otherwise is how you accept
-        // a command you did not read.
-        let fuzzy = settings::current().suggest.fuzzy;
-        match recall::suggest_fuzzy(line, fuzzy) {
-            Some(full) => {
-                recall::offer_fuzzy(line, &full);
-                Some(format!("  ⟶  {full}"))
-            }
-            None => {
-                recall::withdraw_fuzzy();
-                None
-            }
-        }
+        // **Nothing else.** A fuzzy pass used to run here, drawn with a `⟶` marker because its
+        // answer replaces the line rather than continuing it. That was a mistake in a way worth
+        // recording: a rustyline hint is *text appended after the cursor*, so the only thing it can
+        // honestly be is a continuation. Marking it did not change that — rustyline's own
+        // hint-completion binding appends the hint verbatim, marker and all, without going near the
+        // handler that knew better. Fuzzy matching lives in the dropdown, where a candidate is
+        // shown as a candidate and choosing one is an explicit act.
+        None
     }
 }
 

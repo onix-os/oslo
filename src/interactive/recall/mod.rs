@@ -20,7 +20,6 @@
 
 mod nearby;
 
-use super::matching::{Fuzzy, fuzzy_score};
 use super::prompt;
 use crate::track;
 use nearby::{forget_answers, forget_answers_for, from_store, place};
@@ -117,99 +116,6 @@ pub fn suggest(line: &str) -> Option<String> {
     remembered(&language, line)
 }
 
-/// The fuzzy suggestion currently on offer, as `(what was typed, the line it would become)`.
-///
-/// A slot rather than a recomputation at accept time: the hinter has already done the search on
-/// this keystroke, and doing it again from the key handler could answer differently — the store or
-/// the remembered set may have moved between the two — which would replace the line with something
-/// the user was never shown. The typed half is kept so acceptance can refuse a stale offer.
-static OFFERED: Mutex<Option<(String, String)>> = Mutex::new(None);
-
-/// Record the fuzzy line being shown, so the accept key can put it in the buffer.
-pub fn offer_fuzzy(typed: &str, full: &str) {
-    if let Ok(mut slot) = OFFERED.lock() {
-        *slot = Some((typed.to_string(), full.to_string()));
-    }
-}
-
-/// Forget any fuzzy offer. Called whenever the hinter produces something else, or nothing.
-pub fn withdraw_fuzzy() {
-    if let Ok(mut slot) = OFFERED.lock() {
-        *slot = None;
-    }
-}
-
-/// The line a fuzzy suggestion would put in the buffer, if one is on offer for exactly this text.
-///
-/// The equality check is what makes this safe: a suggestion offered for `crne` must not be accepted
-/// onto `crnex`, and without the check a keystroke arriving between the hint and the key would do
-/// exactly that.
-pub fn accept_fuzzy(typed: &str) -> Option<String> {
-    let slot = OFFERED.lock().ok()?;
-    let (offered, full) = slot.as_ref()?;
-    (offered == typed).then(|| full.clone())
-}
-
-/// The best remembered line that `line` is a gap-capped subsequence of, in full.
-///
-/// **This returns the whole line, not a remainder, and that is the difference that matters.** A
-/// prefix suggestion continues what you typed, so it can be drawn as grey text after the cursor and
-/// accepted without reading it. A fuzzy one does not continue anything — `crne` proposing
-/// `cargo run --example xyz` replaces every character you typed — so the caller has to draw it as a
-/// replacement and accepting it has to overwrite the line rather than extend it.
-///
-/// Searched over the remembered set rather than the store: this runs per keystroke only once every
-/// prefix path has already come back empty, and the remembered set is in memory and already filtered
-/// to the current language. A directory-scoped fuzzy pass would need a query that returns candidate
-/// rows rather than an answer, which is a range scan turned into a table scan.
-pub fn suggest_fuzzy(line: &str, fuzzy: Fuzzy) -> Option<String> {
-    if line.is_empty() || fuzzy == Fuzzy::Off {
-        return None;
-    }
-    let language = prompt::language()?;
-    let all = REMEMBERED.lock().ok()?;
-    all.iter()
-        .filter(|(candidate, l)| {
-            l == &language
-                && candidate != line
-                && !candidate.contains('\n')
-                // A candidate this line already prefixes is the prefix path's answer, and it has
-                // already declined to give it — offering it here would suggest a line the stricter
-                // pass deliberately refused.
-                && !candidate.starts_with(line)
-                // **The suggestion must begin the way you began.** Without this, typing `clear`
-                // offers `ls clear` — c-l-e-a-r sits adjacent inside it starting at the fourth
-                // character, so it scores *well*: every letter touching, every one on a word
-                // boundary. But you are typing a command, and that candidate's command is `ls`.
-                // What you typed landed entirely in somebody else's arguments.
-                //
-                // A line at a prompt is read left to right and the first word is the whole
-                // meaning of it, so a fuzzy match that does not reach the first character is not
-                // an abbreviation of the line — it is a different line that happens to contain
-                // your text. `gco` for `git checkout` starts at `g`, and that is the shape worth
-                // offering.
-                && starts_alike(candidate, line)
-        })
-        .filter_map(|(candidate, _)| {
-            fuzzy_score(candidate, line, fuzzy).map(|score| (score, candidate))
-        })
-        // Newest wins a tie: `max_by_key` keeps the last maximum, and the set is oldest-first.
-        .max_by_key(|(score, _)| *score)
-        .map(|(_, candidate)| candidate.clone())
-}
-
-/// Whether two lines open with the same character, case folded.
-///
-/// The cheapest expression of "this candidate is an abbreviation of that line rather than a
-/// different line containing it". Folded per character, since this runs per candidate per keystroke.
-fn starts_alike(candidate: &str, typed: &str) -> bool {
-    let first = |text: &str| text.chars().next().and_then(|c| c.to_lowercase().next());
-    match (first(candidate), first(typed)) {
-        (Some(a), Some(b)) => a == b,
-        _ => false,
-    }
-}
-
 /// The newest line in `language` that starts with `line`, minus what is already typed.
 ///
 /// What oslo suggested before it had a store, and what it still suggests in a directory the store
@@ -257,33 +163,6 @@ mod tests {
         assert_eq!(suggest("ll"), Some("ama".to_string()));
         seed(vec![("ll\nls".to_string(), "sh".to_string())]);
         assert_eq!(suggest("ll"), None);
-        seed(Vec::new());
-    }
-
-    /// Typing `clear` must not offer `ls clear`.
-    ///
-    /// The reported bug, and it scored *well*: `c-l-e-a-r` sits adjacent inside `ls clear` with
-    /// every letter touching and the run starting on a word boundary. What was wrong was not the
-    /// score but the candidate — its command is `ls`, and the typed text landed entirely in that
-    /// command's arguments. A line at a prompt is its first word, so a match that never reaches the
-    /// first character is a different line that contains your text, not an abbreviation of it.
-    #[test]
-    fn a_fuzzy_suggestion_must_begin_the_way_the_line_begins() {
-        let _guard = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
-        prompt_in("sh");
-        seed(vec![("ls clear".to_string(), "sh".to_string())]);
-        assert_eq!(
-            suggest_fuzzy("clear", Fuzzy::Loose),
-            None,
-            "the command you typed is not the command being offered"
-        );
-
-        // The shape that *is* worth offering still is: same first letter, letters in order.
-        seed(vec![("git checkout main".to_string(), "sh".to_string())]);
-        assert_eq!(
-            suggest_fuzzy("gco", Fuzzy::Smart),
-            Some("git checkout main".to_string())
-        );
         seed(Vec::new());
     }
 

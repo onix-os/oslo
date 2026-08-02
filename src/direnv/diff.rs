@@ -1,5 +1,10 @@
 //! What a directory changed, so that leaving it can change it back.
 //!
+//! Used for two kinds of shell state now — environment variables and aliases — because the shape of
+//! the problem is identical for both: record `name -> (before, after)`, and undoing is
+//! [`Diff::reverse`]. Anything else a `.env.lua` can set reversibly should come through here too
+//! rather than growing its own bookkeeping.
+//!
 //! **Unloading is the hard half of a directory environment, and it is the half that hand-rolled
 //! versions get wrong.** Setting variables on arrival is easy; the thing that makes the feature
 //! trustworthy is that walking out puts the shell back exactly as it was — including variables the

@@ -95,9 +95,9 @@ Or just use `$PS1`, with the full escape set — `\u \h \w \$ \t \A \d \j \! \[ 
 - **Ghost suggestions** from history, per language, never crossing between them, and answering for
   the directory you are standing in
 - **A completion dropdown** with columns, per-kind info and frecency ranking
-- **Matching that is a transform, not a prefix test** — `/u/s/b` reaches `/usr/share/bin`, `f-b`
-  reaches `foo-bar`, `gco` reaches `git checkout`, and each looser pass runs only when the stricter
-  one found nothing, so an exact match is never diluted
+- **Matching that is a transform, not a prefix test** — in the dropdown, `/u/s/b` reaches
+  `/usr/share/bin`, `f-b` reaches `foo-bar` and `gco` reaches `git checkout`, each looser pass
+  running only when the stricter one found nothing, so an exact match is never diluted
 - **Prefix history search** on Up, which restores the line you were composing instead of blanking it
 - **First-class vi mode** on fish's model: cursor shape says the mode, the prompt says it too
 - **A right prompt**, drawn without the save/restore that multiplexers fight over
@@ -176,17 +176,17 @@ is what makes a cache unnecessary, and a cache stale between two terminals impos
 ### Fuzzy matching
 
 ```lua
-oslo.completion = { fuzzy = "smart" }   -- dropdown
-oslo.suggest    = { fuzzy = "smart" }   -- the inline ghost
+oslo.completion = { fuzzy = "smart" }   -- off / tight / smart / loose
 ```
 
 `off`, `tight`, `smart` or `loose` — how far your letters may scatter, capped at 1, 4 and 8
 unmatched characters. `gco` reaches `git checkout` at `smart`, not at `tight`. Always the last pass,
 so switching it on cannot push a candidate you actually prefixed down the list.
 
-A fuzzy suggestion replaces what you typed rather than continuing it, so it is never plain grey
-text — it gets a `⟶` marker and accepting it overwrites the line. You cannot mistake a replacement
-for a continuation, which is the only way this could get you to run something unread.
+**In the dropdown only.** The inline ghost suggestion stays a strict continuation of what you typed,
+because that is the only thing it can honestly be: the editor draws a hint as text appended after
+the cursor, so a suggestion that *replaces* your line cannot be shown as one without lying about
+what pressing a key will do.
 
 ## Your own tools
 
@@ -248,8 +248,10 @@ the **path**, so a refusal survives every edit. Both take effect where you stand
 `use flake`, and `.env` is a second grammar for what one Lua line already says. There is no bash
 subprocess and no serialised diff in your environment — oslo *is* the shell.
 
-Because it is Lua, a directory can set more than variables: a keybinding, an alias, a red prompt
-because it is production. Whatever it prints is grouped under it, repeats collapsed with a count.
+Because it is Lua, a directory can set more than variables — an alias for its test command, say —
+and **aliases are restored on the way out too**, so a project's `t` cannot follow you into the next
+one and run the wrong tests. Whatever the file prints is grouped under it, repeats collapsed with a
+count.
 
 ## Configuration
 
