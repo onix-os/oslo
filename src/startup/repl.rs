@@ -8,7 +8,9 @@ use crate::absorb_loop_control;
 use crate::startup::mode::{Mode, ToggleRequest};
 use crate::startup::read::{Input, read_command};
 use crate::startup::recall::{remember_history, seed_history};
-use crate::startup::{config, history, history_db, keybind, lua_init, mode, rc, tracking};
+use crate::startup::{
+    config, environments, history, history_db, keybind, lua_init, mode, rc, tracking,
+};
 use oslo::Environment;
 use oslo::LuaEngine;
 use oslo::env::builtins::run_exit_trap;
@@ -109,6 +111,13 @@ pub fn run_repl() -> ! {
     // is nobody's wandering.
     oslo::env::builtins::remember_directory(&here);
     let mut tracker = tracking::Tracker::start(&here, &settings);
+    // The directory environment for wherever the shell was started, which is a directory the user
+    // walked into as much as any other — `cd` is not the only way to arrive somewhere.
+    environments::start();
+    {
+        let mut env_guard = env_struct.lock().unwrap();
+        environments::arrive(&mut env_guard, &lua, std::path::Path::new(&here));
+    }
     let mut rl = build_editor(&settings);
 
     // The mode the prompt is reading, and the flag the toggle key sets. Both live for the whole
@@ -259,6 +268,12 @@ pub fn run_repl() -> ! {
                 // command left behind even when that command was the last one of the session.
                 let after = current_directory();
                 if after != before {
+                    // Before the `cd` hook, so a Lua hook that reads an environment variable sees
+                    // the one this directory sets rather than the one the last directory did.
+                    {
+                        let mut env_guard = env_struct.lock().unwrap();
+                        environments::arrive(&mut env_guard, &lua, std::path::Path::new(&after));
+                    }
                     lua.fire_hook("cd", vec![LuaEngine::hook_arg(&after)]);
                     // The terminal is told too, so a new split or tab opens here rather than in
                     // `$HOME`. One write, only when the directory actually changed.

@@ -31,7 +31,39 @@ use diff::Diff;
 use find::{Kind, Rc};
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
+use std::sync::Mutex;
 use std::time::SystemTime;
+
+/// The shell's one directory-environment state.
+///
+/// A process global, like the tracking store, because two callers need it and neither owns the
+/// other: the read loop drives the lifecycle on every `cd`, and the `direnv` builtin reads and
+/// writes the allow list. Threading it through the builtin signature would change every builtin's
+/// type for the sake of one of them.
+static STATE: Mutex<Option<Direnv>> = Mutex::new(None);
+
+/// Hand the shell its directory-environment state. Called once at startup.
+pub fn install(direnv: Direnv) {
+    if let Ok(mut slot) = STATE.lock() {
+        *slot = Some(direnv);
+    }
+}
+
+/// Do something with the state, if this shell has any.
+///
+/// Answers `None` in a script: a non-interactive shell has no directory environment at all, for the
+/// same reason it has no tracking store. A script's environment comes from whoever ran it, and a
+/// file in the working directory silently changing it would make scripts depend on where they are
+/// invoked from.
+pub fn with<T>(f: impl FnOnce(&mut Direnv) -> T) -> Option<T> {
+    let mut slot = STATE.lock().ok()?;
+    slot.as_mut().map(f)
+}
+
+/// Whether this shell has a directory environment at all.
+pub fn installed() -> bool {
+    STATE.lock().map(|slot| slot.is_some()).unwrap_or(false)
+}
 
 /// What is loaded right now, if anything.
 struct Loaded {
@@ -66,6 +98,12 @@ pub enum Event {
     Blocked { path: PathBuf },
     /// Found something explicitly refused.
     Denied { path: PathBuf },
+    /// An allowed file was read and something in it went wrong.
+    ///
+    /// Reported rather than swallowed, and *beside* a `Loaded` rather than instead of it: whatever
+    /// ran before the failure has taken effect, and pretending otherwise would leave the shell in a
+    /// state it says it is not in.
+    Failed { path: PathBuf, problem: String },
 }
 
 impl Direnv {
@@ -109,7 +147,18 @@ impl Direnv {
     }
 
     /// Bring the environment into line with `dir`. The whole feature, from the caller's side.
-    pub fn arrive(&mut self, env: &mut Environment, dir: &Path) -> Vec<Event> {
+    ///
+    /// `run` evaluates one `.envrc` or `.env.lua` and reports what went wrong. It is a callback
+    /// rather than something this module does, because running shell needs the executor and running
+    /// Lua needs the engine, and neither belongs to a module about directories. It is called
+    /// *inside* the before/after snapshot, which is what makes a variable an `.envrc` exports part
+    /// of the undo record — evaluating outside the window would set variables nothing could unset.
+    pub fn arrive(
+        &mut self,
+        env: &mut Environment,
+        dir: &Path,
+        run: &mut dyn FnMut(&mut Environment, &Rc) -> Result<(), String>,
+    ) -> Vec<Event> {
         let rcs = find::applicable(dir);
         let owner = find::owner(&rcs);
 
@@ -131,9 +180,7 @@ impl Direnv {
             return events;
         }
 
-        if let Some(event) = self.load(env, &rcs) {
-            events.push(event);
-        }
+        events.extend(self.load(env, &rcs, run));
         events
     }
 
@@ -165,13 +212,18 @@ impl Direnv {
     }
 
     /// Check the gate, then read.
-    fn load(&mut self, env: &mut Environment, rcs: &[Rc]) -> Option<Event> {
+    fn load(
+        &mut self,
+        env: &mut Environment,
+        rcs: &[Rc],
+        run: &mut dyn FnMut(&mut Environment, &Rc) -> Result<(), String>,
+    ) -> Vec<Event> {
         for rc in rcs {
             match self.allow.status(&rc.path) {
                 Status::Denied => {
-                    return Some(Event::Denied {
+                    return vec![Event::Denied {
                         path: rc.path.clone(),
-                    });
+                    }];
                 }
                 Status::NotAllowed => {
                     // Reported once per path. Returning here rather than loading the *other* files
@@ -179,12 +231,12 @@ impl Direnv {
                     // intent, and loading half of it would produce an environment the author never
                     // described.
                     if self.told.contains(&rc.path) {
-                        return None;
+                        return Vec::new();
                     }
                     self.told.push(rc.path.clone());
-                    return Some(Event::Blocked {
+                    return vec![Event::Blocked {
                         path: rc.path.clone(),
-                    });
+                    }];
                 }
                 Status::Allowed => {}
             }
@@ -195,20 +247,38 @@ impl Direnv {
             .iter()
             .map(|rc| (rc.path.clone(), stamp(&rc.path)))
             .collect();
+        let mut failures = Vec::new();
         for rc in rcs {
-            apply(env, rc);
+            let outcome = match rc.kind {
+                Kind::Dotenv => apply_dotenv(env, rc),
+                // Shell and Lua are the caller's to run.
+                Kind::Shell | Kind::Lua => run(env, rc),
+            };
+            // **A file that failed half way still had its first half take effect**, so the diff is
+            // taken over everything regardless and the failure is reported beside it. Discarding
+            // the load here would leave those variables set with nothing recorded to unset them.
+            if let Err(problem) = outcome {
+                failures.push(Event::Failed {
+                    path: rc.path.clone(),
+                    problem,
+                });
+            }
         }
         let after = snapshot(env);
         let undo = Diff::between(&before, &after).reverse();
 
-        let owner = find::owner(rcs)?;
+        let Some(owner) = find::owner(rcs) else {
+            return failures;
+        };
         let vars = undo.len();
         self.loaded = Some(Loaded {
             owner: owner.clone(),
             watches,
             undo,
         });
-        Some(Event::Loaded { owner, vars })
+        let mut events = vec![Event::Loaded { owner, vars }];
+        events.extend(failures);
+        events
     }
 }
 
@@ -234,24 +304,13 @@ fn stamp(path: &Path) -> Stamp {
     }
 }
 
-/// Read one rc file into the environment.
-///
-/// `.envrc` is not handled here: running shell means parsing and evaluating, which needs the
-/// executor, and wiring that in from the library layer would make this module depend on half the
-/// shell. The caller supplies it — see [`shell_source`].
-fn apply(env: &mut Environment, rc: &Rc) {
-    match rc.kind {
-        Kind::Dotenv => {
-            let Ok(source) = std::fs::read_to_string(&rc.path) else {
-                return;
-            };
-            for (name, value) in dotenv::parse(&source) {
-                env.set_var(&name, &value, true);
-            }
-        }
-        // Both are handed to the caller, which owns an evaluator for each language.
-        Kind::Shell | Kind::Lua => {}
+/// Read a `.env` into the environment. The only kind this module can read by itself.
+fn apply_dotenv(env: &mut Environment, rc: &Rc) -> Result<(), String> {
+    let source = std::fs::read_to_string(&rc.path).map_err(|e| e.to_string())?;
+    for (name, value) in dotenv::parse(&source) {
+        env.set_var(&name, &value, true);
     }
+    Ok(())
 }
 
 /// The rc files of a kind the caller has to evaluate, in load order.
@@ -287,6 +346,11 @@ mod tests {
         Environment::new()
     }
 
+    /// These tests use `.env` files only, which this module reads itself, so nothing needs running.
+    fn nothing(_: &mut Environment, _: &Rc) -> Result<(), String> {
+        Ok(())
+    }
+
     fn rc_in(dir: &Path, name: &str, body: &str) -> PathBuf {
         let path = dir.join(name);
         std::fs::write(&path, body).expect("write");
@@ -303,14 +367,18 @@ mod tests {
         let mut direnv = Direnv::new(store.path().to_str(), None);
         let mut env = shell();
 
-        let events = direnv.arrive(&mut env, project.path());
+        let events = direnv.arrive(&mut env, project.path(), &mut nothing);
         assert!(matches!(events.as_slice(), [Event::Blocked { .. }]));
         assert_eq!(env.get_var("SECRET"), None, "refused means not read");
 
         // The second arrival says nothing: a warning shown on every prompt is a warning nobody
         // reads, which is the worst outcome for this particular warning.
         direnv.loaded = None;
-        assert!(direnv.arrive(&mut env, project.path()).is_empty());
+        assert!(
+            direnv
+                .arrive(&mut env, project.path(), &mut nothing)
+                .is_empty()
+        );
     }
 
     /// The whole point: arriving sets, leaving restores.
@@ -326,10 +394,10 @@ mod tests {
         let mut env = shell();
         env.set_var("EDITOR", "vim", true);
 
-        direnv.arrive(&mut env, project.path());
+        direnv.arrive(&mut env, project.path(), &mut nothing);
         assert_eq!(env.get_var("DATABASE_URL"), Some("postgres://local"));
 
-        direnv.arrive(&mut env, elsewhere.path());
+        direnv.arrive(&mut env, elsewhere.path(), &mut nothing);
         assert_eq!(
             env.get_var("DATABASE_URL"),
             None,
@@ -352,8 +420,8 @@ mod tests {
         direnv.permissions().allow(&two).expect("allow");
         let mut env = shell();
 
-        direnv.arrive(&mut env, first.path());
-        direnv.arrive(&mut env, second.path());
+        direnv.arrive(&mut env, first.path(), &mut nothing);
+        direnv.arrive(&mut env, second.path(), &mut nothing);
 
         assert_eq!(env.get_var("ONLY_IN_SECOND"), Some("2"));
         assert_eq!(
@@ -374,9 +442,15 @@ mod tests {
         direnv.permissions().allow(&path).expect("allow");
         let mut env = shell();
 
-        assert!(!direnv.arrive(&mut env, project.path()).is_empty());
         assert!(
-            direnv.arrive(&mut env, project.path()).is_empty(),
+            !direnv
+                .arrive(&mut env, project.path(), &mut nothing)
+                .is_empty()
+        );
+        assert!(
+            direnv
+                .arrive(&mut env, project.path(), &mut nothing)
+                .is_empty(),
             "a second arrival in the same place is not a reload"
         );
     }
@@ -394,8 +468,8 @@ mod tests {
         direnv.permissions().allow(&path).expect("allow");
         let mut env = shell();
 
-        direnv.arrive(&mut env, project.path());
-        assert!(direnv.arrive(&mut env, &deep).is_empty());
+        direnv.arrive(&mut env, project.path(), &mut nothing);
+        assert!(direnv.arrive(&mut env, &deep, &mut nothing).is_empty());
         assert_eq!(env.get_var("OSLO_T_DEEP"), Some("1"));
     }
 
@@ -409,14 +483,14 @@ mod tests {
         let mut direnv = Direnv::new(store.path().to_str(), None);
         direnv.permissions().allow(&path).expect("allow");
         let mut env = shell();
-        direnv.arrive(&mut env, project.path());
+        direnv.arrive(&mut env, project.path(), &mut nothing);
         assert_eq!(env.get_var("OSLO_T_EDIT_A"), Some("1"));
 
         // Rewrite it. The mtime moves, so the next arrival re-checks, and the hash no longer matches.
         std::thread::sleep(std::time::Duration::from_millis(10));
         rc_in(project.path(), ".env", "OSLO_T_EDIT_A=1\nOSLO_T_EDIT_B=2\n");
 
-        let events = direnv.arrive(&mut env, project.path());
+        let events = direnv.arrive(&mut env, project.path(), &mut nothing);
         assert!(
             events.iter().any(|e| matches!(e, Event::Blocked { .. })),
             "an edited file has to be allowed again: {events:?}"
