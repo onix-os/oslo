@@ -150,7 +150,7 @@ pub fn row_answer(
 /// Read directly rather than parsed out of `ps` output: the column set `ps` prints differs between
 /// implementations and between invocations, so a parser would be guessing at which machine it is
 /// on. `/proc` is the same everywhere oslo runs, which is Linux.
-fn ps_rows() -> Value {
+pub(crate) fn ps_rows() -> Value {
     let mut list = Table::new();
     let Ok(entries) = std::fs::read_dir("/proc") else {
         return Value::Table(Rc::new(RefCell::new(list)));
@@ -267,7 +267,7 @@ fn env_rows(env: &std::sync::Arc<std::sync::Mutex<crate::env::Environment>>) -> 
 ///
 /// The text form of `ls` is genuinely ambiguous for a filename containing a newline, which is a
 /// legal filename. Rows have no such problem.
-fn ls_rows(dir: &str) -> Value {
+pub(crate) fn ls_rows(dir: &str) -> Value {
     let mut list = Table::new();
     let Ok(entries) = std::fs::read_dir(dir) else {
         return Value::Table(Rc::new(RefCell::new(list)));

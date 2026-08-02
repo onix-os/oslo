@@ -5,6 +5,7 @@
 
 pub mod bridge;
 pub mod df;
+pub mod system;
 pub mod verbs;
 pub mod where_;
 
@@ -18,6 +19,8 @@ use crate::data::plan::Shape;
 /// name any of them, so no edge of it can ever be planned as rows.
 pub fn register_all() {
     crate::data::tool::register("df", Shape::Nothing, Shape::Rows);
+    crate::data::tool::register("ps", Shape::Nothing, Shape::Rows);
+    crate::data::tool::register("ls", Shape::Nothing, Shape::Rows);
     crate::data::tool::register("where", Shape::Rows, Shape::Rows);
     // The bridge into structure. These take *bytes* — which is what an external command produces —
     // and manufacture rows, so they work with every program already installed.
@@ -43,6 +46,8 @@ pub fn run_tool(
     bytes: Option<&str>,
 ) -> Option<(i32, Option<Vec<Record>>)> {
     match name {
+        "ps" => Some((0, Some(system::ps()))),
+        "ls" => Some((0, Some(system::ls(&words[1..])))),
         "lines" => Some((0, Some(bridge::lines(bytes.unwrap_or_default())))),
         "parse" => {
             let Some(pattern) = words.get(1) else {
