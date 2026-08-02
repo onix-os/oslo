@@ -292,7 +292,7 @@ pub fn run_repl() -> ! {
                     Err(ShellError::Exit(code)) => {
                         // The amortised trim lets the table run over between sweeps, so the bound
                         // is enforced on the way out or a short session never enforces it at all.
-                        trim_history(&db, &settings);
+                        settle_stores(&db, &settings);
                         // R6.5: `exit` from the prompt is still a shell ending, so the EXIT trap
                         // fires here too. A REPL that skipped it would leave behind exactly the
                         // temp files an interactive session accumulates most of.
@@ -312,7 +312,7 @@ pub fn run_repl() -> ! {
         }
     }
 
-    trim_history(&db, &settings);
+    settle_stores(&db, &settings);
     // End of input (Ctrl-D) is the other way a REPL ends, and POSIX makes no distinction: the
     // EXIT trap fires on both.
     let mut env_guard = env_struct.lock().unwrap();
@@ -321,10 +321,27 @@ pub fn run_repl() -> ! {
     std::process::exit(last_status);
 }
 
-/// Put the history table back inside `$HISTSIZE` before the shell ends.
-fn trim_history(db: &Option<history_db::History>, settings: &history::Settings) {
+/// Leave both stores in the state a shell that is not running should leave them.
+///
+/// Two jobs at the same moment because it is the same moment: the shell is ending, nothing in this
+/// process is mid-query, and a few milliseconds cost nobody anything.
+///
+/// The trim puts the history table back inside `$HISTSIZE`. It has to happen here as well as on the
+/// amortised counter, or a session shorter than the counter's period never enforces the bound at
+/// all.
+///
+/// The checkpoint folds the tracker's write-ahead log back into its database. turso never does that
+/// on its own — not on drop and not on reopen — and the log grows with every commit, so without this
+/// the `-wal` passes the database in size within one session and stays passed: measured 1.2 MB of
+/// log against 4 KB of data after thirty commands. Both are best effort and neither blocks: another
+/// terminal holding the lock means it does not happen this time.
+fn settle_stores(db: &Option<history_db::History>, settings: &history::Settings) {
     if let Some(db) = db {
         db.trim(settings.max_size.max(1));
+        db.checkpoint();
+    }
+    if let Some(track) = oslo::track::store() {
+        track.checkpoint();
     }
 }
 

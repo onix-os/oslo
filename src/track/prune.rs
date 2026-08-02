@@ -423,13 +423,7 @@ mod tests {
             let track = Track::open(&path).expect("the database opens");
             track.record(&ran("/w/alpha", "cargo build", 0));
             age_run(&track, "cargo build", RUN_MAX_AGE + 60);
-            runtime().block_on(async {
-                track
-                    .conn
-                    .pragma_update("user_version", super::super::db::SCHEMA_VERSION + 1)
-                    .await
-                    .expect("the version is stamped");
-            });
+            track.claim_future_version();
         }
 
         let newer = Track::open(&path).expect("it still opens");

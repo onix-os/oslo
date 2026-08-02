@@ -291,6 +291,18 @@ impl Track {
     pub fn is_writable(&self) -> bool {
         self.writable
     }
+
+    /// Stamp a schema version this binary does not understand, so that reopening the file produces
+    /// the read-only store a newer oslo would have left behind.
+    #[cfg(test)]
+    pub(super) fn claim_future_version(&self) {
+        runtime().block_on(async {
+            self.conn
+                .pragma_update("user_version", SCHEMA_VERSION + 1)
+                .await
+                .expect("the version is stamped");
+        });
+    }
 }
 
 /// The `dir.id` for a path, inserting an unvisited row if there is none.
@@ -415,13 +427,7 @@ mod tests {
         {
             let track = Track::open(&path).expect("the database opens");
             track.record(&ran("/w/alpha", "cargo build", 0));
-            runtime().block_on(async {
-                track
-                    .conn
-                    .pragma_update("user_version", SCHEMA_VERSION + 1)
-                    .await
-                    .expect("the version is stamped");
-            });
+            track.claim_future_version();
         }
 
         let newer = Track::open(&path).expect("it still opens");

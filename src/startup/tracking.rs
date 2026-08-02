@@ -79,6 +79,11 @@ impl Tracker {
                 path: here,
                 root: root.as_deref(),
             });
+            // On open, and on a thread, exactly as `command_index::warm` starts the `$PATH` scan a
+            // few lines earlier in the loop: whatever the shell does between here and the first
+            // prompt is time the sweep gets for free, and a sweep the prompt waited on would be a
+            // daily stall on the one command a person did not ask for.
+            track::prune::sweep_soon(track);
         }
         tracker
     }

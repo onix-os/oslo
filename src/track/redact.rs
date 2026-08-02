@@ -135,10 +135,7 @@ fn secret_option() -> &'static Regex {
 /// Only the first physical line is read: a command continued over several lines is one entry with
 /// newlines in it, and its head is on the first of them.
 pub fn head_of(line: &str) -> String {
-    let words: Vec<&str> = line
-        .lines()
-        .next()
-        .unwrap_or_default()
+    let words: Vec<&str> = first_command(line.lines().next().unwrap_or_default())
         .split_whitespace()
         .collect();
 
@@ -167,6 +164,32 @@ pub fn head_of(line: &str) -> String {
             format!("{command} {second}")
         }
         _ => command.to_string(),
+    }
+}
+
+/// The characters that end one command and begin another, or send its output somewhere.
+const SEPARATORS: [char; 8] = [';', '&', '|', '(', ')', '<', '>', '`'];
+
+/// As much of a line as belongs to the command it starts with.
+///
+/// Splitting on whitespace alone leaves a separator glued to the word beside it, and the head is
+/// then a string no other line will ever produce: `cd; pwd` gave a head of `cd;`, filed apart from
+/// every other `cd` the user has ever run. Since the whole reason `head` is a column is that "what
+/// does this tool cost me" should be one grouped read, a punctuation mark that splits a tool into
+/// two groups defeats it.
+///
+/// Leading separators come off first — `(cd build && make)` opens with one, and cutting at it would
+/// leave nothing and drop the row entirely rather than merely mis-file it.
+///
+/// Quoting is not tracked, deliberately. Cutting `git commit -m "wip; fix"` at the quoted `;` shortens
+/// a line whose first two words this has already read, and those are all it returns. A quote-aware
+/// scan here would be a second parser living beside the real one and drifting from it, to decide
+/// something no caller can observe.
+fn first_command(line: &str) -> &str {
+    let line = line.trim_start().trim_start_matches(SEPARATORS);
+    match line.find(SEPARATORS) {
+        Some(end) => &line[..end],
+        None => line,
     }
 }
 
@@ -409,6 +432,24 @@ mod tests {
         assert_eq!(head_of("git -C /tmp status"), "git");
         assert_eq!(head_of("cargo --version"), "cargo");
         assert_eq!(head_of("cargo ./script"), "cargo");
+    }
+
+    /// A separator glued to the command word used to travel with it into the `head` column, so
+    /// `cd; pwd` was filed under `cd;` and never counted with any other `cd`. Observed in a real
+    /// session, not imagined.
+    #[test]
+    fn punctuation_does_not_become_part_of_the_tool_name() {
+        assert_eq!(head_of("cd; pwd"), "cd");
+        assert_eq!(head_of("make&"), "make");
+        assert_eq!(head_of("ls|wc -l"), "ls");
+        assert_eq!(head_of("cargo build && ./run"), "cargo build");
+        assert_eq!(head_of("cargo test; echo done"), "cargo test");
+        assert_eq!(head_of("cargo build > log.txt"), "cargo build");
+        assert_eq!(head_of("grep x 2>/dev/null"), "grep");
+        // An opening bracket must not leave an empty head, which would drop the row outright.
+        assert_eq!(head_of("(cd build && make)"), "cd");
+        // What follows the first command is somebody else's head, not part of this one.
+        assert_eq!(head_of("sudo cargo build; rm -rf /"), "cargo build");
     }
 
     #[test]

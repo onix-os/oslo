@@ -118,6 +118,29 @@ impl History {
         }
     }
 
+    /// Fold the write-ahead log back into the database and truncate it. Best effort.
+    ///
+    /// turso opens in WAL mode without being asked, which is why a second terminal can read this
+    /// table while this one appends to it — and it never checkpoints on its own, not on drop and not
+    /// on reopen. So the `-wal` grows by a page or two per line typed and is never given back:
+    /// measured 330 KB of log against 4 KB of data after one short session. It has to be asked for,
+    /// and the way out of the loop is the place to ask.
+    ///
+    /// Through `query` rather than `execute`: a checkpoint answers with a row, and `execute` fails
+    /// on a statement that returns one.
+    pub fn checkpoint(&self) {
+        runtime().block_on(async {
+            let Ok(conn) = self.db.connect() else {
+                return;
+            };
+            if let Ok(mut rows) = conn.query("PRAGMA wal_checkpoint(TRUNCATE)", ()).await {
+                // Stepped, not merely offered: turso runs the statement as the row is fetched, so a
+                // `Rows` that is dropped unread checkpoints nothing.
+                let _ = rows.next().await;
+            }
+        });
+    }
+
     /// Remember one line.
     pub fn append(&self, line: &str, mode: &str) -> bool {
         let at = std::time::SystemTime::now()
