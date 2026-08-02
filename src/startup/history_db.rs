@@ -13,8 +13,11 @@
 //!
 //! # Why the async is hidden here
 //!
-//! `turso` is the pure-Rust rewrite of SQLite, which is what keeps oslo's build free of a C
-//! toolchain — `cargo tree -e build` returns only `oslo`, and the static musl binary still links.
+//! `turso` is the pure-Rust rewrite of SQLite, so there is no vendored SQLite here. It is not,
+//! however, free of a C toolchain: `cargo tree -i cc` names `aegis`, `simsimd`, `libmimalloc-sys`
+//! and `zstd-sys`, all reached through `turso_core`, and every one of them shells out to a
+//! compiler. `cargo tree -e build` says otherwise only because it lists oslo's *direct* build
+//! dependencies, of which there are none. The release workflow installs `musl-tools` for them.
 //! Its API is async, and oslo's REPL is not. Rather than colour the shell async, every call below
 //! blocks on a small current-thread runtime owned by this module. The runtime is built once: one
 //! per call would be a thread and an epoll set per command.
