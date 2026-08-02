@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.1.4] - 2026-08-02
+
+### <!-- 0 -->⛰️  Features
+
+- *(complete)* gap-capped fuzzy matching, off by default inline
+- *(suggest)* fuzzy inline suggestions on by default
+
+### <!-- 2 -->🚜 Refactor
+
+- *(ci)* drop --locked so a version bump cannot redden every job
+
 ## [0.1.3] - 2026-08-02
 
 ### <!-- 0 -->⛰️  Features
