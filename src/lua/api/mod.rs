@@ -34,6 +34,7 @@ pub(crate) mod segment;
 mod shell;
 pub(crate) mod tool;
 pub(crate) mod tools;
+mod ui;
 
 pub(crate) use shell::handlers as hook_handlers;
 pub(crate) mod util;
@@ -95,6 +96,7 @@ pub fn install(interp: &Rc<Interp>, registry: &Registry, env: Arc<Mutex<Environm
     // belongs with what. `fs`, `json`, `path`, `proc` and `re` were already tables; these are the
     // rest of the surface grouped the same way. What stays on `oslo` itself is only what belongs
     // to no group: `glob`, and the two `register_*` hooks that extend the shell.
+    ui::install(&mut ui);
     commands(&mut process, &env);
     variables(&mut variables_t, &env);
     filesystem(&mut oslo, &mut system, &env);
