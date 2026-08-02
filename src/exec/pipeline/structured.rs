@@ -64,24 +64,85 @@ fn plan_pipeline(pipeline: &Pipeline) -> Vec<Sink> {
     )
 }
 
-/// Whether any edge of this pipeline carries rows.
-pub(super) fn has_structured_edge(pipeline: &Pipeline) -> bool {
-    plan_pipeline(pipeline).contains(&Sink::Rows)
+/// The sinks for this pipeline, when any edge of it carries rows.
+///
+/// One call, not two: [`plan`](crate::data::plan) counts the structured edges it hands out, and
+/// planning the same pipeline twice would report twice as many as were actually taken — which
+/// matters because that count is what the POSIX assertion reads.
+pub(super) fn structured_sinks(pipeline: &Pipeline) -> Option<Vec<Sink>> {
+    let sinks = plan_pipeline(pipeline);
+    sinks.contains(&Sink::Rows).then_some(sinks)
 }
 
-/// Run a pipeline that has at least one structured edge.
+/// Run a pipeline whose edges carry rows.
 ///
-/// Nothing reaches this yet: no tool declares itself, so [`has_structured_edge`] is false for every
-/// pipeline. It is wired now, with the corpus proving it is unreachable, so that the commit adding
-/// the first structured tool is small and its blast radius has already been measured.
+/// **No forking.** Every stage here runs in this process, one after another, and the rows move by
+/// being handed over — there is no descriptor between them, so there is nothing to serialise and
+/// no format to get wrong. That is the whole argument for keeping structure in-process.
 ///
-/// `fallback` is the byte path, taken until this has something of its own to do — a fallback rather
-/// than a panic, so a config registering a tool before the machinery exists degrades to today's
-/// behaviour instead of killing the shell.
+/// `fallback` is the byte path, used for anything this cannot run.
 pub(super) fn run(
     env: &mut Environment,
     pipeline: &Pipeline,
+    sinks: &[Sink],
     fallback: fn(&mut Environment, &Pipeline) -> Result<i32>,
 ) -> Result<i32> {
-    fallback(env, pipeline)
+    let mut rows: Option<Vec<crate::data::Record>> = None;
+    let mut statuses = Vec::with_capacity(pipeline.commands.len());
+
+    for (i, command) in pipeline.commands.iter().enumerate() {
+        let Command::Simple(simple) = command else {
+            return fallback(env, pipeline);
+        };
+        let Some(name) = simple_command_name(simple) else {
+            return fallback(env, pipeline);
+        };
+        let words = expand_words(env, simple)?;
+
+        let (status, produced) = match crate::data::tools::run_tool(&name, &words, rows.take()) {
+            Some(outcome) => outcome,
+            // A stage the planner thought was a tool but which cannot run here. Falling back for
+            // the whole pipeline is the only honest answer: half of it has not run yet, so there
+            // is nothing to undo.
+            None => return fallback(env, pipeline),
+        };
+        statuses.push(status);
+        rows = produced;
+
+        // Everything but the last stage hands its rows on. The last one writes them out, in
+        // whichever of the two renderings its sink asked for.
+        if i + 1 == pipeline.commands.len()
+            && let Some(final_rows) = rows.take()
+        {
+            {
+                let value = crate::data::Val::table(final_rows);
+                let text = match sinks.last() {
+                    Some(Sink::Print) => crate::data::render_display(&value),
+                    // Into a pipe or a file: the plain, complete form. **Never the drawn table** —
+                    // a box-drawing character on another program's stdin is the failure this whole
+                    // design exists to prevent.
+                    _ => crate::data::render_transport(&value),
+                };
+                if !text.is_empty() {
+                    println!("{text}");
+                }
+            }
+        }
+    }
+
+    let status = statuses.last().copied().unwrap_or(0);
+    // The stages did not fork, so there are no child statuses to collect — but `PIPESTATUS` must
+    // still describe the pipeline the user wrote, or `${PIPESTATUS[0]}` starts lying the moment a
+    // pipeline happens to be structured.
+    env.set_pipeline_status(statuses);
+    Ok(status)
+}
+
+/// The words of a simple command, expanded as the byte path would expand them.
+fn expand_words(env: &mut Environment, simple: &SimpleCommand) -> Result<Vec<String>> {
+    let mut out = Vec::new();
+    for word in &simple.words {
+        out.extend(crate::expand::expand_word(env, word)?);
+    }
+    Ok(out)
 }

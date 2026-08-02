@@ -332,11 +332,11 @@ fn run_stages(env: &mut Environment, pipeline: &Pipeline) -> Result<i32> {
     //
     // Deliberately a question asked here rather than a check scattered through the stages: there
     // is one place where the byte path can be left, and it is this line.
-    if structured::has_structured_edge(pipeline) {
+    if let Some(sinks) = structured::structured_sinks(pipeline) {
         // Nothing takes this path yet — the tools that would are the next stage of the work. It is
         // wired now, with the corpus proving it is never reached, so that the commit which adds
         // the first structured tool is small and its blast radius is already measured.
-        return structured::run(env, pipeline, run_byte_stages);
+        return structured::run(env, pipeline, &sinks, run_byte_stages);
     }
     run_byte_stages(env, pipeline)
 }

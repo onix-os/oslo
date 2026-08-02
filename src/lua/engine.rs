@@ -32,6 +32,20 @@ thread_local! {
     static ACTIVE: RefCell<Option<(Rc<Interp>, Registry)>> = const { RefCell::new(None) };
 }
 
+/// The interpreter on this thread, if there is one, as a handle that can outlive the borrow.
+pub fn interpreter_handle() -> Option<Rc<Interp>> {
+    ACTIVE.with(|slot| slot.borrow().as_ref().map(|(interp, _)| Rc::clone(interp)))
+}
+
+/// Borrow the interpreter on this thread, if there is one.
+///
+/// The same reach-back the hooks use, for callers that need more than one call against the same
+/// interpreter — a filter evaluating one parsed expression against every row, for instance.
+pub fn with_interpreter<T>(f: impl FnOnce(&Interp) -> T) -> Option<T> {
+    let (interp, _) = ACTIVE.with(|slot| slot.borrow().clone())?;
+    Some(f(&interp))
+}
+
 /// Call a Lua value with whatever interpreter is on this thread.
 ///
 /// The same reach-back `ask_hook_here` uses, for callers that hold a function rather than a hook

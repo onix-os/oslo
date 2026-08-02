@@ -77,6 +77,9 @@ fn main() {
     // Before any thread exists, as the safety note on the function requires.
     restore_default_sigpipe();
     report_structured_audit();
+    // The names that can carry structure. Declared once, here, for every mode the shell runs in —
+    // a script and a prompt must agree about what `df` is.
+    oslo::data::tools::register_all();
 
     // The shell runs on a stack oslo chose rather than one it inherited; see
     // [`oslo::INTERPRETER_STACK`]. `main` itself does nothing afterwards but wait.
