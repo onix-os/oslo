@@ -230,7 +230,7 @@ and end up with none again rather than with an empty one.
 -- .env.lua
 oslo.set_var("DATABASE_URL", "postgres://localhost/app_dev")
 oslo.set_alias("t", "cargo test")
-oslo.path_add("./bin")          -- prepended, idempotent, gone when you leave
+oslo.direnv.path_add("./bin")   -- prepended, idempotent, gone when you leave
 oslo.set_prompt(function() return "PRODUCTION> " end)
 ```
 
@@ -251,7 +251,7 @@ the **path**, and survives every edit. Both take effect where you stand, not on 
 
 ```lua
 -- a Nix flake's dev shell, without entering one
-oslo.nix_develop()
+oslo.direnv.nix_develop()
 ```
 
 direnv's `use flake` is `eval "$(nix print-dev-env …)"` — a hundred kilobytes of generated bash.
