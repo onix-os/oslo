@@ -29,6 +29,7 @@
 
 pub mod db;
 mod private;
+pub mod prune;
 pub mod query;
 pub mod redact;
 pub mod score;

@@ -102,7 +102,13 @@ pub fn run_repl() -> ! {
     // Beside it, and opened from here for the same reason: this is the one place in the program
     // that knows a person is typing. `tracking::Tracker::start` is what installs the process-wide
     // handle, so a script, an `oslo -c` or a subshell has none to write to.
-    let mut tracker = tracking::Tracker::start(&current_directory(), &settings);
+    let here = current_directory();
+    // The directory a session begins in is one the shell has been in, so `cd -1` names it and means
+    // what `cd -` means from the first move rather than from the second. Here and nowhere else: the
+    // ring is appended to by `change_directory`, which scripts also go through, and a script's ring
+    // is nobody's wandering.
+    oslo::env::builtins::remember_directory(&here);
+    let mut tracker = tracking::Tracker::start(&here, &settings);
     let mut rl = build_editor(&settings);
 
     // The mode the prompt is reading, and the flag the toggle key sets. Both live for the whole

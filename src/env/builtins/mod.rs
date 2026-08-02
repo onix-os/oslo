@@ -89,6 +89,18 @@ pub use hash::lookup as hash_lookup;
 pub use hash::recall as hash_recall;
 pub use hash::remember as hash_remember;
 
+/// Put the directory a session began in into the ring `cd -N` counts back through.
+///
+/// The interactive loop calls this once, before the first prompt, and nothing else calls it at all.
+/// `cd -` reads `$OLDPWD` and so works from the very first move; `cd -N` reads the ring, which is
+/// only appended to by a *successful* change of directory. Without the starting directory in it the
+/// two disagree for exactly one command — `cd -1` answers "no such entry" in a shell where `cd -`
+/// works — and the shell's own documentation says they are the same thing.
+///
+/// Seeding it from [`crate::env::builtins::builtin_cd`]'s helper instead would seed every script's
+/// ring as well, and a script has no wandering to count back through.
+pub use directories::ring::record as remember_directory;
+
 use crate::env::scope::Environment;
 
 pub fn register_default_builtins(env: &mut Environment) {
