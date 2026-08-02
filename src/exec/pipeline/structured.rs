@@ -90,7 +90,40 @@ pub(super) fn run(
     let mut rows: Option<Vec<crate::data::Record>> = None;
     let mut statuses = Vec::with_capacity(pipeline.commands.len());
 
-    for (i, command) in pipeline.commands.iter().enumerate() {
+    // **The byte prefix.** `kubectl get pods -o json | from json | where ...` is an external
+    // followed by structured stages: the external cannot hand over rows, so its *output* is what
+    // the first structured stage is given. Everything up to the first tool runs exactly as it
+    // always did, forked and on descriptors, and only its bytes cross into this half.
+    let first_tool = pipeline.commands.iter().position(|c| {
+        matches!(c, Command::Simple(s)
+            if simple_command_name(s).is_some_and(|n| crate::data::tool::lookup(&n).is_some()))
+    });
+    let mut bytes: Option<String> = None;
+    let start = match first_tool {
+        Some(0) | None => 0,
+        Some(at) => {
+            let prefix = Pipeline {
+                commands: pipeline.commands[..at].to_vec(),
+                negated: false,
+                timed: false,
+            };
+            match capture(env, &prefix, fallback) {
+                Ok((status, output)) => {
+                    // One status per prefix stage; the byte path filled in its own vector, and
+                    // this half appends to it rather than replacing it.
+                    statuses.extend(env.pipeline_status().iter().copied());
+                    if statuses.is_empty() {
+                        statuses.push(status);
+                    }
+                    bytes = Some(output);
+                    at
+                }
+                Err(e) => return Err(e),
+            }
+        }
+    };
+
+    for (i, command) in pipeline.commands.iter().enumerate().skip(start) {
         let Command::Simple(simple) = command else {
             return fallback(env, pipeline);
         };
@@ -99,15 +132,19 @@ pub(super) fn run(
         };
         let words = expand_words(env, simple)?;
 
-        let (status, produced) = match crate::data::tools::run_tool(&name, &words, rows.take()) {
-            Some(outcome) => outcome,
-            // A stage the planner thought was a tool but which cannot run here. Falling back for
-            // the whole pipeline is the only honest answer: half of it has not run yet, so there
-            // is nothing to undo.
-            None => return fallback(env, pipeline),
-        };
+        let (status, produced) =
+            match crate::data::tools::run_tool(&name, &words, rows.take(), bytes.as_deref()) {
+                Some(outcome) => outcome,
+                // A stage the planner thought was a tool but which cannot run here. Falling back for
+                // the whole pipeline is the only honest answer: half of it has not run yet, so there
+                // is nothing to undo.
+                None => return fallback(env, pipeline),
+            };
         statuses.push(status);
         rows = produced;
+        // The bytes belong to the first structured stage only; a second `lines` further down the
+        // pipeline is reading rows, not the original output all over again.
+        bytes = None;
 
         // Everything but the last stage hands its rows on. The last one writes them out, in
         // whichever of the two renderings its sink asked for.
@@ -136,6 +173,41 @@ pub(super) fn run(
     // pipeline happens to be structured.
     env.set_pipeline_status(statuses);
     Ok(status)
+}
+
+/// Run the byte half of a mixed pipeline and collect what it printed.
+///
+/// The prefix runs through the ordinary path — same forks, same descriptors, same everything — with
+/// stdout pointed at a pipe instead of the terminal. Nothing about how those commands execute
+/// changes; only where their output goes.
+fn capture(
+    env: &mut Environment,
+    prefix: &Pipeline,
+    fallback: fn(&mut Environment, &Pipeline) -> Result<i32>,
+) -> Result<(i32, String)> {
+    use std::io::Read;
+    use std::os::fd::{AsRawFd, FromRawFd};
+
+    let (reader, writer) = nix::unistd::pipe()
+        .map_err(|e| crate::error::ShellError::ExecutionError(format!("pipe: {e}")))?;
+
+    // stdout is put back whatever happens below, including on the error path: leaving the shell
+    // writing into a closed pipe would be a far worse failure than the one being reported.
+    let saved = nix::unistd::dup(std::io::stdout().as_raw_fd())
+        .map_err(|e| crate::error::ShellError::ExecutionError(format!("dup: {e}")))?;
+    let _ = nix::unistd::dup2(writer.as_raw_fd(), std::io::stdout().as_raw_fd());
+    drop(writer);
+
+    let status = fallback(env, prefix);
+
+    // SAFETY: `saved` is a descriptor this function created with `dup` and has not closed.
+    let saved = unsafe { std::os::fd::OwnedFd::from_raw_fd(saved) };
+    let _ = nix::unistd::dup2(saved.as_raw_fd(), std::io::stdout().as_raw_fd());
+
+    let mut output = String::new();
+    let mut reader = std::fs::File::from(reader);
+    let _ = reader.read_to_string(&mut output);
+    Ok((status?, output))
 }
 
 /// The words of a simple command, expanded as the byte path would expand them.
