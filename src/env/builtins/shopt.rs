@@ -73,7 +73,7 @@ const OPTIONS: &[ShoptOption] = &[
     fixed("expand_aliases", true, "oslo expands aliases in every shell, not only interactive ones"),
     fixed("extglob", false, "the extended pattern operators are not implemented"),
     fixed("failglob", false, "an unmatched pattern is left alone, never an error"),
-    fixed("globstar", false, "`**` is an ordinary `*` and cannot cross a `/`"),
+    hook("globstar", crate::expand::glob::set_globstar),
     fixed("huponexit", false, "the shell does not signal its jobs on exit"),
     fixed("interactive_comments", true, "`#` starts a comment in every shell"),
     fixed("lastpipe", false, "every stage of a pipeline runs in its own process"),
@@ -299,15 +299,28 @@ mod tests {
     }
 
     /// The rule this builtin exists to keep: an option oslo does not implement must not report
-    /// success when asked to turn it on. `shopt -s globstar` returning 0 would mean every later
-    /// `**` silently matched the wrong files.
+    /// success when asked to turn it on. Reporting 0 for `extglob` would mean every later `@(a|b)`
+    /// silently matched the wrong files.
+    ///
+    /// `globstar` was this test's example until it was implemented — which is the outcome the rule
+    /// is for. It is now a real option and lives in the test below.
     #[test]
     fn an_option_oslo_cannot_honour_is_refused_not_faked() {
         let mut env = Environment::new();
-        assert_eq!(run(&mut env, &["shopt", "-s", "globstar"]), 1);
-        assert_eq!(run(&mut env, &["shopt", "-q", "globstar"]), 1);
+        assert_eq!(run(&mut env, &["shopt", "-s", "extglob"]), 1);
+        assert_eq!(run(&mut env, &["shopt", "-q", "extglob"]), 1);
         // Asking for the state it is already in is not a failure: there is nothing to do.
+        assert_eq!(run(&mut env, &["shopt", "-u", "extglob"]), 0);
+    }
+
+    /// An option oslo *does* implement is switchable both ways and reports what it is.
+    #[test]
+    fn globstar_is_a_real_option() {
+        let mut env = Environment::new();
+        assert_eq!(run(&mut env, &["shopt", "-s", "globstar"]), 0);
+        assert_eq!(run(&mut env, &["shopt", "-q", "globstar"]), 0);
         assert_eq!(run(&mut env, &["shopt", "-u", "globstar"]), 0);
+        assert_eq!(run(&mut env, &["shopt", "-q", "globstar"]), 1, "off again");
     }
 
     #[test]
