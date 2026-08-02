@@ -177,6 +177,18 @@ pub fn suggest_fuzzy(line: &str, fuzzy: Fuzzy) -> Option<String> {
                 // already declined to give it — offering it here would suggest a line the stricter
                 // pass deliberately refused.
                 && !candidate.starts_with(line)
+                // **The suggestion must begin the way you began.** Without this, typing `clear`
+                // offers `ls clear` — c-l-e-a-r sits adjacent inside it starting at the fourth
+                // character, so it scores *well*: every letter touching, every one on a word
+                // boundary. But you are typing a command, and that candidate's command is `ls`.
+                // What you typed landed entirely in somebody else's arguments.
+                //
+                // A line at a prompt is read left to right and the first word is the whole
+                // meaning of it, so a fuzzy match that does not reach the first character is not
+                // an abbreviation of the line — it is a different line that happens to contain
+                // your text. `gco` for `git checkout` starts at `g`, and that is the shape worth
+                // offering.
+                && starts_alike(candidate, line)
         })
         .filter_map(|(candidate, _)| {
             fuzzy_score(candidate, line, fuzzy).map(|score| (score, candidate))
@@ -184,6 +196,18 @@ pub fn suggest_fuzzy(line: &str, fuzzy: Fuzzy) -> Option<String> {
         // Newest wins a tie: `max_by_key` keeps the last maximum, and the set is oldest-first.
         .max_by_key(|(score, _)| *score)
         .map(|(_, candidate)| candidate.clone())
+}
+
+/// Whether two lines open with the same character, case folded.
+///
+/// The cheapest expression of "this candidate is an abbreviation of that line rather than a
+/// different line containing it". Folded per character, since this runs per candidate per keystroke.
+fn starts_alike(candidate: &str, typed: &str) -> bool {
+    let first = |text: &str| text.chars().next().and_then(|c| c.to_lowercase().next());
+    match (first(candidate), first(typed)) {
+        (Some(a), Some(b)) => a == b,
+        _ => false,
+    }
 }
 
 /// The newest line in `language` that starts with `line`, minus what is already typed.
@@ -233,6 +257,33 @@ mod tests {
         assert_eq!(suggest("ll"), Some("ama".to_string()));
         seed(vec![("ll\nls".to_string(), "sh".to_string())]);
         assert_eq!(suggest("ll"), None);
+        seed(Vec::new());
+    }
+
+    /// Typing `clear` must not offer `ls clear`.
+    ///
+    /// The reported bug, and it scored *well*: `c-l-e-a-r` sits adjacent inside `ls clear` with
+    /// every letter touching and the run starting on a word boundary. What was wrong was not the
+    /// score but the candidate — its command is `ls`, and the typed text landed entirely in that
+    /// command's arguments. A line at a prompt is its first word, so a match that never reaches the
+    /// first character is a different line that contains your text, not an abbreviation of it.
+    #[test]
+    fn a_fuzzy_suggestion_must_begin_the_way_the_line_begins() {
+        let _guard = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
+        prompt_in("sh");
+        seed(vec![("ls clear".to_string(), "sh".to_string())]);
+        assert_eq!(
+            suggest_fuzzy("clear", Fuzzy::Loose),
+            None,
+            "the command you typed is not the command being offered"
+        );
+
+        // The shape that *is* worth offering still is: same first letter, letters in order.
+        seed(vec![("git checkout main".to_string(), "sh".to_string())]);
+        assert_eq!(
+            suggest_fuzzy("gco", Fuzzy::Smart),
+            Some("git checkout main".to_string())
+        );
         seed(Vec::new());
     }
 
