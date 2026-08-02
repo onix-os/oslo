@@ -223,8 +223,6 @@ Reproducible against the binary, and all but the last are differences from bash.
 
 - **`for ((;;))`** is a syntax error when the separators touch — write `for (( ; ; ))`. The cause is
   upstream in brush's tokenizer, which fuses the two `;` into the `;;` that ends a `case` item.
-- **`$(case …)`** does not parse; use backticks — `` x=`case a in a) echo hit;; esac` `` — which
-  works today. Upstream, brush issue #1052, and confirmed not fixed by the rewrite in progress.
 - **Process substitution** needs `/dev/fd`, so it fails in an initramfs that has not set it up.
   bash has the same dependency.
 - **`coproc` and `select`** are refused by name rather than half-implemented.
