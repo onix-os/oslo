@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.1.2] - 2026-08-02
+
+### <!-- 7 -->⚙️ Miscellaneous Tasks
+
+- Fix the release smoke test, publish build artifacts
+
 ## [0.1.1] - 2026-08-02
 
 ### <!-- 0 -->⛰️  Features
