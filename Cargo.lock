@@ -1650,7 +1650,7 @@ dependencies = [
 
 [[package]]
 name = "oslo"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "brush-parser",
  "full_moon",
