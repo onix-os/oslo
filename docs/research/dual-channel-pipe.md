@@ -15,6 +15,36 @@ Nushell's most damaging bug is that piping a table to an external program render
 characters onto its stdin. If a rendered cell ever reaches a pipe in oslo, the premise of the
 project is gone.
 
+## What it looks like from the prompt
+
+Assume `ls` and `sort` are both registered tools.
+
+| typed | the connecting edge | why |
+|---|---|---|
+| `ls ~` | — | last stage, fd 1 is a terminal, so `Print`: the pretty table |
+| `ls ~ \| sort --last-edited` | **rows** | both registered, both declare, nothing redirected |
+| `ls ~ \| grep foo` | text | `grep` is an external and can carry no declaration |
+| `ls ~ \| sort` with the builtin `sort` disabled | text | the name now resolves to `/usr/bin/sort`, so there is no declaration to read |
+
+That last row is worth dwelling on, because nothing implements it. The planner reads whatever the
+name *resolves to*; disable the builtin and it is an external, an external declares nothing, so the
+edge plans `Text` and `ls` renders bytes. The setting is not consulted anywhere in the pipe.
+
+Two consequences that surprise people:
+
+**Structure is not a format.** Between two in-process stages nothing is serialised — `ls` hands
+`sort` a `Vec<Record>`, actual values in memory. There are no tabs, no delimiters, no quoting and no
+escaping problem when a filename contains a tab or a newline, because there is nothing to escape.
+The only place bytes appear is where they have to: at a process boundary, or at a human.
+
+**In the second row, `ls` never renders text at all.** It is told `Rows` before it runs, so it skips
+the formatting entirely rather than producing a table nobody reads. That is the whole reason the
+decision has to be made before the producer starts.
+
+And the edges are decided one at a time, not as a mode. `ls ~ | sort --last-edited | grep foo` gives
+rows on the first edge and text on the second: `sort` takes structure in and writes bytes out,
+because that is what the stage after it can accept. There is no structured mode to be in or out of.
+
 ## The value model
 
 A NEW Rust enum in `src/data/`, NOT `lua::eval::value::Value`. Three reasons the Lua type cannot
