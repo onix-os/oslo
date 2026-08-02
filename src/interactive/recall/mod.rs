@@ -20,6 +20,7 @@
 
 mod nearby;
 
+use super::matching::{Fuzzy, fuzzy_score};
 use super::prompt;
 use crate::track;
 use nearby::{forget_answers, forget_answers_for, from_store, place};
@@ -114,6 +115,75 @@ pub fn suggest(line: &str) -> Option<String> {
         return Some(found);
     }
     remembered(&language, line)
+}
+
+/// The fuzzy suggestion currently on offer, as `(what was typed, the line it would become)`.
+///
+/// A slot rather than a recomputation at accept time: the hinter has already done the search on
+/// this keystroke, and doing it again from the key handler could answer differently — the store or
+/// the remembered set may have moved between the two — which would replace the line with something
+/// the user was never shown. The typed half is kept so acceptance can refuse a stale offer.
+static OFFERED: Mutex<Option<(String, String)>> = Mutex::new(None);
+
+/// Record the fuzzy line being shown, so the accept key can put it in the buffer.
+pub fn offer_fuzzy(typed: &str, full: &str) {
+    if let Ok(mut slot) = OFFERED.lock() {
+        *slot = Some((typed.to_string(), full.to_string()));
+    }
+}
+
+/// Forget any fuzzy offer. Called whenever the hinter produces something else, or nothing.
+pub fn withdraw_fuzzy() {
+    if let Ok(mut slot) = OFFERED.lock() {
+        *slot = None;
+    }
+}
+
+/// The line a fuzzy suggestion would put in the buffer, if one is on offer for exactly this text.
+///
+/// The equality check is what makes this safe: a suggestion offered for `crne` must not be accepted
+/// onto `crnex`, and without the check a keystroke arriving between the hint and the key would do
+/// exactly that.
+pub fn accept_fuzzy(typed: &str) -> Option<String> {
+    let slot = OFFERED.lock().ok()?;
+    let (offered, full) = slot.as_ref()?;
+    (offered == typed).then(|| full.clone())
+}
+
+/// The best remembered line that `line` is a gap-capped subsequence of, in full.
+///
+/// **This returns the whole line, not a remainder, and that is the difference that matters.** A
+/// prefix suggestion continues what you typed, so it can be drawn as grey text after the cursor and
+/// accepted without reading it. A fuzzy one does not continue anything — `crne` proposing
+/// `cargo run --example xyz` replaces every character you typed — so the caller has to draw it as a
+/// replacement and accepting it has to overwrite the line rather than extend it.
+///
+/// Searched over the remembered set rather than the store: this runs per keystroke only once every
+/// prefix path has already come back empty, and the remembered set is in memory and already filtered
+/// to the current language. A directory-scoped fuzzy pass would need a query that returns candidate
+/// rows rather than an answer, which is a range scan turned into a table scan.
+pub fn suggest_fuzzy(line: &str, fuzzy: Fuzzy) -> Option<String> {
+    if line.is_empty() || fuzzy == Fuzzy::Off {
+        return None;
+    }
+    let language = prompt::language()?;
+    let all = REMEMBERED.lock().ok()?;
+    all.iter()
+        .filter(|(candidate, l)| {
+            l == &language
+                && candidate != line
+                && !candidate.contains('\n')
+                // A candidate this line already prefixes is the prefix path's answer, and it has
+                // already declined to give it — offering it here would suggest a line the stricter
+                // pass deliberately refused.
+                && !candidate.starts_with(line)
+        })
+        .filter_map(|(candidate, _)| {
+            fuzzy_score(candidate, line, fuzzy).map(|score| (score, candidate))
+        })
+        // Newest wins a tie: `max_by_key` keeps the last maximum, and the set is oldest-first.
+        .max_by_key(|(score, _)| *score)
+        .map(|(_, candidate)| candidate.clone())
 }
 
 /// The newest line in `language` that starts with `line`, minus what is already typed.

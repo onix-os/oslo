@@ -42,9 +42,12 @@ pub enum Match {
     /// Each separator-delimited piece is a prefix of the corresponding piece of the candidate, so
     /// `/u/s/b` reaches `/usr/share/bin` and `f-b` reaches `foo-bar`.
     Pieces,
+    /// The typed letters appear in order with no gap wider than the preset allows, so `gco` reaches
+    /// `git checkout`. Last in the chain and never mixed with the others.
+    Fuzzy(Fuzzy),
 }
 
-/// Every way of matching, in the order they are tried.
+/// Every way of matching that needs no configuration, in the order they are tried.
 pub const MATCHERS: [Match; 3] = [Match::Exact, Match::Ignoring, Match::Pieces];
 
 impl Match {
@@ -54,8 +57,183 @@ impl Match {
             Match::Exact => candidate.starts_with(typed),
             Match::Ignoring => matches_ignoring_case(candidate, typed),
             Match::Pieces => matches_by_piece(candidate, typed),
+            Match::Fuzzy(fuzzy) => fuzzy_score(candidate, typed, fuzzy).is_some(),
         }
     }
+}
+
+/// The matchers to try, in order, for a given fuzzy setting.
+///
+/// Fuzzy goes last and only runs when everything stricter came back empty, so switching it on can
+/// never dilute a list that already had a real prefix match in it.
+pub fn matchers(fuzzy: Fuzzy) -> Vec<Match> {
+    let mut chain = MATCHERS.to_vec();
+    if fuzzy != Fuzzy::Off {
+        chain.push(Match::Fuzzy(fuzzy));
+    }
+    chain
+}
+
+/// How far apart the letters you typed may be scattered through a candidate.
+///
+/// A gap cap rather than a plain subsequence test, which is the difference between fuzzy matching
+/// that helps and fuzzy matching that returns everything: unbounded, `cat` matches
+/// `create_application_target` and every other word on the machine containing those three letters in
+/// order. deja arrived at the same three presets and the same reasoning.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Fuzzy {
+    /// No subsequence matching at all. What you type must prefix what you get.
+    #[default]
+    Off,
+    /// Letters must be nearly adjacent. `gco` will not reach `git checkout`.
+    Tight,
+    /// Tuned so the canonical shell abbreviations work: `gco` reaches `git checkout`.
+    Smart,
+    /// Wide enough to feel like it is guessing, and it sometimes is.
+    Loose,
+}
+
+impl Fuzzy {
+    /// The most unmatched characters allowed between two typed letters.
+    pub fn max_gap(self) -> Option<usize> {
+        match self {
+            Fuzzy::Off => None,
+            Fuzzy::Tight => Some(1),
+            Fuzzy::Smart => Some(4),
+            Fuzzy::Loose => Some(8),
+        }
+    }
+
+    /// Read a setting. `true` means the default preset, `false` means off.
+    pub fn parse(name: &str) -> Option<Fuzzy> {
+        match name {
+            "off" | "false" | "none" => Some(Fuzzy::Off),
+            "tight" => Some(Fuzzy::Tight),
+            "smart" | "true" | "on" => Some(Fuzzy::Smart),
+            "loose" => Some(Fuzzy::Loose),
+            _ => None,
+        }
+    }
+
+    /// The name this reads back as, for `oslo.settings` and the status line.
+    pub fn name(self) -> &'static str {
+        match self {
+            Fuzzy::Off => "off",
+            Fuzzy::Tight => "tight",
+            Fuzzy::Smart => "smart",
+            Fuzzy::Loose => "loose",
+        }
+    }
+
+    /// The next preset in the ramp, for a key bound to cycle it.
+    pub fn next(self) -> Fuzzy {
+        match self {
+            Fuzzy::Off => Fuzzy::Tight,
+            Fuzzy::Tight => Fuzzy::Smart,
+            Fuzzy::Smart => Fuzzy::Loose,
+            Fuzzy::Loose => Fuzzy::Off,
+        }
+    }
+}
+
+/// How well `typed` matches `candidate` as a gap-capped subsequence, or `None` for no match.
+///
+/// Higher is better. The score exists because a fuzzy match without one is unusable: every
+/// candidate that matches at all matches equally, so the list comes back in whatever order the
+/// source happened to produce. What it rewards, in order of weight:
+///
+/// * letters that land at the start of a word — `gco` on `git checkout` hits `g`, `c`, `o` where a
+///   human would point, and that is the match worth ranking first;
+/// * runs of adjacent letters, so a near-prefix beats a scatter;
+/// * an early first match, because `cargo` for `ca` should beat `libcargo`.
+///
+/// Case-insensitive, and folded per character rather than by lowercasing both strings — this runs
+/// per candidate per keystroke, and a `String` each time is thousands of allocations.
+pub fn fuzzy_score(candidate: &str, typed: &str, fuzzy: Fuzzy) -> Option<i32> {
+    let cap = fuzzy.max_gap()?;
+    if typed.is_empty() {
+        return Some(0);
+    }
+    let have: Vec<char> = candidate.chars().flat_map(char::to_lowercase).collect();
+    let wanted: Vec<char> = typed.chars().flat_map(char::to_lowercase).collect();
+    if wanted.len() > have.len() {
+        return None;
+    }
+
+    // Two alignments, best-of. Neither is right on its own, and both are cheap.
+    //
+    // Preferring word starts is what makes an abbreviation work — `cre` finding `c`argo `r`un
+    // --`e`xample rather than the `r` buried in `cargo`. But applied as a rule it strands the rest
+    // of the query: `rdme` against `README.md` jumps to the `m` after the dot and then has no `e`
+    // left to find. Taking the earliest letter every time has the opposite failure. So try the
+    // boundary-seeking alignment, fall back to the plain one, and keep whichever scored.
+    let boundaries = align(&have, &wanted, cap, true);
+    let plain = align(&have, &wanted, cap, false);
+    boundaries.max(plain)
+}
+
+/// One alignment pass. `prefer_boundaries` chooses between the two failure modes above.
+fn align(have: &[char], wanted: &[char], cap: usize, prefer_boundaries: bool) -> Option<i32> {
+    const SEPARATORS: [char; 6] = ['/', '-', '_', '.', ' ', ':'];
+    let mut score = 0i32;
+    let mut at = 0usize;
+    let mut previous: Option<usize> = None;
+    let mut first: Option<usize> = None;
+
+    let starts_word = |index: usize| {
+        index == 0
+            || index
+                .checked_sub(1)
+                .and_then(|before| have.get(before))
+                .is_some_and(|c| SEPARATORS.contains(c))
+    };
+
+    for &want in wanted {
+        let earliest = have[at..].iter().position(|&have| have == want)? + at;
+        let reachable = |index: usize| match previous {
+            Some(last) => index - last - 1 <= cap,
+            None => true,
+        };
+        let found = if prefer_boundaries {
+            have[at..]
+                .iter()
+                .enumerate()
+                .find(|&(offset, &c)| {
+                    c == want && starts_word(at + offset) && reachable(at + offset)
+                })
+                .map_or(earliest, |(offset, _)| at + offset)
+        } else {
+            earliest
+        };
+
+        // A single gap wider than the preset allows refuses the whole candidate. Measured between
+        // consecutive matches only — the distance from the start of the string is not a gap, or no
+        // candidate could ever match on its second word.
+        if let Some(last) = previous {
+            let gap = found - last - 1;
+            if gap > cap {
+                return None;
+            }
+            score -= gap as i32;
+            if gap == 0 {
+                score += 8;
+            }
+        }
+        if starts_word(found) {
+            score += 12;
+        }
+        first.get_or_insert(found);
+        previous = Some(found);
+        at = found + 1;
+    }
+
+    // Where the match started, and how much candidate is left over. Both are tie-breaks rather than
+    // signals: among candidates that matched the same way, the one that starts sooner and has less
+    // left dangling is the better answer. Capped so a very long candidate cannot be pushed below a
+    // genuinely worse match on length alone.
+    score -= first.unwrap_or(0).min(20) as i32;
+    score -= (have.len() - wanted.len()).min(40) as i32 / 4;
+    Some(score)
 }
 
 /// Whether every piece of `typed` prefixes the corresponding piece of `candidate`.
@@ -91,4 +269,100 @@ fn matches_by_piece(candidate: &str, typed: &str) -> bool {
                 matches_ignoring_case(h, w) && (h.len() == w.len() || i + 1 < wanted.len())
             }
         })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// The canonical shell abbreviation, and the reason `smart` is the default preset.
+    #[test]
+    fn gco_reaches_git_checkout_at_smart_but_not_at_tight() {
+        assert!(fuzzy_score("git checkout", "gco", Fuzzy::Smart).is_some());
+        assert!(
+            fuzzy_score("git checkout", "gco", Fuzzy::Tight).is_none(),
+            "tight means nearly adjacent"
+        );
+        assert!(
+            fuzzy_score("git checkout", "gco", Fuzzy::Off).is_none(),
+            "off must not match anything at all"
+        );
+    }
+
+    /// The failure mode a gap cap exists to prevent.
+    ///
+    /// Note how far apart these have to be to be refused: `cat` against `create_a_template` is
+    /// *not* a scatter, because `c`, `a` and `t` all sit inside `create`. That is the matcher
+    /// working — it is why the cap is measured between consecutive letters and not across the word.
+    #[test]
+    fn a_wide_scatter_is_refused() {
+        let sprawl = "cxxxxxxxxxxaxxxxxxxxxxt";
+        assert!(
+            fuzzy_score(sprawl, "cat", Fuzzy::Loose).is_none(),
+            "gaps of ten beat loose's eight"
+        );
+        assert!(fuzzy_score(sprawl, "cat", Fuzzy::Smart).is_none());
+        assert!(fuzzy_score("create_a_template", "cat", Fuzzy::Smart).is_some());
+    }
+
+    /// The alignment a person means by an abbreviation, which greedy matching gets wrong.
+    ///
+    /// `cre` against `cargo run --example` has an `r` buried in `cargo` that a first-occurrence
+    /// scan takes, stranding the final `e` nine characters away and refusing the whole candidate.
+    /// Preferring a reachable word start finds `c`argo `r`un --`e`xample instead.
+    #[test]
+    fn a_word_start_is_preferred_over_an_earlier_letter_inside_a_word() {
+        assert!(
+            fuzzy_score("cargo run --example", "cre", Fuzzy::Loose).is_some(),
+            "the obvious match must not be refused"
+        );
+        let boundary = fuzzy_score("cargo run --example", "cre", Fuzzy::Loose).unwrap();
+        let buried = fuzzy_score("cargoruneexample", "cre", Fuzzy::Loose).unwrap();
+        assert!(
+            boundary > buried,
+            "boundary {boundary} should beat buried {buried}"
+        );
+    }
+
+    /// A near-prefix must beat a scatter, or the list fills with noise.
+    #[test]
+    fn adjacent_letters_beat_scattered_ones() {
+        let together = fuzzy_score("cargo", "car", Fuzzy::Smart).unwrap();
+        let apart = fuzzy_score("clear-archive", "car", Fuzzy::Smart).unwrap();
+        assert!(together > apart, "{together} should beat {apart}");
+    }
+
+    /// Between two candidates that matched the same way, less left over wins.
+    #[test]
+    fn the_shorter_candidate_wins_a_tie() {
+        let short = fuzzy_score("cargo", "cargo", Fuzzy::Smart).unwrap();
+        let long = fuzzy_score("cargo-nextest-runner", "cargo", Fuzzy::Smart).unwrap();
+        assert!(short > long, "{short} should beat {long}");
+    }
+
+    #[test]
+    fn case_is_ignored_on_both_sides() {
+        assert!(fuzzy_score("README.md", "rdme", Fuzzy::Smart).is_some());
+        assert!(fuzzy_score("readme.md", "RDME", Fuzzy::Smart).is_some());
+    }
+
+    #[test]
+    fn a_preset_reads_back_as_what_it_was_written_as() {
+        for name in ["off", "tight", "smart", "loose"] {
+            assert_eq!(Fuzzy::parse(name).unwrap().name(), name);
+        }
+        assert_eq!(Fuzzy::parse("true"), Some(Fuzzy::Smart));
+        assert_eq!(Fuzzy::parse("false"), Some(Fuzzy::Off));
+        assert_eq!(Fuzzy::parse("nonsense"), None);
+    }
+
+    /// Cycling must come back to where it started, or a key bound to it walks into a corner.
+    #[test]
+    fn the_ramp_is_a_loop() {
+        let mut at = Fuzzy::Off;
+        for _ in 0..4 {
+            at = at.next();
+        }
+        assert_eq!(at, Fuzzy::Off);
+    }
 }

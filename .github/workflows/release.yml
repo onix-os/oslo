@@ -53,7 +53,7 @@ jobs:
         run: |
           cc_var="CC_$(echo '${{ matrix.target }}' | tr - _)"
           export "$cc_var=musl-gcc"
-          cargo build --release --locked --target '${{ matrix.target }}' --bin oslo
+          cargo build --release --target '${{ matrix.target }}' --bin oslo
       # "Static" is a claim about the ELF, so check the ELF. `ldd` is not enough: it prints
       # "statically linked" for a musl binary that still has an INTERP and will not start.
       - name: Assert the binary is static
