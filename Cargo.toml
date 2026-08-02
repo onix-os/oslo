@@ -63,8 +63,10 @@ tokio = { version = "1.53.1", features = ["rt", "macros"] }
 # contents, which is what makes editing an allowed file revoke it. Pure Rust, so it does not cost
 # the static musl build a C toolchain.
 sha2 = "0.11.0"
-
-[dev-dependencies]
+# A regular dependency rather than a dev one since the directory environment arrived: an `.envrc`'s
+# own output is captured to a scratch file so it can be printed under the file that produced it.
+# A pipe would be the obvious choice and is the wrong one — nothing drains it while the rc file
+# runs, so a chatty `.envrc` would block forever on its own output once the pipe filled.
 tempfile = "3.17"
 
 # A one-package workspace, stated explicitly so `cargo fmt --all` and the 600-line limit apply
