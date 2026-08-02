@@ -105,5 +105,9 @@ jobs:
             echo "Update both together, or the MSRV is not actually being checked." >&2
             exit 1
           fi
+      # `--locked` is the lockfile check as well as the MSRV one. A version bump that updates
+      # Cargo.toml and not Cargo.lock builds perfectly everywhere except in the release workflow,
+      # which passes `--locked` for reproducibility and is the only thing that ever noticed — so
+      # the drift was found by a red release rather than by the push that caused it.
       - name: Build at MSRV
-        run: cargo check --all-targets
+        run: cargo check --all-targets --locked
