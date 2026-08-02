@@ -148,6 +148,17 @@ pub struct Table {
     /// Values at 1..=n, Lua's sequence part.
     array: Vec<Value>,
     hash: HashMap<Key, Value>,
+    /// The hash part's keys in the order they were first written.
+    ///
+    /// **Lua does not promise an order for `pairs`, but a shell has to have one.** Without this,
+    /// iteration follows the hash map, so a table built the same way twice iterates differently
+    /// between runs — a config that walks a settings table gets a different order each start, and
+    /// a record printed as columns prints them shuffled. Both are the kind of bug that is noticed
+    /// long after it is introduced and blamed on something else.
+    ///
+    /// Kept beside the map rather than replacing it: lookup stays O(1), and only iteration and
+    /// removal pay anything.
+    order: Vec<Key>,
     /// Keys that are tables or functions, kept so iteration can hand back the original value.
     key_objects: HashMap<usize, Value>,
     pub metatable: Option<Rc<RefCell<Table>>>,
@@ -197,6 +208,7 @@ impl Table {
                 // filling a gap joins the two halves rather than leaving `#t` short.
                 let mut next = self.array.len() as i64 + 1;
                 while let Some(v) = self.hash.remove(&Key::Int(next)) {
+                    self.order.retain(|k| k != &Key::Int(next));
                     self.array.push(v);
                     next += 1;
                 }
@@ -212,11 +224,17 @@ impl Table {
         }
         if matches!(value, Value::Nil) {
             self.hash.remove(&k);
+            self.order.retain(|existing| existing != &k);
             if let Key::Ref(addr) = &k {
                 self.key_objects.remove(addr);
             }
         } else {
-            self.hash.insert(k, value);
+            // Only a key that is genuinely new joins the order. Assigning over an existing key
+            // leaves it where it was, which is what someone editing a table expects: changing a
+            // value should not move the column.
+            if self.hash.insert(k.clone(), value).is_none() {
+                self.order.push(k);
+            }
         }
     }
 
@@ -234,7 +252,11 @@ impl Table {
             .filter(|(_, v)| !matches!(v, Value::Nil))
             .map(|(i, v)| (Value::Number(Number::Int(i as i64 + 1)), v.clone()))
             .collect();
-        for (k, v) in &self.hash {
+        // Insertion order, not the map's. See `order`.
+        for k in &self.order {
+            let Some(v) = self.hash.get(k) else {
+                continue;
+            };
             let key = match k {
                 Key::Ref(addr) => self.key_objects.get(addr).cloned().unwrap_or(Value::Nil),
                 other => other.to_value(),
@@ -391,4 +413,73 @@ pub fn parse_number(text: &str) -> Option<Number> {
         return Some(Number::Int(i));
     }
     t.parse::<f64>().ok().map(Number::Float)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Table, Value};
+
+    fn string_keys(t: &Table) -> Vec<String> {
+        t.pairs()
+            .iter()
+            .filter_map(|(k, _)| match k {
+                Value::Str(s) => Some(s.to_string()),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// `pairs` follows the order the keys were written in, every time.
+    ///
+    /// Lua promises no order here, but a shell needs one: a record's columns are drawn and
+    /// serialised in iteration order, and a hash map's order changes between runs — so a table
+    /// built identically twice would print its columns shuffled. This is the prerequisite the
+    /// structured pipeline rests on; see `docs/research/dual-channel-pipe.md`.
+    #[test]
+    fn the_hash_part_iterates_in_insertion_order() {
+        let names = [
+            "filesystem",
+            "size",
+            "used",
+            "avail",
+            "use_percent",
+            "mounted_on",
+        ];
+        // Built the same way twice: both must agree with each other and with the source order.
+        for _ in 0..2 {
+            let mut t = Table::new();
+            for name in names {
+                t.set(Value::str(name), Value::int(1));
+            }
+            assert_eq!(
+                string_keys(&t),
+                names,
+                "columns keep the order they were written"
+            );
+        }
+    }
+
+    /// Writing over a key leaves it where it was — changing a value must not move the column.
+    #[test]
+    fn assigning_again_does_not_reorder() {
+        let mut t = Table::new();
+        for name in ["a", "b", "c"] {
+            t.set(Value::str(name), Value::int(1));
+        }
+        t.set(Value::str("a"), Value::int(99));
+        assert_eq!(string_keys(&t), ["a", "b", "c"]);
+    }
+
+    /// A removed key forgets its place, and comes back once — not twice, and not where it was.
+    #[test]
+    fn removing_a_key_forgets_its_place() {
+        let mut t = Table::new();
+        for name in ["a", "b", "c"] {
+            t.set(Value::str(name), Value::Bool(true));
+        }
+        t.set(Value::str("b"), Value::Nil);
+        assert_eq!(string_keys(&t), ["a", "c"]);
+        t.set(Value::str("b"), Value::Bool(true));
+        assert_eq!(string_keys(&t), ["a", "c", "b"]);
+    }
 }
