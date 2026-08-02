@@ -26,6 +26,11 @@ fn parse_mode(args: &[String]) -> std::result::Result<(PathMode, &[String]), Str
         if arg.len() < 2 || !arg.starts_with('-') {
             break;
         }
+        // `cd -3` is a destination, not a mistyped option: it means three back through the
+        // directory history. Stopping here leaves it to be read as an operand, where it belongs.
+        if arg[1..].chars().all(|c| c.is_ascii_digit()) {
+            break;
+        }
         for flag in arg.chars().skip(1) {
             match flag {
                 'L' => mode = PathMode::Logical,
@@ -76,6 +81,24 @@ pub fn builtin_cd(env: &mut Environment, args: &[String]) -> Result<i32> {
                 }
             }
         }
+        // `cd -3` — three directories back through the ring, which `cd -` cannot express and
+        // which is what you want the moment you are more than one wrong turn from home. Only a
+        // *number* is treated this way; `cd -L` and `cd -P` are options and were handled above.
+        Some(operand)
+            if operand.len() > 1
+                && operand.starts_with('-')
+                && operand[1..].chars().all(|c| c.is_ascii_digit()) =>
+        {
+            announce = true;
+            let n: usize = operand[1..].parse().unwrap_or(0);
+            match super::ring::nth_back(n) {
+                Some(path) => path,
+                None => {
+                    eprintln!("oslo: cd: {operand}: no such entry in the directory history");
+                    return Ok(1);
+                }
+            }
+        }
         Some(operand) => operand.to_string(),
     };
 
@@ -84,6 +107,9 @@ pub fn builtin_cd(env: &mut Environment, args: &[String]) -> Result<i32> {
             if announce {
                 println!("{destination}");
             }
+            // Remembered *after* the move succeeded, so a failed `cd` does not appear in the
+            // history of places you have been.
+            super::ring::record(&destination);
             Ok(0)
         }
         None => Ok(1),

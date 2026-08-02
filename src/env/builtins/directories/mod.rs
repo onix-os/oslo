@@ -15,6 +15,7 @@
 mod cd;
 mod chdir;
 mod dirs;
+pub mod ring;
 mod stack;
 
 pub use cd::{builtin_cd, builtin_pwd};
