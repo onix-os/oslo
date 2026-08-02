@@ -22,7 +22,14 @@
 //! columns that will never change and wrong for a store other tools are meant to read. Migration is
 //! additive only: `ALTER TABLE ... ADD COLUMN`, never destructive, and a file written by a version
 //! this binary does not understand is read but never written.
+//!
+//! # The file is private, and so are its sidecars
+//!
+//! Every command line and every directory in here is plaintext, so the file is 0600 — and the
+//! `-wal` beside it is 0600 too, which is the half that is easy to get wrong. `super::private`
+//! holds that, and the note there gives the ordering it depends on.
 
+use super::private::{make_private, repair, sidecars};
 use std::path::Path;
 use std::sync::{Mutex, OnceLock};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
@@ -214,13 +221,29 @@ pub struct Track {
 
 impl Track {
     /// Open, creating the file and its directory if they are not there.
+    ///
+    /// The file and its `-wal` are made private *first*, before turso is handed the path and
+    /// therefore before any statement runs. That ordering is the point rather than a detail. The
+    /// schema statements below are the first real statements, and they are what brings the `-wal`
+    /// into existence; tightening at the end of this function would leave it born world-readable,
+    /// and an unclean shutdown then leaves the most recent commands sitting in a file anyone can
+    /// read. Measured on turso 0.7.2: the sidecar does not inherit the database's mode at all — a
+    /// 0600 database still produces a 0664 `-wal` under a 002 umask — so it is created here, at
+    /// zero length, which is what an empty log is anyway.
     pub fn open(path: &Path) -> Option<Track> {
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent).ok()?;
         }
+        make_private(path)?;
+        let [wal, shm] = sidecars(path);
+        let _ = make_private(&wal);
+        // Not created, only repaired: turso writes no `-shm`, and inventing one for it to find
+        // would be this store guessing at another implementation's file format.
+        repair(&shm);
+
         let file = path.to_str()?.to_string();
         let home = std::env::var("HOME").ok().filter(|home| !home.is_empty());
-        runtime().block_on(async move {
+        let track = runtime().block_on(async move {
             let db = turso::Builder::new_local(&file).build().await.ok()?;
             let conn = db.connect().ok()?;
             conn.busy_timeout(Duration::from_millis(BUSY_MS)).ok()?;
@@ -252,7 +275,16 @@ impl Track {
                 current: Mutex::new(None),
                 home,
             })
-        })
+        })?;
+
+        // Best effort, and for a database an earlier version of this store created: anything that
+        // appeared while the schema was being applied is tightened too. Nothing above depends on
+        // this — the `-wal` was already private before turso saw it — which is why a failure here
+        // is not allowed to refuse the store.
+        for sidecar in sidecars(path) {
+            repair(&sidecar);
+        }
+        Some(track)
     }
 
     /// Whether this store will accept writes. False only for a file from a future version.

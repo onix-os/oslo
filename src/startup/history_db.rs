@@ -24,6 +24,7 @@
 
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 /// The language a line was typed in, as stored.
 ///
@@ -70,9 +71,14 @@ const SCHEMA: &str = "CREATE TABLE IF NOT EXISTS history (\
      mode TEXT NOT NULL, \
      at INTEGER NOT NULL)";
 
+/// How many appends go by between trims. See [`History::trim_soon`].
+const TRIM_EVERY: usize = 100;
+
 /// An open history database.
 pub struct History {
     db: turso::Database,
+    /// Appends since the last trim, so the scan is amortised rather than paid per line.
+    since_trim: AtomicUsize,
 }
 
 impl History {
@@ -89,8 +95,27 @@ impl History {
             let db = turso::Builder::new_local(&path).build().await.ok()?;
             let conn = db.connect().ok()?;
             conn.execute(SCHEMA, ()).await.ok()?;
-            Some(History { db })
+            Some(History {
+                db,
+                since_trim: AtomicUsize::new(0),
+            })
         })
+    }
+
+    /// Trim, but not more often than one line in [`TRIM_EVERY`].
+    ///
+    /// The REPL used to call [`History::trim`] after every single command, and `trim` is a
+    /// `DELETE ... WHERE id NOT IN (SELECT ... LIMIT N)` — a full scan of the table, per line
+    /// typed, to delete nothing at all in the overwhelming majority of cases. A hundred lines of
+    /// slack against a ten-thousand-line bound is not a bound anybody can perceive, and the scan
+    /// the shell gets back pays for everything else it now does with a database per command.
+    ///
+    /// The loop trims unconditionally on the way out, so a short session still ends bounded.
+    pub fn trim_soon(&self, max: usize) {
+        if self.since_trim.fetch_add(1, Ordering::Relaxed) + 1 >= TRIM_EVERY {
+            self.since_trim.store(0, Ordering::Relaxed);
+            self.trim(max);
+        }
     }
 
     /// Remember one line.
@@ -252,5 +277,27 @@ mod tests {
 
         assert!(history.clear());
         assert!(history.recent(10).is_empty());
+    }
+
+    /// The amortised trim is still a bound: it lets the table run over for a while and then puts
+    /// it back, rather than scanning the whole table once per line to delete nothing.
+    #[test]
+    fn the_bound_is_enforced_in_batches_rather_than_per_line() {
+        let (_dir, history) = temp_db();
+        for i in 1..=(TRIM_EVERY - 1) {
+            history.append(&format!("cmd {i}"), MODE_SHELL);
+            history.trim_soon(5);
+        }
+        assert_eq!(
+            history.recent(1000).len(),
+            TRIM_EVERY - 1,
+            "nothing has been scanned yet"
+        );
+
+        history.append("cmd last", MODE_SHELL);
+        history.trim_soon(5);
+        let kept = history.recent(1000);
+        assert_eq!(kept.len(), 5);
+        assert_eq!(kept[4].line, "cmd last", "and it kept the newest");
     }
 }

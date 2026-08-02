@@ -11,6 +11,7 @@
 //! * [`history`] — where the history lives, how big it is, and the `history` builtin.
 //! * [`lua_init`] — the optional `init.lua` layer, and what happens when it is broken.
 //! * [`repl`] — the interactive loop that uses all three.
+//! * `tracking` — what that loop hands [`oslo::track`] instead of discarding.
 
 pub mod config;
 pub mod history;
@@ -24,3 +25,4 @@ pub mod rc;
 mod read;
 pub mod recall;
 pub mod repl;
+mod tracking;

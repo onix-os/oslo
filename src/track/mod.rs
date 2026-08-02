@@ -28,6 +28,7 @@
 //! lines cannot reach the file because there is no file to reach.
 
 pub mod db;
+mod private;
 pub mod query;
 pub mod redact;
 pub mod score;

@@ -251,13 +251,16 @@ impl Hinter for OsloHelper {
         // suggestions off entirely.
         for source in settings::current().suggest.sources {
             let found = match source {
-                // oslo's own, not the editor's: the editor holds one history and it is still the
-                // other language's until the line ends. See `recall::suggest`.
                 // oslo's own set, not the editor's. The editor's history is the complete record —
                 // both languages — because that is what `$HISTFILE` must receive, so filtering it
                 // there would corrupt the file. The suggestion therefore reads the
                 // language-filtered set directly, and falls back to the editor's hinter only when
                 // nothing has been remembered at all, where there is no language to cross.
+                //
+                // It is also where the directory gets a say: `recall::suggest` asks what has been
+                // run in *this* directory and then in this worktree before it walks the flat set,
+                // so `cargo run --ex` answers with the example belonging to the project you are
+                // standing in. The editor's own hinter can only ever know the one history.
                 settings::Source::History => recall::suggest(line).or_else(|| {
                     recall::is_empty()
                         .then(|| self.history_hinter.hint(line, pos, ctx))

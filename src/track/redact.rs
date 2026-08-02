@@ -334,11 +334,30 @@ fn is_user_password(word: &str) -> bool {
         .is_some_and(|(user, password)| !user.is_empty() && !password.is_empty())
 }
 
-/// Whether a directory must be kept out of the store entirely — not merely out of `run`.
+/// Directories that are excluded as themselves, not as the top of a subtree.
+///
+/// `/tmp` is a lobby. Nobody works *in* it, so recording it buys nothing, but plenty of people work
+/// in `/tmp/build-xyz` and excluding those with it would silently delete the feature for them.
+const EXCLUDED_DIRS: &[&str] = &["/tmp"];
+
+/// Path components that exclude everything beneath them.
 ///
 /// A store that ranks `~/.cargo/registry/src/index.crates.io-abcd/serde-1.0.219` because a build
-/// touched it is worse than useless, and `$HOME` is never a jump target: `cd` with no operand
-/// already goes there.
+/// touched it is worse than useless, and the same goes for the thousand directories a
+/// `node_modules` is.
+const EXCLUDED_COMPONENTS: &[&str] = &[".git", "node_modules"];
+
+/// Whether a directory must be kept out of the store entirely — not merely out of `run`.
+///
+/// This is the design's directory exclusion list (`docs/research/smart-cd.md`, Privacy and size,
+/// item 6): `$HOME` itself, `/tmp`, and anything under a `node_modules` or `.git` component. Note
+/// which of those are subtrees and which are not — the design spells out "anything under" for the
+/// two components and names the other two as directories, and the difference is the difference
+/// between excluding `/tmp` and excluding everybody who builds in it.
+///
+/// `$HOME` is excluded as itself for the reason the design gives and zoxide's default agrees with:
+/// it is never a jump target, because `cd` with no operand already goes there. Its children are the
+/// ordinary case and are recorded.
 pub fn is_excluded(path: &str, home: Option<&str>) -> bool {
     let path = path.trim_end_matches('/');
     if let Some(home) = home {
@@ -347,11 +366,11 @@ pub fn is_excluded(path: &str, home: Option<&str>) -> bool {
             return true;
         }
     }
-    if path == "/tmp" || path.starts_with("/tmp/") {
+    if EXCLUDED_DIRS.contains(&path) {
         return true;
     }
     path.split('/')
-        .any(|component| component == "node_modules" || component == ".git")
+        .any(|component| EXCLUDED_COMPONENTS.contains(&component))
 }
 
 #[cfg(test)]
@@ -484,13 +503,30 @@ mod tests {
         assert!(is_excluded("/home/u", home), "$HOME is never a jump target");
         assert!(is_excluded("/home/u/", home), "with or without the slash");
         assert!(!is_excluded("/home/u/src", home), "but its children are");
-        assert!(is_excluded("/tmp", None));
-        assert!(is_excluded("/tmp/build/x", None));
-        assert!(!is_excluded("/tmpfoo", None), "a prefix is not a component");
         assert!(is_excluded("/w/p/node_modules/react/lib", None));
         assert!(is_excluded("/w/p/.git/refs", None));
         assert!(!is_excluded("/w/p/src", home));
+        assert!(
+            !is_excluded("/w/p/gitignore", None),
+            "a component is matched whole, not as a prefix"
+        );
         // No home to compare against is not a match against the empty string.
         assert!(!is_excluded("/", Some("")));
+    }
+
+    /// `/tmp` is on the design's exclusion list as a *directory*, next to two entries that say
+    /// "anything under". Nobody works in the lobby, and plenty of people work in a build tree
+    /// under it — excluding those too would kill the feature for them with no diagnostic at all,
+    /// which is the failure this store can least afford, since its only symptom is a `cd` that
+    /// quietly never learns anything.
+    #[test]
+    fn a_build_tree_under_tmp_is_ordinary_work() {
+        assert!(is_excluded("/tmp", None));
+        assert!(is_excluded("/tmp/", None), "with or without the slash");
+        assert!(!is_excluded("/tmp/build-xyz", None));
+        assert!(!is_excluded("/tmp/scratch/src", None));
+        assert!(!is_excluded("/tmpfoo", None), "a prefix is not a component");
+        // And the component rules still reach inside it.
+        assert!(is_excluded("/tmp/p/node_modules/react", None));
     }
 }

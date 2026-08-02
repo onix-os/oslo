@@ -151,6 +151,21 @@ impl Track {
         Some(Some((dir_id(conn, &to).await?, to.path.to_string())))
     }
 
+    /// Forget every command line, and keep every directory.
+    ///
+    /// `history -c` means "forget the history", and a store that went on suggesting the lines it
+    /// had just been told to forget would be lying in exactly the way the recall set would. But
+    /// "forget my command lines" is not "forget where I work", so `dir` is left standing — with it
+    /// go the visit counts a `cd` ranks on, which nobody asked to lose.
+    pub fn forget_runs(&self) -> bool {
+        if !self.writable {
+            return false;
+        }
+        runtime()
+            .block_on(async { self.conn.execute("DELETE FROM run", ()).await.ok() })
+            .is_some()
+    }
+
     /// The cached `dir.id`, but only if it is still the directory being asked about.
     fn cached_id(&self, path: &str) -> Option<i64> {
         self.current
@@ -384,6 +399,27 @@ mod tests {
         assert_eq!(
             count(&track, "SELECT visits FROM dir WHERE path = '/w/p'"),
             1
+        );
+    }
+
+    /// What `history -c` costs and what it does not: the lines go, the places stay.
+    #[test]
+    fn forgetting_the_lines_keeps_the_directories() {
+        let (_dir, track) = store();
+        track.record(&Step {
+            ran_in: Visit::at("/w"),
+            moved_to: Some(Visit::at("/w/alpha")),
+            dwell_ms: 0,
+            run: None,
+        });
+        track.record(&ran("/w/alpha", "cargo build", 0));
+        assert!(track.forget_runs());
+
+        assert_eq!(track.suggestion_here("/w/alpha", SH, "cargo"), None);
+        assert_eq!(
+            count(&track, "SELECT visits FROM dir WHERE path = '/w/alpha'"),
+            1,
+            "where you work is not one of the lines you asked to forget"
         );
     }
 

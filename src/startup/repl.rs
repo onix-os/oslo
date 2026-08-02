@@ -8,7 +8,7 @@ use crate::absorb_loop_control;
 use crate::startup::mode::{Mode, ToggleRequest};
 use crate::startup::read::{Input, read_command};
 use crate::startup::recall::{remember_history, seed_history};
-use crate::startup::{config, history, history_db, keybind, lua_init, mode, rc};
+use crate::startup::{config, history, history_db, keybind, lua_init, mode, rc, tracking};
 use oslo::Environment;
 use oslo::LuaEngine;
 use oslo::env::builtins::run_exit_trap;
@@ -18,10 +18,17 @@ use oslo::exec::{JobManager, eval_command_list};
 use oslo::interactive::OsloHelper;
 use oslo::parser::parse_with_aliases;
 use rustyline::error::ReadlineError;
-use rustyline::history::{History, SearchDirection};
 use rustyline::{Editor, history::FileHistory};
-use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
+
+// A sibling file rather than an entry in `startup::mod`, and a child module rather than a peer,
+// because it is the loop's editor and nothing else's: `run_repl` is its only caller. Declared the
+// way `main.rs` declares `history_expand`, for the same reason — the narrowest name a thing can
+// have is the one that keeps it from being reached by accident.
+#[path = "editor.rs"]
+mod editor;
+
+use editor::{build_editor, publish_history, remember};
 
 pub type Repl = Editor<OsloHelper, FileHistory>;
 
@@ -92,6 +99,10 @@ pub fn run_repl() -> ! {
         std::env::var("HOME").ok().as_deref(),
     )
     .and_then(|path| history_db::History::open(&path));
+    // Beside it, and opened from here for the same reason: this is the one place in the program
+    // that knows a person is typing. `tracking::Tracker::start` is what installs the process-wide
+    // handle, so a script, an `oslo -c` or a subshell has none to write to.
+    let mut tracker = tracking::Tracker::start(&current_directory(), &settings);
     let mut rl = build_editor(&settings);
 
     // The mode the prompt is reading, and the flag the toggle key sets. Both live for the whole
@@ -183,8 +194,9 @@ pub fn run_repl() -> ! {
                         },
                     );
                     // `$HISTSIZE` bounds the table as well as the editor's copy, or the file
-                    // grows without limit while the shell politely forgets.
-                    db.trim(settings.max_size.max(1));
+                    // grows without limit while the shell politely forgets. Amortised, because
+                    // the trim is a full scan and this used to be one per line typed.
+                    db.trim_soon(settings.max_size.max(1));
                 }
 
                 // Handed the command as typed, which is what a `precmd` hook is for: logging it,
@@ -228,6 +240,11 @@ pub fn run_repl() -> ! {
                     if let Some(db) = &db {
                         db.clear();
                     }
+                    // And the tracker's lines, for the same reason. Not its directories: "forget
+                    // my command lines" is not "forget where I work".
+                    if let Some(track) = oslo::track::store() {
+                        track.forget_runs();
+                    }
                     oslo::interactive::recall::clear();
                     publish_history(&rl);
                 }
@@ -254,10 +271,22 @@ pub fn run_repl() -> ! {
                 if let Ok(status) = res {
                     lua.fire_hook("postcmd", vec![LuaEngine::hook_status(status)]);
                 }
+                // Beside the hook rather than through it: `postcmd` fires only on `Ok`, and a
+                // command that failed is exactly the one the `fails` column exists to count. Every
+                // argument here is a local this loop already had and used to drop.
+                if secret {
+                    tracker.forget_boundary();
+                } else {
+                    let run = tracking::ran(&text, mode.name(), &res, elapsed);
+                    tracker.boundary(&before, &after, run);
+                }
 
                 match res {
                     Ok(status) => last_status = status,
                     Err(ShellError::Exit(code)) => {
+                        // The amortised trim lets the table run over between sweeps, so the bound
+                        // is enforced on the way out or a short session never enforces it at all.
+                        trim_history(&db, &settings);
                         // R6.5: `exit` from the prompt is still a shell ending, so the EXIT trap
                         // fires here too. A REPL that skipped it would leave behind exactly the
                         // temp files an interactive session accumulates most of.
@@ -277,6 +306,7 @@ pub fn run_repl() -> ! {
         }
     }
 
+    trim_history(&db, &settings);
     // End of input (Ctrl-D) is the other way a REPL ends, and POSIX makes no distinction: the
     // EXIT trap fires on both.
     let mut env_guard = env_struct.lock().unwrap();
@@ -285,56 +315,11 @@ pub fn run_repl() -> ! {
     std::process::exit(last_status);
 }
 
-/// R9.11: the editor's history configuration, which used to be left entirely at its defaults.
-fn build_editor(settings: &history::Settings) -> Repl {
-    // History is added by hand in `remember`, not automatically: what belongs in the history is
-    // the line *after* history expansion, so that `!!` recalls the command it stood for rather
-    // than itself, and a multi-line command belongs there as one entry rather than three.
-    // Repeats are kept rather than folded into the previous entry. rustyline drops a consecutive
-    // duplicate by default, which would silently renumber every later event and make `!-2` point
-    // one line too far back — bash's default `HISTCONTROL` keeps them, and `!n` only means
-    // anything if the numbering agrees.
-    let config = rustyline::Config::builder()
-        .auto_add_history(false)
-        .history_ignore_dups(false)
-        .expect("history duplicate policy")
-        // rustyline's own default is 100 entries, which loses a working day's commands.
-        .max_history_size(settings.max_size)
-        .expect("history size")
-        // Honoured for anything rustyline adds itself; `history::is_secret` covers the entries
-        // this file adds by hand, which is all of them.
-        .history_ignore_space(true)
-        // `oslo.vi.enabled`. Read here rather than toggled later because the keymap is fixed when
-        // the editor is built.
-        .edit_mode(if oslo::interactive::settings::current().vi.enabled {
-            rustyline::EditMode::Vi
-        } else {
-            rustyline::EditMode::Emacs
-        })
-        // **How long Esc waits for a second byte.** rustyline's default is to wait *forever*:
-        // Esc is also the first byte of every arrow key and function key, so with no timeout the
-        // editor cannot tell "the user pressed Esc" from "a sequence is arriving" until the next
-        // byte turns up. In vi mode that means Esc appears to do nothing until you press
-        // something else — which is why leaving insert mode felt like it took two presses. It
-        // took one; the first just could not be acted on yet.
-        //
-        // 25ms is far longer than a terminal takes to write the rest of a sequence, which it
-        // sends in one burst, and far shorter than a person can notice. fish's `fish_escape_delay`
-        // defaults to the same order for the same reason.
-        .keyseq_timeout(Some(25))
-        // `List`, not `Circular`, and the reason is the dropdown.
-        //
-        // oslo's completer opens its own menu, waits for a choice, and returns that one candidate
-        // already decided. Under `Circular` rustyline then starts a *second* selection loop over
-        // that single candidate: it inserts it, waits for a key, and reads Tab as "next" — which
-        // with one candidate wraps to the index past the end, whose meaning is *restore the
-        // original line*. So accepting a completion and then pressing Tab silently deleted it.
-        //
-        // `List` applies a lone candidate and returns immediately, leaving Tab to start a fresh
-        // completion, which is what the menu having already asked makes correct.
-        .completion_type(rustyline::CompletionType::List)
-        .build();
-    Editor::with_config(config).expect("Failed to initialize line editor")
+/// Put the history table back inside `$HISTSIZE` before the shell ends.
+fn trim_history(db: &Option<history_db::History>, settings: &history::Settings) {
+    if let Some(db) = db {
+        db.trim(settings.max_size.max(1));
+    }
 }
 
 /// A notification for a command that ran long enough to be worth one, or nothing.
@@ -426,29 +411,6 @@ fn ignore_eof_limit(env_struct: &Arc<Mutex<Environment>>) -> Option<usize> {
     Some(raw.trim().parse::<usize>().unwrap_or(10))
 }
 
-/// Add a command to the history, and to the history *file*, before it runs.
-///
-/// Appending rather than rewriting is the fix for the third of R9.11's defects: `save_history`
-/// writes the whole file, so two sessions open at once each ended with only their own commands.
-/// Writing before the command runs is deliberate too — a command that exits the shell, or hangs
-/// until it is killed, is exactly the one you want to find in the history afterwards.
-fn remember(rl: &mut Repl, file: &Option<PathBuf>, text: &str, secret: bool) {
-    if secret {
-        return;
-    }
-    let _ = rl.add_history_entry(text);
-    publish_history(rl);
-    if let Some(path) = file
-        && let Err(e) = rl.append_history(path)
-    {
-        eprintln!(
-            "oslo: {}: {}",
-            oslo::interactive::marks::path(&path.display().to_string()),
-            e
-        );
-    }
-}
-
 thread_local! {
     /// How long the command before this prompt took, for the right prompt to mention.
     ///
@@ -465,24 +427,6 @@ pub(super) fn last_command_duration() -> Option<std::time::Duration> {
 
 fn note_command_duration(elapsed: std::time::Duration) {
     LAST_DURATION.set(Some(elapsed));
-}
-
-pub(super) fn history_entries(rl: &Repl) -> Vec<String> {
-    let history = rl.history();
-    (0..history.len())
-        .filter_map(|i| {
-            history
-                .get(i, SearchDirection::Forward)
-                .ok()
-                .flatten()
-                .map(|r| r.entry.into_owned())
-        })
-        .collect()
-}
-
-/// Hand the `history` builtin the entries it prints.
-fn publish_history(rl: &Repl) {
-    history::publish(history_entries(rl));
 }
 
 #[cfg(test)]

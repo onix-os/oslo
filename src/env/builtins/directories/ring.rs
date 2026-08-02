@@ -82,24 +82,29 @@ pub fn builtin_dirh(_env: &mut Environment, _args: &[String]) -> Result<i32> {
     Ok(0)
 }
 
+/// The one lock every test that touches the ring takes, and the emptying that goes with it.
+///
+/// The ring is process-wide and so is the working directory, so `cd`'s tests and this file's tests
+/// are the same critical section — two mutexes, one in each module, would let them overlap and the
+/// failure would look like a flake rather than a race.
+#[cfg(test)]
+pub(super) fn exclusive() -> std::sync::MutexGuard<'static, ()> {
+    static SERIAL: Mutex<()> = Mutex::new(());
+    let guard = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
+    if let Ok(mut ring) = ring().lock() {
+        *ring = Ring::default();
+    }
+    guard
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn fresh() {
-        if let Ok(mut ring) = ring().lock() {
-            *ring = Ring::default();
-        }
-    }
-
-    /// One process-wide ring, so every test that touches it takes this first.
-    static SERIAL: Mutex<()> = Mutex::new(());
-
     /// `cd -N` counts back from where you are.
     #[test]
     fn nth_back_counts_from_here() {
-        let _guard = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
-        fresh();
+        let _guard = exclusive();
         for path in ["/a", "/b", "/c"] {
             record(path);
         }
@@ -112,8 +117,7 @@ mod tests {
     /// Going where you already are is not a move worth recording.
     #[test]
     fn the_same_directory_twice_is_one_entry() {
-        let _guard = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
-        fresh();
+        let _guard = exclusive();
         record("/a");
         record("/a");
         assert_eq!(history(), ["/a"]);
@@ -123,8 +127,7 @@ mod tests {
     /// it, which is what the walking cursor used to do the moment you moved somewhere new.
     #[test]
     fn moving_on_never_discards_where_you_have_been() {
-        let _guard = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
-        fresh();
+        let _guard = exclusive();
         for path in ["/a", "/b", "/c"] {
             record(path);
         }
@@ -138,8 +141,7 @@ mod tests {
     /// The oldest entries fall off rather than the ring growing for the life of the shell.
     #[test]
     fn the_ring_is_bounded() {
-        let _guard = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
-        fresh();
+        let _guard = exclusive();
         for i in 0..DEPTH + 5 {
             record(&format!("/d{i}"));
         }
