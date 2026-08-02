@@ -45,6 +45,17 @@ pub fn run_tool(
     input: Option<Vec<Record>>,
     bytes: Option<&str>,
 ) -> Option<(i32, Option<Vec<Record>>)> {
+    // A tool the config registered. Looked up first so a config can add a name the shell does not
+    // know; it cannot replace one it does, because a name already registered keeps its meaning.
+    if let Some(outcome) = crate::lua::api::tool::rows_of(name, words) {
+        return match outcome {
+            Ok(rows) => Some((0, Some(rows))),
+            Err(e) => {
+                eprintln!("oslo: {e}");
+                Some((1, None))
+            }
+        };
+    }
     match name {
         "ps" => Some((0, Some(system::ps()))),
         "ls" => Some((0, Some(system::ls(&words[1..])))),

@@ -31,6 +31,7 @@ mod re;
 mod run;
 pub(crate) mod segment;
 mod shell;
+pub(crate) mod tool;
 pub(crate) mod tools;
 
 pub(crate) use shell::handlers as hook_handlers;
@@ -49,6 +50,7 @@ pub fn install(interp: &Rc<Interp>, registry: &Registry, env: Arc<Mutex<Environm
     }
     oslo.set(Value::str("path"), paths);
     prompt::install(&mut oslo, registry);
+    tool::install(&mut oslo);
     // The settings tables exist before the config runs, empty, so that
     // `oslo.completion.max_rows = 5` is an assignment rather than an attempt to index nil. Every
     // one of these is read back after the config by walking the table, so an empty one that the
