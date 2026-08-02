@@ -6,6 +6,7 @@
 use super::OsloHelper;
 use super::command_index::CommandIndex;
 use super::dropdown::CompletionCandidate;
+use super::matching::{MATCHERS, Match, matches_ignoring_case};
 use super::words::{Quote, Word, current_word, quote_replacement, unquote};
 use std::fs;
 
@@ -22,19 +23,20 @@ use std::fs;
 /// can exercise both answers without racing each other — the settings are shared, and the test
 /// binary is multi-threaded.
 fn matches_prefix(candidate: &str, typed: &str, case_sensitive: bool) -> bool {
+    // The pass currently being tried, when the caller is walking the chain. Set around one
+    // builder's run rather than threaded through every call site: the builders are recursive and
+    // the alternative is an extra argument on a dozen functions that only two of them care about.
+    if let Some(matcher) = MATCHER.with(|slot| slot.get()) {
+        return matcher.matches(candidate, typed);
+    }
     if case_sensitive {
         return candidate.starts_with(typed);
     }
-    let mut wanted = typed.chars().flat_map(char::to_lowercase);
-    let mut have = candidate.chars().flat_map(char::to_lowercase);
-    loop {
-        match (wanted.next(), have.next()) {
-            (None, _) => return true,
-            (Some(_), None) => return false,
-            (Some(a), Some(b)) if a == b => {}
-            (Some(_), Some(_)) => return false,
-        }
-    }
+    matches_ignoring_case(candidate, typed)
+}
+
+thread_local! {
+    static MATCHER: std::cell::Cell<Option<Match>> = const { std::cell::Cell::new(None) };
 }
 
 /// A hook a config installs to complete one command itself.
@@ -107,7 +109,18 @@ impl OsloHelper {
             // Paths, variables and config-supplied candidates are left alone: those are still
             // meaningful in Lua, and this is the one source that is not.
             if super::prompt::language().is_none_or(|language| language == "sh") {
-                self.command_candidates(&word, &mut out);
+                // Each way of matching in turn, stopping at the first that finds anything. An
+                // exact match must never arrive diluted with looser ones.
+                for matcher in MATCHERS {
+                    self.command_candidates_with(&word, matcher, &mut out);
+                    if !out.is_empty() {
+                        break;
+                    }
+                    if self.case_sensitive() {
+                        // The config asked for exactness; the looser passes are not wanted.
+                        break;
+                    }
+                }
             }
         } else if let Some(from_config) = word
             .prior_words
@@ -278,6 +291,18 @@ impl OsloHelper {
         current
     }
 
+    /// Command candidates found one particular way. See [`Match`].
+    fn command_candidates_with(
+        &self,
+        word: &Word<'_>,
+        matcher: Match,
+        out: &mut Vec<CompletionCandidate>,
+    ) {
+        MATCHER.with(|slot| slot.set(Some(matcher)));
+        self.command_candidates(word, out);
+        MATCHER.with(|slot| slot.set(None));
+    }
+
     fn spec_candidates(&self, word: &Word<'_>, out: &mut Vec<CompletionCandidate>) {
         // `prior_words` holds this command's words only, so `ls | git comm<TAB>` looks up `git`
         // and not `ls`.
@@ -422,6 +447,51 @@ impl OsloHelper {
 #[cfg(test)]
 mod case_tests {
     use super::matches_prefix;
+    use super::{MATCHERS, Match};
+
+    /// Each way of matching, and the case each one exists for.
+    #[test]
+    fn a_matcher_answers_what_it_is_for() {
+        assert!(Match::Exact.matches("README.md", "REA"));
+        assert!(
+            !Match::Exact.matches("README.md", "rea"),
+            "exact means exact"
+        );
+
+        assert!(Match::Ignoring.matches("README.md", "rea"));
+        assert!(!Match::Ignoring.matches("README.md", "xyz"));
+
+        // The case everyone describes as "zsh just knew".
+        assert!(Match::Pieces.matches("/usr/share/bin", "/u/s/b"));
+        assert!(Match::Pieces.matches("foo-bar-baz", "f-b"));
+        assert!(Match::Pieces.matches("some_long_name", "s_l_n"));
+        assert!(!Match::Pieces.matches("/usr/share/bin", "/u/z/b"));
+    }
+
+    /// Piece matching only applies when a separator was typed. Without that guard it is a plain
+    /// prefix test wearing another name, tried a second time for nothing.
+    #[test]
+    fn piece_matching_needs_a_separator() {
+        assert!(
+            !Match::Pieces.matches("foo-bar", "foo"),
+            "no separator typed"
+        );
+        assert!(Match::Pieces.matches("foo-bar", "foo-b"));
+    }
+
+    /// More pieces than the candidate has cannot match, whatever they say.
+    #[test]
+    fn more_pieces_than_the_candidate_has_never_matches() {
+        assert!(!Match::Pieces.matches("/usr/bin", "/u/s/b/x"));
+    }
+
+    /// Exactness first. A list mixing an exact hit with looser ones is worse than either alone.
+    #[test]
+    fn the_chain_tries_exactness_first() {
+        assert_eq!(MATCHERS[0], Match::Exact);
+        assert_eq!(MATCHERS[1], Match::Ignoring);
+        assert_eq!(MATCHERS[2], Match::Pieces);
+    }
 
     /// The setting was read from the config and then ignored, so turning it on changed nothing.
     #[test]
