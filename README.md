@@ -108,10 +108,12 @@ Or just use `$PS1`, with the full escape set — `\u \h \w \$ \t \A \d \j \! \[ 
 
 ## Interactive
 
-- **Ghost suggestions** from history, per language, never crossing between them
+- **Ghost suggestions** from history, per language, never crossing between them, and answering for
+  the directory you are standing in
 - **A completion dropdown** with columns, per-kind info and frecency ranking
 - **Matching that is a transform, not a prefix test** — `/u/s/b` reaches `/usr/share/bin`, `f-b`
-  reaches `foo-bar`, and an exact match is never diluted with fuzzy noise
+  reaches `foo-bar`, `gco` reaches `git checkout`, and each looser pass runs only when the stricter
+  one found nothing, so an exact match is never diluted
 - **Prefix history search** on Up, which restores the line you were composing instead of blanking it
 - **First-class vi mode** on fish's model: cursor shape says the mode, the prompt says it too, and
   both update the instant it changes
@@ -144,12 +146,67 @@ Data in, data out — the handler is told about the line and answers with what i
 ```sh
 cd -         # back one
 cd -3        # three back
+cd root      # the top of the git worktree, found without running git
+cd oslo      # somewhere you have been, best match wins
 dirh         # the ring, and the numbers `cd -N` takes
 ```
 
 `cd -` is a one-deep toggle and useless once you are three wrong turns out, so every move is
 recorded and `cd -N` reaches any of them. `pushd`/`popd` stay exactly as they were, because scripts
 depend on them.
+
+**POSIX first, always.** A real directory, a `-`, a `-P` — those resolve exactly as they did before,
+and the frecency jump is reached only once `cd` has already failed to find the argument as a path.
+A script gets the old behaviour and the old exit status; the jump is for interactive shells only.
+
+Ranking is not zoxide's. Zoxide's four loudest bugs are one defect wearing four hats — its keywords
+filter but take no part in the score, so the most-visited candidate wins however badly it matched.
+Here *match quality is the primary key* and frecency only orders candidates that matched equally
+well, so `cd rust` cannot land in `prust` because you went there more often. Each of those four
+issues is a named passing test.
+
+### What it remembers
+
+A second database, beside the history one, recording where you go and what you run there:
+
+| | |
+|---|---|
+| `dir` | path, visits, last visit, dwell time, git worktree root |
+| `run` | the line, the directory, exit status, how many times, total and worst duration |
+
+Which makes the ghost suggestion answer differently depending on where you are standing:
+
+```sh
+~/work/alpha ❯ cargo run --ex⏎     # → cargo run --example xyz
+~/work/beta  ❯ cargo run --ex⏎     # → cargo run --example abc
+```
+
+The exact directory is asked first, then the worktree, then flat history. A line that has never once
+succeeded is never offered, so a typo stops haunting you.
+
+It is `0600`, tightened before the first statement so the write-ahead log is born private too. A
+line beginning with a space is not recorded, secrets are reduced to the command name rather than
+dropped, and **a non-interactive shell never opens it at all**. `history -c` clears the lines and
+keeps the directories: "forget what I typed" is not "forget where I work".
+
+No daemon. The read is a B-tree range scan rather than a `LIKE`, measured at 13 µs against 25,000
+rows, which is what makes a cache unnecessary — and therefore makes a cache that goes stale between
+two terminals impossible.
+
+### Fuzzy matching
+
+```lua
+oslo.completion = { fuzzy = "smart" }   -- dropdown
+oslo.suggest    = { fuzzy = "smart" }   -- the inline ghost
+```
+
+`off`, `tight`, `smart` or `loose` — how far apart your letters may be scattered, capped at 1, 4 and
+8 unmatched characters. `gco` reaches `git checkout` at `smart` and not at `tight`. Always the last
+pass, so switching it on can never push a candidate you actually prefixed down the list.
+
+A fuzzy suggestion does not *continue* what you typed, it replaces it, so it is never drawn as plain
+grey text — it gets a `⟶` marker and accepting it overwrites the line. You cannot mistake a
+replacement for a continuation, which is the only way this could get you to run something unread.
 
 ## Your own tools
 
