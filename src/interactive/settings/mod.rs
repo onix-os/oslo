@@ -170,11 +170,11 @@ pub struct Suggest {
     pub accept_word: Option<String>,
     /// How far the ghost suggestion will stretch to reach a line you did not prefix.
     ///
-    /// Off by default, and that is a considered default rather than caution. A prefix suggestion is
-    /// *verifiable at a glance* — the grey text continues what you typed, so you can accept it
-    /// without reading it. A fuzzy one cannot be: the line it proposes may differ from what you
-    /// typed anywhere, so accepting it without reading is how you run the wrong command. The
-    /// dropdown is the right home for guessing, because there you are already looking.
+    /// A fuzzy suggestion is a different kind of thing from a prefix one: it does not continue what
+    /// you typed, it *replaces* it. So it is never drawn as plain grey text — it gets the `⟶`
+    /// marker, and accepting it overwrites the line. That marker is what makes it safe to have on:
+    /// you cannot mistake a replacement for a continuation, which is the one way this could get you
+    /// to run a command you did not read.
     pub fuzzy: Fuzzy,
 }
 
@@ -186,7 +186,10 @@ impl Default for Suggest {
             sources: vec![Source::History, Source::Completion, Source::Path],
             accept: None,
             accept_word: None,
-            fuzzy: Fuzzy::Off,
+            // On, at the same preset as the dropdown. Reached only once every prefix source has
+            // come back empty, so on a line that had a real continuation nothing changes at all —
+            // what it fills is the case where the shell used to offer nothing.
+            fuzzy: Fuzzy::Smart,
         }
     }
 }
