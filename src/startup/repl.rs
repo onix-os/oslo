@@ -57,7 +57,7 @@ pub fn run_repl() -> ! {
     interactive_env.set_option(ShellOption::StdinInput, true);
     history::register(&mut interactive_env);
 
-    // `.oslorc` runs before anything else reads a variable, so a `HISTSIZE=` or `PS1=` in it is
+    // The config runs before anything else reads a variable, so a `HISTSIZE=` or `PS1=` in it is
     // in force for this session rather than for the next one.
     if let Some(status) = rc::load_startup_files(&mut interactive_env, true) {
         std::process::exit(run_exit_trap(&mut interactive_env, status));

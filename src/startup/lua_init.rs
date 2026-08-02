@@ -16,7 +16,7 @@ use std::sync::{Arc, Mutex};
 /// Three names for one file rather than three files that all load: a config split across places
 /// is a config nobody can find the whole of, and "which one won" is the question that follows.
 ///
-/// `~/.oslorc` is Lua. It used to be shell syntax sourced through the `source` builtin; anyone
+/// Configuration is Lua and nothing else. `~/.oslorc` used to be looked for here too; anyone
 /// with an old one gets a Lua syntax error, which is loud and points at the line — the loudest
 /// available way to say the format changed, and better than half of it silently working.
 pub fn config_paths(env: &Environment) -> Vec<PathBuf> {
@@ -34,14 +34,16 @@ pub fn config_paths(env: &Environment) -> Vec<PathBuf> {
         .map(PathBuf::from)
         .or_else(|| (!home.is_empty()).then(|| PathBuf::from(&home).join(".config")));
 
+    // **One name, one language.** `oslo/config` without the extension and `~/.oslorc` both used to
+    // be looked for as well. Neither is worth the question they create — "which one is being read,
+    // and what happens if I have two?" — and `.oslorc` in particular reads like a shell rc file to
+    // anyone who has used one, which it has not been for some time. Configuration is Lua, the file
+    // says so in its name, and there is exactly one place to put it.
     let mut paths = Vec::new();
     if let Some(xdg) = xdg {
         paths.push(xdg.join("oslo/config.lua"));
-        paths.push(xdg.join("oslo/config"));
     }
-    if !home.is_empty() {
-        paths.push(PathBuf::from(&home).join(".oslorc"));
-    }
+    let _ = home;
     paths
 }
 
