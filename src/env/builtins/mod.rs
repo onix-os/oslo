@@ -11,6 +11,7 @@
 //!
 //! [`Environment::builtin_names`]: crate::env::Environment::builtin_names
 
+mod abbr;
 pub(crate) mod arrays;
 mod builtin;
 mod caller;
@@ -128,6 +129,7 @@ pub fn register_default_builtins(env: &mut Environment) {
 
     // `OSC 52` to the terminal, so it works over SSH where a clipboard helper cannot.
     env.register_custom_builtin("copy", copy::builtin_copy);
+    env.register_custom_builtin("abbr", abbr::builtin_abbr);
 
     // Job control. `wait` is registered above but belongs with these: all five read one table.
     env.register_custom_builtin("jobs", builtin_jobs);

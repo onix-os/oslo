@@ -32,7 +32,7 @@ mod deparse;
 mod exporting;
 mod options;
 mod parameters;
-mod quoting;
+pub(crate) mod quoting;
 mod scoped;
 
 pub use aliases::{builtin_alias, builtin_unalias};

@@ -177,6 +177,27 @@ pub fn reset_history_walk() {
 /// line can be told from an untouched one.
 static WALK: Mutex<Option<(String, usize, String, String)>> = Mutex::new(None);
 
+/// Expands an abbreviation when the space that ends its word is typed.
+///
+/// The space is part of the expansion, not a separate keystroke: `gco ` becomes `git checkout `
+/// in one step, so what you see after pressing space is a finished command rather than a word
+/// waiting to be finished.
+struct Abbreviations;
+
+impl ConditionalEventHandler for Abbreviations {
+    fn handle(&self, _: &Event, _: RepeatCount, _: bool, ctx: &EventContext) -> Option<Cmd> {
+        // Only at the end of a word being typed. Expanding while the cursor is in the middle of
+        // the line would rewrite text the user is editing, not text they are writing.
+        let (text, cursor) = oslo::interactive::abbr::expand(ctx.line(), ctx.pos())?;
+        // The space the user pressed, added here rather than left to rustyline: this handler
+        // consumes the keystroke, so it owes the line that character.
+        let mut text = text;
+        text.insert(cursor, ' ');
+        let _ = cursor;
+        Some(Cmd::Replace(rustyline::Movement::WholeLine, Some(text)))
+    }
+}
+
 /// Runs a Lua handler for one key, and applies whatever it says the line should become.
 ///
 /// The handler is given a description of the line and answers with a description of the line it
@@ -290,6 +311,17 @@ pub fn apply(rl: &mut Repl, env_struct: &Arc<Mutex<Environment>>, toggle: &Toggl
             rustyline::EventHandler::Conditional(Box::new(HistoryWalk { back })),
         );
     }
+
+    // Space expands an abbreviation, if the word just typed is one. Bound unconditionally but
+    // cheap: with no abbreviations defined the handler is one hash lookup that answers `None`, and
+    // declining leaves rustyline to insert the space exactly as it would have.
+    rl.bind_sequence(
+        Event::KeySeq(vec![rustyline::KeyEvent(
+            rustyline::KeyCode::Char(' '),
+            rustyline::Modifiers::NONE,
+        )]),
+        rustyline::EventHandler::Conditional(Box::new(Abbreviations)),
+    );
 
     let (bindings, problems) = oslo::interactive::keys::resolve(&settings.keys);
     for problem in problems {

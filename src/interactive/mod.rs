@@ -4,6 +4,7 @@
 //! — each one delegates to a module that can be called directly from a test, because none of this
 //! behaviour was reachable without a pty and that is precisely why it was all wrong.
 
+pub mod abbr;
 pub mod command_index;
 pub mod completion;
 pub mod dropdown;
