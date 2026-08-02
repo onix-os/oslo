@@ -106,10 +106,19 @@ pub fn repaint(line: &str, line_cursor: usize) -> String {
     // then disagrees — also rewrite the line at the wrong column and erase the ghost hint and the
     // right prompt with it. Those prompts have no mode letter and no language segment, so there is
     // nothing a repaint could usefully change.
-    if !row.builtin {
-        return String::new();
-    }
-    let left = render_default_left_prompt(row.status, &row.language);
+    // A prompt that is not oslo's own is redrawn by asking whoever owns it — see `set_renderer`.
+    // Without that this returned nothing at all, which is why a Lua prompt's mode letter only
+    // caught up on the next line.
+    let left = if row.builtin {
+        render_default_left_prompt(row.status, &row.language)
+    } else {
+        match variant_for(&mode_name()) {
+            Some(text) => text,
+            // Nothing was prepared for this mode, so leave the row alone rather than overwrite
+            // somebody else's prompt with oslo's own.
+            None => return String::new(),
+        }
+    };
     let width = super::prompt::printed_width(&left);
     let moved = width != row.prompt_width;
     row.prompt_width = width;
@@ -163,4 +172,38 @@ pub fn repaint(line: &str, line_cursor: usize) -> String {
         out.push_str(&format!("\x1b[{target_col}C"));
     }
     out
+}
+
+// A prompt that is not oslo's own, drawn once for each vi mode it could show.
+//
+// The alternative was a callback into the read loop, but the prompt may be another program's
+// output — and a callback would have run that program again on every mode change, three times a
+// second while somebody holds Esc. Rendering the handful of variants once per line costs the same
+// Lua either way and cannot spawn anything.
+//
+// Thread-local: only the loop that prepared these ever reads them, on its own thread.
+thread_local! {
+    static VARIANTS: std::cell::RefCell<Vec<(String, String)>> =
+        const { std::cell::RefCell::new(Vec::new()) };
+}
+
+/// Record what the prompt looks like in each vi mode, as `(mode name, text)`.
+pub fn set_variants(variants: Vec<(String, String)>) {
+    VARIANTS.with(|slot| *slot.borrow_mut() = variants);
+}
+
+fn variant_for(mode: &str) -> Option<String> {
+    VARIANTS.with(|slot| {
+        slot.borrow()
+            .iter()
+            .find(|(name, _)| name == mode)
+            .map(|(_, text)| text.clone())
+    })
+}
+
+/// The vi mode's name, or an empty string when vi mode is off.
+fn mode_name() -> String {
+    super::vi::mode()
+        .map(|m| m.name().to_string())
+        .unwrap_or_default()
 }

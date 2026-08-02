@@ -14,7 +14,11 @@ use std::sync::{Arc, Mutex};
 ///
 /// Everything here the shell already knows; a segment looking each of them up itself would run
 /// `git` once per segment per keystroke.
-fn context(last_status: i32, mode: Mode) -> oslo::lua::context::Context {
+pub fn segment_context(
+    last_status: i32,
+    mode: Mode,
+    vimode: Option<&str>,
+) -> oslo::lua::context::Context {
     oslo::lua::context::Context {
         status: last_status,
         duration_ms: super::repl::last_command_duration().map(|d| d.as_millis() as u64),
@@ -23,7 +27,9 @@ fn context(last_status: i32, mode: Mode) -> oslo::lua::context::Context {
         user: whoami(),
         host: hostname(),
         language: mode.name().to_string(),
-        vimode: oslo::interactive::vi::mode().map(|m| m.name().to_string()),
+        vimode: vimode
+            .map(str::to_string)
+            .or_else(|| oslo::interactive::vi::mode().map(|m| m.name().to_string())),
         cols: oslo::interactive::dropdown::terminal_cols(),
         jobs: 0,
         continuation: false,
@@ -68,7 +74,7 @@ pub fn primary_prompt(
 
     // A Lua prompt is an explicit choice by the user and outranks `PS1`, which in turn outranks
     // the built-in default.
-    lua.render_with("prompt.left", &context(last_status, mode))
+    lua.render_with("prompt.left", &segment_context(last_status, mode, None))
         .or_else(|| lua.render_prompt())
         .unwrap_or_else(|| {
             // Both languages get the *same* prompt, with the language as one of its segments —

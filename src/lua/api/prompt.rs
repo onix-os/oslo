@@ -38,6 +38,7 @@ pub fn install(oslo: &mut Table, registry: &Registry) {
     // The fine-grained shape: a prompt as a list of named, prioritised pieces rather than one
     // opaque string. See `super::segment`.
     oslo.set(Value::str("segment"), super::segment::constructor());
+    oslo.set(Value::str("theme"), theme_table());
 }
 
 /// The `oslo.prompt` table.
@@ -107,6 +108,36 @@ fn key_for(field: &str) -> Option<&'static str> {
 }
 
 /// A style written as `oslo.style(text, "green")` or `oslo.style(text, {fg = …, bold = true})`.
+/// The `oslo.theme` table, whose `styles` field names colours.
+///
+/// `__newindex` again, for the reason `oslo.prompt` needs it: a plain table would accept the
+/// assignment into itself and never reach the style registry, so the config would look right and
+/// do nothing.
+fn theme_table() -> Value {
+    let styles = Rc::new(std::cell::RefCell::new(Table::new()));
+    let mut meta = Table::new();
+    meta.set(
+        Value::str("__newindex"),
+        super::util::native("oslo.theme.styles.__newindex", move |_, args| {
+            let (Some(Value::Str(name)), Some(Value::Str(spec))) = (args.get(1), args.get(2))
+            else {
+                return Err(LuaError::new(
+                    "oslo.theme.styles: a name maps to a style string, as in \
+                     styles['git.branch'] = 'fg:cyan bold'"
+                        .to_string(),
+                ));
+            };
+            theme::styles::define(name, spec);
+            ok(Value::Bool(true))
+        }),
+    );
+    styles.borrow_mut().metatable = Some(Rc::new(std::cell::RefCell::new(meta)));
+
+    let mut theme_table = Table::new();
+    theme_table.set(Value::str("styles"), Value::Table(styles));
+    Value::Table(Rc::new(std::cell::RefCell::new(theme_table)))
+}
+
 /// A span's `style`, which is a *name*.
 ///
 /// Two vocabularies, because both are worth having. A dotted name — `prompt.user`, `prompt.git` —
@@ -114,6 +145,12 @@ fn key_for(field: &str) -> Option<&'static str> {
 /// naming styles rather than writing colours into the prompt. Anything else is parsed as a colour,
 /// so `"cyan"` or `"#8be9fd"` works without the config having to define a theme first.
 pub fn style_named(name: &str) -> Style {
+    // A config's own definition wins. That is what naming styles is for: `oslo.theme.styles` is
+    // the one place a colour scheme lives, and a name defined there must outrank oslo's idea of
+    // what, say, `prompt.git` should look like.
+    if let Some(defined) = theme::styles::lookup(name) {
+        return defined;
+    }
     let theme = theme::current();
     match name {
         "prompt.cwd" => theme.prompt.cwd,

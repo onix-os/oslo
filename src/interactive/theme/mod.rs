@@ -10,6 +10,7 @@
 
 pub mod color;
 mod from_lua;
+pub mod styles;
 
 pub use color::{Color, Depth, Style};
 pub use from_lua::read_lua_theme;

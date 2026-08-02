@@ -118,6 +118,26 @@ pub(super) fn read_command(
                 oslo::interactive::prompt::printed_width(&prompt),
                 builtin,
             );
+            // What this prompt looks like in each vi mode, so a mode change mid-line can redraw
+            // it. Only the mode changes while a line is being typed; everything else a prompt
+            // shows is fixed for the line, so a handful of variants covers it.
+            //
+            // Only when the width does not move: the editor measures the prompt once and lays the
+            // row out against that number for the life of the line, so a variant of a different
+            // size would put the text a cell away from where the editor believes it is.
+            if !builtin && oslo::interactive::vi::enabled() {
+                let width = oslo::interactive::prompt::printed_width(&prompt);
+                let variants = ["I", "N", "R"]
+                    .into_iter()
+                    .filter_map(|mode| {
+                        let ctx = prompt::segment_context(last_status, reading, Some(mode));
+                        let text = lua.render_with("prompt.left", &ctx)?;
+                        (oslo::interactive::prompt::printed_width(&text) == width)
+                            .then(|| (mode.to_string(), text))
+                    })
+                    .collect();
+                oslo::interactive::row::set_variants(variants);
+            }
         }
 
         // Written before the prompt rather than inside it, for the same reason the right prompt is
