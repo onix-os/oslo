@@ -151,7 +151,7 @@ fn a_command_that_runs_in_this_shell_changes_it() {
     // reason `cd` is a builtin rather than a program.
     let out = lua(r#"
         oslo.run{"cd", "/tmp"}
-        print(oslo.get_pwd())
+        print(oslo.sys.pwd())
     "#);
     assert_eq!(out, "/tmp");
 }

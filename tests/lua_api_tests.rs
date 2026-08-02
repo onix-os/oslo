@@ -38,19 +38,19 @@ fn lua_script_propagates_the_status_of_what_it_ran() {
     let dir = tempfile::tempdir().unwrap();
     let script = dir.path().join("s.lua");
 
-    std::fs::write(&script, "oslo.exec('false')\n").unwrap();
+    std::fs::write(&script, "oslo.proc.exec('false')\n").unwrap();
     let failed = run(&[script.to_str().unwrap()], &[], dir.path());
     assert_eq!(
         failed.status.code(),
         Some(1),
-        "a failing oslo.exec must show"
+        "a failing oslo.proc.exec must show"
     );
 
-    std::fs::write(&script, "oslo.exec('true')\n").unwrap();
+    std::fs::write(&script, "oslo.proc.exec('true')\n").unwrap();
     let ok = run(&[script.to_str().unwrap()], &[], dir.path());
     assert_eq!(ok.status.code(), Some(0));
 
-    std::fs::write(&script, "oslo.exec('exit 7')\n").unwrap();
+    std::fs::write(&script, "oslo.proc.exec('exit 7')\n").unwrap();
     let exited = run(&[script.to_str().unwrap()], &[], dir.path());
     assert_ne!(
         exited.status.code(),
@@ -92,16 +92,16 @@ assert(#arg == 1 and arg[1] == "release", "arg should carry the operands")
 assert(select("#", ...) == 1, "... should carry them too")
 
 -- capture: the answer *and* the status
-local r = oslo.capture("echo  spaced out ")
+local r = oslo.proc.capture("echo  spaced out ")
 assert(r.out == "spaced out", "got " .. r.out)
 assert(r.status == 0)
-assert(oslo.capture("exit 7").status == 7, "a failing command must report its status")
-assert(oslo.capture("{ echo e >&2; } 2>&1").out == "e", "2>&1 folds stderr in")
+assert(oslo.proc.capture("exit 7").status == 7, "a failing command must report its status")
+assert(oslo.proc.capture("{ echo e >&2; } 2>&1").out == "e", "2>&1 folds stderr in")
 
 -- cwd, and the shell has to agree with it afterwards
-assert(oslo.cd(arg[0]:gsub("/[^/]*$", "")))
-assert(oslo.get_pwd() == oslo.capture("pwd").out, "shell and Lua disagree about pwd")
-local ok, err = oslo.cd("/no/such/place")
+assert(oslo.sys.cd(arg[0]:gsub("/[^/]*$", "")))
+assert(oslo.sys.pwd() == oslo.proc.capture("pwd").out, "shell and Lua disagree about pwd")
+local ok, err = oslo.sys.cd("/no/such/place")
 assert(ok == nil and err ~= nil, "a failed cd returns nil, message")
 
 -- glob, with an empty table for no matches rather than the pattern back
@@ -109,34 +109,41 @@ assert(#oslo.glob("conf/*.conf") == 2)
 assert(#oslo.glob("conf/*.nope") == 0, "no matches must not yield the pattern")
 
 -- environment as a table, both directions
-oslo.set_var("OSLO_T_LUA_API", "1")
-assert(oslo.env()["OSLO_T_LUA_API"] == "1")
-oslo.unset("OSLO_T_LUA_API")
-assert(oslo.env()["OSLO_T_LUA_API"] == nil)
+oslo.env.set("OSLO_T_LUA_API", "1")
+assert(oslo.env.all()["OSLO_T_LUA_API"] == "1")
+oslo.env.unset("OSLO_T_LUA_API")
+assert(oslo.env.all()["OSLO_T_LUA_API"] == nil)
 
-oslo.exit(42)
+oslo.proc.exit(42)
 print("NOTREACHED")
 "##,
     )
     .unwrap();
 
     let o = run(&[script.to_str().unwrap(), "release"], &[], dir.path());
-    assert!(!out(&o).contains("NOTREACHED"), "oslo.exit did not exit");
+    assert!(
+        !out(&o).contains("NOTREACHED"),
+        "oslo.proc.exit did not exit"
+    );
     assert_eq!(
         o.status.code(),
         Some(42),
-        "oslo.exit must set the shell's status; stderr: {:?}",
+        "oslo.proc.exit must set the shell's status; stderr: {:?}",
         err(&o)
     );
 }
 
-/// `oslo.exit` has to work from wherever it is called, not just at the top level: the request
+/// `oslo.proc.exit` has to work from wherever it is called, not just at the top level: the request
 /// travels as an error through however many mlua wrappers the call depth adds.
 #[test]
 fn lua_exit_works_from_inside_a_function() {
     let dir = tempfile::tempdir().unwrap();
     let script = dir.path().join("d.lua");
-    std::fs::write(&script, "local function bail() oslo.exit(7) end\nbail()\n").unwrap();
+    std::fs::write(
+        &script,
+        "local function bail() oslo.proc.exit(7) end\nbail()\n",
+    )
+    .unwrap();
     let o = run(&[script.to_str().unwrap()], &[], dir.path());
     assert_eq!(o.status.code(), Some(7), "stderr: {:?}", err(&o));
 }

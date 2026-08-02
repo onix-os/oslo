@@ -6,9 +6,9 @@
 //!
 //! ```lua
 //! oslo.prompt.left = function()
-//!   return oslo.style(oslo.path.shorten(oslo.fs.cwd()), "blue") .. " ❯ "
+//!   return oslo.ui.style(oslo.path.shorten(oslo.fs.cwd()), "blue") .. " ❯ "
 //! end
-//! oslo.prompt.right = function() return oslo.style(os.date("%H:%M"), "brightblack") end
+//! oslo.prompt.right = function() return oslo.ui.style(os.date("%H:%M"), "brightblack") end
 //! ```
 //!
 //! A string works too, for a prompt that never changes.
@@ -25,11 +25,13 @@ pub(crate) const LEFT: &str = "prompt.left";
 pub(crate) const RIGHT: &str = "prompt.right";
 pub(crate) const CONTINUATION: &str = "prompt.continuation";
 
-/// Add `oslo.prompt`, `oslo.style`, `oslo.git` and `oslo.path.shorten`.
-pub fn install(oslo: &mut Table, registry: &Registry) {
+/// Add `oslo.prompt`, `oslo.ui.style`, `oslo.git` and `oslo.path.shorten`.
+pub fn install(oslo: &mut Table, ui: &mut Table, registry: &Registry) {
     oslo.set(Value::str("prompt"), build(registry));
-    put(oslo, "style", |_, args| {
-        let body = text(&args, 1, "oslo.style")?;
+    // Painting text is `oslo.ui`; the prompt's own configuration stays `oslo.prompt`, which is a
+    // table a config assigns into rather than a function it calls.
+    put(ui, "style", |_, args| {
+        let body = text(&args, 1, "oslo.ui.style")?;
         ok(Value::str(
             style_from(args.get(1)).paint(&body, theme::depth()),
         ))
@@ -107,7 +109,7 @@ fn key_for(field: &str) -> Option<&'static str> {
     }
 }
 
-/// A style written as `oslo.style(text, "green")` or `oslo.style(text, {fg = …, bold = true})`.
+/// A style written as `oslo.ui.style(text, "green")` or `oslo.ui.style(text, {fg = …, bold = true})`.
 /// The `oslo.theme` table, whose `styles` field names colours.
 ///
 /// `__newindex` again, for the reason `oslo.prompt` needs it: a plain table would accept the

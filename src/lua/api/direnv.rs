@@ -38,7 +38,7 @@
 //!
 //! # Why this is in Rust when nothing else is
 //!
-//! It could be written in Lua — `oslo.capture`, `oslo.json` and `oslo.set_var` are all there, and
+//! It could be written in Lua — `oslo.proc.capture`, `oslo.json` and `oslo.env.set` are all there, and
 //! about forty lines would do it. It is here because of the paragraph above: the failure mode is
 //! severe, silent, and not something you would think to test. A recipe everyone copies is a list
 //! everyone copies wrong.

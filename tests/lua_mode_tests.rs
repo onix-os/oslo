@@ -133,7 +133,7 @@ fn a_failing_lua_line_leaves_the_prompt_up() {
     assert!(out.contains("still here"), "{out}");
 }
 
-/// `oslo.exit` from the prompt ends the shell with the status it names.
+/// `oslo.proc.exit` from the prompt ends the shell with the status it names.
 #[test]
 fn oslo_exit_from_lua_mode_ends_the_session() {
     let dir = tempfile::tempdir().expect("tempdir");
@@ -152,13 +152,13 @@ fn oslo_exit_from_lua_mode_ends_the_session() {
         .stdin
         .as_mut()
         .expect("stdin")
-        .write_all(b"oslo.exit(7)\nprint('not reached')\n")
+        .write_all(b"oslo.proc.exit(7)\nprint('not reached')\n")
         .expect("write");
     let output = child.wait_with_output().expect("wait");
     assert_eq!(output.status.code(), Some(7));
     assert!(
         !String::from_utf8_lossy(&output.stdout).contains("not reached"),
-        "the shell kept reading after oslo.exit"
+        "the shell kept reading after oslo.proc.exit"
     );
 }
 

@@ -224,7 +224,7 @@ pub fn run_repl() -> ! {
                 let started = std::time::Instant::now();
 
                 let res = match mode {
-                    // A Lua line leaves `$?` where it was unless it asked otherwise: `oslo.exit`
+                    // A Lua line leaves `$?` where it was unless it asked otherwise: `oslo.proc.exit`
                     // is the way to choose a status, and a chunk that merely printed something
                     // has not run a command.
                     Mode::Lua => run_lua_line(&lua, &text, last_status),
@@ -433,7 +433,7 @@ fn current_directory() -> String {
 /// Run one Lua line typed at the prompt.
 ///
 /// A chunk that merely printed something has not run a command, so `$?` stays where it was;
-/// `oslo.exit(n)` is how a script chooses a status, and it ends the shell rather than setting one.
+/// `oslo.proc.exit(n)` is how a script chooses a status, and it ends the shell rather than setting one.
 fn run_lua_line(lua: &LuaEngine, text: &str, last_status: i32) -> Result<i32, ShellError> {
     match lua.eval_script(text) {
         Ok(()) => Ok(last_status),

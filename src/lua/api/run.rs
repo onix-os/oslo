@@ -9,7 +9,7 @@
 //!
 //! **Argv end to end.** The list the caller writes is the list the command receives. There is no
 //! quoting step, so there is no quoting bug: `oslo.run{"rm", name}` is safe for a `name` holding a
-//! space, a `*` or a `;`, where `oslo.exec("rm " .. name)` is one careless value away from running
+//! space, a `*` or a `;`, where `oslo.proc.exec("rm " .. name)` is one careless value away from running
 //! something else entirely. That hole is the standard criticism of shelling out from a scripting
 //! language, and closing it is why this exists.
 //!

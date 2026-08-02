@@ -29,7 +29,7 @@ fn var(env: &Mutex<Environment>, name: &str) -> Option<String> {
 /// what loads, what unloads, what the allow gate refuses — and none of that depends on which
 /// language did the setting. The real evaluator is exercised through the pty harness.
 /// Built per test so it can reach the same environment the loader is diffing, taking the lock
-/// itself — which is exactly what a real `.env.lua` does through `oslo.set_var`.
+/// itself — which is exactly what a real `.env.lua` does through `oslo.env.set`.
 fn pairs_into(env: &Mutex<Environment>) -> impl FnMut(&Rc) -> Result<(), String> + '_ {
     move |rc: &Rc| {
         let source = std::fs::read_to_string(&rc.path).map_err(|e| e.to_string())?;

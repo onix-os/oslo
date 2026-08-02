@@ -89,11 +89,11 @@ pub fn load_config(lua: &LuaEngine, path: &Path) {
     }
 }
 
-/// The status `oslo.exit(n)` asked for, if that is what ended the script.
+/// The status `oslo.proc.exit(n)` asked for, if that is what ended the script.
 ///
 /// The request travels as an error because unwinding is the only way out of a call several Lua
 /// frames deep, and the status rides on the error itself rather than being recovered from a
-/// message. That is what makes `oslo.exit` work from inside a function, a callback, or a
+/// message. That is what makes `oslo.proc.exit` work from inside a function, a callback, or a
 /// registered builtin, rather than only at the top level of a script.
 fn requested_exit(err: &ShellError) -> Option<i32> {
     match err {
@@ -120,7 +120,7 @@ fn without_shebang(source: &str) -> String {
 
 /// Run Lua source as the shell's program, and exit with its status.
 ///
-/// "Its status" is `$?` as the script leaves it, so `oslo.exec("false")` at the end of the file
+/// "Its status" is `$?` as the script leaves it, so `oslo.proc.exec("false")` at the end of the file
 /// exits 1; the process used to exit 0 no matter what the script ran, which made this unusable
 /// from anything that checks an exit code.
 ///
@@ -142,7 +142,7 @@ pub fn run_lua_source(source: &str, name: &str, args: &[String]) -> i32 {
         return 1;
     }
     if let Err(e) = lua.eval_as(&without_shebang(source), name) {
-        // `oslo.exit(n)` unwinds as a shell exit rather than a Lua failure. Without this it
+        // `oslo.proc.exit(n)` unwinds as a shell exit rather than a Lua failure. Without this it
         // reached here as an ordinary error and printed a traceback, so the one API for choosing
         // an exit status produced a diagnostic and exit 1 instead.
         if let Some(code) = requested_exit(&e) {

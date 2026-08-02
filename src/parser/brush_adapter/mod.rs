@@ -2,7 +2,7 @@
 //!
 //! brush is a spec-compliant bash parser; oslo's evaluator works on its own simpler AST. This
 //! module is the translation layer, and it is the *only* path from source text to a runnable
-//! program: `main`, `eval`, `source`, command substitution and the Lua `oslo.exec` binding all
+//! program: `main`, `eval`, `source`, command substitution and the Lua `oslo.proc.exec` binding all
 //! come through here, and an error raised here is what the user sees.
 //!
 //! That makes fidelity here load-bearing: anything this module drops is silently unobservable at

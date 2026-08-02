@@ -100,7 +100,7 @@ Or just use `$PS1`, with the full escape set — `\u \h \w \$ \t \A \d \j \! \[ 
   running only when the stricter one found nothing, so an exact match is never diluted
 - **Prefix history search** on Up, which restores the line you were composing instead of blanking it
 - **First-class vi mode** on fish's model: cursor shape says the mode, the prompt says it too
-- **A right prompt**, drawn without the save/restore that multiplexers fight over
+- **A right prompt**, drawn without the save/restore multiplexers fight over
 - **Syntax highlighting** that marks a command that does not exist
 
 ### Abbreviations
@@ -228,10 +228,10 @@ and end up with none again rather than with an empty one.
 
 ```lua
 -- .env.lua
-oslo.set_var("DATABASE_URL", "postgres://localhost/app_dev")
-oslo.set_alias("t", "cargo test")
+oslo.env.set("DATABASE_URL", "postgres://localhost/app_dev")
+oslo.env.set_alias("t", "cargo test")
 oslo.direnv.path_add("./bin")   -- prepended, idempotent, gone when you leave
-oslo.set_prompt(function() return "PRODUCTION> " end)
+oslo.ui.prompt(function() return "PRODUCTION> " end)
 ```
 
 Variables, aliases, `PATH` and the prompt all come back on the way out — one that was shell-local
@@ -284,7 +284,7 @@ oslo.on.cd(function(dir) print("now in " .. dir) end)
 oslo.on["command-not-found"](function(name) print(name .. " is not installed") end)
 ```
 
-`oslo.capture`, `sh.df()`, `sh.ps()`, `sh.ls()`, `sh.stat()`, `oslo.path.*`, `oslo.json`, `oslo.re`,
+`oslo.proc.capture`, `sh.df()`, `sh.ps()`, `sh.ls()`, `sh.stat()`, `oslo.path.*`, `oslo.json`, `oslo.re`,
 hooks, and a `did you mean` drawn from the command index oslo already keeps.
 
 ## Building

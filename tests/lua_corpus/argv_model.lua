@@ -1,6 +1,6 @@
 -- The argv call model: `oslo.run{…}` and the `sh` sugar over it.
 --
--- The rest of the corpus exercises `oslo.exec`/`oslo.capture`, which take a *command line* and so
+-- The rest of the corpus exercises `oslo.proc.exec`/`oslo.proc.capture`, which take a *command line* and so
 -- have a quoting step between the script and the program. This one takes the words directly, which
 -- is the whole point: there is no shell parse in the middle, so an argument holding a space, a
 -- quote or a `$` reaches the program exactly as written and there is no quoting bug to have.

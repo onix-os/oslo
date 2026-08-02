@@ -46,11 +46,11 @@ pub struct LuaError {
     pub line: Option<usize>,
     /// Innermost frame last, for the traceback.
     pub frames: Vec<String>,
-    /// Set when this is `oslo.exit(n)` rather than a failure.
+    /// Set when this is `oslo.proc.exit(n)` rather than a failure.
     ///
     /// An exit travels as an error because unwinding is the only way out of a call that is
     /// several Lua frames deep. It is deliberately *not* catchable: `pcall` re-raises it, so
-    /// `pcall(oslo.exit)` ends the shell rather than reporting a caught error, which is what
+    /// `pcall(oslo.proc.exit)` ends the shell rather than reporting a caught error, which is what
     /// "never returns" has to mean.
     pub exit: Option<i32>,
 }
@@ -160,7 +160,7 @@ pub enum Flow {
 ///
 /// Every method takes `&self`, with the mutable parts behind `Cell`/`RefCell`. That is not a
 /// stylistic choice — it is what makes the two interfaces re-entrant with each other. A Lua
-/// script calls `oslo.exec("build")`, the shell runs `build`, and `build` turns out to be a
+/// script calls `oslo.proc.exec("build")`, the shell runs `build`, and `build` turns out to be a
 /// builtin the same script registered with `oslo.register_builtin`: control has to come back into
 /// the interpreter that is still part-way through the outer call. With `&mut self` that second
 /// entry is unreachable — the borrow is already out — and the honest workarounds are a raw

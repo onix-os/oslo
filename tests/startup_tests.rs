@@ -179,7 +179,7 @@ fn an_alias_from_the_config_is_visible_at_the_prompt() {
     std::fs::create_dir_all(&config).unwrap();
     std::fs::write(
         config.join("config.lua"),
-        "oslo.set_alias('hi', 'echo aliased')\n",
+        "oslo.env.set_alias('hi', 'echo aliased')\n",
     )
     .unwrap();
 
@@ -218,7 +218,7 @@ fn a_config_under_xdg_is_read_too() {
     let dir = tempfile::tempdir().unwrap();
     let config = dir.path().join(".config/oslo/config.lua");
     std::fs::create_dir_all(config.parent().unwrap()).unwrap();
-    std::fs::write(&config, "oslo.set_alias('hi', 'echo xdg-alias')\n").unwrap();
+    std::fs::write(&config, "oslo.env.set_alias('hi', 'echo xdg-alias')\n").unwrap();
 
     let o = repl("hi\n", &[("HISTFILE", "")], dir.path());
     assert!(out(&o).contains("xdg-alias"), "{:?}", out(&o));
@@ -501,7 +501,7 @@ fn a_working_config_still_applies() {
     let dir = tempfile::tempdir().unwrap();
     let init = dir.path().join(".config/oslo/config.lua");
     std::fs::create_dir_all(init.parent().unwrap()).unwrap();
-    std::fs::write(&init, "oslo.set_alias('hi', 'echo lua-alias')\n").unwrap();
+    std::fs::write(&init, "oslo.env.set_alias('hi', 'echo lua-alias')\n").unwrap();
 
     let o = repl("hi\n", &[("HISTFILE", "")], dir.path());
     assert!(out(&o).contains("lua-alias"), "{:?}", out(&o));

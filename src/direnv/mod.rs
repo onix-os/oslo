@@ -141,7 +141,7 @@ impl Direnv {
     /// this module does, because running Lua needs the engine and that belongs to the read loop.
     ///
     /// **The environment lock is not held while it runs, and must not be.** The file's whole job is
-    /// to call `oslo.set_var` and friends, and those take the same lock with `try_lock` — holding it
+    /// to call `oslo.env.set` and friends, and those take the same lock with `try_lock` — holding it
     /// here made every one of them fail with "shell state is busy" while the load reported success.
     /// So the lock is taken twice, briefly, for the before and after snapshots, and released around
     /// the call in between.

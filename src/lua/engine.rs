@@ -17,7 +17,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 /// `pairs(_G)` does not walk the shell's internals.
 pub(crate) type Registry = Rc<RefCell<HashMap<String, Value>>>;
 
-/// Registry key under which `oslo.set_prompt` stores its function.
+/// Registry key under which `oslo.ui.prompt` stores its function.
 pub(crate) const PROMPT_KEY: &str = "prompt";
 
 /// Prefix for the registry keys holding builtin callbacks.

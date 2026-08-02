@@ -318,10 +318,10 @@ mod in_process {
             .expect("Bindings failed");
 
         let script = r#"
-            oslo.exec("OSLO_T_LUA=works")
-            res = oslo.get_var("OSLO_T_LUA")
-            oslo.set_alias("l", "ls -l")
-            alias_val = oslo.get_alias("l")
+            oslo.proc.exec("OSLO_T_LUA=works")
+            res = oslo.env.get("OSLO_T_LUA")
+            oslo.env.set_alias("l", "ls -l")
+            alias_val = oslo.env.alias("l")
         "#;
 
         lua.eval_script(script).expect("Script execution failed");
