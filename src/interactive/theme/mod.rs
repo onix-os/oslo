@@ -150,9 +150,10 @@ impl Syntax {
         let rgb = |r: u8, g: u8, b: u8| Style::fg(Color::Rgb(r, g, b));
         Syntax {
             command: rgb(0x1a, 0x7f, 0x37),
+            // The dark palette's builtin pink at a lightness a white background can carry.
             builtin: Style {
                 bold: true,
-                ..rgb(0x1a, 0x7f, 0x37)
+                ..rgb(0xa8, 0x00, 0x74)
             },
             function: rgb(0x0a, 0x69, 0x8c),
             keyword: rgb(0xa6, 0x1c, 0x7b),
@@ -210,9 +211,14 @@ impl Default for Syntax {
             // way — the prompt and pager deliberately keep the slots, so they still follow the
             // terminal's scheme.
             command: rgb(0x50, 0xfa, 0x7b),
+            // Pink, not the command green it used to share. A builtin is not a program: it has no
+            // file, `which` cannot find it, and it can change the shell's own state in ways no
+            // `$PATH` command can. Sharing green with commands hid the one distinction worth
+            // drawing. This is exactly `Indexed(212)`, which is the dropdown's builtin pill, so a
+            // builtin is the same colour wherever it appears.
             builtin: Style {
                 bold: true,
-                ..rgb(0x50, 0xfa, 0x7b)
+                ..rgb(0xff, 0x87, 0xd7)
             },
             function: rgb(0x8b, 0xe9, 0xfd),
             keyword: rgb(0xff, 0x79, 0xc6),
@@ -372,7 +378,9 @@ impl Default for KindColors {
         };
         KindColors {
             command: pill(140),
-            builtin: pill(79),
+            // The same pink the line highlighter gives a builtin, so the dropdown and the line
+            // agree about what a builtin is. `Indexed(212)` is `#ff87d7`.
+            builtin: pill(212),
             file: pill(245),
             dir: pill(240),
             variable: pill(215),

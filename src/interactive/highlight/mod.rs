@@ -206,11 +206,45 @@ fn names_an_existing_file(word: &str) -> bool {
 pub fn paint(line: &str, ctx: &Context<'_>) -> String {
     let theme = theme::current();
     let depth = theme::depth();
+    let mut tokens = classify(&lex(line), ctx);
+    pad_danger(&mut tokens);
     let mut out = String::with_capacity(line.len() * 2);
-    for (text, token) in classify(&lex(line), ctx) {
+    for (text, token) in tokens {
         out.push_str(&token.style(&theme.syntax).paint(&text, depth));
     }
     out
+}
+
+/// Widen the `sudo` field over the spaces already beside it.
+///
+/// `danger` is black on red, and a coloured field that stops at the last letter reads as a stain on
+/// the word rather than as a marker. It wants a space of red on each side.
+///
+/// Those spaces are *moved between tokens*, never inserted. rustyline places the cursor by
+/// measuring the raw buffer (`tty/mod.rs`: `calculate_position(&line[..pos], ..)`), not the string
+/// this returns, so one added character would draw the whole rest of the line a column right of
+/// where the cursor is put. The line must come back out of here at exactly the width it went in —
+/// which `painting_reassembles_the_line_once_the_escapes_are_stripped` is the guard for.
+///
+/// So the padding appears wherever the line already affords it, and `sudo` at the very start of a
+/// line gets it on the right only: there is no column to the left of column zero to colour.
+fn pad_danger(tokens: &mut [(String, TokenType)]) {
+    for at in 0..tokens.len() {
+        if tokens[at].1 != TokenType::Danger {
+            continue;
+        }
+        if at > 0 && tokens[at - 1].0.ends_with(' ') && tokens[at - 1].1 != TokenType::Danger {
+            tokens[at - 1].0.pop();
+            tokens[at].0.insert(0, ' ');
+        }
+        if let Some(next) = tokens.get_mut(at + 1)
+            && next.0.starts_with(' ')
+            && next.1 != TokenType::Danger
+        {
+            next.0.remove(0);
+            tokens[at].0.push(' ');
+        }
+    }
 }
 
 /// Whether a command name in the line resolves to something runnable.
@@ -378,6 +412,63 @@ mod tests {
             out
         };
         assert_eq!(stripped, line);
+    }
+
+    /// Strip the escapes from a painted line, leaving what the terminal actually shows.
+    fn shown(painted: &str) -> String {
+        let mut out = String::new();
+        let mut chars = painted.chars();
+        while let Some(ch) = chars.next() {
+            if ch != '\x1b' {
+                out.push(ch);
+                continue;
+            }
+            for c in chars.by_ref() {
+                if c.is_ascii_alphabetic() {
+                    break;
+                }
+            }
+        }
+        out
+    }
+
+    /// The red field around `sudo` is stolen from its neighbours, never added.
+    ///
+    /// This is the whole safety argument for the padding: rustyline positions the cursor by
+    /// measuring the raw buffer, so a painted line one column wider than the real one puts every
+    /// keystroke after it in the wrong place.
+    #[test]
+    fn padding_sudo_does_not_change_a_single_column() {
+        theme::set_depth(theme::Depth::Ansi16);
+        let no = |_: &str| false;
+        for line in [
+            "sudo ls",
+            "sudo",
+            "echo a && sudo ls -l",
+            "sudo  ls",
+            "  sudo ls",
+        ] {
+            assert_eq!(
+                shown(&paint(line, &ctx(&no, &no, false))),
+                line,
+                "the painted line must be the line"
+            );
+        }
+    }
+
+    /// And it really does widen the field, or the test above would pass on a no-op.
+    #[test]
+    fn the_red_field_reaches_past_the_word() {
+        theme::set_depth(theme::Depth::Ansi16);
+        let no = |_: &str| false;
+        let mut tokens = classify(&lex("echo a && sudo ls"), &ctx(&no, &no, false));
+        pad_danger(&mut tokens);
+        let danger: Vec<&String> = tokens
+            .iter()
+            .filter(|(_, kind)| *kind == TokenType::Danger)
+            .map(|(text, _)| text)
+            .collect();
+        assert_eq!(danger, vec![" sudo "], "a space of red on each side");
     }
 
     #[test]
