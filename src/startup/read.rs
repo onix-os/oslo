@@ -159,13 +159,31 @@ pub(super) fn read_command(
         let raw = match rl.readline_with_initial(&prompt, (&typed, "")) {
             Ok(raw) => raw,
             Err(ReadlineError::Interrupted) => {
+                // Ctrl-C abandons the *line*, not the language. If the user switched to Lua and
+                // then thought better of the command, the prompt they were looking at said `lua`
+                // and the next one must too — and the flag has to be consumed either way, or it
+                // fires on the next line and switches the language nobody asked to switch.
+                if toggle.take()
+                    && let Some(language) = oslo::interactive::prompt::language()
+                {
+                    *current = if language == "lua" {
+                        Mode::Lua
+                    } else {
+                        Mode::Shell
+                    };
+                }
                 // No `^C` echoed. The keystroke was the user's instruction to abandon the line,
                 // and they know they pressed it — printing it back spends a row saying so, which
                 // is a row the next prompt could have had. The editor has already moved off the
                 // abandoned line, so there is nothing to write here at all.
                 return Input::Interrupted;
             }
-            Err(ReadlineError::Eof) => return Input::Eof,
+            Err(ReadlineError::Eof) => {
+                // Same for end of input: leaving the flag set would apply the switch to whatever
+                // line came next if `$IGNOREEOF` keeps the shell alive.
+                let _ = toggle.take();
+                return Input::Eof;
+            }
             Err(err) => {
                 eprintln!("oslo: {}", err);
                 return Input::Fatal;

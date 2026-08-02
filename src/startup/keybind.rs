@@ -89,15 +89,45 @@ impl ConditionalEventHandler for HistoryWalk {
                 Some(Cmd::Noop)
             };
         }
+        // **What the walk is anchored to.** A walk that has not started yet takes the line as it
+        // stands now: that is both the prefix to filter by and the text to give back if the user
+        // walks all the way forward again. Recomputing it mid-walk would anchor to whatever the
+        // history just put on the line, so it is captured once and kept until the walk ends.
         let mut walk = WALK.lock().ok()?;
+        // A walk belongs to the line it started on. If what is on screen is not what this walk
+        // last put there, the user has typed, cleared or edited since — so the old prefix is no
+        // longer what they are looking for, and the walk starts again from where they now are.
+        let fresh = !matches!(
+            walk.as_ref(),
+            Some((walked, _, _, shown)) if walked == &language && shown == ctx.line()
+        );
+        let anchor = if fresh {
+            ctx.line().to_string()
+        } else {
+            walk.as_ref()
+                .map(|(_, _, a, _)| a.clone())
+                .unwrap_or_default()
+        };
+        // Only the entries that continue what is already typed. An empty anchor matches
+        // everything, so an empty line still walks the whole history the way it always did.
+        let lines: Vec<String> = lines
+            .into_iter()
+            .filter(|l| l.starts_with(&anchor))
+            .collect();
+        if lines.is_empty() {
+            // Nothing continues this prefix. Doing nothing is the honest answer — clearing the
+            // line or beeping would both lose what the user is part-way through typing.
+            return Some(Cmd::Noop);
+        }
         // **A walk belongs to one language.** Switching in the middle of one starts a new walk
         // rather than carrying the old position across: the two histories have nothing to do with
         // each other, and a position three back in Lua means nothing in shell. Without this,
         // toggling mid-walk left a stale depth behind and the next Up recalled the wrong entry or
         // nothing at all.
-        let depth = match walk.as_ref() {
-            Some((walked, depth)) if walked == &language => *depth,
-            _ => 0,
+        let depth = if fresh {
+            0
+        } else {
+            walk.as_ref().map(|(_, d, _, _)| *d).unwrap_or(0)
         };
         // A walk that has not started begins just past the newest entry, so the first Up lands on
         // it. The depth counts back from the end: 1 is the newest.
@@ -106,19 +136,24 @@ impl ConditionalEventHandler for HistoryWalk {
         } else {
             depth.saturating_sub(1)
         };
-        *walk = Some((language.clone(), depth));
-        // Walked back past the start: the line the user was typing. The editor keeps no copy of it
-        // for us, so it comes back empty rather than wrong.
+        // What this walk is about to put on screen, so the next press can tell an untouched line
+        // from an edited one.
+        let showing = if depth == 0 {
+            anchor.clone()
+        } else {
+            lines.get(lines.len() - depth).cloned().unwrap_or_default()
+        };
+        *walk = Some((language.clone(), depth, anchor.clone(), showing));
+        // Walked forward past the newest entry: back to the line the user was composing when the
+        // walk started. It used to come back *empty* — the editor keeps no copy, so this module
+        // keeps one. Pressing Up and then Down again deleting what you had typed is a small piece
+        // of data loss that happens several times a day.
         if depth == 0 {
-            // `Some("")`, not `None`. A command returned from a binding is treated as repeatable
-            // and rewritten before it runs: `Replace(mvt, None)` has the *last inserted text*
-            // substituted for the `None`, so this cleared the line and then pasted the last thing
-            // typed back into it. Saying explicitly that the replacement is empty leaves nothing
-            // to substitute.
-            return Some(Cmd::Replace(
-                rustyline::Movement::WholeLine,
-                Some(String::new()),
-            ));
+            // `Some(...)`, never `None`. A command returned from a binding is treated as
+            // repeatable and rewritten before it runs: `Replace(mvt, None)` has the *last inserted
+            // text* substituted for the `None`, so clearing the line pasted the last thing typed
+            // back into it. Naming the replacement leaves nothing to substitute.
+            return Some(Cmd::Replace(rustyline::Movement::WholeLine, Some(anchor)));
         }
         let line = lines.get(lines.len() - depth)?.clone();
         // Already showing it — a second Down at the newest entry should not flicker.
@@ -136,8 +171,11 @@ pub fn reset_history_walk() {
     }
 }
 
-/// Shared so Up and Down walk the same position, with the language that position belongs to.
-static WALK: Mutex<Option<(String, usize)>> = Mutex::new(None);
+/// Shared so Up and Down walk the same position: the language it belongs to, how far back it has
+/// gone, the line the walk started from — which is both the prefix being matched and the text
+/// handed back when the walk returns to the present — and what it last put on screen, so an edited
+/// line can be told from an untouched one.
+static WALK: Mutex<Option<(String, usize, String, String)>> = Mutex::new(None);
 
 /// The character a key event carries, if it is a plain one.
 ///
