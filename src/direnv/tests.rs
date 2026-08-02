@@ -69,7 +69,7 @@ fn an_unallowed_file_is_not_read_and_is_reported_once() {
     let mut direnv = Direnv::new(store.path().to_str(), None);
     let env = shell();
 
-    let events = direnv.arrive(&env, project.path(), &mut pairs_into(&env));
+    let events = direnv.arrive(&env, project.path(), &mut pairs_into(&env), &mut || {});
     assert!(matches!(events.as_slice(), [Event::Blocked { .. }]));
     assert_eq!(
         var(&env, "SECRET").as_deref(),
@@ -82,7 +82,7 @@ fn an_unallowed_file_is_not_read_and_is_reported_once() {
     direnv.loaded = None;
     assert!(
         direnv
-            .arrive(&env, project.path(), &mut pairs_into(&env))
+            .arrive(&env, project.path(), &mut pairs_into(&env), &mut || {})
             .is_empty()
     );
 }
@@ -107,7 +107,7 @@ fn an_alias_a_directory_defined_leaves_with_it() {
     let mut direnv = Direnv::new(store.path().to_str(), None);
     direnv.permissions().allow(&path).expect("allow");
 
-    direnv.arrive(&env, project.path(), &mut pairs_into(&env));
+    direnv.arrive(&env, project.path(), &mut pairs_into(&env), &mut || {});
     assert_eq!(
         env.lock()
             .unwrap()
@@ -117,7 +117,7 @@ fn an_alias_a_directory_defined_leaves_with_it() {
         Some("cargo test")
     );
 
-    direnv.arrive(&env, elsewhere.path(), &mut pairs_into(&env));
+    direnv.arrive(&env, elsewhere.path(), &mut pairs_into(&env), &mut || {});
     assert_eq!(
         env.lock().unwrap().get_aliases().get("t"),
         None,
@@ -153,10 +153,10 @@ fn a_local_variable_the_directory_exported_comes_back_local() {
     let mut direnv = Direnv::new(store.path().to_str(), None);
     direnv.permissions().allow(&path).expect("allow");
 
-    direnv.arrive(&env, project.path(), &mut pairs_into(&env));
+    direnv.arrive(&env, project.path(), &mut pairs_into(&env), &mut || {});
     assert_eq!(var(&env, "OSLO_T_LOCAL").as_deref(), Some("exported"));
 
-    direnv.arrive(&env, elsewhere.path(), &mut pairs_into(&env));
+    direnv.arrive(&env, elsewhere.path(), &mut pairs_into(&env), &mut || {});
     assert_eq!(
         var(&env, "OSLO_T_LOCAL").as_deref(),
         Some("mine"),
@@ -193,10 +193,10 @@ fn a_path_a_project_added_does_not_follow_you_out() {
     let mut direnv = Direnv::new(store.path().to_str(), None);
     direnv.permissions().allow(&path).expect("allow");
 
-    direnv.arrive(&env, project.path(), &mut pairs_into(&env));
+    direnv.arrive(&env, project.path(), &mut pairs_into(&env), &mut || {});
     assert_eq!(var(&env, "PATH").as_deref(), Some("/opt/acme/bin:/usr/bin"));
 
-    direnv.arrive(&env, elsewhere.path(), &mut pairs_into(&env));
+    direnv.arrive(&env, elsewhere.path(), &mut pairs_into(&env), &mut || {});
     assert_eq!(
         var(&env, "PATH").as_deref(),
         Some("/usr/bin"),
@@ -221,13 +221,13 @@ fn arriving_loads_and_leaving_puts_everything_back() {
     let env = shell();
     env.lock().unwrap().set_var("EDITOR", "vim", true);
 
-    direnv.arrive(&env, project.path(), &mut pairs_into(&env));
+    direnv.arrive(&env, project.path(), &mut pairs_into(&env), &mut || {});
     assert_eq!(
         var(&env, "DATABASE_URL").as_deref(),
         Some("postgres://local")
     );
 
-    direnv.arrive(&env, elsewhere.path(), &mut pairs_into(&env));
+    direnv.arrive(&env, elsewhere.path(), &mut pairs_into(&env), &mut || {});
     assert_eq!(
         var(&env, "DATABASE_URL").as_deref(),
         None,
@@ -254,8 +254,8 @@ fn one_project_never_leaks_into_the_next() {
     direnv.permissions().allow(&two).expect("allow");
     let env = shell();
 
-    direnv.arrive(&env, first.path(), &mut pairs_into(&env));
-    direnv.arrive(&env, second.path(), &mut pairs_into(&env));
+    direnv.arrive(&env, first.path(), &mut pairs_into(&env), &mut || {});
+    direnv.arrive(&env, second.path(), &mut pairs_into(&env), &mut || {});
 
     assert_eq!(var(&env, "ONLY_IN_SECOND").as_deref(), Some("2"));
     assert_eq!(
@@ -278,12 +278,12 @@ fn staying_put_does_no_work() {
 
     assert!(
         !direnv
-            .arrive(&env, project.path(), &mut pairs_into(&env))
+            .arrive(&env, project.path(), &mut pairs_into(&env), &mut || {})
             .is_empty()
     );
     assert!(
         direnv
-            .arrive(&env, project.path(), &mut pairs_into(&env))
+            .arrive(&env, project.path(), &mut pairs_into(&env), &mut || {})
             .is_empty(),
         "a second arrival in the same place is not a reload"
     );
@@ -304,14 +304,14 @@ fn denying_what_is_loaded_unloads_it() {
     let mut direnv = Direnv::new(store.path().to_str(), None);
     direnv.permissions().allow(&path).expect("allow");
     let env = shell();
-    direnv.arrive(&env, project.path(), &mut pairs_into(&env));
+    direnv.arrive(&env, project.path(), &mut pairs_into(&env), &mut || {});
     assert_eq!(var(&env, "OSLO_T_DENY").as_deref(), Some("1"));
 
     direnv.permissions().deny(&path).expect("deny");
     direnv.invalidate();
 
     // Standing in the very same directory, which the early-return would otherwise skip.
-    let events = direnv.arrive(&env, project.path(), &mut pairs_into(&env));
+    let events = direnv.arrive(&env, project.path(), &mut pairs_into(&env), &mut || {});
     assert!(
         events.iter().any(|e| matches!(e, Event::Unloaded { .. })),
         "the record has to survive long enough to be undone: {events:?}"
@@ -332,7 +332,7 @@ fn allowing_loads_without_moving() {
 
     let mut direnv = Direnv::new(store.path().to_str(), None);
     let env = shell();
-    direnv.arrive(&env, project.path(), &mut pairs_into(&env));
+    direnv.arrive(&env, project.path(), &mut pairs_into(&env), &mut || {});
     assert_eq!(
         var(&env, "OSLO_T_NOW").as_deref(),
         None,
@@ -341,7 +341,7 @@ fn allowing_loads_without_moving() {
 
     direnv.permissions().allow(&path).expect("allow");
     direnv.invalidate();
-    direnv.arrive(&env, project.path(), &mut pairs_into(&env));
+    direnv.arrive(&env, project.path(), &mut pairs_into(&env), &mut || {});
     assert_eq!(
         var(&env, "OSLO_T_NOW").as_deref(),
         Some("1"),
@@ -362,8 +362,12 @@ fn walking_deeper_stays_loaded() {
     direnv.permissions().allow(&path).expect("allow");
     let env = shell();
 
-    direnv.arrive(&env, project.path(), &mut pairs_into(&env));
-    assert!(direnv.arrive(&env, &deep, &mut pairs_into(&env)).is_empty());
+    direnv.arrive(&env, project.path(), &mut pairs_into(&env), &mut || {});
+    assert!(
+        direnv
+            .arrive(&env, &deep, &mut pairs_into(&env), &mut || {})
+            .is_empty()
+    );
     assert_eq!(var(&env, "OSLO_T_DEEP").as_deref(), Some("1"));
 }
 
@@ -377,7 +381,7 @@ fn an_edit_revokes_and_the_environment_comes_back_out() {
     let mut direnv = Direnv::new(store.path().to_str(), None);
     direnv.permissions().allow(&path).expect("allow");
     let env = shell();
-    direnv.arrive(&env, project.path(), &mut pairs_into(&env));
+    direnv.arrive(&env, project.path(), &mut pairs_into(&env), &mut || {});
     assert_eq!(var(&env, "OSLO_T_EDIT_A").as_deref(), Some("1"));
 
     // Rewrite it. The mtime moves, so the next arrival re-checks, and the hash no longer matches.
@@ -388,7 +392,7 @@ fn an_edit_revokes_and_the_environment_comes_back_out() {
         "OSLO_T_EDIT_A=1\nOSLO_T_EDIT_B=2\n",
     );
 
-    let events = direnv.arrive(&env, project.path(), &mut pairs_into(&env));
+    let events = direnv.arrive(&env, project.path(), &mut pairs_into(&env), &mut || {});
     assert!(
         events.iter().any(|e| matches!(e, Event::Blocked { .. })),
         "an edited file has to be allowed again: {events:?}"

@@ -231,7 +231,13 @@ and end up with none again rather than with an empty one.
 oslo.set_var("DATABASE_URL", "postgres://localhost/app_dev")
 oslo.set_alias("t", "cargo test")
 oslo.path_add("./bin")          -- prepended, idempotent, gone when you leave
+oslo.set_prompt(function() return "PRODUCTION> " end)
 ```
+
+Variables, aliases, `PATH` and the prompt all come back on the way out — a variable that was
+shell-local before the directory exported it comes back *local*, not deleted. Keybindings
+deliberately do not: a key that means different things in different directories, with nothing on
+screen to say so, is worse than not having the feature.
 
 ```sh
 direnv allow      # trust this file, as it stands right now

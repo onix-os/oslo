@@ -132,6 +132,11 @@ impl Direnv {
 
     /// Bring the environment into line with `dir`. The whole feature, from the caller's side.
     ///
+    /// `restore` puts back whatever the caller recorded at load time and this module cannot
+    /// describe — the Lua prompt. Called on the way out, before the variables are restored, and
+    /// always *before* `run`, which is what makes moving straight from one project to another put
+    /// the base prompt back before the next file gets to set its own.
+    ///
     /// `run` evaluates the `.env.lua` and reports what went wrong. A callback rather than something
     /// this module does, because running Lua needs the engine and that belongs to the read loop.
     ///
@@ -145,6 +150,7 @@ impl Direnv {
         env: &Mutex<Environment>,
         dir: &Path,
         run: &mut dyn FnMut(&Rc) -> Result<(), String>,
+        restore: &mut dyn FnMut(),
     ) -> Vec<Event> {
         let rc = find::applicable(dir);
         let owner = rc.as_ref().and_then(find::owner);
@@ -162,7 +168,7 @@ impl Direnv {
         let mut events = Vec::new();
         // Unload before load, always. Moving from one project to another must not carry anything
         // across, and doing this in the other order silently merges the two.
-        if let Some(event) = self.unload(env) {
+        if let Some(event) = self.unload(env, restore) {
             events.push(event);
         }
         let Some(rc) = rc else {
@@ -183,8 +189,12 @@ impl Direnv {
     }
 
     /// Put back everything the loaded environment changed.
-    fn unload(&mut self, env: &Mutex<Environment>) -> Option<Event> {
+    fn unload(&mut self, env: &Mutex<Environment>, restore: &mut dyn FnMut()) -> Option<Event> {
         let loaded = self.loaded.take()?;
+        // Anything the caller has to put back that this module cannot describe — the Lua prompt,
+        // today. Run before the variables so a prompt function that reads one sees the directory's
+        // value while it is still set, rather than the restored one it is about to be handed.
+        restore();
         let mut guard = lock(env)?;
         for (name, was) in loaded.undo.to_apply() {
             match was {
