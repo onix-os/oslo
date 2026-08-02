@@ -99,8 +99,14 @@ jobs:
           key: fuzz-corpus-${{ matrix.target }}-${{ github.run_id }}
           restore-keys: fuzz-corpus-${{ matrix.target }}-
 
+      # The cache above restores ~/.cargo/bin/cargo-fuzz, and `cargo install` refuses to overwrite
+      # a binary it did not just place there: "binary `cargo-fuzz` already exists in destination".
+      # So every warm-cache run failed here, before a single target was fuzzed — the cache and the
+      # install step were each correct and together they were a hard error. Use what the cache
+      # restored; build only when there is nothing to use. `--force` would work too and would
+      # rebuild cargo-fuzz on every run, which is the whole cost the cache exists to avoid.
       - name: Install cargo-fuzz
-        run: cargo install cargo-fuzz --locked --version ^0.13
+        run: cargo fuzz --version || cargo install cargo-fuzz --locked --version ^0.13
 
       - name: Seed the corpus from tests/corpus
         run: ./fuzz/seed-corpus.sh

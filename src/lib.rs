@@ -22,6 +22,7 @@ pub mod interactive;
 pub mod lexer;
 pub mod lua;
 pub mod parser;
+pub mod track;
 
 pub use env::Environment;
 pub use error::{Result, ShellError};

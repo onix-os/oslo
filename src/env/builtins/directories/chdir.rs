@@ -1,9 +1,15 @@
 //! The one place the shell changes directory.
 //!
-//! `cd`, `pushd` and `popd` all land in [`change_directory`], so the three things that are easy
+//! `cd`, `pushd` and `popd` all land in [`attempt_directory`], so the four things that are easy
 //! to get subtly wrong are decided once: which reading of a path `$PWD` keeps, that `$OLDPWD` is
-//! written on *every* move (a later `cd -` is only as good as the last builtin that moved), and
-//! the `CDPATH` search with its POSIX echo.
+//! written on *every* move (a later `cd -` is only as good as the last builtin that moved), the
+//! `CDPATH` search with its POSIX echo, and that the move is entered in the directory ring.
+//!
+//! Moving and complaining are two functions, not one. [`attempt_directory`] answers with the error
+//! rather than printing it, because `cd` has something else to try — a remembered directory of that
+//! name — and a shell that printed `No such file or directory` and then jumped somewhere would be
+//! contradicting itself. [`change_directory`] is that pair put back together for the callers with
+//! nothing else to try.
 //!
 //! The logical/physical distinction is the substance of the module. A shell that only ever
 //! stores `getcwd()` — which is what oslo did — cannot answer `cd /tmp/link; pwd` the way every
@@ -14,6 +20,10 @@ use std::env;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
+
+/// What a shell says when asked to move to nowhere. `cd ""` is a usage mistake rather than a
+/// missing directory, so it does not get the `{operand}: {errno}` shape the others do.
+const NULL_DIRECTORY: &str = "null directory";
 
 /// Which reading of a path the shell keeps in `$PWD`.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -150,20 +160,25 @@ fn cdpath_entries(env: &Environment) -> Vec<String> {
     }
 }
 
-/// Change the shell's working directory and keep `$PWD`/`$OLDPWD` in step.
+/// Change the shell's working directory and keep `$PWD`/`$OLDPWD` in step, saying nothing about a
+/// failure.
 ///
-/// Returns the destination as it should be echoed on success — callers decide whether to print
-/// it — or `None` after printing a diagnostic naming `caller`. The status a builtin reports for
-/// `None` is 1: the shell has not moved.
-pub fn change_directory(
+/// Silent about *failure* only: a `CDPATH` hit still echoes, because that echo is POSIX output on
+/// the success path rather than a diagnostic. The error is handed back instead of printed so that
+/// a caller may try something else first — `cd` answers a failure here with a frecency jump, and a
+/// jump preceded by `No such file or directory` would be a shell contradicting itself.
+///
+/// Returns the destination as it should be echoed on success. [`report_failure`] turns the error
+/// into the diagnostic every caller used to get from here.
+pub fn attempt_directory(
     env: &mut Environment,
     operand: &str,
     mode: PathMode,
-    caller: &str,
-) -> Option<String> {
+) -> io::Result<String> {
     if operand.is_empty() {
-        eprintln!("oslo: {caller}: null directory");
-        return None;
+        // Refused here rather than left to `chdir`, which would take the empty string as "where I
+        // already am" and report a move that never happened.
+        return Err(io::Error::new(io::ErrorKind::InvalidInput, NULL_DIRECTORY));
     }
 
     let origin = logical_pwd(env);
@@ -192,18 +207,47 @@ pub fn change_directory(
 
     let landing = match landing {
         Some(found) => found,
-        None => match attempt(&origin, operand, mode) {
-            Ok(found) => found,
-            Err(e) => {
-                eprintln!("oslo: {caller}: {operand}: {e}");
-                return None;
-            }
-        },
+        None => attempt(&origin, operand, mode)?,
     };
 
     env.set_var("OLDPWD", &origin, true);
     env.set_var("PWD", &landing.pwd, true);
-    Some(landing.display)
+    // Every move the shell makes passes through here, so this is where "the directories you have
+    // actually been in" is written down. Recorded from `cd`'s own arm it silently omitted every
+    // `pushd` and `popd`, and every `cd` inside a shell function.
+    super::ring::record(&landing.pwd);
+    Ok(landing.display)
+}
+
+/// The diagnostic a failed move prints, naming `caller`.
+///
+/// Split out so that a caller which tried something else after the failure can still emit the
+/// original error, unchanged, when the something else came to nothing too.
+pub fn report_failure(caller: &str, operand: &str, e: &io::Error) {
+    if operand.is_empty() {
+        eprintln!("oslo: {caller}: {NULL_DIRECTORY}");
+    } else {
+        eprintln!("oslo: {caller}: {operand}: {e}");
+    }
+}
+
+/// Change the shell's working directory, printing a diagnostic naming `caller` if it fails.
+///
+/// Returns the destination as it should be echoed on success — callers decide whether to print
+/// it — or `None`. The status a builtin reports for `None` is 1: the shell has not moved.
+pub fn change_directory(
+    env: &mut Environment,
+    operand: &str,
+    mode: PathMode,
+    caller: &str,
+) -> Option<String> {
+    match attempt_directory(env, operand, mode) {
+        Ok(destination) => Some(destination),
+        Err(e) => {
+            report_failure(caller, operand, &e);
+            None
+        }
+    }
 }
 
 #[cfg(test)]

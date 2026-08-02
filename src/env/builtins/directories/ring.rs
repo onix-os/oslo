@@ -1,19 +1,27 @@
 //! The directories you have actually been in, and how to go back.
 //!
 //! ```text
-//! prevd          back one
-//! nextd          forward again
 //! cd -3          three back
 //! dirh           the ring, newest last
 //! ```
 //!
 //! **`cd -` is a one-deep toggle**, and useless the moment you are three wrong turns from where you
-//! meant to be. This records every `cd` and lets you walk it, which is among the highest-frequency
-//! things anybody does at a shell all day.
+//! meant to be. This records every move and lets `cd -N` reach any of them, which is among the
+//! highest-frequency things anybody does at a shell all day. `dirh` is how you see the numbers
+//! `cd -N` takes; without it `cd -3` is a guess.
 //!
 //! Deliberately *not* `pushd`/`popd`. Those are explicit — you say when to remember and when to
 //! forget, and a script relies on that. This is automatic and interactive, and the two must not
 //! share a store or `popd` in a script would start finding directories nobody pushed.
+//!
+//! # What used to be here
+//!
+//! `prevd`/`nextd` walked this ring backwards and forwards with a cursor. They are gone: `cd -` and
+//! `cd -N` already reach every entry, and the cursor was the only thing that made this file
+//! complicated. Their `walk_to` also called `set_current_dir` and assigned `$PWD` by hand while
+//! never touching `$OLDPWD`, so walking with `prevd` silently desynchronised `cd -` — it would send
+//! you back to wherever the last real `cd` had come from, which by then was somewhere you had left
+//! several moves ago. That is a bug being deleted rather than a feature.
 
 use crate::env::Environment;
 use crate::error::Result;
@@ -28,8 +36,6 @@ const DEPTH: usize = 32;
 struct Ring {
     /// Oldest first; the last entry is where you are now.
     visited: Vec<String>,
-    /// How far back `prevd` has walked, so `nextd` can walk forward again.
-    back: usize,
 }
 
 fn ring() -> &'static Mutex<Ring> {
@@ -38,18 +44,10 @@ fn ring() -> &'static Mutex<Ring> {
 }
 
 /// Record a directory the shell has moved to.
-///
-/// Walking back and then moving somewhere new abandons the forward history, exactly as a browser
-/// does — the alternative is a "forward" that goes somewhere you never chose.
 pub fn record(path: &str) {
     let Ok(mut ring) = ring().lock() else {
         return;
     };
-    if ring.back > 0 {
-        let keep = ring.visited.len() - ring.back;
-        ring.visited.truncate(keep);
-        ring.back = 0;
-    }
     if ring.visited.last().is_some_and(|last| last == path) {
         return;
     }
@@ -65,65 +63,13 @@ pub fn history() -> Vec<String> {
 }
 
 /// The directory `n` steps back, without moving.
+///
+/// `nth_back(0)` is where you are standing, so `cd -1` and `cd -` name the same directory in a
+/// shell whose ring was seeded with the directory it started in.
 pub fn nth_back(n: usize) -> Option<String> {
     let ring = ring().lock().ok()?;
-    let at = ring.visited.len().checked_sub(1 + ring.back)?;
+    let at = ring.visited.len().checked_sub(1)?;
     ring.visited.get(at.checked_sub(n)?).cloned()
-}
-
-/// Walk one step back, answering where to go.
-fn step_back() -> Option<String> {
-    let mut ring = ring().lock().ok()?;
-    let position = ring.visited.len().checked_sub(1 + ring.back)?;
-    let target = ring.visited.get(position.checked_sub(1)?)?.clone();
-    ring.back += 1;
-    Some(target)
-}
-
-/// Walk one step forward, answering where to go.
-fn step_forward() -> Option<String> {
-    let mut ring = ring().lock().ok()?;
-    if ring.back == 0 {
-        return None;
-    }
-    ring.back -= 1;
-    let position = ring.visited.len().checked_sub(1 + ring.back)?;
-    ring.visited.get(position).cloned()
-}
-
-/// Change directory without disturbing the ring's position — a walk is not a new destination.
-fn walk_to(env: &mut Environment, path: &str) -> Result<i32> {
-    match std::env::set_current_dir(path) {
-        Ok(()) => {
-            env.set_var("PWD", path, true);
-            println!("{path}");
-            Ok(0)
-        }
-        Err(e) => {
-            eprintln!("oslo: {path}: {e}");
-            Ok(1)
-        }
-    }
-}
-
-pub fn builtin_prevd(env: &mut Environment, _args: &[String]) -> Result<i32> {
-    match step_back() {
-        Some(path) => walk_to(env, &path),
-        None => {
-            eprintln!("oslo: prevd: nowhere further back");
-            Ok(1)
-        }
-    }
-}
-
-pub fn builtin_nextd(env: &mut Environment, _args: &[String]) -> Result<i32> {
-    match step_forward() {
-        Some(path) => walk_to(env, &path),
-        None => {
-            eprintln!("oslo: nextd: nowhere further forward");
-            Ok(1)
-        }
-    }
 }
 
 pub fn builtin_dirh(_env: &mut Environment, _args: &[String]) -> Result<i32> {
@@ -136,53 +82,29 @@ pub fn builtin_dirh(_env: &mut Environment, _args: &[String]) -> Result<i32> {
     Ok(0)
 }
 
+/// The one lock every test that touches the ring takes, and the emptying that goes with it.
+///
+/// The ring is process-wide and so is the working directory, so `cd`'s tests and this file's tests
+/// are the same critical section — two mutexes, one in each module, would let them overlap and the
+/// failure would look like a flake rather than a race.
+#[cfg(test)]
+pub(super) fn exclusive() -> std::sync::MutexGuard<'static, ()> {
+    static SERIAL: Mutex<()> = Mutex::new(());
+    let guard = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
+    if let Ok(mut ring) = ring().lock() {
+        *ring = Ring::default();
+    }
+    guard
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    fn fresh() {
-        if let Ok(mut ring) = ring().lock() {
-            *ring = Ring::default();
-        }
-    }
-
-    static SERIAL: Mutex<()> = Mutex::new(());
-
-    /// Walking back and forward returns you to where you started.
-    #[test]
-    fn the_ring_walks_both_ways() {
-        let _guard = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
-        fresh();
-        for path in ["/a", "/b", "/c"] {
-            record(path);
-        }
-        assert_eq!(step_back().as_deref(), Some("/b"));
-        assert_eq!(step_back().as_deref(), Some("/a"));
-        assert_eq!(step_back(), None, "nowhere further back");
-        assert_eq!(step_forward().as_deref(), Some("/b"));
-        assert_eq!(step_forward().as_deref(), Some("/c"));
-        assert_eq!(step_forward(), None, "nowhere further forward");
-    }
-
-    /// Moving somewhere new after walking back abandons the forward history, as a browser does.
-    #[test]
-    fn a_new_directory_abandons_the_forward_history() {
-        let _guard = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
-        fresh();
-        for path in ["/a", "/b", "/c"] {
-            record(path);
-        }
-        step_back();
-        record("/d");
-        assert_eq!(step_forward(), None, "there is no forward from here");
-        assert_eq!(history(), ["/a", "/b", "/d"], "and /c is gone");
-    }
-
     /// `cd -N` counts back from where you are.
     #[test]
     fn nth_back_counts_from_here() {
-        let _guard = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
-        fresh();
+        let _guard = exclusive();
         for path in ["/a", "/b", "/c"] {
             record(path);
         }
@@ -195,10 +117,40 @@ mod tests {
     /// Going where you already are is not a move worth recording.
     #[test]
     fn the_same_directory_twice_is_one_entry() {
-        let _guard = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
-        fresh();
+        let _guard = exclusive();
         record("/a");
         record("/a");
         assert_eq!(history(), ["/a"]);
+    }
+
+    /// The ring only ever grows forwards now. Nothing abandons an entry that was recorded before
+    /// it, which is what the walking cursor used to do the moment you moved somewhere new.
+    #[test]
+    fn moving_on_never_discards_where_you_have_been() {
+        let _guard = exclusive();
+        for path in ["/a", "/b", "/c"] {
+            record(path);
+        }
+        let back = nth_back(2);
+        record("/d");
+        assert_eq!(history(), ["/a", "/b", "/c", "/d"]);
+        assert_eq!(back.as_deref(), Some("/a"));
+        assert_eq!(nth_back(3).as_deref(), Some("/a"), "and still reachable");
+    }
+
+    /// The oldest entries fall off rather than the ring growing for the life of the shell.
+    #[test]
+    fn the_ring_is_bounded() {
+        let _guard = exclusive();
+        for i in 0..DEPTH + 5 {
+            record(&format!("/d{i}"));
+        }
+        let visited = history();
+        assert_eq!(visited.len(), DEPTH);
+        assert_eq!(visited.first().map(String::as_str), Some("/d5"));
+        assert_eq!(
+            nth_back(0).as_deref(),
+            Some(&format!("/d{}", DEPTH + 4)[..])
+        );
     }
 }

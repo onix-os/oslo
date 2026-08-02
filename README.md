@@ -142,14 +142,14 @@ Data in, data out — the handler is told about the line and answers with what i
 ### Where you have been
 
 ```sh
-prevd        # back one
-nextd        # forward again
+cd -         # back one
 cd -3        # three back
-dirh         # the ring
+dirh         # the ring, and the numbers `cd -N` takes
 ```
 
-`cd -` is a one-deep toggle and useless once you are three wrong turns out. `pushd`/`popd` stay
-exactly as they were, because scripts depend on them.
+`cd -` is a one-deep toggle and useless once you are three wrong turns out, so every move is
+recorded and `cd -N` reaches any of them. `pushd`/`popd` stay exactly as they were, because scripts
+depend on them.
 
 ## Your own tools
 

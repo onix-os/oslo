@@ -29,9 +29,19 @@ jobs:
       - uses: dtolnay/rust-toolchain@1.94.0
         with:
           targets: ${{ matrix.target }}
-      # No C toolchain step. `musl-tools` used to be installed here to compile mlua's vendored Lua;
-      # oslo evaluates Lua in Rust now, and nothing left in the dependency tree compiles C.
+      # `musl-tools` is back. It was dropped when mlua's vendored Lua left the tree, on the
+      # grounds that nothing compiled C any more; `turso` then arrived and brought `zstd-sys`,
+      # `softaes` and `simsimd`, whose build scripts all shell out to `cc`. The Build step below
+      # has been exporting `CC_<target>=musl-gcc` the whole time — for a compiler that was not
+      # installed, which is a failure nobody saw because this workflow had never run.
       #
+      # Native on both runners: `musl-gcc` targets the host architecture, and the arm64 job runs
+      # on an arm64 runner, so neither leg cross-compiles.
+      - name: Install the musl C toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends musl-tools
+          musl-gcc --version | head -1
       # Deliberately does NOT set a linker for the target. Pointing it at `musl-gcc` looks correct
       # and silently produces a *dynamically* linked musl binary — one that records an INTERP
       # pointing at whatever musl the build host had, and segfaults on any machine that does not

@@ -37,8 +37,19 @@ pub fn git_branch() -> Option<String> {
 
 /// The top of the working tree the current directory is in.
 pub fn git_root() -> Option<PathBuf> {
-    let current = env::current_dir().ok()?;
-    let mut dir: &Path = current.as_path();
+    git_root_of(&env::current_dir().ok()?)
+}
+
+/// The top of the working tree `dir` belongs to.
+///
+/// Split out from [`git_root`] because the tracker has to ask about a directory the shell is not
+/// standing in any more: a command is attributed to where it *started*, which a `cd` has already
+/// left by the time the loop comes to write it down.
+///
+/// `.exists()` rather than `.is_dir()` is what makes this right inside a linked worktree, where
+/// `.git` is a file naming the real one.
+pub fn git_root_of(dir: &Path) -> Option<PathBuf> {
+    let mut dir = dir;
     loop {
         if dir.join(".git").exists() {
             return Some(dir.to_path_buf());

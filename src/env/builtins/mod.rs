@@ -89,6 +89,18 @@ pub use hash::lookup as hash_lookup;
 pub use hash::recall as hash_recall;
 pub use hash::remember as hash_remember;
 
+/// Put the directory a session began in into the ring `cd -N` counts back through.
+///
+/// The interactive loop calls this once, before the first prompt, and nothing else calls it at all.
+/// `cd -` reads `$OLDPWD` and so works from the very first move; `cd -N` reads the ring, which is
+/// only appended to by a *successful* change of directory. Without the starting directory in it the
+/// two disagree for exactly one command — `cd -1` answers "no such entry" in a shell where `cd -`
+/// works — and the shell's own documentation says they are the same thing.
+///
+/// Seeding it from [`crate::env::builtins::builtin_cd`]'s helper instead would seed every script's
+/// ring as well, and a script has no wandering to count back through.
+pub use directories::ring::record as remember_directory;
+
 use crate::env::scope::Environment;
 
 pub fn register_default_builtins(env: &mut Environment) {
@@ -130,10 +142,9 @@ pub fn register_default_builtins(env: &mut Environment) {
     // `OSC 52` to the terminal, so it works over SSH where a clipboard helper cannot.
     env.register_custom_builtin("copy", copy::builtin_copy);
     env.register_custom_builtin("abbr", abbr::builtin_abbr);
-    // The directory ring: where you have been, and how to walk it. Separate from `pushd`/`popd`,
+    // The directory ring: where you have been. Walking it is `cd -` and `cd -N`, so the only
+    // builtin left is the one that shows you the numbers those take. Separate from `pushd`/`popd`,
     // which are explicit and which scripts rely on.
-    env.register_custom_builtin("prevd", directories::ring::builtin_prevd);
-    env.register_custom_builtin("nextd", directories::ring::builtin_nextd);
     env.register_custom_builtin("dirh", directories::ring::builtin_dirh);
 
     // Job control. `wait` is registered above but belongs with these: all five read one table.

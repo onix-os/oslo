@@ -1,5 +1,37 @@
 # Changelog
 
+## [0.1.3] - 2026-08-02
+
+### <!-- 0 -->⛰️  Features
+
+- Pink builtins and a padded sudo field
+- Prune the store and seed the ring
+- Record every command and suggest by directory
+- Jump to a remembered directory
+- The store behind a smarter cd
+- Frecency scoring and match tiers
+
+### <!-- 1 -->🐛 Bug Fixes
+
+- Record what you run at home, never jump to it
+- Checkpoint the log, group heads by tool
+
+### <!-- 3 -->📚 Documentation
+
+- The smart cd design
+
+### <!-- 6 -->🧪 Testing
+
+- Observe a job that is still running
+- Do not inherit XDG_CONFIG_HOME
+
+### <!-- 7 -->⚙️ Miscellaneous Tasks
+
+- Install musl-tools for the C deps
+- Reuse the cached cargo-fuzz binary
+- Check the lockfile at msrv
+- Sync Cargo.lock with the 0.1.2 bump
+
 ## [0.1.2] - 2026-08-02
 
 ### <!-- 7 -->⚙️ Miscellaneous Tasks

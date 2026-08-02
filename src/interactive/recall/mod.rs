@@ -8,8 +8,29 @@
 //! needs it. Swapping the editor's own history when the language changes is not enough — the
 //! language can change in the middle of a line, from a key handler that has no way to reach the
 //! editor, and until the line ends the editor is still holding the other language's history.
+//!
+//! # And where you are standing
+//!
+//! One history for every directory is the wrong answer to `cargo run --ex`: whichever project you
+//! last typed it in wins in all of them. So the suggestion asks three questions in order — what you
+//! have run *here*, then what you have run anywhere in *this worktree*, then what you have run at
+//! all — and takes the first answer. The first two come from [`crate::track`], which keys a line by
+//! the directory it ran in; the third is the flat walk below, which is what oslo did before the
+//! store existed and is still what it does in a directory the store has never seen.
 
+mod nearby;
+
+use super::prompt;
+use crate::track;
+use nearby::{forget_answers, forget_answers_for, from_store, place};
 use std::sync::Mutex;
+
+/// One lock for every test under `recall`, in this file and in `nearby`.
+///
+/// The remembered set, the resolved place and the memo of answers are all process-wide, and these
+/// tests replace them wholesale, so they cannot run beside each other — in either file.
+#[cfg(test)]
+static SERIAL: Mutex<()> = Mutex::new(());
 
 /// Every remembered line with the language it was typed in, oldest first.
 static REMEMBERED: Mutex<Vec<(String, String)>> = Mutex::new(Vec::new());
@@ -19,6 +40,7 @@ pub fn seed(entries: Vec<(String, String)>) {
     if let Ok(mut all) = REMEMBERED.lock() {
         *all = entries;
     }
+    forget_answers();
 }
 
 /// Remember a line typed this session.
@@ -26,6 +48,9 @@ pub fn remember(line: &str, language: &str) {
     if let Ok(mut all) = REMEMBERED.lock() {
         all.push((line.to_string(), language.to_string()));
     }
+    // The store is about to learn this line too, which is the one thing that can make an answer
+    // already given wrong. See [`forget_answers_for`].
+    forget_answers_for(line, language);
 }
 
 /// Forget everything remembered, in every language.
@@ -37,6 +62,7 @@ pub fn clear() {
     if let Ok(mut all) = REMEMBERED.lock() {
         all.clear();
     }
+    forget_answers();
 }
 
 /// How many lines are remembered, in every language.
@@ -65,22 +91,43 @@ pub fn for_language(language: &str) -> Vec<String> {
         .collect()
 }
 
-/// The newest line in the current language that starts with `line`, minus what is already typed.
+/// The line to offer as ghost text for `line`, minus what is already typed.
 ///
-/// This is the suggestion the editor's own history hinter would give, except that it answers for
-/// the language the prompt is reading *now* rather than the one the line started in.
+/// Three sources, narrowest first: this directory, this worktree, then everything remembered. The
+/// first two are the store's, and both are silent in a shell that has none — a script, an `oslo
+/// -c`, a subshell — so this degrades to exactly the flat walk it has always been rather than going
+/// quiet.
+///
+/// It answers for the language the prompt is reading *now* rather than the one the line started in,
+/// which is the whole reason this lives here instead of in the editor's own history hinter. That
+/// language is also what the store is keyed by, so a shell line can no more be offered at a Lua
+/// prompt from the database than it can from the remembered set.
 pub fn suggest(line: &str) -> Option<String> {
     if line.is_empty() {
         return None;
     }
-    let language = super::prompt::language()?;
+    let language = prompt::language()?;
+    if let Some(track) = track::store()
+        && let Some(place) = place()
+        && let Some(found) = from_store(track, &place, &language, line)
+    {
+        return Some(found);
+    }
+    remembered(&language, line)
+}
+
+/// The newest line in `language` that starts with `line`, minus what is already typed.
+///
+/// What oslo suggested before it had a store, and what it still suggests in a directory the store
+/// has never seen. Newest wins, because there is nothing else to rank by here.
+fn remembered(language: &str, line: &str) -> Option<String> {
     let Ok(all) = REMEMBERED.lock() else {
         return None;
     };
     all.iter()
         .rev()
         .find(|(candidate, l)| {
-            l == &language
+            l == language
                 && candidate.starts_with(line)
                 && candidate != line
                 // **Never a multi-line entry.** A command continued over several lines is
@@ -96,10 +143,6 @@ pub fn suggest(line: &str) -> Option<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    /// The remembered set is one process-wide store and these tests replace it wholesale, so they
-    /// cannot run beside each other.
-    static SERIAL: Mutex<()> = Mutex::new(());
 
     /// `suggest` answers for the language the prompt is showing, so a test has to say what that is.
     fn prompt_in(language: &str) {

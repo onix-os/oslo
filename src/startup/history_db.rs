@@ -13,14 +13,18 @@
 //!
 //! # Why the async is hidden here
 //!
-//! `turso` is the pure-Rust rewrite of SQLite, which is what keeps oslo's build free of a C
-//! toolchain — `cargo tree -e build` returns only `oslo`, and the static musl binary still links.
+//! `turso` is the pure-Rust rewrite of SQLite, so there is no vendored SQLite here. It is not,
+//! however, free of a C toolchain: `cargo tree -i cc` names `aegis`, `simsimd`, `libmimalloc-sys`
+//! and `zstd-sys`, all reached through `turso_core`, and every one of them shells out to a
+//! compiler. `cargo tree -e build` says otherwise only because it lists oslo's *direct* build
+//! dependencies, of which there are none. The release workflow installs `musl-tools` for them.
 //! Its API is async, and oslo's REPL is not. Rather than colour the shell async, every call below
 //! blocks on a small current-thread runtime owned by this module. The runtime is built once: one
 //! per call would be a thread and an epoll set per command.
 
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
+use std::sync::atomic::{AtomicUsize, Ordering};
 
 /// The language a line was typed in, as stored.
 ///
@@ -67,9 +71,14 @@ const SCHEMA: &str = "CREATE TABLE IF NOT EXISTS history (\
      mode TEXT NOT NULL, \
      at INTEGER NOT NULL)";
 
+/// How many appends go by between trims. See [`History::trim_soon`].
+const TRIM_EVERY: usize = 100;
+
 /// An open history database.
 pub struct History {
     db: turso::Database,
+    /// Appends since the last trim, so the scan is amortised rather than paid per line.
+    since_trim: AtomicUsize,
 }
 
 impl History {
@@ -86,8 +95,50 @@ impl History {
             let db = turso::Builder::new_local(&path).build().await.ok()?;
             let conn = db.connect().ok()?;
             conn.execute(SCHEMA, ()).await.ok()?;
-            Some(History { db })
+            Some(History {
+                db,
+                since_trim: AtomicUsize::new(0),
+            })
         })
+    }
+
+    /// Trim, but not more often than one line in [`TRIM_EVERY`].
+    ///
+    /// The REPL used to call [`History::trim`] after every single command, and `trim` is a
+    /// `DELETE ... WHERE id NOT IN (SELECT ... LIMIT N)` — a full scan of the table, per line
+    /// typed, to delete nothing at all in the overwhelming majority of cases. A hundred lines of
+    /// slack against a ten-thousand-line bound is not a bound anybody can perceive, and the scan
+    /// the shell gets back pays for everything else it now does with a database per command.
+    ///
+    /// The loop trims unconditionally on the way out, so a short session still ends bounded.
+    pub fn trim_soon(&self, max: usize) {
+        if self.since_trim.fetch_add(1, Ordering::Relaxed) + 1 >= TRIM_EVERY {
+            self.since_trim.store(0, Ordering::Relaxed);
+            self.trim(max);
+        }
+    }
+
+    /// Fold the write-ahead log back into the database and truncate it. Best effort.
+    ///
+    /// turso opens in WAL mode without being asked, which is why a second terminal can read this
+    /// table while this one appends to it — and it never checkpoints on its own, not on drop and not
+    /// on reopen. So the `-wal` grows by a page or two per line typed and is never given back:
+    /// measured 330 KB of log against 4 KB of data after one short session. It has to be asked for,
+    /// and the way out of the loop is the place to ask.
+    ///
+    /// Through `query` rather than `execute`: a checkpoint answers with a row, and `execute` fails
+    /// on a statement that returns one.
+    pub fn checkpoint(&self) {
+        runtime().block_on(async {
+            let Ok(conn) = self.db.connect() else {
+                return;
+            };
+            if let Ok(mut rows) = conn.query("PRAGMA wal_checkpoint(TRUNCATE)", ()).await {
+                // Stepped, not merely offered: turso runs the statement as the row is fetched, so a
+                // `Rows` that is dropped unread checkpoints nothing.
+                let _ = rows.next().await;
+            }
+        });
     }
 
     /// Remember one line.
@@ -249,5 +300,27 @@ mod tests {
 
         assert!(history.clear());
         assert!(history.recent(10).is_empty());
+    }
+
+    /// The amortised trim is still a bound: it lets the table run over for a while and then puts
+    /// it back, rather than scanning the whole table once per line to delete nothing.
+    #[test]
+    fn the_bound_is_enforced_in_batches_rather_than_per_line() {
+        let (_dir, history) = temp_db();
+        for i in 1..=(TRIM_EVERY - 1) {
+            history.append(&format!("cmd {i}"), MODE_SHELL);
+            history.trim_soon(5);
+        }
+        assert_eq!(
+            history.recent(1000).len(),
+            TRIM_EVERY - 1,
+            "nothing has been scanned yet"
+        );
+
+        history.append("cmd last", MODE_SHELL);
+        history.trim_soon(5);
+        let kept = history.recent(1000);
+        assert_eq!(kept.len(), 5);
+        assert_eq!(kept[4].line, "cmd last", "and it kept the newest");
     }
 }

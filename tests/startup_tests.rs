@@ -13,10 +13,16 @@ use std::io::Write;
 use std::path::Path;
 use std::process::{Command, Output, Stdio};
 
+/// Run the binary against a throwaway `$HOME`.
+///
+/// `XDG_CONFIG_HOME` goes with it: it outranks `$HOME/.config` when the shell looks for its
+/// config, so an ambient one — GitHub's runners export it, as do most desktops — points the
+/// shell at the machine's real config and the temporary home is never consulted at all.
 fn run(args: &[&str], vars: &[(&str, &str)], home: &Path) -> Output {
     let mut cmd = Command::new(oslo_bin());
     cmd.args(args)
         .env("HOME", home)
+        .env_remove("XDG_CONFIG_HOME")
         .env_remove("ENV")
         .env_remove("HISTFILE")
         .env_remove("HISTSIZE")
@@ -34,6 +40,7 @@ fn repl(input: &str, vars: &[(&str, &str)], home: &Path) -> Output {
     let mut cmd = Command::new(oslo_bin());
     cmd.arg("-i")
         .env("HOME", home)
+        .env_remove("XDG_CONFIG_HOME")
         .env_remove("ENV")
         .env_remove("PS1")
         .env_remove("PS2")
