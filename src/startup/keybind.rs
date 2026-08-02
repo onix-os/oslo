@@ -198,6 +198,25 @@ impl ConditionalEventHandler for Abbreviations {
     }
 }
 
+/// Accepts the ghost suggestion, whichever of the two kinds is on offer.
+///
+/// A prefix suggestion continues the line, and `Cmd::CompleteHint` appends it — which is right, and
+/// is what this falls back to. A *fuzzy* suggestion replaces the line instead: what is drawn is a
+/// marker and a whole command, so appending it would paste `  ⟶  cargo run --example xyz` into the
+/// buffer verbatim. So the offer is looked up, and only the command it named goes in.
+struct AcceptSuggestion;
+
+impl ConditionalEventHandler for AcceptSuggestion {
+    fn handle(&self, _: &Event, _: RepeatCount, _: bool, ctx: &EventContext) -> Option<Cmd> {
+        match oslo::interactive::recall::accept_fuzzy(ctx.line()) {
+            // Named rather than `None`, for the reason `HistoryWalk` gives: a `Replace` with no
+            // text has the last inserted text substituted into it when the command is repeated.
+            Some(full) => Some(Cmd::Replace(rustyline::Movement::WholeLine, Some(full))),
+            None => Some(Cmd::CompleteHint),
+        }
+    }
+}
+
 /// Runs a Lua handler for one key, and applies whatever it says the line should become.
 ///
 /// The handler is given a description of the line and answers with a description of the line it
@@ -340,6 +359,16 @@ pub fn apply(rl: &mut Repl, env_struct: &Arc<Mutex<Environment>>, toggle: &Toggl
     ] {
         let Some(key) = key else { continue };
         match oslo::interactive::keys::parse_key(key) {
+            // The same special case as below: which command accepting a suggestion means depends
+            // on whether the one showing continues the line or replaces it. Bound through the same
+            // handler, or `oslo.suggest.accept = "right"` would paste the marker into the buffer
+            // while `oslo.keys` on the same action did the right thing.
+            Some(event) if action == "accept-suggestion" => {
+                rl.bind_sequence(
+                    event,
+                    rustyline::EventHandler::Conditional(Box::new(AcceptSuggestion)),
+                );
+            }
             Some(event) => {
                 if let Some(command) =
                     oslo::interactive::keys::action(action).and_then(|a| a.command())
@@ -361,6 +390,14 @@ pub fn apply(rl: &mut Repl, env_struct: &Arc<Mutex<Environment>>, toggle: &Toggl
             rl.bind_sequence(
                 event,
                 rustyline::EventHandler::Conditional(Box::new(LuaKey { key })),
+            );
+            continue;
+        }
+        // Accepting a suggestion depends on which kind is showing, so it cannot be a fixed command.
+        if action == oslo::interactive::keys::Action::AcceptSuggestion {
+            rl.bind_sequence(
+                event,
+                rustyline::EventHandler::Conditional(Box::new(AcceptSuggestion)),
             );
             continue;
         }

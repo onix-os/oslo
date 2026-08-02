@@ -8,7 +8,7 @@
 //! *look* like, and these say what the shell *does*. A user who wants a different colour scheme
 //! and a user who wants fewer dropdown rows are not the same user.
 
-use crate::lua::eval::Value;
+use super::matching::Fuzzy;
 
 /// Everything configurable that is not a colour.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -91,6 +91,12 @@ pub struct Completion {
     pub show_kind: bool,
     /// Whether a candidate must match the typed case.
     pub case_sensitive: bool,
+    /// How far the dropdown will stretch to reach a candidate you did not prefix.
+    ///
+    /// Tried only after the three prefix matchers have all come back empty, so turning it on can
+    /// never push a candidate you *did* prefix down the list. Free on the typing path either way:
+    /// the dropdown is built once per Tab, not per keystroke.
+    pub fuzzy: Fuzzy,
     /// How candidates are ordered: by how often they are used, or by name.
     pub sort: Sort,
     /// The kinds of candidate offered at all. `None` means every kind, which is the default.
@@ -118,6 +124,9 @@ impl Default for Completion {
             descriptions: true,
             show_kind: true,
             case_sensitive: false,
+            // On by default in the dropdown, which is the place it costs nothing and where you
+            // have already said "help me" by pressing Tab.
+            fuzzy: Fuzzy::Smart,
             sort: Sort::default(),
             sources: None,
         }
@@ -159,6 +168,14 @@ pub struct Suggest {
     pub accept: Option<String>,
     /// The key that takes one word of it.
     pub accept_word: Option<String>,
+    /// How far the ghost suggestion will stretch to reach a line you did not prefix.
+    ///
+    /// Off by default, and that is a considered default rather than caution. A prefix suggestion is
+    /// *verifiable at a glance* — the grey text continues what you typed, so you can accept it
+    /// without reading it. A fuzzy one cannot be: the line it proposes may differ from what you
+    /// typed anywhere, so accepting it without reading is how you run the wrong command. The
+    /// dropdown is the right home for guessing, because there you are already looking.
+    pub fuzzy: Fuzzy,
 }
 
 impl Default for Suggest {
@@ -169,6 +186,7 @@ impl Default for Suggest {
             sources: vec![Source::History, Source::Completion, Source::Path],
             accept: None,
             accept_word: None,
+            fuzzy: Fuzzy::Off,
         }
     }
 }
@@ -199,192 +217,8 @@ impl Default for History {
 }
 
 /// Read the settings out of the `oslo` table, and what was wrong with them.
-pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
-    let mut settings = Settings::default();
-    let mut problems = Vec::new();
-    let Value::Table(oslo) = oslo else {
-        return (settings, problems);
-    };
-    let oslo = oslo.borrow();
-
-    if let Value::Table(table) = oslo.get(&Value::str("dirs")) {
-        for (key, value) in table.borrow().pairs() {
-            match (&key, &value) {
-                (Value::Str(name), Value::Str(path)) => {
-                    settings.dirs.push((name.to_string(), path.to_string()));
-                }
-                _ => problems
-                    .push("oslo.dirs: every entry must be a name mapped to a path".to_string()),
-            }
-        }
-        settings.dirs.sort();
-    }
-
-    if let Value::Table(table) = oslo.get(&Value::str("notify"))
-        && let Some(n) = number(&table.borrow(), "after")
-    {
-        settings.notify.after = n.max(0) as u64;
-    }
-
-    if let Value::Table(table) = oslo.get(&Value::str("vi")) {
-        let table = table.borrow();
-        flag(&table, "enabled", &mut settings.vi.enabled);
-        let c = &mut settings.vi.cursors;
-        cursor(&table, "cursor_insert", &mut c.insert, &mut problems);
-        cursor(&table, "cursor_normal", &mut c.normal, &mut problems);
-        cursor(&table, "cursor_replace", &mut c.replace, &mut problems);
-    }
-
-    if let Value::Table(table) = oslo.get(&Value::str("completion")) {
-        let table = table.borrow();
-        if let Some(n) = number(&table, "max_rows") {
-            // One row is still a dropdown; zero would be a dropdown that never appears, which is
-            // what turning completion off looks like and is not what a row count means.
-            settings.completion.max_rows = (n.max(1) as usize).min(super::dropdown::MAX_ROWS);
-        }
-        flag(
-            &table,
-            "descriptions",
-            &mut settings.completion.descriptions,
-        );
-        flag(&table, "show_kind", &mut settings.completion.show_kind);
-        flag(
-            &table,
-            "case_sensitive",
-            &mut settings.completion.case_sensitive,
-        );
-        if let Value::Table(list) = table.get(&Value::str("sources")) {
-            let mut kinds = Vec::new();
-            for value in list.borrow().sequence() {
-                if let Value::Str(name) = value {
-                    let name = match name.as_ref() {
-                        "directory" => "dir",
-                        "function" | "func" => "function",
-                        other => other,
-                    };
-                    if !kinds.iter().any(|k: &String| k == name) {
-                        kinds.push(name.to_string());
-                    }
-                }
-            }
-            settings.completion.sources = Some(kinds);
-        }
-        if let Value::Str(name) = table.get(&Value::str("sort")) {
-            match name.as_ref() {
-                "frecency" | "frequency" => settings.completion.sort = Sort::Frecency,
-                "alpha" | "alphabetical" | "name" => settings.completion.sort = Sort::Alpha,
-                other => problems.push(format!(
-                    "oslo.completion.sort: '{other}' is not an order; use 'frecency' or 'alpha'"
-                )),
-            }
-        }
-    }
-
-    if let Value::Table(table) = oslo.get(&Value::str("suggest")) {
-        let table = table.borrow();
-        if let Value::Table(list) = table.get(&Value::str("sources")) {
-            let mut sources = Vec::new();
-            for value in list.borrow().sequence() {
-                let Value::Str(name) = value else { continue };
-                match Source::parse(name) {
-                    Some(source) if !sources.contains(&source) => sources.push(source),
-                    // A duplicate is harmless and silently ignored; a name nothing answers to is
-                    // a typo, and a typo that turns a source off without saying so is exactly the
-                    // kind of thing that gets blamed on the shell.
-                    Some(_) => {}
-                    None => problems.push(format!(
-                        "oslo.suggest.sources: '{name}' is not a source; \
-                         the sources are history, completion and path"
-                    )),
-                }
-            }
-            settings.suggest.sources = sources;
-        }
-        if let Value::Str(key) = table.get(&Value::str("accept")) {
-            settings.suggest.accept = Some(key.to_string());
-        }
-        if let Value::Str(key) = table.get(&Value::str("accept_word")) {
-            settings.suggest.accept_word = Some(key.to_string());
-        }
-    }
-
-    if let Value::Table(table) = oslo.get(&Value::str("keys")) {
-        for (key, action) in table.borrow().pairs() {
-            match (&key, &action) {
-                (Value::Str(key), Value::Str(action)) => {
-                    settings.keys.push((key.to_string(), action.to_string()));
-                }
-                // A function is a binding the config wrote itself. Kept aside rather than named,
-                // because a `Value` cannot live in `Settings` — the settings are plain data,
-                // readable without an interpreter, and a Lua function is neither.
-                (Value::Str(key), Value::Function(_)) => {
-                    super::editor::register(key, action.clone());
-                    settings
-                        .keys
-                        .push((key.to_string(), super::editor::ACTION.to_string()));
-                }
-                _ => problems.push(
-                    "oslo.keys: an entry is a key name mapped to an action name or to a function"
-                        .to_string(),
-                ),
-            }
-        }
-        // Table iteration has no order, and a binding that depends on which of two entries was
-        // applied last is one that behaves differently between runs.
-        settings.keys.sort();
-    }
-
-    if let Value::Table(table) = oslo.get(&Value::str("history")) {
-        let table = table.borrow();
-        if let Some(n) = number(&table, "size") {
-            settings.history.size = Some(n.max(0) as usize);
-        }
-        if let Value::Str(file) = table.get(&Value::str("file")) {
-            settings.history.file = Some(file.to_string());
-        }
-        flag(&table, "ignore_space", &mut settings.history.ignore_space);
-        flag(&table, "ignore_dups", &mut settings.history.ignore_dups);
-    }
-
-    (settings, problems)
-}
-
-fn number(table: &crate::lua::eval::Table, name: &str) -> Option<i64> {
-    table.get(&Value::str(name)).as_number()?.as_int()
-}
-
-/// A cursor-shape field, left alone when the config does not mention it.
-///
-/// A name nothing answers to is reported rather than silently ignored: a cursor that quietly keeps
-/// its default looks exactly like oslo not reading the config at all.
-fn cursor(
-    table: &crate::lua::eval::Table,
-    name: &str,
-    slot: &mut super::vi::Cursor,
-    problems: &mut Vec<String>,
-) {
-    let Value::Str(text) = table.get(&Value::str(name)) else {
-        return;
-    };
-    match super::vi::Cursor::parse(&text) {
-        Some(cursor) => *slot = cursor,
-        None => problems.push(format!(
-            "oslo.vi.{name}: '{text}' is not a cursor; \
-             use block, line or underscore, optionally followed by blink"
-        )),
-    }
-}
-
-/// A boolean field, left alone when the config does not mention it.
-///
-/// `false` and "absent" have to be told apart, or `descriptions = false` would be indistinguishable
-/// from not setting it and could never turn anything off.
-fn flag(table: &crate::lua::eval::Table, name: &str, slot: &mut bool) {
-    match table.get(&Value::str(name)) {
-        Value::Nil => {}
-        value => *slot = value.truthy(),
-    }
-}
+mod from_lua;
+pub use from_lua::read_lua_settings;
 
 use std::sync::RwLock;
 

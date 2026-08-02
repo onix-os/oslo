@@ -6,7 +6,8 @@
 use super::OsloHelper;
 use super::command_index::CommandIndex;
 use super::dropdown::CompletionCandidate;
-use super::matching::{MATCHERS, Match, matches_ignoring_case};
+use super::matching::{Fuzzy, Match, fuzzy_score, matchers, matches_ignoring_case};
+use super::settings;
 use super::words::{Quote, Word, current_word, quote_replacement, unquote};
 use std::fs;
 
@@ -37,6 +38,19 @@ fn matches_prefix(candidate: &str, typed: &str, case_sensitive: bool) -> bool {
 
 thread_local! {
     static MATCHER: std::cell::Cell<Option<Match>> = const { std::cell::Cell::new(None) };
+}
+
+/// Put the best fuzzy matches first.
+///
+/// A prefix pass needs no such thing: everything it returns matched the same way, so the ordinary
+/// frecency order is the right one. A fuzzy pass is different — `gco` matching `git checkout` and
+/// `gcc --output` are not equally good answers, and the difference is exactly what
+/// [`fuzzy_score`] measures. Stable, so candidates that score the same keep the order the source
+/// gave them, which is frecency.
+fn rank_by_fuzz(out: &mut [CompletionCandidate], typed: &str, fuzzy: Fuzzy) {
+    out.sort_by_key(|candidate| {
+        std::cmp::Reverse(fuzzy_score(&candidate.display, typed, fuzzy).unwrap_or(i32::MIN))
+    });
 }
 
 /// A hook a config installs to complete one command itself.
@@ -111,9 +125,15 @@ impl OsloHelper {
             if super::prompt::language().is_none_or(|language| language == "sh") {
                 // Each way of matching in turn, stopping at the first that finds anything. An
                 // exact match must never arrive diluted with looser ones.
-                for matcher in MATCHERS {
+                for matcher in matchers(settings::current().completion.fuzzy) {
                     self.command_candidates_with(&word, matcher, &mut out);
                     if !out.is_empty() {
+                        // A fuzzy pass has no useful order of its own — every candidate that
+                        // matched at all matched, so without this the list arrives in whatever
+                        // order `$PATH` happened to be walked in.
+                        if let Match::Fuzzy(fuzzy) = matcher {
+                            rank_by_fuzz(&mut out, word.stem.as_str(), fuzzy);
+                        }
                         break;
                     }
                     if self.case_sensitive() {
@@ -447,7 +467,7 @@ impl OsloHelper {
 #[cfg(test)]
 mod case_tests {
     use super::matches_prefix;
-    use super::{MATCHERS, Match};
+    use super::{Match, matchers};
 
     /// Each way of matching, and the case each one exists for.
     #[test]
@@ -488,9 +508,23 @@ mod case_tests {
     /// Exactness first. A list mixing an exact hit with looser ones is worse than either alone.
     #[test]
     fn the_chain_tries_exactness_first() {
-        assert_eq!(MATCHERS[0], Match::Exact);
-        assert_eq!(MATCHERS[1], Match::Ignoring);
-        assert_eq!(MATCHERS[2], Match::Pieces);
+        let chain = matchers(super::Fuzzy::Off);
+        assert_eq!(chain[0], Match::Exact);
+        assert_eq!(chain[1], Match::Ignoring);
+        assert_eq!(chain[2], Match::Pieces);
+    }
+
+    /// Fuzzy is last, and absent entirely when it is off.
+    ///
+    /// The order is the whole safety argument for turning it on: it runs only once every stricter
+    /// pass has come back empty, so a candidate you actually prefixed can never be pushed down the
+    /// list by one you merely scattered the letters of.
+    #[test]
+    fn fuzzy_is_the_last_resort_and_only_when_asked_for() {
+        assert_eq!(matchers(super::Fuzzy::Off).len(), 3, "off adds no pass");
+        let chain = matchers(super::Fuzzy::Smart);
+        assert_eq!(chain.len(), 4);
+        assert_eq!(*chain.last().unwrap(), Match::Fuzzy(super::Fuzzy::Smart));
     }
 
     /// The setting was read from the config and then ignored, so turning it on changed nothing.
