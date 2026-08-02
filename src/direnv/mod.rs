@@ -62,8 +62,6 @@ pub struct Direnv {
 /// What happened, for the caller to report.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Event {
-    /// Nothing applies and nothing was loaded.
-    Idle,
     /// Loaded `owner`, touching this many variables.
     Loaded { owner: PathBuf, vars: usize },
     /// Left a directory environment behind.

@@ -64,7 +64,7 @@ fn hex(bytes: &[u8]) -> String {
 ///
 /// Reading the file to hash it is not a wasted read: if it cannot be read there is nothing to allow,
 /// and the caller is about to read it anyway when the answer comes back [`Status::Allowed`].
-pub fn content_key(path: &Path) -> Option<String> {
+fn content_key(path: &Path) -> Option<String> {
     let absolute = path.canonicalize().ok()?;
     let contents = std::fs::read(&absolute).ok()?;
     let mut hasher = Sha256::new();
@@ -75,7 +75,7 @@ pub fn content_key(path: &Path) -> Option<String> {
 }
 
 /// `sha256(path + "\n")`, the deny key.
-pub fn path_key(path: &Path) -> Option<String> {
+fn path_key(path: &Path) -> Option<String> {
     // Deliberately *not* `canonicalize`, which requires the file to exist: a denial has to be
     // recordable for a path whose file was deleted, and has to keep matching when it comes back.
     let absolute = match path.is_absolute() {
@@ -146,15 +146,6 @@ impl Allow {
             .token("deny", &key)
             .ok_or_else(|| "no data directory to record it in".to_string())?;
         write_token(&token)
-    }
-
-    /// Forget an allowance without recording a refusal.
-    pub fn revoke(&self, path: &Path) {
-        if let Some(key) = content_key(path)
-            && let Some(token) = self.token("allow", &key)
-        {
-            let _ = std::fs::remove_file(token);
-        }
     }
 
     /// How many tokens are held, as `(allowed, denied)`.

@@ -83,7 +83,6 @@ pub(super) fn detail(output: &str) {
 pub(super) fn event(event: &Event) {
     let grey = Style::fg(Color::Indexed(240));
     match event {
-        Event::Idle => {}
         Event::Loaded { owner, vars } => {
             let label = paint(LABEL, Style::fg(slot(GREEN)));
             let count = match vars {

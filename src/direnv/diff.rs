@@ -17,18 +17,16 @@
 
 use std::collections::BTreeMap;
 
-/// A variable's value before or after, where `None` means it did not exist.
-///
-/// The distinction is load-bearing: restoring `FOO` to `Some("")` leaves an empty variable that
-/// tests like `[ -n "$FOO" ]` read differently from the `None` that was there before.
-pub type Value = Option<String>;
-
 /// What changed, as `name -> (before, after)`.
 ///
 /// Sorted, so that reporting it is stable and two diffs of the same change compare equal.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Diff {
-    changes: BTreeMap<String, (Value, Value)>,
+    /// `name -> (before, after)`, where `None` on either side means the variable did not exist.
+    ///
+    /// That distinction is load-bearing: restoring `FOO` to `Some("")` leaves an empty variable,
+    /// which `[ -n "$FOO" ]` reads differently from the `None` that was there before.
+    changes: BTreeMap<String, (Option<String>, Option<String>)>,
 }
 
 impl Diff {
@@ -66,6 +64,9 @@ impl Diff {
     }
 
     /// Whether anything moved at all.
+    ///
+    /// Nothing calls this today; it is here because `len` without `is_empty` is a clippy denial,
+    /// and the lint is right — a caller reaching for one will reach for the other.
     pub fn is_empty(&self) -> bool {
         self.changes.is_empty()
     }
@@ -161,6 +162,6 @@ mod tests {
     #[test]
     fn an_unchanged_environment_has_nothing_to_undo() {
         let same = env(&[("A", "1")]);
-        assert!(Diff::between(&same, &same).is_empty());
+        assert_eq!(Diff::between(&same, &same).len(), 0);
     }
 }
