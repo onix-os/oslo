@@ -26,6 +26,22 @@ pub enum Action {
     AcceptSuggestionWord,
     Interrupt,
     Complete,
+    /// A function the config supplied. The function itself lives in [`super::editor`]; this only
+    /// records that the key has one, because an `Action` has to stay plain data.
+    LuaHandler,
+}
+
+/// The key name an event was parsed from, for looking a handler back up.
+///
+/// Round-tripping through the name rather than keying on the event keeps one spelling of a key
+/// authoritative — `ctrl-s` and `C-s` parse to the same event and must find the same handler.
+pub fn name_of(event: &KeyEvent) -> Option<String> {
+    NAMES.with(|slot| slot.borrow().get(event).cloned())
+}
+
+thread_local! {
+    static NAMES: std::cell::RefCell<std::collections::HashMap<KeyEvent, String>> =
+        std::cell::RefCell::new(std::collections::HashMap::new());
 }
 
 /// The action a name stands for, for callers outside `oslo.keys` that bind by name.
@@ -38,6 +54,7 @@ impl Action {
         match name {
             "toggle-language" | "toggle-mode" => Some(Action::ToggleLanguage),
             "clear-screen" => Some(Action::ClearScreen),
+            super::editor::ACTION => Some(Action::LuaHandler),
             "history-search" | "history-search-backward" => Some(Action::HistorySearchBackward),
             "accept-suggestion" => Some(Action::AcceptSuggestion),
             "accept-suggestion-word" | "accept-word" => Some(Action::AcceptSuggestionWord),
@@ -50,7 +67,10 @@ impl Action {
     /// The editor command, or `None` for an action the loop handles itself.
     pub fn command(self) -> Option<Cmd> {
         Some(match self {
-            Action::ToggleLanguage => return None,
+            // Both are handled by the caller rather than by an editor command: the toggle hands
+            // control back to the read loop, and a Lua handler has to run before anything is
+            // decided about the line.
+            Action::ToggleLanguage | Action::LuaHandler => return None,
             Action::ClearScreen => Cmd::ClearScreen,
             Action::HistorySearchBackward => Cmd::ReverseSearchHistory,
             Action::AcceptSuggestion => Cmd::CompleteHint,
@@ -133,6 +153,7 @@ pub fn resolve(pairs: &[(String, String)]) -> (Vec<(KeyEvent, Action)>, Vec<Stri
             problems.push(format!("oslo.keys: '{key}' is not a key name"));
             continue;
         };
+        NAMES.with(|slot| slot.borrow_mut().insert(event, key.clone()));
         let Some(action) = Action::parse(action) else {
             problems.push(format!(
                 "oslo.keys['{key}']: '{action}' is not an action; the actions are \

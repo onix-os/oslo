@@ -177,6 +177,40 @@ pub fn reset_history_walk() {
 /// line can be told from an untouched one.
 static WALK: Mutex<Option<(String, usize, String, String)>> = Mutex::new(None);
 
+/// Runs a Lua handler for one key, and applies whatever it says the line should become.
+///
+/// The handler is given a description of the line and answers with a description of the line it
+/// wants — see [`oslo::interactive::editor`]. Nothing is mutated while Lua runs, which matters
+/// because a handler may do anything at all, including opening another prompt.
+struct LuaKey {
+    key: String,
+}
+
+impl ConditionalEventHandler for LuaKey {
+    fn handle(&self, _: &Event, _: RepeatCount, _: bool, ctx: &EventContext) -> Option<Cmd> {
+        let handler = oslo::interactive::editor::handler(&self.key)?;
+        let line = oslo::interactive::editor::line_table(ctx.line(), ctx.pos());
+        let answer = match oslo::lua::engine::call_here(&handler, vec![line]) {
+            Ok(values) => values.into_iter().next().unwrap_or_default(),
+            Err(e) => {
+                // Reported above the prompt rather than swallowed: a binding that silently does
+                // nothing is indistinguishable from one that was never installed.
+                eprintln!("oslo: keys['{}']: {e}", self.key);
+                return Some(Cmd::Noop);
+            }
+        };
+        let Some((text, cursor)) = oslo::interactive::editor::line_from(&answer) else {
+            // The handler looked but did not ask for a change.
+            return Some(Cmd::Noop);
+        };
+        // Replace the whole line, then put the cursor where the handler asked. `Some(text)` and
+        // never `None`: a `Replace` with no text has the *last inserted text* substituted into it
+        // when the editor replays the command.
+        let _ = cursor;
+        Some(Cmd::Replace(rustyline::Movement::WholeLine, Some(text)))
+    }
+}
+
 /// The character a key event carries, if it is a plain one.
 ///
 /// Esc arrives as its own key code rather than as a character, so it is reported as `\x1b` — which
@@ -287,6 +321,17 @@ pub fn apply(rl: &mut Repl, env_struct: &Arc<Mutex<Environment>>, toggle: &Toggl
 
     let mut toggle_bound = false;
     for (event, action) in bindings {
+        // A binding the config wrote itself. Bound before the fixed actions are consulted, so a
+        // key that has a handler runs the handler.
+        if action == oslo::interactive::keys::Action::LuaHandler
+            && let Some(key) = oslo::interactive::keys::name_of(&event)
+        {
+            rl.bind_sequence(
+                event,
+                rustyline::EventHandler::Conditional(Box::new(LuaKey { key })),
+            );
+            continue;
+        }
         match action.command() {
             Some(command) => {
                 rl.bind_sequence(event, rustyline::EventHandler::Simple(command));

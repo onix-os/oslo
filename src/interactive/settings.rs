@@ -314,8 +314,17 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
                 (Value::Str(key), Value::Str(action)) => {
                     settings.keys.push((key.to_string(), action.to_string()));
                 }
+                // A function is a binding the config wrote itself. Kept aside rather than named,
+                // because a `Value` cannot live in `Settings` — the settings are plain data,
+                // readable without an interpreter, and a Lua function is neither.
+                (Value::Str(key), Value::Function(_)) => {
+                    super::editor::register(key, action.clone());
+                    settings
+                        .keys
+                        .push((key.to_string(), super::editor::ACTION.to_string()));
+                }
                 _ => problems.push(
-                    "oslo.keys: every entry must be a key name mapped to an action name"
+                    "oslo.keys: an entry is a key name mapped to an action name or to a function"
                         .to_string(),
                 ),
             }

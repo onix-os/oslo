@@ -32,6 +32,19 @@ thread_local! {
     static ACTIVE: RefCell<Option<(Rc<Interp>, Registry)>> = const { RefCell::new(None) };
 }
 
+/// Call a Lua value with whatever interpreter is on this thread.
+///
+/// The same reach-back `ask_hook_here` uses, for callers that hold a function rather than a hook
+/// name — a key binding written in the config, for instance, which the editor holds directly.
+pub fn call_here(f: &Value, args: Vec<Value>) -> LuaResult<Vec<Value>> {
+    let Some((interp, _)) = ACTIVE.with(|slot| slot.borrow().clone()) else {
+        return Err(eval::LuaError::new(
+            "no Lua interpreter on this thread".to_string(),
+        ));
+    };
+    interp.call(f, args)
+}
+
 /// Fire an answering hook using whatever interpreter is on this thread.
 ///
 /// The executor is a long way from the place the engine is owned — `run_simple` has no route back
