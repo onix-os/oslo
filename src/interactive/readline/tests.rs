@@ -4,6 +4,18 @@
 //! invented, because the syntax is only worth reading to the extent those parse.
 
 use super::*;
+use std::sync::{MutexGuard, OnceLock};
+
+/// The registry is one per process, because a shell has one line editor. Every test below writes
+/// to it and libtest runs them at once, so they take turns — without this they clear each other's
+/// bindings, which looks exactly like a bug in the code under test.
+fn exclusive() -> MutexGuard<'static, ()> {
+    static LOCK: OnceLock<Mutex<()>> = OnceLock::new();
+    let guard = LOCK.get_or_init(|| Mutex::new(())).lock();
+    let guard = guard.unwrap_or_else(|poisoned| poisoned.into_inner());
+    clear();
+    guard
+}
 
 fn one(spec: &str) -> KeyEvent {
     let events = parse_sequence(spec).expect("parses");
@@ -79,9 +91,9 @@ fn an_empty_spec_is_not_a_key() {
 /// takes it off. Both go through the same key parse, so `"\C-r"` and `\C-r` name the same key.
 #[test]
 fn binding_is_by_key_not_by_spelling() {
-    clear();
-    bind(r#""\C-t""#, Bound::Command("first".into())).expect("binds");
-    bind(r"\C-t", Bound::Command("second".into())).expect("rebinds");
+    let _lock = exclusive();
+    bind(r#""\C-t""#, Keymap::Emacs, Bound::Command("first".into())).expect("binds");
+    bind(r"\C-t", Keymap::Emacs, Bound::Command("second".into())).expect("rebinds");
     let entries = entries();
     let ours: Vec<_> = entries
         .iter()
@@ -90,33 +102,118 @@ fn binding_is_by_key_not_by_spelling() {
     assert_eq!(ours.len(), 1, "one binding for one key");
     assert_eq!(ours[0].bound, Bound::Command("second".into()));
 
-    assert!(unbind(r#""\C-t""#));
-    assert!(!unbind(r#""\C-t""#), "already gone");
-    clear();
+    assert!(unbind(r#""\C-t""#, Keymap::Emacs));
+    assert!(!unbind(r#""\C-t""#, Keymap::Emacs), "already gone");
 }
 
 /// The generation counter is what tells the read loop to re-apply, so every change must move it.
 #[test]
 fn every_change_moves_the_generation() {
-    clear();
+    let _lock = exclusive();
     let start = generation();
-    bind(r#""\C-t""#, Bound::Command("x".into())).expect("binds");
+    bind(r#""\C-t""#, Keymap::Emacs, Bound::Command("x".into())).expect("binds");
     assert!(generation() > start);
     let after_bind = generation();
-    unbind(r#""\C-t""#);
+    unbind(r#""\C-t""#, Keymap::Emacs);
     assert!(generation() > after_bind);
-    clear();
 }
 
 /// The request survives a round trip intact — this is the whole channel between the editor and
 /// the read loop, and a dropped cursor position is a plugin that pastes in the wrong place.
 #[test]
 fn a_request_round_trips() {
+    let _lock = exclusive();
+    let _ = take_request();
     assert_eq!(take_request(), None);
-    request("__atuin_history", "git comm", 8);
+    request(vec!["__atuin_history".to_string()], "git comm", 8);
     let taken = take_request().expect("a request");
-    assert_eq!(taken.command, "__atuin_history");
+    assert_eq!(taken.commands, vec!["__atuin_history".to_string()]);
     assert_eq!(taken.line, "git comm");
     assert_eq!(taken.point, 8);
     assert_eq!(take_request(), None, "taken exactly once");
+}
+
+/// A macro expands into the commands its key sequence is bound to, in order.
+///
+/// This is atuin's chain in miniature: a key stands for a sequence, each part of the sequence is a
+/// `bind -x` command, and pressing the key has to run all of them. Before macros existed the
+/// binding was recorded and nothing happened at all.
+#[test]
+fn a_macro_expands_to_the_commands_underneath_it() {
+    let _lock = exclusive();
+    bind(
+        r#""\C-x\C-_A1\a""#,
+        Keymap::Emacs,
+        Bound::Command("first".into()),
+    )
+    .expect("binds");
+    bind(
+        r#""\C-x\C-_A2\a""#,
+        Keymap::Emacs,
+        Bound::Command("second".into()),
+    )
+    .expect("binds");
+    let expansion = parse_sequence(r#""\C-x\C-_A1\a\C-x\C-_A2\a""#).expect("parses");
+    bind(
+        r#""\C-r""#,
+        Keymap::Emacs,
+        Bound::Macro {
+            keys: expansion.clone(),
+            text: String::new(),
+        },
+    )
+    .expect("binds");
+
+    assert_eq!(expand(&expansion), vec!["first", "second"]);
+}
+
+/// The bound sequences are not prefix-free — atuin binds both `A1` and `A10` — so the longest
+/// match has to win. Taking the shorter one runs the wrong widget and leaves stray keys behind.
+#[test]
+fn the_longest_bound_sequence_wins() {
+    let _lock = exclusive();
+    bind(
+        r#""\C-x\C-_A1\a""#,
+        Keymap::Emacs,
+        Bound::Command("short".into()),
+    )
+    .expect("binds");
+    bind(
+        r#""\C-x\C-_A10\a""#,
+        Keymap::Emacs,
+        Bound::Command("long".into()),
+    )
+    .expect("binds");
+    let keys = parse_sequence(r#""\C-x\C-_A10\a""#).expect("parses");
+    assert_eq!(expand(&keys), vec!["long"]);
+}
+
+/// Keys nothing is bound to are skipped rather than reported: a macro is a key sequence, and a
+/// key with no binding is an ordinary keypress with nothing to do.
+#[test]
+fn unbound_keys_in_a_macro_are_skipped() {
+    let _lock = exclusive();
+    bind(r#""\C-t""#, Keymap::Emacs, Bound::Command("only".into())).expect("binds");
+    let keys = parse_sequence(r#""z\C-tz""#).expect("parses");
+    assert_eq!(expand(&keys), vec!["only"]);
+}
+
+/// A macro that reaches itself must stop rather than recurse. `bind '"\C-a": "\C-a"'` is a
+/// single line anyone could type.
+#[test]
+fn a_macro_that_loops_stops() {
+    let _lock = exclusive();
+    let keys = parse_sequence(r#""\C-a""#).expect("parses");
+    bind(
+        r#""\C-a""#,
+        Keymap::Emacs,
+        Bound::Macro {
+            keys: keys.clone(),
+            text: String::new(),
+        },
+    )
+    .expect("binds");
+    // The assertion is that this returns at all.
+    let commands = expand(&keys);
+    assert!(commands.is_empty(), "{commands:?}");
 }

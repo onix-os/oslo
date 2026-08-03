@@ -80,10 +80,42 @@ pub enum UnOp {
 
 /// Parsed arithmetic. Short-circuiting and assignment are separate variants rather than `Binary`
 /// cases because they must not evaluate both sides, or must write back.
+/// What an expression names: a variable, or one element of an array.
+///
+/// A struct rather than two `Expr` variants because every operation that touches a variable —
+/// reading it, assigning to it, stepping it — applies equally to an element. `((a[i]++))` is not a
+/// special case of `((i++))`, it is the same case with a subscript, and splitting them meant four
+/// pairs of near-identical arms that could drift apart.
+///
+/// The subscript is an [`Expr`] because it is arithmetic in its own right: `a[i+1]` and
+/// `a[n%4]` are both ordinary, and `BASH_VERSINFO[0]` — the one that started this — is the
+/// simplest member of the family.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Ref {
+    pub name: String,
+    pub index: Option<Box<Expr>>,
+}
+
+impl Ref {
+    /// A plain variable, with no subscript.
+    pub fn plain(name: impl Into<String>) -> Self {
+        Self {
+            name: name.into(),
+            index: None,
+        }
+    }
+}
+
+impl From<&str> for Ref {
+    fn from(name: &str) -> Self {
+        Ref::plain(name)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Expr {
     Number(i64),
-    Var(String),
+    Var(Ref),
     Unary(UnOp, Box<Expr>),
     Binary(BinOp, Box<Expr>, Box<Expr>),
     LogicalAnd(Box<Expr>, Box<Expr>),
@@ -91,11 +123,11 @@ pub enum Expr {
     Conditional(Box<Expr>, Box<Expr>, Box<Expr>),
     Comma(Box<Expr>, Box<Expr>),
     /// `name = rhs`, or `name op= rhs` when the operator is present.
-    Assign(String, Option<BinOp>, Box<Expr>),
+    Assign(Ref, Option<BinOp>, Box<Expr>),
     /// `++name` / `--name`; the value is the variable *after* the change.
-    PreStep(String, i64),
+    PreStep(Ref, i64),
     /// `name++` / `name--`; the value is the variable *before* the change.
-    PostStep(String, i64),
+    PostStep(Ref, i64),
 }
 
 /// Parse a complete expression. An empty token stream is 0, matching `$(( ))`.
@@ -352,6 +384,24 @@ impl<'a> Parser<'a> {
         Ok(Expr::PostStep(name, delta))
     }
 
+    /// The `[expr]` after a name, if there is one.
+    ///
+    /// Only immediately after the name: `a [0]` is not a subscript in bash either, and the space
+    /// is not something the tokeniser preserves — so `[` here is always the subscript's.
+    fn subscript(&mut self, name: String, depth: usize) -> Result<Ref> {
+        if !self.eat(&Token::LBracket) {
+            return Ok(Ref::plain(name));
+        }
+        let index = self.comma(depth + 1)?;
+        if !self.eat(&Token::RBracket) {
+            return Err(syntax("missing `]` in arithmetic subscript"));
+        }
+        Ok(Ref {
+            name,
+            index: Some(Box::new(index)),
+        })
+    }
+
     fn primary(&mut self, depth: usize) -> Result<Expr> {
         let tok = self
             .peek()
@@ -364,7 +414,7 @@ impl<'a> Parser<'a> {
             Token::Ident(name) => {
                 let name = name.clone();
                 self.pos += 1;
-                Ok(Expr::Var(name))
+                Ok(Expr::Var(self.subscript(name, depth)?))
             }
             Token::LParen => {
                 self.pos += 1;

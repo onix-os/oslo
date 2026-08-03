@@ -11,6 +11,9 @@ use crate::error::{Result, ShellError};
 pub enum Token {
     Number(i64),
     Ident(String),
+    /// `[` and `]`, which only ever appear around an array subscript.
+    LBracket,
+    RBracket,
 
     Plus,
     Minus,
@@ -198,6 +201,8 @@ fn lex_operator(src: &[char], i: usize) -> Result<(Token, usize)> {
         '(' => Token::LParen,
         ')' => Token::RParen,
         '=' => Token::Assign,
+        '[' => Token::LBracket,
+        ']' => Token::RBracket,
         _ => {
             return Err(err(format!(
                 "Invalid character in arithmetic expression: {a}"

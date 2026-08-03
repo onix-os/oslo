@@ -20,13 +20,20 @@
 
 use crate::env::Environment;
 use crate::error::Result;
-use crate::interactive::readline::{self, Bound};
+use crate::interactive::readline::{self, Bound, Keymap};
 
 pub fn builtin_bind(env: &mut Environment, args: &[String]) -> Result<i32> {
     let _ = env;
     let mut operands = args[1..].iter().map(String::as_str).peekable();
     let mut run_command = false;
     let mut status = 0;
+    // `bind` with no `-m` binds in the keymap that is in force, which is what an init script
+    // means when it omits it.
+    let mut keymap = if crate::interactive::vi::enabled() {
+        Keymap::ViInsert
+    } else {
+        Keymap::Emacs
+    };
 
     while let Some(arg) = operands.next() {
         match arg {
@@ -39,7 +46,7 @@ pub fn builtin_bind(env: &mut Environment, args: &[String]) -> Result<i32> {
                     status = 1;
                     continue;
                 };
-                if !readline::unbind(spec) {
+                if !readline::unbind(spec, keymap) {
                     eprintln!("oslo: bind: {spec}: cannot unbind");
                     status = 1;
                 }
@@ -49,11 +56,27 @@ pub fn builtin_bind(env: &mut Environment, args: &[String]) -> Result<i32> {
             "-X" => list(true),
             "-p" | "-P" | "-s" | "-S" => list(false),
             "-l" | "-v" | "-V" => {}
-            // A readline variable — `bind 'set completion-ignore-case on'`. oslo has its own
-            // settings and does not implement readline's, so this is accepted and ignored rather
-            // than reported: init scripts set these unconditionally and a diagnostic per line
-            // would bury the ones that matter.
-            "-m" | "-f" | "-q" => {
+            // The keymap the following specs belong to. Honouring this is not optional: atuin
+            // binds `/` and `k` in vi-command, where they are motions, and installing those
+            // globally put a command on the `/` of every path.
+            "-m" => match operands.next() {
+                Some(name) => match Keymap::parse(name) {
+                    Some(parsed) => keymap = parsed,
+                    None => {
+                        eprintln!("oslo: bind: {name}: unknown keymap");
+                        status = 1;
+                    }
+                },
+                None => {
+                    eprintln!("oslo: bind: -m: option requires an argument");
+                    status = 1;
+                }
+            },
+            // A readline variable or function file. oslo has its own settings and does not
+            // implement readline's, so these are accepted and ignored rather than reported: init
+            // scripts set them unconditionally and a diagnostic per line would bury the ones that
+            // matter.
+            "-f" | "-q" => {
                 operands.next();
             }
             "--" => {}
@@ -62,7 +85,7 @@ pub fn builtin_bind(env: &mut Environment, args: &[String]) -> Result<i32> {
                 status = 2;
             }
             spec => {
-                if !apply(spec, run_command) {
+                if !apply(spec, keymap, run_command) {
                     status = 1;
                 }
                 // `-x` binds the one spec that follows it, as bash's does.
@@ -74,7 +97,7 @@ pub fn builtin_bind(env: &mut Environment, args: &[String]) -> Result<i32> {
 }
 
 /// Record one `"key": action` spec. False on anything that could not be read.
-fn apply(spec: &str, run_command: bool) -> bool {
+fn apply(spec: &str, keymap: Keymap, run_command: bool) -> bool {
     // `set editing-mode vi` and friends arrive here as a bare operand. oslo has `oslo.vi` for
     // that and readline's variables are not implemented, so they are dropped quietly — see the
     // module note on why this one is silent.
@@ -88,10 +111,18 @@ fn apply(spec: &str, run_command: bool) -> bool {
     };
     let bound = if run_command {
         Bound::Command(action.to_string())
+    } else if let Some(keys) = macro_target(action) {
+        // A *quoted* action is a macro: the key expands into that key sequence. `bind '"\C-a":
+        // "\C-x\C-r"'` and `bind '"\C-a": beginning-of-line'` differ by nothing but the quotes,
+        // which is readline's own rule and the one atuin's keymap is written against.
+        Bound::Macro {
+            keys,
+            text: action.trim_matches('"').to_string(),
+        }
     } else {
         Bound::Function(action.to_string())
     };
-    match readline::bind(&key, bound) {
+    match readline::bind(&key, keymap, bound) {
         Ok(()) => true,
         Err(message) => {
             eprintln!("oslo: bind: {message}");
@@ -122,6 +153,19 @@ fn split_spec(spec: &str) -> Option<(String, &str)> {
     Some((key, action))
 }
 
+/// The key sequence a quoted action expands to, or `None` when the action is not quoted.
+///
+/// An empty macro — `bind '"\C-a": ""'` — is a real thing: atuin uses it to *neutralise* a key it
+/// no longer wants, and it must record as a macro that does nothing rather than fall through to
+/// being read as a function name.
+fn macro_target(action: &str) -> Option<Vec<rustyline::KeyEvent>> {
+    let inner = action.strip_prefix('"')?.strip_suffix('"')?;
+    if inner.is_empty() {
+        return Some(Vec::new());
+    }
+    readline::parse_sequence(inner)
+}
+
 /// `bind -X` / `bind -p`: what is bound, in the form that would bind it again.
 fn list(commands_only: bool) {
     for entry in readline::entries() {
@@ -130,7 +174,10 @@ fn list(commands_only: bool) {
             Bound::Function(name) if !commands_only => {
                 println!("\"{}\": {}", spelling(&entry.spec), name)
             }
-            Bound::Function(_) => {}
+            Bound::Macro { text, .. } if !commands_only => {
+                println!("\"{}\": \"{text}\"", spelling(&entry.spec))
+            }
+            Bound::Function(_) | Bound::Macro { .. } => {}
         }
     }
 }

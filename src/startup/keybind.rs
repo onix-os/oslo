@@ -388,19 +388,31 @@ pub fn apply(rl: &mut Repl, env_struct: &Arc<Mutex<Environment>>, toggle: &Toggl
     }
 }
 
-/// A key `bind -x` gave a shell command.
+/// A key `bind` gave shell commands to run.
 ///
 /// It records the request and answers `AcceptLine`, which is the only way out of rustyline that
 /// gives the caller both the buffer and control. The read loop recognises the request, so the
-/// line is *not* run as a command — see [`crate::startup::bindx`] for what happens next and why
-/// it cannot happen here.
+/// line is *not* run as a command — see [`crate::startup::integration`] for what happens next and
+/// why it cannot happen here.
+///
+/// The commands are worked out **when the key is pressed**, not when it is bound: a macro names
+/// key sequences, and what those are bound to can change between one prompt and the next. atuin
+/// rebinds its own widgets as the keymap changes, and resolving early would have run whatever the
+/// chain meant at startup.
 struct BindCommand {
-    command: String,
+    /// The key sequence this binding stands for. One event for a `bind -x` key; the macro's
+    /// expansion for a macro.
+    keys: Vec<rustyline::KeyEvent>,
 }
 
 impl ConditionalEventHandler for BindCommand {
     fn handle(&self, _: &Event, _: RepeatCount, _: bool, ctx: &EventContext) -> Option<Cmd> {
-        oslo::interactive::readline::request(&self.command, ctx.line(), ctx.pos());
+        let commands = oslo::interactive::readline::expand(&self.keys);
+        if commands.is_empty() {
+            // Nothing to run, so nothing should happen — least of all ending the line.
+            return Some(Cmd::Noop);
+        }
+        oslo::interactive::readline::request(commands, ctx.line(), ctx.pos());
         Some(Cmd::AcceptLine)
     }
 }
@@ -426,13 +438,25 @@ pub fn apply_bindings(rl: &mut Repl) -> usize {
     let generation = readline::generation();
     APPLIED.store(generation, Ordering::SeqCst);
     for entry in readline::entries() {
+        // Only the keymap in force. A vi-command binding installed while you are typing is not a
+        // shortcut, it is a character that no longer types itself — atuin binds `/` and `k` there,
+        // and applying them made `ls /tmp` open a history search mid-word.
+        if !entry.keymap.is_active() {
+            continue;
+        }
         let event = Event::KeySeq(entry.keys.clone());
         match &entry.bound {
-            Bound::Command(command) => rl.bind_sequence(
+            // Bound to its *own* keys, not to the command: `expand` looks the sequence up again
+            // when the key is pressed, so one path covers both a direct command and a macro.
+            Bound::Command(_) => rl.bind_sequence(
                 event,
                 rustyline::EventHandler::Conditional(Box::new(BindCommand {
-                    command: command.clone(),
+                    keys: entry.keys.clone(),
                 })),
+            ),
+            Bound::Macro { keys, .. } => rl.bind_sequence(
+                event,
+                rustyline::EventHandler::Conditional(Box::new(BindCommand { keys: keys.clone() })),
             ),
             // A readline *function* name. oslo maps the few that name something it has and leaves
             // the rest alone rather than binding a key to nothing — `bind -P` will still list it,

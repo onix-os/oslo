@@ -115,7 +115,19 @@ pub fn builtin_eval(env: &mut Environment, args: &[String]) -> Result<i32> {
         return Ok(0);
     }
 
-    let code = args[1..].join(" ");
+    // `--` ends the options, and `eval` has none — but it still has to be *consumed*, or it
+    // becomes the first word of the code and the shell looks for a command called `--`.
+    // atuin's widget dispatch is written `builtin eval -- "$widget"`, and without this every
+    // keybinding it installs answered `oslo: --: command not found`.
+    let operands = match args.get(1).map(String::as_str) {
+        Some("--") => &args[2..],
+        _ => &args[1..],
+    };
+    if operands.is_empty() {
+        return Ok(0);
+    }
+
+    let code = operands.join(" ");
 
     // `x='eval "$x"'; eval "$x"` recurses through the parser and the evaluator with no function
     // call to bound it, so `eval` carries the same nesting counter `source` does.

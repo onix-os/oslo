@@ -42,15 +42,71 @@ use std::sync::{Mutex, OnceLock};
 pub enum Bound {
     /// `bind -x`: run this shell command, with the line in `$READLINE_LINE`.
     Command(String),
-    /// `bind '"\C-x": text'`: a readline function name or a macro. Recorded so a listing can
-    /// report it; oslo maps the function names it knows onto its own actions and says so about
-    /// the rest, rather than silently doing nothing.
+    /// `bind '"\C-r": "\C-x\C-_A1\a"'`: a **macro** — the key expands into another key
+    /// sequence, which is then dispatched as if it had been typed.
+    ///
+    /// This is not a curiosity. atuin's whole keymap is built out of macros: Ctrl-R expands to a
+    /// sequence of private key codes, each of which is a `bind -x` command, and running them in
+    /// order is what opens the search. Without macros its `bind` lines are recorded and nothing
+    /// ever happens, which is exactly how it behaved before.
+    Macro {
+        keys: Vec<KeyEvent>,
+        /// The sequence as written, so a listing can echo what was asked for rather than a
+        /// re-rendering of it. `bind -p` output is read by init scripts and by people.
+        text: String,
+    },
+    /// `bind '"\C-x": backward-word'`: a readline *function* name. Recorded so a listing can
+    /// report it; oslo maps the names it has an equivalent for and leaves the rest alone rather
+    /// than binding a key to nothing.
     Function(String),
+}
+
+/// Which of readline's keymaps a binding belongs to.
+///
+/// This is not bookkeeping. atuin binds `/` and `k` in the **vi-command** keymap, where they are
+/// motion keys and mean nothing while you are typing. Applying them regardless put a command on
+/// the `/` in every path: typing `ls /tmp` opened the history search and the shell stopped
+/// responding. A keymap oslo cannot express is a binding oslo must not install.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Keymap {
+    /// The default keymap, and the one oslo's editor is in unless vi mode is on.
+    Emacs,
+    /// vi insert mode — where you type, so a binding here behaves like an emacs one.
+    ViInsert,
+    /// vi command mode. oslo's editor has no separate keymap for it, so bindings here are
+    /// recorded and **not** applied, rather than leaking into the mode where you type.
+    ViCommand,
+}
+
+impl Keymap {
+    /// readline's names for the keymaps, as `bind -m` spells them.
+    pub fn parse(name: &str) -> Option<Keymap> {
+        Some(match name {
+            "emacs" | "emacs-standard" | "emacs-meta" | "emacs-ctlx" => Keymap::Emacs,
+            "vi-insert" | "vi" => Keymap::ViInsert,
+            "vi-command" | "vi-move" => Keymap::ViCommand,
+            _ => return None,
+        })
+    }
+
+    /// Whether a binding in this keymap should be applied to the editor as it is now.
+    ///
+    /// oslo's editor is in one keymap at a time and rustyline has no separate vi-command binding
+    /// table, so the honest answer for `ViCommand` is always no.
+    pub fn is_active(self) -> bool {
+        match self {
+            Keymap::Emacs => !crate::interactive::vi::enabled(),
+            Keymap::ViInsert => crate::interactive::vi::enabled(),
+            Keymap::ViCommand => false,
+        }
+    }
 }
 
 /// One binding, as `bind` recorded it.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Entry {
+    /// The keymap it was bound in. `bind` with no `-m` records the active one.
+    pub keymap: Keymap,
     /// The key sequence, already parsed. More than one event for `"\C-x\C-r"`.
     pub keys: Vec<KeyEvent>,
     /// The spec exactly as written, so `bind -r` can match it and a listing can echo it.
@@ -71,11 +127,14 @@ pub fn generation() -> usize {
 }
 
 /// Record a binding, replacing any earlier one for the same spec — as rebinding a key does.
-pub fn bind(spec: &str, bound: Bound) -> Result<(), String> {
+pub fn bind(spec: &str, keymap: Keymap, bound: Bound) -> Result<(), String> {
     let keys = parse_sequence(spec).ok_or_else(|| format!("{spec}: cannot parse key sequence"))?;
     let mut entries = registry().lock().map_err(|_| "bind: lock poisoned")?;
-    entries.retain(|e| e.keys != keys);
+    // Per keymap: `/` may be a search in vi-command and an ordinary character in vi-insert, and
+    // one replacing the other is how binding a motion key broke typing.
+    entries.retain(|e| !(e.keys == keys && e.keymap == keymap));
     entries.push(Entry {
+        keymap,
         keys,
         spec: spec.to_string(),
         bound,
@@ -85,7 +144,7 @@ pub fn bind(spec: &str, bound: Bound) -> Result<(), String> {
 }
 
 /// `bind -r`: forget a binding. True when there was one.
-pub fn unbind(spec: &str) -> bool {
+pub fn unbind(spec: &str, keymap: Keymap) -> bool {
     let Some(keys) = parse_sequence(spec) else {
         return false;
     };
@@ -93,12 +152,66 @@ pub fn unbind(spec: &str) -> bool {
         return false;
     };
     let before = entries.len();
-    entries.retain(|e| e.keys != keys);
+    entries.retain(|e| !(e.keys == keys && e.keymap == keymap));
     if entries.len() != before {
         GENERATION.fetch_add(1, Ordering::SeqCst);
         return true;
     }
     false
+}
+
+/// How many macros deep an expansion may go before it is called a loop.
+///
+/// A macro may expand into keys that are themselves macros — atuin's is two levels — so following
+/// them is a walk, and `bind '"\C-a": "\C-a"'` is a walk with no end. Eight is far past anything
+/// real and far short of a stack problem.
+const MAX_MACRO_DEPTH: usize = 8;
+
+/// The commands a key sequence stands for, following macros to the `bind -x` bindings underneath.
+///
+/// The sequence is segmented by **longest match first**, because the bound sequences are not
+/// prefix-free: atuin binds `\C-x\C-_A1\a` and `\C-x\C-_A10\a`, and matching the shorter one
+/// first would run the wrong widget and leave `0\a` behind as stray keys.
+///
+/// Keys that match nothing are dropped rather than reported. A macro is a *key sequence*, and a
+/// key nothing is bound to is an ordinary key press with nothing to do — under bash it would
+/// insert itself, which is not something a binding should do on the user's behalf.
+pub fn expand(keys: &[KeyEvent]) -> Vec<String> {
+    let mut commands = Vec::new();
+    walk(keys, 0, &mut commands);
+    commands
+}
+
+fn walk(keys: &[KeyEvent], depth: usize, out: &mut Vec<String>) {
+    if depth >= MAX_MACRO_DEPTH {
+        eprintln!("oslo: bind: macro expands into itself; stopping");
+        return;
+    }
+    // Only the keymap in force: a macro bound in one keymap expands through the bindings of that
+    // keymap, not through every binding the shell has ever been given.
+    let table: Vec<Entry> = entries()
+        .into_iter()
+        .filter(|entry| entry.keymap.is_active())
+        .collect();
+    let mut at = 0;
+    while at < keys.len() {
+        let matched = table
+            .iter()
+            .filter(|entry| !entry.keys.is_empty() && keys[at..].starts_with(&entry.keys))
+            .max_by_key(|entry| entry.keys.len());
+        let Some(entry) = matched else {
+            at += 1;
+            continue;
+        };
+        match &entry.bound {
+            Bound::Command(command) => out.push(command.clone()),
+            Bound::Macro { keys, .. } => walk(keys, depth + 1, out),
+            // A readline function is bound in the editor, not run as a command, so a macro that
+            // reaches one has nothing to contribute here.
+            Bound::Function(_) => {}
+        }
+        at += entry.keys.len();
+    }
 }
 
 /// Every binding, for applying to the editor or for a listing.
@@ -125,7 +238,9 @@ pub fn clear() {
 /// This is the same shape the language toggle uses, for the same reason.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Request {
-    pub command: String,
+    /// In order. A macro expands to more than one — atuin's Ctrl-R is five commands that together
+    /// encode which widget to run.
+    pub commands: Vec<String>,
     /// The buffer as it stood when the key was pressed.
     pub line: String,
     /// The cursor, as a byte offset — what `$READLINE_POINT` counts, matching bash.
@@ -137,11 +252,14 @@ fn pending() -> &'static Mutex<Option<Request>> {
     PENDING.get_or_init(|| Mutex::new(None))
 }
 
-/// Record that a `bind -x` key was pressed. The read loop picks this up.
-pub fn request(command: &str, line: &str, point: usize) {
+/// Record that a bound key was pressed. The read loop picks this up.
+pub fn request(commands: Vec<String>, line: &str, point: usize) {
+    if commands.is_empty() {
+        return;
+    }
     if let Ok(mut slot) = pending().lock() {
         *slot = Some(Request {
-            command: command.to_string(),
+            commands,
             line: line.to_string(),
             point,
         });

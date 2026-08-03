@@ -66,12 +66,18 @@ pub(super) fn run(env_struct: &Arc<Mutex<Environment>>, request: &Request) -> Ou
     env.set_var("READLINE_LINE", &request.line, false);
     env.set_var("READLINE_POINT", &point.to_string(), false);
 
-    let outcome = oslo::parser::parse_with_aliases(&request.command, &|name| {
-        env.get_alias(name).map(str::to_string)
-    })
-    .and_then(|ast| eval_command_list(&mut env, &ast));
-    if let Err(e) = outcome {
-        eprintln!("oslo: bind: {}: {e}", request.command);
+    // In order, each seeing what the last one left. A macro is one keystroke that stands for
+    // several commands — atuin's Ctrl-R is five, which between them encode a widget number — so
+    // they have to run as a sequence rather than a set, and a failing one must not abandon the
+    // rest: the last of atuin's five is the dispatch that actually opens the search.
+    for command in &request.commands {
+        let outcome = oslo::parser::parse_with_aliases(command, &|name| {
+            env.get_alias(name).map(str::to_string)
+        })
+        .and_then(|ast| eval_command_list(&mut env, &ast));
+        if let Err(e) = outcome {
+            eprintln!("oslo: bind: {command}: {e}");
+        }
     }
 
     let line = env.get_param("READLINE_LINE").unwrap_or_default();
