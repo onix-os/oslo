@@ -87,41 +87,42 @@ fn home_is_written_as_a_tilde() {
     assert_eq!(shorten("/home/me", ""), "/home/me");
 }
 
-/// The search bar is the last row and carries the query and the match count.
+/// The input is a three-row surface at the bottom: a blank row, the query, a blank row. The query
+/// is therefore the second-from-last row, not the last.
 #[test]
-fn the_search_bar_is_at_the_bottom() {
+fn the_search_bar_sits_inside_its_surface() {
     let matches = [ranked("one", 1, 999_999_999, "/home/me", false)];
-    let rendered = frame_of(&matches, "on", 10);
-    let last = plain(&rendered)
-        .lines()
-        .last()
-        .unwrap_or_default()
-        .to_string();
-    assert!(last.contains('❯'), "no prompt on the last row: {last:?}");
-    assert!(last.contains("on"), "the query is missing: {last:?}");
-    assert!(last.contains("1/1"), "the counter is missing: {last:?}");
+    let seen = plain(&frame_of(&matches, "on", 10));
+    let lines: Vec<&str> = seen.lines().collect();
+    let query_row = lines.len() - 2;
+    assert!(
+        lines[query_row].contains('❯'),
+        "no prompt on the query row: {:?}",
+        lines[query_row]
+    );
+    assert!(lines[query_row].contains("on"), "{:?}", lines[query_row]);
+    assert!(lines[query_row].contains("1/1"), "{:?}", lines[query_row]);
+    assert!(
+        lines[query_row - 1].trim().is_empty() && lines[query_row + 1].trim().is_empty(),
+        "the query should be padded above and below: {lines:?}"
+    );
 }
 
 /// The list grows upward: with one match and room for many, the match sits directly above the
-/// separator and the empty rows are at the top.
+/// input surface and the empty rows are at the top.
 #[test]
 fn the_list_grows_upward_from_the_bar() {
     let matches = [ranked("only", 1, 999_999_999, "/home/me", false)];
     let seen = plain(&frame_of(&matches, "", 8));
     let lines: Vec<&str> = seen.lines().collect();
-    // Rows: 8 total, 2 chrome, 6 for the list — five blank then the match.
     let match_row = lines
         .iter()
         .position(|l| l.contains("only"))
         .expect("the match is drawn");
-    let separator_row = lines
-        .iter()
-        .position(|l| l.contains('─'))
-        .expect("the separator is drawn");
+    // 8 rows: 3 for the surface, 5 for the list. The match is the last list row.
     assert_eq!(
-        match_row + 1,
-        separator_row,
-        "the match should sit against the separator: {lines:?}"
+        match_row, 4,
+        "the match should be the last list row: {lines:?}"
     );
     assert!(
         lines[..match_row].iter().all(|l| l.trim().is_empty()),
@@ -182,18 +183,16 @@ fn exactly_one_row_carries_the_marker() {
         now: 100,
         home: "/home/me",
     });
-    let marked: Vec<&str> = plain(&rendered)
-        .lines()
-        .filter(|l| l.contains('▌'))
-        .map(|_| "x")
-        .collect();
-    assert_eq!(marked.len(), 1, "exactly one marker");
-    let row = plain(&rendered)
-        .lines()
-        .find(|l| l.contains('▌'))
-        .unwrap_or_default()
-        .to_string();
-    assert!(row.contains("second"), "the wrong row is marked: {row:?}");
+    let seen = plain(&rendered);
+    // The search bar uses the same glyph, so only the list rows are counted.
+    let list: Vec<&str> = seen.lines().take(seen.lines().count() - 3).collect();
+    let marked: Vec<&&str> = list.iter().filter(|l| l.contains('❯')).collect();
+    assert_eq!(marked.len(), 1, "exactly one marker: {list:?}");
+    assert!(
+        marked[0].contains("second"),
+        "the wrong row is marked: {:?}",
+        marked[0]
+    );
 }
 
 /// With a full window, the *best* match is the row against the search bar and the oldest is at
@@ -214,21 +213,36 @@ fn the_best_match_sits_nearest_the_bar() {
             .position(|l| l.contains(needle))
             .unwrap_or_else(|| panic!("{needle} is not drawn: {lines:?}"))
     };
-    let separator = lines
-        .iter()
-        .position(|l| l.contains('─'))
-        .expect("the separator is drawn");
-    assert!(
-        row_of("best") < separator,
-        "the best match is above the bar"
-    );
+    // 6 rows: 3 for the surface, 3 for the list, so the best match is the last list row.
     assert_eq!(
-        row_of("best") + 1,
-        separator,
-        "the best match should be the row against the separator: {lines:?}"
+        row_of("best"),
+        2,
+        "the best match should sit against the surface: {lines:?}"
     );
     assert!(
         row_of("third") < row_of("second") && row_of("second") < row_of("best"),
         "older matches should be further up: {lines:?}"
     );
+}
+
+/// No list row carries a background. The whole point of the redesign: a full-screen list has the
+/// screen to itself, so painting the rows spends the strongest signal available on nothing, and
+/// the selected row is marked by its glyph instead.
+#[test]
+fn no_list_row_is_painted() {
+    let matches = [
+        ranked("first", 1, 3, "/home/me", true),
+        ranked("second", 1, 2, "/home/me", false),
+    ];
+    let rendered = frame_of(&matches, "", 8);
+    let list: Vec<&str> = rendered
+        .lines()
+        .take(rendered.lines().count() - 3)
+        .collect();
+    for row in list {
+        assert!(
+            !row.contains("48;5;") && !row.contains("48;2;"),
+            "a list row carries a background: {row:?}"
+        );
+    }
 }
