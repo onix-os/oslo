@@ -1,4 +1,15 @@
-//! Running a `bind -x` command, with the line handed to it and taken back.
+//! Running the shell code a bash integration installed.
+//!
+//! Two hooks, both of which run *from the read loop* rather than from inside the editor, and both
+//! of which exist because the ecosystem is written against bash:
+//!
+//! * [`run`] — a `bind -x` command, with the line handed to it in `$READLINE_LINE`;
+//! * [`prompt_command`] — `$PROMPT_COMMAND`, before every prompt.
+//!
+//! They are in one file because they are one concern: shell code the user did not type, run by
+//! the loop, whose failures must never take the shell down.
+//!
+//! # `bind -x`
 //!
 //! The editor cannot do this itself. Its handler runs inside rustyline's own read loop with the
 //! terminal in raw mode, and a bound command is arbitrary shell code that may want to draw a
@@ -27,6 +38,7 @@
 use oslo::Environment;
 use oslo::exec::eval_command_list;
 use oslo::interactive::readline::Request;
+use oslo::parser::parse_with_aliases;
 use std::sync::{Arc, Mutex};
 
 /// Where the prompt comes back, once a bound command has had the line.
@@ -84,6 +96,46 @@ fn boundary(line: &str, at: usize) -> usize {
         at -= 1;
     }
     at
+}
+
+/// Run `$PROMPT_COMMAND`, bash's "before every prompt" hook.
+///
+/// The counterpart to the DEBUG trap: DEBUG fires before a command, this fires before the prompt
+/// that follows it, and between them they are what every bash integration hangs off. hexe sets
+/// `PROMPT_COMMAND="__shp_precmd;__hexe_precmd"` — one rebuilds `PS1`, the other reports the
+/// command that just ended — and without this it installs perfectly and then does nothing at all.
+///
+/// Two details are load-bearing, both because a hook is written expecting them:
+///
+/// * **`$?` is the finished command's status, and survives.** `__shp_precmd` opens with
+///   `local exit_status=$?`, so a hook that ran with `$?` already clobbered would colour every
+///   prompt as a success. It is restored afterwards too, or the hook's own last command would
+///   become the status the *next* prompt reports;
+/// * **an error is reported and dropped.** A broken `PROMPT_COMMAND` must not take the shell with
+///   it. bash prints the diagnostic and carries on, and a prompt hook is exactly the code most
+///   likely to be half-written.
+///
+/// bash 5.1's array form — several `PROMPT_COMMAND` elements run in turn — is not supported; the
+/// scalar is what integrations emit, and oslo has no associative-array machinery behind it yet.
+pub(super) fn prompt_command(env_struct: &Arc<Mutex<Environment>>, last_status: i32) {
+    let mut env = match env_struct.lock() {
+        Ok(env) => env,
+        Err(poisoned) => poisoned.into_inner(),
+    };
+    let Some(text) = env.get_param("PROMPT_COMMAND") else {
+        return;
+    };
+    if text.trim().is_empty() {
+        return;
+    }
+
+    env.last_status = last_status;
+    let outcome = parse_with_aliases(&text, &|name| env.get_alias(name).map(str::to_string))
+        .and_then(|ast| eval_command_list(&mut env, &ast));
+    if let Err(e) = outcome {
+        eprintln!("oslo: PROMPT_COMMAND: {e}");
+    }
+    env.last_status = last_status;
 }
 
 #[cfg(test)]

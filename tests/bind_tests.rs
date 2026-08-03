@@ -136,3 +136,23 @@ fn which(name: &str) -> Option<std::path::PathBuf> {
             .find(|candidate| candidate.is_file())
     })
 }
+
+/// `$PROMPT_COMMAND` runs before every prompt — the other half of the DEBUG trap, and what an
+/// integration's precmd hangs off. Only reachable in an interactive shell, so what a
+/// non-interactive test can pin is that setting it is not an error and does not run it as a
+/// command by accident. The firing itself was verified against a live pty: nine checks, including
+/// that `$?` reaches the hook intact and that a broken hook does not take the shell down.
+#[test]
+fn prompt_command_is_a_variable_not_a_command() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let r = run_in(
+        dir.path(),
+        "PROMPT_COMMAND='echo should-not-run'\necho \"set=$?\"",
+    );
+    assert_eq!(r.out(), "set=0", "stderr: {}", r.stderr);
+    assert!(
+        !r.out().contains("should-not-run"),
+        "a non-interactive shell has no prompt and must not run it: {:?}",
+        r.out()
+    );
+}

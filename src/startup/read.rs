@@ -209,7 +209,7 @@ pub(super) fn read_command(
         // is. `raw` is not a command the user asked to run and must not be treated as one; the
         // line goes back into the editor as whatever the command left in `$READLINE_LINE`.
         if let Some(request) = oslo::interactive::readline::take_request() {
-            let outcome = super::bindx::run(env_struct, &request);
+            let outcome = super::integration::run(env_struct, &request);
             typed = outcome.line;
             typed_point = outcome.point;
             // Everything else about the line survives: a bound key pressed halfway through a
