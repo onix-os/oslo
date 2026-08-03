@@ -46,6 +46,12 @@ const MIN_VISITS: i64 = 2;
 /// The house frecency: visits, decayed by how long ago the last one was.
 ///
 /// `now` and `last_visit` are epoch seconds, as `dir.last_visit` stores them.
+///
+/// This is the only ranking in oslo. It had a twin — `score_sql`, the same expression written out
+/// for the database to evaluate — which existed so that the ordering done in storage and the
+/// ordering done here could not drift apart. The store has no query language now and cannot
+/// express an ordering at all, so the twin is gone and the drift it guarded against is impossible
+/// rather than merely tested for. Anything that wants rows in an order calls this.
 pub fn score(visits: i64, last_visit: i64, now: i64) -> f64 {
     if visits <= 0 {
         return 0.0;
@@ -55,15 +61,6 @@ pub fn score(visits: i64, last_visit: i64, now: i64) -> f64 {
     // fresh visit, so a single bad timestamp would pin one directory at the top permanently.
     let age_hours = (now - last_visit).max(0) as f64 / 3600.0;
     visits as f64 / (1.0 + (1.0 + age_hours).ln())
-}
-
-/// [`score`] as SQL, with `now` naming the bind that holds the current epoch second.
-///
-/// Single-sourced from here for the reason the module note gives: the ranking done in the database
-/// and the ranking done in Rust must not be able to drift apart. Written against `dir`, so it
-/// assumes the `visits` and `last_visit` columns are in scope.
-pub fn score_sql(now: &str) -> String {
-    format!("visits / (1.0 + ln(1.0 + MAX({now} - last_visit, 0) / 3600.0))")
 }
 
 /// How well a directory matched what was typed, worst first.
@@ -575,15 +572,5 @@ mod tests {
         assert!(!within("/home/u/other", None));
         // Everything is under the root, so a root workspace tells the ranking nothing.
         assert!(!within("/home/u/other", Some("/")));
-    }
-
-    /// The SQL and the Rust are one expression on purpose; if this text changes, the two rankings
-    /// have started to disagree about what "best" means.
-    #[test]
-    fn the_sql_score_names_the_same_expression() {
-        assert_eq!(
-            score_sql("?1"),
-            "visits / (1.0 + ln(1.0 + MAX(?1 - last_visit, 0) / 3600.0))"
-        );
     }
 }

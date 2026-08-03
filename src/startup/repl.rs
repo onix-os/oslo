@@ -339,27 +339,19 @@ pub fn run_repl() -> ! {
     std::process::exit(last_status);
 }
 
-/// Leave both stores in the state a shell that is not running should leave them.
-///
-/// Two jobs at the same moment because it is the same moment: the shell is ending, nothing in this
-/// process is mid-query, and a few milliseconds cost nobody anything.
+/// Leave the history in the state a shell that is not running should leave it.
 ///
 /// The trim puts the history table back inside `$HISTSIZE`. It has to happen here as well as on the
 /// amortised counter, or a session shorter than the counter's period never enforces the bound at
-/// all.
+/// all. Best effort, and it does not block: another terminal holding the file means it does not
+/// happen this time.
 ///
-/// The checkpoint folds the tracker's write-ahead log back into its database. turso never does that
-/// on its own — not on drop and not on reopen — and the log grows with every commit, so without this
-/// the `-wal` passes the database in size within one session and stays passed: measured 1.2 MB of
-/// log against 4 KB of data after thirty commands. Both are best effort and neither blocks: another
-/// terminal holding the lock means it does not happen this time.
+/// Neither store has a checkpoint any more, because neither has a log. Both are one file that is
+/// consistent at every commit, and the tracker's own bound is the daily sweep in `track::prune`
+/// rather than anything the way out of the loop can do. See `history_db`'s note and that module's.
 fn settle_stores(db: &Option<history_db::History>, settings: &history::Settings) {
     if let Some(db) = db {
         db.trim(settings.max_size.max(1));
-        db.checkpoint();
-    }
-    if let Some(track) = oslo::track::store() {
-        track.checkpoint();
     }
 }
 

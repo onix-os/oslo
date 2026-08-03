@@ -55,23 +55,6 @@ thiserror = "2.0"
 # item, so the arithmetic-for rule never sees the two `;` it asks for. That is a loud syntax error
 # rather than a wrong answer — see tests/differential/expected_fail.rs.
 brush-parser = { git = "https://github.com/bresilla/brush", branch = "oslo-integration" }
-# `default-features = false` turns off turso's two default features, neither of which oslo asks
-# for and both of which are large. `fts` is `tantivy`, a full-text search engine — there is no
-# `MATCH` and no FTS table anywhere in `src/track/` or `src/startup/history_db.rs`. `mimalloc` is a
-# C allocator oslo never asked for, and it drags `zstd-sys` along.
-#
-# Measured on this tree: 22,971,144 -> 18,326,960 bytes (-4.43 MiB, -20%), `cargo tree -e normal`
-# from 287 crates to 236, and `strings` finds no `mimalloc`, `zstd`, `tantivy` or `stemmer` in the
-# result. No source change, and no measurable effect on startup, the corpus or glob.
-#
-# It does *not* get the C toolchain back out, which is the thing worth knowing: `turso_core` names
-# `simsimd` — a SIMD distance-function library in C — as a non-optional dependency on every target
-# but wasm and Windows-on-ARM, and its build script runs `gcc` and links a 275 KB `libsimsimd.a`.
-# So the reason `mlua` was dropped and `sha2` was chosen (see the comments above both) is still
-# contradicted, and cannot be un-contradicted by any feature flag. Only removing turso does that.
-# See docs/research/footprint.md.
-turso = { version = "0.7.2", default-features = false }
-tokio = { version = "1.53.1", features = ["rt", "macros"] }
 # The allow list for directory environments is keyed by a hash of the rc file's path *and* its
 # contents, which is what makes editing an allowed file revoke it. Pure Rust, so it does not cost
 # the static musl build a C toolchain.
@@ -81,6 +64,27 @@ sha2 = "0.11.0"
 # A pipe would be the obvious choice and is the wrong one — nothing drains it while the rc file
 # runs, so a chatty `.envrc` would block forever on its own output once the pipe filled.
 tempfile = "3.17"
+# The store's key-value engine, and the reason `turso` is gone: pure Rust, one file, no C, no
+# `simsimd`, no allocator. Bolt/LMDB's design — a copy-on-write B+tree with two alternating meta
+# pages, which is what makes a `kill -9` cost the transaction in flight and nothing else.
+#
+# What went with it, and why the line above this one is now blank: `turso` was 13.3 MB of an
+# 18.3 MB binary and it compiled C into it. `turso_core` names `simsimd` — a SIMD distance
+# library in C — as a non-optional dependency on every target but wasm, so its build script ran
+# `gcc` and linked a 275 KB `libsimsimd.a`. That contradicted the reason `mlua` was dropped and
+# `sha2` was chosen (see the comment above `sha2`), and no feature flag could un-contradict it;
+# turning off `fts` and `mimalloc` took 4.43 MiB off and left the compiler where it was. `tokio`
+# went at the same moment and for the same reason: it was there only because turso's API is async
+# and oslo's REPL is not, so both `OnceLock<Runtime>`s and every `block_on` existed to bridge that
+# and nothing else. See docs/research/footprint.md.
+#
+# Every call to it is behind `src/track/kv/`, and nothing else may `use jammdb`. That is not
+# tidiness: `redb` and `sanakirja` were measured as alternatives and either could win a rerun, and
+# jammdb is one maintainer at 0.11. Read that module's note before changing this line — three of
+# its facts (a blocking `flock` held for the life of the handle, a panic rather than an error on
+# any file that is not a database, an 8 MiB growth step) are load-bearing and none of them is
+# documented upstream.
+jammdb = "0.11"
 
 # A one-package workspace, stated explicitly so `cargo fmt --all` and the 600-line limit apply
 # to this crate and nothing else. `fuzz/` declares its own empty [workspace] to stay out.

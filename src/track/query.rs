@@ -1,103 +1,175 @@
 //! The reads the write path pays for.
 //!
-//! Two questions, and the store answers both from an index. "Which remembered directory did that
-//! keyword mean" is a range on `dir(base)`; "what did I run here that starts like this" is a range
-//! on `run(dir_id, mode, argv)`.
+//! Four questions, and every one of them is a **seek to a lower bound and a walk to an upper one**.
+//! That is the single most performance-relevant decision in `src/track/`, and it survives the move
+//! off SQL unchanged: `argv LIKE 'cargo run --ex%'` and `for row in bucket { if starts_with(..) }`
+//! are the same mistake in two languages and both are O(rows in the bucket). Measured through the
+//! seam: the whole read — open the file, take the transaction, walk the range, close — is 15.1 µs
+//! against 25,000 rows. Three orders of magnitude of headroom on a per-keystroke budget is what
+//! makes a cache unnecessary, and therefore what makes a cache-coherence problem between terminals
+//! impossible.
 //!
-//! Neither is a `LIKE`. That is the single most performance-relevant decision in the store:
-//! `argv LIKE 'cargo run --ex%'` finds the index by `dir_id` and then scans every row for that
-//! directory, whereas `argv >= 'cargo run --ex' AND argv < 'cargo run --ey'` is a true B-tree range
-//! scan — measured at 13 µs against 25,000 rows. Three orders of magnitude of headroom on a
-//! per-keystroke budget is what makes a cache unnecessary, and therefore what makes a
-//! cache-coherence problem between terminals impossible. deja needed a daemon largely to hold a
-//! cache it then could not invalidate.
+//! # Contract item 1: what did I run *here*
 //!
-//! The ordering of the directory reads is [`super::score::score_sql`] rather than a second
-//! expression written out here, so that the ranking done in the database and the ranking done in
-//! Rust cannot drift apart.
+//! A range on `run(dir_id, mode, argv)`, which is one composite key with the typed text as its
+//! final, unterminated field. The directory is resolved through `dir_path` first — one point
+//! lookup — so the range is pinned to the handful of lines run in one directory in one language.
+//!
+//! # Contract item 2: what did I run anywhere in this repository
+//!
+//! Two ranges and a join, exactly as the SQL did it. `dir_root` gives every directory of the
+//! worktree — a prefix scan whose keys arrive in id order, so the result is a sorted array and the
+//! membership test is a binary search rather than a hash. `run_argv`, the secondary index on
+//! `(mode, argv, dir_id)`, then drives the range over the line, and the worktree filter is applied
+//! to whatever it produces.
+//!
+//! The alternative is one narrow range per directory of the worktree, which reads strictly fewer
+//! rows. It is not taken because the count of directories under one root is unbounded — a monorepo
+//! somebody has worked all over is hundreds of seeks — where the secondary range is always one.
+//! The cost profile is therefore the one `interactive::recall::nearby` measured and built its memo
+//! against, and that memo stays correct.
+//!
+//! # Contract item 9: there is one ranking, and it is in Rust
+//!
+//! `score::score_sql` is gone. It existed because the ordering happened inside the database and
+//! had to be kept in step with the ordering that happened in Rust; a store with no query language
+//! cannot express an ordering at all, so the drift it guarded against is now impossible rather
+//! than merely tested for. Every ordering in this file goes through [`score`], which is the same
+//! function `cd`'s ranker calls.
+//!
+//! # No read happens inside a live cursor
+//!
+//! Where a scan needs a row from another bucket — the directory behind an index entry, the
+//! counters behind a `run_argv` key — the scan collects keys first and the rows are read after it
+//! returns. The lists are small (the directories of one worktree, the rows of one prefix), and
+//! keeping a cursor and a second bucket lookup out of each other's way is worth more than the
+//! `Vec`.
 
-use super::db::{Track, now, runtime, upper_bound};
-use super::score::{Candidate, score_sql};
-use turso::{IntoParams, Value};
-
-/// The best remembered line in one directory that starts with what has been typed.
-///
-/// `last_status = 0 OR runs > fails` is a defect this fixes as a side effect: today's suggestion
-/// offers the newest prefix match with no idea whether it ever worked, so a typo is suggested for
-/// ever. A null `last_status` is a command whose exit was never seen, and `= 0` correctly excludes
-/// it rather than mistaking it for a success.
-///
-/// `argv <> ?3` drops the line already typed in full — a suggestion that adds nothing would be
-/// drawn as empty ghost text. A *longer* line starting with it is still worth offering.
-const SUGGEST_HERE: &str = "SELECT argv FROM run \
-     WHERE dir_id = (SELECT id FROM dir WHERE path = ?1) \
-       AND mode = ?2 AND argv >= ?3 AND argv < ?4 AND argv <> ?3 \
-       AND (last_status = 0 OR runs > fails) \
-     ORDER BY (runs - fails) DESC, last_at DESC LIMIT 1";
-
-/// The same question widened to the whole worktree, for when you typed it upstairs.
-///
-/// You ran `cargo run --example abc` in the repository root and you are now in `crates/api`;
-/// asking about the exact directory finds nothing. `dir.root` was written at visit time from the
-/// caller's git-root walk, so there is no `git` subprocess anywhere near the keystroke path.
-const SUGGEST_IN_WORKSPACE: &str = "SELECT r.argv FROM run r JOIN dir d ON d.id = r.dir_id \
-     WHERE d.root = ?1 AND r.mode = ?2 AND r.argv >= ?3 AND r.argv < ?4 AND r.argv <> ?3 \
-       AND (r.last_status = 0 OR r.runs > r.fails) \
-     ORDER BY (r.runs - r.fails) DESC, r.last_at DESC LIMIT 1";
+use super::db::{Track, lookup_dir, now, read_dir};
+use super::kv::{Reader, Span, Tree, Walk};
+use super::row::{DirRow, RunRow, field, key, span};
+use super::score::{Candidate, score};
+use std::cmp::Ordering;
 
 impl Track {
     /// Remembered directories whose final component starts with `needle`, best first.
     ///
-    /// This is both indexed tiers at once — naming a directory exactly is also naming its prefix —
-    /// as a half-open range on `dir_base`. Which of the two a row actually earned is decided in
+    /// This is both indexed tiers at once — naming a directory exactly is also naming its own
+    /// prefix — as one range over `dir_base`. Which of the two a row actually earned is decided in
     /// [`super::score`] against the path, so that the tier and the ordering are read off the same
     /// text in the same place.
     ///
-    /// `exclude` is where the shell is standing. It is a bind rather than a comparison the caller
-    /// makes afterwards, which is the one thing zoxide gets structurally wrong here: it excludes
-    /// `$PWD` from its *shell function*, by string equality against `pwd`, and so silently fails
-    /// whenever `pwd -L` and `pwd -P` disagree.
+    /// `exclude` is where the shell is standing, and it is dropped here rather than by the caller
+    /// afterwards. That is the one thing zoxide gets structurally wrong: it excludes `$PWD` from
+    /// its *shell function*, by string equality against `pwd`, and so silently fails whenever
+    /// `pwd -L` and `pwd -P` disagree.
     pub fn directories_named(&self, needle: &str, exclude: &str, limit: usize) -> Vec<Candidate> {
         let needle = needle.to_lowercase();
-        let Some(upper) = upper_bound(&needle) else {
+        // An empty needle names every directory, which is not what a `cd` with nothing typed
+        // means. The SQL answered the same way, by way of an upper bound it could not compute.
+        if needle.is_empty() {
             return Vec::new();
-        };
-        let sql = format!(
-            "SELECT path, visits, last_visit FROM dir \
-             WHERE base >= ?1 AND base < ?2 AND path <> ?3 AND path <> ?6 \
-             ORDER BY {} DESC, length(path) ASC LIMIT ?5",
-            score_sql("?4")
-        );
-        self.candidates(
-            &sql,
-            (
-                needle,
-                upper,
-                exclude,
-                now(),
-                limit as i64,
-                self.not_a_target(),
-            ),
-        )
+        }
+        let home = self.not_a_target();
+        let mut found = self
+            .store
+            .read(|reader| {
+                let ids = reader.collect(Tree::DirByBase, &span::bases_like(&needle), |key, _| {
+                    field::trailing_id(key)
+                });
+                Some(
+                    ids.into_iter()
+                        .filter_map(|id| candidate(read_dir(reader, id)?, exclude, &home))
+                        .collect::<Vec<Candidate>>(),
+                )
+            })
+            .unwrap_or_default();
+        best_first(&mut found, limit);
+        found
     }
 
     /// The best-scoring remembered directories, for the tiers no index can serve.
     ///
     /// zoxide does this scan on every query; here it is only reached when naming the directory
-    /// found nothing, and only for a `cd` a person typed. Measured at 1.07 ms over 3000
-    /// directories, which is affordable exactly once per keypress of `Enter` and never per
+    /// found nothing, and only for a `cd` a person typed — once per press of Enter, never per
     /// keystroke.
     pub fn directories_ranked(&self, exclude: &str, limit: usize) -> Vec<Candidate> {
-        let sql = format!(
-            "SELECT path, visits, last_visit FROM dir \
-             WHERE path <> ?1 AND path <> ?4 \
-             ORDER BY {} DESC, length(path) ASC LIMIT ?3",
-            score_sql("?2")
-        );
-        self.candidates(&sql, (exclude, now(), limit as i64, self.not_a_target()))
+        let home = self.not_a_target();
+        let mut found = self
+            .store
+            .read(|reader| {
+                Some(reader.collect(Tree::Dir, &Span::all(), |_, value| {
+                    candidate(DirRow::decode(value)?, exclude, &home)
+                }))
+            })
+            .unwrap_or_default();
+        best_first(&mut found, limit);
+        found
     }
 
-    /// The one remembered path that is never a jump destination, as a bind.
+    /// The line to suggest for `typed` in `dir`, or `None`. Contract item 1.
+    pub fn suggestion_here(&self, dir: &str, mode: &str, typed: &str) -> Option<String> {
+        if typed.is_empty() {
+            return None;
+        }
+        self.store.read(|reader| {
+            let id = lookup_dir(reader, dir)?;
+            let mut best = Best::default();
+            reader.scan(
+                Tree::Run,
+                &span::runs_like(id, mode, typed),
+                |key, value| {
+                    if let Some(argv) = field::argv_of_run(key)
+                        && argv != typed
+                        && let Some(row) = RunRow::decode(value)
+                        && row.worked()
+                    {
+                        best.offer(&row, &argv);
+                    }
+                    Walk::On
+                },
+            );
+            best.line
+        })
+    }
+
+    /// The same question widened to the whole worktree. Contract item 2.
+    ///
+    /// You ran `cargo run --example abc` in the repository root and you are now in `crates/api`;
+    /// asking about the exact directory finds nothing. `dir.root` was written at visit time from
+    /// the caller's git-root walk, so there is no `git` subprocess anywhere near the keystroke
+    /// path.
+    pub fn suggestion_in_workspace(&self, root: &str, mode: &str, typed: &str) -> Option<String> {
+        if typed.is_empty() {
+            return None;
+        }
+        self.store.read(|reader| {
+            let inside = dirs_of_root(reader, root);
+            if inside.is_empty() {
+                return None;
+            }
+            let matched: Vec<(String, u64)> =
+                reader.collect(Tree::RunByArgv, &span::argv_like(mode, typed), |key, _| {
+                    let (argv, dir) = field::argv_and_dir(key)?;
+                    (argv != typed && inside.binary_search(&dir).is_ok())
+                        .then(|| (argv.into_owned(), dir))
+                });
+
+            let mut best = Best::default();
+            for (argv, dir) in &matched {
+                if let Some(row) = reader
+                    .get(Tree::Run, &key::run(*dir, mode, argv))
+                    .and_then(|bytes| RunRow::decode(&bytes))
+                    && row.worked()
+                {
+                    best.offer(&row, argv);
+                }
+            }
+            best.line
+        })
+    }
+
+    /// The one remembered path that is never a jump destination.
     ///
     /// `$HOME` is recorded like anywhere else — what you run there is worth suggesting — but `cd`
     /// with no operand already goes there, so offering it as a frecency candidate wins nothing.
@@ -108,67 +180,75 @@ impl Track {
             .map(|home| home.trim_end_matches('/').to_string())
             .unwrap_or_default()
     }
+}
 
-    /// The line to suggest for `typed` in `dir`, or `None`.
-    pub fn suggestion_here(&self, dir: &str, mode: &str, typed: &str) -> Option<String> {
-        self.suggestion(SUGGEST_HERE, dir, mode, typed)
-    }
+/// The best row a scan has seen, and what it takes to beat it.
+///
+/// The order is the SQL's: most net successes, then most recent. Strictly *better* wins, so a tie
+/// is settled by key order and the same store answers the same way twice — which the SQL, ordering
+/// by two columns and taking one row, did not guarantee.
+///
+/// It holds two integers and one string so that a scan over a range allocates once for the winner
+/// rather than once per row it walks past.
+#[derive(Default)]
+struct Best {
+    standing: Option<(i64, i64)>,
+    line: Option<String>,
+}
 
-    /// The line to suggest for `typed` anywhere in the worktree rooted at `root`, or `None`.
-    pub fn suggestion_in_workspace(&self, root: &str, mode: &str, typed: &str) -> Option<String> {
-        self.suggestion(SUGGEST_IN_WORKSPACE, root, mode, typed)
-    }
-
-    fn suggestion(&self, sql: &str, scope: &str, mode: &str, typed: &str) -> Option<String> {
-        if typed.is_empty() {
-            return None;
+impl Best {
+    fn offer(&mut self, row: &RunRow, argv: &str) {
+        let standing = row.standing();
+        if self.standing.is_none_or(|best| standing > best) {
+            self.standing = Some(standing);
+            self.line = Some(argv.to_string());
         }
-        let upper = upper_bound(typed)?;
-        runtime().block_on(async {
-            let mut rows = self
-                .conn
-                .query(sql, (scope, mode, typed, upper))
-                .await
-                .ok()?;
-            match rows.next().await {
-                Ok(Some(row)) => match row.get_value(0) {
-                    Ok(Value::Text(argv)) => Some(argv),
-                    _ => None,
-                },
-                _ => None,
-            }
-        })
     }
+}
 
-    fn candidates(&self, sql: &str, params: impl IntoParams) -> Vec<Candidate> {
-        runtime().block_on(async {
-            let Ok(mut rows) = self.conn.query(sql, params).await else {
-                return Vec::new();
-            };
-            let mut found = Vec::new();
-            while let Ok(Some(row)) = rows.next().await {
-                match (row.get_value(0), row.get_value(1), row.get_value(2)) {
-                    (
-                        Ok(Value::Text(path)),
-                        Ok(Value::Integer(visits)),
-                        Ok(Value::Integer(last_visit)),
-                    ) => found.push(Candidate {
-                        path,
-                        visits,
-                        last_visit,
-                    }),
-                    _ => break,
-                }
-            }
-            found
-        })
-    }
+/// A directory row as the ranker wants it, unless it is one of the two that are never offered.
+fn candidate(row: DirRow, exclude: &str, home: &str) -> Option<Candidate> {
+    (row.path != exclude && row.path != home).then_some(Candidate {
+        path: row.path,
+        visits: row.visits,
+        last_visit: row.last_visit,
+    })
+}
+
+/// Order by the house frecency, then by the shorter path, and cut to `limit`.
+///
+/// `ORDER BY score DESC, length(path) ASC LIMIT n`, in the one place it can now be written. The
+/// path itself settles the rest: two candidates equal in every ranking term must still be cut in
+/// the same place on every run, and a `LIMIT` that dropped a different row each time would make
+/// `cd` answer differently for no reason a person could see.
+fn best_first(found: &mut Vec<Candidate>, limit: usize) {
+    let at = now();
+    found.sort_by(|a, b| {
+        score(b.visits, b.last_visit, at)
+            .partial_cmp(&score(a.visits, a.last_visit, at))
+            .unwrap_or(Ordering::Equal)
+            .then_with(|| a.path.len().cmp(&b.path.len()))
+            .then_with(|| a.path.cmp(&b.path))
+    });
+    found.truncate(limit);
+}
+
+/// Every directory of one worktree, in id order — the first half of contract item 2's join.
+///
+/// The order is the index's, not a sort: `dir_root` is keyed `(root, dir_id)` and a range walks in
+/// key order, so what comes back is already sorted and the membership test below it is a binary
+/// search over an array nobody had to sort.
+fn dirs_of_root(reader: &Reader<'_, '_>, root: &str) -> Vec<u64> {
+    reader.collect(Tree::DirByRoot, &span::dirs_of_root(root), |key, _| {
+        field::trailing_id(key)
+    })
 }
 
 #[cfg(test)]
 mod tests {
     use super::super::db::fixture::*;
     use super::super::db::{Run, Step, Visit};
+    use super::*;
 
     /// Being worth remembering and being worth jumping to are different questions.
     ///
@@ -189,11 +269,7 @@ mod tests {
             "what you run at home is still suggested at home"
         );
 
-        let ranked: Vec<String> = track
-            .directories_ranked("/elsewhere", 10)
-            .into_iter()
-            .map(|found| found.path)
-            .collect();
+        let ranked = paths(track.directories_ranked("/elsewhere", 10));
         assert!(
             !ranked.iter().any(|path| path == "/home/u"),
             "`cd` with no operand already goes home, so it is not a frecency candidate: {ranked:?}"
@@ -203,11 +279,7 @@ mod tests {
             "but its children are ordinary directories: {ranked:?}"
         );
 
-        let named: Vec<String> = track
-            .directories_named("u", "/elsewhere", 10)
-            .into_iter()
-            .map(|found| found.path)
-            .collect();
+        let named = paths(track.directories_named("u", "/elsewhere", 10));
         assert!(
             !named.iter().any(|path| path == "/home/u"),
             "and naming it does not reach it either: {named:?}"
@@ -221,7 +293,7 @@ mod tests {
         track.record(&ran("/w/alpha", "cargo run --example xyz", 0));
         track.record(&ran("/w/beta", "cargo run --example abc", 0));
 
-        assert_eq!(count(&track, "SELECT COUNT(*) FROM run"), 2);
+        assert_eq!(rows(&track, Tree::Run), 2);
         assert_eq!(
             track.suggestion_here("/w/alpha", SH, "cargo run --ex"),
             Some("cargo run --example xyz".to_string())
@@ -333,6 +405,61 @@ mod tests {
         );
     }
 
+    /// The join contract item 2 is written in: the secondary range answers about every directory
+    /// at once, and the worktree index is what cuts it back down to this one.
+    #[test]
+    fn the_widened_question_reaches_the_whole_worktree_and_stops_at_its_edge() {
+        let (_dir, track) = store();
+        let inside = |path: &'static str| Visit {
+            path,
+            root: Some("/w/beta"),
+        };
+        for (place, argv, times) in [
+            (inside("/w/beta"), "cargo run --example abc", 3),
+            (inside("/w/beta/crates/api"), "cargo run --example api", 1),
+            (Visit::at("/w/alpha"), "cargo run --example far", 40),
+        ] {
+            for _ in 0..times {
+                assert!(track.record(&Step {
+                    ran_in: place,
+                    moved_to: None,
+                    dwell_ms: 0,
+                    run: Some(Run {
+                        argv,
+                        mode: SH,
+                        status: Some(0),
+                        duration_ms: 1,
+                    }),
+                }));
+            }
+        }
+
+        let inside_the_tree = track
+            .store
+            .read(|reader| Some(super::dirs_of_root(reader, "/w/beta")))
+            .expect("the read succeeds");
+        assert_eq!(
+            inside_the_tree.len(),
+            2,
+            "both directories of the worktree, and neither of anybody else's"
+        );
+
+        assert_eq!(
+            track.suggestion_in_workspace("/w/beta", SH, "cargo run --ex"),
+            Some("cargo run --example abc".to_string()),
+            "the most-run line of this worktree, not the most-run line in the store"
+        );
+        assert_eq!(
+            track.suggestion_in_workspace("/w/beta", SH, "cargo run --example api"),
+            None,
+            "the line already typed in full is never the answer"
+        );
+        assert_eq!(
+            track.suggestion_in_workspace("/w/beta", "lua", "cargo"),
+            None
+        );
+    }
+
     /// Naming a directory is an indexed range over the folded final component, and where you are
     /// standing is never among the answers.
     #[test]
@@ -347,11 +474,7 @@ mod tests {
             });
         }
 
-        let found: Vec<String> = track
-            .directories_named("rust", "/w/nowhere", 10)
-            .into_iter()
-            .map(|candidate| candidate.path)
-            .collect();
+        let found = paths(track.directories_named("rust", "/w/nowhere", 10));
         assert_eq!(found.len(), 2, "got {found:?}");
         assert!(
             found.contains(&"/w/Rust".to_string()),
@@ -367,12 +490,12 @@ mod tests {
         );
 
         // Where you already are is never an answer, however well it matched.
-        let found: Vec<String> = track
-            .directories_named("rust", "/w/Rust", 10)
-            .into_iter()
-            .map(|candidate| candidate.path)
-            .collect();
-        assert_eq!(found, vec!["/w/rustlings".to_string()]);
+        assert_eq!(
+            paths(track.directories_named("rust", "/w/Rust", 10)),
+            vec!["/w/rustlings".to_string()]
+        );
+        // And nothing typed is not a query at all.
+        assert!(track.directories_named("", "/w/nowhere", 10).is_empty());
 
         // The tiers no index can serve get every directory. `/w` is among them with nothing
         // counted: it is where the commands ran, so a row had to exist, but nobody walked there.
@@ -388,5 +511,42 @@ mod tests {
 
         // A limit cuts the list where the ranker would have cut it, not arbitrarily.
         assert_eq!(track.directories_ranked("/w/nowhere", 2).len(), 2);
+    }
+
+    /// Contract item 9: the ordering the database used to do is done here, by the one function
+    /// that also orders `cd`'s candidates. The cut a `limit` makes has to fall in the same place.
+    #[test]
+    fn the_candidates_come_back_in_the_order_the_ranker_would_have_put_them_in() {
+        let (_dir, track) = store();
+        for (path, visits) in [("/w/one", 1), ("/w/three", 3), ("/w/two", 2)] {
+            for _ in 0..visits {
+                track.record(&Step {
+                    ran_in: Visit::at("/w"),
+                    moved_to: Some(Visit::at(path)),
+                    dwell_ms: 0,
+                    run: None,
+                });
+            }
+        }
+
+        let ranked = paths(track.directories_ranked("/w", 10));
+        assert_eq!(
+            ranked,
+            vec![
+                "/w/three".to_string(),
+                "/w/two".to_string(),
+                "/w/one".to_string()
+            ],
+            "most visited first, every one of them just now"
+        );
+        assert_eq!(
+            paths(track.directories_ranked("/w", 2)),
+            vec!["/w/three".to_string(), "/w/two".to_string()],
+            "and the limit takes the top of that order, not an arbitrary two"
+        );
+    }
+
+    fn paths(found: Vec<Candidate>) -> Vec<String> {
+        found.into_iter().map(|candidate| candidate.path).collect()
     }
 }

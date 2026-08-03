@@ -1,49 +1,54 @@
 //! Opening the store, and the shapes everything else is written in.
 //!
-//! # Why the async is hidden here
+//! # There is no runtime here any more
 //!
-//! `turso` is the pure-Rust rewrite of SQLite and its API is async; oslo's REPL is not. Rather than
-//! colour the shell async, every call blocks on a small current-thread runtime owned by this
-//! module, exactly as `startup::history_db` does. The runtime is built once: one per call would be
-//! a thread and an epoll set per command.
+//! This module used to own a `tokio` current-thread runtime and block every call on it, because
+//! `turso`'s API is async and oslo's REPL is not. The key-value store behind [`super::kv`] is
+//! synchronous, so the runtime, both `OnceLock<Runtime>`s and every `block_on` went with turso.
+//! What is left is ordinary function calls on the calling thread, which is what the shell wanted
+//! all along.
 //!
 //! # Every failure answers nothing
 //!
-//! Copied verbatim from `history_db`: a shell whose tracker will not open is a working shell with a
-//! dumber `cd`. Nothing here returns an error, because there is no caller that could act on one —
-//! and every byte of this file is derived from use and rebuildable by more of it, which is what
-//! makes `rm ~/.local/share/oslo/track.db` a supported repair rather than data loss.
+//! Unchanged, and inherited by the seam: a shell whose tracker will not open is a working shell
+//! with a dumber `cd`. Nothing here returns an error, because there is no caller that could act on
+//! one — and every byte of this file is derived from use and rebuildable by more of it, which is
+//! what makes deleting it a supported repair rather than data loss.
 //!
 //! # Versioning
 //!
-//! `PRAGMA user_version`, mirrored into `meta.schema` so the file is legible by hand — the same
-//! argument `history_db` makes for storing the mode as text. This is the one place the store
-//! deliberately departs from `history_db`'s "there is no migration step", which is right for three
-//! columns that will never change and wrong for a store other tools are meant to read. Migration is
-//! additive only: `ALTER TABLE ... ADD COLUMN`, never destructive, and a file written by a version
-//! this binary does not understand is read but never written.
+//! `meta.schema`, a row like any other. `PRAGMA user_version` is gone with the SQL and it is not
+//! missed: it was mirrored into `meta` anyway so that the file could be read by hand, and there is
+//! now one copy instead of two that could disagree.
 //!
-//! # The file is private, and so are its sidecars
+//! The rule is the one the design gives and it is unchanged: a file written by a version this
+//! binary does not understand is **read but never written**. That gate lives here, on
+//! [`Track::is_writable`], and every write path asks it before it asks the store — deliberately at
+//! this level rather than inside the seam, which is engine plumbing and has no opinion about what
+//! oslo's rows mean.
 //!
-//! Every command line and every directory in here is plaintext, so the file is 0600 — and the
-//! `-wal` beside it is 0600 too, which is the half that is easy to get wrong. `super::private`
-//! holds that, and the note there gives the ordering it depends on.
+//! The version is stamped only when it is not already right, so a shell opening a store it has
+//! opened a thousand times before pays a read and no `fsync` at all.
+//!
+//! # Directory ids are handed out here
+//!
+//! SQL had `INTEGER PRIMARY KEY AUTOINCREMENT`. A key-value store has no such thing, so
+//! `next_id` keeps a counter in `meta` and increments it inside the same transaction that uses
+//! it — which is what makes it safe between terminals, since the seam's `flock` means only one
+//! writer exists at a time and the counter is read and written under it.
+//!
+//! Ids are never reused. A directory that is forgotten takes its id with it rather than freeing it
+//! for the next one, because a stale index row pointing at a recycled id would attach one
+//! directory's history to another. Eight bytes at 2^64 is not a number anybody reaches.
 
-use super::private::{make_private, repair, sidecars};
+use super::kv::{Reader, Store, Tree, Writer};
+use super::row::{DirRow, key};
 use std::path::Path;
-use std::sync::{Mutex, OnceLock};
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
-use turso::{Connection, Value};
+use std::sync::Mutex;
+use std::time::{SystemTime, UNIX_EPOCH};
 
 /// The schema this binary writes.
-pub const SCHEMA_VERSION: i64 = 1;
-
-/// How long a writer waits for a lock another shell is holding.
-///
-/// Small on purpose. Contention blocks a writer for exactly this long and then fails; a large
-/// timeout turns contention into a visible stall at the prompt, a small one turns it into one
-/// dropped sample. For a statistics table that is by far the cheaper failure.
-const BUSY_MS: u64 = 250;
+pub const SCHEMA_VERSION: i64 = 2;
 
 /// The largest single contribution to `dwell_ms` or `total_ms`.
 ///
@@ -51,66 +56,20 @@ const BUSY_MS: u64 = 250;
 /// the time it spent stopped under Ctrl-Z, which would poison a mean just as thoroughly.
 pub(super) const CAP_MS: i64 = 15 * 60 * 1000;
 
-/// The tables and their indexes.
-///
-/// `run` is keyed on `(dir_id, mode, argv)` — the whole line, not the command word, because `cargo
-/// run --example xyz` here and `--example abc` there are the entire feature, and because a Lua line
-/// and a shell line are not alternatives for the same slot. `head` is denormalised alongside so
-/// that "what does cargo cost me, everywhere" is an index-backed read rather than a string split
-/// over every row. `dir.base` is the lowercased final component, folded once at write time, which
-/// is what makes matching a directory by name O(log n) instead of zoxide's full scan.
-const SCHEMA: &[&str] = &[
-    "CREATE TABLE IF NOT EXISTS meta (\
-       key TEXT PRIMARY KEY, \
-       value INTEGER NOT NULL)",
-    "CREATE TABLE IF NOT EXISTS dir (\
-       id INTEGER PRIMARY KEY AUTOINCREMENT, \
-       path TEXT NOT NULL UNIQUE, \
-       base TEXT NOT NULL, \
-       root TEXT, \
-       visits INTEGER NOT NULL DEFAULT 0, \
-       last_visit INTEGER NOT NULL DEFAULT 0, \
-       dwell_ms INTEGER NOT NULL DEFAULT 0, \
-       missing_since INTEGER)",
-    "CREATE INDEX IF NOT EXISTS dir_base ON dir(base)",
-    "CREATE INDEX IF NOT EXISTS dir_root ON dir(root)",
-    "CREATE TABLE IF NOT EXISTS run (\
-       id INTEGER PRIMARY KEY AUTOINCREMENT, \
-       dir_id INTEGER NOT NULL REFERENCES dir(id) ON DELETE CASCADE, \
-       mode TEXT NOT NULL, \
-       argv TEXT NOT NULL, \
-       head TEXT NOT NULL, \
-       runs INTEGER NOT NULL DEFAULT 0, \
-       fails INTEGER NOT NULL DEFAULT 0, \
-       last_at INTEGER NOT NULL DEFAULT 0, \
-       last_status INTEGER, \
-       total_ms INTEGER NOT NULL DEFAULT 0, \
-       max_ms INTEGER NOT NULL DEFAULT 0)",
-    "CREATE UNIQUE INDEX IF NOT EXISTS run_key ON run(dir_id, mode, argv)",
-    "CREATE INDEX IF NOT EXISTS run_argv ON run(mode, argv)",
-    "CREATE INDEX IF NOT EXISTS run_head ON run(head, last_at)",
-    // Partial, because the only rows the prune sweep is interested in are the ones run exactly
-    // once. It stays correct as the upsert takes a row from one run to two: the row leaves the
-    // index rather than lingering in it.
-    "CREATE INDEX IF NOT EXISTS run_age ON run(last_at) WHERE runs = 1",
-];
+/// `meta.schema`: what wrote this file.
+pub(super) const SCHEMA: &str = "schema";
 
-/// The runtime every call blocks on. See the module note.
-pub(super) fn runtime() -> &'static tokio::runtime::Runtime {
-    static RUNTIME: OnceLock<tokio::runtime::Runtime> = OnceLock::new();
-    RUNTIME.get_or_init(|| {
-        tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .expect("a current-thread runtime")
-    })
-}
+/// `meta.last_prune`: when the sweep last ran.
+pub(super) const LAST_PRUNE: &str = "last_prune";
+
+/// `meta.next_dir`: the next directory id to hand out.
+const NEXT_DIR: &str = "next_dir";
 
 /// Seconds since the epoch, as `dir.last_visit` and `run.last_at` store them.
 pub(super) fn now() -> i64 {
     SystemTime::now()
         .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_secs() as i64)
+        .map(|since| since.as_secs() as i64)
         .unwrap_or(0)
 }
 
@@ -120,30 +79,6 @@ pub(super) fn now() -> i64 {
 /// *away* from a directory.
 pub(super) fn capped(ms: i64) -> i64 {
     ms.clamp(0, CAP_MS)
-}
-
-/// The exclusive upper end of the range of strings beginning with `prefix`.
-///
-/// `argv >= 'cargo run --ex' AND argv < 'cargo run --ey'` is a B-tree range scan; the `LIKE` that
-/// expresses the same thing is not. SQLite compares text by bytes and UTF-8 byte order agrees with
-/// code point order, so stepping the last character forward is exactly right.
-///
-/// `None` when there is nothing above the prefix — an empty one, or one ending at the top of the
-/// code space. Callers read that as "no answer" and fall through to a wider search rather than
-/// silently scanning.
-pub(super) fn upper_bound(prefix: &str) -> Option<String> {
-    let mut head = prefix.to_string();
-    let last = head.pop()?;
-    let mut code = u32::from(last) + 1;
-    // Surrogates are not characters; stepping over the hole still names the next string.
-    while char::from_u32(code).is_none() {
-        code = code.checked_add(1)?;
-        if code > u32::from(char::MAX) {
-            return None;
-        }
-    }
-    head.push(char::from_u32(code)?);
-    Some(head)
 }
 
 /// A directory the shell stood in, and the worktree it belongs to.
@@ -205,86 +140,44 @@ pub struct Step<'a> {
 
 /// An open store.
 pub struct Track {
-    pub(super) conn: Connection,
+    /// A path and a promise about the file — no descriptor, no lock, no map. See the seam's note:
+    /// holding a handle would take a blocking `flock` for the life of the shell and hang the next
+    /// terminal at its prompt, for ever.
+    pub(super) store: Store,
     /// False for a file written by a version this binary does not understand: keep reading it,
     /// stop writing to it. Dropping and recreating somebody else's data is never the answer.
     pub(super) writable: bool,
-    /// The directory the shell is in and its `dir.id`.
+    /// The directory the shell is in and its id.
     ///
-    /// Without it the run insert has no `dir_id` on the first command of a session, because the
-    /// visit statement only runs when the directory *changed*. A subselect there would yield null
-    /// against a `NOT NULL` column; the write path resolves-or-inserts instead.
-    pub(super) current: Mutex<Option<(i64, String)>>,
-    /// `$HOME`, which is never a jump target and so is never recorded.
+    /// Without it the run insert has no directory on the first command of a session, because the
+    /// visit only happens when the directory *changed*. The write path resolves-or-inserts instead
+    /// of writing a row that points nowhere.
+    pub(super) current: Mutex<Option<(u64, String)>>,
+    /// `$HOME`, which is never a jump target and so is never offered as one.
     pub(super) home: Option<String>,
 }
 
 impl Track {
     /// Open, creating the file and its directory if they are not there.
     ///
-    /// The file and its `-wal` are made private *first*, before turso is handed the path and
-    /// therefore before any statement runs. That ordering is the point rather than a detail. The
-    /// schema statements below are the first real statements, and they are what brings the `-wal`
-    /// into existence; tightening at the end of this function would leave it born world-readable,
-    /// and an unclean shutdown then leaves the most recent commands sitting in a file anyone can
-    /// read. Measured on turso 0.7.2: the sidecar does not inherit the database's mode at all — a
-    /// 0600 database still produces a 0664 `-wal` under a 002 umask — so it is created here, at
-    /// zero length, which is what an empty log is anyway.
+    /// The privacy ordering — the directory closed first, the file tightened before anything can
+    /// have been written through it — belongs to [`super::kv`] now, along with the header check
+    /// that stops a SQLite file left by an older oslo from being handed to an engine that panics
+    /// on one. Both are the seam's, because both are facts about the engine rather than about
+    /// what oslo stores.
     pub fn open(path: &Path) -> Option<Track> {
-        if let Some(parent) = path.parent() {
-            std::fs::create_dir_all(parent).ok()?;
+        let store = Store::open(path)?;
+        let found = store.read(|r| Some(meta(r, SCHEMA).unwrap_or(0)))?;
+        let writable = found <= SCHEMA_VERSION;
+        if writable && found != SCHEMA_VERSION {
+            store.write(|w| set_meta(w, SCHEMA, SCHEMA_VERSION))?;
         }
-        make_private(path)?;
-        let [wal, shm] = sidecars(path);
-        let _ = make_private(&wal);
-        // Not created, only repaired: turso writes no `-shm`, and inventing one for it to find
-        // would be this store guessing at another implementation's file format.
-        repair(&shm);
-
-        let file = path.to_str()?.to_string();
-        let home = std::env::var("HOME").ok().filter(|home| !home.is_empty());
-        let track = runtime().block_on(async move {
-            let db = turso::Builder::new_local(&file).build().await.ok()?;
-            let conn = db.connect().ok()?;
-            conn.busy_timeout(Duration::from_millis(BUSY_MS)).ok()?;
-            // Both of these are per *connection*, not per database, which is why the store holds
-            // one open rather than taking a fresh one per call. They also have to go through a
-            // query rather than an execute: a pragma answers with a row, and `execute` refuses one.
-            conn.pragma_update("foreign_keys", "ON").await.ok()?;
-
-            let found = user_version(&conn).await?;
-            let writable = found <= SCHEMA_VERSION;
-            if writable {
-                for statement in SCHEMA {
-                    conn.execute(*statement, ()).await.ok()?;
-                }
-                conn.pragma_update("user_version", SCHEMA_VERSION)
-                    .await
-                    .ok()?;
-                conn.execute(
-                    "INSERT INTO meta (key, value) VALUES ('schema', ?1) \
-                     ON CONFLICT(key) DO UPDATE SET value = excluded.value",
-                    (SCHEMA_VERSION,),
-                )
-                .await
-                .ok()?;
-            }
-            Some(Track {
-                conn,
-                writable,
-                current: Mutex::new(None),
-                home,
-            })
-        })?;
-
-        // Best effort, and for a database an earlier version of this store created: anything that
-        // appeared while the schema was being applied is tightened too. Nothing above depends on
-        // this — the `-wal` was already private before turso saw it — which is why a failure here
-        // is not allowed to refuse the store.
-        for sidecar in sidecars(path) {
-            repair(&sidecar);
-        }
-        Some(track)
+        Some(Track {
+            store,
+            writable,
+            current: Mutex::new(None),
+            home: std::env::var("HOME").ok().filter(|home| !home.is_empty()),
+        })
     }
 
     /// Whether this store will accept writes. False only for a file from a future version.
@@ -296,71 +189,113 @@ impl Track {
     /// the read-only store a newer oslo would have left behind.
     #[cfg(test)]
     pub(super) fn claim_future_version(&self) {
-        runtime().block_on(async {
-            self.conn
-                .pragma_update("user_version", SCHEMA_VERSION + 1)
-                .await
-                .expect("the version is stamped");
-        });
+        self.store
+            .write(|w| set_meta(w, SCHEMA, SCHEMA_VERSION + 1))
+            .expect("the version is stamped");
     }
 }
 
-/// The `dir.id` for a path, inserting an unvisited row if there is none.
+/// A `meta` value, or `None` for a name this store has never written.
+pub(super) fn meta(reader: &Reader<'_, '_>, name: &str) -> Option<i64> {
+    key::number_of(&reader.get(Tree::Meta, &key::meta(name))?)
+}
+
+pub(super) fn set_meta(writer: &Writer<'_, '_>, name: &str, value: i64) -> Option<()> {
+    writer.put(Tree::Meta, key::meta(name), key::number(value))
+}
+
+/// The id for a path, or `None` if this store has never seen it.
+pub(super) fn lookup_dir(reader: &Reader<'_, '_>, path: &str) -> Option<u64> {
+    key::id_of(&reader.get(Tree::DirByPath, &key::by_path(path))?)
+}
+
+/// One directory's row.
+pub(super) fn read_dir(reader: &Reader<'_, '_>, id: u64) -> Option<DirRow> {
+    DirRow::decode(&reader.get(Tree::Dir, &key::dir(id))?)
+}
+
+/// The id for a directory, inserting an unvisited row if there is none.
 ///
 /// The insert counts nothing: a directory reached this way was resolved because a command needed
 /// somewhere to be attributed to, which is not the same act as walking there.
-pub(super) async fn dir_id(conn: &Connection, at: &Visit<'_>) -> Option<i64> {
-    if let Some(id) = lookup_dir(conn, at.path).await {
+pub(super) fn resolve_dir(writer: &Writer<'_, '_>, at: &Visit<'_>) -> Option<u64> {
+    if let Some(id) = lookup_dir(writer, at.path) {
         return Some(id);
     }
-    conn.execute(
-        "INSERT INTO dir (path, base, root, visits, last_visit) VALUES (?1, ?2, ?3, 0, 0)",
-        (at.path, at.base(), at.root),
-    )
-    .await
-    .ok()?;
-    lookup_dir(conn, at.path).await
+    insert_dir(writer, &DirRow::unvisited(at.path, at.base(), at.root))
 }
 
-async fn lookup_dir(conn: &Connection, path: &str) -> Option<i64> {
-    let mut rows = conn
-        .query("SELECT id FROM dir WHERE path = ?1", (path,))
-        .await
-        .ok()?;
-    match rows.next().await {
-        Ok(Some(row)) => match row.get_value(0) {
-            Ok(Value::Integer(id)) => Some(id),
-            _ => None,
-        },
-        _ => None,
-    }
+/// Take the next id and write a directory under it, indexes and all.
+pub(super) fn insert_dir(writer: &Writer<'_, '_>, row: &DirRow) -> Option<u64> {
+    let id = next_id(writer)?;
+    put_dir(writer, id, None, row)?;
+    Some(id)
 }
 
-/// `PRAGMA user_version`, which is 0 for a file this store has never touched.
-async fn user_version(conn: &Connection) -> Option<i64> {
-    let mut rows = conn.query("PRAGMA user_version", ()).await.ok()?;
-    match rows.next().await {
-        Ok(Some(row)) => match row.get_value(0) {
-            Ok(Value::Integer(version)) => Some(version),
-            _ => Some(0),
-        },
-        _ => Some(0),
-    }
-}
-
-/// A real database in a temporary directory, and the plainest way to look inside it.
+/// Write a directory's row and bring its three index buckets into line with it.
 ///
-/// Shared by the write and query tests, which both need to assert against columns rather than
-/// against whatever the read API happens to expose.
+/// `was` is the row as it stood, or `None` for one being inserted. It is asked for rather than
+/// re-read because every caller has just read it to modify it, and because the difference between
+/// the two is exactly the index work that has to happen: there are no foreign keys here and no
+/// triggers, so an index this function forgets is an index that silently rots.
+///
+/// `path` and `base` are not in that list. The path *is* the identity of a directory, so neither
+/// can change without the row being a different row.
+pub(super) fn put_dir(
+    writer: &Writer<'_, '_>,
+    id: u64,
+    was: Option<&DirRow>,
+    row: &DirRow,
+) -> Option<()> {
+    writer.put(Tree::Dir, key::dir(id), row.encode())?;
+    if was.is_none() {
+        writer.put(Tree::DirByPath, key::by_path(&row.path), key::id(id))?;
+        writer.put(Tree::DirByBase, key::by_base(&row.base, id), Vec::new())?;
+    }
+    // A directory can change worktree — `git init` in it, a repository moved, a submodule turned
+    // into a directory — and the visit statement refreshes `root` every time precisely so that it
+    // does. The index has to follow, or a widened suggestion answers out of a repository the user
+    // left months ago.
+    let before = was.and_then(|was| was.root.as_deref());
+    if before != row.root.as_deref() {
+        if let Some(root) = before {
+            writer.delete(Tree::DirByRoot, &key::by_root(root, id));
+        }
+        if let Some(root) = row.root.as_deref() {
+            writer.put(Tree::DirByRoot, key::by_root(root, id), Vec::new())?;
+        }
+    }
+    Some(())
+}
+
+/// The next directory id, taken from the counter and put back one higher.
+///
+/// Read and written inside the caller's transaction, so two terminals cannot be handed the same
+/// id: the seam's `flock` means only one writer exists at a time, and a transaction that does not
+/// commit does not consume a number either.
+fn next_id(writer: &Writer<'_, '_>) -> Option<u64> {
+    let next = meta(writer, NEXT_DIR).unwrap_or(1).max(1);
+    set_meta(writer, NEXT_DIR, next + 1)?;
+    Some(next as u64)
+}
+
+/// A real store in a temporary directory, and the plainest way to look inside it.
+///
+/// Shared by the write, query and prune tests, which all need to assert against rows rather than
+/// against whatever the read API happens to expose. Under SQL these took a `SELECT`; a store with
+/// no query language needs named accessors instead, which is a fair trade — `visits_of(&track,
+/// "/w/alpha")` says what it wants, and a typo in it does not compile.
 #[cfg(test)]
 pub(super) mod fixture {
+    use super::super::kv::Span;
+    use super::super::row::{RunRow, span};
     use super::*;
 
     pub const SH: &str = "sh";
 
     pub fn store() -> (tempfile::TempDir, Track) {
         let dir = tempfile::tempdir().expect("a temp dir");
-        let track = Track::open(&dir.path().join("nested/track.db")).expect("the database opens");
+        let track = Track::open(&dir.path().join("nested/track.kv")).expect("the store opens");
         (dir, track)
     }
 
@@ -390,18 +325,45 @@ pub(super) mod fixture {
         }
     }
 
-    pub fn row(track: &Track, sql: &str) -> Option<Value> {
-        runtime().block_on(async {
-            let mut rows = track.conn.query(sql, ()).await.ok()?;
-            rows.next().await.ok()??.get_value(0).ok()
-        })
+    pub fn dir_row(track: &Track, path: &str) -> Option<DirRow> {
+        track.store.read(|r| read_dir(r, lookup_dir(r, path)?))
     }
 
-    pub fn count(track: &Track, sql: &str) -> i64 {
-        match row(track, sql) {
-            Some(Value::Integer(n)) => n,
-            other => panic!("expected a count, got {other:?}"),
-        }
+    pub fn visits_of(track: &Track, path: &str) -> i64 {
+        dir_row(track, path).map_or(-1, |row| row.visits)
+    }
+
+    pub fn run_row(track: &Track, path: &str, mode: &str, argv: &str) -> Option<RunRow> {
+        track
+            .store
+            .read(|r| {
+                let id = lookup_dir(r, path)?;
+                Some(RunRow::decode(
+                    &r.get(Tree::Run, &key::run(id, mode, argv))?,
+                ))
+            })
+            .flatten()
+    }
+
+    /// Every line remembered in one directory, in key order.
+    pub fn lines_in(track: &Track, path: &str) -> Vec<String> {
+        track
+            .store
+            .read(|r| {
+                let id = lookup_dir(r, path)?;
+                Some(r.collect(Tree::Run, &span::runs_of(id), |key, _| {
+                    super::super::row::field::argv_of_run(key).map(|argv| argv.into_owned())
+                }))
+            })
+            .unwrap_or_default()
+    }
+
+    /// How many rows a bucket holds, which is what most of the old `SELECT COUNT(*)` asked.
+    pub fn rows(track: &Track, tree: Tree) -> usize {
+        track
+            .store
+            .read(|r| Some(r.count(tree, &Span::all())))
+            .unwrap_or(0)
     }
 }
 
@@ -413,8 +375,8 @@ mod tests {
     #[test]
     fn opening_creates_what_is_missing_and_stamps_the_version() {
         let dir = tempfile::tempdir().expect("a temp dir");
-        let path = dir.path().join("nested/track.db");
-        let track = Track::open(&path).expect("the database opens");
+        let path = dir.path().join("nested/track.kv");
+        let track = Track::open(&path).expect("the store opens");
 
         assert!(
             path.exists(),
@@ -422,11 +384,11 @@ mod tests {
         );
         assert!(track.is_writable());
         assert_eq!(
-            count(&track, "SELECT value FROM meta WHERE key = 'schema'"),
-            SCHEMA_VERSION,
-            "mirrored where a human reading the file by hand will find it"
+            track.store.read(|r| meta(r, SCHEMA)),
+            Some(SCHEMA_VERSION),
+            "written where a human reading the file by hand will find it"
         );
-        assert_eq!(count(&track, "SELECT COUNT(*) FROM dir"), 0);
+        assert_eq!(rows(&track, Tree::Dir), 0);
     }
 
     /// A store must never be the reason a shell will not start, and it must never be the reason
@@ -434,9 +396,9 @@ mod tests {
     #[test]
     fn a_file_from_a_newer_version_is_read_but_not_written() {
         let dir = tempfile::tempdir().expect("a temp dir");
-        let path = dir.path().join("track.db");
+        let path = dir.path().join("track.kv");
         {
-            let track = Track::open(&path).expect("the database opens");
+            let track = Track::open(&path).expect("the store opens");
             track.record(&ran("/w/alpha", "cargo build", 0));
             track.claim_future_version();
         }
@@ -452,17 +414,97 @@ mod tests {
         );
     }
 
+    /// The stamp is not rewritten on every open. It matters here in a way it did not under SQL: a
+    /// write is an `fsync`, and paying one to say what the file already says would be a cost on
+    /// every shell that ever starts.
     #[test]
-    fn a_prefix_with_nothing_above_it_answers_nothing() {
+    fn a_store_already_at_this_version_is_not_written_to_when_it_is_opened() {
+        let dir = tempfile::tempdir().expect("a temp dir");
+        let path = dir.path().join("track.kv");
+        let before = {
+            let track = Track::open(&path).expect("the store opens");
+            track.record(&ran("/w/alpha", "cargo build", 0));
+            std::fs::metadata(&path).expect("it exists").modified().ok()
+        };
+        // Long enough that a write would land in a different tick, so the assertion below is about
+        // nothing having been written rather than about the clock being coarse.
+        std::thread::sleep(std::time::Duration::from_millis(20));
+
+        let again = Track::open(&path).expect("it opens again");
+        assert!(again.is_writable());
         assert_eq!(
-            upper_bound("cargo run --ex").as_deref(),
-            Some("cargo run --ey")
+            std::fs::metadata(&path).expect("it exists").modified().ok(),
+            before,
+            "the second open read the version and wrote nothing"
         );
-        assert_eq!(upper_bound("ab"), Some("ac".to_string()));
-        assert_eq!(upper_bound(""), None);
-        assert_eq!(upper_bound("\u{10FFFF}"), None);
-        // Over the surrogate hole, which is not a character and cannot be pushed.
-        assert_eq!(upper_bound("\u{D7FF}"), Some("\u{E000}".to_string()));
+    }
+
+    /// Ids are handed out one at a time and never reused: a recycled id would attach one
+    /// directory's remembered lines to whichever directory got the number next.
+    #[test]
+    fn every_directory_gets_its_own_id_and_no_id_is_ever_handed_out_twice() {
+        let (_dir, track) = store();
+        let seen: Vec<u64> = ["/w/alpha", "/w/beta", "/w/gamma"]
+            .iter()
+            .map(|path| {
+                track
+                    .store
+                    .write(|w| resolve_dir(w, &Visit::at(path)))
+                    .expect("resolved")
+            })
+            .collect();
+        assert_eq!(seen, vec![1, 2, 3]);
+
+        // Asking again is a lookup, not another id.
+        assert_eq!(
+            track
+                .store
+                .write(|w| resolve_dir(w, &Visit::at("/w/beta")))
+                .expect("resolved"),
+            2
+        );
+        assert_eq!(rows(&track, Tree::Dir), 3);
+    }
+
+    /// A directory that changes worktree must leave the old one's index behind, or a suggestion
+    /// widened to a repository answers out of a repository the user left months ago.
+    #[test]
+    fn moving_a_directory_into_a_worktree_moves_its_index_row_with_it() {
+        let (_dir, track) = store();
+        fn inside(root: &'static str) -> Visit<'static> {
+            Visit {
+                path: "/w/alpha",
+                root: Some(root),
+            }
+        }
+        track.record(&Step {
+            ran_in: Visit::at("/w"),
+            moved_to: Some(inside("/w/old")),
+            dwell_ms: 0,
+            run: None,
+        });
+        track.record(&Step {
+            ran_in: inside("/w/old"),
+            moved_to: Some(Visit::at("/w")),
+            dwell_ms: 0,
+            run: None,
+        });
+        track.record(&Step {
+            ran_in: Visit::at("/w"),
+            moved_to: Some(inside("/w/new")),
+            dwell_ms: 0,
+            run: None,
+        });
+
+        assert_eq!(
+            dir_row(&track, "/w/alpha").and_then(|row| row.root),
+            Some("/w/new".to_string())
+        );
+        assert_eq!(
+            rows(&track, Tree::DirByRoot),
+            1,
+            "one row, not one per worktree it has ever been in"
+        );
     }
 
     #[test]
