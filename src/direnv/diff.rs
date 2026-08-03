@@ -22,6 +22,31 @@
 
 use std::collections::BTreeMap;
 
+/// What happened to one name.
+///
+/// The three marks direnv uses, and for the same reason: `+FOO ~PATH -BAR` says in eleven
+/// characters what a sentence would take a line to say, and the shape is already in people's eyes
+/// from `git status` and from direnv itself.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum Change {
+    /// Something you had is gone. Rare, and the most surprising thing a directory can do.
+    Removed,
+    /// Something you had is different — `~PATH` on nearly every dev shell.
+    Modified,
+    /// Something new. Expected, numerous, and the first thing to drop when the line is full.
+    Added,
+}
+
+impl Change {
+    pub fn mark(self) -> char {
+        match self {
+            Change::Added => '+',
+            Change::Modified => '~',
+            Change::Removed => '-',
+        }
+    }
+}
+
 /// What changed, as `name -> (before, after)`.
 ///
 /// Sorted, so that reporting it is stable and two diffs of the same change compare equal.
@@ -84,6 +109,32 @@ impl<V: Clone + PartialEq> Diff<V> {
     /// The names it touches, for `direnv status`.
     pub fn names(&self) -> Vec<&str> {
         self.changes.keys().map(String::as_str).collect()
+    }
+
+    /// What happened to each name, for reporting a load.
+    ///
+    /// Sorted **most surprising first**: removals, then modifications, then additions, and
+    /// alphabetically within each.
+    ///
+    /// The ordering is the difference between a useful line and a useless one. A Nix dev shell adds
+    /// thirty boilerplate variables and takes away one that mattered; sorted the other way the line
+    /// fills with `+AR_FOR_BUILD +AS_FOR_BUILD …` and the `-GITHUB_TOKEN` you needed to see is in
+    /// the part that got truncated.
+    pub fn changes(&self) -> Vec<(&str, Change)> {
+        let mut out: Vec<(&str, Change)> = self
+            .changes
+            .iter()
+            .map(|(name, (before, after))| {
+                let kind = match (before.is_some(), after.is_some()) {
+                    (false, true) => Change::Added,
+                    (true, false) => Change::Removed,
+                    _ => Change::Modified,
+                };
+                (name.as_str(), kind)
+            })
+            .collect();
+        out.sort_by_key(|(name, kind)| (*kind, *name));
+        out
     }
 
     /// Every change as `(name, value_to_apply)`, where `None` means remove it.
@@ -170,6 +221,27 @@ mod tests {
             &env(&[("A", "9"), ("C", "3")]),
         );
         assert_eq!(diff.reverse().reverse(), diff);
+    }
+
+    /// The three marks, and the order that keeps the surprising names at the front.
+    #[test]
+    fn changes_are_marked_and_ordered_additions_first() {
+        let diff = Diff::between(
+            &env(&[("GONE", "1"), ("SAME", "s"), ("MOVED", "old")]),
+            &env(&[("SAME", "s"), ("MOVED", "new"), ("FRESH", "2")]),
+        );
+        assert_eq!(
+            diff.changes(),
+            vec![
+                ("GONE", Change::Removed),
+                ("MOVED", Change::Modified),
+                ("FRESH", Change::Added),
+            ],
+            "most surprising first, so truncation drops the boilerplate"
+        );
+        assert_eq!(Change::Added.mark(), '+');
+        assert_eq!(Change::Modified.mark(), '~');
+        assert_eq!(Change::Removed.mark(), '-');
     }
 
     #[test]

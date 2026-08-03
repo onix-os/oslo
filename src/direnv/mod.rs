@@ -29,7 +29,7 @@ pub use handle::{install, installed, request_reload, take_reload_request, with};
 
 use crate::env::Environment;
 use allow::{Allow, Status};
-use diff::Diff;
+use diff::{Change, Diff};
 use find::Rc;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -68,8 +68,16 @@ pub struct Direnv {
 /// What happened, for the caller to report.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Event {
-    /// Loaded `owner`, touching this many variables.
-    Loaded { owner: PathBuf, vars: usize },
+    /// Loaded `owner`, and what it did to the environment.
+    ///
+    /// The marks rather than a count: "11 variables" tells you nothing, and the whole reason to
+    /// print anything at all when a directory changes is so you can see what it did to your shell
+    /// without having to go and ask.
+    Loaded {
+        owner: PathBuf,
+        changed: Vec<(String, Change)>,
+        aliases: Vec<(String, Change)>,
+    },
     /// Left a directory environment behind.
     Unloaded { owner: PathBuf },
     /// Found something, but it has not been allowed. Nothing was read.
@@ -263,20 +271,37 @@ impl Direnv {
         // **A file that failed half way still had its first half take effect**, so the diff is
         // taken regardless and the failure reported beside it. Discarding the load here would
         // leave those variables set with nothing recorded to unset them.
-        let undo = Diff::between(&before, &after).reverse();
-        let aliases = Diff::between(&aliases_before, &aliases_after).reverse();
+        // Taken forwards for reporting and reversed for undoing — the same comparison read in
+        // both directions, so what is announced and what is put back cannot disagree.
+        let forward = Diff::between(&before, &after);
+        let changed: Vec<(String, Change)> = forward
+            .changes()
+            .into_iter()
+            .map(|(name, kind)| (name.to_string(), kind))
+            .collect();
+        let undo = forward.reverse();
+        let alias_diff = Diff::between(&aliases_before, &aliases_after);
+        let alias_changes: Vec<(String, Change)> = alias_diff
+            .changes()
+            .into_iter()
+            .map(|(name, kind)| (name.to_string(), kind))
+            .collect();
+        let aliases = alias_diff.reverse();
 
         let Some(owner) = find::owner(rc) else {
             return Vec::new();
         };
-        let vars = undo.len() + aliases.len();
         self.loaded = Some(Loaded {
             owner: owner.clone(),
             watch,
             undo,
             aliases,
         });
-        let mut events = vec![Event::Loaded { owner, vars }];
+        let mut events = vec![Event::Loaded {
+            owner,
+            changed,
+            aliases: alias_changes,
+        }];
         if let Err(problem) = outcome {
             events.push(Event::Failed {
                 path: rc.path.clone(),

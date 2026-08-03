@@ -7,6 +7,8 @@
 //! that is a security decision belongs looking like one.
 
 use oslo::direnv::Event;
+use oslo::direnv::diff::Change;
+use oslo::interactive::dropdown::width;
 use oslo::interactive::theme::{self, Color, Style};
 use std::path::Path;
 
@@ -79,21 +81,96 @@ pub(super) fn detail(output: &str) {
     }
 }
 
+/// The environment a directory changed, grouped by what happened to it.
+///
+/// One line per kind, on the same rail the failure detail uses, so a load and a failure read as
+/// parts of one block rather than two unrelated shapes. Kinds are separate lines rather than one
+/// mixed run because the eye groups by colour badly and by position well — thirty names in three
+/// colours is a wall; three labelled rows is a list.
+///
+/// Each row is cut to the terminal with a count of what was dropped. A Nix dev shell adds
+/// thirty-five variables, and printed in full that is four wrapped lines of noise on every `cd` —
+/// which is how a useful message becomes one nobody reads.
+fn rail_rows(changed: &[(String, Change)], aliases: &[(String, Change)]) -> Vec<String> {
+    let grey = Style::fg(Color::Indexed(240));
+    let rail = paint("│", grey);
+    let mut rows = Vec::new();
+
+    for kind in [Change::Removed, Change::Modified, Change::Added] {
+        let names: Vec<&str> = changed
+            .iter()
+            .filter(|(_, k)| *k == kind)
+            .map(|(name, _)| name.as_str())
+            .collect();
+        if names.is_empty() {
+            continue;
+        }
+        let (style, label) = match kind {
+            Change::Removed => (Style::fg(slot(RED)), "removed"),
+            Change::Modified => (Style::fg(slot(YELLOW)), "changed"),
+            Change::Added => (Style::fg(slot(GREEN)), "added"),
+        };
+        // 2 indent + rail + space + 7 label + 2 = the fixed part of the row.
+        let budget = width::terminal_cols().saturating_sub(14);
+        let (shown, hidden) = fit_names(&names, budget);
+        // Padded so the names start in the same column on every row; a ragged left edge is the
+        // difference between a list you can scan and one you have to read.
+        let mut row = format!("  {rail} {} {shown}", paint(&format!("{label:<7}"), style));
+        if hidden > 0 {
+            row.push_str(&paint(&format!(" +{hidden}"), grey));
+        }
+        rows.push(row);
+    }
+
+    if !aliases.is_empty() {
+        let names: Vec<&str> = aliases.iter().map(|(name, _)| name.as_str()).collect();
+        let (shown, hidden) = fit_names(&names, width::terminal_cols().saturating_sub(14));
+        let mut row = format!(
+            "  {rail} {} {shown}",
+            paint(&format!("{:<7}", "aliases"), grey)
+        );
+        if hidden > 0 {
+            row.push_str(&paint(&format!(" +{hidden}"), grey));
+        }
+        rows.push(row);
+    }
+    rows
+}
+
+/// As many names as fit in `budget` cells, and how many did not.
+fn fit_names(names: &[&str], budget: usize) -> (String, usize) {
+    let mut out = String::new();
+    let mut used = 0usize;
+    let mut shown = 0usize;
+    for name in names {
+        let w = name.chars().count() + usize::from(shown > 0);
+        if used + w > budget && shown > 0 {
+            break;
+        }
+        if shown > 0 {
+            out.push(' ');
+        }
+        out.push_str(name);
+        used += w;
+        shown += 1;
+    }
+    (out, names.len() - shown)
+}
+
 /// One event, as one line.
 pub(super) fn event(event: &Event) {
     let grey = Style::fg(Color::Indexed(240));
     match event {
-        Event::Loaded { owner, vars } => {
+        Event::Loaded {
+            owner,
+            changed,
+            aliases,
+        } => {
             let label = paint(LABEL, Style::fg(slot(GREEN)));
-            let count = match vars {
-                1 => "1 variable".to_string(),
-                n => format!("{n} variables"),
-            };
-            println!(
-                "{label} {} {}",
-                paint(&short(owner), Style::default()),
-                paint(&format!("· {count}"), grey)
-            );
+            println!("{label} {}", paint(&short(owner), Style::default()));
+            for row in rail_rows(changed, aliases) {
+                println!("{row}");
+            }
         }
         Event::Unloaded { owner } => {
             println!(
