@@ -162,14 +162,47 @@ Candidate generation, ranking and drawing together are under two milliseconds. T
 `Fuzzed`/`fold-once` change above removed 166 µs of that; the remainder is not worth restructuring
 the candidate pipeline for.
 
+## How big is that, next to other shells
+
+Measured on this machine, same day. Binary size is the fairest single column: nix closure sizes
+include every runtime dependency down to libc and are not comparable with a system package's.
+
+| shell | binary | closure / +libs | what it is |
+|---|---:|---:|---|
+| dash | 0.12 MB | 2.9 MB | C, POSIX only, no interactive anything |
+| zsh | 0.93 MB | 4.8 MB | C |
+| bash | 1.06 MB | 3.9 MB | C |
+| brush | 8.16 MB | 54 MB | Rust — oslo uses its parser |
+| hilbish | 9.39 MB | 48 MB | Go, Lua-scripted |
+| fish | 11.90 MB | 306 MB | C++/Rust |
+| **oslo** | **21.91 MB** | 26 MB | Rust, Lua, turso |
+| nushell | 66.50 MB | 113 MB | Rust, structured data |
+
+Reproduce with `stat -c%s "$(command -v <shell>)"`, and for the nix ones
+`nix path-info -S nixpkgs#<shell>`.
+
+**oslo is second largest, and a third of nushell** — which is the closest comparison, being the
+other Rust shell with a structured pipeline. It is 20× bash, and that is the number worth sitting
+with: bash is the thing it intends to replace as `/bin/sh`.
+
+The gap is not the shell. `brush` is oslo's own parser plus a shell around it at 8.16 MB, so
+roughly 8 MB of the 22 is "a Rust shell" and the remaining ~14 MB is what oslo adds: the Lua
+interpreter, the structured pipeline, and `turso` — which drags in tantivy, icu, zstd, simsimd and
+aegis, a full-text search engine and a unicode collation library, to store command history.
+
+That last one is the whole question. Nothing else in the list ships a search engine.
+
 ## What is actually left
 
 Nothing measured here is worth doing. If more performance is ever wanted, the honest order is:
 
-1. **Binary size beyond the profile.** 21.9 MB is still large for a static `/bin/sh`, and it is
-   almost all `turso`'s transitive tree — tantivy, icu, zstd, simsimd, aegis. `cargo bloat` would
-   say exactly how much. The question is not how to shrink it but whether a shell needs a database
-   with a full-text search engine attached.
+1. **Binary size beyond the profile** — the only lever left, and it is a design question rather
+   than an optimisation. See the comparison above: ~8 MB is "a Rust shell" and ~14 MB is what oslo
+   adds on top, most of it `turso`'s transitive tree. Two honest options, neither yet costed:
+   measure with `cargo bloat --release` first, then either turn off turso features that a history
+   store cannot need (full-text search, vector similarity), or store history in something smaller.
+   The second is a real loss — the range-scan query is what makes directory-aware suggestion free —
+   so it is a trade, not a cleanup.
 2. **Nothing else.** Startup beats bash, globbing beats bash by 3×, and every interactive path is
    between one and two milliseconds.
 
