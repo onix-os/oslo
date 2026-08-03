@@ -56,7 +56,9 @@ pub use io::{builtin_echo, builtin_printf, builtin_read};
 pub use jobs::{builtin_bg, builtin_disown, builtin_fg, builtin_jobs, builtin_wait};
 pub use r#let::builtin_let;
 pub use mapfile::builtin_mapfile;
-pub use process::{builtin_kill, builtin_trap, builtin_umask, run_exit_trap, run_pending_traps};
+pub use process::{
+    builtin_kill, builtin_trap, builtin_umask, run_debug_trap, run_exit_trap, run_pending_traps,
+};
 pub use shopt::builtin_shopt;
 pub use suspend::builtin_suspend;
 pub use times::builtin_times;

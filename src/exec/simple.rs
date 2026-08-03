@@ -40,6 +40,9 @@ fn eval_simple_command_inner(env: &mut Environment, simple: &SimpleCommand) -> R
     // where the trap body can run ordinary shell code. See `run_pending_traps`.
     crate::env::builtins::run_pending_traps(env)?;
 
+    // Before expansion: `$BASH_COMMAND` is what is about to run, not what it turns into.
+    crate::env::builtins::run_debug_trap(env, &crate::ast::render::simple_command(simple));
+
     if simple.words.is_empty() {
         return apply_assignments_only(env, simple);
     }

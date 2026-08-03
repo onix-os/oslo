@@ -24,7 +24,7 @@ mod umask;
 /// copy of the table.
 pub(crate) mod signals;
 
-pub use handlers::{run_exit_trap, run_pending_traps};
+pub use handlers::{run_debug_trap, run_exit_trap, run_pending_traps};
 pub use kill::builtin_kill;
 pub use trap::builtin_trap;
 pub use umask::builtin_umask;
