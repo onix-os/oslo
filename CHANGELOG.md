@@ -1,5 +1,64 @@
 # Changelog
 
+## [0.2.0] - 2026-08-03
+
+### <!-- 0 -->⛰️  Features
+
+- Report what changed, not how many
+- A real terminal library, and the escapes to use it
+- The api is require-able, and you can write your own
+- Nix_develop, the use flake equivalent
+- A directory may set the prompt, and give it back
+- Restore locals and export flags, add oslo.path_add
+- One Lua config file, and direnv helpers from it
+- Group and colour what a directory environment reports
+- Load directory environments on cd
+- The allow gate, env diff and dotenv reader
+- The allow gate, the env diff and dotenv
+- Fuzzy inline suggestions on by default
+- Gap-capped fuzzy matching, off by default inline
+
+### <!-- 1 -->🐛 Bug Fixes
+
+- Signal a job by its spec, not only by pid
+- A dev shell must not take your commands away
+- The ghost is a continuation again; aliases unload
+- Allow and deny take effect where you stand
+- A fuzzy match must reach the first character
+
+### <!-- 2 -->🚜 Refactor
+
+- Drop the migrate module
+- Group the api into libraries
+- Oslo.direnv is a library, not loose functions
+- Drop what nothing calls
+- One file type, .env.lua and nothing else
+
+### <!-- 3 -->📚 Documentation
+
+- Re-measure size against other shells
+- How big oslo is next to seven other shells
+- Why --json loses what the bash form keeps
+- Oslo's own .env.lua
+- Move the known gaps out of the README
+- The directory environment design
+- The tracking store, the smarter cd and fuzzy matching
+
+### <!-- 4 -->⚡ Performance
+
+- Replace turso with jammdb behind one seam
+- Turn off turso features oslo never used
+- Tune the release profile, measure the rest
+- Cache compiled regexes, fold fuzzy patterns once
+
+### <!-- 6 -->🧪 Testing
+
+- Pin the PATH round-trip
+
+### <!-- 7 -->⚙️ Miscellaneous Tasks
+
+- Drop --locked so a version bump cannot redden every job
+
 ## [0.1.4] - 2026-08-02
 
 ### <!-- 0 -->⛰️  Features
