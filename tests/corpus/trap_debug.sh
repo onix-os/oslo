@@ -1,47 +1,49 @@
 # mode: bash
-# `trap ... DEBUG` fires before each simple command, with `$BASH_COMMAND` naming what is next.
+# `trap ... DEBUG` fires before each simple command.
 #
-# This is not a completeness item. It is the hook every shell integration is built on: starship
-# times commands through it, hexe's `__shp_preexec` is installed with exactly `trap '...' DEBUG`,
-# and bash-preexec — which atuin, and most of the ecosystem, sits on top of — is nothing but a
-# DEBUG trap and a `PROMPT_COMMAND`. Without it those tools install cleanly and then do nothing.
+# With `$PROMPT_COMMAND` this is bash's preexec/precmd pair, and it is what a prompt integration
+# uses to time a command: this one starts the clock, that one draws the elapsed time.
 #
-# `$BASH_COMMAND` is a *re-render* of the parsed command, not the source text. bash does the same,
-# and the visible tell is the space it puts after a redirection operator that the script never
-# wrote. That normalisation is asserted here on purpose: a hook matching on this text has to see
-# what it would see under bash.
+# **`$BASH_COMMAND` is not set by oslo and is not tested here.** bash names the command about to
+# run in it, which means rendering the parsed command back to shell text — 234 lines of renderer
+# for one variable, which was removed as not worth its weight. A hook that needs to know *that* a
+# command is starting works; one that needs to know *which* does not. Every case below is written
+# to hold under both shells, so what it pins is the firing itself.
 
-trap 'echo "<$BASH_COMMAND>"' DEBUG
+count=0
+trap 'count=$((count + 1))' DEBUG
 
 # An assignment is a command of its own and fires on its own.
 target=world
+echo "one command later: $count"
 
 echo hello $target
-
-# Unexpanded: the trap sees what is about to run, not what it becomes. A hook that wants to veto
-# `rm $dir` needs the variable, not the directory it happened to name this time.
-echo "$target"
-
-# `2>/dev/null` comes back as `2> /dev/null`, which is bash's spelling and not the script's.
-ls /nonexistent 2>/dev/null
+echo "and another: $count"
 
 # The condition of an `if`, then its body: two commands, two firings.
-if true; then echo inside; fi
+if true; then :; fi
+echo "if is two: $count"
 
-# The handler's own commands must not fire the trap again. Without that guard this line would
-# recurse until the stack ran out.
-trap 'echo "<<$BASH_COMMAND>>"; echo nested' DEBUG
-echo after
+# The handler's own commands must not fire it again. Without that guard the first firing would
+# recurse until the stack ran out, so reaching this line at all is the assertion.
+trap 'count=$((count + 1)); :' DEBUG
+:
+echo "no recursion: $count"
+
+# Resetting stops it.
+trap - DEBUG
+before=$count
+:
+:
+echo "after reset, unchanged: $((count - before))"
 
 # `trap -p` reports it in re-inputtable form, like any other condition.
-trap - DEBUG
-echo "reset: $?"
-
 trap 'echo listed' DEBUG
 trap -p DEBUG
 trap - DEBUG
 
-# A DEBUG handler runs between commands, so it cannot disturb `$?`.
+# A DEBUG handler runs *between* commands, so it cannot disturb `$?`.
 false
-trap 'true' DEBUG
+trap ':' DEBUG
 echo "status survives: $?"
+trap - DEBUG

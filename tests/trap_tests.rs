@@ -171,18 +171,21 @@ fn the_exit_trap_runs_at_end_of_input() {
     );
 }
 
-/// The DEBUG trap fires before each simple command, with `$BASH_COMMAND` naming what is next.
+/// The DEBUG trap fires before each simple command.
 ///
 /// End to end through a real shell rather than the unit test, because the two halves live apart:
 /// `trap` records the condition and `exec::simple` fires it, and a test of either alone passed
 /// while the pair did nothing.
+///
+/// The count is what is asserted, not `$BASH_COMMAND` — oslo does not set it, and
+/// `tests/corpus/trap_debug.sh` says why.
 #[test]
 fn the_debug_trap_fires_before_each_command() {
     let r = run_in(
         tempfile::tempdir().expect("tempdir").path(),
-        "trap 'echo \"<$BASH_COMMAND>\"' DEBUG\nx=1\necho done",
+        "n=0\ntrap 'n=$((n + 1))' DEBUG\nx=1\necho $n",
     );
-    assert_eq!(r.out(), "<x=1>\n<echo done>\ndone", "stderr: {}", r.stderr);
+    assert_eq!(r.out(), "2", "stderr: {}", r.stderr);
 }
 
 /// A handler's own commands must not fire it again, or the first `trap 'date' DEBUG` recurses

@@ -17,7 +17,6 @@ pub mod marks;
 pub mod matching;
 pub mod prompt;
 pub mod query;
-pub mod readline;
 pub mod recall;
 pub mod row;
 pub mod settings;

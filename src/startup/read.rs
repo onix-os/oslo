@@ -79,13 +79,6 @@ pub(super) fn read_command(
             print!("{}", settings.vi.cursors.insert.escape());
         }
 
-        // `bind` is shell code and may have run since the last prompt — from the rc file, from a
-        // function, or from an `eval` typed a moment ago. Re-applied only when something actually
-        // changed, so the common case costs one atomic load.
-        if super::keybind::bindings_changed() {
-            super::keybind::apply_bindings(rl);
-        }
-
         let prompt = if buffer.is_empty() {
             prompt::primary_prompt(env_struct, lua, last_status, *current)
         } else {
@@ -213,19 +206,6 @@ pub(super) fn read_command(
         };
         typed.clear();
         typed_point = 0;
-
-        // A `bind -x` key ends the line so its command can run out here, with the terminal back in
-        // its normal mode — the command may be a full-screen picker, which is what atuin's Ctrl-R
-        // is. `raw` is not a command the user asked to run and must not be treated as one; the
-        // line goes back into the editor as whatever the command left in `$READLINE_LINE`.
-        if let Some(request) = oslo::interactive::readline::take_request() {
-            let outcome = super::integration::run(env_struct, &request);
-            typed = outcome.line;
-            typed_point = outcome.point;
-            // Everything else about the line survives: a bound key pressed halfway through a
-            // continuation is still inside that continuation when the prompt comes back.
-            continue;
-        }
 
         // The toggle key repaints the prompt in place rather than submitting, so by the time a
         // line comes back the prompt may be showing the other language. That is the answer for

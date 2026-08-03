@@ -11,7 +11,6 @@ use oslo::Environment;
 use oslo::interactive::vi;
 use rustyline::{Cmd, ConditionalEventHandler, Event, EventContext, RepeatCount};
 use std::io::Write;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
 /// Watches every keystroke to keep the cursor shape agreeing with the vi mode.
@@ -296,11 +295,19 @@ pub fn apply(rl: &mut Repl, env_struct: &Arc<Mutex<Environment>>, toggle: &Toggl
     }
 
     // Up and Down before `oslo.keys`, so a config can still take them.
+    //
+    // **Ctrl-R is in this list on purpose.** Left alone, rustyline binds it to its own
+    // `ReverseSearchHistory`, which knows nothing about oslo's prompt: it draws
+    // `(reverse-i-search)` over the row, mangles what is already typed, and there is no way to
+    // make it agree with a prompt it cannot see. Nothing in oslo ever asked for that binding — it
+    // was simply the editor's default showing through, which is the worst way for a shell to
+    // acquire a feature. Ctrl-R now walks history the way Up does, against the same prefix.
     for (code, back) in [
         (rustyline::KeyCode::Up, true),
         (rustyline::KeyCode::Down, false),
         (rustyline::KeyCode::Char('p'), true),
         (rustyline::KeyCode::Char('n'), false),
+        (rustyline::KeyCode::Char('r'), true),
     ] {
         let modifiers = if matches!(code, rustyline::KeyCode::Char(_)) {
             rustyline::Modifiers::CTRL
@@ -354,6 +361,17 @@ pub fn apply(rl: &mut Repl, env_struct: &Arc<Mutex<Environment>>, toggle: &Toggl
 
     let mut toggle_bound = false;
     for (event, action) in bindings {
+        // `history-search` means oslo's own walk, not rustyline's `(reverse-i-search)` overlay.
+        // Routing it through `Action::command` would hand back the overlay, which is the thing
+        // this binding exists to avoid.
+        if action == oslo::interactive::keys::Action::HistorySearchBackward {
+            rl.bind_sequence(
+                event,
+                rustyline::EventHandler::Conditional(Box::new(HistoryWalk { back: true })),
+            );
+            continue;
+        }
+
         // A binding the config wrote itself. Bound before the fixed actions are consulted, so a
         // key that has a handler runs the handler.
         if action == oslo::interactive::keys::Action::LuaHandler
@@ -386,113 +404,4 @@ pub fn apply(rl: &mut Repl, env_struct: &Arc<Mutex<Environment>>, toggle: &Toggl
             rustyline::EventHandler::Conditional(Box::new(toggle.clone())),
         );
     }
-}
-
-/// A key `bind` gave shell commands to run.
-///
-/// It records the request and answers `AcceptLine`, which is the only way out of rustyline that
-/// gives the caller both the buffer and control. The read loop recognises the request, so the
-/// line is *not* run as a command — see [`crate::startup::integration`] for what happens next and
-/// why it cannot happen here.
-///
-/// The commands are worked out **when the key is pressed**, not when it is bound: a macro names
-/// key sequences, and what those are bound to can change between one prompt and the next. atuin
-/// rebinds its own widgets as the keymap changes, and resolving early would have run whatever the
-/// chain meant at startup.
-struct BindCommand {
-    /// The key sequence this binding stands for. One event for a `bind -x` key; the macro's
-    /// expansion for a macro.
-    keys: Vec<rustyline::KeyEvent>,
-}
-
-impl ConditionalEventHandler for BindCommand {
-    fn handle(&self, _: &Event, _: RepeatCount, _: bool, ctx: &EventContext) -> Option<Cmd> {
-        let commands = oslo::interactive::readline::expand(&self.keys);
-        if commands.is_empty() {
-            // Nothing to run, so nothing should happen — least of all ending the line.
-            return Some(Cmd::Noop);
-        }
-        oslo::interactive::readline::request(commands, ctx.line(), ctx.pos());
-        Some(Cmd::AcceptLine)
-    }
-}
-
-/// Whether `bind` has changed anything since the bindings were last applied.
-///
-/// One atomic load in the common case, which is what makes it safe to ask before every prompt.
-pub fn bindings_changed() -> bool {
-    oslo::interactive::readline::generation() != APPLIED.load(Ordering::SeqCst)
-}
-
-/// The generation the editor's bindings were last built from.
-static APPLIED: AtomicUsize = AtomicUsize::new(usize::MAX);
-
-/// Apply everything `bind` has recorded, and report the generation it was applied at.
-///
-/// Called from the read loop rather than once at startup, because `bind` is shell code: it runs
-/// from an rc file, from a function, or from an `eval` typed into a shell that is already up.
-/// Binding only at startup meant `eval "$(atuin init bash)"` at the prompt did nothing until the
-/// next restart, which is the kind of half-working that costs an evening to diagnose.
-pub fn apply_bindings(rl: &mut Repl) -> usize {
-    use oslo::interactive::readline::{self, Bound};
-    let generation = readline::generation();
-    APPLIED.store(generation, Ordering::SeqCst);
-    for entry in readline::entries() {
-        // Only the keymap in force. A vi-command binding installed while you are typing is not a
-        // shortcut, it is a character that no longer types itself — atuin binds `/` and `k` there,
-        // and applying them made `ls /tmp` open a history search mid-word.
-        if !entry.keymap.is_active() {
-            continue;
-        }
-        let event = Event::KeySeq(entry.keys.clone());
-        match &entry.bound {
-            // Bound to its *own* keys, not to the command: `expand` looks the sequence up again
-            // when the key is pressed, so one path covers both a direct command and a macro.
-            Bound::Command(_) => rl.bind_sequence(
-                event,
-                rustyline::EventHandler::Conditional(Box::new(BindCommand {
-                    keys: entry.keys.clone(),
-                })),
-            ),
-            Bound::Macro { keys, .. } => rl.bind_sequence(
-                event,
-                rustyline::EventHandler::Conditional(Box::new(BindCommand { keys: keys.clone() })),
-            ),
-            // A readline *function* name. oslo maps the few that name something it has and leaves
-            // the rest alone rather than binding a key to nothing — `bind -P` will still list it,
-            // so a user can see what was asked for and what happened to it.
-            Bound::Function(name) => match readline_function(name) {
-                Some(command) => rl.bind_sequence(event, rustyline::EventHandler::Simple(command)),
-                None => continue,
-            },
-        };
-    }
-    generation
-}
-
-/// readline function names oslo has an equivalent for.
-///
-/// Deliberately short. These are the ones an init script binds in passing, and inventing a mapping
-/// for the rest of readline's ~150 functions would be guessing at behaviour oslo does not have.
-fn readline_function(name: &str) -> Option<Cmd> {
-    Some(match name {
-        "accept-line" => Cmd::AcceptLine,
-        "beginning-of-line" => Cmd::Move(rustyline::Movement::BeginningOfLine),
-        "end-of-line" => Cmd::Move(rustyline::Movement::EndOfLine),
-        "backward-char" => Cmd::Move(rustyline::Movement::BackwardChar(1)),
-        "forward-char" => Cmd::Move(rustyline::Movement::ForwardChar(1)),
-        "backward-word" => Cmd::Move(rustyline::Movement::BackwardWord(1, rustyline::Word::Emacs)),
-        "forward-word" => Cmd::Move(rustyline::Movement::ForwardWord(
-            1,
-            rustyline::At::AfterEnd,
-            rustyline::Word::Emacs,
-        )),
-        "clear-screen" => Cmd::ClearScreen,
-        "complete" => Cmd::Complete,
-        "kill-line" => Cmd::Kill(rustyline::Movement::EndOfLine),
-        "unix-line-discard" => Cmd::Kill(rustyline::Movement::BeginningOfLine),
-        "previous-history" => Cmd::PreviousHistory,
-        "next-history" => Cmd::NextHistory,
-        _ => return None,
-    })
 }
