@@ -99,7 +99,7 @@ pub(super) fn make_private(path: &Path) -> Option<()> {
 ///
 /// Public because [`super::Store::open`] is not the only caller that needs the answer: anything
 /// holding a path an *older* oslo wrote has to move that file aside before opening, and asking here
-/// is how it knows to. `startup::history_db::migrate` is the one that does.
+/// is how it knows to. `startup::history_db::History::open` is the one that does.
 pub fn is_a_database(path: &Path) -> bool {
     let header = match read_header(path) {
         Ok(Some(header)) => header,

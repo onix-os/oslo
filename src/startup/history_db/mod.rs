@@ -22,7 +22,7 @@
 //!
 //! * the store holds no handle, so a second terminal is never blocked waiting on this one;
 //! * a file that is not a jammdb database makes `DB::open` *panic* rather than error, which is why
-//!   [`migrate`] exists;
+//!   [`History::open`] renames a file it cannot read out of the way before opening;
 //! * the file grows in 8 MiB steps and never shrinks, and a large delete is the shape that panics
 //!   inside the engine, which together are why [`History::trim`] is written the way it is.
 //!
@@ -64,8 +64,6 @@
 //! The timestamp is written and nothing reads it yet, exactly as the `at` column it replaces was
 //! written and never selected. It is what a `history -t` would need, and adding it later would need
 //! a migration where recording it now needs none.
-
-mod migrate;
 
 use oslo::track::kv::{Fields, Key, Span, Store, Tree, Walk};
 use std::path::{Path, PathBuf};
@@ -158,13 +156,19 @@ pub struct History {
 impl History {
     /// Open, creating the file and its directory if they are not there.
     ///
-    /// A history left by an older oslo is turso's and cannot be read by this build; it is moved
-    /// aside rather than opened or deleted, which is [`migrate`]'s whole job.
-    ///
     /// Every failure answers `None` rather than propagating: a shell whose history cannot be
     /// opened is a working shell without history, and refusing to start over it would be absurd.
+    ///
+    /// A file at this path that is not ours — an older build's database, or something a disk
+    /// corrupted — is renamed aside rather than opened or deleted. Without that, an unreadable
+    /// file means `Store::open` refuses for ever and the shell silently has no history until
+    /// somebody deletes it by hand. `rename` within one directory is atomic, so two terminals
+    /// starting together cannot both move it: the loser finds nothing at the source and does
+    /// nothing, which is the right outcome.
     pub fn open(path: &Path) -> Option<History> {
-        migrate::keep_a_history_this_build_cannot_read(path);
+        if path.is_file() && !oslo::track::kv::is_a_database(path) {
+            let _ = std::fs::rename(path, path.with_extension("db.unreadable"));
+        }
         Some(History {
             store: Store::open(path)?,
             since_trim: AtomicUsize::new(0),
