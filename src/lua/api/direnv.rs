@@ -117,6 +117,31 @@ pub fn exported_from(json: &str) -> Result<Vec<(String, String)>, String> {
     Ok(out)
 }
 
+/// The dev shell's `PATH`, with everything of yours that it does not already have, behind it.
+///
+/// **A dev shell's `PATH` is a *build* environment, not a usable one.** `nix print-dev-env` hands
+/// back the derivation's own `PATH` — 36 store entries for this repository's flake — and it
+/// *replaces* yours rather than adding to it. It has `ls` and `grep`, because coreutils is a build
+/// input; it does not have `clear`, or `git`, or anything you installed. Taking it verbatim means
+/// `cd` into a project and your shell quietly loses half its commands, which is exactly what
+/// happened the first time this was used for real.
+///
+/// So the dev shell goes first — its toolchain must win, that is the entire point — and yours
+/// follows. Entries already present are not repeated, so a reload cannot grow the variable.
+///
+/// direnv's `use flake` does *not* do this: it evals the bash and takes the replacement. That is
+/// why so many real `.envrc` files re-append `$PATH` by hand afterwards, including the one this
+/// repository used to have.
+fn keeping_yours(dev: &str, outer: &str) -> String {
+    let mut out: Vec<&str> = dev.split(':').filter(|e| !e.is_empty()).collect();
+    for entry in outer.split(':').filter(|e| !e.is_empty()) {
+        if !out.contains(&entry) {
+            out.push(entry);
+        }
+    }
+    out.join(":")
+}
+
 /// The command direnv runs, with the profile that keeps the shell from being garbage-collected.
 ///
 /// `--profile` is not decoration: without it the dev shell's store paths have no GC root, and the
@@ -219,7 +244,12 @@ fn nix_develop(it: &mut Table, env: &Arc<Mutex<Environment>>) {
         let count = exported.len();
         {
             let mut guard = crate::lua::engine::borrow_env(&env)?;
+            let outer_path = guard.get_var("PATH").unwrap_or_default().to_string();
             for (name, value) in exported {
+                if name == "PATH" {
+                    guard.set_var(&name, &keeping_yours(&value, &outer_path), true);
+                    continue;
+                }
                 guard.set_var(&name, &value, true);
             }
         }
@@ -294,6 +324,27 @@ mod tests {
         assert!(built.contains("print-dev-env --json"), "{built}");
         // An installable with a quote in it must not end the quoting.
         assert!(!command("it's", ".direnv/p").contains("'it's'"));
+    }
+
+    /// The bug this exists for: a dev shell must not take your commands away.
+    #[test]
+    fn your_own_path_survives_behind_the_dev_shells() {
+        let merged = keeping_yours(
+            "/nix/store/cc/bin:/nix/store/ld/bin",
+            "/usr/bin:/home/u/.local/bin",
+        );
+        assert_eq!(
+            merged, "/nix/store/cc/bin:/nix/store/ld/bin:/usr/bin:/home/u/.local/bin",
+            "the toolchain wins, and `clear` still resolves"
+        );
+    }
+
+    /// A reload must not grow `$PATH` a copy at a time.
+    #[test]
+    fn an_entry_in_both_appears_once() {
+        assert_eq!(keeping_yours("/a:/b", "/b:/c"), "/a:/b:/c");
+        assert_eq!(keeping_yours("/a", ""), "/a");
+        assert_eq!(keeping_yours("", "/c"), "/c");
     }
 
     #[test]
