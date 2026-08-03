@@ -21,7 +21,7 @@ it — a number nobody can re-run is a rumour.
 | Enter → next prompt | **0.46 ms** median (p90 0.48) | `scratchpad/roundtrip.py` |
 | Tab press | **1.42 ms** median (p90 1.90) | `scratchpad/tab.py` |
 | glob over 12,000 files | **2.1 ms** (bash: 6.0 ms) | 100 globs in one shell, timed |
-| release binary | **21.9 MB** (was 29.9) | `ls -l target/release/oslo` |
+| release binary | **5.73 MB** (was 29.9) | `ls -l target/release/oslo` |
 
 **oslo starts faster than bash, and globs nearly three times faster.** Those are the numbers that
 matter most for a `/bin/sh`, and they were already good before any of this work. Every interactive
@@ -164,33 +164,41 @@ the candidate pipeline for.
 
 ## How big is that, next to other shells
 
-Measured on this machine, same day. Binary size is the fairest single column: nix closure sizes
-include every runtime dependency down to libc and are not comparable with a system package's.
+Re-measured after the jammdb migration, all on this machine on one day. Binary size is the only
+column worth ranking on. The closure column is here to be discounted: it is dominated by glibc and
+gcc, which every dynamically linked shell in the table shares, so oslo's 46 MB and bash's 47 MB are
+the same libc counted twice and say nothing about either shell.
 
-| shell | binary | closure / +libs | what it is |
+| shell | binary | closure | what it is |
 |---|---:|---:|---|
-| dash | 0.12 MB | 2.9 MB | C, POSIX only, no interactive anything |
-| zsh | 0.93 MB | 4.8 MB | C |
-| bash | 1.06 MB | 3.9 MB | C |
+| dash | 0.16 MB | 40 MB | C, POSIX only, no interactive anything |
+| zsh | 0.87 MB | 49 MB | C |
+| bash | 1.16 MB | 47 MB | C |
+| **oslo** | **5.73 MB** | 46 MB | Rust, Lua, jammdb |
 | brush | 8.16 MB | 54 MB | Rust — oslo uses its parser |
 | hilbish | 9.39 MB | 48 MB | Go, Lua-scripted |
 | fish | 11.90 MB | 306 MB | C++/Rust |
-| **oslo** | **21.91 MB** | 26 MB | Rust, Lua, turso |
 | nushell | 66.50 MB | 113 MB | Rust, structured data |
 
-Reproduce with `stat -c%s "$(command -v <shell>)"`, and for the nix ones
-`nix path-info -S nixpkgs#<shell>`.
+Reproduce with `stat -Lc%s "$(command -v <shell>)"`, and for the nix ones
+`nix build --no-link --print-out-paths nixpkgs#<shell>^out` then `nix path-info -S` on the result.
+Ask for `^out` explicitly or nix hands back the `-man` output and reports a 0-byte binary.
 
-**oslo is second largest, and a third of nushell** — which is the closest comparison, being the
-other Rust shell with a structured pipeline. It is 20× bash, and that is the number worth sitting
-with: bash is the thing it intends to replace as `/bin/sh`.
+**oslo was second largest in this table and is now fourth smallest.** 21.91 MB → 5.73 MB, a 74%
+cut, from three changes: the release profile (29.9 → 21.9), turning off turso's default features
+(21.9 → 17.5), and replacing turso with jammdb (17.5 → 5.73). The last one did most of it.
 
-The gap is not the shell. `brush` is oslo's own parser plus a shell around it at 8.16 MB, so
-roughly 8 MB of the 22 is "a Rust shell" and the remaining ~14 MB is what oslo adds: the Lua
-interpreter, the structured pipeline, and `turso` — which drags in tantivy, icu, zstd, simsimd and
-aegis, a full-text search engine and a unicode collation library, to store command history.
+The comparison that says the most is `brush`. It is oslo's own parser with a shell around it and
+nothing else — no Lua, no structured pipeline, no history store — and it is **2.4 MB larger**. Every
+Rust shell here is larger. oslo is now closer to zsh than to any of them.
 
-That last one is the whole question. Nothing else in the list ships a search engine.
+Against bash it went from 20× to 5.4×, which is the number that still matters, because bash is what
+it intends to replace as `/bin/sh`. 4.6 MB over bash buys a Lua interpreter, a structured pipeline
+and an embedded database. That is a trade worth making, where the previous 20 MB was not.
+
+One caveat on the release shape: `cargo build --release --target x86_64-unknown-linux-musl` does not
+run in this nix shell — the target's `core` and `std` are not installed, so the static musl binary
+these figures are meant to predict has not been built here. The number above is the glibc build.
 
 ## What is actually left
 
