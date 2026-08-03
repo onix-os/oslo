@@ -13,6 +13,7 @@
 //! * [`repl`] — the interactive loop that uses all three.
 //! * `tracking` — what that loop hands [`oslo::track`] instead of discarding.
 
+mod bindx;
 pub mod config;
 mod environments;
 pub mod history;

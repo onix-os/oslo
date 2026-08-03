@@ -11,6 +11,7 @@ use oslo::Environment;
 use oslo::interactive::vi;
 use rustyline::{Cmd, ConditionalEventHandler, Event, EventContext, RepeatCount};
 use std::io::Write;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
 
 /// Watches every keystroke to keep the cursor shape agreeing with the vi mode.
@@ -385,4 +386,89 @@ pub fn apply(rl: &mut Repl, env_struct: &Arc<Mutex<Environment>>, toggle: &Toggl
             rustyline::EventHandler::Conditional(Box::new(toggle.clone())),
         );
     }
+}
+
+/// A key `bind -x` gave a shell command.
+///
+/// It records the request and answers `AcceptLine`, which is the only way out of rustyline that
+/// gives the caller both the buffer and control. The read loop recognises the request, so the
+/// line is *not* run as a command — see [`crate::startup::bindx`] for what happens next and why
+/// it cannot happen here.
+struct BindCommand {
+    command: String,
+}
+
+impl ConditionalEventHandler for BindCommand {
+    fn handle(&self, _: &Event, _: RepeatCount, _: bool, ctx: &EventContext) -> Option<Cmd> {
+        oslo::interactive::readline::request(&self.command, ctx.line(), ctx.pos());
+        Some(Cmd::AcceptLine)
+    }
+}
+
+/// Whether `bind` has changed anything since the bindings were last applied.
+///
+/// One atomic load in the common case, which is what makes it safe to ask before every prompt.
+pub fn bindings_changed() -> bool {
+    oslo::interactive::readline::generation() != APPLIED.load(Ordering::SeqCst)
+}
+
+/// The generation the editor's bindings were last built from.
+static APPLIED: AtomicUsize = AtomicUsize::new(usize::MAX);
+
+/// Apply everything `bind` has recorded, and report the generation it was applied at.
+///
+/// Called from the read loop rather than once at startup, because `bind` is shell code: it runs
+/// from an rc file, from a function, or from an `eval` typed into a shell that is already up.
+/// Binding only at startup meant `eval "$(atuin init bash)"` at the prompt did nothing until the
+/// next restart, which is the kind of half-working that costs an evening to diagnose.
+pub fn apply_bindings(rl: &mut Repl) -> usize {
+    use oslo::interactive::readline::{self, Bound};
+    let generation = readline::generation();
+    APPLIED.store(generation, Ordering::SeqCst);
+    for entry in readline::entries() {
+        let event = Event::KeySeq(entry.keys.clone());
+        match &entry.bound {
+            Bound::Command(command) => rl.bind_sequence(
+                event,
+                rustyline::EventHandler::Conditional(Box::new(BindCommand {
+                    command: command.clone(),
+                })),
+            ),
+            // A readline *function* name. oslo maps the few that name something it has and leaves
+            // the rest alone rather than binding a key to nothing — `bind -P` will still list it,
+            // so a user can see what was asked for and what happened to it.
+            Bound::Function(name) => match readline_function(name) {
+                Some(command) => rl.bind_sequence(event, rustyline::EventHandler::Simple(command)),
+                None => continue,
+            },
+        };
+    }
+    generation
+}
+
+/// readline function names oslo has an equivalent for.
+///
+/// Deliberately short. These are the ones an init script binds in passing, and inventing a mapping
+/// for the rest of readline's ~150 functions would be guessing at behaviour oslo does not have.
+fn readline_function(name: &str) -> Option<Cmd> {
+    Some(match name {
+        "accept-line" => Cmd::AcceptLine,
+        "beginning-of-line" => Cmd::Move(rustyline::Movement::BeginningOfLine),
+        "end-of-line" => Cmd::Move(rustyline::Movement::EndOfLine),
+        "backward-char" => Cmd::Move(rustyline::Movement::BackwardChar(1)),
+        "forward-char" => Cmd::Move(rustyline::Movement::ForwardChar(1)),
+        "backward-word" => Cmd::Move(rustyline::Movement::BackwardWord(1, rustyline::Word::Emacs)),
+        "forward-word" => Cmd::Move(rustyline::Movement::ForwardWord(
+            1,
+            rustyline::At::AfterEnd,
+            rustyline::Word::Emacs,
+        )),
+        "clear-screen" => Cmd::ClearScreen,
+        "complete" => Cmd::Complete,
+        "kill-line" => Cmd::Kill(rustyline::Movement::EndOfLine),
+        "unix-line-discard" => Cmd::Kill(rustyline::Movement::BeginningOfLine),
+        "previous-history" => Cmd::PreviousHistory,
+        "next-history" => Cmd::NextHistory,
+        _ => return None,
+    })
 }

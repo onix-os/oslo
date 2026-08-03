@@ -56,6 +56,10 @@ pub(super) fn read_command(
     let mut reading = *current;
     // Carried across a toggle, so switching language mid-command does not lose what was typed.
     let mut typed = String::new();
+    // Where the cursor goes when `typed` is put back. Only a `bind -x` command moves it away from
+    // the end — `$READLINE_POINT` is how a plugin says "leave the cursor here", and a picker that
+    // inserts a word mid-line needs it.
+    let mut typed_point = 0usize;
 
     loop {
         // Every line starts in insert mode as far as the editor is concerned, so the mode this
@@ -73,6 +77,13 @@ pub(super) fn read_command(
         let settings = oslo::interactive::settings::current();
         if settings.vi.enabled && std::io::IsTerminal::is_terminal(&std::io::stdout()) {
             print!("{}", settings.vi.cursors.insert.escape());
+        }
+
+        // `bind` is shell code and may have run since the last prompt — from the rc file, from a
+        // function, or from an `eval` typed a moment ago. Re-applied only when something actually
+        // changed, so the common case costs one atomic load.
+        if super::keybind::bindings_changed() {
+            super::keybind::apply_bindings(rl);
         }
 
         let prompt = if buffer.is_empty() {
@@ -156,7 +167,8 @@ pub(super) fn read_command(
         );
         let _ = std::io::Write::flush(&mut std::io::stdout());
 
-        let raw = match rl.readline_with_initial(&prompt, (&typed, "")) {
+        let split = typed_point.min(typed.len());
+        let raw = match rl.readline_with_initial(&prompt, (&typed[..split], &typed[split..])) {
             Ok(raw) => raw,
             Err(ReadlineError::Interrupted) => {
                 // Ctrl-C abandons the *line*, not the language. If the user switched to Lua and
@@ -190,6 +202,20 @@ pub(super) fn read_command(
             }
         };
         typed.clear();
+        typed_point = 0;
+
+        // A `bind -x` key ends the line so its command can run out here, with the terminal back in
+        // its normal mode — the command may be a full-screen picker, which is what atuin's Ctrl-R
+        // is. `raw` is not a command the user asked to run and must not be treated as one; the
+        // line goes back into the editor as whatever the command left in `$READLINE_LINE`.
+        if let Some(request) = oslo::interactive::readline::take_request() {
+            let outcome = super::bindx::run(env_struct, &request);
+            typed = outcome.line;
+            typed_point = outcome.point;
+            // Everything else about the line survives: a bound key pressed halfway through a
+            // continuation is still inside that continuation when the prompt comes back.
+            continue;
+        }
 
         // The toggle key repaints the prompt in place rather than submitting, so by the time a
         // line comes back the prompt may be showing the other language. That is the answer for
