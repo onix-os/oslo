@@ -18,10 +18,14 @@ it — a number nobody can re-run is a rumour.
 | one corpus script | **9.3 ms** | `time (for i in $(seq 1 50); do ./target/release/oslo tests/corpus/builtin_read_options.sh; done)` |
 | whole corpus | **4.76 s** (~408 scripts) | `time (for f in tests/corpus/*.sh; do ./target/release/oslo "$f"; done)` |
 | syscalls per keystroke | **7.8**, zero subprocesses | `scratchpad/keystroke.py` (straces a real pty session) |
-| release binary | 29.9 MB unstripped | `ls -l target/release/oslo` |
+| Enter → next prompt | **0.46 ms** median (p90 0.48) | `scratchpad/roundtrip.py` |
+| Tab press | **1.42 ms** median (p90 1.90) | `scratchpad/tab.py` |
+| glob over 12,000 files | **2.1 ms** (bash: 6.0 ms) | 100 globs in one shell, timed |
+| release binary | **21.9 MB** (was 29.9) | `ls -l target/release/oslo` |
 
-**oslo starts faster than bash.** That is the number that matters most for a `/bin/sh`, and it is
-already good; the effort is better spent elsewhere.
+**oslo starts faster than bash, and globs nearly three times faster.** Those are the numbers that
+matter most for a `/bin/sh`, and they were already good before any of this work. Every interactive
+figure above is an order of magnitude below the ~50 ms a person can perceive.
 
 ## Confirmed, and fixed
 
@@ -57,7 +61,24 @@ paid by scripts, not by a person typing. Fixed with a bounded thread-local cache
 rather than a global with a lock, because a mutex on the execution path trades one cost for
 another; bounded because `=~ "^$prefix"` inside a loop would otherwise grow it without limit.
 
-### 3. `tracing` and `tracing-subscriber` were unused
+### 3. `[profile.release]` did not exist
+
+The release profile was entirely default: no `lto`, no `codegen-units`, no `strip`.
+
+| | binary | startup | corpus |
+|---|---|---|---|
+| before | 29.9 MB | 1.8 ms | 4.76 s |
+| `lto = "thin"`, `codegen-units = 1`, `strip = "symbols"` | **21.9 MB** | **1.5 ms** | **4.38 s** |
+
+**27% smaller and 8% faster**, which is the largest single win here. The cost is build time: about
+4½ minutes instead of 30 seconds, paid by whoever cuts a release and by CI, never by a user.
+
+`panic = "abort"` would have taken it to 19.8 MB and is deliberately **not** set: `catch_unwind` in
+`startup::environments` restores stdout and stderr before re-raising, and under `abort` that never
+runs — a panic inside a `.env.lua` would kill the shell with its own message written into a temp
+file nobody reads. 2 MB is not worth a silent death.
+
+### 4. `tracing` and `tracing-subscriber` were unused
 
 Both removed from `Cargo.toml`. Nothing in `src/` referenced either; the four grep hits were
 comments about shell `set -x` tracing. `tracing` remains in the tree transitively via `turso`, so
@@ -97,23 +118,60 @@ Each of these is called; the report's line references point at the definition, n
 `is_empty`, and the lint is right. `Diff::len` is used only by its own test. Both are three lines;
 removing them costs more in churn than it saves.
 
-## Not measured, and therefore not claimed
+## Measured, and refuted
 
-Named so nobody assumes they were cleared:
+Everything left over from `REPORT.md` has now been measured. None of it survived.
 
-- **glob `Vec<char>` per filename** (`src/expand/glob/compile.rs`) — plausible and unmeasured. The
-  right experiment is a directory of 10,000 files and a wildcard, timed before and after.
-- **Completion's four matcher passes** each re-locking the environment and re-scanning `$PATH`.
-  Real by construction — the chain is first-non-empty-wins — but the cost is unmeasured, and Tab
-  latency is already 436 µs, so the ceiling on the win is small.
-- **Frecency scoring inside `sort_by`**, taking a lock per comparison. Same: real shape, unmeasured
-  size, small ceiling.
-- **`block_on` for the history and tracking writes** after each command. The design note claims
-  81 µs; nobody has verified it, and the interesting question is not the write but whether it lands
-  before the prompt returns.
-- **Binary size.** 29.9 MB unstripped is large for a static `/bin/sh`. Nothing here established
-  what is in it — `cargo bloat` or `bloaty` would, and `[profile.release]` has no `lto`, `strip` or
-  `codegen-units` settings at all, which is the first thing to try and the easiest to measure.
+### glob allocates a `Vec<char>` per filename — real, and irrelevant
+
+`src/expand/glob/compile.rs` does allocate per entry. Against a directory of 12,000 files, 100
+globs in one shell:
+
+```
+oslo : 0.21 s   (2.1 ms per glob)
+bash : 0.60 s   (6.0 ms per glob)
+```
+
+**oslo is 2.9× faster than the reference implementation.** The allocation is real and the code
+could be tightened, but optimising the thing that is already winning by 3× is not where the next
+hour goes.
+
+### `block_on` for the history and tracking writes blocks the REPL — refuted
+
+Both writes happen between the command finishing and the prompt returning, so if they cost anything
+a person feels it exactly there. Measured with a warm store over 60 commands:
+
+```
+Enter → next prompt : 0.46 ms median, 0.48 ms p90, 0.74 ms max
+```
+
+That is the *whole* round trip — command, history write, tracking write, prompt render — at about
+one percent of the ~50 ms a person can perceive. Moving the writes to a background channel would
+add an ordering-bug class for no gain anyone could feel.
+
+### Four matcher passes and a lock per frecency comparison — refuted
+
+Both are real by construction: the matcher chain is first-non-empty-wins, and the sort takes a lock
+per comparison. Measured end to end over 25 Tab presses:
+
+```
+Tab press : 1.42 ms median, 1.90 ms p90
+```
+
+Candidate generation, ranking and drawing together are under two milliseconds. The
+`Fuzzed`/`fold-once` change above removed 166 µs of that; the remainder is not worth restructuring
+the candidate pipeline for.
+
+## What is actually left
+
+Nothing measured here is worth doing. If more performance is ever wanted, the honest order is:
+
+1. **Binary size beyond the profile.** 21.9 MB is still large for a static `/bin/sh`, and it is
+   almost all `turso`'s transitive tree — tantivy, icu, zstd, simsimd, aegis. `cargo bloat` would
+   say exactly how much. The question is not how to shrink it but whether a shell needs a database
+   with a full-text search engine attached.
+2. **Nothing else.** Startup beats bash, globbing beats bash by 3×, and every interactive path is
+   between one and two milliseconds.
 
 ## Repository hygiene
 

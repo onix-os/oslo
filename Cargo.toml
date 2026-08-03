@@ -76,3 +76,14 @@ tempfile = "3.17"
 [[bench]]
 name = "fuzzy"
 harness = false
+
+# Measured, not assumed — the before/after is in PERF_AND_CODE.md.
+#
+# No `panic = "abort"`, deliberately, though it is the obvious fourth setting: `catch_unwind` in
+# `startup::environments` restores stdout and stderr before re-raising, and under `abort` that
+# restore never runs — a panic inside a `.env.lua` would kill the shell with its own message
+# written into a temp file nobody ever reads. A silent death is worse than a slightly larger binary.
+[profile.release]
+lto = "thin"
+codegen-units = 1
+strip = "symbols"
