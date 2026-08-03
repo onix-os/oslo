@@ -126,12 +126,6 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
         if let Value::Str(key) = table.get(&Value::str("accept_word")) {
             settings.suggest.accept_word = Some(key.to_string());
         }
-        fuzzy(
-            &table,
-            "oslo.suggest.fuzzy",
-            &mut settings.suggest.fuzzy,
-            &mut problems,
-        );
     }
 
     if let Value::Table(table) = oslo.get(&Value::str("keys")) {

@@ -122,7 +122,7 @@ fn calling_back_into_the_oslo_api_errors_instead_of_deadlocking() {
     let (_lua, env) = shell_with_lua(
         r#"
         oslo.register_builtin("reenter", function(argv)
-            oslo.set_var("SHOULD_NOT_HAPPEN", "1")
+            oslo.env.set("SHOULD_NOT_HAPPEN", "1")
             return 0
         end)
         "#,

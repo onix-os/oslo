@@ -5,9 +5,12 @@
 //! and script shells read no configuration at all. Two files fix that, and they are deliberately
 //! different in kind:
 //!
-//! * `~/.oslorc` is **Lua**, and is loaded by [`super::lua_init`] rather than sourced here. It
-//!   used to be shell syntax; one config file in one language is the decision, and the shell
-//!   half of it is gone.
+//! * The **config** is Lua, is `$XDG_CONFIG_HOME/oslo/config.lua`, and is loaded by
+//!   [`super::lua_init`] rather than sourced here. There is no shell-syntax config file at all:
+//!   one file, one language, one place.
+//!
+//!   This is the *only* rule oslo gets to make. Everything below is POSIX's, and oslo is a
+//!   `/bin/sh` before it is anything else.
 //! * `$ENV` is POSIX's own hook and stays *shell* syntax, because POSIX defines it that way and
 //!   oslo has to be a real `/bin/sh`. Its value is subject to parameter expansion before use,
 //!   which is why it goes through the expander rather than being taken literally.
@@ -20,7 +23,7 @@ use oslo::interactive::prompt::render_default_left_prompt;
 use oslo::lexer::parse_single_word;
 use std::path::PathBuf;
 
-/// A startup file asked the shell to end: `exit 3` in `.oslorc` is still an `exit`.
+/// A startup file asked the shell to end: `exit 3` in `$ENV` is still an `exit`.
 pub type ExitRequest = Option<i32>;
 
 /// Read the files a shell of this kind reads before its first command.
@@ -33,8 +36,8 @@ pub type ExitRequest = Option<i32>;
 pub fn load_startup_files(env: &mut Environment, interactive: bool) -> ExitRequest {
     let sourced: Vec<PathBuf> = Vec::new();
 
-    // `~/.oslorc` is **Lua** and is loaded by `super::lua_init`, not sourced here — see
-    // `config_path`. What remains in this function is POSIX's own hook.
+    // The config is Lua and is loaded by `super::lua_init`, not sourced here — see `config_path`.
+    // What remains in this function is POSIX's own hook, which is not oslo's to remove.
     let _ = interactive;
 
     if let Some(path) = env_file(env)

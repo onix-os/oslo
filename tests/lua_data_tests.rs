@@ -335,11 +335,11 @@ fn from_json_is_the_json_decoder_under_the_family_name() {
 #[test]
 fn proc_names_signals_rather_than_numbering_them() {
     let out = lua(r#"
-        print(oslo.proc.alive(oslo.pid()), oslo.proc.alive(2147483))
+        print(oslo.proc.alive(oslo.proc.pid()), oslo.proc.alive(2147483))
         print(oslo.proc.signal_number("TERM"), oslo.proc.signal_number("sigterm"))
         print(#oslo.proc.signals() > 10)
         -- A typo is refused, not quietly turned into SIGTERM.
-        local ok, err = pcall(oslo.proc.kill, oslo.pid(), "NOTASIGNAL")
+        local ok, err = pcall(oslo.proc.kill, oslo.proc.pid(), "NOTASIGNAL")
         print(ok, err:find("no signal") ~= nil)
     "#);
     assert_eq!(out, "true\tfalse\n15\t15\ntrue\nfalse\ttrue");
@@ -359,13 +359,13 @@ fn the_job_table_is_the_shells_own() {
 #[test]
 fn the_shell_can_describe_itself() {
     let out = lua(r#"
-        print(oslo.version ~= nil, type(oslo.host()), oslo.pid() > 0, oslo.ppid() > 0)
+        print(oslo.version ~= nil, type(oslo.sys.host()), oslo.proc.pid() > 0, oslo.proc.ppid() > 0)
         -- A script run from a file is neither interactive nor a login shell.
-        print(oslo.interactive(), oslo.login())
-        oslo.exec("false")
-        print(oslo.exit_code())
+        print(oslo.sys.interactive(), oslo.sys.login())
+        oslo.proc.exec("false")
+        print(oslo.proc.status())
         -- The script's own exit status is `$?` as it leaves it, so this puts it back to 0.
-        oslo.exec("true")
+        oslo.proc.exec("true")
     "#);
     assert_eq!(out, "true\tstring\ttrue\ttrue\nfalse\tfalse\n1");
 }
@@ -376,7 +376,7 @@ fn options_are_shell_variables_under_a_namespace() {
     // thing — and so `oslo.opts.set` cannot reach an unrelated variable.
     let out = lua(r#"
         oslo.opts.set("toggle_key", "f2")
-        print(oslo.opts.get("toggle_key"), oslo.get_var("OSLO_TOGGLE_KEY"))
+        print(oslo.opts.get("toggle_key"), oslo.env.get("OSLO_TOGGLE_KEY"))
         print(oslo.opts.get("never_set"))
         print(#oslo.opts.names() > 0)
     "#);

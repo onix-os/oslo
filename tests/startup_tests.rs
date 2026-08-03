@@ -145,15 +145,21 @@ fn env_is_expanded_before_it_is_read() {
     assert_eq!(out(&o).trim_end(), "expanded");
 }
 
-/// `~/.oslorc` is **Lua** — it used to be shell syntax, and that is the change.
+/// The config is **Lua**, and lives in exactly one place.
+///
+/// `~/.oslorc` and an extensionless `oslo/config` were both looked for once. Neither is any more:
+/// a second place to put a config is a question — "which one is winning?" — with no upside, and
+/// `.oslorc` in particular reads like a shell rc file to anyone who has ever used one.
 #[test]
-fn oslorc_is_read_by_an_interactive_shell_only() {
+fn the_config_is_read_by_an_interactive_shell_only() {
     let dir = tempfile::tempdir().unwrap();
-    std::fs::write(dir.path().join(".oslorc"), "MARK = 'from-oslorc'\n").unwrap();
+    let config = dir.path().join(".config/oslo");
+    std::fs::create_dir_all(&config).unwrap();
+    std::fs::write(config.join("config.lua"), "MARK = 'from-config'\n").unwrap();
 
     let interactive = repl("echo $MARK\n", &[("HISTFILE", "")], dir.path());
     assert!(
-        out(&interactive).contains("from-oslorc"),
+        out(&interactive).contains("from-config"),
         "{:?}",
         out(&interactive)
     );
@@ -167,11 +173,13 @@ fn oslorc_is_read_by_an_interactive_shell_only() {
 }
 
 #[test]
-fn an_alias_from_oslorc_is_visible_at_the_prompt() {
+fn an_alias_from_the_config_is_visible_at_the_prompt() {
     let dir = tempfile::tempdir().unwrap();
+    let config = dir.path().join(".config/oslo");
+    std::fs::create_dir_all(&config).unwrap();
     std::fs::write(
-        dir.path().join(".oslorc"),
-        "oslo.set_alias('hi', 'echo aliased')\n",
+        config.join("config.lua"),
+        "oslo.env.set_alias('hi', 'echo aliased')\n",
     )
     .unwrap();
 
@@ -179,13 +187,17 @@ fn an_alias_from_oslorc_is_visible_at_the_prompt() {
     assert!(out(&o).contains("aliased"), "{:?}", out(&o));
 }
 
-/// An existing shell-syntax `.oslorc` fails loudly rather than half-working. That is the whole
-/// migration story: a Lua syntax error names the line, where a file that silently applied its
-/// first two commands and dropped the rest would be far harder to notice.
+/// A config written in shell fails loudly rather than half-working.
+///
+/// Configuration is Lua and only Lua, so `alias hi='...'` is a syntax error that names the line.
+/// The alternative — applying the lines that happen to parse as both and dropping the rest — is
+/// far harder to notice.
 #[test]
-fn a_shell_syntax_oslorc_is_refused_by_name() {
+fn a_shell_syntax_config_is_refused_by_name() {
     let dir = tempfile::tempdir().unwrap();
-    std::fs::write(dir.path().join(".oslorc"), "alias hi='echo aliased'\n").unwrap();
+    let config = dir.path().join(".config/oslo");
+    std::fs::create_dir_all(&config).unwrap();
+    std::fs::write(config.join("config.lua"), "alias hi='echo aliased'\n").unwrap();
 
     let o = repl("echo alive\n", &[("HISTFILE", "")], dir.path());
     assert!(
@@ -195,7 +207,7 @@ fn a_shell_syntax_oslorc_is_refused_by_name() {
     );
     let diagnostic = err(&o);
     assert!(
-        diagnostic.contains(".oslorc"),
+        diagnostic.contains("config.lua"),
         "the diagnostic must name the file: {diagnostic:?}"
     );
 }
@@ -206,16 +218,18 @@ fn a_config_under_xdg_is_read_too() {
     let dir = tempfile::tempdir().unwrap();
     let config = dir.path().join(".config/oslo/config.lua");
     std::fs::create_dir_all(config.parent().unwrap()).unwrap();
-    std::fs::write(&config, "oslo.set_alias('hi', 'echo xdg-alias')\n").unwrap();
+    std::fs::write(&config, "oslo.env.set_alias('hi', 'echo xdg-alias')\n").unwrap();
 
     let o = repl("hi\n", &[("HISTFILE", "")], dir.path());
     assert!(out(&o).contains("xdg-alias"), "{:?}", out(&o));
 }
 
 #[test]
-fn a_broken_oslorc_reports_and_leaves_the_shell_usable() {
+fn a_broken_config_reports_and_leaves_the_shell_usable() {
     let dir = tempfile::tempdir().unwrap();
-    std::fs::write(dir.path().join(".oslorc"), "this is not lua(((\n").unwrap();
+    let config = dir.path().join(".config/oslo");
+    std::fs::create_dir_all(&config).unwrap();
+    std::fs::write(config.join("config.lua"), "this is not lua(((\n").unwrap();
 
     let o = repl("echo alive\n", &[("HISTFILE", "")], dir.path());
     assert!(out(&o).contains("alive"), "{:?}", out(&o));
@@ -487,7 +501,7 @@ fn a_working_config_still_applies() {
     let dir = tempfile::tempdir().unwrap();
     let init = dir.path().join(".config/oslo/config.lua");
     std::fs::create_dir_all(init.parent().unwrap()).unwrap();
-    std::fs::write(&init, "oslo.set_alias('hi', 'echo lua-alias')\n").unwrap();
+    std::fs::write(&init, "oslo.env.set_alias('hi', 'echo lua-alias')\n").unwrap();
 
     let o = repl("hi\n", &[("HISTFILE", "")], dir.path());
     assert!(out(&o).contains("lua-alias"), "{:?}", out(&o));

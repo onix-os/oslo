@@ -146,7 +146,7 @@ fn apply_assignments_only(env: &mut Environment, simple: &SimpleCommand) -> Resu
 ///
 /// This is the whole point of the argv call model: no word, no quoting, no glob and no field
 /// splitting stand between the caller's list and the command. `oslo.run{"rm", name}` cannot
-/// misbehave for a `name` with a space or a `*` in it, where `oslo.exec("rm " .. name)` can.
+/// misbehave for a `name` with a space or a `*` in it, where `oslo.proc.exec("rm " .. name)` can.
 ///
 /// Everything past this point is shared with the shell — the same command search, the same
 /// builtins, the same functions — so `sh.cd("/tmp")` moves the shell exactly as `cd /tmp` does.

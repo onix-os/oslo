@@ -14,6 +14,7 @@
 //! * `tracking` — what that loop hands [`oslo::track`] instead of discarding.
 
 pub mod config;
+mod environments;
 pub mod history;
 pub mod history_db;
 pub mod keybind;

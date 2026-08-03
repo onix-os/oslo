@@ -10,11 +10,14 @@
 //! # It is an aggregate, not a log
 //!
 //! `history.db` is already the event log, one row per line typed. A second log would double the
-//! write cost and double the privacy surface for a chronology that already exists — and turso 0.7.2
-//! has neither `VACUUM` nor `auto_vacuum`, so a file that grows is a permanent high-water mark. An
-//! aggregate is bounded by distinct *behaviour* rather than by time: repeats, which are the entire
-//! point of the ranking, cost nothing after the first. What it gives up is the order of individual
-//! executions, which is recoverable by joining `history.db` if anything ever needs it.
+//! write cost and double the privacy surface for a chronology that already exists — and the store
+//! underneath has no `VACUUM`, so a file that grows is a permanent high-water mark. That argument
+//! got sharper rather than weaker when the engine changed: jammdb grows in one 8 MiB step and
+//! never gives it back, so the aggregate and the bounds in [`prune`] are what stand between oslo
+//! and 8.5 MiB for ever. An aggregate is bounded by distinct *behaviour* rather than by time:
+//! repeats, which are the entire point of the ranking, cost nothing after the first. What it gives
+//! up is the order of individual executions, which is recoverable by joining `history.db` if
+//! anything ever needs it.
 //!
 //! # Why it lives in the library
 //!
@@ -28,10 +31,16 @@
 //! lines cannot reach the file because there is no file to reach.
 
 pub mod db;
-mod private;
+// The one module that knows which key-value engine is underneath. Read its note before touching
+// it: nothing else may `use jammdb`, so that moving engines again is a day of rewriting one
+// directory. Named `kv` rather than `store` because `store()` below is already the accessor for
+// this module's process-global, and a module and a function sharing a name is a thing to read
+// twice.
+pub mod kv;
 pub mod prune;
 pub mod query;
 pub mod redact;
+mod row;
 pub mod score;
 pub mod write;
 
@@ -68,12 +77,22 @@ pub fn store() -> Option<&'static Track> {
 /// Beside `history.db`, and for the same reason: this is state the user accumulates, not
 /// configuration they wrote. `None` when neither `$XDG_DATA_HOME` nor `$HOME` is knowable — a
 /// container's `nobody` — which must run without a store rather than fail.
+///
+/// # `track.kv`, not `track.db`, and it is not cosmetic
+///
+/// Every machine that has run a released oslo has a *SQLite* file at `track.db`. The seam refuses
+/// to hand a foreign file to an engine that panics on one, so opening the old name would be safe —
+/// but it would also be permanent: the SQLite file would sit there being refused, and that user's
+/// shell would silently never track anything again. A new name means the old file is simply not
+/// looked at, this store is created beside it, and a rollback to a turso build still finds its own
+/// data where it left it. The stale `track.db` is the user's to delete; nothing here removes a
+/// file it did not write.
 pub fn default_path(xdg_data: Option<&str>, home: Option<&str>) -> Option<PathBuf> {
     let base = match xdg_data {
         Some(dir) if !dir.trim().is_empty() => PathBuf::from(dir),
         _ => PathBuf::from(home?).join(".local/share"),
     };
-    Some(base.join("oslo/track.db"))
+    Some(base.join("oslo/track.kv"))
 }
 
 #[cfg(test)]
@@ -89,16 +108,16 @@ mod tests {
     fn the_store_lives_beside_the_history_database() {
         assert_eq!(
             default_path(Some("/x/data"), Some("/home/u")),
-            Some(PathBuf::from("/x/data/oslo/track.db"))
+            Some(PathBuf::from("/x/data/oslo/track.kv"))
         );
         assert_eq!(
             default_path(None, Some("/home/u")),
-            Some(PathBuf::from("/home/u/.local/share/oslo/track.db"))
+            Some(PathBuf::from("/home/u/.local/share/oslo/track.kv"))
         );
         // An empty XDG is unset, not a relative path from the root.
         assert_eq!(
             default_path(Some("  "), Some("/home/u")),
-            Some(PathBuf::from("/home/u/.local/share/oslo/track.db"))
+            Some(PathBuf::from("/home/u/.local/share/oslo/track.kv"))
         );
         // Nowhere to put it is not an error; it is a shell without a store.
         assert_eq!(default_path(None, None), None);
@@ -112,7 +131,7 @@ mod tests {
         assert!(store().is_none(), "a process starts with no store at all");
 
         let dir = tempfile::tempdir().expect("a temp dir");
-        let track = Track::open(&dir.path().join("track.db")).expect("the database opens");
+        let track = Track::open(&dir.path().join("track.kv")).expect("the store opens");
         install(Some(track));
         assert!(store().is_some(), "and has one once it is installed");
 

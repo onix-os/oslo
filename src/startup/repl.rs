@@ -8,7 +8,9 @@ use crate::absorb_loop_control;
 use crate::startup::mode::{Mode, ToggleRequest};
 use crate::startup::read::{Input, read_command};
 use crate::startup::recall::{remember_history, seed_history};
-use crate::startup::{config, history, history_db, keybind, lua_init, mode, rc, tracking};
+use crate::startup::{
+    config, environments, history, history_db, keybind, lua_init, mode, rc, tracking,
+};
 use oslo::Environment;
 use oslo::LuaEngine;
 use oslo::env::builtins::run_exit_trap;
@@ -55,7 +57,7 @@ pub fn run_repl() -> ! {
     interactive_env.set_option(ShellOption::StdinInput, true);
     history::register(&mut interactive_env);
 
-    // `.oslorc` runs before anything else reads a variable, so a `HISTSIZE=` or `PS1=` in it is
+    // The config runs before anything else reads a variable, so a `HISTSIZE=` or `PS1=` in it is
     // in force for this session rather than for the next one.
     if let Some(status) = rc::load_startup_files(&mut interactive_env, true) {
         std::process::exit(run_exit_trap(&mut interactive_env, status));
@@ -109,6 +111,10 @@ pub fn run_repl() -> ! {
     // is nobody's wandering.
     oslo::env::builtins::remember_directory(&here);
     let mut tracker = tracking::Tracker::start(&here, &settings);
+    // The directory environment for wherever the shell was started, which is a directory the user
+    // walked into as much as any other — `cd` is not the only way to arrive somewhere.
+    environments::start();
+    environments::arrive(&env_struct, &lua, std::path::Path::new(&here));
     let mut rl = build_editor(&settings);
 
     // The mode the prompt is reading, and the flag the toggle key sets. Both live for the whole
@@ -218,7 +224,7 @@ pub fn run_repl() -> ! {
                 let started = std::time::Instant::now();
 
                 let res = match mode {
-                    // A Lua line leaves `$?` where it was unless it asked otherwise: `oslo.exit`
+                    // A Lua line leaves `$?` where it was unless it asked otherwise: `oslo.proc.exit`
                     // is the way to choose a status, and a chunk that merely printed something
                     // has not run a command.
                     Mode::Lua => run_lua_line(&lua, &text, last_status),
@@ -257,8 +263,20 @@ pub fn run_repl() -> ! {
 
                 // Fired before the status is acted on, so a `cd` hook sees the directory the
                 // command left behind even when that command was the last one of the session.
+                // A `direnv allow` or `deny` cannot reload itself: running `.env.lua` needs the
+                // Lua engine, which lives here and not in a builtin's arguments. So the builtin
+                // leaves a request and this carries it out — before the directory check below, so
+                // that allowing and then `cd`-ing does not do the work twice.
+                if oslo::direnv::take_reload_request() {
+                    let here = current_directory();
+                    environments::arrive(&env_struct, &lua, std::path::Path::new(&here));
+                }
+
                 let after = current_directory();
                 if after != before {
+                    // Before the `cd` hook, so a Lua hook that reads an environment variable sees
+                    // the one this directory sets rather than the one the last directory did.
+                    environments::arrive(&env_struct, &lua, std::path::Path::new(&after));
                     lua.fire_hook("cd", vec![LuaEngine::hook_arg(&after)]);
                     // The terminal is told too, so a new split or tab opens here rather than in
                     // `$HOME`. One write, only when the directory actually changed.
@@ -321,27 +339,19 @@ pub fn run_repl() -> ! {
     std::process::exit(last_status);
 }
 
-/// Leave both stores in the state a shell that is not running should leave them.
-///
-/// Two jobs at the same moment because it is the same moment: the shell is ending, nothing in this
-/// process is mid-query, and a few milliseconds cost nobody anything.
+/// Leave the history in the state a shell that is not running should leave it.
 ///
 /// The trim puts the history table back inside `$HISTSIZE`. It has to happen here as well as on the
 /// amortised counter, or a session shorter than the counter's period never enforces the bound at
-/// all.
+/// all. Best effort, and it does not block: another terminal holding the file means it does not
+/// happen this time.
 ///
-/// The checkpoint folds the tracker's write-ahead log back into its database. turso never does that
-/// on its own — not on drop and not on reopen — and the log grows with every commit, so without this
-/// the `-wal` passes the database in size within one session and stays passed: measured 1.2 MB of
-/// log against 4 KB of data after thirty commands. Both are best effort and neither blocks: another
-/// terminal holding the lock means it does not happen this time.
+/// Neither store has a checkpoint any more, because neither has a log. Both are one file that is
+/// consistent at every commit, and the tracker's own bound is the daily sweep in `track::prune`
+/// rather than anything the way out of the loop can do. See `history_db`'s note and that module's.
 fn settle_stores(db: &Option<history_db::History>, settings: &history::Settings) {
     if let Some(db) = db {
         db.trim(settings.max_size.max(1));
-        db.checkpoint();
-    }
-    if let Some(track) = oslo::track::store() {
-        track.checkpoint();
     }
 }
 
@@ -415,7 +425,7 @@ fn current_directory() -> String {
 /// Run one Lua line typed at the prompt.
 ///
 /// A chunk that merely printed something has not run a command, so `$?` stays where it was;
-/// `oslo.exit(n)` is how a script chooses a status, and it ends the shell rather than setting one.
+/// `oslo.proc.exit(n)` is how a script chooses a status, and it ends the shell rather than setting one.
 fn run_lua_line(lua: &LuaEngine, text: &str, last_status: i32) -> Result<i32, ShellError> {
     match lua.eval_script(text) {
         Ok(()) => Ok(last_status),

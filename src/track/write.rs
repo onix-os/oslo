@@ -1,65 +1,76 @@
-//! Three statements, one transaction, once per prompt.
+//! One transaction, once per prompt.
 //!
 //! The REPL loop already computes every input this needs within sixty lines of each other and then
 //! throws all but two of them away. So the whole write path is one call at the end of the loop
 //! taking a struct built from locals that already exist; nothing is threaded through anything, and
-//! nothing here runs on a worker thread. Measured at 81 µs against a 3000-directory database, which
-//! is not something a shell can feel next to the fork and exec of the command itself — and a queue
-//! would introduce a shutdown-drain problem for a store whose whole value is that it survives a
-//! `kill -9` without corruption.
+//! nothing here runs on a worker thread. Measured through the seam at 27.9 µs for the whole thing —
+//! open the file, take the transaction, write, commit, close — which is not something a shell can
+//! feel next to the fork and exec of the command itself, and a queue would introduce a
+//! shutdown-drain problem for a store whose whole value is that it survives a `kill -9`.
 //!
-//! # One open interval, and it is not in the database
+//! # Contract item 3: the upsert is a read, an add and a put
 //!
-//! Time in a directory accumulates as `dwell_ms = dwell_ms + ?`, in SQL, from *closed* segments
-//! only. A row with a null end is the thing that cannot survive a kill, so there isn't one: the
-//! open segment is a clock mark held in the shell process, and the store is only ever told about
-//! time that has already elapsed. Doing the addition in SQL rather than as a read-then-write in
-//! Rust is also what lets two shells in one directory add up instead of clobbering each other.
+//! `INSERT ... ON CONFLICT DO UPDATE SET runs = runs + 1` was one statement and it is three lines
+//! of Rust now: `RunRow::absorb` does the arithmetic, and the read and the write
+//! happen inside one [`super::kv::Store::write`], which is one transaction.
+//!
+//! That is the whole of the atomicity argument and it is worth stating, because the SQL comment it
+//! replaces said the opposite. Under SQLite the increment had to be written *in SQL* — `dwell_ms =
+//! dwell_ms + ?` rather than a read-then-write in Rust — precisely so that two shells in one
+//! directory would add up instead of clobbering each other. Here a read-then-write is safe for a
+//! reason SQLite could not offer: the seam holds a whole-file exclusive `flock` for the duration of
+//! the transaction, so no other terminal can read the row between this read and this write. The
+//! rule that follows is the seam's and it is respected everywhere in this file — **no transaction
+//! stays open for long**, because every other terminal's next keystroke queues behind it.
+//!
+//! A crash between two of these writes cannot leave a run attributed to a directory whose arrival
+//! was never recorded: jammdb writes no page until `commit`, so a transaction that does not finish
+//! wrote nothing at all.
+//!
+//! # One open interval, and it is not in the store
+//!
+//! Time in a directory accumulates from *closed* segments only. A row with a null end is the thing
+//! that cannot survive a kill, so there isn't one: the open segment is a clock mark held in the
+//! shell process, and the store is only ever told about time that has already elapsed.
 //!
 //! Note the unit honestly: this is shell-milliseconds, not wall-clock. Two shells sitting in one
 //! directory for an hour record two hours. That is right for a ranking signal and wrong for a
 //! report, and deduplicating it would need a session table and an interval-overlap computation on
 //! read.
+//!
+//! # Indexes are maintained by hand, here and in [`super::prune`]
+//!
+//! There are no triggers and no foreign keys. Every write that creates a row creates its index
+//! entries in the same transaction, and every delete removes them — see `db::put_dir` for
+//! the directory side and `record_run` for `run_argv`. An index this file forgets is not an error
+//! anywhere; it is a suggestion that quietly stops appearing.
 
-use super::db::{Run, Step, Track, Visit, capped, dir_id, now, runtime};
+use super::db::{Run, Step, Track, Visit, capped, lookup_dir, now, put_dir, read_dir, resolve_dir};
+use super::kv::{Tree, Writer};
 use super::redact;
-use turso::Connection;
-
-/// Count one arrival, or record the first.
-const VISIT: &str = "INSERT INTO dir (path, base, root, visits, last_visit) \
-     VALUES (?1, ?2, ?3, 1, ?4) \
-     ON CONFLICT(path) DO UPDATE SET \
-       visits = visits + 1, last_visit = excluded.last_visit, \
-       root = excluded.root, missing_since = NULL";
-
-/// Close the segment that just ended.
-const DWELL: &str = "UPDATE dir SET dwell_ms = dwell_ms + ?1 WHERE id = ?2";
-
-/// Fold one execution into the row for that line in that directory.
-const RUN: &str = "INSERT INTO run \
-       (dir_id, mode, argv, head, runs, fails, last_at, last_status, total_ms, max_ms) \
-     VALUES (?1, ?2, ?3, ?4, 1, ?5, ?6, ?7, ?8, ?8) \
-     ON CONFLICT(dir_id, mode, argv) DO UPDATE SET \
-       runs = runs + 1, \
-       fails = fails + excluded.fails, \
-       last_at = excluded.last_at, \
-       last_status = excluded.last_status, \
-       total_ms = total_ms + excluded.total_ms, \
-       max_ms = MAX(max_ms, excluded.max_ms)";
+use super::row::{DirRow, RunRow, key};
 
 impl Track {
     /// Tell the store where the shell is standing, without counting it as a visit.
     ///
     /// Called once at startup with `$PWD`. Starting a shell somewhere is not the same act as
     /// walking there, so it must not raise that directory's rank — but the first command of the
-    /// session still needs a `dir_id` to be attributed to, and the visit statement only runs when
-    /// the directory *changes*.
+    /// session still needs a directory to be attributed to, and the visit only happens when the
+    /// directory *changes*.
+    ///
+    /// A directory the store already knows is resolved by a read, so the overwhelmingly common
+    /// case of starting a shell somewhere familiar costs no `fsync` at all. Only the first time
+    /// anybody has ever run a command in a directory does this write.
     pub fn prime(&self, at: &Visit<'_>) -> bool {
         if !self.writable || redact::is_excluded(at.path) {
             self.forget_current();
             return false;
         }
-        match runtime().block_on(async { dir_id(&self.conn, at).await }) {
+        if let Some(id) = self.store.read(|reader| lookup_dir(reader, at.path)) {
+            self.remember_current(id, at.path);
+            return true;
+        }
+        match self.store.write(|writer| resolve_dir(writer, at)) {
             Some(id) => {
                 self.remember_current(id, at.path);
                 true
@@ -69,9 +80,6 @@ impl Track {
     }
 
     /// Write down one turn of the loop.
-    ///
-    /// The statements go in one transaction so that a crash between them cannot leave a run
-    /// attributed to a directory whose arrival was never counted.
     pub fn record(&self, step: &Step<'_>) -> bool {
         if !self.writable {
             return false;
@@ -88,24 +96,12 @@ impl Track {
         }
 
         let cached = self.cached_id(step.ran_in.path);
-        // The lock is deliberately not held across the await: where the shell ended up comes back
-        // out of the transaction and is stored afterwards.
-        let outcome = runtime().block_on(async {
-            let Ok(tx) = self.conn.unchecked_transaction().await else {
-                return None;
-            };
-            match self.write(&tx, step, cached, here_excluded, moved_to).await {
-                Some(next) => tx.commit().await.ok().map(|()| next),
-                // Rolled back here rather than left to drop: a dangling transaction is undone on
-                // the connection's *next* use, which would otherwise be somebody's read.
-                None => {
-                    let _ = tx.rollback().await;
-                    None
-                }
-            }
-        });
-
-        let Some(next) = outcome else {
+        // The lock is deliberately not held across the transaction: where the shell ended up comes
+        // back out of the closure and is stored afterwards.
+        let Some(next) = self
+            .store
+            .write(|writer| write_step(writer, step, cached, here_excluded, moved_to))
+        else {
             return false;
         };
         match next {
@@ -115,59 +111,29 @@ impl Track {
         true
     }
 
-    /// The statements themselves. Answers where the shell now is, or `None` if anything failed.
-    async fn write(
-        &self,
-        conn: &Connection,
-        step: &Step<'_>,
-        cached: Option<i64>,
-        here_excluded: bool,
-        moved_to: Option<Visit<'_>>,
-    ) -> Option<Option<(i64, String)>> {
-        let at = now();
-        let mut here = None;
-        if !here_excluded {
-            let id = match cached {
-                Some(id) => id,
-                None => dir_id(conn, &step.ran_in).await?,
-            };
-            here = Some(id);
-
-            let dwell = capped(step.dwell_ms);
-            if dwell > 0 {
-                conn.execute(DWELL, (dwell, id)).await.ok()?;
-            }
-            if let Some(run) = step.run {
-                record_run(conn, id, &run, at).await?;
-            }
-        }
-
-        let Some(to) = moved_to else {
-            return Some(here.map(|id| (id, step.ran_in.path.to_string())));
-        };
-        conn.execute(VISIT, (to.path, to.base(), to.root, at))
-            .await
-            .ok()?;
-        Some(Some((dir_id(conn, &to).await?, to.path.to_string())))
-    }
-
     /// Forget every command line, and keep every directory.
     ///
     /// `history -c` means "forget the history", and a store that went on suggesting the lines it
     /// had just been told to forget would be lying in exactly the way the recall set would. But
-    /// "forget my command lines" is not "forget where I work", so `dir` is left standing — with it
-    /// go the visit counts a `cd` ranks on, which nobody asked to lose.
+    /// "forget my command lines" is not "forget where I work", so the directories are left standing
+    /// — with them go the visit counts a `cd` ranks on, which nobody asked to lose.
+    ///
+    /// Both buckets, or the secondary index would go on naming rows that are not there.
     pub fn forget_runs(&self) -> bool {
         if !self.writable {
             return false;
         }
-        runtime()
-            .block_on(async { self.conn.execute("DELETE FROM run", ()).await.ok() })
+        self.store
+            .write(|writer| {
+                writer.clear(Tree::Run);
+                writer.clear(Tree::RunByArgv);
+                Some(())
+            })
             .is_some()
     }
 
-    /// The cached `dir.id`, but only if it is still the directory being asked about.
-    fn cached_id(&self, path: &str) -> Option<i64> {
+    /// The cached id, but only if it is still the directory being asked about.
+    fn cached_id(&self, path: &str) -> Option<u64> {
         self.current
             .lock()
             .ok()
@@ -177,7 +143,7 @@ impl Track {
             })
     }
 
-    fn remember_current(&self, id: i64, path: &str) {
+    fn remember_current(&self, id: u64, path: &str) {
         if let Ok(mut current) = self.current.lock() {
             *current = Some((id, path.to_string()));
         }
@@ -190,29 +156,113 @@ impl Track {
     }
 }
 
-/// One execution, folded into its row.
-async fn record_run(conn: &Connection, dir: i64, run: &Run<'_>, at: i64) -> Option<()> {
+/// The whole of one boundary. Answers where the shell now is, or `None` if anything failed — and a
+/// `None` discards the transaction, so a half-written boundary is never a boundary.
+fn write_step(
+    writer: &Writer<'_, '_>,
+    step: &Step<'_>,
+    cached: Option<u64>,
+    here_excluded: bool,
+    moved_to: Option<Visit<'_>>,
+) -> Option<Option<(u64, String)>> {
+    let at = now();
+    let mut here = None;
+    if !here_excluded {
+        // The cached id is checked against the store rather than trusted. It is one point lookup
+        // on eight fixed bytes, and it is what makes a directory another terminal's prune sweep
+        // dropped between two commands cost a re-resolve instead of a run row filed under an id
+        // that no longer names anything.
+        let id = match cached.filter(|id| writer.has(Tree::Dir, &key::dir(*id))) {
+            Some(id) => id,
+            None => resolve_dir(writer, &step.ran_in)?,
+        };
+        here = Some(id);
+
+        let dwell = capped(step.dwell_ms);
+        if dwell > 0 {
+            add_dwell(writer, id, dwell)?;
+        }
+        if let Some(run) = step.run {
+            record_run(writer, id, &run, at)?;
+        }
+    }
+
+    let Some(to) = moved_to else {
+        return Some(here.map(|id| (id, step.ran_in.path.to_string())));
+    };
+    Some(Some((arrive(writer, &to, at)?, to.path.to_string())))
+}
+
+/// Count one arrival, or record the first — the `VISIT` upsert, in Rust.
+///
+/// `root` is taken from the arrival every time rather than only on the insert, which is what makes
+/// a directory that has just become a repository, or has moved to another one, correct in the
+/// worktree index. `missing_since` is cleared for the same reason it was in SQL: a disk that came
+/// back is not a directory that was deleted, and walking into it is the proof.
+fn arrive(writer: &Writer<'_, '_>, to: &Visit<'_>, at: i64) -> Option<u64> {
+    let Some(id) = lookup_dir(writer, to.path) else {
+        let mut row = DirRow::unvisited(to.path, to.base(), to.root);
+        row.visits = 1;
+        row.last_visit = at;
+        return super::db::insert_dir(writer, &row);
+    };
+    // A row that will not decode is treated as one that is not there, and rewritten under the same
+    // id. Keeping the id is what stops the index rows it is named by from being orphaned.
+    let was = read_dir(writer, id);
+    let mut row = was
+        .clone()
+        .unwrap_or_else(|| DirRow::unvisited(to.path, to.base(), to.root));
+    row.visits += 1;
+    row.last_visit = at;
+    row.root = to.root.map(str::to_string);
+    row.missing_since = None;
+    put_dir(writer, id, was.as_ref(), &row)?;
+    Some(id)
+}
+
+/// Close the segment that just ended.
+///
+/// A directory that has gone missing while the shell stood in it is not created again by this: it
+/// is time spent somewhere the store has forgotten, which is worth nothing and is not an error.
+fn add_dwell(writer: &Writer<'_, '_>, id: u64, ms: i64) -> Option<()> {
+    let Some(was) = read_dir(writer, id) else {
+        return Some(());
+    };
+    let mut row = was.clone();
+    row.dwell_ms += ms;
+    put_dir(writer, id, Some(&was), &row)
+}
+
+/// Fold one execution into the row for that line in that directory.
+///
+/// The row is written under `(dir_id, mode, argv)`; the first time a line is seen it also gets a
+/// `run_argv` entry under `(mode, argv, dir_id)`, and after that it does not, because the key has
+/// not changed and a `put` of the same bytes would be a page written for nothing.
+fn record_run(writer: &Writer<'_, '_>, dir: u64, run: &Run<'_>, at: i64) -> Option<()> {
     let (argv, head) = redact::prepare(run.argv);
     if argv.is_empty() {
         // Not a failure: a line with no command in it has nothing to remember.
         return Some(());
     }
-    let failed = i64::from(run.status.is_some_and(|status| status != 0));
-    conn.execute(
-        RUN,
-        (
-            dir,
-            run.mode,
-            argv,
-            head,
-            failed,
-            at,
-            run.status.map(i64::from),
-            capped(run.duration_ms),
-        ),
-    )
-    .await
-    .ok()?;
+    let fresh = RunRow::first(head, run.status.map(i64::from), at, capped(run.duration_ms));
+    let primary = key::run(dir, run.mode, &argv);
+    let known = writer
+        .get(Tree::Run, &primary)
+        .and_then(|bytes| RunRow::decode(&bytes));
+    match known {
+        Some(mut row) => {
+            row.absorb(&fresh);
+            writer.put(Tree::Run, primary, row.encode())?;
+        }
+        None => {
+            writer.put(Tree::Run, primary, fresh.encode())?;
+            writer.put(
+                Tree::RunByArgv,
+                key::by_argv(run.mode, &argv, dir),
+                Vec::new(),
+            )?;
+        }
+    }
     Some(())
 }
 
@@ -231,7 +281,7 @@ mod tests {
 
         assert!(track.prime(&alpha));
         assert_eq!(
-            count(&track, "SELECT visits FROM dir WHERE path = '/w/alpha'"),
+            visits_of(&track, "/w/alpha"),
             0,
             "starting a shell somewhere is not walking there"
         );
@@ -251,20 +301,13 @@ mod tests {
             }));
         }
 
-        assert_eq!(
-            count(&track, "SELECT COUNT(*) FROM dir"),
-            2,
-            "two directories, four arrivals"
+        assert_eq!(rows(&track, Tree::Dir), 2, "two directories, four arrivals");
+        assert_eq!(visits_of(&track, "/w/beta"), 2);
+        assert_eq!(visits_of(&track, "/w/alpha"), 2);
+        assert!(
+            dir_row(&track, "/w/beta").expect("a row").last_visit > 0,
+            "and each arrival is stamped"
         );
-        assert_eq!(
-            count(&track, "SELECT visits FROM dir WHERE path = '/w/beta'"),
-            2
-        );
-        assert_eq!(
-            count(&track, "SELECT visits FROM dir WHERE path = '/w/alpha'"),
-            2
-        );
-        assert!(count(&track, "SELECT last_visit FROM dir WHERE path = '/w/beta'") > 0);
     }
 
     /// Going nowhere is not an arrival, however many commands are run standing still.
@@ -279,14 +322,12 @@ mod tests {
                 run: None,
             });
         }
-        assert_eq!(
-            count(&track, "SELECT visits FROM dir WHERE path = '/w/alpha'"),
-            0
-        );
+        assert_eq!(visits_of(&track, "/w/alpha"), 0);
     }
 
-    /// Time is added in SQL from closed segments, and one contribution can never be a suspended
-    /// laptop's worth.
+    /// Time is added from closed segments, and one contribution can never be a suspended laptop's
+    /// worth. The addition is a read and a write in Rust now rather than an increment in SQL, and
+    /// it is still safe between terminals because it happens inside one transaction.
     #[test]
     fn dwell_accumulates_and_is_capped() {
         let (_dir, track) = store();
@@ -300,9 +341,43 @@ mod tests {
             }));
         }
         assert_eq!(
-            count(&track, "SELECT dwell_ms FROM dir WHERE path = '/w/alpha'"),
+            dir_row(&track, "/w/alpha").expect("a row").dwell_ms,
             1_000 + 2_500 + CAP_MS,
             "nine hours of suspend counts as fifteen minutes"
+        );
+    }
+
+    /// Two stores against one file are two terminals, and the increment neither may lose.
+    #[test]
+    fn two_terminals_in_one_directory_add_up_rather_than_clobber_each_other() {
+        let dir = tempfile::tempdir().expect("a temp dir");
+        let path = dir.path().join("track.kv");
+        let first = Track::open(&path).expect("the first opens");
+        let second = Track::open(&path).expect("the second opens too");
+
+        for shell in [&first, &second] {
+            for _ in 0..5 {
+                assert!(shell.record(&Step {
+                    ran_in: Visit::at("/w/alpha"),
+                    moved_to: None,
+                    dwell_ms: 1_000,
+                    run: Some(Run {
+                        argv: "cargo build",
+                        mode: SH,
+                        status: Some(0),
+                        duration_ms: 3,
+                    }),
+                }));
+            }
+        }
+
+        let row = run_row(&first, "/w/alpha", SH, "cargo build").expect("one row");
+        assert_eq!(row.runs, 10, "ten runs, and one row to hold them");
+        assert_eq!(rows(&first, Tree::Run), 1);
+        assert_eq!(
+            dir_row(&second, "/w/alpha").expect("a row").dwell_ms,
+            10_000,
+            "and neither terminal's time was overwritten by the other's"
         );
     }
 
@@ -314,20 +389,21 @@ mod tests {
         track.record(&ran("/w/alpha", "cargo build", 1));
         track.record(&ran("/w/alpha", "cargo build", 0));
 
-        assert_eq!(count(&track, "SELECT COUNT(*) FROM run"), 1);
-        assert_eq!(count(&track, "SELECT runs FROM run"), 3);
-        assert_eq!(count(&track, "SELECT fails FROM run"), 1);
+        assert_eq!(rows(&track, Tree::Run), 1);
+        let row = run_row(&track, "/w/alpha", SH, "cargo build").expect("one row");
+        assert_eq!(row.runs, 3);
+        assert_eq!(row.fails, 1);
+        assert_eq!(row.last_status, Some(0), "the newest status wins");
+        assert_eq!(row.total_ms, 15);
+        assert_eq!(row.max_ms, 5);
         assert_eq!(
-            count(&track, "SELECT last_status FROM run"),
-            0,
-            "the newest status wins"
-        );
-        assert_eq!(count(&track, "SELECT total_ms FROM run"), 15);
-        assert_eq!(count(&track, "SELECT max_ms FROM run"), 5);
-        assert_eq!(
-            row(&track, "SELECT head FROM run"),
-            Some(turso::Value::Text("cargo build".to_string())),
+            row.head, "cargo build",
             "the tool and what it was doing, not the whole line"
+        );
+        assert_eq!(
+            rows(&track, Tree::RunByArgv),
+            1,
+            "and the secondary index gained one entry, not three"
         );
     }
 
@@ -346,11 +422,9 @@ mod tests {
                 duration_ms: 1,
             }),
         });
-        assert_eq!(
-            row(&track, "SELECT last_status FROM run"),
-            Some(turso::Value::Null)
-        );
-        assert_eq!(count(&track, "SELECT fails FROM run"), 0);
+        let row = run_row(&track, "/w/alpha", SH, "sleep 100").expect("one row");
+        assert_eq!(row.last_status, None);
+        assert_eq!(row.fails, 0);
     }
 
     /// A secret in the arguments costs the arguments. The directory, the count and the timing all
@@ -360,15 +434,14 @@ mod tests {
         let (_dir, track) = store();
         track.record(&ran("/w/alpha", "curl --token abcdef https://x", 0));
 
+        assert_eq!(lines_in(&track, "/w/alpha"), vec!["curl".to_string()]);
         assert_eq!(
-            row(&track, "SELECT argv FROM run"),
-            Some(turso::Value::Text("curl".to_string()))
+            run_row(&track, "/w/alpha", SH, "curl")
+                .expect("one row")
+                .total_ms,
+            5
         );
-        assert_eq!(count(&track, "SELECT total_ms FROM run"), 5);
-        assert_eq!(
-            count(&track, "SELECT COUNT(*) FROM dir WHERE path = '/w/alpha'"),
-            1
-        );
+        assert!(dir_row(&track, "/w/alpha").is_some());
     }
 
     /// The privacy rule that is about places rather than about words.
@@ -376,8 +449,8 @@ mod tests {
     fn an_excluded_directory_leaves_no_trace() {
         let (_dir, track) = store();
         assert!(!track.record(&ran("/w/p/node_modules/react", "npm test", 0)));
-        assert_eq!(count(&track, "SELECT COUNT(*) FROM dir"), 0);
-        assert_eq!(count(&track, "SELECT COUNT(*) FROM run"), 0);
+        assert_eq!(rows(&track, Tree::Dir), 0);
+        assert_eq!(rows(&track, Tree::Run), 0);
 
         // Leaving one is still a real arrival somewhere worth remembering.
         assert!(track.record(&Step {
@@ -392,17 +465,15 @@ mod tests {
             }),
         }));
         assert_eq!(
-            count(&track, "SELECT COUNT(*) FROM run"),
+            rows(&track, Tree::Run),
             0,
             "not the command, though, and not its time"
         );
-        assert_eq!(
-            count(&track, "SELECT visits FROM dir WHERE path = '/w/p'"),
-            1
-        );
+        assert_eq!(visits_of(&track, "/w/p"), 1);
     }
 
-    /// What `history -c` costs and what it does not: the lines go, the places stay.
+    /// What `history -c` costs and what it does not: the lines go, the places stay — and the index
+    /// that names the lines goes with them.
     #[test]
     fn forgetting_the_lines_keeps_the_directories() {
         let (_dir, track) = store();
@@ -416,24 +487,57 @@ mod tests {
         assert!(track.forget_runs());
 
         assert_eq!(track.suggestion_here("/w/alpha", SH, "cargo"), None);
+        assert_eq!(rows(&track, Tree::Run), 0);
         assert_eq!(
-            count(&track, "SELECT visits FROM dir WHERE path = '/w/alpha'"),
+            rows(&track, Tree::RunByArgv),
+            0,
+            "or the secondary index would go on naming rows that are not there"
+        );
+        assert_eq!(
+            visits_of(&track, "/w/alpha"),
             1,
             "where you work is not one of the lines you asked to forget"
         );
     }
 
-    /// The bug the naive version has: the run needs a `dir_id` for a directory whose arrival was
-    /// never recorded, because the shell started there.
+    /// The bug the naive version has: the run needs a directory whose arrival was never recorded,
+    /// because the shell started there.
     #[test]
     fn the_first_command_of_a_session_has_somewhere_to_be_attributed_to() {
         let (_dir, track) = store();
         assert!(track.record(&ran("/w/alpha", "cargo build", 0)));
-        assert_eq!(count(&track, "SELECT COUNT(*) FROM run"), 1);
+        assert_eq!(rows(&track, Tree::Run), 1);
+        assert_eq!(visits_of(&track, "/w/alpha"), 0, "resolved, not visited");
+    }
+
+    /// A cached directory that has since been forgotten must not become a run row filed under an
+    /// id that names nothing — the shape a store with no foreign keys fails in silently.
+    #[test]
+    fn a_directory_forgotten_under_the_cache_is_resolved_again_rather_than_trusted() {
+        let (_dir, track) = store();
+        assert!(track.prime(&Visit::at("/w/alpha")));
+
+        // Whatever the cache says, the row is gone: another terminal's sweep took it.
+        track
+            .store
+            .write(|writer| {
+                writer.delete(Tree::Dir, &key::dir(1));
+                writer.delete(Tree::DirByPath, &key::by_path("/w/alpha"));
+                Some(())
+            })
+            .expect("the row is dropped");
+
+        assert!(track.record(&ran("/w/alpha", "cargo build", 0)));
+        let id = track
+            .store
+            .read(|reader| lookup_dir(reader, "/w/alpha"))
+            .expect("resolved again");
         assert_eq!(
-            count(&track, "SELECT visits FROM dir WHERE path = '/w/alpha'"),
-            0,
-            "resolved, not visited"
+            track
+                .store
+                .read(|reader| Some(reader.has(Tree::Run, &key::run(id, SH, "cargo build")))),
+            Some(true),
+            "the run is filed under the directory that exists, not the one that did"
         );
     }
 }

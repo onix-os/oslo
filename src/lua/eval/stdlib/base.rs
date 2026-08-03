@@ -175,7 +175,7 @@ fn pcall(interp: &Interp, mut args: Vec<Value>) -> LuaResult<Vec<Value>> {
             out.extend(values);
             Ok(out)
         }
-        // An `oslo.exit` request is not a failure and must not be caught: `pcall(oslo.exit)` has
+        // An `oslo.proc.exit` request is not a failure and must not be caught: `pcall(oslo.proc.exit)` has
         // to end the shell, or a script could accidentally trap its own exit.
         Err(e) if e.exit.is_some() => Err(e),
         Err(e) => Ok(vec![

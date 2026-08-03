@@ -94,6 +94,23 @@ vm:
 vm-distro:
 	bash scripts/alpine-distro-vm.sh
 
+# Time the corpus, in a scratch directory.
+#
+# **Never run the corpus from the repository root.** These are real scripts and many of them create
+# files where they are run; doing it by hand has twice now left ~70 stray files in the tree and in
+# `tests/corpus/` itself, and one of them dropping a file called `f` changes what a *different*
+# script does afterwards. `tests/differential_tests.rs` and
+# `tests/posix_stays_on_the_byte_path.rs` already sandbox for exactly that reason — this target is
+# the same courtesy for a human with a stopwatch.
+corpus:
+	@cargo build --release
+	@dir=$$(mktemp -d) && cp tests/corpus/*.sh "$$dir"/ && cd "$$dir" && \
+		start=$$(date +%s.%N); \
+		for f in *.sh; do "$(CURDIR)/target/release/oslo" "$$f" >/dev/null 2>&1; done; \
+		end=$$(date +%s.%N); \
+		printf 'corpus: %d scripts in %.2fs\n' "$$(ls *.sh | wc -l)" "$$(echo "$$end - $$start" | bc)"; \
+		cd / && rm -rf "$$dir"
+
 verify: fmt-check check-loc check-readme check test clippy rustdoc
 
 install:

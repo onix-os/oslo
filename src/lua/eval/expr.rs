@@ -336,9 +336,14 @@ fn string_literal(token: &TokenReference) -> String {
 }
 
 /// Resolve Lua's backslash escapes.
+///
+/// Includes the numeric forms — `\ddd` decimal, `\xXX` hex, `\u{XXX}` — which were missing, so
+/// `"\27"` was three characters and `"\x1b"` was four. That is not an obscure corner: an escape
+/// byte is how anything writes colour, and a UI library you cannot write `\x1b[1m` in is a UI
+/// library in name only.
 fn unescape(text: &str) -> String {
     let mut out = String::with_capacity(text.len());
-    let mut chars = text.chars();
+    let mut chars = text.chars().peekable();
     while let Some(c) = chars.next() {
         if c != '\\' {
             out.push(c);
@@ -356,6 +361,61 @@ fn unescape(text: &str) -> String {
             Some('"') => out.push('"'),
             Some('\'') => out.push('\''),
             Some('\n') => out.push('\n'),
+            // `\z` skips the whitespace that follows, so a long literal can be broken across
+            // lines without the newline landing in the string.
+            Some('z') => {
+                while chars.peek().is_some_and(|c| c.is_whitespace()) {
+                    chars.next();
+                }
+            }
+            // `\xXX`: exactly two hex digits, and a byte rather than a code point.
+            Some('x') => {
+                let mut hex = String::new();
+                while hex.len() < 2 && chars.peek().is_some_and(char::is_ascii_hexdigit) {
+                    hex.push(chars.next().unwrap_or_default());
+                }
+                match u8::from_str_radix(&hex, 16) {
+                    Ok(byte) => out.push(byte as char),
+                    // Malformed, so it is left as written rather than silently becoming something
+                    // else. Lua would refuse the file; refusing it here would mean a lexer error
+                    // from a string this function does not own.
+                    Err(_) => {
+                        out.push_str("\\x");
+                        out.push_str(&hex);
+                    }
+                }
+            }
+            // `\u{XXX}`: a code point, up to six hex digits.
+            Some('u') if chars.peek() == Some(&'{') => {
+                chars.next();
+                let mut hex = String::new();
+                while chars.peek().is_some_and(|c| *c != '}') && hex.len() < 8 {
+                    hex.push(chars.next().unwrap_or_default());
+                }
+                chars.next();
+                match u32::from_str_radix(&hex, 16).ok().and_then(char::from_u32) {
+                    Some(c) => out.push(c),
+                    None => {
+                        out.push_str("\\u{");
+                        out.push_str(&hex);
+                        out.push('}');
+                    }
+                }
+            }
+            // `\ddd`: up to three *decimal* digits, and a byte. `\27` is escape, `\65` is `A`.
+            Some(d) if d.is_ascii_digit() => {
+                let mut digits = d.to_string();
+                while digits.len() < 3 && chars.peek().is_some_and(char::is_ascii_digit) {
+                    digits.push(chars.next().unwrap_or_default());
+                }
+                match digits.parse::<u32>() {
+                    Ok(n) if n <= 255 => out.push(n as u8 as char),
+                    _ => {
+                        out.push('\\');
+                        out.push_str(&digits);
+                    }
+                }
+            }
             Some(other) => {
                 out.push('\\');
                 out.push(other);
@@ -380,4 +440,47 @@ pub fn first(mut values: Vec<Value>) -> Value {
 /// Loud and specific, never silent: see the module comment on `super`.
 pub fn unsupported(what: &str) -> LuaError {
     LuaError::new(format!("{what} is not implemented in oslo's Lua"))
+}
+
+#[cfg(test)]
+mod escape_tests {
+    use super::unescape;
+
+    /// The numeric escapes, which were missing entirely.
+    ///
+    /// `"\\27"` used to be three characters and `"\\x1b"` four, so nothing written in Lua could
+    /// emit an escape byte — no colour, no cursor movement, no terminal anything.
+    #[test]
+    fn numeric_escapes_resolve_to_one_byte() {
+        assert_eq!(unescape(r"\27"), "\u{1b}");
+        assert_eq!(unescape(r"\x1b"), "\u{1b}");
+        assert_eq!(unescape(r"\65"), "A");
+        assert_eq!(unescape(r"\u{48}\u{49}"), "HI");
+    }
+
+    /// A decimal escape takes at most three digits, so the digits after it are text.
+    #[test]
+    fn a_decimal_escape_stops_at_three_digits() {
+        assert_eq!(unescape(r"\0651"), "A1");
+    }
+
+    /// `\z` eats the whitespace after it, which is how a long literal is broken across lines.
+    #[test]
+    fn backslash_z_swallows_the_line_break() {
+        assert_eq!(unescape("one\\z\n     two"), "onetwo");
+    }
+
+    /// The named escapes still work, and an unknown one is still left as written.
+    #[test]
+    fn the_named_escapes_are_unchanged() {
+        assert_eq!(unescape(r"a\nb\tc"), "a\nb\tc");
+        assert_eq!(unescape(r"\q"), r"\q");
+    }
+
+    /// A malformed numeric escape is left alone rather than becoming a different character.
+    #[test]
+    fn a_malformed_escape_is_left_as_written() {
+        assert_eq!(unescape(r"\xZZ"), r"\xZZ");
+        assert_eq!(unescape(r"\u{ZZ}"), r"\u{ZZ}");
+    }
 }

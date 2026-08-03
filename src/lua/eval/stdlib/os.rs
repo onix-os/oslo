@@ -211,7 +211,7 @@ fn execute(_: &Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
     }
     Err(LuaError::new(
         "os.execute runs its argument through /bin/sh, which is not this shell; \
-         use oslo.run{...} for an argv call or oslo.exec(...) for a shell line",
+         use oslo.run{...} for an argv call or oslo.proc.exec(...) for a shell line",
     ))
 }
 

@@ -1,6 +1,7 @@
 mod array;
 mod environ;
 mod frames;
+mod names;
 mod options;
 mod registry;
 #[cfg(test)]
@@ -451,6 +452,23 @@ impl Environment {
     /// Exported only, because that is the question a caller is asking when it wants "the
     /// environment": a shell-local variable is not part of it and would mislead anyone iterating
     /// this to decide what a command will see.
+    /// Every variable and whether it is exported, for a caller that must put the shell back exactly
+    /// as it found it.
+    ///
+    /// [`Self::exported_vars`] is the right answer to "what will a child see" and the wrong one to
+    /// "what was here before": a shell-local variable that a directory environment then exports has
+    /// to come back *local*, and a snapshot of the exported set alone cannot say that — it would
+    /// remove the variable entirely on the way out.
+    pub fn all_vars(&self) -> Vec<(String, String, bool)> {
+        let mut out: Vec<(String, String, bool)> = self
+            .vars
+            .iter()
+            .map(|(name, (value, exported))| (name.clone(), value.clone(), *exported))
+            .collect();
+        out.sort();
+        out
+    }
+
     pub fn exported_vars(&self) -> Vec<(String, String)> {
         let mut out: Vec<(String, String)> = self
             .vars
@@ -526,75 +544,5 @@ impl Environment {
 
     pub fn get_positional(&self) -> &[String] {
         &self.positional
-    }
-
-    pub fn set_alias(&mut self, name: &str, value: &str) {
-        self.aliases.insert(name.to_string(), value.to_string());
-    }
-
-    pub fn get_alias(&self, name: &str) -> Option<&str> {
-        self.aliases.get(name).map(|s| s.as_str())
-    }
-
-    pub fn get_aliases(&self) -> &HashMap<String, String> {
-        &self.aliases
-    }
-
-    pub fn remove_alias(&mut self, name: &str) {
-        self.aliases.remove(name);
-    }
-
-    pub fn set_function(&mut self, name: &str, body: Command) {
-        self.functions.insert(name.to_string(), body);
-    }
-
-    /// Forget the function `name`; `true` if there was one.
-    ///
-    /// `unset -f` is the only caller, and without this it had nothing to call: the functions
-    /// table was exposed read-only, so a function could be defined and never taken back.
-    /// The answer is not `unset`'s exit status — bash exits 0 for `unset -f nosuchfn` — but it
-    /// is what a caller that needs to know would ask for.
-    pub fn remove_function(&mut self, name: &str) -> bool {
-        self.functions.remove(name).is_some()
-    }
-
-    pub fn get_function(&self, name: &str) -> Option<&Command> {
-        self.functions.get(name)
-    }
-
-    pub fn get_functions(&self) -> &HashMap<String, Command> {
-        &self.functions
-    }
-
-    /// Register `name` as a builtin, replacing any earlier one.
-    ///
-    /// The single point of entry: whatever is registered here is what `is_builtin`, the
-    /// dispatcher, completion and `type` will all report and run.
-    pub fn register_custom_builtin(&mut self, name: &str, func: BuiltinFn) {
-        self.builtins.register(name, func);
-    }
-
-    /// The implementation registered for `name`, if any. Prefer [`Self::exec_custom_builtin`]:
-    /// this exists for callers that need to know a builtin is callable without calling it.
-    pub fn get_builtin(&self, name: &str) -> Option<BuiltinFn> {
-        self.builtins.lookup(name)
-    }
-
-    /// Every registered builtin name.
-    ///
-    /// The single source of truth for completion and `type`, so adding a builtin does not
-    /// require remembering to update a list somewhere else.
-    pub fn builtin_names(&self) -> impl Iterator<Item = &str> {
-        self.builtins.names()
-    }
-
-    /// Whether `name` is a builtin — that is, whether it is in the registry.
-    ///
-    /// This used to be a `matches!` over a hand-written list that had drifted from both the
-    /// registry and the dispatcher's own `match` (PLAN R5.6): `type` called `set` an external
-    /// command while the shell ran it as a builtin, and a name in the list with no
-    /// implementation dispatched to `Ok(0)` — a command that silently did nothing.
-    pub fn is_builtin(&self, name: &str) -> bool {
-        self.builtins.contains(name)
     }
 }

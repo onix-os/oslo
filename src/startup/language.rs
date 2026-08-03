@@ -215,7 +215,7 @@ mod tests {
             Language::Lua
         );
         assert_eq!(
-            detect_text("oslo.set_alias(\"gs\", \"git status\")\n"),
+            detect_text("oslo.env.set_alias(\"gs\", \"git status\")\n"),
             Language::Lua
         );
         assert_eq!(detect_text("echo \"$HOME\"\n"), Language::Shell);

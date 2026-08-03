@@ -128,6 +128,71 @@ pub fn truncate_to_width(s: &str, max: usize) -> String {
     out
 }
 
+/// `s` with every escape sequence removed — what the terminal actually shows.
+///
+/// The counterpart to [`display_width`], which measures the same thing without building it. A
+/// caller writing to a pipe, a log or a test wants the text; a caller writing to a terminal wants
+/// the escapes left alone.
+pub fn without_escapes(s: &str) -> String {
+    let mut out = String::with_capacity(s.len());
+    let mut chars = s.chars();
+    while let Some(c) = chars.next() {
+        if c != '\x1b' {
+            out.push(c);
+            continue;
+        }
+        // CSI and OSC both end at a byte this can recognise: CSI at its alphabetic final byte, OSC
+        // at BEL or ST. Anything else is a two-character sequence whose second character is eaten.
+        match chars.next() {
+            Some('[') => {
+                for c in chars.by_ref() {
+                    if c.is_ascii_alphabetic() {
+                        break;
+                    }
+                }
+            }
+            Some(']') => {
+                while let Some(c) = chars.next() {
+                    if c == '\x07' {
+                        break;
+                    }
+                    if c == '\x1b' {
+                        chars.next();
+                        break;
+                    }
+                }
+            }
+            _ => {}
+        }
+    }
+    out
+}
+
+/// Terminal height in rows, by the same route as [`terminal_cols`].
+///
+/// `$LINES` rather than `$COLUMNS` as the fallback, and 24 as the last resort — the size of the
+/// terminal every fallback in this file is descended from.
+pub fn terminal_rows() -> usize {
+    for fd in [libc::STDOUT_FILENO, libc::STDERR_FILENO, libc::STDIN_FILENO] {
+        if let Some(rows) = winsize_rows(fd) {
+            return rows;
+        }
+    }
+    std::env::var("LINES")
+        .ok()
+        .and_then(|n| n.parse::<usize>().ok())
+        .filter(|n| *n > 0)
+        .unwrap_or(24)
+}
+
+fn winsize_rows(fd: i32) -> Option<usize> {
+    let mut ws: libc::winsize = unsafe { std::mem::zeroed() };
+    // SAFETY: as `winsize_cols` — a live, correctly typed `struct winsize`, written only by the
+    // ioctl, which fails rather than writing when the fd is not a terminal.
+    let rc = unsafe { libc::ioctl(fd, libc::TIOCGWINSZ, &mut ws) };
+    (rc == 0 && ws.ws_row > 0).then_some(ws.ws_row as usize)
+}
+
 /// Right-pad `s` with spaces to `target` cells; a no-op when it is already at least that wide.
 pub fn pad_to_width(s: &str, target: usize) -> String {
     let w = display_width(s);

@@ -18,7 +18,7 @@
 mod columns;
 mod layout;
 mod render;
-mod width;
+pub mod width;
 
 pub use columns::{
     Facts, Provider, builtin_columns, columns_for, facts_for, human_age, human_mode, human_size,

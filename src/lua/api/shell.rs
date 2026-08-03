@@ -1,7 +1,7 @@
 //! What a script can ask *about* the shell, and what it can ask the shell to call back into.
 //!
 //! Two groups that belong together because both are about the session rather than about doing
-//! something: introspection (`oslo.interactive`, `oslo.user`, `oslo.exit_code`) and hooks
+//! something: introspection (`oslo.sys.interactive`, `oslo.sys.user`, `oslo.proc.status`) and hooks
 //! (`oslo.on.precmd`).
 //!
 //! **Hooks are named setters, not an event bus.** `oslo.on.precmd(fn)` returns a handle and
@@ -29,18 +29,28 @@ pub(crate) const HOOK_PREFIX: &str = "hook:";
 pub(crate) const HOOKS: [&str; 4] = ["precmd", "postcmd", "cd", "command-not-found"];
 
 /// Add the introspection fields, `oslo.opts` and `oslo.on` to the `oslo` table.
-pub fn install(oslo: &mut Table, registry: &Registry, env: &Arc<Mutex<Environment>>) {
-    facts(oslo, env);
+pub fn install(
+    oslo: &mut Table,
+    system: &mut Table,
+    process: &mut Table,
+    registry: &Registry,
+    env: &Arc<Mutex<Environment>>,
+) {
+    facts(oslo, system, process, env);
     oslo.set(Value::str("on"), hooks(registry));
 }
 
-fn facts(oslo: &mut Table, env: &Arc<Mutex<Environment>>) {
+/// What the shell knows about itself, split by subject rather than left on `oslo`.
+///
+/// Who and where you are is `oslo.sys`; which process this is and how the last one ended is
+/// `oslo.proc`. `oslo.version` stays on `oslo` itself — it describes the whole thing.
+fn facts(oslo: &mut Table, system: &mut Table, process: &mut Table, env: &Arc<Mutex<Environment>>) {
     oslo.set(Value::str("version"), Value::str(env!("CARGO_PKG_VERSION")));
 
     // Read at call time, not at startup: a script that changes `$USER` or `hostname` mid-session
     // should see what it changed, and a value frozen at startup is a lie that is hard to spot.
     let env_user = Arc::clone(env);
-    put(oslo, "user", move |_, _| {
+    put(system, "user", move |_, _| {
         let guard = borrow_env(&env_user)?;
         ok(
             match guard.get_var("USER").or_else(|| guard.get_var("LOGNAME")) {
@@ -50,7 +60,7 @@ fn facts(oslo: &mut Table, env: &Arc<Mutex<Environment>>) {
         )
     });
 
-    put(oslo, "host", |_, _| {
+    put(system, "host", |_, _| {
         ok(match nix::unistd::gethostname() {
             Ok(name) => Value::str(name.to_string_lossy()),
             Err(_) => Value::Nil,
@@ -58,7 +68,7 @@ fn facts(oslo: &mut Table, env: &Arc<Mutex<Environment>>) {
     });
 
     let env_interactive = Arc::clone(env);
-    put(oslo, "interactive", move |_, _| {
+    put(system, "interactive", move |_, _| {
         let guard = borrow_env(&env_interactive)?;
         ok(Value::Bool(
             guard
@@ -68,23 +78,23 @@ fn facts(oslo: &mut Table, env: &Arc<Mutex<Environment>>) {
     });
 
     let env_login = Arc::clone(env);
-    put(oslo, "login", move |_, _| {
+    put(system, "login", move |_, _| {
         let guard = borrow_env(&env_login)?;
         // A login shell is one invoked with a `-` in front of its name, which is what `$0` keeps.
         ok(Value::Bool(guard.shell_name.starts_with('-')))
     });
 
-    // oslo.exit_code() -> $? — the status of the last command, whichever language ran it.
+    // oslo.proc.status() -> $? — the status of the last command, whichever language ran it.
     let env_status = Arc::clone(env);
-    put(oslo, "exit_code", move |_, _| {
+    put(process, "status", move |_, _| {
         ok(Value::int(borrow_env(&env_status)?.last_status as i64))
     });
 
-    // oslo.pid() and oslo.ppid(), which a script needs to name itself in a lock file or a log.
-    put(oslo, "pid", |_, _| {
+    // oslo.proc.pid() and oslo.proc.ppid(), which a script needs to name itself in a lock file or a log.
+    put(process, "pid", |_, _| {
         ok(Value::int(std::process::id() as i64))
     });
-    put(oslo, "ppid", |_, _| {
+    put(process, "ppid", |_, _| {
         ok(Value::int(nix::unistd::getppid().as_raw() as i64))
     });
 

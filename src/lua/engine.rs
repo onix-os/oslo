@@ -17,7 +17,7 @@ use std::sync::{Arc, Mutex, MutexGuard};
 /// `pairs(_G)` does not walk the shell's internals.
 pub(crate) type Registry = Rc<RefCell<HashMap<String, Value>>>;
 
-/// Registry key under which `oslo.set_prompt` stores its function.
+/// Registry key under which `oslo.ui.prompt` stores its function.
 pub(crate) const PROMPT_KEY: &str = "prompt";
 
 /// Prefix for the registry keys holding builtin callbacks.
@@ -418,6 +418,29 @@ impl LuaEngine {
     /// Install `oslo.completion.for_command`, the per-command completion hook.
     pub fn install_command_completer(&self) {
         crate::lua::columns::install_command_completer(&self.interp);
+    }
+
+    /// The prompt function currently installed, if any.
+    ///
+    /// For a caller that has to put it back — a `.env.lua` may set the prompt for its directory,
+    /// and leaving that directory has to restore whatever was there before. Returned as the opaque
+    /// value it is; nothing outside Lua can do anything with it except hand it back.
+    pub fn prompt_handler(&self) -> Option<Value> {
+        self.registry.borrow().get(PROMPT_KEY).cloned()
+    }
+
+    /// Put a prompt function back, or remove it when there was none.
+    pub fn restore_prompt(&self, handler: Option<Value>) {
+        match handler {
+            Some(handler) => {
+                self.registry
+                    .borrow_mut()
+                    .insert(PROMPT_KEY.to_string(), handler);
+            }
+            None => {
+                self.registry.borrow_mut().remove(PROMPT_KEY);
+            }
+        }
     }
 
     pub fn render_prompt(&self) -> Option<String> {
