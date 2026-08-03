@@ -39,8 +39,6 @@ serde_json = "1"
 which = "7.0"
 thiserror = "2.0"
 
-tracing = "0.1"
-tracing-subscriber = "0.3"
 # Used for *parsing only* — its AST is converted straight into oslo's own in
 # `src/parser/brush_adapter/`, and nothing else from brush executes anything. Every builtin here is
 # oslo's own.
@@ -74,3 +72,7 @@ tempfile = "3.17"
 [workspace]
 
 
+
+[[bench]]
+name = "fuzzy"
+harness = false

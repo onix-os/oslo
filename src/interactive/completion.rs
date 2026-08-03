@@ -6,7 +6,7 @@
 use super::OsloHelper;
 use super::command_index::CommandIndex;
 use super::dropdown::CompletionCandidate;
-use super::matching::{Fuzzy, Match, fuzzy_score, matchers, matches_ignoring_case};
+use super::matching::{Fuzzed, Fuzzy, Match, matchers, matches_ignoring_case};
 use super::settings;
 use super::words::{Quote, Word, current_word, quote_replacement, unquote};
 use std::fs;
@@ -48,8 +48,11 @@ thread_local! {
 /// [`fuzzy_score`] measures. Stable, so candidates that score the same keep the order the source
 /// gave them, which is frecency.
 fn rank_by_fuzz(out: &mut [CompletionCandidate], typed: &str, fuzzy: Fuzzy) {
+    // Folded once, outside the sort. `sort_by_key` calls this O(n log n) times, and the previous
+    // version rebuilt the typed pattern into a `Vec<char>` on every one of them.
+    let pattern = Fuzzed::new(typed, fuzzy);
     out.sort_by_key(|candidate| {
-        std::cmp::Reverse(fuzzy_score(&candidate.display, typed, fuzzy).unwrap_or(i32::MIN))
+        std::cmp::Reverse(pattern.score(&candidate.display).unwrap_or(i32::MIN))
     });
 }
 

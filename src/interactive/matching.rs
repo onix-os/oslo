@@ -150,12 +150,48 @@ impl Fuzzy {
 /// Case-insensitive, and folded per character rather than by lowercasing both strings — this runs
 /// per candidate per keystroke, and a `String` each time is thousands of allocations.
 pub fn fuzzy_score(candidate: &str, typed: &str, fuzzy: Fuzzy) -> Option<i32> {
-    let cap = fuzzy.max_gap()?;
-    if typed.is_empty() {
-        return Some(0);
+    Fuzzed::new(typed, fuzzy).score(candidate)
+}
+
+/// A typed pattern, folded once, ready to be scored against many candidates.
+///
+/// **The point is the `once`.** [`fuzzy_score`] folds `typed` into a `Vec<char>` on every call, and
+/// the caller is a loop over every executable on `$PATH` — measured at ~3,300 here, so the same
+/// short pattern was being rebuilt 3,300 times per Tab press. Hoisting it out of the loop is the
+/// whole optimisation; the scoring itself was never the cost.
+///
+/// The candidate still has to be folded per call, because it is different every time.
+pub struct Fuzzed<'a> {
+    wanted: Vec<char>,
+    cap: Option<usize>,
+    typed: &'a str,
+}
+
+impl<'a> Fuzzed<'a> {
+    pub fn new(typed: &'a str, fuzzy: Fuzzy) -> Fuzzed<'a> {
+        Fuzzed {
+            wanted: typed.chars().flat_map(char::to_lowercase).collect(),
+            cap: fuzzy.max_gap(),
+            typed,
+        }
     }
+
+    /// Whether this pattern can match anything at all — `Fuzzy::Off`, or nothing typed.
+    pub fn is_idle(&self) -> bool {
+        self.cap.is_none() || self.typed.is_empty()
+    }
+
+    pub fn score(&self, candidate: &str) -> Option<i32> {
+        let cap = self.cap?;
+        if self.typed.is_empty() {
+            return Some(0);
+        }
+        score_with(candidate, &self.wanted, cap)
+    }
+}
+
+fn score_with(candidate: &str, wanted: &[char], cap: usize) -> Option<i32> {
     let have: Vec<char> = candidate.chars().flat_map(char::to_lowercase).collect();
-    let wanted: Vec<char> = typed.chars().flat_map(char::to_lowercase).collect();
     if wanted.len() > have.len() {
         return None;
     }
@@ -167,8 +203,8 @@ pub fn fuzzy_score(candidate: &str, typed: &str, fuzzy: Fuzzy) -> Option<i32> {
     // of the query: `rdme` against `README.md` jumps to the `m` after the dot and then has no `e`
     // left to find. Taking the earliest letter every time has the opposite failure. So try the
     // boundary-seeking alignment, fall back to the plain one, and keep whichever scored.
-    let boundaries = align(&have, &wanted, cap, true);
-    let plain = align(&have, &wanted, cap, false);
+    let boundaries = align(&have, wanted, cap, true);
+    let plain = align(&have, wanted, cap, false);
     boundaries.max(plain)
 }
 

@@ -1706,8 +1706,6 @@ dependencies = [
  "tempfile",
  "thiserror",
  "tokio",
- "tracing",
- "tracing-subscriber",
  "turso",
  "which 7.0.3",
 ]
