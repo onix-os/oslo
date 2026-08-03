@@ -55,7 +55,22 @@ thiserror = "2.0"
 # item, so the arithmetic-for rule never sees the two `;` it asks for. That is a loud syntax error
 # rather than a wrong answer — see tests/differential/expected_fail.rs.
 brush-parser = { git = "https://github.com/bresilla/brush", branch = "oslo-integration" }
-turso = "0.7.2"
+# `default-features = false` turns off turso's two default features, neither of which oslo asks
+# for and both of which are large. `fts` is `tantivy`, a full-text search engine — there is no
+# `MATCH` and no FTS table anywhere in `src/track/` or `src/startup/history_db.rs`. `mimalloc` is a
+# C allocator oslo never asked for, and it drags `zstd-sys` along.
+#
+# Measured on this tree: 22,971,144 -> 18,326,960 bytes (-4.43 MiB, -20%), `cargo tree -e normal`
+# from 287 crates to 236, and `strings` finds no `mimalloc`, `zstd`, `tantivy` or `stemmer` in the
+# result. No source change, and no measurable effect on startup, the corpus or glob.
+#
+# It does *not* get the C toolchain back out, which is the thing worth knowing: `turso_core` names
+# `simsimd` — a SIMD distance-function library in C — as a non-optional dependency on every target
+# but wasm and Windows-on-ARM, and its build script runs `gcc` and links a 275 KB `libsimsimd.a`.
+# So the reason `mlua` was dropped and `sha2` was chosen (see the comments above both) is still
+# contradicted, and cannot be un-contradicted by any feature flag. Only removing turso does that.
+# See docs/research/footprint.md.
+turso = { version = "0.7.2", default-features = false }
 tokio = { version = "1.53.1", features = ["rt", "macros"] }
 # The allow list for directory environments is keyed by a hash of the rc file's path *and* its
 # contents, which is what makes editing an allowed file revoke it. Pure Rust, so it does not cost
@@ -87,3 +102,10 @@ harness = false
 lto = "thin"
 codegen-units = 1
 strip = "symbols"
+
+# No `[profile.release.package."*"] opt-level = "s"` either, though it is the obvious next setting
+# and it was built and measured. Compiling only the dependencies for size is worth 2.32 MiB
+# (18,326,960 -> 15,893,936) and costs 14% on the parser loop and 3% on the arithmetic loop,
+# because `brush-parser` is a dependency and thin LTO inlines it into oslo's hot path. That is a
+# trade for the owner to make, not a cleanup — the numbers and the untested refinement that may
+# make it free are in docs/research/footprint.md.
