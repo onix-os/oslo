@@ -98,12 +98,22 @@ pub(super) fn read_command(
         if let Some(helper) = rl.helper() {
             // A config's own right prompt wins; otherwise oslo draws one. There used to be none at
             // all unless a config asked, which meant the machinery existed and nobody saw it.
-            let right = lua.render("prompt.right").or_else(|| {
-                Some(oslo::interactive::prompt::render_default_right_prompt(
-                    last_status,
-                    super::repl::last_command_duration(),
-                ))
-            });
+            // The same order the left prompt resolves in: a Lua prompt is an explicit choice and
+            // outranks the shell variable, which outranks oslo's own.
+            //
+            // `$RPS1` is here so that a *shell* integration can own both sides. hexe and starship
+            // rebuild the prompt from `PROMPT_COMMAND`, and until now the only thing they could
+            // set was `PS1` — the right column was oslo's whatever they did, so half the prompt
+            // came from the integration and half from the shell arguing with it.
+            let right = lua
+                .render("prompt.right")
+                .or_else(|| rc::rps1(&mut env_struct.lock().unwrap()))
+                .or_else(|| {
+                    Some(oslo::interactive::prompt::render_default_right_prompt(
+                        last_status,
+                        super::repl::last_command_duration(),
+                    ))
+                });
             helper.set_right_prompt(right, oslo::interactive::prompt::printed_width(&prompt));
             // What this prompt is for, so a vi-mode repaint rebuilds the same one rather than
             // guessing at the language or the status.

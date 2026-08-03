@@ -111,6 +111,24 @@ pub fn ps1(env: &mut Environment, last_status: i32) -> String {
     }
 }
 
+/// The right-hand prompt, from `$RPS1` — or `$RPROMPT`, which is what zsh calls it.
+///
+/// bash has no right prompt, so there is no name to inherit and no precedent to follow. Both
+/// spellings are accepted because both are already in people's fingers: `RPS1` is zsh's primary
+/// name and `RPROMPT` its older one, and an integration that sets either should be seen. `RPS1`
+/// wins when both are set, matching zsh.
+///
+/// `None` when neither is set, so the caller can fall back rather than draw an empty column.
+/// A variable set to the empty string is *not* nothing: it is an explicit request for no right
+/// prompt, and it suppresses oslo's default.
+pub fn rps1(env: &mut Environment) -> Option<String> {
+    let raw = env
+        .get_var("RPS1")
+        .or_else(|| env.get_var("RPROMPT"))
+        .map(str::to_string)?;
+    Some(expand_prompt(env, &raw))
+}
+
 /// The continuation prompt, shown for the second and later lines of one command.
 pub fn ps2(env: &mut Environment) -> String {
     match env.get_var("PS2").map(str::to_string) {

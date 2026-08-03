@@ -156,3 +156,28 @@ fn prompt_command_is_a_variable_not_a_command() {
         r.out()
     );
 }
+
+/// `$RPS1` / `$RPROMPT` give a shell integration the right-hand prompt.
+///
+/// bash has no right prompt, so there was no name for one and an integration could only ever set
+/// `PS1` — half the prompt came from the integration and half from oslo arguing with it. Both zsh
+/// spellings are accepted; `RPS1` wins when both are set, as it does in zsh.
+///
+/// Only an interactive shell draws a prompt, so what a non-interactive test can pin is that the
+/// variables are ordinary and expand like `PS1` does. The drawing was verified against a live
+/// pty: six checks, covering both spellings, prompt escapes, command substitution, and that an
+/// empty value suppresses oslo's own right prompt rather than falling back to it.
+#[test]
+fn the_right_prompt_variables_expand_like_ps1() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let r = run_in(
+        dir.path(),
+        "RPS1='$(echo substituted)'\nRPROMPT=other\necho \"[$RPS1] [$RPROMPT]\"",
+    );
+    assert_eq!(
+        r.out(),
+        "[$(echo substituted)] [other]",
+        "stderr: {}",
+        r.stderr
+    );
+}
