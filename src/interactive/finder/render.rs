@@ -52,11 +52,20 @@ use crate::interactive::theme::{self, Depth, Style};
 
 /// Rows the input surface takes: a blank row, the query, a blank row.
 ///
-/// The blank rows are the surface, not spacing around it — they carry the same tint, which is what
-/// makes the input read as a panel rather than as one coloured line. Three is codex's shape and it
-/// is the smallest number that reads as deliberate: one row looks like a highlight, three looks
+/// The blank rows are the surface, not spacing around it — they carry the same colour, which is
+/// what makes the input read as a panel rather than as one coloured line. Three is codex's shape
+/// and the smallest number that reads as deliberate: one row looks like a highlight, three looks
 /// like somewhere to type.
-const CHROME_ROWS: usize = 3;
+const SURFACE_ROWS: usize = 3;
+
+/// Unpainted rows below the surface, so the panel does not sit flush against the bottom edge.
+const BOTTOM_MARGIN: usize = 1;
+
+/// Unpainted columns either side of the surface, for the same reason.
+const SIDE_MARGIN: usize = 1;
+
+/// Everything the list does not get.
+const CHROME_ROWS: usize = SURFACE_ROWS + BOTTOM_MARGIN;
 
 /// What the frame needs to know about the world.
 pub struct Frame<'a> {
@@ -72,9 +81,6 @@ pub struct Frame<'a> {
     /// Unix seconds, for the age column. Passed in so the frame is a pure function of its input
     /// and can be tested without a clock.
     pub now: i64,
-    /// Where the shell is, so the directory column can be shortened against `$HOME` and the local
-    /// rows marked.
-    pub home: &'a str,
 }
 
 impl Frame<'_> {
@@ -110,26 +116,41 @@ pub fn frame(f: &Frame<'_>) -> String {
     for (index, row) in shown.iter().enumerate().rev() {
         let absolute = f.offset + index;
         out.push_str("\x1b[2K");
-        out.push_str(&list_row(row, absolute == f.selected, f, pager, depth));
+        out.push_str(&list_row(
+            row,
+            absolute == f.selected,
+            absolute % 2 == 1,
+            f,
+            pager,
+            depth,
+        ));
         out.push_str("\r\n");
     }
 
-    // The input surface: three rows of one colour, the middle one carrying the query.
+    // The input surface: three rows of one colour, the middle one carrying the query, inset from
+    // both edges so the panel floats rather than sitting flush against them.
     let surface = pager.bg;
+    let inner = f.cols.saturating_sub(SIDE_MARGIN * 2);
+    let margin = " ".repeat(SIDE_MARGIN);
     let blank = Style {
         bg: surface,
         ..Style::default()
     };
-    out.push_str("\x1b[2K");
-    out.push_str(&blank.paint(&" ".repeat(f.cols), depth));
-    out.push_str("\r\n");
 
-    out.push_str("\x1b[2K");
-    out.push_str(&search_bar(f, pager, surface, depth));
-    out.push_str("\r\n");
+    for row in 0..SURFACE_ROWS {
+        out.push_str("\x1b[2K");
+        out.push_str(&margin);
+        if row == 1 {
+            out.push_str(&search_bar(f, pager, surface, inner, depth));
+        } else {
+            out.push_str(&blank.paint(&" ".repeat(inner), depth));
+        }
+        out.push_str(&margin);
+        out.push_str("\r\n");
+    }
 
+    // And a plain row under it, so the panel has air on all four sides.
     out.push_str("\x1b[2K");
-    out.push_str(&blank.paint(&" ".repeat(f.cols), depth));
     out
 }
 
@@ -142,53 +163,57 @@ pub fn frame(f: &Frame<'_>) -> String {
 fn list_row(
     row: &Ranked,
     selected: bool,
+    stripe: bool,
     f: &Frame<'_>,
     pager: &theme::Pager,
     depth: Depth,
 ) -> String {
-    let runs = format!("{}×", row.command.runs);
-    let when = ago(f.now, row.command.last_at);
-    let dir = shorten(&row.command.dir, f.home);
-
-    // Widths for the fixed columns, with a gap between each.
-    let runs_col = 7usize;
+    // **When and how often come first, then the command.** The two numbers are short and fixed
+    // width, so leading with them gives the eye a ruler down the left of the screen; the command
+    // is the variable-length thing and belongs after it. The directory is not shown at all — it
+    // is still the third ranking signal, but it is the one you look at least and it was costing a
+    // quarter of the width.
     let when_col = 5usize;
-    let dir_col = (f.cols / 4).clamp(10, 40);
-    // What is left over is the command's, minus the marker and the gaps.
+    let runs_col = 6usize;
     let marker_col = 2usize;
-    let gaps = 3usize;
+    let gaps = 2usize;
     let line_col = f
         .cols
-        .saturating_sub(marker_col + runs_col + when_col + dir_col + gaps)
+        .saturating_sub(marker_col + when_col + runs_col + gaps + SIDE_MARGIN * 2)
         .max(8);
 
-    // `❯` rather than a block: the row is not filled, so the mark has to be a shape the eye finds
-    // on an otherwise plain line.
     let marker = if selected { "❯ " } else { "  " };
+    let when = pad_left(&ago(f.now, row.command.last_at), when_col);
+    let runs = pad_left(&format!("{}×", row.command.runs), runs_col);
     let line = pad_to_width(&truncate_to_width(&row.command.line, line_col), line_col);
-    let runs = pad_left(&runs, runs_col);
-    let when = pad_left(&when, when_col);
-    let dir = pad_to_width(&truncate_to_width(&dir, dir_col), dir_col);
 
     let text_style = if selected { pager.text_sel } else { pager.text };
     let meta_style = pager.column(1, selected);
-    // A directory you are standing in is worth marking: it is the third ranking signal, so seeing
-    // *why* a row is high in the list should not require guessing.
-    let dir_style = if row.here {
-        pager.column(0, selected)
-    } else {
-        meta_style
-    };
 
-    // **No background on any row.** The marker and the weight say which one is selected; see the
-    // module note on why a full-screen list must not paint what a dropdown has to.
+    // Zebra striping: every other row takes the same colour the input surface uses, so a long
+    // list can be read across without the eye losing its place. The selected row takes the
+    // brighter selection colour, which is what distinguishes it from a merely-striped one.
+    let row_bg = if selected {
+        pager.sel_bg
+    } else if stripe {
+        pager.bg
+    } else {
+        None
+    };
+    let on_row = |style: Style| Style {
+        bg: row_bg.or(style.bg),
+        ..style
+    };
+    let pad = " ".repeat(SIDE_MARGIN);
+
     format!(
-        "{}{} {} {} {}",
-        pager.match_.paint(marker, depth),
-        text_style.paint(&line, depth),
-        meta_style.paint(&runs, depth),
-        meta_style.paint(&when, depth),
-        dir_style.paint(&dir, depth),
+        "{}{}{} {} {}{}",
+        on_row(Style::default()).paint(&pad, depth),
+        on_row(pager.match_).paint(marker, depth),
+        on_row(meta_style).paint(&when, depth),
+        on_row(meta_style).paint(&runs, depth),
+        on_row(text_style).paint(&line, depth),
+        on_row(Style::default()).paint(&pad, depth),
     )
 }
 
@@ -197,16 +222,14 @@ fn search_bar(
     f: &Frame<'_>,
     pager: &theme::Pager,
     surface: Option<theme::Color>,
+    cols: usize,
     depth: Depth,
 ) -> String {
     let count = format!("{}/{}", f.matches.len(), f.total);
     let prompt = " ❯ ";
-    let room = f
-        .cols
-        .saturating_sub(printed_width(prompt) + printed_width(&count) + 1);
+    let room = cols.saturating_sub(printed_width(prompt) + printed_width(&count) + 1);
     let typed = truncate_to_width(f.query, room);
-    let gap = f
-        .cols
+    let gap = cols
         .saturating_sub(printed_width(prompt) + printed_width(&typed) + printed_width(&count) + 1);
     // Every part of the row takes the surface, the gap included: a panel with a hole in it is not
     // a panel.
@@ -224,25 +247,15 @@ fn search_bar(
     )
 }
 
-/// Right-align `text` in `width` cells.
+/// Right-align `text` in exactly `width` cells, truncating if it does not fit.
+///
+/// Truncation matters as much as padding: a command run a million times renders `999999×`, which
+/// is a cell wider than its column, and one cell of overflow wraps the row — after which every row
+/// below it is one line out of place for the rest of the session.
 fn pad_left(text: &str, width: usize) -> String {
-    let used = printed_width(text);
+    let text = truncate_to_width(text, width);
+    let used = printed_width(&text);
     format!("{}{}", " ".repeat(width.saturating_sub(used)), text)
-}
-
-/// `$HOME` written as `~`, because the directory column is narrow and the prefix is the least
-/// informative part of every path in it.
-fn shorten(path: &str, home: &str) -> String {
-    if home.is_empty() || !path.starts_with(home) {
-        return path.to_string();
-    }
-    match path.len() == home.len() {
-        true => "~".to_string(),
-        false if path.as_bytes().get(home.len()) == Some(&b'/') => {
-            format!("~{}", &path[home.len()..])
-        }
-        false => path.to_string(),
-    }
 }
 
 #[cfg(test)]

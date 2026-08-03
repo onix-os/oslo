@@ -23,9 +23,8 @@ fn many(n: usize) -> Vec<Command> {
         .collect()
 }
 
-/// Down moves toward the search bar, which is where the best match is. The list grows upward, so
-/// this is the direction the arrow points on screen — getting it backwards is the most noticeable
-/// thing a finder can get wrong.
+/// Up moves away from the search bar, toward the older commands at the top; Down moves toward it.
+/// The first version had these swapped and it was wrong the moment anyone pressed a key.
 #[test]
 fn the_arrows_point_the_way_the_list_grows() {
     assert_eq!(key(b"\x1b[A"), Key::Up);
@@ -176,4 +175,96 @@ fn an_empty_result_list_is_safe_to_move_in() {
     state.move_by(1);
     state.move_by(-1);
     assert_eq!(state.selected, 0);
+}
+
+/// A mouse report is consumed whole and means nothing.
+///
+/// This is the bug that produced `;5;;5;;6;66;6;5995` in the search box: read in eight-byte
+/// chunks, a thirteen-byte report is cut in two and the tail arrives looking like typed text.
+/// tmux and hexe both have mouse reporting on, so every movement of the pointer typed into the
+/// query.
+#[test]
+fn a_mouse_report_is_swallowed() {
+    // SGR encoding, which is what anything modern sends.
+    let report = b"\x1b[<35;56;12M";
+    match parse(report) {
+        Parsed::Took(used, Key::Ignored) | Parsed::Discard(used) => {
+            assert_eq!(used, report.len(), "the whole report must go")
+        }
+        Parsed::Took(_, other) => panic!("a mouse report became {other:?}"),
+        Parsed::Partial => panic!("a complete report was called partial"),
+    }
+    // The X10 encoding, whose three trailing bytes are not part of the sequence by any rule.
+    match parse(b"\x1b[M\x20\x21\x22") {
+        Parsed::Discard(used) => assert_eq!(used, 6),
+        other => panic!("x10 mouse: {:?}", matches!(other, Parsed::Partial)),
+    }
+}
+
+/// Bracketed paste markers are consumed; the text between them is ordinary typing, which is what
+/// pasting into a search box should do.
+#[test]
+fn bracketed_paste_markers_are_swallowed() {
+    for marker in [b"\x1b[200~".as_slice(), b"\x1b[201~".as_slice()] {
+        match parse(marker) {
+            Parsed::Took(used, Key::Ignored) | Parsed::Discard(used) => {
+                assert_eq!(used, marker.len())
+            }
+            _ => panic!("paste marker leaked"),
+        }
+    }
+}
+
+/// An OSC reply — a terminal answering something oslo asked earlier — runs to its terminator and
+/// is dropped whole.
+#[test]
+fn an_osc_reply_is_swallowed() {
+    match parse(b"\x1b]11;rgb:1e1e/1e1e/2e2e\x1b\\") {
+        Parsed::Discard(used) => assert_eq!(used, 25),
+        _ => panic!("osc leaked"),
+    }
+    match parse(b"\x1b]0;title\x07") {
+        Parsed::Discard(used) => assert_eq!(used, 10),
+        _ => panic!("osc with BEL leaked"),
+    }
+}
+
+/// A sequence that has not all arrived waits instead of being read as text. This is the half of
+/// the fix that matters: the old code could not wait, so it guessed.
+#[test]
+fn a_split_sequence_waits_for_the_rest() {
+    assert!(matches!(parse(b"\x1b"), Parsed::Partial));
+    assert!(matches!(parse(b"\x1b["), Parsed::Partial));
+    assert!(matches!(parse(b"\x1b[<35;56"), Parsed::Partial));
+    assert!(matches!(parse(b"\x1b]11;rgb:1e"), Parsed::Partial));
+    // A multibyte character, cut in half.
+    assert!(matches!(parse(&"é".as_bytes()[..1]), Parsed::Partial));
+}
+
+/// Ordinary text still gets through, one character at a time, however many bytes it is.
+#[test]
+fn text_is_taken_a_character_at_a_time() {
+    match parse(b"abc") {
+        Parsed::Took(1, Key::Char('a')) => {}
+        other => panic!("{}", matches!(other, Parsed::Partial)),
+    }
+    match parse("éx".as_bytes()) {
+        Parsed::Took(2, Key::Char('é')) => {}
+        other => panic!("{}", matches!(other, Parsed::Partial)),
+    }
+}
+
+/// An arrow key arriving in the same read as the text before it must not swallow that text.
+#[test]
+fn a_key_after_text_is_not_lost() {
+    let buf = b"ab\x1b[A";
+    let Parsed::Took(1, Key::Char('a')) = parse(buf) else {
+        panic!("the first character was not taken")
+    };
+    let Parsed::Took(1, Key::Char('b')) = parse(&buf[1..]) else {
+        panic!("the second character was not taken")
+    };
+    let Parsed::Took(3, Key::Up) = parse(&buf[2..]) else {
+        panic!("the arrow was not taken")
+    };
 }

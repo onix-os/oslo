@@ -34,7 +34,6 @@ fn frame_of<'a>(matches: &'a [Ranked], query: &'a str, rows: usize) -> String {
         cols: 80,
         rows,
         now: 1_000_000_000,
-        home: "/home/me",
     })
 }
 
@@ -59,8 +58,11 @@ fn plain(rendered: &str) -> String {
     out
 }
 
+/// When and how often, then the command. The directory is deliberately absent: it is still the
+/// third ranking signal but it is the column you look at least, and it was costing a quarter of
+/// the width.
 #[test]
-fn a_command_appears_with_its_count_age_and_directory() {
+fn a_row_reads_when_then_how_often_then_the_command() {
     let matches = [ranked(
         "cargo build",
         41,
@@ -69,22 +71,18 @@ fn a_command_appears_with_its_count_age_and_directory() {
         false,
     )];
     let seen = plain(&frame_of(&matches, "", 10));
-    assert!(seen.contains("cargo build"), "{seen:?}");
-    assert!(seen.contains("41×"), "the run count is missing: {seen:?}");
-    // 10,000 seconds ago is under a day.
-    assert!(seen.contains("2h"), "the age is missing: {seen:?}");
-    assert!(seen.contains("~/src"), "the directory is missing: {seen:?}");
-}
-
-/// `$HOME` is the least informative part of every path in a narrow column.
-#[test]
-fn home_is_written_as_a_tilde() {
-    assert_eq!(shorten("/home/me", "/home/me"), "~");
-    assert_eq!(shorten("/home/me/src/oslo", "/home/me"), "~/src/oslo");
-    // Only on a boundary, or `/home/mel` becomes `~l`.
-    assert_eq!(shorten("/home/mel", "/home/me"), "/home/mel");
-    assert_eq!(shorten("/etc", "/home/me"), "/etc");
-    assert_eq!(shorten("/home/me", ""), "/home/me");
+    let row = seen
+        .lines()
+        .find(|l| l.contains("cargo build"))
+        .expect("the command is drawn");
+    let when = row.find("2h").expect("the age is missing");
+    let runs = row.find("41").expect("the run count is missing");
+    let line = row.find("cargo build").expect("unreachable");
+    assert!(when < runs && runs < line, "columns out of order: {row:?}");
+    assert!(
+        !seen.contains("~/src") && !seen.contains("/home/me"),
+        "the directory should not be shown: {seen:?}"
+    );
 }
 
 /// The input is a three-row surface at the bottom: a blank row, the query, a blank row. The query
@@ -94,6 +92,7 @@ fn the_search_bar_sits_inside_its_surface() {
     let matches = [ranked("one", 1, 999_999_999, "/home/me", false)];
     let seen = plain(&frame_of(&matches, "on", 10));
     let lines: Vec<&str> = seen.lines().collect();
+    // From the bottom: the margin produces no line, so the surface is the last three.
     let query_row = lines.len() - 2;
     assert!(
         lines[query_row].contains('❯'),
@@ -121,7 +120,7 @@ fn the_list_grows_upward_from_the_bar() {
         .expect("the match is drawn");
     // 8 rows: 3 for the surface, 5 for the list. The match is the last list row.
     assert_eq!(
-        match_row, 4,
+        match_row, 3,
         "the match should be the last list row: {lines:?}"
     );
     assert!(
@@ -181,7 +180,6 @@ fn exactly_one_row_carries_the_marker() {
         cols: 80,
         rows: 10,
         now: 100,
-        home: "/home/me",
     });
     let seen = plain(&rendered);
     // The search bar uses the same glyph, so only the list rows are counted.
@@ -205,7 +203,7 @@ fn the_best_match_sits_nearest_the_bar() {
         ranked("second", 1, 4, "/home/me", false),
         ranked("third", 1, 3, "/home/me", false),
     ];
-    let seen = plain(&frame_of(&matches, "", 6));
+    let seen = plain(&frame_of(&matches, "", 7));
     let lines: Vec<&str> = seen.lines().collect();
     let row_of = |needle: &str| {
         lines
@@ -213,7 +211,7 @@ fn the_best_match_sits_nearest_the_bar() {
             .position(|l| l.contains(needle))
             .unwrap_or_else(|| panic!("{needle} is not drawn: {lines:?}"))
     };
-    // 6 rows: 3 for the surface, 3 for the list, so the best match is the last list row.
+    // 7 rows: 3 surface, 1 margin, 3 for the list — so the best match is row 2, against the panel.
     assert_eq!(
         row_of("best"),
         2,
@@ -228,21 +226,23 @@ fn the_best_match_sits_nearest_the_bar() {
 /// No list row carries a background. The whole point of the redesign: a full-screen list has the
 /// screen to itself, so painting the rows spends the strongest signal available on nothing, and
 /// the selected row is marked by its glyph instead.
+/// Rows alternate: one plain, one on the surface colour, so a long list can be read across
+/// without the eye losing its place.
 #[test]
-fn no_list_row_is_painted() {
-    let matches = [
-        ranked("first", 1, 3, "/home/me", true),
-        ranked("second", 1, 2, "/home/me", false),
-    ];
-    let rendered = frame_of(&matches, "", 8);
-    let list: Vec<&str> = rendered
-        .lines()
-        .take(rendered.lines().count() - 3)
+fn the_rows_alternate() {
+    let matches: Vec<_> = (0..4)
+        .map(|i| ranked(&format!("row-{i}"), 1, 10 - i, "/home/me", false))
         .collect();
-    for row in list {
-        assert!(
-            !row.contains("48;5;") && !row.contains("48;2;"),
-            "a list row carries a background: {row:?}"
-        );
-    }
+    let rendered = frame_of(&matches, "", 9);
+    let painted = |needle: &str| {
+        rendered
+            .lines()
+            .find(|l| l.contains(needle))
+            .unwrap_or_else(|| panic!("{needle} is not drawn in {rendered:?}"))
+            .contains("48;5;")
+    };
+    // Index 0 is selected and takes the selection colour; odd rows stripe, even ones do not.
+    assert!(!painted("row-2"), "an even row should be plain");
+    assert!(painted("row-1"), "an odd row should be striped");
+    assert!(painted("row-3"), "an odd row should be striped");
 }

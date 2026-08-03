@@ -480,19 +480,12 @@ impl ConditionalEventHandler for OpenFinder {
         let cwd = std::env::current_dir()
             .map(|p| p.display().to_string())
             .unwrap_or_default();
-        let home = std::env::var("HOME").unwrap_or_default();
         let now = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_secs() as i64)
             .unwrap_or(0);
 
-        match oslo::interactive::finder::open(
-            &commands,
-            &cwd,
-            &home,
-            now,
-            settings.completion.fuzzy,
-        ) {
+        match oslo::interactive::finder::open(&commands, &cwd, now, settings.completion.fuzzy) {
             // The line replaces what was typed but is **not** run: you may want to edit it, and a
             // finder that submitted on Enter would take that choice away. This is the same
             // contract every other recall in the shell has.
