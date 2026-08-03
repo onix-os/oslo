@@ -206,6 +206,31 @@ Nothing measured here is worth doing. If more performance is ever wanted, the ho
 2. **Nothing else.** Startup beats bash, globbing beats bash by 3×, and every interactive path is
    between one and two milliseconds.
 
+## Found while fixing `kill`: job numbers are never recycled
+
+`kill %1` was unimplemented — 1.005 s against bash's 0.002 s on one corpus script, and a
+compatibility bug hiding behind a redirect. Fixed: `%`-specs now resolve through the same
+`JobTable::lookup` that `wait` and `fg` use, and signal the job's process group rather than its
+leader, so `sleep 10 | cat &` dies whole.
+
+Writing the regression test surfaced a **second, separate divergence**, which is recorded here
+rather than fixed because it belongs to the job table and not to `kill`:
+
+```sh
+sleep 5 & kill %1; wait      # job 1
+sleep 5 & kill %1; wait      # bash: job 1 again.  oslo: still the first, now dead → ESRCH
+```
+
+**bash clears finished jobs from the table, so numbering restarts; oslo keeps counting upward.**
+A script that backgrounds, signals and waits in a loop therefore works once under oslo and then
+signals a corpse. It is not a hang and not a crash — `kill` reports "No such process" and returns
+1 — but it is wrong, and it is the kind of wrong that only shows up in a loop.
+
+The fix belongs in `JobTable`: remove a completed job once its status has been collected, the way
+`wait`'s `resolve_job` already does for the job it reports. Not attempted here because it changes
+what `jobs` prints and what `$!` means across a whole class of scripts, and that deserves its own
+differential pass rather than being smuggled in beside a `kill` fix.
+
 ## Repository hygiene
 
 The corpus scripts create files **in whatever directory they are run from**, so running them by

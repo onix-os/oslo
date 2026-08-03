@@ -9,6 +9,7 @@
 use super::signals;
 use crate::env::scope::Environment;
 use crate::error::Result;
+use crate::exec::job::with_jobs;
 use nix::errno::Errno;
 
 /// What the argument scan produced. `spec` is unresolved on purpose — parsing it is the caller's
@@ -44,6 +45,23 @@ pub fn builtin_kill(_env: &mut Environment, args: &[String]) -> Result<i32> {
     // not mask the live ones. Nothing here stops at the first failure.
     let mut any_succeeded = false;
     for operand in inv.operands {
+        // A `%`-form is a job, not a number, and it was reaching the `parse` below and failing.
+        // The symptom was not a diagnostic anybody saw: `kill %1` printed to stderr, exited 1, and
+        // the script that had just backgrounded something went on to `wait` for a job nothing had
+        // signalled — one corpus script sat there for a full second where bash took two
+        // milliseconds. A shell that cannot signal its own jobs by name is not a shell.
+        if operand.starts_with('%') {
+            match signal_job(operand, signum) {
+                Ok(()) => any_succeeded = true,
+                Err(JobSignal::NoSuchJob) => {
+                    eprintln!("oslo: kill: {operand}: no such job");
+                }
+                Err(JobSignal::Failed(e)) => {
+                    eprintln!("oslo: kill: ({operand}) - {}", e.desc());
+                }
+            }
+            continue;
+        }
         match operand.parse::<i32>() {
             Ok(pid) => match send(pid, signum) {
                 Ok(()) => any_succeeded = true,
@@ -146,6 +164,33 @@ fn describe(spec: &str) -> Option<String> {
 /// `libc::kill` rather than nix's wrapper: nix's `Signal` enum has no realtime signals and so
 /// cannot express `kill -RTMIN+3`. Signal 0 passes straight through — that is the existence
 /// probe, and the kernel delivers nothing for it.
+/// Why signalling a job spec did not work.
+enum JobSignal {
+    /// The table has no job by that name — a different message from a failed `kill(2)`, because
+    /// they are different mistakes: one is a typo, the other is a process that has gone.
+    NoSuchJob,
+    Failed(Errno),
+}
+
+/// Signal the job named by a `%`-spec: `%1`, `%%`, `%+`, `%-`, `%prefix`, `%?substring`.
+///
+/// **The whole process group, not the leader.** bash signals `-pgid`, and the difference is the
+/// point of job control: `sleep 10 | cat &` is one job of two processes, and signalling only the
+/// leader leaves the other running with its stdin closed. The negation is what `kill(2)` reads as
+/// "every process in this group".
+///
+/// Resolution goes through the same `JobTable::lookup` that `wait` and `fg` use, so every spelling
+/// of a job spec means the same thing to every builtin — a second parser here is how `%prefix`
+/// ends up meaning one thing to `wait` and another to `kill`.
+fn signal_job(spec: &str, signum: i32) -> std::result::Result<(), JobSignal> {
+    let pgid = with_jobs(|jobs| {
+        let id = jobs.lookup(spec)?;
+        jobs.get(id).map(|job| job.pgid)
+    })
+    .ok_or(JobSignal::NoSuchJob)?;
+    send(-pgid.as_raw(), signum).map_err(JobSignal::Failed)
+}
+
 fn send(pid: i32, signum: i32) -> std::result::Result<(), Errno> {
     // SAFETY: kill(2) takes two scalars, reads no memory owned by this process and cannot
     // invalidate any Rust invariant. Failure is reported through errno, which is what
