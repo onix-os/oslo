@@ -15,40 +15,32 @@
 //!    cargo build --release                  41×    5h   ~/src/oslo
 //!  ❯ cargo test                            118×    1d   ~/src/oslo   ← selected
 //!                                                                    ┐
-//!    ❯ car                                             12/840        ├ the surface, three rows
+//!    ❯ car                                    12/840 [global]        ├ the surface, three rows
 //!                                                                    ┘
 //! ```
 //!
 //! **The list grows upward from the search bar.** The bar is at the bottom because that is where
-//! the cursor is and where your eyes already are; the first result sits directly above it, so the
-//! thing you are most likely to take is the thing nearest what you are typing. fzf and atuin both
-//! settled here, and the reason is the same one.
+//! the cursor is and where your eyes already are; the first result sits nearest it, across one
+//! separating row, so the likely choice stays close without merging into the input. fzf and atuin
+//! both settled on bottom-up results, and the reason is the same one.
 //!
-//! # Nothing is painted except the input
+//! # The input and row rulers
 //!
-//! The list rows carry **no background at all** — they are text on the terminal's own background,
-//! and the selected one is marked by a `❯` and its weight rather than by a slab of colour. Only
-//! the input is a surface, and it is three rows tall: a blank row, the query, a blank row, all
-//! sharing one tint.
+//! The input is a three-row surface: a blank row, the query, and a blank row, all sharing the
+//! pager tint. It reaches both screen edges. The list is lighter-weight: even rows keep the
+//! terminal background, odd rows use xterm colour 235 as a quiet ruler, and the selected row uses
+//! the theme's selection colour. Every cell in a coloured row is painted, including the spaces
+//! between columns, so the ruler remains continuous.
 //!
-//! This is codex's treatment and it is worth saying why it is better than the completion
-//! dropdown's, which paints every row. A menu that appears *under a prompt* needs a background,
-//! because the background is the only thing saying where the menu starts and where the shell's
-//! output stops. A full-screen finder has no such problem — the whole screen is already its own —
-//! so painting the rows spends the strongest signal available on information nobody needed, and
-//! leaves nothing to mark the thing that matters. Here the tint means "this is where you are
-//! typing", and it is the only tinted thing on screen.
-//!
-//! The colour is the dropdown's own — `oslo.theme.pager.bg` — so the two surfaces in the shell
-//! match and a theme sets them both at once. codex derives its tint from the terminal's live
-//! background instead, which is a nicer idea and a worse fit here: oslo already has a themed
-//! colour for exactly this, and deriving a second one would mean the finder ignored the theme the
-//! user configured.
+//! The input colour is the dropdown's own — `oslo.theme.pager.bg` — so a theme still controls the
+//! shell's two input surfaces together. The scope badge is deliberately stronger: foreground 0
+//! on accent background 1.
 
+use super::Scope;
 use super::rank::{Ranked, ago};
 use crate::interactive::dropdown::width::{pad_to_width, truncate_to_width};
 use crate::interactive::prompt::printed_width;
-use crate::interactive::theme::{self, Depth, Style};
+use crate::interactive::theme::{self, Color, Depth, Style};
 
 /// Rows the input surface takes: a blank row, the query, a blank row.
 ///
@@ -61,11 +53,18 @@ const SURFACE_ROWS: usize = 3;
 /// Unpainted rows below the surface, so the panel does not sit flush against the bottom edge.
 const BOTTOM_MARGIN: usize = 1;
 
-/// Unpainted columns either side of the surface, for the same reason.
-const SIDE_MARGIN: usize = 1;
+/// Unpainted row between the result list and the input surface.
+const TOP_MARGIN: usize = 1;
+
+/// The list keeps a little horizontal air. The input does not: its surface spans the full width.
+const LIST_SIDE_MARGIN: usize = 1;
+
+/// The alternating finder row. Kept separate from `pager.bg`: that colour belongs to the input
+/// surface and the completion dropdown, while this is only a quiet ruler across history rows.
+const STRIPE_BG: Color = Color::Indexed(235);
 
 /// Everything the list does not get.
-const CHROME_ROWS: usize = SURFACE_ROWS + BOTTOM_MARGIN;
+const CHROME_ROWS: usize = TOP_MARGIN + SURFACE_ROWS + BOTTOM_MARGIN;
 
 /// What the frame needs to know about the world.
 pub struct Frame<'a> {
@@ -74,6 +73,7 @@ pub struct Frame<'a> {
     /// The first visible row, so a long list can scroll under a fixed window.
     pub offset: usize,
     pub query: &'a str,
+    pub scope: Scope,
     /// How many commands there are in total, for the `12/840` counter.
     pub total: usize,
     pub cols: usize,
@@ -86,8 +86,13 @@ pub struct Frame<'a> {
 impl Frame<'_> {
     /// How many list rows fit.
     pub fn visible_rows(&self) -> usize {
-        self.rows.saturating_sub(CHROME_ROWS).max(1)
+        visible_rows(self.rows)
     }
+}
+
+/// How many rows remain for results after the input and its margins.
+pub(super) fn visible_rows(rows: usize) -> usize {
+    rows.saturating_sub(CHROME_ROWS).max(1)
 }
 
 /// The whole screen, as one string of escapes.
@@ -127,11 +132,12 @@ pub fn frame(f: &Frame<'_>) -> String {
         out.push_str("\r\n");
     }
 
-    // The input surface: three rows of one colour, the middle one carrying the query, inset from
-    // both edges so the panel floats rather than sitting flush against them.
+    // A real gap above the surface. Its own upper blank row is tinted and therefore reads as part
+    // of the input, not as separation from the result list.
+    out.push_str("\x1b[2K\r\n");
+
+    // The input surface: three full-width rows of one colour, the middle one carrying the query.
     let surface = pager.bg;
-    let inner = f.cols.saturating_sub(SIDE_MARGIN * 2);
-    let margin = " ".repeat(SIDE_MARGIN);
     let blank = Style {
         bg: surface,
         ..Style::default()
@@ -139,17 +145,15 @@ pub fn frame(f: &Frame<'_>) -> String {
 
     for row in 0..SURFACE_ROWS {
         out.push_str("\x1b[2K");
-        out.push_str(&margin);
         if row == 1 {
-            out.push_str(&search_bar(f, pager, surface, inner, depth));
+            out.push_str(&search_bar(f, pager, surface, f.cols, depth));
         } else {
-            out.push_str(&blank.paint(&" ".repeat(inner), depth));
+            out.push_str(&blank.paint(&" ".repeat(f.cols), depth));
         }
-        out.push_str(&margin);
         out.push_str("\r\n");
     }
 
-    // And a plain row under it, so the panel has air on all four sides.
+    // And a plain row under it, so the panel does not sit on the terminal edge.
     out.push_str("\x1b[2K");
     out
 }
@@ -179,7 +183,7 @@ fn list_row(
     let gaps = 2usize;
     let line_col = f
         .cols
-        .saturating_sub(marker_col + when_col + runs_col + gaps + SIDE_MARGIN * 2)
+        .saturating_sub(marker_col + when_col + runs_col + gaps + LIST_SIDE_MARGIN * 2)
         .max(8);
 
     let marker = if selected { "❯ " } else { "  " };
@@ -190,13 +194,12 @@ fn list_row(
     let text_style = if selected { pager.text_sel } else { pager.text };
     let meta_style = pager.column(1, selected);
 
-    // Zebra striping: every other row takes the same colour the input surface uses, so a long
-    // list can be read across without the eye losing its place. The selected row takes the
-    // brighter selection colour, which is what distinguishes it from a merely-striped one.
+    // Zebra striping: every other row takes a quiet fixed grey, so a long list can be read across
+    // without the eye losing its place. The selected row takes the brighter selection colour.
     let row_bg = if selected {
         pager.sel_bg
     } else if stripe {
-        pager.bg
+        Some(STRIPE_BG)
     } else {
         None
     };
@@ -204,20 +207,25 @@ fn list_row(
         bg: row_bg.or(style.bg),
         ..style
     };
-    let pad = " ".repeat(SIDE_MARGIN);
+    let pad = " ".repeat(LIST_SIDE_MARGIN);
+    // These gaps must be painted too. Literal spaces between independently styled columns punch
+    // terminal-background holes through selected and striped rows.
+    let gap = on_row(Style::default()).paint(" ", depth);
 
     format!(
-        "{}{}{} {} {}{}",
+        "{}{}{}{}{}{}{}{}",
         on_row(Style::default()).paint(&pad, depth),
         on_row(pager.match_).paint(marker, depth),
         on_row(meta_style).paint(&when, depth),
+        gap,
         on_row(meta_style).paint(&runs, depth),
+        on_row(Style::default()).paint(" ", depth),
         on_row(text_style).paint(&line, depth),
         on_row(Style::default()).paint(&pad, depth),
     )
 }
 
-/// The query line, with the count of what matched on the right.
+/// The query line, with the count and current search scope on the right.
 fn search_bar(
     f: &Frame<'_>,
     pager: &theme::Pager,
@@ -225,12 +233,22 @@ fn search_bar(
     cols: usize,
     depth: Depth,
 ) -> String {
+    let scope = match f.scope {
+        Scope::Global => "[global]",
+        Scope::Local => "[local]",
+    };
     let count = format!("{}/{}", f.matches.len(), f.total);
     let prompt = " ❯ ";
-    let room = cols.saturating_sub(printed_width(prompt) + printed_width(&count) + 1);
+    let room = cols
+        .saturating_sub(printed_width(prompt) + printed_width(&count) + printed_width(scope) + 2);
     let typed = truncate_to_width(f.query, room);
-    let gap = cols
-        .saturating_sub(printed_width(prompt) + printed_width(&typed) + printed_width(&count) + 1);
+    let gap = cols.saturating_sub(
+        printed_width(prompt)
+            + printed_width(&typed)
+            + printed_width(&count)
+            + printed_width(scope)
+            + 2,
+    );
     // Every part of the row takes the surface, the gap included: a panel with a hole in it is not
     // a panel.
     let on_surface = |style: Style| Style {
@@ -238,11 +256,18 @@ fn search_bar(
         ..style
     };
     format!(
-        "{}{}{}{}{}",
+        "{}{}{}{}{}{}{}",
         on_surface(pager.match_).paint(prompt, depth),
         on_surface(pager.text_sel).paint(&typed, depth),
         on_surface(Style::default()).paint(&" ".repeat(gap), depth),
         on_surface(pager.column(1, false)).paint(&count, depth),
+        on_surface(Style::default()).paint(" ", depth),
+        Style {
+            fg: Some(Color::Indexed(0)),
+            bg: Some(Color::Indexed(1)),
+            ..Style::default()
+        }
+        .paint(scope, depth),
         on_surface(Style::default()).paint(" ", depth),
     )
 }

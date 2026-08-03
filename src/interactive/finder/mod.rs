@@ -15,6 +15,9 @@
 //! that column on the thing worth knowing about a past command: **when you last ran it**, beside
 //! how often and where.
 //!
+//! The finder opens over global history. Tab switches to commands from the current directory only
+//! and back again; the scope shown at the end of the search bar makes that filter explicit.
+//!
 //! # Why it takes the whole screen
 //!
 //! Because history is long. The dropdown shows eight rows because a completion list that pushed
@@ -31,5 +34,14 @@
 pub mod rank;
 pub mod render;
 mod run;
+
+/// Which part of history the finder is searching.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Scope {
+    /// Commands from every recorded directory.
+    Global,
+    /// Commands recorded in the shell's current directory only.
+    Local,
+}
 
 pub use run::{Outcome, open};

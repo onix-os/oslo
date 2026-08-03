@@ -30,6 +30,7 @@ fn frame_of<'a>(matches: &'a [Ranked], query: &'a str, rows: usize) -> String {
         selected: 0,
         offset: 0,
         query,
+        scope: Scope::Global,
         total: matches.len(),
         cols: 80,
         rows,
@@ -107,8 +108,64 @@ fn the_search_bar_sits_inside_its_surface() {
     );
 }
 
-/// The list grows upward: with one match and room for many, the match sits directly above the
-/// input surface and the empty rows are at the top.
+/// The tint reaches both terminal edges. A raw unpainted space before or after the styled row is
+/// the side margin this layout deliberately does not have.
+#[test]
+fn the_input_surface_is_full_width() {
+    let matches = [ranked("one", 1, 999_999_999, "/home/me", false)];
+    let rendered = frame_of(&matches, "needle", 10);
+    let row = rendered
+        .lines()
+        .find(|line| line.contains("needle"))
+        .expect("the query row is drawn");
+    assert!(!row.starts_with("\x1b[2K "), "left margin remains: {row:?}");
+    assert!(!row.ends_with(" \r"), "right margin remains: {row:?}");
+}
+
+#[test]
+fn the_scope_is_shown_at_the_end_of_the_search_bar() {
+    let matches = [ranked("one", 1, 999_999_999, "/home/me", false)];
+    let global = plain(&frame_of(&matches, "", 10));
+    assert!(global.lines().any(|line| line.contains("1/1 [global]")));
+
+    let local = plain(&frame(&Frame {
+        matches: &matches,
+        selected: 0,
+        offset: 0,
+        query: "",
+        scope: Scope::Local,
+        total: 1,
+        cols: 80,
+        rows: 10,
+        now: 1_000_000_000,
+    }));
+    assert!(local.lines().any(|line| line.contains("1/1 [local]")));
+}
+
+#[test]
+fn the_scope_badge_uses_accent_on_zero() {
+    let matches = [ranked("one", 1, 999_999_999, "/home/me", false)];
+    let f = Frame {
+        matches: &matches,
+        selected: 0,
+        offset: 0,
+        query: "",
+        scope: Scope::Global,
+        total: 1,
+        cols: 80,
+        rows: 10,
+        now: 1_000_000_000,
+    };
+    let pager = theme::Pager::default();
+    let bar = search_bar(&f, &pager, pager.bg, 80, Depth::Ansi256);
+    assert!(
+        bar.contains("\x1b[38;5;0;48;5;1m[global]\x1b[0m"),
+        "scope badge has the wrong colours: {bar:?}"
+    );
+}
+
+/// The list grows upward: with one match and room for many, the match sits above the one plain
+/// separator row and the empty result rows are at the top.
 #[test]
 fn the_list_grows_upward_from_the_bar() {
     let matches = [ranked("only", 1, 999_999_999, "/home/me", false)];
@@ -118,14 +175,23 @@ fn the_list_grows_upward_from_the_bar() {
         .iter()
         .position(|l| l.contains("only"))
         .expect("the match is drawn");
-    // 8 rows: 3 for the surface, 5 for the list. The match is the last list row.
+    // 8 rows: 3 for the surface, 2 margins, 3 for the list. The match is the last list row.
     assert_eq!(
-        match_row, 3,
-        "the match should be the last list row: {lines:?}"
+        match_row, 2,
+        "the match should be the last result row: {lines:?}"
     );
     assert!(
         lines[..match_row].iter().all(|l| l.trim().is_empty()),
         "the empty rows should be above: {lines:?}"
+    );
+    let query_row = lines
+        .iter()
+        .position(|line| line.contains('❯') && line.contains("[global]"))
+        .expect("the query row is drawn");
+    assert_eq!(
+        query_row - match_row,
+        3,
+        "there should be a separator and the surface's upper padding: {lines:?}"
     );
 }
 
@@ -176,6 +242,7 @@ fn exactly_one_row_carries_the_marker() {
         selected: 1,
         offset: 0,
         query: "",
+        scope: Scope::Global,
         total: 3,
         cols: 80,
         rows: 10,
@@ -203,7 +270,7 @@ fn the_best_match_sits_nearest_the_bar() {
         ranked("second", 1, 4, "/home/me", false),
         ranked("third", 1, 3, "/home/me", false),
     ];
-    let seen = plain(&frame_of(&matches, "", 7));
+    let seen = plain(&frame_of(&matches, "", 8));
     let lines: Vec<&str> = seen.lines().collect();
     let row_of = |needle: &str| {
         lines
@@ -211,7 +278,7 @@ fn the_best_match_sits_nearest_the_bar() {
             .position(|l| l.contains(needle))
             .unwrap_or_else(|| panic!("{needle} is not drawn: {lines:?}"))
     };
-    // 7 rows: 3 surface, 1 margin, 3 for the list — so the best match is row 2, against the panel.
+    // 8 rows: 3 surface, 2 margins, 3 for the list — so the best match is result row 2.
     assert_eq!(
         row_of("best"),
         2,
@@ -223,26 +290,46 @@ fn the_best_match_sits_nearest_the_bar() {
     );
 }
 
-/// No list row carries a background. The whole point of the redesign: a full-screen list has the
-/// screen to itself, so painting the rows spends the strongest signal available on nothing, and
-/// the selected row is marked by its glyph instead.
-/// Rows alternate: one plain, one on the surface colour, so a long list can be read across
-/// without the eye losing its place.
+/// Rows alternate: one plain, one on colour 235, so a long list can be read across without the eye
+/// losing its place.
 #[test]
 fn the_rows_alternate() {
     let matches: Vec<_> = (0..4)
         .map(|i| ranked(&format!("row-{i}"), 1, 10 - i, "/home/me", false))
         .collect();
     let rendered = frame_of(&matches, "", 9);
-    let painted = |needle: &str| {
+    let row = |needle: &str| {
         rendered
             .lines()
             .find(|l| l.contains(needle))
             .unwrap_or_else(|| panic!("{needle} is not drawn in {rendered:?}"))
-            .contains("48;5;")
     };
     // Index 0 is selected and takes the selection colour; odd rows stripe, even ones do not.
-    assert!(!painted("row-2"), "an even row should be plain");
-    assert!(painted("row-1"), "an odd row should be striped");
-    assert!(painted("row-3"), "an odd row should be striped");
+    assert!(
+        !row("row-2").contains("48;5;"),
+        "an even row should be plain"
+    );
+    assert!(row("row-1").contains("48;5;235"));
+    assert!(row("row-3").contains("48;5;235"));
+}
+
+/// Every separator between columns carries the row background too; otherwise the terminal's own
+/// background appears as vertical holes through striped and selected rows.
+#[test]
+fn coloured_rows_have_no_unpainted_column_gaps() {
+    let matches = [
+        ranked("selected", 1, 10, "/home/me", false),
+        ranked("striped", 1, 9, "/home/me", false),
+    ];
+    let rendered = frame_of(&matches, "", 9);
+    for needle in ["selected", "striped"] {
+        let row = rendered
+            .lines()
+            .find(|line| line.contains(needle))
+            .expect("row is drawn");
+        assert!(
+            !row.contains("\x1b[0m \x1b["),
+            "an unpainted column gap remains in {needle}: {row:?}"
+        );
+    }
 }

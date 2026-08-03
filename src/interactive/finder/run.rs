@@ -8,8 +8,9 @@
 //! type into, and the only way out is to close the window. So the restore is a guard that runs on
 //! drop rather than a line at the end of the loop, and the loop below cannot forget it.
 
+use super::Scope;
 use super::rank::{Ranked, rank};
-use super::render::{Frame, frame};
+use super::render::{Frame, frame, visible_rows};
 use crate::interactive::matching::Fuzzy;
 use crate::track::history::Command;
 use nix::sys::termios::{LocalFlags, SetArg, Termios, tcgetattr, tcsetattr};
@@ -83,7 +84,8 @@ pub fn open(commands: &[Command], cwd: &str, now: i64, fuzzy: Fuzzy) -> Option<O
             selected: state.selected,
             offset: state.offset,
             query: &state.query,
-            total: commands.len(),
+            scope: state.scope,
+            total: state.total(),
             cols,
             rows,
             now,
@@ -109,10 +111,11 @@ pub fn open(commands: &[Command], cwd: &str, now: i64, fuzzy: Fuzzy) -> Option<O
                     None => Outcome::Cancelled,
                 });
             }
-            Key::Up => state.move_by(-1),
-            Key::Down => state.move_by(1),
-            Key::PageUp => state.move_by(-(state.window as isize)),
-            Key::PageDown => state.move_by(state.window as isize),
+            Key::Up => state.up(),
+            Key::Down => state.down(),
+            Key::PageUp => state.page_up(),
+            Key::PageDown => state.page_down(),
+            Key::ToggleScope => state.toggle_scope(),
             Key::Backspace => {
                 state.query.pop();
                 state.refilter();
@@ -136,6 +139,7 @@ struct State<'a> {
     cwd: String,
     fuzzy: Fuzzy,
     query: String,
+    scope: Scope,
     matches: Vec<Ranked>,
     /// Index into `matches`.
     selected: usize,
@@ -154,6 +158,7 @@ impl<'a> State<'a> {
             cwd: cwd.to_string(),
             fuzzy,
             query: String::new(),
+            scope: Scope::Global,
             matches,
             // The list grows upward from the search bar, so the row *nearest* the bar is the one
             // selected when it opens: the best match, under the cursor, one keystroke away.
@@ -165,10 +170,50 @@ impl<'a> State<'a> {
 
     fn refilter(&mut self) {
         self.matches = rank(self.commands, &self.query, &self.cwd, self.fuzzy);
+        if self.scope == Scope::Local {
+            self.matches.retain(|row| row.command.dir == self.cwd);
+        }
         // Back to the top: the old selection referred to a list that no longer exists, and
         // keeping the index would land the cursor on an unrelated command.
         self.selected = 0;
         self.offset = 0;
+    }
+
+    fn toggle_scope(&mut self) {
+        self.scope = match self.scope {
+            Scope::Global => Scope::Local,
+            Scope::Local => Scope::Global,
+        };
+        self.refilter();
+    }
+
+    fn total(&self) -> usize {
+        match self.scope {
+            Scope::Global => self.commands.len(),
+            Scope::Local => self
+                .commands
+                .iter()
+                .filter(|command| command.dir == self.cwd)
+                .count(),
+        }
+    }
+
+    /// Results are stored best-first but painted bottom-up. Moving visually upward therefore
+    /// advances through the vector; moving down goes back toward index zero.
+    fn up(&mut self) {
+        self.move_by(1);
+    }
+
+    fn down(&mut self) {
+        self.move_by(-1);
+    }
+
+    fn page_up(&mut self) {
+        self.move_by(self.window as isize);
+    }
+
+    fn page_down(&mut self) {
+        self.move_by(-(self.window as isize));
     }
 
     /// Move the selection, clamped, and bring it back into view.
@@ -184,7 +229,7 @@ impl<'a> State<'a> {
 
     /// Note this frame's window size and keep the selection visible in it.
     fn fit(&mut self, rows: usize) {
-        self.window = rows.saturating_sub(2).max(1);
+        self.window = visible_rows(rows);
         self.scroll_into_view();
     }
 
@@ -213,14 +258,14 @@ enum Key {
     Accept,
     Cancel,
     Clear,
+    ToggleScope,
     Ignored,
 }
 
 /// What a byte sequence means, once a whole one has been collected.
 ///
-/// **Up moves away from the search bar and Down moves toward it.** The list grows upward, so
-/// "up" is toward the older commands at the top of the screen — the direction the key points. The
-/// first version had these the other way round and it was wrong the moment anyone pressed a key.
+/// Up and Down name screen directions, not vector directions. Results are stored best-first and
+/// drawn bottom-up, so the loop advances the index for Up and reduces it for Down.
 fn key(bytes: &[u8]) -> Key {
     match bytes {
         [] => Key::Ignored,
@@ -230,6 +275,7 @@ fn key(bytes: &[u8]) -> Key {
         [0x03] => Key::Cancel,
         [0x0d] | [0x0a] => Key::Accept,
         [0x7f] | [0x08] => Key::Backspace,
+        [0x09] => Key::ToggleScope,
         // Ctrl-U, as it clears the line at a prompt.
         [0x15] => Key::Clear,
         // Ctrl-P / Ctrl-N, for the same reason every other list in the shell takes them.

@@ -174,6 +174,21 @@ pub(super) fn read_command(
         let raw = match rl.readline_with_initial(&prompt, (&typed[..split], &typed[split..])) {
             Ok(raw) => raw,
             Err(ReadlineError::Interrupted) => {
+                // A finder choice deliberately interrupts this editor instance instead of using
+                // rustyline's `Replace`: replacement text is inserted at the right place but its
+                // logical cursor is not advanced. Reopening with the whole choice on the *left*
+                // side of `readline_with_initial` puts both the visible and logical cursor at the
+                // end, so the next typed character really appends there.
+                if let Some(choice) = super::keybind::take_finder_choice() {
+                    typed = choice.line;
+                    typed_point = typed.len();
+                    print!(
+                        "{}",
+                        oslo::interactive::row::rewind_after_readline(&choice.previous)
+                    );
+                    let _ = std::io::Write::flush(&mut std::io::stdout());
+                    continue;
+                }
                 // Ctrl-C abandons the *line*, not the language. If the user switched to Lua and
                 // then thought better of the command, the prompt they were looking at said `lua`
                 // and the next one must too — and the flag has to be consumed either way, or it

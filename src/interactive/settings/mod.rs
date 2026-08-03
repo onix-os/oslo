@@ -22,6 +22,8 @@ pub struct Settings {
     pub notify: Notify,
     /// `oslo.finder`: the full-screen history search.
     pub finder: Finder,
+    /// `oslo.misc`: the settings that belong to no other group.
+    pub misc: Misc,
     /// `oslo.dirs`: the directories `@name` reaches.
     ///
     /// Sorted, because table iteration has no order and a diagnostic that named them in a
@@ -154,6 +156,27 @@ impl Source {
             "path" | "paths" | "file" => Some(Source::Path),
             _ => None,
         }
+    }
+}
+
+/// `oslo.misc` — the handful of settings that are not about any one subsystem.
+///
+/// A deliberate catch-all rather than a group per switch. A shell accumulates these, and inventing
+/// `oslo.startup`, `oslo.banner` and `oslo.greeting` for one boolean each is how a config grows a
+/// vocabulary nobody can remember.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Misc {
+    /// Whether to print the version banner and the exit hint at startup.
+    ///
+    /// On by default, because a first-time user needs to be told how to leave — that is the
+    /// oldest usability bug in the interactive-program genre. Off is for everybody else, who has
+    /// read it a thousand times and would rather have the two rows.
+    pub welcome: bool,
+}
+
+impl Default for Misc {
+    fn default() -> Self {
+        Misc { welcome: true }
     }
 }
 

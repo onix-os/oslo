@@ -23,8 +23,7 @@ fn many(n: usize) -> Vec<Command> {
         .collect()
 }
 
-/// Up moves away from the search bar, toward the older commands at the top; Down moves toward it.
-/// The first version had these swapped and it was wrong the moment anyone pressed a key.
+/// The parser names the physical keys; the loop maps those onto the bottom-up result vector.
 #[test]
 fn the_arrows_point_the_way_the_list_grows() {
     assert_eq!(key(b"\x1b[A"), Key::Up);
@@ -34,6 +33,20 @@ fn the_arrows_point_the_way_the_list_grows() {
     assert_eq!(key(b"\x1bOB"), Key::Down);
     assert_eq!(key(b"\x10"), Key::Up);
     assert_eq!(key(b"\x0e"), Key::Down);
+}
+
+/// Index zero is drawn nearest the search bar. Up must advance to the row above it and Down must
+/// return toward it, the reverse of the vector's numeric direction.
+#[test]
+fn arrow_navigation_follows_the_screen() {
+    let commands = many(5);
+    let mut state = State::new(&commands, "/here", Fuzzy::Smart);
+    state.fit(10);
+
+    state.up();
+    assert_eq!(state.selected, 1);
+    state.down();
+    assert_eq!(state.selected, 0);
 }
 
 #[test]
@@ -52,6 +65,7 @@ fn the_keys_that_edit_the_query() {
     assert_eq!(key(b"g"), Key::Char('g'));
     assert_eq!(key(b" "), Key::Char(' '));
     assert_eq!(key(b"-"), Key::Char('-'));
+    assert_eq!(key(b"\t"), Key::ToggleScope);
 }
 
 /// A terminal delivers a multibyte character in one read. Dropping it would make the finder
@@ -97,19 +111,19 @@ fn the_selection_is_clamped() {
 fn the_window_follows_the_selection() {
     let commands = many(100);
     let mut state = State::new(&commands, "/here", Fuzzy::Smart);
-    // 12 rows: 10 for the list.
+    // 12 rows: five rows of input chrome leave seven for the list.
     state.fit(12);
-    assert_eq!(state.window, 10);
+    assert_eq!(state.window, 7);
 
-    state.move_by(9);
-    assert_eq!(state.selected, 9);
+    state.move_by(6);
+    assert_eq!(state.selected, 6);
     assert_eq!(state.offset, 0, "still in the first window");
 
     state.move_by(1);
-    assert_eq!(state.selected, 10);
+    assert_eq!(state.selected, 7);
     assert_eq!(state.offset, 1, "scrolled by one");
 
-    state.move_by(-10);
+    state.move_by(-7);
     assert_eq!(state.selected, 0);
     assert_eq!(state.offset, 0, "scrolled back");
 }
@@ -123,7 +137,7 @@ fn the_window_does_not_overrun_the_list() {
     state.fit(12);
     state.move_by(100);
     assert_eq!(state.selected, 11);
-    assert_eq!(state.offset, 2, "the last window, not past it");
+    assert_eq!(state.offset, 5, "the last window, not past it");
 }
 
 /// Typing resets the selection: the old index referred to a list that no longer exists, and
@@ -153,7 +167,7 @@ fn shrinking_the_terminal_keeps_the_selection_visible() {
     assert_eq!(state.selected, 30);
 
     state.fit(7);
-    assert_eq!(state.window, 5);
+    assert_eq!(state.window, 2);
     assert!(
         state.selected >= state.offset && state.selected < state.offset + state.window,
         "selected {} is outside the window at {}..{}",
@@ -161,6 +175,34 @@ fn shrinking_the_terminal_keeps_the_selection_visible() {
         state.offset,
         state.offset + state.window
     );
+}
+
+/// Tab switches between all history and commands run in this exact directory. A parent directory
+/// is useful as a ranking hint in global mode, but local means this directory only.
+#[test]
+fn tab_toggles_exact_directory_history() {
+    let mut here = command("here", 3);
+    here.dir = "/work/project/crate".to_string();
+    let mut parent = command("parent", 2);
+    parent.dir = "/work/project".to_string();
+    let mut elsewhere = command("elsewhere", 1);
+    elsewhere.dir = "/other".to_string();
+    let commands = [here, parent, elsewhere];
+    let mut state = State::new(&commands, "/work/project/crate", Fuzzy::Smart);
+
+    assert_eq!(state.scope, Scope::Global);
+    assert_eq!(state.matches.len(), 3);
+    assert_eq!(state.total(), 3);
+
+    state.toggle_scope();
+    assert_eq!(state.scope, Scope::Local);
+    assert_eq!(state.total(), 1);
+    assert_eq!(state.matches.len(), 1);
+    assert_eq!(state.matches[0].command.line, "here");
+
+    state.toggle_scope();
+    assert_eq!(state.scope, Scope::Global);
+    assert_eq!(state.matches.len(), 3);
 }
 
 /// A query that matches nothing leaves an empty list, and moving in it must not panic.

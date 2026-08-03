@@ -155,11 +155,16 @@ pub fn run_repl() -> ! {
     let mut jobs = JobManager::new();
     jobs.setup_signals();
 
-    println!(
-        "oslo {} - POSIX Compatible Shell with Lua & Fish-style Features",
-        env!("CARGO_PKG_VERSION")
-    );
-    println!("Type 'exit' or Ctrl-D to exit.");
+    // `oslo.misc.welcome = false` takes these two rows back. Printed here rather than earlier
+    // because the config has run by now and can have turned them off — a banner that appeared
+    // before the setting was read could not be suppressed by it.
+    if oslo::interactive::settings::current().misc.welcome {
+        println!(
+            "oslo {} - POSIX Compatible Shell with Lua & Fish-style Features",
+            env!("CARGO_PKG_VERSION")
+        );
+        println!("Type 'exit' or Ctrl-D to exit.");
+    }
 
     let mut last_status = 0;
     let mut eof_count = 0usize;

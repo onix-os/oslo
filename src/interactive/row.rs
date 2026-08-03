@@ -93,6 +93,32 @@ pub fn language() -> Option<String> {
     ROW.lock().ok()?.as_ref().map(|row| row.language.clone())
 }
 
+/// Return to the first screen row of an editor instance that has just ended, and clear it.
+///
+/// rustyline writes a newline whenever `readline_with_initial` returns, including the private
+/// interrupt used to hand a finder choice back to the read loop. The next editor instance must
+/// start where the old one did or accepting a choice would leave a duplicate prompt behind. The
+/// old input may have wrapped, so moving up one row is not enough.
+pub fn rewind_after_readline(line: &str) -> String {
+    let prompt_width = ROW
+        .lock()
+        .ok()
+        .and_then(|row| row.as_ref().map(|row| row.prompt_width))
+        .unwrap_or(0);
+    rewind_rows(
+        prompt_width,
+        super::prompt::printed_width(line),
+        super::dropdown::terminal_cols().max(1),
+    )
+}
+
+fn rewind_rows(prompt_width: usize, line_width: usize, cols: usize) -> String {
+    // The cursor was moved to the end before rustyline wrote its newline. `end / cols` is the
+    // zero-based wrapped row it occupied; one more crosses the newline back to the prompt's row.
+    let rows = (prompt_width + line_width) / cols.max(1) + 1;
+    format!("\x1b[{rows}A\r\x1b[J")
+}
+
 pub fn repaint(line: &str, line_cursor: usize) -> String {
     let Ok(mut slot) = ROW.lock() else {
         return String::new();
@@ -206,4 +232,16 @@ fn mode_name() -> String {
     super::vi::mode()
         .map(|m| m.name().to_string())
         .unwrap_or_default()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::rewind_rows;
+
+    #[test]
+    fn finder_rewind_accounts_for_wrapped_input() {
+        assert_eq!(rewind_rows(10, 20, 80), "\x1b[1A\r\x1b[J");
+        assert_eq!(rewind_rows(10, 80, 80), "\x1b[2A\r\x1b[J");
+        assert_eq!(rewind_rows(10, 160, 80), "\x1b[3A\r\x1b[J");
+    }
 }

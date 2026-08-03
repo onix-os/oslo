@@ -13,6 +13,35 @@ use rustyline::{Cmd, ConditionalEventHandler, Event, EventContext, RepeatCount};
 use std::io::Write;
 use std::sync::{Arc, Mutex};
 
+/// A finder choice waiting for the read loop to reopen the editor around it.
+///
+/// rustyline's `Replace` command inserts replacement text without advancing its logical cursor.
+/// Returning `Interrupt` lets [`super::read`] reopen with `readline_with_initial`, whose left/right
+/// split sets the cursor exactly; the old line is kept so its wrapped screen rows can be erased.
+pub(super) struct FinderChoice {
+    pub line: String,
+    pub previous: String,
+}
+
+static FINDER_CHOICE: Mutex<Option<FinderChoice>> = Mutex::new(None);
+
+pub(super) fn take_finder_choice() -> Option<FinderChoice> {
+    FINDER_CHOICE.lock().ok()?.take()
+}
+
+fn return_finder_choice(line: String, previous: &str) -> Cmd {
+    if let Ok(mut slot) = FINDER_CHOICE.lock() {
+        *slot = Some(FinderChoice {
+            line,
+            previous: previous.to_string(),
+        });
+        Cmd::Interrupt
+    } else {
+        // A poisoned handoff must not throw away what was already on the prompt.
+        Cmd::Noop
+    }
+}
+
 /// Watches every keystroke to keep the cursor shape agreeing with the vi mode.
 ///
 /// A wildcard handler that **never handles anything**: it reads the mode rustyline is now in,
@@ -425,8 +454,8 @@ pub fn apply(rl: &mut Repl, env_struct: &Arc<Mutex<Environment>>, toggle: &Toggl
 ///
 /// It runs *from inside the editor*, exactly as the completion dropdown does: raw mode is already
 /// on, and the finder takes the alternate screen for as long as it is open, so the prompt
-/// underneath is untouched and comes back as it was. That is why this needs no cooperation from
-/// the read loop — the chosen line is simply what the key press produces.
+/// underneath is untouched and comes back as it was. A chosen line is handed through the read
+/// loop once so rustyline can initialise it with the cursor explicitly at the end.
 ///
 /// Declining — answering `None` — hands Up back to whatever would have had it, which is
 /// [`HistoryWalk`]. So a shell with no history, no tracker, or the finder turned off keeps the
@@ -490,7 +519,7 @@ impl ConditionalEventHandler for OpenFinder {
             // finder that submitted on Enter would take that choice away. This is the same
             // contract every other recall in the shell has.
             Some(oslo::interactive::finder::Outcome::Chosen { line, .. }) => {
-                Some(Cmd::Replace(rustyline::Movement::WholeLine, Some(line)))
+                Some(return_finder_choice(line, ctx.line()))
             }
             // Cancelled: the prompt comes back with exactly what was on it. `Noop` rather than
             // `None`, or declining would hand the same keystroke to the history walk and Esc would
@@ -502,5 +531,26 @@ impl ConditionalEventHandler for OpenFinder {
             // No terminal to draw on — a pipe, or a test harness. The walk still works there.
             None => self.fallback.handle(event, n, positive, ctx),
         }
+    }
+}
+
+#[cfg(test)]
+mod finder_choice_tests {
+    use super::*;
+
+    #[test]
+    fn a_choice_carries_both_lines_and_interrupts_the_editor() {
+        let _ = take_finder_choice();
+        assert_eq!(
+            return_finder_choice("chosen command".to_string(), "half typed"),
+            Cmd::Interrupt
+        );
+        let choice = take_finder_choice().expect("the read loop receives the choice");
+        assert_eq!(choice.line, "chosen command");
+        assert_eq!(choice.previous, "half typed");
+        assert!(
+            take_finder_choice().is_none(),
+            "the handoff is consumed once"
+        );
     }
 }

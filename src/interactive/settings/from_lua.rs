@@ -128,6 +128,13 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
         }
     }
 
+    if let Value::Table(table) = oslo.get(&Value::str("misc")) {
+        let table = table.borrow();
+        if let Value::Bool(on) = table.get(&Value::str("welcome")) {
+            settings.misc.welcome = on;
+        }
+    }
+
     if let Value::Table(table) = oslo.get(&Value::str("finder")) {
         let table = table.borrow();
         if let Value::Bool(on) = table.get(&Value::str("enabled")) {
