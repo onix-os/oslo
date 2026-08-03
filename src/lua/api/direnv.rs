@@ -36,6 +36,19 @@
 //! `cd` into a flake. [`IGNORED`] is that list, widened to nix's full documented set so a variable
 //! that is merely absent from this flake cannot appear in another one and break it.
 //!
+//! # The rule behind both of the bugs this module has had
+//!
+//! **`print-dev-env`'s bash output is curated for a shell to consume; `--json` is a raw dump of the
+//! builder.** Everything the bash form does *besides* assigning values is invisible to `--json`:
+//!
+//! * variables it declines to emit at all — `HOME`, `TERM`, `TZ` and two more, handled by
+//!   [`IGNORED`];
+//! * statements it runs after the assignments — the `PATH` restore, handled by [`keeping_yours`].
+//!
+//! Both bugs were the same mistake twice: treating a snapshot of values as if it were the script.
+//! A third difference of this kind is likely, so when something loaded from a flake behaves oddly,
+//! diff the two forms before looking anywhere else — that is how both of these were found.
+//!
 //! # Why this is in Rust when nothing else is
 //!
 //! It could be written in Lua — `oslo.proc.capture`, `oslo.json` and `oslo.env.set` are all there, and
@@ -119,19 +132,23 @@ pub fn exported_from(json: &str) -> Result<Vec<(String, String)>, String> {
 
 /// The dev shell's `PATH`, with everything of yours that it does not already have, behind it.
 ///
-/// **A dev shell's `PATH` is a *build* environment, not a usable one.** `nix print-dev-env` hands
-/// back the derivation's own `PATH` — 36 store entries for this repository's flake — and it
-/// *replaces* yours rather than adding to it. It has `ls` and `grep`, because coreutils is a build
-/// input; it does not have `clear`, or `git`, or anything you installed. Taking it verbatim means
-/// `cd` into a project and your shell quietly loses half its commands, which is exactly what
-/// happened the first time this was used for real.
+/// **This is not our invention — it is a line `--json` cannot carry.** The bash form of
+/// `print-dev-env` is bookended:
 ///
-/// So the dev shell goes first — its toolchain must win, that is the entire point — and yours
-/// follows. Entries already present are not repeated, so a reload cannot grow the variable.
+/// ```sh
+/// line    3:  nix_saved_PATH="$PATH"                           # save yours
+/// line   91:  PATH='/nix/store/…gcc-wrapper/bin:…'             # replace with the dev shell's
+/// line 2195:  PATH="$PATH${nix_saved_PATH:+:$nix_saved_PATH}"  # and put yours back, behind it
+/// ```
 ///
-/// direnv's `use flake` does *not* do this: it evals the bash and takes the replacement. That is
-/// why so many real `.envrc` files re-append `$PATH` by hand afterwards, including the one this
-/// repository used to have.
+/// direnv `eval`s that script, so line 2195 runs and a zsh user keeps `clear` and `git`. `--json`
+/// is a snapshot of *values*: line 2195 is a statement, and `nix_saved_PATH` is not among its 144
+/// variables at all. So the append has to be done here, or it does not happen.
+///
+/// Without it, a dev shell's `PATH` is a *build* environment — 36 store entries for this
+/// repository's flake, with `ls` and `grep` because coreutils is a build input, and no `clear`, no
+/// `git`, and nothing you installed. `cd` into the project and the shell quietly loses half its
+/// commands, which is exactly what happened the first time this was used for real.
 fn keeping_yours(dev: &str, outer: &str) -> String {
     let mut out: Vec<&str> = dev.split(':').filter(|e| !e.is_empty()).collect();
     for entry in outer.split(':').filter(|e| !e.is_empty()) {
