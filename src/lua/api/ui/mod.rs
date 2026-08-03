@@ -5,19 +5,28 @@
 //! * [`text`] measures and shapes text in **cells**, which is what a terminal has and what a
 //!   string does not;
 //! * [`layout`] puts text where it fits — columns and tables;
-//! * [`ask`] takes an answer back from the person;
+//! * [`ask`] takes an answer back from the person, in ordinary lines;
+//! * [`prompt`] does the same with the terminal in raw mode — arrow keys, a moving cursor, a
+//!   list you can filter — for the cases where a person is definitely there;
 //! * the terminal facts below are what all three are relative to.
 //!
-//! # What this deliberately is not
+//! # Two ways to ask, and why both
 //!
-//! There is no screen, no cursor addressing, no alternate buffer, no widget that owns the terminal
-//! until it decides to give it back. A shell's UI has to compose with a *scrolling transcript* —
-//! everything drawn here is lines of text that stay where they were printed, and that a pipe, a
-//! log or `tee` receives intact. A full-screen library would be a second, incompatible way to use
-//! the terminal living inside the one that already works.
+//! [`ask`] writes a line and reads a line. It works down a pipe, over a serial console, and in a
+//! script whose output is being logged, and what you were asked stays in the transcript where you
+//! can scroll back to it.
+//!
+//! [`prompt`] takes the terminal for the length of one question. It needs a tty and answers `nil`
+//! without one. It is what a person at a keyboard expects — arrows, a cursor, a list that narrows
+//! as they type — and it is the same code the `ui` builtin runs, so a prompt is identical whether
+//! shell or Lua asked for it.
+//!
+//! Neither owns the screen beyond its own question: even the raw-mode widgets draw in place and
+//! erase themselves, so the transcript above them is untouched.
 
 mod ask;
 mod layout;
+mod prompt;
 mod text;
 
 use super::util::{ok, put};
@@ -32,6 +41,7 @@ pub fn install(ui: &mut Table) {
     text::install(ui);
     layout::install(ui);
     ask::install(ui);
+    prompt::install(ui);
 }
 
 /// What the terminal is, so a script can decide what to draw before drawing it.

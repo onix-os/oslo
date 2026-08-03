@@ -5,6 +5,7 @@
 //! behaviour was reachable without a pty and that is precisely why it was all wrong.
 
 pub mod abbr;
+pub mod ask;
 pub mod command_index;
 pub mod completion;
 pub mod dropdown;
@@ -23,6 +24,7 @@ pub mod row;
 pub mod settings;
 pub mod spec;
 pub mod syntax;
+pub mod term;
 pub mod theme;
 pub mod vi;
 pub mod words;

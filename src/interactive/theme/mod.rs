@@ -94,6 +94,54 @@ pub struct Theme {
     pub syntax: Syntax,
     pub pager: Pager,
     pub prompt: Prompt,
+    /// Colours for the input widgets — `oslo.ui` in Lua, the `ui` builtin in scripts.
+    pub ui: Ui,
+}
+
+/// The palette every prompt widget draws from.
+///
+/// **One accent, and then ordinary ANSI.** The accent is the shell's colour: it marks the thing
+/// you are being asked about and the thing you have chosen, and nothing else competes with it.
+/// Everything else is a basic ANSI colour rather than an RGB value, so a widget looks like it
+/// belongs in whatever palette the terminal is using — which is the difference between a prompt
+/// that sits in your theme and one that ignores it.
+///
+/// The set is small on purpose. gum has a flag for the colour of every part of every widget; the
+/// result is that nobody sets any of them, and the ones who do end up with a prompt that matches
+/// nothing else on their screen.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Ui {
+    /// The main colour: the cursor, the selected row, the checked box, the focused button.
+    pub accent: Style,
+    /// The question itself.
+    pub question: Style,
+    /// Placeholder text, hints, and the key legend along the bottom.
+    pub muted: Style,
+    /// An answer that was refused, and the `no` side of a confirm.
+    pub error: Style,
+    /// A finished answer, echoed back after the widget closes.
+    pub done: Style,
+}
+
+impl Default for Ui {
+    fn default() -> Self {
+        let basic = |index: u8, bright: bool| Style::fg(Color::Basic { index, bright });
+        Ui {
+            // Bright magenta, which is gum's default accent and is unused by oslo's syntax
+            // colours — so an input never looks like a piece of the command line behind it.
+            accent: Style {
+                bold: true,
+                ..basic(5, true)
+            },
+            question: Style {
+                bold: true,
+                ..Style::default()
+            },
+            muted: basic(0, true),
+            error: basic(1, true),
+            done: basic(2, false),
+        }
+    }
 }
 
 /// Colours for the line as it is typed.
