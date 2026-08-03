@@ -128,6 +128,24 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
         }
     }
 
+    if let Value::Table(table) = oslo.get(&Value::str("finder")) {
+        let table = table.borrow();
+        if let Value::Bool(on) = table.get(&Value::str("enabled")) {
+            settings.finder.enabled = on;
+        }
+        if let Value::Str(key) = table.get(&Value::str("key")) {
+            // Checked here rather than at bind time, so a typo is reported next to the line that
+            // wrote it instead of silently leaving the finder unreachable.
+            match crate::interactive::keys::parse_key(&key) {
+                Some(_) => settings.finder.key = key.to_string(),
+                None => problems.push(format!("oslo.finder.key: '{key}' is not a key name")),
+            }
+        }
+        if let Some(n) = number(&table, "limit") {
+            settings.finder.limit = n.max(1) as usize;
+        }
+    }
+
     if let Value::Table(table) = oslo.get(&Value::str("keys")) {
         for (key, action) in table.borrow().pairs() {
             match (&key, &action) {

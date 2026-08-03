@@ -9,6 +9,7 @@ pub mod command_index;
 pub mod completion;
 pub mod dropdown;
 pub mod editor;
+pub mod finder;
 pub mod frecency_store;
 pub mod highlight;
 mod hinting;

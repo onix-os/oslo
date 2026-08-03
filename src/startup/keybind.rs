@@ -320,6 +320,21 @@ pub fn apply(rl: &mut Repl, env_struct: &Arc<Mutex<Environment>>, toggle: &Toggl
         );
     }
 
+    // The finder takes its key *after* the walk has taken Up, because rustyline keeps only the
+    // last binding for a sequence — binding it first meant the walk quietly replaced it. Falling
+    // back therefore cannot be done by declining; `OpenFinder` carries the walk and delegates to
+    // it when the finder is off or has nothing to show.
+    if settings.finder.enabled
+        && let Some(event) = oslo::interactive::keys::parse_key(&settings.finder.key)
+    {
+        rl.bind_sequence(
+            event,
+            rustyline::EventHandler::Conditional(Box::new(OpenFinder {
+                fallback: HistoryWalk { back: true },
+            })),
+        );
+    }
+
     // Space expands an abbreviation, if the word just typed is one. Bound unconditionally but
     // cheap: with no abbreviations defined the handler is one hash lookup that answers `None`, and
     // declining leaves rustyline to insert the space exactly as it would have.
@@ -403,5 +418,96 @@ pub fn apply(rl: &mut Repl, env_struct: &Arc<Mutex<Environment>>, toggle: &Toggl
             key,
             rustyline::EventHandler::Conditional(Box::new(toggle.clone())),
         );
+    }
+}
+
+/// Up opens the full-screen history finder.
+///
+/// It runs *from inside the editor*, exactly as the completion dropdown does: raw mode is already
+/// on, and the finder takes the alternate screen for as long as it is open, so the prompt
+/// underneath is untouched and comes back as it was. That is why this needs no cooperation from
+/// the read loop — the chosen line is simply what the key press produces.
+///
+/// Declining — answering `None` — hands Up back to whatever would have had it, which is
+/// [`HistoryWalk`]. So a shell with no history, no tracker, or the finder turned off keeps the
+/// behaviour it has always had rather than doing nothing.
+struct OpenFinder {
+    /// What the key does when the finder cannot open: walk history a line at a time, as Up
+    /// always has. Carried rather than declined to, because rustyline keeps one binding per key
+    /// and answering `None` would fall through to *its* default instead of oslo's.
+    fallback: HistoryWalk,
+}
+
+impl OpenFinder {
+    /// The commands to show, or `None` when the finder should stand aside.
+    fn commands(
+        &self,
+        settings: &oslo::interactive::settings::Settings,
+    ) -> Option<Vec<oslo::track::history::Command>> {
+        if !settings.finder.enabled {
+            return None;
+        }
+        let track = oslo::track::store()?;
+        // Only this language's commands. The editor's history holds both, and offering a Lua line
+        // at a shell prompt produces something that cannot run — the same crossing the ghost
+        // suggestion and the arrow keys are already filtered for.
+        let language = oslo::interactive::prompt::language().unwrap_or_else(|| "sh".to_string());
+        let commands: Vec<_> = track
+            .commands(settings.finder.limit)
+            .into_iter()
+            .filter(|command| command.mode == language)
+            .collect();
+        if commands.is_empty() {
+            return None;
+        }
+        Some(commands)
+    }
+}
+
+impl ConditionalEventHandler for OpenFinder {
+    fn handle(
+        &self,
+        event: &Event,
+        n: RepeatCount,
+        positive: bool,
+        ctx: &EventContext,
+    ) -> Option<Cmd> {
+        let settings = oslo::interactive::settings::current();
+        let Some(commands) = self.commands(&settings) else {
+            return self.fallback.handle(event, n, positive, ctx);
+        };
+
+        let cwd = std::env::current_dir()
+            .map(|p| p.display().to_string())
+            .unwrap_or_default();
+        let home = std::env::var("HOME").unwrap_or_default();
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs() as i64)
+            .unwrap_or(0);
+
+        match oslo::interactive::finder::open(
+            &commands,
+            &cwd,
+            &home,
+            now,
+            settings.completion.fuzzy,
+        ) {
+            // The line replaces what was typed but is **not** run: you may want to edit it, and a
+            // finder that submitted on Enter would take that choice away. This is the same
+            // contract every other recall in the shell has.
+            Some(oslo::interactive::finder::Outcome::Chosen { line, .. }) => {
+                Some(Cmd::Replace(rustyline::Movement::WholeLine, Some(line)))
+            }
+            // Cancelled: the prompt comes back with exactly what was on it. `Noop` rather than
+            // `None`, or declining would hand the same keystroke to the history walk and Esc would
+            // scroll the line away.
+            Some(oslo::interactive::finder::Outcome::Cancelled) => {
+                let _ = ctx;
+                Some(Cmd::Noop)
+            }
+            // No terminal to draw on — a pipe, or a test harness. The walk still works there.
+            None => self.fallback.handle(event, n, positive, ctx),
+        }
     }
 }

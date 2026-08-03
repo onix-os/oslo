@@ -67,7 +67,7 @@ pub fn install(interp: &Rc<Interp>, registry: &Registry, env: Arc<Mutex<Environm
     // one of these is read back after the config by walking the table, so an empty one that the
     // user never touches is indistinguishable from an absent one — which is what makes leaving
     // them here free.
-    for name in ["completion", "suggest", "history", "keys"] {
+    for name in ["completion", "suggest", "history", "keys", "finder"] {
         oslo.set(
             Value::str(name),
             Value::Table(Rc::new(RefCell::new(Table::new()))),
