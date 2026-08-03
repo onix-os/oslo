@@ -20,6 +20,10 @@ pub struct Settings {
     pub vi: Vi,
     /// `oslo.notify`: when a finished command is worth a desktop notification.
     pub notify: Notify,
+    /// `oslo.finder`: the full-screen history search.
+    pub finder: Finder,
+    /// `oslo.misc`: the settings that belong to no other group.
+    pub misc: Misc,
     /// `oslo.dirs`: the directories `@name` reaches.
     ///
     /// Sorted, because table iteration has no order and a diagnostic that named them in a
@@ -151,6 +155,60 @@ impl Source {
             "completion" | "completions" => Some(Source::Completion),
             "path" | "paths" | "file" => Some(Source::Path),
             _ => None,
+        }
+    }
+}
+
+/// `oslo.misc` — the handful of settings that are not about any one subsystem.
+///
+/// A deliberate catch-all rather than a group per switch. A shell accumulates these, and inventing
+/// `oslo.startup`, `oslo.banner` and `oslo.greeting` for one boolean each is how a config grows a
+/// vocabulary nobody can remember.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Misc {
+    /// Whether to print the version banner and the exit hint at startup.
+    ///
+    /// On by default, because a first-time user needs to be told how to leave — that is the
+    /// oldest usability bug in the interactive-program genre. Off is for everybody else, who has
+    /// read it a thousand times and would rather have the two rows.
+    pub welcome: bool,
+}
+
+impl Default for Misc {
+    fn default() -> Self {
+        Misc { welcome: true }
+    }
+}
+
+/// `oslo.finder` — the full-screen history search.
+///
+/// Separate from `oslo.completion` because it answers a different question. Completion suggests
+/// what a half-typed word *could* be; this searches what you have actually run. They share the
+/// fuzzy setting, since "how loosely should matching work" is one preference and having two would
+/// only ever be a way to set them inconsistently.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Finder {
+    /// Off means Up keeps walking history a line at a time, as it always did.
+    pub enabled: bool,
+    /// The key that opens it. Any name `oslo.keys` understands.
+    pub key: String,
+    /// How many distinct commands to load. The finder reads once when it opens and filters in
+    /// memory, so this bounds the work done on the keystroke that opens it — not per keystroke
+    /// while you type.
+    pub limit: usize,
+}
+
+impl Default for Finder {
+    fn default() -> Self {
+        Finder {
+            enabled: true,
+            // Up rather than Ctrl-R: Ctrl-R is muscle memory pointing at a *search*, and this is
+            // first of all a history *list* — the thing you reach for by pressing Up. Both are
+            // configurable, and Up still walks a line at a time when the finder is off.
+            key: "up".to_string(),
+            // Far more than anyone has, so the list is "everything" in practice, and still a bound
+            // rather than an unbounded read on a store that has been collecting for years.
+            limit: 10_000,
         }
     }
 }

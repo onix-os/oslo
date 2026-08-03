@@ -174,11 +174,16 @@ fn parse_and_run(env: &mut Environment, action: &str) -> Result<i32> {
 /// Whether a DEBUG handler is on the stack, so its own commands do not fire it again.
 static IN_DEBUG_TRAP: AtomicBool = AtomicBool::new(false);
 
-/// Run the DEBUG trap for the command about to execute.
+/// Run the DEBUG trap, before the command about to execute.
 ///
-/// bash fires this before each *simple* command with `$BASH_COMMAND` naming what is about to run,
-/// and that pair is the whole preexec mechanism — starship times commands with it, hexe records
-/// them, bash-preexec builds its entire hook array on it.
+/// bash fires this before each *simple* command, and with `$PROMPT_COMMAND` it forms the
+/// preexec/precmd pair every bash integration is built on: this one starts a timer, that one
+/// draws the prompt with the elapsed time.
+///
+/// **`$BASH_COMMAND` is deliberately not set.** bash names the command about to run in it, which
+/// needs the parsed command rendered back to shell text — 234 lines of renderer for one variable,
+/// which is not a trade oslo makes. A hook that only needs to know *that* a command is starting
+/// works as it does under bash; one that needs to know *which* does not.
 ///
 /// Three things make it safe to call from the execution path:
 ///
@@ -190,8 +195,7 @@ static IN_DEBUG_TRAP: AtomicBool = AtomicBool::new(false);
 /// * **a failing handler is not the command's failure.** An error inside a hook is reported and
 ///   the command still runs, because a broken prompt integration must not make the shell unusable.
 ///
-/// `$BASH_COMMAND` is left set afterwards, as bash leaves it.
-pub fn run_debug_trap(env: &mut Environment, command_text: &str) {
+pub fn run_debug_trap(env: &mut Environment) {
     if IN_DEBUG_TRAP.load(Ordering::SeqCst) {
         return;
     }
@@ -199,7 +203,6 @@ pub fn run_debug_trap(env: &mut Environment, command_text: &str) {
         return;
     };
     let action = text.to_string();
-    env.set_var("BASH_COMMAND", command_text, false);
 
     IN_DEBUG_TRAP.store(true, Ordering::SeqCst);
     let outcome = run_handler(env, &action);

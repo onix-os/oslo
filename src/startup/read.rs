@@ -79,13 +79,6 @@ pub(super) fn read_command(
             print!("{}", settings.vi.cursors.insert.escape());
         }
 
-        // `bind` is shell code and may have run since the last prompt — from the rc file, from a
-        // function, or from an `eval` typed a moment ago. Re-applied only when something actually
-        // changed, so the common case costs one atomic load.
-        if super::keybind::bindings_changed() {
-            super::keybind::apply_bindings(rl);
-        }
-
         let prompt = if buffer.is_empty() {
             prompt::primary_prompt(env_struct, lua, last_status, *current)
         } else {
@@ -98,12 +91,22 @@ pub(super) fn read_command(
         if let Some(helper) = rl.helper() {
             // A config's own right prompt wins; otherwise oslo draws one. There used to be none at
             // all unless a config asked, which meant the machinery existed and nobody saw it.
-            let right = lua.render("prompt.right").or_else(|| {
-                Some(oslo::interactive::prompt::render_default_right_prompt(
-                    last_status,
-                    super::repl::last_command_duration(),
-                ))
-            });
+            // The same order the left prompt resolves in: a Lua prompt is an explicit choice and
+            // outranks the shell variable, which outranks oslo's own.
+            //
+            // `$RPS1` is here so that a *shell* integration can own both sides. hexe and starship
+            // rebuild the prompt from `PROMPT_COMMAND`, and until now the only thing they could
+            // set was `PS1` — the right column was oslo's whatever they did, so half the prompt
+            // came from the integration and half from the shell arguing with it.
+            let right = lua
+                .render("prompt.right")
+                .or_else(|| rc::rps1(&mut env_struct.lock().unwrap()))
+                .or_else(|| {
+                    Some(oslo::interactive::prompt::render_default_right_prompt(
+                        last_status,
+                        super::repl::last_command_duration(),
+                    ))
+                });
             helper.set_right_prompt(right, oslo::interactive::prompt::printed_width(&prompt));
             // What this prompt is for, so a vi-mode repaint rebuilds the same one rather than
             // guessing at the language or the status.
@@ -171,6 +174,21 @@ pub(super) fn read_command(
         let raw = match rl.readline_with_initial(&prompt, (&typed[..split], &typed[split..])) {
             Ok(raw) => raw,
             Err(ReadlineError::Interrupted) => {
+                // A finder choice deliberately interrupts this editor instance instead of using
+                // rustyline's `Replace`: replacement text is inserted at the right place but its
+                // logical cursor is not advanced. Reopening with the whole choice on the *left*
+                // side of `readline_with_initial` puts both the visible and logical cursor at the
+                // end, so the next typed character really appends there.
+                if let Some(choice) = super::keybind::take_finder_choice() {
+                    typed = choice.line;
+                    typed_point = typed.len();
+                    print!(
+                        "{}",
+                        oslo::interactive::row::rewind_after_readline(&choice.previous)
+                    );
+                    let _ = std::io::Write::flush(&mut std::io::stdout());
+                    continue;
+                }
                 // Ctrl-C abandons the *line*, not the language. If the user switched to Lua and
                 // then thought better of the command, the prompt they were looking at said `lua`
                 // and the next one must too — and the flag has to be consumed either way, or it
@@ -203,19 +221,6 @@ pub(super) fn read_command(
         };
         typed.clear();
         typed_point = 0;
-
-        // A `bind -x` key ends the line so its command can run out here, with the terminal back in
-        // its normal mode — the command may be a full-screen picker, which is what atuin's Ctrl-R
-        // is. `raw` is not a command the user asked to run and must not be treated as one; the
-        // line goes back into the editor as whatever the command left in `$READLINE_LINE`.
-        if let Some(request) = oslo::interactive::readline::take_request() {
-            let outcome = super::integration::run(env_struct, &request);
-            typed = outcome.line;
-            typed_point = outcome.point;
-            // Everything else about the line survives: a bound key pressed halfway through a
-            // continuation is still inside that continuation when the prompt comes back.
-            continue;
-        }
 
         // The toggle key repaints the prompt in place rather than submitting, so by the time a
         // line comes back the prompt may be showing the other language. That is the answer for

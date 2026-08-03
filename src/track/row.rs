@@ -372,6 +372,14 @@ pub(super) mod field {
     }
 
     /// `(dir_id, mode, argv)` -> the line, borrowed from the mapped file wherever it holds no NUL.
+    /// `(dir_id, mode, argv)` -> the mode, which the finder needs to hand a line back to the
+    /// language it was typed in.
+    pub fn mode_of_run(key: &[u8]) -> Option<Cow<'_, [u8]>> {
+        let mut fields = Fields::of(key);
+        fields.int()?;
+        fields.blob()
+    }
+
     pub fn argv_of_run(key: &[u8]) -> Option<Cow<'_, str>> {
         let mut fields = Fields::of(key);
         fields.int()?;

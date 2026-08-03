@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.2.2] - 2026-08-03
+
+### <!-- 0 -->⛰️  Features
+
+- Full-screen fuzzy history search on up
+- Let shell code set the right prompt
+- Make bash shell integrations work end to end
+
+### <!-- 1 -->🐛 Bug Fixes
+
+- Swallow escape sequences, restyle the list
+
+### <!-- 2 -->🚜 Refactor
+
+- Remove bind and the command renderer
+
+### <!-- 5 -->🎨 Styling
+
+- Plain rows and a codex-shaped input surface
+
 ## [0.2.1] - 2026-08-03
 
 ### <!-- 0 -->⛰️  Features

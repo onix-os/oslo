@@ -11,8 +11,36 @@ use oslo::Environment;
 use oslo::interactive::vi;
 use rustyline::{Cmd, ConditionalEventHandler, Event, EventContext, RepeatCount};
 use std::io::Write;
-use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex};
+
+/// A finder choice waiting for the read loop to reopen the editor around it.
+///
+/// rustyline's `Replace` command inserts replacement text without advancing its logical cursor.
+/// Returning `Interrupt` lets [`super::read`] reopen with `readline_with_initial`, whose left/right
+/// split sets the cursor exactly; the old line is kept so its wrapped screen rows can be erased.
+pub(super) struct FinderChoice {
+    pub line: String,
+    pub previous: String,
+}
+
+static FINDER_CHOICE: Mutex<Option<FinderChoice>> = Mutex::new(None);
+
+pub(super) fn take_finder_choice() -> Option<FinderChoice> {
+    FINDER_CHOICE.lock().ok()?.take()
+}
+
+fn return_finder_choice(line: String, previous: &str) -> Cmd {
+    if let Ok(mut slot) = FINDER_CHOICE.lock() {
+        *slot = Some(FinderChoice {
+            line,
+            previous: previous.to_string(),
+        });
+        Cmd::Interrupt
+    } else {
+        // A poisoned handoff must not throw away what was already on the prompt.
+        Cmd::Noop
+    }
+}
 
 /// Watches every keystroke to keep the cursor shape agreeing with the vi mode.
 ///
@@ -296,11 +324,19 @@ pub fn apply(rl: &mut Repl, env_struct: &Arc<Mutex<Environment>>, toggle: &Toggl
     }
 
     // Up and Down before `oslo.keys`, so a config can still take them.
+    //
+    // **Ctrl-R is in this list on purpose.** Left alone, rustyline binds it to its own
+    // `ReverseSearchHistory`, which knows nothing about oslo's prompt: it draws
+    // `(reverse-i-search)` over the row, mangles what is already typed, and there is no way to
+    // make it agree with a prompt it cannot see. Nothing in oslo ever asked for that binding — it
+    // was simply the editor's default showing through, which is the worst way for a shell to
+    // acquire a feature. Ctrl-R now walks history the way Up does, against the same prefix.
     for (code, back) in [
         (rustyline::KeyCode::Up, true),
         (rustyline::KeyCode::Down, false),
         (rustyline::KeyCode::Char('p'), true),
         (rustyline::KeyCode::Char('n'), false),
+        (rustyline::KeyCode::Char('r'), true),
     ] {
         let modifiers = if matches!(code, rustyline::KeyCode::Char(_)) {
             rustyline::Modifiers::CTRL
@@ -310,6 +346,21 @@ pub fn apply(rl: &mut Repl, env_struct: &Arc<Mutex<Environment>>, toggle: &Toggl
         rl.bind_sequence(
             Event::KeySeq(vec![rustyline::KeyEvent(code, modifiers)]),
             rustyline::EventHandler::Conditional(Box::new(HistoryWalk { back })),
+        );
+    }
+
+    // The finder takes its key *after* the walk has taken Up, because rustyline keeps only the
+    // last binding for a sequence — binding it first meant the walk quietly replaced it. Falling
+    // back therefore cannot be done by declining; `OpenFinder` carries the walk and delegates to
+    // it when the finder is off or has nothing to show.
+    if settings.finder.enabled
+        && let Some(event) = oslo::interactive::keys::parse_key(&settings.finder.key)
+    {
+        rl.bind_sequence(
+            event,
+            rustyline::EventHandler::Conditional(Box::new(OpenFinder {
+                fallback: HistoryWalk { back: true },
+            })),
         );
     }
 
@@ -354,6 +405,17 @@ pub fn apply(rl: &mut Repl, env_struct: &Arc<Mutex<Environment>>, toggle: &Toggl
 
     let mut toggle_bound = false;
     for (event, action) in bindings {
+        // `history-search` means oslo's own walk, not rustyline's `(reverse-i-search)` overlay.
+        // Routing it through `Action::command` would hand back the overlay, which is the thing
+        // this binding exists to avoid.
+        if action == oslo::interactive::keys::Action::HistorySearchBackward {
+            rl.bind_sequence(
+                event,
+                rustyline::EventHandler::Conditional(Box::new(HistoryWalk { back: true })),
+            );
+            continue;
+        }
+
         // A binding the config wrote itself. Bound before the fixed actions are consulted, so a
         // key that has a handler runs the handler.
         if action == oslo::interactive::keys::Action::LuaHandler
@@ -388,87 +450,107 @@ pub fn apply(rl: &mut Repl, env_struct: &Arc<Mutex<Environment>>, toggle: &Toggl
     }
 }
 
-/// A key `bind -x` gave a shell command.
+/// Up opens the full-screen history finder.
 ///
-/// It records the request and answers `AcceptLine`, which is the only way out of rustyline that
-/// gives the caller both the buffer and control. The read loop recognises the request, so the
-/// line is *not* run as a command — see [`crate::startup::bindx`] for what happens next and why
-/// it cannot happen here.
-struct BindCommand {
-    command: String,
+/// It runs *from inside the editor*, exactly as the completion dropdown does: raw mode is already
+/// on, and the finder takes the alternate screen for as long as it is open, so the prompt
+/// underneath is untouched and comes back as it was. A chosen line is handed through the read
+/// loop once so rustyline can initialise it with the cursor explicitly at the end.
+///
+/// Declining — answering `None` — hands Up back to whatever would have had it, which is
+/// [`HistoryWalk`]. So a shell with no history, no tracker, or the finder turned off keeps the
+/// behaviour it has always had rather than doing nothing.
+struct OpenFinder {
+    /// What the key does when the finder cannot open: walk history a line at a time, as Up
+    /// always has. Carried rather than declined to, because rustyline keeps one binding per key
+    /// and answering `None` would fall through to *its* default instead of oslo's.
+    fallback: HistoryWalk,
 }
 
-impl ConditionalEventHandler for BindCommand {
-    fn handle(&self, _: &Event, _: RepeatCount, _: bool, ctx: &EventContext) -> Option<Cmd> {
-        oslo::interactive::readline::request(&self.command, ctx.line(), ctx.pos());
-        Some(Cmd::AcceptLine)
+impl OpenFinder {
+    /// The commands to show, or `None` when the finder should stand aside.
+    fn commands(
+        &self,
+        settings: &oslo::interactive::settings::Settings,
+    ) -> Option<Vec<oslo::track::history::Command>> {
+        if !settings.finder.enabled {
+            return None;
+        }
+        let track = oslo::track::store()?;
+        // Only this language's commands. The editor's history holds both, and offering a Lua line
+        // at a shell prompt produces something that cannot run — the same crossing the ghost
+        // suggestion and the arrow keys are already filtered for.
+        let language = oslo::interactive::prompt::language().unwrap_or_else(|| "sh".to_string());
+        let commands: Vec<_> = track
+            .commands(settings.finder.limit)
+            .into_iter()
+            .filter(|command| command.mode == language)
+            .collect();
+        if commands.is_empty() {
+            return None;
+        }
+        Some(commands)
     }
 }
 
-/// Whether `bind` has changed anything since the bindings were last applied.
-///
-/// One atomic load in the common case, which is what makes it safe to ask before every prompt.
-pub fn bindings_changed() -> bool {
-    oslo::interactive::readline::generation() != APPLIED.load(Ordering::SeqCst)
-}
-
-/// The generation the editor's bindings were last built from.
-static APPLIED: AtomicUsize = AtomicUsize::new(usize::MAX);
-
-/// Apply everything `bind` has recorded, and report the generation it was applied at.
-///
-/// Called from the read loop rather than once at startup, because `bind` is shell code: it runs
-/// from an rc file, from a function, or from an `eval` typed into a shell that is already up.
-/// Binding only at startup meant `eval "$(atuin init bash)"` at the prompt did nothing until the
-/// next restart, which is the kind of half-working that costs an evening to diagnose.
-pub fn apply_bindings(rl: &mut Repl) -> usize {
-    use oslo::interactive::readline::{self, Bound};
-    let generation = readline::generation();
-    APPLIED.store(generation, Ordering::SeqCst);
-    for entry in readline::entries() {
-        let event = Event::KeySeq(entry.keys.clone());
-        match &entry.bound {
-            Bound::Command(command) => rl.bind_sequence(
-                event,
-                rustyline::EventHandler::Conditional(Box::new(BindCommand {
-                    command: command.clone(),
-                })),
-            ),
-            // A readline *function* name. oslo maps the few that name something it has and leaves
-            // the rest alone rather than binding a key to nothing — `bind -P` will still list it,
-            // so a user can see what was asked for and what happened to it.
-            Bound::Function(name) => match readline_function(name) {
-                Some(command) => rl.bind_sequence(event, rustyline::EventHandler::Simple(command)),
-                None => continue,
-            },
+impl ConditionalEventHandler for OpenFinder {
+    fn handle(
+        &self,
+        event: &Event,
+        n: RepeatCount,
+        positive: bool,
+        ctx: &EventContext,
+    ) -> Option<Cmd> {
+        let settings = oslo::interactive::settings::current();
+        let Some(commands) = self.commands(&settings) else {
+            return self.fallback.handle(event, n, positive, ctx);
         };
+
+        let cwd = std::env::current_dir()
+            .map(|p| p.display().to_string())
+            .unwrap_or_default();
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs() as i64)
+            .unwrap_or(0);
+
+        match oslo::interactive::finder::open(&commands, &cwd, now, settings.completion.fuzzy) {
+            // The line replaces what was typed but is **not** run: you may want to edit it, and a
+            // finder that submitted on Enter would take that choice away. This is the same
+            // contract every other recall in the shell has.
+            Some(oslo::interactive::finder::Outcome::Chosen { line, .. }) => {
+                Some(return_finder_choice(line, ctx.line()))
+            }
+            // Cancelled: the prompt comes back with exactly what was on it. `Noop` rather than
+            // `None`, or declining would hand the same keystroke to the history walk and Esc would
+            // scroll the line away.
+            Some(oslo::interactive::finder::Outcome::Cancelled) => {
+                let _ = ctx;
+                Some(Cmd::Noop)
+            }
+            // No terminal to draw on — a pipe, or a test harness. The walk still works there.
+            None => self.fallback.handle(event, n, positive, ctx),
+        }
     }
-    generation
 }
 
-/// readline function names oslo has an equivalent for.
-///
-/// Deliberately short. These are the ones an init script binds in passing, and inventing a mapping
-/// for the rest of readline's ~150 functions would be guessing at behaviour oslo does not have.
-fn readline_function(name: &str) -> Option<Cmd> {
-    Some(match name {
-        "accept-line" => Cmd::AcceptLine,
-        "beginning-of-line" => Cmd::Move(rustyline::Movement::BeginningOfLine),
-        "end-of-line" => Cmd::Move(rustyline::Movement::EndOfLine),
-        "backward-char" => Cmd::Move(rustyline::Movement::BackwardChar(1)),
-        "forward-char" => Cmd::Move(rustyline::Movement::ForwardChar(1)),
-        "backward-word" => Cmd::Move(rustyline::Movement::BackwardWord(1, rustyline::Word::Emacs)),
-        "forward-word" => Cmd::Move(rustyline::Movement::ForwardWord(
-            1,
-            rustyline::At::AfterEnd,
-            rustyline::Word::Emacs,
-        )),
-        "clear-screen" => Cmd::ClearScreen,
-        "complete" => Cmd::Complete,
-        "kill-line" => Cmd::Kill(rustyline::Movement::EndOfLine),
-        "unix-line-discard" => Cmd::Kill(rustyline::Movement::BeginningOfLine),
-        "previous-history" => Cmd::PreviousHistory,
-        "next-history" => Cmd::NextHistory,
-        _ => return None,
-    })
+#[cfg(test)]
+mod finder_choice_tests {
+    use super::*;
+
+    #[test]
+    fn a_choice_carries_both_lines_and_interrupts_the_editor() {
+        let _ = take_finder_choice();
+        assert_eq!(
+            return_finder_choice("chosen command".to_string(), "half typed"),
+            Cmd::Interrupt
+        );
+        let choice = take_finder_choice().expect("the read loop receives the choice");
+        assert_eq!(choice.line, "chosen command");
+        assert_eq!(choice.previous, "half typed");
+        assert!(
+            take_finder_choice().is_none(),
+            "the handoff is consumed once"
+        );
+    }
 }

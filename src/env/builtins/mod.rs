@@ -13,7 +13,6 @@
 
 mod abbr;
 pub(crate) mod arrays;
-mod bind;
 mod builtin;
 mod caller;
 mod colon;
@@ -146,7 +145,6 @@ pub fn register_default_builtins(env: &mut Environment) {
     // `OSC 52` to the terminal, so it works over SSH where a clipboard helper cannot.
     env.register_custom_builtin("copy", copy::builtin_copy);
     env.register_custom_builtin("abbr", abbr::builtin_abbr);
-    env.register_custom_builtin("bind", bind::builtin_bind);
     // The directory ring: where you have been. Walking it is `cd -` and `cd -N`, so the only
     // builtin left is the one that shows you the numbers those take. Separate from `pushd`/`popd`,
     // which are explicit and which scripts rely on.

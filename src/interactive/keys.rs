@@ -72,6 +72,10 @@ impl Action {
             // decided about the line.
             Action::ToggleLanguage | Action::LuaHandler => return None,
             Action::ClearScreen => Cmd::ClearScreen,
+            // Never reached from `keybind::apply`, which binds this to oslo's own history walk
+            // before consulting this table — rustyline's `(reverse-i-search)` overlay cannot see
+            // oslo's prompt and corrupts the row it draws over. Kept as the honest answer for any
+            // caller that asks this table directly rather than a silent `None`.
             Action::HistorySearchBackward => Cmd::ReverseSearchHistory,
             Action::AcceptSuggestion => Cmd::CompleteHint,
             Action::AcceptSuggestionWord => Cmd::Move(rustyline::Movement::ForwardWord(

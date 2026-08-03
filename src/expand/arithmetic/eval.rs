@@ -8,7 +8,7 @@ use crate::env::Environment;
 use crate::error::{Result, ShellError};
 use crate::expand::arithmetic::lexer::{self, tokenize};
 use crate::expand::arithmetic::operand::expand_expression;
-use crate::expand::arithmetic::parser::{self, BinOp, Expr, UnOp};
+use crate::expand::arithmetic::parser::{self, BinOp, Expr, Ref, UnOp};
 
 /// How long a chain of "this variable's value is itself an expression" may get.
 ///
@@ -39,13 +39,35 @@ fn eval_text(env: &mut Environment, expr: &str, depth: usize) -> Result<i64> {
     eval(env, &ast, depth)
 }
 
-/// Read a variable as a number.
+/// The text a reference currently holds, and — for an element — which slot it names.
+///
+/// Both are worked out together because the subscript is itself arithmetic and may have side
+/// effects: `a[i++]` must evaluate `i++` exactly once, so the index is computed here and handed to
+/// whoever needs it rather than being evaluated again on the way back.
+fn read(
+    env: &mut Environment,
+    reference: &Ref,
+    depth: usize,
+) -> Result<(Option<i64>, Option<String>)> {
+    let Some(index) = &reference.index else {
+        return Ok((None, env.get_param(&reference.name)));
+    };
+    let index = eval(env, index, depth)?;
+    let text = env
+        .get_array(&reference.name)
+        .and_then(|array| array.get(index))
+        .map(str::to_string);
+    Ok((Some(index), text))
+}
+
+/// Read a reference as a number.
 ///
 /// A plain numeric value is that number. Anything else is re-evaluated as an expression, which is
-/// how bash resolves `a=b; b=7` and how a variable holding `1+1` becomes 2. An unset variable, or
-/// one whose value evaluates to nothing recognisable, is 0.
-fn resolve(env: &mut Environment, name: &str, depth: usize) -> Result<i64> {
-    let Some(text) = env.get_param(name) else {
+/// how bash resolves `a=b; b=7` and how a variable holding `1+1` becomes 2. An unset variable, an
+/// element that is not there, or one whose value evaluates to nothing recognisable, is 0.
+fn resolve(env: &mut Environment, reference: &Ref, depth: usize) -> Result<i64> {
+    let name = &reference.name;
+    let Some(text) = read(env, reference, depth)?.1 else {
         return Ok(0);
     };
     if let Some(n) = lexer::literal_value(&text) {
@@ -62,15 +84,31 @@ fn resolve(env: &mut Environment, name: &str, depth: usize) -> Result<i64> {
     eval_text(env, &text, depth + 1)
 }
 
-fn store(env: &mut Environment, name: &str, value: i64) -> i64 {
-    env.set_var(name, &value.to_string(), false);
-    value
+/// Write a reference back, and answer the value written.
+///
+/// The subscript is evaluated here rather than reused from an earlier `resolve`, which is a real
+/// difference for `a[i++] = 5`: bash evaluates the subscript once per *reference*, and the two
+/// halves of `a[i++] += 1` are two references. Matching that exactly would need the index threaded
+/// through, so it is written down here as the divergence it is — an assignment whose subscript has
+/// a side effect steps it twice.
+fn store(env: &mut Environment, reference: &Ref, value: i64, depth: usize) -> Result<i64> {
+    let text = value.to_string();
+    match &reference.index {
+        None => {
+            env.set_var(&reference.name, &text, false);
+        }
+        Some(index) => {
+            let index = eval(env, index, depth)?;
+            env.set_array_element(&reference.name, index, &text);
+        }
+    }
+    Ok(value)
 }
 
 fn eval(env: &mut Environment, expr: &Expr, depth: usize) -> Result<i64> {
     match expr {
         Expr::Number(n) => Ok(*n),
-        Expr::Var(name) => resolve(env, name, depth),
+        Expr::Var(reference) => resolve(env, reference, depth),
         Expr::Unary(op, operand) => {
             let v = eval(env, operand, depth)?;
             Ok(match op {
@@ -122,15 +160,15 @@ fn eval(env: &mut Environment, expr: &Expr, depth: usize) -> Result<i64> {
                     apply(*op, current, operand)?
                 }
             };
-            Ok(store(env, name, value))
+            store(env, name, value, depth)
         }
         Expr::PreStep(name, delta) => {
             let value = resolve(env, name, depth)?.wrapping_add(*delta);
-            Ok(store(env, name, value))
+            store(env, name, value, depth)
         }
         Expr::PostStep(name, delta) => {
             let old = resolve(env, name, depth)?;
-            store(env, name, old.wrapping_add(*delta));
+            store(env, name, old.wrapping_add(*delta), depth)?;
             Ok(old)
         }
     }
