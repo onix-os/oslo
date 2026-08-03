@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.2.1] - 2026-08-03
+
+### <!-- 0 -->⛰️  Features
+
+- Run PROMPT_COMMAND before every prompt
+- Let shell code claim a keystroke
+- Run the DEBUG trap before each command
+
+### <!-- 1 -->🐛 Bug Fixes
+
+- A quoted empty default is still one field
+
 ## [0.2.0] - 2026-08-03
 
 ### <!-- 0 -->⛰️  Features

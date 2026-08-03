@@ -107,9 +107,11 @@ fn an_ignored_signal_is_discarded() {
 
 /// Not implemented has to *say* not implemented. A stored-and-never-run ERR handler is the one
 /// outcome a script cannot detect for itself.
+///
+/// `DEBUG` left this list when it became real; see `the_debug_trap_fires_before_each_command`.
 #[test]
 fn the_unsupported_conditions_refuse_loudly() {
-    for condition in ["ERR", "DEBUG", "RETURN"] {
+    for condition in ["ERR", "RETURN"] {
         let r = run_in(
             tempfile::tempdir().expect("tempdir").path(),
             &format!("trap 'echo handler' {condition}\necho \"status=$?\""),
@@ -167,4 +169,29 @@ fn the_exit_trap_runs_at_end_of_input() {
         !scratch.exists(),
         "the EXIT trap did not run at end of input"
     );
+}
+
+/// The DEBUG trap fires before each simple command, with `$BASH_COMMAND` naming what is next.
+///
+/// End to end through a real shell rather than the unit test, because the two halves live apart:
+/// `trap` records the condition and `exec::simple` fires it, and a test of either alone passed
+/// while the pair did nothing.
+#[test]
+fn the_debug_trap_fires_before_each_command() {
+    let r = run_in(
+        tempfile::tempdir().expect("tempdir").path(),
+        "trap 'echo \"<$BASH_COMMAND>\"' DEBUG\nx=1\necho done",
+    );
+    assert_eq!(r.out(), "<x=1>\n<echo done>\ndone", "stderr: {}", r.stderr);
+}
+
+/// A handler's own commands must not fire it again, or the first `trap 'date' DEBUG` recurses
+/// until the stack runs out.
+#[test]
+fn a_debug_handler_does_not_fire_itself() {
+    let r = run_in(
+        tempfile::tempdir().expect("tempdir").path(),
+        "trap 'echo tick' DEBUG\necho done",
+    );
+    assert_eq!(r.out(), "tick\ndone", "stderr: {}", r.stderr);
 }

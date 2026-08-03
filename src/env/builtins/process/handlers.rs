@@ -171,6 +171,45 @@ fn parse_and_run(env: &mut Environment, action: &str) -> Result<i32> {
     crate::exec::eval_command_list(env, &ast)
 }
 
+/// Whether a DEBUG handler is on the stack, so its own commands do not fire it again.
+static IN_DEBUG_TRAP: AtomicBool = AtomicBool::new(false);
+
+/// Run the DEBUG trap for the command about to execute.
+///
+/// bash fires this before each *simple* command with `$BASH_COMMAND` naming what is about to run,
+/// and that pair is the whole preexec mechanism — starship times commands with it, hexe records
+/// them, bash-preexec builds its entire hook array on it.
+///
+/// Three things make it safe to call from the execution path:
+///
+/// * **it does not recurse.** The handler is shell code and its commands are simple commands too,
+///   so without the guard `trap 'date' DEBUG` would fire the trap for `date`, forever. bash has
+///   the same rule and spells the exception `set -o functrace`, which oslo does not have;
+/// * **it cannot change `$?`.** The handler runs between two commands, so the status the next one
+///   sees must still be the previous one's. `run_handler` restores it;
+/// * **a failing handler is not the command's failure.** An error inside a hook is reported and
+///   the command still runs, because a broken prompt integration must not make the shell unusable.
+///
+/// `$BASH_COMMAND` is left set afterwards, as bash leaves it.
+pub fn run_debug_trap(env: &mut Environment, command_text: &str) {
+    if IN_DEBUG_TRAP.load(Ordering::SeqCst) {
+        return;
+    }
+    let Disposition::Run(text) = disposition(env, "DEBUG") else {
+        return;
+    };
+    let action = text.to_string();
+    env.set_var("BASH_COMMAND", command_text, false);
+
+    IN_DEBUG_TRAP.store(true, Ordering::SeqCst);
+    let outcome = run_handler(env, &action);
+    IN_DEBUG_TRAP.store(false, Ordering::SeqCst);
+
+    if let Err(e) = outcome {
+        eprintln!("oslo: trap: DEBUG: {e}");
+    }
+}
+
 /// Run the EXIT trap and give the status the shell should finally exit with.
 ///
 /// Every path out of a shell goes through here — falling off the end of the script, `exit N`, a

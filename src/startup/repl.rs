@@ -5,6 +5,7 @@
 //! decides what is remembered, and [`super::lua_init`] adds the optional Lua layer on top.
 
 use crate::absorb_loop_control;
+use crate::startup::integration;
 use crate::startup::mode::{Mode, ToggleRequest};
 use crate::startup::read::{Input, read_command};
 use crate::startup::recall::{remember_history, seed_history};
@@ -164,6 +165,13 @@ pub fn run_repl() -> ! {
     let mut eof_count = 0usize;
 
     loop {
+        // `$PROMPT_COMMAND` runs before every prompt. It is the other half of the DEBUG trap —
+        // together they are bash's preexec/precmd pair, and every integration written for bash is
+        // built on the two of them: starship redraws `PS1` here, hexe reports the command that
+        // just finished. Fired before `read_command` rather than after a command, so it also runs
+        // for the first prompt of the session, which is where a prompt integration draws itself.
+        integration::prompt_command(&env_struct, last_status);
+
         match read_command(
             &mut rl,
             &env_struct,
