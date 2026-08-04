@@ -100,11 +100,21 @@ impl Restore {
         raw.local_flags.remove(LocalFlags::ICANON);
         raw.local_flags.remove(LocalFlags::ECHO);
         tcsetattr(handle, SetArg::TCSANOW, &raw).ok()?;
-        if alternate {
-            let mut out = io::stdout();
-            let _ = out.write_all(b"\x1b[?1049h\x1b[?25l");
-            let _ = out.flush();
-        }
+        // **stderr, not stdout.** Every widget draws to stderr so that `x=$(ui …)` captures the
+        // answer and nothing else — and these escapes are part of the drawing. Sent to stdout they
+        // land in the redirection instead: `ui pager … > log` wrote `?1049h` into the file, never
+        // entered the alternate screen, and painted over the live transcript from the top.
+        //
+        // The cursor is hidden for **every** widget, not only the full-screen ones. An inline
+        // widget repaints its whole block on each keystroke, and a visible cursor is dragged
+        // across all of it every time — which is most of what "it flickers" means.
+        let mut out = io::stderr();
+        let _ = out.write_all(if alternate {
+            b"\x1b[?1049h\x1b[?25l".as_slice()
+        } else {
+            b"\x1b[?25l".as_slice()
+        });
+        let _ = out.flush();
         Some(Restore {
             tty,
             original,
@@ -115,14 +125,16 @@ impl Restore {
 
 impl Drop for Restore {
     fn drop(&mut self) {
-        let mut stdout = io::stdout();
+        let mut out = io::stderr();
         // Show the cursor and leave the alternate screen, then hand the terminal's modes back. In
         // that order: the escapes have to reach a terminal that is still in raw mode, or the
         // shell's own prompt is drawn over whatever is left of ours.
-        if self.alternate {
-            let _ = stdout.write_all(b"\x1b[?25h\x1b[?1049l");
-        }
-        let _ = stdout.flush();
+        let _ = out.write_all(if self.alternate {
+            b"\x1b[?25h\x1b[?1049l".as_slice()
+        } else {
+            b"\x1b[?25h".as_slice()
+        });
+        let _ = out.flush();
         // SAFETY: as above — the descriptor is `self.tty`'s and is still open here.
         let handle = unsafe { std::os::fd::BorrowedFd::borrow_raw(self.tty.fd()) };
         let _ = tcsetattr(handle, SetArg::TCSANOW, &self.original);

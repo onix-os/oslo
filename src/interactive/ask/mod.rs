@@ -100,10 +100,51 @@ pub(crate) fn show(text: &str) {
     let _ = err.flush();
 }
 
+/// Every inline widget draws the same way, and this is it.
+///
+/// A [`crate::interactive::paint::Panel`] plus the two rules that were got wrong when each widget
+/// had its own copy of this:
+///
+/// * **rows are reserved before they are drawn**, so any scrolling happens while the cursor is
+///   still accounted for. Drawing first and walking back up eats the caller's transcript one row
+///   per keypress — see the module note on `paint`;
+/// * **the row count is the number of `\r\n` written**, taken from the frame itself rather than
+///   recomputed. Every widget used to compute it a second time and every one of them was off by
+///   one, because the last row is written without a newline.
+pub(crate) struct Inline {
+    panel: crate::interactive::paint::Panel,
+}
+
+impl Inline {
+    pub(crate) fn new() -> Inline {
+        Inline {
+            // Column 0: an inline widget starts at the beginning of the row below the prompt, and
+            // there is nothing to the left of it to come back to.
+            panel: crate::interactive::paint::Panel::at(0),
+        }
+    }
+
+    /// Draw `frame`, whose rows are separated by `\r\n`.
+    ///
+    /// The count comes from the frame, so it cannot disagree with what was printed.
+    pub(crate) fn draw(&mut self, frame: &str) {
+        let rows = frame.matches("\r\n").count();
+        show(&self.panel.draw(frame, rows));
+    }
+
+    /// Erase everything drawn, exactly.
+    pub(crate) fn close(&mut self) {
+        show(&self.panel.close());
+    }
+}
+
 /// The key legend along the bottom of a widget.
 ///
 /// Always shown, and dim. A prompt whose keys you have to guess is one you leave by closing the
-/// window; the two rows a legend costs are cheaper than that once.
+/// window; the row a legend costs is cheaper than that once.
+///
+/// `key what` pairs joined by ` • `, which is gum's separator and readable enough that the pairs
+/// do not run together at a glance.
 pub(crate) fn legend(keys: &[(&str, &str)]) -> String {
     let ui = crate::interactive::theme::current().ui;
     let depth = crate::interactive::theme::depth();
@@ -117,5 +158,5 @@ pub(crate) fn legend(keys: &[(&str, &str)]) -> String {
             )
         })
         .collect();
-    parts.join(ui.muted.paint("  ", depth).as_str())
+    parts.join(&ui.muted.paint(" • ", depth))
 }

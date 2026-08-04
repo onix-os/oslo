@@ -10,7 +10,7 @@
 //! The answer is the **whole row**, in its original text. A widget that answered with a field
 //! would have to be told which one, and a caller that wants a field can `cut` the row it got back.
 
-use super::{Answer, legend, show};
+use super::{Answer, Inline, legend};
 use crate::interactive::dropdown::width::{
     pad_to_width, terminal_cols, terminal_rows, truncate_to_width,
 };
@@ -102,13 +102,16 @@ pub fn table(spec: &Table) -> Answer<String> {
     let mut selected = 0usize;
     let mut offset = 0usize;
     let mut keys = Keys::on(raw_mode.fd());
-    let mut drawn = 0usize;
+    let mut panel = Inline::new();
 
     loop {
+        // Computed from the same booleans the frame draws with, so the clamp and the frame cannot
+        // disagree — a hard-coded constant here is how this reserved a row it never used.
+        let chrome = 1 + usize::from(!spec.headers.is_empty()) + usize::from(spec.filter);
         let height = spec
             .height
             .min(shown.len().max(1))
-            .min(terminal_rows().saturating_sub(4).max(1));
+            .min(terminal_rows().saturating_sub(chrome + 1).max(1));
         if selected >= shown.len() {
             selected = shown.len().saturating_sub(1);
         }
@@ -126,22 +129,19 @@ pub fn table(spec: &Table) -> Answer<String> {
                 line.push_str(&pad_to_width(&truncate_to_width(field, *width), *width));
                 line.push_str("  ");
             }
-            truncate_to_width(line.trim_end(), cols.saturating_sub(3))
+            truncate_to_width(line.trim_end(), cols.saturating_sub(2))
         };
 
         let mut frame = String::new();
-        if drawn > 0 {
-            frame.push_str(&format!("\x1b[{drawn}A"));
-        }
         if !spec.headers.is_empty() {
             frame.push_str(&format!(
-                "\r\x1b[K  {}\r\n",
+                "\r\n\r\x1b[K  {}",
                 ui.question.paint(&render(&spec.headers), depth)
             ));
         }
         if spec.filter {
             frame.push_str(&format!(
-                "\r\x1b[K{} {}\r\n",
+                "\r\n\r\x1b[K{} {}",
                 ui.accent.paint("❯", depth),
                 if query.is_empty() {
                     ui.muted.paint("type to filter", depth)
@@ -167,27 +167,26 @@ pub fn table(spec: &Table) -> Answer<String> {
                 }
                 None => String::new(),
             };
-            frame.push_str(&format!("\r\x1b[K{text}\r\n"));
+            frame.push_str(&format!("\r\n\r\x1b[K{text}"));
         }
         frame.push_str(&format!(
-            "\r\x1b[K{}",
+            "\r\n\r\x1b[K{}",
             legend(&[("↑↓", "move"), ("enter", "choose")])
         ));
-        show(&frame);
-        drawn = height + 1 + usize::from(!spec.headers.is_empty()) + usize::from(spec.filter);
+        panel.draw(&frame);
 
         let Some(pressed) = keys.read() else {
-            erase(drawn);
+            panel.close();
             return Answer::Cancelled;
         };
         match pressed {
             Key::Cancel => {
-                erase(drawn);
+                panel.close();
                 return Answer::Cancelled;
             }
             Key::Accept => {
                 let picked = shown.get(selected).and_then(|&i| spec.raw.get(i)).cloned();
-                erase(drawn);
+                panel.close();
                 return match picked {
                     Some(row) => Answer::Given(row),
                     None => Answer::Cancelled,
@@ -237,18 +236,6 @@ fn narrow(spec: &Table, query: &str) -> Vec<usize> {
         .collect();
     scored.sort_by(|a, b| b.0.cmp(&a.0).then(a.1.cmp(&b.1)));
     scored.into_iter().map(|(_, index)| index).collect()
-}
-
-fn erase(rows: usize) {
-    if rows == 0 {
-        return;
-    }
-    let mut out = format!("\x1b[{rows}A");
-    for _ in 0..rows {
-        out.push_str("\r\x1b[K\r\n");
-    }
-    out.push_str(&format!("\x1b[{rows}A"));
-    show(&out);
 }
 
 #[cfg(test)]

@@ -10,7 +10,7 @@
 //! page cache — and caching it would mean showing a file that has since been deleted, which for a
 //! file picker is the one wrong answer worth avoiding. Moving into a directory rereads it.
 
-use super::{Answer, legend, show};
+use super::{Answer, Inline, legend};
 use crate::interactive::dropdown::width::{terminal_cols, terminal_rows, truncate_to_width};
 use crate::interactive::matching::{Fuzzed, Fuzzy};
 use crate::interactive::term::{Key, Keys, Restore};
@@ -99,9 +99,11 @@ pub fn file(spec: &Browse) -> Answer<String> {
     let mut selected = 0usize;
     let mut offset = 0usize;
     let mut keys = Keys::on(raw.fd());
-    let mut drawn = 0usize;
+    let mut panel = Inline::new();
 
     loop {
+        // Two chrome rows above (the path and the query) plus the legend, and one spare so the
+        // block can never fill the screen exactly.
         let height = spec
             .height
             .min(shown.len().max(1))
@@ -117,16 +119,15 @@ pub fn file(spec: &Browse) -> Answer<String> {
 
         let cols = terminal_cols();
         let mut frame = String::new();
-        if drawn > 0 {
-            frame.push_str(&format!("\x1b[{drawn}A"));
-        }
         frame.push_str(&format!(
-            "\r\x1b[K{}\r\n",
-            ui.question
-                .paint(&truncate_to_width(&at.display().to_string(), cols), depth)
+            "\r\n\r\x1b[K{}",
+            ui.question.paint(
+                &truncate_to_width(&at.display().to_string(), cols.saturating_sub(2)),
+                depth,
+            )
         ));
         frame.push_str(&format!(
-            "\r\x1b[K{} {}\r\n",
+            "\r\n\r\x1b[K{} {}",
             ui.accent.paint("❯", depth),
             if query.is_empty() {
                 ui.muted.paint("type to filter", depth)
@@ -155,22 +156,21 @@ pub fn file(spec: &Browse) -> Answer<String> {
                         } else {
                             theme::Style::default()
                         }
-                        .paint(&truncate_to_width(&label, cols.saturating_sub(3)), depth)
+                        .paint(&truncate_to_width(&label, cols.saturating_sub(2)), depth)
                     )
                 }
                 None => String::new(),
             };
-            frame.push_str(&format!("\r\x1b[K{text}\r\n"));
+            frame.push_str(&format!("\r\n\r\x1b[K{text}"));
         }
         frame.push_str(&format!(
-            "\r\x1b[K{}",
+            "\r\n\r\x1b[K{}",
             legend(&[("↑↓", "move"), ("←→", "in/out"), ("enter", "choose")])
         ));
-        show(&frame);
-        drawn = height + 3;
+        panel.draw(&frame);
 
         let Some(pressed) = keys.read() else {
-            erase(drawn);
+            panel.close();
             return Answer::Cancelled;
         };
 
@@ -193,7 +193,7 @@ pub fn file(spec: &Browse) -> Answer<String> {
 
         match pressed {
             Key::Cancel => {
-                erase(drawn);
+                panel.close();
                 return Answer::Cancelled;
             }
             Key::Accept => {
@@ -218,7 +218,7 @@ pub fn file(spec: &Browse) -> Answer<String> {
                 if !entry.directory && spec.want == Want::Directories {
                     continue;
                 }
-                erase(drawn);
+                panel.close();
                 return Answer::Given(full.display().to_string());
             }
             Key::Right => {
@@ -283,18 +283,6 @@ fn narrow(entries: &[Entry], query: &str, fuzzy: Fuzzy) -> Vec<usize> {
         .collect();
     scored.sort_by(|a, b| b.0.cmp(&a.0).then(a.1.cmp(&b.1)));
     scored.into_iter().map(|(_, index)| index).collect()
-}
-
-fn erase(rows: usize) {
-    if rows == 0 {
-        return;
-    }
-    let mut out = format!("\x1b[{rows}A");
-    for _ in 0..rows {
-        out.push_str("\r\x1b[K\r\n");
-    }
-    out.push_str(&format!("\x1b[{rows}A"));
-    show(&out);
 }
 
 #[cfg(test)]

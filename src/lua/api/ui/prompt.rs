@@ -51,9 +51,22 @@ fn flag(table: &Table, name: &str) -> bool {
     matches!(table.get(&Value::str(name)), Value::Bool(true))
 }
 
+/// A count that must be at least one — a height, a number of rows.
 fn count(table: &Table, name: &str, fallback: usize) -> usize {
     match table.get(&Value::str(name)) {
         Value::Number(n) => n.as_int().map(|i| i.max(1) as usize).unwrap_or(fallback),
+        _ => fallback,
+    }
+}
+
+/// A count that may be zero — a padding, a width.
+///
+/// Separate from [`count`] because clamping these to one is a bug you cannot see until you compare
+/// the two languages: `oslo.ui.style{padding_x = 0}` drew a column of padding where the shell's
+/// `ui style --padding "0 0"` drew none. Same widget, same theme, different box.
+fn size(table: &Table, name: &str, fallback: usize) -> usize {
+    match table.get(&Value::str(name)) {
+        Value::Number(n) => n.as_int().map(|i| i.max(0) as usize).unwrap_or(fallback),
         _ => fallback,
     }
 }
@@ -276,6 +289,16 @@ pub fn install(ui: &mut Table) {
                 fields
             })
         );
+        // `fatal` is `error` plus stopping, which is the only thing that distinguishes the two —
+        // printing it and carrying on would make the level a lie in one of the two languages.
+        //
+        // A Lua error rather than an exit: it unwinds the chunk, which is what `fatal` means
+        // *inside* a script, and it leaves a caller in `pcall` able to decide otherwise. The
+        // shell-side `ui log --level fatal` exits non-zero instead, because there is no chunk
+        // there to unwind.
+        if level == Level::Fatal {
+            return Err(crate::lua::eval::LuaError::new("ui.log: fatal"));
+        }
         ok(Value::Nil)
     });
 
@@ -307,6 +330,10 @@ pub fn install(ui: &mut Table) {
                             values.push((k.to_string(), v.to_string()));
                         }
                     }
+                    // Sorted for the same reason `log`'s fields are: table iteration has no order,
+                    // and `template` applies replacements in sequence — so overlapping keys would
+                    // render differently between two runs of the same script.
+                    values.sort();
                 }
             }
             _ => {}
@@ -374,8 +401,8 @@ pub fn install(ui: &mut Table) {
                     settings.border_style.fg = Some(c);
                 }
                 settings.style.bold = flag(&t, "bold");
-                settings.padding_x = count(&t, "padding_x", 0);
-                settings.padding_y = count(&t, "padding_y", 0);
+                settings.padding_x = size(&t, "padding_x", 0);
+                settings.padding_y = size(&t, "padding_y", 0);
                 settings.width = match t.get(&Value::str("width")) {
                     Value::Number(n) => n.as_int().map(|i| i.max(0) as usize),
                     _ => None,
@@ -397,14 +424,7 @@ fn list_widget(args: &[Value], filtering: bool) -> Value {
     if chosen.is_empty() {
         // `oslo.ui.choose{"a", "b"}` — the list itself as the argument, which is what a Lua
         // caller writes first and is worth accepting.
-        chosen = items(&t, "");
-        if chosen.is_empty() {
-            let mut index = 1i64;
-            while let Value::Str(s) = t.get(&Value::int(index)) {
-                chosen.push(s.to_string());
-                index += 1;
-            }
-        }
+        chosen = positional(&t);
     }
     let multi = flag(&t, "multi");
     let settings = Choice {
@@ -430,4 +450,18 @@ fn list_widget(args: &[Value], filtering: bool) -> Value {
         Answer::Given(picked) => picked.first().map(Value::str).unwrap_or(Value::Nil),
         _ => Value::Nil,
     }
+}
+
+/// The positional entries of a table: `{"a", "b", "c"}`.
+///
+/// Every widget that takes a list accepts one this way as well as under its named field, because
+/// `oslo.ui.choose{"a", "b"}` is what a Lua caller writes before reading any documentation.
+fn positional(table: &Table) -> Vec<String> {
+    let mut out = Vec::new();
+    let mut index = 1i64;
+    while let Value::Str(s) = table.get(&Value::int(index)) {
+        out.push(s.to_string());
+        index += 1;
+    }
+    out
 }

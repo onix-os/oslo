@@ -80,12 +80,9 @@ pub fn confirm(spec: &Confirm) -> Answer<bool> {
                 return Answer::Cancelled;
             }
             Key::Accept => {
-                let chosen = if yes { &spec.yes } else { &spec.no };
-                show(&format!(
-                    "\r\x1b[K{}  {}\r\n",
-                    ui.question.paint(&spec.question, depth),
-                    if yes { ui.done } else { ui.error }.paint(chosen, depth)
-                ));
+                // Erased rather than echoed — `confirm`'s answer is its exit status, so there is
+                // nothing to leave behind. See `input` for why nothing here echoes.
+                show("\r\x1b[K");
                 return Answer::Given(yes);
             }
             // The letters, because that is what people type without looking.

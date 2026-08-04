@@ -8,8 +8,8 @@
 //! Drawn in place below the header, like the list widgets, so the transcript above is untouched
 //! and the finished text stays where it was typed.
 
-use super::{Answer, legend, show};
-use crate::interactive::dropdown::width::terminal_cols;
+use super::{Answer, Inline, legend};
+use crate::interactive::dropdown::width::{terminal_cols, terminal_rows, truncate_to_width};
 use crate::interactive::term::{Key, Keys, Restore};
 use crate::interactive::theme;
 
@@ -48,53 +48,59 @@ pub fn write(spec: &Write) -> Answer<String> {
     let mut row = lines.len() - 1;
     let mut col = lines[row].len();
     let mut keys = Keys::on(raw.fd());
-    let mut drawn = 0usize;
+    let mut panel = Inline::new();
 
     loop {
+        let cols = terminal_cols();
+        let room = cols.saturating_sub(3);
+        // The document scrolls under a window, like every other list here. Without this a document
+        // longer than the terminal walked off the top and the redraw painted over the transcript.
+        let chrome = 1 + usize::from(!spec.header.is_empty());
+        let window = terminal_rows().saturating_sub(chrome + 1).max(1);
+        let top = row.saturating_sub(window.saturating_sub(1));
+
         let mut frame = String::new();
-        if drawn > 0 {
-            frame.push_str(&format!("\x1b[{drawn}A"));
-        }
         if !spec.header.is_empty() {
             frame.push_str(&format!(
-                "\r\x1b[K{}\r\n",
-                ui.question.paint(&spec.header, depth)
+                "\r\n\r\x1b[K{}",
+                ui.question
+                    .paint(&truncate_to_width(&spec.header, room), depth)
             ));
         }
         let empty = lines.len() == 1 && lines[0].is_empty();
-        for (index, line) in lines.iter().enumerate() {
+        for (index, line) in lines.iter().enumerate().skip(top).take(window) {
+            let raw_text: String = line.iter().collect();
             let text: String = if empty && !spec.placeholder.is_empty() {
                 ui.muted.paint(&spec.placeholder, depth)
             } else {
-                line.iter().collect()
+                truncate_to_width(&raw_text, room)
             };
+            // `┃` in the accent, which is gum's prompt for a multi-line field and the same colour
+            // every other cursor in this module uses.
             frame.push_str(&format!(
-                "\r\x1b[K{} {}\r\n",
-                ui.muted.paint(if index == row { "▎" } else { " " }, depth),
+                "\r\n\r\x1b[K{} {}",
+                if index == row { ui.accent } else { ui.muted }.paint("┃", depth),
                 text
             ));
         }
         frame.push_str(&format!(
-            "\r\x1b[K{}",
-            legend(&[("enter", "new line"), ("ctrl-d", "done"), ("esc", "cancel")])
+            "\r\n\r\x1b[K{}",
+            legend(&[
+                ("enter", "new line"),
+                ("ctrl-d", "submit"),
+                ("esc", "cancel")
+            ])
         ));
-        show(&frame);
-        drawn = lines.len() + 1 + usize::from(!spec.header.is_empty());
-        // Put the cursor where the caret is, so a terminal's own cursor tracks the text.
-        let up = lines.len() - row;
-        let across = 2 + col.min(terminal_cols().saturating_sub(3));
-        show(&format!("\x1b[{up}A\r\x1b[{across}C"));
+        panel.draw(&frame);
 
         let Some(pressed) = keys.read() else {
-            erase(drawn, row, lines.len());
+            panel.close();
             return Answer::Cancelled;
         };
-        // Every branch below leaves the cursor wherever it was; the next frame moves it.
-        show(&format!("\x1b[{}B", lines.len() - row));
 
         match pressed {
             Key::Cancel => {
-                erase(drawn, 0, 0);
+                panel.close();
                 return Answer::Cancelled;
             }
             // Ctrl-D on an empty document is a cancel rather than an empty answer, matching what
@@ -105,7 +111,7 @@ pub fn write(spec: &Write) -> Answer<String> {
                     .map(|l| l.iter().collect::<String>())
                     .collect::<Vec<_>>()
                     .join("\n");
-                erase(drawn, 0, 0);
+                panel.close();
                 return if text.is_empty() {
                     Answer::Cancelled
                 } else {
@@ -167,19 +173,6 @@ pub fn write(spec: &Write) -> Answer<String> {
             _ => {}
         }
     }
-}
-
-/// Erase the rows this widget printed.
-fn erase(rows: usize, _row: usize, _total: usize) {
-    if rows == 0 {
-        return;
-    }
-    let mut out = format!("\x1b[{rows}A");
-    for _ in 0..rows {
-        out.push_str("\r\x1b[K\r\n");
-    }
-    out.push_str(&format!("\x1b[{rows}A"));
-    show(&out);
 }
 
 #[cfg(test)]

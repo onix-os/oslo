@@ -16,7 +16,7 @@
 //! Space checks a row, Enter takes everything checked — or the row under the cursor when nothing
 //! is. That last rule is what stops "I pressed Enter and got nothing" from being a state.
 
-use super::{Answer, legend, show};
+use super::{Answer, Inline, legend};
 use crate::interactive::dropdown::width::{terminal_cols, terminal_rows, truncate_to_width};
 use crate::interactive::matching::{Fuzzed, Fuzzy};
 use crate::interactive::term::{Key, Keys, Restore};
@@ -82,15 +82,18 @@ fn run(spec: &Choice) -> Answer<Vec<String>> {
     let mut selected = 0usize;
     let mut offset = 0usize;
     let mut keys = Keys::on(raw.fd());
-    // Rows this widget printed last time, so the next frame erases exactly them. Erasing more
-    // would eat the caller's output; erasing fewer leaves half a list on the screen.
-    let mut drawn = 0usize;
+    let mut panel = Inline::new();
 
     loop {
+        // The chrome is whatever this frame will actually draw — the legend, plus a header and a
+        // filter row when there are any. Computed from the same booleans the drawing uses, so the
+        // clamp and the frame cannot disagree; a hard-coded constant here is how two of these
+        // widgets ended up reserving a row they never drew.
+        let chrome = 1 + usize::from(!spec.header.is_empty()) + usize::from(spec.filter);
         let height = spec
             .height
             .min(shown.len().max(1))
-            .min(terminal_rows().saturating_sub(3).max(1));
+            .min(terminal_rows().saturating_sub(chrome + 1).max(1));
         if selected >= shown.len() {
             selected = shown.len().saturating_sub(1);
         }
@@ -100,27 +103,28 @@ fn run(spec: &Choice) -> Answer<Vec<String>> {
             offset = selected + 1 - height;
         }
 
+        // Every row starts with `\r\n`, which is what makes the row count exact — see `Inline`.
         let mut frame = String::new();
-        // Back to the top of what was drawn, then repaint downward.
-        if drawn > 0 {
-            frame.push_str(&format!("\x1b[{drawn}A"));
-        }
         let cols = terminal_cols();
+        // Chrome is truncated like everything else: a header or a query longer than the terminal
+        // wraps, and a wrapped row is two physical rows the count knows nothing about.
+        let room = cols.saturating_sub(2);
 
         if !spec.header.is_empty() {
             frame.push_str(&format!(
-                "\r\x1b[K{}\r\n",
-                ui.question.paint(&spec.header, depth)
+                "\r\n\r\x1b[K{}",
+                ui.question
+                    .paint(&truncate_to_width(&spec.header, room), depth)
             ));
         }
         if spec.filter {
             frame.push_str(&format!(
-                "\r\x1b[K{} {}\r\n",
+                "\r\n\r\x1b[K{} {}",
                 ui.accent.paint("❯", depth),
                 if query.is_empty() {
                     ui.muted.paint("type to filter", depth)
                 } else {
-                    query.clone()
+                    truncate_to_width(&query, room)
                 }
             ));
         }
@@ -128,45 +132,53 @@ fn run(spec: &Choice) -> Answer<Vec<String>> {
             let text = match shown.get(offset + row) {
                 Some(&item) => {
                     let here = offset + row == selected;
-                    let mark = if spec.multi {
+                    // **The caret and the checkbox are two columns, not one.** They answer
+                    // different questions — where you are, and what is chosen — and folding them
+                    // together left `--multi` with no cursor at all.
+                    let caret = if here { "❯ " } else { "  " };
+                    let box_ = if spec.multi {
                         if checked[item] { "◉ " } else { "◯ " }
-                    } else if here {
-                        "❯ "
                     } else {
-                        "  "
+                        ""
                     };
-                    let label = truncate_to_width(&spec.items[item], cols.saturating_sub(4));
-                    let style = if here {
-                        ui.accent
-                    } else {
-                        theme::Style::default()
-                    };
+                    let width = room.saturating_sub(2 + box_.chars().count());
+                    let label = truncate_to_width(&spec.items[item], width);
                     format!(
-                        "{}{}",
-                        if here { ui.accent } else { ui.muted }.paint(mark, depth),
-                        style.paint(&label, depth)
+                        "{}{}{}",
+                        ui.accent.paint(caret, depth),
+                        if checked[item] { ui.accent } else { ui.muted }.paint(box_, depth),
+                        if here {
+                            ui.accent
+                        } else {
+                            theme::Style::default()
+                        }
+                        .paint(&label, depth)
                     )
                 }
                 None => String::new(),
             };
-            frame.push_str(&format!("\r\x1b[K{text}\r\n"));
+            frame.push_str(&format!("\r\n\r\x1b[K{text}"));
         }
         let keys_shown: &[(&str, &str)] = if spec.multi {
-            &[("↑↓", "move"), ("space", "check"), ("enter", "done")]
+            &[
+                ("↑↓", "move"),
+                ("space", "check"),
+                ("enter", "confirm"),
+                ("esc", "cancel"),
+            ]
         } else {
-            &[("↑↓", "move"), ("enter", "choose")]
+            &[("↑↓", "move"), ("enter", "confirm"), ("esc", "cancel")]
         };
-        frame.push_str(&format!("\r\x1b[K{}", legend(keys_shown)));
-        show(&frame);
-        drawn = height + 1 + usize::from(!spec.header.is_empty()) + usize::from(spec.filter);
+        frame.push_str(&format!("\r\n\r\x1b[K{}", legend(keys_shown)));
+        panel.draw(&frame);
 
         let Some(pressed) = keys.read() else {
-            erase(drawn);
+            panel.close();
             return Answer::Cancelled;
         };
         match pressed {
             Key::Cancel => {
-                erase(drawn);
+                panel.close();
                 return Answer::Cancelled;
             }
             Key::Accept => {
@@ -190,24 +202,29 @@ fn run(spec: &Choice) -> Answer<Vec<String>> {
                         .map(|&i| vec![spec.items[i].clone()])
                         .unwrap_or_default()
                 };
-                erase(drawn);
+                panel.close();
                 if picked.is_empty() {
                     return Answer::Cancelled;
                 }
-                if !spec.header.is_empty() {
-                    show(&format!(
-                        "{} {}\r\n",
-                        ui.question.paint(&spec.header, depth),
-                        ui.done.paint(&picked.join(", "), depth)
-                    ));
-                }
+                // Nothing is echoed. The widget erases itself completely and the answer — which
+                // the caller prints to stdout — is the line left in the transcript. Echoing as
+                // well showed it twice, once from each stream. This is gum's arrangement and the
+                // reason it is right: there is exactly one record, and `$(…)` captures it.
                 return Answer::Given(picked);
             }
             Key::Up => selected = selected.saturating_sub(1),
             Key::Down => selected = (selected + 1).min(shown.len().saturating_sub(1)),
             Key::PageUp | Key::Home => selected = 0,
             Key::PageDown | Key::End => selected = shown.len().saturating_sub(1),
-            Key::ToggleScope | Key::Char(' ') if spec.multi => {
+            // Tab always toggles; space only when there is no query to type into. Swallowing
+            // space unconditionally made multi-word filtering impossible in the one widget that
+            // offers both.
+            Key::ToggleScope if spec.multi => {
+                if let Some(&item) = shown.get(selected) {
+                    checked[item] = !checked[item];
+                }
+            }
+            Key::Char(' ') if spec.multi && !spec.filter => {
                 if let Some(&item) = shown.get(selected) {
                     checked[item] = !checked[item];
                 }
@@ -250,19 +267,6 @@ fn narrow(spec: &Choice, query: &str) -> Vec<usize> {
     // Best first, then the original order — so a list the caller sorted stays sorted among equals.
     scored.sort_by(|a, b| b.0.cmp(&a.0).then(a.1.cmp(&b.1)));
     scored.into_iter().map(|(_, i)| i).collect()
-}
-
-/// Erase the `rows` this widget printed, leaving the cursor where it started.
-fn erase(rows: usize) {
-    if rows == 0 {
-        return;
-    }
-    let mut out = format!("\x1b[{rows}A");
-    for _ in 0..rows {
-        out.push_str("\r\x1b[K\r\n");
-    }
-    out.push_str(&format!("\x1b[{rows}A"));
-    show(&out);
 }
 
 #[cfg(test)]

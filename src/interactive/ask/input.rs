@@ -73,11 +73,18 @@ pub fn input(spec: &Input) -> Answer<String> {
         } else {
             line[..cursor].iter().collect()
         };
+        // `CSI 0 C` is a move of *one*, not none — so the caret sat a cell right of an empty
+        // line and did not move when the first character was typed.
+        let caret = printed_width(&spec.prompt) + printed_width(&before);
         show(&format!(
-            "\r\x1b[K{}{}\r\x1b[{}C",
+            "\r\x1b[K{}{}\r{}",
             ui.question.paint(&spec.prompt, depth),
             body,
-            printed_width(&spec.prompt) + printed_width(&before)
+            if caret > 0 {
+                format!("\x1b[{caret}C")
+            } else {
+                String::new()
+            }
         ));
 
         let Some(pressed) = keys.read() else {
@@ -101,19 +108,10 @@ pub fn input(spec: &Input) -> Answer<String> {
                     ));
                     continue;
                 }
-                // The finished answer is echoed where the question was, so the transcript shows
-                // what was asked and what you said — and then a newline, because the next thing
-                // the script prints is not part of this row.
-                let echo = if spec.password {
-                    "•".repeat(answer.chars().count())
-                } else {
-                    answer.clone()
-                };
-                show(&format!(
-                    "\r\x1b[K{}{}\r\n",
-                    ui.question.paint(&spec.prompt, depth),
-                    ui.done.paint(&echo, depth)
-                ));
+                // Erased, not echoed: the caller prints the answer to stdout and that is the one
+                // record of it. Echoing here as well put the answer on screen twice, once from
+                // each stream — and made `x=$(ui input)` leave a stray copy behind.
+                show("\r\x1b[K");
                 return Answer::Given(answer);
             }
             Key::Char(c) => {

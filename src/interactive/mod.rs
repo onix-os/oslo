@@ -17,6 +17,7 @@ mod hinting;
 pub mod keys;
 pub mod marks;
 pub mod matching;
+pub mod paint;
 pub mod prompt;
 pub mod query;
 pub mod recall;
