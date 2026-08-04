@@ -192,7 +192,10 @@ const LONG: &[(&str, &str)] = &[
     ("--details", "with --help: the full option reference"),
     ("--version", "print the version, then exit"),
     ("--help", "print this message, then exit"),
-    ("--", "end of options"),
+    // `--` is deliberately absent. It is a separator rather than an option, it means the same
+    // thing in every program that uses getopt, and bash does not list it either. Where it does
+    // something oslo-specific — forcing a tool name to be read as a path — it is documented under
+    // TOOLS, which is where somebody needs it.
 ];
 
 /// The tools.
@@ -209,6 +212,12 @@ fn tools_section(paint: Paint) -> String {
     for tool in TOOLS {
         s.push_str(&row(tool.name, paint.key(tool.name), tool.about));
     }
+    // The one place `--` does something oslo-specific, so the one place worth saying it.
+    let _ = writeln!(
+        s,
+        "\n  {}",
+        paint.dim("`oslo ./history` and `oslo -- history` read the name as a path instead.")
+    );
     s
 }
 
