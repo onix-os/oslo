@@ -12,7 +12,7 @@
 //! `carry on?  next  stop here  ←→ choose • enter confirm`.
 
 use super::{Answer, Inline, footer};
-use crate::interactive::term::{Key, Keys, Restore};
+use crate::interactive::term::{Key, Keys, Restore, Screen};
 use crate::interactive::theme;
 
 /// How `confirm` is asked.
@@ -43,7 +43,7 @@ pub fn confirm(spec: &Confirm) -> Answer<bool> {
     let ui = theme::current().ui;
     let depth = theme::depth();
 
-    let Some(raw) = Restore::enter(false) else {
+    let Some(raw) = Restore::enter(Screen::Inline) else {
         return Answer::Given(spec.default);
     };
 

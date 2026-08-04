@@ -15,7 +15,7 @@ use crate::interactive::dropdown::width::{
     pad_to_width, terminal_cols, terminal_rows, truncate_to_width,
 };
 use crate::interactive::matching::{Fuzzed, Fuzzy};
-use crate::interactive::term::{Key, Keys, Restore};
+use crate::interactive::term::{Key, Keys, Restore, Screen};
 use crate::interactive::theme;
 
 /// How the table is asked.
@@ -71,7 +71,7 @@ pub fn table(spec: &Table) -> Answer<String> {
     let ui = theme::current().ui;
     let depth = theme::depth();
 
-    let Some(raw_mode) = Restore::enter(false) else {
+    let Some(raw_mode) = Restore::enter(Screen::Inline) else {
         return Answer::NoTerminal;
     };
 

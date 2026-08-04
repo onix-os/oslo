@@ -14,7 +14,7 @@
 //! of the shell's life.
 
 use super::{Answer, show, with_caret};
-use crate::interactive::term::{Key, Keys, Restore};
+use crate::interactive::term::{Key, Keys, Restore, Screen};
 use crate::interactive::theme;
 
 /// How `input` is asked.
@@ -40,7 +40,7 @@ pub fn input(spec: &Input) -> Answer<String> {
     let ui = theme::current().ui;
     let depth = theme::depth();
 
-    let Some(raw) = Restore::enter(false) else {
+    let Some(raw) = Restore::enter(Screen::Inline) else {
         // No terminal. A default is the script's own answer for exactly this, and is why one of
         // these in a CI pipeline need not hang.
         return match &spec.default {

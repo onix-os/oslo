@@ -86,12 +86,30 @@ impl Restore {
     }
 }
 
+/// What the terminal is being taken over *for*.
+///
+/// The three cases differ in two independent ways — whether the alternate screen is taken, and
+/// whether the cursor is hidden — and a boolean could only say one of them. [`Screen::Line`] is
+/// the one that needs saying: an editor's cursor is the thing the user is looking at, so hiding it
+/// there would be hiding the point.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Screen {
+    /// Draw in place below the cursor, and hide it: an inline widget repaints its whole block on
+    /// every keystroke, and a visible cursor dragged across all of it is most of what "it
+    /// flickers" means.
+    Inline,
+    /// Take the alternate screen and hide the cursor. The pager and the history finder.
+    Alternate,
+    /// Stay on the main screen and **keep the cursor visible** — the line editor.
+    Line,
+}
+
 impl Restore {
-    /// Put the terminal into raw mode. `alternate` also takes the alternate screen and hides the
-    /// cursor, which is what a full-screen widget wants and an inline one does not.
+    /// Put the terminal into raw mode for `screen`.
     ///
     /// `None` when there is no terminal, which every caller treats as "do not draw".
-    pub fn enter(alternate: bool) -> Option<Restore> {
+    pub fn enter(screen: Screen) -> Option<Restore> {
+        let alternate = screen == Screen::Alternate;
         let tty = Tty::open()?;
         // SAFETY: the descriptor is owned by `tty` and outlives every use of this borrow.
         let handle = unsafe { std::os::fd::BorrowedFd::borrow_raw(tty.fd()) };
@@ -121,10 +139,12 @@ impl Restore {
         // widget repaints its whole block on each keystroke, and a visible cursor is dragged
         // across all of it every time — which is most of what "it flickers" means.
         let mut out = io::stderr();
-        let _ = out.write_all(if alternate {
-            b"\x1b[?1049h\x1b[?25l".as_slice()
-        } else {
-            b"\x1b[?25l".as_slice()
+        let _ = out.write_all(match screen {
+            Screen::Alternate => b"\x1b[?1049h\x1b[?25l".as_slice(),
+            Screen::Inline => b"\x1b[?25l".as_slice(),
+            // Nothing at all: the mode change is the whole takeover, and the cursor stays where
+            // the user can see it.
+            Screen::Line => b"".as_slice(),
         });
         let _ = out.flush();
         Some(Restore {

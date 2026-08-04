@@ -13,7 +13,7 @@
 use super::{Answer, FOOTER_ROWS, Inline, footer};
 use crate::interactive::dropdown::width::{terminal_cols, terminal_rows, truncate_to_width};
 use crate::interactive::matching::{Fuzzed, Fuzzy};
-use crate::interactive::term::{Key, Keys, Restore};
+use crate::interactive::term::{Key, Keys, Restore, Screen};
 use crate::interactive::theme;
 use std::path::{Path, PathBuf};
 
@@ -85,7 +85,7 @@ pub fn file(spec: &Browse) -> Answer<String> {
     let ui = theme::current().ui;
     let depth = theme::depth();
 
-    let Some(raw) = Restore::enter(false) else {
+    let Some(raw) = Restore::enter(Screen::Inline) else {
         return Answer::NoTerminal;
     };
 

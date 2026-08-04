@@ -15,7 +15,7 @@
 
 use super::{Answer, legend, show};
 use crate::interactive::dropdown::width::{terminal_cols, terminal_rows, truncate_to_width};
-use crate::interactive::term::{Key, Keys, Restore};
+use crate::interactive::term::{Key, Keys, Restore, Screen};
 use crate::interactive::theme;
 
 /// What to show, and what to call it.
@@ -34,7 +34,7 @@ pub fn pager(spec: &Pager) -> Answer<()> {
     let ui = theme::current().ui;
     let depth = theme::depth();
 
-    let Some(raw) = Restore::enter(true) else {
+    let Some(raw) = Restore::enter(Screen::Alternate) else {
         return Answer::NoTerminal;
     };
 

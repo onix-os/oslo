@@ -10,7 +10,7 @@
 
 use super::{Answer, FOOTER_ROWS, Inline, footer, with_caret};
 use crate::interactive::dropdown::width::{terminal_cols, terminal_rows, truncate_to_width};
-use crate::interactive::term::{Key, Keys, Restore};
+use crate::interactive::term::{Key, Keys, Restore, Screen};
 use crate::interactive::theme;
 
 /// How `write` is asked.
@@ -26,7 +26,7 @@ pub fn write(spec: &Write) -> Answer<String> {
     let ui = theme::current().ui;
     let depth = theme::depth();
 
-    let Some(raw) = Restore::enter(false) else {
+    let Some(raw) = Restore::enter(Screen::Inline) else {
         return match &spec.default {
             Some(value) => Answer::Given(value.clone()),
             None => Answer::NoTerminal,

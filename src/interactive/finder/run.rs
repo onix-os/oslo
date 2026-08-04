@@ -12,7 +12,7 @@ use super::Scope;
 use super::rank::{Ranked, rank};
 use super::render::{Frame, frame, visible_rows};
 use crate::interactive::matching::Fuzzy;
-use crate::interactive::term::{Key, Keys, Restore};
+use crate::interactive::term::{Key, Keys, Restore, Screen};
 use crate::track::history::Command;
 use std::io::{self, Write};
 
@@ -36,7 +36,7 @@ pub fn open(commands: &[Command], cwd: &str, now: i64, fuzzy: Fuzzy) -> Option<O
     // Raw mode and the alternate screen, both undone whichever way this returns. The prompt
     // underneath is untouched and comes back exactly as it was, which is the whole reason a
     // full-screen finder is affordable here.
-    let restore = Restore::enter(true)?;
+    let restore = Restore::enter(Screen::Alternate)?;
 
     let mut stdout = io::stdout();
     let mut state = State::new(commands, cwd, fuzzy);
