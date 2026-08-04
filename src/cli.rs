@@ -7,6 +7,9 @@
 //! previous implementation recognised three forms and silently started a REPL for everything
 //! else, so `oslo --version` read the caller's stdin and exited 0.
 
+pub mod help;
+pub mod tools;
+
 use crate::startup::language::Language;
 use oslo::env::options::ShellOption;
 use std::fmt::Write as _;
@@ -92,43 +95,32 @@ pub fn version_line() -> String {
     format!("oslo version {}", env!("CARGO_PKG_VERSION"))
 }
 
+/// Printing the help is not a failure, so it goes to stdout with status 0 — which is also what
+/// makes `oslo --help | less` and `oslo --help > FILE` work, and both of those are why the paint
+/// is detected rather than assumed.
+fn help_exit(detailed: bool) -> Exit {
+    let paint = help::Paint::detect();
+    let text = if detailed {
+        help::details(paint)
+    } else {
+        help::short(paint)
+    };
+    Exit {
+        message: text.trim_end().to_string(),
+        to_stderr: false,
+        status: 0,
+    }
+}
+
+/// The two-line synopsis a usage *error* prints.
+///
+/// Short on purpose. A mistyped flag should say what was wrong and how to ask for more, not bury
+/// it under the whole reference — `oslo --help` is one keystroke away and is where the detail is.
 pub fn usage() -> String {
     let mut s = String::new();
     let _ = writeln!(s, "usage: oslo [option]... [script [argument]...]");
     let _ = writeln!(s, "       oslo [option]... -c command [name [argument]...]");
-    let _ = writeln!(s);
-    let _ = writeln!(s, "Options:");
-    let _ = writeln!(s, "  -c COMMAND        run COMMAND, then exit");
-    let _ = writeln!(s, "  -s                read commands from standard input");
-    let _ = writeln!(s, "  -i                force interactive mode");
-    let _ = writeln!(s, "  -l                act as a login shell");
-    let _ = writeln!(
-        s,
-        "  -e -u -x ...      set a shell option, as `set` does (see `set -o`)"
-    );
-    let _ = writeln!(
-        s,
-        "  --posix           follow POSIX where bash's default differs"
-    );
-    let _ = writeln!(
-        s,
-        "  --lua             run the program as Lua (normally detected)"
-    );
-    let _ = writeln!(
-        s,
-        "  --sh              run the program as shell (normally detected)"
-    );
-    let _ = writeln!(
-        s,
-        "  --no-vi           emacs key bindings; vi is the default (see oslo.vi.enabled)"
-    );
-    let _ = writeln!(
-        s,
-        "  --profile=NAME    use NAME's history store instead of the default ($OSLO_PROFILE)"
-    );
-    let _ = writeln!(s, "  --version         print the version, then exit");
-    let _ = writeln!(s, "  --help            print this message, then exit");
-    let _ = writeln!(s, "  --                end of options");
+    let _ = write!(s, "try `oslo --help` for the options.");
     s
 }
 
@@ -220,13 +212,21 @@ pub fn parse(argv: &[String]) -> Result<Invocation, Exit> {
                         status: 0,
                     });
                 }
+                // `--details` modifies `--help` and may be written on either side of it, so the
+                // rest of the command line is consulted rather than only what has been seen. It
+                // stops at `--`, past which a `--details` is somebody's argument and not a flag.
+                // `--details` modifies `--help` and may be written on either side of it, so the
+                // rest of the command line is consulted rather than only what has been seen. It
+                // stops at `--`, past which a `--details` is somebody's argument and not a flag.
                 "help" => {
-                    return Err(Exit {
-                        message: usage().trim_end().to_string(),
-                        to_stderr: false,
-                        status: 0,
-                    });
+                    let detailed = argv[i + 1..]
+                        .iter()
+                        .take_while(|arg| *arg != "--")
+                        .any(|arg| arg == "--details");
+                    return Err(help_exit(detailed));
                 }
+                // On its own it means the same thing, so neither spelling has to be remembered.
+                "details" => return Err(help_exit(true)),
                 // `--login` beside `-l`. bash accepts both, and the long form is what a display
                 // manager, a terminal emulator's "run as login shell" setting and `su --login`
                 // reach for — so a shell that only took `-l` failed to start under exactly the

@@ -326,6 +326,28 @@ next profile** — which is how you go and read what the agent ran without leavi
 There used to be two files, `history.db` and `track.kv`. There is one now. Nothing migrates the old
 pair — delete them.
 
+## Tools
+
+oslo's own utilities are reached by the name it was called by, not by a subcommand word:
+
+```sh
+ln -s /usr/bin/oslo /usr/bin/oslo-history
+oslo-history            # the tool
+oslo history            # still runs a script named `history`
+```
+
+`oslo --help` lists them and marks the ones with no symlink on `$PATH` as `(inactive)`.
+
+**Why not `oslo history`.** POSIX defines the shell as `sh [options] [command_file [argument...]]`
+— the first operand *is* a script path, and neither bash nor dash reserves a single word there.
+The case that settles it is the shebang: a script starting `#!/bin/oslo` is run by the kernel as
+`execve("/bin/oslo", ["/bin/oslo", "./history"])`, an argv identical byte-for-byte to somebody
+typing `oslo history`. Nothing can tell them apart. On a machine where oslo is `/bin/sh` that is
+every script on it.
+
+`argv[0]` has no such job, which is how busybox does it — and busybox's `sh` reserves none of its
+hundreds of applets either: `busybox sh sync` runs a script named `sync`.
+
 ## Configuration
 
 `~/.config/oslo/config.lua`. One file, one language, one place — there is no shell-syntax config.

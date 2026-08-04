@@ -67,6 +67,11 @@ pub struct OptionSpec {
     pub letter: Option<char>,
     /// The `set -o` name. `None` for the three invocation flags, which `set` cannot change.
     pub name: Option<&'static str>,
+    /// What turning it on does, in one line, for `--help --details`.
+    ///
+    /// Held here rather than in the help text so that the two cannot drift: an option added to
+    /// this table appears in the reference without anybody remembering to write it down twice.
+    pub about: &'static str,
     /// Why turning this on does nothing, when it does nothing.
     ///
     /// **An option that is accepted and ignored is worse than one that is refused.** A script
@@ -88,11 +93,17 @@ impl OptionSpec {
     }
 }
 
-const fn spec(option: ShellOption, letter: Option<char>, name: Option<&'static str>) -> OptionSpec {
+const fn spec(
+    option: ShellOption,
+    letter: Option<char>,
+    name: Option<&'static str>,
+    about: &'static str,
+) -> OptionSpec {
     OptionSpec {
         option,
         letter,
         name,
+        about,
         unsupported: None,
     }
 }
@@ -102,12 +113,14 @@ const fn refused(
     option: ShellOption,
     letter: Option<char>,
     name: Option<&'static str>,
+    about: &'static str,
     why: &'static str,
 ) -> OptionSpec {
     OptionSpec {
         option,
         letter,
         name,
+        about,
         unsupported: Some(why),
     }
 }
@@ -118,68 +131,146 @@ const fn refused(
 /// bash's own ordering amounts to; the three invocation flags come last because `$-` puts them
 /// there (`bash -c 'echo $-'` prints `hBc`, not `chB`).
 pub const ALL: &[OptionSpec] = &[
-    spec(ShellOption::AllExport, Some('a'), Some("allexport")),
+    spec(
+        ShellOption::AllExport,
+        Some('a'),
+        Some("allexport"),
+        "export every variable an assignment creates",
+    ),
     refused(
         ShellOption::Notify,
         Some('b'),
         Some("notify"),
+        "report a finished background job as soon as it finishes",
         "a finished background job is reported at the next prompt, not immediately",
     ),
-    spec(ShellOption::ErrExit, Some('e'), Some("errexit")),
-    spec(ShellOption::NoGlob, Some('f'), Some("noglob")),
+    spec(
+        ShellOption::ErrExit,
+        Some('e'),
+        Some("errexit"),
+        "exit as soon as a command fails",
+    ),
+    spec(
+        ShellOption::NoGlob,
+        Some('f'),
+        Some("noglob"),
+        "leave glob patterns alone instead of expanding them",
+    ),
     refused(
         ShellOption::HashAll,
         Some('h'),
         Some("hashall"),
+        "remember where a command was found, to skip the next $PATH search",
         "command locations are not remembered between lookups",
     ),
     refused(
         ShellOption::Keyword,
         Some('k'),
         Some("keyword"),
+        "treat an assignment after the command name as an assignment",
         "an assignment after the command name is an argument, not an assignment",
     ),
-    spec(ShellOption::Monitor, Some('m'), Some("monitor")),
-    spec(ShellOption::NoExec, Some('n'), Some("noexec")),
+    spec(
+        ShellOption::Monitor,
+        Some('m'),
+        Some("monitor"),
+        "job control: each job in its own process group, with fg and bg",
+    ),
+    spec(
+        ShellOption::NoExec,
+        Some('n'),
+        Some("noexec"),
+        "read and parse commands without running them, to check syntax",
+    ),
     refused(
         ShellOption::OneCmd,
         Some('t'),
         Some("onecmd"),
+        "exit after reading and running one command",
         "the shell does not exit after one command",
     ),
-    spec(ShellOption::NoUnset, Some('u'), Some("nounset")),
+    spec(
+        ShellOption::NoUnset,
+        Some('u'),
+        Some("nounset"),
+        "fail rather than expand an unset variable to nothing",
+    ),
     refused(
         ShellOption::Verbose,
         Some('v'),
         Some("verbose"),
+        "echo each line of input as it is read",
         "input is not echoed as it is read; `set -x` traces what runs",
     ),
-    spec(ShellOption::XTrace, Some('x'), Some("xtrace")),
-    spec(ShellOption::NoClobber, Some('C'), Some("noclobber")),
-    spec(ShellOption::IgnoreEof, None, Some("ignoreeof")),
+    spec(
+        ShellOption::XTrace,
+        Some('x'),
+        Some("xtrace"),
+        "print each command, expanded, before it runs",
+    ),
+    spec(
+        ShellOption::NoClobber,
+        Some('C'),
+        Some("noclobber"),
+        "refuse to overwrite an existing file with `>`",
+    ),
+    spec(
+        ShellOption::IgnoreEof,
+        None,
+        Some("ignoreeof"),
+        "do not let Ctrl-D end an interactive shell",
+    ),
     refused(
         ShellOption::NoLog,
         None,
         Some("nolog"),
+        "keep function definitions out of the history",
         "history records function definitions like anything else",
     ),
-    spec(ShellOption::PipeFail, None, Some("pipefail")),
-    spec(ShellOption::Posix, None, Some("posix")),
+    spec(
+        ShellOption::PipeFail,
+        None,
+        Some("pipefail"),
+        "a pipeline fails if any command in it failed, not just the last",
+    ),
+    spec(
+        ShellOption::Posix,
+        None,
+        Some("posix"),
+        "follow POSIX in the four places bash's default differs",
+    ),
     refused(
         ShellOption::Vi,
         None,
         Some("vi"),
-        "the editing mode is `oslo.vi.enabled` or `--vi`, fixed when the editor is built",
+        "vi key bindings while editing a line",
+        "the editing mode is `oslo.vi.enabled` or `--no-vi`, fixed when the editor is built",
     ),
     refused(
         ShellOption::Emacs,
         None,
         Some("emacs"),
-        "the editing mode is `oslo.vi.enabled` or `--vi`, fixed when the editor is built",
+        "emacs key bindings while editing a line",
+        "the editing mode is `oslo.vi.enabled` or `--no-vi`, fixed when the editor is built",
     ),
-    spec(ShellOption::Interactive, Some('i'), None),
-    spec(ShellOption::CommandString, Some('c'), None),
-    spec(ShellOption::StdinInput, Some('s'), None),
+    spec(
+        ShellOption::Interactive,
+        Some('i'),
+        None,
+        "the shell is interactive (from the invocation; `set` cannot change it)",
+    ),
+    spec(
+        ShellOption::CommandString,
+        Some('c'),
+        None,
+        "the commands came from `-c` (from the invocation)",
+    ),
+    spec(
+        ShellOption::StdinInput,
+        Some('s'),
+        None,
+        "commands are read from standard input (from the invocation)",
+    ),
 ];
 
 impl ShellOption {

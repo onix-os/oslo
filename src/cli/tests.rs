@@ -125,7 +125,40 @@ fn version_and_help_exit_zero_on_stdout() {
     let h = parse_args(&["--help"]).expect_err("terminates");
     assert_eq!(h.status, 0);
     assert!(!h.to_stderr);
-    assert!(h.message.contains("usage: oslo"));
+    assert!(h.message.contains("USAGE"), "{}", h.message);
+    assert!(h.message.contains("oslo-config"), "the tools are listed");
+}
+
+/// `--details` is the long form, and works written either side of `--help` — nobody should have
+/// to remember an order.
+#[test]
+fn details_is_the_long_help_in_either_order() {
+    let short = parse_args(&["--help"]).expect_err("terminates").message;
+    for spelling in [
+        vec!["--help", "--details"],
+        vec!["--details", "--help"],
+        vec!["--details"],
+    ] {
+        let long = parse_args(&spelling).expect_err("terminates");
+        assert_eq!(long.status, 0, "{spelling:?}");
+        assert!(!long.to_stderr, "{spelling:?}");
+        assert!(
+            long.message.len() > short.len(),
+            "{spelling:?}: no more than the short help"
+        );
+        assert!(
+            long.message.contains("xtrace"),
+            "{spelling:?}: no option reference"
+        );
+    }
+}
+
+/// Past `--`, a `--details` is somebody's argument. Consulting the whole command line for it
+/// would make `oslo --help -- --details` mean something different from what was written.
+#[test]
+fn details_after_a_double_dash_is_not_a_flag() {
+    let h = parse_args(&["--help", "--", "--details"]).expect_err("terminates");
+    assert!(!h.message.contains("xtrace"), "it was read as a flag");
 }
 
 #[test]
