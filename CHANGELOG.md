@@ -1,5 +1,32 @@
 # Changelog
 
+## [0.2.3] - 2026-08-04
+
+### <!-- 0 -->⛰️  Features
+
+- The remaining eight gum widgets
+- Gum-style input widgets for shell and lua
+
+### <!-- 1 -->🐛 Bug Fixes
+
+- Draw the caret instead of moving the cursor
+- An abort is not an ordinary quit
+- Ctrl-c cancels and erases the widget
+- Run a script the kernel refuses as ENOEXEC
+- Stop the widgets eating the transcript
+
+### <!-- 3 -->📚 Documentation
+
+- A tour of the thirteen ui widgets
+
+### <!-- 5 -->🎨 Styling
+
+- A measured rule above every key legend
+
+### Build
+
+- Static musl by default, and accept --login
+
 ## [0.2.2] - 2026-08-03
 
 ### <!-- 0 -->⛰️  Features
