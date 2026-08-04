@@ -265,6 +265,8 @@ mod tests {
     fn a_session_that_keeps_no_history_opens_no_store() {
         let kept = |file: Option<&str>, max_size| {
             keeps_a_record(&history::Settings {
+                ignore_space: true,
+                ignore_dups: false,
                 file: file.map(std::path::PathBuf::from),
                 max_size,
             })

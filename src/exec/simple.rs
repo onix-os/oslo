@@ -10,6 +10,7 @@
 
 mod assign;
 mod autocd;
+mod autoload;
 mod declare;
 mod external;
 mod posix;
@@ -247,6 +248,22 @@ fn run_builtin(
     posix::resolve_builtin_result(env, name, result)
 }
 
+/// Call the function registered under `name`.
+///
+/// Looking it up here rather than taking a body keeps [`autoload`] from having to know how a
+/// function is stored — it loads a file and asks for the name back.
+pub(super) fn call_named_function(
+    env: &mut Environment,
+    name: &str,
+    words: &[String],
+    redirections: &[Redirection],
+) -> Result<i32> {
+    let Some(body) = env.get_function(name).cloned() else {
+        return Ok(127);
+    };
+    call_function_command(env, &body, words, redirections)
+}
+
 /// Call a shell function, absorbing the control flow that must not escape it.
 fn call_function_command(
     env: &mut Environment,
@@ -257,7 +274,11 @@ fn call_function_command(
     // Checked before anything is set up, so a refused call has nothing to unwind. `f() { f; }`
     // recurses through the whole evaluator; without this the stack overflows and Rust aborts
     // the process outright, status 134 and a core dump.
-    env.enter_function()?;
+    // **Named**, because the name is the whole point of recording the frame. `enter_function`
+    // records `NULL`, which is what `caller` printed as the source of every frame and what
+    // `status current-function` would answer for a function that plainly has a name. The API to
+    // do this right already existed; nothing called it outside its own tests.
+    env.enter_function_named(words.first().map_or("", String::as_str))?;
     let res = call_function(env, body, words, redirections);
     env.exit_function();
 
@@ -296,38 +317,48 @@ fn run_program(
         // is not interactive.
         Lookup::NotFound => match autocd::try_autocd(env, cmd_name, words) {
             Some(result) => result,
-            // Before giving up, ask the config. A distribution's package manager is the obvious
-            // handler — "nvim is in package neovim", or install it and run it — and a handler that
-            // resolved the situation answers with the status to report. Everyone else bolts this
-            // on as a shell function; here it is a hook.
-            None => match crate::lua::engine::ask_hook_here(
-                "command-not-found",
-                vec![crate::lua::eval::value::Value::str(cmd_name)],
-            ) {
-                Some(status) => Ok(status),
-                None => {
-                    // Nobody handled it, so say what a person needs next: the name that was
-                    // probably meant. Only when the shell is interactive — a script's stderr is
-                    // read by machines, and bash says exactly "command not found" there.
-                    let hint = if env.interactive() {
-                        let path = env.get_var("PATH").unwrap_or_default().to_string();
-                        crate::interactive::command_index::nearest(&path, cmd_name)
-                    } else {
-                        None
-                    };
-                    match hint {
-                        Some(near) => report_unrunnable(
-                            env,
-                            redirections,
-                            cmd_name,
-                            &format!("command not found; did you mean {near}?"),
-                            127,
-                        ),
-                        None => {
-                            report_unrunnable(env, redirections, cmd_name, "command not found", 127)
+            // Nothing on `$PATH` and not a directory — so a function kept in its own file may
+            // still answer for this name. Read *after* the search rather than before it, which is
+            // what stops a file on disk from quietly redefining a command that already works.
+            None => match autoload::try_call(env, cmd_name, words, redirections) {
+                Some(result) => result,
+                // Before giving up, ask the config. A distribution's package manager is the obvious
+                // handler — "nvim is in package neovim", or install it and run it — and a handler that
+                // resolved the situation answers with the status to report. Everyone else bolts this
+                // on as a shell function; here it is a hook.
+                None => match crate::lua::engine::ask_hook_here(
+                    "command-not-found",
+                    vec![crate::lua::eval::value::Value::str(cmd_name)],
+                ) {
+                    Some(status) => Ok(status),
+                    None => {
+                        // Nobody handled it, so say what a person needs next: the name that was
+                        // probably meant. Only when the shell is interactive — a script's stderr is
+                        // read by machines, and bash says exactly "command not found" there.
+                        let hint = if env.interactive() {
+                            let path = env.get_var("PATH").unwrap_or_default().to_string();
+                            crate::interactive::command_index::nearest(&path, cmd_name)
+                        } else {
+                            None
+                        };
+                        match hint {
+                            Some(near) => report_unrunnable(
+                                env,
+                                redirections,
+                                cmd_name,
+                                &format!("command not found; did you mean {near}?"),
+                                127,
+                            ),
+                            None => report_unrunnable(
+                                env,
+                                redirections,
+                                cmd_name,
+                                "command not found",
+                                127,
+                            ),
                         }
                     }
-                }
+                },
             },
         },
     }

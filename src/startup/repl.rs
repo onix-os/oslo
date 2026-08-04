@@ -10,7 +10,7 @@ use crate::startup::mode::{Mode, ToggleRequest};
 use crate::startup::read::{Input, read_command};
 use crate::startup::recall::{remember_history, seed_history};
 use crate::startup::{
-    config, environments, history, history_db, keybind, lua_init, mode, rc, tracking,
+    config, environments, history, history_db, keybind, lua_init, mode, prompt, rc, tracking,
 };
 use oslo::Environment;
 use oslo::LuaEngine;
@@ -30,6 +30,8 @@ use std::sync::{Arc, Mutex};
 // have is the one that keeps it from being reached by accident.
 #[path = "editor.rs"]
 mod editor;
+#[path = "notify.rs"]
+mod notify;
 
 use editor::{build_editor, publish_history, remember};
 
@@ -75,13 +77,15 @@ pub fn run_repl() -> ! {
     // The lock is taken and released *before* the config runs. Holding it across `load_config`
     // is a deadlock in disguise: `borrow_env` uses `try_lock`, so every `oslo.*` call in the
     // config fails with "shell state is busy" and the whole file silently does nothing.
-    let config = lua_init::config_path(&env_struct.lock().unwrap());
-    if lua_init::install_bindings(&lua, Arc::clone(&env_struct))
-        && let Some(path) = config
-    {
-        lua_init::load_config(&lua, &path);
-        // The theme is read after the config has run, so `oslo.theme = {…}` in it takes effect
-        // before the first prompt is drawn rather than after the first command.
+    let config = lua_init::config_files(&env_struct.lock().unwrap());
+    if lua_init::install_bindings(&lua, Arc::clone(&env_struct)) && !config.is_empty() {
+        for path in &config {
+            lua_init::load_config(&lua, path);
+        }
+        // The settings are read after **every** config file has run, so a `conf.d` snippet and the
+        // config proper are one decision rather than each one being applied and then overwritten.
+        // Reading per file would also mean a snippet that set nothing reverted what an earlier one
+        // set, since what is read is the whole `oslo` table each time.
         config::apply(&lua);
     }
 
@@ -158,18 +162,43 @@ pub fn run_repl() -> ! {
     // `oslo.misc.welcome = false` takes these two rows back. Printed here rather than earlier
     // because the config has run by now and can have turned them off — a banner that appeared
     // before the setting was read could not be suppressed by it.
-    if oslo::interactive::settings::current().misc.welcome {
-        println!(
-            "oslo {} - POSIX Compatible Shell with Lua & Fish-style Features",
-            env!("CARGO_PKG_VERSION")
-        );
-        println!("Type 'exit' or Ctrl-D to exit.");
+    // A greeting of your own replaces the banner outright, fish's `fish_greeting`. It is a
+    // separate setting from `welcome` rather than an empty-string special case, because "say
+    // nothing" and "say this" are different intentions and one of them should not be spelled `""`.
+    let misc = oslo::interactive::settings::current().misc;
+    match &misc.greeting {
+        Some(greeting) => println!("{greeting}"),
+        None if misc.welcome => {
+            println!(
+                "oslo {} - POSIX Compatible Shell with Lua & Fish-style Features",
+                env!("CARGO_PKG_VERSION")
+            );
+            println!("Type 'exit' or Ctrl-D to exit.");
+        }
+        None => {}
     }
 
     let mut last_status = 0;
     let mut eof_count = 0usize;
 
+    // Universal variables, seeded once and then re-read whenever another shell writes the file.
+    // `seen` is the set this loop put there, so a name the *user* assigns afterwards is not
+    // quietly overwritten by the next reload — see `universal::apply`.
+    let mut universal_stamp = oslo::env::universal::changed_at();
+    oslo::env::universal::apply(&mut env_struct.lock().unwrap());
+
     loop {
+        // Another shell may have set a universal variable since the last prompt. A `stat` decides
+        // whether to read the file, so the common case — nobody changed anything — costs one
+        // syscall per prompt rather than a parse.
+        universal_stamp =
+            oslo::env::universal::refresh(&mut env_struct.lock().unwrap(), universal_stamp);
+
+        // A prompt is about to be drawn. This is bash's `PROMPT_COMMAND` and zsh's `precmd`, and
+        // the hook a prompt integration written in Lua needs — the shell-side one already exists
+        // as `$PROMPT_COMMAND` below.
+        lua.fire_hook("prompt", Vec::new());
+
         // `$PROMPT_COMMAND` runs before every prompt. It is the other half of the DEBUG trap —
         // together they are bash's preexec/precmd pair, and every integration written for bash is
         // built on the two of them: starship redraws `PS1` here, hexe reports the command that
@@ -226,10 +255,26 @@ pub fn run_repl() -> ! {
 
                 // Handed the command as typed, which is what a `precmd` hook is for: logging it,
                 // timing it, or setting a title from it.
+                // `preexec` is the accurate name; `precmd` is what oslo called it first and still
+                // answers to. Both are handed the command line as typed.
+                // Again here: this shell has been blocked in its line editor since before the
+                // command was typed, so the check at the top of the loop last ran a command ago.
+                // Without this, `universal X=1` in one terminal and `echo $X` in another shows the
+                // old value once and the new one from then on — the worst possible behaviour,
+                // since it looks like it works and does not.
+                universal_stamp =
+                    oslo::env::universal::refresh(&mut env_struct.lock().unwrap(), universal_stamp);
+                lua.fire_hook("preexec", vec![LuaEngine::hook_arg(&text)]);
                 lua.fire_hook("precmd", vec![LuaEngine::hook_arg(&text)]);
                 // The title says what is running while it runs, and goes back to the directory
                 // when the prompt returns. A row of tabs then says what each is *doing*.
-                announce(&oslo::interactive::marks::title(&title_for_command(&text)));
+                announce(&oslo::interactive::marks::title(
+                    &lua.render_with(
+                        "prompt.title",
+                        &prompt::title_context(last_status, current, &text),
+                    )
+                    .unwrap_or_else(|| title_for_command(&text)),
+                ));
                 // Everything after this belongs to the command, not to the prompt.
                 print!("{}", oslo::interactive::marks::output_start());
                 let _ = std::io::Write::flush(&mut std::io::stdout());
@@ -297,7 +342,7 @@ pub fn run_repl() -> ! {
                 }
                 let elapsed = started.elapsed();
                 note_command_duration(elapsed);
-                announce(&slow_command_notice(&text, elapsed, &res));
+                announce(&notify::slow_command_notice(&text, elapsed, &res));
                 // The command is over and its status is known: close the block before anything
                 // else prints, so nothing that follows lands inside it.
                 print!(
@@ -306,6 +351,7 @@ pub fn run_repl() -> ! {
                 );
                 let _ = std::io::Write::flush(&mut std::io::stdout());
                 if let Ok(status) = res {
+                    lua.fire_hook("postexec", vec![LuaEngine::hook_status(status)]);
                     lua.fire_hook("postcmd", vec![LuaEngine::hook_status(status)]);
                 }
                 // Beside the hook rather than through it: `postcmd` fires only on `Ok`, and a
@@ -368,34 +414,6 @@ fn settle_stores(db: &Option<history_db::History>, settings: &history::Settings)
     }
 }
 
-/// A notification for a command that ran long enough to be worth one, or nothing.
-///
-/// The threshold is `oslo.notify.after`, in seconds, and `0` turns it off. There is deliberately no
-/// check for whether the terminal is focused: reporting focus needs a mode the shell would have to
-/// enable and then read replies for, and getting that wrong costs stray characters at the prompt —
-/// a worse failure than a notification you did not need.
-fn slow_command_notice(
-    text: &str,
-    elapsed: std::time::Duration,
-    result: &Result<i32, ShellError>,
-) -> String {
-    let after = oslo::interactive::settings::current().notify.after;
-    if after == 0 || elapsed.as_secs() < after {
-        return String::new();
-    }
-    let status = result.as_ref().copied().unwrap_or(1);
-    let outcome = if status == 0 {
-        "finished".to_string()
-    } else {
-        format!("failed ({status})")
-    };
-    let took = oslo::interactive::prompt::notable_duration(elapsed)
-        .unwrap_or_else(|| format!("{}s", elapsed.as_secs()));
-    // The first word, as the title bar gets: a notification is narrow too.
-    let what = text.split_whitespace().next().unwrap_or("command");
-    oslo::interactive::marks::notify(what, &format!("{outcome} after {took}"))
-}
-
 /// Write a terminal sequence, if there is one to write.
 ///
 /// Empty when the sequence is disabled, which is every script and every `-c`, so this is the one
@@ -453,8 +471,15 @@ fn run_lua_line(lua: &LuaEngine, text: &str, last_status: i32) -> Result<i32, Sh
 /// documented fallback for a value that is not a number is 10.
 fn ignore_eof_limit(env_struct: &Arc<Mutex<Environment>>) -> Option<usize> {
     let guard = env_struct.lock().unwrap();
-    let raw = guard.get_var("IGNOREEOF")?;
-    Some(raw.trim().parse::<usize>().unwrap_or(10))
+    if let Some(raw) = guard.get_var("IGNOREEOF") {
+        return Some(raw.trim().parse::<usize>().unwrap_or(10));
+    }
+    // `set -o ignoreeof` is the option spelling of the same thing, and bash treats it as
+    // `IGNOREEOF=10`. It used to be accepted and ignored, so a shell that had been told not to
+    // exit on Ctrl-D exited on Ctrl-D.
+    guard
+        .option(oslo::env::options::ShellOption::IgnoreEof)
+        .then_some(10)
 }
 
 thread_local! {

@@ -24,14 +24,17 @@ pub(super) fn build_editor(settings: &history::Settings) -> Repl {
     // anything if the numbering agrees.
     let config = rustyline::Config::builder()
         .auto_add_history(false)
-        .history_ignore_dups(false)
+        // `oslo.history.ignore_dups`. Off by default because dropping a duplicate silently
+        // renumbers every later event and makes `!-2` point one line too far back — bash's
+        // default `HISTCONTROL` keeps them, and `!n` only means anything if the numbering agrees.
+        .history_ignore_dups(settings.ignore_dups)
         .expect("history duplicate policy")
         // rustyline's own default is 100 entries, which loses a working day's commands.
         .max_history_size(settings.max_size)
         .expect("history size")
-        // Honoured for anything rustyline adds itself; `history::is_secret` covers the entries
-        // this file adds by hand, which is all of them.
-        .history_ignore_space(true)
+        // `oslo.history.ignore_space`. Honoured for anything rustyline adds itself;
+        // `history::is_secret` covers the entries this file adds by hand, which is all of them.
+        .history_ignore_space(settings.ignore_space)
         // `oslo.vi.enabled`. Read here rather than toggled later because the keymap is fixed when
         // the editor is built.
         .edit_mode(if oslo::interactive::settings::current().vi.enabled {
@@ -65,6 +68,18 @@ pub(super) fn build_editor(settings: &history::Settings) -> Repl {
     Editor::with_config(config).expect("Failed to initialize line editor")
 }
 
+/// Whether `oslo.history.ignore` says this line is not worth keeping.
+///
+/// bash's `$HISTIGNORE`, with the shell's own glob rules and matched against the whole line — so
+/// `ls` means only `ls`, and `ls *` means every `ls`. The line is compared as typed, without
+/// trimming: a line the user indented is `ignore_space`'s business, not this one's.
+fn ignored(text: &str) -> bool {
+    let patterns = oslo::interactive::settings::current().history.ignore;
+    patterns
+        .iter()
+        .any(|pattern| oslo::expand::glob::ShellPattern::from_unquoted(pattern).matches(text))
+}
+
 /// Add a command to the history, and to the history *file*, before it runs.
 ///
 /// Appending rather than rewriting is the fix for the third of R9.11's defects: `save_history`
@@ -72,7 +87,7 @@ pub(super) fn build_editor(settings: &history::Settings) -> Repl {
 /// Writing before the command runs is deliberate too — a command that exits the shell, or hangs
 /// until it is killed, is exactly the one you want to find in the history afterwards.
 pub(super) fn remember(rl: &mut Repl, file: &Option<PathBuf>, text: &str, secret: bool) {
-    if secret {
+    if secret || ignored(text) {
         return;
     }
     let _ = rl.add_history_entry(text);

@@ -312,9 +312,11 @@ impl Keys {
                 }
                 Parsed::Partial => {
                     // A lone `ESC` that nothing follows is the Esc key. Everything else waits for
-                    // the rest of itself. The pause is the standard one: long enough that a real
-                    // sequence is never split, short enough that Esc feels immediate.
-                    if self.buf == [0x1b] && !waiting(self.fd, 25) {
+                    // the rest of itself. `oslo.misc.escape_delay` sets the pause, because 25ms is
+                    // right locally and too short over a link that can split one arrow key across
+                    // it.
+                    let delay = crate::interactive::settings::current().misc.escape_delay as i32;
+                    if self.buf == [0x1b] && !waiting(self.fd, delay) {
                         self.buf.clear();
                         return Some(Key::Cancel);
                     }

@@ -70,10 +70,9 @@ fn realtime_from_name(bare: &str) -> Option<i32> {
     }
     let num = if let Some(rest) = bare.strip_prefix("RTMIN") {
         range.start().checked_add(offset(rest, '+')?)?
-    } else if let Some(rest) = bare.strip_prefix("RTMAX") {
-        range.end().checked_sub(offset(rest, '-')?)?
     } else {
-        return None;
+        let rest = bare.strip_prefix("RTMAX")?;
+        range.end().checked_sub(offset(rest, '-')?)?
     };
     range.contains(&num).then_some(num)
 }

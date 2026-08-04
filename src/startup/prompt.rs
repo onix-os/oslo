@@ -31,8 +31,21 @@ pub fn segment_context(
             .map(str::to_string)
             .or_else(|| oslo::interactive::vi::mode().map(|m| m.name().to_string())),
         cols: oslo::interactive::dropdown::terminal_cols(),
-        jobs: 0,
+        // The real count. Hardcoded `0` until now, which made a `jobs` segment in a prompt — the
+        // reason the field exists — always draw nothing. Every prompt tool reads this; in bash it
+        // is `jobs -p | wc -l` and in zsh `${#jobstates}`.
+        jobs: oslo::exec::job::with_jobs(|jobs| jobs.jobs().len()),
         continuation: false,
+        // Nothing is running at a prompt; `title_context` fills this in for the other case.
+        command: None,
+    }
+}
+
+/// The same facts, for a title drawn while `command` is running.
+pub fn title_context(last_status: i32, mode: Mode, command: &str) -> oslo::lua::context::Context {
+    oslo::lua::context::Context {
+        command: Some(command.to_string()),
+        ..segment_context(last_status, mode, None)
     }
 }
 

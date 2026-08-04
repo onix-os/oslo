@@ -39,6 +39,12 @@ pub struct Context {
     pub jobs: usize,
     /// Whether this is the continuation of an unfinished command.
     pub continuation: bool,
+    /// The command that is *about to run*, when there is one.
+    ///
+    /// `None` at a prompt, since nothing is running. Set while a command is in flight, which is
+    /// what makes `oslo.prompt.title` able to name it — a tab reading `cargo` is worth more than
+    /// one reading the directory you started it from.
+    pub command: Option<String>,
 }
 
 impl Context {
@@ -74,6 +80,13 @@ impl Context {
         t.set(Value::str("cols"), Value::int(self.cols as i64));
         t.set(Value::str("jobs"), Value::int(self.jobs as i64));
         t.set(Value::str("continuation"), Value::Bool(self.continuation));
+        t.set(
+            Value::str("command"),
+            match &self.command {
+                Some(text) => Value::str(text),
+                None => Value::Nil,
+            },
+        );
         // `ok` reads better than `status == 0` in the common case, and is the check almost every
         // prompt makes.
         t.set(Value::str("ok"), Value::Bool(self.status == 0));
@@ -130,6 +143,7 @@ mod tests {
             cols: 120,
             jobs: 2,
             continuation: false,
+            command: Some("cargo build".to_string()),
         };
         let t = table_of(&ctx);
         assert_eq!(int(&t, "status"), Some(1));

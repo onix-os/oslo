@@ -27,6 +27,20 @@ pub enum Depth {
 }
 
 impl Depth {
+    /// A depth by the name a config writes, or `None` for anything else.
+    ///
+    /// The aliases are the ones people already type: `truecolor` and `24bit` are the same thing,
+    /// and `off` reads better than `none` next to a `= ` sign.
+    pub fn named(name: &str) -> Option<Depth> {
+        Some(match name.trim().to_ascii_lowercase().as_str() {
+            "truecolor" | "24bit" | "24-bit" | "true" => Depth::True,
+            "256" | "ansi256" | "8bit" => Depth::Ansi256,
+            "16" | "ansi16" | "8" | "basic" => Depth::Ansi16,
+            "none" | "off" | "no" | "mono" => Depth::None,
+            _ => return None,
+        })
+    }
+
     /// What the environment says this terminal can do.
     ///
     /// `$NO_COLOR` wins over everything — it is the one convention whose whole point is that a
@@ -408,3 +422,6 @@ mod tests {
         assert_eq!(Style::default().paint("x", Depth::True), "x");
     }
 }
+
+/// Making a colour more vivid without touching the ones the terminal owns.
+mod vivid;

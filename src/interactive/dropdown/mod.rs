@@ -25,7 +25,9 @@ pub use columns::{
     set_provider,
 };
 pub use layout::{DropdownLayout, compute_layout};
-pub use render::{MAX_ROWS, render_vertical_dropdown, render_vertical_dropdown_at_width};
+pub use render::{
+    CEILING_ROWS, DEFAULT_ROWS, render_vertical_dropdown, render_vertical_dropdown_at_width,
+};
 pub use width::{
     FALLBACK_COLS, display_width, pad_to_width, physical_rows, terminal_cols, truncate_to_width,
     visible_len,
@@ -167,7 +169,7 @@ impl DropdownMenu {
         Self {
             candidates,
             selected_index: 0,
-            max_visible: MAX_ROWS,
+            max_visible: DEFAULT_ROWS,
             indent_cols,
         }
     }
@@ -185,10 +187,14 @@ impl DropdownMenu {
         }
 
         let mut menu = Self::new(candidates, indent_cols);
-        // `oslo.completion.max_rows`.
-        menu.max_visible = menu
-            .max_visible
-            .min(crate::interactive::settings::current().completion.max_rows);
+        // `oslo.completion.max_rows` *sets* the height rather than capping it. Taking the minimum
+        // with the built-in default meant the setting could only ever make the menu smaller:
+        // asking for twenty rows silently got you eight.
+        //
+        // Bounded by the terminal as well, with rows left for the prompt and the line being typed
+        // — a menu that filled the screen would have nowhere to appear below.
+        let wanted = crate::interactive::settings::current().completion.max_rows;
+        menu.max_visible = wanted.min(width::terminal_rows().saturating_sub(3)).max(1);
 
         let stdin = io::stdin();
         let orig_termios = tcgetattr(&stdin).ok()?;

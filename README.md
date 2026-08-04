@@ -173,6 +173,32 @@ directories: "forget what I typed" is not "forget where I work".
 No daemon. The read is a B-tree range scan rather than a `LIKE` — 13 µs against 25,000 rows — which
 is what makes a cache unnecessary, and a cache stale between two terminals impossible.
 
+### Colours
+
+Every one of the 54 roles — 22 syntax, 19 dropdown, 7 prompt, 5 widget — is settable, and each
+takes an index or an RGB triplet:
+
+```lua
+oslo.theme = {
+  syntax = { command = "#7cff9d", keyword = "212", comment = { fg = "244", italic = true } },
+  pager  = { bg = "#101010", sel_bg = "238" },
+  prompt = { cwd = "blue", git = "green" },
+  ui     = { accent = "213" },
+}
+```
+
+That "every one" is a test, not a claim: adding a role to the theme without a reader fails
+`every_role_can_be_set_from_a_config`.
+
+**oslo brightens its own colours and never yours.** The syntax palette is absolute RGB, so it is
+lifted on HSV's value and saturation axes to sit off the background. An ANSI slot is returned
+untouched — `"green"` means "colour 2, whatever this terminal thinks that is", and a tool that
+remaps the slots (pywal and friends) owns that answer. Near-greys are left alone too, which is what
+keeps the dropdown's chrome and the black on `sudo`'s red background from being "brightened".
+
+HSV rather than HSL, because in HSL lifting an already-light colour bleeds it toward white:
+`#ff5555` becomes `#ff8888`, a *paler* red. Brighter has to mean more colour.
+
 ### Fuzzy matching
 
 ```lua
@@ -284,13 +310,125 @@ oslo.on.cd(function(dir) print("now in " .. dir) end)
 oslo.on["command-not-found"](function(name) print(name .. " is not installed") end)
 ```
 
+Anything in `~/.config/oslo/conf.d/*.lua` runs first, in name order, and `config.lua` runs last.
+That directory is fish's, and it is there for the same reason: a plugin or a dotfile repo needs
+somewhere to add a line without editing a file it does not own, and the file you wrote by hand
+keeps the final say.
+
+### The settings
+
+```lua
+oslo.misc.greeting     = "hello"     -- instead of the banner; misc.welcome = false for silence
+oslo.misc.escape_delay = 300         -- ms to wait for the rest of an escape sequence, over ssh
+oslo.misc.color_depth  = "truecolor" -- truecolor / 256 / 16 / none, when detection is wrong
+
+oslo.history.ignore    = { "ls", "cd *" }   -- $HISTIGNORE, matched against the whole line
+oslo.notify.after      = 10                 -- seconds; 0 never notifies
+oslo.notify.command    = "notify-send {title} {body}"   -- instead of the terminal's escape
+
+oslo.abbr.gco = "git checkout"
+oslo.abbr.brc = { "~/.config/oslo/config.lua", anywhere = true }
+```
+
+### Autoloaded functions
+
+`~/.config/oslo/functions/NAME.sh` defines `NAME`, and is not read until something calls it.
+
+```sh
+$ cat ~/.config/oslo/functions/gitroot.sh
+gitroot() { git rev-parse --show-toplevel; }
+```
+
+fish's `functions/` directory, and the reason it is worth copying is arithmetic: a `conf.d` snippet
+defining twenty functions costs twenty definitions on **every** shell start, including the hundred
+short-lived ones a build spawns. An autoloaded one costs a `stat` on the call that needs it.
+
+**It can never shadow anything.** The file is read only after the `$PATH` search has already
+failed, so a file called `ls.sh` is dead — `ls` resolves to the program long before. fish lets an
+autoloaded function override a command; a shell that promises scripts see POSIX behaviour cannot
+have a file on disk quietly redefining `test`. Autoloading adds names, it never changes them.
+
+Abbreviations expand as you type the space that ends the word — `gco ` becomes `git checkout `,
+and the line that runs is the one you can read. The `abbr` builtin defines them too, and by hand at
+the prompt it is the shorter thing to type; `oslo.abbr` is for the ones you want every session.
+
+### The prompt
+
+Four render keys, each a function returning a string:
+
+```lua
+oslo.prompt.left         = function(p) return p.cwd .. " ❯ " end
+oslo.prompt.right        = function(p) return p.duration_ms and (p.duration_ms .. "ms") or "" end
+oslo.prompt.continuation = function() return "… " end
+oslo.prompt.transient    = function() return "❯ " end   -- redrawn once the line is accepted
+oslo.prompt.title        = function(p)                  -- the terminal tab, fish's fish_title
+  return p.command and (p.command .. " — " .. p.cwd) or p.cwd
+end
+```
+
+Every one of them is handed the same facts: `status`, `duration_ms`, `cwd`, `branch`, `user`,
+`host`, `language`, `vimode`, `cols`, `jobs`, `continuation`, and `command` — which is set only
+while something is running, so `title` can name it and go back to the directory afterwards. A shell-side integration reads the
+same things from `$?`, `$EPOCHREALTIME`, `$PWD` and `$OSLO_MODE`, and can own both columns through
+`$PS1` and `$RPS1`.
+
+`oslo.prompt.transient` is the one that has no equivalent elsewhere. zsh users build it by wrapping
+ZLE widgets — powerlevel10k and oh-my-posh each spend several hundred lines on it — because zsh has
+no way to say "redraw the accepted line differently". oslo owns its own editor, so it is one key.
+
+### The hooks
+
+```lua
+oslo.on.prompt(function()       end)  -- before each prompt is drawn
+oslo.on.preexec(function(line)  end)  -- after Enter, before the command runs
+oslo.on.postexec(function(code) end)  -- after it finishes
+oslo.on.cd(function(dir)        end)
+oslo.on["command-not-found"](function(name) end)
+```
+
+`precmd` and `postcmd` are the names oslo shipped first and still answers to. They fire alongside
+`preexec` and `postexec`, which are what the rest of the world calls the same two moments.
+
+### Universal variables
+
+```sh
+universal THEME=dark        # here, in every other running oslo, and next session
+universal -x EDITOR=hx      # and exported to children
+universal -e THEME          # gone, everywhere
+universal                   # list them
+```
+
+fish's `set -U`, under a name oslo can spell — `set` is POSIX's, and its options are shell options
+and positional parameters. Stored in `$XDG_DATA_HOME/oslo/universal`, one variable per line, and
+**never sourced**: a file every one of your shells writes to is not a file to execute.
+
+Running shells pick up a change before the next command, not the next login. That costs one `stat`
+per prompt, since the file is only read when it has actually moved.
+
+**A local assignment wins.** A universal `PAGER` must not stop `PAGER=cat cmd` meaning `cat`, so
+the file fills in names this shell has not set and loses to any it has — including for erasure,
+where a value you assigned over is yours to keep.
+
+### `status`
+
+```sh
+status is-interactive || return    # the line every dotfile repo opens with
+status is-login
+status current-function            # or `status function` for the whole stack
+status basename
+```
+
+The predicates answer through the exit status, so they compose with `&&` and `||`. The portable
+spelling of the first line is `case $- in *i*) … esac`, which is correct and which nobody remembers.
+
 `oslo.proc.capture`, `sh.df()`, `sh.ps()`, `sh.ls()`, `sh.stat()`, `oslo.path.*`, `oslo.json`, `oslo.re`,
-hooks, and a `did you mean` drawn from the command index oslo already keeps.
+and a `did you mean` drawn from the command index oslo already keeps.
 
 ## Building
 
 ```sh
-make build        # debug
+make build        # static musl release, the same binary the release action ships
+make dev          # a plain debug build, for iterating
 make verify       # fmt, line limits, README paths, tests, clippy, rustdoc — all of it
 make install      # to /usr/local/bin
 nix build         # static musl binary

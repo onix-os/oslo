@@ -184,6 +184,11 @@ fn read_pager(table: &crate::lua::eval::Table, into: &mut Pager, problems: &mut 
     field(table, "match", p, &mut into.match_, problems);
     field(table, "desc", p, &mut into.desc, problems);
     field(table, "desc_sel", p, &mut into.desc_sel, problems);
+    // The info columns after the description — a file's size, a directory's entry count. Drawn
+    // since they were written and unreachable from a config until now, because nobody added these
+    // two lines.
+    field(table, "extra", p, &mut into.extra, problems);
+    field(table, "extra_sel", p, &mut into.extra_sel, problems);
     field(table, "scroll", p, &mut into.scroll, problems);
 
     // `bg` and `sel_bg` are bare colours rather than styles: they are the row's background and
@@ -222,6 +227,12 @@ fn read_prompt(table: &crate::lua::eval::Table, into: &mut Prompt, problems: &mu
     field(table, "git", p, &mut into.git, problems);
     field(table, "ok", p, &mut into.ok, problems);
     field(table, "failed", p, &mut into.failed, problems);
+    // Reachable only through the `oslo.theme.styles["prompt.host"]` back door before this — the
+    // fields existed, were defaulted and were drawn, and the obvious spelling silently did
+    // nothing.
+    field(table, "host", p, &mut into.host, problems);
+    field(table, "user", p, &mut into.user, problems);
+    field(table, "aside", p, &mut into.aside, problems);
 }
 
 /// `oslo.theme.ui` — the input widgets' palette.
@@ -346,5 +357,163 @@ mod tests {
         assert_eq!(theme.pager.kind.dir.bg, Some(Color::Rgb(0x82, 0xe2, 0xff)));
         // A kind the config did not name keeps its default pill.
         assert_eq!(theme.pager.kind.file, KindColors::default().file);
+    }
+
+    /// **Every role a theme has must be settable from a config**, in both forms a colour can take.
+    ///
+    /// Written as one table naming all of them rather than a test per field, because the failure
+    /// this guards against is a *new* field arriving with no reader — which no per-field test would
+    /// ever catch, and which looks from the outside like the config being ignored.
+    ///
+    /// The counts are asserted too, so adding a role forces this list to be extended: a wrong
+    /// number is a compile-time-ish reminder in a place somebody will read.
+    #[test]
+    fn every_role_can_be_set_from_a_config() {
+        // Distinct values per group, in both accepted forms: an index and an RGB triplet. Anything
+        // that silently kept its default would still equal `Default::default()` below.
+        let (theme, problems) = theme_from(
+            "theme = {
+               syntax = {
+                 command = '17', builtin = '18', ['function'] = '19', keyword = '20',
+                 error = '21', danger = '22', param = '23', valid_path = '24',
+                 option = '25', glob = '26', number = '27', assignment = '28',
+                 single_quote = '29', double_quote = '30', escape = '31',
+                 operator = '32', redirection = '33', ['end'] = '34', comment = '35',
+                 variable = '36', autosuggestion = '37', match_bracket = '38'
+               },
+               pager = {
+                 bg = '#101010', text = '40', text_sel = '41', sel_bg = '#202020',
+                 kind_sel = '#303030', match = '44', desc = '45', desc_sel = '46',
+                 extra = '47', extra_sel = '48', scroll = '49',
+                 kind = { command = '50', builtin = '51', file = '52', dir = '53',
+                          variable = '54', history = '55', alias = '56', other = '57' }
+               },
+               prompt = { cwd = '60', host = '61', user = '62', git = '63',
+                          ok = '64', failed = '65', aside = '66' },
+               ui = { accent = '70', question = '71', muted = '72', error = '73', done = '74' }
+             }",
+        );
+        assert!(problems.is_empty(), "{problems:?}");
+
+        let d = Theme::default();
+        let s = &theme.syntax;
+        let ds = &d.syntax;
+        let syntax: Vec<(&str, bool)> = vec![
+            ("command", s.command != ds.command),
+            ("builtin", s.builtin != ds.builtin),
+            ("function", s.function != ds.function),
+            ("keyword", s.keyword != ds.keyword),
+            ("error", s.error != ds.error),
+            ("danger", s.danger != ds.danger),
+            ("param", s.param != ds.param),
+            ("valid_path", s.valid_path != ds.valid_path),
+            ("option", s.option != ds.option),
+            ("glob", s.glob != ds.glob),
+            ("number", s.number != ds.number),
+            ("assignment", s.assignment != ds.assignment),
+            ("single_quote", s.single_quote != ds.single_quote),
+            ("double_quote", s.double_quote != ds.double_quote),
+            ("escape", s.escape != ds.escape),
+            ("operator", s.operator != ds.operator),
+            ("redirection", s.redirection != ds.redirection),
+            ("end", s.end != ds.end),
+            ("comment", s.comment != ds.comment),
+            ("variable", s.variable != ds.variable),
+            ("autosuggestion", s.autosuggestion != ds.autosuggestion),
+            ("match_bracket", s.match_bracket != ds.match_bracket),
+        ];
+        assert_eq!(
+            syntax.len(),
+            22,
+            "a syntax role was added without a case here"
+        );
+
+        let p = &theme.pager;
+        let dp = &d.pager;
+        let pager: Vec<(&str, bool)> = vec![
+            ("bg", p.bg != dp.bg),
+            ("text", p.text != dp.text),
+            ("text_sel", p.text_sel != dp.text_sel),
+            ("sel_bg", p.sel_bg != dp.sel_bg),
+            ("kind_sel", p.kind_sel != dp.kind_sel),
+            ("match", p.match_ != dp.match_),
+            ("desc", p.desc != dp.desc),
+            ("desc_sel", p.desc_sel != dp.desc_sel),
+            ("extra", p.extra != dp.extra),
+            ("extra_sel", p.extra_sel != dp.extra_sel),
+            ("scroll", p.scroll != dp.scroll),
+            ("kind.command", p.kind.command != dp.kind.command),
+            ("kind.builtin", p.kind.builtin != dp.kind.builtin),
+            ("kind.file", p.kind.file != dp.kind.file),
+            ("kind.dir", p.kind.dir != dp.kind.dir),
+            ("kind.variable", p.kind.variable != dp.kind.variable),
+            ("kind.history", p.kind.history != dp.kind.history),
+            ("kind.alias", p.kind.alias != dp.kind.alias),
+            ("kind.other", p.kind.other != dp.kind.other),
+        ];
+        assert_eq!(
+            pager.len(),
+            11 + 8,
+            "a pager role was added without a case here"
+        );
+
+        let r = &theme.prompt;
+        let dr = &d.prompt;
+        let prompt: Vec<(&str, bool)> = vec![
+            ("cwd", r.cwd != dr.cwd),
+            ("host", r.host != dr.host),
+            ("user", r.user != dr.user),
+            ("git", r.git != dr.git),
+            ("ok", r.ok != dr.ok),
+            ("failed", r.failed != dr.failed),
+            ("aside", r.aside != dr.aside),
+        ];
+        assert_eq!(
+            prompt.len(),
+            7,
+            "a prompt role was added without a case here"
+        );
+
+        let u = &theme.ui;
+        let du = &d.ui;
+        let ui: Vec<(&str, bool)> = vec![
+            ("accent", u.accent != du.accent),
+            ("question", u.question != du.question),
+            ("muted", u.muted != du.muted),
+            ("error", u.error != du.error),
+            ("done", u.done != du.done),
+        ];
+        assert_eq!(ui.len(), 5, "a ui role was added without a case here");
+
+        let unread: Vec<&str> = syntax
+            .into_iter()
+            .chain(pager)
+            .chain(prompt)
+            .chain(ui)
+            .filter(|(_, changed)| !changed)
+            .map(|(name, _)| name)
+            .collect();
+        assert!(
+            unread.is_empty(),
+            "these roles are in the theme but nothing reads them from a config: {unread:?}"
+        );
+    }
+
+    /// A colour may be an index or an RGB triplet wherever one is accepted — including the three
+    /// bare-`Color` slots, which take a colour rather than a style.
+    #[test]
+    fn a_colour_may_be_indexed_or_rgb() {
+        let (theme, problems) = theme_from(
+            "theme = { syntax = { command = '#ff8800', keyword = '208' },
+                       pager  = { bg = '#123456', sel_bg = '238' } }",
+        );
+        assert!(problems.is_empty(), "{problems:?}");
+        assert_eq!(
+            theme.syntax.command,
+            Style::fg(Color::Rgb(0xff, 0x88, 0x00))
+        );
+        assert_eq!(theme.syntax.keyword, Style::fg(Color::Indexed(208)));
+        assert_eq!(theme.pager.bg, Some(Color::Rgb(0x12, 0x34, 0x56)));
+        assert_eq!(theme.pager.sel_bg, Some(Color::Indexed(238)));
     }
 }

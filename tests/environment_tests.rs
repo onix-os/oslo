@@ -182,3 +182,106 @@ fn unsetting_forgets_a_pending_export() {
     assert!(env.set_var("PENDING_TWO", "9", false));
     assert!(!env.exported_vars().iter().any(|(n, _)| n == "PENDING_TWO"));
 }
+
+/// The clock, spelled as a variable.
+///
+/// Every prompt tool measures command duration by reading a high-resolution clock in preexec and
+/// again in precmd. Without these, starship forks `starship time`, oh-my-posh forks
+/// `oh-my-posh get millis` and hexe forks `date +%s%3N` — once per command, on the path between
+/// pressing Enter and seeing a prompt.
+#[test]
+fn the_clock_variables_exist_and_advance() {
+    let r = run("echo $EPOCHREALTIME\necho $EPOCHSECONDS");
+    let out = r.out().to_string();
+    let mut lines = out.lines();
+    let real = lines.next().expect("EPOCHREALTIME").to_string();
+    let whole = lines.next().expect("EPOCHSECONDS").to_string();
+
+    let (secs, micros) = real.split_once('.').expect("always a dot, never a comma");
+    assert!(
+        secs.parse::<u64>().expect("seconds") > 1_600_000_000,
+        "{real}"
+    );
+    assert_eq!(micros.len(), 6, "six places always: {real}");
+    assert_eq!(secs, whole.trim(), "the two must agree");
+}
+
+/// An assignment always wins — `SECONDS=0` is an idiom and `RANDOM=42` asks for a fixed sequence.
+#[test]
+fn a_set_value_beats_the_clock() {
+    assert_eq!(run("SECONDS=99\necho $SECONDS").out(), "99");
+    assert_eq!(run("RANDOM=7\necho $RANDOM").out(), "7");
+    assert_eq!(run("EPOCHSECONDS=1\necho $EPOCHSECONDS").out(), "1");
+}
+
+/// `$RANDOM` is a sequence in bash's range, not one number repeated.
+#[test]
+fn random_is_a_sequence() {
+    let out = run("for i in 1 2 3 4 5 6; do echo $RANDOM; done")
+        .out()
+        .to_string();
+    let draws: Vec<u32> = out.lines().filter_map(|l| l.trim().parse().ok()).collect();
+    assert_eq!(draws.len(), 6, "{out:?}");
+    assert!(
+        draws.iter().all(|&n| n < 32768),
+        "outside 0..32767: {draws:?}"
+    );
+    assert!(
+        draws.windows(2).any(|w| w[0] != w[1]),
+        "constant: {draws:?}"
+    );
+}
+
+/// `$SHLVL` counts nesting, which means it has to reach the child's environment — not just
+/// oslo's own table, or every nested shell reads the grandparent's depth.
+#[test]
+fn shlvl_counts_nesting() {
+    // Both read in one process tree, so the harness's own nesting cancels out.
+    let bin = common::oslo_bin();
+    let r = run(&format!("echo $SHLVL\n{} -c 'echo $SHLVL'", bin.display()));
+    let mut lines = r.out().lines();
+    let outer: u32 = lines.next().expect("outer").parse().expect("a number");
+    let nested: u32 = lines.next().expect("nested").parse().expect("a number");
+    assert_eq!(
+        nested,
+        outer + 1,
+        "outer {outer}, nested {nested}: {}",
+        r.stderr
+    );
+}
+
+/// An option oslo does not implement is refused when you ask to turn it on, and says why.
+///
+/// Accepting it and doing nothing is the failure mode `shopt`'s fixed states were built to avoid:
+/// a script that sets an option and gets status 0 is entitled to believe it took.
+#[test]
+fn an_unimplemented_option_is_refused_rather_than_ignored() {
+    for name in ["notify", "hashall", "keyword", "onecmd", "verbose", "nolog"] {
+        let r = run(&format!("set -o {name}\necho status=$?"));
+        assert!(
+            r.stderr.contains("not supported"),
+            "{name}: stderr was {:?}",
+            r.stderr
+        );
+        assert_eq!(r.out(), "status=1", "{name} reported success");
+    }
+    // Turning one off is fine — it is already off, so there is nothing to disagree with.
+    let r = run("set +o notify\necho status=$?");
+    assert_eq!(r.out(), "status=0", "{:?}", r.stderr);
+}
+
+/// The ones that are implemented still work, or the refusal has cost more than it bought.
+#[test]
+fn the_implemented_options_still_take() {
+    for name in [
+        "pipefail",
+        "errexit",
+        "nounset",
+        "posix",
+        "noclobber",
+        "noglob",
+    ] {
+        let r = run(&format!("set -o {name}\necho status=$?"));
+        assert_eq!(r.out(), "status=0", "{name}: {:?}", r.stderr);
+    }
+}

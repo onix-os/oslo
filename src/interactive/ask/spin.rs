@@ -118,11 +118,18 @@ mod tests {
 
     /// The command's status is the widget's, which is what lets `ui spin` wrap a command already
     /// in a script without changing what the script does.
+    ///
+    /// **An absolute path, so nothing here consults `$PATH`.** Spawning `true` and `false` by name
+    /// asks the ambient environment a question, and under libtest the answer is not stable:
+    /// `environ_set` writes the *real* process environment — sound in production, where oslo is
+    /// single-threaded, and not sound on a test harness that runs sibling tests on other threads.
+    /// A test elsewhere exporting `PATH` therefore made this one fail with 127, intermittently and
+    /// only under `make verify`. `/bin/sh` is a fixed path on the only platform oslo targets.
     #[test]
     fn the_commands_status_is_the_answer() {
-        assert_eq!(spin(&spec(&["true"])), 0);
-        assert_eq!(spin(&spec(&["false"])), 1);
-        assert_eq!(spin(&spec(&["sh", "-c", "exit 7"])), 7);
+        assert_eq!(spin(&spec(&["/bin/sh", "-c", "exit 0"])), 0);
+        assert_eq!(spin(&spec(&["/bin/sh", "-c", "exit 1"])), 1);
+        assert_eq!(spin(&spec(&["/bin/sh", "-c", "exit 7"])), 7);
     }
 
     /// A command that is not there is 127, as a shell reports it.

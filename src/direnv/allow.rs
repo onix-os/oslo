@@ -300,4 +300,31 @@ mod tests {
         assert_eq!(allow.status(&path), Status::NotAllowed);
         assert!(allow.allow(&path).is_err(), "and says so rather than lying");
     }
+
+    /// A known-answer test for the hash itself.
+    ///
+    /// The allow store is keyed by this digest, so changing it silently revokes every directory a
+    /// user has already allowed — they would simply stop loading, with no message. The vector is
+    /// NIST's for the empty string and for "abc", so a change of crate, version or algorithm fails
+    /// here rather than in somebody's project a week later.
+    #[test]
+    fn sha256_matches_the_standard_vector() {
+        use sha2::{Digest, Sha256};
+        let hex = |bytes: &[u8]| {
+            let mut h = Sha256::new();
+            h.update(bytes);
+            h.finalize()
+                .iter()
+                .map(|b| format!("{b:02x}"))
+                .collect::<String>()
+        };
+        assert_eq!(
+            hex(b""),
+            "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+        );
+        assert_eq!(
+            hex(b"abc"),
+            "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad"
+        );
+    }
 }

@@ -82,8 +82,13 @@ pub(super) fn read_command(
         let prompt = if buffer.is_empty() {
             prompt::primary_prompt(env_struct, lua, last_status, *current)
         } else {
-            lua.render("prompt.continuation")
-                .unwrap_or_else(|| rc::ps2(&mut env_struct.lock().unwrap()))
+            lua.render_with("prompt.continuation", &{
+                let mut ctx = prompt::segment_context(last_status, *current, None);
+                // The one fact that is different here, and the reason the field exists.
+                ctx.continuation = true;
+                ctx
+            })
+            .unwrap_or_else(|| rc::ps2(&mut env_struct.lock().unwrap()))
         };
 
         // The right prompt is handed to the helper rather than concatenated: it is drawn from
@@ -98,8 +103,14 @@ pub(super) fn read_command(
             // rebuild the prompt from `PROMPT_COMMAND`, and until now the only thing they could
             // set was `PS1` — the right column was oslo's whatever they did, so half the prompt
             // came from the integration and half from the shell arguing with it.
+            // **The same facts the left prompt gets.** These two used to be rendered with
+            // `render`, which is `render_with(Context::default())` — so a right-prompt segment saw
+            // status 0, an empty cwd, no branch and no duration, whatever had actually happened.
+            // A right prompt exists to show the status and the duration; handing it zeros made the
+            // whole feature draw the wrong thing rather than nothing, which is worse.
+            let facts = prompt::segment_context(last_status, reading, None);
             let right = lua
-                .render("prompt.right")
+                .render_with("prompt.right", &facts)
                 .or_else(|| rc::rps1(&mut env_struct.lock().unwrap()))
                 .or_else(|| {
                     Some(oslo::interactive::prompt::render_default_right_prompt(
@@ -163,9 +174,15 @@ pub(super) fn read_command(
         print!(
             "{}{}{}",
             oslo::interactive::marks::working_directory(&crate::startup::repl::cwd()),
-            oslo::interactive::marks::title(&oslo::interactive::prompt::tilde(
-                &crate::startup::repl::cwd()
-            )),
+            oslo::interactive::marks::title(
+                &lua.render_with(
+                    "prompt.title",
+                    &prompt::segment_context(last_status, reading, None)
+                )
+                .unwrap_or_else(|| {
+                    oslo::interactive::prompt::tilde(&crate::startup::repl::cwd())
+                })
+            ),
             oslo::interactive::marks::prompt_start()
         );
         let _ = std::io::Write::flush(&mut std::io::stdout());
@@ -221,6 +238,27 @@ pub(super) fn read_command(
         };
         typed.clear();
         typed_point = 0;
+
+        // The line has been accepted, so the prompt above it has done its job. If a config asked
+        // for a shorter one to stand in its place, put that there now — before the command runs,
+        // so what scrolls past is one line of prompt per command rather than three.
+        //
+        // Only to a terminal, and only from the row the editor actually drew: `rewind_after_readline`
+        // accounts for the wrap, which is why this is not `ESC [ 1 A`.
+        if std::io::IsTerminal::is_terminal(&std::io::stdout())
+            && let Some(short) = lua.render_with(
+                "prompt.transient",
+                &prompt::segment_context(last_status, reading, None),
+            )
+        {
+            print!(
+                "{}{}{}\r\n",
+                oslo::interactive::row::rewind_after_readline(&raw),
+                short,
+                raw
+            );
+            let _ = std::io::Write::flush(&mut std::io::stdout());
+        }
 
         // The toggle key repaints the prompt in place rather than submitting, so by the time a
         // line comes back the prompt may be showing the other language. That is the answer for
