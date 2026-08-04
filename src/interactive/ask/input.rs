@@ -134,7 +134,15 @@ pub fn input(spec: &Input) -> Answer<String> {
                 cursor = 0;
             }
             // Nothing here scrolls or toggles.
-            Key::Up | Key::Down | Key::ToggleScope | Key::BackTab | Key::Ignored => {}
+            // `Ctrl`/`Alt` chords belong to the line editor, not to a one-line prompt: listed
+            // rather than caught by a wildcard so a new key has to be considered here too.
+            Key::Up
+            | Key::Down
+            | Key::ToggleScope
+            | Key::BackTab
+            | Key::Ctrl(_)
+            | Key::Alt(_)
+            | Key::Ignored => {}
         }
     }
 }

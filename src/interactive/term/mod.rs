@@ -154,7 +154,9 @@ impl Drop for Restore {
 }
 
 /// What a keypress means.
-#[derive(Debug, PartialEq, Eq)]
+/// `Copy`, because a key is two words at most and the editor passes one through a keymap, a
+/// history walk and a redraw before it is done with it. Borrowing it would be noise.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Key {
     Char(char),
     Backspace,
@@ -184,6 +186,14 @@ pub enum Key {
     ToggleScope,
     /// Shift-Tab, which a terminal spells `ESC [ Z`.
     BackTab,
+    /// A control chord with no widget-level meaning of its own — `C-k`, `C-w`, `C-y`, `C-t`.
+    ///
+    /// The chords that *do* have one are decoded to it instead: `C-a` is [`Key::Home`], `C-b` is
+    /// [`Key::Left`], and so on. A widget should never need to know it was a control key, which
+    /// is why those come through named. This variant carries the rest, for the line editor.
+    Ctrl(char),
+    /// `ESC` then a character: Alt (Meta) chords, which is how readline spells its word motions.
+    Alt(char),
     Ignored,
 }
 
@@ -215,6 +225,14 @@ pub fn key(bytes: &[u8]) -> Key {
         // Ctrl-P / Ctrl-N, for the same reason every other list in the shell takes them.
         [0x10] => Key::Up,
         [0x0e] => Key::Down,
+        // The rest of the control chords a line editor binds. Named by their letter rather than
+        // by an action, because what they *do* is the keymap's business, not the decoder's.
+        [0x0b] => Key::Ctrl('k'),
+        [0x0c] => Key::Ctrl('l'),
+        [0x12] => Key::Ctrl('r'),
+        [0x14] => Key::Ctrl('t'),
+        [0x17] => Key::Ctrl('w'),
+        [0x19] => Key::Ctrl('y'),
         [0x1b, b'[', rest @ ..] => match rest {
             [b'A', ..] => Key::Up,
             [b'B', ..] => Key::Down,
@@ -239,7 +257,16 @@ pub fn key(bytes: &[u8]) -> Key {
             [b'F', ..] => Key::End,
             _ => Key::Ignored,
         },
-        [0x1b, ..] => Key::Ignored,
+        // `ESC DEL` is `M-DEL`, readline's backward-kill-word. Spelled out because `0x7f` is not
+        // a printable character and would otherwise fall through to the text branch.
+        [0x1b, 0x7f] => Key::Alt('\x7f'),
+        [0x1b, rest @ ..] => match std::str::from_utf8(rest) {
+            Ok(text) => match text.chars().next() {
+                Some(c) if !c.is_control() => Key::Alt(c),
+                _ => Key::Ignored,
+            },
+            Err(_) => Key::Ignored,
+        },
         // Anything printable is query text. Decoded as UTF-8 because a terminal delivers a
         // multibyte character in one read, and dropping it would make the finder unusable in any
         // language whose commands are not ASCII.
@@ -428,8 +455,16 @@ fn parse(buf: &[u8]) -> Parsed {
             }
             Parsed::Partial
         }
-        // `ESC` then an ordinary character is Alt-that-character, which the finder does not bind.
-        Some(_) => Parsed::Discard(2),
+        // `ESC` then an ordinary character is Alt-that-character. Framed as a key rather than
+        // discarded so the line editor can bind `M-b` and friends; a widget that does not bind
+        // them sees [`Key::Alt`] and ignores it, exactly as it ignored the discard before.
+        Some(&next) => {
+            let len = 1 + utf8_len(next);
+            if buf.len() < len {
+                return Parsed::Partial;
+            }
+            Parsed::Took(len, key(&buf[..len]))
+        }
     }
 }
 

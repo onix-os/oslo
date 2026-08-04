@@ -19,4 +19,5 @@
 //! and the scroll-safe redraw discipline in [`crate::interactive::paint`].
 
 pub mod buffer;
+pub mod keymap;
 pub mod layout;

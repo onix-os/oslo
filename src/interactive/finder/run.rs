@@ -97,7 +97,9 @@ pub fn open(commands: &[Command], cwd: &str, now: i64, fuzzy: Fuzzy) -> Option<O
             }
             // Keys the shared reader knows but the finder has no use for: a full-screen list
             // has no cursor to move within a line.
-            Key::Ignored
+            Key::Ctrl(_)
+            | Key::Alt(_)
+            | Key::Ignored
             | Key::Delete
             | Key::Left
             | Key::Right
