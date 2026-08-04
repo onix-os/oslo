@@ -182,14 +182,13 @@ const INVOCATION: &[(&str, &str)] = &[
 /// oslo's own flags. Long-only by design: the short letters belong to POSIX, which claimed the
 /// whole alphabet in 1988 — `-h` is `hashall` and `-v` is `verbose`, which is why bash has no
 /// `-h`/`-v` either.
+///
+/// **`--posix` is deliberately not here.** It still works, and the differential suite needs it to
+/// run the corpus both ways — but nobody should reach for it, because a shell invoked as `sh`
+/// already is one and every other invocation is oslo being itself. Listing it would advertise a
+/// choice that is already made. `--help --details` documents `posix` under the shell options,
+/// where somebody looking for it will find it.
 const LONG: &[(&str, &str)] = &[
-    (
-        "--posix",
-        "follow POSIX where bash's default differs (implied by `sh`)",
-    ),
-    ("--lua", "run the program as Lua (normally detected)"),
-    ("--sh", "run the program as shell (normally detected)"),
-    ("--no-vi", "emacs key bindings; vi is the default"),
     ("--details", "with --help: the full option reference"),
     ("--version", "print the version, then exit"),
     ("--help", "print this message, then exit"),

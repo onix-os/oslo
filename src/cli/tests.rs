@@ -254,33 +254,30 @@ fn a_lua_file_is_just_a_script_operand() {
     let inv = parse_args(&["init.lua"]).expect("parse");
     assert_eq!(inv.action, Action::Script("init.lua".to_string()));
     assert_eq!(inv.name, "init.lua");
-    assert_eq!(inv.force_language, None, "nothing was forced");
 }
 
+/// **The language flags are gone and are refused.** Detection is the feature — a shebang, then an
+/// extension, then the text — and a flag that was accepted and ignored would run a Lua file as
+/// shell and report a syntax error in a file that has none.
 #[test]
-fn the_language_can_still_be_forced_either_way() {
-    let lua = parse_args(&["--lua", "script"]).expect("parse");
-    assert_eq!(lua.force_language, Some(Language::Lua));
-    assert_eq!(lua.action, Action::Script("script".to_string()));
-
-    let sh = parse_args(&["--sh", "script"]).expect("parse");
-    assert_eq!(sh.force_language, Some(Language::Shell));
-}
-/// **Off only.** vi is the default, so the flag turns it off and there is no flag that turns it
-/// on — `--vi` would be a flag that asks for what you already have. Both spellings work.
-#[test]
-fn vi_can_be_turned_off() {
-    assert_eq!(parse_args(&[]).expect("parse").vi, None, "config decides");
-    assert_eq!(parse_args(&["--no-vi"]).expect("parse").vi, Some(false));
-    assert_eq!(parse_args(&["--no-vim"]).expect("parse").vi, Some(false));
+fn the_language_flags_are_gone() {
+    for flag in ["--lua", "--sh"] {
+        let err = parse_args(&[flag, "script"]).expect_err("must be refused");
+        assert!(
+            err.message.contains("invalid option"),
+            "{flag}: {}",
+            err.message
+        );
+        assert_eq!(err.status, 2);
+    }
 }
 
-/// And `--vi` is *refused*, not quietly ignored. A flag that used to work and now does nothing is
-/// the one failure a user cannot see: the shell starts, and the setting silently is not applied.
+/// **The editing mode is config, not a flag.** `oslo.vi.enabled` is the one place it lives, so
+/// there is no way for a command line and a config file to disagree about it.
 #[test]
-fn the_old_vi_on_flag_is_gone() {
-    for flag in ["--vi", "--vim"] {
-        let err = parse_args(&[flag]).expect_err("must be rejected");
+fn the_vi_flags_are_gone() {
+    for flag in ["--vi", "--vim", "--no-vi", "--no-vim"] {
+        let err = parse_args(&[flag]).expect_err("must be refused");
         assert!(
             err.message.contains("invalid option"),
             "{flag}: {}",

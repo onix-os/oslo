@@ -10,7 +10,6 @@
 pub mod help;
 pub mod tools;
 
-use crate::startup::language::Language;
 use oslo::env::options::ShellOption;
 use std::fmt::Write as _;
 
@@ -40,10 +39,6 @@ pub struct Invocation {
     pub positional: Vec<String>,
     /// `-i`: be interactive even when stdin is not a terminal.
     pub force_interactive: bool,
-    /// `--vi` / `--no-vi`: force the line editor's mode, overriding `oslo.vi.enabled`.
-    ///
-    /// `None` — the normal case — leaves the config in charge.
-    pub vi: Option<bool>,
     /// `-l`: behave as a login shell.
     pub login: bool,
     /// Single-letter `set` options given on the command line, e.g. `ex` for `-e -x`.
@@ -53,12 +48,6 @@ pub struct Invocation {
     /// here. Read through [`Invocation::options`], never directly: an option with no letter
     /// cannot be spelled here at all.
     pub set_options: String,
-    /// `--lua` or `--sh`: run the program as that language instead of detecting it.
-    ///
-    /// `None` is the normal case and means "work it out from the shebang, the extension, then the
-    /// text" — see [`crate::startup::language`]. The flag exists for the file that genuinely
-    /// cannot be told apart, not as the usual way to run Lua.
-    pub force_language: Option<Language>,
     /// Options given by their long name, e.g. `--posix`.
     ///
     /// A separate field because [`Self::set_options`] is a string of letters and the options that
@@ -167,8 +156,6 @@ fn named_sh(argv0: &str) -> bool {
 pub fn parse(argv: &[String]) -> Result<Invocation, Exit> {
     let mut name = argv.first().cloned().unwrap_or_else(|| "oslo".to_string());
     let mut command: Option<String> = None;
-    let mut force_language: Option<Language> = None;
-    let mut vi: Option<bool> = None;
     let mut read_stdin = false;
     let mut ended_options = false;
     let mut force_interactive = false;
@@ -229,12 +216,6 @@ pub fn parse(argv: &[String]) -> Result<Invocation, Exit> {
                 // reach for — so a shell that only took `-l` failed to start under exactly the
                 // things that start a login shell.
                 "login" => login = true,
-                "lua" => force_language = Some(Language::Lua),
-                "sh" => force_language = Some(Language::Shell),
-                // **Off only.** vi bindings are oslo's default, so there is nothing for a `--vi`
-                // to turn on from the command line. Both spellings, because the editing mode is
-                // vi and everyone calls the editor vim.
-                "no-vi" | "no-vim" => vi = Some(false),
                 other => match long_option(other) {
                     Some(option) => {
                         if !long_options.contains(&option) {
@@ -339,8 +320,6 @@ pub fn parse(argv: &[String]) -> Result<Invocation, Exit> {
         force_interactive,
         login,
         set_options,
-        force_language,
-        vi,
         long_options,
     })
 }

@@ -95,22 +95,17 @@ impl Default for Notify {
 ///   cursor_replace = "underscore",
 /// }
 /// ```
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub struct Vi {
+    /// **Off by default** — which is what `false` means here, and what every other shell does.
+    ///
+    /// It was on. A vi user says `oslo.vi.enabled = true` once and never thinks about it again,
+    /// whereas the other default made everybody else discover a setting before Esc stopped doing
+    /// something surprising, and there are far more of them. There is no flag either way: the
+    /// editing mode lives in the config and nowhere else, so a command line and a config file
+    /// cannot disagree about it.
     pub enabled: bool,
     pub cursors: super::vi::Cursors,
-}
-
-impl Default for Vi {
-    fn default() -> Self {
-        // On by default. Emacs bindings are still the shell tradition, but oslo's are the ones a
-        // user has to opt *out* of — `oslo.vi = { enabled = false }` — because a vi user who has
-        // to discover a setting before the arrow keys behave has already had a bad first minute.
-        Vi {
-            enabled: true,
-            cursors: super::vi::Cursors::default(),
-        }
-    }
 }
 
 /// `oslo.completion`.
@@ -345,31 +340,18 @@ use std::sync::RwLock;
 
 static SETTINGS: RwLock<Option<Settings>> = RwLock::new(None);
 
-/// `--vi` / `--no-vi`, which outrank whatever a config says.
-///
-/// Kept apart from [`Settings`] rather than folded into it because the config is read *after* the
-/// command line and would otherwise overwrite the flag. A flag the user typed on this invocation
-/// should beat a file they wrote once, which is the whole reason for having it.
-static VI_OVERRIDE: RwLock<Option<bool>> = RwLock::new(None);
-
-/// Force vi mode on or off for this session, or `None` to leave the config in charge.
-pub fn force_vi(on: Option<bool>) {
-    if let Ok(mut slot) = VI_OVERRIDE.write() {
-        *slot = on;
-    }
-}
-
 /// The settings in force.
+///
+/// There used to be a `VI_OVERRIDE` slot here, holding what `--vi`/`--no-vi` had asked for so it
+/// could beat the config that is read after the command line. Both flags are gone and so is it:
+/// `oslo.vi.enabled` is the only place the editing mode lives, which means there is no longer a
+/// second source for the two to disagree from — and one less piece of process-wide mutable state.
 pub fn current() -> Settings {
-    let mut settings = SETTINGS
+    SETTINGS
         .read()
         .ok()
         .and_then(|s| s.clone())
-        .unwrap_or_default();
-    if let Some(on) = VI_OVERRIDE.read().ok().and_then(|s| *s) {
-        settings.vi.enabled = on;
-    }
-    settings
+        .unwrap_or_default()
 }
 
 pub fn install(settings: Settings) {

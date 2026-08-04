@@ -337,7 +337,7 @@ fn highlighting_tells_a_real_command_from_an_unknown_one() {
     let dir = tempfile::tempdir().unwrap();
     make_exe(dir.path(), "zzreal");
     let h = helper(env_with_path(dir.path()));
-    crate::interactive::theme::set_depth(crate::interactive::theme::Depth::Ansi256);
+    let _held = crate::interactive::theme::held_at(crate::interactive::theme::Depth::Ansi256);
 
     let theme = crate::interactive::theme::current();
     let depth = crate::interactive::theme::depth();

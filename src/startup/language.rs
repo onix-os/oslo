@@ -4,15 +4,17 @@
 //! `oslo deploy.sh` and `oslo script` all just work; the old `--lua-script FILE` is gone, because
 //! a shell whose scripting language needs an opt-in flag is not really that shell.
 //!
-//! Four questions, asked in order of how much the answer can be trusted:
+//! Three questions, asked in order of how much the answer can be trusted:
 //!
-//! 1. **An explicit `--lua` or `--sh`.** The author said so; nothing else gets a vote.
-//! 2. **The shebang.** `#!/usr/bin/lua` is what the kernel itself would honour, and it is a
+//! 1. **The shebang.** `#!/usr/bin/lua` is what the kernel itself would honour, and it is a
 //!    deliberate statement by whoever wrote the file.
-//! 3. **The extension.** `.lua` against `.sh`/`.bash`/`.zsh` — weaker than a shebang (a file can
+//! 2. **The extension.** `.lua` against `.sh`/`.bash`/`.zsh` — weaker than a shebang (a file can
 //!    be misnamed) but still an explicit act.
-//! 4. **The text.** Only when the first three say nothing, and only when the evidence is
+//! 3. **The text.** Only when the first two say nothing, and only when the evidence is
 //!    one-sided: markers that are syntactically impossible in the other language.
+//!
+//! There were `--lua` and `--sh` flags to override all three. They are gone: detection is the
+//! feature, and a file that wants to be certain carries a shebang, which is good practice anyway.
 //!
 //! When even the text is ambiguous — no markers, or markers for both — the answer is shell.
 //! Not because shell matters more, but because that is the case where the file was *given* to a
@@ -58,13 +60,14 @@ const SHELL_MARKERS: &[&str] = &[
     "|", ">>", "2>",
 ];
 
-/// Decide from an explicit flag, the path and the program text.
+/// Decide from the path and the program text.
 ///
-/// `forced` short-circuits everything: it is the `--lua`/`--sh` the caller passed.
-pub fn detect(forced: Option<Language>, path: Option<&str>, text: &str) -> Language {
-    if let Some(language) = forced {
-        return language;
-    }
+/// **Detected, never declared.** There were `--lua` and `--sh` flags; they are gone. A shebang,
+/// then an extension, then the text itself answers this for every file anybody actually writes,
+/// and a flag that is needed once in a thousand runs is a flag that is wrong the other times
+/// somebody copies the command line — see [`crate::startup::language`]'s own note on why Lua must
+/// never need an opt-in.
+pub fn detect(path: Option<&str>, text: &str) -> Language {
     if let Some(language) = from_shebang(text) {
         return language;
     }
@@ -139,39 +142,21 @@ mod tests {
     use super::*;
 
     fn detect_text(text: &str) -> Language {
-        detect(None, None, text)
+        detect(None, text)
     }
 
-    #[test]
-    fn an_explicit_flag_beats_everything_else() {
-        // A file that looks like shell in every other way still runs as Lua when asked.
-        let shell = "#!/bin/sh\necho $HOME\n";
-        assert_eq!(
-            detect(Some(Language::Lua), Some("x.sh"), shell),
-            Language::Lua
-        );
-        let lua = "#!/usr/bin/lua\nprint(1)\n";
-        assert_eq!(
-            detect(Some(Language::Shell), Some("x.lua"), lua),
-            Language::Shell
-        );
-    }
-
+    /// **The shebang is the strongest signal there is now.** With `--lua` and `--sh` gone it is
+    /// the only way an author states the language outright, so a file whose name says one thing
+    /// and whose shebang says another must follow the shebang.
     #[test]
     fn a_shebang_decides_and_outranks_the_extension() {
-        assert_eq!(
-            detect(None, Some("x.sh"), "#!/usr/bin/lua\n"),
-            Language::Lua
-        );
-        assert_eq!(
-            detect(None, Some("x.lua"), "#!/bin/bash\n"),
-            Language::Shell
-        );
+        assert_eq!(detect(Some("x.sh"), "#!/usr/bin/lua\n"), Language::Lua);
+        assert_eq!(detect(Some("x.lua"), "#!/bin/bash\n"), Language::Shell);
         // `env` forwards to the interpreter after it.
-        assert_eq!(detect(None, None, "#!/usr/bin/env lua\n"), Language::Lua);
-        assert_eq!(detect(None, None, "#!/usr/bin/env bash\n"), Language::Shell);
+        assert_eq!(detect(None, "#!/usr/bin/env lua\n"), Language::Lua);
+        assert_eq!(detect(None, "#!/usr/bin/env bash\n"), Language::Shell);
         // Versioned interpreters.
-        assert_eq!(detect(None, None, "#!/usr/bin/lua5.4\n"), Language::Lua);
+        assert_eq!(detect(None, "#!/usr/bin/lua5.4\n"), Language::Lua);
     }
 
     /// `#!/usr/bin/env oslo` names the shell, not the language, so it must not decide — it is the
@@ -180,16 +165,16 @@ mod tests {
     #[test]
     fn oslos_own_shebang_defers_to_the_next_test() {
         assert_eq!(
-            detect(None, Some("deploy.lua"), "#!/usr/bin/env oslo\nprint(1)\n"),
+            detect(Some("deploy.lua"), "#!/usr/bin/env oslo\nprint(1)\n"),
             Language::Lua
         );
         assert_eq!(
-            detect(None, Some("deploy.sh"), "#!/usr/bin/env oslo\necho hi\n"),
+            detect(Some("deploy.sh"), "#!/usr/bin/env oslo\necho hi\n"),
             Language::Shell
         );
         // No extension either: the text is all that is left.
         assert_eq!(
-            detect(None, None, "#!/usr/bin/env oslo\nlocal t = {}\nprint(#t)\n"),
+            detect(None, "#!/usr/bin/env oslo\nlocal t = {}\nprint(#t)\n"),
             Language::Lua
         );
     }
@@ -197,14 +182,14 @@ mod tests {
     /// A directory called `lua` on the way to a shell interpreter must not decide the answer.
     #[test]
     fn only_the_interpreters_basename_counts() {
-        assert_eq!(detect(None, None, "#!/opt/lua/bin/bash\n"), Language::Shell);
+        assert_eq!(detect(None, "#!/opt/lua/bin/bash\n"), Language::Shell);
     }
 
     #[test]
     fn the_extension_decides_when_there_is_no_shebang() {
-        assert_eq!(detect(None, Some("build.lua"), "x = 1\n"), Language::Lua);
-        assert_eq!(detect(None, Some("build.sh"), "x=1\n"), Language::Shell);
-        assert_eq!(detect(None, Some("/a/b/deploy.lua"), ""), Language::Lua);
+        assert_eq!(detect(Some("build.lua"), "x = 1\n"), Language::Lua);
+        assert_eq!(detect(Some("build.sh"), "x=1\n"), Language::Shell);
+        assert_eq!(detect(Some("/a/b/deploy.lua"), ""), Language::Lua);
     }
 
     #[test]

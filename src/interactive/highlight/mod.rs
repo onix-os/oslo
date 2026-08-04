@@ -391,7 +391,7 @@ mod tests {
 
     #[test]
     fn painting_reassembles_the_line_once_the_escapes_are_stripped() {
-        theme::set_depth(theme::Depth::Ansi16);
+        let _held = theme::held_at(theme::Depth::Ansi16);
         let no = |_: &str| false;
         let line = "echo 'a b' $HOME | wc -l";
         let painted = paint(line, &ctx(&no, &no, false));
@@ -439,7 +439,7 @@ mod tests {
     /// keystroke after it in the wrong place.
     #[test]
     fn padding_sudo_does_not_change_a_single_column() {
-        theme::set_depth(theme::Depth::Ansi16);
+        let _held = theme::held_at(theme::Depth::Ansi16);
         let no = |_: &str| false;
         for line in [
             "sudo ls",
@@ -459,7 +459,7 @@ mod tests {
     /// And it really does widen the field, or the test above would pass on a no-op.
     #[test]
     fn the_red_field_reaches_past_the_word() {
-        theme::set_depth(theme::Depth::Ansi16);
+        let _held = theme::held_at(theme::Depth::Ansi16);
         let no = |_: &str| false;
         let mut tokens = classify(&lex("echo a && sudo ls"), &ctx(&no, &no, false));
         pad_danger(&mut tokens);

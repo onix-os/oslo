@@ -546,23 +546,36 @@ fn a_scripts_language_is_detected_rather_than_flagged() {
     assert!(out(&o).contains("lua by syntax 2"), "{:?}", err(&o));
 }
 
-/// `--lua` and `--sh` override every signal, for the file that genuinely cannot be told apart.
+/// **A shebang is how a file settles it.** `--lua` and `--sh` are gone, so the file whose name
+/// and contents disagree says which it is the way every other interpreter expects.
 #[test]
-fn the_language_can_be_forced_against_every_other_signal() {
+fn a_shebang_settles_a_file_whose_name_disagrees() {
     let dir = tempfile::tempdir().unwrap();
     let p = dir.path().join("looks_like_shell.sh");
-    std::fs::write(&p, "print('forced to lua')\n").unwrap();
-    let o = run(&["--lua", p.to_str().unwrap()], &[], dir.path());
-    assert!(out(&o).contains("forced to lua"), "{:?}", err(&o));
+    std::fs::write(&p, "#!/usr/bin/lua\nprint('lua despite the name')\n").unwrap();
+    let o = run(&[p.to_str().unwrap()], &[], dir.path());
+    assert!(out(&o).contains("lua despite the name"), "{:?}", err(&o));
 
     let p = dir.path().join("looks_like_lua.lua");
-    std::fs::write(&p, "echo 'forced to shell'\n").unwrap();
-    let o = run(&["--sh", p.to_str().unwrap()], &[], dir.path());
-    assert!(out(&o).contains("forced to shell"), "{:?}", err(&o));
+    std::fs::write(&p, "#!/bin/sh\necho 'shell despite the name'\n").unwrap();
+    let o = run(&[p.to_str().unwrap()], &[], dir.path());
+    assert!(out(&o).contains("shell despite the name"), "{:?}", err(&o));
+}
+
+/// The flags that used to force it are refused, not ignored. Accepted-and-ignored would run a Lua
+/// file as shell and report a syntax error in a file that has none.
+#[test]
+fn the_language_flags_are_refused() {
+    let dir = tempfile::tempdir().unwrap();
+    for flag in ["--lua", "--sh"] {
+        let o = run(&[flag, "-c", "print('hi')"], &[], dir.path());
+        assert_eq!(o.status.code(), Some(2), "{flag}: {:?}", err(&o));
+        assert!(err(&o).contains("invalid option"), "{flag}: {:?}", err(&o));
+    }
 }
 
 /// `-c` stays shell whatever the text looks like: every `sh -c` idiom depends on it, and the
-/// differential corpus is 390 scripts' worth of that assumption.
+/// differential corpus is 412 scripts' worth of that assumption.
 #[test]
 fn dash_c_is_shell_even_when_the_text_could_be_lua() {
     let dir = tempfile::tempdir().unwrap();
@@ -571,8 +584,4 @@ fn dash_c_is_shell_even_when_the_text_could_be_lua() {
     let o = run(&["-c", "print('hi')"], &[], dir.path());
     assert_eq!(o.status.code(), Some(2), "stderr: {:?}", err(&o));
     assert!(!out(&o).contains("hi"), "-c ran as Lua: {:?}", out(&o));
-
-    // And `--lua` is the way to ask for the other reading.
-    let o = run(&["--lua", "-c", "print('hi')"], &[], dir.path());
-    assert!(out(&o).contains("hi"), "{:?}", err(&o));
 }

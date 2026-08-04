@@ -28,6 +28,9 @@ fn ranked(line: &str, runs: i64, last_at: i64, dir: &str, here: bool) -> Ranked 
 }
 
 fn frame_of<'a>(matches: &'a [Ranked], query: &'a str, rows: usize) -> String {
+    // The escapes asserted on below are 256-colour ones, and the depth is process-wide — see
+    // `theme::held_at`. Held only across the render: the string it returns is already decided.
+    let _held = crate::interactive::theme::held_at(crate::interactive::theme::Depth::Ansi256);
     frame(&Frame {
         matches,
         selected: 0,
