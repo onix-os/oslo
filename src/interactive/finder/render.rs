@@ -244,10 +244,13 @@ fn highlight_matches(padded: &str, shown: &str, query: &str, base: Style, depth:
     }
     // The mark keeps the row's background nowhere: it *is* a background, which is what makes it
     // visible on a selected row as well as a plain one.
+    //
+    // **Not bold.** Bold is a colour hint as much as a weight: many terminals render it by
+    // switching to the bright palette, and some to plain grey — which would take the foreground
+    // off colour 0 and undo the contrast this pair exists for. The inversion is the emphasis.
     let marked = Style {
         fg: Some(Color::Indexed(0)),
         bg: Some(Color::Indexed(1)),
-        bold: true,
         ..Style::default()
     };
     let mut out = String::new();
