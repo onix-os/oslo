@@ -23,6 +23,7 @@ pub mod prompt;
 pub mod query;
 pub mod recall;
 pub mod row;
+pub mod scanner;
 pub mod settings;
 pub mod spec;
 pub mod syntax;

@@ -35,6 +35,8 @@ fn frame_of<'a>(matches: &'a [Ranked], query: &'a str, rows: usize) -> String {
         cols: 80,
         rows,
         now: 1_000_000_000,
+        // The scanner's frame. Fixed, so a test never depends on when it ran.
+        elapsed_ms: 0,
     })
 }
 
@@ -95,9 +97,10 @@ fn the_search_bar_sits_inside_its_surface() {
     let lines: Vec<&str> = seen.lines().collect();
     // From the bottom: the margin produces no line, so the surface is the last three.
     let query_row = lines.len() - 2;
+    // The scanner stands where the `❯` used to, so the query row is the one carrying it.
     assert!(
-        lines[query_row].contains('❯'),
-        "no prompt on the query row: {:?}",
+        lines[query_row].contains('■') || lines[query_row].contains('⬝'),
+        "no scanner on the query row: {:?}",
         lines[query_row]
     );
     assert!(lines[query_row].contains("on"), "{:?}", lines[query_row]);
@@ -138,6 +141,8 @@ fn the_scope_is_shown_at_the_end_of_the_search_bar() {
         cols: 80,
         rows: 10,
         now: 1_000_000_000,
+        // The scanner's frame. Fixed, so a test never depends on when it ran.
+        elapsed_ms: 0,
     }));
     assert!(local.lines().any(|line| line.contains("1/1 [local]")));
 }
@@ -155,6 +160,8 @@ fn the_scope_badge_uses_accent_on_zero() {
         cols: 80,
         rows: 10,
         now: 1_000_000_000,
+        // The scanner's frame. Fixed, so a test never depends on when it ran.
+        elapsed_ms: 0,
     };
     let pager = theme::Pager::default();
     let bar = search_bar(&f, &pager, pager.bg, 80, Depth::Ansi256);
@@ -186,7 +193,7 @@ fn the_list_grows_upward_from_the_bar() {
     );
     let query_row = lines
         .iter()
-        .position(|line| line.contains('❯') && line.contains("[global]"))
+        .position(|line| (line.contains('■') || line.contains('⬝')) && line.contains("[global]"))
         .expect("the query row is drawn");
     assert_eq!(
         query_row - match_row,
@@ -247,6 +254,8 @@ fn exactly_one_row_carries_the_marker() {
         cols: 80,
         rows: 10,
         now: 100,
+        // The scanner's frame. Fixed, so a test never depends on when it ran.
+        elapsed_ms: 0,
     });
     let seen = plain(&rendered);
     // The search bar uses the same glyph, so only the list rows are counted.

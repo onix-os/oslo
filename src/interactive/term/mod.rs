@@ -217,6 +217,19 @@ pub enum Key {
     Ignored,
 }
 
+/// What came back from a wait with a deadline.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Pressed {
+    Key(Key),
+    /// The deadline passed with nothing typed.
+    ///
+    /// Distinct from end-of-input, and that distinction is the whole point: a caller that draws
+    /// something moving needs "nothing happened, draw the next frame" to be a different answer
+    /// from "there will never be anything again".
+    Timeout,
+    Ended,
+}
+
 /// What a byte sequence means, once a whole one has been collected.
 ///
 /// Up and Down name screen directions, not vector directions. Results are stored best-first and
@@ -401,6 +414,44 @@ impl Keys {
 }
 
 /// Whether another byte is already waiting, within `ms`.
+/// Wait up to `ms` for a key.
+///
+/// [`Keys::read`] blocks until something is typed, which is right for a widget that only changes
+/// when you touch it and wrong for one that animates: a frame that advances with time needs the
+/// loop to come back on its own. This returns [`Pressed::Timeout`] when the deadline passes, and
+/// the caller redraws and asks again.
+impl Keys {
+    pub fn read_within(&mut self, ms: i32) -> Pressed {
+        loop {
+            match parse(&self.buf) {
+                Parsed::Took(used, key) => {
+                    self.buf.drain(..used);
+                    return Pressed::Key(key);
+                }
+                Parsed::Discard(used) => {
+                    self.buf.drain(..used);
+                    continue;
+                }
+                Parsed::Partial => {
+                    // A lone `ESC` still resolves by its own, shorter deadline — otherwise Esc
+                    // would take as long as one animation frame to register.
+                    let delay = crate::interactive::settings::current().misc.escape_delay as i32;
+                    if self.buf == [0x1b] && !waiting(self.fd, delay) {
+                        self.buf.clear();
+                        return Pressed::Key(Key::Cancel);
+                    }
+                    if !waiting(self.fd, ms) {
+                        return Pressed::Timeout;
+                    }
+                    if !self.fill() {
+                        return Pressed::Ended;
+                    }
+                }
+            }
+        }
+    }
+}
+
 fn waiting(fd: i32, ms: i32) -> bool {
     let mut fds = nix::libc::pollfd {
         fd,

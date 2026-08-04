@@ -76,6 +76,8 @@ pub struct Frame<'a> {
     /// The first visible row, so a long list can scroll under a fixed window.
     pub offset: usize,
     pub query: &'a str,
+    /// How long the finder has been open, for the scanner in the search bar.
+    pub elapsed_ms: u64,
     pub scope: Scope,
     /// How many commands there are in total, for the `12/840` counter.
     pub total: usize,
@@ -288,13 +290,17 @@ fn search_bar(
         Scope::Local => "[local]",
     };
     let count = format!("{}/{}", f.matches.len(), f.total);
-    let prompt = " ❯ ";
-    let room = cols
-        .saturating_sub(printed_width(prompt) + printed_width(&count) + printed_width(scope) + 2);
+    // **The scanner stands where the `❯` did.** A search bar wants to say it is live; a static
+    // arrow says nothing a blank would not. See [`crate::interactive::scanner`] — it is a function
+    // of elapsed time, so drawing it costs one call and holds no state.
+    let scanner = crate::interactive::scanner::Scanner::default();
+    let sweep = scanner.render(f.elapsed_ms, depth);
+    let prompt_cells = scanner.plain(f.elapsed_ms).chars().count() + 2;
+    let room = cols.saturating_sub(prompt_cells + printed_width(&count) + printed_width(scope) + 2);
     // One cell is kept back for the cursor, which is part of the input and has to fit.
     let typed = truncate_to_width(f.query, room.saturating_sub(1));
     let gap = cols.saturating_sub(
-        printed_width(prompt)
+        prompt_cells
             + printed_width(&typed)
             + CURSOR_WIDTH
             + printed_width(&count)
@@ -308,8 +314,10 @@ fn search_bar(
         ..style
     };
     format!(
-        "{}{}{}{}{}{}{}{}",
-        on_surface(pager.match_).paint(prompt, depth),
+        "{}{}{}{}{}{}{}{}{}{}",
+        on_surface(Style::default()).paint(" ", depth),
+        sweep,
+        on_surface(Style::default()).paint(" ", depth),
         on_surface(pager.text_sel).paint(&typed, depth),
         // **A cursor.** The real one is hidden — the finder owns the alternate screen — so the
         // caret is drawn into the frame as a reversed block, the same way every widget in

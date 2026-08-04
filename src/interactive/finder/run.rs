@@ -12,7 +12,8 @@ use super::Scope;
 use super::rank::{Ranked, rank};
 use super::render::{Frame, frame, visible_rows};
 use crate::interactive::matching::Fuzzy;
-use crate::interactive::term::{Key, Keys, Restore, Screen};
+use crate::interactive::scanner::Scanner;
+use crate::interactive::term::{Key, Keys, Pressed, Restore, Screen};
 use crate::track::history::Command;
 use std::io::{self, Write};
 
@@ -44,6 +45,11 @@ pub fn open(
     // full-screen finder is affordable here.
     let restore = Restore::enter(Screen::Alternate)?;
 
+    // When the finder opened, so the scanner in the search bar knows how far through its sweep it
+    // is. Taken once: the animation is a function of elapsed time, not of a counter to keep.
+    let opened = std::time::Instant::now();
+    let scanner = Scanner::default();
+
     let mut stdout = io::stdout();
     let mut state = State::new(commands, cwd, fuzzy, seed);
     let mut keys = Keys::on(restore.fd());
@@ -56,6 +62,7 @@ pub fn open(
             selected: state.selected,
             offset: state.offset,
             query: &state.query,
+            elapsed_ms: opened.elapsed().as_millis() as u64,
             scope: state.scope,
             total: state.total(),
             cols,
@@ -65,8 +72,13 @@ pub fn open(
         let _ = stdout.write_all(painted.as_bytes());
         let _ = stdout.flush();
 
-        let Some(pressed) = keys.read() else {
-            return Some(Outcome::Cancelled);
+        // **Waited for with a deadline, not blocked on.** A blocking read would leave the
+        // scanner frozen between keystrokes, which is the opposite of what an animation is for.
+        // On a timeout the loop simply comes back round and draws the next frame.
+        let pressed = match keys.read_within(scanner.step_ms as i32) {
+            Pressed::Key(key) => key,
+            Pressed::Timeout => continue,
+            Pressed::Ended => return Some(Outcome::Cancelled),
         };
 
         match pressed {
