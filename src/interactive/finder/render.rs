@@ -303,12 +303,14 @@ fn search_bar(
         Scope::Local => "[local]",
     };
     let count = format!("{}/{}", f.matches.len(), f.total);
-    // **The scanner stands where the `❯` did.** A search bar wants to say it is live; a static
-    // arrow says nothing a blank would not. See [`crate::interactive::scanner`] — it is a function
-    // of elapsed time, so drawing it costs one call and holds no state.
+    // The bar reads `⬝⬝⬝⬝⬝⬝⬝⬝  ❯❯  query`: the scanner says the finder is live, and the chevrons
+    // still mark where the typing starts. See [`crate::interactive::scanner`] — the sweep is a
+    // function of elapsed time, so drawing it costs one call and holds no state.
     let scanner = crate::interactive::scanner::Scanner::default();
     let sweep = scanner.render(f.elapsed_ms, surface, depth);
-    let prompt_cells = scanner.plain(f.elapsed_ms).chars().count() + 2;
+    let chevrons = "❯❯";
+    let prompt_cells =
+        1 + scanner.plain(f.elapsed_ms).chars().count() + 2 + printed_width(chevrons) + 2;
     let room = cols.saturating_sub(prompt_cells + printed_width(&count) + printed_width(scope) + 2);
     // One cell is kept back for the cursor, which is part of the input and has to fit.
     let typed = truncate_to_width(f.query, room.saturating_sub(1));
@@ -327,10 +329,12 @@ fn search_bar(
         ..style
     };
     format!(
-        "{}{}{}{}{}{}{}{}{}{}",
+        "{}{}{}{}{}{}{}{}{}{}{}{}",
         on_surface(Style::default()).paint(" ", depth),
         sweep,
-        on_surface(Style::default()).paint(" ", depth),
+        on_surface(Style::default()).paint("  ", depth),
+        on_surface(pager.match_).paint(chevrons, depth),
+        on_surface(Style::default()).paint("  ", depth),
         on_surface(pager.text_sel).paint(&typed, depth),
         // **A cursor.** The real one is hidden — the finder owns the alternate screen — so the
         // caret is drawn into the frame as a reversed block, the same way every widget in
