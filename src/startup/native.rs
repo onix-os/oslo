@@ -13,13 +13,22 @@
 
 use oslo::Environment;
 use oslo::interactive::edit::session::Assist;
-use oslo::interactive::{highlight, marks};
+use oslo::interactive::{OsloHelper, dropdown, highlight, marks, recall, settings};
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 
 /// What the shell plugs into an editing session.
-pub struct ShellAssist {
+pub struct ShellAssist<'a> {
     env: Arc<Mutex<Environment>>,
+    /// The completion and hinting machinery, borrowed rather than rebuilt: it carries the
+    /// frecency table and the command index, and a second copy would rank differently.
+    helper: Option<&'a OsloHelper>,
+    /// How wide the prompt prints.
+    ///
+    /// The **real** width. Under rustyline the dropdown had to guess it by rendering a default
+    /// prompt, because the editor never told anyone where the line started — so a custom prompt
+    /// put the menu in the wrong column. Here it is simply known.
+    prompt_cols: usize,
     /// History, newest last — the same order the editor's own store keeps.
     history: Vec<String>,
     /// How many steps back into history the walk has gone. `0` is the line being composed.
@@ -29,10 +38,17 @@ pub struct ShellAssist {
     composing: Option<String>,
 }
 
-impl ShellAssist {
-    pub fn new(env: Arc<Mutex<Environment>>, history: Vec<String>) -> ShellAssist {
+impl<'a> ShellAssist<'a> {
+    pub fn new(
+        env: Arc<Mutex<Environment>>,
+        history: Vec<String>,
+        helper: Option<&'a OsloHelper>,
+        prompt_cols: usize,
+    ) -> ShellAssist<'a> {
         ShellAssist {
             env,
+            helper,
+            prompt_cols,
             history,
             back: 0,
             composing: None,
@@ -47,7 +63,7 @@ impl ShellAssist {
     }
 }
 
-impl Assist for ShellAssist {
+impl Assist for ShellAssist<'_> {
     fn highlight(&mut self, line: &str) -> String {
         if line.is_empty() {
             return String::new();
@@ -85,6 +101,65 @@ impl Assist for ShellAssist {
         painted
     }
 
+    /// The ghost suggestion, from `oslo.suggest.sources` in order.
+    ///
+    /// Only at the end of the line: a suggestion is text that *continues* what you have typed, and
+    /// appending it after a cursor sitting mid-line would be a claim about the wrong position.
+    fn hint(&mut self, line: &str, cursor: usize) -> Option<String> {
+        let helper = self.helper?;
+        if line.is_empty() || cursor < line.chars().count() {
+            return None;
+        }
+        let pos = line.len();
+        for source in settings::current().suggest.sources {
+            let found = match source {
+                // oslo's own set, not the editor's: `recall` is language-filtered and knows which
+                // directory you are standing in, so `cargo run --ex` answers with this project's
+                // example. The editor's flat history can only ever know the one list.
+                settings::Source::History => recall::suggest(line),
+                settings::Source::Completion => helper.command_hint(line, pos),
+                settings::Source::Path => helper.path_hint(line, pos),
+            };
+            if let Some(text) = found {
+                let theme = oslo::interactive::theme::current();
+                return Some(
+                    theme
+                        .syntax
+                        .autosuggestion
+                        .paint(&text, oslo::interactive::theme::depth()),
+                );
+            }
+        }
+        None
+    }
+
+    /// Tab. Runs the whole interaction — the dropdown draws itself and takes its own keys — and
+    /// answers with the line it produced.
+    fn complete(&mut self, line: &str, cursor: usize, _back: bool) -> Option<(String, usize)> {
+        let helper = self.helper?;
+        // The dropdown works in bytes; the editor's cursor is in characters.
+        let pos: usize = line.chars().take(cursor).map(char::len_utf8).sum();
+        let (start, candidates) = helper.candidates(line, pos);
+        if candidates.is_empty() {
+            return None;
+        }
+
+        let chosen = if candidates.len() == 1 {
+            candidates.into_iter().next()?
+        } else {
+            let indent = self.prompt_cols + dropdown::visible_len(&line[..start]);
+            dropdown::DropdownMenu::select_interactive(candidates, indent, &line[start..pos])?
+        };
+        helper.record_accepted(&chosen);
+
+        let mut out = String::with_capacity(line.len() + chosen.replacement.len());
+        out.push_str(&line[..start]);
+        out.push_str(&chosen.replacement);
+        let at = out.chars().count();
+        out.push_str(&line[pos..]);
+        Some((out, at))
+    }
+
     fn history_prev(&mut self, line: &str) -> Option<String> {
         let entry = self.history.iter().rev().nth(self.back)?.clone();
         if self.back == 0 {
@@ -114,10 +189,12 @@ impl Assist for ShellAssist {
 mod tests {
     use super::*;
 
-    fn assist(entries: &[&str]) -> ShellAssist {
+    fn assist(entries: &[&str]) -> ShellAssist<'static> {
         ShellAssist::new(
             Arc::new(Mutex::new(Environment::new())),
             entries.iter().map(|e| e.to_string()).collect(),
+            None,
+            0,
         )
     }
 

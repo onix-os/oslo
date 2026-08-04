@@ -201,8 +201,16 @@ pub(super) fn read_command(
         // the layout — which is the shape of the whole reason this exists.
         if oslo::interactive::settings::current().misc.native_editor {
             let cursor = typed[..split].chars().count();
-            let mut assist =
-                super::native::ShellAssist::new(Arc::clone(env_struct), history_lines(rl));
+            let history = history_lines(rl);
+            let mut assist = super::native::ShellAssist::new(
+                Arc::clone(env_struct),
+                history,
+                rl.helper(),
+                // The real printed width, which is what puts the completion menu under the word
+                // it is completing. rustyline never told anyone where the line started, so the
+                // dropdown had to guess by rendering a default prompt.
+                oslo::interactive::prompt::printed_width(&prompt),
+            );
             assist.begin();
             return match oslo::interactive::edit::session::read_line(
                 &prompt,

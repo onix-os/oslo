@@ -193,7 +193,12 @@ impl OsloHelper {
         }
     }
 
-    fn record_accepted(&self, candidate: &CompletionCandidate) {
+    /// Note an accepted candidate for frecency ranking.
+    ///
+    /// `pub` because the native editor drives completion itself and must record the same
+    /// acceptance rustyline's path did — otherwise ranking would quietly stop learning the
+    /// moment the native editor was switched on.
+    pub fn record_accepted(&self, candidate: &CompletionCandidate) {
         if candidate
             .kind
             .as_deref()
