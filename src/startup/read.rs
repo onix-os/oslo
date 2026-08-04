@@ -193,13 +193,18 @@ pub(super) fn read_command(
 
         let split = typed_point.min(typed.len());
 
-        // **The native editor, when the config asks for it.** Taken before rustyline rather than
-        // beside it: the two cannot share a row, so this either owns the line or does not run.
+        // **The native editor, when the config asks for it.** Either it owns the line or it does
+        // not run: the two cannot share a row.
+        //
+        // It produces a `raw` line and then falls through to exactly the same path rustyline's
+        // does — mode prefixes, history expansion, here-document tracking and the completeness
+        // check that decides whether to ask for another line. That is what gives it `PS2`
+        // continuation without a second implementation of any of it.
         //
         // The right prompt is passed as an argument here. Under rustyline it had to be smuggled
         // out of the highlighter, because that was the only place a cursor move did not confuse
         // the layout — which is the shape of the whole reason this exists.
-        if oslo::interactive::settings::current().misc.native_editor {
+        let raw = if oslo::interactive::settings::current().misc.native_editor {
             let cursor = typed[..split].chars().count();
             let history = history_lines(rl);
             let mut assist = super::native::ShellAssist::new(
@@ -212,75 +217,68 @@ pub(super) fn read_command(
                 oslo::interactive::prompt::printed_width(&prompt),
             );
             assist.begin();
-            return match oslo::interactive::edit::session::read_line(
+            match oslo::interactive::edit::session::read_line(
                 &prompt,
                 &right_prompt,
                 (&typed, cursor),
                 &mut assist,
             ) {
-                oslo::interactive::edit::session::Outcome::Line(line) => {
-                    buffer.push_str(&line);
-                    if buffer.trim().is_empty() {
-                        Input::Nothing
-                    } else {
-                        Input::Command {
-                            text: buffer,
-                            mode: reading,
-                            secret,
-                        }
+                oslo::interactive::edit::session::Outcome::Line(line) => line,
+                // A partial multi-line command is abandoned whole, which is what Ctrl-C means
+                // when you are three lines into a `for` loop you no longer want.
+                oslo::interactive::edit::session::Outcome::Interrupted => {
+                    return Input::Interrupted;
+                }
+                oslo::interactive::edit::session::Outcome::Eof => return Input::Eof,
+            }
+        } else {
+            match rl.readline_with_initial(&prompt, (&typed[..split], &typed[split..])) {
+                Ok(raw) => raw,
+                Err(ReadlineError::Interrupted) => {
+                    // A finder choice deliberately interrupts this editor instance instead of using
+                    // rustyline's `Replace`: replacement text is inserted at the right place but its
+                    // logical cursor is not advanced. Reopening with the whole choice on the *left*
+                    // side of `readline_with_initial` puts both the visible and logical cursor at the
+                    // end, so the next typed character really appends there.
+                    if let Some(choice) = super::keybind::take_finder_choice() {
+                        typed = choice.line;
+                        typed_point = typed.len();
+                        print!(
+                            "{}",
+                            oslo::interactive::row::rewind_after_readline(&choice.previous)
+                        );
+                        let _ = std::io::Write::flush(&mut std::io::stdout());
+                        continue;
                     }
+                    // Ctrl-C abandons the *line*, not the language. If the user switched to Lua and
+                    // then thought better of the command, the prompt they were looking at said `lua`
+                    // and the next one must too — and the flag has to be consumed either way, or it
+                    // fires on the next line and switches the language nobody asked to switch.
+                    if toggle.take()
+                        && let Some(language) = oslo::interactive::prompt::language()
+                    {
+                        *current = if language == "lua" {
+                            Mode::Lua
+                        } else {
+                            Mode::Shell
+                        };
+                    }
+                    // No `^C` echoed. The keystroke was the user's instruction to abandon the line,
+                    // and they know they pressed it — printing it back spends a row saying so, which
+                    // is a row the next prompt could have had. The editor has already moved off the
+                    // abandoned line, so there is nothing to write here at all.
+                    return Input::Interrupted;
                 }
-                oslo::interactive::edit::session::Outcome::Interrupted => Input::Interrupted,
-                oslo::interactive::edit::session::Outcome::Eof => Input::Eof,
-            };
-        }
-
-        let raw = match rl.readline_with_initial(&prompt, (&typed[..split], &typed[split..])) {
-            Ok(raw) => raw,
-            Err(ReadlineError::Interrupted) => {
-                // A finder choice deliberately interrupts this editor instance instead of using
-                // rustyline's `Replace`: replacement text is inserted at the right place but its
-                // logical cursor is not advanced. Reopening with the whole choice on the *left*
-                // side of `readline_with_initial` puts both the visible and logical cursor at the
-                // end, so the next typed character really appends there.
-                if let Some(choice) = super::keybind::take_finder_choice() {
-                    typed = choice.line;
-                    typed_point = typed.len();
-                    print!(
-                        "{}",
-                        oslo::interactive::row::rewind_after_readline(&choice.previous)
-                    );
-                    let _ = std::io::Write::flush(&mut std::io::stdout());
-                    continue;
+                Err(ReadlineError::Eof) => {
+                    // Same for end of input: leaving the flag set would apply the switch to whatever
+                    // line came next if `$IGNOREEOF` keeps the shell alive.
+                    let _ = toggle.take();
+                    return Input::Eof;
                 }
-                // Ctrl-C abandons the *line*, not the language. If the user switched to Lua and
-                // then thought better of the command, the prompt they were looking at said `lua`
-                // and the next one must too — and the flag has to be consumed either way, or it
-                // fires on the next line and switches the language nobody asked to switch.
-                if toggle.take()
-                    && let Some(language) = oslo::interactive::prompt::language()
-                {
-                    *current = if language == "lua" {
-                        Mode::Lua
-                    } else {
-                        Mode::Shell
-                    };
+                Err(err) => {
+                    eprintln!("oslo: {}", err);
+                    return Input::Fatal;
                 }
-                // No `^C` echoed. The keystroke was the user's instruction to abandon the line,
-                // and they know they pressed it — printing it back spends a row saying so, which
-                // is a row the next prompt could have had. The editor has already moved off the
-                // abandoned line, so there is nothing to write here at all.
-                return Input::Interrupted;
-            }
-            Err(ReadlineError::Eof) => {
-                // Same for end of input: leaving the flag set would apply the switch to whatever
-                // line came next if `$IGNOREEOF` keeps the shell alive.
-                let _ = toggle.take();
-                return Input::Eof;
-            }
-            Err(err) => {
-                eprintln!("oslo: {}", err);
-                return Input::Fatal;
             }
         };
         typed.clear();
