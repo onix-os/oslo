@@ -1,5 +1,26 @@
 # Changelog
 
+## [0.2.4] - 2026-08-04
+
+### <!-- 0 -->⛰️  Features
+
+- Brighter syntax colours, ansi slots untouched
+- Universal variables shared between shells
+- Autoload functions from functions/NAME.sh
+- Title key, status builtin, named frames
+- Preexec/prompt hooks, transient prompt, fish settings
+- Real facts for every prompt, honest set -o
+- Dynamic variables and the config fixes
+
+### <!-- 4 -->⚡ Performance
+
+- Drop duplicated digest stack via sha2 0.10
+- Trim regex features, smaller and faster
+
+### <!-- 6 -->🧪 Testing
+
+- Stop a stdin-reading test hanging the suite
+
 ## [0.2.3] - 2026-08-04
 
 ### <!-- 0 -->⛰️  Features
