@@ -422,3 +422,6 @@ mod tests {
         assert_eq!(Style::default().paint("x", Depth::True), "x");
     }
 }
+
+/// Making a colour more vivid without touching the ones the terminal owns.
+mod vivid;

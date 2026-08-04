@@ -195,7 +195,10 @@ impl Syntax {
     /// Reached only when the terminal actually answers `OSC 11` and says it is light. A terminal
     /// that stays silent keeps the dark palette, which is the safer guess.
     pub fn for_light_background() -> Syntax {
-        let rgb = |r: u8, g: u8, b: u8| Style::fg(Color::Rgb(r, g, b));
+        // Sharpened, not lifted. "Brighter" on a white background means *more colour*, not more
+        // light: raising the value of these would wash them out and cost the contrast they were
+        // chosen for. Same transform, zero on the value axis.
+        let rgb = |r: u8, g: u8, b: u8| Style::fg(Color::Rgb(r, g, b).intensified(0.0));
         Syntax {
             command: rgb(0x1a, 0x7f, 0x37),
             // The dark palette's builtin pink at a lightness a white background can carry.
@@ -211,7 +214,7 @@ impl Syntax {
             },
             danger: Style {
                 bold: true,
-                bg: Some(Color::Rgb(0xcf, 0x22, 0x2e)),
+                bg: Some(Color::Rgb(0xcf, 0x22, 0x2e).intensified(0.0)),
                 ..rgb(0xff, 0xff, 0xff)
             },
             param: Style::default(),
@@ -244,6 +247,12 @@ impl Syntax {
     }
 }
 
+/// How far the dark palette's hues are lifted off the background, on HSV's value axis.
+///
+/// Positive because the default background is dark. The light palette passes `0.0` — see
+/// [`Syntax::for_light_background`].
+const LIFT: f32 = 0.12;
+
 impl Default for Syntax {
     fn default() -> Self {
         // A light terminal gets the light palette as its *starting point*, so a config's own
@@ -251,7 +260,15 @@ impl Default for Syntax {
         if background() == Some(super::query::Background::Light) {
             return Syntax::for_light_background();
         }
-        let rgb = |r: u8, g: u8, b: u8| Style::fg(Color::Rgb(r, g, b));
+        // Every hue here is lifted off the background before it is used. The palette was picked
+        // for a black terminal and read as muted on the grey ones people actually use; rather than
+        // re-choosing twenty hex values by eye, the lift is one number in `color.rs` and applies
+        // evenly, so the relationships between the colours are the ones that were chosen.
+        //
+        // `intensified` leaves ANSI slots and near-greys alone, which is why it can be applied
+        // here without any per-colour exceptions: the black on `sudo`'s red background and the
+        // ghost-text grey come through untouched.
+        let rgb = |r: u8, g: u8, b: u8| Style::fg(Color::Rgb(r, g, b).intensified(LIFT));
         Syntax {
             // **RGB, not the sixteen ANSI slots.** A palette tool like pywal remaps what
             // `basic(2)` means, so a theme built on the slots changes colour whenever the wallpaper
@@ -278,7 +295,7 @@ impl Default for Syntax {
             // is the one word in a line whose presence changes what every other word can do.
             danger: Style {
                 bold: true,
-                bg: Some(Color::Rgb(0xff, 0x55, 0x55)),
+                bg: Some(Color::Rgb(0xff, 0x55, 0x55).intensified(LIFT)),
                 ..rgb(0x00, 0x00, 0x00)
             },
             param: Style::default(),

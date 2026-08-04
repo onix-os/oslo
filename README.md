@@ -173,6 +173,32 @@ directories: "forget what I typed" is not "forget where I work".
 No daemon. The read is a B-tree range scan rather than a `LIKE` — 13 µs against 25,000 rows — which
 is what makes a cache unnecessary, and a cache stale between two terminals impossible.
 
+### Colours
+
+Every one of the 54 roles — 22 syntax, 19 dropdown, 7 prompt, 5 widget — is settable, and each
+takes an index or an RGB triplet:
+
+```lua
+oslo.theme = {
+  syntax = { command = "#7cff9d", keyword = "212", comment = { fg = "244", italic = true } },
+  pager  = { bg = "#101010", sel_bg = "238" },
+  prompt = { cwd = "blue", git = "green" },
+  ui     = { accent = "213" },
+}
+```
+
+That "every one" is a test, not a claim: adding a role to the theme without a reader fails
+`every_role_can_be_set_from_a_config`.
+
+**oslo brightens its own colours and never yours.** The syntax palette is absolute RGB, so it is
+lifted on HSV's value and saturation axes to sit off the background. An ANSI slot is returned
+untouched — `"green"` means "colour 2, whatever this terminal thinks that is", and a tool that
+remaps the slots (pywal and friends) owns that answer. Near-greys are left alone too, which is what
+keeps the dropdown's chrome and the black on `sudo`'s red background from being "brightened".
+
+HSV rather than HSL, because in HSL lifting an already-light colour bleeds it toward white:
+`#ff5555` becomes `#ff8888`, a *paler* red. Brighter has to mean more colour.
+
 ### Fuzzy matching
 
 ```lua
