@@ -304,6 +304,24 @@ oslo.abbr.gco = "git checkout"
 oslo.abbr.brc = { "~/.config/oslo/config.lua", anywhere = true }
 ```
 
+### Autoloaded functions
+
+`~/.config/oslo/functions/NAME.sh` defines `NAME`, and is not read until something calls it.
+
+```sh
+$ cat ~/.config/oslo/functions/gitroot.sh
+gitroot() { git rev-parse --show-toplevel; }
+```
+
+fish's `functions/` directory, and the reason it is worth copying is arithmetic: a `conf.d` snippet
+defining twenty functions costs twenty definitions on **every** shell start, including the hundred
+short-lived ones a build spawns. An autoloaded one costs a `stat` on the call that needs it.
+
+**It can never shadow anything.** The file is read only after the `$PATH` search has already
+failed, so a file called `ls.sh` is dead — `ls` resolves to the program long before. fish lets an
+autoloaded function override a command; a shell that promises scripts see POSIX behaviour cannot
+have a file on disk quietly redefining `test`. Autoloading adds names, it never changes them.
+
 Abbreviations expand as you type the space that ends the word — `gco ` becomes `git checkout `,
 and the line that runs is the one you can read. The `abbr` builtin defines them too, and by hand at
 the prompt it is the shorter thing to type; `oslo.abbr` is for the ones you want every session.
