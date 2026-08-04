@@ -169,7 +169,14 @@ pub enum Key {
     PageUp,
     PageDown,
     Accept,
+    /// Esc: leave, having decided not to answer.
     Cancel,
+    /// Ctrl-C: leave, and mean it.
+    ///
+    /// Distinct from [`Key::Cancel`] because one widget tells them apart: the pager has nothing to
+    /// answer, so `q` and Esc are both an ordinary "finished reading" — but an abort is still an
+    /// abort, and a script that runs `ui pager … || handle` deserves to see it.
+    Abort,
     /// Clear the line: Ctrl-U, as at a prompt.
     Clear,
     /// Tab. Named for what the finder does with it; other widgets use it to toggle a selection,
@@ -190,7 +197,7 @@ pub fn key(bytes: &[u8]) -> Key {
         // Esc alone. A lone `0x1b` with nothing after it is the key; anything after it is a
         // sequence, handled below.
         [0x1b] => Key::Cancel,
-        [0x03] => Key::Cancel,
+        [0x03] => Key::Abort,
         [0x0d] | [0x0a] => Key::Accept,
         [0x7f] | [0x08] => Key::Backspace,
         [0x09] => Key::ToggleScope,

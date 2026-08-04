@@ -87,7 +87,11 @@ pub fn pager(spec: &Pager) -> Answer<()> {
             return Answer::Given(());
         };
         match pressed {
+            // `q`, Esc and Enter are all "finished reading", which is the pager's success — there
+            // is nothing here to answer, so declining to answer is not a thing you can do.
             Key::Cancel | Key::Accept | Key::Char('q') => return Answer::Given(()),
+            // Ctrl-C is not that. A script running `ui pager … || cleanup` should see the abort.
+            Key::Abort => return Answer::Cancelled,
             Key::Up => top = top.saturating_sub(1),
             Key::Down => top = (top + 1).min(last),
             Key::PageUp => top = top.saturating_sub(window),

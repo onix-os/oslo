@@ -39,7 +39,8 @@ fn the_control_keys() {
 #[test]
 fn the_keys_that_leave() {
     assert_eq!(key(b"\x1b"), Key::Cancel);
-    assert_eq!(key(b"\x03"), Key::Cancel);
+    // Ctrl-C is its own key: the pager treats an abort differently from an ordinary quit.
+    assert_eq!(key(b"\x03"), Key::Abort);
     assert_eq!(key(b"\r"), Key::Accept);
     assert_eq!(key(b"\n"), Key::Accept);
     assert_eq!(key(b"\x7f"), Key::Backspace);

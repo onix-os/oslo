@@ -100,7 +100,8 @@ pub fn write(spec: &Write) -> Answer<String> {
         };
 
         match pressed {
-            Key::Cancel => {
+            // An abort is a cancel here: there is an answer to decline either way.
+            Key::Cancel | Key::Abort => {
                 panel.close();
                 return Answer::Cancelled;
             }

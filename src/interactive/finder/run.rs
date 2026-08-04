@@ -64,7 +64,8 @@ pub fn open(commands: &[Command], cwd: &str, now: i64, fuzzy: Fuzzy) -> Option<O
         };
 
         match pressed {
-            Key::Cancel => return Some(Outcome::Cancelled),
+            // The history finder has one way out: both leave the line as it was.
+            Key::Cancel | Key::Abort => return Some(Outcome::Cancelled),
             Key::Accept => {
                 return Some(match state.matches.get(state.selected) {
                     Some(chosen) => Outcome::Chosen {

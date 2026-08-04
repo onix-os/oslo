@@ -92,7 +92,8 @@ pub fn input(spec: &Input) -> Answer<String> {
             return Answer::Cancelled;
         };
         match pressed {
-            Key::Cancel => {
+            // An abort is a cancel here: there is an answer to decline either way.
+            Key::Cancel | Key::Abort => {
                 show("\r\x1b[K");
                 return Answer::Cancelled;
             }
