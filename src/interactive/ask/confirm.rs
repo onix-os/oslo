@@ -6,8 +6,12 @@
 //!
 //! Two buttons rather than a `[y/N]` prompt, because a button you can see is selected tells you
 //! what Enter will do. `y` and `n` still work, since that is what fingers already know.
+//!
+//! Laid out as gum lays it out — question, blank, buttons, blank, keys — rather than crammed onto
+//! one row. Three kinds of text on one line read as a sentence that does not parse:
+//! `carry on?  next  stop here  ←→ choose • enter confirm`.
 
-use super::{Answer, legend, show};
+use super::{Answer, Inline, footer};
 use crate::interactive::term::{Key, Keys, Restore};
 use crate::interactive::theme;
 
@@ -45,6 +49,7 @@ pub fn confirm(spec: &Confirm) -> Answer<bool> {
 
     let mut yes = spec.default;
     let mut keys = Keys::on(raw.fd());
+    let mut panel = Inline::new();
 
     loop {
         // The chosen button takes the accent as a *background*, which is what makes it read as a
@@ -62,27 +67,36 @@ pub fn confirm(spec: &Confirm) -> Answer<bool> {
             };
             style.paint(&format!(" {label} "), depth)
         };
-        show(&format!(
-            "\r\x1b[K{}  {}  {}   {}",
+        // gum's shape: the question, a blank row, the buttons, a blank row, the keys. Five rows
+        // rather than one, because a question, the thing you are answering it with, and the list
+        // of keys are three different kinds of text — run together on one line they read as a
+        // sentence that does not parse.
+        let mut frame = format!(
+            "\r\n\r\x1b[K {}\r\n\r\x1b[K\r\n\r\x1b[K  {}  {}",
             ui.question.paint(&spec.question, depth),
             button(&spec.yes, yes),
             button(&spec.no, !yes),
-            legend(&[("←→", "choose"), ("enter", "confirm")])
-        ));
+        );
+        let bottom = footer(
+            &frame,
+            &[("←→", "choose"), ("y/n", "answer"), ("enter", "confirm")],
+        );
+        frame.push_str(&bottom);
+        panel.draw(&frame);
 
         let Some(pressed) = keys.read() else {
-            show("\r\x1b[K");
+            panel.close();
             return Answer::Cancelled;
         };
         match pressed {
             Key::Cancel => {
-                show("\r\x1b[K");
+                panel.close();
                 return Answer::Cancelled;
             }
             Key::Accept => {
                 // Erased rather than echoed — `confirm`'s answer is its exit status, so there is
                 // nothing to leave behind. See `input` for why nothing here echoes.
-                show("\r\x1b[K");
+                panel.close();
                 return Answer::Given(yes);
             }
             // The letters, because that is what people type without looking.

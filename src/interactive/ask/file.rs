@@ -10,7 +10,7 @@
 //! page cache — and caching it would mean showing a file that has since been deleted, which for a
 //! file picker is the one wrong answer worth avoiding. Moving into a directory rereads it.
 
-use super::{Answer, Inline, legend};
+use super::{Answer, FOOTER_ROWS, Inline, footer};
 use crate::interactive::dropdown::width::{terminal_cols, terminal_rows, truncate_to_width};
 use crate::interactive::matching::{Fuzzed, Fuzzy};
 use crate::interactive::term::{Key, Keys, Restore};
@@ -102,12 +102,13 @@ pub fn file(spec: &Browse) -> Answer<String> {
     let mut panel = Inline::new();
 
     loop {
-        // Two chrome rows above (the path and the query) plus the legend, and one spare so the
-        // block can never fill the screen exactly.
+        // Two rows above (the path and the query), the footer below, and one spare so the block
+        // can never fill the screen exactly.
+        let chrome = 2 + FOOTER_ROWS;
         let height = spec
             .height
             .min(shown.len().max(1))
-            .min(terminal_rows().saturating_sub(4).max(1));
+            .min(terminal_rows().saturating_sub(chrome + 1).max(1));
         if selected >= shown.len() {
             selected = shown.len().saturating_sub(1);
         }
@@ -163,10 +164,11 @@ pub fn file(spec: &Browse) -> Answer<String> {
             };
             frame.push_str(&format!("\r\n\r\x1b[K{text}"));
         }
-        frame.push_str(&format!(
-            "\r\n\r\x1b[K{}",
-            legend(&[("↑↓", "move"), ("←→", "in/out"), ("enter", "choose")])
-        ));
+        let bottom = footer(
+            &frame,
+            &[("↑↓", "move"), ("←→", "in/out"), ("enter", "choose")],
+        );
+        frame.push_str(&bottom);
         panel.draw(&frame);
 
         let Some(pressed) = keys.read() else {

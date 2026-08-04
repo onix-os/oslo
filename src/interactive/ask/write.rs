@@ -8,7 +8,7 @@
 //! Drawn in place below the header, like the list widgets, so the transcript above is untouched
 //! and the finished text stays where it was typed.
 
-use super::{Answer, Inline, legend};
+use super::{Answer, FOOTER_ROWS, Inline, footer};
 use crate::interactive::dropdown::width::{terminal_cols, terminal_rows, truncate_to_width};
 use crate::interactive::term::{Key, Keys, Restore};
 use crate::interactive::theme;
@@ -55,7 +55,7 @@ pub fn write(spec: &Write) -> Answer<String> {
         let room = cols.saturating_sub(3);
         // The document scrolls under a window, like every other list here. Without this a document
         // longer than the terminal walked off the top and the redraw painted over the transcript.
-        let chrome = 1 + usize::from(!spec.header.is_empty());
+        let chrome = FOOTER_ROWS + usize::from(!spec.header.is_empty());
         let window = terminal_rows().saturating_sub(chrome + 1).max(1);
         let top = row.saturating_sub(window.saturating_sub(1));
 
@@ -83,14 +83,15 @@ pub fn write(spec: &Write) -> Answer<String> {
                 text
             ));
         }
-        frame.push_str(&format!(
-            "\r\n\r\x1b[K{}",
-            legend(&[
+        let bottom = footer(
+            &frame,
+            &[
                 ("enter", "new line"),
                 ("ctrl-d", "submit"),
-                ("esc", "cancel")
-            ])
-        ));
+                ("esc", "cancel"),
+            ],
+        );
+        frame.push_str(&bottom);
         panel.draw(&frame);
 
         let Some(pressed) = keys.read() else {

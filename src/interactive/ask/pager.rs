@@ -50,8 +50,8 @@ pub fn pager(spec: &Pager) -> Answer<()> {
 
     loop {
         let rows = terminal_rows();
-        // One row for the title bar, one for the legend.
-        let window = rows.saturating_sub(2).max(1);
+        // The title bar above, and the footer — a blank row and the keys — below.
+        let window = rows.saturating_sub(1 + super::FOOTER_ROWS).max(1);
         let last = lines.len().saturating_sub(window);
         top = top.min(last);
 
@@ -74,8 +74,11 @@ pub fn pager(spec: &Pager) -> Answer<()> {
                 .unwrap_or_default();
             frame.push_str(&format!("\x1b[2K{text}\r\n"));
         }
+        // The pager is full-width by construction, so its rule spans the terminal rather than the
+        // widest row — measuring the content would give a ragged line under a ragged document.
         frame.push_str(&format!(
-            "\x1b[2K{}",
+            "\x1b[2K{}\r\n\x1b[2K{}",
+            ui.muted.paint("- ".repeat(cols / 2).trim_end(), depth),
             legend(&[("↑↓", "scroll"), ("q", "quit")])
         ));
         show(&frame);
