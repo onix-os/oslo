@@ -48,6 +48,8 @@ pub fn open(
     // When the finder opened, so the scanner in the search bar knows how far through its sweep it
     // is. Taken once: the animation is a function of elapsed time, not of a counter to keep.
     let opened = std::time::Instant::now();
+    // Only the *step* is needed here — the bar owns how wide the sweep is drawn. Sharing the
+    // default keeps the loop's tick and the animation's frame rate the same number.
     let scanner = Scanner::default();
 
     let mut stdout = io::stdout();

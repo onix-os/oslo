@@ -367,7 +367,12 @@ fn search_bar(
     // The bar reads `⬝⬝⬝⬝⬝⬝⬝⬝  ❯❯  query`: the scanner says the finder is live, and the chevrons
     // still mark where the typing starts. See [`crate::interactive::scanner`] — the sweep is a
     // function of elapsed time, so drawing it costs one call and holds no state.
-    let scanner = crate::interactive::scanner::Scanner::default();
+    // One cell wider than hexe's default. The bar has the room, and a longer track gives the
+    // sweep somewhere to travel — at eight the head is turning round almost as soon as it leaves.
+    let scanner = crate::interactive::scanner::Scanner {
+        width: 9,
+        ..crate::interactive::scanner::Scanner::default()
+    };
     let sweep = scanner.render(f.elapsed_ms, surface, depth);
     let chevrons = "❯❯";
     let prompt_cells =
@@ -394,7 +399,9 @@ fn search_bar(
         on_surface(Style::default()).paint(" ", depth),
         sweep,
         on_surface(Style::default()).paint("  ", depth),
-        on_surface(pager.match_).paint(chevrons, depth),
+        // The same white as the query: the chevrons mark where typing starts, so they belong to
+        // the text rather than standing apart from it as an accent.
+        on_surface(pager.text_sel).paint(chevrons, depth),
         on_surface(Style::default()).paint("  ", depth),
         on_surface(pager.text_sel).paint(&typed, depth),
         // **A cursor.** The real one is hidden — the finder owns the alternate screen — so the
