@@ -15,6 +15,9 @@ fn command(line: &str, last_at: i64) -> Command {
         dir: "/here".to_string(),
         places: 1,
         worked: true,
+        session: String::new(),
+        host: String::new(),
+        root: None,
     }
 }
 
@@ -126,7 +129,7 @@ fn shrinking_the_terminal_keeps_the_selection_visible() {
 /// Tab switches between all history and commands run in this exact directory. A parent directory
 /// is useful as a ranking hint in global mode, but local means this directory only.
 #[test]
-fn tab_toggles_exact_directory_history() {
+fn the_arrows_walk_the_scopes() {
     let mut here = command("here", 3);
     here.dir = "/work/project/crate".to_string();
     let mut parent = command("parent", 2);
@@ -140,15 +143,114 @@ fn tab_toggles_exact_directory_history() {
     assert_eq!(state.matches.len(), 3);
     assert_eq!(state.total(), 3);
 
-    state.toggle_scope();
-    assert_eq!(state.scope, Scope::Local);
+    // Right walks widest to narrowest: global, host, session, directory, workspace, and round.
+    state.narrow_scope();
+    assert_eq!(state.scope, Scope::Host);
+    state.narrow_scope();
+    assert_eq!(state.scope, Scope::Session);
+    state.narrow_scope();
+    assert_eq!(state.scope, Scope::Directory);
     assert_eq!(state.total(), 1);
     assert_eq!(state.matches.len(), 1);
     assert_eq!(state.matches[0].command.line, "here");
 
-    state.toggle_scope();
+    state.narrow_scope();
+    assert_eq!(state.scope, Scope::Workspace);
+    state.narrow_scope();
     assert_eq!(state.scope, Scope::Global);
     assert_eq!(state.matches.len(), 3);
+}
+
+/// Left walks back the way Right came, so the two are inverses at every step.
+#[test]
+fn the_arrows_are_inverses() {
+    let commands = [command("anything", 100)];
+    let mut state = State::new(&commands, "/here", Fuzzy::Smart, "");
+    for _ in 0..5 {
+        let was = state.scope;
+        state.narrow_scope();
+        assert_ne!(state.scope, was, "Right did not move");
+        state.widen_scope();
+        assert_eq!(state.scope, was, "Left did not come back");
+        state.narrow_scope();
+    }
+    // And a full turn in either direction lands where it started.
+    let start = state.scope;
+    for _ in 0..5 {
+        state.narrow_scope();
+    }
+    assert_eq!(state.scope, start, "Right does not wrap");
+    for _ in 0..5 {
+        state.widen_scope();
+    }
+    assert_eq!(state.scope, start, "Left does not wrap");
+}
+
+/// Each scope filters on what the store recorded, not on anything re-derived here.
+#[test]
+fn every_scope_filters_on_a_stored_fact() {
+    let mut mine = command("mine", 100);
+    mine.session = crate::track::session::id();
+    mine.host = crate::track::session::host();
+    mine.dir = "/work/app".to_string();
+    mine.root = Some("/work/app".to_string());
+
+    let mut theirs = command("theirs", 90);
+    theirs.session = "some-other-shell".to_string();
+    theirs.host = "another-machine".to_string();
+    theirs.dir = "/elsewhere".to_string();
+    theirs.root = None;
+
+    let commands = [mine, theirs];
+    let mut state = State::new(&commands, "/work/app", Fuzzy::Smart, "");
+    // The shell's own worktree, which `State::new` would otherwise ask git for — and these paths
+    // are not real directories.
+    state.worktree = Some("/work/app".to_string());
+
+    let lines = |state: &State| -> Vec<String> {
+        state
+            .matches
+            .iter()
+            .map(|row| row.command.line.clone())
+            .collect()
+    };
+
+    assert_eq!(lines(&state), ["mine", "theirs"], "global shows both");
+    state.narrow_scope(); // host
+    assert_eq!(
+        lines(&state),
+        ["mine"],
+        "another machine's row is filtered out"
+    );
+    state.narrow_scope(); // session
+    assert_eq!(
+        lines(&state),
+        ["mine"],
+        "another shell's row is filtered out"
+    );
+    state.narrow_scope(); // directory
+    assert_eq!(lines(&state), ["mine"]);
+    state.narrow_scope(); // workspace
+    assert_eq!(lines(&state), ["mine"], "same worktree only");
+}
+
+/// A row written before sessions and hosts were recorded has neither. It still belongs to *this*
+/// machine — there was only ever one — so `host` keeps showing it rather than hiding a history
+/// somebody built up before the field existed.
+#[test]
+fn rows_from_before_the_fields_existed_still_show() {
+    let mut old = command("from an older oslo", 100);
+    old.session = String::new();
+    old.host = String::new();
+    let commands = [old];
+    let mut state = State::new(&commands, "/here", Fuzzy::Smart, "");
+    state.narrow_scope(); // host
+    assert_eq!(state.matches.len(), 1, "an old row vanished from host");
+    state.narrow_scope(); // session
+    assert!(
+        state.matches.is_empty(),
+        "but it cannot claim to be from this session"
+    );
 }
 
 /// A query that matches nothing leaves an empty list, and moving in it must not panic.

@@ -359,10 +359,7 @@ fn search_bar(
     cols: usize,
     depth: Depth,
 ) -> String {
-    let scope = match f.scope {
-        Scope::Global => "[global]",
-        Scope::Local => "[local]",
-    };
+    let scope = f.scope.label();
     let count = format!("{}/{}", f.matches.len(), f.total);
     // The bar reads `⬝⬝⬝⬝⬝⬝⬝⬝  ❯❯  query`: the scanner says the finder is live, and the chevrons
     // still mark where the typing starts. See [`crate::interactive::scanner`] — the sweep is a

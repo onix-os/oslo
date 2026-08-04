@@ -18,6 +18,9 @@ fn ranked(line: &str, runs: i64, last_at: i64, dir: &str, here: bool) -> Ranked 
             dir: dir.to_string(),
             places: 1,
             worked: true,
+            session: String::new(),
+            host: String::new(),
+            root: None,
         },
         score: 0,
         here,
@@ -138,7 +141,7 @@ fn the_scope_is_shown_at_the_end_of_the_search_bar() {
         selected: 0,
         offset: 0,
         query: "",
-        scope: Scope::Local,
+        scope: Scope::Directory,
         total: 1,
         cols: 80,
         rows: 10,
@@ -148,7 +151,7 @@ fn the_scope_is_shown_at_the_end_of_the_search_bar() {
         // Not asking anything: these cover the ordinary search bar.
         confirm: None,
     }));
-    assert!(local.lines().any(|line| line.contains("1/1 [local]")));
+    assert!(local.lines().any(|line| line.contains("1/1 [directory]")));
 }
 
 #[test]

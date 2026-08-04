@@ -15,8 +15,10 @@
 //! that column on the thing worth knowing about a past command: **when you last ran it**, beside
 //! how often and where.
 //!
-//! The finder opens over global history. Tab switches to commands from the current directory only
-//! and back again; the scope shown at the end of the search bar makes that filter explicit.
+//! The finder opens over global history. **Left and Right narrow and widen the scope** — global,
+//! host, session, directory, workspace — and the one in force is shown at the end of the search
+//! bar. They are the arrows because the scopes are a line from widest to narrowest, and because
+//! there is no cursor to move in a search box that only ever appends.
 //!
 //! # Why it takes the whole screen
 //!
@@ -36,12 +38,61 @@ pub mod render;
 mod run;
 
 /// Which part of history the finder is searching.
+///
+/// The order is widest to narrowest, so Right feels like closing in on what you want and Left like
+/// opening back out — rather than jumping between unrelated views.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Scope {
-    /// Commands from every recorded directory.
+    /// Everything the store knows.
     Global,
-    /// Commands recorded in the shell's current directory only.
-    Local,
+    /// This machine only.
+    ///
+    /// **Identical to [`Scope::Global`] today**, and deliberately still its own scope: the store
+    /// is local, so every row in it was run here. It becomes a real filter the moment history is
+    /// shared between machines, and having the name already means that change is a filter rather
+    /// than a new concept for anyone to learn.
+    Host,
+    /// Only what this shell has run since it started.
+    Session,
+    /// Only what has been run in the current directory.
+    Directory,
+    /// Anywhere inside the current git worktree.
+    Workspace,
+}
+
+impl Scope {
+    /// One scope narrower, wrapping — Right.
+    pub fn next(self) -> Scope {
+        match self {
+            Scope::Global => Scope::Host,
+            Scope::Host => Scope::Session,
+            Scope::Session => Scope::Directory,
+            Scope::Directory => Scope::Workspace,
+            Scope::Workspace => Scope::Global,
+        }
+    }
+
+    /// One scope wider, wrapping — Left.
+    pub fn previous(self) -> Scope {
+        match self {
+            Scope::Global => Scope::Workspace,
+            Scope::Host => Scope::Global,
+            Scope::Session => Scope::Host,
+            Scope::Directory => Scope::Session,
+            Scope::Workspace => Scope::Directory,
+        }
+    }
+
+    /// What the search bar shows.
+    pub fn label(self) -> &'static str {
+        match self {
+            Scope::Global => "[global]",
+            Scope::Host => "[host]",
+            Scope::Session => "[session]",
+            Scope::Directory => "[directory]",
+            Scope::Workspace => "[workspace]",
+        }
+    }
 }
 
 pub use run::{Outcome, open};

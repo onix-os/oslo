@@ -32,6 +32,7 @@
 
 pub mod db;
 pub mod history;
+pub mod session;
 // The one module that knows which key-value engine is underneath. Read its note before touching
 // it: nothing else may `use jammdb`, so that moving engines again is a day of rewriting one
 // directory. Named `kv` rather than `store` because `store()` below is already the accessor for

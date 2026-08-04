@@ -134,7 +134,11 @@ pub fn open(
             Key::Down => state.down(),
             Key::PageUp => state.page_up(),
             Key::PageDown => state.page_down(),
-            Key::ToggleScope => state.toggle_scope(),
+            // **The arrows move the scope.** There is nothing to move a cursor over — the search
+            // box only ever appends — so the keys are free, and the scopes are a line from widest
+            // to narrowest, which is what an arrow means.
+            Key::Right => state.narrow_scope(),
+            Key::Left => state.widen_scope(),
             Key::Backspace => {
                 state.query.pop();
                 state.refilter();
@@ -168,11 +172,12 @@ pub fn open(
             }
             // Keys the shared reader knows but the finder has no use for: a full-screen list
             // has no cursor to move within a line.
-            Key::Ctrl(_)
+            // Tab is deliberately unbound now. It used to switch the scope, and leaving it doing
+            // that as well would keep two spellings of one action alive for no reason.
+            Key::ToggleScope
+            | Key::Ctrl(_)
             | Key::Alt(_)
             | Key::Ignored
-            | Key::Left
-            | Key::Right
             | Key::Home
             | Key::End
             | Key::BackTab => {}
@@ -198,6 +203,11 @@ struct State {
     window: usize,
     /// `Some(true)` while Delete is waiting on an answer, with *yes* selected.
     confirm: Option<bool>,
+    /// The git worktree the shell is standing in, resolved once when the finder opens.
+    worktree: Option<String>,
+    /// This shell's session id and this machine's name, to compare rows against.
+    session: String,
+    host: String,
 }
 
 impl State {
@@ -222,14 +232,17 @@ impl State {
             offset: 0,
             window: 1,
             confirm: None,
+            worktree: crate::interactive::prompt::git_root_of(std::path::Path::new(cwd))
+                .map(|root| root.to_string_lossy().into_owned()),
+            session: crate::track::session::id(),
+            host: crate::track::session::host(),
         }
     }
 
     fn refilter(&mut self) {
-        self.matches = rank(&self.commands, &self.query, &self.cwd, self.fuzzy);
-        if self.scope == Scope::Local {
-            self.matches.retain(|row| row.command.dir == self.cwd);
-        }
+        let mut found = rank(&self.commands, &self.query, &self.cwd, self.fuzzy);
+        found.retain(|row| self.in_scope(&row.command));
+        self.matches = found;
         // Back to the top: the old selection referred to a list that no longer exists, and
         // keeping the index would land the cursor on an unrelated command.
         self.selected = 0;
@@ -256,21 +269,49 @@ impl State {
         self.selected = was.min(self.matches.len().saturating_sub(1));
     }
 
-    fn toggle_scope(&mut self) {
-        self.scope = match self.scope {
-            Scope::Global => Scope::Local,
-            Scope::Local => Scope::Global,
-        };
+    /// Whether `command` belongs to the scope being shown.
+    ///
+    /// Every answer comes from what the store recorded at the time the command ran. None of it is
+    /// re-derived here: which shell ran a line, and which machine, are facts about that moment and
+    /// cannot be recovered from the line afterwards.
+    fn in_scope(&self, command: &Command) -> bool {
+        match self.scope {
+            Scope::Global => true,
+            // Every row in a local store was run here, so this shows everything today. It filters
+            // for real the moment a store is shared between machines, and rows written now already
+            // carry the name.
+            Scope::Host => command.host.is_empty() || command.host == self.host,
+            Scope::Session => command.session == self.session,
+            Scope::Directory => command.dir == self.cwd,
+            // The worktree the *command* ran in, against the one the shell is standing in. Both
+            // were resolved by the store when the directory was first seen.
+            Scope::Workspace => match (&command.root, &self.worktree) {
+                (Some(ran_in), Some(here)) => ran_in == here,
+                // Not in a repository at all, so nothing is in this one.
+                _ => false,
+            },
+        }
+    }
+
+    fn narrow_scope(&mut self) {
+        self.scope = self.scope.next();
+        self.refilter();
+    }
+
+    fn widen_scope(&mut self) {
+        self.scope = self.scope.previous();
         self.refilter();
     }
 
     fn total(&self) -> usize {
         match self.scope {
             Scope::Global => self.commands.len(),
-            Scope::Local => self
+            // Counted over what this scope *could* show, not over the store: `3/5` is only
+            // meaningful if the denominator is the pool the query narrowed.
+            _ => self
                 .commands
                 .iter()
-                .filter(|command| command.dir == self.cwd)
+                .filter(|command| self.in_scope(command))
                 .count(),
         }
     }

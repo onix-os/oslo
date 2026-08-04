@@ -52,6 +52,16 @@ pub struct Command {
     /// Whether the most recent run succeeded. A command that has only ever failed is still worth
     /// listing — you may be going back to fix it — but it should not be ranked as a habit.
     pub worked: bool,
+    /// The shell session of the most recent run, for the `session` scope.
+    pub session: String,
+    /// The machine of the most recent run, for the `host` scope.
+    pub host: String,
+    /// The git worktree the most recent run happened in, or `None` outside a repository.
+    ///
+    /// Taken from the directory's own row rather than by asking git at filter time: the store
+    /// already resolved it when the directory was first visited, and re-walking five thousand
+    /// directories per keystroke is not a filter anybody would wait for.
+    pub root: Option<String>,
 }
 
 impl Track {
@@ -95,7 +105,7 @@ impl Track {
         let mut folded: HashMap<(String, String), Command> = HashMap::new();
         // Directory ids resolve to paths, and the same id recurs across most rows — a monorepo's
         // runs are nearly all one directory — so the lookup is cached rather than repeated.
-        let mut paths: HashMap<u64, String> = HashMap::new();
+        let mut paths: HashMap<u64, (String, Option<String>)> = HashMap::new();
 
         self.store.read(|reader| {
             reader.scan(Tree::Run, &Span::all(), |key, value| {
@@ -121,9 +131,9 @@ impl Track {
                     return Walk::On;
                 }
 
-                let path = paths.entry(dir_id).or_insert_with(|| {
+                let (path, root) = paths.entry(dir_id).or_insert_with(|| {
                     read_dir(reader, dir_id)
-                        .map(|dir| dir.path)
+                        .map(|dir| (dir.path, dir.root))
                         .unwrap_or_default()
                 });
 
@@ -137,6 +147,9 @@ impl Track {
                         if row.last_at > command.last_at {
                             command.last_at = row.last_at;
                             command.dir = path.clone();
+                            command.root = root.clone();
+                            command.session = row.session.clone();
+                            command.host = row.host.clone();
                             command.worked = row.worked();
                         }
                     })
@@ -146,6 +159,9 @@ impl Track {
                         runs: row.runs,
                         last_at: row.last_at,
                         dir: path.clone(),
+                        root: root.clone(),
+                        session: row.session.clone(),
+                        host: row.host.clone(),
                         places: 1,
                         worked: row.worked(),
                     });

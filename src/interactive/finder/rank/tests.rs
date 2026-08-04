@@ -11,6 +11,9 @@ fn command(line: &str, runs: i64, last_at: i64, dir: &str) -> Command {
         dir: dir.to_string(),
         places: 1,
         worked: true,
+        session: String::new(),
+        host: String::new(),
+        root: None,
     }
 }
 
