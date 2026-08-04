@@ -2,8 +2,18 @@
 //! terminal to ask on.
 //!
 //! The widgets themselves are tested in `interactive::ask`. What is testable here is the contract
-//! a script is written against — the statuses — because under `cargo test` stdin is never a
-//! terminal, which is exactly the headless path scripts hit in CI.
+//! a script is written against — the statuses — because under `cargo test` there is no terminal,
+//! which is exactly the headless path scripts hit in CI.
+//!
+//! **Nothing here may run a widget that falls back to stdin.** `ui choose` with no operands reads
+//! stdin for its items, and "not a terminal" is not the same as "at end of input": a test harness
+//! hands the process a *pipe*, which blocks until somebody closes the far end, and nobody does.
+//! That is a hang of the whole suite — no failure, no output, just a run that never finishes —
+//! and it depends on how the runner was launched, so it reproduces on one machine and not the
+//! next. It cost two full verify runs before it was pinned down.
+//!
+//! The status mapping those calls were reaching for is asserted directly on [`report`] instead,
+//! and the widget behaviour behind it in `interactive::ask::choose`.
 
 use super::*;
 
@@ -39,11 +49,21 @@ fn confirm_answers_through_its_status() {
     assert_eq!(run(&["confirm", "--default", "sure?"]), 0);
 }
 
-/// An empty list is not a question. Status 1 keeps `x=$(… | ui choose) || exit` correct when the
-/// pipeline produced no lines.
+/// An empty list is not a question, and a cancel is status 1 — which is what keeps
+/// `x=$(… | ui choose) || exit` correct when the pipeline produced no lines.
+///
+/// Asserted on `report` rather than by running `ui choose` with no operands: that would read
+/// stdin, and see the module comment for why doing so here hangs the suite. That an empty list
+/// cancels at all is `interactive::ask::choose`'s `an_empty_list_cancels`.
 #[test]
-fn choosing_from_nothing_is_a_cancel() {
-    assert_eq!(run(&["choose"]), 1);
+fn a_cancelled_answer_is_status_one() {
+    assert_eq!(report(Answer::Cancelled), 1);
+    assert_eq!(report(Answer::NoTerminal), 2, "and nobody to ask is 2");
+    assert_eq!(
+        report(Answer::Given(vec!["picked".to_string()])),
+        0,
+        "an answer is a success"
+    );
 }
 
 /// With items but no terminal, `choose` refuses rather than picking one on the script's behalf.
