@@ -44,6 +44,9 @@ pub fn read_lua_theme(value: &Value) -> (Theme, Vec<String>) {
     if let Value::Table(prompt) = table.get(&Value::str("prompt")) {
         read_prompt(&prompt.borrow(), &mut theme.prompt, &mut problems);
     }
+    if let Value::Table(ui) = table.get(&Value::str("ui")) {
+        read_ui(&ui.borrow(), &mut theme.ui, &mut problems);
+    }
 
     (theme, problems)
 }
@@ -219,6 +222,21 @@ fn read_prompt(table: &crate::lua::eval::Table, into: &mut Prompt, problems: &mu
     field(table, "git", p, &mut into.git, problems);
     field(table, "ok", p, &mut into.ok, problems);
     field(table, "failed", p, &mut into.failed, problems);
+}
+
+/// `oslo.theme.ui` — the input widgets' palette.
+fn read_ui(table: &crate::lua::eval::Table, ui: &mut super::Ui, problems: &mut Vec<String>) {
+    field(table, "accent", "oslo.theme.ui", &mut ui.accent, problems);
+    field(
+        table,
+        "question",
+        "oslo.theme.ui",
+        &mut ui.question,
+        problems,
+    );
+    field(table, "muted", "oslo.theme.ui", &mut ui.muted, problems);
+    field(table, "error", "oslo.theme.ui", &mut ui.error, problems);
+    field(table, "done", "oslo.theme.ui", &mut ui.done, problems);
 }
 
 #[cfg(test)]

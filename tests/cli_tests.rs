@@ -203,3 +203,60 @@ fn recorded_set_options_do_not_prevent_a_script_from_running() {
     assert_eq!(status_of(&out), 0, "stderr: {}", stderr_of(&out));
     assert_eq!(stdout_of(&out), "ran\n");
 }
+
+/// `--login` beside `-l`.
+///
+/// The long form is what a display manager, a terminal emulator's "run as login shell" setting and
+/// `su --login` reach for — so a shell that took only `-l` failed to start under exactly the things
+/// that start a login shell. Found while making oslo usable with `chsh`.
+#[test]
+fn the_login_flag_has_both_spellings() {
+    for flag in ["-l", "--login"] {
+        let out = oslo(&[flag, "-c", "echo started"]);
+        assert_eq!(status_of(&out), 0, "{flag}: {}", stderr_of(&out));
+        assert_eq!(stdout_of(&out).trim(), "started", "{flag}");
+    }
+}
+
+/// A file with no `#!` line is run by the shell itself.
+///
+/// `execve` answers `ENOEXEC` for it, which means "not a binary" rather than "cannot run" — POSIX
+/// says to fall back to interpreting the file, and bash, dash and zsh all do. Without it
+/// `./script.sh` on a shebang-less script is a dead end: the file is executable, the shell can read
+/// it, and the only thing missing is two bytes nobody has needed to write since the seventies.
+///
+/// `$0` and the positional parameters have to survive the fallback, or a script that inspects its
+/// own name sees the shell's instead.
+#[test]
+fn a_script_without_a_shebang_is_run_by_the_shell() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let script = dir.path().join("noshebang.sh");
+    std::fs::write(&script, "echo ran\necho \"zero=$0\"\necho \"args=$*\"\n").expect("write");
+    let mut perms = std::fs::metadata(&script).expect("stat").permissions();
+    std::os::unix::fs::PermissionsExt::set_mode(&mut perms, 0o755);
+    std::fs::set_permissions(&script, perms).expect("chmod");
+
+    let path = script.display().to_string();
+    let out = oslo(&["-c", &format!("{path} alpha beta")]);
+    assert_eq!(status_of(&out), 0, "stderr: {}", stderr_of(&out));
+    let text = stdout_of(&out);
+    assert!(text.contains("ran"), "{text:?}");
+    assert!(text.contains(&format!("zero={path}")), "{text:?}");
+    assert!(text.contains("args=alpha beta"), "{text:?}");
+}
+
+/// A file that is not executable is still refused — the fallback is about the *format*, not about
+/// permission, and running something the user did not mark runnable would be worse than failing.
+#[test]
+fn an_unexecutable_file_is_still_refused() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let script = dir.path().join("notexec.sh");
+    std::fs::write(&script, "echo should-not-run\n").expect("write");
+    let out = oslo(&["-c", &script.display().to_string()]);
+    assert_ne!(status_of(&out), 0);
+    assert!(
+        !stdout_of(&out).contains("should-not-run"),
+        "it ran anyway: {:?}",
+        stdout_of(&out)
+    );
+}
