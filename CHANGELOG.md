@@ -1,5 +1,41 @@
 # Changelog
 
+## [0.2.6] - 2026-08-04
+
+### <!-- 0 -->⛰️  Features
+
+- Warning box goes last, sized to the help
+- Warn about install problems in --help
+- Drop --lua, --sh, --no-vi; hide --posix
+- Sh implies posix, drop --profile
+- Oslo <tool> when no script of that name exists
+- Tools by argv0, coloured help, --details
+- Drop --vi, vi is the default
+- Strict profile names, quicker scanner
+- OSLO_PROFILE names a profile too
+- Profile in the bar, tab switches it
+- Name both stores after a profile, add --profile
+- Five scopes on the arrow keys, tracked in the store
+
+### <!-- 1 -->🐛 Bug Fixes
+
+- Right accepts only outside vi normal mode
+- Right accepts the ghost suggestion
+
+### <!-- 2 -->🚜 Refactor
+
+- Toggle key is config, not an env var
+- Drop the argv0 symlink dispatch
+- One store, not two
+- Drop the legacy store adoption
+
+### <!-- 3 -->📚 Documentation
+
+- Add an ENVIRONMENT section to --help
+- Drop -- from the option list
+- Posix mode changes four things, not two
+- Two known gaps are no longer gaps
+
 ## [0.2.5] - 2026-08-04
 
 ### <!-- 0 -->⛰️  Features
