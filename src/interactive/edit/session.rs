@@ -190,26 +190,8 @@ impl Session {
                 }
                 None => changed(false),
             },
-            // The ghost suggestion is *what would be drawn now*, asked for again rather than
-            // remembered from the last frame — a remembered one can be stale by exactly the
-            // keystroke that accepted it.
-            Bound::AcceptHint | Bound::AcceptHintWord => {
-                let line = self.buffer.text();
-                let Some(hint) = assist.hint_text(&line, self.buffer.cursor()) else {
-                    return changed(false);
-                };
-                let take = if bound == Bound::AcceptHintWord {
-                    first_word(&hint)
-                } else {
-                    hint
-                };
-                if take.is_empty() {
-                    return changed(false);
-                }
-                self.buffer.move_end();
-                self.buffer.insert_str(&take);
-                changed(true)
-            }
+            Bound::AcceptHint => changed(self.take_hint(true, assist)),
+            Bound::AcceptHintWord => changed(self.take_hint(false, assist)),
             Bound::Lua(name) => {
                 match assist.lua_key(&name, &self.buffer.text(), self.buffer.cursor()) {
                     Some((line, cursor)) => {
@@ -220,6 +202,27 @@ impl Session {
                 }
             }
         }
+    }
+
+    /// Take the ghost suggestion into the line — all of it, or one word.
+    ///
+    /// The suggestion is *what would be drawn now*, asked for again rather than remembered from
+    /// the last frame — a remembered one can be stale by exactly the keystroke that accepted it.
+    ///
+    /// `false` when there was nothing to take, so a key that also means something else can fall
+    /// through to that meaning.
+    fn take_hint(&mut self, whole: bool, assist: &mut dyn Assist) -> bool {
+        let line = self.buffer.text();
+        let Some(hint) = assist.hint_text(&line, self.buffer.cursor()) else {
+            return false;
+        };
+        let take = if whole { hint } else { first_word(&hint) };
+        if take.is_empty() {
+            return false;
+        }
+        self.buffer.move_end();
+        self.buffer.insert_str(&take);
+        true
     }
 
     /// Apply one key.
@@ -234,6 +237,18 @@ impl Session {
         // an explicit binding has to beat a heuristic about what someone probably meant.
         if let Some(bound) = assist.binding(key) {
             return self.perform(bound, assist);
+        }
+
+        // **Right at the end of the line takes the ghost suggestion**, and moves the cursor
+        // everywhere else. One key doing both jobs is fish's `forward-char`, and it is the key
+        // people reach for — Tab opens the dropdown when there is a choice to make, Right says
+        // "yes, that one". `hint_text` answers `None` unless the cursor is already at the end, so
+        // Right mid-line is unaffected and needs no check here.
+        //
+        // Above vi rather than in the keymap: vi answers `Right` itself in normal mode, so a
+        // keymap-only version would work while inserting and quietly stop working after Esc.
+        if key == Key::Right && self.take_hint(true, assist) {
+            return changed(true);
         }
 
         // Vi gets next refusal. `Passthrough` means the key is not vi's business — insert mode,

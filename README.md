@@ -93,7 +93,8 @@ Or just use `$PS1`, with the full escape set — `\u \h \w \$ \t \A \d \j \! \[ 
 ## Interactive
 
 - **Ghost suggestions** from history, per language, never crossing between them, and answering for
-  the directory you are standing in
+  the directory you are standing in. Right takes the one on screen, Tab opens the dropdown when
+  there is a choice to make
 - **A completion dropdown** with columns, per-kind info and frecency ranking
 - **Matching that is a transform, not a prefix test** — in the dropdown, `/u/s/b` reaches
   `/usr/share/bin`, `f-b` reaches `foo-bar` and `gco` reaches `git checkout`, each looser pass
@@ -333,7 +334,7 @@ refuse them.)
 
 ```lua
 oslo.completion.max_rows = 12
-oslo.suggest.accept = "ctrl-f"
+oslo.suggest.accept = "ctrl-f" -- as well as Right, which always accepts
 oslo.vi.enabled = true
 oslo.on.cd(function(dir) print("now in " .. dir) end)
 oslo.on["command-not-found"](function(name) print(name .. " is not installed") end)
