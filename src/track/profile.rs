@@ -25,12 +25,11 @@ static CHOSEN: RwLock<Option<String>> = RwLock::new(None);
 
 /// Use `name` for the rest of this process. Called once, from the invocation.
 pub fn choose(name: &str) {
-    let cleaned = sanitise(name);
-    if cleaned.is_empty() {
+    if !valid(name) {
         return;
     }
     if let Ok(mut slot) = CHOSEN.write() {
-        *slot = Some(cleaned);
+        *slot = Some(name.to_string());
     }
 }
 
@@ -52,13 +51,24 @@ pub fn current() -> String {
     {
         return name.clone();
     }
-    if let Ok(name) = std::env::var(ENV) {
-        let cleaned = sanitise(&name);
-        if !cleaned.is_empty() {
-            return cleaned;
+    match std::env::var(ENV) {
+        Ok(name) if valid(&name) => name,
+        // Named but unusable. Said once rather than per call, and then the default is used: a
+        // shell that refused to start over a stray variable would be worse than one that tells you
+        // and carries on.
+        Ok(name) if !name.trim().is_empty() => {
+            static COMPLAINED: std::sync::Once = std::sync::Once::new();
+            COMPLAINED.call_once(|| {
+                eprintln!(
+                    "oslo: {ENV}: {name:?} is not a profile name; \
+                     using {}. A name is a letter, then letters, digits, _ or -",
+                    default_name()
+                );
+            });
+            default_name()
         }
+        _ => default_name(),
     }
-    default_name()
 }
 
 /// What a shell uses when nothing asked for anything else.
@@ -70,28 +80,26 @@ fn default_name() -> String {
     "default".to_string()
 }
 
-/// A profile name reduced to something safe to put in a path.
+/// Whether `name` is a profile name.
 ///
-/// A name reaches this from `--profile`, which can hold anything. A `/` would write the store
-/// somewhere else entirely and `..` would climb out of the data directory, so the set is restricted
-/// rather than escaped: everything outside it becomes `-`, which cannot traverse.
-fn sanitise(name: &str) -> String {
-    let kept: String = name
-        .trim()
-        .chars()
-        .map(|c| {
-            if c.is_ascii_alphanumeric() || c == '_' || c == '-' || c == '.' {
-                c
-            } else {
-                '-'
-            }
-        })
-        .collect();
-    // A name of only dots is `.` or `..`, which name directories rather than files.
-    if kept.chars().all(|c| c == '.') {
-        return String::new();
-    }
-    kept
+/// **A letter, then letters, digits, `_` or `-`.** Nothing else, and nothing that starts with a
+/// digit or a punctuation mark.
+///
+/// Restrictive on purpose. The name becomes a file name, so anything looser has to be *escaped*
+/// rather than checked — and an escape is a thing that can be got wrong, whereas a name that
+/// cannot contain a separator cannot name a file outside the directory however it is handled. It
+/// also keeps a profile something a person can say out loud and type again.
+pub fn valid(name: &str) -> bool {
+    let mut chars = name.chars();
+    let Some(first) = chars.next() else {
+        return false;
+    };
+    // A leading digit would let a profile look like a number, and a leading `-` would look like a
+    // flag everywhere the name is passed on.
+    first.is_ascii_alphabetic()
+        && chars.all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+        // Long enough for anything anybody means, short enough to stay a file name everywhere.
+        && name.len() <= 64
 }
 
 /// `<data>/oslo/<profile>.<extension>`.
@@ -168,28 +176,44 @@ mod tests {
     /// The profile is process-wide state, so the tests that set it cannot run beside each other.
     static SERIAL: std::sync::Mutex<()> = std::sync::Mutex::new(());
 
-    /// A name that could climb out of the data directory cannot.
+    /// A profile name is a letter, then letters, digits, `_` or `-`. Everything else is refused
+    /// rather than cleaned: the name *is* the file, so turning a typo into a different valid name
+    /// would write somewhere nobody asked for.
     #[test]
     fn a_name_cannot_escape_the_directory() {
-        // Dots survive — `v1.2` is a reasonable profile name — but the separator does not, so
-        // there is nothing left to traverse with.
-        assert_eq!(sanitise("../../etc/passwd"), "..-..-etc-passwd");
-        assert_eq!(sanitise("a/b"), "a-b");
-        assert_eq!(sanitise(".."), "", "a name of only dots is not a name");
-        assert_eq!(sanitise("."), "");
-        for hostile in ["../../etc/passwd", "a/b", "~/x", "a\\b"] {
-            let cleaned = sanitise(hostile);
-            assert!(!cleaned.contains('/'), "{cleaned}");
-            assert!(!cleaned.contains('\\'), "{cleaned}");
+        for hostile in [
+            "../../etc/passwd",
+            "a/b",
+            "..",
+            ".",
+            "~/x",
+            "a\\b",
+            "with space",
+            "dot.name",
+            "9lives",
+            "-dash",
+            "_under",
+            "",
+            "   ",
+            "emoji-🎉",
+        ] {
+            assert!(!valid(hostile), "{hostile:?} must not be a profile name");
         }
     }
 
-    /// The ordinary names survive untouched — this must not mangle what people actually type.
+    /// The ordinary names are accepted — this must not refuse what people actually type.
     #[test]
-    fn ordinary_names_are_left_alone() {
-        for name in ["bresilla", "claude", "agent-1", "test_run", "v1.2"] {
-            assert_eq!(sanitise(name), name);
+    fn ordinary_names_are_accepted() {
+        for name in ["bresilla", "claude", "agent-1", "test_run", "v2", "a"] {
+            assert!(valid(name), "{name:?} should be a profile name");
         }
+    }
+
+    /// A name too long to be a comfortable file name is refused rather than truncated.
+    #[test]
+    fn an_absurd_name_is_refused() {
+        assert!(valid(&"a".repeat(64)));
+        assert!(!valid(&"a".repeat(65)));
     }
 
     /// Nothing chosen means `default`, which is what an ordinary shell writes to.
@@ -210,9 +234,9 @@ mod tests {
         unsafe { std::env::set_var(ENV, "from-the-env") };
         assert_eq!(current(), "from-the-env");
 
-        // A hostile value is cleaned here too, not only on the flag.
+        // A hostile value is refused here too, not only on the flag — and the default is used.
         unsafe { std::env::set_var(ENV, "../escape") };
-        assert_eq!(current(), "..-escape");
+        assert_eq!(current(), "default");
 
         // Empty means unset: fall through rather than writing to a file called nothing.
         unsafe { std::env::set_var(ENV, "   ") };

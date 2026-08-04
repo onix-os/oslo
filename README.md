@@ -308,6 +308,9 @@ oslo --profile=claude -c 'make'    # claude.kv instead — the default untouched
 OSLO_PROFILE=claude oslo           # the same, for a whole session
 ```
 
+A name is a **letter, then letters, digits, `_` or `-`** — anything else is refused rather than
+cleaned up, because the name is the file and a typo must not quietly write somewhere else.
+
 `--profile` wins over `$OSLO_PROFILE`, which wins over `default`. The variable is how you put a
 session on a profile — export it once and every `oslo` a tool spawns inherits it — and the flag is
 how you override that for one invocation.
