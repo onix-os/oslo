@@ -40,7 +40,8 @@ pub struct Invocation {
     pub login: bool,
     /// `--profile=NAME`: which history and tracking stores to use.
     ///
-    /// `None` is the `default` profile. A name here gives a shell its own history and its own
+    /// `None` leaves it to `$OSLO_PROFILE`, and then to `default`. A name here gives a shell its
+    /// own history and its own
     /// frecency ranking, which is what separates an agent's thousands of commands from the ones a
     /// person typed: `oslo --profile=claude -c '…'` records into `claude.db` and `claude.kv` and
     /// leaves the default pair untouched.
@@ -123,7 +124,7 @@ pub fn usage() -> String {
     );
     let _ = writeln!(
         s,
-        "  --profile=NAME    use NAME's history and tracking stores instead of the default"
+        "  --profile=NAME    use NAME's history store instead of the default ($OSLO_PROFILE)"
     );
     let _ = writeln!(s, "  --version         print the version, then exit");
     let _ = writeln!(s, "  --help            print this message, then exit");

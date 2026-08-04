@@ -305,7 +305,12 @@ count.
 ```sh
 oslo                               # ~/.local/share/oslo/default.kv
 oslo --profile=claude -c 'make'    # claude.kv instead — the default untouched
+OSLO_PROFILE=claude oslo           # the same, for a whole session
 ```
+
+`--profile` wins over `$OSLO_PROFILE`, which wins over `default`. The variable is how you put a
+session on a profile — export it once and every `oslo` a tool spawns inherits it — and the flag is
+how you override that for one invocation.
 
 The store is named after a **profile**, `default` unless you say otherwise. Agents shell out constantly,
 and every line they run otherwise lands in the history you are trying to search and in the frecency

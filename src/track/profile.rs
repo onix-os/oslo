@@ -13,6 +13,9 @@
 //!
 //! It is a *profile*, not a lock. Nothing stops two shells sharing one, which is what makes
 //! `oslo --profile=claude` twice in a row accumulate rather than start over.
+//!
+//! Either `--profile=NAME` or `$OSLO_PROFILE` names it — the flag for one invocation, the variable
+//! for a whole session, and the flag wins when both are given.
 
 use std::path::PathBuf;
 use std::sync::RwLock;
@@ -31,12 +34,29 @@ pub fn choose(name: &str) {
     }
 }
 
-/// The profile in force: what `--profile` asked for, or `default`.
+/// The environment variable that names a profile without a flag.
+pub const ENV: &str = "OSLO_PROFILE";
+
+/// The profile in force.
+///
+/// `--profile` wins, then `$OSLO_PROFILE`, then `default`. That order is the usual one and it is
+/// the useful one here: the variable is how you put a whole *session* on a profile — export it
+/// once and every `oslo` a tool spawns inherits it — and the flag is how you override that for one
+/// invocation without disturbing the session.
+///
+/// Read rather than cached, so exporting it mid-session takes effect on the next shell without
+/// anything having to be told.
 pub fn current() -> String {
     if let Ok(slot) = CHOSEN.read()
         && let Some(name) = slot.as_ref()
     {
         return name.clone();
+    }
+    if let Ok(name) = std::env::var(ENV) {
+        let cleaned = sanitise(&name);
+        if !cleaned.is_empty() {
+            return cleaned;
+        }
     }
     default_name()
 }
@@ -145,6 +165,9 @@ pub fn after(name: &str) -> Option<String> {
 mod tests {
     use super::*;
 
+    /// The profile is process-wide state, so the tests that set it cannot run beside each other.
+    static SERIAL: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
     /// A name that could climb out of the data directory cannot.
     #[test]
     fn a_name_cannot_escape_the_directory() {
@@ -175,9 +198,38 @@ mod tests {
         assert_eq!(default_name(), "default");
     }
 
+    /// `$OSLO_PROFILE` names a profile for a whole session; `--profile` overrides it for one
+    /// invocation. Both are cleaned the same way, so neither can escape the directory.
+    #[test]
+    fn the_environment_names_a_profile_and_the_flag_beats_it() {
+        // SAFETY: as elsewhere in this crate's tests — see `env::scope::environ`. The lock below
+        // is what keeps this from racing the other tests that read the profile.
+        let _guard = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
+        *CHOSEN.write().expect("chosen") = None;
+
+        unsafe { std::env::set_var(ENV, "from-the-env") };
+        assert_eq!(current(), "from-the-env");
+
+        // A hostile value is cleaned here too, not only on the flag.
+        unsafe { std::env::set_var(ENV, "../escape") };
+        assert_eq!(current(), "..-escape");
+
+        // Empty means unset: fall through rather than writing to a file called nothing.
+        unsafe { std::env::set_var(ENV, "   ") };
+        assert_eq!(current(), "default");
+
+        unsafe { std::env::set_var(ENV, "from-the-env") };
+        choose("from-the-flag");
+        assert_eq!(current(), "from-the-flag", "the flag wins");
+
+        *CHOSEN.write().expect("chosen") = None;
+        unsafe { std::env::remove_var(ENV) };
+    }
+
     /// The path is the profile with the store's extension, under the data directory.
     #[test]
     fn the_path_is_the_profile_and_the_extension() {
+        let _guard = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
         choose("claude");
         assert_eq!(
             store_path(Some("/x/data"), None, "db"),
