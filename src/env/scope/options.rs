@@ -108,9 +108,16 @@ impl Environment {
     /// both land here now, so the two can no longer disagree — and a forked subshell inherits the
     /// mode with the rest of its environment rather than out of a static.
     ///
-    /// Two things read it: command search puts a special builtin ahead of a function
-    /// (POSIX 2.9.1.1), and a utility error ends the shell (POSIX 2.8.1) — see
-    /// `crate::exec::simple::posix`.
+    /// Four things read it:
+    ///
+    /// - command search puts a special builtin ahead of a function (POSIX 2.9.1.1)
+    /// - an error in a special builtin ends a non-interactive shell (POSIX 2.8.1)
+    ///   — both in `crate::exec::simple::posix`
+    /// - `$?` beside a command substitution in the same word keeps the *previous command's*
+    ///   status rather than the substitution's, which is what bash 5.3 changed to
+    ///   (`crate::expand::word`)
+    /// - `trap` lists conditions as `INT` rather than `SIGINT`
+    ///   (`crate::env::builtins::process::trap`)
     pub fn posix(&self) -> bool {
         self.option(ShellOption::Posix)
     }
