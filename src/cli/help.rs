@@ -162,6 +162,7 @@ pub fn short(paint: Paint) -> String {
     }
 
     s.push_str(&tools_section(paint));
+    s.push_str(&environment_section(paint));
 
     let _ = write!(
         s,
@@ -218,6 +219,53 @@ fn tools_section(paint: Paint) -> String {
         "\n  {}",
         paint.dim("`oslo ./history` and `oslo -- history` read the name as a path instead.")
     );
+    s
+}
+
+/// The variables oslo reads, and the one it writes.
+///
+/// **oslo's own, plus the standard ones whose effect is not guessable.** `$PATH`, `$PS1`, `$IFS`,
+/// `$ENV` and the rest of POSIX's behave as POSIX says and are not listed — a shell that
+/// documented those in `--help` would be documenting the shell, not itself.
+///
+/// `$OSLO_PROFILE` is here rather than as a flag on purpose: a profile is a property of a session,
+/// so exporting it once covers every shell anything spawns afterwards.
+const ENVIRONMENT: &[(&str, &str)] = &[
+    (
+        "OSLO_PROFILE",
+        "which history and tracking store to use (default: default)",
+    ),
+    (
+        "OSLO_DEFAULT_MODE",
+        "`lua` to start prompts in Lua; anything else is shell",
+    ),
+    (
+        "OSLO_TOGGLE_KEY",
+        "the key that switches language; `none` turns it off",
+    ),
+    (
+        "OSLO_MODE",
+        "set *by* oslo to the current mode, for prompt functions",
+    ),
+    ("NO_COLOR", "any value turns off colour everywhere"),
+    ("XDG_CONFIG_HOME", "where config.lua lives (~/.config)"),
+    (
+        "XDG_DATA_HOME",
+        "where the store lives (~/.local/share/oslo)",
+    ),
+];
+
+fn environment_section(paint: Paint) -> String {
+    let mut s = String::new();
+    let _ = writeln!(
+        s,
+        "\n{}  {}",
+        paint.head("ENVIRONMENT"),
+        paint.dim("$PATH, $PS1, $IFS and the rest of POSIX's behave as POSIX says")
+    );
+    for (name, about) in ENVIRONMENT {
+        s.push_str(&row(name, paint.key(name), about));
+    }
     s
 }
 

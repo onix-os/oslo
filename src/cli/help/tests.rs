@@ -68,6 +68,33 @@ fn every_tool_appears_in_the_help() {
     }
 }
 
+/// **The documented variable name is the one the code reads.** `$OSLO_PROFILE` is the only one
+/// whose spelling is pinned in a constant; asserting against it catches the rename that updates
+/// the code and leaves the help describing a variable that no longer does anything.
+#[test]
+fn the_profile_variable_is_named_as_the_code_spells_it() {
+    let text = short(Paint::plain());
+    assert!(
+        text.contains(oslo::track::profile::ENV),
+        "the help must name {}: {text}",
+        oslo::track::profile::ENV
+    );
+}
+
+/// Every listed variable is `OSLO_`-prefixed or a convention oslo did not invent. A one-off name
+/// in here would be a setting nobody could guess and nothing else honours.
+#[test]
+fn the_environment_section_lists_only_real_conventions() {
+    const BORROWED: &[&str] = &["NO_COLOR", "XDG_CONFIG_HOME", "XDG_DATA_HOME"];
+    for (name, about) in ENVIRONMENT {
+        assert!(
+            name.starts_with("OSLO_") || BORROWED.contains(name),
+            "{name} is neither oslo's nor a standard"
+        );
+        assert!(!about.is_empty(), "{name}: needs a description");
+    }
+}
+
 /// The synopsis shows how a tool is run, beside the two shell forms.
 #[test]
 fn the_help_shows_how_to_run_a_tool() {
