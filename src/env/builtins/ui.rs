@@ -26,7 +26,9 @@
 use crate::env::Environment;
 use crate::error::Result;
 use crate::interactive::ask::{
-    Answer, Border, Choice, Confirm, Input, Styling, choose, confirm, filter, input, style,
+    Align, Answer, As, Border, Browse, Choice, Confirm, Entry, Input, Level, Pager, Spin, Styling,
+    Table, Want, Write, choose, confirm, file, filter, format, horizontal, input, line, pager,
+    parse_table, spin, style, table, vertical, write,
 };
 use crate::interactive::matching::Fuzzy;
 use crate::interactive::theme;
@@ -40,11 +42,19 @@ pub fn builtin_ui(env: &mut Environment, args: &[String]) -> Result<i32> {
     };
     let rest = &args[2..];
     Ok(match sub.as_str() {
-        "input" | "write" => run_input(rest),
+        "input" => run_input(rest),
+        "write" => run_write(rest),
         "confirm" => run_confirm(rest),
         "choose" => run_choose(rest, false),
         "filter" => run_choose(rest, true),
         "style" => run_style(rest),
+        "file" => run_file(rest),
+        "format" => run_format(rest),
+        "join" => run_join(rest),
+        "log" => run_log(rest),
+        "pager" => run_pager(rest),
+        "spin" => run_spin(rest),
+        "table" => run_table(rest),
         "help" | "--help" | "-h" => {
             usage();
             0
@@ -59,13 +69,24 @@ pub fn builtin_ui(env: &mut Environment, args: &[String]) -> Result<i32> {
 
 fn usage() {
     eprintln!(
-        "usage: ui input|confirm|choose|filter|style [options] [arguments]\n\
+        "usage: ui WIDGET [options] [arguments]\n\
          \n\
+         ask for something\n\
          \x20 input   [--placeholder T] [--prompt T] [--value T] [--password] [--required]\n\
+         \x20 write   [--header T] [--placeholder T] [--value T]\n\
          \x20 confirm [--yes T] [--no T] [--default] [question]\n\
          \x20 choose  [--header T] [--multi] [--height N] [items…]\n\
          \x20 filter  [--header T] [--multi] [--height N] [items…]\n\
+         \x20 table   [--separator C] [--header-row] [--height N]\n\
+         \x20 file    [--all] [--directory] [--height N] [path]\n\
+         \n\
+         show something\n\
          \x20 style   [--border B] [--fg C] [--bg C] [--bold] [--padding \"Y X\"] [text…]\n\
+         \x20 format  [--type markdown|template|code|text] [--field K=V] [text…]\n\
+         \x20 join    [--horizontal|--vertical] [--align A] [blocks…]\n\
+         \x20 pager   [--title T] [--wrap] [text…]\n\
+         \x20 log     [--level L] [--time T] [--field K=V] message…\n\
+         \x20 spin    [--title T] [--quiet] -- command [args…]\n\
          \n\
          The answer goes to stdout. Cancelling is status 1; no terminal is status 2.\n\
          Items come from stdin when none are given."
@@ -255,3 +276,258 @@ impl<T> Answer<T> {
 #[cfg(test)]
 #[path = "ui/tests.rs"]
 mod tests;
+
+fn run_write(args: &[String]) -> i32 {
+    let mut spec = Write::default();
+    let mut at = 0;
+    while at < args.len() {
+        match args[at].as_str() {
+            "--header" => spec.header = take(args, &mut at),
+            "--placeholder" => spec.placeholder = take(args, &mut at),
+            "--value" | "--default" => spec.default = Some(take(args, &mut at)),
+            other => {
+                eprintln!("oslo: ui write: {other}: unknown option");
+                return 2;
+            }
+        }
+        at += 1;
+    }
+    report(write(&spec).map(|text| vec![text]))
+}
+
+fn run_file(args: &[String]) -> i32 {
+    let mut spec = Browse::default();
+    let mut at = 0;
+    while at < args.len() {
+        match args[at].as_str() {
+            "--all" | "--hidden" => spec.hidden = true,
+            "--directory" | "--dir" => spec.want = Want::Directories,
+            "--both" => spec.want = Want::Both,
+            "--height" => spec.height = take(args, &mut at).parse().unwrap_or(spec.height).max(1),
+            other if other.starts_with("--") => {
+                eprintln!("oslo: ui file: {other}: unknown option");
+                return 2;
+            }
+            other => spec.start = std::path::PathBuf::from(other),
+        }
+        at += 1;
+    }
+    report(file(&spec).map(|path| vec![path]))
+}
+
+fn run_format(args: &[String]) -> i32 {
+    let mut kind = As::Markdown;
+    let mut values = Vec::new();
+    let mut words = Vec::new();
+    let mut at = 0;
+    while at < args.len() {
+        match args[at].as_str() {
+            "--type" | "-t" => match As::parse(&take(args, &mut at)) {
+                Some(parsed) => kind = parsed,
+                None => {
+                    eprintln!("oslo: ui format: not a type; try markdown, template, code, text");
+                    return 2;
+                }
+            },
+            "--field" => {
+                let pair = take(args, &mut at);
+                match pair.split_once('=') {
+                    Some((key, value)) => values.push((key.to_string(), value.to_string())),
+                    None => {
+                        eprintln!("oslo: ui format: --field wants key=value");
+                        return 2;
+                    }
+                }
+            }
+            other if other.starts_with("--") => {
+                eprintln!("oslo: ui format: {other}: unknown option");
+                return 2;
+            }
+            other => words.push(other.to_string()),
+        }
+        at += 1;
+    }
+    let text = if words.is_empty() {
+        from_stdin().join("\n")
+    } else {
+        words.join(" ")
+    };
+    println!("{}", format(&text, kind, &values));
+    0
+}
+
+fn run_join(args: &[String]) -> i32 {
+    let mut align = Align::Start;
+    let mut side_by_side = true;
+    let mut blocks = Vec::new();
+    let mut at = 0;
+    while at < args.len() {
+        match args[at].as_str() {
+            "--horizontal" => side_by_side = true,
+            "--vertical" => side_by_side = false,
+            "--align" => match Align::parse(&take(args, &mut at)) {
+                Some(parsed) => align = parsed,
+                None => {
+                    eprintln!("oslo: ui join: not an alignment; try top, center, bottom");
+                    return 2;
+                }
+            },
+            other if other.starts_with("--") => {
+                eprintln!("oslo: ui join: {other}: unknown option");
+                return 2;
+            }
+            other => blocks.push(other.to_string()),
+        }
+        at += 1;
+    }
+    println!(
+        "{}",
+        if side_by_side {
+            horizontal(&blocks, align)
+        } else {
+            vertical(&blocks, align)
+        }
+    );
+    0
+}
+
+fn run_log(args: &[String]) -> i32 {
+    let mut entry = Entry {
+        level: Level::Info,
+        message: String::new(),
+        time: None,
+        fields: Vec::new(),
+    };
+    let mut words = Vec::new();
+    let mut at = 0;
+    while at < args.len() {
+        match args[at].as_str() {
+            "--level" | "-l" => match Level::parse(&take(args, &mut at)) {
+                Some(level) => entry.level = level,
+                None => {
+                    eprintln!("oslo: ui log: not a level; try debug, info, warn, error, fatal");
+                    return 2;
+                }
+            },
+            "--time" => entry.time = Some(take(args, &mut at)),
+            "--field" => {
+                let pair = take(args, &mut at);
+                match pair.split_once('=') {
+                    Some((key, value)) => entry.fields.push((key.to_string(), value.to_string())),
+                    None => {
+                        eprintln!("oslo: ui log: --field wants key=value");
+                        return 2;
+                    }
+                }
+            }
+            other if other.starts_with("--") => {
+                eprintln!("oslo: ui log: {other}: unknown option");
+                return 2;
+            }
+            other => words.push(other.to_string()),
+        }
+        at += 1;
+    }
+    entry.message = words.join(" ");
+    // stderr: a log line is not the script's output. `x=$(cmd)` must not capture it.
+    eprintln!("{}", line(&entry));
+    // `fatal` ends the script, which is the only thing distinguishing it from `error`.
+    i32::from(entry.level == Level::Fatal)
+}
+
+fn run_pager(args: &[String]) -> i32 {
+    let mut spec = Pager::default();
+    let mut words = Vec::new();
+    let mut at = 0;
+    while at < args.len() {
+        match args[at].as_str() {
+            "--title" => spec.title = take(args, &mut at),
+            "--wrap" => spec.wrap = true,
+            other if other.starts_with("--") => {
+                eprintln!("oslo: ui pager: {other}: unknown option");
+                return 2;
+            }
+            other => words.push(other.to_string()),
+        }
+        at += 1;
+    }
+    spec.text = if words.is_empty() {
+        from_stdin_raw()
+    } else {
+        words.join(" ")
+    };
+    match pager(&spec) {
+        Answer::Given(()) => 0,
+        other => other.status(),
+    }
+}
+
+fn run_spin(args: &[String]) -> i32 {
+    let mut spec = Spin {
+        title: "working".to_string(),
+        command: Vec::new(),
+        quiet: false,
+    };
+    let mut at = 0;
+    while at < args.len() {
+        match args[at].as_str() {
+            "--title" => spec.title = take(args, &mut at),
+            "--quiet" => spec.quiet = true,
+            // Everything after `--` is the command, so its own options cannot be read as ours.
+            "--" => {
+                spec.command = args[at + 1..].to_vec();
+                break;
+            }
+            other if other.starts_with("--") => {
+                eprintln!("oslo: ui spin: {other}: unknown option");
+                return 2;
+            }
+            _ => {
+                spec.command = args[at..].to_vec();
+                break;
+            }
+        }
+        at += 1;
+    }
+    spin(&spec)
+}
+
+fn run_table(args: &[String]) -> i32 {
+    let mut separator = ',';
+    let mut header_row = false;
+    let mut spec = Table::default();
+    let mut at = 0;
+    while at < args.len() {
+        match args[at].as_str() {
+            "--separator" | "-s" => separator = take(args, &mut at).chars().next().unwrap_or(','),
+            "--header-row" | "--headers" => header_row = true,
+            "--height" => spec.height = take(args, &mut at).parse().unwrap_or(spec.height).max(1),
+            "--no-filter" => spec.filter = false,
+            other => {
+                eprintln!("oslo: ui table: {other}: unknown option");
+                return 2;
+            }
+        }
+        at += 1;
+    }
+    let (mut rows, mut raw) = parse_table(&from_stdin_raw(), separator);
+    if header_row && !rows.is_empty() {
+        spec.headers = rows.remove(0);
+        raw.remove(0);
+    }
+    spec.rows = rows;
+    spec.raw = raw;
+    spec.fuzzy = crate::interactive::settings::current().completion.fuzzy;
+    report(table(&spec).map(|row| vec![row]))
+}
+
+/// Everything on stdin, newlines and all — for the widgets that take a document rather than items.
+fn from_stdin_raw() -> String {
+    use std::io::{IsTerminal, Read};
+    if std::io::stdin().is_terminal() {
+        return String::new();
+    }
+    let mut text = String::new();
+    let _ = std::io::stdin().lock().read_to_string(&mut text);
+    text
+}

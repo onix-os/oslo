@@ -38,13 +38,29 @@
 
 mod choose;
 mod confirm;
+mod file;
+mod format;
 mod input;
+mod join;
+mod log;
+mod pager;
+mod spin;
 mod style;
+mod table;
+mod write;
 
 pub use choose::{Choice, choose, filter};
 pub use confirm::{Confirm, confirm};
+pub use file::{Browse, Want, file};
+pub use format::{As, format};
 pub use input::{Input, input};
+pub use join::{Align, horizontal, vertical};
+pub use log::{Entry, Level, line};
+pub use pager::{Pager, pager};
+pub use spin::{Spin, spin};
 pub use style::{Border, Styling, style};
+pub use table::{Table, parse as parse_table, table};
+pub use write::{Write, write};
 
 /// What a widget answered.
 #[derive(Debug, Clone, PartialEq, Eq)]

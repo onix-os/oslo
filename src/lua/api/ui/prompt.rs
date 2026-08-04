@@ -22,7 +22,9 @@
 
 use super::super::util::{ok, put};
 use crate::interactive::ask::{
-    Answer, Border, Choice, Confirm, Input, Styling, choose, confirm, filter, input, style,
+    Align, Answer, As, Border, Browse, Choice, Confirm, Entry, Input, Level, Pager, Spin, Styling,
+    Table as Rows, Want, Write, choose, confirm, file, filter, format, horizontal, input, line,
+    pager, parse_table, spin, style, table, vertical, write,
 };
 use crate::interactive::theme;
 use crate::lua::eval::value::{Table, Value};
@@ -134,6 +136,217 @@ pub fn install(ui: &mut Table) {
     put(ui, "choose", |_, args| ok(list_widget(&args, false)));
     // The same, narrowed as you type.
     put(ui, "filter", |_, args| ok(list_widget(&args, true)));
+
+    // oslo.ui.write{header=, placeholder=, default=} -> string or nil
+    put(ui, "write", |_, args| {
+        let t = spec(&args);
+        let t = t.borrow();
+        ok(
+            match write(&Write {
+                header: field(&t, "header"),
+                placeholder: field(&t, "placeholder"),
+                default: maybe(&t, "default").or_else(|| maybe(&t, "value")),
+            }) {
+                Answer::Given(text) => Value::str(&text),
+                _ => Value::Nil,
+            },
+        )
+    });
+
+    // oslo.ui.file{start=, directories=, hidden=, height=} -> path or nil
+    put(ui, "file", |_, args| {
+        let t = spec(&args);
+        let t = t.borrow();
+        let want = if flag(&t, "directories") {
+            Want::Directories
+        } else if flag(&t, "both") {
+            Want::Both
+        } else {
+            Want::Files
+        };
+        ok(
+            match file(&Browse {
+                start: maybe(&t, "start")
+                    .or_else(|| maybe(&t, "path"))
+                    .map(std::path::PathBuf::from)
+                    .unwrap_or_else(|| std::path::PathBuf::from(".")),
+                want,
+                hidden: flag(&t, "hidden"),
+                height: count(&t, "height", 12),
+                fuzzy: crate::interactive::settings::current().completion.fuzzy,
+            }) {
+                Answer::Given(path) => Value::str(&path),
+                _ => Value::Nil,
+            },
+        )
+    });
+
+    // oslo.ui.table{rows=, headers=, separator=, height=} -> the chosen row, or nil
+    put(ui, "table", |_, args| {
+        let t = spec(&args);
+        let t = t.borrow();
+        let separator = maybe(&t, "separator")
+            .and_then(|s| s.chars().next())
+            .unwrap_or(',');
+        let text = items(&t, "rows").join("\n");
+        let (rows, raw) = parse_table(&text, separator);
+        ok(
+            match table(&Rows {
+                headers: items(&t, "headers"),
+                rows,
+                raw,
+                height: count(&t, "height", 10),
+                filter: !flag(&t, "no_filter"),
+                fuzzy: crate::interactive::settings::current().completion.fuzzy,
+            }) {
+                Answer::Given(row) => Value::str(&row),
+                _ => Value::Nil,
+            },
+        )
+    });
+
+    // oslo.ui.pager{text=, title=, wrap=} -> true when it was shown
+    put(ui, "pager", |_, args| {
+        let t = spec(&args);
+        let t = t.borrow();
+        ok(Value::Bool(matches!(
+            pager(&Pager {
+                title: field(&t, "title"),
+                text: field(&t, "text"),
+                wrap: flag(&t, "wrap"),
+            }),
+            Answer::Given(())
+        )))
+    });
+
+    // oslo.ui.spin{title=, command={"sleep","1"}, quiet=} -> the command's exit status
+    put(ui, "spin", |_, args| {
+        let t = spec(&args);
+        let t = t.borrow();
+        ok(Value::int(spin(&Spin {
+            title: maybe(&t, "title").unwrap_or_else(|| "working".to_string()),
+            command: items(&t, "command"),
+            quiet: flag(&t, "quiet"),
+        }) as i64))
+    });
+
+    // oslo.ui.log{message=, level=, time=, fields=} -> nothing; writes to stderr
+    put(ui, "log", |_, args| {
+        let mut level = Level::Info;
+        let mut message = String::new();
+        let mut time = None;
+        let mut fields = Vec::new();
+        match args.first() {
+            Some(Value::Str(text)) => message = text.to_string(),
+            Some(Value::Table(_)) => {
+                let t = spec(&args);
+                let t = t.borrow();
+                message = field(&t, "message");
+                if let Some(name) = maybe(&t, "level") {
+                    match Level::parse(&name) {
+                        Some(parsed) => level = parsed,
+                        None => {
+                            return crate::lua::api::util::failed(
+                                "oslo.ui.log",
+                                format!("{name}: not a level"),
+                            );
+                        }
+                    }
+                }
+                time = maybe(&t, "time");
+                if let Value::Table(pairs) = t.get(&Value::str("fields")) {
+                    for (key, value) in pairs.borrow().pairs() {
+                        if let (Value::Str(k), Value::Str(v)) = (&key, &value) {
+                            fields.push((k.to_string(), v.to_string()));
+                        }
+                    }
+                    // Table iteration has no order, and a log line whose fields moved between runs
+                    // is one nobody can diff.
+                    fields.sort();
+                }
+            }
+            _ => {}
+        }
+        eprintln!(
+            "{}",
+            line(&Entry {
+                level,
+                message,
+                time,
+                fields
+            })
+        );
+        ok(Value::Nil)
+    });
+
+    // oslo.ui.format(text | {text=, type=, fields=}) -> string
+    put(ui, "format", |_, args| {
+        let mut kind = As::Markdown;
+        let mut text = String::new();
+        let mut values = Vec::new();
+        match args.first() {
+            Some(Value::Str(body)) => text = body.to_string(),
+            Some(Value::Table(_)) => {
+                let t = spec(&args);
+                let t = t.borrow();
+                text = field(&t, "text");
+                if let Some(name) = maybe(&t, "type") {
+                    match As::parse(&name) {
+                        Some(parsed) => kind = parsed,
+                        None => {
+                            return crate::lua::api::util::failed(
+                                "oslo.ui.format",
+                                format!("{name}: not a type"),
+                            );
+                        }
+                    }
+                }
+                if let Value::Table(pairs) = t.get(&Value::str("fields")) {
+                    for (key, value) in pairs.borrow().pairs() {
+                        if let (Value::Str(k), Value::Str(v)) = (&key, &value) {
+                            values.push((k.to_string(), v.to_string()));
+                        }
+                    }
+                }
+            }
+            _ => {}
+        }
+        ok(Value::str(format(&text, kind, &values).as_str()))
+    });
+
+    // oslo.ui.join{blocks=, vertical=, align=} -> string
+    put(ui, "join", |_, args| {
+        let t = spec(&args);
+        let t = t.borrow();
+        let mut blocks = items(&t, "blocks");
+        if blocks.is_empty() {
+            let mut index = 1i64;
+            while let Value::Str(s) = t.get(&Value::int(index)) {
+                blocks.push(s.to_string());
+                index += 1;
+            }
+        }
+        let align = match maybe(&t, "align") {
+            Some(name) => match Align::parse(&name) {
+                Some(parsed) => parsed,
+                None => {
+                    return crate::lua::api::util::failed(
+                        "oslo.ui.join",
+                        format!("{name}: not an alignment"),
+                    );
+                }
+            },
+            None => Align::Start,
+        };
+        ok(Value::str(
+            if flag(&t, "vertical") {
+                vertical(&blocks, align)
+            } else {
+                horizontal(&blocks, align)
+            }
+            .as_str(),
+        ))
+    });
 
     // oslo.ui.style(text | {text=, border=, fg=, bg=, bold=, padding_x=, padding_y=, width=})
     put(ui, "style", |_, args| {
