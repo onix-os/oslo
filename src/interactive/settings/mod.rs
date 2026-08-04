@@ -215,6 +215,13 @@ pub struct Misc {
     /// means your cursor keys start executing commands. Raising this is the fix, and until now
     /// there was no way to.
     pub escape_delay: u64,
+    /// Use oslo's own line editor instead of rustyline.
+    ///
+    /// Off while it is being built. The native one owns the *layout* of the row it edits, which
+    /// rustyline does not hand over — see [`crate::interactive::edit`] for the list of things that
+    /// costs. Until it is at parity this is opt-in, because the line editor is the one component
+    /// where a regression is felt on every keystroke.
+    pub native_editor: bool,
     /// Force a colour depth instead of detecting one: `truecolor`, `256`, `16` or `none`.
     ///
     /// Detection reads `$COLORTERM` and `$TERM`, and both lie in either direction — inside tmux,
@@ -231,6 +238,7 @@ impl Default for Misc {
             // The standard pause: long enough that a real sequence is never split, short enough
             // that Esc feels immediate.
             escape_delay: 25,
+            native_editor: false,
             color_depth: None,
         }
     }

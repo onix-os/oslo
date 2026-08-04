@@ -93,6 +93,9 @@ pub(super) fn read_command(
 
         // The right prompt is handed to the helper rather than concatenated: it is drawn from
         // the highlighter, which is the only place a cursor move does not confuse rustyline.
+        // Hoisted out of the helper block below: the native editor takes the right prompt as an
+        // argument, which is what it always should have been.
+        let mut right_prompt = String::new();
         if let Some(helper) = rl.helper() {
             // A config's own right prompt wins; otherwise oslo draws one. There used to be none at
             // all unless a config asked, which meant the machinery existed and nobody saw it.
@@ -118,6 +121,7 @@ pub(super) fn read_command(
                         super::repl::last_command_duration(),
                     ))
                 });
+            right_prompt = right.clone().unwrap_or_default();
             helper.set_right_prompt(right, oslo::interactive::prompt::printed_width(&prompt));
             // What this prompt is for, so a vi-mode repaint rebuilds the same one rather than
             // guessing at the language or the status.
@@ -188,6 +192,41 @@ pub(super) fn read_command(
         let _ = std::io::Write::flush(&mut std::io::stdout());
 
         let split = typed_point.min(typed.len());
+
+        // **The native editor, when the config asks for it.** Taken before rustyline rather than
+        // beside it: the two cannot share a row, so this either owns the line or does not run.
+        //
+        // The right prompt is passed as an argument here. Under rustyline it had to be smuggled
+        // out of the highlighter, because that was the only place a cursor move did not confuse
+        // the layout — which is the shape of the whole reason this exists.
+        if oslo::interactive::settings::current().misc.native_editor {
+            let cursor = typed[..split].chars().count();
+            let mut assist =
+                super::native::ShellAssist::new(Arc::clone(env_struct), history_lines(rl));
+            assist.begin();
+            return match oslo::interactive::edit::session::read_line(
+                &prompt,
+                &right_prompt,
+                (&typed, cursor),
+                &mut assist,
+            ) {
+                oslo::interactive::edit::session::Outcome::Line(line) => {
+                    buffer.push_str(&line);
+                    if buffer.trim().is_empty() {
+                        Input::Nothing
+                    } else {
+                        Input::Command {
+                            text: buffer,
+                            mode: reading,
+                            secret,
+                        }
+                    }
+                }
+                oslo::interactive::edit::session::Outcome::Interrupted => Input::Interrupted,
+                oslo::interactive::edit::session::Outcome::Eof => Input::Eof,
+            };
+        }
+
         let raw = match rl.readline_with_initial(&prompt, (&typed[..split], &typed[split..])) {
             Ok(raw) => raw,
             Err(ReadlineError::Interrupted) => {
@@ -395,4 +434,22 @@ pub(super) fn is_complete(source: &str, mode: Mode) -> bool {
             InputStatus::Incomplete
         ),
     }
+}
+
+/// The history the native editor walks, oldest first.
+///
+/// Read out of the editor's own store rather than kept separately: two copies of the history is
+/// two chances for them to disagree about what you just ran.
+fn history_lines(rl: &Repl) -> Vec<String> {
+    use rustyline::history::{History, SearchDirection};
+    let history = rl.history();
+    (0..history.len())
+        .filter_map(|i| {
+            history
+                .get(i, SearchDirection::Forward)
+                .ok()
+                .flatten()
+                .map(|found| found.entry.into_owned())
+        })
+        .collect()
 }

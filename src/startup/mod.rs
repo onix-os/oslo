@@ -22,6 +22,7 @@ pub mod keybind;
 pub mod language;
 pub mod lua_init;
 pub mod mode;
+pub mod native;
 pub mod prompt;
 pub mod rc;
 mod read;
