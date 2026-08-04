@@ -194,19 +194,28 @@ fn the_language_can_still_be_forced_either_way() {
     let sh = parse_args(&["--sh", "script"]).expect("parse");
     assert_eq!(sh.force_language, Some(Language::Shell));
 }
-/// The flag beats the config, and both spellings work.
+/// **Off only.** vi is the default, so the flag turns it off and there is no flag that turns it
+/// on — `--vi` would be a flag that asks for what you already have. Both spellings work.
 #[test]
-fn vi_can_be_forced_on_or_off() {
+fn vi_can_be_turned_off() {
     assert_eq!(parse_args(&[]).expect("parse").vi, None, "config decides");
     assert_eq!(parse_args(&["--no-vi"]).expect("parse").vi, Some(false));
     assert_eq!(parse_args(&["--no-vim"]).expect("parse").vi, Some(false));
-    assert_eq!(parse_args(&["--vi"]).expect("parse").vi, Some(true));
-    assert_eq!(parse_args(&["--vim"]).expect("parse").vi, Some(true));
-    // Last one wins, as with every other repeated flag.
-    assert_eq!(
-        parse_args(&["--vi", "--no-vi"]).expect("parse").vi,
-        Some(false)
-    );
+}
+
+/// And `--vi` is *refused*, not quietly ignored. A flag that used to work and now does nothing is
+/// the one failure a user cannot see: the shell starts, and the setting silently is not applied.
+#[test]
+fn the_old_vi_on_flag_is_gone() {
+    for flag in ["--vi", "--vim"] {
+        let err = parse_args(&[flag]).expect_err("must be rejected");
+        assert!(
+            err.message.contains("invalid option"),
+            "{flag}: {}",
+            err.message
+        );
+        assert_eq!(err.status, 2);
+    }
 }
 
 /// The flag it replaced must not linger as a silently-accepted no-op.

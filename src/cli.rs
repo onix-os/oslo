@@ -120,7 +120,7 @@ pub fn usage() -> String {
     );
     let _ = writeln!(
         s,
-        "  --vi, --no-vi     force vi key bindings on or off (see oslo.vi.enabled)"
+        "  --no-vi           emacs key bindings; vi is the default (see oslo.vi.enabled)"
     );
     let _ = writeln!(
         s,
@@ -234,7 +234,6 @@ pub fn parse(argv: &[String]) -> Result<Invocation, Exit> {
                 "login" => login = true,
                 "lua" => force_language = Some(Language::Lua),
                 "sh" => force_language = Some(Language::Shell),
-                // Both spellings: the editing mode is vi, but everyone calls the editor vim.
                 name if name.starts_with("profile=") => {
                     let value = name["profile=".len()..].trim();
                     if value.is_empty() {
@@ -249,7 +248,9 @@ pub fn parse(argv: &[String]) -> Result<Invocation, Exit> {
                     profile = Some(value.to_string());
                 }
                 "profile" => return Err(missing_profile_name()),
-                "vi" | "vim" => vi = Some(true),
+                // **Off only.** vi bindings are oslo's default, so there is nothing for a `--vi`
+                // to turn on from the command line. Both spellings, because the editing mode is
+                // vi and everyone calls the editor vim.
                 "no-vi" | "no-vim" => vi = Some(false),
                 other => match long_option(other) {
                     Some(option) => {
