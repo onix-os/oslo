@@ -80,35 +80,7 @@ pub fn store_path(xdg_data: Option<&str>, home: Option<&str>, extension: &str) -
         Some(dir) if !dir.trim().is_empty() => PathBuf::from(dir),
         _ => PathBuf::from(home?).join(".local/share"),
     };
-    let dir = base.join("oslo");
-    let path = dir.join(format!("{}.{extension}", current()));
-    adopt_legacy(&dir, &path, extension);
-    Some(path)
-}
-
-/// Move a store written under the old fixed name to the profile's name, once.
-///
-/// The stores used to be called `history.db` and `track.kv`. Renaming them without this would
-/// leave a person's whole history sitting in a file nothing looks at any more — the shell would
-/// come up empty and nothing would say why.
-///
-/// Only for the **default** profile, and only when the new name does not exist: `--profile=claude`
-/// must never adopt your history, and a profile that already has a store is not touched. A rename
-/// rather than a copy, so it happens once and the old name does not linger to be adopted twice.
-fn adopt_legacy(dir: &std::path::Path, wanted: &std::path::Path, extension: &str) {
-    if wanted.exists() || current() != default_name() {
-        return;
-    }
-    let legacy = match extension {
-        "db" => dir.join("history.db"),
-        "kv" => dir.join("track.kv"),
-        _ => return,
-    };
-    if legacy.is_file() {
-        // A failure here is not worth a diagnostic on every prompt: the shell simply starts with
-        // an empty store, which is what would have happened anyway.
-        let _ = std::fs::rename(&legacy, wanted);
-    }
+    Some(base.join("oslo").join(format!("{}.{extension}", current())))
 }
 
 #[cfg(test)]

@@ -314,6 +314,9 @@ table that decides what `cd` and Tab suggest. Give them a profile and that stops
 It is a name, not a lock: two shells can share one, and pointing a shell at `--profile=claude` is
 how you go and read what the agent ran.
 
+The stores used to be called `history.db` and `track.kv`. Nothing migrates them — delete them, or
+rename one to `default.db` yourself if you want what is in it.
+
 ## Configuration
 
 `~/.config/oslo/config.lua`. One file, one language, one place — there is no shell-syntax config.
