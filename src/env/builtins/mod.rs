@@ -33,6 +33,7 @@ mod mapfile;
 mod process;
 mod shopt;
 mod spawn;
+mod status;
 mod suspend;
 mod times;
 mod ui;
@@ -61,6 +62,7 @@ pub use process::{
     builtin_kill, builtin_trap, builtin_umask, run_debug_trap, run_exit_trap, run_pending_traps,
 };
 pub use shopt::builtin_shopt;
+pub use status::builtin_status;
 pub use suspend::builtin_suspend;
 pub use times::builtin_times;
 pub use ulimit::builtin_ulimit;
@@ -177,6 +179,7 @@ pub fn register_default_builtins(env: &mut Environment) {
     // also the only way to reach `exec::simple::set_autocd`, which had no caller before it.
     env.register_custom_builtin("shopt", builtin_shopt);
     env.register_custom_builtin("caller", builtin_caller);
+    env.register_custom_builtin("status", builtin_status);
     env.register_custom_builtin("suspend", builtin_suspend);
 
     // One builtin, two names, exactly as in bash — `readarray` is the spelling that says what it
@@ -216,6 +219,7 @@ mod tests {
             "mapfile",
             "readarray",
             "caller",
+            "status",
             "suspend",
         ] {
             assert!(env.is_builtin(name), "{name} is not registered");

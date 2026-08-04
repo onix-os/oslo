@@ -317,10 +317,14 @@ oslo.prompt.left         = function(p) return p.cwd .. " ❯ " end
 oslo.prompt.right        = function(p) return p.duration_ms and (p.duration_ms .. "ms") or "" end
 oslo.prompt.continuation = function() return "… " end
 oslo.prompt.transient    = function() return "❯ " end   -- redrawn once the line is accepted
+oslo.prompt.title        = function(p)                  -- the terminal tab, fish's fish_title
+  return p.command and (p.command .. " — " .. p.cwd) or p.cwd
+end
 ```
 
 Every one of them is handed the same facts: `status`, `duration_ms`, `cwd`, `branch`, `user`,
-`host`, `language`, `vimode`, `cols`, `jobs`, `continuation`. A shell-side integration reads the
+`host`, `language`, `vimode`, `cols`, `jobs`, `continuation`, and `command` — which is set only
+while something is running, so `title` can name it and go back to the directory afterwards. A shell-side integration reads the
 same things from `$?`, `$EPOCHREALTIME`, `$PWD` and `$OSLO_MODE`, and can own both columns through
 `$PS1` and `$RPS1`.
 
@@ -340,6 +344,18 @@ oslo.on["command-not-found"](function(name) end)
 
 `precmd` and `postcmd` are the names oslo shipped first and still answers to. They fire alongside
 `preexec` and `postexec`, which are what the rest of the world calls the same two moments.
+
+### `status`
+
+```sh
+status is-interactive || return    # the line every dotfile repo opens with
+status is-login
+status current-function            # or `status function` for the whole stack
+status basename
+```
+
+The predicates answer through the exit status, so they compose with `&&` and `||`. The portable
+spelling of the first line is `case $- in *i*) … esac`, which is correct and which nobody remembers.
 
 `oslo.proc.capture`, `sh.df()`, `sh.ps()`, `sh.ls()`, `sh.stat()`, `oslo.path.*`, `oslo.json`, `oslo.re`,
 and a `did you mean` drawn from the command index oslo already keeps.

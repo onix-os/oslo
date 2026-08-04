@@ -10,7 +10,7 @@ use crate::startup::mode::{Mode, ToggleRequest};
 use crate::startup::read::{Input, read_command};
 use crate::startup::recall::{remember_history, seed_history};
 use crate::startup::{
-    config, environments, history, history_db, keybind, lua_init, mode, rc, tracking,
+    config, environments, history, history_db, keybind, lua_init, mode, prompt, rc, tracking,
 };
 use oslo::Environment;
 use oslo::LuaEngine;
@@ -249,7 +249,13 @@ pub fn run_repl() -> ! {
                 lua.fire_hook("precmd", vec![LuaEngine::hook_arg(&text)]);
                 // The title says what is running while it runs, and goes back to the directory
                 // when the prompt returns. A row of tabs then says what each is *doing*.
-                announce(&oslo::interactive::marks::title(&title_for_command(&text)));
+                announce(&oslo::interactive::marks::title(
+                    &lua.render_with(
+                        "prompt.title",
+                        &prompt::title_context(last_status, current, &text),
+                    )
+                    .unwrap_or_else(|| title_for_command(&text)),
+                ));
                 // Everything after this belongs to the command, not to the prompt.
                 print!("{}", oslo::interactive::marks::output_start());
                 let _ = std::io::Write::flush(&mut std::io::stdout());

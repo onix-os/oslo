@@ -34,6 +34,15 @@ pub(crate) const CONTINUATION: &str = "prompt.continuation";
 /// It is a render key here because the shell owns its own line editor and can simply redraw. Unset
 /// means "leave the prompt as it was", which is what every shell does today.
 pub(crate) const TRANSIENT: &str = "prompt.transient";
+/// What the terminal's title bar and tab are named.
+///
+/// fish's `fish_title`, and the reason it is a function rather than a setting: the answer is
+/// different at a prompt and while something is running. oslo picked both for you until now — the
+/// directory, then the command's first word — which is a sensible default and not something a
+/// config could argue with. A multiplexer naming tabs cares a great deal.
+///
+/// Called with `command` set while a command is in flight and `nil` at a prompt.
+pub(crate) const TITLE: &str = "prompt.title";
 
 /// Add `oslo.prompt`, `oslo.ui.style`, `oslo.git` and `oslo.path.shorten`.
 pub fn install(oslo: &mut Table, ui: &mut Table, registry: &Registry) {
@@ -87,7 +96,7 @@ fn build(registry: &Registry) -> Value {
             let Some(key) = key_for(field) else {
                 return Err(LuaError::new(format!(
                     "oslo.prompt.{field} is not a prompt; the prompts are left, right and \
-                     continuation, transient"
+                     continuation, transient, title"
                 )));
             };
             match args.get(2) {
@@ -116,6 +125,7 @@ fn key_for(field: &str) -> Option<&'static str> {
         "right" => Some(RIGHT),
         "continuation" => Some(CONTINUATION),
         "transient" => Some(TRANSIENT),
+        "title" => Some(TITLE),
         _ => None,
     }
 }

@@ -332,7 +332,14 @@ impl LuaEngine {
         if let Some(spec) = crate::lua::api::external::spec_of(&value) {
             return crate::lua::api::external::render(&spec, ctx);
         }
-        match self.interp.call(&value, Vec::new()) {
+        // **The facts go in as the argument.** A segment list and an external prompt were handed
+        // the context above; a plain function was called with nothing, so `oslo.prompt.left =
+        // function(p) return p.cwd end` — the shape the documentation shows and the obvious one to
+        // write — saw `p` as nil and raised. Every prompt key is a function of the same facts, so
+        // there is no reason for the three shapes to disagree.
+        //
+        // Zero-argument functions are unaffected: Lua discards arguments a function does not name.
+        match self.interp.call(&value, vec![ctx.to_lua()]) {
             Ok(values) => match values.first() {
                 Some(Value::Str(s)) => Some(s.to_string()),
                 Some(Value::Number(n)) => Some(n.to_string()),
@@ -456,3 +463,7 @@ impl LuaEngine {
         }
     }
 }
+
+#[cfg(test)]
+#[path = "engine/tests.rs"]
+mod tests;

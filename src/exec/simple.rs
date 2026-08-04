@@ -257,7 +257,11 @@ fn call_function_command(
     // Checked before anything is set up, so a refused call has nothing to unwind. `f() { f; }`
     // recurses through the whole evaluator; without this the stack overflows and Rust aborts
     // the process outright, status 134 and a core dump.
-    env.enter_function()?;
+    // **Named**, because the name is the whole point of recording the frame. `enter_function`
+    // records `NULL`, which is what `caller` printed as the source of every frame and what
+    // `status current-function` would answer for a function that plainly has a name. The API to
+    // do this right already existed; nothing called it outside its own tests.
+    env.enter_function_named(words.first().map_or("", String::as_str))?;
     let res = call_function(env, body, words, redirections);
     env.exit_function();
 

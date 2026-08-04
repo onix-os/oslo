@@ -168,3 +168,40 @@ fn an_unregistered_name_is_not_a_builtin() {
     assert!(!env.is_builtin("oslo-not-a-builtin"));
     assert!(env.is_builtin("type"));
 }
+
+/// A function frame records the function's **name**.
+///
+/// `enter_function` stores `NULL`, and that placeholder was what every frame held: `caller` printed
+/// it as the source of every frame, and any question about "which function am I in" could only be
+/// answered with it. `enter_function_named` existed the whole time and nothing outside its own
+/// tests called it.
+///
+/// Recorded from *inside* the call, because the frame is popped on the way out — which is also
+/// why this went unnoticed: from the outside the stack is always empty.
+#[test]
+fn a_function_frame_knows_its_name() {
+    thread_local! {
+        static SEEN: std::cell::RefCell<Vec<String>> = const { std::cell::RefCell::new(Vec::new()) };
+    }
+    // A builtin rather than a closure: registration takes a plain function pointer, so the only
+    // way back out of the call is thread-local state.
+    fn record(env: &mut Environment, _args: &[String]) -> crate::error::Result<i32> {
+        SEEN.with(|seen| *seen.borrow_mut() = env.call_stack().to_vec());
+        Ok(0)
+    }
+
+    let mut env = Environment::new();
+    env.register_custom_builtin("record-stack", record);
+    run_in(
+        &mut env,
+        "outer() { inner; }\ninner() { record-stack; }\nouter",
+    )
+    .expect("exec");
+    SEEN.with(|seen| {
+        assert_eq!(
+            *seen.borrow(),
+            vec!["outer".to_string(), "inner".to_string()],
+            "frames must carry their names, outermost first"
+        )
+    });
+}

@@ -174,9 +174,15 @@ pub(super) fn read_command(
         print!(
             "{}{}{}",
             oslo::interactive::marks::working_directory(&crate::startup::repl::cwd()),
-            oslo::interactive::marks::title(&oslo::interactive::prompt::tilde(
-                &crate::startup::repl::cwd()
-            )),
+            oslo::interactive::marks::title(
+                &lua.render_with(
+                    "prompt.title",
+                    &prompt::segment_context(last_status, reading, None)
+                )
+                .unwrap_or_else(|| {
+                    oslo::interactive::prompt::tilde(&crate::startup::repl::cwd())
+                })
+            ),
             oslo::interactive::marks::prompt_start()
         );
         let _ = std::io::Write::flush(&mut std::io::stdout());

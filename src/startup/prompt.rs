@@ -36,6 +36,16 @@ pub fn segment_context(
         // is `jobs -p | wc -l` and in zsh `${#jobstates}`.
         jobs: oslo::exec::job::with_jobs(|jobs| jobs.jobs().len()),
         continuation: false,
+        // Nothing is running at a prompt; `title_context` fills this in for the other case.
+        command: None,
+    }
+}
+
+/// The same facts, for a title drawn while `command` is running.
+pub fn title_context(last_status: i32, mode: Mode, command: &str) -> oslo::lua::context::Context {
+    oslo::lua::context::Context {
+        command: Some(command.to_string()),
+        ..segment_context(last_status, mode, None)
     }
 }
 
