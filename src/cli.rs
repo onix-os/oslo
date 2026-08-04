@@ -193,6 +193,11 @@ pub fn parse(argv: &[String]) -> Result<Invocation, Exit> {
                         status: 0,
                     });
                 }
+                // `--login` beside `-l`. bash accepts both, and the long form is what a display
+                // manager, a terminal emulator's "run as login shell" setting and `su --login`
+                // reach for — so a shell that only took `-l` failed to start under exactly the
+                // things that start a login shell.
+                "login" => login = true,
                 "lua" => force_language = Some(Language::Lua),
                 "sh" => force_language = Some(Language::Shell),
                 // Both spellings: the editing mode is vi, but everyone calls the editor vim.

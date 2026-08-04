@@ -203,3 +203,17 @@ fn recorded_set_options_do_not_prevent_a_script_from_running() {
     assert_eq!(status_of(&out), 0, "stderr: {}", stderr_of(&out));
     assert_eq!(stdout_of(&out), "ran\n");
 }
+
+/// `--login` beside `-l`.
+///
+/// The long form is what a display manager, a terminal emulator's "run as login shell" setting and
+/// `su --login` reach for — so a shell that took only `-l` failed to start under exactly the things
+/// that start a login shell. Found while making oslo usable with `chsh`.
+#[test]
+fn the_login_flag_has_both_spellings() {
+    for flag in ["-l", "--login"] {
+        let out = oslo(&[flag, "-c", "echo started"]);
+        assert_eq!(status_of(&out), 0, "{flag}: {}", stderr_of(&out));
+        assert_eq!(stdout_of(&out).trim(), "started", "{flag}");
+    }
+}

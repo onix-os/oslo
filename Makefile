@@ -11,6 +11,20 @@ endif
 
 TOP_DIR := $(CURDIR)
 CARGO := cargo
+
+# What a release is: one file that runs anywhere, with no loader and no libc to find.
+#
+# `make build` produces exactly what the release workflow produces, and for a reason beyond
+# tidiness — oslo is meant to be somebody's *login shell*, and a login shell linked against a
+# /nix/store glibc stops existing the day `nix-collect-garbage` runs. There is no recovering from
+# that from inside the session it breaks.
+#
+# `RUSTFLAGS` and the deliberately-absent linker override are copied from
+# `.github/workflows/release.yml`; the comment there explains why pointing this at `musl-gcc`
+# silently produces a *dynamic* musl binary.
+TARGET ?= x86_64-unknown-linux-musl
+STATIC_RUSTFLAGS := -C target-feature=+crt-static
+BIN := target/$(TARGET)/release/$(PROJECT_NAME)
 EXAMPLE ?= main
 PREFIX ?= $(HOME)/.local
 
@@ -20,12 +34,34 @@ $(info ------------------------------------------)
 $(info Project: $(PROJECT_NAME) v$(PROJECT_VERSION))
 $(info ------------------------------------------)
 
-.PHONY: build b compile c run r example test t check check-all test-all check-loc check-readme print-name clippy rustdoc fmt fmt-check clean verify vm vm-distro install uninstall release help h
+.PHONY: build b dev check-static compile c run r example test t check check-all test-all check-loc check-readme print-name clippy rustdoc fmt fmt-check clean verify vm vm-distro install uninstall release help h
 
 build:
-	@$(CARGO) build
+	@RUSTFLAGS="$(STATIC_RUSTFLAGS)" $(CARGO) build --release --target $(TARGET) --bin $(PROJECT_NAME)
+	@$(MAKE) --no-print-directory check-static
+	@ls -l "$(BIN)" | awk '{printf "%s  %.2f MB\n", $$NF, $$5/1048576}'
 
 b: build
+
+# "Static" is a claim about the ELF, so check the ELF. `ldd` is not enough: it prints
+# "statically linked" for a musl binary that still has an INTERP and will not start.
+check-static:
+	@bin="$(BIN)"; \
+	if readelf -l "$$bin" | grep -q 'program interpreter'; then \
+		echo "error: $$bin requests a dynamic loader; it is not static" >&2; \
+		readelf -l "$$bin" | grep 'program interpreter' >&2; \
+		exit 1; \
+	fi; \
+	if readelf -d "$$bin" 2>/dev/null | grep -q NEEDED; then \
+		echo "error: $$bin has NEEDED entries; it is not static" >&2; \
+		readelf -d "$$bin" | grep NEEDED >&2; \
+		exit 1; \
+	fi; \
+	echo "static: no INTERP, no NEEDED"
+
+# The fast inner loop. `build` is what ships; this is what you run while writing code.
+dev:
+	@$(CARGO) build
 
 compile:
 	@$(CARGO) clean
@@ -113,10 +149,9 @@ corpus:
 
 verify: fmt-check check-loc check-readme check test clippy rustdoc
 
-install:
-	@$(CARGO) build --release --bin $(PROJECT_NAME)
+install: build
 	@install -d "$(DESTDIR)$(PREFIX)/bin"
-	@install -m 755 "target/release/$(PROJECT_NAME)" "$(DESTDIR)$(PREFIX)/bin/$(PROJECT_NAME)"
+	@install -m 755 "$(BIN)" "$(DESTDIR)$(PREFIX)/bin/$(PROJECT_NAME)"
 	@echo "installed $(DESTDIR)$(PREFIX)/bin/$(PROJECT_NAME)"
 
 uninstall:
