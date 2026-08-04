@@ -35,6 +35,10 @@ fn frame_of<'a>(matches: &'a [Ranked], query: &'a str, rows: usize) -> String {
         cols: 80,
         rows,
         now: 1_000_000_000,
+        // The scanner's frame. Fixed, so a test never depends on when it ran.
+        elapsed_ms: 0,
+        // Not asking anything: these cover the ordinary search bar.
+        confirm: None,
     })
 }
 
@@ -95,9 +99,10 @@ fn the_search_bar_sits_inside_its_surface() {
     let lines: Vec<&str> = seen.lines().collect();
     // From the bottom: the margin produces no line, so the surface is the last three.
     let query_row = lines.len() - 2;
+    // The scanner stands where the `❯` used to, so the query row is the one carrying it.
     assert!(
-        lines[query_row].contains('❯'),
-        "no prompt on the query row: {:?}",
+        lines[query_row].contains('■') || lines[query_row].contains('⬝'),
+        "no scanner on the query row: {:?}",
         lines[query_row]
     );
     assert!(lines[query_row].contains("on"), "{:?}", lines[query_row]);
@@ -138,6 +143,10 @@ fn the_scope_is_shown_at_the_end_of_the_search_bar() {
         cols: 80,
         rows: 10,
         now: 1_000_000_000,
+        // The scanner's frame. Fixed, so a test never depends on when it ran.
+        elapsed_ms: 0,
+        // Not asking anything: these cover the ordinary search bar.
+        confirm: None,
     }));
     assert!(local.lines().any(|line| line.contains("1/1 [local]")));
 }
@@ -155,6 +164,10 @@ fn the_scope_badge_uses_accent_on_zero() {
         cols: 80,
         rows: 10,
         now: 1_000_000_000,
+        // The scanner's frame. Fixed, so a test never depends on when it ran.
+        elapsed_ms: 0,
+        // Not asking anything: these cover the ordinary search bar.
+        confirm: None,
     };
     let pager = theme::Pager::default();
     let bar = search_bar(&f, &pager, pager.bg, 80, Depth::Ansi256);
@@ -186,7 +199,7 @@ fn the_list_grows_upward_from_the_bar() {
     );
     let query_row = lines
         .iter()
-        .position(|line| line.contains('❯') && line.contains("[global]"))
+        .position(|line| (line.contains('■') || line.contains('⬝')) && line.contains("[global]"))
         .expect("the query row is drawn");
     assert_eq!(
         query_row - match_row,
@@ -247,6 +260,10 @@ fn exactly_one_row_carries_the_marker() {
         cols: 80,
         rows: 10,
         now: 100,
+        // The scanner's frame. Fixed, so a test never depends on when it ran.
+        elapsed_ms: 0,
+        // Not asking anything: these cover the ordinary search bar.
+        confirm: None,
     });
     let seen = plain(&rendered);
     // The search bar uses the same glyph, so only the list rows are counted.
@@ -331,5 +348,116 @@ fn coloured_rows_have_no_unpainted_column_gaps() {
             !row.contains("\x1b[0m \x1b["),
             "an unpainted column gap remains in {needle}: {row:?}"
         );
+    }
+}
+
+/// The confirmation replaces the search bar with a bordered box, in the same three rows.
+///
+/// Same height on purpose: the list above must not shift while you decide, or the row you are
+/// about to delete moves out from under your eye at the moment you are looking at it.
+#[test]
+fn the_confirmation_is_a_box_in_the_bars_place() {
+    let matches = vec![ranked("cargo build", 3, 1_000, "/here", true)];
+    let asking = plain(&frame(&Frame {
+        matches: &matches,
+        selected: 0,
+        offset: 0,
+        query: "",
+        elapsed_ms: 0,
+        confirm: Some(false),
+        scope: Scope::Global,
+        total: 1,
+        cols: 40,
+        rows: 10,
+        now: 1_000_000_000,
+    }));
+    let lines: Vec<&str> = asking.lines().collect();
+    let top = lines
+        .iter()
+        .position(|l| l.contains('╭'))
+        .expect("a top edge");
+    assert!(lines[top].contains('╮'), "{:?}", lines[top]);
+    assert!(
+        lines[top + 1].contains("delete from history?"),
+        "{:?}",
+        lines[top + 1]
+    );
+    assert!(lines[top + 1].contains("yes") && lines[top + 1].contains("no"));
+    assert!(lines[top + 2].contains('╰') && lines[top + 2].contains('╯'));
+    // The sides are drawn, so it reads as a box rather than two stray rules.
+    assert!(lines[top + 1].starts_with('│'), "{:?}", lines[top + 1]);
+    assert!(
+        lines[top + 1].trim_end().ends_with('│'),
+        "{:?}",
+        lines[top + 1]
+    );
+    // And the search bar is gone while the question is up.
+    assert!(!asking.contains("[global]"), "the bar is still drawn");
+}
+
+/// Every row of the box is the same width as the screen, or the border would step in and out.
+#[test]
+fn the_box_squares_up() {
+    let matches = vec![ranked("cargo build", 3, 1_000, "/here", true)];
+    for yes in [true, false] {
+        let asking = plain(&frame(&Frame {
+            matches: &matches,
+            selected: 0,
+            offset: 0,
+            query: "",
+            elapsed_ms: 0,
+            confirm: Some(yes),
+            scope: Scope::Global,
+            total: 1,
+            cols: 44,
+            rows: 10,
+            now: 1_000_000_000,
+        }));
+        for line in asking
+            .lines()
+            .filter(|l| l.contains('│') || l.contains('╭') || l.contains('╰'))
+        {
+            assert_eq!(
+                line.chars().count(),
+                44,
+                "a box row is not the screen's width: {line:?}"
+            );
+        }
+    }
+}
+
+/// The question and its buttons sit in the middle of the box, not against one edge.
+#[test]
+fn the_question_is_centred() {
+    let matches = vec![ranked("cargo build", 3, 1_000, "/here", true)];
+    for cols in [40usize, 60, 80] {
+        let asking = plain(&frame(&Frame {
+            matches: &matches,
+            selected: 0,
+            offset: 0,
+            query: "",
+            elapsed_ms: 0,
+            confirm: Some(false),
+            scope: Scope::Global,
+            total: 1,
+            cols,
+            rows: 10,
+            now: 1_000_000_000,
+        }));
+        let row = asking
+            .lines()
+            .find(|l| l.contains("delete from history?"))
+            .expect("the question row");
+        let inner: String = row.chars().skip(1).take(cols - 2).collect();
+        let left = inner.len() - inner.trim_start().len();
+        let right = inner.len() - inner.trim_end().len();
+        // Within one cell: an odd leftover cannot be split evenly.
+        assert!(
+            left.abs_diff(right) <= 1,
+            "not centred at {cols} cols: {left} left, {right} right"
+        );
+        // And the buttons are bracketed.
+        assert!(row.contains("[ yes ]"), "{row:?}");
+        assert!(row.contains("[ no ]"), "{row:?}");
     }
 }

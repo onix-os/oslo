@@ -86,12 +86,30 @@ impl Restore {
     }
 }
 
+/// What the terminal is being taken over *for*.
+///
+/// The three cases differ in two independent ways — whether the alternate screen is taken, and
+/// whether the cursor is hidden — and a boolean could only say one of them. [`Screen::Line`] is
+/// the one that needs saying: an editor's cursor is the thing the user is looking at, so hiding it
+/// there would be hiding the point.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Screen {
+    /// Draw in place below the cursor, and hide it: an inline widget repaints its whole block on
+    /// every keystroke, and a visible cursor dragged across all of it is most of what "it
+    /// flickers" means.
+    Inline,
+    /// Take the alternate screen and hide the cursor. The pager and the history finder.
+    Alternate,
+    /// Stay on the main screen and **keep the cursor visible** — the line editor.
+    Line,
+}
+
 impl Restore {
-    /// Put the terminal into raw mode. `alternate` also takes the alternate screen and hides the
-    /// cursor, which is what a full-screen widget wants and an inline one does not.
+    /// Put the terminal into raw mode for `screen`.
     ///
     /// `None` when there is no terminal, which every caller treats as "do not draw".
-    pub fn enter(alternate: bool) -> Option<Restore> {
+    pub fn enter(screen: Screen) -> Option<Restore> {
+        let alternate = screen == Screen::Alternate;
         let tty = Tty::open()?;
         // SAFETY: the descriptor is owned by `tty` and outlives every use of this borrow.
         let handle = unsafe { std::os::fd::BorrowedFd::borrow_raw(tty.fd()) };
@@ -121,10 +139,12 @@ impl Restore {
         // widget repaints its whole block on each keystroke, and a visible cursor is dragged
         // across all of it every time — which is most of what "it flickers" means.
         let mut out = io::stderr();
-        let _ = out.write_all(if alternate {
-            b"\x1b[?1049h\x1b[?25l".as_slice()
-        } else {
-            b"\x1b[?25l".as_slice()
+        let _ = out.write_all(match screen {
+            Screen::Alternate => b"\x1b[?1049h\x1b[?25l".as_slice(),
+            Screen::Inline => b"\x1b[?25l".as_slice(),
+            // Nothing at all: the mode change is the whole takeover, and the cursor stays where
+            // the user can see it.
+            Screen::Line => b"".as_slice(),
         });
         let _ = out.flush();
         Some(Restore {
@@ -154,7 +174,9 @@ impl Drop for Restore {
 }
 
 /// What a keypress means.
-#[derive(Debug, PartialEq, Eq)]
+/// `Copy`, because a key is two words at most and the editor passes one through a keymap, a
+/// history walk and a redraw before it is done with it. Borrowing it would be noise.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Key {
     Char(char),
     Backspace,
@@ -184,7 +206,28 @@ pub enum Key {
     ToggleScope,
     /// Shift-Tab, which a terminal spells `ESC [ Z`.
     BackTab,
+    /// A control chord with no widget-level meaning of its own — `C-k`, `C-w`, `C-y`, `C-t`.
+    ///
+    /// The chords that *do* have one are decoded to it instead: `C-a` is [`Key::Home`], `C-b` is
+    /// [`Key::Left`], and so on. A widget should never need to know it was a control key, which
+    /// is why those come through named. This variant carries the rest, for the line editor.
+    Ctrl(char),
+    /// `ESC` then a character: Alt (Meta) chords, which is how readline spells its word motions.
+    Alt(char),
     Ignored,
+}
+
+/// What came back from a wait with a deadline.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Pressed {
+    Key(Key),
+    /// The deadline passed with nothing typed.
+    ///
+    /// Distinct from end-of-input, and that distinction is the whole point: a caller that draws
+    /// something moving needs "nothing happened, draw the next frame" to be a different answer
+    /// from "there will never be anything again".
+    Timeout,
+    Ended,
 }
 
 /// What a byte sequence means, once a whole one has been collected.
@@ -215,6 +258,14 @@ pub fn key(bytes: &[u8]) -> Key {
         // Ctrl-P / Ctrl-N, for the same reason every other list in the shell takes them.
         [0x10] => Key::Up,
         [0x0e] => Key::Down,
+        // The rest of the control chords a line editor binds. Named by their letter rather than
+        // by an action, because what they *do* is the keymap's business, not the decoder's.
+        [0x0b] => Key::Ctrl('k'),
+        [0x0c] => Key::Ctrl('l'),
+        [0x12] => Key::Ctrl('r'),
+        [0x14] => Key::Ctrl('t'),
+        [0x17] => Key::Ctrl('w'),
+        [0x19] => Key::Ctrl('y'),
         [0x1b, b'[', rest @ ..] => match rest {
             [b'A', ..] => Key::Up,
             [b'B', ..] => Key::Down,
@@ -239,7 +290,20 @@ pub fn key(bytes: &[u8]) -> Key {
             [b'F', ..] => Key::End,
             _ => Key::Ignored,
         },
-        [0x1b, ..] => Key::Ignored,
+        // **Every other control chord**, named by its letter. Listed after the ones with a shared
+        // meaning so those keep it, and needed because a config may bind any of them: without
+        // this, `oslo.keys["ctrl-g"]` was decoded as `Ignored` and could never fire.
+        [byte @ 0x01..=0x1a] => Key::Ctrl((byte + b'a' - 1) as char),
+        // `ESC DEL` is `M-DEL`, readline's backward-kill-word. Spelled out because `0x7f` is not
+        // a printable character and would otherwise fall through to the text branch.
+        [0x1b, 0x7f] => Key::Alt('\x7f'),
+        [0x1b, rest @ ..] => match std::str::from_utf8(rest) {
+            Ok(text) => match text.chars().next() {
+                Some(c) if !c.is_control() => Key::Alt(c),
+                _ => Key::Ignored,
+            },
+            Err(_) => Key::Ignored,
+        },
         // Anything printable is query text. Decoded as UTF-8 because a terminal delivers a
         // multibyte character in one read, and dropping it would make the finder unusable in any
         // language whose commands are not ASCII.
@@ -284,7 +348,7 @@ impl Keys {
 }
 
 /// What the front of the buffer holds.
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 enum Parsed {
     /// A key, and how many bytes it took.
     Took(usize, Key),
@@ -350,6 +414,44 @@ impl Keys {
 }
 
 /// Whether another byte is already waiting, within `ms`.
+/// Wait up to `ms` for a key.
+///
+/// [`Keys::read`] blocks until something is typed, which is right for a widget that only changes
+/// when you touch it and wrong for one that animates: a frame that advances with time needs the
+/// loop to come back on its own. This returns [`Pressed::Timeout`] when the deadline passes, and
+/// the caller redraws and asks again.
+impl Keys {
+    pub fn read_within(&mut self, ms: i32) -> Pressed {
+        loop {
+            match parse(&self.buf) {
+                Parsed::Took(used, key) => {
+                    self.buf.drain(..used);
+                    return Pressed::Key(key);
+                }
+                Parsed::Discard(used) => {
+                    self.buf.drain(..used);
+                    continue;
+                }
+                Parsed::Partial => {
+                    // A lone `ESC` still resolves by its own, shorter deadline — otherwise Esc
+                    // would take as long as one animation frame to register.
+                    let delay = crate::interactive::settings::current().misc.escape_delay as i32;
+                    if self.buf == [0x1b] && !waiting(self.fd, delay) {
+                        self.buf.clear();
+                        return Pressed::Key(Key::Cancel);
+                    }
+                    if !waiting(self.fd, ms) {
+                        return Pressed::Timeout;
+                    }
+                    if !self.fill() {
+                        return Pressed::Ended;
+                    }
+                }
+            }
+        }
+    }
+}
+
 fn waiting(fd: i32, ms: i32) -> bool {
     let mut fds = nix::libc::pollfd {
         fd,
@@ -428,8 +530,16 @@ fn parse(buf: &[u8]) -> Parsed {
             }
             Parsed::Partial
         }
-        // `ESC` then an ordinary character is Alt-that-character, which the finder does not bind.
-        Some(_) => Parsed::Discard(2),
+        // `ESC` then an ordinary character is Alt-that-character. Framed as a key rather than
+        // discarded so the line editor can bind `M-b` and friends; a widget that does not bind
+        // them sees [`Key::Alt`] and ignores it, exactly as it ignored the discard before.
+        Some(&next) => {
+            let len = 1 + utf8_len(next);
+            if buf.len() < len {
+                return Parsed::Partial;
+            }
+            Parsed::Took(len, key(&buf[..len]))
+        }
     }
 }
 

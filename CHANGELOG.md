@@ -1,5 +1,35 @@
 # Changelog
 
+## [0.2.5] - 2026-08-04
+
+### <!-- 0 -->⛰️  Features
+
+- Wider scanner, chevrons in the query colour
+- Centre the delete question, bracket the buttons
+- Confirm before deleting from history
+- Scanner then chevrons in the search bar
+- Knight rider scanner in the search bar
+- Seed from the line, cursor, marks, delete
+- Remove rustyline, oslo owns its line editor
+- Finder, abbreviations and lua keys on the native editor
+- Vi mode on the native editor
+- Multi-line continuation on the native editor
+- Completion and ghost hints on the native editor
+- Run the shell on the native editor, opt-in
+- Example that drives the native editor
+- Redraw escapes and the editing state machine
+- Ctrl/alt key decoding and the emacs keymap
+- Native line buffer and layout engine
+
+### <!-- 1 -->🐛 Bug Fixes
+
+- Atomic redraws and the scanner on its surface
+- Drop bold from match marks
+
+### <!-- 6 -->🧪 Testing
+
+- Answer the finder's delete confirmation
+
 ## [0.2.4] - 2026-08-04
 
 ### <!-- 0 -->⛰️  Features

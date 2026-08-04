@@ -283,3 +283,6 @@ mod tests {
         );
     }
 }
+
+/// The in-memory history and the file behind it.
+pub mod store;

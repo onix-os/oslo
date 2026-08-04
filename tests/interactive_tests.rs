@@ -12,10 +12,6 @@ use oslo::env::Environment;
 
 use oslo::interactive::{DEFAULT_PS2, InputStatus, OsloHelper, extract_current_word};
 use oslo::parser::parse_bash_script;
-use rustyline::Context;
-use rustyline::highlight::Highlighter;
-use rustyline::hint::Hinter;
-use rustyline::history::{History, MemHistory};
 use std::fs;
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
@@ -246,11 +242,14 @@ fn a_command_the_user_has_run_is_offered_first() {
 fn a_line_already_in_the_history_is_hinted_from_it() {
     let dir = tempfile::tempdir().unwrap();
     let h = helper(env_with_path(dir.path()));
-    let mut history = MemHistory::new();
-    history.add("echo hello world").unwrap();
-    let ctx = Context::new(&history);
+    // `recall` is language-filtered, so the row has to say which language is being read. The old
+    // version of this test got that for free from the editor's own history hinter, which had no
+    // notion of language — and offering a Lua line at a shell prompt is exactly what the filter
+    // exists to stop.
+    oslo::interactive::prompt::note_row("sh", 0, 0, true);
+    oslo::interactive::recall::remember("echo hello world", "sh");
 
-    assert_eq!(h.hint("echo hel", 8, &ctx), Some("lo world".to_string()));
+    assert_eq!(h.suggest("echo hel", 8), Some("lo world".to_string()));
 }
 
 #[test]
@@ -258,13 +257,12 @@ fn history_wins_over_the_command_index() {
     let dir = tempfile::tempdir().unwrap();
     make_exe(dir.path(), "zzalpha");
     let h = helper(env_with_path(dir.path()));
-    let mut history = MemHistory::new();
-    history.add("zzbravo --flag").unwrap();
-    let ctx = Context::new(&history);
+    oslo::interactive::prompt::note_row("sh", 0, 0, true);
+    oslo::interactive::recall::remember("zzbravo --flag", "sh");
 
     // A line the user has actually run beats any name we could rank: `zzalpha` is on `$PATH` and
     // is still not the answer.
-    assert_eq!(h.hint("zz", 2, &ctx), Some("bravo --flag".to_string()));
+    assert_eq!(h.suggest("zz", 2), Some("bravo --flag".to_string()));
 }
 
 #[test]
@@ -272,28 +270,29 @@ fn a_command_prefix_is_hinted_when_the_history_has_nothing() {
     let dir = tempfile::tempdir().unwrap();
     make_exe(dir.path(), "zzalpha");
     let h = helper(env_with_path(dir.path()));
-    let history = MemHistory::new();
-    let ctx = Context::new(&history);
 
-    assert_eq!(h.hint("zzal", 4, &ctx), Some("pha".to_string()));
+    assert_eq!(h.suggest("zzal", 4), Some("pha".to_string()));
     // An argument is not a command name, so nothing is guessed for it.
-    assert_eq!(h.hint("echo zzal", 9, &ctx), None);
+    assert_eq!(h.suggest("echo zzal", 9), None);
 }
 
 #[test]
 fn nothing_is_hinted_for_an_empty_line_or_from_the_middle_of_one() {
     let dir = tempfile::tempdir().unwrap();
     let h = helper(env_with_path(dir.path()));
-    let mut history = MemHistory::new();
-    history.add("echo hello world").unwrap();
-    let ctx = Context::new(&history);
+    // `recall` is language-filtered, so the row has to say which language is being read. The old
+    // version of this test got that for free from the editor's own history hinter, which had no
+    // notion of language — and offering a Lua line at a shell prompt is exactly what the filter
+    // exists to stop.
+    oslo::interactive::prompt::note_row("sh", 0, 0, true);
+    oslo::interactive::recall::remember("echo hello world", "sh");
 
-    assert_eq!(h.hint("", 0, &ctx), None);
+    assert_eq!(h.suggest("", 0), None);
     // The ghost text is drawn past the cursor; with the cursor mid-line it would overwrite what
     // is already there.
-    assert_eq!(h.hint("echo hello world", 4, &ctx), None);
+    assert_eq!(h.suggest("echo hello world", 4), None);
     // An exact match has no tail to suggest.
-    assert_eq!(h.hint("echo hello world", 16, &ctx), None);
+    assert_eq!(h.suggest("echo hello world", 16), None);
 }
 
 // ---------------------------------------------------------------- validator verdicts
@@ -400,27 +399,20 @@ fn colouring_never_changes_the_text_it_colours() {
         "echo don't",
         "cat <<EOF",
     ] {
-        assert_eq!(strip_ansi(&h.highlight(line, line.len())), line, "{line:?}");
+        assert_eq!(strip_ansi(&h.paint(line)), line, "{line:?}");
     }
 }
 
-/// An empty line has no syntax to paint, but it still gets the right prompt.
+/// An empty line paints to nothing at all.
 ///
-/// This used to assert `Cow::Borrowed("")`, which pinned a real bug: rustyline draws the prompt and
-/// calls `highlight` with `""`, so returning the line untouched meant the right prompt appeared
-/// only after the first keystroke. With no right prompt set there is still nothing to add.
+/// It used to carry the **right prompt**, because under rustyline the highlighter was the only
+/// place a cursor move did not confuse the layout — so the right prompt was smuggled out through
+/// it. oslo's own editor takes the right prompt as an argument and places it from the layout, so
+/// the painter has one job again: nothing in, nothing out.
 #[test]
-fn an_empty_line_carries_the_right_prompt_and_nothing_else() {
+fn an_empty_line_paints_to_nothing() {
     let h = helper(Environment::new());
-    assert_eq!(
-        strip_ansi(&h.highlight("", 0)),
-        "",
-        "no right prompt, nothing added"
-    );
-
-    h.set_right_prompt(Some("RIGHT".to_string()), 4);
-    let drawn = h.highlight("", 0);
-    assert!(drawn.contains("RIGHT"), "{drawn:?}");
+    assert_eq!(h.paint(""), "", "an empty line has no syntax to paint");
 }
 
 #[test]
@@ -429,16 +421,13 @@ fn a_ghost_hint_is_drawn_in_the_autosuggestion_colour() {
 
     // Colour 240 where the terminal can say it, which is the default.
     oslo::interactive::theme::set_depth(oslo::interactive::theme::Depth::Ansi256);
-    assert_eq!(
-        h.highlight_hint("lo world"),
-        "\x1b[38;5;240mlo world\x1b[0m"
-    );
+    assert_eq!(h.paint_hint("lo world"), "\x1b[38;5;240mlo world\x1b[0m");
 
     // On sixteen colours it degrades to whatever grey is nearest. Pinned rather than left
     // implicit, because naming an exact grey means accepting whatever the sixteen-slot palette
     // rounds it to.
     oslo::interactive::theme::set_depth(oslo::interactive::theme::Depth::Ansi16);
-    assert_eq!(h.highlight_hint("lo world"), "\x1b[37mlo world\x1b[0m");
+    assert_eq!(h.paint_hint("lo world"), "\x1b[37mlo world\x1b[0m");
 }
 
 /// The lexer is the half that needs no shell, so it is the half an integration test can pin

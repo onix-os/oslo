@@ -42,6 +42,9 @@ use crate::interactive::dropdown::width::{pad_to_width, truncate_to_width};
 use crate::interactive::prompt::printed_width;
 use crate::interactive::theme::{self, Color, Depth, Style};
 
+/// Cells the drawn cursor takes in the search bar.
+const CURSOR_WIDTH: usize = 1;
+
 /// Rows the input surface takes: a blank row, the query, a blank row.
 ///
 /// The blank rows are the surface, not spacing around it — they carry the same colour, which is
@@ -73,6 +76,14 @@ pub struct Frame<'a> {
     /// The first visible row, so a long list can scroll under a fixed window.
     pub offset: usize,
     pub query: &'a str,
+    /// How long the finder has been open, for the scanner in the search bar.
+    pub elapsed_ms: u64,
+    /// When Delete is waiting to be confirmed, which button is selected.
+    ///
+    /// `Some(true)` is *yes*. The search bar becomes the question — the three rows it already
+    /// owns are exactly the height of a bordered box, so nothing moves and the list keeps its
+    /// place while you answer.
+    pub confirm: Option<bool>,
     pub scope: Scope,
     /// How many commands there are in total, for the `12/840` counter.
     pub total: usize,
@@ -95,6 +106,18 @@ pub(super) fn visible_rows(rows: usize) -> usize {
     rows.saturating_sub(CHROME_ROWS).max(1)
 }
 
+/// Begin an atomic update, so the terminal cannot show a half-drawn frame.
+///
+/// DEC mode 2026: a terminal that understands it buffers everything until the matching end and
+/// presents the result in one go; one that does not ignores both, so this costs nothing anywhere.
+///
+/// It matters here because the finder redraws on a timer now, not only on a keystroke — the
+/// screen is rewritten many times a second, and without this the terminal is free to render
+/// halfway through a rewrite. That is what tearing *is*, and on a list it reads as the rows
+/// flickering or jumping.
+const SYNC_BEGIN: &str = "\x1b[?2026h";
+const SYNC_END: &str = "\x1b[?2026l";
+
 /// The whole screen, as one string of escapes.
 pub fn frame(f: &Frame<'_>) -> String {
     let theme = theme::current();
@@ -102,7 +125,7 @@ pub fn frame(f: &Frame<'_>) -> String {
     let pager = &theme.pager;
     let visible = f.visible_rows();
 
-    let mut out = String::new();
+    let mut out = String::from(SYNC_BEGIN);
     // Home, then draw downward. Every row erases to the end of the line as it goes, so a shorter
     // row cannot leave the tail of a longer one behind it.
     out.push_str("\x1b[H");
@@ -145,16 +168,19 @@ pub fn frame(f: &Frame<'_>) -> String {
 
     for row in 0..SURFACE_ROWS {
         out.push_str("\x1b[2K");
-        if row == 1 {
-            out.push_str(&search_bar(f, pager, surface, f.cols, depth));
-        } else {
-            out.push_str(&blank.paint(&" ".repeat(f.cols), depth));
+        match f.confirm {
+            // Asking: the surface becomes a bordered box, so it reads as a thing that wants an
+            // answer rather than as the search bar with different words in it.
+            Some(yes) => out.push_str(&confirm_row(row, yes, pager, f.cols, depth)),
+            None if row == 1 => out.push_str(&search_bar(f, pager, surface, f.cols, depth)),
+            None => out.push_str(&blank.paint(&" ".repeat(f.cols), depth)),
         }
         out.push_str("\r\n");
     }
 
     // And a plain row under it, so the panel does not sit on the terminal edge.
     out.push_str("\x1b[2K");
+    out.push_str(SYNC_END);
     out
 }
 
@@ -189,7 +215,8 @@ fn list_row(
     let marker = if selected { "❯ " } else { "  " };
     let when = pad_left(&ago(f.now, row.command.last_at), when_col);
     let runs = pad_left(&format!("{}×", row.command.runs), runs_col);
-    let line = pad_to_width(&truncate_to_width(&row.command.line, line_col), line_col);
+    let shown = truncate_to_width(&row.command.line, line_col);
+    let line = pad_to_width(&shown, line_col);
 
     let text_style = if selected { pager.text_sel } else { pager.text };
     let meta_style = pager.column(1, selected);
@@ -220,9 +247,108 @@ fn list_row(
         gap,
         on_row(meta_style).paint(&runs, depth),
         on_row(Style::default()).paint(" ", depth),
-        on_row(text_style).paint(&line, depth),
+        highlight_matches(&line, &shown, f.query, on_row(text_style), depth),
         on_row(Style::default()).paint(&pad, depth),
     )
+}
+
+/// Paint `line`, marking the characters the query matched.
+///
+/// **Only the characters that matched**, not the row and not the word around them. A fuzzy hit is
+/// otherwise a mystery: five rows come back and nothing says which letters put them there.
+///
+/// The mark is the accent on colour 1 with colour 0 over it — the terminal's own palette, so it
+/// belongs to whatever scheme is in use, and inverted enough to read at a glance against both the
+/// striped and the selected background.
+fn highlight_matches(padded: &str, shown: &str, query: &str, base: Style, depth: Depth) -> String {
+    let marks = crate::interactive::matching::positions(shown, query.trim());
+    if marks.is_empty() {
+        return base.paint(padded, depth);
+    }
+    // The mark keeps the row's background nowhere: it *is* a background, which is what makes it
+    // visible on a selected row as well as a plain one.
+    //
+    // **Not bold.** Bold is a colour hint as much as a weight: many terminals render it by
+    // switching to the bright palette, and some to plain grey — which would take the foreground
+    // off colour 0 and undo the contrast this pair exists for. The inversion is the emphasis.
+    let marked = Style {
+        fg: Some(Color::Indexed(0)),
+        bg: Some(Color::Indexed(1)),
+        ..Style::default()
+    };
+    let mut out = String::new();
+    let mut run = String::new();
+    for (at, ch) in padded.char_indices() {
+        let hit = marks.contains(&at);
+        // Runs are painted together, so a contiguous match is one escape rather than one per
+        // character — which matters on a screen of rows redrawn per keystroke.
+        if hit {
+            if !run.is_empty() {
+                out.push_str(&base.paint(&run, depth));
+                run.clear();
+            }
+            out.push_str(&marked.paint(&ch.to_string(), depth));
+        } else {
+            run.push(ch);
+        }
+    }
+    if !run.is_empty() {
+        out.push_str(&base.paint(&run, depth));
+    }
+    out
+}
+
+/// One row of the delete confirmation.
+///
+/// **A border, not a fill.** The search bar is a filled panel because it is where you type; this
+/// is a question, and a box that has been drawn *around* something is the shape every terminal
+/// program uses to say "answer me". Reusing the same three rows means the list above does not
+/// shift while you decide, so the row you are about to delete stays under your eye.
+fn confirm_row(row: usize, yes: bool, pager: &theme::Pager, cols: usize, depth: Depth) -> String {
+    let edge = pager.match_;
+    let inner = cols.saturating_sub(2);
+    match row {
+        0 => edge.paint(&format!("╭{}╮", "─".repeat(inner)), depth),
+        2 => edge.paint(&format!("╰{}╯", "─".repeat(inner)), depth),
+        _ => {
+            let question = "delete from history?";
+            let (yes_label, no_label) = ("[ yes ]", "[ no ]");
+            // The selected button is filled, the other one is not: one difference, and it is the
+            // one being asked about. A colour change alone reads as decoration.
+            let picked = Style {
+                fg: Some(Color::Indexed(0)),
+                bg: Some(Color::Indexed(1)),
+                ..Style::default()
+            };
+            let plain = pager.text;
+
+            // **Centred.** The question and its two answers are one object, so the whole run is
+            // measured and the leftover split either side — padding only the right would leave it
+            // sitting against the border it is supposed to be inside.
+            let body = printed_width(question)
+                + 2
+                + printed_width(yes_label)
+                + 2
+                + printed_width(no_label);
+            let left = inner.saturating_sub(body) / 2;
+            let right = inner.saturating_sub(body + left);
+
+            let tail = plain.paint(&" ".repeat(right), depth);
+            let side = edge.paint("│", depth);
+            format!(
+                "{}{}{}{}{}{}{}{}{}",
+                side,
+                plain.paint(&" ".repeat(left), depth),
+                plain.paint(question, depth),
+                plain.paint("  ", depth),
+                if yes { picked } else { plain }.paint(yes_label, depth),
+                plain.paint("  ", depth),
+                if yes { plain } else { picked }.paint(no_label, depth),
+                tail,
+                side,
+            )
+        }
+    }
 }
 
 /// The query line, with the count and current search scope on the right.
@@ -238,13 +364,26 @@ fn search_bar(
         Scope::Local => "[local]",
     };
     let count = format!("{}/{}", f.matches.len(), f.total);
-    let prompt = " ❯ ";
-    let room = cols
-        .saturating_sub(printed_width(prompt) + printed_width(&count) + printed_width(scope) + 2);
-    let typed = truncate_to_width(f.query, room);
+    // The bar reads `⬝⬝⬝⬝⬝⬝⬝⬝  ❯❯  query`: the scanner says the finder is live, and the chevrons
+    // still mark where the typing starts. See [`crate::interactive::scanner`] — the sweep is a
+    // function of elapsed time, so drawing it costs one call and holds no state.
+    // One cell wider than hexe's default. The bar has the room, and a longer track gives the
+    // sweep somewhere to travel — at eight the head is turning round almost as soon as it leaves.
+    let scanner = crate::interactive::scanner::Scanner {
+        width: 9,
+        ..crate::interactive::scanner::Scanner::default()
+    };
+    let sweep = scanner.render(f.elapsed_ms, surface, depth);
+    let chevrons = "❯❯";
+    let prompt_cells =
+        1 + scanner.plain(f.elapsed_ms).chars().count() + 2 + printed_width(chevrons) + 2;
+    let room = cols.saturating_sub(prompt_cells + printed_width(&count) + printed_width(scope) + 2);
+    // One cell is kept back for the cursor, which is part of the input and has to fit.
+    let typed = truncate_to_width(f.query, room.saturating_sub(1));
     let gap = cols.saturating_sub(
-        printed_width(prompt)
+        prompt_cells
             + printed_width(&typed)
+            + CURSOR_WIDTH
             + printed_width(&count)
             + printed_width(scope)
             + 2,
@@ -256,9 +395,24 @@ fn search_bar(
         ..style
     };
     format!(
-        "{}{}{}{}{}{}{}",
-        on_surface(pager.match_).paint(prompt, depth),
+        "{}{}{}{}{}{}{}{}{}{}{}{}",
+        on_surface(Style::default()).paint(" ", depth),
+        sweep,
+        on_surface(Style::default()).paint("  ", depth),
+        // The same white as the query: the chevrons mark where typing starts, so they belong to
+        // the text rather than standing apart from it as an accent.
+        on_surface(pager.text_sel).paint(chevrons, depth),
+        on_surface(Style::default()).paint("  ", depth),
         on_surface(pager.text_sel).paint(&typed, depth),
+        // **A cursor.** The real one is hidden — the finder owns the alternate screen — so the
+        // caret is drawn into the frame as a reversed block, the same way every widget in
+        // `interactive::ask` does it. Without it the search box gave no sign it was taking keys.
+        Style {
+            fg: Some(Color::Indexed(0)),
+            bg: Some(Color::Indexed(1)),
+            ..Style::default()
+        }
+        .paint(" ", depth),
         on_surface(Style::default()).paint(&" ".repeat(gap), depth),
         on_surface(pager.column(1, false)).paint(&count, depth),
         on_surface(Style::default()).paint(" ", depth),

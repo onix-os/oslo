@@ -55,6 +55,32 @@ pub struct Command {
 }
 
 impl Track {
+    /// Forget every run of `line` in `mode`, in every directory. Answers how many rows went.
+    ///
+    /// The finder's Delete key. A command you have run once by mistake — a password on the command
+    /// line, a typo that will be suggested forever — should be removable without emptying the
+    /// whole history, which is the only tool `history -c` gives you.
+    ///
+    /// Every directory, not just this one: the line is what you want gone, and leaving copies
+    /// under other directories would make it reappear the moment you walked there.
+    pub fn forget(&self, line: &str, mode: &str) -> usize {
+        let doomed: Vec<Vec<u8>> = self
+            .store
+            .read(|reader| {
+                Some(reader.collect(Tree::Run, &Span::all(), |key, _| {
+                    let same = field::argv_of_run(key).is_some_and(|argv| argv == line)
+                        && field::mode_of_run(key)
+                            .is_some_and(|found| found.as_ref() == mode.as_bytes());
+                    same.then(|| key.to_vec())
+                }))
+            })
+            .unwrap_or_default();
+        if doomed.is_empty() {
+            return 0;
+        }
+        self.store.delete_keys_in_chunks(Tree::Run, &doomed)
+    }
+
     /// Every distinct command line the store knows, newest-first, capped at `limit`.
     ///
     /// One scan of the run table. That is deliberate: the finder reads this once when it opens and

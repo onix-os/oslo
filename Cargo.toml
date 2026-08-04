@@ -1,6 +1,6 @@
 [package]
 name = "oslo"
-version = "0.2.4"
+version = "0.2.5"
 edition = "2024"
 # Edition 2024 alone needs 1.85, but the codebase uses let-chains in edition-2024 position
 # (stabilised in 1.88) and brush-parser declares 1.88 too. Bump this only alongside the MSRV
@@ -25,10 +25,12 @@ path = "src/lib.rs"
 full_moon = { version = "1", features = ["lua54"] }
 # `resource` is what `ulimit` reads and sets limits through, and what `times` reads getrusage(2)
 # through. Without it both had to parse /proc by hand.
+# `poll` is declared here rather than arriving by accident. It used to come from rustyline's own
+# feature selection — oslo called `nix::poll` without ever asking for it, and removing rustyline is
+# what revealed the borrowed feature.
 nix = { version = "0.29", features = [
-    "process", "signal", "term", "fs", "user", "resource", "hostname",
+    "process", "signal", "term", "fs", "user", "resource", "hostname", "poll",
 ] }
-rustyline = "15.0"
 # `[[ str =~ ere ]]` needs a real POSIX-ERE engine. Approximating it with globs would make every
 # validation idiom (`=~ ^[0-9]+$`) answer plausibly and wrongly.
 # **Trimmed on purpose, and measured.** The default feature set costs ~370KB and is *slower* for

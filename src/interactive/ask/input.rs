@@ -14,7 +14,7 @@
 //! of the shell's life.
 
 use super::{Answer, show, with_caret};
-use crate::interactive::term::{Key, Keys, Restore};
+use crate::interactive::term::{Key, Keys, Restore, Screen};
 use crate::interactive::theme;
 
 /// How `input` is asked.
@@ -40,7 +40,7 @@ pub fn input(spec: &Input) -> Answer<String> {
     let ui = theme::current().ui;
     let depth = theme::depth();
 
-    let Some(raw) = Restore::enter(false) else {
+    let Some(raw) = Restore::enter(Screen::Inline) else {
         // No terminal. A default is the script's own answer for exactly this, and is why one of
         // these in a CI pipeline need not hang.
         return match &spec.default {
@@ -134,7 +134,15 @@ pub fn input(spec: &Input) -> Answer<String> {
                 cursor = 0;
             }
             // Nothing here scrolls or toggles.
-            Key::Up | Key::Down | Key::ToggleScope | Key::BackTab | Key::Ignored => {}
+            // `Ctrl`/`Alt` chords belong to the line editor, not to a one-line prompt: listed
+            // rather than caught by a wildcard so a new key has to be considered here too.
+            Key::Up
+            | Key::Down
+            | Key::ToggleScope
+            | Key::BackTab
+            | Key::Ctrl(_)
+            | Key::Alt(_)
+            | Key::Ignored => {}
         }
     }
 }

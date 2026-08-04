@@ -252,6 +252,13 @@ pub struct Finder {
     /// memory, so this bounds the work done on the keystroke that opens it — not per keystroke
     /// while you type.
     pub limit: usize,
+    /// Whether Delete asks before forgetting a command.
+    ///
+    /// **On by default.** Deleting a history entry is not undoable — the rows are gone from the
+    /// store, and the only way back is to run the command again — so the default is the one that
+    /// cannot lose something by a mistyped keystroke. Turn it off if you are clearing a lot at
+    /// once and the question is in the way.
+    pub confirm_delete: bool,
 }
 
 impl Default for Finder {
@@ -262,6 +269,7 @@ impl Default for Finder {
             // first of all a history *list* — the thing you reach for by pressing Up. Both are
             // configurable, and Up still walks a line at a time when the finder is off.
             key: "up".to_string(),
+            confirm_delete: true,
             // Far more than anyone has, so the list is "everything" in practice, and still a bound
             // rather than an unbounded read on a store that has been collecting for years.
             limit: 10_000,
@@ -365,6 +373,11 @@ pub fn current() -> Settings {
 }
 
 pub fn install(settings: Settings) {
+    // Vi mode is a process-wide fact — the prompt reads it to draw its indicator, and the editor
+    // reads it to decide whether to have modes at all. Published here because this is the moment
+    // the config is known; it used to be set while binding rustyline's keys, which is a place that
+    // no longer exists.
+    super::vi::set_enabled(settings.vi.enabled);
     // `oslo.misc.color_depth` is applied here rather than read where colour is painted: the depth
     // is cached on first use, so a config that sets it after something has already drawn would be
     // ignored. Installing the settings is the moment the config is known and nothing has drawn.

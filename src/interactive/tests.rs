@@ -3,12 +3,11 @@
 //! Everything here goes through the public seams a test can reach — [`OsloHelper::candidates`],
 //! [`OsloHelper::command_hint`], [`OsloHelper::input_status`] — plus `Completer::complete`
 //! itself, which is callable once the dropdown is off. `Validator::validate` is *not* callable
-//! from outside rustyline (`ValidationContext::new` is crate-private), which is why the
+//! from outside the editor, which is why the
 //! classifier is exposed separately.
 
 use super::*;
 use crate::env::Environment;
-use rustyline::history::MemHistory;
 use std::fs;
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
@@ -185,9 +184,7 @@ fn complete_returns_the_whole_candidate_list_without_a_terminal() {
     make_exe(dir.path(), "zzbeta");
     let h = helper(env_with_path(dir.path()));
 
-    let history = MemHistory::new();
-    let ctx = Context::new(&history);
-    let (start, pairs) = h.complete("true && zz", 10, &ctx).unwrap();
+    let (start, pairs) = h.complete_word("true && zz", 10);
     assert_eq!(start, 8);
     let mut names: Vec<&str> = pairs.iter().map(|p| p.display.as_str()).collect();
     names.sort();
@@ -280,10 +277,8 @@ fn an_accepted_completion_is_counted() {
     let h = helper(env_with_path(dir.path()));
 
     assert_eq!(h.frecency_score("zzsingle"), 0.0);
-    let history = MemHistory::new();
-    let ctx = Context::new(&history);
     // Exactly one candidate, so rustyline inserts it: that is an acceptance.
-    let (_, pairs) = h.complete("zzsing", 6, &ctx).unwrap();
+    let (_, pairs) = h.complete_word("zzsing", 6);
     assert_eq!(pairs.len(), 1);
     assert!(h.frecency_score("zzsingle") > 0.0);
 }
@@ -294,10 +289,8 @@ fn a_completed_file_name_does_not_enter_the_command_ranking() {
     fs::write(dir.path().join("solo.txt"), b"x").unwrap();
     let h = helper(Environment::new());
 
-    let history = MemHistory::new();
-    let ctx = Context::new(&history);
     let line = format!("cat {}/solo", dir.path().display());
-    let (_, pairs) = h.complete(&line, line.len(), &ctx).unwrap();
+    let (_, pairs) = h.complete_word(&line, line.len());
     assert_eq!(pairs.len(), 1);
     assert_eq!(h.frecency_score("solo.txt"), 0.0);
 }
@@ -354,22 +347,20 @@ fn highlighting_tells_a_real_command_from_an_unknown_one() {
     assert_ne!(command, error, "a real and a missing command look the same");
 
     assert!(
-        h.highlight("zzreal -x", 9)
-            .contains(&format!("{command}zzreal")),
+        h.paint("zzreal -x").contains(&format!("{command}zzreal")),
         "{:?}",
-        h.highlight("zzreal -x", 9)
+        h.paint("zzreal -x")
     );
     assert!(
-        h.highlight("zzfake -x", 9)
-            .contains(&format!("{error}zzfake")),
+        h.paint("zzfake -x").contains(&format!("{error}zzfake")),
         "{:?}",
-        h.highlight("zzfake -x", 9)
+        h.paint("zzfake -x")
     );
     // Builtins resolve without any file existing, and take their own colour.
     assert!(
-        h.highlight("cd /tmp", 7).contains(&format!("{builtin}cd")),
+        h.paint("cd /tmp").contains(&format!("{builtin}cd")),
         "{:?}",
-        h.highlight("cd /tmp", 7)
+        h.paint("cd /tmp")
     );
 }
 

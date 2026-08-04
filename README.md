@@ -100,6 +100,8 @@ Or just use `$PS1`, with the full escape set — `\u \h \w \$ \t \A \d \j \! \[ 
   running only when the stricter one found nothing, so an exact match is never diluted
 - **Prefix history search** on Up, which restores the line you were composing instead of blanking it
 - **First-class vi mode** on fish's model: cursor shape says the mode, the prompt says it too
+- **Its own line editor** — buffer, layout, redraw, emacs and vi keymaps — so oslo owns the row it
+  edits rather than renting it. No `readline`, no `rustyline`.
 - **A right prompt**, drawn without the save/restore multiplexers fight over
 - **Syntax highlighting** that marks a command that does not exist
 
@@ -317,14 +319,29 @@ keeps the final say.
 
 ### The settings
 
-```lua
-oslo.misc.greeting     = "hello"     -- instead of the banner; misc.welcome = false for silence
-oslo.misc.escape_delay = 300         -- ms to wait for the rest of an escape sequence, over ssh
-oslo.misc.color_depth  = "truecolor" -- truecolor / 256 / 16 / none, when detection is wrong
+Shown with their defaults, so the options are visible without reading the source. Every line here
+is what oslo already does — you only need the ones you want to change.
 
-oslo.history.ignore    = { "ls", "cd *" }   -- $HISTIGNORE, matched against the whole line
-oslo.notify.after      = 10                 -- seconds; 0 never notifies
-oslo.notify.command    = "notify-send {title} {body}"   -- instead of the terminal's escape
+```lua
+oslo.misc.welcome       = true        -- the startup banner
+oslo.misc.greeting      = nil         -- a line of your own instead of the banner
+oslo.misc.escape_delay  = 25          -- ms to wait for the rest of an escape sequence; raise on ssh
+oslo.misc.color_depth   = nil         -- truecolor / 256 / 16 / none, when detection is wrong
+
+oslo.vi.enabled         = true        -- vi mode; false for emacs only
+oslo.completion.fuzzy   = "smart"     -- off / tight / smart / loose
+oslo.completion.max_rows = 15
+
+oslo.finder.enabled        = true     -- the full-screen history search
+oslo.finder.key            = "up"
+oslo.finder.limit          = 5000     -- distinct commands loaded when it opens
+oslo.finder.confirm_delete = true     -- Delete asks before forgetting a command
+
+oslo.history.ignore     = {}          -- $HISTIGNORE patterns, matched against the whole line
+oslo.history.ignore_space = true      -- a line starting with a space is not remembered
+oslo.history.ignore_dups = false
+oslo.notify.after       = 10          -- seconds a command must run to be worth a notification
+oslo.notify.command     = nil         -- e.g. "notify-send {title} {body}", instead of the escape
 
 oslo.abbr.gco = "git checkout"
 oslo.abbr.brc = { "~/.config/oslo/config.lua", anywhere = true }

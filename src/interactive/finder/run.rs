@@ -12,7 +12,8 @@ use super::Scope;
 use super::rank::{Ranked, rank};
 use super::render::{Frame, frame, visible_rows};
 use crate::interactive::matching::Fuzzy;
-use crate::interactive::term::{Key, Keys, Restore};
+use crate::interactive::scanner::Scanner;
+use crate::interactive::term::{Key, Keys, Pressed, Restore, Screen};
 use crate::track::history::Command;
 use std::io::{self, Write};
 
@@ -29,18 +30,38 @@ pub enum Outcome {
 ///
 /// `None` when there is no terminal to draw on or nothing to show — a finder that opened onto an
 /// empty screen would be a keystroke that appears to hang.
-pub fn open(commands: &[Command], cwd: &str, now: i64, fuzzy: Fuzzy) -> Option<Outcome> {
+pub fn open(
+    commands: &[Command],
+    cwd: &str,
+    now: i64,
+    fuzzy: Fuzzy,
+    seed: &str,
+) -> Option<Outcome> {
     if commands.is_empty() {
         return None;
     }
     // Raw mode and the alternate screen, both undone whichever way this returns. The prompt
     // underneath is untouched and comes back exactly as it was, which is the whole reason a
     // full-screen finder is affordable here.
-    let restore = Restore::enter(true)?;
+    let restore = Restore::enter(Screen::Alternate)?;
+
+    // When the finder opened, so the scanner in the search bar knows how far through its sweep it
+    // is. Taken once: the animation is a function of elapsed time, not of a counter to keep.
+    let opened = std::time::Instant::now();
+    // Only the *step* is needed here — the bar owns how wide the sweep is drawn. Sharing the
+    // default keeps the loop's tick and the animation's frame rate the same number.
+    let scanner = Scanner::default();
 
     let mut stdout = io::stdout();
-    let mut state = State::new(commands, cwd, fuzzy);
+    let mut state = State::new(commands, cwd, fuzzy, seed);
     let mut keys = Keys::on(restore.fd());
+
+    // The last frame written, so an unchanged one is not written again.
+    //
+    // The scanner holds still for nine frames at each end of its sweep, and nothing else moves
+    // between keystrokes — so without this the finder would rewrite the whole screen many times a
+    // second to produce a picture identical to the one already on it.
+    let mut last = String::new();
 
     loop {
         let (cols, rows) = terminal_size();
@@ -50,18 +71,49 @@ pub fn open(commands: &[Command], cwd: &str, now: i64, fuzzy: Fuzzy) -> Option<O
             selected: state.selected,
             offset: state.offset,
             query: &state.query,
+            elapsed_ms: opened.elapsed().as_millis() as u64,
+            confirm: state.confirm,
             scope: state.scope,
             total: state.total(),
             cols,
             rows,
             now,
         });
-        let _ = stdout.write_all(painted.as_bytes());
-        let _ = stdout.flush();
+        if painted != last {
+            let _ = stdout.write_all(painted.as_bytes());
+            let _ = stdout.flush();
+            last = painted;
+        }
 
-        let Some(pressed) = keys.read() else {
-            return Some(Outcome::Cancelled);
+        // **Waited for with a deadline, not blocked on.** A blocking read would leave the
+        // scanner frozen between keystrokes, which is the opposite of what an animation is for.
+        // On a timeout the loop simply comes back round and draws the next frame.
+        let pressed = match keys.read_within(scanner.step_ms as i32) {
+            Pressed::Key(key) => key,
+            Pressed::Timeout => continue,
+            Pressed::Ended => return Some(Outcome::Cancelled),
         };
+
+        // While the question is up it owns the keyboard: anything else typed would filter a list
+        // you cannot see the search bar for, and Enter would mean two different things at once.
+        if let Some(yes) = state.confirm {
+            match pressed {
+                Key::Left | Key::Right | Key::ToggleScope | Key::BackTab => {
+                    state.confirm = Some(!yes)
+                }
+                Key::Accept => {
+                    state.confirm = None;
+                    if yes {
+                        state.forget_selected();
+                    }
+                }
+                // Esc and Ctrl-C answer *no* rather than leaving the finder: you asked to delete
+                // something and changed your mind, which is not the same as wanting to close.
+                Key::Cancel | Key::Abort => state.confirm = None,
+                _ => {}
+            }
+            continue;
+        }
 
         match pressed {
             // The history finder has one way out: both leave the line as it was.
@@ -91,14 +143,34 @@ pub fn open(commands: &[Command], cwd: &str, now: i64, fuzzy: Fuzzy) -> Option<O
                 state.query.clear();
                 state.refilter();
             }
+            // Delete forgets the highlighted command — every run of it, in every directory. The
+            // selection stays where it is so a run of unwanted lines can be cleared without
+            // moving the cursor back each time.
+            //
+            // Asked about first unless the config turned that off: the rows are gone from the
+            // store afterwards and the only way back is to run the command again.
+            Key::Delete => {
+                if state.matches.is_empty() {
+                    // Nothing to ask about.
+                } else if crate::interactive::settings::current()
+                    .finder
+                    .confirm_delete
+                {
+                    // *No* is selected first, so a stray Enter answers the safe way.
+                    state.confirm = Some(false);
+                } else {
+                    state.forget_selected();
+                }
+            }
             Key::Char(c) => {
                 state.query.push(c);
                 state.refilter();
             }
             // Keys the shared reader knows but the finder has no use for: a full-screen list
             // has no cursor to move within a line.
-            Key::Ignored
-            | Key::Delete
+            Key::Ctrl(_)
+            | Key::Alt(_)
+            | Key::Ignored
             | Key::Left
             | Key::Right
             | Key::Home
@@ -109,8 +181,9 @@ pub fn open(commands: &[Command], cwd: &str, now: i64, fuzzy: Fuzzy) -> Option<O
 }
 
 /// The finder's state between keystrokes.
-struct State<'a> {
-    commands: &'a [Command],
+struct State {
+    /// Owned rather than borrowed: Delete removes a row, and a slice cannot lose one.
+    commands: Vec<Command>,
     cwd: String,
     fuzzy: Fuzzy,
     query: String,
@@ -123,16 +196,24 @@ struct State<'a> {
     /// How many rows the list currently has. Set from the terminal each frame, because it can be
     /// resized while the finder is open.
     window: usize,
+    /// `Some(true)` while Delete is waiting on an answer, with *yes* selected.
+    confirm: Option<bool>,
 }
 
-impl<'a> State<'a> {
-    fn new(commands: &'a [Command], cwd: &str, fuzzy: Fuzzy) -> State<'a> {
-        let matches = rank(commands, "", cwd, fuzzy);
+impl State {
+    /// `seed` is whatever was already on the prompt line.
+    ///
+    /// Carried in rather than starting empty, because pressing Up after typing `ls` means "find
+    /// the `ls` I ran before" — throwing the word away and asking for it again is a keystroke tax
+    /// on the one case the key exists for.
+    fn new(commands: &[Command], cwd: &str, fuzzy: Fuzzy, seed: &str) -> State {
+        let query = seed.trim().to_string();
+        let matches = rank(commands, &query, cwd, fuzzy);
         State {
-            commands,
+            commands: commands.to_vec(),
             cwd: cwd.to_string(),
             fuzzy,
-            query: String::new(),
+            query,
             scope: Scope::Global,
             matches,
             // The list grows upward from the search bar, so the row *nearest* the bar is the one
@@ -140,11 +221,12 @@ impl<'a> State<'a> {
             selected: 0,
             offset: 0,
             window: 1,
+            confirm: None,
         }
     }
 
     fn refilter(&mut self) {
-        self.matches = rank(self.commands, &self.query, &self.cwd, self.fuzzy);
+        self.matches = rank(&self.commands, &self.query, &self.cwd, self.fuzzy);
         if self.scope == Scope::Local {
             self.matches.retain(|row| row.command.dir == self.cwd);
         }
@@ -152,6 +234,26 @@ impl<'a> State<'a> {
         // keeping the index would land the cursor on an unrelated command.
         self.selected = 0;
         self.offset = 0;
+    }
+
+    /// Forget the highlighted command, in the store and in the list on screen.
+    fn forget_selected(&mut self) {
+        let Some(row) = self.matches.get(self.selected) else {
+            return;
+        };
+        let (line, mode) = (row.command.line.clone(), row.command.mode.clone());
+        if let Some(track) = crate::track::store() {
+            track.forget(&line, &mode);
+        }
+        // Dropped from the in-memory copy too, so the row goes now rather than the next time the
+        // finder is opened — the key has to look like it did something.
+        self.commands
+            .retain(|command| !(command.line == line && command.mode == mode));
+        let was = self.selected;
+        self.refilter();
+        // Back to where the eye was. `refilter` homes the selection because a *query* change
+        // makes the old index meaningless; a deletion does not — the rows around it are the same.
+        self.selected = was.min(self.matches.len().saturating_sub(1));
     }
 
     fn toggle_scope(&mut self) {
