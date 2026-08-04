@@ -1,35 +1,21 @@
-//! oslo's own tools, reached by the name it was called by.
+//! oslo's own tools: `oslo config`, `oslo history`, and the rest.
 //!
-//! # Why not `oslo config`
+//! # Sharing the operand slot with scripts
 //!
-//! Because that already means something. POSIX defines the shell's synopsis as
-//! `sh [options] [command_file [argument...]]` — the first operand **is a script path**, and
-//! neither bash nor dash reserves a single word in that slot. `oslo config` means "run the script
-//! named `config`", and a shell that decided otherwise would break the idiom on a `/bin/sh`.
+//! POSIX defines the shell's synopsis as `sh [options] [command_file [argument...]]` — the first
+//! operand **is a script path**, and neither bash nor dash reserves a single word in that slot. So
+//! a tool name has to be read there without ever taking an invocation a script could have wanted.
 //!
-//! The case that settles it is the shebang. A script beginning `#!/bin/oslo` is executed by the
-//! kernel as `execve("/bin/oslo", ["/bin/oslo", "./config"])` — argv identical, byte for byte, to
-//! somebody typing `oslo config`. There is nothing to tell them apart, so a subcommand named
-//! `config` would silently swallow every `#!/bin/oslo` script called `config`. On a machine where
-//! oslo *is* `/bin/sh`, that is every script on it.
+//! [`as_operand`] is that rule, and it holds because of one measured fact: **every shebang
+//! produces a slashed argv[1]**. A `#!/bin/oslo` script is executed by the kernel as
+//! `execve("/bin/oslo", ["/bin/oslo", "./config"])` when run from the current directory, and with
+//! the full path when found on `$PATH`. A bare `config` in that slot can therefore only have been
+//! typed by a person — which is what leaves the word free to mean something.
 //!
-//! # argv[0] instead
-//!
-//! busybox's answer, and it works because `argv[0]` is a slot the shell never reads as a script
-//! path. One binary, extra names:
-//!
-//! ```text
-//! ln -s /usr/bin/oslo /usr/bin/oslo-config
-//! ```
-//!
-//! `oslo-config` runs the tool; `oslo` and `sh` are the shell, untouched. The two can never
-//! collide because they are never reached through the same `argv[0]`. Verified against busybox
-//! itself, which has hundreds of applets and reserves *none* of them in `sh` mode: `busybox sh
-//! sync` runs a script named `sync`, not the `sync` applet.
-//!
-//! The names are prefixed `oslo-` because oslo is not replacing coreutils — a bare `config` on
-//! `$PATH` would shadow somebody else's program. busybox drops the prefix precisely because
-//! shadowing coreutils is its job.
+//! The second condition does the rest: a file of that name always wins. oslo does not search
+//! `$PATH` for a script operand, so when no such file exists the alternative was never "run
+//! something else", it was `No such file or directory`. An error becomes useful; nothing that
+//! worked changes meaning.
 
 /// One tool.
 pub struct Tool {
@@ -111,36 +97,6 @@ pub fn from_name(name: &str) -> Option<&'static Tool> {
     TOOLS.iter().find(|tool| tool.name == name)
 }
 
-/// The tool `called_as` names, if it names one.
-///
-/// Takes the whole `argv[0]` and reduces it: `/usr/bin/oslo-config` and `oslo-config` are the same
-/// request. A leading `-`, which is how a login shell is invoked, cannot survive the `oslo-`
-/// prefix test and so is never mistaken for a tool.
-pub fn from_argv0(called_as: &str) -> Option<&'static Tool> {
-    let base = called_as.rsplit('/').next()?;
-    from_name(base.strip_prefix("oslo-")?)
-}
-
-/// Whether `oslo-<name>` on `$PATH` is a signpost back to *this* binary.
-///
-/// **Resolved and compared, not merely tested for existence.** A different program of that name
-/// would answer to it instead, and reporting that as available would be a lie the user only finds
-/// out by running it.
-///
-/// `$PATH` rather than the directory beside the binary, because the question being asked is "if I
-/// type `oslo-config`, will it work?" — which is a `$PATH` question, and stays right for a distro
-/// that puts the real binary in `/usr/lib/oslo/` with the signposts in `/usr/bin/`.
-pub fn linked(name: &str) -> bool {
-    let Ok(me) = std::fs::canonicalize("/proc/self/exe") else {
-        return false;
-    };
-    let Some(path) = std::env::var_os("PATH") else {
-        return false;
-    };
-    std::env::split_paths(&path)
-        .any(|dir| std::fs::canonicalize(dir.join(format!("oslo-{name}"))).is_ok_and(|f| f == me))
-}
-
 /// Run a tool. The status is the process's.
 ///
 /// Every tool answers `--help` and nothing else yet — the sub-subcommands are still to be written.
@@ -154,7 +110,7 @@ pub fn run(tool: &'static Tool, args: &[String]) -> i32 {
     }
     if let Some(unknown) = args.first() {
         eprint!("{}", help(tool, paint));
-        eprintln!("\noslo-{}: {unknown:?}: no such subcommand", tool.name);
+        eprintln!("\noslo {}: {unknown:?}: no such subcommand", tool.name);
         return 2;
     }
     print!("{}", help(tool, paint));
@@ -163,25 +119,15 @@ pub fn run(tool: &'static Tool, args: &[String]) -> i32 {
 
 /// A tool's own help.
 fn help(tool: &'static Tool, paint: crate::cli::help::Paint) -> String {
-    let name = format!("oslo-{}", tool.name);
     format!(
-        "{}\n  {} {}\n\n{}\n  {}\n",
+        "{}\n  {} {} {}\n\n{}\n  {}\n",
         paint.head("USAGE"),
-        paint.key(&name),
+        paint.key("oslo"),
+        paint.key(tool.name),
         paint.slot("<subcommand> [...]"),
         paint.head("SUBCOMMANDS"),
         paint.dim("none yet — this tool is not implemented"),
     )
-}
-
-/// Where this binary really lives, for the hint that tells you how to make a signpost.
-///
-/// The resolved path rather than a hardcoded `/usr/bin/oslo`, so the `ln -s` line printed is one
-/// that can be pasted — which is the whole difference between a hint and a chore.
-pub fn own_path() -> String {
-    std::fs::canonicalize("/proc/self/exe")
-        .map(|p| p.display().to_string())
-        .unwrap_or_else(|_| "oslo".to_string())
 }
 
 #[cfg(test)]

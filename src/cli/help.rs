@@ -19,7 +19,7 @@
 //! `--help` that printed all twenty-two shell options would bury the six things somebody running
 //! it actually wanted. `--details` is where the long form lives, and the short form says so.
 
-use crate::cli::tools::{self, TOOLS};
+use crate::cli::tools::TOOLS;
 use oslo::env::options::ALL;
 use oslo::interactive::theme::{Color, Depth, Style};
 use std::fmt::Write as _;
@@ -89,10 +89,6 @@ impl Paint {
 
 /// The width the description column starts at. Wide enough for `--profile=NAME`.
 const COLUMN: usize = 20;
-
-/// The width of the description column, so the `(inactive)` marks form one of their own.
-/// A ragged mark reads as noise attached to the text rather than as a status.
-const ABOUT_COLUMN: usize = 46;
 
 /// One `flag  description` line, with the description aligned.
 ///
@@ -198,56 +194,19 @@ const LONG: &[(&str, &str)] = &[
     ("--", "end of options"),
 ];
 
-/// The tools, each marked with whether it also answers to a command of its own.
+/// The tools.
 ///
-/// **The mark is about the second spelling, not about availability.** Every tool runs as
-/// `oslo <tool>` whether or not anything is symlinked; a signpost on `$PATH` only adds
-/// `oslo-<tool>` beside it. Calling an unlinked tool "inactive" would be the more eye-catching
-/// label and the wrong one — it would send somebody off to debug a `$PATH` that is fine.
+/// Nothing to install and nothing to mark: a tool is reachable the moment the binary is.
 fn tools_section(paint: Paint) -> String {
     let mut s = String::new();
     let _ = writeln!(
         s,
         "\n{}  {}",
         paint.head("TOOLS"),
-        paint.dim("run as `oslo <tool>`")
+        paint.dim("a script of the same name always wins")
     );
-
-    let mut unlinked = false;
     for tool in TOOLS {
-        let linked = tools::linked(tool.name);
-        unlinked |= !linked;
-        let mark = if linked {
-            let gap = ABOUT_COLUMN.saturating_sub(tool.about.chars().count());
-            format!(
-                "{}{}",
-                " ".repeat(gap),
-                paint.dim(&format!("also oslo-{}", tool.name))
-            )
-        } else {
-            String::new()
-        };
-        let pad = COLUMN.saturating_sub(tool.name.chars().count());
-        let _ = writeln!(
-            s,
-            "  {}{}{}{}",
-            paint.key(tool.name),
-            " ".repeat(pad),
-            tool.about,
-            mark
-        );
-    }
-
-    if unlinked {
-        let _ = writeln!(
-            s,
-            "\n  {}\n      {}",
-            paint.dim("A tool can have a command of its own as well:"),
-            paint.dim(&format!(
-                "ln -s {} /usr/local/bin/oslo-config",
-                tools::own_path()
-            ))
-        );
+        s.push_str(&row(tool.name, paint.key(tool.name), tool.about));
     }
     s
 }

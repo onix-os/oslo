@@ -68,10 +68,9 @@ fn every_tool_appears_in_the_help() {
     }
 }
 
-/// The help teaches the form that always works. `oslo-<tool>` needs a symlink; `oslo <tool>` never
-/// does, so that is the one the synopsis shows.
+/// The synopsis shows how a tool is run, beside the two shell forms.
 #[test]
-fn the_help_shows_the_form_that_needs_no_symlink() {
+fn the_help_shows_how_to_run_a_tool() {
     let text = short(Paint::plain());
     assert!(text.contains("oslo <tool>"), "{text}");
 }

@@ -126,7 +126,7 @@ fn version_and_help_exit_zero_on_stdout() {
     assert_eq!(h.status, 0);
     assert!(!h.to_stderr);
     assert!(h.message.contains("USAGE"), "{}", h.message);
-    assert!(h.message.contains("oslo-config"), "the tools are listed");
+    assert!(h.message.contains("config"), "the tools are listed");
 }
 
 /// `--details` is the long form, and works written either side of `--help` — nobody should have

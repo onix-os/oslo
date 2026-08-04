@@ -129,17 +129,6 @@ fn restore_signal_mask(mask: &nix::sys::signal::SigSet) {
 fn dispatch() {
     let args: Vec<String> = env::args().collect();
 
-    // **The name oslo was called by decides whether it is a shell at all.** `oslo-config` is the
-    // config tool; `oslo`, `sh` and `-sh` are the shell. See `cli::tools` for why this is argv[0]
-    // and not a subcommand word — briefly: argv[1] is already a script path, and a `#!/bin/oslo`
-    // script named `config` produces an argv identical to `oslo config`.
-    //
-    // First thing in `dispatch`, before the arguments are parsed at all, because a tool's flags
-    // are its own and need not be a shell's.
-    if let Some(tool) = args.first().and_then(|argv0| cli::tools::from_argv0(argv0)) {
-        std::process::exit(cli::tools::run(tool, &args[1..]));
-    }
-
     let invocation = match cli::parse(&args) {
         Ok(inv) => inv,
         Err(exit) => {

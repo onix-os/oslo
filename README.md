@@ -331,8 +331,8 @@ pair — delete them.
 `oslo --help` lists them. `config`, `profile`, `history`, `direnv` and `hook`:
 
 ```sh
-oslo history            # the tool
-oslo-history            # the same thing, if you symlink oslo to that name
+oslo history
+oslo config
 ```
 
 **A script always wins.** The operand slot belongs to scripts — POSIX defines the shell as
@@ -350,9 +350,6 @@ becomes useful. `oslo ./history` and `oslo -- history` say "this is a path" and 
 The slash rule is what keeps shebangs working. A script starting `#!/bin/oslo` is always run by
 the kernel with a *slashed* argv[1] — `./history` from the current directory, the full path when
 found on `$PATH` — so a bare `history` can only ever have been typed by a person.
-
-Symlinking `oslo-<tool>` adds a command of its own, which is busybox's `argv[0]` trick and works
-because `argv[0]` is a slot the shell never reads as a script path.
 
 ## Configuration
 
