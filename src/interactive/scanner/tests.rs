@@ -124,9 +124,22 @@ fn a_zero_step_does_not_divide_by_zero() {
 /// The head is the brightest cell and the tail fades behind it.
 #[test]
 fn the_head_is_brighter_than_its_tail() {
-    let painted = scanner().render(75 * 5, Depth::Ansi256);
+    let painted = scanner().render(75 * 5, None, Depth::Ansi256);
     // Frame 5 is `■■■■■■⬝⬝`: the head is at cell 5, so 243 is present and so are dimmer steps.
     assert!(painted.contains("38;5;243"), "no head colour: {painted:?}");
     assert!(painted.contains("38;5;238"), "no faded tail: {painted:?}");
     assert!(painted.contains("38;5;240"), "no unlit track: {painted:?}");
+}
+
+/// The scanner takes the background it is drawn on, or it punches a hole through the panel it
+/// sits inside — which is what the search bar's surface is.
+#[test]
+fn the_background_is_carried_through_every_cell() {
+    let on_surface = scanner().render(0, Some(Color::Indexed(236)), Depth::Ansi256);
+    // Every cell, lit or not, names the surface.
+    assert_eq!(
+        on_surface.matches("48;5;236").count(),
+        8,
+        "not every cell took the background: {on_surface:?}"
+    );
 }

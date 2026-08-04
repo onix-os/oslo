@@ -54,6 +54,13 @@ pub fn open(
     let mut state = State::new(commands, cwd, fuzzy, seed);
     let mut keys = Keys::on(restore.fd());
 
+    // The last frame written, so an unchanged one is not written again.
+    //
+    // The scanner holds still for nine frames at each end of its sweep, and nothing else moves
+    // between keystrokes — so without this the finder would rewrite the whole screen many times a
+    // second to produce a picture identical to the one already on it.
+    let mut last = String::new();
+
     loop {
         let (cols, rows) = terminal_size();
         state.fit(rows);
@@ -69,8 +76,11 @@ pub fn open(
             rows,
             now,
         });
-        let _ = stdout.write_all(painted.as_bytes());
-        let _ = stdout.flush();
+        if painted != last {
+            let _ = stdout.write_all(painted.as_bytes());
+            let _ = stdout.flush();
+            last = painted;
+        }
 
         // **Waited for with a deadline, not blocked on.** A blocking read would leave the
         // scanner frozen between keystrokes, which is the opposite of what an animation is for.

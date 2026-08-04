@@ -143,8 +143,12 @@ impl Scanner {
         (0..TRAIL).contains(&behind).then_some(behind)
     }
 
-    /// The frame at `elapsed_ms`, painted.
-    pub fn render(self, elapsed_ms: u64, depth: Depth) -> String {
+    /// The frame at `elapsed_ms`, painted on `bg`.
+    ///
+    /// The background is taken rather than left to the terminal's default: the scanner sits inside
+    /// the search bar's surface, and a cell drawn without one punches a hole through the panel it
+    /// is standing on.
+    pub fn render(self, elapsed_ms: u64, bg: Option<Color>, depth: Depth) -> String {
         let sweep = self.sweep(self.frame_at(elapsed_ms));
         let mut out = String::new();
         for cell in 0..self.cells() {
@@ -154,7 +158,11 @@ impl Scanner {
                 Some(behind) => (HEAD, BRIGHTEST - behind.min(7) as u8),
                 None => (TRACK, UNLIT),
             };
-            out.push_str(&Style::fg(Color::Indexed(colour)).paint(&glyph.to_string(), depth));
+            let style = Style {
+                bg,
+                ..Style::fg(Color::Indexed(colour))
+            };
+            out.push_str(&style.paint(&glyph.to_string(), depth));
         }
         out
     }

@@ -100,6 +100,18 @@ pub(super) fn visible_rows(rows: usize) -> usize {
     rows.saturating_sub(CHROME_ROWS).max(1)
 }
 
+/// Begin an atomic update, so the terminal cannot show a half-drawn frame.
+///
+/// DEC mode 2026: a terminal that understands it buffers everything until the matching end and
+/// presents the result in one go; one that does not ignores both, so this costs nothing anywhere.
+///
+/// It matters here because the finder redraws on a timer now, not only on a keystroke — the
+/// screen is rewritten many times a second, and without this the terminal is free to render
+/// halfway through a rewrite. That is what tearing *is*, and on a list it reads as the rows
+/// flickering or jumping.
+const SYNC_BEGIN: &str = "\x1b[?2026h";
+const SYNC_END: &str = "\x1b[?2026l";
+
 /// The whole screen, as one string of escapes.
 pub fn frame(f: &Frame<'_>) -> String {
     let theme = theme::current();
@@ -107,7 +119,7 @@ pub fn frame(f: &Frame<'_>) -> String {
     let pager = &theme.pager;
     let visible = f.visible_rows();
 
-    let mut out = String::new();
+    let mut out = String::from(SYNC_BEGIN);
     // Home, then draw downward. Every row erases to the end of the line as it goes, so a shorter
     // row cannot leave the tail of a longer one behind it.
     out.push_str("\x1b[H");
@@ -160,6 +172,7 @@ pub fn frame(f: &Frame<'_>) -> String {
 
     // And a plain row under it, so the panel does not sit on the terminal edge.
     out.push_str("\x1b[2K");
+    out.push_str(SYNC_END);
     out
 }
 
@@ -294,7 +307,7 @@ fn search_bar(
     // arrow says nothing a blank would not. See [`crate::interactive::scanner`] — it is a function
     // of elapsed time, so drawing it costs one call and holds no state.
     let scanner = crate::interactive::scanner::Scanner::default();
-    let sweep = scanner.render(f.elapsed_ms, depth);
+    let sweep = scanner.render(f.elapsed_ms, surface, depth);
     let prompt_cells = scanner.plain(f.elapsed_ms).chars().count() + 2;
     let room = cols.saturating_sub(prompt_cells + printed_width(&count) + printed_width(scope) + 2);
     // One cell is kept back for the cursor, which is part of the input and has to fit.
