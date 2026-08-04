@@ -123,8 +123,10 @@ pub enum Sort {
 impl Default for Completion {
     fn default() -> Self {
         Completion {
-            // IRIS's default, and about the most a dropdown can show without covering the work.
-            max_rows: 15,
+            // What the menu has always actually shown. It used to be documented as 15 and capped
+            // at 8, so the number here was unreachable; now the cap is gone the honest default is
+            // the behaviour people already have. Raise it to anything up to `CEILING_ROWS`.
+            max_rows: crate::interactive::dropdown::DEFAULT_ROWS,
             descriptions: true,
             show_kind: true,
             case_sensitive: false,
@@ -415,7 +417,10 @@ mod tests {
         let (tiny, _) = settings_from("oslo = { completion = { max_rows = 0 } }");
         assert_eq!(tiny.completion.max_rows, 1);
         let (huge, _) = settings_from("oslo = { completion = { max_rows = 9999 } }");
-        assert_eq!(huge.completion.max_rows, super::super::dropdown::MAX_ROWS);
+        assert_eq!(
+            huge.completion.max_rows,
+            crate::interactive::dropdown::CEILING_ROWS
+        );
     }
 
     #[test]

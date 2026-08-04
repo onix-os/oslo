@@ -10,8 +10,16 @@ use super::layout::compute_layout;
 use super::width::{FALLBACK_COLS, pad_to_width, physical_rows, terminal_cols, truncate_to_width};
 use crate::interactive::theme::{self, Style};
 
-/// The most candidates shown at once; beyond this the list pages.
-pub const MAX_ROWS: usize = 8;
+/// How many candidates are shown at once when the config does not say; beyond this the list pages.
+///
+/// A **default**, not a ceiling. It used to be both, which made `oslo.completion.max_rows` a knob
+/// that could only ever lower the menu — asking for twenty rows silently got you eight, and the
+/// documented default of fifteen was unreachable.
+pub const DEFAULT_ROWS: usize = 8;
+
+/// The most rows a menu may take however large `max_rows` is, so a dropdown can never fill the
+/// screen and leave nowhere for the prompt.
+pub const CEILING_ROWS: usize = 40;
 
 /// Render the dropdown against the real terminal's width.
 ///
@@ -50,7 +58,7 @@ pub fn render_vertical_dropdown_at_width(
         return (String::new(), 0);
     }
 
-    let max_visible = max_visible.clamp(1, MAX_ROWS);
+    let max_visible = max_visible.clamp(1, CEILING_ROWS);
     let start = (selected_idx / max_visible) * max_visible;
     let end = (start + max_visible).min(candidates.len());
     let visible = &candidates[start..end];

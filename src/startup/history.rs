@@ -39,6 +39,10 @@ pub struct Settings {
     pub file: Option<PathBuf>,
     /// Maximum entries held in memory and written to the file.
     pub max_size: usize,
+    /// `oslo.history.ignore_space`: a line starting with whitespace is not remembered.
+    pub ignore_space: bool,
+    /// `oslo.history.ignore_dups`: a line identical to the one before it is not remembered.
+    pub ignore_dups: bool,
 }
 
 /// Read `$HISTFILE` and `$HISTSIZE`, and `oslo.history` where the config set it.
@@ -66,7 +70,12 @@ pub fn settings(env: &Environment) -> Settings {
         Some(value) => histsize(Some(value)),
         None => configured.size.unwrap_or(DEFAULT_HISTSIZE),
     };
-    Settings { file, max_size }
+    Settings {
+        file,
+        max_size,
+        ignore_space: configured.ignore_space,
+        ignore_dups: configured.ignore_dups,
+    }
 }
 
 /// `~/h` as a path, since a config writes a path the way a person says one.
@@ -111,7 +120,11 @@ fn home(env: &Environment) -> Option<PathBuf> {
 /// So the test has to be made against the line as typed, here, or ` secret` is stored despite
 /// the leading space that exists precisely to prevent that.
 pub fn is_secret(raw_line: &str) -> bool {
-    raw_line.starts_with(|c: char| c.is_whitespace())
+    // `oslo.history.ignore_space = false` turns the leading-space convention off, for somebody who
+    // pastes indented lines and would rather keep them. It used to be hardcoded on, so the setting
+    // existed, was read, was stored — and did nothing.
+    oslo::interactive::settings::current().history.ignore_space
+        && raw_line.starts_with(|c: char| c.is_whitespace())
 }
 
 /// What the `history` builtin prints, published by the REPL after every line.

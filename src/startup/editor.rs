@@ -24,14 +24,17 @@ pub(super) fn build_editor(settings: &history::Settings) -> Repl {
     // anything if the numbering agrees.
     let config = rustyline::Config::builder()
         .auto_add_history(false)
-        .history_ignore_dups(false)
+        // `oslo.history.ignore_dups`. Off by default because dropping a duplicate silently
+        // renumbers every later event and makes `!-2` point one line too far back — bash's
+        // default `HISTCONTROL` keeps them, and `!n` only means anything if the numbering agrees.
+        .history_ignore_dups(settings.ignore_dups)
         .expect("history duplicate policy")
         // rustyline's own default is 100 entries, which loses a working day's commands.
         .max_history_size(settings.max_size)
         .expect("history size")
-        // Honoured for anything rustyline adds itself; `history::is_secret` covers the entries
-        // this file adds by hand, which is all of them.
-        .history_ignore_space(true)
+        // `oslo.history.ignore_space`. Honoured for anything rustyline adds itself;
+        // `history::is_secret` covers the entries this file adds by hand, which is all of them.
+        .history_ignore_space(settings.ignore_space)
         // `oslo.vi.enabled`. Read here rather than toggled later because the keymap is fixed when
         // the editor is built.
         .edit_mode(if oslo::interactive::settings::current().vi.enabled {

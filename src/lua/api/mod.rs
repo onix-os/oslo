@@ -67,7 +67,24 @@ pub fn install(interp: &Rc<Interp>, registry: &Registry, env: Arc<Mutex<Environm
     // one of these is read back after the config by walking the table, so an empty one that the
     // user never touches is indistinguishable from an absent one — which is what makes leaving
     // them here free.
-    for name in ["completion", "suggest", "history", "keys", "finder", "misc"] {
+    //
+    // **Every settings table, not most of them.** `vi`, `notify` and `dirs` were missing, so
+    // `oslo.vi.enabled = false` — the spelling the README documents — died with "attempt to index
+    // a nil value" while `oslo.vi = { enabled = false }` worked. A config language where two
+    // spellings of the same thing differ by whether somebody remembered to add a line here is one
+    // nobody can hold in their head.
+    for name in [
+        "completion",
+        "suggest",
+        "history",
+        "keys",
+        "finder",
+        "misc",
+        "vi",
+        "notify",
+        "dirs",
+        "theme",
+    ] {
         oslo.set(
             Value::str(name),
             Value::Table(Rc::new(RefCell::new(Table::new()))),

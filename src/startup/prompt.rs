@@ -31,7 +31,10 @@ pub fn segment_context(
             .map(str::to_string)
             .or_else(|| oslo::interactive::vi::mode().map(|m| m.name().to_string())),
         cols: oslo::interactive::dropdown::terminal_cols(),
-        jobs: 0,
+        // The real count. Hardcoded `0` until now, which made a `jobs` segment in a prompt — the
+        // reason the field exists — always draw nothing. Every prompt tool reads this; in bash it
+        // is `jobs -p | wc -l` and in zsh `${#jobstates}`.
+        jobs: oslo::exec::job::with_jobs(|jobs| jobs.jobs().len()),
         continuation: false,
     }
 }

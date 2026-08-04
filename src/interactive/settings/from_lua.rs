@@ -54,7 +54,7 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
             // One row is still a dropdown; zero would be a dropdown that never appears, which is
             // what turning completion off looks like and is not what a row count means.
             settings.completion.max_rows =
-                (n.max(1) as usize).min(crate::interactive::dropdown::MAX_ROWS);
+                (n.max(1) as usize).min(crate::interactive::dropdown::CEILING_ROWS);
         }
         flag(
             &table,
