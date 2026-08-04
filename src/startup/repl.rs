@@ -181,7 +181,19 @@ pub fn run_repl() -> ! {
     let mut last_status = 0;
     let mut eof_count = 0usize;
 
+    // Universal variables, seeded once and then re-read whenever another shell writes the file.
+    // `seen` is the set this loop put there, so a name the *user* assigns afterwards is not
+    // quietly overwritten by the next reload — see `universal::apply`.
+    let mut universal_stamp = oslo::env::universal::changed_at();
+    oslo::env::universal::apply(&mut env_struct.lock().unwrap());
+
     loop {
+        // Another shell may have set a universal variable since the last prompt. A `stat` decides
+        // whether to read the file, so the common case — nobody changed anything — costs one
+        // syscall per prompt rather than a parse.
+        universal_stamp =
+            oslo::env::universal::refresh(&mut env_struct.lock().unwrap(), universal_stamp);
+
         // A prompt is about to be drawn. This is bash's `PROMPT_COMMAND` and zsh's `precmd`, and
         // the hook a prompt integration written in Lua needs — the shell-side one already exists
         // as `$PROMPT_COMMAND` below.
@@ -245,6 +257,13 @@ pub fn run_repl() -> ! {
                 // timing it, or setting a title from it.
                 // `preexec` is the accurate name; `precmd` is what oslo called it first and still
                 // answers to. Both are handed the command line as typed.
+                // Again here: this shell has been blocked in its line editor since before the
+                // command was typed, so the check at the top of the loop last ran a command ago.
+                // Without this, `universal X=1` in one terminal and `echo $X` in another shows the
+                // old value once and the new one from then on — the worst possible behaviour,
+                // since it looks like it works and does not.
+                universal_stamp =
+                    oslo::env::universal::refresh(&mut env_struct.lock().unwrap(), universal_stamp);
                 lua.fire_hook("preexec", vec![LuaEngine::hook_arg(&text)]);
                 lua.fire_hook("precmd", vec![LuaEngine::hook_arg(&text)]);
                 // The title says what is running while it runs, and goes back to the directory

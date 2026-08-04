@@ -363,6 +363,26 @@ oslo.on["command-not-found"](function(name) end)
 `precmd` and `postcmd` are the names oslo shipped first and still answers to. They fire alongside
 `preexec` and `postexec`, which are what the rest of the world calls the same two moments.
 
+### Universal variables
+
+```sh
+universal THEME=dark        # here, in every other running oslo, and next session
+universal -x EDITOR=hx      # and exported to children
+universal -e THEME          # gone, everywhere
+universal                   # list them
+```
+
+fish's `set -U`, under a name oslo can spell — `set` is POSIX's, and its options are shell options
+and positional parameters. Stored in `$XDG_DATA_HOME/oslo/universal`, one variable per line, and
+**never sourced**: a file every one of your shells writes to is not a file to execute.
+
+Running shells pick up a change before the next command, not the next login. That costs one `stat`
+per prompt, since the file is only read when it has actually moved.
+
+**A local assignment wins.** A universal `PAGER` must not stop `PAGER=cat cmd` meaning `cat`, so
+the file fills in names this shell has not set and loses to any it has — including for erasure,
+where a value you assigned over is yours to keep.
+
 ### `status`
 
 ```sh
