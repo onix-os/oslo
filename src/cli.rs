@@ -21,6 +21,11 @@ pub enum Action {
     Command(String),
     /// A script operand: read the program from this path.
     Script(String),
+    /// `oslo history …`: one of oslo's own tools, named in the operand slot.
+    ///
+    /// The name rather than the [`tools::Tool`] so that this type stays comparable and printable
+    /// for the parser's tests; the binary looks it up again to run it.
+    Tool(String, Vec<String>),
     /// `-s`, or no operand at all: read the program from standard input.
     Stdin,
 }
@@ -177,6 +182,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, Exit> {
     let mut vi: Option<bool> = None;
     let mut profile: Option<String> = None;
     let mut read_stdin = false;
+    let mut ended_options = false;
     let mut force_interactive = false;
     let mut login = false;
     let mut set_options = String::new();
@@ -193,12 +199,10 @@ pub fn parse(argv: &[String]) -> Result<Invocation, Exit> {
     while i < argv.len() {
         let arg = argv[i].clone();
 
-        // `--` and a bare `-` both end option processing; neither is an operand.
-        if arg == "--" {
-            i += 1;
-            break;
-        }
-        if arg == "-" {
+        // `--` and a bare `-` both end option processing; neither is an operand. Remembered,
+        // because `--` is also how somebody says "the next word is a path, not a tool name".
+        if arg == "--" || arg == "-" {
+            ended_options = true;
             i += 1;
             break;
         }
@@ -335,6 +339,12 @@ pub fn parse(argv: &[String]) -> Result<Invocation, Exit> {
         }
         None if read_stdin => (Action::Stdin, operands.to_vec()),
         None => match operands.split_first() {
+            // A tool only when nothing else could have been meant — see `tools::as_operand`. Not
+            // after an explicit `--`, which is how you say "this really is a path".
+            Some((word, rest)) if !ended_options && tools::as_operand(word).is_some() => {
+                name = word.clone();
+                (Action::Tool(word.clone(), rest.to_vec()), Vec::new())
+            }
             Some((path, rest)) => {
                 name = path.clone();
                 (Action::Script(path.clone()), rest.to_vec())

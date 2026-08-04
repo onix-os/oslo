@@ -66,6 +66,51 @@ pub const TOOLS: &[Tool] = &[
     },
 ];
 
+/// The tool a first *operand* names, if it safely names one.
+///
+/// This is what makes `oslo history` work without taking the operand slot away from scripts. Three
+/// conditions, and all of them must hold:
+///
+/// 1. **No `/` in it.** Every shebang produces a slashed path — `./config` when run from the
+///    current directory, the full path when found on `$PATH` — so a bare word can only have been
+///    typed by a person. Verified against the kernel rather than assumed.
+/// 2. **No file of that name exists.** A script always wins. `oslo config` next to a `./config`
+///    runs the script, exactly as it does today.
+/// 3. It is one of [`TOOLS`].
+///
+/// Condition 2 is what makes this safe rather than merely unlikely to bite. oslo does not search
+/// `$PATH` for a script operand, so if no such file exists the alternative was not "run something
+/// else" — it was `oslo: config: No such file or directory`. Nothing that works today can change
+/// meaning; only an error becomes useful.
+///
+/// The escape hatches, for the day somebody has a script named `hook`: `oslo ./hook` and
+/// `oslo -- hook` both say "this is a path" and are honoured.
+pub fn as_operand(word: &str) -> Option<&'static Tool> {
+    as_operand_when(word, |word| std::path::Path::new(word).exists())
+}
+
+/// [`as_operand`], with the filesystem passed in.
+///
+/// Split out **so the tests never touch the process's working directory.** Proving "a real file
+/// wins" by `chdir`-ing into a temporary directory would work exactly once: `cwd` is process-wide,
+/// libtest runs tests on threads, and a sibling resolving a relative path mid-`chdir` sees the
+/// wrong one. The same in-process global-state trap as `environ`, which has caused three flaky
+/// tests in this codebase already.
+fn as_operand_when(word: &str, exists: impl Fn(&str) -> bool) -> Option<&'static Tool> {
+    if word.contains('/') {
+        return None;
+    }
+    if exists(word) {
+        return None;
+    }
+    from_name(word)
+}
+
+/// The tool with exactly this name.
+pub fn from_name(name: &str) -> Option<&'static Tool> {
+    TOOLS.iter().find(|tool| tool.name == name)
+}
+
 /// The tool `called_as` names, if it names one.
 ///
 /// Takes the whole `argv[0]` and reduces it: `/usr/bin/oslo-config` and `oslo-config` are the same
@@ -73,8 +118,7 @@ pub const TOOLS: &[Tool] = &[
 /// prefix test and so is never mistaken for a tool.
 pub fn from_argv0(called_as: &str) -> Option<&'static Tool> {
     let base = called_as.rsplit('/').next()?;
-    let name = base.strip_prefix("oslo-")?;
-    TOOLS.iter().find(|tool| tool.name == name)
+    from_name(base.strip_prefix("oslo-")?)
 }
 
 /// Whether `oslo-<name>` on `$PATH` is a signpost back to *this* binary.

@@ -162,6 +162,12 @@ fn dispatch() {
     }
 
     match invocation.action {
+        // `oslo history …` — reached only when no file of that name exists, so this never takes
+        // an invocation a script could have wanted. See `cli::tools::as_operand`.
+        Action::Tool(ref name, ref args) => {
+            let tool = cli::tools::from_name(name).expect("the parser only names tools it found");
+            std::process::exit(cli::tools::run(tool, args));
+        }
         // `-c` is the POSIX interface and is always shell: every `sh -c` idiom in the world
         // depends on that, and `--lua` is there for the caller who wants otherwise.
         Action::Command(ref text) => match invocation.force_language {

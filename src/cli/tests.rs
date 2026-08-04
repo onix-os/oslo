@@ -161,6 +161,45 @@ fn details_after_a_double_dash_is_not_a_flag() {
     assert!(!h.message.contains("xtrace"), "it was read as a flag");
 }
 
+/// `oslo history` reaches the tool, and its arguments come with it.
+#[test]
+fn a_tool_can_be_named_in_the_operand_slot() {
+    let inv = parse_args(&["history", "search", "-n", "5"]).expect("parse");
+    assert_eq!(
+        inv.action,
+        Action::Tool(
+            "history".to_string(),
+            vec!["search".to_string(), "-n".to_string(), "5".to_string()]
+        )
+    );
+}
+
+/// **`--` says the word is a path.** The escape hatch for the day somebody has a script named
+/// `hook`, and the reason the operand slot is not silently narrowed.
+#[test]
+fn a_double_dash_forces_the_operand_to_be_a_script() {
+    let inv = parse_args(&["--", "history"]).expect("parse");
+    assert_eq!(inv.action, Action::Script("history".to_string()));
+}
+
+/// A tool name after `-c` is `$0`, not a tool. Everything past `-c`'s command string is an
+/// operand, and `find -exec sh -c '…' -- {} +` depends on that staying true.
+#[test]
+fn a_tool_name_is_not_special_after_dash_c() {
+    let inv = parse_args(&["-c", "echo hi", "history", "arg"]).expect("parse");
+    assert_eq!(inv.action, Action::Command("echo hi".to_string()));
+    assert_eq!(inv.name, "history", "it is $0");
+    assert_eq!(inv.positional, vec!["arg".to_string()]);
+}
+
+/// A path is a script however it is spelled, so a `#!/bin/oslo` script keeps working whatever it
+/// is called — the kernel always hands over a slashed path.
+#[test]
+fn a_slashed_tool_name_is_a_script() {
+    let inv = parse_args(&["./history"]).expect("parse");
+    assert_eq!(inv.action, Action::Script("./history".to_string()));
+}
+
 #[test]
 fn dash_s_reads_stdin_with_positionals() {
     let inv = parse_args(&["-s", "a", "b"]).expect("parse");

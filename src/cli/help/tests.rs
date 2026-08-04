@@ -60,12 +60,20 @@ fn every_tool_appears_in_the_help() {
     let text = short(Paint::plain());
     for tool in TOOLS {
         assert!(
-            text.contains(&format!("oslo-{}", tool.name)),
+            text.contains(tool.name),
             "{} is missing from the help",
             tool.name
         );
         assert!(text.contains(tool.about), "{}: no description", tool.name);
     }
+}
+
+/// The help teaches the form that always works. `oslo-<tool>` needs a symlink; `oslo <tool>` never
+/// does, so that is the one the synopsis shows.
+#[test]
+fn the_help_shows_the_form_that_needs_no_symlink() {
+    let text = short(Paint::plain());
+    assert!(text.contains("oslo <tool>"), "{text}");
 }
 
 /// The short help stays short, and points at where the long form lives.

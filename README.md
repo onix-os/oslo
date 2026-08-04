@@ -328,25 +328,31 @@ pair — delete them.
 
 ## Tools
 
-oslo's own utilities are reached by the name it was called by, not by a subcommand word:
+`oslo --help` lists them. `config`, `profile`, `history`, `direnv` and `hook`:
 
 ```sh
-ln -s /usr/bin/oslo /usr/bin/oslo-history
-oslo-history            # the tool
-oslo history            # still runs a script named `history`
+oslo history            # the tool
+oslo-history            # the same thing, if you symlink oslo to that name
 ```
 
-`oslo --help` lists them and marks the ones with no symlink on `$PATH` as `(inactive)`.
+**A script always wins.** The operand slot belongs to scripts — POSIX defines the shell as
+`sh [options] [command_file [argument...]]` — so a word is only read as a tool when all three hold:
 
-**Why not `oslo history`.** POSIX defines the shell as `sh [options] [command_file [argument...]]`
-— the first operand *is* a script path, and neither bash nor dash reserves a single word there.
-The case that settles it is the shebang: a script starting `#!/bin/oslo` is run by the kernel as
-`execve("/bin/oslo", ["/bin/oslo", "./history"])`, an argv identical byte-for-byte to somebody
-typing `oslo history`. Nothing can tell them apart. On a machine where oslo is `/bin/sh` that is
-every script on it.
+- it contains no `/`
+- **no file of that name exists**
+- it is one of the five
 
-`argv[0]` has no such job, which is how busybox does it — and busybox's `sh` reserves none of its
-hundreds of applets either: `busybox sh sync` runs a script named `sync`.
+The second is what makes this safe rather than merely unlikely to bite. oslo does not search
+`$PATH` for a script operand, so when no such file exists the alternative was never "run something
+else", it was `No such file or directory`. Nothing that works today can change meaning; an error
+becomes useful. `oslo ./history` and `oslo -- history` say "this is a path" and are honoured.
+
+The slash rule is what keeps shebangs working. A script starting `#!/bin/oslo` is always run by
+the kernel with a *slashed* argv[1] — `./history` from the current directory, the full path when
+found on `$PATH` — so a bare `history` can only ever have been typed by a person.
+
+Symlinking `oslo-<tool>` adds a command of its own, which is busybox's `argv[0]` trick and works
+because `argv[0]` is a slot the shell never reads as a script path.
 
 ## Configuration
 

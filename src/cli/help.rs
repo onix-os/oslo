@@ -128,7 +128,13 @@ fn synopsis(paint: Paint) -> String {
         paint.slot("command"),
         paint.slot("[name [argument]...]")
     );
-    let _ = writeln!(s, "  {} {}", paint.key("oslo-<tool>"), paint.slot("[...]"));
+    let _ = writeln!(
+        s,
+        "  {} {} {}",
+        paint.key("oslo"),
+        paint.slot("<tool>"),
+        paint.slot("[argument]...")
+    );
     s
 }
 
@@ -192,46 +198,51 @@ const LONG: &[(&str, &str)] = &[
     ("--", "end of options"),
 ];
 
-/// The tools, each marked with whether it can actually be run.
+/// The tools, each marked with whether it also answers to a command of its own.
 ///
-/// The mark is the point of the section. A tool with no signpost on `$PATH` is real code that
-/// cannot be reached, and listing it without saying so sends people off to debug their `$PATH`.
+/// **The mark is about the second spelling, not about availability.** Every tool runs as
+/// `oslo <tool>` whether or not anything is symlinked; a signpost on `$PATH` only adds
+/// `oslo-<tool>` beside it. Calling an unlinked tool "inactive" would be the more eye-catching
+/// label and the wrong one — it would send somebody off to debug a `$PATH` that is fine.
 fn tools_section(paint: Paint) -> String {
     let mut s = String::new();
     let _ = writeln!(
         s,
         "\n{}  {}",
         paint.head("TOOLS"),
-        paint.dim("run as oslo-<name>")
+        paint.dim("run as `oslo <tool>`")
     );
 
-    let mut missing = false;
+    let mut unlinked = false;
     for tool in TOOLS {
-        let name = format!("oslo-{}", tool.name);
         let linked = tools::linked(tool.name);
-        missing |= !linked;
+        unlinked |= !linked;
         let mark = if linked {
-            String::new()
-        } else {
             let gap = ABOUT_COLUMN.saturating_sub(tool.about.chars().count());
-            format!("{}{}", " ".repeat(gap), paint.dim("(inactive)"))
+            format!(
+                "{}{}",
+                " ".repeat(gap),
+                paint.dim(&format!("also oslo-{}", tool.name))
+            )
+        } else {
+            String::new()
         };
-        let pad = COLUMN.saturating_sub(name.chars().count());
+        let pad = COLUMN.saturating_sub(tool.name.chars().count());
         let _ = writeln!(
             s,
             "  {}{}{}{}",
-            paint.key(&name),
+            paint.key(tool.name),
             " ".repeat(pad),
             tool.about,
             mark
         );
     }
 
-    if missing {
+    if unlinked {
         let _ = writeln!(
             s,
             "\n  {}\n      {}",
-            paint.dim("An inactive tool has no oslo-<name> on $PATH. To add one:"),
+            paint.dim("A tool can have a command of its own as well:"),
             paint.dim(&format!(
                 "ln -s {} /usr/local/bin/oslo-config",
                 tools::own_path()
