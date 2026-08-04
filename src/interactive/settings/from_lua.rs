@@ -140,6 +140,9 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
         if let Value::Bool(on) = table.get(&Value::str("welcome")) {
             settings.misc.welcome = on;
         }
+        if let Value::Bool(on) = table.get(&Value::str("warnings")) {
+            settings.misc.warnings = on;
+        }
         if let Value::Str(greeting) = table.get(&Value::str("greeting")) {
             settings.misc.greeting = Some(greeting.to_string());
         }

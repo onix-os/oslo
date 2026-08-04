@@ -9,6 +9,7 @@
 
 pub mod help;
 pub mod tools;
+pub mod warn;
 
 use oslo::env::options::ShellOption;
 use std::fmt::Write as _;

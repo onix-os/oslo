@@ -50,6 +50,12 @@ impl Paint {
         Paint { depth: Depth::None }
     }
 
+    /// A given depth, for the tests that assert on the escapes themselves.
+    #[cfg(test)]
+    pub fn at(depth: Depth) -> Paint {
+        Paint { depth }
+    }
+
     fn paint(self, text: &str, style: Style) -> String {
         style.paint(text, self.depth)
     }
@@ -84,6 +90,14 @@ impl Paint {
     /// An aside: the `(inactive)` mark, the note under a section.
     pub fn dim(self, text: &str) -> String {
         self.paint(text, Style::fg(Color::Indexed(8)))
+    }
+
+    /// A painter for one true colour, for a caller that draws many spans in it.
+    ///
+    /// Returns a closure rather than painting once because the warning box paints its border a
+    /// piece at a time, and threading `Paint` through each call reads worse than holding a brush.
+    pub fn rgb(self, (r, g, b): (u8, u8, u8)) -> impl Fn(&str) -> String {
+        move |text| self.paint(text, Style::fg(Color::Rgb(r, g, b)))
     }
 }
 
@@ -135,8 +149,15 @@ fn synopsis(paint: Paint) -> String {
 }
 
 /// The short help: what somebody running `oslo --help` came for.
+///
+/// Any warning goes **first**. It is the one part of this page that is about the reader's machine
+/// rather than about oslo, and a warning below the fold is a warning nobody read.
 pub fn short(paint: Paint) -> String {
-    let mut s = synopsis(paint);
+    let mut s = String::new();
+    if super::warn::wanted() {
+        s.push_str(&super::warn::box_of(&super::warn::detect(), paint));
+    }
+    s.push_str(&synopsis(paint));
 
     let _ = writeln!(s, "\n{}", paint.head("OPTIONS"));
     for (key, about) in INVOCATION {

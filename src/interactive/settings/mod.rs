@@ -216,6 +216,14 @@ pub struct Misc {
     /// over ssh, under a CI runner. A config that knows what it is talking to should be able to
     /// say so.
     pub color_depth: Option<String>,
+    /// Whether `--help` reports what is wrong with this installation.
+    ///
+    /// **On by default**, because the things it checks are ones you cannot see from inside a
+    /// working shell: `/bin/sh` still pointing at dash, a binary nobody but you can execute. A
+    /// user who has read the warning and decided against acting on it turns it off with
+    /// `oslo.misc.warnings = false`; the default cannot be silence, or an installation that is
+    /// half-finished looks finished.
+    pub warnings: bool,
 }
 
 impl Default for Misc {
@@ -227,6 +235,7 @@ impl Default for Misc {
             // that Esc feels immediate.
             escape_delay: 25,
             color_depth: None,
+            warnings: true,
         }
     }
 }
