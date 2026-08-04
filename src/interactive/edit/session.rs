@@ -80,17 +80,42 @@ pub enum Step {
 #[derive(Debug, Default)]
 pub struct Session {
     pub buffer: Buffer,
+    /// Vi mode, when `oslo.vi.enabled` asked for it.
+    ///
+    /// `None` is emacs, and then nothing vi-shaped is consulted at all. With it on, insert mode
+    /// still passes every key through to the ordinary keymap — a vi user at a shell still expects
+    /// `C-w` and `C-a` to work, because those are the shell's keys and not vi's.
+    pub vi: Option<super::vi::Vi>,
 }
 
 impl Session {
     pub fn new(text: &str, cursor: usize) -> Session {
         let mut buffer = Buffer::new();
         buffer.set(text, cursor);
-        Session { buffer }
+        Session {
+            buffer,
+            vi: crate::interactive::vi::enabled().then(super::vi::Vi::default),
+        }
+    }
+
+    /// The mode a prompt should show, when there is one.
+    ///
+    /// **Read, not guessed.** `crate::interactive::vi::after_key` exists to infer this by watching
+    /// keystrokes go past, because rustyline owned the mode and would not say — so the indicator
+    /// was always one key behind. Here it is simply the field.
+    pub fn mode(&self) -> Option<super::vi::Mode> {
+        self.vi.as_ref().map(|vi| vi.mode)
     }
 
     /// Apply one key.
     pub fn apply(&mut self, key: Key, assist: &mut dyn Assist) -> Step {
+        // Vi gets first refusal. `Passthrough` means the key is not vi's business — insert mode,
+        // or Enter in any mode — and falls through to the ordinary keymap below.
+        if let Some(vi) = self.vi.as_mut()
+            && let super::vi::Outcome::Handled { redraw } = vi.apply(key, &mut self.buffer)
+        {
+            return Step::Continue { redraw };
+        }
         let changed = |yes: bool| Step::Continue { redraw: yes };
         match action(key) {
             Action::Insert(c) => {
@@ -222,6 +247,18 @@ pub fn read_line(
     let mut out = std::io::stderr();
 
     loop {
+        // The cursor shape says which mode you are in, as fish's vi mode does. `observe` publishes
+        // the mode for the prompt to read and answers with an escape only when it actually
+        // changed, so an unchanged mode costs nothing per keystroke.
+        if let Some(mode) = session.mode()
+            && let Some(shape) = crate::interactive::vi::observe(
+                mode,
+                &crate::interactive::settings::current().vi.cursors,
+            )
+        {
+            let _ = out.write_all(shape.as_bytes());
+        }
+
         let placed = draw(prompt, right, &session, assist);
         let _ = out.write_all(screen::redraw(at_row, &placed.text, into_at(&placed)).as_bytes());
         let _ = out.flush();
@@ -238,6 +275,16 @@ pub fn read_line(
                 at_row = 0;
             }
             Step::Accept => {
+                // The next line starts in insert, so the shape must go back — otherwise a line
+                // accepted from normal mode leaves a block cursor over the one you type next.
+                crate::interactive::vi::reset();
+                if session.vi.is_some() {
+                    let shape = crate::interactive::settings::current()
+                        .vi
+                        .cursors
+                        .for_mode(crate::interactive::vi::Mode::Insert);
+                    let _ = out.write_all(shape.escape().as_bytes());
+                }
                 let placed = draw(prompt, right, &session, assist);
                 let _ = out
                     .write_all(screen::redraw(at_row, &placed.text, into_at(&placed)).as_bytes());

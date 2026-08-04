@@ -52,7 +52,20 @@ pub struct Buffer {
     /// `M-y` rotate is reached by a vanishing fraction of users, and an unused ring is state
     /// that can still be wrong.
     kill: Vec<char>,
+    /// States to go back to, for vi's `u`.
+    ///
+    /// Snapshots rather than a log of edits, because a line is short and the alternative is an
+    /// inverse for every operation — which is a second implementation of editing, and the place
+    /// undo bugs come from. Depth is bounded so a long session cannot grow it without limit.
+    undo: Vec<(Vec<char>, usize)>,
 }
+
+/// How many states `u` can walk back through.
+///
+/// Vi's own undo is one level; this is more generous because there is no reason not to be, and
+/// stops short of unbounded because the stack is per-line state that a paste-heavy line could
+/// otherwise grow without anyone noticing.
+const UNDO_DEPTH: usize = 128;
 
 impl Buffer {
     pub fn new() -> Buffer {
@@ -66,7 +79,79 @@ impl Buffer {
             cursor: chars.len(),
             chars,
             kill: Vec::new(),
+            undo: Vec::new(),
         }
+    }
+
+    /// Remember the current state, so [`Self::undo`] can come back to it.
+    ///
+    /// Called *before* a change, by whatever knows where a change begins — which for vi is the
+    /// command, not the keystroke: `cwhello<Esc>` is one undo step, not six.
+    pub fn snapshot(&mut self) {
+        if self
+            .undo
+            .last()
+            .is_some_and(|(text, _)| *text == self.chars)
+        {
+            // Nothing moved since the last snapshot, so a second one would only make `u` need
+            // pressing twice to do anything.
+            return;
+        }
+        self.undo.push((self.chars.clone(), self.cursor));
+        if self.undo.len() > UNDO_DEPTH {
+            self.undo.remove(0);
+        }
+    }
+
+    /// Go back to the last snapshot. Answers whether there was one.
+    pub fn undo(&mut self) -> bool {
+        let Some((text, cursor)) = self.undo.pop() else {
+            return false;
+        };
+        self.chars = text;
+        self.cursor = cursor.min(self.chars.len());
+        true
+    }
+
+    /// The character at the cursor, if any — vi asks this constantly.
+    pub fn at_cursor(&self) -> Option<char> {
+        self.chars.get(self.cursor).copied()
+    }
+
+    /// Read a character by index.
+    pub fn char_at(&self, at: usize) -> Option<char> {
+        self.chars.get(at).copied()
+    }
+
+    /// Put the cursor at `at`, clamped to the line.
+    pub fn set_cursor(&mut self, at: usize) {
+        self.cursor = at.min(self.chars.len());
+    }
+
+    /// Remove `from..to` into the kill buffer, leaving the cursor at `from`.
+    ///
+    /// Public because vi's operators decide their own range from a motion, where readline's kills
+    /// each have one fixed shape.
+    pub fn cut(&mut self, from: usize, to: usize) -> bool {
+        self.kill_range(from, to)
+    }
+
+    /// Copy `from..to` into the kill buffer without removing it — vi's `y`.
+    pub fn copy(&mut self, from: usize, to: usize) -> bool {
+        if from >= to {
+            return false;
+        }
+        self.kill = self.chars[from..to.min(self.chars.len())].to_vec();
+        true
+    }
+
+    /// Overwrite the character at the cursor — vi's `r` and replace mode.
+    pub fn replace_at_cursor(&mut self, c: char) -> bool {
+        if self.cursor >= self.chars.len() {
+            return false;
+        }
+        self.chars[self.cursor] = c;
+        true
     }
 
     pub fn text(&self) -> String {

@@ -320,7 +320,7 @@ keeps the final say.
 ```lua
 oslo.misc.greeting     = "hello"     -- instead of the banner; misc.welcome = false for silence
 oslo.misc.escape_delay = 300         -- ms to wait for the rest of an escape sequence, over ssh
-oslo.misc.native_editor = true       -- oslo's own line editor instead of rustyline (in progress)
+oslo.misc.native_editor = true       -- oslo's own line editor instead of rustyline
 oslo.misc.color_depth  = "truecolor" -- truecolor / 256 / 16 / none, when detection is wrong
 
 oslo.history.ignore    = { "ls", "cd *" }   -- $HISTIGNORE, matched against the whole line

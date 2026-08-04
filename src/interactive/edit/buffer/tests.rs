@@ -16,6 +16,7 @@ fn buf(spec: &str) -> Buffer {
         cursor: before.chars().count(),
         chars,
         kill: Vec::new(),
+        undo: Vec::new(),
     }
 }
 

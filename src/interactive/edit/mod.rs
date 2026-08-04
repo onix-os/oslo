@@ -23,3 +23,4 @@ pub mod keymap;
 pub mod layout;
 pub mod screen;
 pub mod session;
+pub mod vi;
