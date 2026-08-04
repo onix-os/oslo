@@ -100,6 +100,8 @@ Or just use `$PS1`, with the full escape set — `\u \h \w \$ \t \A \d \j \! \[ 
   running only when the stricter one found nothing, so an exact match is never diluted
 - **Prefix history search** on Up, which restores the line you were composing instead of blanking it
 - **First-class vi mode** on fish's model: cursor shape says the mode, the prompt says it too
+- **Its own line editor** — buffer, layout, redraw, emacs and vi keymaps — so oslo owns the row it
+  edits rather than renting it. No `readline`, no `rustyline`.
 - **A right prompt**, drawn without the save/restore multiplexers fight over
 - **Syntax highlighting** that marks a command that does not exist
 
@@ -320,7 +322,6 @@ keeps the final say.
 ```lua
 oslo.misc.greeting     = "hello"     -- instead of the banner; misc.welcome = false for silence
 oslo.misc.escape_delay = 300         -- ms to wait for the rest of an escape sequence, over ssh
-oslo.misc.native_editor = true       -- oslo's own line editor instead of rustyline
 oslo.misc.color_depth  = "truecolor" -- truecolor / 256 / 16 / none, when detection is wrong
 
 oslo.history.ignore    = { "ls", "cd *" }   -- $HISTIGNORE, matched against the whole line

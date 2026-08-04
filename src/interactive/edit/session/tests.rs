@@ -8,7 +8,12 @@ use super::*;
 
 /// Feed a sequence of keys and hand back the line.
 fn run(start: &str, keys: &[Key]) -> (Session, Vec<Step>) {
-    let mut session = Session::new(start, start.chars().count());
+    // The emacs keymap, explicitly: vi mode is the default, and these assert what a key does when
+    // it is *not* a vi command.
+    let mut session = Session {
+        vi: None,
+        ..Session::new(start, start.chars().count())
+    };
     let mut assist = NoAssist;
     let steps = keys
         .iter()
@@ -44,10 +49,16 @@ fn editing_keys_reach_the_buffer() {
 /// this backwards means a stray keypress closes somebody's shell.
 #[test]
 fn ctrl_d_is_eof_only_when_the_line_is_empty() {
-    let mut empty = Session::new("", 0);
+    let mut empty = Session {
+        vi: None,
+        ..Session::new("", 0)
+    };
     assert_eq!(empty.apply(Key::Delete, &mut NoAssist), Step::Eof);
 
-    let mut has_text = Session::new("ls", 0);
+    let mut has_text = Session {
+        vi: None,
+        ..Session::new("ls", 0)
+    };
     assert_eq!(
         has_text.apply(Key::Delete, &mut NoAssist),
         Step::Continue { redraw: true }
@@ -57,7 +68,10 @@ fn ctrl_d_is_eof_only_when_the_line_is_empty() {
 
 #[test]
 fn enter_accepts_and_ctrl_c_interrupts() {
-    let mut s = Session::new("ls", 2);
+    let mut s = Session {
+        vi: None,
+        ..Session::new("ls", 2)
+    };
     assert_eq!(s.apply(Key::Accept, &mut NoAssist), Step::Accept);
     assert_eq!(s.apply(Key::Abort, &mut NoAssist), Step::Interrupted);
 }
@@ -66,7 +80,10 @@ fn enter_accepts_and_ctrl_c_interrupts() {
 /// visible as flicker on a slow link.
 #[test]
 fn a_key_that_changes_nothing_does_not_ask_for_a_redraw() {
-    let mut s = Session::new("", 0);
+    let mut s = Session {
+        vi: None,
+        ..Session::new("", 0)
+    };
     for key in [Key::Ctrl('q'), Key::Alt('z'), Key::Ignored, Key::Cancel] {
         assert_eq!(
             s.apply(key, &mut NoAssist),
@@ -83,9 +100,16 @@ fn a_key_that_changes_nothing_does_not_ask_for_a_redraw() {
 
 /// Esc alone is not "abandon the line". A shell prompt has nothing to cancel back to, and
 /// Ctrl-C is the key that abandons.
+///
+/// **In emacs mode**, stated explicitly: with vi mode on — which is oslo's default — Esc leaves
+/// insert mode, which is very much something. Building the session with `vi: None` is what makes
+/// this test about the emacs keymap rather than about whichever default is current.
 #[test]
-fn escape_alone_does_nothing() {
-    let mut s = Session::new("half typed", 10);
+fn escape_alone_does_nothing_in_emacs_mode() {
+    let mut s = Session {
+        vi: None,
+        ..Session::new("half typed", 10)
+    };
     assert_eq!(
         s.apply(Key::Cancel, &mut NoAssist),
         Step::Continue { redraw: false }
@@ -141,7 +165,10 @@ fn history_walks_through_the_assist() {
         history: vec!["cargo test".into(), "ls -la".into()],
         ..Canned::default()
     };
-    let mut s = Session::new("", 0);
+    let mut s = Session {
+        vi: None,
+        ..Session::new("", 0)
+    };
     s.apply(Key::Up, &mut a);
     assert_eq!(s.buffer.text(), "cargo test");
     assert_eq!(s.buffer.cursor(), 10, "the cursor lands at the end");
@@ -159,7 +186,10 @@ fn coming_back_out_of_history_restores_the_typed_line() {
         history: vec!["cargo test".into()],
         ..Canned::default()
     };
-    let mut s = Session::new("half-writ", 9);
+    let mut s = Session {
+        vi: None,
+        ..Session::new("half-writ", 9)
+    };
     s.apply(Key::Up, &mut a);
     assert_eq!(s.buffer.text(), "cargo test");
     s.apply(Key::Down, &mut a);
@@ -170,7 +200,10 @@ fn coming_back_out_of_history_restores_the_typed_line() {
 #[test]
 fn history_that_runs_out_changes_nothing() {
     let mut a = Canned::default();
-    let mut s = Session::new("typed", 5);
+    let mut s = Session {
+        vi: None,
+        ..Session::new("typed", 5)
+    };
     assert_eq!(s.apply(Key::Up, &mut a), Step::Continue { redraw: false });
     assert_eq!(s.buffer.text(), "typed");
 }
@@ -182,7 +215,10 @@ fn completion_replaces_the_line() {
         completion: Some(("git checkout ".to_string(), 13)),
         ..Canned::default()
     };
-    let mut s = Session::new("git ch", 6);
+    let mut s = Session {
+        vi: None,
+        ..Session::new("git ch", 6)
+    };
     assert_eq!(
         s.apply(Key::ToggleScope, &mut a),
         Step::Continue { redraw: true }
@@ -194,7 +230,10 @@ fn completion_replaces_the_line() {
 /// Ctrl-L asks for the screen to be cleared, which the loop does — the buffer is untouched.
 #[test]
 fn ctrl_l_clears_the_screen_without_touching_the_line() {
-    let mut s = Session::new("half typed", 4);
+    let mut s = Session {
+        vi: None,
+        ..Session::new("half typed", 4)
+    };
     assert_eq!(s.apply(Key::Ctrl('l'), &mut NoAssist), Step::ClearScreen);
     assert_eq!(s.buffer.text(), "half typed");
     assert_eq!(s.buffer.cursor(), 4, "and the cursor stayed put");

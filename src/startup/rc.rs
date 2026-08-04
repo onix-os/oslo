@@ -247,8 +247,9 @@ fn decode_escapes(env: &Environment, raw: &str) -> String {
                 }
             }
             // `\[` and `\]` bracket non-printing runs so bash can measure the prompt's width.
-            // rustyline measures it itself, so the markers are dropped rather than emitted:
-            // passing them through would print two stray control characters.
+            // oslo measures what a prompt *prints* — escapes are skipped by `display_width` — so
+            // the markers say nothing it does not already know, and are dropped rather than
+            // emitted: passing them through would print two stray control characters.
             Some('[') | Some(']') => {}
             Some(other) => {
                 out.push('\\');

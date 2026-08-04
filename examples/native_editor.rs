@@ -87,6 +87,8 @@ fn main() {
                 }
             }
             Outcome::Interrupted => println!("  (interrupted)"),
+            // The demo has one language, so there is nothing to switch to.
+            Outcome::ToggleLanguage { .. } => println!("  (toggle: nothing to switch to here)"),
             Outcome::Eof => return,
         }
     }

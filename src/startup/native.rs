@@ -11,16 +11,12 @@
 //! that was the only place a cursor move did not confuse the layout. The native editor takes it as
 //! an argument, which is what it always should have been.
 
-use oslo::Environment;
-use oslo::interactive::edit::session::Assist;
+use oslo::interactive::edit::session::{Assist, Bound};
 use oslo::interactive::term::Key;
-use oslo::interactive::{OsloHelper, abbr, dropdown, editor, highlight, marks, recall, settings};
-use std::collections::HashSet;
-use std::sync::{Arc, Mutex};
+use oslo::interactive::{OsloHelper, abbr, dropdown, editor, marks, settings};
 
 /// What the shell plugs into an editing session.
 pub struct ShellAssist<'a> {
-    env: Arc<Mutex<Environment>>,
     /// The completion and hinting machinery, borrowed rather than rebuilt: it carries the
     /// frecency table and the command index, and a second copy would rank differently.
     helper: Option<&'a OsloHelper>,
@@ -37,22 +33,24 @@ pub struct ShellAssist<'a> {
     /// What was on the line when the walk started, so coming back out restores it rather than
     /// blanking it. oslo has always promised this; it is the reason a walk is not destructive.
     composing: Option<String>,
+    /// The key that switches language, or `None` when `$OSLO_TOGGLE_KEY` turned it off.
+    toggle: Option<String>,
 }
 
 impl<'a> ShellAssist<'a> {
     pub fn new(
-        env: Arc<Mutex<Environment>>,
         history: Vec<String>,
         helper: Option<&'a OsloHelper>,
         prompt_cols: usize,
+        toggle: Option<String>,
     ) -> ShellAssist<'a> {
         ShellAssist {
-            env,
             helper,
             prompt_cols,
             history,
             back: 0,
             composing: None,
+            toggle,
         }
     }
 
@@ -125,39 +123,16 @@ fn open_finder() -> Option<oslo::interactive::finder::Outcome> {
 
 impl Assist for ShellAssist<'_> {
     fn highlight(&mut self, line: &str) -> String {
+        let Some(helper) = self.helper else {
+            return line.to_string();
+        };
         if line.is_empty() {
             return String::new();
         }
-        let (path, builtins, functions) = {
-            let Ok(env) = self.env.lock() else {
-                return line.to_string();
-            };
-            let path = env.get_var("PATH").unwrap_or_default().to_string();
-            // Snapshotted rather than queried per word: the closures below run once per command
-            // word and would each take the lock again while this one is still held.
-            let builtins: HashSet<String> = env.builtin_names().map(str::to_string).collect();
-            let functions: HashSet<String> = env
-                .get_functions()
-                .keys()
-                .chain(env.get_aliases().keys())
-                .cloned()
-                .collect();
-            (path, builtins, functions)
-        };
-        let is_builtin = |name: &str| builtins.contains(name);
-        let is_function = |name: &str| functions.contains(name);
-        let ctx = highlight::Context {
-            path: &path,
-            is_builtin: &is_builtin,
-            is_function: &is_function,
-            // A line long enough for the syscalls to add up is one nobody is reading the colours
-            // of. See `highlight::MAX_PATH_CHECKS`.
-            check_paths: line.len() <= 512,
-        };
         // `OSC 133;B` first, so it lands between the prompt and the typed text, which is where it
         // means anything. It prints nothing, so it costs no cells.
         let mut painted = marks::input_start();
-        painted.push_str(&highlight::paint(line, &ctx));
+        painted.push_str(&helper.paint(line));
         painted
     }
 
@@ -166,31 +141,17 @@ impl Assist for ShellAssist<'_> {
     /// Only at the end of the line: a suggestion is text that *continues* what you have typed, and
     /// appending it after a cursor sitting mid-line would be a claim about the wrong position.
     fn hint(&mut self, line: &str, cursor: usize) -> Option<String> {
+        let text = self.hint_text(line, cursor)?;
+        Some(self.helper?.paint_hint(&text))
+    }
+
+    /// The suggestion as plain text, which is what accepting it inserts.
+    fn hint_text(&mut self, line: &str, cursor: usize) -> Option<String> {
         let helper = self.helper?;
-        if line.is_empty() || cursor < line.chars().count() {
+        if cursor < line.chars().count() {
             return None;
         }
-        let pos = line.len();
-        for source in settings::current().suggest.sources {
-            let found = match source {
-                // oslo's own set, not the editor's: `recall` is language-filtered and knows which
-                // directory you are standing in, so `cargo run --ex` answers with this project's
-                // example. The editor's flat history can only ever know the one list.
-                settings::Source::History => recall::suggest(line),
-                settings::Source::Completion => helper.command_hint(line, pos),
-                settings::Source::Path => helper.path_hint(line, pos),
-            };
-            if let Some(text) = found {
-                let theme = oslo::interactive::theme::current();
-                return Some(
-                    theme
-                        .syntax
-                        .autosuggestion
-                        .paint(&text, oslo::interactive::theme::depth()),
-                );
-            }
-        }
-        None
+        helper.suggest(line, line.len())
     }
 
     /// Tab. Runs the whole interaction — the dropdown draws itself and takes its own keys — and
@@ -199,18 +160,22 @@ impl Assist for ShellAssist<'_> {
         let helper = self.helper?;
         // The dropdown works in bytes; the editor's cursor is in characters.
         let pos: usize = line.chars().take(cursor).map(char::len_utf8).sum();
-        let (start, candidates) = helper.candidates(line, pos);
+        let (start, candidates) = helper.complete_word(line, pos);
         if candidates.is_empty() {
             return None;
         }
 
         let chosen = if candidates.len() == 1 {
+            // Already recorded by `complete_word`, which is where "one candidate is an
+            // acceptance" belongs so that every caller agrees.
             candidates.into_iter().next()?
         } else {
             let indent = self.prompt_cols + dropdown::visible_len(&line[..start]);
-            dropdown::DropdownMenu::select_interactive(candidates, indent, &line[start..pos])?
+            let chosen =
+                dropdown::DropdownMenu::select_interactive(candidates, indent, &line[start..pos])?;
+            helper.record_accepted(&chosen);
+            chosen
         };
-        helper.record_accepted(&chosen);
 
         let mut out = String::with_capacity(line.len() + chosen.replacement.len());
         out.push_str(&line[..start]);
@@ -218,6 +183,49 @@ impl Assist for ShellAssist<'_> {
         let at = out.chars().count();
         out.push_str(&line[pos..]);
         Some((out, at))
+    }
+
+    /// What the config bound `key` to.
+    ///
+    /// The order is the order of specificity: an `oslo.keys` entry is the most explicit statement
+    /// a config makes, then the suggestion-accept keys, then oslo's own defaults. A default that
+    /// could shadow a config entry would make the entry look ignored.
+    fn binding(&mut self, key: Key) -> Option<Bound> {
+        let name = key_name(key)?;
+        let settings = settings::current();
+
+        if let Some((_, action)) = settings.keys.iter().find(|(bound, _)| *bound == name) {
+            return match oslo::interactive::keys::action(action) {
+                Some(oslo::interactive::keys::Action::ToggleLanguage) => {
+                    Some(Bound::ToggleLanguage)
+                }
+                Some(oslo::interactive::keys::Action::ClearScreen) => Some(Bound::ClearScreen),
+                Some(oslo::interactive::keys::Action::HistorySearchBackward) => {
+                    Some(Bound::SearchHistory)
+                }
+                Some(oslo::interactive::keys::Action::AcceptSuggestion) => Some(Bound::AcceptHint),
+                Some(oslo::interactive::keys::Action::AcceptSuggestionWord) => {
+                    Some(Bound::AcceptHintWord)
+                }
+                Some(oslo::interactive::keys::Action::Interrupt) => Some(Bound::Interrupt),
+                Some(oslo::interactive::keys::Action::Complete) => Some(Bound::Complete),
+                Some(oslo::interactive::keys::Action::LuaHandler) => Some(Bound::Lua(name)),
+                // An action name oslo does not know was already reported when the config was
+                // read; doing nothing here is better than doing something arbitrary.
+                None => None,
+            };
+        }
+
+        if settings.suggest.accept.as_deref() == Some(name.as_str()) {
+            return Some(Bound::AcceptHint);
+        }
+        if settings.suggest.accept_word.as_deref() == Some(name.as_str()) {
+            return Some(Bound::AcceptHintWord);
+        }
+
+        // oslo's own default, for a key the ordinary keymap does not already answer.
+        // `$OSLO_TOGGLE_KEY` names it, and `none` turns it off.
+        (Some(name.as_str()) == self.toggle.as_deref()).then_some(Bound::ToggleLanguage)
     }
 
     fn key_name(&mut self, key: Key) -> Option<String> {
@@ -312,10 +320,10 @@ mod tests {
 
     fn assist(entries: &[&str]) -> ShellAssist<'static> {
         ShellAssist::new(
-            Arc::new(Mutex::new(Environment::new())),
             entries.iter().map(|e| e.to_string()).collect(),
             None,
             0,
+            Some("shift-tab".to_string()),
         )
     }
 

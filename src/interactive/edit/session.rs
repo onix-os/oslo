@@ -33,6 +33,14 @@ pub trait Assist {
         None
     }
 
+    /// The same suggestion **without** styling, for accepting it into the line.
+    ///
+    /// Separate from [`Assist::hint`] because that one is painted, and inserting escapes into the
+    /// command would put them in the history and in what runs.
+    fn hint_text(&mut self, _line: &str, _cursor: usize) -> Option<String> {
+        None
+    }
+
     /// Run completion, answering the line and cursor it produced.
     ///
     /// The whole interaction belongs to the implementation — oslo's dropdown draws itself and
@@ -76,6 +84,31 @@ pub trait Assist {
     fn key_name(&mut self, _key: Key) -> Option<String> {
         None
     }
+
+    /// What the config bound this key to, if anything.
+    fn binding(&mut self, _key: Key) -> Option<Bound> {
+        None
+    }
+}
+
+/// A binding the config asked for, which the session performs instead of its default.
+///
+/// Named for the effect rather than the key, because the same effect can be reached from a chord,
+/// a config entry or a default — and the loop performing it should not care which.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Bound {
+    /// Switch the prompt between shell and Lua.
+    ToggleLanguage,
+    ClearScreen,
+    SearchHistory,
+    /// Take the whole ghost suggestion.
+    AcceptHint,
+    /// Take one word of it.
+    AcceptHintWord,
+    Interrupt,
+    Complete,
+    /// A Lua function, by the key's name.
+    Lua(String),
 }
 
 /// An `Assist` that does nothing, for tests and for a shell that has not wired one yet.
@@ -97,6 +130,9 @@ pub enum Step {
     Eof,
     /// Ctrl-L: the screen should be cleared before the next draw.
     ClearScreen,
+    /// Shift-Tab: the prompt should switch between shell and Lua. Handled by the read loop, which
+    /// is the only thing that knows what a language *is*.
+    ToggleLanguage,
 }
 
 /// The line being edited, and where in history it came from.
@@ -130,22 +166,74 @@ impl Session {
         self.vi.as_ref().map(|vi| vi.mode)
     }
 
+    /// Carry out a binding the config asked for.
+    fn perform(&mut self, bound: Bound, assist: &mut dyn Assist) -> Step {
+        let changed = |yes: bool| Step::Continue { redraw: yes };
+        match bound {
+            Bound::ToggleLanguage => Step::ToggleLanguage,
+            Bound::ClearScreen => Step::ClearScreen,
+            Bound::Interrupt => Step::Interrupted,
+            Bound::Complete => {
+                match assist.complete(&self.buffer.text(), self.buffer.cursor(), false) {
+                    Some((line, cursor)) => {
+                        self.buffer.set(&line, cursor);
+                        changed(true)
+                    }
+                    None => changed(false),
+                }
+            }
+            Bound::SearchHistory => match assist.search_history(&self.buffer.text()) {
+                Some(line) => {
+                    let end = line.chars().count();
+                    self.buffer.set(&line, end);
+                    changed(true)
+                }
+                None => changed(false),
+            },
+            // The ghost suggestion is *what would be drawn now*, asked for again rather than
+            // remembered from the last frame — a remembered one can be stale by exactly the
+            // keystroke that accepted it.
+            Bound::AcceptHint | Bound::AcceptHintWord => {
+                let line = self.buffer.text();
+                let Some(hint) = assist.hint_text(&line, self.buffer.cursor()) else {
+                    return changed(false);
+                };
+                let take = if bound == Bound::AcceptHintWord {
+                    first_word(&hint)
+                } else {
+                    hint
+                };
+                if take.is_empty() {
+                    return changed(false);
+                }
+                self.buffer.move_end();
+                self.buffer.insert_str(&take);
+                changed(true)
+            }
+            Bound::Lua(name) => {
+                match assist.lua_key(&name, &self.buffer.text(), self.buffer.cursor()) {
+                    Some((line, cursor)) => {
+                        self.buffer.set(&line, cursor);
+                        changed(true)
+                    }
+                    None => changed(false),
+                }
+            }
+        }
+    }
+
     /// Apply one key.
     pub fn apply(&mut self, key: Key, assist: &mut dyn Assist) -> Step {
         let changed = |yes: bool| Step::Continue { redraw: yes };
 
-        // **A key the config bound to Lua wins over everything, vi included.**
+        // **A key the config bound wins over everything, vi included.**
         //
         // Before vi rather than after, and that ordering is load-bearing: vi mode is on by
         // default, and it reads `Alt(x)` as Esc-then-`x` so that leaving insert mode at speed
         // works. That would make every `oslo.keys["alt-…"]` binding unreachable for most users —
         // an explicit binding has to beat a heuristic about what someone probably meant.
-        if let Some(name) = assist.key_name(key)
-            && let Some((line, cursor)) =
-                assist.lua_key(&name, &self.buffer.text(), self.buffer.cursor())
-        {
-            self.buffer.set(&line, cursor);
-            return changed(true);
+        if let Some(bound) = assist.binding(key) {
+            return self.perform(bound, assist);
         }
 
         // Vi gets next refusal. `Passthrough` means the key is not vi's business — insert mode,
@@ -271,6 +359,13 @@ impl Session {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Outcome {
     Line(String),
+    /// The language toggle was pressed. The read loop switches and reopens with the same text, so
+    /// the line and the cursor survive the switch — which is the whole point of a toggle that
+    /// works mid-line.
+    ToggleLanguage {
+        text: String,
+        cursor: usize,
+    },
     /// Ctrl-C: this line is abandoned, the shell carries on.
     Interrupted,
     /// Ctrl-D on an empty line, or the input ended.
@@ -290,7 +385,8 @@ pub fn read_line(
     let Some(raw) = Restore::enter(Screen::Line) else {
         // No terminal: the line comes off stdin with no editing, which is what a piped script
         // needs and what `read` already does elsewhere.
-        return read_plain();
+        //
+        return read_plain(prompt);
     };
     let mut session = Session::new(initial.0, initial.1);
     let mut keys = Keys::on(raw.fd());
@@ -320,6 +416,17 @@ pub fn read_line(
         };
         match session.apply(key, assist) {
             Step::Continue { .. } => {}
+            Step::ToggleLanguage => {
+                let placed = draw(prompt, right, &session, assist);
+                // Back to the top of the block and erase it: the caller redraws from the same row
+                // with the other language's prompt, so leaving this one would double it.
+                let _ = out.write_all(screen::redraw(at_row, "", into_at(&placed)).as_bytes());
+                let _ = out.flush();
+                return Outcome::ToggleLanguage {
+                    text: session.buffer.text(),
+                    cursor: session.buffer.cursor(),
+                };
+            }
             Step::ClearScreen => {
                 // Home the cursor and clear, then fall through to a normal redraw from row 0.
                 let _ = out.write_all(b"\x1b[H\x1b[2J");
@@ -388,7 +495,15 @@ fn into_at(placed: &layout::Placed) -> screen::At {
 }
 
 /// A line from stdin, for when there is no terminal to edit on.
-fn read_plain() -> Outcome {
+fn read_plain(prompt: &str) -> Outcome {
+    // The prompt is written only for a terminal that cannot be edited on — `TERM=dumb`, a serial
+    // console, a `screen` session someone has told to be simple. Down an ordinary pipe it is not
+    // written at all: the shell is being driven by a script, and a prompt interleaved with the
+    // output would be noise in the middle of the data.
+    if std::env::var("TERM").as_deref() == Ok("dumb") {
+        print!("{prompt}");
+        let _ = std::io::Write::flush(&mut std::io::stdout());
+    }
     let mut line = String::new();
     match std::io::BufRead::read_line(&mut std::io::stdin().lock(), &mut line) {
         Ok(0) | Err(_) => Outcome::Eof,
@@ -404,3 +519,20 @@ fn read_plain() -> Outcome {
 #[cfg(test)]
 #[path = "session/tests.rs"]
 mod tests;
+
+/// The first word of a suggestion, with the whitespace that follows it.
+///
+/// Accepting "one word" of `--example foo` should leave the cursor after the space, ready for the
+/// next word — stopping before it would make the second press insert a leading space.
+fn first_word(hint: &str) -> String {
+    let trimmed = hint.trim_start();
+    let lead = hint.len() - trimmed.len();
+    let end = trimmed
+        .find(char::is_whitespace)
+        .map(|at| {
+            let rest = &trimmed[at..];
+            at + rest.len() - rest.trim_start().len()
+        })
+        .unwrap_or(trimmed.len());
+    hint[..lead + end].to_string()
+}

@@ -6,11 +6,11 @@
 
 use crate::absorb_loop_control;
 use crate::startup::integration;
-use crate::startup::mode::{Mode, ToggleRequest};
+use crate::startup::mode::Mode;
 use crate::startup::read::{Input, read_command};
 use crate::startup::recall::{remember_history, seed_history};
 use crate::startup::{
-    config, environments, history, history_db, keybind, lua_init, mode, prompt, rc, tracking,
+    config, environments, history, history_db, lua_init, mode, prompt, rc, tracking,
 };
 use oslo::Environment;
 use oslo::LuaEngine;
@@ -20,8 +20,6 @@ use oslo::error::ShellError;
 use oslo::exec::{JobManager, eval_command_list};
 use oslo::interactive::OsloHelper;
 use oslo::parser::parse_with_aliases;
-use rustyline::error::ReadlineError;
-use rustyline::{Editor, history::FileHistory};
 use std::sync::{Arc, Mutex};
 
 // A sibling file rather than an entry in `startup::mod`, and a child module rather than a peer,
@@ -33,9 +31,8 @@ mod editor;
 #[path = "notify.rs"]
 mod notify;
 
-use editor::{build_editor, publish_history, remember};
-
-pub type Repl = Editor<OsloHelper, FileHistory>;
+use super::history::store::History;
+use editor::{publish_history, remember};
 
 pub fn run_repl() -> ! {
     // Everything downstream that behaves differently for a person than for a script — the job
@@ -120,41 +117,19 @@ pub fn run_repl() -> ! {
     // walked into as much as any other — `cd` is not the only way to arrive somewhere.
     environments::start();
     environments::arrive(&env_struct, &lua, std::path::Path::new(&here));
-    let mut rl = build_editor(&settings);
-
-    // The mode the prompt is reading, and the flag the toggle key sets. Both live for the whole
-    // session: switching language is a property of the session, not of one line.
+    // The mode the prompt is reading. It lives for the whole session: switching language is a
+    // property of the session, not of one line.
     let mut current = mode::starting_mode(&env_struct.lock().unwrap());
-    let toggle = ToggleRequest::new();
-    keybind::apply(&mut rl, &env_struct, &toggle);
 
-    let mut helper = OsloHelper::new(Arc::clone(&env_struct));
-    // R9.10 needs a real `PS2`, and rustyline draws no prompt on a continuation row of its own
-    // multi-line editor. `OsloHelper` exposes the switch for exactly this: with editor multi-line
-    // off, an unfinished line comes back from `readline` and `read_command` below asks for the
-    // next one under `PS2`, the way every POSIX shell does.
-    helper.set_editor_multiline(false);
-    rl.set_helper(Some(helper));
-    if let Some(ref path) = settings.file {
-        // A missing history file on a first run is not worth a diagnostic; anything else is,
-        // because a history that silently fails to load looks exactly like one that was lost.
-        match rl.load_history(path) {
-            Ok(()) => {}
-            Err(ReadlineError::Io(e)) if e.kind() == std::io::ErrorKind::NotFound => {}
-            Err(e) => eprintln!(
-                "oslo: {}: {}",
-                oslo::interactive::marks::path(&path.display().to_string()),
-                e
-            ),
-        }
-    }
+    let helper = OsloHelper::new(Arc::clone(&env_struct));
+    let mut history = History::open(settings.file.clone(), settings.max_size);
     // Seeded from the database when there is one, so a session started on a machine with no
     // `$HISTFILE` still has its history back.
     if let Some(db) = &db {
         let entries = db.recent(settings.max_size.max(1));
         seed_history(entries.iter().map(|e| (e.line.clone(), e.mode.clone())));
     }
-    publish_history(&rl);
+    publish_history(&history);
 
     let mut jobs = JobManager::new();
     jobs.setup_signals();
@@ -207,15 +182,14 @@ pub fn run_repl() -> ! {
         integration::prompt_command(&env_struct, last_status);
 
         match read_command(
-            &mut rl,
+            &helper,
+            &history,
             &env_struct,
             &lua,
             last_status,
             &mut current,
-            &toggle,
         ) {
             Input::Nothing | Input::Interrupted => continue,
-            Input::Fatal => break,
             Input::Eof => {
                 eof_count += 1;
                 match ignore_eof_limit(&env_struct) {
@@ -231,7 +205,7 @@ pub fn run_repl() -> ! {
             }
             Input::Command { text, mode, secret } => {
                 eof_count = 0;
-                remember(&mut rl, &settings.file, &text, secret);
+                remember(&mut history, &text, secret);
                 if !secret {
                     // Kept alongside the editor's own copy so a later language switch, which
                     // refills that copy from scratch, still finds this line.
@@ -302,7 +276,7 @@ pub fn run_repl() -> ! {
                 // `history -c` cannot reach the editor from inside a builtin, so it leaves a
                 // request behind and the loop carries it out.
                 if history::take_clear_request() {
-                    let _ = rl.clear_history();
+                    history.clear();
                     // Every copy, or the ones left behind go on answering. The database, because
                     // clearing only the editor's would put every line back on the next start; and
                     // oslo's own recall set, which is what the ghost suggestion, the Up/Down walk
@@ -316,7 +290,7 @@ pub fn run_repl() -> ! {
                         track.forget_runs();
                     }
                     oslo::interactive::recall::clear();
-                    publish_history(&rl);
+                    publish_history(&history);
                 }
 
                 // Fired before the status is acted on, so a `cd` hook sees the directory the

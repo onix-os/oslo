@@ -6,13 +6,11 @@
 //! choose between, and a key that hands control back by accepting the line.
 
 use crate::expand_history;
-use crate::startup::mode::{self, Line, Mode, ToggleRequest};
-use crate::startup::repl::Repl;
+use crate::startup::mode::{self, Line, Mode};
 use crate::startup::{history, prompt, rc};
 use oslo::Environment;
 use oslo::LuaEngine;
 use oslo::interactive::InputStatus;
-use rustyline::error::ReadlineError;
 use std::sync::{Arc, Mutex};
 
 /// One trip round the prompt.
@@ -30,9 +28,6 @@ pub(super) enum Input {
     Interrupted,
     /// End of input. `$IGNOREEOF` may ask for this to be ignored.
     Eof,
-    /// The editor failed. Unlike an end of input this is never ignored: retrying would print the
-    /// same error forever.
-    Fatal,
 }
 
 /// Read one complete command, continuing onto further lines while the parser wants more.
@@ -41,12 +36,12 @@ pub(super) enum Input {
 /// prompt, instead of the hard syntax error `for i in 1 2 3` used to produce the moment you
 /// pressed Enter.
 pub(super) fn read_command(
-    rl: &mut Repl,
+    helper: &oslo::interactive::OsloHelper,
+    history: &super::history::store::History,
     env_struct: &Arc<Mutex<Environment>>,
     lua: &LuaEngine,
     last_status: i32,
     current: &mut Mode,
-    toggle: &ToggleRequest,
 ) -> Input {
     let mut buffer = String::new();
     let mut secret = false;
@@ -67,9 +62,6 @@ pub(super) fn read_command(
         // leaving a line in normal mode otherwise drew the next prompt saying `N` while the editor
         // was already back in insert, and it stayed wrong until the first keystroke.
         oslo::interactive::vi::reset();
-        // A new line is a new walk through the history: whatever the last one had scrolled back
-        // to belongs to the line that is now finished.
-        super::keybind::reset_history_walk();
         // The shape too: the terminal is still drawing whatever the last line ended in, and a
         // block cursor over a line you are typing into says normal mode when it is insert.
         // Only to a terminal: a cursor-shape escape written down a pipe is not a cursor shape,
@@ -91,12 +83,11 @@ pub(super) fn read_command(
             .unwrap_or_else(|| rc::ps2(&mut env_struct.lock().unwrap()))
         };
 
-        // The right prompt is handed to the helper rather than concatenated: it is drawn from
-        // the highlighter, which is the only place a cursor move does not confuse rustyline.
-        // Hoisted out of the helper block below: the native editor takes the right prompt as an
-        // argument, which is what it always should have been.
-        let mut right_prompt = String::new();
-        if let Some(helper) = rl.helper() {
+        // The right prompt, computed here and handed to the editor as an argument. It used to be
+        // smuggled out of the *highlighter*, because that was the only place a cursor move did not
+        // confuse rustyline's layout — one of the workarounds that went with it.
+        let right_prompt;
+        {
             // A config's own right prompt wins; otherwise oslo draws one. There used to be none at
             // all unless a config asked, which meant the machinery existed and nobody saw it.
             // The same order the left prompt resolves in: a Lua prompt is an explicit choice and
@@ -122,10 +113,7 @@ pub(super) fn read_command(
                     ))
                 });
             right_prompt = right.clone().unwrap_or_default();
-            helper.set_right_prompt(right, oslo::interactive::prompt::printed_width(&prompt));
-            // What this prompt is for, so a vi-mode repaint rebuilds the same one rather than
-            // guessing at the language or the status.
-            helper.set_prompt_context(reading.name(), last_status);
+            let _ = helper;
         }
 
         // What this row *is*, recorded before the editor is entered rather than from inside the
@@ -193,28 +181,20 @@ pub(super) fn read_command(
 
         let split = typed_point.min(typed.len());
 
-        // **The native editor, when the config asks for it.** Either it owns the line or it does
-        // not run: the two cannot share a row.
-        //
-        // It produces a `raw` line and then falls through to exactly the same path rustyline's
-        // does — mode prefixes, history expansion, here-document tracking and the completeness
-        // check that decides whether to ask for another line. That is what gives it `PS2`
-        // continuation without a second implementation of any of it.
-        //
-        // The right prompt is passed as an argument here. Under rustyline it had to be smuggled
-        // out of the highlighter, because that was the only place a cursor move did not confuse
-        // the layout — which is the shape of the whole reason this exists.
-        let raw = if oslo::interactive::settings::current().misc.native_editor {
+        // The editor produces a `raw` line, and everything below is common to however it was
+        // read — mode prefixes, history expansion, here-document tracking, and the completeness
+        // check that decides whether to ask for another line under `PS2`.
+        let raw = {
             let cursor = typed[..split].chars().count();
-            let history = history_lines(rl);
+            let history = history.entries().to_vec();
             let mut assist = super::native::ShellAssist::new(
-                Arc::clone(env_struct),
                 history,
-                rl.helper(),
+                Some(helper),
                 // The real printed width, which is what puts the completion menu under the word
                 // it is completing. rustyline never told anyone where the line started, so the
                 // dropdown had to guess by rendering a default prompt.
                 oslo::interactive::prompt::printed_width(&prompt),
+                mode::toggle_key(&env_struct.lock().unwrap()),
             );
             assist.begin();
             match oslo::interactive::edit::session::read_line(
@@ -224,6 +204,23 @@ pub(super) fn read_command(
                 &mut assist,
             ) {
                 oslo::interactive::edit::session::Outcome::Line(line) => line,
+                // Switch and reopen with the same text and cursor, so the line survives the
+                // switch — which is what makes a toggle usable mid-command.
+                oslo::interactive::edit::session::Outcome::ToggleLanguage { text, cursor } => {
+                    let switched = match *current {
+                        Mode::Shell => Mode::Lua,
+                        Mode::Lua => Mode::Shell,
+                    };
+                    *current = switched;
+                    reading = switched;
+                    typed = text;
+                    typed_point = typed
+                        .char_indices()
+                        .nth(cursor)
+                        .map(|(at, _)| at)
+                        .unwrap_or(typed.len());
+                    continue;
+                }
                 // A partial multi-line command is abandoned whole, which is what Ctrl-C means
                 // when you are three lines into a `for` loop you no longer want.
                 oslo::interactive::edit::session::Outcome::Interrupted => {
@@ -231,56 +228,8 @@ pub(super) fn read_command(
                 }
                 oslo::interactive::edit::session::Outcome::Eof => return Input::Eof,
             }
-        } else {
-            match rl.readline_with_initial(&prompt, (&typed[..split], &typed[split..])) {
-                Ok(raw) => raw,
-                Err(ReadlineError::Interrupted) => {
-                    // A finder choice deliberately interrupts this editor instance instead of using
-                    // rustyline's `Replace`: replacement text is inserted at the right place but its
-                    // logical cursor is not advanced. Reopening with the whole choice on the *left*
-                    // side of `readline_with_initial` puts both the visible and logical cursor at the
-                    // end, so the next typed character really appends there.
-                    if let Some(choice) = super::keybind::take_finder_choice() {
-                        typed = choice.line;
-                        typed_point = typed.len();
-                        print!(
-                            "{}",
-                            oslo::interactive::row::rewind_after_readline(&choice.previous)
-                        );
-                        let _ = std::io::Write::flush(&mut std::io::stdout());
-                        continue;
-                    }
-                    // Ctrl-C abandons the *line*, not the language. If the user switched to Lua and
-                    // then thought better of the command, the prompt they were looking at said `lua`
-                    // and the next one must too — and the flag has to be consumed either way, or it
-                    // fires on the next line and switches the language nobody asked to switch.
-                    if toggle.take()
-                        && let Some(language) = oslo::interactive::prompt::language()
-                    {
-                        *current = if language == "lua" {
-                            Mode::Lua
-                        } else {
-                            Mode::Shell
-                        };
-                    }
-                    // No `^C` echoed. The keystroke was the user's instruction to abandon the line,
-                    // and they know they pressed it — printing it back spends a row saying so, which
-                    // is a row the next prompt could have had. The editor has already moved off the
-                    // abandoned line, so there is nothing to write here at all.
-                    return Input::Interrupted;
-                }
-                Err(ReadlineError::Eof) => {
-                    // Same for end of input: leaving the flag set would apply the switch to whatever
-                    // line came next if `$IGNOREEOF` keeps the shell alive.
-                    let _ = toggle.take();
-                    return Input::Eof;
-                }
-                Err(err) => {
-                    eprintln!("oslo: {}", err);
-                    return Input::Fatal;
-                }
-            }
         };
+
         typed.clear();
         typed_point = 0;
 
@@ -305,24 +254,9 @@ pub(super) fn read_command(
             let _ = std::io::Write::flush(&mut std::io::stdout());
         }
 
-        // The toggle key repaints the prompt in place rather than submitting, so by the time a
-        // line comes back the prompt may be showing the other language. That is the answer for
-        // *this* line and for the ones after it: what you see above the cursor is what runs.
-        // The toggle no longer submits anything — it repaints the prompt where it stands — so
-        // this is only catching up with a switch that already happened on screen. It must not put
-        // the line back into the editor: by the time this runs the user has pressed Enter, and
-        // re-entering here would swallow the command instead of running it.
-        if toggle.take()
-            && let Some(language) = oslo::interactive::prompt::language()
-        {
-            let switched = if language == "lua" {
-                Mode::Lua
-            } else {
-                Mode::Shell
-            };
-            *current = switched;
-            reading = switched;
-        }
+        // The language toggle used to be caught up with here, because rustyline's key handler
+        // could repaint the prompt but not tell the loop. The native editor returns
+        // `Outcome::ToggleLanguage` instead and the switch happens where it is made, above.
 
         if buffer.is_empty() {
             if raw.trim().is_empty() {
@@ -378,7 +312,7 @@ pub(super) fn read_command(
             // The frecency table is fed from here rather than from the editor's `validate`,
             // because with editor multi-line off (which is what `PS2` costs) `validate` never
             // sees a multi-line command whole — see `OsloHelper::record_command_use`.
-            if let Some(helper) = rl.helper() {
+            {
                 helper.record_command_use(&buffer);
             }
             return Input::Command {
@@ -440,22 +374,4 @@ pub(super) fn is_complete(source: &str, mode: Mode) -> bool {
             InputStatus::Incomplete
         ),
     }
-}
-
-/// The history the native editor walks, oldest first.
-///
-/// Read out of the editor's own store rather than kept separately: two copies of the history is
-/// two chances for them to disagree about what you just ran.
-fn history_lines(rl: &Repl) -> Vec<String> {
-    use rustyline::history::{History, SearchDirection};
-    let history = rl.history();
-    (0..history.len())
-        .filter_map(|i| {
-            history
-                .get(i, SearchDirection::Forward)
-                .ok()
-                .flatten()
-                .map(|found| found.entry.into_owned())
-        })
-        .collect()
 }

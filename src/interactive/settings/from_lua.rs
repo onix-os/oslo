@@ -143,7 +143,6 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
         if let Value::Str(greeting) = table.get(&Value::str("greeting")) {
             settings.misc.greeting = Some(greeting.to_string());
         }
-        flag(&table, "native_editor", &mut settings.misc.native_editor);
         if let Some(ms) = number(&table, "escape_delay") {
             // Clamped rather than refused: a zero would make every arrow key over ssh read as Esc,
             // and a delay longer than a second is a shell that appears to have stopped responding
@@ -169,9 +168,10 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
         if let Value::Str(key) = table.get(&Value::str("key")) {
             // Checked here rather than at bind time, so a typo is reported next to the line that
             // wrote it instead of silently leaving the finder unreachable.
-            match crate::interactive::keys::parse_key(&key) {
-                Some(_) => settings.finder.key = key.to_string(),
-                None => problems.push(format!("oslo.finder.key: '{key}' is not a key name")),
+            if crate::interactive::keys::is_key_name(&key) {
+                settings.finder.key = key.to_string();
+            } else {
+                problems.push(format!("oslo.finder.key: '{key}' is not a key name"));
             }
         }
         if let Some(n) = number(&table, "limit") {
