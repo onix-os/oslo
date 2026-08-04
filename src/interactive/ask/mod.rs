@@ -138,6 +138,37 @@ impl Inline {
     }
 }
 
+/// `text` with a block cursor drawn on the character at `at`.
+///
+/// The real terminal cursor is hidden for every widget — an inline one repaints its whole block on
+/// each keystroke and the cursor is dragged across all of it — so a text field has to draw its own.
+/// This is what bubbletea does for gum, and it is better than positioning the real one for a
+/// reason beyond flicker: the caret is *part of the frame*, so it cannot end up a cell out of step
+/// with the text the way a separate `ESC [ n C` can.
+///
+/// At the end of the text the block sits on a space, which is how you can tell "typing at the end"
+/// from "on the last character".
+pub(crate) fn with_caret(text: &str, at: usize) -> String {
+    let ui = crate::interactive::theme::current().ui;
+    let depth = crate::interactive::theme::depth();
+    let block = crate::interactive::theme::Style {
+        reverse: true,
+        ..crate::interactive::theme::Style::default()
+    };
+    let chars: Vec<char> = text.chars().collect();
+    let at = at.min(chars.len());
+    let before: String = chars[..at].iter().collect();
+    let under = chars.get(at).copied().unwrap_or(' ');
+    let after: String = chars.iter().skip(at + 1).collect();
+    let _ = ui;
+    format!(
+        "{}{}{}",
+        before,
+        block.paint(&under.to_string(), depth),
+        after
+    )
+}
+
 /// The bottom of a widget: a dashed rule, then the keys.
 ///
 /// The rule is not decoration. The rows above it are the thing you are answering — a list, a
@@ -273,6 +304,34 @@ mod tests {
     fn the_row_prefix_is_not_measured() {
         assert_eq!(widest("\r\n\r\x1b[Kab"), 2);
         assert_eq!(widest(""), 0);
+    }
+
+    /// The caret is part of the text, so it can never be a cell out of step with it.
+    #[test]
+    fn the_caret_marks_the_character_it_is_on() {
+        // Reverse video around exactly one character, and the rest untouched.
+        let drawn = with_caret("abc", 1);
+        assert!(drawn.contains("\x1b[7m"), "not reversed: {drawn:?}");
+        assert_eq!(plain(&drawn), "abc", "the text changed: {drawn:?}");
+    }
+
+    /// Past the end it sits on a space, which is how "typing at the end" looks different from
+    /// "on the last character".
+    #[test]
+    fn at_the_end_the_caret_is_a_space() {
+        let drawn = with_caret("ab", 2);
+        assert_eq!(plain(&drawn), "ab ", "{drawn:?}");
+        // And an index past even that cannot panic — a cursor arriving from shell code is a
+        // number somebody could have written.
+        assert_eq!(plain(&with_caret("ab", 99)), "ab ");
+        assert_eq!(plain(&with_caret("", 0)), " ");
+    }
+
+    /// A multibyte character is one cell, not one byte — slicing by byte would panic on it.
+    #[test]
+    fn the_caret_counts_characters_not_bytes() {
+        assert_eq!(plain(&with_caret("héllo", 1)), "héllo");
+        assert_eq!(plain(&with_caret("→x", 0)), "→x");
     }
 
     /// Two rows: the rule and the keys. Anything sizing a window depends on that being exact.

@@ -8,7 +8,7 @@
 //! Drawn in place below the header, like the list widgets, so the transcript above is untouched
 //! and the finished text stays where it was typed.
 
-use super::{Answer, FOOTER_ROWS, Inline, footer};
+use super::{Answer, FOOTER_ROWS, Inline, footer, with_caret};
 use crate::interactive::dropdown::width::{terminal_cols, terminal_rows, truncate_to_width};
 use crate::interactive::term::{Key, Keys, Restore};
 use crate::interactive::theme;
@@ -70,8 +70,19 @@ pub fn write(spec: &Write) -> Answer<String> {
         let empty = lines.len() == 1 && lines[0].is_empty();
         for (index, line) in lines.iter().enumerate().skip(top).take(window) {
             let raw_text: String = line.iter().collect();
+            // The caret is drawn into the row it is on, not positioned afterwards — the real
+            // cursor is hidden, and a block that is part of the frame cannot drift out of step
+            // with the text.
             let text: String = if empty && !spec.placeholder.is_empty() {
-                ui.muted.paint(&spec.placeholder, depth)
+                let mut chars = spec.placeholder.chars();
+                let first = chars.next().unwrap_or(' ');
+                format!(
+                    "{}{}",
+                    with_caret(&first.to_string(), 0),
+                    ui.muted.paint(chars.as_str(), depth)
+                )
+            } else if index == row {
+                with_caret(&truncate_to_width(&raw_text, room), col)
             } else {
                 truncate_to_width(&raw_text, room)
             };

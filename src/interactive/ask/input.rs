@@ -13,8 +13,7 @@
 //! oslo's whole `readline`, and hosting it here would mean two things to keep in step for the rest
 //! of the shell's life.
 
-use super::{Answer, show};
-use crate::interactive::prompt::printed_width;
+use super::{Answer, show, with_caret};
 use crate::interactive::term::{Key, Keys, Restore};
 use crate::interactive::theme;
 
@@ -63,28 +62,24 @@ pub fn input(spec: &Input) -> Answer<String> {
         } else {
             line.iter().collect()
         };
+        // The placeholder carries the caret too, on its first character, so an empty field still
+        // shows where typing will go. The block is drawn first and the rest dimmed after it —
+        // painting the whole string muted and then reversing part of it would nest the escapes.
         let body = if line.is_empty() && !spec.placeholder.is_empty() {
-            ui.muted.paint(&spec.placeholder, depth)
+            let mut chars = spec.placeholder.chars();
+            let first = chars.next().unwrap_or(' ');
+            format!(
+                "{}{}",
+                with_caret(&first.to_string(), 0),
+                ui.muted.paint(chars.as_str(), depth)
+            )
         } else {
-            shown.clone()
+            with_caret(&shown, cursor)
         };
-        let before: String = if spec.password {
-            "•".repeat(cursor)
-        } else {
-            line[..cursor].iter().collect()
-        };
-        // `CSI 0 C` is a move of *one*, not none — so the caret sat a cell right of an empty
-        // line and did not move when the first character was typed.
-        let caret = printed_width(&spec.prompt) + printed_width(&before);
         show(&format!(
-            "\r\x1b[K{}{}\r{}",
+            "\r\x1b[K{}{}",
             ui.question.paint(&spec.prompt, depth),
-            body,
-            if caret > 0 {
-                format!("\x1b[{caret}C")
-            } else {
-                String::new()
-            }
+            body
         ));
 
         let Some(pressed) = keys.read() else {
