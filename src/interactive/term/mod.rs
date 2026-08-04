@@ -99,6 +99,18 @@ impl Restore {
         let mut raw = original.clone();
         raw.local_flags.remove(LocalFlags::ICANON);
         raw.local_flags.remove(LocalFlags::ECHO);
+        // **`ISIG` off, so Ctrl-C arrives as a byte.**
+        //
+        // Left on, the tty driver turns `0x03` into a SIGINT and the default disposition kills the
+        // shell outright — before the guard below can leave the alternate screen, put the termios
+        // back, or erase what the widget drew. A `Drop` does not run on a signal death, so the
+        // widget stays on the screen and the terminal keeps whatever mode it was in.
+        //
+        // With it off the byte reaches the reader, `Key::Cancel` runs the ordinary cancel path,
+        // and everything unwinds the way Esc already did. This is what every full-screen picker
+        // does for the same reason. Ctrl-Z and Ctrl-\ stop being signals too for the moment the
+        // widget is open, which is correct: a modal prompt is not somewhere to suspend into.
+        raw.local_flags.remove(LocalFlags::ISIG);
         tcsetattr(handle, SetArg::TCSANOW, &raw).ok()?;
         // **stderr, not stdout.** Every widget draws to stderr so that `x=$(ui …)` captures the
         // answer and nothing else — and these escapes are part of the drawing. Sent to stdout they
