@@ -26,7 +26,22 @@ pub(crate) const HOOK_PREFIX: &str = "hook:";
 /// A fixed list rather than an open set: a name that is never fired is indistinguishable from a
 /// typo, and `oslo.on.precmb(fn)` silently doing nothing for ever is the failure mode this
 /// avoids.
-pub(crate) const HOOKS: [&str; 4] = ["precmd", "postcmd", "cd", "command-not-found"];
+pub(crate) const HOOKS: [&str; 7] = [
+    // **`preexec` and `precmd` are the names the rest of the world uses**, and oslo had them
+    // crossed: what it called `precmd` fires *before the command*, which is preexec everywhere
+    // else, and there was no hook at all for "a prompt is about to be drawn" — the thing every
+    // prompt integration actually installs.
+    //
+    // Both spellings now exist and fire together, so no config breaks; `preexec` is the one to
+    // write. `prompt` is the missing one.
+    "preexec",
+    "precmd",
+    "postexec",
+    "postcmd",
+    "prompt",
+    "cd",
+    "command-not-found",
+];
 
 /// Add the introspection fields, `oslo.opts` and `oslo.on` to the `oslo` table.
 pub fn install(

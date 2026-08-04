@@ -284,13 +284,71 @@ oslo.on.cd(function(dir) print("now in " .. dir) end)
 oslo.on["command-not-found"](function(name) print(name .. " is not installed") end)
 ```
 
+Anything in `~/.config/oslo/conf.d/*.lua` runs first, in name order, and `config.lua` runs last.
+That directory is fish's, and it is there for the same reason: a plugin or a dotfile repo needs
+somewhere to add a line without editing a file it does not own, and the file you wrote by hand
+keeps the final say.
+
+### The settings
+
+```lua
+oslo.misc.greeting     = "hello"     -- instead of the banner; misc.welcome = false for silence
+oslo.misc.escape_delay = 300         -- ms to wait for the rest of an escape sequence, over ssh
+oslo.misc.color_depth  = "truecolor" -- truecolor / 256 / 16 / none, when detection is wrong
+
+oslo.history.ignore    = { "ls", "cd *" }   -- $HISTIGNORE, matched against the whole line
+oslo.notify.after      = 10                 -- seconds; 0 never notifies
+oslo.notify.command    = "notify-send {title} {body}"   -- instead of the terminal's escape
+
+oslo.abbr.gco = "git checkout"
+oslo.abbr.brc = { "~/.config/oslo/config.lua", anywhere = true }
+```
+
+Abbreviations expand as you type the space that ends the word — `gco ` becomes `git checkout `,
+and the line that runs is the one you can read. The `abbr` builtin defines them too, and by hand at
+the prompt it is the shorter thing to type; `oslo.abbr` is for the ones you want every session.
+
+### The prompt
+
+Four render keys, each a function returning a string:
+
+```lua
+oslo.prompt.left         = function(p) return p.cwd .. " ❯ " end
+oslo.prompt.right        = function(p) return p.duration_ms and (p.duration_ms .. "ms") or "" end
+oslo.prompt.continuation = function() return "… " end
+oslo.prompt.transient    = function() return "❯ " end   -- redrawn once the line is accepted
+```
+
+Every one of them is handed the same facts: `status`, `duration_ms`, `cwd`, `branch`, `user`,
+`host`, `language`, `vimode`, `cols`, `jobs`, `continuation`. A shell-side integration reads the
+same things from `$?`, `$EPOCHREALTIME`, `$PWD` and `$OSLO_MODE`, and can own both columns through
+`$PS1` and `$RPS1`.
+
+`oslo.prompt.transient` is the one that has no equivalent elsewhere. zsh users build it by wrapping
+ZLE widgets — powerlevel10k and oh-my-posh each spend several hundred lines on it — because zsh has
+no way to say "redraw the accepted line differently". oslo owns its own editor, so it is one key.
+
+### The hooks
+
+```lua
+oslo.on.prompt(function()       end)  -- before each prompt is drawn
+oslo.on.preexec(function(line)  end)  -- after Enter, before the command runs
+oslo.on.postexec(function(code) end)  -- after it finishes
+oslo.on.cd(function(dir)        end)
+oslo.on["command-not-found"](function(name) end)
+```
+
+`precmd` and `postcmd` are the names oslo shipped first and still answers to. They fire alongside
+`preexec` and `postexec`, which are what the rest of the world calls the same two moments.
+
 `oslo.proc.capture`, `sh.df()`, `sh.ps()`, `sh.ls()`, `sh.stat()`, `oslo.path.*`, `oslo.json`, `oslo.re`,
-hooks, and a `did you mean` drawn from the command index oslo already keeps.
+and a `did you mean` drawn from the command index oslo already keeps.
 
 ## Building
 
 ```sh
-make build        # debug
+make build        # static musl release, the same binary the release action ships
+make dev          # a plain debug build, for iterating
 make verify       # fmt, line limits, README paths, tests, clippy, rustdoc — all of it
 make install      # to /usr/local/bin
 nix build         # static musl binary

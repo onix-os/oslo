@@ -33,10 +33,17 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
         settings.dirs.sort();
     }
 
-    if let Value::Table(table) = oslo.get(&Value::str("notify"))
-        && let Some(n) = number(&table.borrow(), "after")
-    {
-        settings.notify.after = n.max(0) as u64;
+    if let Value::Table(table) = oslo.get(&Value::str("notify")) {
+        let table = table.borrow();
+        if let Some(n) = number(&table, "after") {
+            settings.notify.after = n.max(0) as u64;
+        }
+        if let Value::Str(title) = table.get(&Value::str("title")) {
+            settings.notify_text.title = Some(title.to_string());
+        }
+        if let Value::Str(command) = table.get(&Value::str("command")) {
+            settings.notify_text.command = Some(command.to_string());
+        }
     }
 
     if let Value::Table(table) = oslo.get(&Value::str("vi")) {
@@ -133,6 +140,24 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
         if let Value::Bool(on) = table.get(&Value::str("welcome")) {
             settings.misc.welcome = on;
         }
+        if let Value::Str(greeting) = table.get(&Value::str("greeting")) {
+            settings.misc.greeting = Some(greeting.to_string());
+        }
+        if let Some(ms) = number(&table, "escape_delay") {
+            // Clamped rather than refused: a zero would make every arrow key over ssh read as Esc,
+            // and a delay longer than a second is a shell that appears to have stopped responding
+            // to Esc at all.
+            settings.misc.escape_delay = ms.clamp(1, 2000) as u64;
+        }
+        if let Value::Str(depth) = table.get(&Value::str("color_depth")) {
+            match crate::interactive::theme::Depth::named(&depth) {
+                Some(_) => settings.misc.color_depth = Some(depth.to_string()),
+                None => problems.push(format!(
+                    "oslo.misc.color_depth: {depth:?} is not a depth; \
+                     it is truecolor, 256, 16 or none"
+                )),
+            }
+        }
     }
 
     if let Value::Table(table) = oslo.get(&Value::str("finder")) {
@@ -180,6 +205,51 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
         settings.keys.sort();
     }
 
+    if let Value::Table(table) = oslo.get(&Value::str("abbr")) {
+        // Sorted by name, for the reason `oslo.keys` is: Lua table iteration has no order, and two
+        // runs of the same config must install the same thing in the same sequence.
+        let mut defined: Vec<(String, String, bool)> = Vec::new();
+        for (key, value) in table.borrow().pairs() {
+            let Value::Str(name) = key else {
+                problems
+                    .push("oslo.abbr: every key must be the word being abbreviated".to_string());
+                continue;
+            };
+            match value {
+                // The short form, which is what almost every entry is: `gco = "git checkout"`.
+                Value::Str(expansion) => {
+                    defined.push((name.to_string(), expansion.to_string(), false))
+                }
+                // The long form, for the one in ten that needs to fire outside command position.
+                Value::Table(spec) => {
+                    let spec = spec.borrow();
+                    let expansion = match spec.get(&Value::str("expansion")) {
+                        Value::Str(text) => text.to_string(),
+                        // `{ "git checkout", anywhere = true }` — the expansion as the first
+                        // element, which is how the same table reads when written by hand.
+                        _ => match spec.get(&Value::int(1)) {
+                            Value::Str(text) => text.to_string(),
+                            _ => {
+                                problems.push(format!(
+                                    "oslo.abbr.{name}: needs an expansion, \
+                                     either as `expansion = ...` or as the first element"
+                                ));
+                                continue;
+                            }
+                        },
+                    };
+                    let anywhere = matches!(spec.get(&Value::str("anywhere")), Value::Bool(true));
+                    defined.push((name.to_string(), expansion, anywhere));
+                }
+                _ => problems.push(format!(
+                    "oslo.abbr.{name}: an abbreviation expands to a string"
+                )),
+            }
+        }
+        defined.sort();
+        settings.abbr = defined;
+    }
+
     if let Value::Table(table) = oslo.get(&Value::str("history")) {
         let table = table.borrow();
         if let Some(n) = number(&table, "size") {
@@ -190,6 +260,15 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
         }
         flag(&table, "ignore_space", &mut settings.history.ignore_space);
         flag(&table, "ignore_dups", &mut settings.history.ignore_dups);
+        if let Value::Table(list) = table.get(&Value::str("ignore")) {
+            for value in list.borrow().sequence() {
+                match value {
+                    Value::Str(pattern) => settings.history.ignore.push(pattern.to_string()),
+                    _ => problems
+                        .push("oslo.history.ignore: every entry must be a pattern".to_string()),
+                }
+            }
+        }
     }
 
     (settings, problems)

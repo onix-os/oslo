@@ -84,6 +84,7 @@ pub fn install(interp: &Rc<Interp>, registry: &Registry, env: Arc<Mutex<Environm
         "notify",
         "dirs",
         "theme",
+        "abbr",
     ] {
         oslo.set(
             Value::str(name),

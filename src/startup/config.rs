@@ -32,6 +32,23 @@ pub fn apply(lua: &LuaEngine) {
             .collect(),
     );
 
+    // Installed rather than kept in the settings and consulted on each keystroke: the abbreviation
+    // table is also written by the `abbr` builtin, and having two sources that disagree is worse
+    // than having one that a config seeds. Cleared first so a reload does not leave behind an entry
+    // the config no longer defines — but only when the config defines any, so a shell whose
+    // abbreviations all come from `abbr` at the prompt does not lose them to a config reload.
+    if !settings.abbr.is_empty() {
+        oslo::interactive::abbr::clear();
+        for (name, expansion, anywhere) in &settings.abbr {
+            let placement = if *anywhere {
+                oslo::interactive::abbr::Placement::Anywhere
+            } else {
+                oslo::interactive::abbr::Placement::Command
+            };
+            oslo::interactive::abbr::add(name, expansion, placement);
+        }
+    }
+
     oslo::interactive::settings::install(settings);
 
     // Installed rather than read: unlike a theme, this one is a *function*, and it has to be

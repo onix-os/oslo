@@ -20,6 +20,17 @@ pub struct Settings {
     pub vi: Vi,
     /// `oslo.notify`: when a finished command is worth a desktop notification.
     pub notify: Notify,
+    /// The notification's words, split out because `Notify` is `Copy`.
+    pub notify_text: NotifyText,
+    /// `oslo.abbr` — abbreviations declared by the config, as `(name, expansion, anywhere)`.
+    ///
+    /// A `Vec` rather than a map because it is installed once, in order, and a map would only add
+    /// a question about which of two definitions of the same name won.
+    ///
+    /// Abbreviations already existed, and until now the **only** way to define one was the `abbr`
+    /// builtin — so a Lua config had to shell out to declare one, in a shell whose configuration
+    /// is Lua. That is the gap this closes.
+    pub abbr: Vec<(String, String, bool)>,
     /// `oslo.finder`: the full-screen history search.
     pub finder: Finder,
     /// `oslo.misc`: the settings that belong to no other group.
@@ -46,6 +57,24 @@ pub struct Settings {
 pub struct Notify {
     /// Seconds a command must run before finishing is worth telling you about. `0` never notifies.
     pub after: u64,
+}
+
+/// `oslo.notify`'s text, which is a `String` and so cannot live in the `Copy` struct above.
+///
+/// The title is configurable because the default — the command that finished — is the right
+/// answer on a desktop and the wrong one on a machine you have four sessions open on. Naming the
+/// host, or the project, is what makes a notification worth reading.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct NotifyText {
+    /// Shown as the notification's title instead of the command. `{cmd}`, `{status}` and
+    /// `{duration}` are substituted.
+    pub title: Option<String>,
+    /// A command run instead of writing the terminal's own notification escape.
+    ///
+    /// The escape is right for a terminal that forwards it and does nothing at all for one that
+    /// does not — and there is no way to ask. This is the escape hatch: `notify-send`, `terminal-notifier`,
+    /// a shell function that pushes to your phone. The same three placeholders are substituted.
+    pub command: Option<String>,
 }
 
 impl Default for Notify {
@@ -174,11 +203,36 @@ pub struct Misc {
     /// oldest usability bug in the interactive-program genre. Off is for everybody else, who has
     /// read it a thousand times and would rather have the two rows.
     pub welcome: bool,
+    /// Printed instead of the banner. fish's `fish_greeting`, which is the setting people
+    /// actually reach for — `welcome = false` and then a line of your own is two settings in
+    /// fish too, and merging them would mean an empty string had to mean "silent".
+    pub greeting: Option<String>,
+    /// Milliseconds to wait for the rest of an escape sequence before deciding a lone `ESC` was
+    /// the Esc key. fish's `fish_escape_delay_ms`.
+    ///
+    /// 25 is right on a local terminal and wrong over a slow link, where the bytes of one arrow
+    /// key can arrive far enough apart to be read as Esc followed by letters — which in vi mode
+    /// means your cursor keys start executing commands. Raising this is the fix, and until now
+    /// there was no way to.
+    pub escape_delay: u64,
+    /// Force a colour depth instead of detecting one: `truecolor`, `256`, `16` or `none`.
+    ///
+    /// Detection reads `$COLORTERM` and `$TERM`, and both lie in either direction — inside tmux,
+    /// over ssh, under a CI runner. A config that knows what it is talking to should be able to
+    /// say so.
+    pub color_depth: Option<String>,
 }
 
 impl Default for Misc {
     fn default() -> Self {
-        Misc { welcome: true }
+        Misc {
+            welcome: true,
+            greeting: None,
+            // The standard pause: long enough that a real sequence is never split, short enough
+            // that Esc feels immediate.
+            escape_delay: 25,
+            color_depth: None,
+        }
     }
 }
 
@@ -254,6 +308,13 @@ pub struct History {
     /// Off by default, and that is not an aesthetic choice: dropping a repeat renumbers every
     /// later event, so `!-2` would point one line further back than it says.
     pub ignore_dups: bool,
+    /// Patterns whose matching lines are never remembered. bash's `$HISTIGNORE`.
+    ///
+    /// Matched against the **whole line** with the shell's own glob rules, so `ls` is only `ls`
+    /// and `ls *` is every `ls`. Whole-line rather than per-word because the thing people want to
+    /// keep out is a command shape — `git commit -m *`, or anything with a token in it — and a
+    /// per-word rule would drop half a line and remember the rest.
+    pub ignore: Vec<String>,
 }
 
 impl Default for History {
@@ -263,6 +324,7 @@ impl Default for History {
             file: None,
             ignore_space: true,
             ignore_dups: false,
+            ignore: Vec::new(),
         }
     }
 }
@@ -303,152 +365,18 @@ pub fn current() -> Settings {
 }
 
 pub fn install(settings: Settings) {
+    // `oslo.misc.color_depth` is applied here rather than read where colour is painted: the depth
+    // is cached on first use, so a config that sets it after something has already drawn would be
+    // ignored. Installing the settings is the moment the config is known and nothing has drawn.
+    if let Some(name) = &settings.misc.color_depth
+        && let Some(depth) = super::theme::Depth::named(name)
+    {
+        super::theme::set_depth(depth);
+    }
     if let Ok(mut slot) = SETTINGS.write() {
         *slot = Some(settings);
     }
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::lua::eval;
-
-    fn settings_from(source: &str) -> (Settings, Vec<String>) {
-        let interp = eval::Interp::new("settings test");
-        let ast = eval::parse(source).expect("the test chunk must parse");
-        interp.run_ast(&ast).expect("the test chunk must run");
-        read_lua_settings(&interp.global("oslo"))
-    }
-
-    #[test]
-    fn naming_one_field_keeps_every_other_default() {
-        let (settings, problems) = settings_from("oslo = { completion = { max_rows = 5 } }");
-        assert!(problems.is_empty(), "{problems:?}");
-        assert_eq!(settings.completion.max_rows, 5);
-        assert!(settings.completion.descriptions);
-        assert_eq!(settings.suggest, Suggest::default());
-        assert_eq!(settings.history, History::default());
-    }
-
-    /// `false` and "not mentioned" have to be different, or nothing could ever be turned off.
-    #[test]
-    fn a_false_flag_is_not_the_same_as_an_absent_one() {
-        let (off, _) = settings_from("oslo = { completion = { show_kind = false } }");
-        assert!(!off.completion.show_kind);
-        let (absent, _) = settings_from("oslo = { completion = {} }");
-        assert!(absent.completion.show_kind);
-    }
-
-    /// An empty list is a real answer — "offer nothing" — and must not read as "offer everything".
-    #[test]
-    fn the_completion_sources_are_read_including_an_empty_list() {
-        let (all, _) = settings_from("oslo = { completion = {} }");
-        assert_eq!(all.completion.sources, None, "unset means every kind");
-
-        let (some, problems) =
-            settings_from("oslo = { completion = { sources = {'command', 'dir'} } }");
-        assert!(problems.is_empty(), "{problems:?}");
-        assert_eq!(
-            some.completion.sources.as_deref(),
-            Some(["command".to_string(), "dir".to_string()].as_slice())
-        );
-
-        let (none, _) = settings_from("oslo = { completion = { sources = {} } }");
-        assert_eq!(none.completion.sources.as_deref(), Some([].as_slice()));
-    }
-
-    #[test]
-    fn the_completion_order_is_read_and_a_typo_is_named() {
-        let (alpha, problems) = settings_from("oslo = { completion = { sort = 'alpha' } }");
-        assert!(problems.is_empty(), "{problems:?}");
-        assert_eq!(alpha.completion.sort, Sort::Alpha);
-        assert_eq!(Settings::default().completion.sort, Sort::Frecency);
-
-        let (kept, problems) = settings_from("oslo = { completion = { sort = 'vibes' } }");
-        assert_eq!(problems.len(), 1, "{problems:?}");
-        assert!(problems[0].contains("vibes"));
-        assert_eq!(
-            kept.completion.sort,
-            Sort::Frecency,
-            "a typo keeps the default"
-        );
-    }
-
-    /// `oslo.suggest.accept = "right"` is how fish spells it, and it used to bind nothing.
-    #[test]
-    fn the_suggestion_keys_are_read_under_their_own_names() {
-        let (settings, problems) =
-            settings_from("oslo = { suggest = { accept = 'right', accept_word = 'alt-right' } }");
-        assert!(problems.is_empty(), "{problems:?}");
-        assert_eq!(settings.suggest.accept.as_deref(), Some("right"));
-        assert_eq!(settings.suggest.accept_word.as_deref(), Some("alt-right"));
-        // Naming them does not disturb the sources.
-        assert_eq!(settings.suggest.sources, Suggest::default().sources);
-    }
-
-    #[test]
-    fn suggestion_sources_keep_the_order_they_were_written_in() {
-        let (settings, problems) =
-            settings_from("oslo = { suggest = { sources = {'path', 'history'} } }");
-        assert!(problems.is_empty(), "{problems:?}");
-        assert_eq!(
-            settings.suggest.sources,
-            vec![Source::Path, Source::History]
-        );
-
-        // An empty list turns suggestions off, which is a thing someone may want.
-        let (off, _) = settings_from("oslo = { suggest = { sources = {} } }");
-        assert!(off.suggest.sources.is_empty());
-    }
-
-    /// A typo that silently turns a source off is the kind of thing that gets blamed on the shell.
-    #[test]
-    fn an_unknown_source_is_named() {
-        let (settings, problems) =
-            settings_from("oslo = { suggest = { sources = {'history', 'psychic'} } }");
-        assert_eq!(problems.len(), 1, "{problems:?}");
-        assert!(problems[0].contains("psychic"), "{problems:?}");
-        // The ones that were understood still take effect.
-        assert_eq!(settings.suggest.sources, vec![Source::History]);
-    }
-
-    #[test]
-    fn a_row_count_is_clamped_to_something_drawable() {
-        let (tiny, _) = settings_from("oslo = { completion = { max_rows = 0 } }");
-        assert_eq!(tiny.completion.max_rows, 1);
-        let (huge, _) = settings_from("oslo = { completion = { max_rows = 9999 } }");
-        assert_eq!(
-            huge.completion.max_rows,
-            crate::interactive::dropdown::CEILING_ROWS
-        );
-    }
-
-    #[test]
-    fn key_bindings_are_read_in_a_stable_order() {
-        let (settings, problems) = settings_from(
-            "oslo = { keys = { ['ctrl-l'] = 'clear-screen', ['shift-tab'] = 'toggle-language' } }",
-        );
-        assert!(problems.is_empty(), "{problems:?}");
-        // Sorted, because table iteration has no order and a binding that depends on it would
-        // behave differently between runs.
-        assert_eq!(
-            settings.keys,
-            vec![
-                ("ctrl-l".to_string(), "clear-screen".to_string()),
-                ("shift-tab".to_string(), "toggle-language".to_string()),
-            ]
-        );
-    }
-
-    #[test]
-    fn history_settings_are_read_through() {
-        let (settings, _) = settings_from(
-            "oslo = { history = { size = 50000, file = '~/h', ignore_dups = true } }",
-        );
-        assert_eq!(settings.history.size, Some(50000));
-        assert_eq!(settings.history.file.as_deref(), Some("~/h"));
-        assert!(settings.history.ignore_dups);
-        // Untouched.
-        assert!(settings.history.ignore_space);
-    }
-}
+mod tests;

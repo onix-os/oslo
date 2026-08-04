@@ -313,7 +313,7 @@ fn over_the_cap(reader: &Reader<'_, '_>) -> Vec<Vec<u8>> {
         let Some(excess) = group.len().checked_sub(RUNS_PER_DIR) else {
             continue;
         };
-        group.sort_by(|a, b| (a.0, a.1).cmp(&(b.0, b.1)));
+        group.sort_by_key(|a| (a.0, a.1));
         doomed.extend(group.drain(..excess).map(|(_, _, key)| key));
     }
     doomed

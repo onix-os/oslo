@@ -233,6 +233,27 @@ pub(super) fn read_command(
         typed.clear();
         typed_point = 0;
 
+        // The line has been accepted, so the prompt above it has done its job. If a config asked
+        // for a shorter one to stand in its place, put that there now — before the command runs,
+        // so what scrolls past is one line of prompt per command rather than three.
+        //
+        // Only to a terminal, and only from the row the editor actually drew: `rewind_after_readline`
+        // accounts for the wrap, which is why this is not `ESC [ 1 A`.
+        if std::io::IsTerminal::is_terminal(&std::io::stdout())
+            && let Some(short) = lua.render_with(
+                "prompt.transient",
+                &prompt::segment_context(last_status, reading, None),
+            )
+        {
+            print!(
+                "{}{}{}\r\n",
+                oslo::interactive::row::rewind_after_readline(&raw),
+                short,
+                raw
+            );
+            let _ = std::io::Write::flush(&mut std::io::stdout());
+        }
+
         // The toggle key repaints the prompt in place rather than submitting, so by the time a
         // line comes back the prompt may be showing the other language. That is the answer for
         // *this* line and for the ones after it: what you see above the cursor is what runs.

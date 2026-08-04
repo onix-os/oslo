@@ -52,6 +52,33 @@ pub fn config_path(env: &Environment) -> Option<PathBuf> {
     config_paths(env).into_iter().find(|p| p.is_file())
 }
 
+/// Every `.lua` file in `oslo/conf.d`, in name order, then the config file itself.
+///
+/// fish's `conf.d`, and it exists for the same reason fish grew it: a plugin, a package manager or
+/// a dotfile repo needs somewhere to add a line of configuration **without editing a file it does
+/// not own**. Appending to `config.lua` means every uninstall is a text edit that can go wrong, and
+/// two tools appending at once means a merge conflict in a file a person also writes by hand.
+///
+/// Name order rather than directory order, so `10-path.lua` runs before `20-prompt.lua` and the
+/// result does not depend on what the filesystem feels like returning. `config.lua` runs **last**,
+/// so the file you wrote by hand has the final say over anything a package dropped in.
+pub fn config_files(env: &Environment) -> Vec<PathBuf> {
+    let mut files = Vec::new();
+    if let Some(dir) = config_paths(env).first().and_then(|p| p.parent()) {
+        let mut snippets: Vec<PathBuf> = std::fs::read_dir(dir.join("conf.d"))
+            .into_iter()
+            .flatten()
+            .flatten()
+            .map(|entry| entry.path())
+            .filter(|path| path.extension().is_some_and(|e| e == "lua") && path.is_file())
+            .collect();
+        snippets.sort();
+        files.extend(snippets);
+    }
+    files.extend(config_path(env));
+    files
+}
+
 /// Wire the `oslo.*` table into `lua`, reporting a failure instead of swallowing it.
 ///
 /// Returns whether the bindings are usable. When they are not, `init.lua` is not run at all:
