@@ -31,7 +31,23 @@ nix = { version = "0.29", features = [
 rustyline = "15.0"
 # `[[ str =~ ere ]]` needs a real POSIX-ERE engine. Approximating it with globs would make every
 # validation idiom (`=~ ^[0-9]+$`) answer plausibly and wrongly.
-regex = "1"
+# **Trimmed on purpose, and measured.** The default feature set costs ~370KB and is *slower* for
+# what a shell actually does. Two things are dropped:
+#
+# * `perf-dfa` — the lazy DFA. It pays for itself scanning a long haystack and charges per search,
+#   which is the wrong trade for matching one short line at a time: line-by-line scanning measured
+#   972ms with it and 320ms without. Dropping it costs a pattern with no literal to prefilter on a
+#   long haystack — 6ms became 68ms — which is the rarer shape and still milliseconds.
+# * `unicode-age`, `-bool`, `-script`, `-segment` — the tables behind `\p{Age:…}`, `\p{Script:…}`
+#   and `\b{…}`. Nothing in a shell's regex reaches for them. `unicode-case` stays for `(?i)`,
+#   `-gencat` for `\p{L}`, and `-perl` for `\d \w \s`.
+#
+# `perf-literal` is kept, and it is the one that matters: without it a long scan goes from 4ms to
+# 192ms. It brings `aho-corasick` and `memchr`, and earns them.
+regex = { version = "1", default-features = false, features = [
+    "std", "unicode-case", "unicode-gencat", "unicode-perl",
+    "perf-literal", "perf-inline",
+] }
 # JSON is a core capability rather than a library a user can install: a C module cannot load into
 # a static binary, which rules out lua-cjson and every Lua JSON parser that wraps it. `serde_json`
 # is pure Rust, so it works where those cannot. See PLAN-LUA.md.
