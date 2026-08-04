@@ -29,7 +29,7 @@ fn many(n: usize) -> Vec<Command> {
 #[test]
 fn arrow_navigation_follows_the_screen() {
     let commands = many(5);
-    let mut state = State::new(&commands, "/here", Fuzzy::Smart);
+    let mut state = State::new(&commands, "/here", Fuzzy::Smart, "");
     state.fit(10);
 
     state.up();
@@ -42,7 +42,7 @@ fn arrow_navigation_follows_the_screen() {
 #[test]
 fn the_selection_is_clamped() {
     let commands = many(5);
-    let mut state = State::new(&commands, "/here", Fuzzy::Smart);
+    let mut state = State::new(&commands, "/here", Fuzzy::Smart, "");
     state.fit(10);
     state.move_by(-100);
     assert_eq!(state.selected, 0);
@@ -56,7 +56,7 @@ fn the_selection_is_clamped() {
 #[test]
 fn the_window_follows_the_selection() {
     let commands = many(100);
-    let mut state = State::new(&commands, "/here", Fuzzy::Smart);
+    let mut state = State::new(&commands, "/here", Fuzzy::Smart, "");
     // 12 rows: five rows of input chrome leave seven for the list.
     state.fit(12);
     assert_eq!(state.window, 7);
@@ -79,7 +79,7 @@ fn the_window_follows_the_selection() {
 #[test]
 fn the_window_does_not_overrun_the_list() {
     let commands = many(12);
-    let mut state = State::new(&commands, "/here", Fuzzy::Smart);
+    let mut state = State::new(&commands, "/here", Fuzzy::Smart, "");
     state.fit(12);
     state.move_by(100);
     assert_eq!(state.selected, 11);
@@ -91,7 +91,7 @@ fn the_window_does_not_overrun_the_list() {
 #[test]
 fn filtering_returns_to_the_top() {
     let commands = many(50);
-    let mut state = State::new(&commands, "/here", Fuzzy::Smart);
+    let mut state = State::new(&commands, "/here", Fuzzy::Smart, "");
     state.fit(12);
     state.move_by(20);
     assert_eq!(state.selected, 20);
@@ -107,7 +107,7 @@ fn filtering_returns_to_the_top() {
 #[test]
 fn shrinking_the_terminal_keeps_the_selection_visible() {
     let commands = many(100);
-    let mut state = State::new(&commands, "/here", Fuzzy::Smart);
+    let mut state = State::new(&commands, "/here", Fuzzy::Smart, "");
     state.fit(40);
     state.move_by(30);
     assert_eq!(state.selected, 30);
@@ -134,7 +134,7 @@ fn tab_toggles_exact_directory_history() {
     let mut elsewhere = command("elsewhere", 1);
     elsewhere.dir = "/other".to_string();
     let commands = [here, parent, elsewhere];
-    let mut state = State::new(&commands, "/work/project/crate", Fuzzy::Smart);
+    let mut state = State::new(&commands, "/work/project/crate", Fuzzy::Smart, "");
 
     assert_eq!(state.scope, Scope::Global);
     assert_eq!(state.matches.len(), 3);
@@ -155,7 +155,7 @@ fn tab_toggles_exact_directory_history() {
 #[test]
 fn an_empty_result_list_is_safe_to_move_in() {
     let commands = many(5);
-    let mut state = State::new(&commands, "/here", Fuzzy::Smart);
+    let mut state = State::new(&commands, "/here", Fuzzy::Smart, "");
     state.query.push_str("zzzzzzzz-no-such-command");
     state.refilter();
     assert!(state.matches.is_empty());
@@ -163,4 +163,35 @@ fn an_empty_result_list_is_safe_to_move_in() {
     state.move_by(1);
     state.move_by(-1);
     assert_eq!(state.selected, 0);
+}
+
+/// **The typed line seeds the search.** Pressing Up after typing `ls` means "find the `ls` I ran
+/// before"; opening on an empty query would throw the word away and ask for it again.
+#[test]
+fn the_seed_filters_the_list_immediately() {
+    let commands = vec![
+        command("ls -la /tmp", 100),
+        command("echo alpha", 200),
+        command("ls /etc", 50),
+    ];
+    let state = State::new(&commands, "/here", Fuzzy::Smart, "ls");
+    assert_eq!(state.query, "ls");
+    let lines: Vec<&str> = state
+        .matches
+        .iter()
+        .map(|row| row.command.line.as_str())
+        .collect();
+    assert!(lines.contains(&"ls -la /tmp"), "{lines:?}");
+    assert!(lines.contains(&"ls /etc"), "{lines:?}");
+    assert!(!lines.contains(&"echo alpha"), "not filtered: {lines:?}");
+}
+
+/// A seed of only whitespace is no seed: opening the finder from a blank line must show
+/// everything, not filter on a space.
+#[test]
+fn a_blank_seed_shows_everything() {
+    let commands = vec![command("ls -la /tmp", 100), command("echo alpha", 200)];
+    let state = State::new(&commands, "/here", Fuzzy::Smart, "   ");
+    assert_eq!(state.query, "");
+    assert_eq!(state.matches.len(), 2);
 }

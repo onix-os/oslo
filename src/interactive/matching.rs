@@ -402,3 +402,113 @@ mod tests {
         assert_eq!(at, Fuzzy::Off);
     }
 }
+
+/// Which bytes of `candidate` the user's `typed` characters landed on.
+///
+/// For painting: the finder marks the characters that matched, so a fuzzy hit shows *why* it is a
+/// hit. Returns byte offsets, each the start of a matched character, in ascending order.
+///
+/// A contiguous run wins when there is one, because that is what a person reading the row expects
+/// to see marked — `ec` in `echo` is one block, not two scattered letters. Failing that, the
+/// leftmost subsequence is marked, which is the same walk the loose matchers make.
+///
+/// Empty when nothing matched, or when `typed` is empty: an empty query marks nothing rather than
+/// everything, or opening the finder would light up the whole screen.
+pub fn positions(candidate: &str, typed: &str) -> Vec<usize> {
+    if typed.is_empty() || candidate.is_empty() {
+        return Vec::new();
+    }
+    let lower_candidate = candidate.to_lowercase();
+    let lower_typed = typed.to_lowercase();
+
+    // A substring hit, marked as the one block it is.
+    if let Some(at) = lower_candidate.find(&lower_typed) {
+        // `to_lowercase` can change byte lengths, so the offset is re-derived by walking the
+        // original — a `İ` earlier in the line would otherwise shift every mark after it.
+        return contiguous_from(candidate, &lower_candidate, at, &lower_typed);
+    }
+
+    // Otherwise the leftmost subsequence.
+    let mut wanted = lower_typed.chars().peekable();
+    let mut found = Vec::new();
+    for (at, ch) in candidate.char_indices() {
+        let Some(&next) = wanted.peek() else { break };
+        if ch.to_lowercase().next() == Some(next) {
+            found.push(at);
+            wanted.next();
+        }
+    }
+    if wanted.peek().is_some() {
+        // Not every typed character was placed, so this is not a match and marking part of it
+        // would claim one.
+        return Vec::new();
+    }
+    found
+}
+
+/// The byte offsets of a contiguous match found in the lowercased copy, mapped back to the
+/// original.
+fn contiguous_from(candidate: &str, lower: &str, at: usize, typed: &str) -> Vec<usize> {
+    // How many characters precede the hit, and how many it spans. Counting in characters is what
+    // makes this survive a case fold that changed the byte length.
+    let before = lower[..at].chars().count();
+    let span = typed.chars().count();
+    candidate
+        .char_indices()
+        .skip(before)
+        .take(span)
+        .map(|(offset, _)| offset)
+        .collect()
+}
+
+#[cfg(test)]
+mod position_tests {
+    use super::positions;
+
+    /// A substring is marked as one block.
+    #[test]
+    fn a_substring_is_one_run() {
+        assert_eq!(positions("echo hello", "ech"), vec![0, 1, 2]);
+        assert_eq!(positions("git checkout", "check"), vec![4, 5, 6, 7, 8]);
+    }
+
+    /// Case does not matter to the match, and the marks land on the original's bytes.
+    #[test]
+    fn matching_ignores_case() {
+        assert_eq!(positions("Cargo Build", "cargo"), vec![0, 1, 2, 3, 4]);
+    }
+
+    /// A scattered match marks each character it placed.
+    #[test]
+    fn a_subsequence_marks_each_character() {
+        // `gco` inside `git checkout`: g(0), the first c(4), then the first o after it — which is
+        // at 9, not 6. `git checkout` is g i t ␠ c h e c k o u t.
+        assert_eq!(positions("git checkout", "gco"), vec![0, 4, 9]);
+    }
+
+    /// Nothing matched marks nothing — never a partial claim.
+    #[test]
+    fn a_failed_match_marks_nothing() {
+        assert!(positions("echo", "zzz").is_empty());
+        assert!(positions("echo", "eco2").is_empty());
+        assert!(
+            positions("echo", "").is_empty(),
+            "an empty query marks nothing"
+        );
+        assert!(positions("", "x").is_empty());
+    }
+
+    /// Multi-byte characters keep their real offsets, so a mark cannot land mid-character.
+    #[test]
+    fn multibyte_offsets_are_real_byte_offsets() {
+        let found = positions("héllo wörld", "wö");
+        // `w` is at byte 7 (h=0, é=1..3, l, l, o, space), `ö` at 8.
+        assert_eq!(found.len(), 2);
+        for at in found {
+            assert!(
+                "héllo wörld".is_char_boundary(at),
+                "{at} is not a character boundary"
+            );
+        }
+    }
+}

@@ -29,7 +29,13 @@ pub enum Outcome {
 ///
 /// `None` when there is no terminal to draw on or nothing to show — a finder that opened onto an
 /// empty screen would be a keystroke that appears to hang.
-pub fn open(commands: &[Command], cwd: &str, now: i64, fuzzy: Fuzzy) -> Option<Outcome> {
+pub fn open(
+    commands: &[Command],
+    cwd: &str,
+    now: i64,
+    fuzzy: Fuzzy,
+    seed: &str,
+) -> Option<Outcome> {
     if commands.is_empty() {
         return None;
     }
@@ -39,7 +45,7 @@ pub fn open(commands: &[Command], cwd: &str, now: i64, fuzzy: Fuzzy) -> Option<O
     let restore = Restore::enter(Screen::Alternate)?;
 
     let mut stdout = io::stdout();
-    let mut state = State::new(commands, cwd, fuzzy);
+    let mut state = State::new(commands, cwd, fuzzy, seed);
     let mut keys = Keys::on(restore.fd());
 
     loop {
@@ -91,6 +97,10 @@ pub fn open(commands: &[Command], cwd: &str, now: i64, fuzzy: Fuzzy) -> Option<O
                 state.query.clear();
                 state.refilter();
             }
+            // Delete forgets the highlighted command — every run of it, in every directory. The
+            // selection stays where it is so a run of unwanted lines can be cleared without
+            // moving the cursor back each time.
+            Key::Delete => state.forget_selected(),
             Key::Char(c) => {
                 state.query.push(c);
                 state.refilter();
@@ -100,7 +110,6 @@ pub fn open(commands: &[Command], cwd: &str, now: i64, fuzzy: Fuzzy) -> Option<O
             Key::Ctrl(_)
             | Key::Alt(_)
             | Key::Ignored
-            | Key::Delete
             | Key::Left
             | Key::Right
             | Key::Home
@@ -111,8 +120,9 @@ pub fn open(commands: &[Command], cwd: &str, now: i64, fuzzy: Fuzzy) -> Option<O
 }
 
 /// The finder's state between keystrokes.
-struct State<'a> {
-    commands: &'a [Command],
+struct State {
+    /// Owned rather than borrowed: Delete removes a row, and a slice cannot lose one.
+    commands: Vec<Command>,
     cwd: String,
     fuzzy: Fuzzy,
     query: String,
@@ -127,14 +137,20 @@ struct State<'a> {
     window: usize,
 }
 
-impl<'a> State<'a> {
-    fn new(commands: &'a [Command], cwd: &str, fuzzy: Fuzzy) -> State<'a> {
-        let matches = rank(commands, "", cwd, fuzzy);
+impl State {
+    /// `seed` is whatever was already on the prompt line.
+    ///
+    /// Carried in rather than starting empty, because pressing Up after typing `ls` means "find
+    /// the `ls` I ran before" — throwing the word away and asking for it again is a keystroke tax
+    /// on the one case the key exists for.
+    fn new(commands: &[Command], cwd: &str, fuzzy: Fuzzy, seed: &str) -> State {
+        let query = seed.trim().to_string();
+        let matches = rank(commands, &query, cwd, fuzzy);
         State {
-            commands,
+            commands: commands.to_vec(),
             cwd: cwd.to_string(),
             fuzzy,
-            query: String::new(),
+            query,
             scope: Scope::Global,
             matches,
             // The list grows upward from the search bar, so the row *nearest* the bar is the one
@@ -146,7 +162,7 @@ impl<'a> State<'a> {
     }
 
     fn refilter(&mut self) {
-        self.matches = rank(self.commands, &self.query, &self.cwd, self.fuzzy);
+        self.matches = rank(&self.commands, &self.query, &self.cwd, self.fuzzy);
         if self.scope == Scope::Local {
             self.matches.retain(|row| row.command.dir == self.cwd);
         }
@@ -154,6 +170,26 @@ impl<'a> State<'a> {
         // keeping the index would land the cursor on an unrelated command.
         self.selected = 0;
         self.offset = 0;
+    }
+
+    /// Forget the highlighted command, in the store and in the list on screen.
+    fn forget_selected(&mut self) {
+        let Some(row) = self.matches.get(self.selected) else {
+            return;
+        };
+        let (line, mode) = (row.command.line.clone(), row.command.mode.clone());
+        if let Some(track) = crate::track::store() {
+            track.forget(&line, &mode);
+        }
+        // Dropped from the in-memory copy too, so the row goes now rather than the next time the
+        // finder is opened — the key has to look like it did something.
+        self.commands
+            .retain(|command| !(command.line == line && command.mode == mode));
+        let was = self.selected;
+        self.refilter();
+        // Back to where the eye was. `refilter` homes the selection because a *query* change
+        // makes the old index meaningless; a deletion does not — the rows around it are the same.
+        self.selected = was.min(self.matches.len().saturating_sub(1));
     }
 
     fn toggle_scope(&mut self) {

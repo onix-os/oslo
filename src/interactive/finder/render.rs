@@ -42,6 +42,9 @@ use crate::interactive::dropdown::width::{pad_to_width, truncate_to_width};
 use crate::interactive::prompt::printed_width;
 use crate::interactive::theme::{self, Color, Depth, Style};
 
+/// Cells the drawn cursor takes in the search bar.
+const CURSOR_WIDTH: usize = 1;
+
 /// Rows the input surface takes: a blank row, the query, a blank row.
 ///
 /// The blank rows are the surface, not spacing around it — they carry the same colour, which is
@@ -189,7 +192,8 @@ fn list_row(
     let marker = if selected { "❯ " } else { "  " };
     let when = pad_left(&ago(f.now, row.command.last_at), when_col);
     let runs = pad_left(&format!("{}×", row.command.runs), runs_col);
-    let line = pad_to_width(&truncate_to_width(&row.command.line, line_col), line_col);
+    let shown = truncate_to_width(&row.command.line, line_col);
+    let line = pad_to_width(&shown, line_col);
 
     let text_style = if selected { pager.text_sel } else { pager.text };
     let meta_style = pager.column(1, selected);
@@ -220,9 +224,52 @@ fn list_row(
         gap,
         on_row(meta_style).paint(&runs, depth),
         on_row(Style::default()).paint(" ", depth),
-        on_row(text_style).paint(&line, depth),
+        highlight_matches(&line, &shown, f.query, on_row(text_style), depth),
         on_row(Style::default()).paint(&pad, depth),
     )
+}
+
+/// Paint `line`, marking the characters the query matched.
+///
+/// **Only the characters that matched**, not the row and not the word around them. A fuzzy hit is
+/// otherwise a mystery: five rows come back and nothing says which letters put them there.
+///
+/// The mark is the accent on colour 1 with colour 0 over it — the terminal's own palette, so it
+/// belongs to whatever scheme is in use, and inverted enough to read at a glance against both the
+/// striped and the selected background.
+fn highlight_matches(padded: &str, shown: &str, query: &str, base: Style, depth: Depth) -> String {
+    let marks = crate::interactive::matching::positions(shown, query.trim());
+    if marks.is_empty() {
+        return base.paint(padded, depth);
+    }
+    // The mark keeps the row's background nowhere: it *is* a background, which is what makes it
+    // visible on a selected row as well as a plain one.
+    let marked = Style {
+        fg: Some(Color::Indexed(0)),
+        bg: Some(Color::Indexed(1)),
+        bold: true,
+        ..Style::default()
+    };
+    let mut out = String::new();
+    let mut run = String::new();
+    for (at, ch) in padded.char_indices() {
+        let hit = marks.contains(&at);
+        // Runs are painted together, so a contiguous match is one escape rather than one per
+        // character — which matters on a screen of rows redrawn per keystroke.
+        if hit {
+            if !run.is_empty() {
+                out.push_str(&base.paint(&run, depth));
+                run.clear();
+            }
+            out.push_str(&marked.paint(&ch.to_string(), depth));
+        } else {
+            run.push(ch);
+        }
+    }
+    if !run.is_empty() {
+        out.push_str(&base.paint(&run, depth));
+    }
+    out
 }
 
 /// The query line, with the count and current search scope on the right.
@@ -241,10 +288,12 @@ fn search_bar(
     let prompt = " ❯ ";
     let room = cols
         .saturating_sub(printed_width(prompt) + printed_width(&count) + printed_width(scope) + 2);
-    let typed = truncate_to_width(f.query, room);
+    // One cell is kept back for the cursor, which is part of the input and has to fit.
+    let typed = truncate_to_width(f.query, room.saturating_sub(1));
     let gap = cols.saturating_sub(
         printed_width(prompt)
             + printed_width(&typed)
+            + CURSOR_WIDTH
             + printed_width(&count)
             + printed_width(scope)
             + 2,
@@ -256,9 +305,18 @@ fn search_bar(
         ..style
     };
     format!(
-        "{}{}{}{}{}{}{}",
+        "{}{}{}{}{}{}{}{}",
         on_surface(pager.match_).paint(prompt, depth),
         on_surface(pager.text_sel).paint(&typed, depth),
+        // **A cursor.** The real one is hidden — the finder owns the alternate screen — so the
+        // caret is drawn into the frame as a reversed block, the same way every widget in
+        // `interactive::ask` does it. Without it the search box gave no sign it was taking keys.
+        Style {
+            fg: Some(Color::Indexed(0)),
+            bg: Some(Color::Indexed(1)),
+            ..Style::default()
+        }
+        .paint(" ", depth),
         on_surface(Style::default()).paint(&" ".repeat(gap), depth),
         on_surface(pager.column(1, false)).paint(&count, depth),
         on_surface(Style::default()).paint(" ", depth),

@@ -93,7 +93,7 @@ fn key_name(key: Key) -> Option<String> {
 /// caller should carry on as though it had never been asked. That is a different answer from
 /// `Some(Cancelled)`, which means the user looked and declined, and where carrying on would
 /// scroll their line away as if Esc had done something.
-fn open_finder() -> Option<oslo::interactive::finder::Outcome> {
+fn open_finder(seed: &str) -> Option<oslo::interactive::finder::Outcome> {
     let settings = settings::current();
     if !settings.finder.enabled {
         return None;
@@ -118,7 +118,7 @@ fn open_finder() -> Option<oslo::interactive::finder::Outcome> {
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_secs() as i64)
         .unwrap_or(0);
-    oslo::interactive::finder::open(&commands, &cwd, now, settings.completion.fuzzy)
+    oslo::interactive::finder::open(&commands, &cwd, now, settings.completion.fuzzy, seed)
 }
 
 impl Assist for ShellAssist<'_> {
@@ -266,10 +266,10 @@ impl Assist for ShellAssist<'_> {
         Some((text, cursor))
     }
 
-    fn search_history(&mut self, _line: &str) -> Option<String> {
+    fn search_history(&mut self, line: &str) -> Option<String> {
         // Chosen, but **not run**: you may want to edit it first, which is the contract every
         // other recall in the shell has.
-        match open_finder()? {
+        match open_finder(line)? {
             oslo::interactive::finder::Outcome::Chosen { line, .. } => Some(line),
             oslo::interactive::finder::Outcome::Cancelled => None,
         }
@@ -280,7 +280,9 @@ impl Assist for ShellAssist<'_> {
         // full-screen fuzzy search over what you have actually run.
         let settings = settings::current();
         if self.back == 0 && settings.finder.enabled && settings.finder.key == "up" {
-            match open_finder() {
+            // Whatever is already on the line seeds the search: pressing Up after typing `ls`
+            // means "the `ls` I ran before".
+            match open_finder(line) {
                 Some(oslo::interactive::finder::Outcome::Chosen { line, .. }) => return Some(line),
                 // Looked and declined: leave the line exactly as it was rather than falling
                 // through to a walk, which would scroll it away as if Esc had done something.
