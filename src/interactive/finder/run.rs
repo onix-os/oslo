@@ -73,6 +73,7 @@ pub fn open(
             query: &state.query,
             elapsed_ms: opened.elapsed().as_millis() as u64,
             confirm: state.confirm,
+            profile: &state.profile,
             scope: state.scope,
             total: state.total(),
             cols,
@@ -172,17 +173,32 @@ pub fn open(
             }
             // Keys the shared reader knows but the finder has no use for: a full-screen list
             // has no cursor to move within a line.
-            // Tab is deliberately unbound now. It used to switch the scope, and leaving it doing
-            // that as well would keep two spellings of one action alive for no reason.
-            Key::ToggleScope
-            | Key::Ctrl(_)
-            | Key::Alt(_)
-            | Key::Ignored
-            | Key::Home
-            | Key::End
-            | Key::BackTab => {}
+            // Tab moves to the next profile — a different pair of stores, so the whole list is
+            // replaced rather than filtered.
+            Key::ToggleScope => state.next_profile(),
+            Key::Ctrl(_) | Key::Alt(_) | Key::Ignored | Key::Home | Key::End | Key::BackTab => {}
         }
     }
+}
+
+/// Every command another profile's store knows.
+///
+/// Opened for the read and dropped again: the finder holds one profile's rows at a time, and
+/// keeping every visited profile's store open would be a file handle per Tab press.
+fn load_profile(name: &str) -> Vec<Command> {
+    let limit = crate::interactive::settings::current().finder.limit;
+    let Some(path) = crate::track::profile::store_path(
+        std::env::var("XDG_DATA_HOME").ok().as_deref(),
+        std::env::var("HOME").ok().as_deref(),
+        "kv",
+    ) else {
+        return Vec::new();
+    };
+    // `store_path` names the *current* profile, so the file name is swapped for the one asked for.
+    let path = path.with_file_name(format!("{name}.kv"));
+    crate::track::Track::open(&path)
+        .map(|track| track.commands(limit))
+        .unwrap_or_default()
 }
 
 /// The finder's state between keystrokes.
@@ -203,6 +219,8 @@ struct State {
     window: usize,
     /// `Some(true)` while Delete is waiting on an answer, with *yes* selected.
     confirm: Option<bool>,
+    /// Which profile's history is on screen. Tab moves to the next one.
+    profile: String,
     /// The git worktree the shell is standing in, resolved once when the finder opens.
     worktree: Option<String>,
     /// This shell's session id and this machine's name, to compare rows against.
@@ -232,6 +250,7 @@ impl State {
             offset: 0,
             window: 1,
             confirm: None,
+            profile: crate::track::profile::current(),
             worktree: crate::interactive::prompt::git_root_of(std::path::Path::new(cwd))
                 .map(|root| root.to_string_lossy().into_owned()),
             session: crate::track::session::id(),
@@ -291,6 +310,21 @@ impl State {
                 _ => false,
             },
         }
+    }
+
+    /// Show the next profile's history: a different store, so the commands are re-read.
+    ///
+    /// The query and the scope survive the switch. You are asking the same question of a different
+    /// history, and making you retype it would be the wrong answer to "what did the agent run".
+    fn next_profile(&mut self) {
+        let Some(next) = crate::track::profile::after(&self.profile) else {
+            return;
+        };
+        self.commands = load_profile(&next);
+        self.profile = next;
+        self.selected = 0;
+        self.offset = 0;
+        self.refilter();
     }
 
     fn narrow_scope(&mut self) {

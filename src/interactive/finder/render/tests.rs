@@ -42,6 +42,7 @@ fn frame_of<'a>(matches: &'a [Ranked], query: &'a str, rows: usize) -> String {
         elapsed_ms: 0,
         // Not asking anything: these cover the ordinary search bar.
         confirm: None,
+        profile: "default",
     })
 }
 
@@ -134,7 +135,13 @@ fn the_input_surface_is_full_width() {
 fn the_scope_is_shown_at_the_end_of_the_search_bar() {
     let matches = [ranked("one", 1, 999_999_999, "/home/me", false)];
     let global = plain(&frame_of(&matches, "", 10));
-    assert!(global.lines().any(|line| line.contains("1/1 [global]")));
+    // `profile @ [scope] || matches/total`.
+    assert!(
+        global
+            .lines()
+            .any(|line| line.contains("default @ [global] || 1/1")),
+        "{global:?}"
+    );
 
     let local = plain(&frame(&Frame {
         matches: &matches,
@@ -150,8 +157,13 @@ fn the_scope_is_shown_at_the_end_of_the_search_bar() {
         elapsed_ms: 0,
         // Not asking anything: these cover the ordinary search bar.
         confirm: None,
+        profile: "default",
     }));
-    assert!(local.lines().any(|line| line.contains("1/1 [directory]")));
+    assert!(
+        local
+            .lines()
+            .any(|line| line.contains("[directory] || 1/1"))
+    );
 }
 
 #[test]
@@ -171,6 +183,7 @@ fn the_scope_badge_uses_accent_on_zero() {
         elapsed_ms: 0,
         // Not asking anything: these cover the ordinary search bar.
         confirm: None,
+        profile: "default",
     };
     let pager = theme::Pager::default();
     let bar = search_bar(&f, &pager, pager.bg, 80, Depth::Ansi256);
@@ -267,6 +280,7 @@ fn exactly_one_row_carries_the_marker() {
         elapsed_ms: 0,
         // Not asking anything: these cover the ordinary search bar.
         confirm: None,
+        profile: "default",
     });
     let seen = plain(&rendered);
     // The search bar uses the same glyph, so only the list rows are counted.
@@ -368,6 +382,7 @@ fn the_confirmation_is_a_box_in_the_bars_place() {
         query: "",
         elapsed_ms: 0,
         confirm: Some(false),
+        profile: "default",
         scope: Scope::Global,
         total: 1,
         cols: 40,
@@ -410,6 +425,7 @@ fn the_box_squares_up() {
             query: "",
             elapsed_ms: 0,
             confirm: Some(yes),
+            profile: "default",
             scope: Scope::Global,
             total: 1,
             cols: 44,
@@ -441,6 +457,7 @@ fn the_question_is_centred() {
             query: "",
             elapsed_ms: 0,
             confirm: Some(false),
+            profile: "default",
             scope: Scope::Global,
             total: 1,
             cols,

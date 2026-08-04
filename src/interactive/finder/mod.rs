@@ -16,8 +16,9 @@
 //! how often and where.
 //!
 //! The finder opens over global history. **Left and Right narrow and widen the scope** — global,
-//! host, session, directory, workspace — and the one in force is shown at the end of the search
-//! bar. They are the arrows because the scopes are a line from widest to narrowest, and because
+//! host, session, directory, workspace — and **Tab moves to the next profile**, which is a
+//! different pair of stores and so a different history entirely. The bar's right end says which:
+//! `default @ [global] || 3/57`. They are the arrows because the scopes are a line from widest to narrowest, and because
 //! there is no cursor to move in a search box that only ever appends.
 //!
 //! # Why it takes the whole screen

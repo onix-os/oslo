@@ -83,6 +83,64 @@ pub fn store_path(xdg_data: Option<&str>, home: Option<&str>, extension: &str) -
     Some(base.join("oslo").join(format!("{}.{extension}", current())))
 }
 
+/// The directory both stores live in.
+pub fn store_dir(xdg_data: Option<&str>, home: Option<&str>) -> Option<PathBuf> {
+    let base = match xdg_data {
+        Some(dir) if !dir.trim().is_empty() => PathBuf::from(dir),
+        _ => PathBuf::from(home?).join(".local/share"),
+    };
+    Some(base.join("oslo"))
+}
+
+/// Every profile that has a tracking store, sorted, with the current one always present.
+///
+/// Found by listing rather than recorded anywhere: a profile *is* a pair of files, so the
+/// directory is the only thing that could be authoritative. The current profile is included even
+/// with nothing written yet, or a brand-new shell would have nothing to switch away from.
+pub fn available() -> Vec<String> {
+    let mut found: Vec<String> = std::env::var("XDG_DATA_HOME")
+        .ok()
+        .or_else(|| std::env::var("HOME").ok())
+        .and_then(|_| {
+            store_dir(
+                std::env::var("XDG_DATA_HOME").ok().as_deref(),
+                std::env::var("HOME").ok().as_deref(),
+            )
+        })
+        .and_then(|dir| std::fs::read_dir(dir).ok())
+        .map(|entries| {
+            entries
+                .flatten()
+                .filter_map(|entry| {
+                    let path = entry.path();
+                    // The aggregate is the one that must exist for a profile to be worth showing:
+                    // an event log with no store has nothing the finder can rank.
+                    (path.extension()? == "kv")
+                        .then(|| path.file_stem()?.to_str().map(str::to_string))
+                        .flatten()
+                })
+                .collect()
+        })
+        .unwrap_or_default();
+    let now = current();
+    if !found.contains(&now) {
+        found.push(now);
+    }
+    found.sort();
+    found.dedup();
+    found
+}
+
+/// The profile after `name` in the list, wrapping. `None` when there is only one.
+pub fn after(name: &str) -> Option<String> {
+    let all = available();
+    if all.len() < 2 {
+        return None;
+    }
+    let at = all.iter().position(|found| found == name).unwrap_or(0);
+    all.get((at + 1) % all.len()).cloned()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

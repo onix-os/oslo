@@ -311,8 +311,8 @@ Both stores are named after a **profile**, `default` unless you say otherwise. A
 and every line they run otherwise lands in the history you are trying to search and in the frecency
 table that decides what `cd` and Tab suggest. Give them a profile and that stops.
 
-It is a name, not a lock: two shells can share one, and pointing a shell at `--profile=claude` is
-how you go and read what the agent ran.
+It is a name, not a lock: two shells can share one, and **Tab in the history finder moves to the
+next profile** — which is how you go and read what the agent ran without leaving your shell.
 
 The stores used to be called `history.db` and `track.kv`. Nothing migrates them — delete them, or
 rename one to `default.db` yourself if you want what is in it.
