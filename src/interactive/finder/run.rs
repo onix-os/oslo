@@ -70,6 +70,7 @@ pub fn open(
             offset: state.offset,
             query: &state.query,
             elapsed_ms: opened.elapsed().as_millis() as u64,
+            confirm: state.confirm,
             scope: state.scope,
             total: state.total(),
             cols,
@@ -90,6 +91,27 @@ pub fn open(
             Pressed::Timeout => continue,
             Pressed::Ended => return Some(Outcome::Cancelled),
         };
+
+        // While the question is up it owns the keyboard: anything else typed would filter a list
+        // you cannot see the search bar for, and Enter would mean two different things at once.
+        if let Some(yes) = state.confirm {
+            match pressed {
+                Key::Left | Key::Right | Key::ToggleScope | Key::BackTab => {
+                    state.confirm = Some(!yes)
+                }
+                Key::Accept => {
+                    state.confirm = None;
+                    if yes {
+                        state.forget_selected();
+                    }
+                }
+                // Esc and Ctrl-C answer *no* rather than leaving the finder: you asked to delete
+                // something and changed your mind, which is not the same as wanting to close.
+                Key::Cancel | Key::Abort => state.confirm = None,
+                _ => {}
+            }
+            continue;
+        }
 
         match pressed {
             // The history finder has one way out: both leave the line as it was.
@@ -122,7 +144,22 @@ pub fn open(
             // Delete forgets the highlighted command — every run of it, in every directory. The
             // selection stays where it is so a run of unwanted lines can be cleared without
             // moving the cursor back each time.
-            Key::Delete => state.forget_selected(),
+            //
+            // Asked about first unless the config turned that off: the rows are gone from the
+            // store afterwards and the only way back is to run the command again.
+            Key::Delete => {
+                if state.matches.is_empty() {
+                    // Nothing to ask about.
+                } else if crate::interactive::settings::current()
+                    .finder
+                    .confirm_delete
+                {
+                    // *No* is selected first, so a stray Enter answers the safe way.
+                    state.confirm = Some(false);
+                } else {
+                    state.forget_selected();
+                }
+            }
             Key::Char(c) => {
                 state.query.push(c);
                 state.refilter();
@@ -157,6 +194,8 @@ struct State {
     /// How many rows the list currently has. Set from the terminal each frame, because it can be
     /// resized while the finder is open.
     window: usize,
+    /// `Some(true)` while Delete is waiting on an answer, with *yes* selected.
+    confirm: Option<bool>,
 }
 
 impl State {
@@ -180,6 +219,7 @@ impl State {
             selected: 0,
             offset: 0,
             window: 1,
+            confirm: None,
         }
     }
 

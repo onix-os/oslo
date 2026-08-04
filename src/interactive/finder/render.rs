@@ -78,6 +78,12 @@ pub struct Frame<'a> {
     pub query: &'a str,
     /// How long the finder has been open, for the scanner in the search bar.
     pub elapsed_ms: u64,
+    /// When Delete is waiting to be confirmed, which button is selected.
+    ///
+    /// `Some(true)` is *yes*. The search bar becomes the question — the three rows it already
+    /// owns are exactly the height of a bordered box, so nothing moves and the list keeps its
+    /// place while you answer.
+    pub confirm: Option<bool>,
     pub scope: Scope,
     /// How many commands there are in total, for the `12/840` counter.
     pub total: usize,
@@ -162,10 +168,12 @@ pub fn frame(f: &Frame<'_>) -> String {
 
     for row in 0..SURFACE_ROWS {
         out.push_str("\x1b[2K");
-        if row == 1 {
-            out.push_str(&search_bar(f, pager, surface, f.cols, depth));
-        } else {
-            out.push_str(&blank.paint(&" ".repeat(f.cols), depth));
+        match f.confirm {
+            // Asking: the surface becomes a bordered box, so it reads as a thing that wants an
+            // answer rather than as the search bar with different words in it.
+            Some(yes) => out.push_str(&confirm_row(row, yes, pager, f.cols, depth)),
+            None if row == 1 => out.push_str(&search_bar(f, pager, surface, f.cols, depth)),
+            None => out.push_str(&blank.paint(&" ".repeat(f.cols), depth)),
         }
         out.push_str("\r\n");
     }
@@ -288,6 +296,48 @@ fn highlight_matches(padded: &str, shown: &str, query: &str, base: Style, depth:
         out.push_str(&base.paint(&run, depth));
     }
     out
+}
+
+/// One row of the delete confirmation.
+///
+/// **A border, not a fill.** The search bar is a filled panel because it is where you type; this
+/// is a question, and a box that has been drawn *around* something is the shape every terminal
+/// program uses to say "answer me". Reusing the same three rows means the list above does not
+/// shift while you decide, so the row you are about to delete stays under your eye.
+fn confirm_row(row: usize, yes: bool, pager: &theme::Pager, cols: usize, depth: Depth) -> String {
+    let edge = pager.match_;
+    let inner = cols.saturating_sub(2);
+    match row {
+        0 => edge.paint(&format!("╭{}╮", "─".repeat(inner)), depth),
+        2 => edge.paint(&format!("╰{}╯", "─".repeat(inner)), depth),
+        _ => {
+            let question = "delete from history?";
+            // The selected button is filled, the other one is not: one difference, and it is the
+            // one being asked about. A colour change alone reads as decoration.
+            let picked = Style {
+                fg: Some(Color::Indexed(0)),
+                bg: Some(Color::Indexed(1)),
+                ..Style::default()
+            };
+            let plain = pager.text;
+            let yes_button = if yes { picked } else { plain }.paint(" yes ", depth);
+            let no_button = if yes { plain } else { picked }.paint(" no ", depth);
+
+            let body_cells = printed_width(question) + 2 + 5 + 2 + 4 + 1;
+            let pad = inner.saturating_sub(body_cells + 1);
+            format!(
+                "{}{}{}{}{}{}{}{}",
+                edge.paint("│", depth),
+                plain.paint(&format!(" {question}  "), depth),
+                yes_button,
+                plain.paint("  ", depth),
+                no_button,
+                plain.paint(&" ".repeat(pad), depth),
+                plain.paint(" ", depth),
+                edge.paint("│", depth),
+            )
+        }
+    }
 }
 
 /// The query line, with the count and current search scope on the right.

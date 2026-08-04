@@ -37,6 +37,8 @@ fn frame_of<'a>(matches: &'a [Ranked], query: &'a str, rows: usize) -> String {
         now: 1_000_000_000,
         // The scanner's frame. Fixed, so a test never depends on when it ran.
         elapsed_ms: 0,
+        // Not asking anything: these cover the ordinary search bar.
+        confirm: None,
     })
 }
 
@@ -143,6 +145,8 @@ fn the_scope_is_shown_at_the_end_of_the_search_bar() {
         now: 1_000_000_000,
         // The scanner's frame. Fixed, so a test never depends on when it ran.
         elapsed_ms: 0,
+        // Not asking anything: these cover the ordinary search bar.
+        confirm: None,
     }));
     assert!(local.lines().any(|line| line.contains("1/1 [local]")));
 }
@@ -162,6 +166,8 @@ fn the_scope_badge_uses_accent_on_zero() {
         now: 1_000_000_000,
         // The scanner's frame. Fixed, so a test never depends on when it ran.
         elapsed_ms: 0,
+        // Not asking anything: these cover the ordinary search bar.
+        confirm: None,
     };
     let pager = theme::Pager::default();
     let bar = search_bar(&f, &pager, pager.bg, 80, Depth::Ansi256);
@@ -256,6 +262,8 @@ fn exactly_one_row_carries_the_marker() {
         now: 100,
         // The scanner's frame. Fixed, so a test never depends on when it ran.
         elapsed_ms: 0,
+        // Not asking anything: these cover the ordinary search bar.
+        confirm: None,
     });
     let seen = plain(&rendered);
     // The search bar uses the same glyph, so only the list rows are counted.
@@ -340,5 +348,80 @@ fn coloured_rows_have_no_unpainted_column_gaps() {
             !row.contains("\x1b[0m \x1b["),
             "an unpainted column gap remains in {needle}: {row:?}"
         );
+    }
+}
+
+/// The confirmation replaces the search bar with a bordered box, in the same three rows.
+///
+/// Same height on purpose: the list above must not shift while you decide, or the row you are
+/// about to delete moves out from under your eye at the moment you are looking at it.
+#[test]
+fn the_confirmation_is_a_box_in_the_bars_place() {
+    let matches = vec![ranked("cargo build", 3, 1_000, "/here", true)];
+    let asking = plain(&frame(&Frame {
+        matches: &matches,
+        selected: 0,
+        offset: 0,
+        query: "",
+        elapsed_ms: 0,
+        confirm: Some(false),
+        scope: Scope::Global,
+        total: 1,
+        cols: 40,
+        rows: 10,
+        now: 1_000_000_000,
+    }));
+    let lines: Vec<&str> = asking.lines().collect();
+    let top = lines
+        .iter()
+        .position(|l| l.contains('╭'))
+        .expect("a top edge");
+    assert!(lines[top].contains('╮'), "{:?}", lines[top]);
+    assert!(
+        lines[top + 1].contains("delete from history?"),
+        "{:?}",
+        lines[top + 1]
+    );
+    assert!(lines[top + 1].contains("yes") && lines[top + 1].contains("no"));
+    assert!(lines[top + 2].contains('╰') && lines[top + 2].contains('╯'));
+    // The sides are drawn, so it reads as a box rather than two stray rules.
+    assert!(lines[top + 1].starts_with('│'), "{:?}", lines[top + 1]);
+    assert!(
+        lines[top + 1].trim_end().ends_with('│'),
+        "{:?}",
+        lines[top + 1]
+    );
+    // And the search bar is gone while the question is up.
+    assert!(!asking.contains("[global]"), "the bar is still drawn");
+}
+
+/// Every row of the box is the same width as the screen, or the border would step in and out.
+#[test]
+fn the_box_squares_up() {
+    let matches = vec![ranked("cargo build", 3, 1_000, "/here", true)];
+    for yes in [true, false] {
+        let asking = plain(&frame(&Frame {
+            matches: &matches,
+            selected: 0,
+            offset: 0,
+            query: "",
+            elapsed_ms: 0,
+            confirm: Some(yes),
+            scope: Scope::Global,
+            total: 1,
+            cols: 44,
+            rows: 10,
+            now: 1_000_000_000,
+        }));
+        for line in asking
+            .lines()
+            .filter(|l| l.contains('│') || l.contains('╭') || l.contains('╰'))
+        {
+            assert_eq!(
+                line.chars().count(),
+                44,
+                "a box row is not the screen's width: {line:?}"
+            );
+        }
     }
 }

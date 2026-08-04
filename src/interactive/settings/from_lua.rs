@@ -177,6 +177,11 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
         if let Some(n) = number(&table, "limit") {
             settings.finder.limit = n.max(1) as usize;
         }
+        flag(
+            &table,
+            "confirm_delete",
+            &mut settings.finder.confirm_delete,
+        );
     }
 
     if let Value::Table(table) = oslo.get(&Value::str("keys")) {
