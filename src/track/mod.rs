@@ -32,6 +32,7 @@
 
 pub mod db;
 pub mod history;
+pub mod profile;
 pub mod session;
 // The one module that knows which key-value engine is underneath. Read its note before touching
 // it: nothing else may `use jammdb`, so that moving engines again is a day of rewriting one
@@ -90,11 +91,7 @@ pub fn store() -> Option<&'static Track> {
 /// data where it left it. The stale `track.db` is the user's to delete; nothing here removes a
 /// file it did not write.
 pub fn default_path(xdg_data: Option<&str>, home: Option<&str>) -> Option<PathBuf> {
-    let base = match xdg_data {
-        Some(dir) if !dir.trim().is_empty() => PathBuf::from(dir),
-        _ => PathBuf::from(home?).join(".local/share"),
-    };
-    Some(base.join("oslo/track.kv"))
+    profile::store_path(xdg_data, home, "kv")
 }
 
 #[cfg(test)]
@@ -108,18 +105,20 @@ mod tests {
 
     #[test]
     fn the_store_lives_beside_the_history_database() {
+        // Named after the profile now, not after what it holds — see `track::profile`.
+        let named = |dir: &str| PathBuf::from(format!("{dir}/oslo/{}.kv", profile::current()));
         assert_eq!(
             default_path(Some("/x/data"), Some("/home/u")),
-            Some(PathBuf::from("/x/data/oslo/track.kv"))
+            Some(named("/x/data"))
         );
         assert_eq!(
             default_path(None, Some("/home/u")),
-            Some(PathBuf::from("/home/u/.local/share/oslo/track.kv"))
+            Some(named("/home/u/.local/share"))
         );
         // An empty XDG is unset, not a relative path from the root.
         assert_eq!(
             default_path(Some("  "), Some("/home/u")),
-            Some(PathBuf::from("/home/u/.local/share/oslo/track.kv"))
+            Some(named("/home/u/.local/share"))
         );
         // Nowhere to put it is not an error; it is a shell without a store.
         assert_eq!(default_path(None, None), None);

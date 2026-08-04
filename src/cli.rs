@@ -38,6 +38,13 @@ pub struct Invocation {
     pub vi: Option<bool>,
     /// `-l`: behave as a login shell.
     pub login: bool,
+    /// `--profile=NAME`: which history and tracking stores to use.
+    ///
+    /// `None` is the `default` profile. A name here gives a shell its own history and its own
+    /// frecency ranking, which is what separates an agent's thousands of commands from the ones a
+    /// person typed: `oslo --profile=claude -c '…'` records into `claude.db` and `claude.kv` and
+    /// leaves the default pair untouched.
+    pub profile: Option<String>,
     /// Single-letter `set` options given on the command line, e.g. `ex` for `-e -x`.
     ///
     /// Letters only, in the order they were written, deduplicated. The letters that are not
@@ -114,6 +121,10 @@ pub fn usage() -> String {
         s,
         "  --vi, --no-vi     force vi key bindings on or off (see oslo.vi.enabled)"
     );
+    let _ = writeln!(
+        s,
+        "  --profile=NAME    use NAME's history and tracking stores instead of the default"
+    );
     let _ = writeln!(s, "  --version         print the version, then exit");
     let _ = writeln!(s, "  --help            print this message, then exit");
     let _ = writeln!(s, "  --                end of options");
@@ -145,11 +156,21 @@ fn usage_error(problem: String) -> Exit {
 }
 
 /// Interpret `argv` (including `argv[0]`).
+/// The error for `--profile` with nothing after it.
+fn missing_profile_name() -> Exit {
+    Exit {
+        message: "oslo: --profile needs a name, e.g. --profile=claude".to_string(),
+        to_stderr: true,
+        status: 2,
+    }
+}
+
 pub fn parse(argv: &[String]) -> Result<Invocation, Exit> {
     let mut name = argv.first().cloned().unwrap_or_else(|| "oslo".to_string());
     let mut command: Option<String> = None;
     let mut force_language: Option<Language> = None;
     let mut vi: Option<bool> = None;
+    let mut profile: Option<String> = None;
     let mut read_stdin = false;
     let mut force_interactive = false;
     let mut login = false;
@@ -201,6 +222,14 @@ pub fn parse(argv: &[String]) -> Result<Invocation, Exit> {
                 "lua" => force_language = Some(Language::Lua),
                 "sh" => force_language = Some(Language::Shell),
                 // Both spellings: the editing mode is vi, but everyone calls the editor vim.
+                name if name.starts_with("profile=") => {
+                    let value = name["profile=".len()..].trim();
+                    if value.is_empty() {
+                        return Err(missing_profile_name());
+                    }
+                    profile = Some(value.to_string());
+                }
+                "profile" => return Err(missing_profile_name()),
                 "vi" | "vim" => vi = Some(true),
                 "no-vi" | "no-vim" => vi = Some(false),
                 other => match long_option(other) {
@@ -300,6 +329,7 @@ pub fn parse(argv: &[String]) -> Result<Invocation, Exit> {
         positional,
         force_interactive,
         login,
+        profile,
         set_options,
         force_language,
         vi,
@@ -527,5 +557,33 @@ mod tests {
             "{}",
             err.message
         );
+    }
+
+    /// `--profile` names which pair of stores a shell writes to.
+    #[test]
+    fn a_profile_can_be_named() {
+        assert_eq!(parse_args(&[]).expect("parse").profile, None, "the default");
+        assert_eq!(
+            parse_args(&["--profile=claude"]).expect("parse").profile,
+            Some("claude".to_string())
+        );
+        // Last one wins, as with every other repeated flag.
+        assert_eq!(
+            parse_args(&["--profile=a", "--profile=b"])
+                .expect("parse")
+                .profile,
+            Some("b".to_string())
+        );
+    }
+
+    /// A `--profile` with nothing after it is a usage error, not a silent fall back to the
+    /// default — a typo there would quietly write an agent's history into yours.
+    #[test]
+    fn a_profile_needs_a_name() {
+        for args in [vec!["--profile"], vec!["--profile="], vec!["--profile=  "]] {
+            let err = parse_args(&args).expect_err("must be refused");
+            assert_eq!(err.status, 2, "{args:?}");
+            assert!(err.message.contains("--profile"), "{}", err.message);
+        }
     }
 }

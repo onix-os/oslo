@@ -27,19 +27,22 @@ fn newest_row(history: &History) -> Option<(Vec<u8>, Vec<u8>)> {
 /// data directory — not `$HOME`, and not beside the config.
 #[test]
 fn the_database_lives_under_the_data_directory() {
+    // Named after the profile, not after what it holds — see `oslo::track::profile`.
+    let named =
+        |dir: &str| PathBuf::from(format!("{dir}/oslo/{}.db", oslo::track::profile::current()));
     assert_eq!(
         database_path(Some("/x/data"), Some("/home/u")),
-        Some(PathBuf::from("/x/data/oslo/history.db"))
+        Some(named("/x/data"))
     );
     // No XDG: the specification's own default.
     assert_eq!(
         database_path(None, Some("/home/u")),
-        Some(PathBuf::from("/home/u/.local/share/oslo/history.db"))
+        Some(named("/home/u/.local/share"))
     );
     // An empty XDG is unset, not a relative path from the root.
     assert_eq!(
         database_path(Some("  "), Some("/home/u")),
-        Some(PathBuf::from("/home/u/.local/share/oslo/history.db"))
+        Some(named("/home/u/.local/share"))
     );
     // Nowhere to put it is not an error; it is a shell without history.
     assert_eq!(database_path(None, None), None);

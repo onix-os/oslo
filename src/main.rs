@@ -145,6 +145,11 @@ fn dispatch() {
     // beat the config, so it is installed first and applied on top of it.
     oslo::interactive::settings::force_vi(invocation.vi);
 
+    // Which stores this shell writes to, chosen before anything opens one.
+    if let Some(name) = invocation.profile.as_deref() {
+        oslo::track::profile::choose(name);
+    }
+
     match invocation.action {
         // `-c` is the POSIX interface and is always shell: every `sh -c` idiom in the world
         // depends on that, and `--lua` is there for the caller who wants otherwise.

@@ -98,11 +98,7 @@ const FIRST_ID: u64 = 1;
 /// `None` when neither is knowable, which is a shell with no home — a container's `nobody`, say —
 /// and which must run without a history rather than fail.
 pub fn database_path(xdg_data: Option<&str>, home: Option<&str>) -> Option<PathBuf> {
-    let base = match xdg_data {
-        Some(dir) if !dir.trim().is_empty() => PathBuf::from(dir),
-        _ => PathBuf::from(home?).join(".local/share"),
-    };
-    Some(base.join("oslo/history.db"))
+    oslo::track::profile::store_path(xdg_data, home, "db")
 }
 
 /// The key a line with this id is stored under: the id descending, so that the newest sorts first.

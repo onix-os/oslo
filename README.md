@@ -300,6 +300,20 @@ and **aliases are restored on the way out too**, so a project's `t` cannot follo
 one and run the wrong tests. Whatever the file prints is grouped under it, repeats collapsed with a
 count.
 
+## One shell, several histories
+
+```sh
+oslo                               # ~/.local/share/oslo/default.{db,kv}
+oslo --profile=claude -c 'make'    # claude.db and claude.kv instead — the default untouched
+```
+
+Both stores are named after a **profile**, `default` unless you say otherwise. Agents shell out constantly,
+and every line they run otherwise lands in the history you are trying to search and in the frecency
+table that decides what `cd` and Tab suggest. Give them a profile and that stops.
+
+It is a name, not a lock: two shells can share one, and pointing a shell at `--profile=claude` is
+how you go and read what the agent ran.
+
 ## Configuration
 
 `~/.config/oslo/config.lua`. One file, one language, one place — there is no shell-syntax config.
