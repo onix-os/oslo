@@ -103,7 +103,32 @@ pub(crate) fn run_external(
                     std::process::exit(report_redirect_failure(&e));
                 }
 
-                let _ = nix::unistd::execv(&c_path, &c_args);
+                let failed = nix::unistd::execv(&c_path, &c_args);
+
+                // **`ENOEXEC` means "this is not a binary", not "this cannot run".** A file the
+                // kernel will not exec — no `#!` line, or one naming an interpreter that is not
+                // there — is run by the shell itself, with the path as `$0` and the operands as
+                // its positional parameters. POSIX requires it, bash, dash and zsh all do it, and
+                // without it `./script.sh` on a shebang-less script is a dead end: the file is
+                // executable, the shell can read it, and the only thing missing is two bytes at
+                // the top that nobody has needed to write since the seventies.
+                //
+                // Re-exec rather than interpret in place: this process has already applied the
+                // redirections and joined the foreground group, and a fresh shell inherits both.
+                // Interpreting here would mean running a script inside a process that is halfway
+                // through becoming something else.
+                if failed == Err(nix::errno::Errno::ENOEXEC)
+                    && let Ok(shell) = std::env::current_exe()
+                {
+                    let c_shell = exec_cstring(shell.as_os_str().as_bytes());
+                    // `argv[0]` is the shell, then the script, then whatever the caller passed
+                    // after the command name — so `$0` inside the script is the path it was
+                    // invoked by, exactly as a `#!` line would have given it.
+                    let mut argv = vec![c_shell.clone(), c_path.clone()];
+                    argv.extend(c_args.iter().skip(1).cloned());
+                    let _ = nix::unistd::execv(&c_shell, &argv);
+                }
+
                 eprintln!("oslo: exec failed for {}", cmd_name);
                 std::process::exit(126);
             }
