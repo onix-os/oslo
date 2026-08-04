@@ -303,19 +303,19 @@ count.
 ## One shell, several histories
 
 ```sh
-oslo                               # ~/.local/share/oslo/default.{db,kv}
-oslo --profile=claude -c 'make'    # claude.db and claude.kv instead — the default untouched
+oslo                               # ~/.local/share/oslo/default.kv
+oslo --profile=claude -c 'make'    # claude.kv instead — the default untouched
 ```
 
-Both stores are named after a **profile**, `default` unless you say otherwise. Agents shell out constantly,
+The store is named after a **profile**, `default` unless you say otherwise. Agents shell out constantly,
 and every line they run otherwise lands in the history you are trying to search and in the frecency
 table that decides what `cd` and Tab suggest. Give them a profile and that stops.
 
 It is a name, not a lock: two shells can share one, and **Tab in the history finder moves to the
 next profile** — which is how you go and read what the agent ran without leaving your shell.
 
-The stores used to be called `history.db` and `track.kv`. Nothing migrates them — delete them, or
-rename one to `default.db` yourself if you want what is in it.
+There used to be two files, `history.db` and `track.kv`. There is one now. Nothing migrates the old
+pair — delete them.
 
 ## Configuration
 

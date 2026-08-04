@@ -1,78 +1,22 @@
-//! Command history in a database rather than a flat file.
+//! The command log: one row per line typed, in the order it was typed.
 //!
-//! A text file cannot answer the question the shell actually has. oslo reads two languages, and a
-//! line recalled from history has to run in the one it was typed in — recall a Lua line while the
-//! prompt is in shell mode and a flat file gives you no way to know. The mode is a field here, so
-//! there is nothing to guess and no marker smuggled into the text.
+//! Lives in the **same store** as the aggregate, in its own [`Tree::History`] bucket. It used to be
+//! a second file — `history.db` beside `track.kv` — because it used to be a second *engine*,
+//! SQLite where the aggregate was jammdb. Both have been jammdb for a while, so the split was
+//! paying for nothing: two opens, two file handles, two floors on disk, and two commits per
+//! command with no atomicity between them. A crash between the two left a line in your history
+//! that never happened for ranking, or the reverse.
 //!
-//! # Where it lives
+//! # Why a log at all, beside the aggregate
 //!
-//! `$XDG_DATA_HOME/oslo/history.db`, falling back to `~/.local/share/oslo/history.db`. History is
-//! state the user accumulates, not configuration they wrote, so it belongs under the data
-//! directory rather than in `$HOME` or beside the config.
-//!
-//! # There is no runtime here any more
-//!
-//! This module used to own a `tokio` current-thread runtime and `block_on` every call, because
-//! turso's API is async and oslo's REPL is not. Both are gone: the store underneath is
-//! [`oslo::track::kv`], which is `jammdb` behind a seam and is synchronous all the way down. Every
-//! call to the engine goes through that seam and **nothing here may `use jammdb`** — read
-//! `src/track/kv/mod.rs` before changing anything below, because three of its measured facts are
-//! load-bearing for this file:
-//!
-//! * the store holds no handle, so a second terminal is never blocked waiting on this one;
-//! * a file that is not a jammdb database makes `DB::open` *panic* rather than error, which is why
-//!   [`History::open`] renames a file it cannot read out of the way before opening;
-//! * the file grows in 8 MiB steps and never shrinks, and a large delete is the shape that panics
-//!   inside the engine, which together are why [`History::trim`] is written the way it is.
-//!
-//! That last one is worth the numbers, measured on this file with real lines in it:
-//!
-//! ```text
-//!    400 lines      131,072 B        10,000 lines   8,519,680 B
-//!    500 lines      131,072 B        then trimmed
-//!  1,000 lines    8,519,680 B          to 500       8,519,680 B
-//! ```
-//!
-//! The cliff is between 500 and 1,000 rows, there is no `VACUUM`, and a trim gives nothing back. So
-//! the default `HISTSIZE` of 10,000 costs 8.5 MB of disk for the rest of the machine's life, where
-//! turso's file was a few hundred KB — a real regression, and the only lever is `HISTSIZE`. A
-//! history in the hundreds stays at 128 KiB.
-//!
-//! There is also no write-ahead log, so there is nothing to checkpoint. `History::checkpoint` went
-//! with turso; `settle_stores` in the REPL now only trims.
-//!
-//! # The newest line is the first row
-//!
-//! The only read this file does is "the last N", and the seam's cursor walks *forwards* — a bucket
-//! keyed by ascending id would need a reverse cursor it does not have, or a walk of the whole
-//! history to reach the end of it. So the key is the id **descending**: `u64::MAX - id`, eight
-//! bytes big-endian. The newest line is then the first row in the bucket and "the last N" is a walk
-//! of N rows from the start, whatever the history's size. [`History::trim`] falls out of the same
-//! ordering: everything to keep is a prefix of the bucket and everything to drop is one contiguous
-//! span at the end of it, deleted as a range rather than found by a scan.
-//!
-//! # A command that spans several lines is one entry
-//!
-//! `$HISTFILE` is newline-separated and therefore cannot hold a `for` loop as one entry; it is
-//! stored here as a field, and a field is framed by length and terminator rather than by a
-//! separator anybody has to escape. The value is `(line, mode, at)` in the seam's own encoding,
-//! where a newline is an ordinary byte and the only byte with a meaning is `0x00`, which that
-//! encoding escapes. So a multi-line command round-trips exactly as typed — see
-//! `a_command_typed_across_several_lines_comes_back_as_one_entry`.
-//!
-//! The timestamp is written and nothing reads it yet, exactly as the `at` column it replaces was
-//! written and never selected. It is what a `history -t` would need, and adding it later would need
-//! a migration where recording it now needs none.
+//! They answer different questions. The aggregate folds by `(directory, mode, argv)` and so knows
+//! *how often* and *how recently* — which is what ranking needs, and what makes repeats free. The
+//! log keeps the order individual executions happened in, which is what `!-2` and `history` need
+//! and what folding necessarily throws away.
 
-use oslo::track::kv::{Fields, Key, Span, Store, Tree, Walk};
-use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicUsize, Ordering};
+use super::kv::{Fields, Key, Span, Tree, Walk};
+use std::sync::atomic::Ordering;
 
-/// The language a line was typed in, as stored.
-///
-/// A string rather than an integer so that a dump of the store is legible without a decoder ring:
-/// the two-letter tag is what the mode is called everywhere else in the shell.
 pub const MODE_SHELL: &str = "sh";
 pub const MODE_LUA: &str = "lua";
 
@@ -83,7 +27,7 @@ pub struct Entry {
     pub mode: String,
 }
 
-/// How many appends go by between trims. See [`History::trim_soon`].
+/// How many appends go by between trims. See [`super::Track::trim_soon`].
 const TRIM_EVERY: usize = 100;
 
 /// The id the first line of a fresh history gets.
@@ -93,14 +37,6 @@ const TRIM_EVERY: usize = 100;
 const FIRST_ID: u64 = 1;
 
 /// Where history is kept, given the environment.
-///
-/// `$XDG_DATA_HOME` first, then the specification's own default of `~/.local/share`. Returns
-/// `None` when neither is knowable, which is a shell with no home — a container's `nobody`, say —
-/// and which must run without a history rather than fail.
-pub fn database_path(xdg_data: Option<&str>, home: Option<&str>) -> Option<PathBuf> {
-    oslo::track::profile::store_path(xdg_data, home, "db")
-}
-
 /// The key a line with this id is stored under: the id descending, so that the newest sorts first.
 ///
 /// See the module note. `u64::MAX - id` rather than a reversed comparison because the store
@@ -142,35 +78,8 @@ fn now() -> u64 {
         .unwrap_or(0)
 }
 
-/// An open history.
-pub struct History {
-    store: Store,
-    /// Appends since the last trim, so the trim is amortised rather than paid per line.
-    since_trim: AtomicUsize,
-}
-
-impl History {
-    /// Open, creating the file and its directory if they are not there.
-    ///
-    /// Every failure answers `None` rather than propagating: a shell whose history cannot be
-    /// opened is a working shell without history, and refusing to start over it would be absurd.
-    ///
-    /// A file at this path that is not ours — an older build's database, or something a disk
-    /// corrupted — is renamed aside rather than opened or deleted. Without that, an unreadable
-    /// file means `Store::open` refuses for ever and the shell silently has no history until
-    /// somebody deletes it by hand. `rename` within one directory is atomic, so two terminals
-    /// starting together cannot both move it: the loser finds nothing at the source and does
-    /// nothing, which is the right outcome.
-    pub fn open(path: &Path) -> Option<History> {
-        if path.is_file() && !oslo::track::kv::is_a_database(path) {
-            let _ = std::fs::rename(path, path.with_extension("db.unreadable"));
-        }
-        Some(History {
-            store: Store::open(path)?,
-            since_trim: AtomicUsize::new(0),
-        })
-    }
-
+/// The log's half of the store.
+impl super::Track {
     /// Remember one line.
     pub fn append(&self, line: &str, mode: &str) -> bool {
         let at = now();
@@ -228,7 +137,7 @@ impl History {
     /// no upper end — the whole of the trim is naming the key where that span starts. Nothing is
     /// read beyond it.
     ///
-    /// The deleting is [`Store::delete_span_in_chunks`] and not the one-transaction version, which
+    /// The deleting is `Store::delete_span_in_chunks` and not the one-transaction version, which
     /// is not a preference. A single transaction that deletes a hundred rows from a bucket of a few
     /// thousand panics inside jammdb and deletes *nothing*; the seam has the measurements. A
     /// history at the default `HISTSIZE` of ten thousand is exactly that shape, every hundred lines
@@ -261,9 +170,9 @@ impl History {
         }
     }
 
-    /// Trim, but not more often than one line in [`TRIM_EVERY`].
+    /// Trim, but not more often than one line in `TRIM_EVERY`.
     ///
-    /// The REPL used to call [`History::trim`] after every single command, and under SQL `trim` was
+    /// The REPL used to call [`super::Track::trim`] after every single command, and under SQL `trim` was
     /// a `DELETE ... WHERE id NOT IN (SELECT ... LIMIT N)` — a full scan of the table, per line
     /// typed, to delete nothing at all in the overwhelming majority of cases. The scan is gone with
     /// the SQL, but the batching stays and the reason is now the other one: a trim is a *write*,
@@ -284,7 +193,7 @@ impl History {
 ///
 /// One row read, because the newest is the first row. Taken inside the same write transaction as
 /// the `put` that uses it, which is what stops two terminals appending under one id.
-fn next_id(reader: &oslo::track::kv::Reader<'_, '_>) -> u64 {
+fn next_id(reader: &super::kv::Reader<'_, '_>) -> u64 {
     reader
         .find(Tree::History, &Span::all(), |key, _| id_of(key))
         .map_or(FIRST_ID, |newest| newest.saturating_add(1))

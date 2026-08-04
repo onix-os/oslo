@@ -33,6 +33,7 @@
 
 pub mod db;
 pub mod history;
+pub mod log;
 pub mod profile;
 pub mod session;
 // The one module that knows which key-value engine is underneath. Read its note before touching

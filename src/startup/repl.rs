@@ -9,9 +9,7 @@ use crate::startup::integration;
 use crate::startup::mode::Mode;
 use crate::startup::read::{Input, read_command};
 use crate::startup::recall::{remember_history, seed_history};
-use crate::startup::{
-    config, environments, history, history_db, lua_init, mode, prompt, rc, tracking,
-};
+use crate::startup::{config, environments, history, lua_init, mode, prompt, rc, tracking};
 use oslo::Environment;
 use oslo::LuaEngine;
 use oslo::env::builtins::run_exit_trap;
@@ -95,17 +93,14 @@ pub fn run_repl() -> ! {
         oslo::interactive::command_index::warm(path.to_string());
     }
 
-    // The database keeps the language each line was typed in, which a flat file cannot: recalling
-    // a Lua line while the prompt is in shell mode has to run it as Lua. `$HISTFILE` still works
-    // and still gets appended to, so nothing that reads it breaks.
-    let db = history_db::database_path(
-        std::env::var("XDG_DATA_HOME").ok().as_deref(),
-        std::env::var("HOME").ok().as_deref(),
-    )
-    .and_then(|path| history_db::History::open(&path));
-    // Beside it, and opened from here for the same reason: this is the one place in the program
-    // that knows a person is typing. `tracking::Tracker::start` is what installs the process-wide
-    // handle, so a script, an `oslo -c` or a subshell has none to write to.
+    // The command log keeps the language each line was typed in, which a flat file cannot:
+    // recalling a Lua line while the prompt is in shell mode has to run it as Lua. `$HISTFILE`
+    // still works and still gets appended to, so nothing that reads it breaks.
+    //
+    // It lives in the **same store** as the aggregate — one file, one open, one commit per
+    // command. Opened from here because this is the one place in the program that knows a person
+    // is typing: `tracking::Tracker::start` installs the process-wide handle, so a script, an
+    // `oslo -c` or a subshell has none to write to.
     let here = current_directory();
     // The directory a session begins in is one the shell has been in, so `cd -1` names it and means
     // what `cd -` means from the first move rather than from the second. Here and nowhere else: the
@@ -125,7 +120,7 @@ pub fn run_repl() -> ! {
     let mut history = History::open(settings.file.clone(), settings.max_size);
     // Seeded from the database when there is one, so a session started on a machine with no
     // `$HISTFILE` still has its history back.
-    if let Some(db) = &db {
+    if let Some(db) = oslo::track::store() {
         let entries = db.recent(settings.max_size.max(1));
         seed_history(entries.iter().map(|e| (e.line.clone(), e.mode.clone())));
     }
@@ -211,19 +206,19 @@ pub fn run_repl() -> ! {
                     // refills that copy from scratch, still finds this line.
                     remember_history(&text, mode);
                 }
-                if let Some(db) = &db
+                if let Some(db) = oslo::track::store()
                     && !secret
                 {
                     db.append(
                         &text,
                         match mode {
-                            Mode::Lua => history_db::MODE_LUA,
-                            Mode::Shell => history_db::MODE_SHELL,
+                            Mode::Lua => oslo::track::log::MODE_LUA,
+                            Mode::Shell => oslo::track::log::MODE_SHELL,
                         },
                     );
-                    // `$HISTSIZE` bounds the table as well as the editor's copy, or the file
-                    // grows without limit while the shell politely forgets. Amortised, because
-                    // the trim is a full scan and this used to be one per line typed.
+                    // `$HISTSIZE` bounds the log as well as the editor's copy, or the file grows
+                    // without limit while the shell politely forgets. Amortised, because the trim
+                    // is a full scan and this used to be one per line typed.
                     db.trim_soon(settings.max_size.max(1));
                 }
 
@@ -281,12 +276,10 @@ pub fn run_repl() -> ! {
                     // clearing only the editor's would put every line back on the next start; and
                     // oslo's own recall set, which is what the ghost suggestion, the Up/Down walk
                     // and history expansion all read — those kept offering the cleared commands.
-                    if let Some(db) = &db {
-                        db.clear();
-                    }
-                    // And the tracker's lines, for the same reason. Not its directories: "forget
-                    // my command lines" is not "forget where I work".
+                    // The log and the tracker's folded runs, which are now the same store — but
+                    // not its directories: "forget my command lines" is not "forget where I work".
                     if let Some(track) = oslo::track::store() {
+                        track.clear();
                         track.forget_runs();
                     }
                     oslo::interactive::recall::clear();
@@ -343,7 +336,7 @@ pub fn run_repl() -> ! {
                     Err(ShellError::Exit(code)) => {
                         // The amortised trim lets the table run over between sweeps, so the bound
                         // is enforced on the way out or a short session never enforces it at all.
-                        settle_stores(&db, &settings);
+                        settle_stores(&settings);
                         // R6.5: `exit` from the prompt is still a shell ending, so the EXIT trap
                         // fires here too. A REPL that skipped it would leave behind exactly the
                         // temp files an interactive session accumulates most of.
@@ -363,7 +356,7 @@ pub fn run_repl() -> ! {
         }
     }
 
-    settle_stores(&db, &settings);
+    settle_stores(&settings);
     // End of input (Ctrl-D) is the other way a REPL ends, and POSIX makes no distinction: the
     // EXIT trap fires on both.
     let mut env_guard = env_struct.lock().unwrap();
@@ -382,8 +375,8 @@ pub fn run_repl() -> ! {
 /// Neither store has a checkpoint any more, because neither has a log. Both are one file that is
 /// consistent at every commit, and the tracker's own bound is the daily sweep in `track::prune`
 /// rather than anything the way out of the loop can do. See `history_db`'s note and that module's.
-fn settle_stores(db: &Option<history_db::History>, settings: &history::Settings) {
-    if let Some(db) = db {
+fn settle_stores(settings: &history::Settings) {
+    if let Some(db) = oslo::track::store() {
         db.trim(settings.max_size.max(1));
     }
 }
