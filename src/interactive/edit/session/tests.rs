@@ -266,18 +266,24 @@ fn right_at_the_end_of_the_line_takes_the_suggestion() {
     );
 }
 
-/// It works in vi's normal mode too, where vi answers `Right` itself. This is the half a fix in
-/// the keymap would have missed: vi mode is oslo's default, so accepting would have worked while
-/// inserting and stopped after Esc.
+/// **In vi's normal mode Right is a motion and nothing else.** There it is `l`, and `d<Right>`
+/// has to delete a character — a Right that inserted the suggestion instead would turn every
+/// operator that takes it into something else. Accepting belongs to the modes where text is
+/// being added.
 #[test]
-fn right_takes_the_suggestion_in_vi_normal_mode_as_well() {
+fn right_is_only_a_motion_in_vi_normal_mode() {
     let mut a = Canned {
         hint: Some(" -la".into()),
         ..Canned::default()
     };
     let mut s = Session::new("ls", 2);
     s.vi = Some(crate::interactive::edit::vi::Vi::default());
-    s.apply(Key::Cancel, &mut a); // Esc: into normal mode
+    s.apply(Key::Cancel, &mut a); // Esc: into normal mode, and one step left as vi does
+    s.apply(Key::Right, &mut a);
+    assert_eq!(s.buffer.text(), "ls", "the suggestion was not taken");
+
+    // Back to insert, and the same key takes it.
+    s.apply(Key::Char('a'), &mut a);
     s.buffer.move_end();
     s.apply(Key::Right, &mut a);
     assert_eq!(s.buffer.text(), "ls -la");

@@ -245,9 +245,17 @@ impl Session {
         // "yes, that one". `hint_text` answers `None` unless the cursor is already at the end, so
         // Right mid-line is unaffected and needs no check here.
         //
-        // Above vi rather than in the keymap: vi answers `Right` itself in normal mode, so a
-        // keymap-only version would work while inserting and quietly stop working after Esc.
-        if key == Key::Right && self.take_hint(true, assist) {
+        // **Not in vi's normal mode.** There `l` and Right are a motion, and a motion has to be a
+        // motion — `d<Right>` deletes a character, and a Right that inserted text instead would
+        // make the operator do something no vi user asked for. Insert and replace are where text
+        // gets added, so that is where a key can add some.
+        //
+        // Above vi rather than in the keymap because vi sees the key first and would move the
+        // cursor before the keymap ever ran.
+        if key == Key::Right
+            && self.mode() != Some(super::vi::Mode::Normal)
+            && self.take_hint(true, assist)
+        {
             return changed(true);
         }
 
