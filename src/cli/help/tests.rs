@@ -148,6 +148,22 @@ fn details_includes_the_short_help() {
     assert!(details(Paint::plain()).starts_with(&short(Paint::plain())));
 }
 
+/// **Width is what a terminal draws, not what a `String` holds.** An escape sequence occupies
+/// bytes and no columns, so measuring the painted text would report a page far wider than it is —
+/// and the warning box sized from that would run off the edge of the screen.
+#[test]
+fn width_ignores_the_escapes() {
+    let painted = short(Paint {
+        depth: Depth::Ansi256,
+    });
+    assert!(painted.contains('\x1b'), "nothing was painted");
+    assert_eq!(
+        widest(&painted),
+        widest(&short(Paint::plain())),
+        "colour changed the measured width"
+    );
+}
+
 /// A pipe is not a terminal, so a redirected `--help` is never painted.
 #[test]
 fn a_pipe_is_never_painted() {

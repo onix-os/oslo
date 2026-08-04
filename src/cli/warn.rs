@@ -140,7 +140,12 @@ const RED: (u8, u8, u8) = (224, 64, 64);
 ///
 /// **Silent when there is nothing to say.** A warning box that appears every time teaches people
 /// to skip the top of the output, which costs exactly the one time it matters.
-pub fn box_of(facts: &Facts, paint: Paint) -> String {
+///
+/// `width` is how wide the page it sits under is. The box is drawn to match, because a box
+/// narrower than the text above it reads as a stray fragment rather than as the page's own
+/// footer — and it still grows past `width` rather than truncate, since a warning that has been
+/// cut off is worse than a ragged edge.
+pub fn box_of(facts: &Facts, paint: Paint, width: usize) -> String {
     let lines = facts.lines();
     if lines.is_empty() {
         return String::new();
@@ -148,14 +153,19 @@ pub fn box_of(facts: &Facts, paint: Paint) -> String {
     let red = paint.rgb(RED);
 
     const TITLE: &str = " warning ";
-    // Wide enough for the longest line, and never narrower than the title.
-    let inner = lines
+    // The interior, between the two corner characters — so a drawn row is `inner + 2` wide, and
+    // matching a page of `width` means an interior of `width - 2`.
+    //
+    // The content's own `+ 2` is its one space of padding on each side, and is applied *before*
+    // the page is taken into account: doing it after made every box two columns too wide.
+    let inner = (lines
         .iter()
         .map(|l| l.chars().count())
         .max()
         .unwrap_or(0)
         .max(TITLE.len())
-        + 2;
+        + 2)
+    .max(width.saturating_sub(2));
 
     let mut s = String::new();
     let rule = "─".repeat(inner - TITLE.len() - 1);

@@ -87,11 +87,21 @@ pub fn version_line() -> String {
 /// is detected rather than assumed.
 fn help_exit(detailed: bool) -> Exit {
     let paint = help::Paint::detect();
-    let text = if detailed {
+    let mut text = if detailed {
         help::details(paint)
     } else {
         help::short(paint)
     };
+
+    // **Last, and sized to the page above it.** Appended here rather than inside `short` so that
+    // it stays at the end of `--details` too — `details` builds on `short`, so a box added there
+    // would sit in the middle of the longer view.
+    if warn::wanted() {
+        let width = help::widest(&text);
+        text.push('\n');
+        text.push_str(&warn::box_of(&warn::detect(), paint, width));
+    }
+
     Exit {
         message: text.trim_end().to_string(),
         to_stderr: false,

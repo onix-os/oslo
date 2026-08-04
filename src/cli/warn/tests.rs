@@ -6,7 +6,7 @@ use super::*;
 fn a_healthy_install_says_nothing() {
     let facts = Facts::default();
     assert!(facts.lines().is_empty());
-    assert_eq!(box_of(&facts, Paint::plain()), "");
+    assert_eq!(box_of(&facts, Paint::plain(), 0), "");
 }
 
 /// Each problem is one line, and the line names the path and what is actually there — "not oslo"
@@ -31,7 +31,7 @@ fn the_box_lines_up() {
         foreign_sh: vec![("/bin/sh".into(), "dash".into())],
         bad_mode: Some(0o600),
     };
-    let drawn = box_of(&facts, Paint::plain());
+    let drawn = box_of(&facts, Paint::plain(), 0);
     let rows: Vec<&str> = drawn.lines().filter(|l| !l.is_empty()).collect();
     assert_eq!(rows.len(), 4, "top, two problems, bottom: {drawn}");
 
@@ -50,7 +50,7 @@ fn a_long_line_widens_the_box() {
         foreign_sh: vec![("/usr/bin/sh".into(), "a-very-long-shell-name-indeed".into())],
         ..Facts::default()
     };
-    let drawn = box_of(&facts, Paint::plain());
+    let drawn = box_of(&facts, Paint::plain(), 0);
     let rows: Vec<&str> = drawn.lines().filter(|l| !l.is_empty()).collect();
     let width = rows[0].chars().count();
     assert!(rows.iter().all(|r| r.chars().count() == width), "{drawn}");
@@ -66,10 +66,39 @@ fn the_box_is_red_only_when_colour_is_wanted() {
         bad_mode: Some(0o600),
         ..Facts::default()
     };
-    assert!(!box_of(&facts, Paint::plain()).contains('\x1b'));
+    assert!(!box_of(&facts, Paint::plain(), 0).contains('\x1b'));
 
-    let painted = box_of(&facts, Paint::at(oslo::interactive::theme::Depth::True));
+    let painted = box_of(&facts, Paint::at(oslo::interactive::theme::Depth::True), 0);
     assert!(painted.contains("38;2;224;64;64"), "{painted:?}");
+}
+
+/// **The box matches the page it sits under.** Narrower than the text above it, it reads as a
+/// stray fragment rather than as the page's own footer.
+#[test]
+fn the_box_widens_to_the_page() {
+    let facts = Facts {
+        bad_mode: Some(0o600),
+        ..Facts::default()
+    };
+    let drawn = box_of(&facts, Paint::plain(), 78);
+    for row in drawn.lines().filter(|l| !l.is_empty()) {
+        assert_eq!(row.chars().count(), 78, "{row:?} in {drawn}");
+    }
+}
+
+/// But it grows past the page rather than truncating: a warning that has been cut off is worse
+/// than a ragged edge.
+#[test]
+fn a_line_too_long_for_the_page_still_fits_whole() {
+    let long = "a-shell-with-a-really-quite-unreasonably-long-name-here";
+    let facts = Facts {
+        foreign_sh: vec![("/bin/sh".into(), long.into())],
+        ..Facts::default()
+    };
+    let drawn = box_of(&facts, Paint::plain(), 20);
+    assert!(drawn.contains(long), "the text was cut: {drawn}");
+    let width = drawn.lines().next().expect("a top edge").chars().count();
+    assert!(width > 20, "the box grew past the page: {width}");
 }
 
 /// A missing path is not a misconfiguration — plenty of systems have no `/usr/bin/sh`, and

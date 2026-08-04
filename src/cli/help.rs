@@ -148,16 +148,37 @@ fn synopsis(paint: Paint) -> String {
     s
 }
 
-/// The short help: what somebody running `oslo --help` came for.
+/// How wide `text` is on screen: the longest line, escapes not counted.
 ///
-/// Any warning goes **first**. It is the one part of this page that is about the reader's machine
-/// rather than about oslo, and a warning below the fold is a warning nobody read.
-pub fn short(paint: Paint) -> String {
-    let mut s = String::new();
-    if super::warn::wanted() {
-        s.push_str(&super::warn::box_of(&super::warn::detect(), paint));
+/// **Measured, not assumed.** An escape sequence has no width on a terminal and plenty in a
+/// `String`, so `line.len()` would make a coloured page look far wider than it is — and the
+/// warning box sized from it would run off the edge of the screen.
+pub fn widest(text: &str) -> usize {
+    text.lines().map(visible_width).max().unwrap_or(0)
+}
+
+/// The printed width of one line, skipping CSI sequences.
+fn visible_width(line: &str) -> usize {
+    let mut width = 0;
+    let mut chars = line.chars();
+    while let Some(c) = chars.next() {
+        if c != '\x1b' {
+            width += 1;
+            continue;
+        }
+        // `ESC [ … final`, where the final byte ends the sequence and is not itself drawn.
+        for c in chars.by_ref() {
+            if ('\x40'..='\x7e').contains(&c) && c != '[' {
+                break;
+            }
+        }
     }
-    s.push_str(&synopsis(paint));
+    width
+}
+
+/// The short help: what somebody running `oslo --help` came for.
+pub fn short(paint: Paint) -> String {
+    let mut s = synopsis(paint);
 
     let _ = writeln!(s, "\n{}", paint.head("OPTIONS"));
     for (key, about) in INVOCATION {
