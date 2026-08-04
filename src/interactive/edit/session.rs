@@ -13,7 +13,8 @@ use super::buffer::{Buffer, Case};
 use super::keymap::{Action, action};
 use super::{layout, screen};
 use crate::interactive::dropdown::terminal_cols;
-use crate::interactive::term::{Key, Keys, Restore, Screen};
+pub use crate::interactive::term::Key;
+use crate::interactive::term::{Keys, Restore, Screen};
 use std::io::Write;
 
 /// What the shell supplies to an editing session.
@@ -51,6 +52,28 @@ pub trait Assist {
 
     /// Ctrl-R. Answers a whole line to put in place, or `None` to leave things alone.
     fn search_history(&mut self, _line: &str) -> Option<String> {
+        None
+    }
+
+    /// The space that ends a word has been typed: expand an abbreviation if this is one.
+    ///
+    /// Answers the line **including the space**, because the expansion and the space are one act —
+    /// `gco ` becomes `git checkout ` in a single step, so what you see is a finished command
+    /// rather than a word waiting to be finished.
+    fn abbreviation(&mut self, _line: &str, _cursor: usize) -> Option<(String, usize)> {
+        None
+    }
+
+    /// A key the config bound to a Lua handler. Answers the line the handler asked for.
+    ///
+    /// The name is oslo's spelling — `ctrl-s`, `alt-u`, `shift-tab` — so a config's key table can
+    /// be looked up directly.
+    fn lua_key(&mut self, _name: &str, _line: &str, _cursor: usize) -> Option<(String, usize)> {
+        None
+    }
+
+    /// oslo's name for a key, when the config could have bound it. `None` means never ask.
+    fn key_name(&mut self, _key: Key) -> Option<String> {
         None
     }
 }
@@ -109,15 +132,43 @@ impl Session {
 
     /// Apply one key.
     pub fn apply(&mut self, key: Key, assist: &mut dyn Assist) -> Step {
-        // Vi gets first refusal. `Passthrough` means the key is not vi's business — insert mode,
+        let changed = |yes: bool| Step::Continue { redraw: yes };
+
+        // **A key the config bound to Lua wins over everything, vi included.**
+        //
+        // Before vi rather than after, and that ordering is load-bearing: vi mode is on by
+        // default, and it reads `Alt(x)` as Esc-then-`x` so that leaving insert mode at speed
+        // works. That would make every `oslo.keys["alt-…"]` binding unreachable for most users —
+        // an explicit binding has to beat a heuristic about what someone probably meant.
+        if let Some(name) = assist.key_name(key)
+            && let Some((line, cursor)) =
+                assist.lua_key(&name, &self.buffer.text(), self.buffer.cursor())
+        {
+            self.buffer.set(&line, cursor);
+            return changed(true);
+        }
+
+        // Vi gets next refusal. `Passthrough` means the key is not vi's business — insert mode,
         // or Enter in any mode — and falls through to the ordinary keymap below.
         if let Some(vi) = self.vi.as_mut()
             && let super::vi::Outcome::Handled { redraw } = vi.apply(key, &mut self.buffer)
         {
             return Step::Continue { redraw };
         }
-        let changed = |yes: bool| Step::Continue { redraw: yes };
+
         match action(key) {
+            // A space may end an abbreviation. Tried before the space is inserted, because the
+            // expansion supplies its own — the two are one step.
+            Action::Insert(' ') => {
+                if let Some((line, cursor)) =
+                    assist.abbreviation(&self.buffer.text(), self.buffer.cursor())
+                {
+                    self.buffer.set(&line, cursor);
+                    return changed(true);
+                }
+                self.buffer.insert(' ');
+                changed(true)
+            }
             Action::Insert(c) => {
                 self.buffer.insert(c);
                 changed(true)

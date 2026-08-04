@@ -13,7 +13,8 @@
 
 use oslo::Environment;
 use oslo::interactive::edit::session::Assist;
-use oslo::interactive::{OsloHelper, dropdown, highlight, marks, recall, settings};
+use oslo::interactive::term::Key;
+use oslo::interactive::{OsloHelper, abbr, dropdown, editor, highlight, marks, recall, settings};
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 
@@ -61,6 +62,65 @@ impl<'a> ShellAssist<'a> {
         self.back = 0;
         self.composing = None;
     }
+}
+
+/// oslo's name for a key, in the spelling `oslo.keys` uses.
+///
+/// `None` for anything a config could not name — an ordinary character, above all, since asking
+/// Lua about every letter typed would put a hash lookup on the hot path for nothing.
+fn key_name(key: Key) -> Option<String> {
+    Some(match key {
+        Key::Ctrl(c) => format!("ctrl-{c}"),
+        Key::Alt(c) if !c.is_control() => format!("alt-{c}"),
+        Key::ToggleScope => "tab".to_string(),
+        Key::BackTab => "shift-tab".to_string(),
+        Key::Up => "up".to_string(),
+        Key::Down => "down".to_string(),
+        Key::Left => "left".to_string(),
+        Key::Right => "right".to_string(),
+        Key::Home => "home".to_string(),
+        Key::End => "end".to_string(),
+        Key::PageUp => "pageup".to_string(),
+        Key::PageDown => "pagedown".to_string(),
+        // The chords `term` folded into shared names. A config that bound `ctrl-a` means the
+        // chord, so the name has to come back out even though the key arrived as `Home`.
+        Key::Clear => "ctrl-u".to_string(),
+        _ => return None,
+    })
+}
+
+/// Open the full-screen history finder.
+///
+/// `None` means it could not open at all — no terminal, no store, nothing remembered — and the
+/// caller should carry on as though it had never been asked. That is a different answer from
+/// `Some(Cancelled)`, which means the user looked and declined, and where carrying on would
+/// scroll their line away as if Esc had done something.
+fn open_finder() -> Option<oslo::interactive::finder::Outcome> {
+    let settings = settings::current();
+    if !settings.finder.enabled {
+        return None;
+    }
+    let track = oslo::track::store()?;
+    // Only this language's commands. The editor's history holds both, and offering a Lua line at a
+    // shell prompt produces something that cannot run — the same crossing the ghost suggestion and
+    // the arrow keys are already filtered for.
+    let language = oslo::interactive::prompt::language().unwrap_or_else(|| "sh".to_string());
+    let commands: Vec<_> = track
+        .commands(settings.finder.limit)
+        .into_iter()
+        .filter(|command| command.mode == language)
+        .collect();
+    if commands.is_empty() {
+        return None;
+    }
+    let cwd = std::env::current_dir()
+        .map(|p| p.display().to_string())
+        .unwrap_or_default();
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs() as i64)
+        .unwrap_or(0);
+    oslo::interactive::finder::open(&commands, &cwd, now, settings.completion.fuzzy)
 }
 
 impl Assist for ShellAssist<'_> {
@@ -160,7 +220,68 @@ impl Assist for ShellAssist<'_> {
         Some((out, at))
     }
 
+    fn key_name(&mut self, key: Key) -> Option<String> {
+        let name = key_name(key)?;
+        // **Asked of the handler registry, not of `oslo.keys` in the settings.** A binding whose
+        // value is a *function* never reaches the settings — those hold only the name-to-action
+        // strings — so filtering on them meant every Lua binding was silently never consulted.
+        //
+        // A hash lookup per named key is cheap, and `key_name` has already ruled out every
+        // ordinary character, which is what keeps this off the path of simply typing.
+        editor::handler(&name).is_some().then_some(name)
+    }
+
+    fn lua_key(&mut self, name: &str, line: &str, cursor: usize) -> Option<(String, usize)> {
+        let handler = editor::handler(name)?;
+        let table = editor::line_table(line, cursor);
+        let answer = match oslo::lua::engine::call_here(&handler, vec![table]) {
+            Ok(values) => values.into_iter().next().unwrap_or_default(),
+            // Reported rather than swallowed: a binding that silently does nothing is
+            // indistinguishable from one that was never installed.
+            Err(e) => {
+                eprintln!("oslo: keys['{name}']: {e}");
+                return None;
+            }
+        };
+        let (text, asked) = editor::line_from(&answer)?;
+        let end = text.chars().count();
+        Some((text, asked.unwrap_or(end).min(end)))
+    }
+
+    fn abbreviation(&mut self, line: &str, cursor: usize) -> Option<(String, usize)> {
+        // The dropdown and `abbr` both work in bytes; the editor's cursor is in characters.
+        let at: usize = line.chars().take(cursor).map(char::len_utf8).sum();
+        let (mut text, expanded_to) = abbr::expand(line, at)?;
+        // The space that triggered this, supplied here because this consumed the keystroke.
+        text.insert(expanded_to, ' ');
+        let cursor = text[..expanded_to + 1].chars().count();
+        Some((text, cursor))
+    }
+
+    fn search_history(&mut self, _line: &str) -> Option<String> {
+        // Chosen, but **not run**: you may want to edit it first, which is the contract every
+        // other recall in the shell has.
+        match open_finder()? {
+            oslo::interactive::finder::Outcome::Chosen { line, .. } => Some(line),
+            oslo::interactive::finder::Outcome::Cancelled => None,
+        }
+    }
+
     fn history_prev(&mut self, line: &str) -> Option<String> {
+        // Up opens the finder when the config asked for that, which is oslo's default: a
+        // full-screen fuzzy search over what you have actually run.
+        let settings = settings::current();
+        if self.back == 0 && settings.finder.enabled && settings.finder.key == "up" {
+            match open_finder() {
+                Some(oslo::interactive::finder::Outcome::Chosen { line, .. }) => return Some(line),
+                // Looked and declined: leave the line exactly as it was rather than falling
+                // through to a walk, which would scroll it away as if Esc had done something.
+                Some(oslo::interactive::finder::Outcome::Cancelled) => return None,
+                // Could not open — no terminal, or nothing remembered yet. Walk the history the
+                // ordinary way, which is what Up meant before the finder existed.
+                None => {}
+            }
+        }
         let entry = self.history.iter().rev().nth(self.back)?.clone();
         if self.back == 0 {
             self.composing = Some(line.to_string());

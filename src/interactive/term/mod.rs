@@ -277,6 +277,10 @@ pub fn key(bytes: &[u8]) -> Key {
             [b'F', ..] => Key::End,
             _ => Key::Ignored,
         },
+        // **Every other control chord**, named by its letter. Listed after the ones with a shared
+        // meaning so those keep it, and needed because a config may bind any of them: without
+        // this, `oslo.keys["ctrl-g"]` was decoded as `Ignored` and could never fire.
+        [byte @ 0x01..=0x1a] => Key::Ctrl((byte + b'a' - 1) as char),
         // `ESC DEL` is `M-DEL`, readline's backward-kill-word. Spelled out because `0x7f` is not
         // a printable character and would otherwise fall through to the text branch.
         [0x1b, 0x7f] => Key::Alt('\x7f'),
@@ -331,7 +335,7 @@ impl Keys {
 }
 
 /// What the front of the buffer holds.
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 enum Parsed {
     /// A key, and how many bytes it took.
     Took(usize, Key),

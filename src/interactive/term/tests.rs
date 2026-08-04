@@ -132,3 +132,26 @@ fn a_key_after_text_is_not_lost() {
     assert!(matches!(parse(&buf[1..]), Parsed::Took(1, Key::Char('b'))));
     assert!(matches!(parse(&buf[2..]), Parsed::Took(3, Key::Up)));
 }
+
+/// Alt chords, which a terminal spells `ESC` then the character.
+///
+/// Worth pinning because a config may bind any of them and the decoding is easy to lose: an
+/// earlier version discarded `ESC x` outright, so `oslo.keys["alt-p"]` could never fire.
+#[test]
+fn esc_then_a_character_is_an_alt_chord() {
+    assert_eq!(key(&[0x1b, b'p']), Key::Alt('p'));
+    assert_eq!(key(&[0x1b, b'b']), Key::Alt('b'));
+    assert_eq!(key(&[0x1b, 0x7f]), Key::Alt('\x7f'), "M-DEL");
+    // And the whole two-byte sequence is consumed, so the character is not also read as text.
+    assert_eq!(parse(&[0x1b, b'p']), Parsed::Took(2, Key::Alt('p')));
+}
+
+/// Every control chord decodes, because a config may bind any of them. The ones with a shared
+/// meaning keep it.
+#[test]
+fn control_chords_decode_by_letter() {
+    assert_eq!(key(&[0x07]), Key::Ctrl('g'));
+    assert_eq!(key(&[0x0f]), Key::Ctrl('o'));
+    assert_eq!(key(&[0x01]), Key::Home, "C-a keeps its shared meaning");
+    assert_eq!(key(&[0x09]), Key::ToggleScope, "Tab is not C-i here");
+}
