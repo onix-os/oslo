@@ -312,6 +312,7 @@ fn confirm_row(row: usize, yes: bool, pager: &theme::Pager, cols: usize, depth: 
         2 => edge.paint(&format!("╰{}╯", "─".repeat(inner)), depth),
         _ => {
             let question = "delete from history?";
+            let (yes_label, no_label) = ("[ yes ]", "[ no ]");
             // The selected button is filled, the other one is not: one difference, and it is the
             // one being asked about. A colour change alone reads as decoration.
             let picked = Style {
@@ -320,21 +321,31 @@ fn confirm_row(row: usize, yes: bool, pager: &theme::Pager, cols: usize, depth: 
                 ..Style::default()
             };
             let plain = pager.text;
-            let yes_button = if yes { picked } else { plain }.paint(" yes ", depth);
-            let no_button = if yes { plain } else { picked }.paint(" no ", depth);
 
-            let body_cells = printed_width(question) + 2 + 5 + 2 + 4 + 1;
-            let pad = inner.saturating_sub(body_cells + 1);
+            // **Centred.** The question and its two answers are one object, so the whole run is
+            // measured and the leftover split either side — padding only the right would leave it
+            // sitting against the border it is supposed to be inside.
+            let body = printed_width(question)
+                + 2
+                + printed_width(yes_label)
+                + 2
+                + printed_width(no_label);
+            let left = inner.saturating_sub(body) / 2;
+            let right = inner.saturating_sub(body + left);
+
+            let tail = plain.paint(&" ".repeat(right), depth);
+            let side = edge.paint("│", depth);
             format!(
-                "{}{}{}{}{}{}{}{}",
-                edge.paint("│", depth),
-                plain.paint(&format!(" {question}  "), depth),
-                yes_button,
+                "{}{}{}{}{}{}{}{}{}",
+                side,
+                plain.paint(&" ".repeat(left), depth),
+                plain.paint(question, depth),
                 plain.paint("  ", depth),
-                no_button,
-                plain.paint(&" ".repeat(pad), depth),
-                plain.paint(" ", depth),
-                edge.paint("│", depth),
+                if yes { picked } else { plain }.paint(yes_label, depth),
+                plain.paint("  ", depth),
+                if yes { plain } else { picked }.paint(no_label, depth),
+                tail,
+                side,
             )
         }
     }

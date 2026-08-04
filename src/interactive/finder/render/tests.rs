@@ -425,3 +425,39 @@ fn the_box_squares_up() {
         }
     }
 }
+
+/// The question and its buttons sit in the middle of the box, not against one edge.
+#[test]
+fn the_question_is_centred() {
+    let matches = vec![ranked("cargo build", 3, 1_000, "/here", true)];
+    for cols in [40usize, 60, 80] {
+        let asking = plain(&frame(&Frame {
+            matches: &matches,
+            selected: 0,
+            offset: 0,
+            query: "",
+            elapsed_ms: 0,
+            confirm: Some(false),
+            scope: Scope::Global,
+            total: 1,
+            cols,
+            rows: 10,
+            now: 1_000_000_000,
+        }));
+        let row = asking
+            .lines()
+            .find(|l| l.contains("delete from history?"))
+            .expect("the question row");
+        let inner: String = row.chars().skip(1).take(cols - 2).collect();
+        let left = inner.len() - inner.trim_start().len();
+        let right = inner.len() - inner.trim_end().len();
+        // Within one cell: an odd leftover cannot be split evenly.
+        assert!(
+            left.abs_diff(right) <= 1,
+            "not centred at {cols} cols: {left} left, {right} right"
+        );
+        // And the buttons are bracketed.
+        assert!(row.contains("[ yes ]"), "{row:?}");
+        assert!(row.contains("[ no ]"), "{row:?}");
+    }
+}
