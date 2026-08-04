@@ -74,7 +74,11 @@ brush-parser = { git = "https://github.com/bresilla/brush", branch = "oslo-integ
 # The allow list for directory environments is keyed by a hash of the rc file's path *and* its
 # contents, which is what makes editing an allowed file revoke it. Pure Rust, so it does not cost
 # the static musl build a C toolchain.
-sha2 = "0.11.0"
+# **0.10, deliberately.** `jammdb` pulls `sha3 0.10`, which is built on `digest 0.10`; asking for
+# `sha2 0.11` meant a second copy of the whole framework — `digest`, `block-buffer` and
+# `crypto-common` each linked twice — for no benefit. SHA-256 is SHA-256, so the version here
+# changes no hash and therefore invalidates no `.envrc` that has already been allowed.
+sha2 = "0.10"
 # A regular dependency rather than a dev one since the directory environment arrived: an `.envrc`'s
 # own output is captured to a scratch file so it can be printed under the file that produced it.
 # A pipe would be the obvious choice and is the wrong one — nothing drains it while the rc file
