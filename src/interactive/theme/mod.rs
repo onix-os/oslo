@@ -67,6 +67,28 @@ pub fn set_depth(depth: Depth) {
     }
 }
 
+/// Hold the depth at `depth` for as long as the returned guard lives.
+///
+/// **[`DEPTH`] is one slot for the whole process**, and several modules' tests assert on the
+/// escapes it decides: `highlight` renders at `Ansi16`, the finder and the dropdown at `Ansi256`.
+/// Without a lock they race — whichever sets it first decides what the others see, and the loser
+/// fails on an escape that is perfectly correct for the depth it actually got. It is intermittent,
+/// which is worse than broken: it went green six runs in a row while being wrong.
+///
+/// The same in-process global-state trap as `environ`, and the same answer: serialise the tests
+/// that touch it rather than hope they do not overlap.
+#[cfg(test)]
+#[must_use = "the depth is only held while the guard lives; `let _ = ` drops it immediately"]
+pub fn held_at(depth: Depth) -> std::sync::MutexGuard<'static, ()> {
+    static SERIAL: std::sync::Mutex<()> = std::sync::Mutex::new(());
+
+    // A poisoned lock means some other test panicked while holding it. That is its problem, not
+    // this test's, and refusing to run would turn one failure into all of them.
+    let guard = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
+    set_depth(depth);
+    guard
+}
+
 /// What the terminal said its background is, once it has been asked.
 static BACKGROUND: RwLock<Option<super::query::Background>> = RwLock::new(None);
 
@@ -528,7 +550,7 @@ mod tests {
     #[test]
     fn the_default_theme_paints_something_for_every_role() {
         let theme = Theme::default();
-        set_depth(Depth::Ansi256);
+        let _held = held_at(Depth::Ansi256);
         // Not exhaustive by field name — the point is that no role is left silently plain except
         // the ones that are meant to be.
         assert!(!theme.syntax.command.is_plain());

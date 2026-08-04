@@ -73,6 +73,7 @@ pub fn open(
             query: &state.query,
             elapsed_ms: opened.elapsed().as_millis() as u64,
             confirm: state.confirm,
+            profile: &state.profile,
             scope: state.scope,
             total: state.total(),
             cols,
@@ -134,7 +135,11 @@ pub fn open(
             Key::Down => state.down(),
             Key::PageUp => state.page_up(),
             Key::PageDown => state.page_down(),
-            Key::ToggleScope => state.toggle_scope(),
+            // **The arrows move the scope.** There is nothing to move a cursor over — the search
+            // box only ever appends — so the keys are free, and the scopes are a line from widest
+            // to narrowest, which is what an arrow means.
+            Key::Right => state.narrow_scope(),
+            Key::Left => state.widen_scope(),
             Key::Backspace => {
                 state.query.pop();
                 state.refilter();
@@ -168,16 +173,32 @@ pub fn open(
             }
             // Keys the shared reader knows but the finder has no use for: a full-screen list
             // has no cursor to move within a line.
-            Key::Ctrl(_)
-            | Key::Alt(_)
-            | Key::Ignored
-            | Key::Left
-            | Key::Right
-            | Key::Home
-            | Key::End
-            | Key::BackTab => {}
+            // Tab moves to the next profile — a different pair of stores, so the whole list is
+            // replaced rather than filtered.
+            Key::ToggleScope => state.next_profile(),
+            Key::Ctrl(_) | Key::Alt(_) | Key::Ignored | Key::Home | Key::End | Key::BackTab => {}
         }
     }
+}
+
+/// Every command another profile's store knows.
+///
+/// Opened for the read and dropped again: the finder holds one profile's rows at a time, and
+/// keeping every visited profile's store open would be a file handle per Tab press.
+fn load_profile(name: &str) -> Vec<Command> {
+    let limit = crate::interactive::settings::current().finder.limit;
+    let Some(path) = crate::track::profile::store_path(
+        std::env::var("XDG_DATA_HOME").ok().as_deref(),
+        std::env::var("HOME").ok().as_deref(),
+        "kv",
+    ) else {
+        return Vec::new();
+    };
+    // `store_path` names the *current* profile, so the file name is swapped for the one asked for.
+    let path = path.with_file_name(format!("{name}.kv"));
+    crate::track::Track::open(&path)
+        .map(|track| track.commands(limit))
+        .unwrap_or_default()
 }
 
 /// The finder's state between keystrokes.
@@ -198,6 +219,13 @@ struct State {
     window: usize,
     /// `Some(true)` while Delete is waiting on an answer, with *yes* selected.
     confirm: Option<bool>,
+    /// Which profile's history is on screen. Tab moves to the next one.
+    profile: String,
+    /// The git worktree the shell is standing in, resolved once when the finder opens.
+    worktree: Option<String>,
+    /// This shell's session id and this machine's name, to compare rows against.
+    session: String,
+    host: String,
 }
 
 impl State {
@@ -222,14 +250,18 @@ impl State {
             offset: 0,
             window: 1,
             confirm: None,
+            profile: crate::track::profile::current(),
+            worktree: crate::interactive::prompt::git_root_of(std::path::Path::new(cwd))
+                .map(|root| root.to_string_lossy().into_owned()),
+            session: crate::track::session::id(),
+            host: crate::track::session::host(),
         }
     }
 
     fn refilter(&mut self) {
-        self.matches = rank(&self.commands, &self.query, &self.cwd, self.fuzzy);
-        if self.scope == Scope::Local {
-            self.matches.retain(|row| row.command.dir == self.cwd);
-        }
+        let mut found = rank(&self.commands, &self.query, &self.cwd, self.fuzzy);
+        found.retain(|row| self.in_scope(&row.command));
+        self.matches = found;
         // Back to the top: the old selection referred to a list that no longer exists, and
         // keeping the index would land the cursor on an unrelated command.
         self.selected = 0;
@@ -256,21 +288,64 @@ impl State {
         self.selected = was.min(self.matches.len().saturating_sub(1));
     }
 
-    fn toggle_scope(&mut self) {
-        self.scope = match self.scope {
-            Scope::Global => Scope::Local,
-            Scope::Local => Scope::Global,
+    /// Whether `command` belongs to the scope being shown.
+    ///
+    /// Every answer comes from what the store recorded at the time the command ran. None of it is
+    /// re-derived here: which shell ran a line, and which machine, are facts about that moment and
+    /// cannot be recovered from the line afterwards.
+    fn in_scope(&self, command: &Command) -> bool {
+        match self.scope {
+            Scope::Global => true,
+            // Every row in a local store was run here, so this shows everything today. It filters
+            // for real the moment a store is shared between machines, and rows written now already
+            // carry the name.
+            Scope::Host => command.host.is_empty() || command.host == self.host,
+            Scope::Session => command.session == self.session,
+            Scope::Directory => command.dir == self.cwd,
+            // The worktree the *command* ran in, against the one the shell is standing in. Both
+            // were resolved by the store when the directory was first seen.
+            Scope::Workspace => match (&command.root, &self.worktree) {
+                (Some(ran_in), Some(here)) => ran_in == here,
+                // Not in a repository at all, so nothing is in this one.
+                _ => false,
+            },
+        }
+    }
+
+    /// Show the next profile's history: a different store, so the commands are re-read.
+    ///
+    /// The query and the scope survive the switch. You are asking the same question of a different
+    /// history, and making you retype it would be the wrong answer to "what did the agent run".
+    fn next_profile(&mut self) {
+        let Some(next) = crate::track::profile::after(&self.profile) else {
+            return;
         };
+        self.commands = load_profile(&next);
+        self.profile = next;
+        self.selected = 0;
+        self.offset = 0;
+        self.refilter();
+    }
+
+    fn narrow_scope(&mut self) {
+        self.scope = self.scope.next();
+        self.refilter();
+    }
+
+    fn widen_scope(&mut self) {
+        self.scope = self.scope.previous();
         self.refilter();
     }
 
     fn total(&self) -> usize {
         match self.scope {
             Scope::Global => self.commands.len(),
-            Scope::Local => self
+            // Counted over what this scope *could* show, not over the store: `3/5` is only
+            // meaningful if the denominator is the pool the query narrowed.
+            _ => self
                 .commands
                 .iter()
-                .filter(|command| command.dir == self.cwd)
+                .filter(|command| self.in_scope(command))
                 .count(),
         }
     }

@@ -131,6 +131,16 @@ pub(super) struct RunRow {
     pub last_status: Option<i64>,
     pub total_ms: i64,
     pub max_ms: i64,
+    /// The shell session that ran it most recently.
+    ///
+    /// Recorded rather than derived: "did I run this in *this* shell" cannot be answered from a
+    /// line and a timestamp, and an in-memory list would only know about the shell it lives in.
+    pub session: String,
+    /// The machine it most recently ran on.
+    ///
+    /// Always this one today — the store is local — and written anyway, so that a history shared
+    /// between machines is a filter that already works rather than a schema change.
+    pub host: String,
 }
 
 impl RunRow {
@@ -144,6 +154,8 @@ impl RunRow {
             last_status: status,
             total_ms: ms,
             max_ms: ms,
+            session: super::session::id(),
+            host: super::session::host(),
         }
     }
 
@@ -188,6 +200,11 @@ impl RunRow {
             .signed(self.total_ms)
             .signed(self.max_ms)
             .text(&self.head)
+            // **Appended, never inserted.** A store written by an older oslo has neither field;
+            // `decode` treats a missing trailing field as empty, so an upgrade reads old rows
+            // rather than discarding a history somebody has been building for months.
+            .text(&self.session)
+            .text(&self.host)
             .done()
     }
 
@@ -199,8 +216,15 @@ impl RunRow {
         let last_status = optional(fields.signed()?);
         let total_ms = fields.signed()?;
         let max_ms = fields.signed()?;
+        let head = fields.text()?.into_owned();
+        // Missing trailing fields are empty, not a decode failure — that is what makes a store
+        // written before these existed still readable.
+        let session = fields.text().map(|t| t.into_owned()).unwrap_or_default();
+        let host = fields.text().map(|t| t.into_owned()).unwrap_or_default();
         Some(RunRow {
-            head: fields.text()?.into_owned(),
+            head,
+            session,
+            host,
             runs,
             fails,
             last_at,
@@ -397,163 +421,5 @@ pub(super) mod field {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn a_directory() -> DirRow {
-        DirRow {
-            path: "/w/Alpha".to_string(),
-            base: "alpha".to_string(),
-            root: Some("/w".to_string()),
-            visits: 7,
-            last_visit: 1_700_000_000,
-            dwell_ms: 91_000,
-            missing_since: None,
-        }
-    }
-
-    #[test]
-    fn a_directory_reads_back_as_the_row_it_was_written_from() {
-        let row = a_directory();
-        assert_eq!(DirRow::decode(&row.encode()), Some(row));
-    }
-
-    /// The two nulls, which SQL spelled and this has to encode. Neither may come back as a zero,
-    /// because a `missing_since` of zero is January 1970 and a `root` of `""` is a directory named
-    /// nothing.
-    #[test]
-    fn a_null_column_reads_back_as_absent_rather_than_as_zero() {
-        let mut row = a_directory();
-        row.root = None;
-        row.missing_since = None;
-        let back = DirRow::decode(&row.encode()).expect("it decodes");
-        assert_eq!(back.root, None, "outside a repository, not the root itself");
-        assert_eq!(back.missing_since, None, "present, not missing since 1970");
-
-        row.missing_since = Some(0);
-        assert_eq!(
-            DirRow::decode(&row.encode())
-                .expect("it decodes")
-                .missing_since,
-            Some(0),
-            "and a real zero is still a real zero"
-        );
-
-        let never = RunRow::first("cargo".to_string(), None, 5, 1);
-        let back = RunRow::decode(&never.encode()).expect("it decodes");
-        assert_eq!(
-            back.last_status, None,
-            "an exit nobody saw is not an exit 0"
-        );
-        assert_eq!(back.fails, 0, "and it is not a failure either");
-    }
-
-    /// Contract item 3: repeats are the entire point and cost nothing after the first.
-    #[test]
-    fn absorbing_a_run_adds_the_counters_and_keeps_the_worst_time() {
-        let mut row = RunRow::first("cargo build".to_string(), Some(0), 100, 30);
-        row.absorb(&RunRow::first("cargo build".to_string(), Some(1), 200, 90));
-        row.absorb(&RunRow::first("cargo build".to_string(), Some(0), 300, 10));
-
-        assert_eq!(row.runs, 3);
-        assert_eq!(row.fails, 1);
-        assert_eq!(row.last_at, 300, "the newest wins");
-        assert_eq!(row.last_status, Some(0), "and so does its status");
-        assert_eq!(row.total_ms, 130, "time adds up");
-        assert_eq!(row.max_ms, 90, "and the worst of it is remembered");
-        assert_eq!(RunRow::decode(&row.encode()), Some(row));
-    }
-
-    /// A line that has only ever failed is not a suggestion, and a line whose exit was never
-    /// observed is not a success.
-    #[test]
-    fn a_line_that_never_worked_is_not_one_to_offer_back() {
-        let mut failed = RunRow::first("carg".to_string(), Some(127), 1, 1);
-        assert!(!failed.worked());
-        failed.absorb(&RunRow::first("carg".to_string(), Some(0), 2, 1));
-        assert!(failed.worked(), "it works now, so it is a command again");
-
-        let unseen = RunRow::first("sleep".to_string(), None, 1, 1);
-        assert!(
-            unseen.worked(),
-            "never seen to fail either — one run, no failures"
-        );
-    }
-
-    /// The keys the contract is written in, decoded back out of themselves. An index row has no
-    /// value, so if this is wrong the scan has nothing else to fall back on.
-    #[test]
-    fn an_index_key_carries_everything_a_scan_needs_to_read_off_it() {
-        assert_eq!(field::trailing_id(&key::by_base("rust", 42)), Some(42));
-        assert_eq!(field::trailing_id(&key::by_root("/w/beta", 9)), Some(9));
-        assert_eq!(
-            field::argv_of_run(&key::run(7, "sh", "cargo test")).as_deref(),
-            Some("cargo test")
-        );
-        let rotated = key::by_argv("sh", "cargo test", 7);
-        let (argv, dir) = field::argv_and_dir(&rotated).expect("it decodes");
-        assert_eq!((argv.as_ref(), dir), ("cargo test", 7));
-
-        // Bytes from somewhere else decode to nothing rather than to a plausible id.
-        assert_eq!(field::trailing_id(b"not a key"), None);
-        assert_eq!(field::argv_of_run(b"short"), None);
-    }
-
-    /// The ranges, against the keys they have to hold and the neighbours they must not. This is
-    /// contract item 1's boundary in the smallest form it can be stated in.
-    #[test]
-    fn a_range_holds_its_own_rows_and_stops_at_its_neighbours() {
-        let here = span::runs_like(7, "sh", "cargo te");
-        assert!(here.holds(&key::run(7, "sh", "cargo test")));
-        assert!(here.holds(&key::run(7, "sh", "cargo te")));
-        assert!(!here.holds(&key::run(7, "sh", "cargo t")));
-        assert!(!here.holds(&key::run(7, "sh", "cargo tf")));
-        assert!(!here.holds(&key::run(7, "lua", "cargo test")));
-        assert!(!here.holds(&key::run(6, "sh", "cargo test")));
-        assert!(!here.holds(&key::run(8, "sh", "cargo test")));
-
-        // The cascade's range: one directory, every language, every line.
-        let all = span::runs_of(7);
-        assert!(all.holds(&key::run(7, "lua", "print(1)")));
-        assert!(!all.holds(&key::run(8, "sh", "cargo test")));
-
-        // Naming a directory: the exact name and every extension of it, and nothing that merely
-        // contains it — `prust` is a weaker tier and a different question.
-        let named = span::bases_like("rust");
-        assert!(named.holds(&key::by_base("rust", 1)));
-        assert!(named.holds(&key::by_base("rustlings", 1)));
-        assert!(!named.holds(&key::by_base("prust", 1)));
-        assert!(!named.holds(&key::by_base("rus", 1)));
-
-        // One worktree, and not the one whose path extends it.
-        let inside = span::dirs_of_root("/w/beta");
-        assert!(inside.holds(&key::by_root("/w/beta", 3)));
-        assert!(!inside.holds(&key::by_root("/w/beta-old", 3)));
-
-        let anywhere = span::argv_like("sh", "cargo te");
-        assert!(anywhere.holds(&key::by_argv("sh", "cargo test", 99)));
-        assert!(!anywhere.holds(&key::by_argv("lua", "cargo test", 99)));
-        assert!(!anywhere.holds(&key::by_argv("sh", "cargo t", 99)));
-    }
-
-    /// An empty prefix is every line in the directory rather than none, which is what the cap and
-    /// the counter both ask for.
-    #[test]
-    fn an_empty_prefix_names_the_whole_directory() {
-        let span = span::runs_like(7, "sh", "");
-        assert!(span.holds(&key::run(7, "sh", "")));
-        assert!(span.holds(&key::run(7, "sh", "anything at all")));
-        assert!(!span.holds(&key::run(7, "lua", "anything at all")));
-    }
-
-    /// A row this module did not write is refused rather than decoded into something plausible —
-    /// which is the same rule the seam applies to the file as a whole.
-    #[test]
-    fn a_row_from_somewhere_else_decodes_to_nothing() {
-        assert_eq!(DirRow::decode(b""), None);
-        assert_eq!(DirRow::decode(b"far too short"), None);
-        assert_eq!(RunRow::decode(&a_directory().encode()), None);
-        // Enough integers, no text: the head was never there.
-        assert_eq!(RunRow::decode(&[0u8; 48]), None);
-    }
-}
+#[path = "row/tests.rs"]
+mod tests;

@@ -141,24 +141,19 @@ fn dispatch() {
         }
     };
 
-    // Before anything reads the settings, and before the config is loaded — the flag is meant to
-    // beat the config, so it is installed first and applied on top of it.
-    oslo::interactive::settings::force_vi(invocation.vi);
-
     match invocation.action {
-        // `-c` is the POSIX interface and is always shell: every `sh -c` idiom in the world
-        // depends on that, and `--lua` is there for the caller who wants otherwise.
-        Action::Command(ref text) => match invocation.force_language {
-            Some(Language::Lua) => std::process::exit(startup::lua_init::run_lua_source(
-                text,
-                "-c",
-                &invocation.positional,
-            )),
-            _ => run_program(&invocation, text),
-        },
+        // `oslo history …` — reached only when no file of that name exists, so this never takes
+        // an invocation a script could have wanted. See `cli::tools::as_operand`.
+        Action::Tool(ref name, ref args) => {
+            let tool = cli::tools::from_name(name).expect("the parser only names tools it found");
+            std::process::exit(cli::tools::run(tool, args));
+        }
+        // **`-c` is always shell.** Every `sh -c` idiom in the world depends on it, and no amount
+        // of detection is worth being wrong about that one.
+        Action::Command(ref text) => run_program(&invocation, text),
         // A script operand names a file whose language is worked out from the file itself.
         Action::Script(ref path) => match fs::read_to_string(path) {
-            Ok(script) => match language::detect(invocation.force_language, Some(path), &script) {
+            Ok(script) => match language::detect(Some(path), &script) {
                 Language::Lua => std::process::exit(startup::lua_init::run_lua_source(
                     &script,
                     path,
@@ -180,7 +175,7 @@ fn dispatch() {
                     eprintln!("oslo: cannot read standard input: {}", e);
                     std::process::exit(1);
                 }
-                match language::detect(invocation.force_language, None, &script) {
+                match language::detect(None, &script) {
                     Language::Lua => std::process::exit(startup::lua_init::run_lua_source(
                         &script,
                         "stdin",

@@ -129,9 +129,15 @@ struct Canned {
     /// What was on the line when the walk started, so coming back down can restore it.
     typed: Option<String>,
     completion: Option<(String, usize)>,
+    /// What the ghost suggestion would add, if anything.
+    hint: Option<String>,
 }
 
 impl Assist for Canned {
+    /// As the real one does: no suggestion unless the cursor is at the end of the line.
+    fn hint_text(&mut self, line: &str, cursor: usize) -> Option<String> {
+        (cursor >= line.chars().count()).then(|| self.hint.clone())?
+    }
     fn complete(&mut self, _l: &str, _c: usize, _b: bool) -> Option<(String, usize)> {
         self.completion.clone()
     }
@@ -237,4 +243,77 @@ fn ctrl_l_clears_the_screen_without_touching_the_line() {
     assert_eq!(s.apply(Key::Ctrl('l'), &mut NoAssist), Step::ClearScreen);
     assert_eq!(s.buffer.text(), "half typed");
     assert_eq!(s.buffer.cursor(), 4, "and the cursor stayed put");
+}
+
+/// **Right at the end of the line accepts the ghost suggestion.** The key that reads as "yes,
+/// that one" — Tab is for choosing between several, Right is for taking the one on screen.
+#[test]
+fn right_at_the_end_of_the_line_takes_the_suggestion() {
+    let mut a = Canned {
+        hint: Some(" --release".into()),
+        ..Canned::default()
+    };
+    let mut s = Session {
+        vi: None,
+        ..Session::new("cargo build", 11)
+    };
+    assert_eq!(s.apply(Key::Right, &mut a), Step::Continue { redraw: true });
+    assert_eq!(s.buffer.text(), "cargo build --release");
+    assert_eq!(
+        s.buffer.cursor(),
+        21,
+        "and the cursor follows it to the end"
+    );
+}
+
+/// **In vi's normal mode Right is a motion and nothing else.** There it is `l`, and `d<Right>`
+/// has to delete a character — a Right that inserted the suggestion instead would turn every
+/// operator that takes it into something else. Accepting belongs to the modes where text is
+/// being added.
+#[test]
+fn right_is_only_a_motion_in_vi_normal_mode() {
+    let mut a = Canned {
+        hint: Some(" -la".into()),
+        ..Canned::default()
+    };
+    let mut s = Session::new("ls", 2);
+    s.vi = Some(crate::interactive::edit::vi::Vi::default());
+    s.apply(Key::Cancel, &mut a); // Esc: into normal mode, and one step left as vi does
+    s.apply(Key::Right, &mut a);
+    assert_eq!(s.buffer.text(), "ls", "the suggestion was not taken");
+
+    // Back to insert, and the same key takes it.
+    s.apply(Key::Char('a'), &mut a);
+    s.buffer.move_end();
+    s.apply(Key::Right, &mut a);
+    assert_eq!(s.buffer.text(), "ls -la");
+}
+
+/// Mid-line it is still an ordinary cursor move — the suggestion is only ever drawn at the end,
+/// so accepting one from the middle would insert text nobody was shown.
+#[test]
+fn right_in_the_middle_of_a_line_only_moves() {
+    let mut a = Canned {
+        hint: Some(" --release".into()),
+        ..Canned::default()
+    };
+    let mut s = Session {
+        vi: None,
+        ..Session::new("cargo build", 5)
+    };
+    s.apply(Key::Right, &mut a);
+    assert_eq!(s.buffer.text(), "cargo build", "unchanged");
+    assert_eq!(s.buffer.cursor(), 6);
+}
+
+/// With nothing to suggest, Right falls through to moving — it must not become a dead key at the
+/// end of a line, which is where it is pressed most.
+#[test]
+fn right_with_no_suggestion_still_moves() {
+    let mut s = Session {
+        vi: None,
+        ..Session::new("ls", 1)
+    };
+    s.apply(Key::Right, &mut Canned::default());
+    assert_eq!(s.buffer.cursor(), 2);
 }

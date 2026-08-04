@@ -50,10 +50,11 @@ pub struct Scanner {
 
 impl Default for Scanner {
     fn default() -> Self {
-        // hexe's defaults, which are tuned to read as motion without being distracting.
+        // hexe's, but a step quicker: 75ms reads as a lag rather than as motion when the thing it
+        // is drawn beside — a search box — responds instantly.
         Scanner {
             width: 8,
-            step_ms: 75,
+            step_ms: 62,
             hold: 9,
         }
     }

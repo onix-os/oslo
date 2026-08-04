@@ -48,9 +48,30 @@ fn help_prints_usage_on_stdout_and_exits_zero() {
     let out = oslo(&["--help"]);
     assert_eq!(status_of(&out), 0);
     let text = stdout_of(&out);
-    assert!(text.contains("usage: oslo"), "{text:?}");
+    assert!(text.contains("USAGE"), "{text:?}");
     assert!(text.contains("-c COMMAND"), "{text:?}");
     assert!(stderr_of(&out).is_empty());
+}
+
+/// **A captured `--help` has no escape sequences in it.** The whole colour decision rests on
+/// stdout not being a terminal here, and only a spawned binary can prove it — the in-process
+/// tests share libtest's captured stdout and would pass even if the check were removed.
+#[test]
+fn a_redirected_help_is_never_coloured() {
+    for args in [vec!["--help"], vec!["--help", "--details"]] {
+        let text = stdout_of(&oslo(&args));
+        assert!(!text.contains('\x1b'), "{args:?} was painted into a pipe");
+    }
+}
+
+/// `--details` is the reference, and it is longer than the summary by more than a line.
+#[test]
+fn details_prints_the_option_reference() {
+    let short = stdout_of(&oslo(&["--help"]));
+    let long = stdout_of(&oslo(&["--help", "--details"]));
+    assert!(long.contains("xtrace"), "{long:?}");
+    assert!(long.contains("not implemented:"), "{long:?}");
+    assert!(long.lines().count() > short.lines().count() + 10);
 }
 
 #[test]

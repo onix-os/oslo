@@ -9,14 +9,15 @@
 //!
 //! # It is an aggregate, not a log
 //!
-//! `history.db` is already the event log, one row per line typed. A second log would double the
+//! The `.db` of the same profile is already the event log, one row per line typed. A second log
+//! would double the
 //! write cost and double the privacy surface for a chronology that already exists — and the store
 //! underneath has no `VACUUM`, so a file that grows is a permanent high-water mark. That argument
 //! got sharper rather than weaker when the engine changed: jammdb grows in one 8 MiB step and
 //! never gives it back, so the aggregate and the bounds in [`prune`] are what stand between oslo
 //! and 8.5 MiB for ever. An aggregate is bounded by distinct *behaviour* rather than by time:
 //! repeats, which are the entire point of the ranking, cost nothing after the first. What it gives
-//! up is the order of individual executions, which is recoverable by joining `history.db` if
+//! up is the order of individual executions, which is recoverable by joining the event log if
 //! anything ever needs it.
 //!
 //! # Why it lives in the library
@@ -32,6 +33,9 @@
 
 pub mod db;
 pub mod history;
+pub mod log;
+pub mod profile;
+pub mod session;
 // The one module that knows which key-value engine is underneath. Read its note before touching
 // it: nothing else may `use jammdb`, so that moving engines again is a day of rewriting one
 // directory. Named `kv` rather than `store` because `store()` below is already the accessor for
@@ -75,25 +79,20 @@ pub fn store() -> Option<&'static Track> {
 
 /// Where the store is kept, given the environment.
 ///
-/// Beside `history.db`, and for the same reason: this is state the user accumulates, not
-/// configuration they wrote. `None` when neither `$XDG_DATA_HOME` nor `$HOME` is knowable — a
+/// Beside the profile's event log, and for the same reason: this is state the user accumulates,
+/// not configuration they wrote. `None` when neither `$XDG_DATA_HOME` nor `$HOME` is knowable — a
 /// container's `nobody` — which must run without a store rather than fail.
 ///
-/// # `track.kv`, not `track.db`, and it is not cosmetic
+/// # `.kv`, not `.db`
 ///
-/// Every machine that has run a released oslo has a *SQLite* file at `track.db`. The seam refuses
-/// to hand a foreign file to an engine that panics on one, so opening the old name would be safe —
-/// but it would also be permanent: the SQLite file would sit there being refused, and that user's
-/// shell would silently never track anything again. A new name means the old file is simply not
-/// looked at, this store is created beside it, and a rollback to a turso build still finds its own
-/// data where it left it. The stale `track.db` is the user's to delete; nothing here removes a
-/// file it did not write.
+/// The two stores of one profile differ only by extension, and the extension says which engine
+/// wrote the file: `.db` is the event log, `.kv` the aggregate. Neither is ever handed to the
+/// other's reader, and the seam refuses a foreign file rather than letting an engine panic on one.
+///
+/// Nothing here adopts a store written under an older name. Files this did not write are the
+/// user's to keep or delete — see [`profile`].
 pub fn default_path(xdg_data: Option<&str>, home: Option<&str>) -> Option<PathBuf> {
-    let base = match xdg_data {
-        Some(dir) if !dir.trim().is_empty() => PathBuf::from(dir),
-        _ => PathBuf::from(home?).join(".local/share"),
-    };
-    Some(base.join("oslo/track.kv"))
+    profile::store_path(xdg_data, home, "kv")
 }
 
 #[cfg(test)]
@@ -107,18 +106,20 @@ mod tests {
 
     #[test]
     fn the_store_lives_beside_the_history_database() {
+        // Named after the profile now, not after what it holds — see `track::profile`.
+        let named = |dir: &str| PathBuf::from(format!("{dir}/oslo/{}.kv", profile::current()));
         assert_eq!(
             default_path(Some("/x/data"), Some("/home/u")),
-            Some(PathBuf::from("/x/data/oslo/track.kv"))
+            Some(named("/x/data"))
         );
         assert_eq!(
             default_path(None, Some("/home/u")),
-            Some(PathBuf::from("/home/u/.local/share/oslo/track.kv"))
+            Some(named("/home/u/.local/share"))
         );
         // An empty XDG is unset, not a relative path from the root.
         assert_eq!(
             default_path(Some("  "), Some("/home/u")),
-            Some(PathBuf::from("/home/u/.local/share/oslo/track.kv"))
+            Some(named("/home/u/.local/share"))
         );
         // Nowhere to put it is not an error; it is a shell without a store.
         assert_eq!(default_path(None, None), None);

@@ -372,15 +372,15 @@ fn the_shell_can_describe_itself() {
 
 #[test]
 fn options_are_shell_variables_under_a_namespace() {
-    // One home for each setting, so `$OSLO_TOGGLE_KEY` set from either language means the same
+    // One home for each setting, so `$OSLO_DEFAULT_MODE` set from either language means the same
     // thing — and so `oslo.opts.set` cannot reach an unrelated variable.
     let out = lua(r#"
-        oslo.opts.set("toggle_key", "f2")
-        print(oslo.opts.get("toggle_key"), oslo.env.get("OSLO_TOGGLE_KEY"))
+        oslo.opts.set("default_mode", "lua")
+        print(oslo.opts.get("default_mode"), oslo.env.get("OSLO_DEFAULT_MODE"))
         print(oslo.opts.get("never_set"))
         print(#oslo.opts.names() > 0)
     "#);
-    assert_eq!(out, "f2\tf2\nnil\ntrue");
+    assert_eq!(out, "lua\tlua\nnil\ntrue");
 }
 
 #[test]

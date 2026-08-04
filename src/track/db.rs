@@ -147,6 +147,9 @@ pub struct Track {
     /// False for a file written by a version this binary does not understand: keep reading it,
     /// stop writing to it. Dropping and recreating somebody else's data is never the answer.
     pub(super) writable: bool,
+    /// Appends to the command log since it was last trimmed, so the trim is amortised rather than
+    /// paid on every line. See [`Track::trim_soon`].
+    pub(super) since_trim: std::sync::atomic::AtomicUsize,
     /// The directory the shell is in and its id.
     ///
     /// Without it the run insert has no directory on the first command of a session, because the
@@ -166,6 +169,17 @@ impl Track {
     /// on one. Both are the seam's, because both are facts about the engine rather than about
     /// what oslo stores.
     pub fn open(path: &Path) -> Option<Track> {
+        // A file here that is not ours — an older build's database, or something a disk corrupted
+        // — is renamed aside rather than opened or deleted. Without that, `Store::open` refuses it
+        // for ever and the shell silently has no history and no ranking until somebody finds the
+        // file by hand. `rename` within one directory is atomic, so two terminals starting together
+        // cannot both move it: the loser finds nothing at the source and does nothing.
+        if path.is_file()
+            && !crate::track::kv::is_a_database(path)
+            && let Some(name) = path.file_name().and_then(|name| name.to_str())
+        {
+            let _ = std::fs::rename(path, path.with_file_name(format!("{name}.unreadable")));
+        }
         let store = Store::open(path)?;
         let found = store.read(|r| Some(meta(r, SCHEMA).unwrap_or(0)))?;
         let writable = found <= SCHEMA_VERSION;
@@ -175,6 +189,7 @@ impl Track {
         Some(Track {
             store,
             writable,
+            since_trim: std::sync::atomic::AtomicUsize::new(0),
             current: Mutex::new(None),
             home: std::env::var("HOME").ok().filter(|home| !home.is_empty()),
         })

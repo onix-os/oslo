@@ -86,34 +86,14 @@ pub fn starting_mode(env: &Environment) -> Mode {
     }
 }
 
-/// The key that toggles, from `$OSLO_TOGGLE_KEY`.
+/// The key that switches the prompt between shell and Lua.
 ///
-/// Spelled as a name rather than an escape sequence — `backtab`, `f2`, `ctrl-o` — because the
-/// escape sequence a key produces depends on the terminal, which is the thing the user is trying
-/// to work around by rebinding it.
-pub fn toggle_key(env: &Environment) -> Option<String> {
-    let requested = env
-        .get_var("OSLO_TOGGLE_KEY")
-        .map(|k| k.trim().to_ascii_lowercase());
-    let name = requested.as_deref().unwrap_or("shift-tab");
-    Some(match name {
-        // The default. Also accepted under the names people actually say out loud.
-        "backtab" | "shift-tab" | "s-tab" => "shift-tab".to_string(),
-        "none" | "off" => return None,
-        "f1" | "f2" | "f3" | "f4" => name.to_string(),
-        // `ctrl-` and one character. Spelled out rather than parsed into an event: the editor
-        // matches on the name.
-        _ if name
-            .strip_prefix("ctrl-")
-            .is_some_and(|rest| rest.chars().count() == 1) =>
-        {
-            name.to_string()
-        }
-        // An unreadable name falls back rather than leaving the shell with no toggle at all —
-        // and says so, because a silently ignored setting is worse than a wrong one.
-        _ => {
-            eprintln!("oslo: OSLO_TOGGLE_KEY: cannot read '{name}'; using shift-tab");
-            "shift-tab".to_string()
-        }
-    })
-}
+/// **A constant, not a setting.** There was an `$OSLO_TOGGLE_KEY`; it is gone, because the key
+/// bindings already live in one place and a variable that could also set one was a second place
+/// for them to disagree from. The config does both jobs:
+///
+/// ```lua
+/// oslo.keys["f2"] = "toggle-language"   -- another key as well
+/// oslo.keys["shift-tab"] = "none"       -- and this one turns the default off
+/// ```
+pub const TOGGLE_KEY: &str = "shift-tab";

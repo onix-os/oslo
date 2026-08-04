@@ -93,12 +93,15 @@ Or just use `$PS1`, with the full escape set — `\u \h \w \$ \t \A \d \j \! \[ 
 ## Interactive
 
 - **Ghost suggestions** from history, per language, never crossing between them, and answering for
-  the directory you are standing in
+  the directory you are standing in. Right takes the one on screen, Tab opens the dropdown when
+  there is a choice to make
 - **A completion dropdown** with columns, per-kind info and frecency ranking
 - **Matching that is a transform, not a prefix test** — in the dropdown, `/u/s/b` reaches
   `/usr/share/bin`, `f-b` reaches `foo-bar` and `gco` reaches `git checkout`, each looser pass
   running only when the stricter one found nothing, so an exact match is never diluted
-- **Prefix history search** on Up, which restores the line you were composing instead of blanking it
+- **A full-screen history finder** on Up, seeded with whatever you had typed. Left and Right narrow
+  and widen the scope — global, host, session, directory, workspace — and Delete forgets a command
+  for good, after asking
 - **First-class vi mode** on fish's model: cursor shape says the mode, the prompt says it too
 - **Its own line editor** — buffer, layout, redraw, emacs and vi keymaps — so oslo owns the row it
   edits rather than renting it. No `readline`, no `rustyline`.
@@ -298,6 +301,57 @@ and **aliases are restored on the way out too**, so a project's `t` cannot follo
 one and run the wrong tests. Whatever the file prints is grouped under it, repeats collapsed with a
 count.
 
+## One shell, several histories
+
+```sh
+oslo                            # ~/.local/share/oslo/default.kv
+OSLO_PROFILE=claude oslo        # claude.kv instead — the default untouched
+```
+
+A name is a **letter, then letters, digits, `_` or `-`** — anything else is refused rather than
+cleaned up, because the name is the file and a typo must not quietly write somewhere else. An
+unusable name falls back to `default` and says so once.
+
+**`$OSLO_PROFILE` and nothing else.** There was a `--profile` flag; it is gone. A profile is a
+property of a session, not of one command: export it once and every shell anything spawns inherits
+it, which is the point when the thing spawning them is an agent running thousands of commands. A
+flag only covers the invocation you remembered to put it on.
+
+The store is named after a **profile**, `default` unless you say otherwise. Agents shell out constantly,
+and every line they run otherwise lands in the history you are trying to search and in the frecency
+table that decides what `cd` and Tab suggest. Give them a profile and that stops.
+
+It is a name, not a lock: two shells can share one, and **Tab in the history finder moves to the
+next profile** — which is how you go and read what the agent ran without leaving your shell.
+
+There used to be two files, `history.db` and `track.kv`. There is one now. Nothing migrates the old
+pair — delete them.
+
+## Tools
+
+`oslo --help` lists them. `config`, `profile`, `history`, `direnv` and `hook`:
+
+```sh
+oslo history
+oslo config
+```
+
+**A script always wins.** The operand slot belongs to scripts — POSIX defines the shell as
+`sh [options] [command_file [argument...]]` — so a word is only read as a tool when all three hold:
+
+- it contains no `/`
+- **no file of that name exists**
+- it is one of the five
+
+The second is what makes this safe rather than merely unlikely to bite. oslo does not search
+`$PATH` for a script operand, so when no such file exists the alternative was never "run something
+else", it was `No such file or directory`. Nothing that works today can change meaning; an error
+becomes useful. `oslo ./history` and `oslo -- history` say "this is a path" and are honoured.
+
+The slash rule is what keeps shebangs working. A script starting `#!/bin/oslo` is always run by
+the kernel with a *slashed* argv[1] — `./history` from the current directory, the full path when
+found on `$PATH` — so a bare `history` can only ever have been typed by a person.
+
 ## Configuration
 
 `~/.config/oslo/config.lua`. One file, one language, one place — there is no shell-syntax config.
@@ -306,7 +360,7 @@ refuse them.)
 
 ```lua
 oslo.completion.max_rows = 12
-oslo.suggest.accept = "ctrl-f"
+oslo.suggest.accept = "ctrl-f" -- as well as Right, which always accepts
 oslo.vi.enabled = true
 oslo.on.cd(function(dir) print("now in " .. dir) end)
 oslo.on["command-not-found"](function(name) print(name .. " is not installed") end)

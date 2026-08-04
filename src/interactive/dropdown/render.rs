@@ -483,7 +483,7 @@ mod tests {
     /// inside the row that is already highlighted.
     #[test]
     fn the_selected_rows_badge_takes_its_own_colour() {
-        crate::interactive::theme::set_depth(crate::interactive::theme::Depth::Ansi256);
+        let _held = crate::interactive::theme::held_at(crate::interactive::theme::Depth::Ansi256);
         let candidates = vec![kinded("a", "dir", None), kinded("b", "dir", None)];
         let (rendered, _) = render_vertical_dropdown_at_width(&candidates, 0, 8, 0, 80, "");
         let theme = crate::interactive::theme::current();
@@ -513,7 +513,7 @@ mod tests {
     /// the menu is.
     #[test]
     fn every_row_is_drawn_on_the_background() {
-        crate::interactive::theme::set_depth(crate::interactive::theme::Depth::Ansi256);
+        let _held = crate::interactive::theme::held_at(crate::interactive::theme::Depth::Ansi256);
         let candidates = vec![cand("one", None), cand("two", None)];
         let (rendered, _) = render_vertical_dropdown_at_width(&candidates, 0, 8, 0, 80, "");
         assert!(rendered.contains("48;5;236"), "no background: {rendered:?}");

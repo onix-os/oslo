@@ -27,6 +27,13 @@ pub enum Action {
     /// A function the config supplied. The function itself lives in [`super::editor`]; this only
     /// records that the key has one, because an `Action` has to stay plain data.
     LuaHandler,
+    /// **Unbind.** `oslo.keys["shift-tab"] = "none"` makes the key do nothing at all.
+    ///
+    /// Needed because a binding table can only ever *add*, and some of oslo's keys are bound
+    /// before any config runs — Shift-Tab toggles the language whether or not anybody asked. This
+    /// is the only way to say no to one, and saying no has to be possible or the default is a
+    /// decision the user cannot revisit.
+    Nothing,
 }
 
 /// The action a name stands for, for callers outside `oslo.keys` that bind by name.
@@ -45,6 +52,7 @@ impl Action {
             "accept-suggestion-word" | "accept-word" => Some(Action::AcceptSuggestionWord),
             "interrupt" => Some(Action::Interrupt),
             "complete" => Some(Action::Complete),
+            "none" | "nothing" => Some(Action::Nothing),
             _ => None,
         }
     }
@@ -138,6 +146,11 @@ mod tests {
         assert_eq!(action("toggle-language"), Some(Action::ToggleLanguage));
         assert_eq!(action("toggle-mode"), Some(Action::ToggleLanguage));
         assert_eq!(action("clear-screen"), Some(Action::ClearScreen));
+        // **Unbinding is an action**, not the absence of one. `oslo.keys["shift-tab"] = "none"`
+        // has to be distinguishable from a typo, because the typo is reported and this is not —
+        // and it is the only way to refuse a key oslo bound before the config ran.
+        assert_eq!(action("none"), Some(Action::Nothing));
+        assert_eq!(action("nothing"), Some(Action::Nothing));
         assert_eq!(
             action("history-search"),
             Some(Action::HistorySearchBackward)

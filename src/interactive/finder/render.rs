@@ -78,6 +78,8 @@ pub struct Frame<'a> {
     pub query: &'a str,
     /// How long the finder has been open, for the scanner in the search bar.
     pub elapsed_ms: u64,
+    /// Which profile's history is being shown.
+    pub profile: &'a str,
     /// When Delete is waiting to be confirmed, which button is selected.
     ///
     /// `Some(true)` is *yes*. The search bar becomes the question — the three rows it already
@@ -359,11 +361,12 @@ fn search_bar(
     cols: usize,
     depth: Depth,
 ) -> String {
-    let scope = match f.scope {
-        Scope::Global => "[global]",
-        Scope::Local => "[local]",
-    };
-    let count = format!("{}/{}", f.matches.len(), f.total);
+    // `profile @ [scope] || 3/57`. The scope is the only part with a background, because it is
+    // the only part that is a *state you can change from here* — the profile and the count are
+    // facts about what you are looking at.
+    let scope = f.scope.label();
+    let before_scope = format!("{} @ ", f.profile);
+    let count = format!(" || {}/{}", f.matches.len(), f.total);
     // The bar reads `⬝⬝⬝⬝⬝⬝⬝⬝  ❯❯  query`: the scanner says the finder is live, and the chevrons
     // still mark where the typing starts. See [`crate::interactive::scanner`] — the sweep is a
     // function of elapsed time, so drawing it costs one call and holds no state.
@@ -377,17 +380,12 @@ fn search_bar(
     let chevrons = "❯❯";
     let prompt_cells =
         1 + scanner.plain(f.elapsed_ms).chars().count() + 2 + printed_width(chevrons) + 2;
-    let room = cols.saturating_sub(prompt_cells + printed_width(&count) + printed_width(scope) + 2);
+    let right_cells = printed_width(&before_scope) + printed_width(scope) + printed_width(&count);
+    let room = cols.saturating_sub(prompt_cells + right_cells + 2);
     // One cell is kept back for the cursor, which is part of the input and has to fit.
     let typed = truncate_to_width(f.query, room.saturating_sub(1));
-    let gap = cols.saturating_sub(
-        prompt_cells
-            + printed_width(&typed)
-            + CURSOR_WIDTH
-            + printed_width(&count)
-            + printed_width(scope)
-            + 2,
-    );
+    let gap =
+        cols.saturating_sub(prompt_cells + printed_width(&typed) + CURSOR_WIDTH + right_cells + 1);
     // Every part of the row takes the surface, the gap included: a panel with a hole in it is not
     // a panel.
     let on_surface = |style: Style| Style {
@@ -414,14 +412,15 @@ fn search_bar(
         }
         .paint(" ", depth),
         on_surface(Style::default()).paint(&" ".repeat(gap), depth),
-        on_surface(pager.column(1, false)).paint(&count, depth),
-        on_surface(Style::default()).paint(" ", depth),
+        // The profile reads as an ordinary fact, in the same quiet colour as the count.
+        on_surface(pager.column(1, false)).paint(&before_scope, depth),
         Style {
             fg: Some(Color::Indexed(0)),
             bg: Some(Color::Indexed(1)),
             ..Style::default()
         }
         .paint(scope, depth),
+        on_surface(pager.column(1, false)).paint(&count, depth),
         on_surface(Style::default()).paint(" ", depth),
     )
 }

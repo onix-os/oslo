@@ -15,12 +15,10 @@ somebody adds one.
   upstream in brush's tokenizer, which fuses the two `;` into the `;;` that ends a `case` item.
 - **Process substitution** needs `/dev/fd`, so it fails in an initramfs without it. So does bash.
 - **`coproc` and `select`** are refused by name rather than half-implemented.
-- **A failing special builtin** does not exit a POSIX-mode shell, though a failed readonly
-  assignment does.
 - **Arrays are indexed only.** `declare -A` says so rather than pretending.
 - **`shopt`** switches `autocd` and `globstar`; the rest report the state oslo actually has and
   *fail* when asked for the other one — an error rather than a lie.
 - **A structured tool cannot read the shell's own stdin.** `df | where …` works; `cat x.json |
   oslo -c 'from json | …'` does not — structure is assembled inside one pipeline. Use
   `oslo -c 'cat x.json | from json | …'`.
-- No `SECONDS`, `RANDOM`, `LINENO`, `/dev/tcp` or restricted mode.
+- No `/dev/tcp` or restricted mode.
