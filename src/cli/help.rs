@@ -183,11 +183,13 @@ const INVOCATION: &[(&str, &str)] = &[
 /// whole alphabet in 1988 — `-h` is `hashall` and `-v` is `verbose`, which is why bash has no
 /// `-h`/`-v` either.
 const LONG: &[(&str, &str)] = &[
-    ("--posix", "follow POSIX where bash's default differs"),
+    (
+        "--posix",
+        "follow POSIX where bash's default differs (implied by `sh`)",
+    ),
     ("--lua", "run the program as Lua (normally detected)"),
     ("--sh", "run the program as shell (normally detected)"),
     ("--no-vi", "emacs key bindings; vi is the default"),
-    ("--profile=NAME", "use NAME's history store ($OSLO_PROFILE)"),
     ("--details", "with --help: the full option reference"),
     ("--version", "print the version, then exit"),
     ("--help", "print this message, then exit"),

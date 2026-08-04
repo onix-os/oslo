@@ -304,17 +304,18 @@ count.
 ## One shell, several histories
 
 ```sh
-oslo                               # ~/.local/share/oslo/default.kv
-oslo --profile=claude -c 'make'    # claude.kv instead — the default untouched
-OSLO_PROFILE=claude oslo           # the same, for a whole session
+oslo                            # ~/.local/share/oslo/default.kv
+OSLO_PROFILE=claude oslo        # claude.kv instead — the default untouched
 ```
 
 A name is a **letter, then letters, digits, `_` or `-`** — anything else is refused rather than
-cleaned up, because the name is the file and a typo must not quietly write somewhere else.
+cleaned up, because the name is the file and a typo must not quietly write somewhere else. An
+unusable name falls back to `default` and says so once.
 
-`--profile` wins over `$OSLO_PROFILE`, which wins over `default`. The variable is how you put a
-session on a profile — export it once and every `oslo` a tool spawns inherits it — and the flag is
-how you override that for one invocation.
+**`$OSLO_PROFILE` and nothing else.** There was a `--profile` flag; it is gone. A profile is a
+property of a session, not of one command: export it once and every shell anything spawns inherits
+it, which is the point when the thing spawning them is an agent running thousands of commands. A
+flag only covers the invocation you remembered to put it on.
 
 The store is named after a **profile**, `default` unless you say otherwise. Agents shell out constantly,
 and every line they run otherwise lands in the history you are trying to search and in the frecency

@@ -145,11 +145,6 @@ fn dispatch() {
     // beat the config, so it is installed first and applied on top of it.
     oslo::interactive::settings::force_vi(invocation.vi);
 
-    // Which stores this shell writes to, chosen before anything opens one.
-    if let Some(name) = invocation.profile.as_deref() {
-        oslo::track::profile::choose(name);
-    }
-
     match invocation.action {
         // `oslo history …` — reached only when no file of that name exists, so this never takes
         // an invocation a script could have wanted. See `cli::tools::as_operand`.

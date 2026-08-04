@@ -301,56 +301,55 @@ fn the_old_lua_script_flag_is_gone() {
     );
 }
 
-/// `--profile` names which pair of stores a shell writes to.
+/// The flag that used to name a profile is *refused*, not quietly ignored. `$OSLO_PROFILE` is the
+/// only spelling now, and a shell that accepted `--profile=claude` and then wrote to the default
+/// store would mix an agent's history into yours without ever saying so.
 #[test]
-fn a_profile_can_be_named() {
-    assert_eq!(parse_args(&[]).expect("parse").profile, None, "the default");
-    assert_eq!(
-        parse_args(&["--profile=claude"]).expect("parse").profile,
-        Some("claude".to_string())
-    );
-    // Last one wins, as with every other repeated flag.
-    assert_eq!(
-        parse_args(&["--profile=a", "--profile=b"])
-            .expect("parse")
-            .profile,
-        Some("b".to_string())
-    );
-}
-
-/// A `--profile` with nothing after it is a usage error, not a silent fall back to the
-/// default — a typo there would quietly write an agent's history into yours.
-#[test]
-fn a_profile_needs_a_name() {
-    for args in [vec!["--profile"], vec!["--profile="], vec!["--profile=  "]] {
+fn the_profile_flag_is_gone() {
+    for args in [
+        vec!["--profile=claude"],
+        vec!["--profile"],
+        vec!["--profile="],
+    ] {
         let err = parse_args(&args).expect_err("must be refused");
         assert_eq!(err.status, 2, "{args:?}");
-        assert!(err.message.contains("--profile"), "{}", err.message);
+        assert!(err.message.contains("invalid option"), "{}", err.message);
     }
 }
 
-/// A name oslo will not use is refused, not cleaned into a different one — the name *is* the
-/// store, so a typo must not quietly write somewhere else.
+/// **Called as `sh`, oslo is a POSIX shell without being told.** bash has done this since 1989 —
+/// the same binary is lax as `bash` and strict as `sh` — and it is what lets a distro point
+/// `/bin/sh` at oslo and have every `#!/bin/sh` script get POSIX behaviour with no flag anywhere.
 #[test]
-fn a_profile_name_is_letters_digits_underscore_and_dash() {
-    for good in ["claude", "agent-1", "test_run", "a"] {
-        assert_eq!(
-            parse_args(&[&format!("--profile={good}")])
-                .expect("accepted")
-                .profile,
-            Some(good.to_string())
+fn being_called_sh_means_posix() {
+    for argv0 in ["sh", "/bin/sh", "/usr/bin/sh", "-sh"] {
+        let inv = parse_with_name(argv0, &[]).expect("parse");
+        assert!(
+            inv.options().any(|o| o == ShellOption::Posix),
+            "{argv0} must imply posix"
         );
     }
-    for bad in [
-        "../escape",
-        "9lives",
-        "with space",
-        "-dash",
-        "dot.name",
-        "a/b",
-    ] {
-        let err = parse_args(&[&format!("--profile={bad}")]).expect_err("must be refused");
-        assert_eq!(err.status, 2, "{bad:?}");
-        assert!(err.message.contains(bad), "{}", err.message);
+}
+
+/// And any other name is not POSIX mode, or `--posix` would mean nothing and the differential
+/// suite would have no way to run the same corpus both ways.
+#[test]
+fn other_names_are_not_posix() {
+    for argv0 in ["oslo", "/usr/bin/oslo", "-oslo", "rush", "shell", "bash"] {
+        let inv = parse_with_name(argv0, &[]).expect("parse");
+        assert!(
+            !inv.options().any(|o| o == ShellOption::Posix),
+            "{argv0} must not imply posix"
+        );
     }
+    // The flag still reaches it under any name.
+    let inv = parse_with_name("oslo", &["--posix"]).expect("parse");
+    assert!(inv.options().any(|o| o == ShellOption::Posix));
+}
+
+/// `parse`, with `argv[0]` chosen — the helper above always says `oslo`.
+fn parse_with_name(argv0: &str, args: &[&str]) -> Result<Invocation, Exit> {
+    let mut argv = vec![argv0.to_string()];
+    argv.extend(args.iter().map(|a| a.to_string()));
+    parse(&argv)
 }

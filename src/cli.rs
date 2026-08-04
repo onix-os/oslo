@@ -46,14 +46,6 @@ pub struct Invocation {
     pub vi: Option<bool>,
     /// `-l`: behave as a login shell.
     pub login: bool,
-    /// `--profile=NAME`: which history and tracking stores to use.
-    ///
-    /// `None` leaves it to `$OSLO_PROFILE`, and then to `default`. A name here gives a shell its
-    /// own history and its own
-    /// frecency ranking, which is what separates an agent's thousands of commands from the ones a
-    /// person typed: `oslo --profile=claude -c '…'` records into `claude.db` and `claude.kv` and
-    /// leaves the default pair untouched.
-    pub profile: Option<String>,
     /// Single-letter `set` options given on the command line, e.g. `ex` for `-e -x`.
     ///
     /// Letters only, in the order they were written, deduplicated. The letters that are not
@@ -154,25 +146,22 @@ fn usage_error(problem: String) -> Exit {
 }
 
 /// Interpret `argv` (including `argv[0]`).
-/// The error for a `--profile` name oslo will not use.
-fn bad_profile_name(name: &str) -> Exit {
-    Exit {
-        message: format!(
-            "oslo: --profile: {name:?} is not a profile name. \
-             A name is a letter, then letters, digits, _ or -"
-        ),
-        to_stderr: true,
-        status: 2,
-    }
-}
-
-/// The error for `--profile` with nothing after it.
-fn missing_profile_name() -> Exit {
-    Exit {
-        message: "oslo: --profile needs a name, e.g. --profile=claude".to_string(),
-        to_stderr: true,
-        status: 2,
-    }
+/// Whether being called by this name means "be a POSIX shell".
+///
+/// **`sh` is a personality, not just a path.** bash has done this since 1989 — invoked as `sh` it
+/// enters POSIX mode, invoked as `bash` it does not, and the same binary serves both. Verified
+/// against the real bash rather than taken from the manual: `ln -s bash sh; ./sh -c 'echo
+/// $SHELLOPTS'` lists `posix`; `bash -c` on the identical binary does not.
+///
+/// It matters most for the case oslo is built for. A distro that points `/bin/sh` at oslo is
+/// asking for a POSIX shell, and every `#!/bin/sh` script on it then gets one without a flag
+/// anybody has to remember — which is the only way a system-wide default can actually hold.
+///
+/// The leading `-` of a login shell is stripped first: `su -` and every display manager start
+/// `/bin/sh` as `-sh`, and those are the shells this matters for most.
+fn named_sh(argv0: &str) -> bool {
+    let base = argv0.rsplit('/').next().unwrap_or(argv0);
+    base.strip_prefix('-').unwrap_or(base) == "sh"
 }
 
 pub fn parse(argv: &[String]) -> Result<Invocation, Exit> {
@@ -180,13 +169,17 @@ pub fn parse(argv: &[String]) -> Result<Invocation, Exit> {
     let mut command: Option<String> = None;
     let mut force_language: Option<Language> = None;
     let mut vi: Option<bool> = None;
-    let mut profile: Option<String> = None;
     let mut read_stdin = false;
     let mut ended_options = false;
     let mut force_interactive = false;
     let mut login = false;
     let mut set_options = String::new();
     let mut long_options: Vec<ShellOption> = Vec::new();
+
+    // Before the flags are read, so `--posix` on top of it is simply the same option twice.
+    if argv.first().is_some_and(|argv0| named_sh(argv0)) {
+        long_options.push(ShellOption::Posix);
+    }
 
     let mut i = 1;
     // Set once `-c` has taken its command string: everything after it is an operand, whatever it
@@ -238,20 +231,6 @@ pub fn parse(argv: &[String]) -> Result<Invocation, Exit> {
                 "login" => login = true,
                 "lua" => force_language = Some(Language::Lua),
                 "sh" => force_language = Some(Language::Shell),
-                name if name.starts_with("profile=") => {
-                    let value = name["profile=".len()..].trim();
-                    if value.is_empty() {
-                        return Err(missing_profile_name());
-                    }
-                    // Refused, not cleaned. A name is what names the store, so quietly turning a
-                    // typo into a *different* valid name would write somewhere you did not ask for
-                    // — which for a history store is the one mistake worth being loud about.
-                    if !oslo::track::profile::valid(value) {
-                        return Err(bad_profile_name(value));
-                    }
-                    profile = Some(value.to_string());
-                }
-                "profile" => return Err(missing_profile_name()),
                 // **Off only.** vi bindings are oslo's default, so there is nothing for a `--vi`
                 // to turn on from the command line. Both spellings, because the editing mode is
                 // vi and everyone calls the editor vim.
@@ -359,7 +338,6 @@ pub fn parse(argv: &[String]) -> Result<Invocation, Exit> {
         positional,
         force_interactive,
         login,
-        profile,
         set_options,
         force_language,
         vi,

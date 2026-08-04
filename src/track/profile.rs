@@ -18,39 +18,21 @@
 //! for a whole session, and the flag wins when both are given.
 
 use std::path::PathBuf;
-use std::sync::RwLock;
 
-/// The profile this process uses, once something has chosen one.
-static CHOSEN: RwLock<Option<String>> = RwLock::new(None);
-
-/// Use `name` for the rest of this process. Called once, from the invocation.
-pub fn choose(name: &str) {
-    if !valid(name) {
-        return;
-    }
-    if let Ok(mut slot) = CHOSEN.write() {
-        *slot = Some(name.to_string());
-    }
-}
-
-/// The environment variable that names a profile without a flag.
+/// The environment variable that names a profile.
 pub const ENV: &str = "OSLO_PROFILE";
 
-/// The profile in force.
+/// The profile in force: `$OSLO_PROFILE`, or `default`.
 ///
-/// `--profile` wins, then `$OSLO_PROFILE`, then `default`. That order is the usual one and it is
-/// the useful one here: the variable is how you put a whole *session* on a profile — export it
-/// once and every `oslo` a tool spawns inherits it — and the flag is how you override that for one
-/// invocation without disturbing the session.
+/// **The variable and nothing else.** There was a `--profile` flag; it is gone, because a profile
+/// is a property of a *session* rather than of one command. Export it once and every `oslo` that
+/// anything spawns inherits it — which is the whole point when the thing spawning shells is an
+/// agent running thousands of commands you would rather keep out of your own history. A flag
+/// covers only the invocation you remembered to put it on.
 ///
 /// Read rather than cached, so exporting it mid-session takes effect on the next shell without
 /// anything having to be told.
 pub fn current() -> String {
-    if let Ok(slot) = CHOSEN.read()
-        && let Some(name) = slot.as_ref()
-    {
-        return name.clone();
-    }
     match std::env::var(ENV) {
         Ok(name) if valid(&name) => name,
         // Named but unusable. Said once rather than per call, and then the default is used: a
@@ -222,52 +204,42 @@ mod tests {
         assert_eq!(default_name(), "default");
     }
 
-    /// `$OSLO_PROFILE` names a profile for a whole session; `--profile` overrides it for one
-    /// invocation. Both are cleaned the same way, so neither can escape the directory.
+    /// **`$OSLO_PROFILE` is the only way to name one.** A hostile or empty value falls back to
+    /// the default rather than being cleaned into a different valid name.
     #[test]
-    fn the_environment_names_a_profile_and_the_flag_beats_it() {
+    fn the_environment_names_the_profile() {
         // SAFETY: as elsewhere in this crate's tests — see `env::scope::environ`. The lock below
         // is what keeps this from racing the other tests that read the profile.
         let _guard = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
-        *CHOSEN.write().expect("chosen") = None;
 
         unsafe { std::env::set_var(ENV, "from-the-env") };
         assert_eq!(current(), "from-the-env");
 
-        // A hostile value is refused here too, not only on the flag — and the default is used.
         unsafe { std::env::set_var(ENV, "../escape") };
-        assert_eq!(current(), "default");
+        assert_eq!(current(), "default", "a hostile value is refused");
 
         // Empty means unset: fall through rather than writing to a file called nothing.
         unsafe { std::env::set_var(ENV, "   ") };
         assert_eq!(current(), "default");
 
-        unsafe { std::env::set_var(ENV, "from-the-env") };
-        choose("from-the-flag");
-        assert_eq!(current(), "from-the-flag", "the flag wins");
-
-        *CHOSEN.write().expect("chosen") = None;
         unsafe { std::env::remove_var(ENV) };
+        assert_eq!(current(), "default");
     }
 
     /// The path is the profile with the store's extension, under the data directory.
     #[test]
     fn the_path_is_the_profile_and_the_extension() {
         let _guard = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
-        choose("claude");
+        unsafe { std::env::set_var(ENV, "claude") };
         assert_eq!(
-            store_path(Some("/x/data"), None, "db"),
-            Some(PathBuf::from("/x/data/oslo/claude.db"))
+            store_path(Some("/x/data"), None, "kv"),
+            Some(PathBuf::from("/x/data/oslo/claude.kv"))
         );
         assert_eq!(
             store_path(None, Some("/home/u"), "kv"),
             Some(PathBuf::from("/home/u/.local/share/oslo/claude.kv"))
         );
-        // And the two stores of one profile sit beside each other, differing only in extension.
-        let db = store_path(Some("/x"), None, "db").expect("a path");
-        let kv = store_path(Some("/x"), None, "kv").expect("a path");
-        assert_eq!(db.parent(), kv.parent());
-        assert_eq!(db.file_stem(), kv.file_stem());
+        unsafe { std::env::remove_var(ENV) };
     }
 
     /// With nowhere to put it, there is no path — not a path in the wrong place.
