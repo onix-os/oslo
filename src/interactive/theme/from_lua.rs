@@ -184,6 +184,11 @@ fn read_pager(table: &crate::lua::eval::Table, into: &mut Pager, problems: &mut 
     field(table, "match", p, &mut into.match_, problems);
     field(table, "desc", p, &mut into.desc, problems);
     field(table, "desc_sel", p, &mut into.desc_sel, problems);
+    // The info columns after the description — a file's size, a directory's entry count. Drawn
+    // since they were written and unreachable from a config until now, because nobody added these
+    // two lines.
+    field(table, "extra", p, &mut into.extra, problems);
+    field(table, "extra_sel", p, &mut into.extra_sel, problems);
     field(table, "scroll", p, &mut into.scroll, problems);
 
     // `bg` and `sel_bg` are bare colours rather than styles: they are the row's background and
@@ -222,6 +227,12 @@ fn read_prompt(table: &crate::lua::eval::Table, into: &mut Prompt, problems: &mu
     field(table, "git", p, &mut into.git, problems);
     field(table, "ok", p, &mut into.ok, problems);
     field(table, "failed", p, &mut into.failed, problems);
+    // Reachable only through the `oslo.theme.styles["prompt.host"]` back door before this — the
+    // fields existed, were defaulted and were drawn, and the obvious spelling silently did
+    // nothing.
+    field(table, "host", p, &mut into.host, problems);
+    field(table, "user", p, &mut into.user, problems);
+    field(table, "aside", p, &mut into.aside, problems);
 }
 
 /// `oslo.theme.ui` — the input widgets' palette.

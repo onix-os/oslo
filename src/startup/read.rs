@@ -82,8 +82,13 @@ pub(super) fn read_command(
         let prompt = if buffer.is_empty() {
             prompt::primary_prompt(env_struct, lua, last_status, *current)
         } else {
-            lua.render("prompt.continuation")
-                .unwrap_or_else(|| rc::ps2(&mut env_struct.lock().unwrap()))
+            lua.render_with("prompt.continuation", &{
+                let mut ctx = prompt::segment_context(last_status, *current, None);
+                // The one fact that is different here, and the reason the field exists.
+                ctx.continuation = true;
+                ctx
+            })
+            .unwrap_or_else(|| rc::ps2(&mut env_struct.lock().unwrap()))
         };
 
         // The right prompt is handed to the helper rather than concatenated: it is drawn from
@@ -98,8 +103,14 @@ pub(super) fn read_command(
             // rebuild the prompt from `PROMPT_COMMAND`, and until now the only thing they could
             // set was `PS1` — the right column was oslo's whatever they did, so half the prompt
             // came from the integration and half from the shell arguing with it.
+            // **The same facts the left prompt gets.** These two used to be rendered with
+            // `render`, which is `render_with(Context::default())` — so a right-prompt segment saw
+            // status 0, an empty cwd, no branch and no duration, whatever had actually happened.
+            // A right prompt exists to show the status and the duration; handing it zeros made the
+            // whole feature draw the wrong thing rather than nothing, which is worse.
+            let facts = prompt::segment_context(last_status, reading, None);
             let right = lua
-                .render("prompt.right")
+                .render_with("prompt.right", &facts)
                 .or_else(|| rc::rps1(&mut env_struct.lock().unwrap()))
                 .or_else(|| {
                     Some(oslo::interactive::prompt::render_default_right_prompt(

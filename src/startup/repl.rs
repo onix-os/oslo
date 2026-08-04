@@ -453,8 +453,15 @@ fn run_lua_line(lua: &LuaEngine, text: &str, last_status: i32) -> Result<i32, Sh
 /// documented fallback for a value that is not a number is 10.
 fn ignore_eof_limit(env_struct: &Arc<Mutex<Environment>>) -> Option<usize> {
     let guard = env_struct.lock().unwrap();
-    let raw = guard.get_var("IGNOREEOF")?;
-    Some(raw.trim().parse::<usize>().unwrap_or(10))
+    if let Some(raw) = guard.get_var("IGNOREEOF") {
+        return Some(raw.trim().parse::<usize>().unwrap_or(10));
+    }
+    // `set -o ignoreeof` is the option spelling of the same thing, and bash treats it as
+    // `IGNOREEOF=10`. It used to be accepted and ignored, so a shell that had been told not to
+    // exit on Ctrl-D exited on Ctrl-D.
+    guard
+        .option(oslo::env::options::ShellOption::IgnoreEof)
+        .then_some(10)
 }
 
 thread_local! {

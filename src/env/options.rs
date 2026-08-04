@@ -67,12 +67,24 @@ pub struct OptionSpec {
     pub letter: Option<char>,
     /// The `set -o` name. `None` for the three invocation flags, which `set` cannot change.
     pub name: Option<&'static str>,
+    /// Why turning this on does nothing, when it does nothing.
+    ///
+    /// **An option that is accepted and ignored is worse than one that is refused.** A script
+    /// writing `set -o notify` and getting status 0 is entitled to believe the shell will report
+    /// finished jobs immediately; it will not. This is the same argument `shopt`'s `Fixed` states
+    /// were built on, applied to the other half of the option namespace.
+    pub unsupported: Option<&'static str>,
 }
 
 impl OptionSpec {
     /// Whether `set` may change this option. False only for the invocation flags.
     pub fn settable(&self) -> bool {
         self.name.is_some()
+    }
+
+    /// The spec for an option, by the value.
+    pub fn of(option: ShellOption) -> Option<&'static OptionSpec> {
+        ALL.iter().find(|s| s.option == option)
     }
 }
 
@@ -81,6 +93,22 @@ const fn spec(option: ShellOption, letter: Option<char>, name: Option<&'static s
         option,
         letter,
         name,
+        unsupported: None,
+    }
+}
+
+/// An option the shell knows the name of and does not implement.
+const fn refused(
+    option: ShellOption,
+    letter: Option<char>,
+    name: Option<&'static str>,
+    why: &'static str,
+) -> OptionSpec {
+    OptionSpec {
+        option,
+        letter,
+        name,
+        unsupported: Some(why),
     }
 }
 
@@ -91,24 +119,64 @@ const fn spec(option: ShellOption, letter: Option<char>, name: Option<&'static s
 /// there (`bash -c 'echo $-'` prints `hBc`, not `chB`).
 pub const ALL: &[OptionSpec] = &[
     spec(ShellOption::AllExport, Some('a'), Some("allexport")),
-    spec(ShellOption::Notify, Some('b'), Some("notify")),
+    refused(
+        ShellOption::Notify,
+        Some('b'),
+        Some("notify"),
+        "a finished background job is reported at the next prompt, not immediately",
+    ),
     spec(ShellOption::ErrExit, Some('e'), Some("errexit")),
     spec(ShellOption::NoGlob, Some('f'), Some("noglob")),
-    spec(ShellOption::HashAll, Some('h'), Some("hashall")),
-    spec(ShellOption::Keyword, Some('k'), Some("keyword")),
+    refused(
+        ShellOption::HashAll,
+        Some('h'),
+        Some("hashall"),
+        "command locations are not remembered between lookups",
+    ),
+    refused(
+        ShellOption::Keyword,
+        Some('k'),
+        Some("keyword"),
+        "an assignment after the command name is an argument, not an assignment",
+    ),
     spec(ShellOption::Monitor, Some('m'), Some("monitor")),
     spec(ShellOption::NoExec, Some('n'), Some("noexec")),
-    spec(ShellOption::OneCmd, Some('t'), Some("onecmd")),
+    refused(
+        ShellOption::OneCmd,
+        Some('t'),
+        Some("onecmd"),
+        "the shell does not exit after one command",
+    ),
     spec(ShellOption::NoUnset, Some('u'), Some("nounset")),
-    spec(ShellOption::Verbose, Some('v'), Some("verbose")),
+    refused(
+        ShellOption::Verbose,
+        Some('v'),
+        Some("verbose"),
+        "input is not echoed as it is read; `set -x` traces what runs",
+    ),
     spec(ShellOption::XTrace, Some('x'), Some("xtrace")),
     spec(ShellOption::NoClobber, Some('C'), Some("noclobber")),
     spec(ShellOption::IgnoreEof, None, Some("ignoreeof")),
-    spec(ShellOption::NoLog, None, Some("nolog")),
+    refused(
+        ShellOption::NoLog,
+        None,
+        Some("nolog"),
+        "history records function definitions like anything else",
+    ),
     spec(ShellOption::PipeFail, None, Some("pipefail")),
     spec(ShellOption::Posix, None, Some("posix")),
-    spec(ShellOption::Vi, None, Some("vi")),
-    spec(ShellOption::Emacs, None, Some("emacs")),
+    refused(
+        ShellOption::Vi,
+        None,
+        Some("vi"),
+        "the editing mode is `oslo.vi.enabled` or `--vi`, fixed when the editor is built",
+    ),
+    refused(
+        ShellOption::Emacs,
+        None,
+        Some("emacs"),
+        "the editing mode is `oslo.vi.enabled` or `--vi`, fixed when the editor is built",
+    ),
     spec(ShellOption::Interactive, Some('i'), None),
     spec(ShellOption::CommandString, Some('c'), None),
     spec(ShellOption::StdinInput, Some('s'), None),

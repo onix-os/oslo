@@ -46,7 +46,23 @@ pub fn builtin_set(env: &mut Environment, args: &[String]) -> Result<i32> {
         }
     };
 
+    let mut status = 0;
     for (option, on) in parsed.changes {
+        // An option oslo does not implement is refused when you ask to turn it *on*, and accepted
+        // when you ask to turn it off — it is already off, so there is nothing to disagree with.
+        // Accepting both and doing neither is the failure mode `shopt`'s fixed states exist to
+        // avoid: a script that sets an option and gets status 0 is entitled to believe it took.
+        if on
+            && let Some(spec) = crate::env::options::OptionSpec::of(option)
+            && let Some(why) = spec.unsupported
+        {
+            eprintln!(
+                "oslo: set: {}: not supported; {why}",
+                spec.name.unwrap_or("?")
+            );
+            status = 1;
+            continue;
+        }
         env.set_option(option, on);
         // `-m` is the one option that has to *do* something rather than be remembered: job control
         // means owning the terminal and leading a process group, and neither happens by reading a
@@ -69,7 +85,7 @@ pub fn builtin_set(env: &mut Environment, args: &[String]) -> Result<i32> {
         env.set_positional(positional);
     }
 
-    Ok(0)
+    Ok(status)
 }
 
 /// Turn job control on or off to match `set -m` / `set +m`.
