@@ -194,7 +194,7 @@ pub(super) fn read_command(
                 // it is completing. rustyline never told anyone where the line started, so the
                 // dropdown had to guess by rendering a default prompt.
                 oslo::interactive::prompt::printed_width(&prompt),
-                mode::toggle_key(&env_struct.lock().unwrap()),
+                Some(mode::TOGGLE_KEY.to_string()),
             );
             assist.begin();
             match oslo::interactive::edit::session::read_line(

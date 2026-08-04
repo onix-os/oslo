@@ -222,14 +222,21 @@ fn tools_section(paint: Paint) -> String {
     s
 }
 
-/// The variables oslo reads, and the one it writes.
+/// The variables you *set* to change what oslo does.
 ///
-/// **oslo's own, plus the standard ones whose effect is not guessable.** `$PATH`, `$PS1`, `$IFS`,
-/// `$ENV` and the rest of POSIX's behave as POSIX says and are not listed — a shell that
-/// documented those in `--help` would be documenting the shell, not itself.
+/// Three kinds are deliberately absent, and the rule is the same for all of them — **if setting it
+/// is not how you change the thing, it does not belong here.**
 ///
-/// `$OSLO_PROFILE` is here rather than as a flag on purpose: a profile is a property of a session,
-/// so exporting it once covers every shell anything spawns afterwards.
+/// - **`$OSLO_MODE`** is written by oslo for prompt functions to read. Setting it changes nothing.
+/// - **`$NO_COLOR`** is honoured, but it is a convention oslo did not invent and behaves the same
+///   in every program that respects it.
+/// - **Anything the config decides.** The editing mode, the toggle key, the theme and the
+///   suggestion keys live in `config.lua`, and a variable that shadowed one would be a second
+///   place for the same setting to disagree from itself.
+///
+/// `$PATH`, `$PS1`, `$IFS`, `$ENV` and the rest of POSIX's are absent for a different reason: they
+/// behave as POSIX says, and a `/bin/sh` documenting those in its own `--help` would be
+/// documenting the shell rather than itself.
 const ENVIRONMENT: &[(&str, &str)] = &[
     (
         "OSLO_PROFILE",
@@ -239,15 +246,6 @@ const ENVIRONMENT: &[(&str, &str)] = &[
         "OSLO_DEFAULT_MODE",
         "`lua` to start prompts in Lua; anything else is shell",
     ),
-    (
-        "OSLO_TOGGLE_KEY",
-        "the key that switches language; `none` turns it off",
-    ),
-    (
-        "OSLO_MODE",
-        "set *by* oslo to the current mode, for prompt functions",
-    ),
-    ("NO_COLOR", "any value turns off colour everywhere"),
     ("XDG_CONFIG_HOME", "where config.lua lives (~/.config)"),
     (
         "XDG_DATA_HOME",
@@ -261,7 +259,7 @@ fn environment_section(paint: Paint) -> String {
         s,
         "\n{}  {}",
         paint.head("ENVIRONMENT"),
-        paint.dim("$PATH, $PS1, $IFS and the rest of POSIX's behave as POSIX says")
+        paint.dim("everything else is config.lua, or POSIX's")
     );
     for (name, about) in ENVIRONMENT {
         s.push_str(&row(name, paint.key(name), about));

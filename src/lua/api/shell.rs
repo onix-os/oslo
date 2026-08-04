@@ -117,15 +117,15 @@ fn facts(oslo: &mut Table, system: &mut Table, process: &mut Table, env: &Arc<Mu
     //
     // A table rather than getters because a config file's natural shape is assignment, and
     // because the values are read by the *shell* rather than by Lua: they live in shell variables
-    // so that `$OSLO_TOGGLE_KEY` set from either language means the same thing.
+    // so that `$OSLO_DEFAULT_MODE` set from either language means the same thing.
     let env_opts = Arc::clone(env);
     let mut opts = Table::new();
     let env_set = Arc::clone(&env_opts);
     put(&mut opts, "set", move |_, args| {
         let name = text(&args, 1, "oslo.opts.set")?;
         let value = text(&args, 2, "oslo.opts.set")?;
-        // Namespaced on the way in, so `oslo.opts.set("toggle_key", …)` is `$OSLO_TOGGLE_KEY` and
-        // a script cannot reach an unrelated variable through it.
+        // Namespaced on the way in, so `oslo.opts.set("default_mode", …)` is `$OSLO_DEFAULT_MODE`
+        // and a script cannot reach an unrelated variable through it.
         borrow_env(&env_set)?.set_var(&option_var(&name), &value, false);
         ok(Value::Bool(true))
     });
@@ -136,10 +136,10 @@ fn facts(oslo: &mut Table, system: &mut Table, process: &mut Table, env: &Arc<Mu
             None => Value::Nil,
         })
     });
+    // `toggle_key` was here. It is now `oslo.keys`, which is where every other key binding already
+    // lived — see `crate::startup::mode::TOGGLE_KEY`.
     put(&mut opts, "names", |_, _| {
-        ok(list(
-            ["toggle_key", "default_mode"].into_iter().map(Value::str),
-        ))
+        ok(list(["default_mode"].into_iter().map(Value::str)))
     });
     oslo.set(Value::str("opts"), Value::table(opts));
 }

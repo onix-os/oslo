@@ -33,7 +33,8 @@ pub struct ShellAssist<'a> {
     /// What was on the line when the walk started, so coming back out restores it rather than
     /// blanking it. oslo has always promised this; it is the reason a walk is not destructive.
     composing: Option<String>,
-    /// The key that switches language, or `None` when `$OSLO_TOGGLE_KEY` turned it off.
+    /// The key that switches language — `crate::startup::mode::TOGGLE_KEY`, unless the config
+    /// unbound it with `oslo.keys["shift-tab"] = "none"`.
     toggle: Option<String>,
 }
 
@@ -210,6 +211,10 @@ impl Assist for ShellAssist<'_> {
                 Some(oslo::interactive::keys::Action::Interrupt) => Some(Bound::Interrupt),
                 Some(oslo::interactive::keys::Action::Complete) => Some(Bound::Complete),
                 Some(oslo::interactive::keys::Action::LuaHandler) => Some(Bound::Lua(name)),
+                // Unbound on purpose. Answering `None` here rather than with a do-nothing `Bound`
+                // is what makes it reach the *defaults* below and cancel them too — which is the
+                // whole point, since Shift-Tab is bound before any config has run.
+                Some(oslo::interactive::keys::Action::Nothing) => return None,
                 // An action name oslo does not know was already reported when the config was
                 // read; doing nothing here is better than doing something arbitrary.
                 None => None,
@@ -223,8 +228,9 @@ impl Assist for ShellAssist<'_> {
             return Some(Bound::AcceptHintWord);
         }
 
-        // oslo's own default, for a key the ordinary keymap does not already answer.
-        // `$OSLO_TOGGLE_KEY` names it, and `none` turns it off.
+        // oslo's own default, for a key the ordinary keymap does not already answer. Reached only
+        // when the config said nothing about this key: `oslo.keys["shift-tab"] = "none"` returns
+        // above and so cancels it.
         (Some(name.as_str()) == self.toggle.as_deref()).then_some(Bound::ToggleLanguage)
     }
 
