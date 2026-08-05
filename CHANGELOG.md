@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.2.14] - 2026-08-05
+
+### <!-- 0 -->⛰️  Features
+
+- A lua hook can see every keypress
+- Preexec and postexec get the command
+- A lua binding can submit the line
+- Complete inside a brace list
+
+### <!-- 1 -->🐛 Bug Fixes
+
+- -c takes the first non-option argument
+
 ## [0.2.13] - 2026-08-05
 
 ### <!-- 1 -->🐛 Bug Fixes
