@@ -220,13 +220,48 @@ fn plus_turns_an_option_off() {
     assert_eq!(err.status, 2);
 }
 
-/// **`sh -c -- 'cmd'` runs `cmd`.** A `--` where `-c`'s argument would go ends option processing;
-/// the command string is the operand after it.
+/// **`-c`'s argument is the first *non-option* argument.** Options may sit between them.
 ///
-/// This is not a nicety. musl's `system(3)` calls `execl("/bin/sh", "sh", "-c", "--", cmd, 0)`, so
-/// reading the `--` as the program text meant every `system()` call on a machine with oslo as
-/// `/bin/sh` ran `--` and reported "command not found" — found by `python3 -c 'os.system(…)'`
-/// within a minute of pointing `/bin/sh` at it.
+/// Both spellings that broke came from programs *calling* the shell rather than from scripts, so
+/// no corpus could reach either:
+///
+/// - `sh -c -l '<cmd>'` — Claude Code invokes its shell exactly this way when it has no
+///   environment snapshot to source. oslo ran `-l` and answered "command not found" for **every**
+///   command, which is how this was found: it broke the tool being used to write it.
+/// - `sh -c -- cmd` — musl's `system(3)` is `execl("/bin/sh", "sh", "-c", "--", cmd, 0)`, so every
+///   `system()` call on the machine failed the moment `/bin/sh` pointed at oslo.
+#[test]
+fn dash_c_takes_the_first_non_option_argument() {
+    for before in [vec!["-l"], vec!["-x"], vec!["--"], vec!["-l", "-x"], vec![]] {
+        let mut args = vec!["-c"];
+        args.extend(before.iter().copied());
+        args.push("echo hi");
+        let inv = parse_args(&args).expect("parse");
+        assert_eq!(
+            inv.action,
+            Action::Command("echo hi".to_string()),
+            "with {before:?} between -c and the program"
+        );
+    }
+
+    // The options in between still take effect, rather than being skipped over.
+    let inv = parse_args(&["-c", "-x", "echo hi"]).expect("parse");
+    assert!(inv.options().any(|o| o == ShellOption::XTrace));
+    let inv = parse_args(&["-c", "-l", "echo hi"]).expect("parse");
+    assert!(inv.login, "-l after -c is still a login shell");
+
+    // And with nothing but options, there is no program: an error, not a shell that runs `-l`.
+    let err = parse_args(&["-c", "-l"]).expect_err("must be refused");
+    assert_eq!(err.status, 2);
+    assert!(
+        err.message.contains("requires an argument"),
+        "{}",
+        err.message
+    );
+}
+
+/// Operands after the program text are untouched: the first is `$0`, and a `--` among them is an
+/// ordinary word — which is what `find -exec sh -c '…' -- {} +` depends on.
 #[test]
 fn a_double_dash_before_the_command_string_ends_the_options() {
     let inv = parse_args(&["-c", "--", "echo hi"]).expect("parse");

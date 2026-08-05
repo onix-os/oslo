@@ -196,6 +196,8 @@ pub fn parse(argv: &[String]) -> Result<Invocation, Exit> {
     let mut long_options: Vec<ShellOption> = Vec::new();
     let mut unset_letters = String::new();
     let mut unset_long: Vec<ShellOption> = Vec::new();
+    // `-c` was given with no attached text, so the first operand is the program.
+    let mut want_command = false;
 
     // Before the flags are read, so `--posix` on top of it is simply the same option twice.
     if argv.first().is_some_and(|argv0| named_sh(argv0)) {
@@ -315,33 +317,22 @@ pub fn parse(argv: &[String]) -> Result<Invocation, Exit> {
                 'c' => {
                     let rest: String = letters[pos + 1..].iter().collect();
                     if rest.is_empty() {
-                        i += 1;
-                        // **`sh -c -- 'cmd'` runs `cmd`.** A `--` in the argument's place ends
-                        // option processing rather than becoming the program text, so the command
-                        // string is the operand after it. bash and dash both do this, and it is
-                        // not a nicety: musl's `system(3)` calls
-                        // `execl("/bin/sh", "sh", "-c", "--", cmd, 0)`, so reading the `--` as the
-                        // program meant *every* `system()` call on a machine with oslo as
-                        // `/bin/sh` ran `--` and reported "command not found".
+                        // **`-c`'s argument is the first *non-option* argument**, not simply the
+                        // next one. Options may sit between them, and both bash and dash read
+                        // `sh -c -l 'echo hi'` as `-c` + `-l` + the program — so taking argv
+                        // literally ran `-l` as a command.
                         //
-                        // Only in this position. A `--` *after* the command string is an ordinary
-                        // operand and becomes `$0` — which is what `find -exec sh -c '…' -- {} +`
-                        // depends on, and is covered by its own test.
-                        if argv.get(i).is_some_and(|arg| arg == "--") {
-                            ended_options = true;
-                            i += 1;
-                        }
-                        match argv.get(i) {
-                            Some(text) => command = Some(text.clone()),
-                            None => {
-                                return Err(usage_error(
-                                    "-c: option requires an argument".to_string(),
-                                ));
-                            }
-                        }
-                    } else {
-                        command = Some(rest);
+                        // That is not a corner case. Claude Code invokes its shell as
+                        // `sh -c -l '<command>'` when it has no environment snapshot to source,
+                        // and musl's `system(3)` uses `sh -c -- cmd`. Both were broken, and
+                        // neither is reachable from a script — only from something *calling* the
+                        // shell. The operand loop below takes it, once the options are done.
+                        want_command = true;
+                        pos = letters.len();
+                        continue;
                     }
+                    // `-c'echo hi'` attached: the rest of the cluster is the program.
+                    command = Some(rest);
                     operands_only = true;
                     pos = letters.len();
                     continue;
@@ -392,7 +383,19 @@ pub fn parse(argv: &[String]) -> Result<Invocation, Exit> {
         }
     }
 
-    let operands = &argv[i.min(argv.len())..];
+    let mut operands = &argv[i.min(argv.len())..];
+
+    // The program text for a bare `-c`, taken here rather than in the option loop so that every
+    // option between them has already been read — see the `'c'` arm.
+    if want_command {
+        match operands.split_first() {
+            Some((text, rest)) => {
+                command = Some(text.clone());
+                operands = rest;
+            }
+            None => return Err(usage_error("-c: option requires an argument".to_string())),
+        }
+    }
 
     // Precedence: `-c` decides where the program comes from; `-s` forces stdin even when operands
     // follow; otherwise the first operand is a script. Which *language* that program is written in
