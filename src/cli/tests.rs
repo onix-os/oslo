@@ -174,6 +174,52 @@ fn a_tool_can_be_named_in_the_operand_slot() {
     );
 }
 
+/// **`-o name` on the command line.** POSIX's synopsis is
+/// `sh [-abCefhimnuvx] [-o option]... [+abCefhimnuvx] [+o option]...`, and it is the *only* way to
+/// ask for an option with no letter — `pipefail` and `posix` are both spelled this way.
+///
+/// oslo refused `-o` outright, so `sh -o pipefail -c '…'` did not start at all. Found by running
+/// the invocation shapes another program would use, not the ones a script uses.
+#[test]
+fn dash_o_names_an_option() {
+    let inv = parse_args(&["-o", "pipefail", "-c", "echo hi"]).expect("parse");
+    assert!(inv.options().any(|o| o == ShellOption::PipeFail));
+    assert_eq!(inv.action, Action::Command("echo hi".to_string()));
+
+    // Attached, as a getopt-style caller may write it.
+    let inv = parse_args(&["-onounset", "-c", "echo hi"]).expect("parse");
+    assert!(inv.options().any(|o| o == ShellOption::NoUnset));
+
+    // A name that is not an option is refused rather than ignored.
+    let err = parse_args(&["-o", "bogus"]).expect_err("must be refused");
+    assert_eq!(err.status, 2);
+    assert!(err.message.contains("bogus"), "{}", err.message);
+}
+
+/// **`+x` and `+o name` turn options off**, and are options rather than operands. Falling through
+/// to the operand branch made `sh +x -c 'cmd'` go looking for a *script* named `+x`.
+#[test]
+fn plus_turns_an_option_off() {
+    let inv = parse_args(&["+o", "nounset", "-c", "echo hi"]).expect("parse");
+    assert!(inv.unset_options().any(|o| o == ShellOption::NoUnset));
+    assert_eq!(
+        inv.action,
+        Action::Command("echo hi".to_string()),
+        "`+o name` was read as an operand"
+    );
+
+    let inv = parse_args(&["+x", "-c", "echo hi"]).expect("parse");
+    assert!(inv.unset_options().any(|o| o == ShellOption::XTrace));
+
+    // Both spellings of the same option, `-` then `+`: the caller asked for off last.
+    let inv = parse_args(&["-x", "+x", "-c", "echo hi"]).expect("parse");
+    assert!(inv.options().any(|o| o == ShellOption::XTrace));
+    assert!(inv.unset_options().any(|o| o == ShellOption::XTrace));
+
+    let err = parse_args(&["+q"]).expect_err("must be refused");
+    assert_eq!(err.status, 2);
+}
+
 /// **`sh -c -- 'cmd'` runs `cmd`.** A `--` where `-c`'s argument would go ends option processing;
 /// the command string is the operand after it.
 ///

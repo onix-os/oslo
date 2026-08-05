@@ -193,7 +193,12 @@ pub fn short(paint: Paint) -> String {
             paint.key("-x"),
             paint.dim("...")
         ),
-        "set a shell option, as `set` does",
+        "set a shell option, as `set` does (`+x` turns one off)",
+    ));
+    s.push_str(&row(
+        "-o NAME",
+        format!("{} {}", paint.key("-o"), paint.slot("NAME")),
+        "the same by name, for the ones with no letter (`+o` off)",
     ));
     for (key, about) in LONG {
         let painted = match key.split_once('=') {
