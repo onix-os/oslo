@@ -1,5 +1,32 @@
 # Changelog
 
+## [0.2.7] - 2026-08-05
+
+### <!-- 0 -->⛰️  Features
+
+- A login shell reads /etc/profile and ~/.profile
+- Oslo.source runs a shell file in this shell
+- OSLO_ALLHIST records sh -c commands
+- Run a script a command at a time
+
+### <!-- 1 -->🐛 Bug Fixes
+
+- One warning per file, not per name
+- IFS is a set variable; exit keeps the trap status
+- Errexit exemption survives a compound
+- Comments inside a heredoc substitution
+
+### <!-- 6 -->🧪 Testing
+
+- Assert the command is in the store, not the file
+- Boot arch linux with oslo as /bin/sh
+- Pin the errexit and-or compound bug
+
+### <!-- 7 -->⚙️ Miscellaneous Tasks
+
+- Rename benches to bench
+- Cleanup
+
 ## [0.2.6] - 2026-08-04
 
 ### <!-- 0 -->⛰️  Features
