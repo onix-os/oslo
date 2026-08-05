@@ -429,7 +429,7 @@ pub fn read_line(
             let _ = out.write_all(shape.as_bytes());
         }
 
-        let placed = draw(prompt, right, &session, assist);
+        let placed = draw(prompt, right, &session, assist, true);
         let _ = out.write_all(screen::redraw(at_row, &placed.text, into_at(&placed)).as_bytes());
         let _ = out.flush();
         at_row = placed.cursor_row;
@@ -440,7 +440,7 @@ pub fn read_line(
         match session.apply(key, assist) {
             Step::Continue { .. } => {}
             Step::ToggleLanguage => {
-                let placed = draw(prompt, right, &session, assist);
+                let placed = draw(prompt, right, &session, assist, true);
                 // Back to the top of the block and erase it: the caller redraws from the same row
                 // with the other language's prompt, so leaving this one would double it.
                 let _ = out.write_all(screen::redraw(at_row, "", into_at(&placed)).as_bytes());
@@ -466,7 +466,7 @@ pub fn read_line(
                         .for_mode(crate::interactive::vi::Mode::Insert);
                     let _ = out.write_all(shape.escape().as_bytes());
                 }
-                let placed = draw(prompt, right, &session, assist);
+                let placed = draw(prompt, right, &session, assist, false);
                 let _ = out
                     .write_all(screen::redraw(at_row, &placed.text, into_at(&placed)).as_bytes());
                 let _ = out.write_all(screen::finish(placed.cursor_row, placed.rows).as_bytes());
@@ -477,7 +477,7 @@ pub fn read_line(
             // takes away the thing you might want to look at or copy. Only the cursor moves,
             // down past the block so the next prompt starts on a clean row.
             step @ (Step::Interrupted | Step::Eof) => {
-                let placed = draw(prompt, right, &session, assist);
+                let placed = draw(prompt, right, &session, assist, false);
                 let _ = out.write_all(screen::finish(placed.cursor_row, placed.rows).as_bytes());
                 let _ = out.flush();
                 return match step {
@@ -490,12 +490,28 @@ pub fn read_line(
 }
 
 /// Build the frame for the current state.
-fn draw(prompt: &str, right: &str, session: &Session, assist: &mut dyn Assist) -> layout::Placed {
+/// Lay the line out. `ghost` is whether the suggestion is drawn with it.
+///
+/// **Off for the last frame of a line.** The ghost is a proposal, not text you typed — so once the
+/// line is finished it has to go, or the transcript shows a command that was never run. Typing
+/// `cat ~/` with `lis/` suggested and pressing Enter left `cat ~/lis/` on screen above the output
+/// of `cat ~/`, which is a scrollback that lies about what happened.
+fn draw(
+    prompt: &str,
+    right: &str,
+    session: &Session,
+    assist: &mut dyn Assist,
+    ghost: bool,
+) -> layout::Placed {
     let plain = session.buffer.text();
     let painted = assist.highlight(&plain);
-    let hint = assist
-        .hint(&plain, session.buffer.cursor())
-        .unwrap_or_default();
+    let hint = if ghost {
+        assist
+            .hint(&plain, session.buffer.cursor())
+            .unwrap_or_default()
+    } else {
+        String::new()
+    };
     layout::place(&layout::Row {
         prompt,
         text: &painted,
