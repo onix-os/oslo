@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.2.8] - 2026-08-05
+
+### <!-- 7 -->⚙️ Miscellaneous Tasks
+
+- Cleanup
+
 ## [0.2.7] - 2026-08-05
 
 ### <!-- 0 -->⛰️  Features
