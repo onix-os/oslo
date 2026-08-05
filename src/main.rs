@@ -159,7 +159,8 @@ fn dispatch() {
                     path,
                     &invocation.positional,
                 )),
-                Language::Shell => run_program(&invocation, &script),
+                // Streamed: a file is what polyglots and partial execution are about.
+                Language::Shell => run_program_reading(&invocation, &script, Reading::Streamed),
             },
             Err(_) => {
                 eprintln!("oslo: {}: No such file or directory", path);
@@ -181,7 +182,9 @@ fn dispatch() {
                         "stdin",
                         &invocation.positional,
                     )),
-                    Language::Shell => run_program(&invocation, &script),
+                    // A pipe is a stream, and bash and dash both run what they have read of one
+                    // before a later syntax error stops them.
+                    Language::Shell => run_program_reading(&invocation, &script, Reading::Streamed),
                 }
             }
         }
@@ -196,7 +199,34 @@ fn stdin_is_a_terminal() -> bool {
     nix::unistd::isatty(0).unwrap_or(false) && nix::unistd::isatty(2).unwrap_or(false)
 }
 
+/// How a program's text reaches the evaluator.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Reading {
+    /// **A command at a time**, as a shell reads a file or a stream.
+    ///
+    /// POSIX says the shell reads its input and parses and executes it; every shell does so a
+    /// command at a time, and scripts are written for that. Two things depend on it:
+    ///
+    /// - **`#!/bin/sh` polyglots.** `/usr/bin/pnmflip` and nine of its netpbm siblings are Perl
+    ///   below an `exec perl -x -S -- "$0"` on line 23. Reading a command at a time reaches the
+    ///   `exec`, and the process is replaced before the Perl is ever looked at. Parsing the file
+    ///   first meant a syntax error at line 51 and nothing running at all.
+    /// - **Partial execution.** A syntax error on line 500 leaves the first 499 lines run, which
+    ///   is what bash, dash and busybox all do. oslo used to run none of them.
+    ///
+    /// `oslo -n` is still how you check a whole file without running it — that is what it is for,
+    /// and it is what makes doing this implicitly on every run unnecessary.
+    Streamed,
+    /// All at once. `-c` only, because bash and dash both parse a `-c` string whole:
+    /// `sh -c 'echo RAN; if true; then'` prints nothing in either.
+    Whole,
+}
+
 fn run_program(invocation: &Invocation, script: &str) -> ! {
+    run_program_reading(invocation, script, Reading::Whole)
+}
+
+fn run_program_reading(invocation: &Invocation, script: &str, reading: Reading) -> ! {
     let mut env = Environment::new();
     env.shell_name = invocation.name.clone();
     env.set_positional(invocation.positional.clone());
@@ -209,25 +239,106 @@ fn run_program(invocation: &Invocation, script: &str) -> ! {
         std::process::exit(run_exit_trap(&mut env, status));
     }
 
-    // Parsing is kept out of `run_string` so the two kinds of failure stay distinguishable. A
-    // script that does not parse never runs at all and exits 2; anything that goes wrong later
-    // happened *during* execution, and gets the 127 below.
-    let ast = match parse_with_aliases(script, &|n| env.get_alias(n).map(str::to_string)) {
-        Ok(ast) => ast,
-        Err(e) => {
-            eprintln!("oslo: {}", e);
-            std::process::exit(e.failure_status());
-        }
-    };
-
-    let status = match absorb_loop_control(eval_command_list(&mut env, &ast)) {
-        // The shell's exit status is that of the last command it ran.
-        Ok(status) => status,
-        Err(e) => exit_error_status(e),
+    let status = match reading {
+        Reading::Whole => run_whole(&mut env, script),
+        Reading::Streamed => run_streamed(&mut env, script),
     };
     // R6.5: every way out of a script converges here, so a cleanup handler that fires on a clean
     // finish also fires on `exit 3` and on a fatal error.
     std::process::exit(run_exit_trap(&mut env, status));
+}
+
+/// Parse the whole program, then run it.
+fn run_whole(env: &mut Environment, script: &str) -> i32 {
+    // Parsing is kept out of `run_string` so the two kinds of failure stay distinguishable. A
+    // program that does not parse never runs at all and exits 2; anything that goes wrong later
+    // happened *during* execution, and gets the 127 below.
+    match run_chunk(env, script) {
+        Ok(status) => status,
+        Err(status) => status,
+    }
+}
+
+/// Run a file or a stream: whole if it parses, a command at a time if it does not.
+///
+/// **The split is a performance one, and it changes nothing observable.** A program that parses
+/// has no syntax error to be partial about, so running it whole and running it a command at a time
+/// produce the same thing — and parsing once is enormously cheaper. Classifying after every line
+/// re-parses a growing buffer, which is quadratic in the length of a single command: a one-megabyte
+/// here-document is one command, and `tests/redirection_tests.rs` timed out at ten seconds on it.
+///
+/// Only a program that does *not* parse takes the slow path, and there the cost is the point: it
+/// is the only way to run the lines before the mistake, which is what
+/// [`Reading::Streamed`] exists for.
+fn run_streamed(env: &mut Environment, script: &str) -> i32 {
+    if let Ok(ast) = parse_with_aliases(script, &|n| env.get_alias(n).map(str::to_string)) {
+        return match absorb_loop_control(eval_command_list(env, &ast)) {
+            Ok(status) => status,
+            Err(e) => exit_error_status(e),
+        };
+    }
+    run_line_at_a_time(env, script)
+}
+
+/// Read a command at a time, running each before looking at the next.
+///
+/// The buffer is emptied after every complete command, so each re-parse covers one command's worth
+/// of text rather than the whole file.
+fn run_line_at_a_time(env: &mut Environment, script: &str) -> i32 {
+    use oslo::interactive::syntax::{InputStatus, classify};
+
+    let mut buffer = String::new();
+    let mut status = 0;
+    for line in script.split_inclusive('\n') {
+        buffer.push_str(line);
+        match classify(&buffer) {
+            // The command has not ended yet — an open `if`, a heredoc still looking for its
+            // delimiter, a trailing `|`.
+            InputStatus::Incomplete => continue,
+            // Not shell at all. Stop reading and let the parse below report it the usual way,
+            // *after* everything already read has run — which is the whole point.
+            InputStatus::Invalid => break,
+            InputStatus::Complete => {
+                // A blank line or a comment parses to nothing; there is no command to run and no
+                // status to take from it.
+                if !buffer.trim().is_empty() {
+                    match run_chunk(env, &buffer) {
+                        Ok(next) => status = next,
+                        Err(failed) => return failed,
+                    }
+                }
+                buffer.clear();
+            }
+        }
+    }
+
+    // Whatever is left never became a complete command: an unterminated `if`, or the invalid text
+    // the loop stopped at. Running it produces the same diagnostic a whole-file parse would.
+    if !buffer.trim().is_empty() {
+        match run_chunk(env, &buffer) {
+            Ok(next) => status = next,
+            Err(failed) => return failed,
+        }
+    }
+    status
+}
+
+/// Parse one piece of program text and run it.
+///
+/// `Err` carries the status the shell should exit with; the caller stops there.
+fn run_chunk(env: &mut Environment, source: &str) -> std::result::Result<i32, i32> {
+    let ast = match parse_with_aliases(source, &|n| env.get_alias(n).map(str::to_string)) {
+        Ok(ast) => ast,
+        Err(e) => {
+            eprintln!("oslo: {}", e);
+            return Err(e.failure_status());
+        }
+    };
+    match absorb_loop_control(eval_command_list(env, &ast)) {
+        // The shell's exit status is that of the last command it ran.
+        Ok(status) => Ok(status),
+        Err(e) => Err(exit_error_status(e)),
+    }
 }
 
 /// Put the invocation's own flags into the option set, so `$-` describes this shell.
