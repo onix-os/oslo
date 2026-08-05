@@ -245,7 +245,7 @@ impl Assist for ShellAssist<'_> {
         editor::handler(&name).is_some().then_some(name)
     }
 
-    fn lua_key(&mut self, name: &str, line: &str, cursor: usize) -> Option<(String, usize)> {
+    fn lua_key(&mut self, name: &str, line: &str, cursor: usize) -> Option<(String, usize, bool)> {
         let handler = editor::handler(name)?;
         let table = editor::line_table(line, cursor);
         let answer = match oslo::lua::engine::call_here(&handler, vec![table]) {
@@ -257,9 +257,13 @@ impl Assist for ShellAssist<'_> {
                 return None;
             }
         };
-        let (text, asked) = editor::line_from(&answer)?;
-        let end = text.chars().count();
-        Some((text, asked.unwrap_or(end).min(end)))
+        let answer = editor::answer_from(&answer)?;
+        let end = answer.text.chars().count();
+        Some((
+            answer.text,
+            answer.cursor.unwrap_or(end).min(end),
+            answer.submit,
+        ))
     }
 
     fn abbreviation(&mut self, line: &str, cursor: usize) -> Option<(String, usize)> {

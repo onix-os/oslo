@@ -76,7 +76,13 @@ pub trait Assist {
     ///
     /// The name is oslo's spelling — `ctrl-s`, `alt-u`, `shift-tab` — so a config's key table can
     /// be looked up directly.
-    fn lua_key(&mut self, _name: &str, _line: &str, _cursor: usize) -> Option<(String, usize)> {
+    /// The line the handler asked for, its cursor, and whether to run it.
+    fn lua_key(
+        &mut self,
+        _name: &str,
+        _line: &str,
+        _cursor: usize,
+    ) -> Option<(String, usize, bool)> {
         None
     }
 
@@ -194,9 +200,11 @@ impl Session {
             Bound::AcceptHintWord => changed(self.take_hint(false, assist)),
             Bound::Lua(name) => {
                 match assist.lua_key(&name, &self.buffer.text(), self.buffer.cursor()) {
-                    Some((line, cursor)) => {
+                    Some((line, cursor, submit)) => {
                         self.buffer.set(&line, cursor);
-                        changed(true)
+                        // `submit = true` is zsh's `bindkey -s '…\n'`: the key runs the line
+                        // rather than only typing it.
+                        if submit { Step::Accept } else { changed(true) }
                     }
                     None => changed(false),
                 }

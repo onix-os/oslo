@@ -358,3 +358,48 @@ fn the_last_frame_of_a_line_has_no_ghost() {
         finished.text
     );
 }
+
+/// A Lua binding may run the line, not only fill it in.
+///
+/// zsh spells this `bindkey -s '^[a' ' _a\n'`, and the trailing newline is the whole point: the
+/// key runs something. A handler that could only set the text left the line sitting there.
+#[test]
+fn a_lua_binding_can_submit_the_line() {
+    struct Bind {
+        submit: bool,
+    }
+    impl Assist for Bind {
+        fn binding(&mut self, key: Key) -> Option<Bound> {
+            (key == Key::Alt('a')).then(|| Bound::Lua("alt-a".into()))
+        }
+        fn lua_key(&mut self, _n: &str, _l: &str, _c: usize) -> Option<(String, usize, bool)> {
+            Some((" _a".to_string(), 3, self.submit))
+        }
+    }
+
+    let mut s = Session {
+        vi: None,
+        ..Session::new("half typed", 10)
+    };
+    assert_eq!(
+        s.apply(Key::Alt('a'), &mut Bind { submit: true }),
+        Step::Accept,
+        "submit = true runs the line"
+    );
+    assert_eq!(
+        s.buffer.text(),
+        " _a",
+        "and it is the handler's line that runs"
+    );
+
+    let mut s = Session {
+        vi: None,
+        ..Session::new("half typed", 10)
+    };
+    assert_eq!(
+        s.apply(Key::Alt('a'), &mut Bind { submit: false }),
+        Step::Continue { redraw: true },
+        "without it the line is only filled in"
+    );
+    assert_eq!(s.buffer.text(), " _a");
+}

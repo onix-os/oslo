@@ -73,9 +73,29 @@ pub fn line_table(text: &str, cursor: usize) -> Value {
 /// `None` when the handler answered nothing, or answered something that is not a line — a handler
 /// that returns a number by accident should leave the line alone rather than replace it with `4`.
 pub fn line_from(answer: &Value) -> Option<(String, Option<usize>)> {
+    answer_from(answer).map(|a| (a.text, a.cursor))
+}
+
+/// What a handler asked for: the new line, where to put the cursor, and whether to run it.
+pub struct Answer {
+    pub text: String,
+    pub cursor: Option<usize>,
+    /// `submit = true`: run the line, as though Enter had been pressed.
+    ///
+    /// zsh spells this `bindkey -s '^[a' ' _a\n'` — a macro whose trailing newline is what makes
+    /// the key run something rather than type it. Without a way to say so, every binding could
+    /// only ever fill the line in and wait.
+    pub submit: bool,
+}
+
+pub fn answer_from(answer: &Value) -> Option<Answer> {
     match answer {
         // A bare string is the whole line: the common case should not need a table.
-        Value::Str(text) => Some((text.to_string(), None)),
+        Value::Str(text) => Some(Answer {
+            text: text.to_string(),
+            cursor: None,
+            submit: false,
+        }),
         Value::Table(t) => {
             let t = t.borrow();
             let Value::Str(text) = t.get(&Value::str("text")) else {
@@ -85,7 +105,11 @@ pub fn line_from(answer: &Value) -> Option<(String, Option<usize>)> {
                 Value::Number(n) => n.as_int().map(|i| i.max(0) as usize),
                 _ => None,
             };
-            Some((text.to_string(), cursor))
+            Some(Answer {
+                text: text.to_string(),
+                cursor,
+                submit: matches!(t.get(&Value::str("submit")), Value::Bool(true)),
+            })
         }
         _ => None,
     }
