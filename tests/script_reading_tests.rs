@@ -104,9 +104,18 @@ fn allhist_records_a_dash_c_command_in_both_stores() {
 
     let text = std::fs::read_to_string(&hist).expect("the history file");
     assert!(text.contains("echo recorded"), "$HISTFILE: {text:?}");
+
+    // **The bytes, not the file.** jammdb pre-allocates 131072 bytes the moment it opens one, so
+    // asserting the store *exists* passes whether or not anything was ever written to it — which
+    // is exactly the kind of assertion that reports success for a feature that does nothing.
+    let store = dir.path().join("oslo").join("default.kv");
+    let bytes = std::fs::read(&store).expect("the tracking store");
     assert!(
-        dir.path().join("oslo").join("default.kv").exists(),
-        "the finder's store was not written"
+        bytes
+            .windows(b"echo recorded".len())
+            .any(|w| w == b"echo recorded"),
+        "the command is not in the finder's store ({} bytes)",
+        bytes.len()
     );
 
     // A leading space keeps a command out, exactly as it does at a prompt — that is how a secret
