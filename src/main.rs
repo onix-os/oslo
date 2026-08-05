@@ -239,6 +239,13 @@ fn run_program_reading(invocation: &Invocation, script: &str, reading: Reading) 
         std::process::exit(run_exit_trap(&mut env, status));
     }
 
+    // `-c` only, and only when `$OSLO_ALLHIST` asks: a script's *contents* are not commands
+    // anybody typed, and recording them would put every line of every `#!/bin/sh` script on the
+    // machine into the history the moment oslo becomes `/bin/sh`.
+    if reading == Reading::Whole && startup::history::record_commands() {
+        startup::history::record_command(&env, script);
+    }
+
     let status = match reading {
         Reading::Whole => run_whole(&mut env, script),
         Reading::Streamed => run_streamed(&mut env, script),

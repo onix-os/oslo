@@ -288,6 +288,10 @@ const ENVIRONMENT: &[(&str, &str)] = &[
         "OSLO_DEFAULT_MODE",
         "`lua` to start prompts in Lua; anything else is shell",
     ),
+    (
+        "OSLO_ALLHIST",
+        "record `sh -c` commands in the history too (off unless set)",
+    ),
     ("XDG_CONFIG_HOME", "where config.lua lives (~/.config)"),
     (
         "XDG_DATA_HOME",

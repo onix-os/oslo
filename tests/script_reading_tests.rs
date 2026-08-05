@@ -66,6 +66,79 @@ fn a_polyglot_execs_away_before_its_other_language_is_parsed() {
     assert!(o.status.success(), "exited {:?}: {:?}", o.status, err(&o));
 }
 
+/// **A `-c` command is not recorded unless `$OSLO_ALLHIST` asks.**
+///
+/// The default is what makes oslo safe as `/bin/sh`: `sh -c` is how every `system()` call, git
+/// hook, build tool and cron line runs, and recording those would bury what a person typed.
+#[test]
+fn a_dash_c_command_is_not_recorded_by_default() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let hist = dir.path().join("hist");
+    run(
+        &["-c", "echo one"],
+        &[
+            ("HISTFILE", hist.to_str().expect("path")),
+            ("XDG_DATA_HOME", dir.path().to_str().expect("path")),
+        ],
+        dir.path(),
+    );
+    assert!(!hist.exists(), "a -c command was recorded without asking");
+    assert!(
+        !dir.path().join("oslo").exists(),
+        "a tracking store was opened without asking"
+    );
+}
+
+/// With it set, the command lands in **both** stores: `$HISTFILE` for the Up arrow, and the
+/// tracking store for the finder. A command you ran is a command you ran.
+#[test]
+fn allhist_records_a_dash_c_command_in_both_stores() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let hist = dir.path().join("hist");
+    let vars = [
+        ("HISTFILE", hist.to_str().expect("path")),
+        ("XDG_DATA_HOME", dir.path().to_str().expect("path")),
+        ("OSLO_ALLHIST", "1"),
+    ];
+    run(&["-c", "echo recorded"], &vars, dir.path());
+
+    let text = std::fs::read_to_string(&hist).expect("the history file");
+    assert!(text.contains("echo recorded"), "$HISTFILE: {text:?}");
+    assert!(
+        dir.path().join("oslo").join("default.kv").exists(),
+        "the finder's store was not written"
+    );
+
+    // A leading space keeps a command out, exactly as it does at a prompt — that is how a secret
+    // on a command line stays out of the log.
+    run(&["-c", " echo private"], &vars, dir.path());
+    let text = std::fs::read_to_string(&hist).expect("the history file");
+    assert!(
+        !text.contains("private"),
+        "a space-prefixed command was recorded: {text:?}"
+    );
+}
+
+/// A *script* is never recorded, however `$OSLO_ALLHIST` is set: its contents are not commands
+/// anybody typed, and every `#!/bin/sh` script on the machine would otherwise land in the history.
+#[test]
+fn a_script_is_never_recorded() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let hist = dir.path().join("hist");
+    let script = dir.path().join("s.sh");
+    std::fs::write(&script, "echo from-a-script\n").expect("write");
+    run(
+        &[script.to_str().expect("path")],
+        &[
+            ("HISTFILE", hist.to_str().expect("path")),
+            ("XDG_DATA_HOME", dir.path().to_str().expect("path")),
+            ("OSLO_ALLHIST", "1"),
+        ],
+        dir.path(),
+    );
+    assert!(!hist.exists(), "a script's contents were recorded");
+}
+
 /// `-c` is *not* streamed: bash and dash both parse a `-c` string whole, so
 /// `sh -c 'echo RAN; if true; then'` prints nothing in either.
 #[test]
