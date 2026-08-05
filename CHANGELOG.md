@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.2.9] - 2026-08-05
+
+### <!-- 7 -->⚙️ Miscellaneous Tasks
+
+- Sync Cargo.lock to 0.2.8
+
 ## [0.2.8] - 2026-08-05
 
 ### <!-- 7 -->⚙️ Miscellaneous Tasks
