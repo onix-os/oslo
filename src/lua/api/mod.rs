@@ -92,6 +92,19 @@ pub fn install(interp: &Rc<Interp>, registry: &Registry, env: Arc<Mutex<Environm
             Value::Table(Rc::new(RefCell::new(Table::new()))),
         );
     }
+
+    // `oslo.builtin` is the same thing one level deeper: it is a namespace *per builtin*, so
+    // `oslo.builtin.rm.to_tmp = true` indexes twice and both tables have to be here. A new
+    // builtin with settings adds a line beside `rm`.
+    let mut builtin = Table::new();
+    builtin.set(
+        Value::str("rm"),
+        Value::Table(Rc::new(RefCell::new(Table::new()))),
+    );
+    oslo.set(
+        Value::str("builtin"),
+        Value::Table(Rc::new(RefCell::new(builtin))),
+    );
     oslo.set(Value::str("json"), json::build());
     oslo.set(Value::str("re"), re::build());
     oslo.set(Value::str("proc"), proc::build_proc());

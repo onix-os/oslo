@@ -35,6 +35,8 @@ pub struct Settings {
     pub finder: Finder,
     /// `oslo.misc`: the settings that belong to no other group.
     pub misc: Misc,
+    /// `oslo.builtin`: knobs belonging to a builtin rather than to the editor.
+    pub builtin: Builtins,
     /// `oslo.dirs`: the directories `@name` reaches.
     ///
     /// Sorted, because table iteration has no order and a diagnostic that named them in a
@@ -337,6 +339,53 @@ impl Default for History {
             ignore_space: true,
             ignore_dups: false,
             ignore: Vec::new(),
+        }
+    }
+}
+
+/// `oslo.builtin` — the knobs that belong to a builtin rather than to the editor.
+///
+/// Separate from the rest because these are read by code in `crate::env::builtins`, which runs in
+/// scripts as well as at a prompt. Everything else here describes an interactive session.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Builtins {
+    pub rm: Rm,
+}
+
+/// `oslo.builtin.rm` — what the `rm` builtin does with what it removes.
+///
+/// ```lua
+/// oslo.builtin.rm.to_tmp     = true    -- move instead of destroying
+/// oslo.builtin.rm.max_to_tmp = 100     -- MB; anything larger is destroyed
+/// oslo.builtin.rm.trash      = "/tmp"
+/// ```
+///
+/// **None of this applies to a script.** `rm` reads these only when the shell is interactive, so a
+/// `#!/bin/sh` file running under oslo removes what it says it removes.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Rm {
+    /// Whether a removal at the prompt moves the file to [`Rm::trash`] instead of unlinking it.
+    ///
+    /// Off by default. On is the more forgiving behaviour, but it is also the more surprising one:
+    /// `rm` that does not free space is not what the name has meant since 1971, and a default that
+    /// silently fills a filesystem is not a default.
+    pub to_tmp: bool,
+    /// Megabytes. Anything larger than this is destroyed rather than moved.
+    ///
+    /// The cap exists because the trash is often on another filesystem — `/tmp` usually is, and is
+    /// usually tmpfs — where a move is a *copy*, so trashing a large file costs its size in time
+    /// and possibly in RAM. Below the cap that cost is not worth noticing; above it, it is.
+    pub max_to_tmp: u64,
+    /// Where trashed files go. Created on first use.
+    pub trash: String,
+}
+
+impl Default for Rm {
+    fn default() -> Self {
+        Rm {
+            to_tmp: false,
+            max_to_tmp: 100,
+            trash: "/tmp".to_string(),
         }
     }
 }

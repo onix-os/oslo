@@ -259,6 +259,27 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
         settings.abbr = defined;
     }
 
+    // `oslo.builtin.rm`. Nested one deeper than the rest because `builtin` is a namespace per
+    // builtin, not a group of settings — the next one to want a knob adds a sibling table.
+    if let Value::Table(table) = oslo.get(&Value::str("builtin"))
+        && let Value::Table(rm) = table.borrow().get(&Value::str("rm"))
+    {
+        let rm = rm.borrow();
+        flag(&rm, "to_tmp", &mut settings.builtin.rm.to_tmp);
+        if let Some(mb) = number(&rm, "max_to_tmp") {
+            settings.builtin.rm.max_to_tmp = mb.max(0) as u64;
+        }
+        match rm.get(&Value::str("trash")) {
+            Value::Str(dir) if !dir.trim().is_empty() => {
+                settings.builtin.rm.trash = dir.to_string();
+            }
+            Value::Nil => {}
+            // Reported rather than ignored: a trash directory that silently stayed `/tmp` would
+            // send files somewhere the config plainly said it did not want them.
+            _ => problems.push("oslo.builtin.rm.trash: must be a directory path".to_string()),
+        }
+    }
+
     if let Value::Table(table) = oslo.get(&Value::str("history")) {
         let table = table.borrow();
         if let Some(n) = number(&table, "size") {

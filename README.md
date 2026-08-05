@@ -414,7 +414,35 @@ oslo.notify.command     = nil         -- e.g. "notify-send {title} {body}", inst
 
 oslo.abbr.gco = "git checkout"
 oslo.abbr.brc = { "~/.config/oslo/config.lua", anywhere = true }
+
+oslo.builtin.rm.to_tmp     = false    -- move removals aside instead of destroying them
+oslo.builtin.rm.max_to_tmp = 100      -- MB; anything larger is destroyed
+oslo.builtin.rm.trash      = "/tmp"
 ```
+
+### `rm`
+
+`rm` is a builtin, and at a prompt it is a friendlier one: it removes a directory without needing
+`-r`, and with `to_tmp` on it *moves* what you delete instead of unlinking it.
+
+```
+~/p ❯ rm -v build notes.txt
+moved 'build' to '/tmp/build'
+moved 'notes.txt' to '/tmp/notes.txt'
+```
+
+**In a script it is none of those things.** A builtin shadows `/bin/rm` for everything the shell
+runs, and oslo means to be `/bin/sh` — so the extensions are confined to an interactive shell.
+A `#!/bin/sh` file gets POSIX `rm`: a directory without `-r` is an error, and what is removed is
+gone. `-s`/`--strict` asks for the same at a prompt. An option oslo does not implement —
+`--one-file-system`, `-I` — is handed to the real `rm` on `$PATH`, so the builtin can never be less
+capable than the system's.
+
+`max_to_tmp` is there because the trash is usually on another filesystem, and `/tmp` is usually
+tmpfs. Across a filesystem a move is a *copy*, so trashing a 4 GB file would copy 4 GB and then
+hold it in RAM until the next reboot. Under the cap that cost is not worth noticing; over it, the
+file is destroyed as `rm` has always destroyed things. A name already in the trash is never
+overwritten — the second `notes.txt` becomes `notes.txt.1`.
 
 ### Autoloaded functions
 
