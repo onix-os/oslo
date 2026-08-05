@@ -522,6 +522,10 @@ nix build         # static musl binary
 
 Every `.rs` file is under 600 lines, enforced by `scripts/check-loc.sh`.
 
+To make it the system `/bin/sh` — the symlink, the dpkg diversion that survives a dash upgrade,
+what to check afterwards and how to undo all of it — see
+[docs/default-shell.md](docs/default-shell.md).
+
 ## Known gaps
 
 `for ((;;))` with touching separators, process substitution without `/dev/fd`, `coproc`, `select`,

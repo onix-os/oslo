@@ -49,6 +49,10 @@ pub struct Invocation {
     /// here. Read through [`Invocation::options`], never directly: an option with no letter
     /// cannot be spelled here at all.
     pub set_options: String,
+    /// Letters given with `+`, which turn their option off. See [`Invocation::unset_options`].
+    pub unset_letters: String,
+    /// Options `+o name` turned off, which have no letter or were spelled by name.
+    pub unset_long: Vec<ShellOption>,
     /// Options given by their long name, e.g. `--posix`.
     ///
     /// A separate field because [`Self::set_options`] is a string of letters and the options that
@@ -67,6 +71,18 @@ impl Invocation {
             .chars()
             .filter_map(ShellOption::from_letter)
             .chain(self.long_options.iter().copied())
+    }
+
+    /// The options the command line asked to turn **off**, with `+x` or `+o name`.
+    ///
+    /// Nearly always a no-op, since almost every option is off already — but POSIX's synopsis has
+    /// `[+abCefhimnuvx] [+o option]...` beside the `-` forms, and a shell that read `+x` as a
+    /// *script path* would try to run a file called `+x`. That is what oslo did.
+    pub fn unset_options(&self) -> impl Iterator<Item = ShellOption> + '_ {
+        self.unset_letters
+            .chars()
+            .filter_map(ShellOption::from_letter)
+            .chain(self.unset_long.iter().copied())
     }
 }
 
@@ -178,6 +194,8 @@ pub fn parse(argv: &[String]) -> Result<Invocation, Exit> {
         .is_some_and(|argv0| argv0.starts_with('-') && argv0.len() > 1);
     let mut set_options = String::new();
     let mut long_options: Vec<ShellOption> = Vec::new();
+    let mut unset_letters = String::new();
+    let mut unset_long: Vec<ShellOption> = Vec::new();
 
     // Before the flags are read, so `--posix` on top of it is simply the same option twice.
     if argv.first().is_some_and(|argv0| named_sh(argv0)) {
@@ -245,6 +263,44 @@ pub fn parse(argv: &[String]) -> Result<Invocation, Exit> {
             continue;
         }
 
+        // **`+x` and `+o name` are options too.** POSIX's synopsis is
+        // `sh [-abCefhimnuvx] [-o option]... [+abCefhimnuvx] [+o option]...`, and a `+` cluster
+        // turns its options off. Falling through to the operand branch made `sh +x -c 'cmd'` look
+        // for a *script* called `+x`.
+        if arg.starts_with('+') && arg.len() > 1 {
+            let letters: Vec<char> = arg.chars().skip(1).collect();
+            let mut pos = 0;
+            while pos < letters.len() {
+                match letters[pos] {
+                    'o' => {
+                        // `+o` alone takes the name from the next argument, as `-o` does.
+                        let rest: String = letters[pos + 1..].iter().collect();
+                        let name = if rest.is_empty() {
+                            i += 1;
+                            argv.get(i).cloned().unwrap_or_default()
+                        } else {
+                            rest
+                        };
+                        match ShellOption::from_name(name.trim()) {
+                            Some(option) => unset_long.push(option),
+                            None => return Err(usage_error(format!("+o: {name}: invalid option"))),
+                        }
+                        pos = letters.len();
+                        continue;
+                    }
+                    letter if ShellOption::from_letter(letter).is_some() => {
+                        if !unset_letters.contains(letter) {
+                            unset_letters.push(letter);
+                        }
+                    }
+                    other => return Err(usage_error(format!("+{other}: invalid option"))),
+                }
+                pos += 1;
+            }
+            i += 1;
+            continue;
+        }
+
         if !arg.starts_with('-') {
             break; // an operand: the script name, or `-c`'s `$0`
         }
@@ -287,6 +343,29 @@ pub fn parse(argv: &[String]) -> Result<Invocation, Exit> {
                         command = Some(rest);
                     }
                     operands_only = true;
+                    pos = letters.len();
+                    continue;
+                }
+                // `-o name` names an option that may have no letter — `pipefail` and `posix` are
+                // both spelled this way and only this way. POSIX lists it in the synopsis beside
+                // the letters, and both bash and dash take it; oslo refused it outright, so
+                // `sh -o pipefail -c '…'` did not start at all.
+                'o' => {
+                    let rest: String = letters[pos + 1..].iter().collect();
+                    let name = if rest.is_empty() {
+                        i += 1;
+                        argv.get(i).cloned().unwrap_or_default()
+                    } else {
+                        rest
+                    };
+                    match ShellOption::from_name(name.trim()) {
+                        Some(option) => {
+                            if !long_options.contains(&option) {
+                                long_options.push(option);
+                            }
+                        }
+                        None => return Err(usage_error(format!("-o: {name}: invalid option"))),
+                    }
                     pos = letters.len();
                     continue;
                 }
@@ -351,6 +430,8 @@ pub fn parse(argv: &[String]) -> Result<Invocation, Exit> {
         force_interactive,
         login,
         set_options,
+        unset_letters,
+        unset_long,
         long_options,
     })
 }

@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.2.13] - 2026-08-05
+
+### <!-- 1 -->🐛 Bug Fixes
+
+- -o name and the + option forms
+
+### <!-- 3 -->📚 Documentation
+
+- How to make oslo the system /bin/sh
+
 ## [0.2.12] - 2026-08-05
 
 ### <!-- 1 -->🐛 Bug Fixes

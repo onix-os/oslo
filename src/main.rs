@@ -361,6 +361,10 @@ fn apply_invocation_options(env: &mut Environment, invocation: &Invocation) {
     for option in invocation.options() {
         env.set_option(option, true);
     }
+    // The `+` forms, after the `-` ones so that `sh -x +x` ends up off — last wins, as `set` does.
+    for option in invocation.unset_options() {
+        env.set_option(option, false);
+    }
     match invocation.action {
         Action::Command(_) => env.set_option(ShellOption::CommandString, true),
         Action::Stdin => env.set_option(ShellOption::StdinInput, true),
