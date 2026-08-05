@@ -15,12 +15,6 @@ somebody adds one.
   upstream in brush's tokenizer, which fuses the two `;` into the `;;` that ends a `case` item.
 - **Process substitution** needs `/dev/fd`, so it fails in an initramfs without it. So does bash.
 - **`coproc` and `select`** are refused by name rather than half-implemented.
-- **`set -e` is too eager after a short-circuited `&&` inside a compound.** `set -e; if true;
-  then false && echo no; fi` ends the shell; bash, dash and busybox all carry on. The AND-OR
-  exemption is correct on its own — `set -e; false && echo no` is fine — but it is lost when the
-  list is the *last* command of an `if`, `for`, `while` or `{ }`, because the compound inherits
-  the status and is then judged on it. Pinned by
-  `tests/corpus/options_errexit_and_or_in_compound.sh`.
 - **Arrays are indexed only.** `declare -A` says so rather than pretending.
 - **`shopt`** switches `autocd` and `globstar`; the rest report the state oslo actually has and
   *fail* when asked for the other one — an error rather than a lie.

@@ -282,6 +282,12 @@ fn call_function_command(
     let res = call_function(env, body, words, redirections);
     env.exit_function();
 
+    // **A call is judged on its own, whatever the body did.** The `set -e` exemption a compound
+    // inherits from its last command stops at the function boundary: `set -e; f() { false && :; };
+    // f` ends the shell in bash and dash even though the same `false && :` written inline inside
+    // an `if` does not. The body's status crosses the boundary; its exemption does not.
+    crate::exec::pipeline::clear_status_exempt();
+
     // `return` unwinds to here and becomes the function's exit status. `break`/`continue`
     // are also absorbed: they must not escape into a loop in the caller.
     match res {
