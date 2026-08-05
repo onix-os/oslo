@@ -78,10 +78,15 @@ pub const EXPECTED_FAIL: &[(&str, &str, &str)] = &[
     // branch until that lands in a release. `comment_in_command_substitution.sh` now matches bash.
 
     // --- divergences the audit did not enumerate ---
-    // Empty: `robust_special_builtin_failure.sh` closed with R11's C4. It needed three things at
-    // once — a `--posix` flag, a differential harness that gives oslo the same mode it gives the
-    // oracle, and a builtin that reports a *utility* error rather than a non-zero status, so that
+    // `robust_special_builtin_failure.sh` closed with R11's C4. It needed three things at once —
+    // a `--posix` flag, a differential harness that gives oslo the same mode it gives the oracle,
+    // and a builtin that reports a *utility* error rather than a non-zero status, so that
     // `export "=1"` is fatal where `shift 5` is not.
+    //
+    // The errexit row below is the one open bug of the three found by running every `#!/bin/sh`
+    // script on a Debian system under oslo and dash. The other two are fixed: a comment inside a
+    // `$( … )` inside a heredoc body, and `printf`'s missing `%*` width.
+    ("options_errexit_and_or_in_compound.sh", "UNFILED", "a short-circuited AND-OR list is exempt from errexit, but the exemption is lost when the list is the last command of an `if`, `for`, `while` or `{ }` — the compound inherits the status and is judged on it. bash, dash and busybox all carry on"),
 ];
 
 /// Corpus file and why bash cannot arbitrate it. Empty is the healthy state.
