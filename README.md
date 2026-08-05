@@ -362,6 +362,7 @@ refuse them.)
 oslo.completion.max_rows = 12
 oslo.suggest.accept = "ctrl-f" -- as well as Right, which always accepts
 oslo.vi.enabled = true
+oslo.source(oslo.env.get("HOME") .. "/.profile") -- shell files, sourced into *this* shell
 oslo.on.cd(function(dir) print("now in " .. dir) end)
 oslo.on["command-not-found"](function(name) print(name .. " is not installed") end)
 ```
