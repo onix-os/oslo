@@ -238,7 +238,12 @@ pub fn run_exit_trap(env: &mut Environment, status: i32) -> i32 {
     env.set_trap("EXIT", DEFAULT_ACTION);
     env.last_status = status;
 
-    match parse_and_run(env, &action) {
+    // What a bare `exit` inside the action means; see [`exit_trap_status`].
+    EXIT_TRAP_STATUS.with(|s| s.set(Some(status)));
+    let outcome = parse_and_run(env, &action);
+    EXIT_TRAP_STATUS.with(|s| s.set(None));
+
+    match outcome {
         Ok(_) => status,
         Err(ShellError::Exit(code)) => code,
         Err(e) => {
@@ -246,6 +251,21 @@ pub fn run_exit_trap(env: &mut Environment, status: i32) -> i32 {
             status
         }
     }
+}
+
+thread_local! {
+    /// The status the shell is leaving with, while the EXIT trap runs.
+    ///
+    /// Thread-local for the same reason as the errexit counter: the test binaries evaluate scripts
+    /// on several threads, and one shell's exit must not be visible to another's.
+    static EXIT_TRAP_STATUS: std::cell::Cell<Option<i32>> = const { std::cell::Cell::new(None) };
+}
+
+/// The status a bare `exit` should carry out, when one is running inside the EXIT trap.
+///
+/// `None` anywhere else, so `cmd; exit` keeps meaning `cmd; exit $?`.
+pub fn exit_trap_status() -> Option<i32> {
+    EXIT_TRAP_STATUS.with(|s| s.get())
 }
 
 #[cfg(test)]

@@ -16,10 +16,14 @@
 //! exempt reach in through `suspend_errexit`.
 
 mod describe;
+mod errexit;
 mod interrupt;
 mod jobs;
 mod structured;
 mod timing;
+
+pub(crate) use errexit::{clear_status_exempt, errexit_suspended, suspend_errexit};
+use errexit::{set_status_exempt, status_exempt};
 
 use crate::ast::*;
 use crate::env::Environment;
@@ -32,7 +36,6 @@ use crate::exec::simple::{eval_simple_command, report_redirect_failure};
 use interrupt::ListFrame;
 use nix::sys::wait::{WaitPidFlag, WaitStatus, waitpid};
 use nix::unistd::{ForkResult, Pid, close, dup2, fork, pipe};
-use std::cell::Cell;
 use std::os::fd::{AsRawFd, IntoRawFd};
 use std::sync::atomic::{AtomicBool, Ordering};
 
@@ -117,60 +120,6 @@ fn wait_for_child(pid: Pid) -> (i32, bool) {
             _ => (127, false),
         };
     }
-}
-
-thread_local! {
-    /// How many enclosing constructs have suspended `set -e`.
-    ///
-    /// A counter rather than a field on [`Environment`] because the exemption is a property of
-    /// the *evaluation in progress*, not of a scope: a function called from a condition runs
-    /// exempt (`set -e; f || true` runs all of `f`) even though it has its own variable scope,
-    /// and the same function called normally does not. Dynamic extent is exactly what a counter
-    /// around a `?`-bearing call expresses.
-    ///
-    /// `fork` copies it as it stands, which is what makes `if (false; echo x); then` print `x`:
-    /// the subshell inherits the exemption its parent was under.
-    ///
-    /// Thread-local, not a plain `static`: the test binaries evaluate scripts on several threads
-    /// at once, and one test's condition context must not exempt another's.
-    static ERREXIT_SUSPENDED: Cell<u32> = const { Cell::new(0) };
-}
-
-/// A live suspension of `set -e`; errexit resumes when this is dropped.
-///
-/// Returned rather than taking a closure so a caller can hold it across a `?` — the counter is
-/// restored on the unwind path too, which is the whole reason it is a guard and not a pair of
-/// calls.
-pub(crate) struct ErrExitSuspension {
-    // Not `Send`: the counter it decrements is the *creating* thread's.
-    _not_send: std::marker::PhantomData<*const ()>,
-}
-
-impl Drop for ErrExitSuspension {
-    fn drop(&mut self) {
-        ERREXIT_SUSPENDED.with(|d| d.set(d.get().saturating_sub(1)));
-    }
-}
-
-/// Exempt everything evaluated while the returned guard lives from `set -e`.
-///
-/// The POSIX exemptions (2.9.1): the condition of `if`/`elif`/`while`/`until`, every command of an
-/// and-or list but the last, and anything under `!`. They nest, so this counts rather than sets.
-pub(crate) fn suspend_errexit() -> ErrExitSuspension {
-    ERREXIT_SUSPENDED.with(|d| d.set(d.get() + 1));
-    ErrExitSuspension {
-        _not_send: std::marker::PhantomData,
-    }
-}
-
-/// Whether an enclosing construct has exempted the command about to be judged.
-///
-/// Read by `crate::exec::simple::posix` as well as by errexit itself: bash applies the same
-/// exemption list to POSIX 2.8.1's "a special builtin's utility error ends the shell", so
-/// `bash --posix -c 'export BAD-NAME=1 || true; echo alive'` prints `alive` while the same
-/// command on its own does not.
-pub(crate) fn errexit_suspended() -> bool {
-    ERREXIT_SUSPENDED.with(|d| d.get()) > 0
 }
 
 /// Run a command list, and absorb an interrupt that unwound all the way out of it.
@@ -263,20 +212,35 @@ pub fn eval_and_or_list(env: &mut Environment, and_or: &AndOrList) -> Result<i32
 /// exemption covers the whole evaluation — not just this pipeline's own status — so that a
 /// function on the left of `||` runs to its end instead of dying inside.
 fn run_and_record(env: &mut Environment, pipeline: &Pipeline, judged: bool) -> Result<i32> {
+    // Cleared first, so what is read below can only have been set by *this* pipeline's own
+    // evaluation — a compound's body setting it on the way out — and never left over from an
+    // unrelated command that ran earlier.
+    set_status_exempt(false);
+
     if !judged {
         let _exempt = suspend_errexit();
         let status = eval_pipeline(env, pipeline)?;
         env.last_status = status;
+        // Every command of an and-or list but the last is exempt, and so is the status it leaves.
+        set_status_exempt(true);
         return Ok(status);
     }
 
     let status = eval_pipeline(env, pipeline)?;
     env.last_status = status;
+    // **A compound inherits its body's last status, exemption included.** `if true; then false &&
+    // echo no; fi` reports 1 because the `&&` short-circuited, and that 1 was never judgeable —
+    // so the `if` carrying it is not judgeable either.
+    let inherited = status_exempt();
     // `! cmd` is exempt whichever way it comes out, so `set -e; ! true` does not end the shell
     // even though the pipeline reports 1.
-    if status != 0 && !pipeline.negated && env.errexit() && !errexit_suspended() {
+    if status != 0 && !pipeline.negated && !inherited && env.errexit() && !errexit_suspended() {
         return Err(ShellError::Exit(status));
     }
+    // Carried on rather than cleared, so it survives another layer of nesting: the outer `if` of
+    // `if true; then if true; then false && :; fi; fi` inherits from the inner one, which
+    // inherited from the `&&`. Clearing here stopped the exemption one level short.
+    set_status_exempt(pipeline.negated || inherited);
     Ok(status)
 }
 

@@ -286,8 +286,36 @@ impl Lexer<'_> {
         let mut cases: Vec<CaseAt> = Vec::new();
         let counting_cases = open == '(';
         let mut word = String::new();
+        // Whether a `#` here would start a comment, which it does only at a word boundary — a
+        // `#` inside a word is an ordinary character (`ab#cd`, `${x#pat}`).
+        let mut at_word_start = true;
 
         while let Some(ch) = self.current_char() {
+            // **A comment runs to the end of the line and nothing in it is shell.** Without this,
+            // an apostrophe in one — `# Don't complain about nonexistent directories` — opened a
+            // quote that ran to the end of the file, so the `)` closing the substitution was
+            // never seen. `/usr/bin/xdg-terminal-exec` carries exactly that comment inside a
+            // `$( … )` inside a heredoc body, which is the path that reaches this scanner.
+            //
+            // The third scanner to need this rule, after `parser::alias::scan` and the tokenizer.
+            //
+            // **Only inside `$( … )`.** A command substitution holds a command list, which can
+            // have comments; `${ … }` holds a parameter expansion, which cannot — and its very
+            // first character is `#` in `${#name}`, the length operator. Applying the rule there
+            // ate the whole expansion, which is the same "a hash inside a word is not a comment"
+            // mistake this rule was written to avoid.
+            if counting_cases && ch == '#' && at_word_start {
+                while let Some(c) = self.current_char() {
+                    if c == '\n' {
+                        break;
+                    }
+                    out.push(c);
+                    self.advance();
+                }
+                continue;
+            }
+            at_word_start = matches!(ch, ' ' | '\t' | '\n' | ';' | '&' | '|' | '(' | ')');
+
             if counting_cases {
                 // A word ends here, so decide what it was before acting on `ch`.
                 if !(ch.is_ascii_alphanumeric() || ch == '_') {

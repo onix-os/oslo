@@ -17,7 +17,7 @@
 //! Each line therefore says what is true, and the box says how to act on it.
 
 use super::help::Paint;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 /// The paths a system expects to find a shell at.
 ///
@@ -91,13 +91,30 @@ pub fn wanted() -> bool {
 }
 
 /// Look at the real filesystem.
+///
+/// **One line per problem, not per path.** `/bin` is a symlink to `usr/bin` on every distribution
+/// that did the usrmerge, so `/bin/sh` and `/usr/bin/sh` are the same inode — reporting both said
+/// the same thing twice and made one misconfiguration look like two. They are reported separately
+/// only where they genuinely differ, which is a system where half the scripts would get a
+/// different shell from the other half and is worth two lines.
 pub fn detect() -> Facts {
     let me = std::fs::canonicalize("/proc/self/exe").ok();
+    let mut foreign_sh: Vec<(String, String)> = Vec::new();
+    let mut seen: Vec<PathBuf> = Vec::new();
+    for path in SH_PATHS {
+        let path = Path::new(path);
+        // Keyed on where it *resolves*, so the second name for one file is skipped.
+        let Ok(target) = std::fs::canonicalize(path) else {
+            continue;
+        };
+        if seen.contains(&target) {
+            continue;
+        }
+        seen.push(target);
+        foreign_sh.extend(foreign(path, me.as_deref()));
+    }
     Facts {
-        foreign_sh: SH_PATHS
-            .iter()
-            .filter_map(|path| foreign(Path::new(path), me.as_deref()))
-            .collect(),
+        foreign_sh,
         bad_mode: me.as_deref().and_then(bad_mode),
     }
 }

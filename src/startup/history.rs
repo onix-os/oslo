@@ -153,6 +153,57 @@ pub fn register(env: &mut Environment) {
     env.register_custom_builtin("history", builtin_history);
 }
 
+/// The variable that puts `-c` commands into the history too.
+pub const ALLHIST: &str = "OSLO_ALLHIST";
+
+/// Whether `$OSLO_ALLHIST` asks for `sh -c` commands to be recorded.
+///
+/// **Off unless asked**, and an environment variable rather than a config setting for a reason
+/// that only matters once oslo is `/bin/sh`: `-c` does not read `config.lua`, so a Lua setting
+/// would mean starting an interpreter and running the user's config on *every* `system()` call on
+/// the machine. This is one `getenv`.
+///
+/// Exporting it is the way to turn it on for a session — and that is also the thing to know about
+/// it: a child process inherits the variable, so a program that shells out while it is set has its
+/// shell-outs recorded too. `make` driving a build through `sh -c` will fill the log. Set it where
+/// you want the recording, not globally, unless that is what you meant.
+pub fn record_commands() -> bool {
+    std::env::var_os(ALLHIST).is_some_and(|v| !v.is_empty())
+}
+
+/// Record a `-c` command, as though it had been typed at a prompt.
+///
+/// Both stores, because they answer different questions and a command you ran is a command you
+/// ran: the tracking store is what the finder searches, and `$HISTFILE` is what the Up arrow
+/// walks. Recording in one and not the other would mean a command you could find but not recall,
+/// or the reverse.
+pub fn record_command(env: &Environment, text: &str) {
+    if text.trim().is_empty() {
+        return;
+    }
+    let settings = settings(env);
+    // The same courtesy the prompt extends: a line beginning with a space is not recorded, which
+    // is how a password on a command line is kept out of the log.
+    if settings.ignore_space && text.starts_with(' ') {
+        return;
+    }
+    // The store is otherwise opened only by the interactive loop, because no other shell has
+    // anything to put in it. This one does, so it opens its own — and pays for it, which is part
+    // of why `$OSLO_ALLHIST` is off unless asked.
+    oslo::track::install(
+        oslo::track::default_path(
+            std::env::var("XDG_DATA_HOME").ok().as_deref(),
+            std::env::var("HOME").ok().as_deref(),
+        )
+        .and_then(|path| oslo::track::Track::open(&path)),
+    );
+    if let Some(db) = oslo::track::store() {
+        db.append(text, oslo::track::log::MODE_SHELL);
+        db.trim_soon(settings.max_size.max(1));
+    }
+    store::History::open(settings.file.clone(), settings.max_size).add(text);
+}
+
 fn builtin_history(_env: &mut Environment, args: &[String]) -> Result<i32> {
     let entries = SNAPSHOT.lock().map(|g| g.clone()).unwrap_or_default();
 

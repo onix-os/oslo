@@ -375,6 +375,35 @@ fn shell(
     registry: &Registry,
     env: &Arc<Mutex<Environment>>,
 ) {
+    // `oslo.source(path)` — run a **shell** file in this shell.
+    //
+    // The config is Lua, but a person's `~/.profile` and their pile of `aliases.sh` are shell and
+    // are shared with every other shell they use. Rewriting them in Lua is not an answer; being
+    // able to read them is.
+    //
+    // Sourced, not run: `oslo.run{"sh", path}` would execute the file in a *child*, where every
+    // alias, export and function it defines dies with the process. This is the same code path as
+    // the `source` builtin, so it lands in the environment the prompt actually uses.
+    //
+    // Answers `true`, or `false` and a message — a missing `~/.profile` is the ordinary case on a
+    // fresh machine and must not stop the rest of the config from loading.
+    let env_source = Arc::clone(env);
+    put(oslo, "source", move |_, args| {
+        let path = text(&args, 1, "oslo.source")?;
+        let mut guard = borrow_env(&env_source)?;
+        match crate::env::builtins::builtin_source(
+            &mut guard,
+            &["source".to_string(), path.clone()],
+        ) {
+            Ok(0) => Ok(vec![Value::Bool(true)]),
+            Ok(status) => Ok(vec![
+                Value::Bool(false),
+                Value::str(format!("{path}: exited {status}")),
+            ]),
+            Err(e) => Ok(vec![Value::Bool(false), Value::str(e.to_string())]),
+        }
+    });
+
     let env_alias = Arc::clone(env);
     put(names, "set_alias", move |_, args| {
         let name = text(&args, 1, "oslo.env.set_alias")?;

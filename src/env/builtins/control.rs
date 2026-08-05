@@ -91,8 +91,16 @@ pub fn builtin_exit(env: &mut Environment, args: &[String]) -> Result<i32> {
         return Ok(1);
     }
     let code = match args.get(1) {
-        // Bare `exit` carries the last command's status out, so `cmd; exit` is `cmd; exit $?`.
-        None => env.last_status,
+        // Bare `exit` carries the last command's status out, so `cmd; exit` is `cmd; exit $?` —
+        // **except inside the EXIT trap**, where it carries out the status the shell was already
+        // leaving with. The trap runs *after* that status is decided, so letting its own last
+        // command decide instead would let a cleanup step rewrite the result of the whole script.
+        //
+        // `trap 'stty …; exit' 0` is the idiom that shows it: `/usr/bin/bzmore` restores the
+        // terminal on the way out, and with no terminal to restore the `stty` fails — which turned
+        // a successful run into exit 1. bash and dash both report 0. An explicit operand still
+        // wins, so `trap 'exit 7' 0` leaves with 7.
+        None => super::process::exit_trap_status().unwrap_or(env.last_status),
         Some(raw) => match numeric_operand::<i64>("exit", raw) {
             Ok(n) => n as i32,
             Err(()) => return Err(ShellError::Exit(2)),

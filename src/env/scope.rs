@@ -160,6 +160,7 @@ impl Environment {
         crate::env::dynamic::start();
         crate::env::builtins::register_default_builtins(&mut env_struct);
         env_struct.seed_process_vars();
+        env_struct.seed_field_separator();
         env_struct.seed_compatibility_vars();
         env_struct
     }

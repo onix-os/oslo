@@ -170,7 +170,12 @@ pub fn parse(argv: &[String]) -> Result<Invocation, Exit> {
     let mut read_stdin = false;
     let mut ended_options = false;
     let mut force_interactive = false;
-    let mut login = false;
+    // **An `argv[0]` beginning with `-` is a login shell.** That is how `login(1)`, `su -` and
+    // every display manager start one — the convention predates `-l` and is the only signal those
+    // callers give. Without it, `-sh` read no profile at all.
+    let mut login = argv
+        .first()
+        .is_some_and(|argv0| argv0.starts_with('-') && argv0.len() > 1);
     let mut set_options = String::new();
     let mut long_options: Vec<ShellOption> = Vec::new();
 

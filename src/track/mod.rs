@@ -61,7 +61,12 @@ use std::sync::OnceLock;
 /// is a property of the invocation, decided once before the first prompt and never afterwards.
 static TRACK: OnceLock<Option<Track>> = OnceLock::new();
 
-/// Hand the process its store. **Only the interactive loop may call this.**
+/// Hand the process its store.
+///
+/// **Two callers, and no more.** The interactive loop, which is where commands are normally
+/// recorded; and a `-c` command under `$OSLO_ALLHIST`, which is the one non-interactive shell with
+/// something to record. Everything else — a script, a subshell, a `#!/bin/sh` maintainer script —
+/// runs with no store at all, which is what keeps a `/bin/sh` from logging the whole system.
 ///
 /// `None` is a legitimate argument: a shell whose store would not open is a working shell with a
 /// dumber `cd`, and installing the absence says so explicitly rather than leaving the slot to be

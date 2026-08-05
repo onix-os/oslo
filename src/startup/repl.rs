@@ -32,7 +32,7 @@ mod notify;
 use super::history::store::History;
 use editor::{publish_history, remember};
 
-pub fn run_repl() -> ! {
+pub fn run_repl(login: bool) -> ! {
     // Everything downstream that behaves differently for a person than for a script — the job
     // notice, whether a background job keeps the terminal's stdin — reads this.
     // (Addressed by path rather than a re-export: `exec::mod` is being edited elsewhere.)
@@ -57,7 +57,7 @@ pub fn run_repl() -> ! {
 
     // The config runs before anything else reads a variable, so a `HISTSIZE=` or `PS1=` in it is
     // in force for this session rather than for the next one.
-    if let Some(status) = rc::load_startup_files(&mut interactive_env, true) {
+    if let Some(status) = rc::load_startup_files(&mut interactive_env, true, login) {
         std::process::exit(run_exit_trap(&mut interactive_env, status));
     }
 

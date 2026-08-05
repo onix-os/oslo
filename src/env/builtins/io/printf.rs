@@ -100,6 +100,24 @@ fn render(
             continue;
         };
 
+        // Each `*` eats an argument before the conversion's own, as C and every shell do.
+        let mut sizes = Vec::new();
+        for _ in 0..spec.star_count() {
+            let value = args.get(*next).map(String::as_str).unwrap_or("0");
+            if *next < args.len() {
+                *next += 1;
+            }
+            // A width that is not a number is reported and treated as 0, exactly as an unreadable
+            // *argument* is: the format itself is still valid, so the rest of the line is still
+            // what the author asked for. bash and dash both say something here and carry on.
+            sizes.push(parse_int(value).unwrap_or_else(|()| {
+                eprintln!("oslo: printf: {value}: invalid number");
+                status = Err(1);
+                0
+            }));
+        }
+        let spec = spec.with_sizes(&sizes);
+
         let arg = args.get(*next).map(String::as_str).unwrap_or("");
         if *next < args.len() {
             *next += 1;
@@ -125,15 +143,69 @@ enum Bad {
     Format(i32),
 }
 
+/// A width or a precision: written out, or `*` meaning "the next argument says".
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Size {
+    Fixed(usize),
+    /// `%*d` and `%.*f`. The argument is consumed **before** the one being converted, which is the
+    /// order C and every shell use — `printf '%*d' 5 42` is width 5, value 42.
+    FromArgument,
+}
+
 /// One `%` conversion: its flags, width, precision and the letter that decides the type.
 struct Spec {
     flags: String,
-    width: Option<usize>,
-    precision: Option<usize>,
+    width: Option<Size>,
+    precision: Option<Size>,
     conversion: char,
 }
 
 impl Spec {
+    /// How many arguments this conversion eats before its own: one per `*`.
+    fn star_count(&self) -> usize {
+        usize::from(self.width == Some(Size::FromArgument))
+            + usize::from(self.precision == Some(Size::FromArgument))
+    }
+
+    /// Replace each `*` with the number that was read for it, in written order.
+    ///
+    /// A **negative** width means left-justify at that width, exactly as a `-` flag would — C says
+    /// so, and `printf '%*s' -6 hi` is how a script asks for it without knowing the sign up front.
+    fn with_sizes(mut self, sizes: &[i64]) -> Self {
+        let mut next = sizes.iter().copied();
+        if self.width == Some(Size::FromArgument) {
+            let n = next.next().unwrap_or(0);
+            if n < 0 {
+                self.flags.push('-');
+            }
+            self.width = Some(Size::Fixed(n.unsigned_abs() as usize));
+        }
+        if self.precision == Some(Size::FromArgument) {
+            // A negative precision means "no precision given" in C, not a precision of zero.
+            self.precision = match next.next().unwrap_or(0) {
+                n if n < 0 => None,
+                n => Some(Size::Fixed(n as usize)),
+            };
+        }
+        self
+    }
+
+    /// The width, once every `*` has been resolved.
+    fn width(&self) -> Option<usize> {
+        match self.width {
+            Some(Size::Fixed(n)) => Some(n),
+            _ => None,
+        }
+    }
+
+    /// The precision, once every `*` has been resolved.
+    fn precision(&self) -> Option<usize> {
+        match self.precision {
+            Some(Size::Fixed(n)) => Some(n),
+            _ => None,
+        }
+    }
+
     /// Parse a conversion starting at `chars[*i] == '%'`, leaving `*i` just past it.
     fn parse(chars: &[char], i: &mut usize) -> Option<Self> {
         let mut j = *i + 1;
@@ -142,10 +214,20 @@ impl Spec {
             flags.push(chars[j]);
             j += 1;
         }
-        let width = take_number(chars, &mut j);
+        // `*` takes the number from an argument. Required by every shell that scripts are written
+        // against — `printf '%c %*u. %s\n'` is how `select-editor` lines its menu up — and without
+        // it the `*` reached the conversion letter and the whole format was refused.
+        let take_size = |j: &mut usize| -> Option<Size> {
+            if chars.get(*j) == Some(&'*') {
+                *j += 1;
+                return Some(Size::FromArgument);
+            }
+            take_number(chars, j).map(Size::Fixed)
+        };
+        let width = take_size(&mut j);
         let precision = if j < chars.len() && chars[j] == '.' {
             j += 1;
-            Some(take_number(chars, &mut j).unwrap_or(0))
+            Some(take_size(&mut j).unwrap_or(Size::Fixed(0)))
         } else {
             None
         };
@@ -172,7 +254,7 @@ impl Spec {
         let body: Vec<u8> = match self.conversion {
             's' => {
                 let mut s = arg.to_string();
-                if let Some(p) = self.precision {
+                if let Some(p) = self.precision() {
                     s.truncate(p.min(s.len()));
                 }
                 s.into_bytes()
@@ -229,7 +311,7 @@ impl Spec {
                     }
                     0.0
                 });
-                let p = self.precision.unwrap_or(6);
+                let p = self.precision().unwrap_or(6);
                 match self.conversion {
                     'e' => c_exponent(&format!("{:.*e}", p, value), 'e'),
                     'E' => c_exponent(&format!("{:.*E}", p, value), 'E'),
@@ -252,7 +334,7 @@ impl Spec {
     /// Zero-fill is ignored for `%s`, as in C: padding a string with zeros produces `000abc`,
     /// which no caller means.
     fn pad(&self, body: Vec<u8>) -> Vec<u8> {
-        let Some(width) = self.width else {
+        let Some(width) = self.width() else {
             return body;
         };
         if body.len() >= width {

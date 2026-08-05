@@ -101,6 +101,26 @@ fn a_line_too_long_for_the_page_still_fits_whole() {
     assert!(width > 20, "the box grew past the page: {width}");
 }
 
+/// **Two names for one file is one problem.** `/bin` is a symlink to `usr/bin` on every
+/// distribution that did the usrmerge, so `/bin/sh` and `/usr/bin/sh` are the same inode and
+/// reporting both said the same thing twice.
+///
+/// Asserted against the real filesystem, because that is where the duplication came from: on a
+/// merged-`/usr` machine `detect()` must find at most one foreign `sh`, and on an unmerged one two
+/// genuinely different files would deserve two lines.
+#[test]
+fn one_file_under_two_names_is_reported_once() {
+    let merged = std::fs::canonicalize("/bin/sh").ok() == std::fs::canonicalize("/usr/bin/sh").ok();
+    let found = detect().foreign_sh.len();
+    if merged {
+        assert!(
+            found <= 1,
+            "one file reported {found} times: {:?}",
+            detect().foreign_sh
+        );
+    }
+}
+
 /// A missing path is not a misconfiguration — plenty of systems have no `/usr/bin/sh`, and
 /// warning about one would be a warning nobody can act on.
 #[test]
