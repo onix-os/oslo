@@ -233,8 +233,13 @@ pub fn run_repl(login: bool) -> ! {
                 // since it looks like it works and does not.
                 universal_stamp =
                     oslo::env::universal::refresh(&mut env_struct.lock().unwrap(), universal_stamp);
-                lua.fire_hook("preexec", vec![LuaEngine::hook_arg(&text)]);
-                lua.fire_hook("precmd", vec![LuaEngine::hook_arg(&text)]);
+                // Read here rather than below because the hook is told it: a `preexec` handler
+                // that logs where a command ran needs the directory it started in, and asking for
+                // it from inside the handler would answer after any `cd` the last command did.
+                let before = current_directory();
+                let about = LuaEngine::command_started(&text, &before, mode.name());
+                lua.fire_hook("preexec", vec![about.clone()]);
+                lua.fire_hook("precmd", vec![about]);
                 // The title says what is running while it runs, and goes back to the directory
                 // when the prompt returns. A row of tabs then says what each is *doing*.
                 announce(&oslo::interactive::marks::title(
@@ -247,7 +252,6 @@ pub fn run_repl(login: bool) -> ! {
                 // Everything after this belongs to the command, not to the prompt.
                 print!("{}", oslo::interactive::marks::output_start());
                 let _ = std::io::Write::flush(&mut std::io::stdout());
-                let before = current_directory();
                 let started = std::time::Instant::now();
 
                 let res = match mode {
@@ -317,13 +321,25 @@ pub fn run_repl(login: bool) -> ! {
                     oslo::interactive::marks::command_end(res.as_ref().copied().unwrap_or(1))
                 );
                 let _ = std::io::Write::flush(&mut std::io::stdout());
-                if let Ok(status) = res {
-                    lua.fire_hook("postexec", vec![LuaEngine::hook_status(status)]);
-                    lua.fire_hook("postcmd", vec![LuaEngine::hook_status(status)]);
-                }
-                // Beside the hook rather than through it: `postcmd` fires only on `Ok`, and a
-                // command that failed is exactly the one the `fails` column exists to count. Every
-                // argument here is a local this loop already had and used to drop.
+                // **Fired whether the command succeeded or not.** It used to run only on `Ok`, so
+                // the hook was silent for exactly the commands a hook is most often installed to
+                // notice — a parse error, an `exit`, anything that did not return a status. A
+                // `postexec` that skips failures cannot be used to report them.
+                //
+                // `after` rather than `before`, so a `cd` is reflected in the directory the hook is
+                // told about; and the same `elapsed` the notice and the history column use.
+                let done = LuaEngine::command_finished(
+                    &text,
+                    &after,
+                    mode.name(),
+                    res.as_ref().copied().unwrap_or(1),
+                    elapsed,
+                );
+                lua.fire_hook("postexec", vec![done.clone()]);
+                lua.fire_hook("postcmd", vec![done]);
+                // Beside the hook rather than through it: a command that failed is exactly the one
+                // the `fails` column exists to count. Every argument here is a local this loop
+                // already had and used to drop.
                 if secret {
                     tracker.forget_boundary();
                 } else {

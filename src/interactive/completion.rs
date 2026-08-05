@@ -23,6 +23,46 @@ use std::fs;
 /// The flag is a parameter rather than read from the process-global settings here, so the tests
 /// can exercise both answers without racing each other — the settings are shared, and the test
 /// binary is multi-threaded.
+/// Retarget a word at the item being typed inside an open `{a,b}` list.
+///
+/// `rm /dir/{alpha,be` completes `be` against `/dir/`, so the stem becomes `/dir/be` and `start`
+/// moves to the `be`. Without this the whole word is one path with a literal brace in it, which
+/// matches nothing and left completion silent from the `{` onwards.
+fn brace_segment(word: Word<'_>) -> Word<'_> {
+    let Some(open) = unclosed_brace(word.text) else {
+        return word;
+    };
+    let after = &word.text[open + 1..];
+    let item = after.rfind(',').map_or(0, |c| c + 1);
+    let head = &word.text[..open];
+    let start = word.start + open + 1 + item;
+    Word {
+        start,
+        text: &after[item..],
+        stem: format!("{}{}", unquote(head), unquote(&after[item..])),
+        ..word
+    }
+}
+
+/// The offset of a `{` that is still open at the end of `text`, ignoring quoted ones.
+fn unclosed_brace(text: &str) -> Option<usize> {
+    let mut open: Vec<usize> = Vec::new();
+    let mut quote = None;
+    for (i, c) in text.char_indices() {
+        match (quote, c) {
+            (Some(q), _) if c == q => quote = None,
+            (Some(_), _) => {}
+            (None, '\'' | '"') => quote = Some(c),
+            (None, '{') => open.push(i),
+            (None, '}') => {
+                open.pop();
+            }
+            _ => {}
+        }
+    }
+    open.pop()
+}
+
 fn matches_prefix(candidate: &str, typed: &str, case_sensitive: bool) -> bool {
     // The pass currently being tried, when the caller is walking the chain. Set around one
     // builder's run rather than threaded through every call site: the builders are recursive and
@@ -112,7 +152,7 @@ impl OsloHelper {
     /// rustyline a bare `entry.file_name()`, so `wc -c My<TAB>` produced `wc -c My File.txt` and
     /// three "no such file" errors.
     pub fn candidates(&self, line: &str, pos: usize) -> (usize, Vec<CompletionCandidate>) {
-        let word = current_word(line, pos);
+        let word = brace_segment(current_word(line, pos));
         let mut out = Vec::new();
 
         if let Some(prefix) = word.stem.strip_prefix('$') {

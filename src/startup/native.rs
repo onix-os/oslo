@@ -11,7 +11,7 @@
 //! that was the only place a cursor move did not confuse the layout. The native editor takes it as
 //! an argument, which is what it always should have been.
 
-use oslo::interactive::edit::session::{Assist, Bound};
+use oslo::interactive::edit::session::{Assist, Bound, KeyHook};
 use oslo::interactive::term::Key;
 use oslo::interactive::{OsloHelper, abbr, dropdown, editor, marks, settings};
 
@@ -86,6 +86,74 @@ fn key_name(key: Key) -> Option<String> {
         Key::Clear => "ctrl-u".to_string(),
         _ => return None,
     })
+}
+
+/// oslo's name for a key, for the `key` hook — which sees *every* key.
+///
+/// A superset of [`key_name`], and separate from it on purpose. That one answers only for keys a
+/// config could bind, because it feeds `oslo.keys` and a name there that cannot be bound would be
+/// a lie. The hook has no such contract: it reports what was pressed, so Enter and Esc and an
+/// ordinary letter all need a name.
+///
+/// The `char` half is `Some` only for an ordinary character, which is what lets a handler tell
+/// `k.name == "char"` apart from a chord without comparing against a list.
+///
+/// **The names are the decoded ones.** `term` folds Ctrl-A into [`Key::Home`] before anything here
+/// runs, so that key is reported as `"home"` — the same name `oslo.keys` uses for it, which is the
+/// property worth keeping. A hook cannot recover the chord, and neither can a binding.
+fn hook_key_name(key: Key) -> (String, Option<char>) {
+    match key {
+        Key::Char(c) => ("char".to_string(), Some(c)),
+        Key::Ctrl(c) => (format!("ctrl-{c}"), None),
+        Key::Alt(c) if !c.is_control() => (format!("alt-{c}"), None),
+        Key::Alt(_) => ("alt-backspace".to_string(), None),
+        Key::Accept => ("enter".to_string(), None),
+        Key::Cancel => ("esc".to_string(), None),
+        Key::Abort => ("ctrl-c".to_string(), None),
+        Key::Backspace => ("backspace".to_string(), None),
+        Key::Delete => ("delete".to_string(), None),
+        Key::ToggleScope => ("tab".to_string(), None),
+        Key::BackTab => ("shift-tab".to_string(), None),
+        Key::Clear => ("ctrl-u".to_string(), None),
+        Key::Up => ("up".to_string(), None),
+        Key::Down => ("down".to_string(), None),
+        Key::Left => ("left".to_string(), None),
+        Key::Right => ("right".to_string(), None),
+        Key::Home => ("home".to_string(), None),
+        Key::End => ("end".to_string(), None),
+        Key::PageUp => ("pageup".to_string(), None),
+        Key::PageDown => ("pagedown".to_string(), None),
+        Key::Ignored => ("ignored".to_string(), None),
+    }
+}
+
+/// A character index into the byte index Lua counts in.
+///
+/// The editor's cursor is a position among *characters*; `line.cursor` is documented as bytes so
+/// that `line.text:sub(1, line.cursor)` works, and Lua's own string functions count bytes. The two
+/// agree for ASCII and diverge on the first accented letter, which is why this is not skipped.
+fn byte_cursor(line: &str, cursor: usize) -> usize {
+    line.chars().take(cursor).map(char::len_utf8).sum()
+}
+
+/// The byte index a handler answered with, back into a character index for the buffer.
+fn char_cursor(line: &str, at: usize) -> usize {
+    line.char_indices().take_while(|(i, _)| *i < at).count()
+}
+
+/// A handler's answer as the editor wants it: text, a character cursor, and whether to run it.
+///
+/// The cursor a handler gives is a byte offset, because that is what it computed with; the buffer
+/// counts characters. Defaulting to the end is what "just set the line" means, and it is by far
+/// the common case.
+fn placed(answer: editor::Answer) -> (String, usize, bool) {
+    let end = answer.text.chars().count();
+    let cursor = answer
+        .cursor
+        .map(|at| char_cursor(&answer.text, at))
+        .unwrap_or(end)
+        .min(end);
+    (answer.text, cursor, answer.submit)
 }
 
 /// Open the full-screen history finder.
@@ -245,9 +313,9 @@ impl Assist for ShellAssist<'_> {
         editor::handler(&name).is_some().then_some(name)
     }
 
-    fn lua_key(&mut self, name: &str, line: &str, cursor: usize) -> Option<(String, usize)> {
+    fn lua_key(&mut self, name: &str, line: &str, cursor: usize) -> Option<(String, usize, bool)> {
         let handler = editor::handler(name)?;
-        let table = editor::line_table(line, cursor);
+        let table = editor::line_table(line, byte_cursor(line, cursor));
         let answer = match oslo::lua::engine::call_here(&handler, vec![table]) {
             Ok(values) => values.into_iter().next().unwrap_or_default(),
             // Reported rather than swallowed: a binding that silently does nothing is
@@ -257,9 +325,29 @@ impl Assist for ShellAssist<'_> {
                 return None;
             }
         };
-        let (text, asked) = editor::line_from(&answer)?;
-        let end = text.chars().count();
-        Some((text, asked.unwrap_or(end).min(end)))
+        let answer = editor::answer_from(&answer)?;
+        Some(placed(answer))
+    }
+
+    fn watches_keys(&mut self) -> bool {
+        oslo::lua::engine::key_hook_watched()
+    }
+
+    fn key_hook(&mut self, key: Key, line: &str, cursor: usize) -> Option<KeyHook> {
+        let (name, pressed) = hook_key_name(key);
+        let table = editor::key_table(&name, pressed, line, byte_cursor(line, cursor));
+        match editor::key_outcome_from(&oslo::lua::engine::key_hook_here(vec![table])?) {
+            editor::KeyOutcome::Pass => None,
+            editor::KeyOutcome::Swallow => Some(KeyHook::Swallow),
+            editor::KeyOutcome::Line(answer) => {
+                let (text, cursor, submit) = placed(answer);
+                Some(KeyHook::Line {
+                    text,
+                    cursor,
+                    submit,
+                })
+            }
+        }
     }
 
     fn abbreviation(&mut self, line: &str, cursor: usize) -> Option<(String, usize)> {
@@ -372,5 +460,49 @@ mod tests {
     #[test]
     fn an_empty_line_paints_to_nothing() {
         assert_eq!(assist(&[]).highlight(""), "");
+    }
+
+    /// **Every key has a hook name.** A key the hook cannot name is a key it cannot be told about,
+    /// and the whole point of the hook is that it sees all of them — so this asserts the ones
+    /// `key_name` deliberately leaves out, which is where a missing arm would actually hide.
+    #[test]
+    fn the_key_hook_can_name_the_keys_a_binding_cannot() {
+        for (key, name) in [
+            (Key::Accept, "enter"),
+            (Key::Cancel, "esc"),
+            (Key::Abort, "ctrl-c"),
+            (Key::Backspace, "backspace"),
+            (Key::Delete, "delete"),
+        ] {
+            assert_eq!(hook_key_name(key).0, name);
+            assert!(
+                key_name(key).is_none(),
+                "{name} is not bindable, which is why the hook needs its own table"
+            );
+        }
+        // An ordinary character is the one case with a `char`, and they all share one name so a
+        // handler can ask "was this typing?" without listing the alphabet.
+        assert_eq!(
+            hook_key_name(Key::Char('ß')),
+            ("char".to_string(), Some('ß'))
+        );
+        assert_eq!(hook_key_name(Key::Ctrl('k')).0, "ctrl-k");
+        assert_eq!(hook_key_name(Key::Ctrl('k')).1, None);
+    }
+
+    /// The cursor crosses the boundary between the editor, which counts characters, and Lua, which
+    /// counts bytes — so `line.text:sub(1, line.cursor)` is the text before the cursor even when
+    /// the line is not ASCII. Handing over the character index put the split in the wrong place.
+    #[test]
+    fn the_cursor_a_handler_sees_is_in_bytes() {
+        let line = "größe x";
+        // Six characters in, which is after the space: eight bytes, since ö and ß are two each.
+        assert_eq!(byte_cursor(line, 6), 8);
+        assert_eq!(&line[..byte_cursor(line, 6)], "größe ");
+        // And back again, so a handler's answer lands where it asked.
+        assert_eq!(char_cursor(line, 8), 6);
+        for at in 0..=line.chars().count() {
+            assert_eq!(char_cursor(line, byte_cursor(line, at)), at, "round trip");
+        }
     }
 }

@@ -17,78 +17,23 @@ pub use crate::interactive::term::Key;
 use crate::interactive::term::{Keys, Restore, Screen};
 use std::io::Write;
 
-/// What the shell supplies to an editing session.
+mod assist;
+pub use assist::{Assist, NoAssist};
+
+/// What a `key` hook asked the editor to do with the keystroke it just saw.
 ///
-/// Every method has a default that does nothing, so a test — or an early integration — can
-/// implement none of them and still get a working editor.
-pub trait Assist {
-    /// The line as it should be drawn. Must print the same *characters*: the layout measures the
-    /// plain text and draws this, so adding or removing anything but escapes moves the cursor.
-    fn highlight(&mut self, line: &str) -> String {
-        line.to_string()
-    }
-
-    /// Ghost text shown after the cursor, already styled.
-    fn hint(&mut self, _line: &str, _cursor: usize) -> Option<String> {
-        None
-    }
-
-    /// The same suggestion **without** styling, for accepting it into the line.
-    ///
-    /// Separate from [`Assist::hint`] because that one is painted, and inserting escapes into the
-    /// command would put them in the history and in what runs.
-    fn hint_text(&mut self, _line: &str, _cursor: usize) -> Option<String> {
-        None
-    }
-
-    /// Run completion, answering the line and cursor it produced.
-    ///
-    /// The whole interaction belongs to the implementation — oslo's dropdown draws itself and
-    /// takes its own keys — because a menu is a different mode, not a keystroke.
-    fn complete(&mut self, _line: &str, _cursor: usize, _back: bool) -> Option<(String, usize)> {
-        None
-    }
-
-    /// The previous history entry, given what is on the line now.
-    fn history_prev(&mut self, _line: &str) -> Option<String> {
-        None
-    }
-
-    fn history_next(&mut self) -> Option<String> {
-        None
-    }
-
-    /// Ctrl-R. Answers a whole line to put in place, or `None` to leave things alone.
-    fn search_history(&mut self, _line: &str) -> Option<String> {
-        None
-    }
-
-    /// The space that ends a word has been typed: expand an abbreviation if this is one.
-    ///
-    /// Answers the line **including the space**, because the expansion and the space are one act —
-    /// `gco ` becomes `git checkout ` in a single step, so what you see is a finished command
-    /// rather than a word waiting to be finished.
-    fn abbreviation(&mut self, _line: &str, _cursor: usize) -> Option<(String, usize)> {
-        None
-    }
-
-    /// A key the config bound to a Lua handler. Answers the line the handler asked for.
-    ///
-    /// The name is oslo's spelling — `ctrl-s`, `alt-u`, `shift-tab` — so a config's key table can
-    /// be looked up directly.
-    fn lua_key(&mut self, _name: &str, _line: &str, _cursor: usize) -> Option<(String, usize)> {
-        None
-    }
-
-    /// oslo's name for a key, when the config could have bound it. `None` means never ask.
-    fn key_name(&mut self, _key: Key) -> Option<String> {
-        None
-    }
-
-    /// What the config bound this key to, if anything.
-    fn binding(&mut self, _key: Key) -> Option<Bound> {
-        None
-    }
+/// The third possibility — carry on as normal — is the `None` the hook answers with, so it needs
+/// no variant here.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum KeyHook {
+    /// Consume the keystroke: the editor never sees it, and the line is untouched.
+    Swallow,
+    /// Put this line in place instead, and run it if `submit`.
+    Line {
+        text: String,
+        cursor: usize,
+        submit: bool,
+    },
 }
 
 /// A binding the config asked for, which the session performs instead of its default.
@@ -110,11 +55,6 @@ pub enum Bound {
     /// A Lua function, by the key's name.
     Lua(String),
 }
-
-/// An `Assist` that does nothing, for tests and for a shell that has not wired one yet.
-#[derive(Debug, Default)]
-pub struct NoAssist;
-impl Assist for NoAssist {}
 
 /// What a keypress did to the session.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -194,9 +134,11 @@ impl Session {
             Bound::AcceptHintWord => changed(self.take_hint(false, assist)),
             Bound::Lua(name) => {
                 match assist.lua_key(&name, &self.buffer.text(), self.buffer.cursor()) {
-                    Some((line, cursor)) => {
+                    Some((line, cursor, submit)) => {
                         self.buffer.set(&line, cursor);
-                        changed(true)
+                        // `submit = true` is zsh's `bindkey -s '…\n'`: the key runs the line
+                        // rather than only typing it.
+                        if submit { Step::Accept } else { changed(true) }
                     }
                     None => changed(false),
                 }
@@ -228,6 +170,33 @@ impl Session {
     /// Apply one key.
     pub fn apply(&mut self, key: Key, assist: &mut dyn Assist) -> Step {
         let changed = |yes: bool| Step::Continue { redraw: yes };
+
+        // **The `key` hook sees the keystroke before anything else, ordinary characters included.**
+        //
+        // First, because a hook that cannot see a key before its binding runs cannot implement the
+        // thing it exists for — deciding what a key *means*. That is also why it can answer with a
+        // whole line: an observer would not need one.
+        //
+        // Gated on `watches_keys` so a session with no handler attached pays one atomic load per
+        // keystroke rather than building the line to hand over. It is the only method on `Assist`
+        // that runs for every key including the ones nobody bound, so it is the only one where
+        // that distinction is worth drawing.
+        if assist.watches_keys()
+            && let Some(hook) = assist.key_hook(key, &self.buffer.text(), self.buffer.cursor())
+        {
+            return match hook {
+                // Nothing happened and nothing is redrawn — the key is simply gone.
+                KeyHook::Swallow => changed(false),
+                KeyHook::Line {
+                    text,
+                    cursor,
+                    submit,
+                } => {
+                    self.buffer.set(&text, cursor);
+                    if submit { Step::Accept } else { changed(true) }
+                }
+            };
+        }
 
         // **A key the config bound wins over everything, vi included.**
         //
