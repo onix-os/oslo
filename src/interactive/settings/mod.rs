@@ -200,6 +200,12 @@ pub struct Misc {
     /// oldest usability bug in the interactive-program genre. Off is for everybody else, who has
     /// read it a thousand times and would rather have the two rows.
     pub welcome: bool,
+    /// Seconds a prompt may sit untouched before `on-idle-timeout` fires. `0` never fires.
+    ///
+    /// Off by default, and it costs nothing when off *or* when nothing is attached to the hook:
+    /// the editor only asks for a timed read when both are true, so an ordinary session still
+    /// blocks in one `read` per keystroke rather than waking up to ask whether anyone cared.
+    pub idle_timeout: u64,
     /// Printed instead of the banner. fish's `fish_greeting`, which is the setting people
     /// actually reach for — `welcome = false` and then a line of your own is two settings in
     /// fish too, and merging them would mean an empty string had to mean "silent".
@@ -232,6 +238,7 @@ impl Default for Misc {
     fn default() -> Self {
         Misc {
             welcome: true,
+            idle_timeout: 0,
             greeting: None,
             // The standard pause: long enough that a real sequence is never split, short enough
             // that Esc feels immediate.

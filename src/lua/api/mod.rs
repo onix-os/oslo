@@ -36,8 +36,8 @@ pub(crate) mod tool;
 pub(crate) mod tools;
 mod ui;
 
+pub mod hooks;
 pub(crate) use shell::handlers as hook_handlers;
-pub(crate) use shell::{KEY as HOOK_KEY, key_hook_watched};
 pub(crate) mod util;
 
 use util::{native, put, text};

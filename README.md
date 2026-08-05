@@ -492,21 +492,56 @@ no way to say "redraw the accepted line differently". oslo owns its own editor, 
 
 ### The hooks
 
+Twenty moments, named `pre-`, `post-` or `on-`. Kebab-case cannot be a Lua field, so every one is
+also spelled with underscores — `oslo.on.pre_cmd` and `oslo.on["pre-cmd"]` are the same hook.
+
 ```lua
-oslo.on.prompt(function()      end)  -- before each prompt is drawn
-oslo.on.preexec(function(cmd)  end)  -- after Enter, before the command runs
-oslo.on.postexec(function(cmd) end)  -- after it finishes, success or not
-oslo.on.cd(function(dir)       end)
-oslo.on.key(function(k)        end)  -- every keystroke, before the editor acts
-oslo.on["command-not-found"](function(name) end)
+oslo.on.pre_cmd(function(c)  end)   -- { text, cwd, mode }   may answer
+oslo.on.post_cmd(function(c) end)   -- + { status, ok, duration_ms }
+oslo.on.pre_change_dir(function(d)  end)   -- { from, to }   may answer
+oslo.on.post_change_dir(function(d) end)   -- { from, to }
+oslo.on.pre_prompt(function()  end)
+oslo.on.post_prompt(function() end)        -- once the prompt is on screen
+oslo.on.pre_mode_change(function(m)  end)  -- { kind = "vi"|"language", from, to }
+oslo.on.post_mode_change(function(m) end)
+oslo.on.on_history_open(function(h)   end) -- { seed }
+oslo.on.on_history_select(function(h) end) -- { line }
+oslo.on.on_history_close(function(h)  end) -- { chosen }
+oslo.on.on_completion_start(function(c)  end) -- { word, line, count }
+oslo.on.on_completion_select(function(c) end) -- { value, word }
+oslo.on.on_completion_cancel(function(c) end) -- { word }
+oslo.on.on_job_finish(function(j) end)     -- { id, pid, text, status }
+oslo.on.on_time_report(function(t) end)    -- { real_ms, user_ms, sys_ms } — `time cmd` only
+oslo.on.on_command_not_found(function(name) end)
+oslo.on.on_idle_timeout(function(i) end)   -- needs oslo.misc.idle_timeout
+oslo.on.on_exit(function(e) end)           -- { status }
+oslo.on.on_key(function(k) end)            -- every keystroke, before the editor acts
 ```
 
-`preexec` is handed `{ text, cwd, mode }` and `postexec` the same plus `{ status, ok, duration_ms }`,
-with `cwd` being where the command *ended* so the pair still reads correctly across a `cd`.
-`postexec` fires whether the command succeeded or not.
+**Three may answer; the rest observe.** `pre-cmd` may return a replacement line or `false` to
+cancel the command; `pre-change-dir` may return `false` to refuse the move; `on-command-not-found`
+may return a status meaning it handled things. Everything else has its return value discarded —
+there is nothing coherent for `post-prompt` to veto, and a `pre-mode-change` that could refuse
+would let a config make vi mode inescapable.
 
-`precmd` and `postcmd` are the names oslo shipped first and still answers to. They fire alongside
-`preexec` and `postexec`, which are what the rest of the world calls the same two moments.
+```lua
+oslo.on.pre_cmd(function(c)
+  if c.text:match("^rm %-rf /%s*$") then return false end
+  return nil
+end)
+```
+
+`preexec`/`precmd`, `postexec`/`postcmd`, `prompt`, `cd`, `command-not-found` and `key` are the
+names oslo shipped first and still answers to; each is an alias of the `pre-`/`post-`/`on-` name
+above and fires on the same list, so no config breaks. `cd` is an alias of **`post-change-dir`**,
+since it always fired after the move.
+
+`post-cmd`'s `cwd` is where the command *ended*, so the pair reads correctly across a `cd`, and it
+fires whether the command succeeded or not. `post-change-dir` fires from the one place every `cd`,
+`pushd`, `popd` and jump passes through — so it also catches a move made inside a function.
+
+None of this reaches a script: a config is only read by an interactive shell, so nothing here can
+change what `sh -c` or a `#!/bin/sh` file does.
 
 `on.key` sees every keystroke — ordinary characters included — before any binding, before vi, and
 before the editor acts. It is told `{ name, char, text, cursor, word, word_start }`, and what it

@@ -146,6 +146,9 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
         if let Value::Str(greeting) = table.get(&Value::str("greeting")) {
             settings.misc.greeting = Some(greeting.to_string());
         }
+        if let Some(seconds) = number(&table, "idle_timeout") {
+            settings.misc.idle_timeout = seconds.max(0) as u64;
+        }
         if let Some(ms) = number(&table, "escape_delay") {
             // Clamped rather than refused: a zero would make every arrow key over ssh read as Esc,
             // and a delay longer than a second is a shell that appears to have stopped responding

@@ -384,6 +384,8 @@ pub fn read_line(
     let mut keys = Keys::on(raw.fd());
     let mut at_row = 0usize;
     let mut out = std::io::stderr();
+    let mut drawn = false;
+    let mut idle = false;
 
     loop {
         // The cursor shape says which mode you are in, as fish's vi mode does. `observe` publishes
@@ -403,7 +405,16 @@ pub fn read_line(
         let _ = out.flush();
         at_row = placed.cursor_row;
 
-        let Some(key) = keys.read() else {
+        // **`post-prompt`: the prompt is now on the screen.** Once per line, not once per frame —
+        // the loop redraws on every keystroke, and a hook firing there would be an `on-key` with a
+        // worse name. This is the first moment anything could be seen, which is what "after the
+        // prompt is displayed" has to mean.
+        if !drawn {
+            drawn = true;
+            crate::lua::engine::fire_at_here(crate::lua::api::hooks::at::POST_PROMPT, &[]);
+        }
+
+        let Some(key) = next_key(&mut keys, &mut idle) else {
             return Outcome::Eof;
         };
         match session.apply(key, assist) {
@@ -454,6 +465,40 @@ pub fn read_line(
                     _ => Outcome::Interrupted,
                 };
             }
+        }
+    }
+}
+
+/// The next key, firing `on-idle-timeout` if the prompt sits untouched long enough.
+///
+/// **The blocking read is the default and stays the default.** A timed read is only asked for when
+/// `oslo.misc.idle_timeout` is set *and* something is attached to the hook — otherwise the editor
+/// would wake up on a timer for the rest of the session to ask a question nobody is listening for.
+///
+/// `reported` is what stops it firing over and over: idleness is a state you enter once, not a
+/// tick. It resets the moment a key arrives, so walking away twice reports twice.
+fn next_key(keys: &mut Keys, reported: &mut bool) -> Option<Key> {
+    let seconds = crate::interactive::settings::current().misc.idle_timeout;
+    if seconds == 0 || !crate::lua::api::hooks::watched(crate::lua::api::hooks::at::IDLE_TIMEOUT) {
+        return keys.read();
+    }
+    let ms = seconds.saturating_mul(1000).min(i32::MAX as u64) as i32;
+    loop {
+        match keys.read_within(ms) {
+            crate::interactive::term::Pressed::Key(key) => {
+                *reported = false;
+                return Some(key);
+            }
+            crate::interactive::term::Pressed::Timeout => {
+                if !*reported {
+                    *reported = true;
+                    crate::lua::engine::fire_at_here(
+                        crate::lua::api::hooks::at::IDLE_TIMEOUT,
+                        &[("seconds", &seconds.to_string())],
+                    );
+                }
+            }
+            crate::interactive::term::Pressed::Ended => return None,
         }
     }
 }

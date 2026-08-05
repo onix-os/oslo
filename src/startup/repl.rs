@@ -17,6 +17,7 @@ use oslo::env::options::ShellOption;
 use oslo::error::ShellError;
 use oslo::exec::{JobManager, eval_command_list};
 use oslo::interactive::OsloHelper;
+use oslo::lua::api::hooks;
 use oslo::parser::parse_with_aliases;
 use std::sync::{Arc, Mutex};
 
@@ -167,7 +168,7 @@ pub fn run_repl(login: bool) -> ! {
         // A prompt is about to be drawn. This is bash's `PROMPT_COMMAND` and zsh's `precmd`, and
         // the hook a prompt integration written in Lua needs — the shell-side one already exists
         // as `$PROMPT_COMMAND` below.
-        lua.fire_hook("prompt", Vec::new());
+        lua.fire_at(hooks::at::PRE_PROMPT, Vec::new());
 
         // `$PROMPT_COMMAND` runs before every prompt. It is the other half of the DEBUG trap —
         // together they are bash's preexec/precmd pair, and every integration written for bash is
@@ -238,8 +239,24 @@ pub fn run_repl(login: bool) -> ! {
                 // it from inside the handler would answer after any `cd` the last command did.
                 let before = current_directory();
                 let about = LuaEngine::command_started(&text, &before, mode.name());
-                lua.fire_hook("preexec", vec![about.clone()]);
-                lua.fire_hook("precmd", vec![about]);
+                // **`pre-cmd` may answer.** A string replaces the line; `false` cancels it. Only
+                // here, at a prompt — a script and `sh -c` never load a config, so no hook exists
+                // to change what they run.
+                let text = match oslo::lua::engine::answer_hook_with(
+                    hooks::at::PRE_CMD,
+                    vec![about.clone()],
+                ) {
+                    Some(oslo::lua::eval::value::Value::Bool(false)) => {
+                        // Cancelled. 130 is the status a line abandoned at the prompt already
+                        // reports, so nothing downstream needs a new case for this.
+                        last_status = 130;
+                        continue;
+                    }
+                    Some(oslo::lua::eval::value::Value::Str(replacement)) => {
+                        replacement.to_string()
+                    }
+                    _ => text,
+                };
                 // The title says what is running while it runs, and goes back to the directory
                 // when the prompt returns. A row of tabs then says what each is *doing*.
                 announce(&oslo::interactive::marks::title(
@@ -306,7 +323,11 @@ pub fn run_repl(login: bool) -> ! {
                     // Before the `cd` hook, so a Lua hook that reads an environment variable sees
                     // the one this directory sets rather than the one the last directory did.
                     environments::arrive(&env_struct, &lua, std::path::Path::new(&after));
-                    lua.fire_hook("cd", vec![LuaEngine::hook_arg(&after)]);
+                    // The `post-change-dir` hook is **not** fired here. It fires from
+                    // `attempt_directory`, which every `cd`, `pushd`, `popd` and jump passes
+                    // through — so it also catches a move made inside a function or a subshell,
+                    // which comparing the directory across a whole command line cannot see. Firing
+                    // in both places would fire it twice for every ordinary `cd`.
                     // The terminal is told too, so a new split or tab opens here rather than in
                     // `$HOME`. One write, only when the directory actually changed.
                     announce(&oslo::interactive::marks::working_directory(&after));
@@ -335,8 +356,7 @@ pub fn run_repl(login: bool) -> ! {
                     res.as_ref().copied().unwrap_or(1),
                     elapsed,
                 );
-                lua.fire_hook("postexec", vec![done.clone()]);
-                lua.fire_hook("postcmd", vec![done]);
+                lua.fire_at(hooks::at::POST_CMD, vec![done]);
                 // Beside the hook rather than through it: a command that failed is exactly the one
                 // the `fails` column exists to count. Every argument here is a local this loop
                 // already had and used to drop.
@@ -353,6 +373,7 @@ pub fn run_repl(login: bool) -> ! {
                         // The amortised trim lets the table run over between sweeps, so the bound
                         // is enforced on the way out or a short session never enforces it at all.
                         settle_stores(&settings);
+                        fire_exit(&lua, code);
                         // R6.5: `exit` from the prompt is still a shell ending, so the EXIT trap
                         // fires here too. A REPL that skipped it would leave behind exactly the
                         // temp files an interactive session accumulates most of.
@@ -375,10 +396,27 @@ pub fn run_repl(login: bool) -> ! {
     settle_stores(&settings);
     // End of input (Ctrl-D) is the other way a REPL ends, and POSIX makes no distinction: the
     // EXIT trap fires on both.
+    fire_exit(&lua, last_status);
     let mut env_guard = env_struct.lock().unwrap();
     let last_status = run_exit_trap(&mut env_guard, last_status);
     drop(env_guard);
     std::process::exit(last_status);
+}
+
+/// `on-exit`, from both ways a REPL ends — `exit` and end of input.
+///
+/// **Before the EXIT trap, not after.** The trap may itself call `exit`, and a hook that ran after
+/// it would be skipped exactly when the session ended in the way most worth reporting. Both call
+/// sites are needed because POSIX makes no distinction between the two endings and neither does
+/// anything else here.
+fn fire_exit(lua: &LuaEngine, status: i32) {
+    lua.fire_at(
+        hooks::at::ON_EXIT,
+        vec![LuaEngine::hook_fields(&[(
+            "status",
+            oslo::lua::eval::value::Value::int(status as i64),
+        )])],
+    );
 }
 
 /// Leave the history in the state a shell that is not running should leave it.
@@ -397,95 +435,9 @@ fn settle_stores(settings: &history::Settings) {
     }
 }
 
-/// Write a terminal sequence, if there is one to write.
-///
-/// Empty when the sequence is disabled, which is every script and every `-c`, so this is the one
-/// place that has to know the difference.
-fn announce(sequence: &str) {
-    if sequence.is_empty() {
-        return;
-    }
-    print!("{sequence}");
-    let _ = std::io::Write::flush(&mut std::io::stdout());
-}
-
-/// The title to show while `text` runs: the command, shortened to its first word and trimmed.
-///
-/// The first word rather than the whole line, because a title bar is narrow and `cargo` in a tab
-/// is more use than the first forty characters of a `for` loop.
-fn title_for_command(text: &str) -> String {
-    let first = text.split_whitespace().next().unwrap_or("");
-    if first.is_empty() {
-        current_directory()
-    } else {
-        format!(
-            "{first} — {}",
-            oslo::interactive::prompt::tilde(&current_directory())
-        )
-    }
-}
-
-/// Where the shell is now, for the `cd` hook to compare against.
-pub(super) fn cwd() -> String {
-    current_directory()
-}
-
-fn current_directory() -> String {
-    std::env::current_dir()
-        .map(|p| p.to_string_lossy().into_owned())
-        .unwrap_or_default()
-}
-
-/// Run one Lua line typed at the prompt.
-///
-/// A chunk that merely printed something has not run a command, so `$?` stays where it was;
-/// `oslo.proc.exit(n)` is how a script chooses a status, and it ends the shell rather than setting one.
-fn run_lua_line(lua: &LuaEngine, text: &str, last_status: i32) -> Result<i32, ShellError> {
-    match lua.eval_script(text) {
-        Ok(()) => Ok(last_status),
-        Err(ShellError::Lua(e)) if e.exit.is_some() => Err(ShellError::Exit(e.exit.unwrap_or(0))),
-        Err(e) => Err(e),
-    }
-}
-
-/// `$IGNOREEOF`: how many end-of-file characters to ignore before ending the shell.
-///
-/// `None` means the variable is unset and Ctrl-D exits immediately, as it always has. bash's
-/// documented fallback for a value that is not a number is 10.
-fn ignore_eof_limit(env_struct: &Arc<Mutex<Environment>>) -> Option<usize> {
-    let guard = env_struct.lock().unwrap();
-    if let Some(raw) = guard.get_var("IGNOREEOF") {
-        return Some(raw.trim().parse::<usize>().unwrap_or(10));
-    }
-    // `set -o ignoreeof` is the option spelling of the same thing, and bash treats it as
-    // `IGNOREEOF=10`. It used to be accepted and ignored, so a shell that had been told not to
-    // exit on Ctrl-D exited on Ctrl-D.
-    guard
-        .option(oslo::env::options::ShellOption::IgnoreEof)
-        .then_some(10)
-}
-
-thread_local! {
-    /// How long the command before this prompt took, for the right prompt to mention.
-    ///
-    /// Thread-local rather than threaded through `read_command`: the duration is a property of the
-    /// session's last command, and every caller that wants it is on the REPL's own thread.
-    static LAST_DURATION: std::cell::Cell<Option<std::time::Duration>> =
-        const { std::cell::Cell::new(None) };
-}
-
-/// How long the last command took, if one has run.
-pub(super) fn last_command_duration() -> Option<std::time::Duration> {
-    LAST_DURATION.get()
-}
-
-fn note_command_duration(elapsed: std::time::Duration) {
-    LAST_DURATION.set(Some(elapsed));
-}
-
 #[cfg(test)]
 mod tests {
-    use super::Mode;
+    use super::*;
     use crate::startup::read::{HeredocTracker, is_complete};
 
     /// The command line that opens a here-document is still a command, so it is expanded; every
@@ -576,3 +528,10 @@ mod tests {
         assert!(is_complete("done", Mode::Shell));
     }
 }
+
+#[path = "repl/aside.rs"]
+mod aside;
+use aside::{announce, current_directory, note_command_duration, run_lua_line, title_for_command};
+// Read from `startup::prompt` and `startup::read`, which asked `repl` for them before the split
+// and should not have to learn where they moved to.
+pub(crate) use aside::{cwd, ignore_eof_limit, last_command_duration};

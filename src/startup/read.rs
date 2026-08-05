@@ -211,7 +211,23 @@ pub(super) fn read_command(
                         Mode::Shell => Mode::Lua,
                         Mode::Lua => Mode::Shell,
                     };
+                    // The other half of `pre`/`post-mode-change`: `kind = "language"` here, and
+                    // `kind = "vi"` from the editor. One hook for both, because "the mode changed"
+                    // is the same question — a handler that cares about only one reads `kind`.
+                    let fields = [
+                        ("kind", "language"),
+                        ("from", current.name()),
+                        ("to", switched.name()),
+                    ];
+                    oslo::lua::engine::fire_at_here(
+                        oslo::lua::api::hooks::at::PRE_MODE_CHANGE,
+                        &fields,
+                    );
                     *current = switched;
+                    oslo::lua::engine::fire_at_here(
+                        oslo::lua::api::hooks::at::POST_MODE_CHANGE,
+                        &fields,
+                    );
                     reading = switched;
                     typed = text;
                     typed_point = typed
