@@ -82,15 +82,18 @@ jobs:
           out="$("$bin" -c 'echo ok' </dev/null)"
           test "$out" = "ok" || { echo "shell printed '$out', expected 'ok'" >&2; exit 1; }
 
-          # Lua, by the two routes that reach it. `--lua-script` used to be here and is not a flag
-          # oslo has ever had, so this step failed on every release — it had simply never run,
-          # because the repository had no remote when it was written.
-          "$bin" --lua -c 'print("lua " .. _VERSION)' </dev/null | grep -q 'lua Lua 5.4' \
-            || { echo "Lua did not start via --lua -c" >&2; exit 1; }
-
+          # Lua, by the routes that reach it — which are now detection and only detection.
+          # `--lua` used to be tested here and no longer exists: a shell whose scripting language
+          # needs an opt-in flag is not really that shell, so the extension and the shebang decide.
+          # `-c` is deliberately *not* one of the routes; it is always shell, because every
+          # `sh -c` idiom in the world depends on that.
           lua="$(mktemp --suffix=.lua)"; echo 'print("lua " .. _VERSION)' > "$lua"
           "$bin" "$lua" </dev/null | grep -q 'lua Lua 5.4' \
             || { echo "a .lua file was not detected as Lua" >&2; exit 1; }
+
+          shebang="$(mktemp)"; printf '#!/usr/bin/lua\nprint("lua " .. _VERSION)\n' > "$shebang"
+          "$bin" "$shebang" </dev/null | grep -q 'lua Lua 5.4' \
+            || { echo "a lua shebang was not detected as Lua" >&2; exit 1; }
 
           # The structured pipeline, since it is the part most likely to be broken by a build
           # difference rather than by a code change.

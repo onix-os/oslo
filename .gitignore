@@ -31,3 +31,10 @@ compile_commands.json
 # find out. This repository's `data` is code.
 !src/data/
 !src/data/**
+
+# **`src/` is source, whatever a global ignore thinks.** A `log` pattern in the user's global
+# ignore file matched the *directory* `src/track/log/`, so `src/track/log/tests.rs` was never
+# added — `make verify` passed locally and CI failed to compile on a file that was not in the
+# repository. A directory has to be re-included before anything inside it can be.
+!src/**/
+!src/**
