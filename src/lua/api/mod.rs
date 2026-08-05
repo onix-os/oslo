@@ -74,6 +74,13 @@ pub fn install(interp: &Rc<Interp>, registry: &Registry, env: Arc<Mutex<Environm
     // a nil value" while `oslo.vi = { enabled = false }` worked. A config language where two
     // spellings of the same thing differ by whether somebody remembered to add a line here is one
     // nobody can hold in their head.
+    //
+    // **A fallback, never a replacement.** This used to assign unconditionally, and `theme` is in
+    // the list, so it overwrote the real `oslo.theme` that `prompt::install` had just built one
+    // line above — taking `oslo.theme.styles` and its `__newindex` with it. The README's
+    // `oslo.theme.styles["my.dir"] = …` therefore died on an empty table, which is the very
+    // failure this loop exists to prevent, caused by the fix for it. A namespace that something
+    // else already built with behaviour keeps what it has.
     for name in [
         "completion",
         "suggest",
@@ -87,10 +94,12 @@ pub fn install(interp: &Rc<Interp>, registry: &Registry, env: Arc<Mutex<Environm
         "theme",
         "abbr",
     ] {
-        oslo.set(
-            Value::str(name),
-            Value::Table(Rc::new(RefCell::new(Table::new()))),
-        );
+        if matches!(oslo.get(&Value::str(name)), Value::Nil) {
+            oslo.set(
+                Value::str(name),
+                Value::Table(Rc::new(RefCell::new(Table::new()))),
+            );
+        }
     }
 
     // `oslo.builtin` is the same thing one level deeper: it is a namespace *per builtin*, so
