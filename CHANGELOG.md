@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.2.11] - 2026-08-05
+
+### <!-- 1 -->🐛 Bug Fixes
+
+- Track src/track/log/tests.rs, drop --lua from the smoke test
+
 ## [0.2.10] - 2026-08-05
 
 ### <!-- 7 -->⚙️ Miscellaneous Tasks
