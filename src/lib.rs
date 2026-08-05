@@ -23,6 +23,10 @@ pub mod interactive;
 pub mod lexer;
 pub mod lua;
 pub mod parser;
+/// SSH, behind the `ssh` feature — off by default. See the module docs for what it costs and what
+/// is still undecided.
+#[cfg(feature = "ssh")]
+pub mod ssh;
 pub mod track;
 
 pub use env::Environment;

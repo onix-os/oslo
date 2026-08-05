@@ -14,7 +14,38 @@ publish = false
 [lib]
 path = "src/lib.rs"
 
+[features]
+# **Nothing is on by default, and that is the point.** A default build has to stay what it is: one
+# static musl binary, no C toolchain, 142 crates. See `docs/research/footprint.md`'s reasoning, and
+# the note above `jammdb` for what happened the last time a dependency was allowed to be large.
+default = []
+
+# `ssh` — an SSH client in the shell, behind a switch.
+#
+# **Off, and measured.** Adding it costs about 0.6 MB on the static musl binary (5.57 → 6.15) and
+# 83 crates. That is a quarter of what `russh` costs, and it is the only option that keeps the
+# no-C rule: `russh`'s default `aws-lc-rs` backend does not even *link* against musl — its C
+# objects want glibc's `__memcpy_chk` and `__isoc23_sscanf` — and its `ring` backend still runs a C
+# compiler, which is the thing `mlua` and `turso` were dropped for.
+#
+# Two things are unresolved and are why this is not on:
+#
+# * **The crypto is unaudited.** `maki` and the RustCrypto crates under it say so themselves. For a
+#   shell meant to be `/bin/sh` on a distribution that is a different class of risk from binary size.
+# * **`tokio` comes back.** `maki` is async and oslo's REPL is not, so using it means a runtime and
+#   `block_on` — the exact bridging that was deleted when `turso` went. Whether that lives at the
+#   edge or spreads is the design question this feature exists to answer.
+ssh = ["dep:maki", "dep:tokio"]
+
 [dependencies]
+# A fork of `makiko`, the one pure-Rust SSH client — no `cc`, no `ring`, no `-sys` crate that is
+# really C. Forked rather than depended on because upstream was last touched in March 2025, and a
+# shell that ships this needs to be able to fix it. Optional, and reached only through `src/ssh.rs`.
+maki = { git = "https://github.com/onix-os/maki", branch = "master", optional = true }
+# Only ever with `ssh`. `maki` pulls `tokio` for its `sync` primitives on its own; what oslo needs
+# on top is a runtime and a socket, which is what these two features are.
+tokio = { version = "1", features = ["rt-multi-thread", "net"], optional = true }
+
 # The Lua front end, in the same relationship to Lua that brush-parser has to the shell: it parses
 # and nothing else. Evaluation is oslo's own, in `src/lua/eval/`, so that both languages run on one
 # Rust core. `full_moon` is the parser behind StyLua and selene.
