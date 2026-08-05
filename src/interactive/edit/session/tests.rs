@@ -138,6 +138,10 @@ impl Assist for Canned {
     fn hint_text(&mut self, line: &str, cursor: usize) -> Option<String> {
         (cursor >= line.chars().count()).then(|| self.hint.clone())?
     }
+    /// What is *drawn*. The real one paints it; plain here so a test can look for the text.
+    fn hint(&mut self, line: &str, cursor: usize) -> Option<String> {
+        self.hint_text(line, cursor)
+    }
     fn complete(&mut self, _l: &str, _c: usize, _b: bool) -> Option<(String, usize)> {
         self.completion.clone()
     }
@@ -316,4 +320,41 @@ fn right_with_no_suggestion_still_moves() {
     };
     s.apply(Key::Right, &mut Canned::default());
     assert_eq!(s.buffer.cursor(), 2);
+}
+
+/// **The finished line is drawn without its ghost.**
+///
+/// The suggestion is a proposal, not text you typed, so the last frame of a line must not carry
+/// it: `cat ~/` with `lis/` suggested left `cat ~/lis/` in the scrollback above the output of
+/// `cat ~/`, a transcript that says a command ran which never did.
+#[test]
+fn the_last_frame_of_a_line_has_no_ghost() {
+    let mut a = Canned {
+        hint: Some("lis/".into()),
+        ..Canned::default()
+    };
+    let s = Session {
+        vi: None,
+        ..Session::new("cat /home/me/", 13)
+    };
+
+    let editing = super::draw("$ ", "", &s, &mut a, true);
+    assert!(
+        editing.text.contains("lis/"),
+        "the ghost must be drawn while editing: {:?}",
+        editing.text
+    );
+
+    let finished = super::draw("$ ", "", &s, &mut a, false);
+    assert!(
+        !finished.text.contains("lis/"),
+        "the ghost survived into the finished line: {:?}",
+        finished.text
+    );
+    // The line itself is untouched — only the proposal goes.
+    assert!(
+        finished.text.contains("cat /home/me/"),
+        "{:?}",
+        finished.text
+    );
 }

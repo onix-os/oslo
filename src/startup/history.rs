@@ -167,8 +167,20 @@ pub const ALLHIST: &str = "OSLO_ALLHIST";
 /// it: a child process inherits the variable, so a program that shells out while it is set has its
 /// shell-outs recorded too. `make` driving a build through `sh -c` will fill the log. Set it where
 /// you want the recording, not globally, unless that is what you meant.
+/// **`0`, `false`, `no` and `off` mean off**, rather than merely being non-empty.
+///
+/// The `$NO_COLOR` convention is "any value at all", and it works there because the name is
+/// already a negative and nobody writes `NO_COLOR=0`. This name reads as a switch, so somebody
+/// will write `OSLO_ALLHIST=0` meaning off — and having that turn recording *on* is the kind of
+/// surprise you only find by noticing your history filling up.
 pub fn record_commands() -> bool {
-    std::env::var_os(ALLHIST).is_some_and(|v| !v.is_empty())
+    match std::env::var(ALLHIST) {
+        Ok(value) => !matches!(
+            value.trim().to_ascii_lowercase().as_str(),
+            "" | "0" | "false" | "no" | "off"
+        ),
+        Err(_) => false,
+    }
 }
 
 /// Record a `-c` command, as though it had been typed at a prompt.

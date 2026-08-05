@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.2.12] - 2026-08-05
+
+### <!-- 1 -->🐛 Bug Fixes
+
+- The finished line drops its ghost
+- Sh -c -- cmd runs cmd
+- OSLO_ALLHIST=0 means off
+
 ## [0.2.11] - 2026-08-05
 
 ### <!-- 1 -->🐛 Bug Fixes

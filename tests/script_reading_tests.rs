@@ -12,9 +12,25 @@ use common::oslo_bin;
 use std::path::Path;
 use std::process::{Command, Output};
 
+/// Run the binary with the ambient environment cleared of anything that would change the answer.
+///
+/// **Not optional.** These tests assert on where history is written and whether it is written at
+/// all, and both are environment-driven — so a developer who has exported `OSLO_ALLHIST=1` or
+/// `OSLO_PROFILE=…` for their own shell made them fail, and one who had not made them pass. That
+/// is a test that measures the machine rather than the code, and both spellings of it were caught
+/// exactly that way: the store went to `claude.kv` while the assertion looked for `default.kv`.
 fn run(args: &[&str], env: &[(&str, &str)], cwd: &Path) -> Output {
     let mut cmd = Command::new(oslo_bin());
-    cmd.args(args).current_dir(cwd).env("TERM", "dumb");
+    cmd.args(args)
+        .current_dir(cwd)
+        .env("TERM", "dumb")
+        .env("HOME", cwd)
+        .env_remove("OSLO_ALLHIST")
+        .env_remove("OSLO_PROFILE")
+        .env_remove("XDG_DATA_HOME")
+        .env_remove("HISTFILE")
+        .env_remove("HISTSIZE")
+        .env_remove("ENV");
     for (k, v) in env {
         cmd.env(k, v);
     }
@@ -126,6 +142,35 @@ fn allhist_records_a_dash_c_command_in_both_stores() {
         !text.contains("private"),
         "a space-prefixed command was recorded: {text:?}"
     );
+}
+
+/// **`OSLO_ALLHIST=0` means off.** The name reads as a switch, so somebody will write `0` meaning
+/// off — and "any non-empty value is on", which is `$NO_COLOR`'s rule, would have turned it on.
+#[test]
+fn allhist_understands_a_false_value() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    for (value, records) in [
+        ("1", true),
+        ("yes", true),
+        ("on", true),
+        ("0", false),
+        ("false", false),
+        ("no", false),
+        ("off", false),
+        ("", false),
+    ] {
+        let hist = dir.path().join(format!("hist-{value}"));
+        run(
+            &["-c", "echo x"],
+            &[
+                ("HISTFILE", hist.to_str().expect("path")),
+                ("XDG_DATA_HOME", dir.path().to_str().expect("path")),
+                ("OSLO_ALLHIST", value),
+            ],
+            dir.path(),
+        );
+        assert_eq!(hist.exists(), records, "OSLO_ALLHIST={value:?}");
+    }
 }
 
 /// A *script* is never recorded, however `$OSLO_ALLHIST` is set: its contents are not commands
