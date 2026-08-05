@@ -128,6 +128,35 @@ fn allhist_records_a_dash_c_command_in_both_stores() {
     );
 }
 
+/// **`OSLO_ALLHIST=0` means off.** The name reads as a switch, so somebody will write `0` meaning
+/// off — and "any non-empty value is on", which is `$NO_COLOR`'s rule, would have turned it on.
+#[test]
+fn allhist_understands_a_false_value() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    for (value, records) in [
+        ("1", true),
+        ("yes", true),
+        ("on", true),
+        ("0", false),
+        ("false", false),
+        ("no", false),
+        ("off", false),
+        ("", false),
+    ] {
+        let hist = dir.path().join(format!("hist-{value}"));
+        run(
+            &["-c", "echo x"],
+            &[
+                ("HISTFILE", hist.to_str().expect("path")),
+                ("XDG_DATA_HOME", dir.path().to_str().expect("path")),
+                ("OSLO_ALLHIST", value),
+            ],
+            dir.path(),
+        );
+        assert_eq!(hist.exists(), records, "OSLO_ALLHIST={value:?}");
+    }
+}
+
 /// A *script* is never recorded, however `$OSLO_ALLHIST` is set: its contents are not commands
 /// anybody typed, and every `#!/bin/sh` script on the machine would otherwise land in the history.
 #[test]
