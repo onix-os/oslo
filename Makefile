@@ -34,7 +34,7 @@ $(info ------------------------------------------)
 $(info Project: $(PROJECT_NAME) v$(PROJECT_VERSION))
 $(info ------------------------------------------)
 
-.PHONY: build b dev check-static compile c run r example test t check check-all test-all check-loc check-readme print-name clippy rustdoc fmt fmt-check clean verify vm vm-distro install uninstall release help h
+.PHONY: build b dev check-static compile c run r example test t check check-all test-all check-loc check-readme print-name clippy rustdoc fmt fmt-check clean verify vm vm-distro vm-arch install uninstall release help h
 
 build:
 	@RUSTFLAGS="$(STATIC_RUSTFLAGS)" $(CARGO) build --release --target $(TARGET) --bin $(PROJECT_NAME)
@@ -121,14 +121,22 @@ check-readme:
 # check-all/test-all are deliberately absent: the crate declares no [features], so they are
 # byte-identical reruns of check/test and only slow the gate down. Add them back the day a
 # [features] section appears.
-# The two VMs are deliberately *not* in `verify`: each needs a musl toolchain, qemu and the
-# network, and takes minutes. They answer questions a checkout cannot — whether the release
-# artifact runs as PID 1 on a foreign userland, and whether a distro's own init system runs on it.
+# The VMs are deliberately *not* in `verify`: each needs a musl toolchain, qemu and the network,
+# and takes minutes. They answer questions a checkout cannot — whether the release artifact runs as
+# PID 1 on a foreign userland, and whether a distro's own init system runs on it.
+#
+# The two distros are chosen to disagree with each other. Alpine is musl, OpenRC and a busybox
+# `/bin/sh`; Arch is glibc, systemd and a **bash** `/bin/sh`, so standing in for it is a
+# bash-compatibility test rather than a POSIX one. Passing both is worth far more than passing
+# either twice.
 vm:
 	bash scripts/alpine-vm.sh
 
 vm-distro:
 	bash scripts/alpine-distro-vm.sh
+
+vm-arch:
+	bash scripts/arch-vm.sh
 
 # Time the corpus, in a scratch directory.
 #
