@@ -403,3 +403,127 @@ fn a_lua_binding_can_submit_the_line() {
     );
     assert_eq!(s.buffer.text(), " _a");
 }
+
+/// The `key` hook sees a key before any binding, before vi, and before an ordinary character is
+/// inserted — and each of its three answers does a different thing.
+#[test]
+fn the_key_hook_sees_every_key_first() {
+    /// Swallows `x`, rewrites `!`, and lets everything else through.
+    struct Hook;
+    impl Assist for Hook {
+        fn watches_keys(&mut self) -> bool {
+            true
+        }
+        fn key_hook(&mut self, key: Key, line: &str, _cursor: usize) -> Option<KeyHook> {
+            match key {
+                Key::Char('x') => Some(KeyHook::Swallow),
+                Key::Char('!') => Some(KeyHook::Line {
+                    text: format!("sudo {line}"),
+                    cursor: 0,
+                    submit: false,
+                }),
+                _ => None,
+            }
+        }
+        // Bound too, to prove the hook is asked *before* this is.
+        fn binding(&mut self, key: Key) -> Option<Bound> {
+            (key == Key::Char('x')).then_some(Bound::ClearScreen)
+        }
+    }
+
+    let mut s = Session {
+        vi: None,
+        ..Session::new("", 0)
+    };
+    for key in typed("echo") {
+        s.apply(key, &mut Hook);
+    }
+    assert_eq!(
+        s.apply(Key::Char('x'), &mut Hook),
+        Step::Continue { redraw: false },
+        "a swallowed key beats even a binding on the same key"
+    );
+    assert_eq!(s.buffer.text(), "echo", "and never reaches the buffer");
+
+    assert_eq!(
+        s.apply(Key::Char('!'), &mut Hook),
+        Step::Continue { redraw: true }
+    );
+    assert_eq!(s.buffer.text(), "sudo echo", "the hook replaced the line");
+    assert_eq!(s.buffer.cursor(), 0, "and placed the cursor");
+}
+
+/// A hook that declines leaves the key doing exactly what it did before — including a key the
+/// config bound, which the hook is asked about first but has no opinion on.
+#[test]
+fn a_declining_key_hook_changes_nothing() {
+    struct Quiet(usize);
+    impl Assist for Quiet {
+        fn watches_keys(&mut self) -> bool {
+            true
+        }
+        fn key_hook(&mut self, _key: Key, _line: &str, _cursor: usize) -> Option<KeyHook> {
+            self.0 += 1;
+            None
+        }
+    }
+
+    let mut seen = Quiet(0);
+    let mut s = Session {
+        vi: None,
+        ..Session::new("", 0)
+    };
+    for key in typed("ls -l") {
+        s.apply(key, &mut seen);
+    }
+    assert_eq!(
+        s.apply(Key::Ctrl('w'), &mut seen),
+        Step::Continue { redraw: true }
+    );
+    assert_eq!(s.buffer.text(), "ls ", "C-w still killed the word");
+    assert_eq!(seen.0, 6, "and the hook was asked about every one of them");
+}
+
+/// **Nothing is asked when nothing is attached.** `key_hook` is the only `Assist` method on the
+/// path of ordinary typing, so a session with no handler must not even build the line to offer.
+#[test]
+fn an_unwatched_session_never_builds_the_payload() {
+    struct Never;
+    impl Assist for Never {
+        fn key_hook(&mut self, _key: Key, _line: &str, _cursor: usize) -> Option<KeyHook> {
+            panic!("asked despite watches_keys() being false");
+        }
+    }
+    let mut s = Session {
+        vi: None,
+        ..Session::new("", 0)
+    };
+    for key in typed("echo hi") {
+        s.apply(key, &mut Never);
+    }
+    assert_eq!(s.buffer.text(), "echo hi");
+}
+
+/// A hook may run the line, which is what makes it able to replace a binding outright.
+#[test]
+fn the_key_hook_can_submit() {
+    struct Go;
+    impl Assist for Go {
+        fn watches_keys(&mut self) -> bool {
+            true
+        }
+        fn key_hook(&mut self, _key: Key, _line: &str, _cursor: usize) -> Option<KeyHook> {
+            Some(KeyHook::Line {
+                text: "ll".to_string(),
+                cursor: 2,
+                submit: true,
+            })
+        }
+    }
+    let mut s = Session {
+        vi: None,
+        ..Session::new("", 0)
+    };
+    assert_eq!(s.apply(Key::Ctrl('o'), &mut Go), Step::Accept);
+    assert_eq!(s.buffer.text(), "ll");
+}

@@ -26,7 +26,7 @@ pub(crate) const HOOK_PREFIX: &str = "hook:";
 /// A fixed list rather than an open set: a name that is never fired is indistinguishable from a
 /// typo, and `oslo.on.precmb(fn)` silently doing nothing for ever is the failure mode this
 /// avoids.
-pub(crate) const HOOKS: [&str; 7] = [
+pub(crate) const HOOKS: [&str; 8] = [
     // **`preexec` and `precmd` are the names the rest of the world uses**, and oslo had them
     // crossed: what it called `precmd` fires *before the command*, which is preexec everywhere
     // else, and there was no hook at all for "a prompt is about to be drawn" — the thing every
@@ -41,7 +41,29 @@ pub(crate) const HOOKS: [&str; 7] = [
     "prompt",
     "cd",
     "command-not-found",
+    // Every keystroke, before the editor acts on it. See `KEY_WATCHED`.
+    "key",
 ];
+
+/// The `key` hook's name, spelled once.
+pub(crate) const KEY: &str = "key";
+
+/// Whether anything has ever attached to the `key` hook.
+///
+/// **This exists so that not using the hook costs nothing.** Every other hook fires at a moment
+/// that already involves running a command; this one fires on every keypress, and asking the
+/// registry each time — a string format, a map lookup, a `Vec` — would put that on the path of
+/// simply typing. One relaxed load answers it instead.
+///
+/// Never cleared. Removing the last handler leaves the flag set and the lookup then finds an empty
+/// list, which costs a little on a session that attached and detached; clearing it correctly would
+/// mean counting handlers across reloads, and a wrong count here silently kills the hook.
+static KEY_WATCHED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Whether the `key` hook is worth asking about. See [`KEY_WATCHED`].
+pub fn key_hook_watched() -> bool {
+    KEY_WATCHED.load(std::sync::atomic::Ordering::Relaxed)
+}
 
 /// Add the introspection fields, `oslo.opts` and `oslo.on` to the `oslo` table.
 pub fn install(
@@ -161,6 +183,9 @@ fn hooks(registry: &Registry) -> Value {
                     "oslo.on.{name}: the argument must be a function"
                 )));
             };
+            if name == KEY {
+                KEY_WATCHED.store(true, std::sync::atomic::Ordering::Relaxed);
+            }
             let id = append(&registry, &key, handler.clone());
             ok(handle(&registry, &key, id))
         });

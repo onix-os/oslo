@@ -465,15 +465,39 @@ no way to say "redraw the accepted line differently". oslo owns its own editor, 
 ### The hooks
 
 ```lua
-oslo.on.prompt(function()       end)  -- before each prompt is drawn
-oslo.on.preexec(function(line)  end)  -- after Enter, before the command runs
-oslo.on.postexec(function(code) end)  -- after it finishes
-oslo.on.cd(function(dir)        end)
+oslo.on.prompt(function()      end)  -- before each prompt is drawn
+oslo.on.preexec(function(cmd)  end)  -- after Enter, before the command runs
+oslo.on.postexec(function(cmd) end)  -- after it finishes, success or not
+oslo.on.cd(function(dir)       end)
+oslo.on.key(function(k)        end)  -- every keystroke, before the editor acts
 oslo.on["command-not-found"](function(name) end)
 ```
 
+`preexec` is handed `{ text, cwd, mode }` and `postexec` the same plus `{ status, ok, duration_ms }`,
+with `cwd` being where the command *ended* so the pair still reads correctly across a `cd`.
+`postexec` fires whether the command succeeded or not.
+
 `precmd` and `postcmd` are the names oslo shipped first and still answers to. They fire alongside
 `preexec` and `postexec`, which are what the rest of the world calls the same two moments.
+
+`on.key` sees every keystroke — ordinary characters included — before any binding, before vi, and
+before the editor acts. It is told `{ name, char, text, cursor, word, word_start }`, and what it
+returns decides what the key does:
+
+```lua
+oslo.on.key(function(k)
+  if k.name == "ctrl-d" and k.text ~= "" then return false end   -- swallow it
+  if k.char == "(" then                                          -- rewrite the line
+    return { text = k.text:sub(1, k.cursor) .. "()" .. k.text:sub(k.cursor + 1),
+             cursor = k.cursor + 1 }
+  end
+  -- anything else: the key does what it always did
+end)
+```
+
+Returning nothing is the safe default, and so is returning something unrecognised — only an
+explicit `false` swallows a key and only a string or a `{ text = … }` table replaces the line. A
+session with no `key` handler attached does not pay for the hook at all.
 
 ### Universal variables
 

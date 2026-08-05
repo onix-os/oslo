@@ -68,6 +68,56 @@ pub fn line_table(text: &str, cursor: usize) -> Value {
     Value::Table(Rc::new(RefCell::new(t)))
 }
 
+/// What the `key` hook is told: which key, and the line as it stands.
+///
+/// The same fields a binding's handler gets, plus the two that say what was pressed — so a hook
+/// and a binding can share one function, and a hook that only cares about the line need not learn
+/// a second shape.
+///
+/// `char` is set only for an ordinary character, and `name` is `"char"` then. Every other key has
+/// a name and no `char`, which is what lets a handler branch on one field.
+pub fn key_table(name: &str, pressed: Option<char>, text: &str, cursor: usize) -> Value {
+    let table = line_table(text, cursor);
+    if let Value::Table(t) = &table {
+        let mut t = t.borrow_mut();
+        t.set(Value::str("name"), Value::str(name));
+        t.set(
+            Value::str("char"),
+            match pressed {
+                Some(c) => Value::str(c.to_string()),
+                None => Value::Nil,
+            },
+        );
+    }
+    table
+}
+
+/// What a `key` hook answered.
+pub enum KeyOutcome {
+    /// Carry on: the key does whatever it would have done.
+    Pass,
+    /// Consume the key.
+    Swallow,
+    /// Put this line in place instead.
+    Line(Answer),
+}
+
+/// Read a `key` hook's answer.
+///
+/// **Anything unrecognised is [`KeyOutcome::Pass`]**, and that default is the safety property of
+/// the whole feature: this runs for every keystroke, so a handler that falls off the end of an
+/// `if` — or returns a number by accident — must leave typing working. Only an explicit `false`
+/// swallows a key, and only a string or a `{ text = … }` table replaces the line.
+pub fn key_outcome_from(answer: &Value) -> KeyOutcome {
+    match answer {
+        Value::Bool(false) => KeyOutcome::Swallow,
+        other => match answer_from(other) {
+            Some(line) => KeyOutcome::Line(line),
+            None => KeyOutcome::Pass,
+        },
+    }
+}
+
 /// What the line should become, read out of what a handler answered.
 ///
 /// `None` when the handler answered nothing, or answered something that is not a line — a handler
@@ -162,6 +212,65 @@ mod tests {
         // A table with no `text` is not a line either.
         let empty = Value::Table(Rc::new(RefCell::new(Table::new())));
         assert_eq!(line_from(&empty), None);
+    }
+
+    fn field(value: &Value, name: &str) -> Value {
+        match value {
+            Value::Table(t) => t.borrow().get(&Value::str(name)),
+            _ => Value::Nil,
+        }
+    }
+
+    fn string_at(value: &Value, name: &str) -> Option<String> {
+        match field(value, name) {
+            Value::Str(s) => Some(s.to_string()),
+            _ => None,
+        }
+    }
+
+    /// A hook is told what was pressed on top of everything a binding is told about the line.
+    #[test]
+    fn the_key_hook_is_told_the_key_and_the_line() {
+        let k = key_table("char", Some('o'), "echo", 4);
+        assert_eq!(string_at(&k, "name").as_deref(), Some("char"));
+        assert_eq!(string_at(&k, "char").as_deref(), Some("o"));
+        assert_eq!(string_at(&k, "text").as_deref(), Some("echo"));
+        assert_eq!(string_at(&k, "word").as_deref(), Some("echo"));
+        assert!(
+            matches!(field(&k, "cursor"), Value::Number(n) if n.as_int() == Some(4)),
+            "and everything a binding's handler already gets"
+        );
+
+        // A chord has a name and no character, which is what a handler branches on.
+        let k = key_table("ctrl-k", None, "", 0);
+        assert_eq!(string_at(&k, "name").as_deref(), Some("ctrl-k"));
+        assert!(matches!(field(&k, "char"), Value::Nil));
+    }
+
+    /// **Only `false` swallows and only a line replaces.** Everything else carries on, because
+    /// this runs for every keystroke: a handler that falls off the end of an `if`, or returns a
+    /// number by accident, must leave typing working rather than eat the key.
+    #[test]
+    fn an_unrecognised_key_hook_answer_leaves_the_key_alone() {
+        assert!(matches!(
+            key_outcome_from(&Value::Bool(false)),
+            KeyOutcome::Swallow
+        ));
+        for answer in [
+            Value::Nil,
+            Value::Bool(true),
+            Value::int(4),
+            Value::Table(Rc::new(RefCell::new(Table::new()))),
+        ] {
+            assert!(
+                matches!(key_outcome_from(&answer), KeyOutcome::Pass),
+                "an answer that is not a line must not change what the key does"
+            );
+        }
+        let KeyOutcome::Line(line) = key_outcome_from(&Value::str("sudo ls")) else {
+            panic!("a string is the whole line, as it is for a binding");
+        };
+        assert_eq!(line.text, "sudo ls");
     }
 
     /// The word under the cursor, including when the cursor sits at either end of it.
