@@ -355,8 +355,22 @@ found on `$PATH` — so a bare `history` can only ever have been typed by a pers
 ## Configuration
 
 `~/.config/oslo/config.lua`. One file, one language, one place — there is no shell-syntax config.
-(`$ENV` and `$PS1` still work: those are POSIX's, not oslo's, and a `/bin/sh` does not get to
-refuse them.)
+
+What a shell reads before its first command, and when:
+
+| | |
+|---|---|
+| **login** (`-l`, or `argv[0]` starting `-`) | `/etc/profile`, then `~/.profile` |
+| **interactive** | `~/.config/oslo/config.lua` |
+| **any** | `$ENV`, last, since `~/.profile` is where it is usually set |
+
+The profile files are POSIX's and shell syntax, and oslo is a `/bin/sh` before it is anything else
+— it does not get to refuse them. `/etc/profile.d` is **not** walked separately: `/etc/profile`
+does that itself with `run-parts`, and a shell that also did it would source every file twice.
+Root needs no special case, because `~/.profile` follows `$HOME`.
+
+To read a shell file from the Lua config — an `aliases.sh` shared with your other shells — use
+`oslo.source`, which runs it in *this* shell so its aliases and functions stick.
 
 ```lua
 oslo.completion.max_rows = 12

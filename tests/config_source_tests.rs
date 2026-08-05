@@ -38,6 +38,34 @@ fn repl(input: &str, vars: &[(&str, &str)], home: &Path) -> Output {
     child.wait_with_output().expect("oslo output")
 }
 
+/// Run non-interactively against a throwaway `$HOME`.
+fn run(args: &[&str], vars: &[(&str, &str)], home: &Path) -> Output {
+    let mut cmd = Command::new(oslo_bin());
+    cmd.args(args)
+        .env("HOME", home)
+        .env_remove("XDG_CONFIG_HOME")
+        .env_remove("ENV")
+        .stdin(Stdio::null());
+    for (k, v) in vars {
+        cmd.env(k, v);
+    }
+    cmd.output().expect("spawn oslo")
+}
+
+/// Run with a chosen `argv[0]`, which is the only way to test the login convention: `login(1)` and
+/// `su -` pass `-sh`, and nothing but `execve` can spell that.
+fn run_as(argv0: &str, args: &[&str], home: &Path) -> Output {
+    use std::os::unix::process::CommandExt;
+    let mut cmd = Command::new(oslo_bin());
+    cmd.arg0(argv0)
+        .args(args)
+        .env("HOME", home)
+        .env_remove("XDG_CONFIG_HOME")
+        .env_remove("ENV")
+        .stdin(Stdio::null());
+    cmd.output().expect("spawn oslo")
+}
+
 fn out(o: &Output) -> String {
     String::from_utf8_lossy(&o.stdout).into_owned()
 }
@@ -106,4 +134,44 @@ fn sourcing_a_missing_file_does_not_stop_the_config() {
         "the missing file was not reported: {:?}",
         err(&o)
     );
+}
+
+/// **A login shell reads `/etc/profile` and then `~/.profile`.** oslo read neither: `-l` was
+/// parsed and thrown away, so a shell started by `login(1)`, `su -` or a display manager saw none
+/// of the system's setup.
+///
+/// The order is the system's file first, so a user's own can override it — which is what dash and
+/// bash both do, watched with `strace` rather than taken from memory.
+#[test]
+fn a_login_shell_reads_the_profile() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    std::fs::write(dir.path().join(".profile"), "export FROM_PROFILE=yes\n").expect("write");
+
+    let plain = run(&["-c", "echo [$FROM_PROFILE]"], &[], dir.path());
+    assert_eq!(
+        out(&plain).trim_end(),
+        "[]",
+        "a non-login shell must not read ~/.profile"
+    );
+
+    let login = run(&["-l", "-c", "echo [$FROM_PROFILE]"], &[], dir.path());
+    assert_eq!(out(&login).trim_end(), "[yes]", "{:?}", err(&login));
+}
+
+/// **`argv[0]` beginning with `-` means a login shell**, which is the only signal `login(1)` and
+/// `su -` give. `-sh` is the spelling every one of them uses.
+#[test]
+fn a_dash_prefixed_name_is_a_login_shell() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    std::fs::write(dir.path().join(".profile"), "export FROM_PROFILE=yes\n").expect("write");
+
+    for (argv0, want) in [
+        ("-sh", "[yes]"),
+        ("-oslo", "[yes]"),
+        ("sh", "[]"),
+        ("-", "[]"),
+    ] {
+        let o = run_as(argv0, &["-c", "echo [$FROM_PROFILE]"], dir.path());
+        assert_eq!(out(&o).trim_end(), want, "argv[0]={argv0:?}: {:?}", err(&o));
+    }
 }

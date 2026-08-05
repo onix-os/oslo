@@ -33,13 +33,39 @@ pub type ExitRequest = Option<i32>;
 /// Nothing here is fatal. A startup file that does not exist is not an error (that is the normal
 /// case), and one that fails half way through leaves the shell running with whatever it managed
 /// to set — a broken rc file must not cost you your shell.
-pub fn load_startup_files(env: &mut Environment, interactive: bool) -> ExitRequest {
-    let sourced: Vec<PathBuf> = Vec::new();
+pub fn load_startup_files(env: &mut Environment, interactive: bool, login: bool) -> ExitRequest {
+    let mut sourced: Vec<PathBuf> = Vec::new();
 
     // The config is Lua and is loaded by `super::lua_init`, not sourced here — see `config_path`.
-    // What remains in this function is POSIX's own hook, which is not oslo's to remove.
+    // What remains in this function is POSIX's own, which is not oslo's to remove.
     let _ = interactive;
 
+    // **A login shell reads the profile files, and only a login shell does.** `-l`, or an `argv[0]`
+    // beginning with `-`, which is how `login`, `su -` and every display manager start one.
+    //
+    // `/etc/profile` first so a user's own file can override the system's, which is the order dash
+    // and bash both use — verified by watching what they open rather than from memory.
+    //
+    // **`/etc/profile.d` is deliberately absent.** `/etc/profile` walks it itself with `run-parts`;
+    // a shell that also walked it would source all seventeen of this machine's files twice.
+    if login {
+        // Built rather than written inline: a shell with no `$HOME` still reads `/etc/profile`,
+        // and an early return for the missing one would have skipped it.
+        let mut profiles = vec![PathBuf::from("/etc/profile")];
+        profiles.extend(home_profile(env));
+        for path in profiles {
+            if sourced.contains(&path) {
+                continue;
+            }
+            sourced.push(path.clone());
+            if let Some(status) = source_if_present(env, &path) {
+                return Some(status);
+            }
+        }
+    }
+
+    // Last, because a login shell's `~/.profile` is where `$ENV` is usually set — reading it first
+    // would use the value from before the profile ran.
     if let Some(path) = env_file(env)
         && !sourced.contains(&path)
         && let Some(status) = source_if_present(env, &path)
@@ -48,6 +74,19 @@ pub fn load_startup_files(env: &mut Environment, interactive: bool) -> ExitReque
     }
 
     None
+}
+
+/// `$HOME/.profile`.
+///
+/// **Root needs no special case**: `$HOME` is `/root` for root, so this is `/root/.profile` there
+/// and `~/.profile` for everybody else, exactly as every other shell resolves it.
+///
+/// There is no `~/.oslo_profile`. bash looks for `~/.bash_profile` first so that bash-only login
+/// setup has somewhere to live, but oslo's own configuration is `config.lua` — a second oslo-only
+/// file would be a third place to look and a question about which one wins.
+fn home_profile(env: &mut Environment) -> Option<PathBuf> {
+    let home = env.get_var("HOME").map(str::to_string)?;
+    (!home.is_empty()).then(|| PathBuf::from(home).join(".profile"))
 }
 
 /// The file `$ENV` names, after parameter expansion, or `None` when the variable is unset,
