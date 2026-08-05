@@ -260,6 +260,21 @@ pub fn parse(argv: &[String]) -> Result<Invocation, Exit> {
                     let rest: String = letters[pos + 1..].iter().collect();
                     if rest.is_empty() {
                         i += 1;
+                        // **`sh -c -- 'cmd'` runs `cmd`.** A `--` in the argument's place ends
+                        // option processing rather than becoming the program text, so the command
+                        // string is the operand after it. bash and dash both do this, and it is
+                        // not a nicety: musl's `system(3)` calls
+                        // `execl("/bin/sh", "sh", "-c", "--", cmd, 0)`, so reading the `--` as the
+                        // program meant *every* `system()` call on a machine with oslo as
+                        // `/bin/sh` ran `--` and reported "command not found".
+                        //
+                        // Only in this position. A `--` *after* the command string is an ordinary
+                        // operand and becomes `$0` — which is what `find -exec sh -c '…' -- {} +`
+                        // depends on, and is covered by its own test.
+                        if argv.get(i).is_some_and(|arg| arg == "--") {
+                            ended_options = true;
+                            i += 1;
+                        }
                         match argv.get(i) {
                             Some(text) => command = Some(text.clone()),
                             None => {

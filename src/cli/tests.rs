@@ -174,6 +174,35 @@ fn a_tool_can_be_named_in_the_operand_slot() {
     );
 }
 
+/// **`sh -c -- 'cmd'` runs `cmd`.** A `--` where `-c`'s argument would go ends option processing;
+/// the command string is the operand after it.
+///
+/// This is not a nicety. musl's `system(3)` calls `execl("/bin/sh", "sh", "-c", "--", cmd, 0)`, so
+/// reading the `--` as the program text meant every `system()` call on a machine with oslo as
+/// `/bin/sh` ran `--` and reported "command not found" — found by `python3 -c 'os.system(…)'`
+/// within a minute of pointing `/bin/sh` at it.
+#[test]
+fn a_double_dash_before_the_command_string_ends_the_options() {
+    let inv = parse_args(&["-c", "--", "echo hi"]).expect("parse");
+    assert_eq!(inv.action, Action::Command("echo hi".to_string()));
+
+    // The operands after it still land where they did: the next one is `$0`.
+    let inv = parse_args(&["-c", "--", "echo $0", "zero", "one"]).expect("parse");
+    assert_eq!(inv.action, Action::Command("echo $0".to_string()));
+    assert_eq!(inv.name, "zero");
+    assert_eq!(inv.positional, vec!["one".to_string()]);
+}
+
+/// And a `--` *after* the command string is an ordinary operand that becomes `$0`, which is what
+/// `find -exec sh -c '…' -- {} +` depends on. The two positions must not be confused.
+#[test]
+fn a_double_dash_after_the_command_string_is_still_dollar_zero() {
+    let inv = parse_args(&["-c", "echo hi", "--", "x"]).expect("parse");
+    assert_eq!(inv.action, Action::Command("echo hi".to_string()));
+    assert_eq!(inv.name, "--");
+    assert_eq!(inv.positional, vec!["x".to_string()]);
+}
+
 /// **`--` says the word is a path.** The escape hatch for the day somebody has a script named
 /// `hook`, and the reason the operand slot is not silently narrowed.
 #[test]
