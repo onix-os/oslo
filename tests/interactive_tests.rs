@@ -468,3 +468,35 @@ fn an_unterminated_quote_colours_the_rest_of_the_line() {
         ("\"a b", Role::DoubleQuote)
     );
 }
+
+/// Completion inside an open `{a,b}` list targets the item being typed.
+///
+/// `rm /dir/{alpha,be` completes `be` against `/dir/`. Without this the word is one path holding a
+/// literal brace, which matches nothing — completion went silent from the `{` onwards.
+#[test]
+fn a_brace_list_completes_the_item_being_typed() {
+    let dir = tempfile::tempdir().unwrap();
+    fs::write(dir.path().join("alpha.kv"), b"x").unwrap();
+    fs::write(dir.path().join("beta.kv"), b"x").unwrap();
+    let h = helper(Environment::new());
+    let d = dir.path().display();
+
+    let names = |line: &str| -> Vec<String> {
+        let (_, c) = h.candidates(line, line.len());
+        c.iter().map(|c| c.display.clone()).collect()
+    };
+
+    assert_eq!(names(&format!("rm {d}/{{")), ["alpha.kv", "beta.kv"]);
+    assert_eq!(names(&format!("rm {d}/{{al")), ["alpha.kv"]);
+    assert_eq!(names(&format!("rm {d}/{{alpha.kv,be")), ["beta.kv"]);
+
+    // The replacement span is the item, not the whole word, so accepting it keeps the brace.
+    let line = format!("rm {d}/{{alpha.kv,be");
+    let (start, _) = h.candidates(&line, line.len());
+    assert_eq!(&line[start..], "be");
+
+    // A closed list is an ordinary word again: the brace is done, so a following path completes
+    // against the directory as usual.
+    let closed = format!("rm {d}/{{alpha.kv}} {d}/be");
+    assert_eq!(names(&closed), ["beta.kv"]);
+}
