@@ -75,6 +75,26 @@ impl Environment {
     /// Set only when unset, matching [`Self::seed_process_vars`]: a caller who exported their own
     /// `$BASH_VERSION` meant it, and a shell that overwrote it would be arguing with the person
     /// running it.
+    /// `$IFS`, which POSIX says the shell sets at startup to space, tab and newline.
+    ///
+    /// **It was a default without a variable.** Field splitting read `get_var("IFS")` and fell
+    /// back to `" \t\n"` when nothing was there, so splitting behaved correctly while the
+    /// *variable* did not exist: `${#IFS}` was 0, `${IFS+SET}` was empty, and under `set -u` any
+    /// mention of `$IFS` was a fatal "unbound variable". `/usr/bin/xdg-terminal-exec` opens with
+    /// `XTE__OIFS=$IFS` under `set -u` and died there.
+    ///
+    /// Not exported, matching bash and dash — `export -p` lists it in neither — because a child
+    /// process has no use for its parent's field separators.
+    ///
+    /// Set only when unset, like everything else here: a caller who put `IFS` in the environment
+    /// meant it, and POSIX says an inherited value is used.
+    pub(super) fn seed_field_separator(&mut self) {
+        if !self.vars.contains_key("IFS") {
+            self.vars
+                .insert("IFS".to_string(), (" \t\n".to_string(), false));
+        }
+    }
+
     pub(super) fn seed_compatibility_vars(&mut self) {
         let (major, minor, patch) = Self::BASH_COMPAT;
         if !self.vars.contains_key("BASH_VERSION") {
