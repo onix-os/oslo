@@ -70,6 +70,44 @@ pub fn ask_hook_here(name: &str, args: Vec<Value>) -> Option<i32> {
     ask_hook_on(&interp, &registry, name, args)
 }
 
+/// Whether the `key` hook has anything attached, and is therefore worth building a payload for.
+///
+/// Re-exported here because the editor lives in the binary and cannot see `lua::api`. See
+/// `api::shell::KEY_WATCHED` for why the question is asked this way rather than by looking.
+pub fn key_hook_watched() -> bool {
+    crate::lua::api::key_hook_watched()
+}
+
+/// Fire the `key` hook, answering with the first handler that returned anything.
+///
+/// **First to answer wins, and the rest are skipped** — the same rule `ask_hook_here` uses, and
+/// the right one for an interception chain: the handler that decided what the key means has ended
+/// the question. A handler that only watched returns nothing and the next one is asked.
+///
+/// `None` when nothing is attached, when there is no interpreter on this thread, or when every
+/// handler declined. The caller then does what it would have done without the hook, which is what
+/// keeps a config that only *observes* keys from changing how any of them behave.
+pub fn key_hook_here(args: Vec<Value>) -> Option<Value> {
+    if !crate::lua::api::key_hook_watched() {
+        return None;
+    }
+    let (interp, registry) = ACTIVE.with(|slot| slot.borrow().clone())?;
+    for handler in crate::lua::api::hook_handlers(&registry, crate::lua::api::HOOK_KEY) {
+        match interp.call(&handler, args.clone()) {
+            Ok(values) => match values.first() {
+                None | Some(Value::Nil) => {}
+                Some(answer) => return Some(answer.clone()),
+            },
+            // Reported and skipped. A handler that raises on every keystroke would otherwise fill
+            // the screen faster than it could be read, but silence here means a hook that has
+            // stopped working with nothing to say why — and this one is on the typing path, so
+            // "it went quiet" is exactly the symptom that needs explaining.
+            Err(e) => eprintln!("oslo: key hook: {e}"),
+        }
+    }
+    None
+}
+
 fn ask_hook_on(interp: &Interp, registry: &Registry, name: &str, args: Vec<Value>) -> Option<i32> {
     for handler in crate::lua::api::hook_handlers(registry, name) {
         match interp.call(&handler, args.clone()) {
@@ -304,9 +342,42 @@ impl LuaEngine {
         Value::str(text)
     }
 
-    /// A number argument for a hook.
-    pub fn hook_status(status: i32) -> Value {
-        Value::int(status as i64)
+    /// What `preexec` and `precmd` are handed: the command about to run.
+    ///
+    /// A table rather than the bare string these used to get. The string was never enough — a hook
+    /// that wants to log a command wants to know where it ran, and `oslo.sys.cwd()` asked from
+    /// inside the handler answers the same thing only until the command is a `cd`.
+    pub fn command_started(text: &str, cwd: &str, mode: &str) -> Value {
+        let mut t = crate::lua::eval::value::Table::new();
+        t.set(Value::str("text"), Value::str(text));
+        t.set(Value::str("cwd"), Value::str(cwd));
+        t.set(Value::str("mode"), Value::str(mode));
+        Value::table(t)
+    }
+
+    /// What `postexec` and `postcmd` are handed: the command that just finished.
+    ///
+    /// `cwd` is where it *ended*, which is what makes the pair useful across a `cd`. `duration_ms`
+    /// is the same measurement the slow-command notice and the history's timing column use, so a
+    /// hook and the shell cannot disagree about how long something took.
+    pub fn command_finished(
+        text: &str,
+        cwd: &str,
+        mode: &str,
+        status: i32,
+        duration: std::time::Duration,
+    ) -> Value {
+        let mut t = crate::lua::eval::value::Table::new();
+        t.set(Value::str("text"), Value::str(text));
+        t.set(Value::str("cwd"), Value::str(cwd));
+        t.set(Value::str("mode"), Value::str(mode));
+        t.set(Value::str("status"), Value::int(status as i64));
+        t.set(Value::str("ok"), Value::Bool(status == 0));
+        t.set(
+            Value::str("duration_ms"),
+            Value::int(duration.as_millis() as i64),
+        );
+        Value::table(t)
     }
 
     /// Render one of the prompts, or `None` when the config set none.

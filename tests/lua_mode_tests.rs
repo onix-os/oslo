@@ -173,21 +173,35 @@ fn a_lua_line_is_not_rewritten_by_history_expansion() {
 #[test]
 fn a_precmd_hook_sees_each_command_as_typed() {
     let out = typed(
-        "=oslo.on.precmd(function(c) print('PRE ' .. c) end)\necho hi\n",
+        "=oslo.on.precmd(function(c) print('PRE ' .. c.text .. ' in ' .. c.cwd) end)\necho hi\n",
         &[],
     );
-    assert!(out.contains("PRE echo hi"), "{out}");
+    assert!(out.contains("PRE echo hi in /"), "{out}");
     // The command still runs; a hook observes, it does not intercept.
     assert!(out.contains("\nhi"), "{out}");
 }
 
+/// The status, and the rest of what a hook needs to report a command: how long it took, where it
+/// ended, and whether it worked. The status alone was all this used to be handed.
 #[test]
 fn a_postcmd_hook_is_handed_the_status() {
     let out = typed(
-        "=oslo.on.postcmd(function(s) print('POST ' .. s) end)\nfalse\n",
+        "=oslo.on.postcmd(function(c) print('POST ' .. c.text .. ' ' .. c.status \
+         .. ' ' .. tostring(c.ok) .. ' ' .. type(c.duration_ms)) end)\nfalse\n",
         &[],
     );
-    assert!(out.contains("POST 1"), "{out}");
+    assert!(out.contains("POST false 1 false number"), "{out}");
+}
+
+/// **A command that failed still fires the hook.** It used to fire only on success, which left the
+/// hook silent for exactly the commands one is usually installed to notice.
+#[test]
+fn a_postcmd_hook_fires_for_a_command_that_failed() {
+    let out = typed(
+        "=oslo.on.postcmd(function(c) print('POST ' .. c.status) end)\nno-such-command-anywhere\n",
+        &[],
+    );
+    assert!(out.contains("POST 127"), "{out}");
 }
 
 #[test]
@@ -205,7 +219,7 @@ fn a_cd_hook_fires_only_when_the_directory_changed() {
 #[test]
 fn a_hook_handle_removes_the_handler_it_stands_for() {
     let out = typed(
-        "=h = oslo.on.precmd(function(c) print('PRE ' .. c) end)\necho one\n=h:remove()\necho two\n",
+        "=h = oslo.on.precmd(function(c) print('PRE ' .. c.text) end)\necho one\n=h:remove()\necho two\n",
         &[],
     );
     assert!(out.contains("PRE echo one"), "{out}");
