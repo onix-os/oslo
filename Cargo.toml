@@ -116,6 +116,9 @@ jammdb = "0.11"
 
 [[bench]]
 name = "fuzzy"
+# `bench/`, not cargo's default `benches/`. The path has to be stated because of that, and stating
+# it is the whole cost — cargo finds nothing to auto-discover and takes this instead.
+path = "bench/fuzzy.rs"
 harness = false
 
 # Measured, not assumed — the before/after is in PERF_AND_CODE.md.
