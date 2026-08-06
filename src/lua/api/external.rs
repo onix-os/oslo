@@ -72,6 +72,15 @@ pub fn spec_of(value: &Value) -> Option<Spec> {
 }
 
 /// Substitute `$name` in an argument from the context.
+///
+/// **Every field a prompt segment can render is substitutable here**, and that is the rule rather
+/// than a coincidence: an external prompt is oslo describing itself to a program that cannot look
+/// inside, so anything a native segment may use it must be able to say out loud. `$vimode`, `$user`
+/// and `$host` were in [`Context`] and missing from this list, which made them reachable from a
+/// Lua segment and unreachable from starship, hexe or anything else run as a command.
+///
+/// An absent optional becomes the **empty string**, not the word `none`: the receiving program is
+/// being told "no answer", and every argument parser already knows what an empty value means.
 fn fill(arg: &str, ctx: &Context) -> String {
     let mut out = arg.to_string();
     for (name, value) in [
@@ -82,6 +91,9 @@ fn fill(arg: &str, ctx: &Context) -> String {
         ("$jobs", ctx.jobs.to_string()),
         ("$language", ctx.language.clone()),
         ("$branch", ctx.branch.clone().unwrap_or_default()),
+        ("$vimode", ctx.vimode.clone().unwrap_or_default()),
+        ("$user", ctx.user.clone()),
+        ("$host", ctx.host.clone()),
     ] {
         out = out.replace(name, &value);
     }
@@ -215,6 +227,32 @@ mod tests {
         );
         // A name that is not a placeholder is left exactly as written.
         assert_eq!(fill("--keep-$this", &ctx()), "--keep-$this");
+    }
+
+    /// **Every renderable field can be named.** A field that a Lua segment can read but an
+    /// external prompt cannot ask for is a field that works in one prompt and silently vanishes in
+    /// the other — which is how `$vimode` came to exist on `Context` and be unreachable from
+    /// starship or hexe. If a field is added to `Context`, it is added here too.
+    #[test]
+    fn every_context_field_a_prompt_can_render_is_substitutable() {
+        let mut facts = ctx();
+        facts.vimode = Some("normal".to_string());
+        facts.user = "ada".to_string();
+        facts.host = "lovelace".to_string();
+        facts.language = "lua".to_string();
+        facts.branch = Some("main".to_string());
+
+        assert_eq!(fill("$vimode", &facts), "normal");
+        assert_eq!(fill("$user@$host", &facts), "ada@lovelace");
+        assert_eq!(fill("$language", &facts), "lua");
+        assert_eq!(fill("$branch", &facts), "main");
+
+        // An absent optional is the empty string, so `--vimode=` reaches the program as "no
+        // answer" rather than as the literal word `none` it would then have to special-case.
+        facts.vimode = None;
+        facts.branch = None;
+        assert_eq!(fill("--vimode=$vimode", &facts), "--vimode=");
+        assert_eq!(fill("--branch=$branch", &facts), "--branch=");
     }
 
     /// A tool that never finishes must not become a shell that never prompts.
