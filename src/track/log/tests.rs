@@ -29,24 +29,80 @@ fn newest_row(history: &crate::track::Track) -> Option<(Vec<u8>, Vec<u8>)> {
 #[test]
 fn a_line_remembers_which_language_it_was_typed_in() {
     let (_dir, history) = temp_db();
-    assert!(history.append("ls -la", MODE_SHELL));
-    assert!(history.append("print(1)", MODE_LUA));
+    assert!(history.append("ls -la", MODE_SHELL).is_some());
+    assert!(history.append("print(1)", MODE_LUA).is_some());
 
-    let entries = history.recent(10);
+    let entries: Vec<(String, String)> = history
+        .recent(10)
+        .into_iter()
+        .map(|e| (e.line, e.mode))
+        .collect();
     assert_eq!(
         entries,
         vec![
-            Entry {
-                line: "ls -la".to_string(),
-                mode: MODE_SHELL.to_string()
-            },
-            Entry {
-                line: "print(1)".to_string(),
-                mode: MODE_LUA.to_string()
-            },
+            ("ls -la".to_string(), MODE_SHELL.to_string()),
+            ("print(1)".to_string(), MODE_LUA.to_string()),
         ],
         "oldest first, each with its own mode"
     );
+}
+
+/// The row carries which shell typed it and where in that shell's run it came — the two things a
+/// replay needs and a timestamp cannot supply.
+///
+/// `seq` is what makes an *omission* visible: a secret command is never appended and consumes no
+/// id, so the global ordering has no gap for it, and only a per-session counter that skips can
+/// show that something was left out.
+#[test]
+fn a_row_records_the_session_and_its_position_in_it() {
+    let (_dir, history) = temp_db();
+    history.append("first", MODE_SHELL);
+    history.append("second", MODE_SHELL);
+
+    let entries = history.recent(10);
+    assert_eq!(entries.len(), 2);
+    assert_eq!(
+        entries[0].session, entries[1].session,
+        "one shell is one session"
+    );
+    // The ordinal's *value* is not asserted: it is allocated once per process from a `OnceLock`,
+    // so in a test binary it belongs to whichever test appended first. What this file can promise
+    // is that one shell's rows agree about it.
+    //
+    // **Increasing, not consecutive**, and that is the contract rather than a concession to the
+    // test runner: a secret command is deliberately not appended and still consumes a `seq`, so a
+    // gap is the signal, not a defect. Asserting `+ 1` would pin the opposite of what the field is
+    // for. (It also happens to be why this was flaky — the counter is per *process*, and a test
+    // binary runs many "shells" in one.)
+    assert!(
+        entries[1].seq > entries[0].seq,
+        "the counter advances: {} then {}",
+        entries[0].seq,
+        entries[1].seq
+    );
+    assert!(!entries[0].rewritten, "a line nobody rewrote says so");
+}
+
+/// A row written before these fields existed still reads. The encoding is appended to, never
+/// reordered, so an older store is readable rather than a migration.
+#[test]
+fn a_row_from_an_older_oslo_reads_back_without_a_session() {
+    let (_dir, history) = temp_db();
+    // Exactly what the old encoder wrote: line, mode, timestamp, and nothing after it.
+    let value = Key::with_capacity(32)
+        .text("old line")
+        .text(MODE_SHELL)
+        .int(1_700_000_000)
+        .done();
+    history
+        .store
+        .write(|writer| writer.put(Tree::History, slot(1), value));
+
+    let entries = history.recent(10);
+    assert_eq!(entries.len(), 1);
+    assert_eq!(entries[0].line, "old line");
+    assert_eq!(entries[0].session, 0, "no session recorded, not session 0");
+    assert_eq!(entries[0].seq, 0);
 }
 
 /// Opening creates the directory as well as the file — a fresh machine has neither.
@@ -72,7 +128,7 @@ fn the_history_is_private_from_the_moment_it_exists() {
             .mode()
             & 0o777
     };
-    assert!(history.append("passwd", MODE_SHELL));
+    assert!(history.append("passwd", MODE_SHELL).is_some());
     assert_eq!(mode_of(&dir.path().join("nested/history.db")), 0o600);
     assert_eq!(mode_of(&dir.path().join("nested")), 0o700);
 }
@@ -126,8 +182,8 @@ fn the_bound_is_enforced_in_batches_rather_than_per_line() {
 fn a_command_typed_across_several_lines_comes_back_as_one_entry() {
     let (_dir, history) = temp_db();
     let loop_line = "for f in *.rs; do\n    echo \"$f\"\n done";
-    assert!(history.append(loop_line, MODE_SHELL));
-    assert!(history.append("printf 'a\u{0}b\\n'", MODE_SHELL));
+    assert!(history.append(loop_line, MODE_SHELL).is_some());
+    assert!(history.append("printf 'a\u{0}b\\n'", MODE_SHELL).is_some());
 
     let entries = history.recent(10);
     assert_eq!(entries.len(), 2, "two entries, not five lines");
@@ -179,7 +235,7 @@ fn the_newest_line_is_the_first_row_of_the_store() {
 fn every_line_is_stamped_with_when_it_was_typed() {
     let (_dir, history) = temp_db();
     let before = now();
-    assert!(history.append("date", MODE_SHELL));
+    assert!(history.append("date", MODE_SHELL).is_some());
 
     let (_key, value) = newest_row(&history).expect("a row");
     let mut fields = Fields::of(&value);
@@ -187,7 +243,12 @@ fn every_line_is_stamped_with_when_it_was_typed() {
     assert_eq!(fields.text().as_deref(), Some(MODE_SHELL));
     let at = fields.int().expect("a timestamp");
     assert!((before..=now()).contains(&at), "{at} is when it was typed");
-    assert!(fields.is_empty(), "three fields and nothing else");
+    // The three that came later. Order is the contract — `decode` reads positionally, so a field
+    // inserted rather than appended would silently shift every one after it.
+    assert!(fields.int().is_some(), "session");
+    assert!(fields.int().is_some(), "seq");
+    assert_eq!(fields.int(), Some(0), "rewritten, and this line was not");
+    assert!(fields.is_empty(), "six fields and nothing else");
 }
 
 /// `history -c` empties the store, and the next line typed still lands — the numbering starting
@@ -205,7 +266,7 @@ fn clearing_the_history_leaves_a_store_that_still_takes_lines() {
         "clearing an empty history is not a failure"
     );
 
-    assert!(history.append("after", MODE_SHELL));
+    assert!(history.append("after", MODE_SHELL).is_some());
     assert_eq!(history.recent(10).len(), 1);
     assert_eq!(history.recent(10)[0].line, "after");
 }
@@ -219,7 +280,7 @@ fn trimming_does_not_hand_the_next_line_an_id_that_is_already_taken() {
         history.append(&format!("cmd {i}"), MODE_SHELL);
     }
     assert!(history.trim(2));
-    assert!(history.append("cmd 11", MODE_SHELL));
+    assert!(history.append("cmd 11", MODE_SHELL).is_some());
 
     let (key, _value) = newest_row(&history).expect("a first row");
     assert_eq!(id_of(&key), Some(11));
@@ -259,7 +320,11 @@ fn two_terminals_appending_at_once_lose_no_lines_and_reuse_no_ids() {
                 let history = crate::track::Track::open(&path)
                     .expect("and opens again, from the other shell");
                 for i in 1..=30 {
-                    assert!(history.append(&format!("{terminal} {i}"), MODE_SHELL));
+                    assert!(
+                        history
+                            .append(&format!("{terminal} {i}"), MODE_SHELL)
+                            .is_some()
+                    );
                 }
             });
         }
@@ -293,7 +358,7 @@ fn a_history_from_an_older_oslo_is_kept_and_the_shell_starts_fresh() {
 
     let history = crate::track::Track::open(&path).expect("the shell still gets a history");
     assert!(history.recent(10).is_empty());
-    assert!(history.append("ls", MODE_SHELL));
+    assert!(history.append("ls", MODE_SHELL).is_some());
     assert_eq!(history.recent(10).len(), 1);
 
     let aside = dir.path().join("history.db.unreadable");
@@ -311,7 +376,11 @@ fn a_history_from_an_older_oslo_is_kept_and_the_shell_starts_fresh() {
 fn the_bound_holds_on_a_history_deep_enough_for_one_delete_to_fail() {
     let (_dir, history) = temp_db();
     for i in 1..=3_500 {
-        assert!(history.append(&format!("cargo run --example thing-{i}"), MODE_SHELL));
+        assert!(
+            history
+                .append(&format!("cargo run --example thing-{i}"), MODE_SHELL)
+                .is_some()
+        );
     }
     assert!(history.trim(3_400));
 

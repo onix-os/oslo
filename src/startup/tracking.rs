@@ -185,6 +185,47 @@ fn millis(elapsed: Duration) -> i64 {
     i64::try_from(elapsed.as_millis()).unwrap_or(i64::MAX)
 }
 
+/// Write what the line logged as `history_id` did, links and all.
+///
+/// The log row was written *before* the command ran — that is what keeps a long command visible to
+/// another terminal while it is still going — so the directory, the status and the duration can
+/// only be recorded here, against the id it went in under.
+///
+/// The links come from `exec::pipeline::segments`, which the read loop armed for this line. A line
+/// that was not a chain records one row for itself and no links, which is the common case and
+/// costs one small write.
+pub(super) fn record_outcome(history_id: u64, result: &Result<i32, ShellError>, elapsed: Duration) {
+    let Some(track) = track::store() else {
+        return;
+    };
+    let status = match result {
+        Ok(status) => Some(*status),
+        // A line that never reached execution has no status, and saying so is the point: `None`
+        // here means the same as it does on a link that was short-circuited past.
+        Err(ShellError::SyntaxError(_)) => None,
+        Err(ShellError::Exit(code)) => Some(*code),
+        Err(err) => Some(err.failure_status()),
+    };
+    let mut rows = vec![track::Outcome::line(
+        track.current_dir_id(),
+        status,
+        millis(elapsed),
+    )];
+    // Only when it *was* a chain. One link is the line itself, already in row zero.
+    let links = oslo::exec::pipeline::segments::taken();
+    if links.len() > 1 {
+        rows.extend(links.iter().map(|link| track::Outcome {
+            segment: link.index as u32 + 1,
+            join: link.join.written().to_string(),
+            text: link.text.clone(),
+            status: link.status,
+            duration_ms: link.duration_ms,
+            dir_id: 0,
+        }));
+    }
+    track.record_outcome(history_id, &rows);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

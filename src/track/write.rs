@@ -143,6 +143,19 @@ impl Track {
             })
     }
 
+    /// The id of the directory the store last wrote a step for, or `0`.
+    ///
+    /// For the outcome row, which is written straight after `record` and wants the same directory
+    /// without paying for a second lookup — `record` has just cached it. `0` means "not known",
+    /// which is what a shell whose store would not open has anyway.
+    pub fn current_dir_id(&self) -> u64 {
+        self.current
+            .lock()
+            .ok()
+            .and_then(|current| current.as_ref().map(|(id, _)| *id))
+            .unwrap_or(0)
+    }
+
     fn remember_current(&self, id: u64, path: &str) {
         if let Ok(mut current) = self.current.lock() {
             *current = Some((id, path.to_string()));

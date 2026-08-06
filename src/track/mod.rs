@@ -42,6 +42,7 @@ pub mod session;
 // this module's process-global, and a module and a function sharing a name is a thing to read
 // twice.
 pub mod kv;
+pub mod outcome;
 pub mod prune;
 pub mod query;
 pub mod redact;
@@ -50,6 +51,7 @@ pub mod score;
 pub mod write;
 
 pub use db::{Run, Step, Track, Visit};
+pub use outcome::Outcome;
 pub use redact::head_of;
 
 use std::path::PathBuf;
