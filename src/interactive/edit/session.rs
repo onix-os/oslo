@@ -398,16 +398,15 @@ pub fn read_line(
     let mut seen = crate::interactive::prompt::generation();
 
     loop {
-        // Cheap enough to ask every frame: one relaxed load, and equal almost always.
-        let now = crate::interactive::prompt::generation();
-        if now != seen {
-            seen = now;
-            (prompt, right) = render();
-        }
-        let (prompt, right) = (prompt.as_str(), right.as_str());
         // The cursor shape says which mode you are in, as fish's vi mode does. `observe` publishes
         // the mode for the prompt to read and answers with an escape only when it actually
         // changed, so an unchanged mode costs nothing per keystroke.
+        //
+        // **Before the prompt is rebuilt, and that order is the whole thing.** `observe` is what
+        // bumps the generation, so asking first meant every mode change was noticed one keystroke
+        // late: Esc moved the cursor and left the prompt saying `I`, and only the *next* key made
+        // it say `N`. Pressing Esc twice appeared to work, which is what made it look intermittent
+        // rather than simply delayed.
         if let Some(mode) = session.mode()
             && let Some(shape) = crate::interactive::vi::observe(
                 mode,
@@ -416,6 +415,14 @@ pub fn read_line(
         {
             let _ = out.write_all(shape.as_bytes());
         }
+
+        // Cheap enough to ask every frame: one relaxed load, and equal almost always.
+        let now = crate::interactive::prompt::generation();
+        if now != seen {
+            seen = now;
+            (prompt, right) = render();
+        }
+        let (prompt, right) = (prompt.as_str(), right.as_str());
 
         let placed = draw(prompt, right, &session, assist, true);
         let _ = out.write_all(screen::redraw(at_row, &placed.text, into_at(&placed)).as_bytes());
