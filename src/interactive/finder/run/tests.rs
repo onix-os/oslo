@@ -60,19 +60,20 @@ fn the_selection_is_clamped() {
 fn the_window_follows_the_selection() {
     let commands = many(100);
     let mut state = State::new(&commands, "/here", Fuzzy::Smart, "");
-    // 12 rows: five rows of input chrome leave seven for the list.
+    // 12 rows: six rows of chrome (a margin at each edge, the gap, and the three-row surface)
+    // leave six for the list.
     state.fit(12);
-    assert_eq!(state.window, 7);
+    assert_eq!(state.window, 6);
 
-    state.move_by(6);
-    assert_eq!(state.selected, 6);
+    state.move_by(5);
+    assert_eq!(state.selected, 5);
     assert_eq!(state.offset, 0, "still in the first window");
 
     state.move_by(1);
-    assert_eq!(state.selected, 7);
+    assert_eq!(state.selected, 6);
     assert_eq!(state.offset, 1, "scrolled by one");
 
-    state.move_by(-7);
+    state.move_by(-6);
     assert_eq!(state.selected, 0);
     assert_eq!(state.offset, 0, "scrolled back");
 }
@@ -86,7 +87,7 @@ fn the_window_does_not_overrun_the_list() {
     state.fit(12);
     state.move_by(100);
     assert_eq!(state.selected, 11);
-    assert_eq!(state.offset, 5, "the last window, not past it");
+    assert_eq!(state.offset, 6, "the last window, not past it");
 }
 
 /// Typing resets the selection: the old index referred to a list that no longer exists, and
@@ -116,7 +117,7 @@ fn shrinking_the_terminal_keeps_the_selection_visible() {
     assert_eq!(state.selected, 30);
 
     state.fit(7);
-    assert_eq!(state.window, 2);
+    assert_eq!(state.window, 1);
     assert!(
         state.selected >= state.offset && state.selected < state.offset + state.window,
         "selected {} is outside the window at {}..{}",

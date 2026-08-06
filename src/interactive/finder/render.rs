@@ -59,6 +59,12 @@ const BOTTOM_MARGIN: usize = 1;
 /// Unpainted row between the result list and the input surface.
 const TOP_MARGIN: usize = 1;
 
+/// Unpainted row at the very top of the screen, matching [`BOTTOM_MARGIN`] at the other end.
+///
+/// The panel had air beneath it and none above, so the list ran flush into the top edge while the
+/// input floated — which reads as the whole thing having slipped upward rather than as a margin.
+const SCREEN_MARGIN: usize = 1;
+
 /// The list keeps a little horizontal air. The input does not: its surface spans the full width.
 const LIST_SIDE_MARGIN: usize = 1;
 
@@ -67,7 +73,7 @@ const LIST_SIDE_MARGIN: usize = 1;
 const STRIPE_BG: Color = Color::Indexed(235);
 
 /// Everything the list does not get.
-const CHROME_ROWS: usize = TOP_MARGIN + SURFACE_ROWS + BOTTOM_MARGIN;
+const CHROME_ROWS: usize = SCREEN_MARGIN + TOP_MARGIN + SURFACE_ROWS + BOTTOM_MARGIN;
 
 /// What the frame needs to know about the world.
 pub struct Frame<'a> {
@@ -131,6 +137,13 @@ pub fn frame(f: &Frame<'_>) -> String {
     // Home, then draw downward. Every row erases to the end of the line as it goes, so a shorter
     // row cannot leave the tail of a longer one behind it.
     out.push_str("\x1b[H");
+
+    // One untouched row against the top edge, so the panel has as much air above it as
+    // `BOTTOM_MARGIN` gives it below. Drawn rather than skipped, because the alternate screen is
+    // not guaranteed to be blank.
+    for _ in 0..SCREEN_MARGIN {
+        out.push_str("\x1b[2K\r\n");
+    }
 
     // The list occupies the rows above the bar, and grows *upward*: the best match sits against
     // the separator. So the window is drawn bottom-up and any unused rows are at the top.
