@@ -169,6 +169,9 @@ pub mod at {
     pub const COMPLETION_SELECT: usize = 13;
     pub const JOB_FINISH: usize = 14;
     pub const TIME_REPORT: usize = 15;
+    /// The one moment that had no constant, which is why its fire site named it by *alias* — and
+    /// so looked up a key nothing is ever stored under. See `ask_hook_here`.
+    pub const COMMAND_NOT_FOUND: usize = 16;
     pub const IDLE_TIMEOUT: usize = 17;
     pub const ON_EXIT: usize = 18;
     pub const ON_KEY: usize = 19;
@@ -260,6 +263,7 @@ mod tests {
             (at::COMPLETION_SELECT, "on-completion-select"),
             (at::JOB_FINISH, "on-job-finish"),
             (at::TIME_REPORT, "on-time-report"),
+            (at::COMMAND_NOT_FOUND, "on-command-not-found"),
             (at::IDLE_TIMEOUT, "on-idle-timeout"),
             (at::ON_EXIT, "on-exit"),
             (at::ON_KEY, "on-key"),

@@ -8,7 +8,7 @@ use crate::lua::eval::{self, Interp, LuaResult};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
-use std::sync::{Arc, Mutex, MutexGuard};
+use std::sync::{Arc, Mutex};
 
 /// Values the host holds on a script's behalf.
 ///
@@ -30,6 +30,32 @@ thread_local! {
     /// [`LuaEngine::setup_bindings`] finds nothing here and says so, rather than reaching into
     /// another thread's state.
     static ACTIVE: RefCell<Option<(Rc<Interp>, Registry)>> = const { RefCell::new(None) };
+
+    /// The shell state the `oslo.*` API reaches, kept so that code far from it can ask whether it
+    /// is currently *held*.
+    ///
+    /// A hook fires from places that have no `Environment` to offer and no way to get one — the
+    /// line editor, `attempt_directory`, the job reaper. Whether a handler could act depends
+    /// entirely on whether this mutex is free at that moment, and this is what lets the question be
+    /// asked there. See [`state_is_held`] and `queue`.
+    static SHELL_STATE: RefCell<Option<Arc<Mutex<Environment>>>> = const { RefCell::new(None) };
+}
+
+/// Whether the shell is in the middle of something that has its state locked.
+///
+/// **The question a hook fire site has to ask.** `attempt_directory` runs with the `Environment`
+/// locked and the line editor does not, so the same `fire_at_here` call is safe to run inline from
+/// one and useless from the other. `false` when there is no interpreter on this thread, which is
+/// the non-interactive case where nothing can be attached anyway.
+///
+/// One uncontended `try_lock`. The shell is single-threaded through this path, so the answer cannot
+/// go stale between here and the caller acting on it.
+pub(crate) fn state_is_held() -> bool {
+    SHELL_STATE.with(|slot| {
+        slot.borrow()
+            .as_ref()
+            .is_some_and(|env| env.try_lock().is_err())
+    })
 }
 
 /// The interpreter on this thread, if there is one, as a handle that can outlive the borrow.
@@ -59,27 +85,18 @@ pub fn call_here(f: &Value, args: Vec<Value>) -> LuaResult<Vec<Value>> {
     interp.call(f, args)
 }
 
+/// Taking and releasing the shell state, which is also where deferred hooks are drained.
+mod borrow;
 /// The hook reach-backs, which every fire site outside this file uses.
 mod hooks;
+/// Hooks held until the shell can act on them. See that module for why.
+mod queue;
+pub(crate) use borrow::borrow_env;
 pub use hooks::{
     answer_hook_here, answer_hook_with, ask_hook_here, fire_at_here, key_hook_here,
     key_hook_watched,
 };
-
-/// Take the shell state for the duration of one `oslo.*` call.
-///
-/// `try_lock`, not `lock`: the interpreter runs *inside* the evaluator when a Lua-registered
-/// builtin executes, and the evaluator is already holding this mutex. `lock` there is a hang —
-/// the shell stops responding with no output at all. A Lua error instead is recoverable and says
-/// what happened.
-pub(crate) fn borrow_env(env: &Mutex<Environment>) -> LuaResult<MutexGuard<'_, Environment>> {
-    env.try_lock().map_err(|_| {
-        eval::LuaError::new(
-            "oslo: shell state is busy; the oslo.* API cannot be used from inside a builtin \
-             registered with oslo.register_builtin",
-        )
-    })
-}
+pub use queue::drain as run_deferred_hooks;
 
 /// Turn whatever a Lua builtin returned into an exit status.
 ///
@@ -188,6 +205,9 @@ impl LuaEngine {
         ACTIVE.with(|slot| {
             *slot.borrow_mut() = Some((Rc::clone(&self.interp), Rc::clone(&self.registry)))
         });
+        // The same publication, for the question "can a hook act right now". Kept beside the
+        // interpreter because the two are set up and torn down together.
+        SHELL_STATE.with(|slot| *slot.borrow_mut() = Some(Arc::clone(&env)));
         self.interp.set_host(Rc::new(ShellGlobals {
             env: Arc::clone(&env),
         }));
@@ -248,10 +268,15 @@ impl LuaEngine {
         let ast = eval::parse(source).map_err(|e| ShellError::Lua(e.in_chunk(name)))?;
         self.interp.set_chunk(name);
         self.interp.set_varargs(self.script_args.borrow().clone());
-        self.interp
+        let outcome = self
+            .interp
             .run_ast(&ast)
-            .map_err(|e| ShellError::Lua(e.in_chunk(name)))?;
-        Ok(())
+            .map_err(|e| ShellError::Lua(e.in_chunk(name)));
+        // A script is the one place with no loop to drain into. `oslo.run{"cd", d}` at the end of
+        // a chunk would otherwise leave its `post-change-dir` queued for a REPL that never comes.
+        // After the failure case too: a chunk that raised still ran the commands before it.
+        queue::drain();
+        outcome.map(|_| ())
     }
 
     /// Run everything attached to a hook, in the order it was attached.
@@ -287,11 +312,12 @@ impl LuaEngine {
     ///
     /// The watched bit is checked first, so a moment nobody attached to costs one relaxed load —
     /// which is what lets this be called from a mode change or a prompt without thinking about it.
+    ///
+    /// Goes through the same inline-or-deferred decision as every other fire site rather than
+    /// calling the handlers directly. These callers are in the REPL loop, where the state is free
+    /// and nothing is deferred — but a second dispatch path is how the two would drift apart.
     pub fn fire_at(&self, index: usize, args: Vec<Value>) {
-        if !crate::lua::api::hooks::watched(index) {
-            return;
-        }
-        self.fire_hook(crate::lua::api::hooks::HOOKS[index].name, args);
+        hooks::fire_values_here(index, args);
     }
 
     /// A table for a hook, from plain pairs — the shape most of them hand over.

@@ -42,6 +42,10 @@ pub fn run_repl(login: bool) -> ! {
     // starts and stops. oslo only declares the boundaries; folding them is the job of whatever
     // owns the grid. See `oslo::interactive::marks`.
     oslo::interactive::marks::enable(true);
+    // A resize should redraw the line, and a blocked `read` does not notice one on its own. See
+    // `term::watch_for_resize` — installed here rather than in the library so that a script, which
+    // has no line to redraw, does not acquire a signal handler it will never use.
+    oslo::interactive::term::watch_for_resize();
     // Asked once, before anything is drawn: the terminal's background decides whether the syntax
     // palette should be the dark one. A terminal that does not answer leaves the default standing
     // — see `oslo::interactive::query` for why the *silence* is the case worth engineering for.
@@ -320,6 +324,16 @@ pub fn run_repl(login: bool) -> ! {
                     environments::arrive(&env_struct, &lua, std::path::Path::new(&here));
                 }
 
+                // **Where a hook that could only watch becomes one that can act.** `post-change-dir`
+                // and the rest of the notifying hooks fire from places that hold the shell's state
+                // — `attempt_directory`, the job reaper, the timing report — so they are held until
+                // here, which is the first moment in a command's life when nothing is locked. The
+                // fire sites stay where they are accurate; only the handler moves.
+                //
+                // Beside `take_reload_request` above, and for the same reason it exists: a builtin
+                // leaves something behind and this carries it out.
+                oslo::lua::engine::run_deferred_hooks();
+
                 let after = current_directory();
                 if after != before {
                     // Before the `cd` hook, so a Lua hook that reads an environment variable sees
@@ -441,6 +455,9 @@ fn publish_terminal_size(env: &Arc<Mutex<Environment>>) {
 /// sites are needed because POSIX makes no distinction between the two endings and neither does
 /// anything else here.
 fn fire_exit(lua: &LuaEngine, status: i32) {
+    // Anything still held runs before the session's last hook does. A `cd` in the command that
+    // ended the shell would otherwise have queued a `post-change-dir` that nothing ever drained.
+    oslo::lua::engine::run_deferred_hooks();
     lua.fire_at(
         hooks::at::ON_EXIT,
         vec![LuaEngine::hook_fields(&[(

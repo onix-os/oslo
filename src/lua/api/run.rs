@@ -186,6 +186,15 @@ fn sugar(env: &Arc<Mutex<Environment>>) -> Value {
                         ))
                     })?);
                 }
+                // **This is where `sh` stops being pure sugar for `oslo.run`, and it is the one
+                // difference between them.** `sh.rm("*.txt")` is spelled to read like the command
+                // line it stands in for, and a command line expands its patterns; a `sh.` call
+                // that did not was the reason `oslo.glob` had to be reached for at all.
+                //
+                // `oslo.run{…}` remains literal, and is now what a caller reaches for to *stop*
+                // this happening — the argument that must not be read as a pattern, whatever it
+                // holds. The two forms exist for two intentions and this is what tells them apart.
+                let argv = expand_globs(&argv);
                 let mut guard = borrow_env(&env_call)?;
                 let outcome = crate::exec::argv::run(&mut guard, &argv, Capture::default())
                     .map_err(|e| LuaError::new(format!("sh.{command}: {e}")))?;
@@ -227,6 +236,14 @@ impl Request {
             })?);
         }
 
+        // `glob = true` opts this call into pathname expansion. **Off by default and staying that
+        // way**: the safety this module is built on is that the list written is the list run, so
+        // `oslo.run{"rm", name}` cannot turn one file into forty because `name` happened to hold a
+        // `*`. A script that wants the pattern read says so, once, at the call site.
+        if table.get(&Value::str("glob")).truthy() {
+            argv = expand_globs(&argv);
+        }
+
         // `capture = true` is the short form for both streams, which is what a caller who just
         // wants the output means. The two are separable for the caller who does not.
         let both = table.get(&Value::str("capture")).truthy();
@@ -238,6 +255,45 @@ impl Request {
             },
         })
     }
+}
+
+/// Pathname expansion over an argv, exactly as a command line gets it.
+///
+/// # Why this is here at all
+///
+/// `sh.rm("*.txt")` reported `cannot remove '*.txt': No such file or directory`. There is no shell
+/// between Lua and the command — that is the point of this module — so nothing had ever expanded
+/// the pattern, and the only way to write it was `table.unpack(oslo.glob("*.txt"))`, which is both
+/// obscure and a trap: a call anywhere but last in a table constructor is truncated to one value.
+///
+/// # The rules are the shell's, deliberately
+///
+/// **The command word is never expanded**, only its arguments — the same rule
+/// `exec::simple::run_simple` follows, and for the same reason: a command whose *name* came out of
+/// a glob is never what was meant, and one that expanded to nothing would leave the arguments
+/// looking like a command.
+///
+/// **A pattern that matches nothing stays as it is**, which is POSIX and what every shell without
+/// `nullglob` does. It is also what keeps this safe on the arguments that are not patterns at all:
+/// `sh.printf("[%s]", x)` has glob metacharacters in it, matches no file, and arrives unchanged.
+/// (`oslo.glob` answers an empty table in that case instead — there the caller asked a question
+/// about the filesystem, and the pattern back would be a lie.)
+fn expand_globs(argv: &[String]) -> Vec<String> {
+    let mut out = Vec::with_capacity(argv.len());
+    for (i, word) in argv.iter().enumerate() {
+        if i == 0 {
+            out.push(word.clone());
+            continue;
+        }
+        // One unquoted run: the string came from Lua, where there is no quoting to have stripped,
+        // so every metacharacter in it is live.
+        let field = [crate::expand::Run::new(
+            word.clone(),
+            crate::expand::Origin::Literal,
+        )];
+        out.extend(crate::expand::glob::expand_glob(&field));
+    }
+    out
 }
 
 /// A Lua value as a command-line word.

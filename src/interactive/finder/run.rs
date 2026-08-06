@@ -176,7 +176,14 @@ pub fn open(
             // Tab moves to the next profile — a different pair of stores, so the whole list is
             // replaced rather than filtered.
             Key::ToggleScope => state.next_profile(),
-            Key::Ctrl(_) | Key::Alt(_) | Key::Ignored | Key::Home | Key::End | Key::BackTab => {}
+            // A resize redraws on the next loop pass, which reads the size afresh.
+            Key::Ctrl(_)
+            | Key::Alt(_)
+            | Key::Ignored
+            | Key::Resized
+            | Key::Home
+            | Key::End
+            | Key::BackTab => {}
         }
     }
 }

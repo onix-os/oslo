@@ -124,6 +124,9 @@ fn hook_key_name(key: Key) -> (String, Option<char>) {
         Key::End => ("end".to_string(), None),
         Key::PageUp => ("pageup".to_string(), None),
         Key::PageDown => ("pagedown".to_string(), None),
+        // Reported, because a hook watching keystrokes may reasonably want to know the window
+        // moved under it — but it is not a key and is named so that no config mistakes it for one.
+        Key::Resized => ("resized".to_string(), None),
         Key::Ignored => ("ignored".to_string(), None),
     }
 }

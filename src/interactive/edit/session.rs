@@ -170,6 +170,18 @@ impl Session {
     pub fn apply(&mut self, key: Key, assist: &mut dyn Assist) -> Step {
         let changed = |yes: bool| Step::Continue { redraw: yes };
 
+        // **A resize is not a keystroke and never reaches a binding.** It arrives through the key
+        // reader only because that is where the editor is waiting; letting it fall through would
+        // hand `oslo.keys` and vi a key nobody pressed.
+        //
+        // The prompt is invalidated as well as the row redrawn: a prompt that measures the
+        // terminal — one with a right-aligned segment, or any external one told `$cols` — is
+        // wrong at the new width, and redrawing the old string would just re-place a stale one.
+        if key == Key::Resized {
+            crate::interactive::prompt::invalidate();
+            return changed(true);
+        }
+
         // **The `key` hook sees the keystroke before anything else, ordinary characters included.**
         //
         // First, because a hook that cannot see a key before its binding runs cannot implement the

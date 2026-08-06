@@ -142,6 +142,7 @@ pub fn input(spec: &Input) -> Answer<String> {
             | Key::BackTab
             | Key::Ctrl(_)
             | Key::Alt(_)
+            | Key::Resized
             | Key::Ignored => {}
         }
     }

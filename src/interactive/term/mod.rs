@@ -206,6 +206,12 @@ pub enum Key {
     ToggleScope,
     /// Shift-Tab, which a terminal spells `ESC [ Z`.
     BackTab,
+    /// The terminal changed size.
+    ///
+    /// Not a keypress, and it arrives through the key reader because that is where the editor is
+    /// waiting: a resize does not wake a blocked `read` on its own, so a widget would keep the
+    /// layout it computed for the old width until the next thing you typed.
+    Resized,
     /// A control chord with no widget-level meaning of its own — `C-k`, `C-w`, `C-y`, `C-t`.
     ///
     /// The chords that *do* have one are decoded to it instead: `C-a` is [`Key::Home`], `C-b` is
@@ -239,6 +245,9 @@ pub fn key(bytes: &[u8]) -> Key {
         [] => Key::Ignored,
         // Esc alone. A lone `0x1b` with nothing after it is the key; anything after it is a
         // sequence, handled below.
+        // The resize marker `fill` pushed. One byte like any other key, so it cannot jump the
+        // queue past something typed before it.
+        [RESIZE_MARK, ..] => Key::Resized,
         [0x1b] => Key::Cancel,
         [0x03] => Key::Abort,
         [0x0d] | [0x0a] => Key::Accept,
@@ -329,8 +338,10 @@ pub fn key(bytes: &[u8]) -> Key {
 /// first read had cut in two.
 ///
 /// So bytes are buffered and a **complete** sequence is taken from the front, or nothing is. An
-/// unrecognised sequence is consumed whole and discarded rather than falling through to the text
-/// path, which is what makes a mouse wheel do nothing instead of typing.
+mod resize;
+pub use resize::watch_for_resize;
+use resize::{RESIZE_MARK, take_resize};
+
 pub struct Keys {
     buf: Vec<u8>,
     /// Where the keystrokes are. See [`Tty`] for why this is not always stdin.
@@ -427,6 +438,13 @@ impl Keys {
             // A window resize, most likely — not the user leaving.
             if io::Error::last_os_error().kind() != io::ErrorKind::Interrupted {
                 return false;
+            }
+            // And if it *was* a resize, say so instead of quietly reading again. The row on
+            // screen was laid out for the old width and is now wrong; only the loop above can
+            // redraw it, and it cannot while this is still blocked in `read`.
+            if take_resize() {
+                self.buf.push(RESIZE_MARK);
+                return true;
             }
         }
     }
