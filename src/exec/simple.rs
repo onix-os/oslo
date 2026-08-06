@@ -333,7 +333,7 @@ fn run_program(
                 // resolved the situation answers with the status to report. Everyone else bolts this
                 // on as a shell function; here it is a hook.
                 None => match crate::lua::engine::ask_hook_here(
-                    "command-not-found",
+                    crate::lua::api::hooks::at::COMMAND_NOT_FOUND,
                     vec![crate::lua::eval::value::Value::str(cmd_name)],
                 ) {
                     Some(status) => Ok(status),

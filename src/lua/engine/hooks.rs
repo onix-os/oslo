@@ -14,7 +14,7 @@
 //! Every one of them checks the watched bit first, so a moment nobody attached to costs a single
 //! relaxed load. That is what lets `fire_at_here` sit on the keystroke and mode-change paths.
 
-use super::{ACTIVE, LuaEngine};
+use super::ACTIVE;
 use crate::lua::engine::Registry;
 use crate::lua::eval::Interp;
 use crate::lua::eval::value::Value;
@@ -25,7 +25,20 @@ use crate::lua::eval::value::Value;
 /// to `repl` — but the interpreter is already parked on this thread for exactly this kind of
 /// reach-back. `None` when there is no interpreter (a non-interactive shell, a script) or when no
 /// handler answered, and the caller then does what it did before.
-pub fn ask_hook_here(name: &str, args: Vec<Value>) -> Option<i32> {
+///
+/// **By index, not by name, and that is a fix rather than tidying.** The one caller asked for
+/// `"command-not-found"`, which is an *alias*; handlers are stored under the canonical name, so the
+/// lookup found an empty list and the hook never fired under either spelling. Every other fire site
+/// already named the moment by index for this reason.
+pub fn ask_hook_here(index: usize, args: Vec<Value>) -> Option<i32> {
+    debug_assert!(
+        crate::lua::api::hooks::HOOKS[index].answers,
+        "ask_hook_here is for a hook whose answer is read; HOOKS says this one only observes"
+    );
+    if !crate::lua::api::hooks::watched(index) {
+        return None;
+    }
+    let name = crate::lua::api::hooks::HOOKS[index].name;
     let (interp, registry) = ACTIVE.with(|slot| slot.borrow().clone())?;
     ask_hook_on(&interp, &registry, name, args)
 }
@@ -70,18 +83,47 @@ pub fn fire_at_here(index: usize, fields: &[(&str, &str)]) {
     if !crate::lua::api::hooks::watched(index) {
         return;
     }
-    let table = LuaEngine::hook_fields(
-        &fields
-            .iter()
-            .map(|(name, value)| (*name, Value::str(value)))
-            .collect::<Vec<_>>(),
+    fire_or_defer(index, super::queue::fields(fields));
+}
+
+/// [`fire_at_here`] for a caller that already has the handler's arguments as values.
+pub(crate) fn fire_values_here(index: usize, args: Vec<Value>) {
+    if !crate::lua::api::hooks::watched(index) {
+        return;
+    }
+    fire_or_defer(index, args);
+}
+
+/// Run a notifying hook now, or hold it until the shell can act on it.
+///
+/// **The whole of the inline-versus-deferred decision, in one place.** A hook that only observes
+/// has no reason to run while the shell is mid-command with its state locked — there it can look
+/// but not touch, which is the defect this exists to close — and every reason to run the moment
+/// that is no longer true. Where the state is already free, which is most fire sites, nothing
+/// changes: it runs inline exactly as before.
+fn fire_or_defer(index: usize, args: Vec<Value>) {
+    debug_assert!(
+        !crate::lua::api::hooks::HOOKS[index].answers,
+        "this hook's answer is read; fire_at_here would discard it — use answer_hook_with"
     );
+    if super::state_is_held() {
+        super::queue::defer(index, args);
+        return;
+    }
+    fire_now(index, args);
+}
+
+/// Call every handler attached to a notifying hook, here and now.
+///
+/// The bottom of both paths: [`fire_or_defer`] when the shell is idle, and the queue when it has
+/// become idle since. Nothing checks the watched bit or the lock again — both callers have.
+pub(super) fn fire_now(index: usize, args: Vec<Value>) {
     let name = crate::lua::api::hooks::HOOKS[index].name;
     let Some((interp, registry)) = ACTIVE.with(|slot| slot.borrow().clone()) else {
         return;
     };
     for handler in crate::lua::api::hook_handlers(&registry, name) {
-        if let Err(e) = interp.call(&handler, vec![table.clone()]) {
+        if let Err(e) = interp.call(&handler, args.clone()) {
             eprintln!("oslo: {name} hook: {e}");
         }
     }
@@ -89,6 +131,13 @@ pub fn fire_at_here(index: usize, fields: &[(&str, &str)]) {
 
 /// [`answer_hook_here`], with arguments for the handler.
 pub fn answer_hook_with(index: usize, args: Vec<Value>) -> Option<Value> {
+    // The other half of the split `fire_or_defer` asserts. Between them, `Hook.answers` is what
+    // decides how a moment is dispatched rather than a second list that can drift from it — which
+    // is the state that let `on-command-not-found` be asked for by a name nothing stored under.
+    debug_assert!(
+        crate::lua::api::hooks::HOOKS[index].answers,
+        "this hook only observes; its return value would be read by nobody"
+    );
     if !crate::lua::api::hooks::watched(index) {
         return None;
     }
