@@ -435,6 +435,12 @@ pub fn read_line(
         // prompt is displayed" has to mean.
         if !drawn {
             drawn = true;
+            // The cursor is shown again here, not on entry. A language switch hides it while the
+            // other language's prompt is being built — otherwise it sits at column one in plain
+            // sight for however long that takes — and this is the first moment there is something
+            // for it to sit *in*. Unconditional, and harmless when it was never hidden.
+            let _ = out.write_all(b"\x1b[?25h");
+            let _ = out.flush();
             crate::lua::engine::fire_at_here(crate::lua::api::hooks::at::POST_PROMPT, &[]);
         }
 

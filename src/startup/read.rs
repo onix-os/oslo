@@ -208,6 +208,16 @@ pub(super) fn read_command(
                 // Switch and reopen with the same text and cursor, so the line survives the
                 // switch — which is what makes a toggle usable mid-command.
                 oslo::interactive::edit::session::Outcome::ToggleLanguage { text, cursor } => {
+                    // **Hidden across the switch.** The editor puts the cursor back at the top of
+                    // the block so the next draw can count from there, and then *returns* — which
+                    // restores the terminal and makes the cursor visible again. It then sits at
+                    // column one, in plain sight, for as long as rendering the other language's
+                    // prompt takes. With a prompt built by running another program that is
+                    // milliseconds, and it reads as the cursor jumping to the start of the line
+                    // and back. The next `read_line` hides it again on entry and shows it on the
+                    // way out, so this only covers the gap between the two.
+                    print!("\x1b[?25l");
+                    let _ = std::io::Write::flush(&mut std::io::stdout());
                     let switched = match *current {
                         Mode::Shell => Mode::Lua,
                         Mode::Lua => Mode::Shell,

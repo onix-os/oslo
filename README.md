@@ -398,6 +398,9 @@ oslo.misc.escape_delay  = 25          -- ms to wait for the rest of an escape se
 oslo.misc.color_depth   = nil         -- truecolor / 256 / 16 / none, when detection is wrong
 
 oslo.vi.enabled         = true        -- vi mode; false for emacs only
+oslo.vi.cursor_insert   = "line"      -- block / line / underscore, each + " blink"
+oslo.vi.cursor_normal   = "block"
+oslo.vi.cursor_replace  = "underscore"
 oslo.completion.fuzzy   = "smart"     -- off / tight / smart / loose
 oslo.completion.max_rows = 15
 
