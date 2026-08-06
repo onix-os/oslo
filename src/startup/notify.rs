@@ -20,6 +20,12 @@ pub(super) fn slow_command_notice(
     if after == 0 || elapsed.as_secs() < after || !oslo::feature::on(oslo::feature::at::NOTIFY) {
         return String::new();
     }
+    // The config gets first refusal. **This one fires from the read loop with nothing locked**, so
+    // a handler here may use the whole `oslo.*` API — unlike `chain`, `job` and `time`, which fire
+    // from inside a builtin or the executor. See `oslo::interactive::report`.
+    if drawn_by_config(text, elapsed, result) {
+        return String::new();
+    }
     let status = result.as_ref().copied().unwrap_or(1);
     let outcome = if status == 0 {
         "finished".to_string()
@@ -58,4 +64,26 @@ pub(super) fn slow_command_notice(
         return String::new();
     }
     oslo::interactive::marks::notify(title, &body)
+}
+
+/// Whether an `on-report` handler dealt with the slow-command notice instead.
+fn drawn_by_config(
+    text: &str,
+    elapsed: std::time::Duration,
+    result: &Result<i32, ShellError>,
+) -> bool {
+    use oslo::interactive::report::{self, int, text as string};
+    if !report::watched() {
+        return false;
+    }
+    let status = result.as_ref().copied().unwrap_or(1);
+    report::handled(
+        "slow",
+        vec![
+            ("text", string(text)),
+            ("duration_ms", int(elapsed.as_millis() as i64)),
+            ("status", int(i64::from(status))),
+            ("ok", oslo::lua::eval::value::Value::Bool(status == 0)),
+        ],
+    )
 }

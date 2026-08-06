@@ -87,7 +87,12 @@ impl Timer {
         // zero, and a zero "after" would otherwise wrap into a 584-year `user`.
         let user = end.user.saturating_sub(self.cpu.user);
         let sys = end.sys.saturating_sub(self.cpu.sys);
-        write_report(real, user, sys);
+        // The config gets first refusal on the three lines. Fired from `time`'s own report, which
+        // is inside the executor — a handler may draw, but not change the shell. See
+        // `interactive::report`.
+        if !drawn_by_config(real, user, sys) {
+            write_report(real, user, sys);
+        }
         // `on-time-report`: only a `time`-prefixed pipeline reaches here, which is what separates
         // this from `post-cmd` — that one fires for everything and carries wall-clock only. These
         // are the three clocks, and they were asked for.
@@ -124,6 +129,26 @@ fn format_elapsed(d: Duration) -> String {
     let minutes = millis / 60_000;
     let rest = millis % 60_000;
     format!("{}m{}.{:03}s", minutes, rest / 1_000, rest % 1_000)
+}
+
+/// Whether an `on-report` handler drew the three clocks instead.
+fn drawn_by_config(
+    real: std::time::Duration,
+    user: std::time::Duration,
+    sys: std::time::Duration,
+) -> bool {
+    use crate::interactive::report::{self, int};
+    if !report::watched() {
+        return false;
+    }
+    report::handled(
+        "time",
+        vec![
+            ("real_ms", int(real.as_millis() as i64)),
+            ("user_ms", int(user.as_millis() as i64)),
+            ("sys_ms", int(sys.as_millis() as i64)),
+        ],
+    )
 }
 
 #[cfg(test)]

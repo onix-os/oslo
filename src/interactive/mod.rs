@@ -24,6 +24,8 @@ pub mod paint;
 pub mod prompt;
 pub mod query;
 pub mod recall;
+/// `on-report` — letting a config draw what the shell was going to draw.
+pub mod report;
 pub mod row;
 pub mod scanner;
 pub mod settings;
