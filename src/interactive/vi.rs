@@ -145,8 +145,14 @@ pub fn set_enabled(on: bool) {
     ENABLED.store(u8::from(on), Ordering::Relaxed);
 }
 
+/// Whether vi mode is in force: **configured on, and not turned off at run time**.
+///
+/// Two questions rather than one. `ENABLED` is what `oslo.vi.enabled` asked for; the feature bit is
+/// whether it applies right now. Because the config value is never overwritten, turning the feature
+/// back on gives you back exactly what the config said — a shell configured for emacs does not
+/// acquire vi mode by having the `vi` feature enabled.
 pub fn enabled() -> bool {
-    ENABLED.load(Ordering::Relaxed) != 0
+    ENABLED.load(Ordering::Relaxed) != 0 && crate::feature::on(crate::feature::at::VI)
 }
 
 /// The mode the editor is in, or `None` when vi mode is off.

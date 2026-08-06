@@ -19,6 +19,8 @@ mod describe;
 mod errexit;
 mod interrupt;
 mod jobs;
+/// What each link of `a && b` did — see the module docs.
+pub mod segments;
 mod structured;
 mod timing;
 
@@ -181,24 +183,77 @@ fn run_list_items(env: &mut Environment, cmd_list: &CommandList) -> Result<i32> 
 }
 
 pub fn eval_and_or_list(env: &mut Environment, and_or: &AndOrList) -> Result<i32> {
+    // Whether this is the chain the user typed rather than one inside a compound's body. Answered
+    // and released around the whole walk, including the error path, so a chain that aborts does
+    // not leave the recorder thinking it is still inside one.
+    let outermost = segments::enter();
+    let result = walk_and_or(env, and_or, outermost);
+    segments::leave(outermost);
+    result
+}
+
+/// The chain itself, with `recording` saying whether each link is worth writing down.
+fn walk_and_or(env: &mut Environment, and_or: &AndOrList, recording: bool) -> Result<i32> {
     // Only the *last* pipeline of the chain is judged by `set -e`: POSIX exempts "any command of
     // an AND-OR list other than the last", and a short-circuited chain therefore never fails the
     // shell at all — `set -e; false && echo no` carries on, because the only command that ran was
     // an exempt one. A lone pipeline is its own last, so `set -e; false` still aborts.
     let last = and_or.rest.len();
-    let mut status = run_and_record(env, &and_or.first, last == 0)?;
+    let mut status = timed_link(
+        env,
+        &and_or.first,
+        last == 0,
+        recording,
+        segments::Join::First,
+    )?;
 
     for (i, (op, next_pipeline)) in and_or.rest.iter().enumerate() {
         let run = match op {
             AndOrOp::And => status == 0,
             AndOrOp::Or => status != 0,
         };
+        let join = segments::Join::of(*op);
         if run {
-            status = run_and_record(env, next_pipeline, i + 1 == last)?;
+            status = timed_link(env, next_pipeline, i + 1 == last, recording, join)?;
+        } else if recording {
+            // **The link that never ran.** Recording it is the point: "the chain stopped before
+            // here" cannot be told from "this succeeded" without it, and that is what a resume
+            // offer has to know.
+            segments::record_skipped(join, describe::describe_pipeline(next_pipeline));
         }
     }
 
     Ok(status)
+}
+
+/// [`run_and_record`], timed and written to the segment buffer when the REPL asked for it.
+///
+/// The clock is only read when recording: a script runs the same chain with no `Instant::now`
+/// anywhere near it.
+fn timed_link(
+    env: &mut Environment,
+    pipeline: &Pipeline,
+    judged: bool,
+    recording: bool,
+    join: segments::Join,
+) -> Result<i32> {
+    if !recording {
+        return run_and_record(env, pipeline, judged);
+    }
+    let started = std::time::Instant::now();
+    let outcome = run_and_record(env, pipeline, judged);
+    let elapsed = i64::try_from(started.elapsed().as_millis()).unwrap_or(i64::MAX);
+    // Recorded whatever happened. A link that ended the shell or raised still ran, and a report
+    // that omitted it would be describing a different line than the one that was typed.
+    if let Ok(status) = &outcome {
+        segments::record(
+            join,
+            describe::describe_pipeline(pipeline),
+            *status,
+            elapsed,
+        );
+    }
+    outcome
 }
 
 /// Run one pipeline, publish its status as `$?`, and let `set -e` judge it if it is judgeable.
@@ -401,6 +456,7 @@ fn run_byte_stages(env: &mut Environment, pipeline: &Pipeline) -> Result<i32> {
     if stopped && let Some(pgid) = pgid {
         jobs::remember_stopped_pipeline(pgid, &pids, pipeline);
     }
+    segments::note_pipeline(&pipeline.commands, &stage_statuses);
     let final_status = pipeline_status(env, &stage_statuses);
     env.set_pipeline_status(stage_statuses);
     Ok(final_status)

@@ -190,6 +190,11 @@ impl OsloHelper {
         if line.is_empty() || pos < line.len() {
             return None;
         }
+        // The `suggest` feature, which is a runtime mask over the configured sources rather than a
+        // second way to configure them: turning it back on restores whatever `oslo.suggest` said.
+        if !crate::feature::on(crate::feature::at::SUGGEST) {
+            return None;
+        }
         for source in settings::current().suggest.sources {
             let found = match source {
                 // oslo's own set, not a flat editor history: `recall` is language-filtered and

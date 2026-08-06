@@ -19,6 +19,8 @@ pub mod env;
 pub mod error;
 pub mod exec;
 pub mod expand;
+/// Parts of the shell a config can turn off and on again while it runs.
+pub mod feature;
 pub mod interactive;
 pub mod lexer;
 pub mod lua;

@@ -85,25 +85,47 @@ impl BuiltinRegistry {
     /// `exec::simple`, `command` and `builtin` all do, and `builtin` shifts its arguments
     /// specifically to preserve it — so the name is always recoverable.
     pub fn lookup(&self, name: &str) -> Option<BuiltinFn> {
-        match self.table.get(name.trim())? {
+        match self.entry(name)? {
             Builtin::Native(func) => Some(*func),
             Builtin::Dynamic(_) => Some(invoke_dynamic_builtin),
         }
     }
 
+    /// The registered implementation of `name`, unless a **feature** that provides it is off.
+    ///
+    /// **The one place a builtin is turned off**, so that a disabled one is invisible to the
+    /// dispatcher, to `type`, to `command -v` and to completion at once rather than in four places
+    /// that can disagree with each other. Nothing is removed from the table: the bit is a mask, so
+    /// turning the feature back on restores the builtin exactly as it was registered.
+    ///
+    /// The word then falls through to `$PATH` like any other, which is the point for `direnv` —
+    /// oslo's builtin cannot read an `.envrc` and the real one can. That is the same route
+    /// `\direnv` already takes; see `exec::simple::escape`.
+    fn entry(&self, name: &str) -> Option<&Builtin> {
+        if crate::feature::builtin_is_off(name) {
+            return None;
+        }
+        self.table.get(name.trim())
+    }
+
     fn dynamic(&self, name: &str) -> Option<DynBuiltin> {
-        match self.table.get(name.trim())? {
+        match self.entry(name)? {
             Builtin::Dynamic(func) => Some(Arc::clone(func)),
             Builtin::Native(_) => None,
         }
     }
 
     pub fn contains(&self, name: &str) -> bool {
-        self.table.contains_key(name.trim())
+        self.entry(name).is_some()
     }
 
+    /// Every builtin this shell currently has. Filtered by the same mask, so a name completion
+    /// offers is a name that will run.
     pub fn names(&self) -> impl Iterator<Item = &str> {
-        self.table.keys().map(String::as_str)
+        self.table
+            .keys()
+            .map(String::as_str)
+            .filter(|name| !crate::feature::builtin_is_off(name))
     }
 }
 

@@ -73,7 +73,18 @@ impl Track {
     ///
     /// Every directory, not just this one: the line is what you want gone, and leaving copies
     /// under other directories would make it reappear the moment you walked there.
+    ///
+    /// **And out of the log, not only the aggregate.** This used to touch [`Tree::Run`] alone, so
+    /// the line stayed in [`Tree::History`] and came back through `recent()` on the next start —
+    /// the password in the doc comment above included. The two stores answer different questions
+    /// but "forget this" is a statement about the line, not about one index of it.
     pub fn forget(&self, line: &str, mode: &str) -> usize {
+        let runs = self.forget_runs_of(line, mode);
+        runs + self.forget_log_of(line, mode)
+    }
+
+    /// The aggregate's copies: `(dir_id, mode, argv)` for every directory it ran in.
+    fn forget_runs_of(&self, line: &str, mode: &str) -> usize {
         let doomed: Vec<Vec<u8>> = self
             .store
             .read(|reader| {
@@ -89,6 +100,27 @@ impl Track {
             return 0;
         }
         self.store.delete_keys_in_chunks(Tree::Run, &doomed)
+    }
+
+    /// The log's copies: every time the line was typed, whenever that was.
+    ///
+    /// A full scan of the bucket, which is the same shape `trim` already uses and is paid on a
+    /// keystroke nobody presses in a loop. Matched on the decoded row rather than on the key,
+    /// because the log keys on an id and keeps the line in the value.
+    fn forget_log_of(&self, line: &str, mode: &str) -> usize {
+        let doomed: Vec<Vec<u8>> = self
+            .store
+            .read(|reader| {
+                Some(reader.collect(Tree::History, &Span::all(), |key, value| {
+                    let entry = super::log::entry_of(value)?;
+                    (entry.line == line && entry.mode == mode).then(|| key.to_vec())
+                }))
+            })
+            .unwrap_or_default();
+        if doomed.is_empty() {
+            return 0;
+        }
+        self.store.delete_keys_in_chunks(Tree::History, &doomed)
     }
 
     /// Every distinct command line the store knows, newest-first, capped at `limit`.

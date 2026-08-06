@@ -100,6 +100,12 @@ pub enum Tree {
     /// from the start of the bucket rather than a reverse cursor this seam does not have.
     /// `startup::history_db` owns the encoding.
     History,
+    /// `(u64::MAX - history_id, segment) -> (join, status, duration_ms)`.
+    ///
+    /// What each link of `a && b || c` did, joined to the log row by id. Segment `0` is the line
+    /// itself; `1..` are its links. Keyed with the *same* descending encoding as `History`, so one
+    /// threshold trims both and the two can never drift apart.
+    Outcome,
 }
 
 impl Tree {
@@ -114,11 +120,12 @@ impl Tree {
             Tree::RunByArgv => "run_argv",
             Tree::Meta => "meta",
             Tree::History => "hist",
+            Tree::Outcome => "out",
         }
     }
 
     /// Every bucket, for a sweep or a migration that has to visit all of them.
-    pub fn all() -> [Tree; 8] {
+    pub fn all() -> [Tree; 9] {
         [
             Tree::Dir,
             Tree::DirByPath,
@@ -128,6 +135,7 @@ impl Tree {
             Tree::RunByArgv,
             Tree::Meta,
             Tree::History,
+            Tree::Outcome,
         ]
     }
 }

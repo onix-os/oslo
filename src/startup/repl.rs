@@ -213,10 +213,14 @@ pub fn run_repl(login: bool) -> ! {
                     // refills that copy from scratch, still finds this line.
                     remember_history(&text, mode);
                 }
+                // The id the line went into the log under, kept so that what it *did* can be
+                // joined to it once it has finished. `None` for a secret line or a shell with no
+                // store, both of which then record no outcome either.
+                let mut logged_as = None;
                 if let Some(db) = oslo::track::store()
                     && !secret
                 {
-                    db.append(
+                    logged_as = db.append(
                         &text,
                         match mode {
                             Mode::Lua => oslo::track::log::MODE_LUA,
@@ -283,6 +287,11 @@ pub fn run_repl(login: bool) -> ! {
                     // has not run a command.
                     Mode::Lua => run_lua_line(&lua, &text, last_status),
                     Mode::Shell => {
+                        // Record what each link of `a && b || c` does, for the line the user typed
+                        // and nothing else. Armed here rather than inside the evaluator because
+                        // *this* is the only place that knows a person typed it: a script, a
+                        // `-c` command and every nested chain leave it off and pay nothing.
+                        oslo::exec::pipeline::segments::arm();
                         let mut env_guard = env_struct.lock().unwrap();
                         let res = absorb_loop_control(
                             parse_with_aliases(&text, &|n| {
@@ -291,6 +300,7 @@ pub fn run_repl(login: bool) -> ! {
                             .and_then(|ast| eval_command_list(&mut env_guard, &ast)),
                         );
                         drop(env_guard);
+                        oslo::exec::pipeline::segments::disarm();
                         res
                     }
                 };
@@ -350,6 +360,12 @@ pub fn run_repl(login: bool) -> ! {
                 }
                 let elapsed = started.elapsed();
                 note_command_duration(elapsed);
+                // A chain that stopped part-way says where, and what would carry on from there.
+                // One line, and only when there is something to say: a chain that finished, or a
+                // single command that failed, prints nothing.
+                if let Some(from) = oslo::exec::pipeline::segments::resumable() {
+                    eprintln!("oslo: chain stopped — resume with: {from}");
+                }
                 announce(&notify::slow_command_notice(&text, elapsed, &res));
                 // The command is over and its status is known: close the block before anything
                 // else prints, so nothing that follows lands inside it.
@@ -379,8 +395,34 @@ pub fn run_repl(login: bool) -> ! {
                 if secret {
                     tracker.forget_boundary();
                 } else {
-                    let run = tracking::ran(&text, mode.name(), &res, elapsed);
-                    tracker.boundary(&before, &after, run);
+                    // A `pre-record` rule may keep one link of a chain instead of the whole line,
+                    // or refuse it. Asked once, before anything is written down, and the answer
+                    // decides both what the aggregate learns and what the log ends up saying.
+                    let decided =
+                        tracking::ask_what_to_record(&text, &before, mode.name(), &res, elapsed);
+                    let lines = tracking::lines_to_record(&decided, &text);
+                    for (first, line) in lines.iter().enumerate().map(|(i, l)| (i == 0, l)) {
+                        let run = tracking::ran(line, mode.name(), &res, elapsed);
+                        // Only the first arrival records the *movement* and the dwell; a second
+                        // one would credit this directory twice for the same command.
+                        if first {
+                            tracker.boundary(&before, &after, run);
+                        } else {
+                            tracker.also_ran(&before, run);
+                        }
+                    }
+                    if lines.is_empty() {
+                        tracker.forget_boundary();
+                    }
+                    // What the line did, joined to the log row it went in under. **After the
+                    // boundary**, because that is what resolves the directory this then reads back
+                    // — one lookup between them rather than two.
+                    if let Some(id) = logged_as {
+                        tracking::settle_log_row(id, &decided, &text);
+                        if !lines.is_empty() {
+                            tracking::record_outcome(id, &res, elapsed);
+                        }
+                    }
                 }
 
                 match res {
@@ -417,70 +459,6 @@ pub fn run_repl(login: bool) -> ! {
     let last_status = run_exit_trap(&mut env_guard, last_status);
     drop(env_guard);
     std::process::exit(last_status);
-}
-
-/// Put the terminal's size in `$COLUMNS` and `$LINES`, **exported**, before every prompt.
-///
-/// # Why a shell has to do this
-///
-/// A program the shell runs cannot ask how wide the terminal is unless it *has* the terminal —
-/// and a prompt renderer is usually reading a pipe, because the shell is capturing what it says.
-/// `TIOCGWINSZ` on a pipe fails, so every such tool falls back to `$COLUMNS`, and to 80 when that
-/// is missing too. bash maintains both under `checkwinsize`; zsh keeps them as special variables.
-///
-/// oslo did neither, and the effect was not subtle: `hexe shp prompt` laid every prompt out as
-/// though the terminal were 80 columns wide however wide it really was, so segments were dropped
-/// as "not fitting" on a 230-column screen. The same is true of starship, of `$(tput cols)` inside
-/// a substitution, and of anything else asked to render into a pipe.
-///
-/// Refreshed per prompt rather than from a `SIGWINCH` handler, which is what `checkwinsize` does
-/// and is enough: nothing between two prompts can observe the value except a command, and a
-/// command that ran before the resize could not have seen it anyway. It also keeps the signal
-/// handler free of anything that allocates.
-///
-/// **Exported**, unlike bash's, because the whole point is that a *child* reads it — a shell
-/// variable a child cannot see would fix nothing here.
-fn publish_terminal_size(env: &Arc<Mutex<Environment>>) {
-    let cols = oslo::interactive::dropdown::terminal_cols();
-    let rows = oslo::interactive::dropdown::width::terminal_rows();
-    let mut guard = env.lock().unwrap();
-    guard.set_var("COLUMNS", &cols.to_string(), true);
-    guard.set_var("LINES", &rows.to_string(), true);
-}
-
-/// `on-exit`, from both ways a REPL ends — `exit` and end of input.
-///
-/// **Before the EXIT trap, not after.** The trap may itself call `exit`, and a hook that ran after
-/// it would be skipped exactly when the session ended in the way most worth reporting. Both call
-/// sites are needed because POSIX makes no distinction between the two endings and neither does
-/// anything else here.
-fn fire_exit(lua: &LuaEngine, status: i32) {
-    // Anything still held runs before the session's last hook does. A `cd` in the command that
-    // ended the shell would otherwise have queued a `post-change-dir` that nothing ever drained.
-    oslo::lua::engine::run_deferred_hooks();
-    lua.fire_at(
-        hooks::at::ON_EXIT,
-        vec![LuaEngine::hook_fields(&[(
-            "status",
-            oslo::lua::eval::value::Value::int(status as i64),
-        )])],
-    );
-}
-
-/// Leave the history in the state a shell that is not running should leave it.
-///
-/// The trim puts the history table back inside `$HISTSIZE`. It has to happen here as well as on the
-/// amortised counter, or a session shorter than the counter's period never enforces the bound at
-/// all. Best effort, and it does not block: another terminal holding the file means it does not
-/// happen this time.
-///
-/// Neither store has a checkpoint any more, because neither has a log. Both are one file that is
-/// consistent at every commit, and the tracker's own bound is the daily sweep in `track::prune`
-/// rather than anything the way out of the loop can do. See `history_db`'s note and that module's.
-fn settle_stores(settings: &history::Settings) {
-    if let Some(db) = oslo::track::store() {
-        db.trim(settings.max_size.max(1));
-    }
 }
 
 #[cfg(test)]
@@ -579,7 +557,9 @@ mod tests {
 
 #[path = "repl/aside.rs"]
 mod aside;
+mod session;
 use aside::{announce, current_directory, note_command_duration, run_lua_line, title_for_command};
+use session::{fire_exit, publish_terminal_size, settle_stores};
 // Read from `startup::prompt` and `startup::read`, which asked `repl` for them before the split
 // and should not have to learn where they moved to.
 pub(crate) use aside::{cwd, ignore_eof_limit, last_command_duration};

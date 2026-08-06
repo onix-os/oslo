@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.2.18] - 2026-08-06
+
+### <!-- 0 -->⛰️  Features
+
+- Pipeline stages, and redaction for a replay
+- One read gives a replay everything it needs
+- Pre-record decides what is written down
+- The log records who typed it and what it did
+- Record what each link of a chain did
+- Turn parts of the shell off at runtime
+
+### <!-- 1 -->🐛 Bug Fixes
+
+- The last chain survives the command asking about it
+- Forget takes a line out of the log too
+
+### <!-- 7 -->⚙️ Miscellaneous Tasks
+
+- Cleanup
+
 ## [0.2.17] - 2026-08-06
 
 ### <!-- 0 -->⛰️  Features

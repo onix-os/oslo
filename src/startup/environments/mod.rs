@@ -45,6 +45,16 @@ pub(super) fn start() {
 /// being left to land above a summary that does not mention it. On a real `.envrc` that is the
 /// difference between eight loose `command not found` lines and one labelled block.
 pub(super) fn arrive(env: &Mutex<Environment>, lua: &LuaEngine, dir: &Path) {
+    // **Every feature with an `oslo.feature.when` predicate is re-decided first**, for this
+    // directory, before anything reads a feature bit.
+    //
+    // Here rather than at the three call sites, so that a fourth cannot forget it — and *before*
+    // the load below rather than after, because the first thing a predicate is for is deciding
+    // whether this directory's `.env.lua` should be loaded at all. That is also why this covers
+    // the startup arrival: the directory a shell opens in is one a predicate has an opinion about
+    // just as much as any other, and it is the one arrival no hook has fired for yet.
+    oslo::lua::api::feature::decide(dir);
+
     let mut said = String::new();
     // The prompt as it was before the directory that is loading got to touch it. Recorded at load
     // time and put back at unload time, which is the same record-and-restore shape the variables

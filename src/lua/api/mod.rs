@@ -23,6 +23,8 @@ use std::sync::{Arc, Mutex};
 mod convert;
 mod direnv;
 pub(crate) mod external;
+/// `oslo.feature` — turning parts of the shell off and on while it runs.
+pub mod feature;
 mod fs;
 mod json;
 mod path;
@@ -114,6 +116,9 @@ pub fn install(interp: &Rc<Interp>, registry: &Registry, env: Arc<Mutex<Environm
         Value::str("builtin"),
         Value::Table(Rc::new(RefCell::new(builtin))),
     );
+    // `oslo.feature` — a namespace of functions rather than a settings table, because a feature is
+    // not configuration. It is a runtime mask over configuration, and the two must not look alike.
+    oslo.set(Value::str("feature"), feature::build(registry));
     oslo.set(Value::str("json"), json::build());
     oslo.set(Value::str("re"), re::build());
     oslo.set(Value::str("proc"), proc::build_proc());

@@ -136,6 +136,11 @@ pub const HOOKS: &[Hook] = &[
         answers: false,
     },
     Hook {
+        name: "pre-record",
+        aliases: &[],
+        answers: true,
+    },
+    Hook {
         name: "on-exit",
         aliases: &[],
         answers: false,
@@ -173,8 +178,10 @@ pub mod at {
     /// so looked up a key nothing is ever stored under. See `ask_hook_here`.
     pub const COMMAND_NOT_FOUND: usize = 16;
     pub const IDLE_TIMEOUT: usize = 17;
-    pub const ON_EXIT: usize = 18;
-    pub const ON_KEY: usize = 19;
+    /// Just before a finished line is written down. May replace what is recorded, or refuse it.
+    pub const PRE_RECORD: usize = 18;
+    pub const ON_EXIT: usize = 19;
+    pub const ON_KEY: usize = 20;
 }
 
 /// Which hooks have ever had a handler attached.
@@ -265,6 +272,7 @@ mod tests {
             (at::TIME_REPORT, "on-time-report"),
             (at::COMMAND_NOT_FOUND, "on-command-not-found"),
             (at::IDLE_TIMEOUT, "on-idle-timeout"),
+            (at::PRE_RECORD, "pre-record"),
             (at::ON_EXIT, "on-exit"),
             (at::ON_KEY, "on-key"),
         ] {
