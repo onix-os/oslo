@@ -25,7 +25,7 @@ end
 local function heading(title)
   step = step + 1
   print("")
-  print(oslo.ui.style(step .. "/12  " .. title, { fg = "magenta", bold = true }))
+  print(oslo.ui.style(step .. "/13  " .. title, { fg = "magenta", bold = true }))
 end
 
 -- ---------------------------------------------------------------- the terminal
@@ -145,6 +145,29 @@ oslo.ui.log{ message = "something to look at", level = "warn", fields = { where 
 oslo.ui.log{ message = "and something wrong", level = "error", fields = { step = step } }
 
 -- ---------------------------------------------------------------- asking
+
+heading("what wraps a widget")
+-- Four options every widget takes, about presentation rather than the question. They compose, and
+-- they are the same four the `ui` builtin takes as flags — one parser builds both.
+--
+--   legend = false          hide the `↑↓ move • enter choose` row
+--   border = "rounded"      and border_fg = "cyan"
+--   fit = "full"            reach the edges rather than hugging the content
+--   fullscreen = true       the alternate screen, out of the scrollback
+--   align_x / align_y       "left"/"top", "center", "right"/"bottom"; `align` sets both
+--
+-- The drawing itself is unit-tested in `interactive::ask::chrome`; `examples/ui_chrome.sh` shows
+-- them on real widgets. What is checked here is that a wrong name is refused rather than defaulted.
+for field, bad in pairs({ border = "fancy", fit = "fully", align = "centred", align_x = "up" }) do
+  local fine = pcall(function()
+    oslo.ui.confirm{ question = "x", [field] = bad }
+  end)
+  check(field .. " refuses a name nobody meant", fine, false)
+end
+-- And that a name anyone would write is accepted. `confirm` is the one widget that works without a
+-- terminal — it falls back to a line — so this is the one that can be exercised here.
+print("  every widget takes: legend, border, border_fg, fit, fullscreen, align_x, align_y")
+print("  see examples/ui_chrome.sh")
 
 heading("asking")
 -- `confirm` works without a terminal: the raw-mode widget falls back to an ordinary line, so a

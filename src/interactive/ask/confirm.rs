@@ -11,7 +11,7 @@
 //! one row. Three kinds of text on one line read as a sentence that does not parse:
 //! `carry on?  next  stop here  ←→ choose • enter confirm`.
 
-use super::{Answer, Inline, footer};
+use super::{Answer, Inline, footer_for};
 use crate::interactive::term::{Key, Keys, Restore, Screen};
 use crate::interactive::theme;
 
@@ -26,6 +26,8 @@ pub struct Confirm {
     /// Defaults to **no**. A confirm is asked before something you cannot undo, and a prompt that
     /// starts on `yes` turns a reflexive Enter into the destructive answer.
     pub default: bool,
+    /// The legend, the border, the screen and where on it. See `super::chrome`.
+    pub chrome: super::chrome::Chrome,
 }
 
 impl Default for Confirm {
@@ -35,6 +37,7 @@ impl Default for Confirm {
             yes: "Yes".to_string(),
             no: "No".to_string(),
             default: false,
+            chrome: super::chrome::Chrome::default(),
         }
     }
 }
@@ -49,7 +52,7 @@ pub fn confirm(spec: &Confirm) -> Answer<bool> {
 
     let mut yes = spec.default;
     let mut keys = Keys::on(raw.fd());
-    let mut panel = Inline::new();
+    let mut panel = Inline::with_chrome(spec.chrome.clone());
 
     loop {
         // The chosen button takes the accent as a *background*, which is what makes it read as a
@@ -77,7 +80,8 @@ pub fn confirm(spec: &Confirm) -> Answer<bool> {
             button(&spec.yes, yes),
             button(&spec.no, !yes),
         );
-        let bottom = footer(
+        let bottom = footer_for(
+            &spec.chrome,
             &frame,
             &[("←→", "choose"), ("y/n", "answer"), ("enter", "confirm")],
         );

@@ -16,7 +16,7 @@
 //! Space checks a row, Enter takes everything checked — or the row under the cursor when nothing
 //! is. That last rule is what stops "I pressed Enter and got nothing" from being a state.
 
-use super::{Answer, FOOTER_ROWS, Inline, footer};
+use super::{Answer, Inline, footer_for, footer_rows};
 use crate::interactive::dropdown::width::{terminal_cols, terminal_rows, truncate_to_width};
 use crate::interactive::matching::{Fuzzed, Fuzzy};
 use crate::interactive::term::{Key, Keys, Restore, Screen};
@@ -35,6 +35,8 @@ pub struct Choice {
     pub height: usize,
     /// How loosely the filter matches.
     pub fuzzy: Fuzzy,
+    /// The legend, the border, the screen and where on it. See `super::chrome`.
+    pub chrome: super::chrome::Chrome,
 }
 
 impl Default for Choice {
@@ -46,6 +48,7 @@ impl Default for Choice {
             filter: false,
             height: 10,
             fuzzy: Fuzzy::Smart,
+            chrome: super::chrome::Chrome::default(),
         }
     }
 }
@@ -82,14 +85,16 @@ fn run(spec: &Choice) -> Answer<Vec<String>> {
     let mut selected = 0usize;
     let mut offset = 0usize;
     let mut keys = Keys::on(raw.fd());
-    let mut panel = Inline::new();
+    let mut panel = Inline::with_chrome(spec.chrome.clone());
 
     loop {
         // The chrome is whatever this frame will actually draw — the legend, plus a header and a
         // filter row when there are any. Computed from the same booleans the drawing uses, so the
         // clamp and the frame cannot disagree; a hard-coded constant here is how two of these
         // widgets ended up reserving a row they never drew.
-        let chrome = FOOTER_ROWS + usize::from(!spec.header.is_empty()) + usize::from(spec.filter);
+        let chrome = footer_rows(&spec.chrome)
+            + usize::from(!spec.header.is_empty())
+            + usize::from(spec.filter);
         let height = spec
             .height
             .min(shown.len().max(1))
@@ -169,7 +174,7 @@ fn run(spec: &Choice) -> Answer<Vec<String>> {
         } else {
             &[("↑↓", "move"), ("enter", "confirm"), ("esc", "cancel")]
         };
-        let bottom = footer(&frame, keys_shown);
+        let bottom = footer_for(&spec.chrome, &frame, keys_shown);
         frame.push_str(&bottom);
         panel.draw(&frame);
 

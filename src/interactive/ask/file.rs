@@ -10,7 +10,7 @@
 //! page cache — and caching it would mean showing a file that has since been deleted, which for a
 //! file picker is the one wrong answer worth avoiding. Moving into a directory rereads it.
 
-use super::{Answer, FOOTER_ROWS, Inline, footer};
+use super::{Answer, Inline, footer_for, footer_rows};
 use crate::interactive::dropdown::width::{terminal_cols, terminal_rows, truncate_to_width};
 use crate::interactive::matching::{Fuzzed, Fuzzy};
 use crate::interactive::term::{Key, Keys, Restore, Screen};
@@ -35,6 +35,8 @@ pub struct Browse {
     pub hidden: bool,
     pub height: usize,
     pub fuzzy: Fuzzy,
+    /// The legend, the border, the screen and where on it. See `super::chrome`.
+    pub chrome: super::chrome::Chrome,
 }
 
 impl Default for Browse {
@@ -45,6 +47,7 @@ impl Default for Browse {
             hidden: false,
             height: 12,
             fuzzy: Fuzzy::Smart,
+            chrome: super::chrome::Chrome::default(),
         }
     }
 }
@@ -99,12 +102,12 @@ pub fn file(spec: &Browse) -> Answer<String> {
     let mut selected = 0usize;
     let mut offset = 0usize;
     let mut keys = Keys::on(raw.fd());
-    let mut panel = Inline::new();
+    let mut panel = Inline::with_chrome(spec.chrome.clone());
 
     loop {
         // Two rows above (the path and the query), the footer below, and one spare so the block
         // can never fill the screen exactly.
-        let chrome = 2 + FOOTER_ROWS;
+        let chrome = 2 + footer_rows(&spec.chrome);
         let height = spec
             .height
             .min(shown.len().max(1))
@@ -164,7 +167,8 @@ pub fn file(spec: &Browse) -> Answer<String> {
             };
             frame.push_str(&format!("\r\n\r\x1b[K{text}"));
         }
-        let bottom = footer(
+        let bottom = footer_for(
+            &spec.chrome,
             &frame,
             &[("↑↓", "move"), ("←→", "in/out"), ("enter", "choose")],
         );

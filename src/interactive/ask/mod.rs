@@ -37,6 +37,7 @@
 //! using these still work under CI.
 
 mod choose;
+pub mod chrome;
 mod confirm;
 mod file;
 mod format;
@@ -113,28 +114,71 @@ pub(crate) fn show(text: &str) {
 ///   one, because the last row is written without a newline.
 pub(crate) struct Inline {
     panel: crate::interactive::paint::Panel,
+    /// The border, the placement and the screen this draws on. Default is exactly what every
+    /// widget did before `chrome` existed: no border, top-left, inline.
+    chrome: chrome::Chrome,
+    /// Whether the alternate screen has been entered and still needs leaving.
+    took_the_screen: bool,
 }
 
 impl Inline {
-    pub(crate) fn new() -> Inline {
+    /// An inline widget wrapped in `chrome`.
+    ///
+    /// Entering the alternate screen happens here rather than on the first draw, so the caller's
+    /// transcript is saved before anything is written over it.
+    pub(crate) fn with_chrome(chrome: chrome::Chrome) -> Inline {
+        let took_the_screen = chrome.fullscreen;
+        if took_the_screen {
+            chrome::enter_fullscreen();
+        }
         Inline {
             // Column 0: an inline widget starts at the beginning of the row below the prompt, and
             // there is nothing to the left of it to come back to.
             panel: crate::interactive::paint::Panel::at(0),
+            chrome,
+            took_the_screen,
         }
     }
 
     /// Draw `frame`, whose rows are separated by `\r\n`.
     ///
-    /// The count comes from the frame, so it cannot disagree with what was printed.
+    /// The count comes from the frame *after* it has been wrapped, so a border's two extra rows are
+    /// reserved and erased like any others. Computing it from the unwrapped frame is how a bordered
+    /// widget would eat two rows of the transcript per keystroke.
     pub(crate) fn draw(&mut self, frame: &str) {
+        let frame = self.chrome.wrap(frame);
         let rows = frame.matches("\r\n").count();
-        show(&self.panel.draw(frame, rows));
+        // Vertical placement is blank rows above, and only on a screen this widget owns. Inline,
+        // pushing the frame down would scroll the caller's transcript rather than move anything.
+        let margin = self.chrome.top_margin(rows + 1);
+        let frame = match margin {
+            0 => frame,
+            n => format!("{}{frame}", "\r\n\r\x1b[K".repeat(n)),
+        };
+        let rows = frame.matches("\r\n").count();
+        show(&self.panel.draw(&frame, rows));
     }
 
     /// Erase everything drawn, exactly.
     pub(crate) fn close(&mut self) {
         show(&self.panel.close());
+        // Leaving puts the transcript back as it was, which is the whole reason to have taken a
+        // second screen rather than clearing this one.
+        if self.took_the_screen {
+            chrome::leave_fullscreen();
+            self.took_the_screen = false;
+        }
+    }
+}
+
+impl Drop for Inline {
+    /// The screen goes back even if the widget was dropped without closing — a panic, an early
+    /// return, a `?`. A shell left on the alternate screen is one whose scrollback has vanished,
+    /// and the user has no way to get it back.
+    fn drop(&mut self) {
+        if self.took_the_screen {
+            chrome::leave_fullscreen();
+        }
     }
 }
 
@@ -201,6 +245,29 @@ pub(crate) fn footer(frame: &str, keys: &[(&str, &str)]) -> String {
 
 /// How many rows [`footer`] draws, for a caller sizing its window.
 pub(crate) const FOOTER_ROWS: usize = 2;
+
+/// [`footer`], or nothing at all when the legend has been turned off.
+///
+/// One helper rather than an `if` at each of the five call sites, for the reason `footer` itself is
+/// one: a widget that got the condition subtly different would draw a rule with no keys under it,
+/// which reads as a bug in the widget rather than as a setting.
+pub(crate) fn footer_for(chrome: &chrome::Chrome, frame: &str, keys: &[(&str, &str)]) -> String {
+    match chrome.legend {
+        true => footer(frame, keys),
+        false => String::new(),
+    }
+}
+
+/// How many rows the footer will take, given the chrome. Zero with the legend off.
+///
+/// Every widget sizes its window against this, so turning the legend off gives the list the two
+/// rows back rather than leaving a gap where the keys used to be.
+pub(crate) fn footer_rows(chrome: &chrome::Chrome) -> usize {
+    match chrome.legend {
+        true => FOOTER_ROWS,
+        false => 0,
+    }
+}
 
 /// The printed width of the widest row in `frame`.
 ///

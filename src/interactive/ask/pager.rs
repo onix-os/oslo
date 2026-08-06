@@ -26,6 +26,8 @@ pub struct Pager {
     /// Wrap long lines rather than cutting them. Off matches `less -S`, which is right for tables
     /// and logs; on is right for prose.
     pub wrap: bool,
+    /// The legend, the border, the screen and where on it. See `super::chrome`.
+    pub chrome: super::chrome::Chrome,
 }
 
 /// Show `spec` until it is dismissed. There is nothing to answer with, so the outcome is only

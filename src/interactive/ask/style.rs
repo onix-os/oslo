@@ -37,7 +37,7 @@ impl Border {
     }
 
     /// Corners and edges: top-left, top-right, bottom-left, bottom-right, horizontal, vertical.
-    fn glyphs(self) -> Option<[&'static str; 6]> {
+    pub(super) fn glyphs(self) -> Option<[&'static str; 6]> {
         Some(match self {
             Border::None => return None,
             Border::Rounded => ["╭", "╮", "╰", "╯", "─", "│"],

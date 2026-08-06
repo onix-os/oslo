@@ -21,6 +21,7 @@
 //! table is also how the caller writes only the two they care about.
 
 use super::super::util::{ok, put};
+use crate::interactive::ask::chrome::{Chrome, Fit, Place};
 use crate::interactive::ask::{
     Align, Answer, As, Border, Browse, Choice, Confirm, Entry, Input, Level, Pager, Spin, Styling,
     Table as Rows, Want, Write, choose, confirm, file, filter, format, horizontal, input, line,
@@ -103,6 +104,60 @@ fn named_values(table: &Table) -> Vec<(String, String)> {
     out
 }
 
+/// The chrome fields every widget accepts: `legend`, `border`, `fit`, `fullscreen`, `align_x`,
+/// `align_y`.
+///
+/// Read from the same options table the widget's own fields come from, because they *are* the
+/// widget's fields as far as a caller is concerned — nobody wants to pass two tables to ask a
+/// question. A name that is not a placement is refused rather than defaulted: `align_x = "centre"`
+/// works, `align_x = "centred"` says so.
+fn chrome_of(t: &Table) -> Result<Chrome, crate::lua::eval::LuaError> {
+    let mut chrome = Chrome::default();
+    // Absent leaves the default on, so `legend = false` is the only spelling that turns it off and
+    // `legend = nil` cannot mean "off" by accident.
+    if let Value::Bool(shown) = t.get(&Value::str("legend")) {
+        chrome.legend = shown;
+    }
+    chrome.fullscreen = flag(t, "fullscreen") || flag(t, "alt");
+    if let Some(name) = maybe(t, "border") {
+        chrome.border = Border::parse(&name)
+            .ok_or_else(|| crate::lua::eval::LuaError::new(format!("{name}: not a border")))?;
+    }
+    if let Some(colour) = maybe(t, "border_fg") {
+        chrome.border_style =
+            theme::Style::fg(theme::Color::parse(&colour).ok_or_else(|| {
+                crate::lua::eval::LuaError::new(format!("{colour}: not a colour"))
+            })?);
+    }
+    for (field, slot) in [("fit", 0), ("border_fit", 0)] {
+        let _ = slot;
+        if let Some(name) = maybe(t, field) {
+            chrome.fit = Fit::parse(&name).ok_or_else(|| {
+                crate::lua::eval::LuaError::new(format!("{name}: fit is \"content\" or \"full\""))
+            })?;
+        }
+    }
+    for (field, axis) in [("align_x", true), ("align_y", false)] {
+        if let Some(name) = maybe(t, field) {
+            let place = Place::parse(&name)
+                .ok_or_else(|| crate::lua::eval::LuaError::new(format!("{name}: not a {field}")))?;
+            if axis {
+                chrome.align_x = place;
+            } else {
+                chrome.align_y = place;
+            }
+        }
+    }
+    // `align = "center"` sets both, which is what anyone centring a full-screen widget means.
+    if let Some(name) = maybe(t, "align") {
+        let place = Place::parse(&name)
+            .ok_or_else(|| crate::lua::eval::LuaError::new(format!("{name}: not an alignment")))?;
+        chrome.align_x = place;
+        chrome.align_y = place;
+    }
+    Ok(chrome)
+}
+
 /// A list field: `{items = {"a", "b"}}`.
 fn items(table: &Table, name: &str) -> Vec<String> {
     let Value::Table(list) = table.get(&Value::str(name)) else {
@@ -129,6 +184,7 @@ pub fn install(ui: &mut Table) {
             default: maybe(&t, "default").or_else(|| maybe(&t, "value")),
             password: flag(&t, "password"),
             required: flag(&t, "required"),
+            chrome: chrome_of(&t)?,
         });
         // `nil` for both cancelled and no-terminal. Lua has one absent value and a script says
         // `if not answer then return end`; splitting the two would mean every caller checking a
@@ -157,6 +213,10 @@ pub fn install(ui: &mut Table) {
                     settings.no = n;
                 }
                 settings.default = flag(&t, "default");
+                // **Parsed before anything is asked.** A bad `align` must be a diagnostic, not a
+                // question answered and then thrown away — and this is the one widget that would
+                // otherwise ask first, because it falls back to a line without a terminal.
+                settings.chrome = chrome_of(&t)?;
             }
             _ => {}
         }
@@ -190,6 +250,7 @@ pub fn install(ui: &mut Table) {
                 header: field(&t, "header"),
                 placeholder: field(&t, "placeholder"),
                 default: maybe(&t, "default").or_else(|| maybe(&t, "value")),
+                chrome: chrome_of(&t)?,
             }) {
                 Answer::Given(text) => Value::str(&text),
                 _ => Value::Nil,
@@ -218,6 +279,7 @@ pub fn install(ui: &mut Table) {
                 hidden: flag(&t, "hidden"),
                 height: count(&t, "height", 12),
                 fuzzy: crate::interactive::settings::current().completion.fuzzy,
+                chrome: chrome_of(&t)?,
             }) {
                 Answer::Given(path) => Value::str(&path),
                 _ => Value::Nil,
@@ -242,6 +304,7 @@ pub fn install(ui: &mut Table) {
                 height: count(&t, "height", 10),
                 filter: !flag(&t, "no_filter"),
                 fuzzy: crate::interactive::settings::current().completion.fuzzy,
+                chrome: chrome_of(&t)?,
             }) {
                 Answer::Given(row) => Value::str(&row),
                 _ => Value::Nil,
@@ -258,6 +321,7 @@ pub fn install(ui: &mut Table) {
                 title: field(&t, "title"),
                 text: field(&t, "text"),
                 wrap: flag(&t, "wrap"),
+                chrome: chrome_of(&t)?,
             }),
             Answer::Given(())
         )))
@@ -477,6 +541,7 @@ fn list_widget(args: &[Value], filtering: bool) -> Value {
         filter: filtering,
         height: count(&t, "height", 10),
         fuzzy: crate::interactive::settings::current().completion.fuzzy,
+        chrome: chrome_of(&t).unwrap_or_default(),
     };
     let answer = if filtering {
         filter(&settings)

@@ -25,6 +25,7 @@
 
 use crate::env::Environment;
 use crate::error::Result;
+mod chrome;
 use crate::interactive::ask::{
     Align, Answer, As, Border, Browse, Choice, Confirm, Entry, Input, Level, Pager, Spin, Styling,
     Table, Want, Write, choose, confirm, file, filter, format, horizontal, input, line, pager,
@@ -32,6 +33,7 @@ use crate::interactive::ask::{
 };
 use crate::interactive::matching::Fuzzy;
 use crate::interactive::theme;
+use chrome::{Chromed, chrome_flag};
 use std::io::BufRead;
 
 pub fn builtin_ui(env: &mut Environment, args: &[String]) -> Result<i32> {
@@ -117,6 +119,15 @@ fn run_input(args: &[String]) -> i32 {
             "--password" => spec.password = true,
             "--required" => spec.required = true,
             other => {
+                // The shared options first — see `chrome_flag`.
+                match chrome_flag(&mut spec.chrome, args, &mut at) {
+                    Chromed::Took => {
+                        at += 1;
+                        continue;
+                    }
+                    Chromed::Bad(status) => return status,
+                    Chromed::NotMine => {}
+                }
                 eprintln!("oslo: ui input: {other}: unknown option");
                 return 2;
             }
@@ -136,6 +147,15 @@ fn run_confirm(args: &[String]) -> i32 {
             "--no" => spec.no = take(args, &mut at),
             "--default" => spec.default = true,
             other if other.starts_with("--") => {
+                // The shared options first — see `chrome_flag`.
+                match chrome_flag(&mut spec.chrome, args, &mut at) {
+                    Chromed::Took => {
+                        at += 1;
+                        continue;
+                    }
+                    Chromed::Bad(status) => return status,
+                    Chromed::NotMine => {}
+                }
                 eprintln!("oslo: ui confirm: {other}: unknown option");
                 return 2;
             }
@@ -170,6 +190,15 @@ fn run_choose(args: &[String], filtering: bool) -> i32 {
             "--height" => spec.height = take(args, &mut at).parse().unwrap_or(spec.height).max(1),
             "--exact" => spec.fuzzy = Fuzzy::Off,
             other if other.starts_with("--") => {
+                // The shared options first — see `chrome_flag`.
+                match chrome_flag(&mut spec.chrome, args, &mut at) {
+                    Chromed::Took => {
+                        at += 1;
+                        continue;
+                    }
+                    Chromed::Bad(status) => return status,
+                    Chromed::NotMine => {}
+                }
                 eprintln!("oslo: ui: {other}: unknown option");
                 return 2;
             }
@@ -236,7 +265,7 @@ fn run_style(args: &[String]) -> i32 {
 }
 
 /// The option's argument, leaving `at` on it so the caller's `+= 1` lands past it.
-fn take(args: &[String], at: &mut usize) -> String {
+pub(super) fn take(args: &[String], at: &mut usize) -> String {
     *at += 1;
     args.get(*at).cloned().unwrap_or_default()
 }
@@ -286,6 +315,15 @@ fn run_write(args: &[String]) -> i32 {
             "--placeholder" => spec.placeholder = take(args, &mut at),
             "--value" | "--default" => spec.default = Some(take(args, &mut at)),
             other => {
+                // The shared options first — see `chrome_flag`.
+                match chrome_flag(&mut spec.chrome, args, &mut at) {
+                    Chromed::Took => {
+                        at += 1;
+                        continue;
+                    }
+                    Chromed::Bad(status) => return status,
+                    Chromed::NotMine => {}
+                }
                 eprintln!("oslo: ui write: {other}: unknown option");
                 return 2;
             }
@@ -305,6 +343,15 @@ fn run_file(args: &[String]) -> i32 {
             "--both" => spec.want = Want::Both,
             "--height" => spec.height = take(args, &mut at).parse().unwrap_or(spec.height).max(1),
             other if other.starts_with("--") => {
+                // The shared options first — see `chrome_flag`.
+                match chrome_flag(&mut spec.chrome, args, &mut at) {
+                    Chromed::Took => {
+                        at += 1;
+                        continue;
+                    }
+                    Chromed::Bad(status) => return status,
+                    Chromed::NotMine => {}
+                }
                 eprintln!("oslo: ui file: {other}: unknown option");
                 return 2;
             }
@@ -444,6 +491,15 @@ fn run_pager(args: &[String]) -> i32 {
             "--title" => spec.title = take(args, &mut at),
             "--wrap" => spec.wrap = true,
             other if other.starts_with("--") => {
+                // The shared options first — see `chrome_flag`.
+                match chrome_flag(&mut spec.chrome, args, &mut at) {
+                    Chromed::Took => {
+                        at += 1;
+                        continue;
+                    }
+                    Chromed::Bad(status) => return status,
+                    Chromed::NotMine => {}
+                }
                 eprintln!("oslo: ui pager: {other}: unknown option");
                 return 2;
             }
@@ -504,6 +560,15 @@ fn run_table(args: &[String]) -> i32 {
             "--height" => spec.height = take(args, &mut at).parse().unwrap_or(spec.height).max(1),
             "--no-filter" => spec.filter = false,
             other => {
+                // The shared options first — see `chrome_flag`.
+                match chrome_flag(&mut spec.chrome, args, &mut at) {
+                    Chromed::Took => {
+                        at += 1;
+                        continue;
+                    }
+                    Chromed::Bad(status) => return status,
+                    Chromed::NotMine => {}
+                }
                 eprintln!("oslo: ui table: {other}: unknown option");
                 return 2;
             }

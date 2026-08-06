@@ -33,6 +33,8 @@ pub struct Input {
     pub password: bool,
     /// Refuse to answer with an empty line.
     pub required: bool,
+    /// The legend, the border, the screen and where on it. See `super::chrome`.
+    pub chrome: super::chrome::Chrome,
 }
 
 /// Ask for one line.

@@ -8,7 +8,7 @@
 //! Drawn in place below the header, like the list widgets, so the transcript above is untouched
 //! and the finished text stays where it was typed.
 
-use super::{Answer, FOOTER_ROWS, Inline, footer, with_caret};
+use super::{Answer, Inline, footer_for, footer_rows, with_caret};
 use crate::interactive::dropdown::width::{terminal_cols, terminal_rows, truncate_to_width};
 use crate::interactive::term::{Key, Keys, Restore, Screen};
 use crate::interactive::theme;
@@ -20,6 +20,8 @@ pub struct Write {
     pub placeholder: String,
     /// The text starts as this, and it is the answer when there is no terminal.
     pub default: Option<String>,
+    /// The legend, the border, the screen and where on it. See `super::chrome`.
+    pub chrome: super::chrome::Chrome,
 }
 
 pub fn write(spec: &Write) -> Answer<String> {
@@ -48,14 +50,14 @@ pub fn write(spec: &Write) -> Answer<String> {
     let mut row = lines.len() - 1;
     let mut col = lines[row].len();
     let mut keys = Keys::on(raw.fd());
-    let mut panel = Inline::new();
+    let mut panel = Inline::with_chrome(spec.chrome.clone());
 
     loop {
         let cols = terminal_cols();
         let room = cols.saturating_sub(3);
         // The document scrolls under a window, like every other list here. Without this a document
         // longer than the terminal walked off the top and the redraw painted over the transcript.
-        let chrome = FOOTER_ROWS + usize::from(!spec.header.is_empty());
+        let chrome = footer_rows(&spec.chrome) + usize::from(!spec.header.is_empty());
         let window = terminal_rows().saturating_sub(chrome + 1).max(1);
         let top = row.saturating_sub(window.saturating_sub(1));
 
@@ -94,7 +96,8 @@ pub fn write(spec: &Write) -> Answer<String> {
                 text
             ));
         }
-        let bottom = footer(
+        let bottom = footer_for(
+            &spec.chrome,
             &frame,
             &[
                 ("enter", "new line"),

@@ -10,7 +10,7 @@
 //! The answer is the **whole row**, in its original text. A widget that answered with a field
 //! would have to be told which one, and a caller that wants a field can `cut` the row it got back.
 
-use super::{Answer, FOOTER_ROWS, Inline, footer};
+use super::{Answer, Inline, footer_for, footer_rows};
 use crate::interactive::dropdown::width::{
     pad_to_width, terminal_cols, terminal_rows, truncate_to_width,
 };
@@ -31,6 +31,8 @@ pub struct Table {
     /// Narrow as you type, over every field of the row.
     pub filter: bool,
     pub fuzzy: Fuzzy,
+    /// The legend, the border, the screen and where on it. See `super::chrome`.
+    pub chrome: super::chrome::Chrome,
 }
 
 impl Default for Table {
@@ -42,6 +44,7 @@ impl Default for Table {
             height: 10,
             filter: true,
             fuzzy: Fuzzy::Smart,
+            chrome: super::chrome::Chrome::default(),
         }
     }
 }
@@ -102,12 +105,14 @@ pub fn table(spec: &Table) -> Answer<String> {
     let mut selected = 0usize;
     let mut offset = 0usize;
     let mut keys = Keys::on(raw_mode.fd());
-    let mut panel = Inline::new();
+    let mut panel = Inline::with_chrome(spec.chrome.clone());
 
     loop {
         // Computed from the same booleans the frame draws with, so the clamp and the frame cannot
         // disagree — a hard-coded constant here is how this reserved a row it never used.
-        let chrome = FOOTER_ROWS + usize::from(!spec.headers.is_empty()) + usize::from(spec.filter);
+        let chrome = footer_rows(&spec.chrome)
+            + usize::from(!spec.headers.is_empty())
+            + usize::from(spec.filter);
         let height = spec
             .height
             .min(shown.len().max(1))
@@ -169,7 +174,7 @@ pub fn table(spec: &Table) -> Answer<String> {
             };
             frame.push_str(&format!("\r\n\r\x1b[K{text}"));
         }
-        let bottom = footer(&frame, &[("↑↓", "move"), ("enter", "choose")]);
+        let bottom = footer_for(&spec.chrome, &frame, &[("↑↓", "move"), ("enter", "choose")]);
         frame.push_str(&bottom);
         panel.draw(&frame);
 
