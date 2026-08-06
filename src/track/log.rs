@@ -61,6 +61,14 @@ fn encode(line: &str, mode: &str, at: u64) -> Vec<u8> {
         .done()
 }
 
+/// A row read back, for another module in this crate that has bytes and wants the fields.
+///
+/// `Track::forget` matches on the line and the language, which live in the value rather than in
+/// the key — so it needs this module.'s encoding rather than a second copy of it.
+pub(super) fn entry_of(value: &[u8]) -> Option<Entry> {
+    decode(value)
+}
+
 /// A row read back, or `None` if it is not one — a truncated value costs one recalled line rather
 /// than the whole history.
 fn decode(value: &[u8]) -> Option<Entry> {

@@ -326,3 +326,71 @@ fn the_bound_holds_on_a_history_deep_enough_for_one_delete_to_fail() {
         "the oldest went"
     );
 }
+
+/// **`forget` takes the line out of the log, not only out of the aggregate.**
+///
+/// It used to delete from `Tree::Run` alone, so the finder's Delete key left the line in
+/// `Tree::History` and `recent()` handed it straight back on the next start. The doc comment on
+/// `forget` names the case it exists for — "a password on the command line" — and that password
+/// survived being forgotten.
+///
+/// Worth pinning here rather than beside `forget`: this file is the one that knows what the log
+/// promises, and the promise is that a line you removed is gone from it.
+#[test]
+fn forgetting_a_line_removes_it_from_the_log_as_well() {
+    let (_dir, history) = temp_db();
+    history.append("echo keep", MODE_SHELL);
+    history.append("curl -H 'Authorization: Bearer hunter2'", MODE_SHELL);
+    history.append("echo keep too", MODE_SHELL);
+
+    let gone = history.forget("curl -H 'Authorization: Bearer hunter2'", MODE_SHELL);
+    assert!(gone >= 1, "nothing was deleted");
+
+    let left: Vec<String> = history.recent(10).into_iter().map(|e| e.line).collect();
+    assert_eq!(
+        left,
+        vec!["echo keep".to_string(), "echo keep too".to_string()],
+        "the forgotten line is still in the log"
+    );
+}
+
+/// Only that line, and only in that language. A `forget` that took neighbours with it would be
+/// worse than one that took nothing.
+#[test]
+fn forgetting_leaves_every_other_line_alone() {
+    let (_dir, history) = temp_db();
+    history.append("same text", MODE_SHELL);
+    history.append("same text", MODE_LUA);
+    history.append("other", MODE_SHELL);
+
+    history.forget("same text", MODE_SHELL);
+
+    let left: Vec<(String, String)> = history
+        .recent(10)
+        .into_iter()
+        .map(|e| (e.line, e.mode))
+        .collect();
+    assert_eq!(
+        left,
+        vec![
+            ("same text".to_string(), MODE_LUA.to_string()),
+            ("other".to_string(), MODE_SHELL.to_string()),
+        ],
+        "the Lua line and the unrelated one must survive"
+    );
+}
+
+/// Every copy of a repeated line goes, not just the newest. Leaving the older ones would make it
+/// reappear the moment the newest scrolled out.
+#[test]
+fn forgetting_removes_every_occurrence() {
+    let (_dir, history) = temp_db();
+    history.append("repeated", MODE_SHELL);
+    history.append("between", MODE_SHELL);
+    history.append("repeated", MODE_SHELL);
+
+    history.forget("repeated", MODE_SHELL);
+
+    let left: Vec<String> = history.recent(10).into_iter().map(|e| e.line).collect();
+    assert_eq!(left, vec!["between".to_string()]);
+}
