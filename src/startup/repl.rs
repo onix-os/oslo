@@ -165,6 +165,8 @@ pub fn run_repl(login: bool) -> ! {
         universal_stamp =
             oslo::env::universal::refresh(&mut env_struct.lock().unwrap(), universal_stamp);
 
+        publish_terminal_size(&env_struct);
+
         // A prompt is about to be drawn. This is bash's `PROMPT_COMMAND` and zsh's `precmd`, and
         // the hook a prompt integration written in Lua needs — the shell-side one already exists
         // as `$PROMPT_COMMAND` below.
@@ -401,6 +403,35 @@ pub fn run_repl(login: bool) -> ! {
     let last_status = run_exit_trap(&mut env_guard, last_status);
     drop(env_guard);
     std::process::exit(last_status);
+}
+
+/// Put the terminal's size in `$COLUMNS` and `$LINES`, **exported**, before every prompt.
+///
+/// # Why a shell has to do this
+///
+/// A program the shell runs cannot ask how wide the terminal is unless it *has* the terminal —
+/// and a prompt renderer is usually reading a pipe, because the shell is capturing what it says.
+/// `TIOCGWINSZ` on a pipe fails, so every such tool falls back to `$COLUMNS`, and to 80 when that
+/// is missing too. bash maintains both under `checkwinsize`; zsh keeps them as special variables.
+///
+/// oslo did neither, and the effect was not subtle: `hexe shp prompt` laid every prompt out as
+/// though the terminal were 80 columns wide however wide it really was, so segments were dropped
+/// as "not fitting" on a 230-column screen. The same is true of starship, of `$(tput cols)` inside
+/// a substitution, and of anything else asked to render into a pipe.
+///
+/// Refreshed per prompt rather than from a `SIGWINCH` handler, which is what `checkwinsize` does
+/// and is enough: nothing between two prompts can observe the value except a command, and a
+/// command that ran before the resize could not have seen it anyway. It also keeps the signal
+/// handler free of anything that allocates.
+///
+/// **Exported**, unlike bash's, because the whole point is that a *child* reads it — a shell
+/// variable a child cannot see would fix nothing here.
+fn publish_terminal_size(env: &Arc<Mutex<Environment>>) {
+    let cols = oslo::interactive::dropdown::terminal_cols();
+    let rows = oslo::interactive::dropdown::width::terminal_rows();
+    let mut guard = env.lock().unwrap();
+    guard.set_var("COLUMNS", &cols.to_string(), true);
+    guard.set_var("LINES", &rows.to_string(), true);
 }
 
 /// `on-exit`, from both ways a REPL ends — `exit` and end of input.
