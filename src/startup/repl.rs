@@ -42,6 +42,10 @@ pub fn run_repl(login: bool) -> ! {
     // starts and stops. oslo only declares the boundaries; folding them is the job of whatever
     // owns the grid. See `oslo::interactive::marks`.
     oslo::interactive::marks::enable(true);
+    // A resize should redraw the line, and a blocked `read` does not notice one on its own. See
+    // `term::watch_for_resize` — installed here rather than in the library so that a script, which
+    // has no line to redraw, does not acquire a signal handler it will never use.
+    oslo::interactive::term::watch_for_resize();
     // Asked once, before anything is drawn: the terminal's background decides whether the syntax
     // palette should be the dark one. A terminal that does not answer leaves the default standing
     // — see `oslo::interactive::query` for why the *silence* is the case worth engineering for.
