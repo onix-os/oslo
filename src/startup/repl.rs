@@ -283,6 +283,11 @@ pub fn run_repl(login: bool) -> ! {
                     // has not run a command.
                     Mode::Lua => run_lua_line(&lua, &text, last_status),
                     Mode::Shell => {
+                        // Record what each link of `a && b || c` does, for the line the user typed
+                        // and nothing else. Armed here rather than inside the evaluator because
+                        // *this* is the only place that knows a person typed it: a script, a
+                        // `-c` command and every nested chain leave it off and pay nothing.
+                        oslo::exec::pipeline::segments::arm();
                         let mut env_guard = env_struct.lock().unwrap();
                         let res = absorb_loop_control(
                             parse_with_aliases(&text, &|n| {
@@ -291,6 +296,7 @@ pub fn run_repl(login: bool) -> ! {
                             .and_then(|ast| eval_command_list(&mut env_guard, &ast)),
                         );
                         drop(env_guard);
+                        oslo::exec::pipeline::segments::disarm();
                         res
                     }
                 };
@@ -350,6 +356,12 @@ pub fn run_repl(login: bool) -> ! {
                 }
                 let elapsed = started.elapsed();
                 note_command_duration(elapsed);
+                // A chain that stopped part-way says where, and what would carry on from there.
+                // One line, and only when there is something to say: a chain that finished, or a
+                // single command that failed, prints nothing.
+                if let Some(from) = oslo::exec::pipeline::segments::resumable() {
+                    eprintln!("oslo: chain stopped — resume with: {from}");
+                }
                 announce(&notify::slow_command_notice(&text, elapsed, &res));
                 // The command is over and its status is known: close the block before anything
                 // else prints, so nothing that follows lands inside it.

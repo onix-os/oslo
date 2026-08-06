@@ -15,6 +15,7 @@ mod abbr;
 pub(crate) mod arrays;
 mod builtin;
 mod caller;
+mod chain;
 mod colon;
 mod command;
 mod conditionals;
@@ -44,6 +45,7 @@ mod variables;
 
 pub use builtin::builtin_builtin;
 pub use caller::builtin_caller;
+pub use chain::builtin_chain;
 pub use colon::builtin_colon;
 pub use command::builtin_command;
 pub use conditionals::{builtin_extended_test, builtin_test};
@@ -187,6 +189,9 @@ pub fn register_default_builtins(env: &mut Environment) {
 
     env.register_custom_builtin("shopt", builtin_shopt);
     env.register_custom_builtin("caller", builtin_caller);
+    // `chain` — what each link of the last `a && b` did. See its module docs: the shell already
+    // computed this and dropped it, and `$PIPESTATUS` only answers one level down.
+    env.register_custom_builtin("chain", builtin_chain);
     env.register_custom_builtin("status", builtin_status);
     env.register_custom_builtin("universal", builtin_universal);
     env.register_custom_builtin("suspend", builtin_suspend);
@@ -232,6 +237,7 @@ mod tests {
             "universal",
             "suspend",
             "rm",
+            "chain",
         ] {
             assert!(env.is_builtin(name), "{name} is not registered");
             assert!(

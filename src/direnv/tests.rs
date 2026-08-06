@@ -18,6 +18,22 @@ fn shell() -> Mutex<Environment> {
     Mutex::new(Environment::new())
 }
 
+/// Exclusion for the one test that turns the `direnv` **feature** off.
+///
+/// The feature bit is process-global, like `shopt`'s, so a test that clears it clears it for every
+/// sibling running at the same instant — and `arrive` then finds no file in a directory that has
+/// one. That is not flakiness in the feature; it is the same class as the `OSLO_T_` note above,
+/// one level up: shared process state and a parallel runner.
+///
+/// A read/write lock rather than a plain mutex, so the fifteen tests that only *depend* on the
+/// feature being on still run concurrently with each other. Only the one that changes it is alone.
+static FEATURE: std::sync::RwLock<()> = std::sync::RwLock::new(());
+
+/// Hold while a test needs the `direnv` feature left alone.
+fn feature_unchanged() -> std::sync::RwLockReadGuard<'static, ()> {
+    FEATURE.read().unwrap_or_else(|e| e.into_inner())
+}
+
 /// Read a variable the way a caller outside the lock would.
 fn var(env: &Mutex<Environment>, name: &str) -> Option<String> {
     env.lock().unwrap().get_var(name).map(str::to_string)
@@ -62,6 +78,7 @@ fn rc_in(dir: &Path, name: &str, body: &str) -> PathBuf {
 /// Nothing is read until it is allowed, and the notice is printed once.
 #[test]
 fn an_unallowed_file_is_not_read_and_is_reported_once() {
+    let _feature = feature_unchanged();
     let store = tempfile::tempdir().expect("temp dir");
     let project = tempfile::tempdir().expect("temp dir");
     rc_in(project.path(), find::NAME, "SECRET=leaked\n");
@@ -96,6 +113,7 @@ fn an_unallowed_file_is_not_read_and_is_reported_once() {
 /// haunted.
 #[test]
 fn an_alias_a_directory_defined_leaves_with_it() {
+    let _feature = feature_unchanged();
     let store = tempfile::tempdir().expect("temp dir");
     let project = tempfile::tempdir().expect("temp dir");
     let elsewhere = tempfile::tempdir().expect("temp dir");
@@ -142,6 +160,7 @@ fn an_alias_a_directory_defined_leaves_with_it() {
 /// not create.
 #[test]
 fn a_local_variable_the_directory_exported_comes_back_local() {
+    let _feature = feature_unchanged();
     let store = tempfile::tempdir().expect("temp dir");
     let project = tempfile::tempdir().expect("temp dir");
     let elsewhere = tempfile::tempdir().expect("temp dir");
@@ -183,6 +202,7 @@ fn a_local_variable_the_directory_exported_comes_back_local() {
 /// instant you leave, rather than still being found through a stale hash.
 #[test]
 fn a_path_a_project_added_does_not_follow_you_out() {
+    let _feature = feature_unchanged();
     let store = tempfile::tempdir().expect("temp dir");
     let project = tempfile::tempdir().expect("temp dir");
     let elsewhere = tempfile::tempdir().expect("temp dir");
@@ -207,6 +227,7 @@ fn a_path_a_project_added_does_not_follow_you_out() {
 /// The whole point: arriving sets, leaving restores.
 #[test]
 fn arriving_loads_and_leaving_puts_everything_back() {
+    let _feature = feature_unchanged();
     let store = tempfile::tempdir().expect("temp dir");
     let project = tempfile::tempdir().expect("temp dir");
     let elsewhere = tempfile::tempdir().expect("temp dir");
@@ -243,6 +264,7 @@ fn arriving_loads_and_leaving_puts_everything_back() {
 /// Moving straight from one project to another must not merge them.
 #[test]
 fn one_project_never_leaks_into_the_next() {
+    let _feature = feature_unchanged();
     let store = tempfile::tempdir().expect("temp dir");
     let first = tempfile::tempdir().expect("temp dir");
     let second = tempfile::tempdir().expect("temp dir");
@@ -268,6 +290,7 @@ fn one_project_never_leaks_into_the_next() {
 /// Standing still costs nothing, which is what makes this affordable on every `cd`.
 #[test]
 fn staying_put_does_no_work() {
+    let _feature = feature_unchanged();
     let store = tempfile::tempdir().expect("temp dir");
     let project = tempfile::tempdir().expect("temp dir");
     let path = rc_in(project.path(), find::NAME, "OSLO_T_STAY=1\n");
@@ -297,6 +320,7 @@ fn staying_put_does_no_work() {
 /// next arrival unloads properly first.
 #[test]
 fn denying_what_is_loaded_unloads_it() {
+    let _feature = feature_unchanged();
     let store = tempfile::tempdir().expect("temp dir");
     let project = tempfile::tempdir().expect("temp dir");
     let path = rc_in(project.path(), find::NAME, "OSLO_T_DENY=1\n");
@@ -326,6 +350,7 @@ fn denying_what_is_loaded_unloads_it() {
 /// Allowing takes effect where you are standing, not on the next `cd`.
 #[test]
 fn allowing_loads_without_moving() {
+    let _feature = feature_unchanged();
     let store = tempfile::tempdir().expect("temp dir");
     let project = tempfile::tempdir().expect("temp dir");
     let path = rc_in(project.path(), find::NAME, "OSLO_T_NOW=1\n");
@@ -352,6 +377,7 @@ fn allowing_loads_without_moving() {
 /// A subdirectory of the project is still the project.
 #[test]
 fn walking_deeper_stays_loaded() {
+    let _feature = feature_unchanged();
     let store = tempfile::tempdir().expect("temp dir");
     let project = tempfile::tempdir().expect("temp dir");
     let deep = project.path().join("src/inner");
@@ -374,6 +400,7 @@ fn walking_deeper_stays_loaded() {
 /// Editing an allowed file revokes it, so the next arrival must refuse rather than reload.
 #[test]
 fn an_edit_revokes_and_the_environment_comes_back_out() {
+    let _feature = feature_unchanged();
     let store = tempfile::tempdir().expect("temp dir");
     let project = tempfile::tempdir().expect("temp dir");
     let path = rc_in(project.path(), find::NAME, "OSLO_T_EDIT_A=1\n");
@@ -421,6 +448,9 @@ fn an_edit_revokes_and_the_environment_comes_back_out() {
 /// directory that has no `.env.lua`; the assertion is that it really is that path.
 #[test]
 fn turning_the_feature_off_unloads_the_loaded_environment() {
+    // **The write half, and the only test that takes it.** The bit this flips is process-global,
+    // so no sibling may be inside `arrive` while it is off. See `FEATURE` above.
+    let _exclusive = FEATURE.write().unwrap_or_else(|e| e.into_inner());
     let store = tempfile::tempdir().expect("temp dir");
     let project = tempfile::tempdir().expect("temp dir");
     let path = rc_in(project.path(), find::NAME, "OSLO_T_FEATURE=loaded\n");
