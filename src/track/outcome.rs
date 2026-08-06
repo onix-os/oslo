@@ -147,6 +147,15 @@ impl super::Track {
             .unwrap_or_default()
     }
 
+    /// Drop every outcome belonging to one log row.
+    ///
+    /// For a line a `pre-record` rule refused: the row goes, so what it did must go with it.
+    pub(super) fn drop_outcome(&self, history_id: u64) -> bool {
+        self.store
+            .delete_span_in_chunks(Tree::Outcome, &span_of(history_id));
+        true
+    }
+
     /// Drop outcomes for every log row older than the newest `max`.
     ///
     /// Called from the log's own trim, with the same bound, so the two buckets cannot drift: an

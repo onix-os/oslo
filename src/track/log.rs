@@ -177,6 +177,44 @@ impl super::Track {
         })
     }
 
+    /// Replace what the row at `history_id` says was typed, and mark it as rewritten.
+    ///
+    /// **In place, keeping the id**, because the id is what the outcome rows join on and what the
+    /// editor's own copy is ordered by. Deleting and re-appending would renumber the line and
+    /// orphan everything already written against it.
+    ///
+    /// The `rewritten` flag is the whole point: a reader can then tell "this is what was typed"
+    /// from "this is what a rule kept", which is the difference between a transformation and a
+    /// hole. See [`Entry::rewritten`].
+    pub fn rewrite_line(&self, history_id: u64, line: &str) -> bool {
+        self.store
+            .write(|writer| {
+                let key = slot(history_id);
+                let mut row = decode(&writer.get(Tree::History, &key)?)?;
+                if row.line == line {
+                    return Some(());
+                }
+                row.line = line.to_string();
+                row.rewritten = true;
+                writer.put(Tree::History, key, encode(&row, now()))
+            })
+            .is_some()
+    }
+
+    /// Take the row at `history_id` out of the log entirely, outcomes and all.
+    ///
+    /// What a `pre-record` rule returning `false` asks for. The outcomes go with it for the same
+    /// reason the trim takes them: a row nothing can join to is a row nothing will ever read.
+    pub fn drop_line(&self, history_id: u64) -> bool {
+        self.store
+            .write(|writer| {
+                writer.delete(Tree::History, &slot(history_id));
+                Some(())
+            })
+            .is_some()
+            && self.drop_outcome(history_id)
+    }
+
     /// This shell's session ordinal, allocated from `Tree::Meta` on first use.
     ///
     /// Zero when the store will not answer, which `decode` already reads as "no session recorded"

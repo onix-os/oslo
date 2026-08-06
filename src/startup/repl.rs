@@ -395,13 +395,33 @@ pub fn run_repl(login: bool) -> ! {
                 if secret {
                     tracker.forget_boundary();
                 } else {
-                    let run = tracking::ran(&text, mode.name(), &res, elapsed);
-                    tracker.boundary(&before, &after, run);
+                    // A `pre-record` rule may keep one link of a chain instead of the whole line,
+                    // or refuse it. Asked once, before anything is written down, and the answer
+                    // decides both what the aggregate learns and what the log ends up saying.
+                    let decided =
+                        tracking::ask_what_to_record(&text, &before, mode.name(), &res, elapsed);
+                    let lines = tracking::lines_to_record(&decided, &text);
+                    for (first, line) in lines.iter().enumerate().map(|(i, l)| (i == 0, l)) {
+                        let run = tracking::ran(line, mode.name(), &res, elapsed);
+                        // Only the first arrival records the *movement* and the dwell; a second
+                        // one would credit this directory twice for the same command.
+                        if first {
+                            tracker.boundary(&before, &after, run);
+                        } else {
+                            tracker.also_ran(&before, run);
+                        }
+                    }
+                    if lines.is_empty() {
+                        tracker.forget_boundary();
+                    }
                     // What the line did, joined to the log row it went in under. **After the
                     // boundary**, because that is what resolves the directory this then reads back
                     // — one lookup between them rather than two.
                     if let Some(id) = logged_as {
-                        tracking::record_outcome(id, &res, elapsed);
+                        tracking::settle_log_row(id, &decided, &text);
+                        if !lines.is_empty() {
+                            tracking::record_outcome(id, &res, elapsed);
+                        }
                     }
                 }
 

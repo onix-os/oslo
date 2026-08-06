@@ -632,6 +632,61 @@ Returning nothing is the safe default, and so is returning something unrecognise
 explicit `false` swallows a key and only a string or a `{ text = … }` table replaces the line. A
 session with no `key` handler attached does not pay for the hook at all.
 
+### Chains
+
+`a && b || c` is one line and several links, and the shell used to keep only the last status. It
+now records each one — including the links it **never ran**, which is neither success nor failure
+and which nothing else in a shell writes down.
+
+```
+❯ make clean && make build && make test
+oslo: chain stopped — resume with: make build && make test
+
+❯ chain
+   make clean     ok               5ms
+&& make build     failed (2)     412ms
+&& make test      skipped
+                  total          417ms
+
+❯ chain resume
+make build && make test
+```
+
+`$PIPESTATUS` answers the same question one level down, for the stages inside a single pipeline,
+and still does.
+
+### What gets written down
+
+`oslo.on.pre_record` runs when a line has finished and before it is recorded. It is told what ran,
+where, how it went, and its links; it answers with the lines to remember.
+
+```lua
+oslo.on.pre_record(function(c)
+  -- c.text, c.cwd, c.mode, c.status, c.duration_ms, c.profile
+  -- c.segments = { { text, op, status, ran, ms }, … }
+  for _, s in ipairs(c.segments) do
+    if s.text:match("^cc ") then
+      return { c.text, s.text }        -- the chain, and that link as its own command
+    end
+  end
+end)
+```
+
+| returned | recorded |
+|---|---|
+| nothing | the whole line — the default |
+| `{ c.text, s.text }` | the chain **and** that link, so typing `cc` suggests `cc -c 'd'` |
+| `{ s.text }` | only the link; the chain is not remembered |
+| `false` | nothing at all |
+
+A link never becomes a command on its own unless a rule asks: a chain is one thing you meant, and
+`aa` inside one is not something you typed.
+
+**A rewritten line says so.** The row carries a flag, so anything reading the history can tell
+"this is what was typed" from "this is what a rule kept". That is the difference between a
+transformation and a hole, and it is why filtering is a rule rather than a switch — recording
+itself cannot be turned off, and `oslo.feature` refuses the name.
+
 ### Features you can turn off
 
 ```lua

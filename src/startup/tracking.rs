@@ -96,6 +96,27 @@ impl Tracker {
         self.write(track, before, after, run);
     }
 
+    /// Record a second line for the same command boundary — a link a `pre-record` rule kept.
+    ///
+    /// **No movement and no dwell.** Those belong to the boundary, which the first line already
+    /// recorded; crediting them again would count one command's seconds twice and make the
+    /// directory look busier than it was.
+    pub(super) fn also_ran(&mut self, here: &str, run: Option<Run<'_>>) {
+        let Some(track) = track::store() else {
+            return;
+        };
+        let root = self.worktree_of(here);
+        track.record(&Step {
+            ran_in: Visit {
+                path: here,
+                root: root.as_deref(),
+            },
+            moved_to: None,
+            dwell_ms: 0,
+            run,
+        });
+    }
+
     /// A line the user asked the shell to forget as they typed it.
     ///
     /// The segment is closed and thrown away, so the time a secret command took is not credited to
@@ -183,6 +204,137 @@ pub(super) fn ran<'a>(
 /// A duration in whole milliseconds. Sub-millisecond resolution on a shell command is noise.
 fn millis(elapsed: Duration) -> i64 {
     i64::try_from(elapsed.as_millis()).unwrap_or(i64::MAX)
+}
+
+/// What a `pre-record` handler decided about a finished line.
+pub(super) enum Recording {
+    /// Nothing was attached, or the handler declined to answer. Record as typed.
+    AsTyped,
+    /// Record these lines instead. The first is what the log row becomes; every one of them gets a
+    /// row in the aggregate.
+    These(Vec<String>),
+    /// Record nothing at all.
+    Refused,
+}
+
+/// Ask a `pre-record` rule what to write down for the line that just finished.
+///
+/// **This runs where the shell's state is free** — `boundary` is called after the guard is dropped
+/// — so a handler may use the whole `oslo.*` API, unlike the answering hooks that fire from inside
+/// a builtin.
+///
+/// The handler is told the line, where and how it ran, and its links; it answers with a list of
+/// lines to record, `false` for none, or nothing to leave it alone. See the README.
+pub(super) fn ask_what_to_record(
+    text: &str,
+    cwd: &str,
+    mode: &str,
+    result: &Result<i32, ShellError>,
+    elapsed: Duration,
+) -> Recording {
+    use oslo::lua::eval::value::Value;
+    let status = match result {
+        Ok(status) => *status,
+        Err(err) => err.failure_status(),
+    };
+    let mut fields = vec![
+        ("text", Value::str(text)),
+        ("cwd", Value::str(cwd)),
+        ("mode", Value::str(mode)),
+        ("status", Value::int(i64::from(status))),
+        ("duration_ms", Value::int(millis(elapsed))),
+        ("profile", Value::str(track::profile::current())),
+        ("segments", segment_table()),
+    ];
+    fields.sort_by_key(|(name, _)| *name);
+    let answer = oslo::lua::engine::answer_hook_with(
+        oslo::lua::api::hooks::at::PRE_RECORD,
+        vec![oslo::LuaEngine::hook_fields(&fields)],
+    );
+    match answer {
+        None | Some(Value::Nil) => Recording::AsTyped,
+        Some(Value::Bool(false)) => Recording::Refused,
+        // A bare string is the one-line shorthand for `{ line }`, which is what anyone who has
+        // written a `pre-cmd` handler will reach for first.
+        Some(Value::Str(one)) => Recording::These(vec![one.to_string()]),
+        Some(Value::Table(list)) => {
+            let lines: Vec<String> = list
+                .borrow()
+                .sequence()
+                .iter()
+                .filter_map(|value| match value {
+                    Value::Str(line) => Some(line.to_string()),
+                    _ => None,
+                })
+                .filter(|line| !line.trim().is_empty())
+                .collect();
+            // An empty list is not a refusal — `false` is. A handler that built a list and matched
+            // nothing meant "no change", and reading it as "forget this line" would lose commands
+            // to a rule that simply did not apply.
+            if lines.is_empty() {
+                Recording::AsTyped
+            } else {
+                Recording::These(lines)
+            }
+        }
+        // Anything else is a handler mistake rather than an instruction. Leaving the line alone is
+        // the only safe reading: the alternative is losing history to a typo.
+        Some(_) => Recording::AsTyped,
+    }
+}
+
+/// The lines a decision says to write down, given what was typed.
+pub(super) fn lines_to_record<'a>(decided: &'a Recording, typed: &'a str) -> Vec<&'a str> {
+    match decided {
+        Recording::AsTyped => vec![typed],
+        Recording::These(lines) => lines.iter().map(String::as_str).collect(),
+        Recording::Refused => Vec::new(),
+    }
+}
+
+/// Bring the log row at `history_id` into line with what was decided.
+///
+/// The row was written *before* the command ran, so by the time a rule has an opinion it is already
+/// there — rewritten in place rather than re-appended, keeping the id everything else joins on.
+pub(super) fn settle_log_row(history_id: u64, decided: &Recording, typed: &str) {
+    let Some(track) = track::store() else {
+        return;
+    };
+    match decided {
+        Recording::AsTyped => {}
+        Recording::Refused => {
+            track.drop_line(history_id);
+        }
+        Recording::These(lines) => {
+            // The first line is what the row becomes; the rest exist only in the aggregate, since
+            // they were never separate things anybody typed.
+            if let Some(kept) = lines.first()
+                && kept != typed
+            {
+                track.rewrite_line(history_id, kept);
+            }
+        }
+    }
+}
+
+/// The links of the line that just ran, as the table a handler walks.
+fn segment_table() -> oslo::lua::eval::value::Value {
+    use oslo::lua::eval::value::{Table, Value};
+    let mut list = Table::new();
+    for (i, link) in oslo::exec::pipeline::segments::taken().iter().enumerate() {
+        let mut row = Table::new();
+        row.set(Value::str("text"), Value::str(&link.text));
+        row.set(Value::str("op"), Value::str(link.join.written()));
+        row.set(Value::str("ran"), Value::Bool(link.ran()));
+        row.set(Value::str("ms"), Value::int(link.duration_ms));
+        // Absent rather than a number when the link never ran: any number here would be read as a
+        // status, and "did not run" is neither success nor failure.
+        if let Some(status) = link.status {
+            row.set(Value::str("status"), Value::int(i64::from(status)));
+        }
+        list.set(Value::int(i as i64 + 1), Value::table(row));
+    }
+    Value::table(list)
 }
 
 /// Write what the line logged as `history_id` did, links and all.

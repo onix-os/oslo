@@ -463,3 +463,55 @@ fn forgetting_removes_every_occurrence() {
     let left: Vec<String> = history.recent(10).into_iter().map(|e| e.line).collect();
     assert_eq!(left, vec!["between".to_string()]);
 }
+
+/// A rule that keeps one link of a chain rewrites the row **in place**, keeping the id.
+///
+/// The id is what the outcome rows join on, so deleting and re-appending would renumber the line
+/// and orphan everything already written against it.
+#[test]
+fn rewriting_a_line_keeps_its_id_and_says_it_was_rewritten() {
+    let (_dir, history) = temp_db();
+    let id = history
+        .append("aa && bb && cc -c 'd'", MODE_SHELL)
+        .expect("an id");
+
+    assert!(history.rewrite_line(id, "cc -c 'd'"));
+
+    let entries = history.recent(10);
+    assert_eq!(entries.len(), 1, "still one row, not two");
+    assert_eq!(entries[0].line, "cc -c 'd'");
+    assert!(
+        entries[0].rewritten,
+        "a reader must be able to tell this from what was typed"
+    );
+    assert_eq!(entries[0].mode, MODE_SHELL, "and nothing else moved");
+}
+
+/// Rewriting to the same text is not a rewrite. Marking it would claim a transformation that never
+/// happened, which is exactly the thing the flag exists to make honest.
+#[test]
+fn rewriting_a_line_to_itself_does_not_mark_it() {
+    let (_dir, history) = temp_db();
+    let id = history.append("unchanged", MODE_SHELL).expect("an id");
+    assert!(history.rewrite_line(id, "unchanged"));
+    assert!(!history.recent(10)[0].rewritten);
+}
+
+/// A refused line leaves the log entirely, and takes what it did with it.
+#[test]
+fn dropping_a_line_removes_it_and_its_outcome() {
+    let (_dir, history) = temp_db();
+    let kept = history.append("keep", MODE_SHELL).expect("an id");
+    let doomed = history.append("forget", MODE_SHELL).expect("an id");
+    history.record_outcome(doomed, &[crate::track::Outcome::line(0, Some(0), 1)]);
+
+    assert!(history.drop_line(doomed));
+
+    let left: Vec<String> = history.recent(10).into_iter().map(|e| e.line).collect();
+    assert_eq!(left, vec!["keep".to_string()]);
+    assert!(
+        history.outcome_of(doomed).is_empty(),
+        "an outcome nothing can join to is a row nothing will read"
+    );
+    assert!(history.outcome_of(kept).is_empty());
+}
