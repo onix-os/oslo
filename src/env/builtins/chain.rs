@@ -77,6 +77,18 @@ fn report() -> i32 {
             outcome,
             took
         );
+        // The stages of a pipeline, under the link they belong to. **No time against them**: they
+        // ran at the same moment as each other, so a wall clock per stage would be the pipeline's
+        // own number printed once per stage and read as though each had taken that long.
+        for (i, stage) in segment.stages.iter().enumerate() {
+            let joined = if i == 0 { "  " } else { " |" };
+            let outcome = if stage.status == 0 {
+                "ok".to_string()
+            } else {
+                format!("failed ({})", stage.status)
+            };
+            println!("   {joined} {:<width$}  {outcome}", stage.text);
+        }
     }
     if segments.len() > 1 {
         println!(

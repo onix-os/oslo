@@ -66,6 +66,18 @@ impl Join {
     }
 }
 
+/// One stage of a pipeline: `a` and `b` in `a | b`.
+///
+/// **No duration, deliberately.** The stages of a pipeline are forked and run *at the same time* —
+/// that is what a pipe is — so a wall clock per stage would print one number three times and read
+/// as though each had taken the whole pipeline's time. What is genuinely per-stage is the status,
+/// which is `$PIPESTATUS`, and the text.
+#[derive(Debug, Clone)]
+pub struct Stage {
+    pub text: String,
+    pub status: i32,
+}
+
 /// One link of the typed line.
 #[derive(Debug, Clone)]
 pub struct Segment {
@@ -77,6 +89,9 @@ pub struct Segment {
     /// `None` when it never ran — see the module note.
     pub status: Option<i32>,
     pub duration_ms: i64,
+    /// The stages of this link, when it was a pipeline. Empty for a link of one command, which is
+    /// the overwhelmingly common case and where a one-entry list would be noise.
+    pub stages: Vec<Stage>,
 }
 
 impl Segment {
@@ -94,6 +109,8 @@ thread_local! {
     static ARMED: Cell<bool> = const { Cell::new(false) };
     /// Whether an outer chain is already being recorded, so a nested one is not.
     static INSIDE: Cell<bool> = const { Cell::new(false) };
+    /// The stages of the pipeline that just finished, waiting for its link to be pushed.
+    static PENDING_STAGES: RefCell<Vec<Stage>> = const { RefCell::new(Vec::new()) };
 }
 
 /// Start recording the line about to run, discarding the last one.
@@ -101,6 +118,7 @@ pub fn arm() {
     ARMED.set(true);
     INSIDE.set(false);
     SEGMENTS.with(|s| s.borrow_mut().clear());
+    PENDING_STAGES.with(|s| s.borrow_mut().clear());
 }
 
 /// Stop recording. The buffer keeps what it has, for whoever asks next.
@@ -138,7 +156,43 @@ pub fn record_skipped(join: Join, text: String) {
     push(join, text, None, 0);
 }
 
+/// Note the stages of the pipeline currently running, for the link about to be pushed.
+///
+/// A pipeline finishes before its link is recorded — the status is not known until every stage has
+/// been reaped — so the stages are left here and collected when the link itself is. Nothing else can
+/// arrive in between: a link is one pipeline, and the recorder only ever follows the outermost
+/// chain.
+pub fn note_stages(stages: Vec<Stage>) {
+    if !ARMED.get() {
+        return;
+    }
+    PENDING_STAGES.with(|s| *s.borrow_mut() = stages);
+}
+
+/// [`note_stages`] from what the pipeline evaluator has in hand.
+///
+/// `$PIPESTATUS` keeps the same numbers for a script to read; this keeps them beside the text that
+/// produced each one, which is what makes "which stage failed" answerable without counting on your
+/// fingers. Nothing is rendered when the recorder is off — `describe_command` walks an AST, and a
+/// script should not pay for a report nobody will read.
+pub fn note_pipeline(commands: &[crate::ast::Command], statuses: &[i32]) {
+    if !ARMED.get() || commands.len() < 2 {
+        return;
+    }
+    note_stages(
+        commands
+            .iter()
+            .zip(statuses)
+            .map(|(command, status)| Stage {
+                text: super::describe::describe_command(command),
+                status: *status,
+            })
+            .collect(),
+    );
+}
+
 fn push(join: Join, text: String, status: Option<i32>, duration_ms: i64) {
+    let stages = PENDING_STAGES.with(|s| std::mem::take(&mut *s.borrow_mut()));
     SEGMENTS.with(|s| {
         let mut list = s.borrow_mut();
         let index = list.len();
@@ -148,6 +202,7 @@ fn push(join: Join, text: String, status: Option<i32>, duration_ms: i64) {
             text,
             status,
             duration_ms,
+            stages,
         });
     });
 }

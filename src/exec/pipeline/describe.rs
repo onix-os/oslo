@@ -38,7 +38,7 @@ pub(crate) fn describe_pipeline(pipeline: &Pipeline) -> String {
     }
 }
 
-fn describe_command(command: &Command) -> String {
+pub(crate) fn describe_command(command: &Command) -> String {
     match command {
         Command::Simple(simple) => describe_simple(simple),
         Command::Compound { kind, .. } => describe_compound(kind),

@@ -456,6 +456,7 @@ fn run_byte_stages(env: &mut Environment, pipeline: &Pipeline) -> Result<i32> {
     if stopped && let Some(pgid) = pgid {
         jobs::remember_stopped_pipeline(pgid, &pids, pipeline);
     }
+    segments::note_pipeline(&pipeline.commands, &stage_statuses);
     let final_status = pipeline_status(env, &stage_statuses);
     env.set_pipeline_status(stage_statuses);
     Ok(final_status)

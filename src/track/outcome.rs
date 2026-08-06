@@ -128,6 +128,25 @@ pub struct Observation {
     pub seq: u32,
     /// Whether a rule rewrote the line. `false` means this is what was typed.
     pub rewritten: bool,
+    /// Whether this line's *arguments* are ones the store would refuse to keep.
+    ///
+    /// # The trap this exists to close
+    ///
+    /// `Tree::Run` stores `redact::prepare(line)`, which for a risky line keeps only the head —
+    /// `AWS_SECRET=… aws s3 cp …` is remembered as `aws`. The **log** stores the raw line, because
+    /// history has to be recallable verbatim or it is not history.
+    ///
+    /// That is a deliberate split, and it means anything learning from the log learns from text
+    /// the aggregate deliberately drops. The difference matters: in the log those arguments are
+    /// *recallable if you go looking*; in a predictor they become **offered unprompted**.
+    ///
+    /// So: learn on [`Self::head`] when this is true, and only ever offer [`Self::line`] when it
+    /// is false. Computed at read time from the line, so it costs nothing stored and cannot go
+    /// stale against the rules that decide it.
+    pub risky: bool,
+    /// The command this line runs, with wrappers and assignments stripped — `cargo` for
+    /// `time sudo cargo build`. What [`Self::line`] degrades to when [`Self::risky`] is set.
+    pub head: String,
     pub dir_id: u64,
     /// `None` when the line never finished: still running, or the shell died. **Not trainable** —
     /// and skipping it should break the sequence, not splice its neighbours together.
@@ -171,6 +190,8 @@ impl super::Track {
                     {
                         newest.push(Observation {
                             id,
+                            risky: super::redact::is_risky(&entry.line),
+                            head: super::redact::head_of(&entry.line),
                             line: entry.line,
                             mode: entry.mode,
                             session: entry.session,

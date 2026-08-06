@@ -117,3 +117,43 @@ fn a_shell_that_was_not_armed_records_nothing() {
         "an unarmed shell must not record"
     );
 }
+
+/// A pipeline's stages are recorded under the link they belong to.
+///
+/// `$PIPESTATUS` has the same numbers, and keeps them; this keeps them beside the text that
+/// produced each one, which is what makes "which stage failed" answerable without counting.
+#[test]
+fn a_pipeline_records_its_stages_under_its_link() {
+    let segments = run("true | false | true");
+    assert_eq!(segments.len(), 1, "one link: {segments:?}");
+    let stages = &segments[0].stages;
+    assert_eq!(stages.len(), 3, "{stages:?}");
+    assert_eq!(stages[0].text, "true");
+    assert_eq!(stages[1].text, "false");
+    assert_eq!(
+        stages[1].status, 1,
+        "the middle stage is the one that failed"
+    );
+    assert_eq!(stages[2].status, 0);
+}
+
+/// A link that is one command has no stages: a single-entry list would be noise on every line
+/// anyone ever types.
+#[test]
+fn a_link_of_one_command_has_no_stages() {
+    let segments = run("true && true");
+    assert!(segments.iter().all(|s| s.stages.is_empty()), "{segments:?}");
+}
+
+/// Stages belong to the link that produced them, not to whichever link is pushed next.
+#[test]
+fn stages_do_not_bleed_into_the_next_link() {
+    let segments = run("true | true && true");
+    assert_eq!(segments.len(), 2);
+    assert_eq!(segments[0].stages.len(), 2, "the pipeline's own");
+    assert!(
+        segments[1].stages.is_empty(),
+        "the plain link must not inherit them: {:?}",
+        segments[1]
+    );
+}
