@@ -687,6 +687,61 @@ A link never becomes a command on its own unless a rule asks: a chain is one thi
 transformation and a hole, and it is why filtering is a rule rather than a switch — recording
 itself cannot be turned off, and `oslo.feature` refuses the name.
 
+### Drawing, and taking over what the shell draws
+
+`oslo.ui.block` is a headline and a rail of labelled rows — the shape every report oslo prints
+already has, and the same code it uses to print them.
+
+```lua
+local b = oslo.ui.block("direnv loaded")
+b:row("PATH", "/nix/store/…:/home/…/target/debug", { overflow = "ellipsis" })
+b:row("aliases", "_b _c _r _t _v")
+b:done()
+```
+
+```
+direnv loaded
+  │ PATH    /nix/store/…:/home/…/target/de…
+  │ aliases _b _c _r _t _v
+```
+
+A row that does not fit does one of three things, and which one is yours to choose:
+
+| `overflow` | |
+|---|---|
+| `count` | cut, then ` +12` — for a list of names, where the count is the information |
+| `ellipsis` | cut, then `…` — for one long value, where the front is what matters |
+| `wrap` | continue on the next line, rail kept — for text that has to be read |
+
+A misspelt policy is an error, not a silent default. `b:done()` writes the whole block at once, so
+it cannot interleave with a command's output, and a block drawn into a pipe has no rail and no
+colour. `b:lines()` gives the rows back instead of printing them.
+
+**`on-report` lets a config draw what the shell was going to draw.** Five kinds — `direnv`, `job`,
+`slow`, `chain`, `time` — and returning `true` means you handled it, so oslo prints nothing.
+
+```lua
+oslo.on.on_report(function(r)
+  if r.kind == "job" then
+    oslo.ui.block(("[%s] %s"):format(r.id, r.text)):done()
+    return true
+  end
+end)
+```
+
+Returning anything else leaves oslo's own rendering alone, so a handler that cares about one kind
+costs nothing for the rest.
+
+This is not `on-job-finish`, which stays. That one answers "this happened" and may be deferred to a
+moment when the shell is idle; this one answers "how should this look" and must be answered before
+the default is drawn. Merging them would mean a handler that merely *logged* a job silently
+*suppressed* its notice.
+
+**A handler may always draw; it may not always change the shell.** `direnv` and `slow` fire from
+the read loop with nothing locked, so the whole `oslo.*` API works. `chain`, `job` and `time` fire
+from inside a builtin or the executor — `oslo.ui.block` is fine there, but `oslo.env.set` raises,
+loudly and by name. Every field a handler could want is passed in for that reason.
+
 ### Features you can turn off
 
 ```lua
