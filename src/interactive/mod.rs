@@ -6,6 +6,8 @@
 
 pub mod abbr;
 pub mod ask;
+/// A headline and a rail of labelled rows — the shape every report the shell prints has.
+pub mod block;
 pub mod command_index;
 pub mod completion;
 pub mod dropdown;

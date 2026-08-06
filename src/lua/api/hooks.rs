@@ -136,6 +136,11 @@ pub const HOOKS: &[Hook] = &[
         answers: false,
     },
     Hook {
+        name: "on-report",
+        aliases: &[],
+        answers: true,
+    },
+    Hook {
         name: "pre-record",
         aliases: &[],
         answers: true,
@@ -179,9 +184,11 @@ pub mod at {
     pub const COMMAND_NOT_FOUND: usize = 16;
     pub const IDLE_TIMEOUT: usize = 17;
     /// Just before a finished line is written down. May replace what is recorded, or refuse it.
-    pub const PRE_RECORD: usize = 18;
-    pub const ON_EXIT: usize = 19;
-    pub const ON_KEY: usize = 20;
+    /// How a report the shell was about to print should look. See `startup::report`.
+    pub const ON_REPORT: usize = 18;
+    pub const PRE_RECORD: usize = 19;
+    pub const ON_EXIT: usize = 20;
+    pub const ON_KEY: usize = 21;
 }
 
 /// Which hooks have ever had a handler attached.
@@ -272,6 +279,7 @@ mod tests {
             (at::TIME_REPORT, "on-time-report"),
             (at::COMMAND_NOT_FOUND, "on-command-not-found"),
             (at::IDLE_TIMEOUT, "on-idle-timeout"),
+            (at::ON_REPORT, "on-report"),
             (at::PRE_RECORD, "pre-record"),
             (at::ON_EXIT, "on-exit"),
             (at::ON_KEY, "on-key"),

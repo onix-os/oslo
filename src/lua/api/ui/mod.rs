@@ -25,6 +25,7 @@
 //! erase themselves, so the transcript above them is untouched.
 
 mod ask;
+mod block;
 mod layout;
 mod prompt;
 mod text;
@@ -39,6 +40,7 @@ use std::io::IsTerminal;
 pub fn install(ui: &mut Table) {
     terminal(ui);
     text::install(ui);
+    block::install(ui);
     layout::install(ui);
     ask::install(ui);
     prompt::install(ui);

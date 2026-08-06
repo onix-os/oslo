@@ -26,4 +26,5 @@ pub mod rc;
 mod read;
 pub mod recall;
 pub mod repl;
+mod report;
 mod tracking;
