@@ -111,6 +111,8 @@ thread_local! {
     static INSIDE: Cell<bool> = const { Cell::new(false) };
     /// The stages of the pipeline that just finished, waiting for its link to be pushed.
     static PENDING_STAGES: RefCell<Vec<Stage>> = const { RefCell::new(Vec::new()) };
+    /// The last line that was a *chain*, kept for `chain` to report on. See [`disarm`].
+    static LAST: RefCell<Vec<Segment>> = const { RefCell::new(Vec::new()) };
 }
 
 /// Start recording the line about to run, discarding the last one.
@@ -121,10 +123,25 @@ pub fn arm() {
     PENDING_STAGES.with(|s| s.borrow_mut().clear());
 }
 
-/// Stop recording. The buffer keeps what it has, for whoever asks next.
+/// Stop recording, and keep the line if it was a chain.
+///
+/// **The kept copy is what `chain` reads, and it has to exist.** Asking about the last chain means
+/// typing a command, and the loop arms — and so clears — before every line, so by the time `chain`
+/// runs the live buffer holds `chain` and nothing else. It reported "nothing has run yet" for
+/// every chain there had ever been.
+///
+/// Only a *chain* is kept, so `chain`, `chain resume` and any other single command you type in
+/// between do not displace the thing you are asking about. "The last chain" is the useful reading
+/// and the only one that survives having to type at all.
 pub fn disarm() {
     ARMED.set(false);
     INSIDE.set(false);
+    SEGMENTS.with(|s| {
+        let line = s.borrow();
+        if line.len() > 1 {
+            LAST.with(|last| *last.borrow_mut() = line.clone());
+        }
+    });
 }
 
 /// Whether this chain is the outermost one since [`arm`], and should therefore record.
@@ -217,12 +234,31 @@ pub fn was_a_chain() -> bool {
     SEGMENTS.with(|s| s.borrow().len() > 1)
 }
 
+/// The last chain that ran, which is what `chain` reports on.
+///
+/// Not the live buffer: see [`disarm`]. Asking about a chain means typing a command, and that
+/// command has already cleared the live one by the time it can look.
+pub fn last_chain() -> Vec<Segment> {
+    LAST.with(|last| last.borrow().clone())
+}
+
 /// The first link that ran and failed, and everything from there on.
 ///
 /// `None` when the line succeeded, when nothing ran, or when it was not a chain — in each case
 /// there is nothing to resume *from*, which is different from having nothing to resume.
 pub fn resumable() -> Option<String> {
-    let segments = taken();
+    rebuild_from(&taken())
+}
+
+/// [`resumable`] for the last *chain* rather than the last line.
+///
+/// What `chain resume` needs: by the time it runs, the live buffer holds `chain resume` itself.
+/// See [`disarm`].
+pub fn last_resumable() -> Option<String> {
+    rebuild_from(&last_chain())
+}
+
+fn rebuild_from(segments: &[Segment]) -> Option<String> {
     if segments.len() < 2 {
         return None;
     }

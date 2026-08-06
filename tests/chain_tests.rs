@@ -157,3 +157,34 @@ fn stages_do_not_bleed_into_the_next_link() {
         segments[1]
     );
 }
+
+/// **`chain` has to survive being typed.** The loop arms — and clears — before every line, so by
+/// the time `chain` runs the live buffer holds `chain` and nothing else. It reported "nothing has
+/// run yet" for every chain there had ever been until the last one was kept separately.
+#[test]
+fn the_last_chain_survives_the_command_that_asks_about_it() {
+    run("true && false && echo never");
+    // Standing in for typing `chain`: one command, its own armed line.
+    run("true");
+
+    let kept = segments::last_chain();
+    assert_eq!(kept.len(), 3, "the chain, not the command that asked");
+    assert_eq!(kept[0].text, "true");
+    assert_eq!(kept[2].text, "echo never");
+    assert_eq!(
+        segments::last_resumable().as_deref(),
+        Some("false && echo never")
+    );
+}
+
+/// A later chain replaces an earlier one; a plain command does not.
+#[test]
+fn only_a_chain_displaces_the_kept_one() {
+    run("true && true");
+    run("echo alone");
+    let kept = segments::last_chain();
+    assert_eq!(kept.len(), 2, "a single command must not displace it");
+
+    run("false || true");
+    assert_eq!(segments::last_chain()[0].text, "false", "a chain does");
+}

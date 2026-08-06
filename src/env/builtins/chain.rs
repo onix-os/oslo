@@ -48,7 +48,7 @@ fn usage() -> i32 {
 
 /// One row per link: how it was joined, what it was, and what it did.
 fn report() -> i32 {
-    let segments = segments::taken();
+    let segments = segments::last_chain();
     if segments.is_empty() {
         eprintln!("oslo: chain: nothing has run yet");
         return 1;
@@ -104,7 +104,7 @@ fn report() -> i32 {
 
 /// The chain from the link that failed onwards, ready to run again.
 fn resume() -> i32 {
-    match segments::resumable() {
+    match segments::last_resumable() {
         Some(line) => {
             println!("{line}");
             0
