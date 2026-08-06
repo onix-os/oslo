@@ -11,8 +11,7 @@
 
 use super::buffer::{Buffer, Case};
 use super::keymap::{Action, action};
-use super::{layout, screen};
-use crate::interactive::dropdown::terminal_cols;
+use super::screen;
 pub use crate::interactive::term::Key;
 use crate::interactive::term::{Keys, Restore, Screen};
 use std::io::Write;
@@ -368,9 +367,16 @@ pub enum Outcome {
 ///
 /// `initial` is text to start with and where to put the cursor in it — how a reopened line, a
 /// history recall or a finder choice comes back.
+/// `initial` is text to start with and where to put the cursor in it.
+///
+/// **`render` is a function, not a string, and that is the whole reason a vi-mode indicator can
+/// work.** The prompt used to be handed in already rendered, so it was fixed for the life of the
+/// line: pressing Esc changed the mode and nothing could redraw it. Asking for it means the loop
+/// can rebuild it — but only when [`crate::interactive::prompt::generation`] says an input
+/// changed, so a prompt that runs another program still runs it once per line while typing, and
+/// once more per mode change. It is never called per keystroke.
 pub fn read_line(
-    prompt: &str,
-    right: &str,
+    render: &mut dyn FnMut() -> (String, String),
     initial: (&str, usize),
     assist: &mut dyn Assist,
 ) -> Outcome {
@@ -378,7 +384,8 @@ pub fn read_line(
         // No terminal: the line comes off stdin with no editing, which is what a piped script
         // needs and what `read` already does elsewhere.
         //
-        return read_plain(prompt);
+        // No terminal, so nothing will ever redraw it — one render is all it can use.
+        return read_plain(&render().0);
     };
     let mut session = Session::new(initial.0, initial.1);
     let mut keys = Keys::on(raw.fd());
@@ -386,8 +393,18 @@ pub fn read_line(
     let mut out = std::io::stderr();
     let mut drawn = false;
     let mut idle = false;
+    // Rendered once up front, then only when an input to it has moved.
+    let (mut prompt, mut right) = render();
+    let mut seen = crate::interactive::prompt::generation();
 
     loop {
+        // Cheap enough to ask every frame: one relaxed load, and equal almost always.
+        let now = crate::interactive::prompt::generation();
+        if now != seen {
+            seen = now;
+            (prompt, right) = render();
+        }
+        let (prompt, right) = (prompt.as_str(), right.as_str());
         // The cursor shape says which mode you are in, as fish's vi mode does. `observe` publishes
         // the mode for the prompt to read and answers with an escape only when it actually
         // changed, so an unchanged mode costs nothing per keystroke.
@@ -420,10 +437,24 @@ pub fn read_line(
         match session.apply(key, assist) {
             Step::Continue { .. } => {}
             Step::ToggleLanguage => {
+                // **No blank frame here any more.** This used to erase the block and return, and
+                // the caller then rendered the other language's prompt and re-entered — so the
+                // screen held an empty row for however long that render took. With a prompt built
+                // by running another program that is milliseconds, and it read as the whole prompt
+                // flashing dark.
+                //
+                // The cursor still has to come home, because the caller draws from the top of the
+                // block. Writing the *current* frame does that and leaves the row looking exactly
+                // as it did, so there is nothing to see between the two draws.
                 let placed = draw(prompt, right, &session, assist, true);
-                // Back to the top of the block and erase it: the caller redraws from the same row
-                // with the other language's prompt, so leaving this one would double it.
-                let _ = out.write_all(screen::redraw(at_row, "", into_at(&placed)).as_bytes());
+                let _ = out
+                    .write_all(screen::redraw(at_row, &placed.text, into_at(&placed)).as_bytes());
+                // Up to the first row of the block and to column one, which is where the caller's
+                // next draw begins counting from.
+                if placed.cursor_row > 0 {
+                    let _ = out.write_all(format!("\x1b[{}A", placed.cursor_row).as_bytes());
+                }
+                let _ = out.write_all(b"\r");
                 let _ = out.flush();
                 return Outcome::ToggleLanguage {
                     text: session.buffer.text(),
@@ -468,124 +499,9 @@ pub fn read_line(
         }
     }
 }
-
-/// The next key, firing `on-idle-timeout` if the prompt sits untouched long enough.
-///
-/// **The blocking read is the default and stays the default.** A timed read is only asked for when
-/// `oslo.misc.idle_timeout` is set *and* something is attached to the hook — otherwise the editor
-/// would wake up on a timer for the rest of the session to ask a question nobody is listening for.
-///
-/// `reported` is what stops it firing over and over: idleness is a state you enter once, not a
-/// tick. It resets the moment a key arrives, so walking away twice reports twice.
-fn next_key(keys: &mut Keys, reported: &mut bool) -> Option<Key> {
-    let seconds = crate::interactive::settings::current().misc.idle_timeout;
-    if seconds == 0 || !crate::lua::api::hooks::watched(crate::lua::api::hooks::at::IDLE_TIMEOUT) {
-        return keys.read();
-    }
-    let ms = seconds.saturating_mul(1000).min(i32::MAX as u64) as i32;
-    loop {
-        match keys.read_within(ms) {
-            crate::interactive::term::Pressed::Key(key) => {
-                *reported = false;
-                return Some(key);
-            }
-            crate::interactive::term::Pressed::Timeout => {
-                if !*reported {
-                    *reported = true;
-                    crate::lua::engine::fire_at_here(
-                        crate::lua::api::hooks::at::IDLE_TIMEOUT,
-                        &[("seconds", &seconds.to_string())],
-                    );
-                }
-            }
-            crate::interactive::term::Pressed::Ended => return None,
-        }
-    }
-}
-
-/// Build the frame for the current state.
-/// Lay the line out. `ghost` is whether the suggestion is drawn with it.
-///
-/// **Off for the last frame of a line.** The ghost is a proposal, not text you typed — so once the
-/// line is finished it has to go, or the transcript shows a command that was never run. Typing
-/// `cat ~/` with `lis/` suggested and pressing Enter left `cat ~/lis/` on screen above the output
-/// of `cat ~/`, which is a scrollback that lies about what happened.
-fn draw(
-    prompt: &str,
-    right: &str,
-    session: &Session,
-    assist: &mut dyn Assist,
-    ghost: bool,
-) -> layout::Placed {
-    let plain = session.buffer.text();
-    let painted = assist.highlight(&plain);
-    let hint = if ghost {
-        assist
-            .hint(&plain, session.buffer.cursor())
-            .unwrap_or_default()
-    } else {
-        String::new()
-    };
-    layout::place(&layout::Row {
-        prompt,
-        text: &painted,
-        plain: &plain,
-        cursor: session.buffer.cursor(),
-        hint: &hint,
-        right,
-        // Read every frame rather than cached, so a resized terminal lays out correctly on the
-        // next keystroke without a `SIGWINCH` handler to get wrong.
-        cols: terminal_cols(),
-    })
-}
-
-fn into_at(placed: &layout::Placed) -> screen::At {
-    screen::At {
-        rows: placed.rows,
-        cursor_row: placed.cursor_row,
-        cursor_col: placed.cursor_col,
-    }
-}
-
-/// A line from stdin, for when there is no terminal to edit on.
-fn read_plain(prompt: &str) -> Outcome {
-    // The prompt is written only for a terminal that cannot be edited on — `TERM=dumb`, a serial
-    // console, a `screen` session someone has told to be simple. Down an ordinary pipe it is not
-    // written at all: the shell is being driven by a script, and a prompt interleaved with the
-    // output would be noise in the middle of the data.
-    if std::env::var("TERM").as_deref() == Ok("dumb") {
-        print!("{prompt}");
-        let _ = std::io::Write::flush(&mut std::io::stdout());
-    }
-    let mut line = String::new();
-    match std::io::BufRead::read_line(&mut std::io::stdin().lock(), &mut line) {
-        Ok(0) | Err(_) => Outcome::Eof,
-        Ok(_) => {
-            while line.ends_with('\n') || line.ends_with('\r') {
-                line.pop();
-            }
-            Outcome::Line(line)
-        }
-    }
-}
+mod frame;
+use frame::{draw, first_word, into_at, next_key, read_plain};
 
 #[cfg(test)]
 #[path = "session/tests.rs"]
 mod tests;
-
-/// The first word of a suggestion, with the whitespace that follows it.
-///
-/// Accepting "one word" of `--example foo` should leave the cursor after the space, ready for the
-/// next word — stopping before it would make the second press insert a leading space.
-fn first_word(hint: &str) -> String {
-    let trimmed = hint.trim_start();
-    let lead = hint.len() - trimmed.len();
-    let end = trimmed
-        .find(char::is_whitespace)
-        .map(|at| {
-            let rest = &trimmed[at..];
-            at + rest.len() - rest.trim_start().len()
-        })
-        .unwrap_or(trimmed.len());
-    hint[..lead + end].to_string()
-}

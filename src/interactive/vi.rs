@@ -206,6 +206,9 @@ pub fn observe(mode: Mode, cursors: &Cursors) -> Option<&'static str> {
     // mode the editor had already left. Both exist so a handler can be written against either
     // name without having to know that.
     if previous != mode {
+        // A prompt that shows the mode is now wrong. This is the only place that knows the instant
+        // it changed, and the editor's redraw loop reads the counter rather than being told.
+        crate::interactive::prompt::invalidate();
         let fields = [
             ("kind", "vi"),
             ("from", previous.name()),

@@ -75,8 +75,15 @@ fn main() {
     println!("oslo native editor — Enter echoes, Ctrl-C abandons, Ctrl-D on an empty line exits.");
     loop {
         assist.at = 0;
-        let prompt = "\x1b[1;35mnative\x1b[0m ❯ ";
-        match read_line(prompt, "\x1b[90mdemo\x1b[0m", ("", 0), &mut assist) {
+        // A function rather than a string: the editor rebuilds the prompt when something it shows
+        // has changed, which is what lets a vi-mode indicator be right. This one never changes.
+        let mut render = || {
+            (
+                "\x1b[1;35mnative\x1b[0m ❯ ".to_string(),
+                "\x1b[90mdemo\x1b[0m".to_string(),
+            )
+        };
+        match read_line(&mut render, ("", 0), &mut assist) {
             Outcome::Line(line) => {
                 if line.trim() == "exit" {
                     return;
