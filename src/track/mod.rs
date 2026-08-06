@@ -46,7 +46,7 @@ pub mod outcome;
 pub mod prune;
 pub mod query;
 pub mod redact;
-mod row;
+pub(crate) mod row;
 pub mod score;
 pub mod write;
 

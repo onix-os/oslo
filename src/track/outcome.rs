@@ -115,7 +115,112 @@ fn decode(key: &[u8], value: &[u8]) -> Option<Outcome> {
     })
 }
 
+/// One line that ran, with everything known about it. The shape a predictor replays.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Observation {
+    /// The log row's id. Global and ascending, so this *is* the chronological order.
+    pub id: u64,
+    pub line: String,
+    pub mode: String,
+    /// Which shell, and where in that shell's run. A gap in `seq` is a command deliberately not
+    /// recorded — see [`super::log::Entry::seq`].
+    pub session: u32,
+    pub seq: u32,
+    /// Whether a rule rewrote the line. `false` means this is what was typed.
+    pub rewritten: bool,
+    pub dir_id: u64,
+    /// `None` when the line never finished: still running, or the shell died. **Not trainable** —
+    /// and skipping it should break the sequence, not splice its neighbours together.
+    pub status: Option<i32>,
+    pub duration_ms: i64,
+    /// The links of `a && b || c`, in order. Empty for a line that was not a chain.
+    pub segments: Vec<Outcome>,
+}
+
+/// A directory an observation points at.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Place {
+    pub id: u64,
+    pub path: String,
+    /// The worktree it belongs to, when it is in one.
+    pub root: Option<String>,
+}
+
 impl super::Track {
+    /// The newest `limit` lines, oldest first, joined to what each of them did.
+    ///
+    /// **One transaction for all three buckets.** The store holds no handle open, so every
+    /// `read` is an `open` + `flock` + `close`; asking for the log, the outcomes and the
+    /// directories separately would pay that three times, and the open alone is 11 µs of a 15 µs
+    /// read. This is the call something replaying history should make, and the only one.
+    ///
+    /// **The chain's *shape* is not stored and is not returned.** The line is here and
+    /// `parse_bash_script` is in this same binary, so a caller that wants the structure re-derives
+    /// it rather than reading a second copy that can disagree with the first. What is returned is
+    /// the part that cannot be re-derived: what each link actually did.
+    pub fn observations(&self, limit: usize) -> (Vec<Observation>, Vec<Place>) {
+        if limit == 0 {
+            return (Vec::new(), Vec::new());
+        }
+        self.store
+            .read(|reader| {
+                let mut newest: Vec<Observation> = Vec::with_capacity(limit.min(1024));
+                reader.scan(Tree::History, &Span::all(), |key, value| {
+                    if let Some(id) = super::log::id_of_key(key)
+                        && let Some(entry) = super::log::entry_of(value)
+                    {
+                        newest.push(Observation {
+                            id,
+                            line: entry.line,
+                            mode: entry.mode,
+                            session: entry.session,
+                            seq: entry.seq,
+                            rewritten: entry.rewritten,
+                            dir_id: 0,
+                            status: None,
+                            duration_ms: 0,
+                            segments: Vec::new(),
+                        });
+                    }
+                    if newest.len() >= limit {
+                        Walk::Stop
+                    } else {
+                        Walk::On
+                    }
+                });
+                // The outcomes for exactly those rows. `Tree::Outcome` shares the log's descending
+                // key, so walking it in step with the ids above needs no second sort.
+                for observation in &mut newest {
+                    for row in
+                        reader.collect(Tree::Outcome, &span_of(observation.id), |key, value| {
+                            decode(key, value)
+                        })
+                    {
+                        if row.segment == 0 {
+                            observation.dir_id = row.dir_id;
+                            observation.status = row.status;
+                            observation.duration_ms = row.duration_ms;
+                        } else {
+                            observation.segments.push(row);
+                        }
+                    }
+                }
+                newest.reverse();
+                let places = reader.collect(Tree::Dir, &Span::all(), |key, value| {
+                    let mut fields = Fields::of(key);
+                    let id = fields.int()?;
+                    let row = super::row::DirRow::decode(value)?;
+                    Some(Place {
+                        id,
+                        path: row.path,
+                        root: row.root,
+                    })
+                });
+                Some((newest, places))
+            })
+            .unwrap_or_default()
+    }
+
     /// Write what the line at `history_id` did, and what each of its links did.
     ///
     /// One transaction for the lot: a crash must not leave a line recorded as having links it has

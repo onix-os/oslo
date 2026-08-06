@@ -77,6 +77,11 @@ fn slot(id: u64) -> Vec<u8> {
 }
 
 /// The id a key names, or `None` for bytes this module did not write.
+/// The id a key names, for the join in `super::outcome`.
+pub(super) fn id_of_key(key: &[u8]) -> Option<u64> {
+    id_of(key)
+}
+
 fn id_of(key: &[u8]) -> Option<u64> {
     let mut fields = Fields::of(key);
     let slot = fields.int()?;

@@ -125,3 +125,55 @@ fn trimming_the_log_takes_the_outcomes_too() {
         "the newest line kept its outcome"
     );
 }
+
+/// **The one call a replay makes.** Oldest first, each line joined to what it did, in a single
+/// transaction — the store holds no handle open, so three separate reads would be three opens.
+#[test]
+fn observations_come_back_in_order_with_what_each_line_did() {
+    let (_dir, track) = temp_db();
+    let first = track.append("true && false", MODE_SHELL).expect("id");
+    track.record_outcome(
+        first,
+        &[
+            Outcome::line(3, Some(1), 9),
+            link(1, "", "true", Some(0), 1),
+            link(2, "&&", "false", Some(1), 8),
+        ],
+    );
+    let second = track.append("echo done", MODE_SHELL).expect("id");
+    track.record_outcome(second, &[Outcome::line(3, Some(0), 2)]);
+
+    let (seen, _places) = track.observations(10);
+    assert_eq!(seen.len(), 2);
+    assert_eq!(seen[0].line, "true && false", "oldest first");
+    assert_eq!(seen[1].line, "echo done");
+
+    assert_eq!(seen[0].status, Some(1));
+    assert_eq!(seen[0].dir_id, 3);
+    assert_eq!(seen[0].segments.len(), 2, "the links, not the line");
+    assert_eq!(seen[0].segments[1].join, "&&");
+    assert!(seen[1].segments.is_empty(), "not a chain");
+}
+
+/// A line still running has no outcome, and says so rather than reporting a status it never had.
+/// A replay must skip it — and break the sequence there rather than splicing its neighbours.
+#[test]
+fn a_line_with_no_outcome_is_returned_but_unfinished() {
+    let (_dir, track) = temp_db();
+    track.append("sleep 300", MODE_SHELL).expect("id");
+    let (seen, _) = track.observations(10);
+    assert_eq!(seen.len(), 1);
+    assert_eq!(seen[0].status, None, "not zero, and not a failure");
+}
+
+/// The session and its counter survive the join, which is what makes per-shell ordering possible.
+#[test]
+fn an_observation_carries_the_session_it_belongs_to() {
+    let (_dir, track) = temp_db();
+    track.append("one", MODE_SHELL);
+    track.append("two", MODE_SHELL);
+    let (seen, _) = track.observations(10);
+    assert_eq!(seen[0].session, seen[1].session);
+    assert!(seen[1].seq > seen[0].seq);
+    assert!(seen[1].id > seen[0].id, "the id is the global order");
+}
