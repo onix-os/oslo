@@ -82,6 +82,27 @@ fn spec(args: &[Value]) -> Rc<RefCell<Table>> {
     }
 }
 
+/// The named entries of a table, as `(name, text)` pairs.
+///
+/// **Numbers and booleans count.** This used to take only `Value::Str`, so
+/// `oslo.ui.log{fields = {count = 12}}` dropped the field on the floor — and a count, a status or a
+/// duration is exactly what anyone logs first. A value that cannot be a word at all (a table, a
+/// function) is still skipped, because `fields = {x = {}}` is a mistake rather than a value.
+fn named_values(table: &Table) -> Vec<(String, String)> {
+    let mut out = Vec::new();
+    for (key, value) in table.pairs() {
+        let Value::Str(name) = &key else { continue };
+        let text = match &value {
+            Value::Str(s) => s.to_string(),
+            Value::Number(n) => n.to_string(),
+            Value::Bool(b) => b.to_string(),
+            _ => continue,
+        };
+        out.push((name.to_string(), text));
+    }
+    out
+}
+
 /// A list field: `{items = {"a", "b"}}`.
 fn items(table: &Table, name: &str) -> Vec<String> {
     let Value::Table(list) = table.get(&Value::str(name)) else {
@@ -138,6 +159,16 @@ pub fn install(ui: &mut Table) {
                 settings.default = flag(&t, "default");
             }
             _ => {}
+        }
+        // **Without a terminal, ask on a line rather than answering nothing.** The raw-mode widget
+        // needs a tty it can take; `super::ask` needs only stdin, works down a pipe and over a
+        // serial console, and leaves the question in the transcript. One name, both behaviours —
+        // and it is what `ui/mod.rs` says the pair is for.
+        if !std::io::IsTerminal::is_terminal(&std::io::stdin()) {
+            return ok(Value::Bool(super::ask::on_a_line(
+                &settings.question,
+                settings.default,
+            )));
         }
         ok(match confirm(&settings) {
             Answer::Given(yes) => Value::Bool(yes),
@@ -268,11 +299,7 @@ pub fn install(ui: &mut Table) {
                 }
                 time = maybe(&t, "time");
                 if let Value::Table(pairs) = t.get(&Value::str("fields")) {
-                    for (key, value) in pairs.borrow().pairs() {
-                        if let (Value::Str(k), Value::Str(v)) = (&key, &value) {
-                            fields.push((k.to_string(), v.to_string()));
-                        }
-                    }
+                    fields.extend(named_values(&pairs.borrow()));
                     // Table iteration has no order, and a log line whose fields moved between runs
                     // is one nobody can diff.
                     fields.sort();
@@ -325,11 +352,7 @@ pub fn install(ui: &mut Table) {
                     }
                 }
                 if let Value::Table(pairs) = t.get(&Value::str("fields")) {
-                    for (key, value) in pairs.borrow().pairs() {
-                        if let (Value::Str(k), Value::Str(v)) = (&key, &value) {
-                            values.push((k.to_string(), v.to_string()));
-                        }
-                    }
+                    values.extend(named_values(&pairs.borrow()));
                     // Sorted for the same reason `log`'s fields are: table iteration has no order,
                     // and `template` applies replacements in sequence — so overlapping keys would
                     // render differently between two runs of the same script.
