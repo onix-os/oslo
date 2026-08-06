@@ -72,6 +72,19 @@ pub fn with_interpreter<T>(f: impl FnOnce(&Interp) -> T) -> Option<T> {
     Some(f(&interp))
 }
 
+/// A value the host is holding under `key`, from the registry on this thread.
+///
+/// The reach-back `oslo.feature.when` needs: the predicate is registered while the config runs and
+/// called from the read loop, which has no route back to the table it was stored in. `None` when
+/// there is no interpreter here — a script, a non-interactive shell — which is also every case
+/// where no config could have registered one.
+pub fn host_value(key: &str) -> Option<Value> {
+    let (_, registry) = ACTIVE.with(|slot| slot.borrow().clone())?;
+    // Cloned out rather than handed back by reference: the caller runs the value it gets, and a
+    // predicate that registered another one would meet its own outstanding borrow.
+    registry.borrow().get(key).cloned()
+}
+
 /// Call a Lua value with whatever interpreter is on this thread.
 ///
 /// The same reach-back `ask_hook_here` uses, for callers that hold a function rather than a hook

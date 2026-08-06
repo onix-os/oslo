@@ -67,7 +67,12 @@ pub(super) fn read_command(
         // Only to a terminal: a cursor-shape escape written down a pipe is not a cursor shape,
         // it is two stray bytes in somebody's output.
         let settings = oslo::interactive::settings::current();
-        if settings.vi.enabled && std::io::IsTerminal::is_terminal(&std::io::stdout()) {
+        // `vi::enabled` rather than the setting, so the `vi` feature is asked about here too — the
+        // cursor and the key bindings must not disagree about which mode the editor is in.
+        if settings.vi.enabled
+            && oslo::interactive::vi::enabled()
+            && std::io::IsTerminal::is_terminal(&std::io::stdout())
+        {
             print!("{}", settings.vi.cursors.insert.escape());
         }
 

@@ -46,8 +46,13 @@ pub fn enable(interactive: bool) {
     ENABLED.store(on, Ordering::Relaxed);
 }
 
+/// Whether marks are being written: a terminal that can take them, and the feature still on.
+///
+/// The feature is the runtime half. `enable` answers "is there anything to mark", which is decided
+/// once at startup and cannot change; the mask answers "should we", which a config may change per
+/// directory — a mux that gets confused by `OSC 133` in one project is the case.
 pub fn enabled() -> bool {
-    ENABLED.load(Ordering::Relaxed)
+    ENABLED.load(Ordering::Relaxed) && crate::feature::on(crate::feature::at::MARKS)
 }
 
 /// The id of the block being prompted for.

@@ -408,3 +408,54 @@ fn an_edit_revokes_and_the_environment_comes_back_out() {
         "the new ones never went in"
     );
 }
+
+/// **Turning the `direnv` feature off unloads what is loaded**, rather than merely declining to
+/// load the next thing.
+///
+/// This is the case the feature exists for: a config that walks into a project using classic
+/// `.envrc` turns oslo's own directory environments off and hands the work to the real `direnv`.
+/// If disabling only stopped the *next* load, the previous project's variables would stay set for
+/// the rest of the session — the exact leak that makes people distrust directory environments.
+///
+/// It falls out of answering "no file applies here", which is the same path as walking into a
+/// directory that has no `.env.lua`; the assertion is that it really is that path.
+#[test]
+fn turning_the_feature_off_unloads_the_loaded_environment() {
+    let store = tempfile::tempdir().expect("temp dir");
+    let project = tempfile::tempdir().expect("temp dir");
+    let path = rc_in(project.path(), find::NAME, "OSLO_T_FEATURE=loaded\n");
+
+    let env = shell();
+    let mut direnv = Direnv::new(store.path().to_str(), None);
+    direnv.permissions().allow(&path).expect("allow");
+
+    direnv.arrive(&env, project.path(), &mut pairs_into(&env), &mut || {});
+    assert_eq!(
+        var(&env, "OSLO_T_FEATURE").as_deref(),
+        Some("loaded"),
+        "the environment has to be loaded before turning it off means anything"
+    );
+
+    crate::feature::set(crate::feature::at::DIRENV, false);
+    // Standing still: the same directory, arrived at again. Nothing about the *place* changed, so
+    // anything that unloads here did so because the feature said to.
+    direnv.arrive(&env, project.path(), &mut pairs_into(&env), &mut || {});
+    let while_off = var(&env, "OSLO_T_FEATURE");
+
+    crate::feature::set(crate::feature::at::DIRENV, true);
+    direnv.arrive(&env, project.path(), &mut pairs_into(&env), &mut || {});
+    let after_on = var(&env, "OSLO_T_FEATURE");
+    // Put it back before asserting, so a failure cannot leave the feature off for every test that
+    // runs after this one in the same process.
+    crate::feature::reset();
+
+    assert_eq!(
+        while_off, None,
+        "disabling direnv must take the loaded environment with it"
+    );
+    assert_eq!(
+        after_on.as_deref(),
+        Some("loaded"),
+        "and enabling it again must load the directory back"
+    );
+}

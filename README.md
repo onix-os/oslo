@@ -632,6 +632,46 @@ Returning nothing is the safe default, and so is returning something unrecognise
 explicit `false` swallows a key and only a string or a `{ text = … }` table replaces the line. A
 session with no `key` handler attached does not pay for the hook at all.
 
+### Features you can turn off
+
+```lua
+oslo.feature.set("direnv", false)     -- now
+oslo.feature.get("direnv")            -- false
+oslo.feature.list()                   -- { name, on, about }, all of them
+```
+
+`direnv`, `vi`, `suggest`, `abbr`, `notify`, `marks`, `finder`, `rm`. A name that is not one of
+those is an error rather than a shrug — a config that turns off `direnvv` and is quietly obeyed
+looks exactly like a config that is not being read.
+
+Turning off a feature that provides a builtin hands the name back to `$PATH`, everywhere at once:
+the dispatcher, `type`, `command -v` and completion all agree. That is the point of the `direnv`
+one — oslo's builtin reads `.env.lua` and cannot read an `.envrc`, and the real `direnv` can:
+
+```lua
+oslo.feature.when("direnv", function(dir)
+  return not oslo.fs.exists(dir .. "/.envrc")
+end)
+```
+
+**`when` is re-asked on every directory change**, so walking out undoes what walking in did. There
+is nothing recorded and nothing to restore, which is where "disable on entry, put it back on exit"
+normally goes wrong. It is asked for the directory a shell starts in too.
+
+**A feature is a mask over your configuration, never an assignment to it.** `oslo.vi.enabled` says
+what you asked for; the feature says whether it applies right now. So turning a feature back on
+restores exactly what the config said — a shell configured for emacs does not acquire vi mode by
+having the `vi` feature enabled — and a handler never has to remember a previous value.
+
+`set` on a feature that a `when` predicate owns is refused, because the write would appear to work
+and then be undone by the next `cd`.
+
+**History and the frecency store are deliberately not features.** They are what the command log is
+built from, and something reading it is entitled to assume it is complete rather than "complete
+except where a config had an opinion" — a gap nobody can see is worse than no data. `redact` and
+`--profile` are the controls that exist for this, and both leave a record that is honestly shaped.
+A test refuses the names outright.
+
 ### Universal variables
 
 ```sh

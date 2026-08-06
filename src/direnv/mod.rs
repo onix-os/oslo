@@ -160,7 +160,17 @@ impl Direnv {
         run: &mut dyn FnMut(&Rc) -> Result<(), String>,
         restore: &mut dyn FnMut(),
     ) -> Vec<Event> {
-        let rc = find::applicable(dir);
+        // **The `direnv` feature, read as "there is no file here".** Turning it off has to *unload*
+        // whatever is currently loaded, not merely decline to load the next one — a config that
+        // walks into a classic-`.envrc` project and turns oslo's own directory environments off
+        // would otherwise keep the last project's variables for the rest of the session.
+        //
+        // Answering `None` here gets that for free: the code below already unloads before it loads,
+        // and then returns early because there is nothing to load. It is the same path as walking
+        // into a directory that has no `.env.lua`.
+        let rc = crate::feature::on(crate::feature::at::DIRENV)
+            .then(|| find::applicable(dir))
+            .flatten();
         let owner = rc.as_ref().and_then(find::owner);
 
         // Standing in the same environment, with nothing edited: the overwhelmingly common case.

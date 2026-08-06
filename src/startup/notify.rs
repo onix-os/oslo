@@ -17,7 +17,7 @@ pub(super) fn slow_command_notice(
     result: &Result<i32, ShellError>,
 ) -> String {
     let after = oslo::interactive::settings::current().notify.after;
-    if after == 0 || elapsed.as_secs() < after {
+    if after == 0 || elapsed.as_secs() < after || !oslo::feature::on(oslo::feature::at::NOTIFY) {
         return String::new();
     }
     let status = result.as_ref().copied().unwrap_or(1);

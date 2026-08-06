@@ -173,7 +173,7 @@ fn fire(index: usize, fields: &[(&str, &str)]) {
 /// scroll their line away as if Esc had done something.
 fn open_finder(seed: &str) -> Option<oslo::interactive::finder::Outcome> {
     let settings = settings::current();
-    if !settings.finder.enabled {
+    if !settings.finder.enabled || !oslo::feature::on(oslo::feature::at::FINDER) {
         return None;
     }
     let track = oslo::track::store()?;
@@ -394,6 +394,9 @@ impl Assist for ShellAssist<'_> {
     }
 
     fn abbreviation(&mut self, line: &str, cursor: usize) -> Option<(String, usize)> {
+        if !oslo::feature::on(oslo::feature::at::ABBR) {
+            return None;
+        }
         // The dropdown and `abbr` both work in bytes; the editor's cursor is in characters.
         let at: usize = line.chars().take(cursor).map(char::len_utf8).sum();
         let (mut text, expanded_to) = abbr::expand(line, at)?;
