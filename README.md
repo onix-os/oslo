@@ -233,6 +233,28 @@ $ hosts | where 'ip:match("^10%.")' | cols host port
 A tool says what its rows *are*. The shell decides how they are drawn — and when the next stage
 wants rows, nothing is drawn at all.
 
+### Running commands from Lua
+
+Two forms, and the difference between them is pathname expansion.
+
+```lua
+sh.rm("*.txt")                             -- the pattern is read, as at a prompt
+oslo.run{ "rm", name }                     -- `name` is one filename, whatever is in it
+oslo.run{ "rm", "*.txt", glob = true }     -- ask for it explicitly
+```
+
+`sh.cmd(…)` is spelled to stand in for a command line, so it expands patterns like one. A pattern
+matching nothing is passed through unchanged — POSIX, and what every shell without `nullglob` does
+— which is also what lets `sh.printf("[%s]", x)` through untouched.
+
+`oslo.run{…}` is the exact-argv form: the list you write is the list that runs, with no quoting
+step and so no quoting bug. That is what makes it safe for a filename the script did not choose,
+and it is the escape when an argument must not be read as a pattern. The command word is never
+expanded in either form.
+
+`oslo.glob(pattern)` answers the question directly, and returns an empty table rather than the
+pattern when nothing matched.
+
 ## The terminal knows what is happening
 
 `OSC 133` semantic marks (so a multiplexer can fold command output), `OSC 7` working directory,
@@ -447,6 +469,28 @@ hold it in RAM until the next reboot. Under the cap that cost is not worth notic
 file is destroyed as `rm` has always destroyed things. A name already in the trash is never
 overwritten — the second `notes.txt` becomes `notes.txt.1`.
 
+### `\command` — getting past the shell's own version of a name
+
+A builtin `rm` needs a short way to ask for the one on `$PATH`. `command rm` is not it: `command`
+bypasses *functions*, and the builtin still wins.
+
+| written | alias | function | builtin | runs |
+|---|---|---|---|---|
+| `rm` | expanded | used | used | oslo's |
+| `\rm` | skipped | skipped | skipped | `/usr/bin/rm` |
+| `\\rm` | expanded | used | skipped | the alias's target, unbuiltin |
+
+`\cmd` reads as "whatever this shell has done to that name, give me the program". `\\cmd` is the
+narrow one, for when the alias is the point — `alias rm='rm -i'` — and the builtin is not.
+
+**Only at a prompt.** In a script a leading backslash does what POSIX says and nothing else: it
+suppresses the alias, and then ordinary command search finds the function or the builtin as it
+always has. `\\cmd` there is a command whose name begins with a backslash, and is not found —
+which is what bash and dash answer, and why giving it a meaning at a prompt breaks nothing.
+`tests/corpus/command_word_backslash.sh` is the case that pins both halves against bash.
+
+Quoting is not escaping: `"rm"` and `'rm'` run the builtin, in oslo as in every other shell.
+
 ### Autoloaded functions
 
 `~/.config/oslo/functions/NAME.sh` defines `NAME`, and is not read until something calls it.
@@ -542,6 +586,29 @@ since it always fired after the move.
 `post-cmd`'s `cwd` is where the command *ended*, so the pair reads correctly across a `cd`, and it
 fires whether the command succeeded or not. `post-change-dir` fires from the one place every `cd`,
 `pushd`, `popd` and jump passes through — so it also catches a move made inside a function.
+
+**A hook that observes may change the shell.** Setting a variable, sourcing a file, defining an
+alias: all of it works from any `post-` or `on-` handler, including `post-change-dir`, which is
+what a `direnv`-style integration needs.
+
+```lua
+oslo.on.post_change_dir(function(d)
+  if oslo.fs.exists(d.to .. "/.envrc") then
+    oslo.source("/dev/stdin")            -- or whatever the integration needs
+  end
+end)
+```
+
+That has not always been true. `post-change-dir` fires from inside `cd`, which is holding the
+shell's state, so a handler that tried to change anything met "shell state is busy" and did
+nothing — and the message named `oslo.register_builtin`, which the config had never used. Handlers
+that only observe are now held until the shell is idle and run there, so the fire site stays where
+it is accurate and the handler runs where it can act.
+
+The three that **answer** still run inline, because a `pre-cmd` veto has to be read while the
+command is still stoppable. They are handed everything they need as arguments — `pre-change-dir`
+gets `d.to` rather than having to ask the shell where it is going — and an `oslo.*` call from one
+that reaches for shell state raises where you can see it.
 
 None of this reaches a script: a config is only read by an interactive shell, so nothing here can
 change what `sh -c` or a `#!/bin/sh` file does.

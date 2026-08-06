@@ -12,6 +12,8 @@ mod assign;
 mod autocd;
 mod autoload;
 mod declare;
+/// `\command` and `\\command`, which decide how much of the shell a name skips past.
+mod escape;
 mod external;
 mod posix;
 mod trace;
@@ -56,7 +58,12 @@ fn eval_simple_command_inner(env: &mut Environment, simple: &SimpleCommand) -> R
     // globbed. See `declare` for what that cost when they were.
     let mut words = Vec::new();
     let mut rest = simple.words.iter();
+    // Read from the word's *shape*, before expansion turns it into a string and the backslash
+    // stops being visible. See `escape`, which is also where the interactive gate lives.
+    let mut escape = escape::Escape::None;
+    let mut backslashes = 0;
     if let Some(first) = rest.next() {
+        (escape, backslashes) = escape::intent(first, env.interactive());
         words.extend(expand_word(env, first)?);
     }
 
@@ -84,7 +91,10 @@ fn eval_simple_command_inner(env: &mut Environment, simple: &SimpleCommand) -> R
     // arguments, and only a pre-parse pass can let `alias forever='while :; do'` work. Doing it
     // in both places would also expand twice: `alias ls='ls -F'` would have become `ls -F -F`.
 
-    let cmd_name = words[0].trim().to_string();
+    // `\\rm` is the word `\rm` by the time it is a string — the lexer turned the pair into one
+    // literal backslash. It comes off here, so that argv[0] and everything downstream see the name
+    // the user meant rather than one no `$PATH` entry will ever match.
+    let cmd_name = words[0].trim()[backslashes..].to_string();
     words[0] = cmd_name.clone();
 
     let is_declaration = is_declaration_builtin(&cmd_name);
@@ -120,14 +130,14 @@ fn eval_simple_command_inner(env: &mut Environment, simple: &SimpleCommand) -> R
     // would give `local` a throwaway frame to write into, so `local V=x` would be undone the
     // moment the command finished.
     if prefix_assignments.is_empty() {
-        return run_command_word(env, &cmd_name, &words, &simple.redirections);
+        return run_command_word(env, &cmd_name, &words, &simple.redirections, escape);
     }
 
     env.push_scope();
     for (name, value) in &prefix_assignments {
         env.set_local_exported_var(name, value);
     }
-    let result = run_command_word(env, &cmd_name, &words, &simple.redirections);
+    let result = run_command_word(env, &cmd_name, &words, &simple.redirections, escape);
     env.pop_scope();
     result
 }
@@ -178,7 +188,10 @@ pub fn run_argv(env: &mut Environment, argv: &[String]) -> Result<i32> {
         return Ok(0);
     };
     crate::env::builtins::run_pending_traps(env)?;
-    run_command_word(env, name, argv, &[])
+    // No escape: the argv model has no source text and therefore no backslash to have written.
+    // `oslo.run{"\\rm"}` asks for a command literally named `\rm`, which is the whole promise of
+    // that call model — the list you write is the list that runs.
+    run_command_word(env, name, argv, &[], escape::Escape::None)
 }
 
 /// Dispatch an already-expanded command word.
@@ -195,15 +208,27 @@ pub fn run_argv(env: &mut Environment, argv: &[String]) -> Result<i32> {
 ///    behaviour it does not control, and silently ignoring the wrapper runs the original.
 /// 4. **regular builtin**.
 /// 5. **PATH**, or a path operand — see the `external` submodule.
+///
+/// `escape` is how much of that a leading backslash asks to skip past — nothing at all for a
+/// script, which is where the steps above are POSIX's and stay POSIX's. See the `escape` module.
 fn run_command_word(
     env: &mut Environment,
     cmd_name: &str,
     words: &[String],
     redirections: &[Redirection],
+    escape: escape::Escape,
 ) -> Result<i32> {
     let name = cmd_name.trim();
 
-    if posix::special_builtins_outrank_functions(env)
+    // Ahead of the POSIX order rather than woven into it, because that is what the two forms mean:
+    // they name a step to start *from*, so the steps before it are not consulted at all. Folding
+    // the condition into each `if` below would read as three unrelated exceptions.
+    if escape.skips_function() {
+        return run_program(env, name, words, redirections, escape);
+    }
+
+    if !escape.skips_builtin()
+        && posix::special_builtins_outrank_functions(env)
         && crate::env::scope::is_special_builtin(name)
         && env.is_builtin(name)
     {
@@ -214,11 +239,11 @@ fn run_command_word(
         return call_function_command(env, &func_body, words, redirections);
     }
 
-    if env.is_builtin(name) {
+    if !escape.skips_builtin() && env.is_builtin(name) {
         return run_builtin(env, name, words, redirections);
     }
 
-    run_program(env, name, words, redirections)
+    run_program(env, name, words, redirections, escape)
 }
 
 /// Apply the command's redirections and run it as a builtin.
@@ -307,6 +332,7 @@ fn run_program(
     cmd_name: &str,
     words: &[String],
     redirections: &[Redirection],
+    escape: escape::Escape,
 ) -> Result<i32> {
     match look_up_command(cmd_name) {
         Lookup::Program(path) => run_external(env, &path, cmd_name, words, redirections),
@@ -326,48 +352,58 @@ fn run_program(
             // Nothing on `$PATH` and not a directory — so a function kept in its own file may
             // still answer for this name. Read *after* the search rather than before it, which is
             // what stops a file on disk from quietly redefining a command that already works.
+            // **Not for `\cmd`**, which asks for the program and nothing else. `autoload::load`
+            // answers "already defined" for a function the shell has in hand — that is its
+            // recursion guard — so leaving this in the path put the function back in the running
+            // after the step above had taken it out, and `\cd` went on calling `cd() { … }`.
+            // **Autoload is skipped for `\cmd`**, which asks for the program and nothing else.
+            // `autoload::load` answers "already defined" for a function the shell has in hand —
+            // that is its recursion guard — so leaving it in the path put the function back in the
+            // running after the step above had taken it out, and `\cd` went on calling
+            // `cd() { … }` with no sign that the backslash had done anything.
+            None if escape.skips_function() => nothing_to_run(env, cmd_name, redirections),
             None => match autoload::try_call(env, cmd_name, words, redirections) {
                 Some(result) => result,
-                // Before giving up, ask the config. A distribution's package manager is the obvious
-                // handler — "nvim is in package neovim", or install it and run it — and a handler that
-                // resolved the situation answers with the status to report. Everyone else bolts this
-                // on as a shell function; here it is a hook.
-                None => match crate::lua::engine::ask_hook_here(
-                    crate::lua::api::hooks::at::COMMAND_NOT_FOUND,
-                    vec![crate::lua::eval::value::Value::str(cmd_name)],
-                ) {
-                    Some(status) => Ok(status),
-                    None => {
-                        // Nobody handled it, so say what a person needs next: the name that was
-                        // probably meant. Only when the shell is interactive — a script's stderr is
-                        // read by machines, and bash says exactly "command not found" there.
-                        let hint = if env.interactive() {
-                            let path = env.get_var("PATH").unwrap_or_default().to_string();
-                            crate::interactive::command_index::nearest(&path, cmd_name)
-                        } else {
-                            None
-                        };
-                        match hint {
-                            Some(near) => report_unrunnable(
-                                env,
-                                redirections,
-                                cmd_name,
-                                &format!("command not found; did you mean {near}?"),
-                                127,
-                            ),
-                            None => report_unrunnable(
-                                env,
-                                redirections,
-                                cmd_name,
-                                "command not found",
-                                127,
-                            ),
-                        }
-                    }
-                },
+                None => nothing_to_run(env, cmd_name, redirections),
             },
         },
     }
+}
+
+/// The end of the command search: nothing on `$PATH`, no function, no builtin.
+///
+/// Split out because two arms reach it — the ordinary one and `\cmd`, which skips the autoload
+/// step between them — and a shell that said something different depending on which would be
+/// reporting on its own internals rather than on the command.
+fn nothing_to_run(
+    env: &mut Environment,
+    cmd_name: &str,
+    redirections: &[Redirection],
+) -> Result<i32> {
+    // Before giving up, ask the config. A distribution's package manager is the obvious handler —
+    // "nvim is in package neovim", or install it and run it — and a handler that resolved the
+    // situation answers with the status to report. Everyone else bolts this on as a shell
+    // function; here it is a hook.
+    if let Some(status) = crate::lua::engine::ask_hook_here(
+        crate::lua::api::hooks::at::COMMAND_NOT_FOUND,
+        vec![crate::lua::eval::value::Value::str(cmd_name)],
+    ) {
+        return Ok(status);
+    }
+    // Nobody handled it, so say what a person needs next: the name that was probably meant. Only
+    // when the shell is interactive — a script's stderr is read by machines, and bash says exactly
+    // "command not found" there.
+    let hint = if env.interactive() {
+        let path = env.get_var("PATH").unwrap_or_default().to_string();
+        crate::interactive::command_index::nearest(&path, cmd_name)
+    } else {
+        None
+    };
+    let reason = match hint {
+        Some(near) => format!("command not found; did you mean {near}?"),
+        None => "command not found".to_string(),
+    };
+    report_unrunnable(env, redirections, cmd_name, &reason, 127)
 }
 
 /// Report a command word that could not be run, with the command's own redirections in force.
