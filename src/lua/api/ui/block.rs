@@ -55,9 +55,14 @@ fn handle(block: Rc<RefCell<Block>>) -> Value {
             _ => text(&args, 3, "block:row")?,
         };
         let overflow = overflow_of(args.get(3))?;
-        let style = style_of(args.get(3));
+        // Two styles, because the two halves of a row mean different things: the label says *what
+        // kind* of row this is — `added` green, `removed` red — and the value is the content. The
+        // shell's own direnv block colours the label and leaves the names plain, which is only
+        // expressible if a config can do the same.
+        let style = style_named_field(args.get(3), "style");
+        let label_style = style_named_field(args.get(3), "label_style");
         let mut block = for_row.borrow_mut();
-        block.styled_row(label, Style::default(), body, style);
+        block.styled_row(label, label_style, body, style);
         if let Some(how) = overflow {
             block.overflow(how);
         }
@@ -124,18 +129,18 @@ fn overflow_of(options: Option<&Value>) -> Result<Option<Overflow>, LuaError> {
     }
 }
 
-/// The `style = …` field, as `oslo.ui.style` produced it.
+/// A named style from an options field.
 ///
-/// Absent is the default style rather than an error: most rows do not want one, and a caller who
-/// passed something unusable gets an unstyled row instead of a failed block.
-fn style_of(options: Option<&Value>) -> Style {
+/// The same vocabulary the prompt takes: a theme slot like `prompt.git`, or a colour like `cyan`
+/// or `#8be9fd`. One parser, so a plugin's rows and the prompt agree about what a name means.
+///
+/// Absent is the default style rather than an error: most rows want none, and a caller who passed
+/// something unusable gets an unstyled row instead of a failed block.
+fn style_named_field(options: Option<&Value>, field: &str) -> Style {
     let Some(Value::Table(table)) = options else {
         return Style::default();
     };
-    match table.borrow().get(&Value::str("style")) {
-        // The same vocabulary `oslo.ui.style` and the prompt take: a theme slot name like
-        // `prompt.git`, or a colour like `cyan` or `#8be9fd`. One parser, so a plugin's rows and
-        // the prompt agree about what a name means.
+    match table.borrow().get(&Value::str(field)) {
         Value::Str(spec) => super::super::prompt::style_named(spec.as_ref()),
         _ => Style::default(),
     }

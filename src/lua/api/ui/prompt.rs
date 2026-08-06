@@ -375,9 +375,29 @@ pub fn install(ui: &mut Table) {
         ))
     });
 
-    // oslo.ui.style(text | {text=, border=, fg=, bg=, bold=, padding_x=, padding_y=, width=})
+    // oslo.ui.style(text | {text=, …}) or oslo.ui.style(text, {…})
+    //
+    // **Both call shapes, and the second one is a bug fix.** `oslo.ui.style("hi", {fg="green"})`
+    // used to take the string, drop the spec on the floor and hand back unpainted text — every
+    // option silently ignored. It is the shape anyone writes first, and it is the shape the other
+    // `oslo.ui.style` (in `api::prompt`, which this one shadows) accepted.
     put(ui, "style", |_, args| {
         let mut settings = Styling::default();
+        // The spec is argument two when the text came first, and argument one otherwise.
+        let leading_text = matches!(args.first(), Some(Value::Str(_)));
+        let args: Vec<Value> = match (leading_text, args.get(1)) {
+            (true, Some(Value::Table(spec))) => {
+                // The caller's spec, with the text folded in, so everything below reads one table
+                // whichever shape was written.
+                let mut merged = Table::new();
+                for (key, value) in spec.borrow().pairs() {
+                    merged.set(key, value);
+                }
+                merged.set(Value::str("text"), args[0].clone());
+                vec![Value::table(merged)]
+            }
+            _ => args,
+        };
         match args.first() {
             Some(Value::Str(text)) => settings.text = text.to_string(),
             Some(Value::Table(_)) => {

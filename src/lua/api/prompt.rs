@@ -44,17 +44,13 @@ pub(crate) const TRANSIENT: &str = "prompt.transient";
 /// Called with `command` set while a command is in flight and `nil` at a prompt.
 pub(crate) const TITLE: &str = "prompt.title";
 
-/// Add `oslo.prompt`, `oslo.ui.style`, `oslo.git` and `oslo.path.shorten`.
-pub fn install(oslo: &mut Table, ui: &mut Table, registry: &Registry) {
+/// Add `oslo.prompt`, `oslo.git` and `oslo.path.shorten`.
+pub fn install(oslo: &mut Table, _ui: &mut Table, registry: &Registry) {
     oslo.set(Value::str("prompt"), build(registry));
-    // Painting text is `oslo.ui`; the prompt's own configuration stays `oslo.prompt`, which is a
-    // table a config assigns into rather than a function it calls.
-    put(ui, "style", |_, args| {
-        let body = text(&args, 1, "oslo.ui.style")?;
-        ok(Value::str(
-            style_from(args.get(1)).paint(&body, theme::depth()),
-        ))
-    });
+    // **`oslo.ui.style` is not installed here.** It used to be, and `ui::prompt` installs one of
+    // the same name *after* this runs — so this one was overwritten before any config could reach
+    // it, and had been dead for as long as both existed. The survivor does everything this did and
+    // more (borders, padding, width), and now accepts this one's two-argument call shape too.
     oslo.set(Value::str("git"), git());
     // The fine-grained shape: a prompt as a list of named, prioritised pieces rather than one
     // opaque string. See `super::segment`.
@@ -130,7 +126,6 @@ fn key_for(field: &str) -> Option<&'static str> {
     }
 }
 
-/// A style written as `oslo.ui.style(text, "green")` or `oslo.ui.style(text, {fg = …, bold = true})`.
 /// The `oslo.theme` table, whose `styles` field names colours.
 ///
 /// `__newindex` again, for the reason `oslo.prompt` needs it: a plain table would accept the
@@ -186,29 +181,6 @@ pub fn style_named(name: &str) -> Style {
         // An unknown dotted name is a typo, not a colour: `prompt.usr` should not silently paint
         // nothing *and* not be mistaken for a colour called "prompt.usr".
         other => Color::parse(other).map(Style::fg).unwrap_or_default(),
-    }
-}
-
-fn style_from(value: Option<&Value>) -> Style {
-    match value {
-        Some(Value::Str(name)) => Color::parse(name).map(Style::fg).unwrap_or_default(),
-        Some(Value::Table(table)) => {
-            let table = table.borrow();
-            let colour = |key: &str| match table.get(&Value::str(key)) {
-                Value::Str(name) => Color::parse(&name),
-                _ => None,
-            };
-            Style {
-                fg: colour("fg"),
-                bg: colour("bg"),
-                bold: table.get(&Value::str("bold")).truthy(),
-                dim: table.get(&Value::str("dim")).truthy(),
-                italic: table.get(&Value::str("italic")).truthy(),
-                underline: table.get(&Value::str("underline")).truthy(),
-                reverse: table.get(&Value::str("reverse")).truthy(),
-            }
-        }
-        _ => Style::default(),
     }
 }
 
