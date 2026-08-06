@@ -210,13 +210,50 @@ pub fn attempt_directory(
         None => attempt(&origin, operand, mode)?,
     };
 
+    // **`pre-change-dir` may refuse the move**, and this is the only place it could: every `cd`,
+    // `pushd`, `popd` and frecency jump lands here, and by now the destination is resolved — so a
+    // handler is told where it would end up rather than what was typed, which is the difference
+    // between guarding `/srv` and guarding the word `..`.
+    //
+    // Refused as `Permission denied` rather than a status of its own: a caller that already knows
+    // how to report a failed move reports this one the same way, and `cd` keeps its contract that
+    // a non-zero status means the directory did not change.
+    if refused(&origin, &landing.pwd) {
+        return Err(io::Error::new(
+            io::ErrorKind::PermissionDenied,
+            "refused by a pre-change-dir hook",
+        ));
+    }
+
     env.set_var("OLDPWD", &origin, true);
     env.set_var("PWD", &landing.pwd, true);
     // Every move the shell makes passes through here, so this is where "the directories you have
     // actually been in" is written down. Recorded from `cd`'s own arm it silently omitted every
     // `pushd` and `popd`, and every `cd` inside a shell function.
     super::ring::record(&landing.pwd);
+    crate::lua::engine::fire_at_here(
+        crate::lua::api::hooks::at::POST_CHANGE_DIR,
+        &[("from", &origin), ("to", &landing.pwd)],
+    );
     Ok(landing.display)
+}
+
+/// Whether a `pre-change-dir` handler said no.
+///
+/// The move has already been resolved and not yet made, which is the only moment where refusing it
+/// means anything. `false` when nothing is attached — one relaxed load — so a shell with no such
+/// hook does not pay for the question on every `cd`.
+fn refused(from: &str, to: &str) -> bool {
+    matches!(
+        crate::lua::engine::answer_hook_with(
+            crate::lua::api::hooks::at::PRE_CHANGE_DIR,
+            vec![crate::lua::engine::LuaEngine::hook_fields(&[
+                ("from", crate::lua::eval::value::Value::str(from)),
+                ("to", crate::lua::eval::value::Value::str(to)),
+            ])],
+        ),
+        Some(crate::lua::eval::value::Value::Bool(false))
+    )
 }
 
 /// The diagnostic a failed move prints, naming `caller`.

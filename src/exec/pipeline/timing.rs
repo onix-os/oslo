@@ -88,6 +88,17 @@ impl Timer {
         let user = end.user.saturating_sub(self.cpu.user);
         let sys = end.sys.saturating_sub(self.cpu.sys);
         write_report(real, user, sys);
+        // `on-time-report`: only a `time`-prefixed pipeline reaches here, which is what separates
+        // this from `post-cmd` — that one fires for everything and carries wall-clock only. These
+        // are the three clocks, and they were asked for.
+        crate::lua::engine::fire_at_here(
+            crate::lua::api::hooks::at::TIME_REPORT,
+            &[
+                ("real_ms", &real.as_millis().to_string()),
+                ("user_ms", &user.as_millis().to_string()),
+                ("sys_ms", &sys.as_millis().to_string()),
+            ],
+        );
     }
 }
 

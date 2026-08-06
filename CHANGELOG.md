@@ -1,5 +1,32 @@
 # Changelog
 
+## [0.2.16] - 2026-08-06
+
+### <!-- 0 -->⛰️  Features
+
+- A margin at the top edge to match the bottom
+- Every context field an external prompt can name
+- Add the maki client behind an off-by-default feature
+- Twenty named events across the shell
+- A builtin rm with a trash at the prompt
+
+### <!-- 1 -->🐛 Bug Fixes
+
+- The cursor is not shown at column one mid-switch
+- PWD is set and exported at startup
+- The mode is published before the prompt is rebuilt
+- Rebuild the prompt when its inputs change
+- Export COLUMNS and LINES for child programs
+- A burst is not read past the key it needs
+
+### <!-- 6 -->🧪 Testing
+
+- Every documented setting must be assignable
+
+### <!-- 7 -->⚙️ Miscellaneous Tasks
+
+- Cleanup
+
 ## [0.2.14] - 2026-08-05
 
 ### <!-- 0 -->⛰️  Features

@@ -392,14 +392,33 @@ impl Keys {
         }
     }
 
-    /// Read whatever is available. False at end of input.
+    /// Take **one** byte. False at end of input.
+    ///
+    /// # Why one, and not a chunk
+    ///
+    /// This used to read 64 at a time, and that lost input. A `Keys` lives for exactly one
+    /// [`super::edit::session::read_line`] call, so every byte in this buffer when the line ends
+    /// is discarded with it — and a chunked read happily pulls in whatever followed the Enter.
+    /// Pasting three commands ran the first and silently dropped the other two, where bash, zsh
+    /// and dash all run three.
+    ///
+    /// Reading one byte makes that impossible rather than merely unlikely: [`Keys::read`] only
+    /// reaches here when the bytes it already holds cannot yield a key, so when it returns
+    /// [`Key::Accept`] the buffer is empty. **The rest is never taken, so it does not have to be
+    /// given back** — it stays in the terminal's own queue, and whoever asks next gets it. That
+    /// is the part a "carry the leftovers into the next line" fix gets wrong: after `cat`, the
+    /// next line of a paste belongs to `cat`'s stdin, not to the next prompt.
+    ///
+    /// The chunked read was never what made escape sequences parse correctly — the buffer and
+    /// [`parse`] do that, at any read size. It only ever saved syscalls, and it cost about 20µs
+    /// per 64 bytes typed to do it.
     fn fill(&mut self) -> bool {
-        let mut chunk = [0u8; 64];
+        let mut byte = [0u8; 1];
         loop {
             // SAFETY: a slice this call owns, read from the terminal's own descriptor.
-            let n = unsafe { nix::libc::read(self.fd, chunk.as_mut_ptr().cast(), chunk.len()) };
+            let n = unsafe { nix::libc::read(self.fd, byte.as_mut_ptr().cast(), 1) };
             if n > 0 {
-                self.buf.extend_from_slice(&chunk[..n as usize]);
+                self.buf.push(byte[0]);
                 return true;
             }
             if n == 0 {

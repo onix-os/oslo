@@ -14,6 +14,7 @@
 use oslo::interactive::edit::session::{Assist, Bound, KeyHook};
 use oslo::interactive::term::Key;
 use oslo::interactive::{OsloHelper, abbr, dropdown, editor, marks, settings};
+use oslo::lua::api::hooks;
 
 /// What the shell plugs into an editing session.
 pub struct ShellAssist<'a> {
@@ -156,6 +157,11 @@ fn placed(answer: editor::Answer) -> (String, usize, bool) {
     (answer.text, cursor, answer.submit)
 }
 
+/// Tell a hook something happened, spelled once so the call sites read as one line each.
+fn fire(index: usize, fields: &[(&str, &str)]) {
+    oslo::lua::engine::fire_at_here(index, fields);
+}
+
 /// Open the full-screen history finder.
 ///
 /// `None` means it could not open at all — no terminal, no store, nothing remembered — and the
@@ -187,7 +193,20 @@ fn open_finder(seed: &str) -> Option<oslo::interactive::finder::Outcome> {
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_secs() as i64)
         .unwrap_or(0);
-    oslo::interactive::finder::open(&commands, &cwd, now, settings.completion.fuzzy, seed)
+    // The three history events bracket the search itself. `open` is fired here rather than inside
+    // the finder because everything above can decline — no store, nothing remembered, disabled by
+    // config — and a hook that fired for a search that never appeared would be lying.
+    fire(hooks::at::HISTORY_OPEN, &[("seed", seed)]);
+    let outcome =
+        oslo::interactive::finder::open(&commands, &cwd, now, settings.completion.fuzzy, seed);
+    match &outcome {
+        Some(oslo::interactive::finder::Outcome::Chosen { line, .. }) => {
+            fire(hooks::at::HISTORY_SELECT, &[("line", line)]);
+            fire(hooks::at::HISTORY_CLOSE, &[("chosen", "true")]);
+        }
+        _ => fire(hooks::at::HISTORY_CLOSE, &[("chosen", "false")]),
+    }
+    outcome
 }
 
 impl Assist for ShellAssist<'_> {
@@ -230,9 +249,20 @@ impl Assist for ShellAssist<'_> {
         // The dropdown works in bytes; the editor's cursor is in characters.
         let pos: usize = line.chars().take(cursor).map(char::len_utf8).sum();
         let (start, candidates) = helper.complete_word(line, pos);
+        // `on-completion-start` fires only once there is something to choose from. Tab on a word
+        // nothing matches has not started a completion — it has done nothing, and a hook that said
+        // otherwise would fire on every stray Tab.
         if candidates.is_empty() {
             return None;
         }
+        fire(
+            hooks::at::COMPLETION_START,
+            &[
+                ("word", &line[start..pos]),
+                ("line", line),
+                ("count", &candidates.len().to_string()),
+            ],
+        );
 
         let chosen = if candidates.len() == 1 {
             // Already recorded by `complete_word`, which is where "one candidate is an
@@ -240,11 +270,21 @@ impl Assist for ShellAssist<'_> {
             candidates.into_iter().next()?
         } else {
             let indent = self.prompt_cols + dropdown::visible_len(&line[..start]);
-            let chosen =
-                dropdown::DropdownMenu::select_interactive(candidates, indent, &line[start..pos])?;
+            let Some(chosen) =
+                dropdown::DropdownMenu::select_interactive(candidates, indent, &line[start..pos])
+            else {
+                // Esc, or a key that closed the menu. Distinct from "nothing matched": the choice
+                // was offered and declined, which is the moment a hook wants to know about.
+                fire(hooks::at::COMPLETION_CANCEL, &[("word", &line[start..pos])]);
+                return None;
+            };
             helper.record_accepted(&chosen);
             chosen
         };
+        fire(
+            hooks::at::COMPLETION_SELECT,
+            &[("value", &chosen.replacement), ("word", &line[start..pos])],
+        );
 
         let mut out = String::with_capacity(line.len() + chosen.replacement.len());
         out.push_str(&line[..start]);

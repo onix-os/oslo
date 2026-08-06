@@ -13,16 +13,33 @@ use common::{run, run_in};
 ///
 /// The listing used to iterate a `HashMap`, so the order changed between runs of the same script
 /// — output no diff, no `cmp` and no cache key could ever rely on.
+///
+/// `$PWD` is excluded, and that is not a workaround. `run` gives each invocation its own temporary
+/// directory, so the two shells genuinely *are* somewhere different — a `set` that printed the same
+/// `PWD` for both would be the bug. bash lists it too. What this test is about is the *order* of
+/// the listing, so the one line that legitimately differs is dropped rather than the comparison
+/// being weakened.
 #[test]
 fn set_listing_is_deterministic() {
     let script = "a=1; b=2; c=3; f() { echo one; }; g() { echo two; }; set";
+    let without_pwd = |text: &str| -> String {
+        text.lines()
+            .filter(|line| !line.starts_with("PWD="))
+            .map(|line| format!("{line}\n"))
+            .collect()
+    };
     let first = run(script);
     let second = run(script);
     assert_eq!(
-        first.stdout, second.stdout,
+        without_pwd(&first.stdout),
+        without_pwd(&second.stdout),
         "set output changed between runs"
     );
     assert!(!first.stdout.is_empty());
+    assert!(
+        first.stdout.contains("PWD="),
+        "and PWD is listed at all, as it is in bash"
+    );
 }
 
 #[test]

@@ -207,7 +207,8 @@ fn a_postcmd_hook_fires_for_a_command_that_failed() {
 #[test]
 fn a_cd_hook_fires_only_when_the_directory_changed() {
     let out = typed(
-        "=oslo.on.cd(function(d) print('CD ' .. d) end)\necho not a cd\ncd /tmp\n",
+        "=oslo.on.cd(function(d) print('CD ' .. d.to .. ' from ' .. d.from) end)\n\
+         echo not a cd\ncd /tmp\n",
         &[],
     );
     assert!(out.contains("CD /tmp"), "{out}");

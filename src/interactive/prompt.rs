@@ -557,3 +557,28 @@ mod right_prompt_tests {
         out
     }
 }
+
+/// How many times something a prompt is built from has changed.
+///
+/// The prompt used to be a `&str` computed once per line, which meant a vi-mode indicator could
+/// never be right: pressing Esc changes the mode but nothing re-renders, so an external prompt
+/// stayed frozen at whatever mode the line began in — always insert.
+///
+/// A counter rather than a callback per input, because the editor needs one cheap question in its
+/// redraw loop ("is what I drew still true?") and the answer has to cost nothing on the ordinary
+/// path. Typing does not bump it, so a prompt built by running another program is run **once per
+/// line**, exactly as before; Esc bumps it, so that one costs a single re-render at human speed.
+static PROMPT_GENERATION: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+/// Say that a prompt built now would differ from one built a moment ago.
+///
+/// Called from the three places a prompt's inputs actually change: the vi mode, the language, and
+/// the working directory. Anything else — a keystroke, a redraw, a resize — leaves it alone.
+pub fn invalidate() {
+    PROMPT_GENERATION.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+}
+
+/// The current generation. Equal to a previous reading means nothing has changed since.
+pub fn generation() -> u64 {
+    PROMPT_GENERATION.load(std::sync::atomic::Ordering::Relaxed)
+}

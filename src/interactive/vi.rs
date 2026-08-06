@@ -200,6 +200,23 @@ pub fn reset() {
 /// bytes to send for no reason.
 pub fn observe(mode: Mode, cursors: &Cursors) -> Option<&'static str> {
     let previous = Mode::from_code(MODE.swap(mode.code(), Ordering::Relaxed));
+    // The mode-change hooks, from the one place that already knows a change happened. `pre` and
+    // `post` fire back to back here because the change *is* the swap above — there is no window
+    // between them to do anything in, and a `pre` that fired before the swap would be reporting a
+    // mode the editor had already left. Both exist so a handler can be written against either
+    // name without having to know that.
+    if previous != mode {
+        // A prompt that shows the mode is now wrong. This is the only place that knows the instant
+        // it changed, and the editor's redraw loop reads the counter rather than being told.
+        crate::interactive::prompt::invalidate();
+        let fields = [
+            ("kind", "vi"),
+            ("from", previous.name()),
+            ("to", mode.name()),
+        ];
+        crate::lua::engine::fire_at_here(crate::lua::api::hooks::at::PRE_MODE_CHANGE, &fields);
+        crate::lua::engine::fire_at_here(crate::lua::api::hooks::at::POST_MODE_CHANGE, &fields);
+    }
     escape_for_change(previous, mode, cursors)
 }
 

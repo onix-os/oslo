@@ -83,38 +83,10 @@ pub(super) fn read_command(
             .unwrap_or_else(|| rc::ps2(&mut env_struct.lock().unwrap()))
         };
 
-        // The right prompt, computed here and handed to the editor as an argument. It used to be
-        // smuggled out of the *highlighter*, because that was the only place a cursor move did not
-        // confuse rustyline's layout — one of the workarounds that went with it.
-        let right_prompt;
-        {
-            // A config's own right prompt wins; otherwise oslo draws one. There used to be none at
-            // all unless a config asked, which meant the machinery existed and nobody saw it.
-            // The same order the left prompt resolves in: a Lua prompt is an explicit choice and
-            // outranks the shell variable, which outranks oslo's own.
-            //
-            // `$RPS1` is here so that a *shell* integration can own both sides. hexe and starship
-            // rebuild the prompt from `PROMPT_COMMAND`, and until now the only thing they could
-            // set was `PS1` — the right column was oslo's whatever they did, so half the prompt
-            // came from the integration and half from the shell arguing with it.
-            // **The same facts the left prompt gets.** These two used to be rendered with
-            // `render`, which is `render_with(Context::default())` — so a right-prompt segment saw
-            // status 0, an empty cwd, no branch and no duration, whatever had actually happened.
-            // A right prompt exists to show the status and the duration; handing it zeros made the
-            // whole feature draw the wrong thing rather than nothing, which is worse.
-            let facts = prompt::segment_context(last_status, reading, None);
-            let right = lua
-                .render_with("prompt.right", &facts)
-                .or_else(|| rc::rps1(&mut env_struct.lock().unwrap()))
-                .or_else(|| {
-                    Some(oslo::interactive::prompt::render_default_right_prompt(
-                        last_status,
-                        super::repl::last_command_duration(),
-                    ))
-                });
-            right_prompt = right.clone().unwrap_or_default();
-            let _ = helper;
-        }
+        // The right prompt is no longer computed here. It is built by the `render` closure
+        // below, together with the left one, so that both are rebuilt when the vi mode changes
+        // rather than being fixed for the life of the line — see `session::read_line`.
+        let _ = helper;
 
         // What this row *is*, recorded before the editor is entered rather than from inside the
         // highlighter. The highlighter only reaches its own `note_row` on some paths, so anything
@@ -197,9 +169,38 @@ pub(super) fn read_command(
                 Some(mode::TOGGLE_KEY.to_string()),
             );
             assist.begin();
+            // Handed as a *function* so the editor can rebuild it when the vi mode changes —
+            // see `read_line`. It is not called per keystroke; the generation counter decides.
+            let mut render = {
+                let at_start = buffer.is_empty();
+                let language = *current;
+                let reading_now = reading;
+                move || -> (String, String) {
+                    let left = if at_start {
+                        prompt::primary_prompt(env_struct, lua, last_status, language)
+                    } else {
+                        lua.render_with("prompt.continuation", &{
+                            let mut ctx = prompt::segment_context(last_status, language, None);
+                            ctx.continuation = true;
+                            ctx
+                        })
+                        .unwrap_or_else(|| rc::ps2(&mut env_struct.lock().unwrap()))
+                    };
+                    let facts = prompt::segment_context(last_status, reading_now, None);
+                    let right = lua
+                        .render_with("prompt.right", &facts)
+                        .or_else(|| rc::rps1(&mut env_struct.lock().unwrap()))
+                        .unwrap_or_else(|| {
+                            oslo::interactive::prompt::render_default_right_prompt(
+                                last_status,
+                                super::repl::last_command_duration(),
+                            )
+                        });
+                    (left, right)
+                }
+            };
             match oslo::interactive::edit::session::read_line(
-                &prompt,
-                &right_prompt,
+                &mut render,
                 (&typed, cursor),
                 &mut assist,
             ) {
@@ -207,11 +208,37 @@ pub(super) fn read_command(
                 // Switch and reopen with the same text and cursor, so the line survives the
                 // switch — which is what makes a toggle usable mid-command.
                 oslo::interactive::edit::session::Outcome::ToggleLanguage { text, cursor } => {
+                    // **Hidden across the switch.** The editor puts the cursor back at the top of
+                    // the block so the next draw can count from there, and then *returns* — which
+                    // restores the terminal and makes the cursor visible again. It then sits at
+                    // column one, in plain sight, for as long as rendering the other language's
+                    // prompt takes. With a prompt built by running another program that is
+                    // milliseconds, and it reads as the cursor jumping to the start of the line
+                    // and back. The next `read_line` hides it again on entry and shows it on the
+                    // way out, so this only covers the gap between the two.
+                    print!("\x1b[?25l");
+                    let _ = std::io::Write::flush(&mut std::io::stdout());
                     let switched = match *current {
                         Mode::Shell => Mode::Lua,
                         Mode::Lua => Mode::Shell,
                     };
+                    // The other half of `pre`/`post-mode-change`: `kind = "language"` here, and
+                    // `kind = "vi"` from the editor. One hook for both, because "the mode changed"
+                    // is the same question — a handler that cares about only one reads `kind`.
+                    let fields = [
+                        ("kind", "language"),
+                        ("from", current.name()),
+                        ("to", switched.name()),
+                    ];
+                    oslo::lua::engine::fire_at_here(
+                        oslo::lua::api::hooks::at::PRE_MODE_CHANGE,
+                        &fields,
+                    );
                     *current = switched;
+                    oslo::lua::engine::fire_at_here(
+                        oslo::lua::api::hooks::at::POST_MODE_CHANGE,
+                        &fields,
+                    );
                     reading = switched;
                     typed = text;
                     typed_point = typed

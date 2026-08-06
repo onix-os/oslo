@@ -95,6 +95,51 @@ impl Environment {
         }
     }
 
+    /// `$PWD`, **exported**, from where the process actually is.
+    ///
+    /// POSIX: the shell sets `PWD` at startup to the absolute pathname of the current working
+    /// directory. oslo only ever wrote it from `cd`, so a shell that had not changed directory yet
+    /// had none at all — and nothing that inherits the environment could find out where it was.
+    ///
+    /// That is not a theoretical gap. `sshd` does not set `PWD`, so a shell logged into over SSH
+    /// started with it missing, and every prompt renderer run as a child — hexe, starship,
+    /// anything reading `$PWD` because it is handed a pipe rather than a terminal — had no
+    /// directory to show until the first `cd` happened to write one.
+    ///
+    /// An inherited value is kept **only when it names this directory**. POSIX allows using the
+    /// inherited one, and a value that survives a `chdir` the shell did not make is a lie: it is
+    /// how `$PWD` ends up pointing at where the *parent* was.
+    pub(super) fn seed_working_directory(&mut self) {
+        let Ok(here) = std::env::current_dir() else {
+            return;
+        };
+        let here = here.to_string_lossy().to_string();
+        // Compared by what they resolve to, not as text: an inherited `$PWD` may reach this same
+        // directory through a symlink, and POSIX prefers that spelling because it is the one the
+        // user typed to get here.
+        let inherited_is_here = self
+            .vars
+            .get("PWD")
+            .map(|(value, _)| value.as_str())
+            .filter(|value| !value.is_empty())
+            .and_then(|value| std::fs::canonicalize(value).ok())
+            .is_some_and(|resolved| std::fs::canonicalize(&here).is_ok_and(|now| resolved == now));
+        // Written through to the real environment as well as the table, for the reason `SHLVL`
+        // above is: a child's environment comes from `execve` reading `environ`, so a value that
+        // lives only in oslo's map is invisible to exactly the programs this exists to serve.
+        if !inherited_is_here {
+            self.vars.insert("PWD".to_string(), (here.clone(), true));
+            environ_set("PWD", &here);
+            return;
+        }
+        // Kept, but exported: an inherited-but-unexported `PWD` is invisible to a child, which is
+        // the whole reason this exists.
+        if let Some(slot) = self.vars.get_mut("PWD") {
+            slot.1 = true;
+            environ_set("PWD", &slot.0.clone());
+        }
+    }
+
     pub(super) fn seed_compatibility_vars(&mut self) {
         let (major, minor, patch) = Self::BASH_COMPAT;
         if !self.vars.contains_key("BASH_VERSION") {
@@ -120,5 +165,28 @@ impl Environment {
             }
             self.set_array("BASH_VERSINFO", array);
         }
+    }
+}
+
+#[cfg(test)]
+mod pwd_tests {
+    use crate::env::Environment;
+
+    /// **A shell knows where it is before anything asks.** POSIX requires `PWD` at startup, and
+    /// oslo only ever wrote it from `cd` — so a shell logged into over SSH, where `sshd` sets no
+    /// `PWD`, had none until the user happened to change directory. Every prompt renderer run as a
+    /// child reads `$PWD`, because it is handed a pipe and cannot ask the terminal.
+    #[test]
+    fn a_new_environment_knows_its_directory() {
+        let env = Environment::new();
+        let pwd = env.get_var("PWD").expect("PWD is set at startup");
+        assert!(!pwd.is_empty());
+        assert_eq!(
+            std::fs::canonicalize(pwd).ok(),
+            std::env::current_dir()
+                .ok()
+                .and_then(|p| std::fs::canonicalize(p).ok()),
+            "PWD must name the directory the process is actually in"
+        );
     }
 }

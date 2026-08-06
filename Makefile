@@ -118,9 +118,13 @@ check-loc:
 check-readme:
 	@./scripts/check-readme.sh
 
-# check-all/test-all are deliberately absent: the crate declares no [features], so they are
-# byte-identical reruns of check/test and only slow the gate down. Add them back the day a
-# [features] section appears.
+# The `[features]` section this note used to wait for now exists — `ssh`, off by default — so the
+# feature *is* built by the gate: `clippy` already runs `--all-features`, which compiles `maki` and
+# everything under it. `check-all` is kept for running that alone.
+#
+# `verify` still runs plain `check` and `test`, which is deliberate: the shipped artifact is the
+# default build, and a gate that only ever exercised `--all-features` would stop testing the thing
+# people actually get. The feature is compiled, not tested — it has nothing to test yet.
 # The VMs are deliberately *not* in `verify`: each needs a musl toolchain, qemu and the network,
 # and takes minutes. They answer questions a checkout cannot — whether the release artifact runs as
 # PID 1 on a foreign userland, and whether a distro's own init system runs on it.

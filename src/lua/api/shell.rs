@@ -21,49 +21,11 @@ use std::sync::{Arc, Mutex};
 /// Registry key prefix under which a hook's handlers live.
 pub(crate) const HOOK_PREFIX: &str = "hook:";
 
-/// The hooks a script may attach to, and what each one is handed.
+/// The moments a config may attach to, and the spellings that reach each one.
 ///
-/// A fixed list rather than an open set: a name that is never fired is indistinguishable from a
-/// typo, and `oslo.on.precmb(fn)` silently doing nothing for ever is the failure mode this
-/// avoids.
-pub(crate) const HOOKS: [&str; 8] = [
-    // **`preexec` and `precmd` are the names the rest of the world uses**, and oslo had them
-    // crossed: what it called `precmd` fires *before the command*, which is preexec everywhere
-    // else, and there was no hook at all for "a prompt is about to be drawn" — the thing every
-    // prompt integration actually installs.
-    //
-    // Both spellings now exist and fire together, so no config breaks; `preexec` is the one to
-    // write. `prompt` is the missing one.
-    "preexec",
-    "precmd",
-    "postexec",
-    "postcmd",
-    "prompt",
-    "cd",
-    "command-not-found",
-    // Every keystroke, before the editor acts on it. See `KEY_WATCHED`.
-    "key",
-];
-
-/// The `key` hook's name, spelled once.
-pub(crate) const KEY: &str = "key";
-
-/// Whether anything has ever attached to the `key` hook.
-///
-/// **This exists so that not using the hook costs nothing.** Every other hook fires at a moment
-/// that already involves running a command; this one fires on every keypress, and asking the
-/// registry each time — a string format, a map lookup, a `Vec` — would put that on the path of
-/// simply typing. One relaxed load answers it instead.
-///
-/// Never cleared. Removing the last handler leaves the flag set and the lookup then finds an empty
-/// list, which costs a little on a session that attached and detached; clearing it correctly would
-/// mean counting handlers across reloads, and a wrong count here silently kills the hook.
-static KEY_WATCHED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
-
-/// Whether the `key` hook is worth asking about. See [`KEY_WATCHED`].
-pub fn key_hook_watched() -> bool {
-    KEY_WATCHED.load(std::sync::atomic::Ordering::Relaxed)
-}
+/// Moved to [`super::hooks`] when there were twenty of them rather than eight, and when the older
+/// names became aliases of the `pre-`/`post-`/`on-` scheme rather than separate entries.
+pub(crate) use super::hooks;
 
 /// Add the introspection fields, `oslo.opts` and `oslo.on` to the `oslo` table.
 pub fn install(
@@ -171,21 +133,26 @@ fn option_var(name: &str) -> String {
     format!("OSLO_{}", name.trim().to_ascii_uppercase())
 }
 
-/// `oslo.on` — one setter per hook, each returning a handle that can remove itself.
+/// `oslo.on` — one setter per spelling, each returning a handle that can remove itself.
+///
+/// Every spelling of a moment is installed, and all of them key on the *canonical* name — so
+/// `oslo.on.preexec(f)` and `oslo.on["pre-cmd"](g)` build one list and fire together.
 fn hooks(registry: &Registry) -> Value {
     let mut on = Table::new();
-    for name in HOOKS {
+    for &(spelling, index) in hooks::spellings() {
         let registry = Rc::clone(registry);
-        let key = format!("{HOOK_PREFIX}{name}");
-        put(&mut on, name, move |_, args| {
+        let canonical = hooks::HOOKS[index].name;
+        let key = format!("{HOOK_PREFIX}{canonical}");
+        let reported = spelling;
+        put(&mut on, spelling, move |_, args| {
             let Some(handler @ Value::Function(_)) = args.first() else {
                 return Err(LuaError::new(format!(
-                    "oslo.on.{name}: the argument must be a function"
+                    "oslo.on.{reported}: the argument must be a function"
                 )));
             };
-            if name == KEY {
-                KEY_WATCHED.store(true, std::sync::atomic::Ordering::Relaxed);
-            }
+            // Recorded before the handler is stored, so a hot-path check can never see the
+            // handler without the bit that says to look for it.
+            hooks::attached(index);
             let id = append(&registry, &key, handler.clone());
             ok(handle(&registry, &key, id))
         });

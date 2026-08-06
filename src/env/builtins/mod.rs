@@ -31,6 +31,7 @@ mod jobs;
 mod r#let;
 mod mapfile;
 mod process;
+mod remove;
 mod shopt;
 mod spawn;
 mod status;
@@ -179,6 +180,11 @@ pub fn register_default_builtins(env: &mut Environment) {
 
     // `shopt` is a namespace of its own, not an alias for `set -o`: see the module docs. It is
     // also the only way to reach `exec::simple::set_autocd`, which had no caller before it.
+    // `rm`. A builtin that shadows `/bin/rm` for every script on the machine, so its extensions
+    // are confined to an interactive shell and an option it does not know is handed to the real
+    // `rm` — see the module docs, which are the argument for it being safe to register at all.
+    env.register_custom_builtin("rm", remove::builtin_rm);
+
     env.register_custom_builtin("shopt", builtin_shopt);
     env.register_custom_builtin("caller", builtin_caller);
     env.register_custom_builtin("status", builtin_status);
@@ -225,6 +231,7 @@ mod tests {
             "status",
             "universal",
             "suspend",
+            "rm",
         ] {
             assert!(env.is_builtin(name), "{name} is not registered");
             assert!(

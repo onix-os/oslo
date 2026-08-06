@@ -155,3 +155,55 @@ fn control_chords_decode_by_letter() {
     assert_eq!(key(&[0x01]), Key::Home, "C-a keeps its shared meaning");
     assert_eq!(key(&[0x09]), Key::ToggleScope, "Tab is not C-i here");
 }
+
+/// **What follows the Enter is left where it was, not swallowed.**
+///
+/// A `Keys` lives for one line. It used to read 64 bytes at a time, so a burst carrying more than
+/// one line had the rest sitting in its buffer when the line ended — and the buffer died with it.
+/// Pasting three commands ran one and silently dropped two, where bash, zsh and dash run three.
+///
+/// The fix is not to carry the leftovers into the next line: after `cat`, the rest of a paste
+/// belongs to `cat`'s stdin. It is to never take them, which is what this asserts — the reader
+/// stops at the key it was asked for, and the remaining bytes are still there for whoever is next.
+#[test]
+fn the_reader_stops_at_the_key_it_needed() {
+    use std::os::fd::AsRawFd;
+
+    let (reader, writer) = nix::unistd::pipe().expect("a pipe");
+    nix::unistd::write(&writer, b"ab\ncd\n").expect("write the burst");
+
+    let mut keys = Keys::on(reader.as_raw_fd());
+    assert_eq!(keys.read(), Some(Key::Char('a')));
+    assert_eq!(keys.read(), Some(Key::Char('b')));
+    assert_eq!(keys.read(), Some(Key::Accept), "the line ends here");
+
+    assert!(
+        keys.buf.is_empty(),
+        "nothing may be held once the line has ended: {:?}",
+        keys.buf
+    );
+
+    // Still in the pipe, and readable by anyone — the next line, or the command about to run.
+    drop(keys);
+    let mut rest = [0u8; 8];
+    let n = nix::unistd::read(reader.as_raw_fd(), &mut rest).expect("the rest is still there");
+    assert_eq!(
+        &rest[..n],
+        b"cd\n",
+        "the bytes after Enter were never taken"
+    );
+}
+
+/// A multi-byte sequence still assembles, which is the thing the chunked read was mistakenly
+/// believed to be doing. The buffer and `parse` do it, at any read size.
+#[test]
+fn an_escape_sequence_assembles_one_byte_at_a_time() {
+    use std::os::fd::AsRawFd;
+
+    let (reader, writer) = nix::unistd::pipe().expect("a pipe");
+    nix::unistd::write(&writer, b"\x1b[Ax").expect("an arrow and a letter");
+
+    let mut keys = Keys::on(reader.as_raw_fd());
+    assert_eq!(keys.read(), Some(Key::Up), "three bytes, one key");
+    assert_eq!(keys.read(), Some(Key::Char('x')));
+}

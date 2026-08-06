@@ -36,8 +36,8 @@ pub(crate) mod tool;
 pub(crate) mod tools;
 mod ui;
 
+pub mod hooks;
 pub(crate) use shell::handlers as hook_handlers;
-pub(crate) use shell::{KEY as HOOK_KEY, key_hook_watched};
 pub(crate) mod util;
 
 use util::{native, put, text};
@@ -74,6 +74,13 @@ pub fn install(interp: &Rc<Interp>, registry: &Registry, env: Arc<Mutex<Environm
     // a nil value" while `oslo.vi = { enabled = false }` worked. A config language where two
     // spellings of the same thing differ by whether somebody remembered to add a line here is one
     // nobody can hold in their head.
+    //
+    // **A fallback, never a replacement.** This used to assign unconditionally, and `theme` is in
+    // the list, so it overwrote the real `oslo.theme` that `prompt::install` had just built one
+    // line above — taking `oslo.theme.styles` and its `__newindex` with it. The README's
+    // `oslo.theme.styles["my.dir"] = …` therefore died on an empty table, which is the very
+    // failure this loop exists to prevent, caused by the fix for it. A namespace that something
+    // else already built with behaviour keeps what it has.
     for name in [
         "completion",
         "suggest",
@@ -87,11 +94,26 @@ pub fn install(interp: &Rc<Interp>, registry: &Registry, env: Arc<Mutex<Environm
         "theme",
         "abbr",
     ] {
-        oslo.set(
-            Value::str(name),
-            Value::Table(Rc::new(RefCell::new(Table::new()))),
-        );
+        if matches!(oslo.get(&Value::str(name)), Value::Nil) {
+            oslo.set(
+                Value::str(name),
+                Value::Table(Rc::new(RefCell::new(Table::new()))),
+            );
+        }
     }
+
+    // `oslo.builtin` is the same thing one level deeper: it is a namespace *per builtin*, so
+    // `oslo.builtin.rm.to_tmp = true` indexes twice and both tables have to be here. A new
+    // builtin with settings adds a line beside `rm`.
+    let mut builtin = Table::new();
+    builtin.set(
+        Value::str("rm"),
+        Value::Table(Rc::new(RefCell::new(Table::new()))),
+    );
+    oslo.set(
+        Value::str("builtin"),
+        Value::Table(Rc::new(RefCell::new(builtin))),
+    );
     oslo.set(Value::str("json"), json::build());
     oslo.set(Value::str("re"), re::build());
     oslo.set(Value::str("proc"), proc::build_proc());

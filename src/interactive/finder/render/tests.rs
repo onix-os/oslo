@@ -201,15 +201,15 @@ fn the_scope_badge_uses_accent_on_zero() {
 #[test]
 fn the_list_grows_upward_from_the_bar() {
     let matches = [ranked("only", 1, 999_999_999, "/home/me", false)];
-    let seen = plain(&frame_of(&matches, "", 8));
+    let seen = plain(&frame_of(&matches, "", 9));
     let lines: Vec<&str> = seen.lines().collect();
     let match_row = lines
         .iter()
         .position(|l| l.contains("only"))
         .expect("the match is drawn");
-    // 8 rows: 3 for the surface, 2 margins, 3 for the list. The match is the last list row.
+    // 9 rows: 3 for the surface, 3 margins, 3 for the list. The match is the last list row.
     assert_eq!(
-        match_row, 2,
+        match_row, 3,
         "the match should be the last result row: {lines:?}"
     );
     assert!(
@@ -307,7 +307,7 @@ fn the_best_match_sits_nearest_the_bar() {
         ranked("second", 1, 4, "/home/me", false),
         ranked("third", 1, 3, "/home/me", false),
     ];
-    let seen = plain(&frame_of(&matches, "", 8));
+    let seen = plain(&frame_of(&matches, "", 9));
     let lines: Vec<&str> = seen.lines().collect();
     let row_of = |needle: &str| {
         lines
@@ -315,10 +315,10 @@ fn the_best_match_sits_nearest_the_bar() {
             .position(|l| l.contains(needle))
             .unwrap_or_else(|| panic!("{needle} is not drawn: {lines:?}"))
     };
-    // 8 rows: 3 surface, 2 margins, 3 for the list — so the best match is result row 2.
+    // 9 rows: 3 surface, 3 margins, 3 for the list — so the best match is result row 2.
     assert_eq!(
         row_of("best"),
-        2,
+        3,
         "the best match should sit against the surface: {lines:?}"
     );
     assert!(
@@ -334,7 +334,7 @@ fn the_rows_alternate() {
     let matches: Vec<_> = (0..4)
         .map(|i| ranked(&format!("row-{i}"), 1, 10 - i, "/home/me", false))
         .collect();
-    let rendered = frame_of(&matches, "", 9);
+    let rendered = frame_of(&matches, "", 10);
     let row = |needle: &str| {
         rendered
             .lines()
@@ -358,7 +358,7 @@ fn coloured_rows_have_no_unpainted_column_gaps() {
         ranked("selected", 1, 10, "/home/me", false),
         ranked("striped", 1, 9, "/home/me", false),
     ];
-    let rendered = frame_of(&matches, "", 9);
+    let rendered = frame_of(&matches, "", 10);
     for needle in ["selected", "striped"] {
         let row = rendered
             .lines()

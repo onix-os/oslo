@@ -59,70 +59,12 @@ pub fn call_here(f: &Value, args: Vec<Value>) -> LuaResult<Vec<Value>> {
     interp.call(f, args)
 }
 
-/// Fire an answering hook using whatever interpreter is on this thread.
-///
-/// The executor is a long way from the place the engine is owned — `run_simple` has no route back
-/// to `repl` — but the interpreter is already parked on this thread for exactly this kind of
-/// reach-back. `None` when there is no interpreter (a non-interactive shell, a script) or when no
-/// handler answered, and the caller then does what it did before.
-pub fn ask_hook_here(name: &str, args: Vec<Value>) -> Option<i32> {
-    let (interp, registry) = ACTIVE.with(|slot| slot.borrow().clone())?;
-    ask_hook_on(&interp, &registry, name, args)
-}
-
-/// Whether the `key` hook has anything attached, and is therefore worth building a payload for.
-///
-/// Re-exported here because the editor lives in the binary and cannot see `lua::api`. See
-/// `api::shell::KEY_WATCHED` for why the question is asked this way rather than by looking.
-pub fn key_hook_watched() -> bool {
-    crate::lua::api::key_hook_watched()
-}
-
-/// Fire the `key` hook, answering with the first handler that returned anything.
-///
-/// **First to answer wins, and the rest are skipped** — the same rule `ask_hook_here` uses, and
-/// the right one for an interception chain: the handler that decided what the key means has ended
-/// the question. A handler that only watched returns nothing and the next one is asked.
-///
-/// `None` when nothing is attached, when there is no interpreter on this thread, or when every
-/// handler declined. The caller then does what it would have done without the hook, which is what
-/// keeps a config that only *observes* keys from changing how any of them behave.
-pub fn key_hook_here(args: Vec<Value>) -> Option<Value> {
-    if !crate::lua::api::key_hook_watched() {
-        return None;
-    }
-    let (interp, registry) = ACTIVE.with(|slot| slot.borrow().clone())?;
-    for handler in crate::lua::api::hook_handlers(&registry, crate::lua::api::HOOK_KEY) {
-        match interp.call(&handler, args.clone()) {
-            Ok(values) => match values.first() {
-                None | Some(Value::Nil) => {}
-                Some(answer) => return Some(answer.clone()),
-            },
-            // Reported and skipped. A handler that raises on every keystroke would otherwise fill
-            // the screen faster than it could be read, but silence here means a hook that has
-            // stopped working with nothing to say why — and this one is on the typing path, so
-            // "it went quiet" is exactly the symptom that needs explaining.
-            Err(e) => eprintln!("oslo: key hook: {e}"),
-        }
-    }
-    None
-}
-
-fn ask_hook_on(interp: &Interp, registry: &Registry, name: &str, args: Vec<Value>) -> Option<i32> {
-    for handler in crate::lua::api::hook_handlers(registry, name) {
-        match interp.call(&handler, args.clone()) {
-            Ok(values) => {
-                if let Some(Value::Number(n)) = values.first() {
-                    return n.as_int().map(|i| i as i32);
-                }
-            }
-            // Reported and skipped, as with any other hook: one broken handler must not stop the
-            // others, and must not turn a missing command into a silent success.
-            Err(e) => eprintln!("oslo: {name} hook: {e}"),
-        }
-    }
-    None
-}
+/// The hook reach-backs, which every fire site outside this file uses.
+mod hooks;
+pub use hooks::{
+    answer_hook_here, answer_hook_with, ask_hook_here, fire_at_here, key_hook_here,
+    key_hook_watched,
+};
 
 /// Take the shell state for the duration of one `oslo.*` call.
 ///
@@ -334,7 +276,31 @@ impl LuaEngine {
     /// The first handler to return a number wins and the rest are skipped, which is what makes a
     /// chain of handlers behave: the one that resolved the situation ends it.
     pub fn ask_hook(&self, name: &str, args: Vec<Value>) -> Option<i32> {
-        ask_hook_on(&self.interp, &self.registry, name, args)
+        hooks::ask_hook_on(&self.interp, &self.registry, name, args)
+    }
+
+    /// Tell a hook something happened, by its index in [`crate::lua::api::hooks::HOOKS`].
+    ///
+    /// By index rather than by name because a name is a spelling and there are several of each:
+    /// `preexec` and `pre-cmd` are one list, and firing "the one the caller typed" would run half
+    /// of it. The index names the *moment*, which is the thing a fire site actually has.
+    ///
+    /// The watched bit is checked first, so a moment nobody attached to costs one relaxed load —
+    /// which is what lets this be called from a mode change or a prompt without thinking about it.
+    pub fn fire_at(&self, index: usize, args: Vec<Value>) {
+        if !crate::lua::api::hooks::watched(index) {
+            return;
+        }
+        self.fire_hook(crate::lua::api::hooks::HOOKS[index].name, args);
+    }
+
+    /// A table for a hook, from plain pairs — the shape most of them hand over.
+    pub fn hook_fields(fields: &[(&str, Value)]) -> Value {
+        let mut t = crate::lua::eval::value::Table::new();
+        for (name, value) in fields {
+            t.set(Value::str(*name), value.clone());
+        }
+        Value::table(t)
     }
 
     /// A string argument for a hook, so callers do not need the value type.
