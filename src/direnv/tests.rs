@@ -489,3 +489,6 @@ fn turning_the_feature_off_unloads_the_loaded_environment() {
         "and enabling it again must load the directory back"
     );
 }
+
+#[path = "tests/inherited.rs"]
+mod inherited;

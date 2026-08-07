@@ -3,12 +3,19 @@
 //! `direnv`, built in. See `docs/research/direnv.md` for what was read and what was deliberately not
 //! copied; the short version is that most of direnv's machinery exists because it is an external
 //! binary talking to a shell it did not write, and oslo *is* the shell. There is no bash subprocess,
-//! no `DIRENV_DIFF` serialised into your environment, no prompt hook, and no `eval` protocol. The
-//! state lives in memory and the load happens on the `cd` path.
+//! no prompt hook and no `eval` protocol: the state lives in memory and the load happens on the
+//! `cd` path.
 //!
-//! What is copied exactly is the part that is not incidental: **the allow gate**. A file in a
-//! directory getting to run code when you walk in is arbitrary code execution by anyone who can get
-//! you to clone a repository, and [`allow`] is the answer, hash for hash.
+//! Two things *are* copied, because neither is incidental to being an external binary:
+//!
+//! * **the allow gate.** A file in a directory getting to run code when you walk in is arbitrary
+//!   code execution by anyone who can get you to clone a repository, and [`allow`] is the answer,
+//!   hash for hash;
+//! * **the undo record in the environment**, direnv's `DIRENV_DIFF`. This one was skipped at first,
+//!   on the reasoning above, and skipping it was wrong — see [`carry`]. The variables have to go
+//!   into the real `environ` for a child to see them at all, so every child inherits them; without
+//!   a record travelling alongside, a child holds one project's `$PATH` in every directory it ever
+//!   visits and has nothing to put back.
 //!
 //! # The lifecycle
 //!
@@ -19,8 +26,12 @@
 //! 3. otherwise **unload first**, always, so moving between two projects cannot leave the first
 //!    one's variables behind;
 //! 4. then load the new one, if it is allowed.
+//!
+//! A shell that inherited an environment starts at step 3 with the record its parent left, which is
+//! how it comes to be holding something it never loaded and can still give it back.
 
 pub mod allow;
+pub mod carry;
 pub mod diff;
 pub mod find;
 mod handle;
@@ -94,9 +105,42 @@ pub enum Event {
 
 impl Direnv {
     pub fn new(xdg_data: Option<&str>, home: Option<&str>) -> Direnv {
+        Direnv::adopting(xdg_data, home, std::env::var(carry::NAME).ok().as_deref())
+    }
+
+    /// [`Direnv::new`], told what it inherited rather than reading it from the environment.
+    ///
+    /// **An environment inherited from a parent counts as loaded.** Without this a shell spawned
+    /// from inside a project — a new pane, a nested `oslo`, an editor's terminal — starts believing
+    /// nothing is loaded while holding every variable that project set. It then carries them into
+    /// every directory it visits and no `cd` can shift them, because there is nothing recorded to
+    /// put back.
+    ///
+    /// Adopting the record makes the first arrival do the right thing by the ordinary path: still
+    /// in that directory and the owner matches, so nothing happens; anywhere else and it unloads
+    /// exactly as walking out would have. See [`carry`].
+    ///
+    /// Split from `new` so a test can hand it a record instead of writing one into the process's
+    /// own environment — which is shared by every test running beside it.
+    pub fn adopting(xdg_data: Option<&str>, home: Option<&str>, carried: Option<&str>) -> Direnv {
         Direnv {
             allow: Allow::new(xdg_data, home),
-            loaded: None,
+            loaded: carried.and_then(carry::decode).map(|carried| Loaded {
+                // The *file*, stamped as it is now. Stamping the directory instead made every
+                // adopted environment look edited, so a child standing in the project it inherited
+                // unloaded and re-ran the file rather than simply keeping it.
+                watch: {
+                    let file = carried.owner.join(find::NAME);
+                    let when = stamp(&file);
+                    (file, when)
+                },
+                owner: carried.owner,
+                undo: carried.undo,
+                // A child inherits variables and never aliases: `execve` carries the environment
+                // and nothing else. Undoing aliases it was never given would restore the
+                // *parent's* aliases into a shell that never had them.
+                aliases: Diff::default(),
+            }),
             stale: false,
             told: Vec::new(),
         }
@@ -236,6 +280,9 @@ impl Direnv {
                 None => guard.remove_alias(name),
             }
         }
+        // Last, and unconditionally: the record describes an environment that no longer applies,
+        // and leaving it behind would have the next child undo variables that are already back.
+        guard.unset_var(carry::NAME);
         drop(guard);
         Some(Event::Unloaded {
             owner: loaded.owner,
@@ -301,6 +348,12 @@ impl Direnv {
         let Some(owner) = find::owner(rc) else {
             return Vec::new();
         };
+        // **The undo travels with the variables it undoes.** Written after the snapshots, so it is
+        // not itself part of the diff; exported, because the shells that need it are the ones this
+        // environment reaches by `execve`. See [`carry`].
+        if let Some(mut guard) = lock(env) {
+            guard.set_var(carry::NAME, &carry::encode(&owner, &undo), true);
+        }
         self.loaded = Some(Loaded {
             owner: owner.clone(),
             watch,

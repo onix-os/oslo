@@ -144,6 +144,21 @@ impl<V: Clone + PartialEq> Diff<V> {
             .map(|(name, (_, after))| (name.as_str(), after.as_ref()))
             .collect()
     }
+
+    /// A diff built from what it should *apply*, which is the inverse of [`Diff::to_apply`].
+    ///
+    /// For a record that arrived from somewhere other than a comparison — one carried in the
+    /// environment from a parent shell, which is a diff that has already been reversed and has no
+    /// "before" side left to speak of. Only [`Diff::to_apply`] is meaningful on the result; asking
+    /// it what *changed* would describe the undo rather than the load.
+    pub fn to_restore(pairs: Vec<(String, Option<V>)>) -> Diff<V> {
+        Diff {
+            changes: pairs
+                .into_iter()
+                .map(|(name, after)| (name, (None, after)))
+                .collect(),
+        }
+    }
 }
 
 #[cfg(test)]
