@@ -55,7 +55,7 @@ pub struct Settings {
 /// editing anything. `oslo.history` fills in what the environment did not say — which until now it
 /// did not do at all, having been parsed, validated, tested and then read by nothing.
 pub fn settings(env: &Environment) -> Settings {
-    let configured = oslo::interactive::settings::current().history;
+    let configured = oslo::ui::settings::current().history;
 
     let file = match env.get_var("HISTFILE") {
         Some("") => None,
@@ -123,7 +123,7 @@ pub fn is_secret(raw_line: &str) -> bool {
     // `oslo.history.ignore_space = false` turns the leading-space convention off, for somebody who
     // pastes indented lines and would rather keep them. It used to be hardcoded on, so the setting
     // existed, was read, was stored — and did nothing.
-    oslo::interactive::settings::current().history.ignore_space
+    oslo::ui::settings::current().history.ignore_space
         && raw_line.starts_with(|c: char| c.is_whitespace())
 }
 
@@ -263,7 +263,7 @@ mod tests {
     /// right and does nothing.
     #[test]
     fn the_config_fills_in_what_the_environment_leaves_unsaid() {
-        use oslo::interactive::settings::{History, Settings as Interactive, install};
+        use oslo::ui::settings::{History, Settings as Interactive, install};
 
         install(Interactive {
             history: History {

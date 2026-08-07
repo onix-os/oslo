@@ -110,7 +110,7 @@ pub fn load_config(lua: &LuaEngine, path: &Path) {
     if let Err(e) = lua.load_file(text) {
         eprintln!(
             "oslo: {}: {}",
-            oslo::interactive::marks::path(&path.display().to_string()),
+            oslo::ui::marks::path(&path.display().to_string()),
             e
         );
     }

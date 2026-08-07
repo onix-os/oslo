@@ -1,15 +1,15 @@
 //! The directory environment's `on-report` payload.
 //!
-//! The hook itself is `oslo::interactive::report`, in the library, because four of the five
+//! The hook itself is `oslo::ui::report`, in the library, because four of the five
 //! reporters live there. This is only the part that knows what a `direnv::Event` contains — it
 //! stays in the binary because the *rendering* it stands in front of does too.
 
 use oslo::direnv::Event;
 use oslo::direnv::diff::Change;
-use oslo::interactive::report::{self, rows, text};
 use oslo::lua::eval::value::Value;
+use oslo::ui::report::{self, rows, text};
 
-/// Whether a config drew this event itself. See `oslo::interactive::report::handled`.
+/// Whether a config drew this event itself. See `oslo::ui::report::handled`.
 pub fn handled(event: &Event) -> bool {
     if !report::watched() {
         return false;

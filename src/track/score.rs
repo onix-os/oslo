@@ -5,7 +5,7 @@
 //!
 //! # The curve, and why not zoxide's
 //!
-//! `visits / (1 + ln(1 + age_hours))`, the expression already in `interactive/spec/frecency.rs`,
+//! `visits / (1 + ln(1 + age_hours))`, the expression already in `ui/spec/frecency.rs`,
 //! so the completion ranker and the directory jump agree about what "best" means. That agreement
 //! matters more than which curve it is.
 //!

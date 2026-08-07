@@ -8,8 +8,8 @@
 
 use oslo::direnv::Event;
 use oslo::direnv::diff::Change;
-use oslo::interactive::block::Block;
-use oslo::interactive::theme::{self, Color, Style};
+use oslo::ui::block::Block;
+use oslo::ui::theme::{self, Color, Style};
 use std::path::Path;
 
 /// The label every line starts with, so the block reads as one thing.

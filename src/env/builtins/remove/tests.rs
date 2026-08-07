@@ -141,7 +141,7 @@ fn a_trashed_file_is_moved_rather_than_destroyed() {
     let bin = tempfile::tempdir().unwrap();
     let mode = Mode {
         loose: true,
-        trash: Some(trash::Trash::new(&crate::interactive::settings::Rm {
+        trash: Some(trash::Trash::new(&crate::ui::settings::Rm {
             to_tmp: true,
             max_to_tmp: 100,
             trash: bin.path().display().to_string(),
@@ -175,7 +175,7 @@ fn a_file_over_the_cap_is_destroyed() {
     std::fs::write(&big, vec![0u8; 4096]).unwrap();
 
     // A cap of zero megabytes: everything with a byte in it is over it.
-    let trash = trash::Trash::new(&crate::interactive::settings::Rm {
+    let trash = trash::Trash::new(&crate::ui::settings::Rm {
         to_tmp: true,
         max_to_tmp: 0,
         trash: bin.path().display().to_string(),
@@ -203,7 +203,7 @@ fn a_name_already_in_the_trash_does_not_overwrite_it() {
     std::fs::write(one.path().join("notes.txt"), b"first").unwrap();
     std::fs::write(two.path().join("notes.txt"), b"second").unwrap();
 
-    let trash = trash::Trash::new(&crate::interactive::settings::Rm {
+    let trash = trash::Trash::new(&crate::ui::settings::Rm {
         to_tmp: true,
         max_to_tmp: 100,
         trash: bin.path().display().to_string(),
@@ -233,7 +233,7 @@ fn a_name_already_in_the_trash_does_not_overwrite_it() {
 fn a_trashed_directory_keeps_what_was_in_it() {
     let dir = tree();
     let bin = tempfile::tempdir().unwrap();
-    let trash = trash::Trash::new(&crate::interactive::settings::Rm {
+    let trash = trash::Trash::new(&crate::ui::settings::Rm {
         to_tmp: true,
         max_to_tmp: 100,
         trash: bin.path().display().to_string(),

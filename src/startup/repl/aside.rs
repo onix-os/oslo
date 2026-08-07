@@ -29,7 +29,7 @@ pub(crate) fn title_for_command(text: &str) -> String {
     } else {
         format!(
             "{first} — {}",
-            oslo::interactive::prompt::tilde(&current_directory())
+            oslo::ui::prompt::tilde(&current_directory())
         )
     }
 }

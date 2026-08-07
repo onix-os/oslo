@@ -2,7 +2,7 @@
 //!
 //! A separate file rather than an inline module because `mod.rs` was over the 600-line limit and
 //! this is the seam that costs nothing: what the module *does* and what proves it does it are
-//! different subjects, and `src/interactive/tests.rs` is already laid out this way.
+//! different subjects, and `src/ui/tests.rs` is already laid out this way.
 
 use super::*;
 

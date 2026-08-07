@@ -11,7 +11,7 @@
 //! Type, edit, press Enter to see the line echoed, Ctrl-C to abandon one, Ctrl-D on an empty line
 //! to leave.
 
-use oslo::interactive::edit::session::{Assist, Outcome, read_line};
+use oslo::ui::edit::session::{Assist, Outcome, read_line};
 
 /// Just enough to show the wiring works: a fixed history and a ghost hint drawn from it.
 #[derive(Default)]

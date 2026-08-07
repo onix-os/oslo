@@ -92,7 +92,7 @@ fn mode_for(env: &Environment, options: &Options) -> Mode {
             trash: None,
         };
     }
-    let settings = crate::interactive::settings::current().builtin.rm;
+    let settings = crate::ui::settings::current().builtin.rm;
     Mode {
         loose: true,
         trash: settings.to_tmp.then(|| trash::Trash::new(&settings)),

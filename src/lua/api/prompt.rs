@@ -14,10 +14,10 @@
 //! A string works too, for a prompt that never changes.
 
 use super::util::{ok, put, text};
-use crate::interactive::theme::{self, Color, Style};
 use crate::lua::engine::Registry;
 use crate::lua::eval::LuaError;
 use crate::lua::eval::value::{Table, Value};
+use crate::ui::theme::{self, Color, Style};
 use std::rc::Rc;
 
 /// Registry keys the prompt lives under.
@@ -190,7 +190,7 @@ fn git() -> Value {
 
     // oslo.git.branch() -> "main", a short hash when detached, or nil outside a repository.
     put(&mut git, "branch", |_, _| {
-        ok(match crate::interactive::prompt::git_branch() {
+        ok(match crate::ui::prompt::git_branch() {
             Some(branch) => Value::str(branch),
             None => Value::Nil,
         })
@@ -198,7 +198,7 @@ fn git() -> Value {
 
     // oslo.git.root() -> the working tree's top directory, or nil.
     put(&mut git, "root", |_, _| {
-        ok(match crate::interactive::prompt::git_root() {
+        ok(match crate::ui::prompt::git_root() {
             Some(root) => Value::str(root.display().to_string()),
             None => Value::Nil,
         })
@@ -222,12 +222,12 @@ pub fn shorten(table: &mut Table) {
             .and_then(|n| n.as_int())
             .unwrap_or(1)
             .max(0) as usize;
-        ok(Value::str(crate::interactive::prompt::shorten(&path, keep)))
+        ok(Value::str(crate::ui::prompt::shorten(&path, keep)))
     });
 
     // oslo.path.home(path) -> the same path with $HOME written as `~`.
     put(table, "home", |_, args| {
         let path = text(&args, 1, "oslo.path.home")?;
-        ok(Value::str(crate::interactive::prompt::tilde(&path)))
+        ok(Value::str(crate::ui::prompt::tilde(&path)))
     });
 }

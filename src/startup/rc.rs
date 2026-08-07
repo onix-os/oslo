@@ -19,8 +19,8 @@ use oslo::Environment;
 use oslo::env::builtins::builtin_source;
 use oslo::error::ShellError;
 use oslo::expand::expand_word_to_string;
-use oslo::interactive::prompt::render_default_left_prompt;
 use oslo::lexer::parse_single_word;
+use oslo::ui::prompt::render_default_left_prompt;
 use std::path::PathBuf;
 
 /// A startup file asked the shell to end: `exit 3` in `$ENV` is still an `exit`.
@@ -129,7 +129,7 @@ fn source_if_present(env: &mut Environment, path: &std::path::Path) -> ExitReque
         Err(e) => {
             eprintln!(
                 "oslo: {}: {}",
-                oslo::interactive::marks::path(&path.display().to_string()),
+                oslo::ui::marks::path(&path.display().to_string()),
                 e
             );
             None
@@ -255,9 +255,7 @@ fn decode_escapes(env: &Environment, raw: &str) -> String {
                 out.push_str(&clock(if format.is_empty() { "%X" } else { &format }));
             }
             // Which line of history this will be. bash counts from one.
-            Some('!') | Some('#') => {
-                out.push_str(&(oslo::interactive::recall::len() + 1).to_string())
-            }
+            Some('!') | Some('#') => out.push_str(&(oslo::ui::recall::len() + 1).to_string()),
             // Jobs the shell is tracking.
             Some('j') => out.push_str(&crate::startup::history::job_count().to_string()),
             // The terminal's basename, as bash reports it.

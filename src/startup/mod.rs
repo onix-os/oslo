@@ -3,7 +3,7 @@
 //! These live in the *binary* rather than the library on purpose. Every one of them reads the
 //! real user's `$HOME`, sources arbitrary files, or holds process-global state; a library that
 //! did any of that behind a caller's back would make the shell impossible to test in-process,
-//! which is exactly the trap `interactive/history_expand.rs` is kept out of too.
+//! which is exactly the trap `ui/history_expand.rs` is kept out of too.
 //!
 //! Split by the question each file answers:
 //!

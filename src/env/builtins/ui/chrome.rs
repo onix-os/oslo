@@ -6,9 +6,9 @@
 //! The Lua side reads the same names from a table; both build the same [`Chrome`].
 
 use super::take;
-use crate::interactive::ask::Border;
-use crate::interactive::ask::chrome::{Chrome, Fit, Place};
-use crate::interactive::theme;
+use crate::ui::ask::Border;
+use crate::ui::ask::chrome::{Chrome, Fit, Place};
+use crate::ui::theme;
 
 /// What happened when a widget's option loop offered a flag to the shared chrome parser.
 pub(super) enum Chromed {

@@ -226,7 +226,7 @@ fn enabling_a_feature_does_not_turn_on_what_the_config_left_off() {
     // The configured value is the other half, and it is `false` by default — `oslo.vi.enabled`
     // ships off. The feature being on therefore cannot mean vi is on.
     assert!(
-        !oslo::interactive::vi::enabled(),
+        !oslo::ui::vi::enabled(),
         "the feature bit alone must not enable vi; the config has not asked for it"
     );
 }

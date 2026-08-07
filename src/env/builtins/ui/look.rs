@@ -6,9 +6,9 @@
 //! side reads the same names from a table and both build the same [`Look`].
 
 use super::take;
-use crate::interactive::ask::look::{Look, Preset, Where, Width};
-use crate::interactive::scanner::Scanner;
-use crate::interactive::theme::{Color, Style};
+use crate::ui::ask::look::{Look, Preset, Where, Width};
+use crate::ui::scanner::Scanner;
+use crate::ui::theme::{Color, Style};
 
 /// What happened when a widget's option loop offered a flag to the shared look parser.
 pub(super) enum Looked {

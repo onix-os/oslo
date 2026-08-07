@@ -80,7 +80,7 @@ pub fn load(env: &mut Environment, name: &str) -> Option<bool> {
     }
     eprintln!(
         "oslo: {}: does not define {name}",
-        crate::interactive::marks::path(&path.display().to_string())
+        crate::ui::marks::path(&path.display().to_string())
     );
     Some(false)
 }

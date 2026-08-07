@@ -89,7 +89,7 @@ impl Timer {
         let sys = end.sys.saturating_sub(self.cpu.sys);
         // The config gets first refusal on the three lines. Fired from `time`'s own report, which
         // is inside the executor — a handler may draw, but not change the shell. See
-        // `interactive::report`.
+        // `ui::report`.
         if !drawn_by_config(real, user, sys) {
             write_report(real, user, sys);
         }
@@ -137,7 +137,7 @@ fn drawn_by_config(
     user: std::time::Duration,
     sys: std::time::Duration,
 ) -> bool {
-    use crate::interactive::report::{self, int};
+    use crate::ui::report::{self, int};
     if !report::watched() {
         return false;
     }

@@ -7,7 +7,7 @@
 //! b:done()
 //! ```
 //!
-//! **The same drawing the shell uses for its own reports.** [`crate::interactive::block`] is the
+//! **The same drawing the shell uses for its own reports.** [`crate::ui::block`] is the
 //! implementation, and `startup::environments::report` is a caller exactly as this is — a Lua API
 //! that reimplemented the built-in renderer would drift from it, and a config that drew a block
 //! looking almost-but-not-quite like the shell's is worse than one that could not draw one at all.
@@ -17,10 +17,10 @@
 //! closure here ignores its first and reads from the capture.
 
 use super::super::util::{ok, put, text};
-use crate::interactive::block::{Block, Overflow};
-use crate::interactive::theme::Style;
 use crate::lua::eval::LuaError;
 use crate::lua::eval::value::{Table, Value};
+use crate::ui::block::{Block, Overflow};
+use crate::ui::theme::Style;
 use std::cell::RefCell;
 use std::io::IsTerminal;
 use std::rc::Rc;

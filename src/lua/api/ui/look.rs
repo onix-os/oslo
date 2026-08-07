@@ -13,11 +13,11 @@
 //! }
 //! ```
 
-use crate::interactive::ask::look::{Look, Preset, Where, Width};
-use crate::interactive::scanner::Scanner;
-use crate::interactive::theme::{Color, Style};
 use crate::lua::eval::LuaError;
 use crate::lua::eval::value::{Table, Value};
+use crate::ui::ask::look::{Look, Preset, Where, Width};
+use crate::ui::scanner::Scanner;
+use crate::ui::theme::{Color, Style};
 
 use super::prompt::{flag, maybe, size};
 

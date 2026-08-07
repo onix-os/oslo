@@ -168,7 +168,7 @@ impl Tracker {
         {
             return root.clone();
         }
-        let root = oslo::interactive::prompt::git_root_of(Path::new(dir))
+        let root = oslo::ui::prompt::git_root_of(Path::new(dir))
             .map(|root| root.to_string_lossy().into_owned());
         self.worktree = Some((dir.to_string(), root.clone()));
         root

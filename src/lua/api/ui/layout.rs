@@ -7,8 +7,8 @@
 
 use super::super::util::{ok, put};
 use super::text::align_to;
-use crate::interactive::dropdown::width;
 use crate::lua::eval::value::{Number, Table, Value};
+use crate::ui::dropdown::width;
 
 /// The strings in a Lua sequence, in order, skipping anything that is not one.
 fn strings(value: &Value) -> Vec<String> {

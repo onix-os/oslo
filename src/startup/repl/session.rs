@@ -32,8 +32,8 @@ use std::sync::{Arc, Mutex};
 /// **Exported**, unlike bash's, because the whole point is that a *child* reads it — a shell
 /// variable a child cannot see would fix nothing here.
 pub(super) fn publish_terminal_size(env: &Arc<Mutex<Environment>>) {
-    let cols = oslo::interactive::dropdown::terminal_cols();
-    let rows = oslo::interactive::dropdown::width::terminal_rows();
+    let cols = oslo::ui::dropdown::terminal_cols();
+    let rows = oslo::ui::dropdown::width::terminal_rows();
     let mut guard = env.lock().unwrap();
     guard.set_var("COLUMNS", &cols.to_string(), true);
     guard.set_var("LINES", &rows.to_string(), true);

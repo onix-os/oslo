@@ -115,7 +115,7 @@ pub(super) fn announce_changes(jobs: &mut JobTable) {
 /// stopped and which `fg` may yet resume. A handler that only wants to announce completions checks
 /// it rather than guessing from the status, which is zero for both.
 fn drawn_by_config(id: usize, pid: i32, command: &str, status: i32, ended: bool) -> bool {
-    use crate::interactive::report::{self, int, text};
+    use crate::ui::report::{self, int, text};
     if !report::watched() {
         return false;
     }

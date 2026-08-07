@@ -54,7 +54,7 @@ fn report() -> i32 {
         return 1;
     }
     // The config gets first refusal. **Fired from inside a builtin**, so a handler may draw
-    // anything it likes but must not reach for shell state — see `interactive::report`.
+    // anything it likes but must not reach for shell state — see `ui::report`.
     if drawn_by_config(&segments) {
         return 0;
     }
@@ -112,7 +112,7 @@ fn report() -> i32 {
 /// The same `segments` table `pre-record` hands over, so a config that already walks one for a
 /// filter walks the same shape here.
 fn drawn_by_config(segments: &[segments::Segment]) -> bool {
-    use crate::interactive::report::{self, int, rows, text};
+    use crate::ui::report::{self, int, rows, text};
     if !report::watched() {
         return false;
     }

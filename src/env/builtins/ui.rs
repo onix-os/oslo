@@ -9,7 +9,7 @@
 //!
 //! A builtin rather than a program on `$PATH`, because it needs the terminal the shell already
 //! owns and because a shell that ships its own prompts should not need one installed beside it.
-//! [`crate::interactive::ask`] is where the widgets live; this is the command line onto them.
+//! [`crate::ui::ask`] is where the widgets live; this is the command line onto them.
 //!
 //! # The three rules a script depends on
 //!
@@ -28,11 +28,11 @@ use crate::error::Result;
 mod chrome;
 mod lists;
 mod look;
-use crate::interactive::ask::{
+use crate::ui::ask::{
     Align, Answer, As, Border, Confirm, Entry, Input, Level, Pager, Spin, Styling, Write, confirm,
     format, horizontal, input, line, pager, spin, style, vertical, write,
 };
-use crate::interactive::theme;
+use crate::ui::theme;
 use chrome::{Chromed, chrome_flag};
 use lists::{from_stdin_raw, run_choose, run_file, run_table};
 use std::io::BufRead;
@@ -120,8 +120,8 @@ pub(super) enum Shared {
 }
 
 pub(super) fn shared_flag(
-    chrome: &mut crate::interactive::ask::chrome::Chrome,
-    look: &mut crate::interactive::ask::look::Look,
+    chrome: &mut crate::ui::ask::chrome::Chrome,
+    look: &mut crate::ui::ask::look::Look,
     args: &[String],
     at: &mut usize,
 ) -> Shared {

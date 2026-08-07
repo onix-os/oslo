@@ -7,13 +7,13 @@
 //! abbr -e gco                      remove one
 //! ```
 //!
-//! See [`crate::interactive::abbr`] for why this exists beside `alias` rather than instead of it:
+//! See [`crate::ui::abbr`] for why this exists beside `alias` rather than instead of it:
 //! an alias changes what a command means, an abbreviation only saves typing.
 
 use super::variables::quoting::single_quoted;
 use crate::env::Environment;
 use crate::error::Result;
-use crate::interactive::abbr::{self, Placement};
+use crate::ui::abbr::{self, Placement};
 
 pub fn builtin_abbr(_env: &mut Environment, args: &[String]) -> Result<i32> {
     let operands = &args[1..];

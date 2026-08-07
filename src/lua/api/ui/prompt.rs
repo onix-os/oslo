@@ -1,7 +1,7 @@
 //! `oslo.ui.input`, `.confirm`, `.choose`, `.filter`, `.style` — the raw-mode widgets, from Lua.
 //!
 //! The same code the `ui` builtin runs, so a prompt looks and behaves identically whether the
-//! script asking is shell or Lua. [`crate::interactive::ask`] is where they live; this is the
+//! script asking is shell or Lua. [`crate::ui::ask`] is where they live; this is the
 //! binding.
 //!
 //! # These are not [`super::ask`]
@@ -21,14 +21,14 @@
 //! table is also how the caller writes only the two they care about.
 
 use super::super::util::{ok, put};
-use crate::interactive::ask::chrome::{Chrome, Fit, Place};
-use crate::interactive::ask::{
+use crate::lua::eval::value::{Table, Value};
+use crate::ui::ask::chrome::{Chrome, Fit, Place};
+use crate::ui::ask::{
     Align, Answer, As, Border, Browse, Choice, Confirm, Entry, Input, Level, Pager, Spin, Styling,
     Table as Rows, Want, Write, choose, confirm, file, filter, format, horizontal, input, line,
     pager, parse_table, spin, style, table, vertical, write,
 };
-use crate::interactive::theme;
-use crate::lua::eval::value::{Table, Value};
+use crate::ui::theme;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -289,7 +289,7 @@ pub fn install(ui: &mut Table) {
                 want,
                 hidden: flag(&t, "hidden"),
                 height: count(&t, "height", 12),
-                fuzzy: crate::interactive::settings::current().completion.fuzzy,
+                fuzzy: crate::ui::settings::current().completion.fuzzy,
                 chrome: chrome_of(&t)?,
                 look: super::look::look_of(&t)?,
             }) {
@@ -315,7 +315,7 @@ pub fn install(ui: &mut Table) {
                 raw,
                 height: count(&t, "height", 10),
                 filter: !flag(&t, "no_filter"),
-                fuzzy: crate::interactive::settings::current().completion.fuzzy,
+                fuzzy: crate::ui::settings::current().completion.fuzzy,
                 chrome: chrome_of(&t)?,
                 look: super::look::look_of(&t)?,
             }) {
@@ -557,7 +557,7 @@ fn list_widget(args: &[Value], filtering: bool) -> Result<Value, crate::lua::eva
         multi,
         filter: filtering,
         height: count(&t, "height", 10),
-        fuzzy: crate::interactive::settings::current().completion.fuzzy,
+        fuzzy: crate::ui::settings::current().completion.fuzzy,
         chrome: chrome_of(&t)?,
         look: super::look::look_of(&t)?,
     };

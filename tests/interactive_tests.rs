@@ -10,8 +10,8 @@
 
 use oslo::env::Environment;
 
-use oslo::interactive::{DEFAULT_PS2, InputStatus, OsloHelper, extract_current_word};
 use oslo::parser::parse_bash_script;
+use oslo::ui::{DEFAULT_PS2, InputStatus, OsloHelper, extract_current_word};
 use std::fs;
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
@@ -246,8 +246,8 @@ fn a_line_already_in_the_history_is_hinted_from_it() {
     // version of this test got that for free from the editor's own history hinter, which had no
     // notion of language — and offering a Lua line at a shell prompt is exactly what the filter
     // exists to stop.
-    oslo::interactive::prompt::note_row("sh", 0, 0, true);
-    oslo::interactive::recall::remember("echo hello world", "sh");
+    oslo::ui::prompt::note_row("sh", 0, 0, true);
+    oslo::ui::recall::remember("echo hello world", "sh");
 
     assert_eq!(h.suggest("echo hel", 8), Some("lo world".to_string()));
 }
@@ -257,8 +257,8 @@ fn history_wins_over_the_command_index() {
     let dir = tempfile::tempdir().unwrap();
     make_exe(dir.path(), "zzalpha");
     let h = helper(env_with_path(dir.path()));
-    oslo::interactive::prompt::note_row("sh", 0, 0, true);
-    oslo::interactive::recall::remember("zzbravo --flag", "sh");
+    oslo::ui::prompt::note_row("sh", 0, 0, true);
+    oslo::ui::recall::remember("zzbravo --flag", "sh");
 
     // A line the user has actually run beats any name we could rank: `zzalpha` is on `$PATH` and
     // is still not the answer.
@@ -284,8 +284,8 @@ fn nothing_is_hinted_for_an_empty_line_or_from_the_middle_of_one() {
     // version of this test got that for free from the editor's own history hinter, which had no
     // notion of language — and offering a Lua line at a shell prompt is exactly what the filter
     // exists to stop.
-    oslo::interactive::prompt::note_row("sh", 0, 0, true);
-    oslo::interactive::recall::remember("echo hello world", "sh");
+    oslo::ui::prompt::note_row("sh", 0, 0, true);
+    oslo::ui::recall::remember("echo hello world", "sh");
 
     assert_eq!(h.suggest("", 0), None);
     // The ghost text is drawn past the cursor; with the cursor mid-line it would overwrite what
@@ -420,13 +420,13 @@ fn a_ghost_hint_is_drawn_in_the_autosuggestion_colour() {
     let h = helper(Environment::new());
 
     // Colour 240 where the terminal can say it, which is the default.
-    oslo::interactive::theme::set_depth(oslo::interactive::theme::Depth::Ansi256);
+    oslo::ui::theme::set_depth(oslo::ui::theme::Depth::Ansi256);
     assert_eq!(h.paint_hint("lo world"), "\x1b[38;5;240mlo world\x1b[0m");
 
     // On sixteen colours it degrades to whatever grey is nearest. Pinned rather than left
     // implicit, because naming an exact grey means accepting whatever the sixteen-slot palette
     // rounds it to.
-    oslo::interactive::theme::set_depth(oslo::interactive::theme::Depth::Ansi16);
+    oslo::ui::theme::set_depth(oslo::ui::theme::Depth::Ansi16);
     assert_eq!(h.paint_hint("lo world"), "\x1b[37mlo world\x1b[0m");
 }
 
@@ -435,7 +435,7 @@ fn a_ghost_hint_is_drawn_in_the_autosuggestion_colour() {
 /// faked; here the point is that each span comes out with the right lexical role.
 #[test]
 fn the_lexer_gives_every_span_its_role() {
-    use oslo::interactive::highlight::{Role, lex};
+    use oslo::ui::highlight::{Role, lex};
 
     let spans: Vec<(String, Role)> = lex("echo \"a b\" $HOME | wc -l")
         .into_iter()
@@ -460,7 +460,7 @@ fn the_lexer_gives_every_span_its_role() {
 
 #[test]
 fn an_unterminated_quote_colours_the_rest_of_the_line() {
-    use oslo::interactive::highlight::{Role, lex};
+    use oslo::ui::highlight::{Role, lex};
     let spans = lex("echo \"a b");
     let last = spans.last().unwrap();
     assert_eq!(

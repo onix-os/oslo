@@ -1,20 +1,18 @@
 //! The widgets that show a list: `choose`, `filter`, `file` and `table`.
 //!
-//! Together here because they are the three that take a [`Look`](crate::interactive::ask::Look) as
+//! Together here because they are the three that take a [`Look`](crate::ui::ask::Look) as
 //! well as a `Chrome` — every flag in [`super::look`] applies to all of them, and the option loops
 //! are the same shape three times over. Keeping them side by side is what makes it obvious when
 //! one of them stops accepting something the others do.
 
 use super::{Shared, from_stdin, report, shared_flag, take};
-use crate::interactive::ask::{
-    Browse, Choice, Table, Want, choose, file, filter, parse_table, table,
-};
-use crate::interactive::matching::Fuzzy;
+use crate::ui::ask::{Browse, Choice, Table, Want, choose, file, filter, parse_table, table};
+use crate::ui::matching::Fuzzy;
 
 pub(super) fn run_choose(args: &[String], filtering: bool) -> i32 {
     let mut spec = Choice {
         filter: filtering,
-        fuzzy: crate::interactive::settings::current().completion.fuzzy,
+        fuzzy: crate::ui::settings::current().completion.fuzzy,
         ..Choice::default()
     };
     let mut items = Vec::new();
@@ -115,7 +113,7 @@ pub(super) fn run_table(args: &[String]) -> i32 {
     }
     spec.rows = rows;
     spec.raw = raw;
-    spec.fuzzy = crate::interactive::settings::current().completion.fuzzy;
+    spec.fuzzy = crate::ui::settings::current().completion.fuzzy;
     report(table(&spec).map(|row| vec![row]))
 }
 

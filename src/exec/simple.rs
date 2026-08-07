@@ -395,7 +395,7 @@ fn nothing_to_run(
     // "command not found" there.
     let hint = if env.interactive() {
         let path = env.get_var("PATH").unwrap_or_default().to_string();
-        crate::interactive::command_index::nearest(&path, cmd_name)
+        crate::ui::command_index::nearest(&path, cmd_name)
     } else {
         None
     };

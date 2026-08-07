@@ -1,7 +1,7 @@
 //! `ui`'s command line: what each widget accepts, and what a script sees when there is no
 //! terminal to ask on.
 //!
-//! The widgets themselves are tested in `interactive::ask`. What is testable here is the contract
+//! The widgets themselves are tested in `ui::ask`. What is testable here is the contract
 //! a script is written against — the statuses — because under `cargo test` there is no terminal,
 //! which is exactly the headless path scripts hit in CI.
 //!
@@ -13,7 +13,7 @@
 //! next. It cost two full verify runs before it was pinned down.
 //!
 //! The status mapping those calls were reaching for is asserted directly on [`report`] instead,
-//! and the widget behaviour behind it in `interactive::ask::choose`.
+//! and the widget behaviour behind it in `ui::ask::choose`.
 
 use super::*;
 
@@ -54,7 +54,7 @@ fn confirm_answers_through_its_status() {
 ///
 /// Asserted on `report` rather than by running `ui choose` with no operands: that would read
 /// stdin, and see the module comment for why doing so here hangs the suite. That an empty list
-/// cancels at all is `interactive::ask::choose`'s `an_empty_list_cancels`.
+/// cancels at all is `ui::ask::choose`'s `an_empty_list_cancels`.
 #[test]
 fn a_cancelled_answer_is_status_one() {
     assert_eq!(report(Answer::Cancelled), 1);
