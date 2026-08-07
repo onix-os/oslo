@@ -507,10 +507,5 @@ fn shell(
         Ok(Vec::new())
     });
 
-    // There is deliberately no `oslo.set_right_prompt` (PLAN R9.7). It was registered, and
-    // `render_right_prompt` had no caller anywhere, so a script that set one saw nothing.
-    // Drawing it means writing the string at `width - len` and restoring the cursor before
-    // handing the line over — and rustyline repaints from the prompt to end-of-line on every
-    // keystroke, erasing it again. Advertising an API that cannot work is worse than not having
-    // one; if it comes back it comes back with a line editor that supports it.
+    // Right prompts are configured through `oslo.prompt.right`.
 }

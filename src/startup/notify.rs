@@ -63,7 +63,12 @@ pub(super) fn slow_command_notice(
             .spawn();
         return String::new();
     }
-    oslo::ui::marks::notify(title, &body)
+    if !oslo::ui::marks::enabled() {
+        return String::new();
+    }
+    let capabilities = oslo::ui::term::capability::snapshot();
+    oslo::ui::term::metadata::notification(capabilities, "oslo-slow-command", title, &body)
+        .unwrap_or_default()
 }
 
 /// Whether an `on-report` handler dealt with the slow-command notice instead.

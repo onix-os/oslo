@@ -196,6 +196,9 @@ mod tests {
     /// go on disagreeing with the dispatcher the way they did before R5.6.
     #[test]
     fn listed_names_are_exactly_the_dispatchable_ones() {
+        let _feature = crate::feature::TEST_STATE
+            .read()
+            .unwrap_or_else(|e| e.into_inner());
         let env = Environment::new();
         let names: Vec<String> = env.builtin_names().map(str::to_string).collect();
         assert!(!names.is_empty());

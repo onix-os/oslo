@@ -8,7 +8,8 @@
 use super::super::{layout, screen};
 use super::{Assist, Outcome, Session};
 use crate::ui::dropdown::terminal_cols;
-use crate::ui::term::{Key, Keys};
+use crate::ui::edit::display::DisplayMap;
+use crate::ui::term::{InputEvent, Keys};
 
 /// The next key, firing `on-idle-timeout` if the prompt sits untouched long enough.
 ///
@@ -18,19 +19,19 @@ use crate::ui::term::{Key, Keys};
 ///
 /// `reported` is what stops it firing over and over: idleness is a state you enter once, not a
 /// tick. It resets the moment a key arrives, so walking away twice reports twice.
-pub(super) fn next_key(keys: &mut Keys, reported: &mut bool) -> Option<Key> {
+pub(super) fn next_input(keys: &mut Keys, reported: &mut bool) -> Option<InputEvent> {
     let seconds = crate::ui::settings::current().misc.idle_timeout;
     if seconds == 0 || !crate::lua::api::hooks::watched(crate::lua::api::hooks::at::IDLE_TIMEOUT) {
-        return keys.read();
+        return keys.read_event();
     }
     let ms = seconds.saturating_mul(1000).min(i32::MAX as u64) as i32;
     loop {
-        match keys.read_within(ms) {
-            crate::ui::term::Pressed::Key(key) => {
+        match keys.read_event_within(ms) {
+            crate::ui::term::EventPressed::Event(event) => {
                 *reported = false;
-                return Some(key);
+                return Some(event);
             }
-            crate::ui::term::Pressed::Timeout => {
+            crate::ui::term::EventPressed::Timeout => {
                 if !*reported {
                     *reported = true;
                     crate::lua::engine::fire_at_here(
@@ -39,7 +40,7 @@ pub(super) fn next_key(keys: &mut Keys, reported: &mut bool) -> Option<Key> {
                     );
                 }
             }
-            crate::ui::term::Pressed::Ended => return None,
+            crate::ui::term::EventPressed::Ended => return None,
         }
     }
 }
@@ -58,11 +59,17 @@ pub(super) fn draw(
     assist: &mut dyn Assist,
     ghost: bool,
 ) -> layout::Placed {
-    let plain = session.buffer.text();
-    let painted = assist.highlight(&plain);
+    let raw = session.buffer.text();
+    let display = DisplayMap::new(&raw);
+    let plain = display.plain();
+    let painted = assist.highlight(plain);
     let hint = if ghost {
         assist
-            .hint(&plain, session.buffer.cursor())
+            .hint_text(&raw, session.buffer.cursor())
+            .map(|hint| {
+                let safe = DisplayMap::new(&hint);
+                assist.paint_hint(safe.plain())
+            })
             .unwrap_or_default()
     } else {
         String::new()
@@ -70,8 +77,8 @@ pub(super) fn draw(
     layout::place(&layout::Row {
         prompt,
         text: &painted,
-        plain: &plain,
-        cursor: session.buffer.cursor(),
+        plain,
+        cursor: display.rendered_cursor(session.buffer.cursor()),
         hint: &hint,
         right,
         // Read every frame rather than cached, so a resized terminal lays out correctly on the

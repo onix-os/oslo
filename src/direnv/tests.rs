@@ -27,11 +27,11 @@ fn shell() -> Mutex<Environment> {
 ///
 /// A read/write lock rather than a plain mutex, so the fifteen tests that only *depend* on the
 /// feature being on still run concurrently with each other. Only the one that changes it is alone.
-static FEATURE: std::sync::RwLock<()> = std::sync::RwLock::new(());
-
 /// Hold while a test needs the `direnv` feature left alone.
 fn feature_unchanged() -> std::sync::RwLockReadGuard<'static, ()> {
-    FEATURE.read().unwrap_or_else(|e| e.into_inner())
+    crate::feature::TEST_STATE
+        .read()
+        .unwrap_or_else(|e| e.into_inner())
 }
 
 /// Read a variable the way a caller outside the lock would.
@@ -450,7 +450,9 @@ fn an_edit_revokes_and_the_environment_comes_back_out() {
 fn turning_the_feature_off_unloads_the_loaded_environment() {
     // **The write half, and the only test that takes it.** The bit this flips is process-global,
     // so no sibling may be inside `arrive` while it is off. See `FEATURE` above.
-    let _exclusive = FEATURE.write().unwrap_or_else(|e| e.into_inner());
+    let _exclusive = crate::feature::TEST_STATE
+        .write()
+        .unwrap_or_else(|e| e.into_inner());
     let store = tempfile::tempdir().expect("temp dir");
     let project = tempfile::tempdir().expect("temp dir");
     let path = rc_in(project.path(), find::NAME, "OSLO_T_FEATURE=loaded\n");

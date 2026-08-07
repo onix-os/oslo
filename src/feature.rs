@@ -95,7 +95,7 @@ pub const FEATURES: &[Feature] = &[
     Feature {
         name: "marks",
         provides: &[],
-        about: "OSC 133 semantic marks and the terminal title",
+        about: "semantic command marks, terminal metadata, and the title",
     },
     Feature {
         name: "finder",
@@ -126,6 +126,9 @@ pub mod at {
 
 /// Which features are **off**. Bit `n` is `FEATURES[n]`. See the module note on why it is inverted.
 static DISABLED: AtomicU32 = AtomicU32::new(0);
+
+#[cfg(test)]
+pub(crate) static TEST_STATE: std::sync::RwLock<()> = std::sync::RwLock::new(());
 
 /// Whether the feature at `index` is in force.
 pub fn on(index: usize) -> bool {

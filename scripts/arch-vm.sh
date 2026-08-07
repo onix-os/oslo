@@ -113,7 +113,20 @@ if $interactive; then
 fi
 
 log=$work/arch-boot.log
-timeout 600 qemu-system-x86_64 "${qemu_args[@]}" </dev/null 2>&1 | tee "$log" >/dev/null || true
+qemu-system-x86_64 "${qemu_args[@]}" </dev/null >"$log" 2>&1 &
+qemu_pid=$!
+deadline=$((SECONDS + 600))
+while kill -0 "$qemu_pid" 2>/dev/null; do
+    grep -aqE 'ARCH-SUITE-EXIT:[0-9]+' "$log" && break
+    if [ "$SECONDS" -ge "$deadline" ]; then
+        break
+    fi
+    sleep 1
+done
+if kill -0 "$qemu_pid" 2>/dev/null; then
+    kill "$qemu_pid" 2>/dev/null || true
+fi
+wait "$qemu_pid" 2>/dev/null || true
 
 say "result"
 sed -n '/ARCH-BOOT/,/ARCH-SUITE-EXIT/p' "$log" | sed 's/\r$//'

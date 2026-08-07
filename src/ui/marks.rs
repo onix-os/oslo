@@ -1,39 +1,15 @@
-//! Semantic marks: telling the terminal where a command begins and ends.
+//! Balanced semantic command marks with one process-stable session identity.
 //!
-//! `OSC 133`, the FinalTerm/FTCS shell-integration protocol that kitty, WezTerm, Ghostty, iTerm2,
-//! VS Code and tmux all read. The shell says where the prompt starts, where output starts, and
-//! what the command exited with; what the terminal *does* with that is the terminal's business.
-//!
-//! # Why the shell only marks, and does not fold
-//!
-//! A shell cannot rewrite scrollback. Once bytes are written they belong to whatever owns the
-//! grid, and folding a command that has scrolled off means redrawing rows the shell can no longer
-//! reach. The thing that *can* do it is the terminal emulator or the multiplexer, which keeps the
-//! grid and the history. So the division is: oslo declares the boundaries, and the layer that owns
-//! the screen decides whether to draw a fold arrow next to them.
-//!
-//! # What is emitted
-//!
-//! | Mark | When | Meaning |
-//! |---|---|---|
-//! | `OSC 133 ; A ; aid=<n> ST` | before the prompt is drawn | prompt start; `aid` is the block id |
-//! | `OSC 133 ; C ; aid=<n> ST` | just before the command runs | output starts here |
-//! | `OSC 133 ; D ; <status> ; aid=<n> ST` | once it has finished | command end, with its exit status |
-//!
-//! `B` — "the prompt ends and typing starts" — *is* emitted, but not from the prompt string. It
-//! has to sit between the prompt and the cursor, and the line editor measures the prompt to work
-//! out where the line begins, so an `OSC` in there is counted as visible width and the cursor
-//! arithmetic is wrong from the first keystroke. The seam is the **highlighter**: rustyline writes
-//! the prompt, then whatever `highlight` returned, and measures only the raw line. A mark prepended
-//! there lands in exactly the right place and costs nothing.
-//!
-//! `aid` is oslo's addition to the standard three: it makes each block nameable, so a reader can
-//! match a `D` to the `A` that opened it without relying on them being adjacent in the stream.
+//! The terminal owns scrollback presentation; Oslo emits lifecycle boundaries only.
 
-use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+use std::io::Write;
+use std::sync::Mutex;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 static ENABLED: AtomicBool = AtomicBool::new(false);
-static NEXT_ID: AtomicU64 = AtomicU64::new(1);
+static VSCODE_RICH_SENT: AtomicBool = AtomicBool::new(false);
+static SEMANTIC: Mutex<Option<crate::ui::term::semantic::SemanticSession>> = Mutex::new(None);
+pub use crate::ui::term::semantic::PromptKind;
 
 /// Turn marks on for an interactive session that has a terminal to mark.
 ///
@@ -44,6 +20,17 @@ pub fn enable(interactive: bool) {
         && nix::unistd::isatty(1).unwrap_or(false)
         && std::env::var("TERM").map(|t| t != "dumb").unwrap_or(true);
     ENABLED.store(on, Ordering::Relaxed);
+    VSCODE_RICH_SENT.store(false, Ordering::Relaxed);
+    let mut semantic = SEMANTIC.lock().unwrap_or_else(|e| e.into_inner());
+    let capabilities = if on {
+        detected_capabilities()
+    } else {
+        crate::ui::term::capability::Capabilities::disabled()
+    };
+    *semantic = Some(crate::ui::term::semantic::SemanticSession::new(
+        aid(),
+        capabilities,
+    ));
 }
 
 /// Whether marks are being written: a terminal that can take them, and the feature still on.
@@ -55,14 +42,36 @@ pub fn enabled() -> bool {
     ENABLED.load(Ordering::Relaxed) && crate::feature::on(crate::feature::at::MARKS)
 }
 
-/// The id of the block being prompted for.
-pub fn current_id() -> u64 {
-    NEXT_ID.load(Ordering::Relaxed)
+fn aid() -> String {
+    crate::track::session::id()
+        .chars()
+        .filter(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
+        .collect()
 }
 
-/// Take an id and move to the next. Called once per prompt.
-fn advance() -> u64 {
-    NEXT_ID.fetch_add(1, Ordering::Relaxed)
+fn detected_capabilities() -> crate::ui::term::capability::Capabilities {
+    *crate::ui::term::capability::snapshot()
+}
+
+fn capabilities() -> crate::ui::term::capability::Capabilities {
+    SEMANTIC
+        .lock()
+        .unwrap_or_else(|error| error.into_inner())
+        .as_ref()
+        .map(crate::ui::term::semantic::SemanticSession::capabilities)
+        .unwrap_or_else(detected_capabilities)
+}
+
+fn semantic(event: crate::ui::term::semantic::SemanticEvent<'_>) -> String {
+    if !enabled() {
+        return String::new();
+    }
+    SEMANTIC
+        .lock()
+        .unwrap_or_else(|error| error.into_inner())
+        .as_mut()
+        .map(|session| session.emit(event))
+        .unwrap_or_default()
 }
 
 /// `OSC 7` — where the shell is now.
@@ -83,7 +92,11 @@ pub fn working_directory(path: &str) -> String {
         .ok()
         .and_then(|h| h.into_string().ok())
         .unwrap_or_default();
-    format!("\x1b]7;file://{host}{}\x1b\\", percent_encode(path))
+    let osc7 = format!("\x1b]7;file://{host}{}\x1b\\", percent_encode(path));
+    format!(
+        "{osc7}{}",
+        semantic(crate::ui::term::semantic::SemanticEvent::CwdChanged(path))
+    )
 }
 
 /// Percent-encode the parts of a path a URL cannot carry literally.
@@ -216,51 +229,121 @@ pub fn file_url(path: &str) -> String {
     format!("file://{host}{}", percent_encode(path))
 }
 
-/// `OSC 133 ; A` — a new prompt, and a new block, begins here.
+/// `OSC 133 ; A` — a new primary prompt and interaction begin here.
 pub fn prompt_start() -> String {
-    if !enabled() {
-        return String::new();
+    let mut mark = String::new();
+    if capabilities().semantic == crate::ui::term::capability::SemanticProtocol::Vscode633
+        && !VSCODE_RICH_SENT.swap(true, Ordering::Relaxed)
+    {
+        mark.push_str(
+            &crate::ui::term::vscode::property("HasRichCommandDetection", "True")
+                .unwrap_or_default(),
+        );
     }
-    format!("\x1b]133;A;aid={}\x1b\\", advance())
+    mark.push_str(&semantic(
+        crate::ui::term::semantic::SemanticEvent::PromptStart(PromptKind::Primary),
+    ));
+    mark
+}
+
+#[must_use]
+pub struct Interaction {
+    active: bool,
+}
+
+impl Interaction {
+    pub fn begin() -> Self {
+        let _ = semantic(crate::ui::term::semantic::SemanticEvent::InteractionStart);
+        Self { active: true }
+    }
+
+    pub fn abort(&mut self) -> String {
+        self.active = false;
+        cancel_interaction()
+    }
+
+    pub fn finish(&mut self, status: i32) -> String {
+        self.active = false;
+        command_end(status)
+    }
+}
+
+impl Drop for Interaction {
+    fn drop(&mut self) {
+        if !self.active {
+            return;
+        }
+        let mark = cancel_interaction();
+        if !mark.is_empty() {
+            let mut out = std::io::stdout();
+            let _ = out.write_all(mark.as_bytes());
+            let _ = out.flush();
+        }
+    }
+}
+
+/// `OSC 133 ; A ; k=s` — a continuation prompt within the current interaction.
+pub fn continuation_prompt_start() -> String {
+    semantic(crate::ui::term::semantic::SemanticEvent::PromptStart(
+        PromptKind::Continuation,
+    ))
 }
 
 /// `OSC 133 ; B` — the prompt ends here and what you type begins.
-///
-/// This has to sit *between* the prompt and the cursor, which is why it was left out for so long:
-/// putting it in the prompt string means the line editor measures it, counts its bytes as visible
-/// cells, and puts the cursor in the wrong column from the first keystroke. fish has an open bug
-/// on exactly that shape.
-///
-/// The seam is the **highlighter**. rustyline writes `prompt` followed by whatever `highlight`
-/// returned, and measures only the raw line — never the painted one. So a mark prepended to the
-/// painted line lands in precisely the right place and costs nothing in the arithmetic. This is
-/// the same property the right prompt already relies on.
 pub fn input_start() -> String {
-    if !enabled() {
-        return String::new();
-    }
-    format!("\x1b]133;B;aid={}\x1b\\", current_id().saturating_sub(1))
+    semantic(crate::ui::term::semantic::SemanticEvent::InputStart)
 }
 
 /// `OSC 133 ; C` — everything after this is the command's output.
-pub fn output_start() -> String {
-    if !enabled() {
-        return String::new();
+///
+/// Kitty accepts the final command as URL-percent-encoded UTF-8. Other terminals retain the
+/// portable classic boundary, and private input passes `None` so it publishes no command text.
+pub fn output_start(command: Option<&str>) -> String {
+    let mut mark = semantic(crate::ui::term::semantic::SemanticEvent::CommandStart {
+        command_line: command.unwrap_or_default(),
+        visibility: if command.is_some() {
+            crate::ui::term::semantic::CommandVisibility::Publish
+        } else {
+            crate::ui::term::semantic::CommandVisibility::Omit
+        },
+    });
+    if !mark.is_empty()
+        && let Some(progress) = crate::ui::term::metadata::progress(
+            &capabilities(),
+            crate::ui::term::metadata::Progress::Indeterminate,
+        )
+    {
+        mark.push_str(&progress);
     }
-    // `current_id` and not a fresh one: this closes the prompt `A` opened, so it carries the same
-    // id. `A` has already advanced the counter, so the id in force is the one before it.
-    format!("\x1b]133;C;aid={}\x1b\\", current_id().saturating_sub(1))
+    mark
 }
 
 /// `OSC 133 ; D` — the command has finished, with this status.
 pub fn command_end(status: i32) -> String {
-    if !enabled() {
-        return String::new();
+    let mut mark = semantic(crate::ui::term::semantic::SemanticEvent::CommandEnd { status });
+    if !mark.is_empty()
+        && let Some(progress) = crate::ui::term::metadata::progress(
+            &capabilities(),
+            crate::ui::term::metadata::Progress::Complete,
+        )
+    {
+        mark.push_str(&progress);
     }
-    format!(
-        "\x1b]133;D;{status};aid={}\x1b\\",
-        current_id().saturating_sub(1)
-    )
+    mark
+}
+
+/// Close input that never became a command, without inventing an execution status or `C` mark.
+pub fn cancel_interaction() -> String {
+    let mut mark = semantic(crate::ui::term::semantic::SemanticEvent::InteractionAbort);
+    if !mark.is_empty()
+        && let Some(progress) = crate::ui::term::metadata::progress(
+            &capabilities(),
+            crate::ui::term::metadata::Progress::Clear,
+        )
+    {
+        mark.push_str(&progress);
+    }
+    mark
 }
 
 #[cfg(test)]
@@ -272,37 +355,136 @@ mod tests {
 
     use super::*;
 
+    fn test_on(capabilities: crate::ui::term::capability::Capabilities) {
+        ENABLED.store(true, Ordering::Relaxed);
+        VSCODE_RICH_SENT.store(false, Ordering::Relaxed);
+        *SEMANTIC.lock().unwrap_or_else(|error| error.into_inner()) = Some(
+            crate::ui::term::semantic::SemanticSession::new(aid(), capabilities),
+        );
+    }
+
+    fn test_off() {
+        ENABLED.store(false, Ordering::Relaxed);
+        *SEMANTIC.lock().unwrap_or_else(|error| error.into_inner()) = None;
+    }
+
     /// Marks are off unless a person is looking at a terminal. A script's output must never carry
     /// escape sequences the shell invented.
     #[test]
     fn nothing_is_emitted_without_a_terminal() {
         let _guard = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
         enable(false);
+        let mut interaction = Interaction::begin();
         assert_eq!(prompt_start(), "");
-        assert_eq!(output_start(), "");
-        assert_eq!(command_end(0), "");
+        assert_eq!(output_start(Some("echo hi")), "");
+        assert_eq!(interaction.finish(0), "");
     }
 
-    /// A block's three marks carry the same id, so a reader can pair them up without assuming
-    /// they arrive next to each other.
     #[test]
-    fn one_block_carries_one_id_through_all_three_marks() {
+    fn interactions_are_balanced_and_keep_the_session_id() {
         let _guard = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
-        ENABLED.store(true, Ordering::Relaxed);
-        NEXT_ID.store(7, Ordering::Relaxed);
+        test_on(crate::ui::term::capability::Capabilities::portable());
 
+        let mut interaction = Interaction::begin();
         let a = prompt_start();
-        let c = output_start();
-        let d = command_end(3);
-        assert_eq!(a, "\x1b]133;A;aid=7\x1b\\");
-        assert_eq!(c, "\x1b]133;C;aid=7\x1b\\");
-        assert_eq!(d, "\x1b]133;D;3;aid=7\x1b\\");
+        let b = input_start();
+        let c = output_start(None);
+        let d = interaction.finish(3);
+        let id = aid();
+        assert_eq!(a, format!("\x1b]133;A;aid={id}\x1b\\"));
+        assert_eq!(b, format!("\x1b]133;B;aid={id}\x1b\\"));
+        assert_eq!(c, format!("\x1b]133;C;aid={id}\x1b\\"));
+        assert_eq!(d, format!("\x1b]133;D;3;aid={id}\x1b\\"));
 
-        // The next prompt is the next block.
-        assert_eq!(prompt_start(), "\x1b]133;A;aid=8\x1b\\");
-        assert_eq!(output_start(), "\x1b]133;C;aid=8\x1b\\");
+        let mut next_interaction = Interaction::begin();
+        let next = prompt_start();
+        assert!(next.contains(&format!("aid={id}")), "{next:?}");
+        let _ = next_interaction.abort();
 
-        ENABLED.store(false, Ordering::Relaxed);
+        test_off();
+    }
+
+    #[test]
+    fn continuation_prompts_do_not_open_another_interaction() {
+        let _guard = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
+        test_on(
+            crate::ui::term::capability::Capabilities::portable().with_verified(
+                crate::ui::term::capability::Verified {
+                    semantic_secondary: true,
+                    ..crate::ui::term::capability::Verified::default()
+                },
+            ),
+        );
+
+        let mut interaction = Interaction::begin();
+        assert!(!prompt_start().is_empty());
+        assert!(!input_start().is_empty());
+        assert!(continuation_prompt_start().contains(";A;k=s;"));
+        assert!(!input_start().is_empty());
+        assert!(!output_start(None).is_empty());
+        assert!(!interaction.finish(0).is_empty());
+        test_off();
+    }
+
+    #[test]
+    fn cancelled_input_closes_without_an_output_or_status() {
+        let _guard = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
+        test_on(crate::ui::term::capability::Capabilities::portable());
+
+        let mut interaction = Interaction::begin();
+        assert!(!prompt_start().is_empty());
+        assert!(!input_start().is_empty());
+        let closed = interaction.abort();
+        assert!(closed.contains(";D;aid="), "{closed:?}");
+        assert!(!closed.contains(";C;"), "{closed:?}");
+        assert_eq!(command_end(130), "");
+        test_off();
+    }
+
+    #[test]
+    fn illegal_duplicate_transitions_emit_nothing() {
+        let _guard = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
+        test_on(crate::ui::term::capability::Capabilities::portable());
+
+        let mut interaction = Interaction::begin();
+        assert_eq!(input_start(), "");
+        assert_eq!(output_start(None), "");
+        assert!(!prompt_start().is_empty());
+        assert_eq!(prompt_start(), "");
+        assert!(!input_start().is_empty());
+        assert_eq!(input_start(), "");
+        assert!(!interaction.abort().is_empty());
+        test_off();
+    }
+
+    #[test]
+    fn kitty_command_metadata_is_utf8_url_encoded_and_private_input_is_omitted() {
+        let _guard = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
+        let capabilities = crate::ui::term::capability::Capabilities::portable().with_verified(
+            crate::ui::term::capability::Verified {
+                semantic_cmdline_url: true,
+                ..crate::ui::term::capability::Verified::default()
+            },
+        );
+        test_on(capabilities);
+
+        let mut interaction = Interaction::begin();
+        let _ = prompt_start();
+        let _ = input_start();
+        let mark = output_start(Some("echo café; 100%\tnext\nline"));
+        assert!(
+            mark.contains("cmdline_url=echo%20caf%C3%A9%3B%20100%25%09next%0Aline"),
+            "{mark:?}"
+        );
+        let _ = interaction.finish(0);
+
+        let mut interaction = Interaction::begin();
+        let _ = prompt_start();
+        let _ = input_start();
+        let private = output_start(None);
+        assert!(!private.contains("cmdline"), "{private:?}");
+        let _ = interaction.finish(0);
+        test_off();
     }
 
     /// A URL is not a path. A directory with a space or a `#` in it makes a URL that means
@@ -310,14 +492,14 @@ mod tests {
     #[test]
     fn a_working_directory_is_percent_encoded() {
         let _guard = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
-        ENABLED.store(true, Ordering::Relaxed);
+        test_on(crate::ui::term::capability::Capabilities::portable());
         let osc = working_directory("/home/u/my dir/a#b");
         assert!(osc.contains("/home/u/my%20dir/a%23b"), "{osc:?}");
         // Slashes stay literal, or the path stops being a path.
         assert!(!osc.contains("%2F"), "{osc:?}");
         assert!(osc.starts_with("\x1b]7;file://"), "{osc:?}");
         assert!(osc.ends_with("\x1b\\"), "{osc:?}");
-        ENABLED.store(false, Ordering::Relaxed);
+        test_off();
     }
 
     /// A semicolon in the text would end the field early and shift the rest into the wrong one.
@@ -325,12 +507,12 @@ mod tests {
     #[test]
     fn a_notification_cannot_be_split_by_its_own_text() {
         let _guard = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
-        ENABLED.store(true, Ordering::Relaxed);
+        test_on(crate::ui::term::capability::Capabilities::portable());
         let osc = notify("oslo", "make; rm -rf /");
         assert_eq!(osc, "\x1b]777;notify;oslo;make, rm -rf /\x1b\\");
         // And a control character cannot terminate it early either.
         assert_eq!(notify("a\x07b", "c\nd"), "\x1b]777;notify;ab;cd\x1b\\");
-        ENABLED.store(false, Ordering::Relaxed);
+        test_off();
     }
 
     /// Checked against the RFC 4648 vectors, because a base64 that is wrong by one pad character
@@ -360,7 +542,7 @@ mod tests {
     #[test]
     fn a_hyperlink_wraps_its_text_without_altering_it() {
         let _guard = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
-        ENABLED.store(true, Ordering::Relaxed);
+        test_on(crate::ui::term::capability::Capabilities::portable());
         let link = hyperlink("file://h/etc/foo", "/etc/foo");
         assert!(
             link.starts_with("\x1b]8;;file://h/etc/foo\x1b\\"),
@@ -368,7 +550,7 @@ mod tests {
         );
         assert!(link.contains("/etc/foo"));
         assert!(link.ends_with("\x1b]8;;\x1b\\"), "{link:?}");
-        ENABLED.store(false, Ordering::Relaxed);
+        test_off();
 
         // With marks off — a script — it is the bare text and nothing else.
         assert_eq!(hyperlink("file://h/x", "/x"), "/x");
@@ -379,10 +561,10 @@ mod tests {
     #[test]
     fn a_title_carries_no_control_characters() {
         let _guard = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
-        ENABLED.store(true, Ordering::Relaxed);
+        test_on(crate::ui::term::capability::Capabilities::portable());
         let osc = title("build\x07 done\nnow");
         assert_eq!(osc, "\x1b]0;build donenow\x1b\\");
-        ENABLED.store(false, Ordering::Relaxed);
+        test_off();
     }
 
     /// Every mark is a complete OSC: introducer, payload, terminator. A half-written one would be
@@ -390,8 +572,15 @@ mod tests {
     #[test]
     fn every_mark_is_a_terminated_osc() {
         let _guard = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
-        ENABLED.store(true, Ordering::Relaxed);
-        for mark in [prompt_start(), output_start(), command_end(0)] {
+        test_on(crate::ui::term::capability::Capabilities::portable());
+        let mut interaction = Interaction::begin();
+        let marks = [
+            prompt_start(),
+            input_start(),
+            output_start(None),
+            interaction.finish(0),
+        ];
+        for mark in marks {
             assert!(mark.starts_with("\x1b]133;"), "{mark:?}");
             assert!(mark.ends_with("\x1b\\"), "{mark:?}");
             assert!(
@@ -399,6 +588,6 @@ mod tests {
                 "a mark must not move the cursor: {mark:?}"
             );
         }
-        ENABLED.store(false, Ordering::Relaxed);
+        test_off();
     }
 }

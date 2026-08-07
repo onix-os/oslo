@@ -34,7 +34,7 @@ $(info ------------------------------------------)
 $(info Project: $(PROJECT_NAME) v$(PROJECT_VERSION))
 $(info ------------------------------------------)
 
-.PHONY: build b dev check-static compile c run r example test t check check-all test-all check-loc check-readme print-name clippy rustdoc fmt fmt-check clean verify vm vm-distro vm-arch install uninstall release help h
+.PHONY: build b dev check-static compile c run r example test test-terminal t check check-all test-all check-loc check-readme print-name clippy rustdoc fmt fmt-check clean verify vm vm-distro vm-arch install uninstall release help h
 
 build:
 	@RUSTFLAGS="$(STATIC_RUSTFLAGS)" $(CARGO) build --release --target $(TARGET) --bin $(PROJECT_NAME)
@@ -79,6 +79,9 @@ example:
 
 test:
 	@$(CARGO) test --all-targets
+
+test-terminal:
+	@$(CARGO) test --test terminal_semantics_tests
 
 t: test
 
@@ -191,6 +194,7 @@ help:
 	@echo "  run          Run the shell (make run ARGS='-c \"echo hi\"')"
 	@echo "  example      Run a development example (make example EXAMPLE=main)"
 	@echo "  test         Run all tests"
+	@echo "  test-terminal Run terminal PTY transcript tests"
 	@echo "  check        Run cargo check on all targets"
 	@echo "  check-all    Run cargo check on all targets/all features"
 	@echo "  test-all     Run cargo test on all targets/all features"
@@ -210,4 +214,3 @@ help:
 	@echo
 
 h: help
-

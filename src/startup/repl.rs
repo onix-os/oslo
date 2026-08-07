@@ -38,20 +38,7 @@ pub fn run_repl(login: bool) -> ! {
     // notice, whether a background job keeps the terminal's stdin — reads this.
     // (Addressed by path rather than a re-export: `exec::mod` is being edited elsewhere.)
     oslo::exec::pipeline::set_interactive(true);
-    // Semantic marks (OSC 133), so a terminal or multiplexer can see where each command's output
-    // starts and stops. oslo only declares the boundaries; folding them is the job of whatever
-    // owns the grid. See `oslo::ui::marks`.
-    oslo::ui::marks::enable(true);
-    // A resize should redraw the line, and a blocked `read` does not notice one on its own. See
-    // `term::watch_for_resize` — installed here rather than in the library so that a script, which
-    // has no line to redraw, does not acquire a signal handler it will never use.
-    oslo::ui::term::watch_for_resize();
-    // Asked once, before anything is drawn: the terminal's background decides whether the syntax
-    // palette should be the dark one. A terminal that does not answer leaves the default standing
-    // — see `oslo::ui::query` for why the *silence* is the case worth engineering for.
-    if let Some(background) = oslo::ui::query::background() {
-        oslo::ui::theme::set_background(background);
-    }
+    super::terminal::initialize();
 
     let mut interactive_env = Environment::new();
     // A REPL is interactive and reads its program from the terminal: `$-` says so with `i` and
@@ -207,6 +194,7 @@ pub fn run_repl(login: bool) -> ! {
         // for the first prompt of the session, which is where a prompt integration draws itself.
         integration::prompt_command(&env_struct, last_status);
 
+        let mut interaction = oslo::ui::marks::Interaction::begin();
         match read_command(
             &helper,
             &history,
@@ -215,8 +203,14 @@ pub fn run_repl(login: bool) -> ! {
             last_status,
             &mut current,
         ) {
-            Input::Nothing | Input::Interrupted => continue,
+            Input::Nothing | Input::Interrupted => {
+                print!("{}", interaction.abort());
+                let _ = std::io::Write::flush(&mut std::io::stdout());
+                continue;
+            }
             Input::Eof => {
+                print!("{}", interaction.abort());
+                let _ = std::io::Write::flush(&mut std::io::stdout());
                 eof_count += 1;
                 match ignore_eof_limit(&env_struct) {
                     Some(limit) if eof_count <= limit => {
@@ -284,6 +278,8 @@ pub fn run_repl(login: bool) -> ! {
                         // Cancelled. 130 is the status a line abandoned at the prompt already
                         // reports, so nothing downstream needs a new case for this.
                         last_status = 130;
+                        print!("{}", interaction.abort());
+                        let _ = std::io::Write::flush(&mut std::io::stdout());
                         continue;
                     }
                     Some(oslo::lua::eval::value::Value::Str(replacement)) => {
@@ -301,7 +297,10 @@ pub fn run_repl(login: bool) -> ! {
                     .unwrap_or_else(|| title_for_command(&text)),
                 ));
                 // Everything after this belongs to the command, not to the prompt.
-                print!("{}", oslo::ui::marks::output_start());
+                print!(
+                    "{}",
+                    oslo::ui::marks::output_start((!secret).then_some(text.as_str()))
+                );
                 let _ = std::io::Write::flush(&mut std::io::stdout());
                 let started = std::time::Instant::now();
 
@@ -382,6 +381,13 @@ pub fn run_repl(login: bool) -> ! {
                 let after = current_directory();
                 let elapsed = started.elapsed();
                 note_command_duration(elapsed);
+                let terminal_status = match &res {
+                    Ok(status) | Err(ShellError::Exit(status)) => *status,
+                    Err(error) => error.failure_status(),
+                };
+                // Close command output before post-command reports and notifications.
+                print!("{}", interaction.finish(terminal_status));
+                let _ = std::io::Write::flush(&mut std::io::stdout());
                 // A chain that stopped part-way says where, and what would carry on from there.
                 // One line, and only when there is something to say: a chain that finished, or a
                 // single command that failed, prints nothing.
@@ -389,13 +395,6 @@ pub fn run_repl(login: bool) -> ! {
                     eprintln!("oslo: chain stopped — resume with: {from}");
                 }
                 announce(&notify::slow_command_notice(&text, elapsed, &res));
-                // The command is over and its status is known: close the block before anything
-                // else prints, so nothing that follows lands inside it.
-                print!(
-                    "{}",
-                    oslo::ui::marks::command_end(res.as_ref().copied().unwrap_or(1))
-                );
-                let _ = std::io::Write::flush(&mut std::io::stdout());
                 // **Fired whether the command succeeded or not.** It used to run only on `Ok`, so
                 // the hook was silent for exactly the commands a hook is most often installed to
                 // notice — a parse error, an `exit`, anything that did not return a status. A

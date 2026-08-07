@@ -7,6 +7,7 @@
 //! status function            the whole call stack, innermost first
 //! status oslo-path           the path to this shell
 //! status basename            the name it was invoked as
+//! status terminal            the installed terminal capability snapshot
 //! ```
 //!
 //! fish's, minus the parts that describe fish. The reason it is worth having is the first line of
@@ -81,6 +82,14 @@ pub fn builtin_status(env: &mut Environment, args: &[String]) -> Result<i32> {
             println!("{}", basename(&env.shell_name));
             0
         }
+        "terminal" => {
+            let summary = crate::ui::term::capability::snapshot_if_initialized()
+                .copied()
+                .unwrap_or_else(crate::ui::term::capability::Capabilities::disabled)
+                .summary();
+            print!("{}", terminal_report(summary));
+            0
+        }
 
         other => {
             eprintln!("status: {other}: unknown subcommand");
@@ -113,6 +122,43 @@ fn yes_no(answer: bool) -> &'static str {
     if answer { "yes" } else { "no" }
 }
 
+fn terminal_report(summary: crate::ui::term::capability::Summary) -> String {
+    use crate::ui::term::capability::SemanticProtocol;
+    let state = |enabled: bool| if enabled { "on" } else { "off" };
+    let semantic = match summary.semantic {
+        SemanticProtocol::None => "none",
+        SemanticProtocol::Osc133 => "osc133",
+        SemanticProtocol::Vscode633 => "osc633",
+    };
+    format!(
+        "semantic-protocol {semantic} {}\n\
+bracketed-paste {} {}\n\
+kitty-keyboard {} {}\n\
+synchronized-output {} {}\n\
+semantic-clicks {} {}\n\
+legacy-clicks {} {}\n\
+osc99-notifications {} {}\n\
+fallback-notifications {} {}\n",
+        summary.origins.semantic.label(),
+        state(summary.bracketed_paste),
+        summary.origins.bracketed_paste.label(),
+        state(summary.kitty_keyboard_disambiguate),
+        summary.origins.kitty_keyboard.label(),
+        state(summary.synchronized_output),
+        summary.origins.synchronized_output.label(),
+        state(summary.semantic_clicks),
+        summary.origins.semantic_clicks.label(),
+        state(summary.legacy_clicks),
+        summary.origins.legacy_clicks.label(),
+        state(summary.osc99_notifications),
+        summary.origins.osc99_notifications.label(),
+        state(
+            summary.origins.fallback_notifications != crate::ui::term::capability::Origin::Disabled
+        ),
+        summary.origins.fallback_notifications.label(),
+    )
+}
+
 fn usage() {
     println!("Usage: status [SUBCOMMAND]");
     println!();
@@ -123,6 +169,7 @@ fn usage() {
     println!("  function           print the call stack, innermost first");
     println!("  oslo-path          print the path to this shell");
     println!("  basename           print the name it was invoked as");
+    println!("  terminal           print the installed terminal capabilities");
     println!();
     println!("The predicates answer through the exit status, so `status is-interactive || return`");
     println!("works. With no subcommand, the interactive and login facts are printed.");
@@ -197,5 +244,45 @@ mod tests {
         // Bare `status` reports rather than failing.
         assert_eq!(run(&mut env, &[]), 0);
         assert_eq!(run(&mut env, &["--help"]), 0);
+    }
+
+    #[test]
+    fn terminal_diagnostics_are_stable_and_do_not_initialize_a_session() {
+        let disabled =
+            terminal_report(crate::ui::term::capability::Capabilities::disabled().summary());
+        assert_eq!(
+            disabled,
+            "semantic-protocol none disabled\n\
+bracketed-paste off disabled\n\
+kitty-keyboard off disabled\n\
+synchronized-output off disabled\n\
+semantic-clicks off disabled\n\
+legacy-clicks off disabled\n\
+osc99-notifications off disabled\n\
+fallback-notifications off disabled\n"
+        );
+
+        let verified = crate::ui::term::capability::Capabilities::portable().with_verified(
+            crate::ui::term::capability::Verified {
+                synchronized_output: true,
+                kitty_keyboard: true,
+                osc99_notifications: true,
+                ..crate::ui::term::capability::Verified::default()
+            },
+        );
+        let report = terminal_report(verified.summary());
+        assert!(report.contains("synchronized-output on verified\n"));
+        assert!(report.contains("kitty-keyboard on verified\n"));
+        assert!(report.contains("fallback-notifications on portable\n"));
+
+        let opted = crate::ui::term::capability::Capabilities::portable().with_explicit_opt_ins(
+            Some("1"),
+            Some("legacy"),
+            None,
+        );
+        let report = terminal_report(opted.summary());
+        assert!(report.contains("synchronized-output on opt-in\n"));
+        assert!(report.contains("semantic-clicks off disabled\n"));
+        assert!(report.contains("legacy-clicks on opt-in\n"));
     }
 }

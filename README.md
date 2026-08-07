@@ -105,6 +105,8 @@ Or just use `$PS1`, with the full escape set — `\u \h \w \$ \t \A \d \j \! \[ 
 - **First-class vi mode** on fish's model: cursor shape says the mode, the prompt says it too
 - **Its own line editor** — buffer, layout, redraw, emacs and vi keymaps — so oslo owns the row it
   edits rather than renting it. No `readline`, no `rustyline`.
+- **Grapheme-aware editing** — combining marks, emoji modifiers, flags, keycaps and ZWJ emoji move,
+  delete, wrap and truncate as whole displayed characters
 - **A right prompt**, drawn without the save/restore multiplexers fight over
 - **Syntax highlighting** that marks a command that does not exist
 
@@ -125,9 +127,11 @@ oslo.keys["ctrl-s"] = function(line) return "sudo " .. line.text end
 oslo.keys["alt-u"]  = function(line)
   return { text = line.text .. " [" .. line.word .. "]", cursor = 0 }
 end
+oslo.keys["f2"] = "toggle-language"
 ```
 
 Data in, data out — the handler is told about the line and answers with what it should become.
+`f1` through `f12` work with both conventional terminal sequences and Kitty's disambiguated input.
 
 ### Where you have been
 
@@ -257,10 +261,78 @@ pattern when nothing matched.
 
 ## The terminal knows what is happening
 
-`OSC 133` semantic marks (so a multiplexer can fold command output), `OSC 7` working directory,
-`OSC 0` title, `OSC 8` hyperlinks, `OSC 52` clipboard over SSH, and desktop notifications for
-commands that outlive a threshold. A `copy` builtin puts text on the clipboard through the terminal,
-so it works over SSH with no X or Wayland helper installed.
+Every interactive command has one balanced semantic lifecycle. Portable terminals receive OSC 133
+`A/B/C/D` boundaries with one stable shell-session ID; blank, cancelled, and EOF input closes
+without pretending that a command ran. OSC 7 publishes the working directory, OSC 0 sets the title,
+OSC 8 carries Oslo-owned hyperlinks, and OSC 52 powers the `copy` builtin over SSH. OSC 52 can still
+be refused by the terminal's clipboard policy.
+
+The native editor enables bracketed paste while it owns the line. A pasted newline is inserted as
+text and does not execute until Enter is pressed. Pasted and typed control characters stay exact in
+the command buffer but redraw as inert notation such as `^[`, `^I`, `^M`, and `^?`; raw OSC and CSI
+bytes never reach an editor frame. Cursor movement, deletion, wrapping, completion width and click
+placement operate on extended grapheme clusters.
+
+Startup sends one ordered, bounded query batch for the background, Kitty keyboard support,
+synchronized output and OSC 99 notifications, with primary device attributes as the final barrier.
+The whole exchange has one 100 ms deadline. Replies and total input are size-bounded, and bytes
+typed during the exchange are handed to the editor in their original order. When Kitty keyboard
+support is verified, Oslo pushes disambiguation mode for the editor and restores it before command
+execution. Completion uses the same decoded event stream as the editor, so CSI-u keys, paste, focus,
+mouse, resize and the character that dismisses the menu are not split or lost.
+
+Terminal-specific behavior is selected conservatively:
+
+| Host | Integration |
+|---|---|
+| Any interactive terminal | OSC 133 lifecycle, OSC 7/8/52, bracketed paste |
+| VS Code (`TERM_PROGRAM=vscode`) | One OSC 633 `A/B/E/C/D` lifecycle plus rich CWD detection |
+| iTerm2 (`TERM_PROGRAM=iTerm.app`) | User-variable encoder and foreground OSC 9;4 progress |
+| WezTerm (`TERM_PROGRAM=WezTerm`) | User-variable encoder |
+| Kitty-keyboard compatible terminal | Queried CSI-u disambiguation with push/pop restoration |
+| `TERM=dumb`, scripts, and `-c` | No semantic marks or terminal queries |
+
+Features with no reliable discovery remain exact opt-ins: `OSLO_TERMINAL_EXTENSIONS=kitty` enables
+the Kitty OSC 133 continuation marker and percent-encoded command metadata, while
+`OSLO_SYNC_OUTPUT=1` forces DEC 2026 synchronized frames even without a verified reply.
+`OSLO_CLICK_EVENTS=1` enables OSC 133 prompt-scoped clicks through `cl=line` and `click_events=2`;
+it does not capture the global mouse or query the cursor after a click. The separate
+`OSLO_CLICK_EVENTS=legacy` fallback enables DECSET 1000/1006 only while the line editor owns the
+terminal and accepts the standard two-coordinate DECXCPR response. Other values enable neither
+click path.
+
+Exact command metadata is taken after `pre-cmd` replacement. Leading-space/private commands keep
+their lifecycle but publish no command text. OSC and OSC 633 fields escape separators and control
+bytes. The VS Code adapter emits no nonce because Oslo receives no documented launch nonce.
+Slow-command notices emit one rich OSC 99 title/body transaction when support is verified,
+requesting delivery only while unfocused when the terminal advertises that occasion. Otherwise
+they emit one sanitized OSC 777 fallback, never both.
+
+The `marks` feature controls semantic boundaries, titles, working-directory reports and
+terminal-specific adapters as one unit. Turning it off leaves the prompt and editor functional but
+emits none of those sequences. OSC 52 is separate because `copy` is an explicit user action.
+
+`status terminal` prints the immutable capability snapshot and the origin of each selection without
+running a query. Scripts and `-c` report a disabled snapshot and emit no terminal escapes.
+
+Terminal metadata is visible to the terminal process: command text is not encrypted or hidden from
+the emulator. Separators and control bytes are encoded or removed before a field is emitted, and a
+private leading-space command omits its text entirely. No nonce is invented or treated as
+authentication. Each reply is limited to 4096 bytes, the batch is limited to 16384 input bytes, and
+unrelated input is preserved.
+
+Compatibility evidence recorded on 2026-08-07:
+
+| Terminal | Version | Evidence | Result |
+|---|---:|---|---|
+| Kitty | 0.48.2 | Real PTY on headless Wayland: prompt/output navigation, multiline PS2, finder restore, click editing, F2 binding and verified Kitty/sync/OSC 99 status | Pass |
+| Ghostty | 1.3.1 | Real PTY on Xvfb: multiline/right prompt, screen extraction and click editing | Pass |
+| WezTerm | 0-unstable-2026-07-16 | Real PTY on headless Wayland: multiline transcript, OSC 7 CWD update and no leaked replies | Pass |
+| iTerm2 | macOS-only; unavailable on this Linux host | OSC 133, metadata and nested-session PTY acceptance tests | Protocol pass; GUI not run |
+| VS Code | unavailable on this host | `TERM_PROGRAM=vscode` PTY acceptance test verifies one OSC 633 lifecycle | Protocol pass; GUI not run |
+| tmux | 3.6 | Real nested PTY: balanced command block and no leaked query reply | Pass |
+| GNU screen | 5.0.2 | Real nested PTY: balanced EOF closure and no leaked query reply | Pass |
+| Basic terminal | `TERM=dumb` | PTY acceptance test verifies readable editing with no semantic bytes | Pass |
 
 ## POSIX, where it counts
 
@@ -271,7 +343,7 @@ field splitting, job control with proper process groups and `tcsetpgrp`.
 Correctness is measured rather than asserted. 408 scripts in `tests/corpus` run under both oslo and
 bash and are compared byte for byte, with known differences listed in
 `tests/differential/expected_fail.rs` as a two-way ratchet — the suite fails if a listed case starts
-passing, so a stale entry cannot survive. 999 unit tests alongside.
+passing, so a stale entry cannot survive. Unit and integration tests run alongside it.
 
 ## Directory environments
 
@@ -809,6 +881,7 @@ status is-interactive || return    # the line every dotfile repo opens with
 status is-login
 status current-function            # or `status function` for the whole stack
 status basename
+status terminal                    # selected terminal features and their origin
 ```
 
 The predicates answer through the exit status, so they compose with `&&` and `||`. The portable

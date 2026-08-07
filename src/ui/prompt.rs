@@ -1,15 +1,7 @@
-//! The prompt: what the shell draws before the line, and to the right of it.
+//! Prompt rendering for the left and right sides of the edited line.
 //!
 //! A prompt is a Lua function (see `crate::lua::api::prompt`); everything here is either what a
 //! prompt function calls, or the built-in prompt used when no Lua one is set.
-//!
-//! **The right prompt is the interesting part.** rustyline has no support for one, and it repaints
-//! from the prompt to end-of-line on every keystroke — which is why the previous attempt was
-//! deleted rather than fixed. What makes it work is where the repaint clears: `refresh_line`
-//! clears the old rows *before* writing the prompt and never clears afterwards, so anything the
-//! prompt string draws survives the redraw and is rewritten each time. And rustyline measures a
-//! prompt by counting graphemes with every CSI sequence as zero width, so an absolute column move
-//! wrapped in save/restore costs nothing in its arithmetic.
 
 use std::env;
 use std::fs;
@@ -165,8 +157,7 @@ fn render_default_left_prompt_unpadded(last_status: i32, language: &str) -> Stri
     out.push_str(&theme.prompt.aside.paint("@", depth));
     out.push_str(&theme.prompt.host.paint(&hostname(), depth));
 
-    // The mode letter. rustyline never redraws a prompt, so oslo repaints this line itself the
-    // moment the mode changes — see `repaint` below and its caller in the key handler.
+    // The mode letter follows the editor's current vi state.
     if let Some(mode) = super::vi::mode() {
         out.push_str(&bar);
         let style = match mode {
@@ -283,52 +274,17 @@ pub fn render_default_right_prompt(last_status: i32, elapsed: Option<Duration>) 
     parts.join(&theme.prompt.aside.paint("  ", depth))
 }
 
-/// The escape that draws a right prompt, or empty when there is no room for one.
-///
-/// **Where this goes matters, and the obvious place is wrong.** Putting it in the prompt string
-/// corrupts rustyline's cursor arithmetic: it counts a CSI sequence as zero width but has no idea
-/// that `\x1b[76G` *moves* the cursor, so the right prompt's own characters get added to the
-/// column it thinks the line starts at. Measured, the composed prompt came out eleven cells wide
-/// where the left prompt alone is six.
-///
-/// The seam that works is the highlighter. `compute_layout` measures the **raw line**, never the
-/// string `highlight` returns — so anything drawn there is free of the arithmetic entirely. And
-/// `refresh_line` clears the old rows *before* it writes, and never after, so this is redrawn
-/// intact on every keystroke rather than erased by the next one.
-///
-/// Empty when it will not fit. A right prompt that collides with what is being typed is worse
-/// than none, and that collision is what made the previous attempt look broken.
+/// Return relative-motion escapes for a right prompt, or empty when it does not fit.
 pub fn right_prompt_escape(right: &str, used: usize, cols: usize) -> String {
     if right.is_empty() || cols == 0 {
         return String::new();
     }
     let right_w = printed_width(right);
-    // Two columns of gap so the text being typed never touches it, and one more on the right that
-    // is never written to at all — see the gap calculation below for why that last one matters.
+    // Keep two cells between input and the right prompt plus one unused final cell.
     if used + right_w + 3 > cols {
         return String::new();
     }
-    // Move right, draw, move back — **not** save/restore.
-    //
-    // `\x1b7`/`\x1b8` (DECSC/DECRC) has exactly one slot per terminal, and it is shared with
-    // everything else drawing on it: oslo's own completion dropdown uses it, and a multiplexer
-    // hosting the session may too. Whoever saves last wins, so a restore can land wherever
-    // somebody else's save left it — which shows up as a right prompt that jumps, duplicates, or
-    // strands debris a row up. Relative motion has no shared state to lose.
-    //
-    // The gap is `cols - right_w - used`: from the cursor's column to the first cell of the right
-    // prompt. Coming back is that gap plus the text just drawn.
-    // **The final column is left empty on purpose.**
-    //
-    // Writing into it leaves the terminal in a deferred-wrap state: the cursor is notionally past
-    // the edge, and what happens next is up to the implementation. Most defer, and the `\r` below
-    // settles it harmlessly. Some wrap *eagerly* — the cursor is already on the next row before
-    // the `\r` arrives, so `\r` homes that row instead, the forward move lands there, and the
-    // ghost hint rustyline writes next is drawn a row down. That is the "new lines of garbage"
-    // this used to produce, and it appears only on terminals that wrap eagerly, which is why it
-    // never showed up in testing here.
-    //
-    // One unwritten column costs nothing and removes the question entirely.
+    // Relative motion avoids the terminal's shared save/restore cursor slot.
     let gap = cols - right_w - used - 1;
     let home = used;
     if home == 0 {
@@ -338,42 +294,9 @@ pub fn right_prompt_escape(right: &str, used: usize, cols: usize) -> String {
     }
 }
 
-/// How many cells a string occupies once its escape sequences are discounted.
-///
-/// `dropdown::display_width` cannot be used here: it documents itself as assuming plain text, and
-/// a prompt is never plain — it is mostly colour escapes. Counting those as cells would push the
-/// right prompt left by however many bytes of colour the left prompt happened to carry, which is
-/// a bug that only appears once somebody themes their prompt.
-///
-/// The rule is rustyline's own, deliberately: an `\x1b` starts a sequence, `[` makes it a CSI that
-/// runs to its first non-digit non-`;` byte, and anything else is a two-character sequence. Both
-/// sides have to agree about the width or the cursor lands in the wrong column.
+/// Count displayed cells while excluding CSI and two-byte escape sequences.
 pub fn printed_width(text: &str) -> usize {
-    let mut width = 0usize;
-    let mut chars = text.chars().peekable();
-    while let Some(c) = chars.next() {
-        if c != '\x1b' {
-            width += super::dropdown::display_width(&c.to_string());
-            continue;
-        }
-        match chars.peek() {
-            Some('[') => {
-                chars.next();
-                // A CSI runs to its final byte, which is the first that is not a parameter.
-                for c in chars.by_ref() {
-                    if !c.is_ascii_digit() && c != ';' {
-                        break;
-                    }
-                }
-            }
-            // `\x1b7`, `\x1b8` and friends: two characters in total.
-            Some(_) => {
-                chars.next();
-            }
-            None => {}
-        }
-    }
-    width
+    super::dropdown::display_width(text)
 }
 
 #[cfg(test)]

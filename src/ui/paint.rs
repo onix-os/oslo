@@ -50,6 +50,25 @@ pub struct Panel {
 pub const SYNC_BEGIN: &str = "\x1b[?2026h";
 pub const SYNC_END: &str = "\x1b[?2026l";
 
+pub struct Frame(String);
+
+impl Frame {
+    pub fn new(content: &str, synchronized: bool) -> Frame {
+        if !synchronized {
+            return Frame(content.to_string());
+        }
+        let mut frame = String::with_capacity(SYNC_BEGIN.len() + content.len() + SYNC_END.len());
+        frame.push_str(SYNC_BEGIN);
+        frame.push_str(content);
+        frame.push_str(SYNC_END);
+        Frame(frame)
+    }
+
+    pub fn as_bytes(&self) -> &[u8] {
+        self.0.as_bytes()
+    }
+}
+
 impl Panel {
     /// A panel drawn from `column`.
     pub fn at(column: usize) -> Panel {
@@ -115,6 +134,21 @@ impl Panel {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_frame_has_one_balanced_sync_pair() {
+        let frame = Frame::new("redraw", true);
+        assert_eq!(
+            std::str::from_utf8(frame.as_bytes()).expect("terminal bytes"),
+            format!("{SYNC_BEGIN}redraw{SYNC_END}")
+        );
+    }
+
+    #[test]
+    fn an_unsupported_frame_has_no_sync_pair() {
+        let frame = Frame::new("redraw", false);
+        assert_eq!(frame.as_bytes(), b"redraw");
+    }
 
     /// The first frame reserves its rows *before* drawing them. That ordering is the whole fix:
     /// the newlines come first, so any scrolling happens while the cursor is still accounted for.

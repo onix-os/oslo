@@ -1,7 +1,4 @@
-//! Recording a line in the history.
-//!
-//! What is left of a file that used to build rustyline's `Editor` and configure it. The editor is
-//! oslo's own now, so the only thing this still owns is the decision of what gets remembered.
+//! Records accepted lines in command history.
 
 use super::history::store::History;
 

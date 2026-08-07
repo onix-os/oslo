@@ -217,17 +217,7 @@ pub fn paint(line: &str, ctx: &Context<'_>) -> String {
 
 /// Widen the `sudo` field over the spaces already beside it.
 ///
-/// `danger` is black on red, and a coloured field that stops at the last letter reads as a stain on
-/// the word rather than as a marker. It wants a space of red on each side.
-///
-/// Those spaces are *moved between tokens*, never inserted. rustyline places the cursor by
-/// measuring the raw buffer (`tty/mod.rs`: `calculate_position(&line[..pos], ..)`), not the string
-/// this returns, so one added character would draw the whole rest of the line a column right of
-/// where the cursor is put. The line must come back out of here at exactly the width it went in —
-/// which `painting_reassembles_the_line_once_the_escapes_are_stripped` is the guard for.
-///
-/// So the padding appears wherever the line already affords it, and `sudo` at the very start of a
-/// line gets it on the right only: there is no column to the left of column zero to colour.
+/// Existing neighboring spaces are moved into the danger token without changing line width.
 fn pad_danger(tokens: &mut [(String, TokenType)]) {
     for at in 0..tokens.len() {
         if tokens[at].1 != TokenType::Danger {
@@ -432,11 +422,7 @@ mod tests {
         out
     }
 
-    /// The red field around `sudo` is stolen from its neighbours, never added.
-    ///
-    /// This is the whole safety argument for the padding: rustyline positions the cursor by
-    /// measuring the raw buffer, so a painted line one column wider than the real one puts every
-    /// keystroke after it in the wrong place.
+    /// Danger padding preserves the source line's cell count.
     #[test]
     fn padding_sudo_does_not_change_a_single_column() {
         let _held = theme::held_at(theme::Depth::Ansi16);

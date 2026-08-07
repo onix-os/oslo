@@ -1,8 +1,4 @@
-//! The interactive line editor: completion, hints, colouring and multi-line input.
-//!
-//! [`OsloHelper`] is the rustyline `Helper`. The trait implementations here are deliberately thin
-//! — each one delegates to a module that can be called directly from a test, because none of this
-//! behaviour was reachable without a pty and that is precisely why it was all wrong.
+//! Interactive completion, hints, colouring and multi-line input services.
 
 pub mod abbr;
 pub mod ask;
@@ -98,15 +94,7 @@ impl OsloHelper {
         self.menu = enabled;
     }
 
-    /// Whether unterminated input is continued inside the editor.
-    ///
-    /// With it on (the default), `validate` answers `Incomplete` and rustyline keeps reading into
-    /// the same buffer. That fixes the three R9.1 failures on its own, but rustyline draws no
-    /// prompt on a continuation row and cannot be made to: it computes the cursor's column from
-    /// the raw buffer, so any prefix the highlighter added would put the cursor in the wrong
-    /// place. A caller that wants a real PS2 turns this off and drives the loop itself, calling
-    /// [`OsloHelper::input_status`] after each line and re-reading with
-    /// [`OsloHelper::continuation_prompt`] while the answer is [`InputStatus::Incomplete`].
+    /// Select whether the editor or its caller accumulates incomplete input.
     pub fn set_editor_multiline(&mut self, enabled: bool) {
         self.editor_multiline = enabled;
     }
@@ -126,18 +114,7 @@ impl OsloHelper {
             .unwrap_or_else(|| DEFAULT_PS2.to_string())
     }
 
-    /// Count the commands in an accepted line towards their frecency.
-    ///
-    /// **Whose job it is to call this depends on who assembles the command**, and getting that
-    /// wrong is how multi-line commands stopped counting (PLAN C10). `validate` calls it only
-    /// while [`OsloHelper::set_editor_multiline`] is on, because that is the mode in which
-    /// rustyline itself accumulates continuation lines and `validate` really does see the whole
-    /// program. With it off — which is what the REPL does, so that `PS2` can be drawn — `validate`
-    /// sees each line separately and answers `Incomplete` for every one but the last, so the loop
-    /// that built the buffer calls this instead. The comment that used to be here claimed
-    /// `validate` was "the one place the editor sees a line the user committed to"; it had been
-    /// false since the REPL turned editor multi-line off, and `for i in …; do git …; done` never
-    /// taught the ranker anything about `git`.
+    /// Count every command word in an accepted program toward frecency.
     pub fn record_command_use(&self, line: &str) {
         for name in words::command_words(line) {
             self.frecency.record(&name);
@@ -149,10 +126,7 @@ impl OsloHelper {
         self.frecency.score(name)
     }
 
-    /// Paint a line with the current theme, for drawing it as it is typed.
-    ///
-    /// Moved here from the editor's side of the bridge when rustyline went: it needs the
-    /// environment, and this is what holds it.
+    /// Paint a line with the current theme and environment.
     pub fn paint(&self, line: &str) -> String {
         if line.is_empty() {
             return String::new();
@@ -237,10 +211,6 @@ impl OsloHelper {
     }
 
     /// Note an accepted candidate for frecency ranking.
-    ///
-    /// `pub` because the native editor drives completion itself and must record the same
-    /// acceptance rustyline's path did — otherwise ranking would quietly stop learning the
-    /// moment the native editor was switched on.
     pub fn record_accepted(&self, candidate: &CompletionCandidate) {
         if candidate
             .kind

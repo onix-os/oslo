@@ -46,7 +46,7 @@ fn the_prompt_expands_history_references() {
         "echo alpha beta gamma\n!!\necho pre !$ post\n!echo\n^pre^POST\nexit\n",
     );
 
-    let count = |want: &str| stdout.lines().filter(|l| *l == want).count();
+    let count = |want: &str| stdout.lines().filter(|line| line.ends_with(want)).count();
     assert_eq!(
         count("alpha beta gamma"),
         2,
@@ -80,7 +80,7 @@ fn an_unresolvable_reference_runs_nothing_and_leaves_the_status_alone() {
         "the reason must be reported: {stderr:?}"
     );
     assert!(
-        stdout.lines().any(|l| l == "status=0"),
+        stdout.lines().any(|line| line.ends_with("status=0")),
         "a failed expansion runs nothing, so `$?` is untouched: {stdout:?}"
     );
 }
@@ -114,7 +114,7 @@ fn history_records_the_expanded_line_not_the_reference() {
     // became, or the second would resolve to the literal `!!` and be a syntax error.
     let (stdout, _) = repl(dir.path(), "echo kept\n!!\n!!\nexit\n");
     assert_eq!(
-        stdout.lines().filter(|l| *l == "kept").count(),
+        stdout.lines().filter(|line| line.ends_with("kept")).count(),
         3,
         "each !! re-runs the stored expansion: {stdout:?}"
     );

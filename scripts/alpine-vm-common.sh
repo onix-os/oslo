@@ -88,6 +88,6 @@ qemu_args_for() {
         -nographic
         -append "console=ttyS0 rdinit=/init panic=1 loglevel=3"
     )
-    command -v kvm >/dev/null 2>&1 && qemu_args+=(-enable-kvm)
     [ -w /dev/kvm ] && qemu_args+=(-enable-kvm)
+    return 0
 }

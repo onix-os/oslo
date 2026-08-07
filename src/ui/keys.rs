@@ -14,7 +14,7 @@
 /// naming them is that the shell can say so.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Action {
-    /// Switch the prompt between shell and Lua. Handled by the loop, not by rustyline.
+    /// Switch the prompt between shell and Lua.
     ToggleLanguage,
     ClearScreen,
     HistorySearchBackward,

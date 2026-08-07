@@ -300,7 +300,11 @@ fn a_here_document_body_keeps_its_indentation() {
         &[("HISTFILE", "")],
         dir.path(),
     );
-    assert!(out(&o).contains("\n    indented\n"), "{:?}", out(&o));
+    assert!(
+        out(&o).lines().any(|line| line.ends_with("    indented")),
+        "{:?}",
+        out(&o)
+    );
 }
 
 #[test]

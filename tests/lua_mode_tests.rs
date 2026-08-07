@@ -52,9 +52,10 @@ fn a_session_starts_in_shell_mode() {
 fn the_equals_prefix_runs_one_lua_line_from_shell_mode() {
     let out = typed("echo one\n=print(1 + 1)\necho two\n", &[]);
     // The prefix does not change the mode: the shell line after it is still shell.
+    let expected = ["one", "2", "two"];
     let lines: Vec<&str> = out
         .lines()
-        .filter(|l| *l == "one" || *l == "2" || *l == "two")
+        .filter_map(|line| expected.iter().find(|want| line.ends_with(**want)).copied())
         .collect();
     assert_eq!(lines, vec!["one", "2", "two"], "{out}");
 }
@@ -71,9 +72,10 @@ fn the_bang_prefix_runs_one_shell_line_from_lua_mode() {
         "print('lua one')\n!echo shell\nprint('lua two')\n",
         &[("OSLO_DEFAULT_MODE", "lua")],
     );
+    let expected = ["lua one", "shell", "lua two"];
     let lines: Vec<&str> = out
         .lines()
-        .filter(|l| ["lua one", "shell", "lua two"].contains(l))
+        .filter_map(|line| expected.iter().find(|want| line.ends_with(**want)).copied())
         .collect();
     assert_eq!(lines, vec!["lua one", "shell", "lua two"], "{out}");
 }

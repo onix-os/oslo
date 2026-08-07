@@ -1,31 +1,16 @@
-//! oslo's own machinery behind the native editor's [`Assist`].
-//!
-//! The bridge between [`oslo::ui::edit`], which knows how to edit and draw a line, and
-//! everything the shell already had — the syntax highlighter, the history, the environment. None
-//! of that is new; it was reachable all along behind rustyline's traits, which is why this file is
-//! mostly plumbing rather than logic.
-//!
-//! # Why the right prompt is not here
-//!
-//! Because it no longer has to be. Under rustyline it was smuggled out of the *highlighter*, since
-//! that was the only place a cursor move did not confuse the layout. The native editor takes it as
-//! an argument, which is what it always should have been.
+//! Adapts shell completion, history and highlighting to the native editor's [`Assist`].
 
 use oslo::lua::api::hooks;
 use oslo::ui::edit::session::{Assist, Bound, KeyHook};
 use oslo::ui::term::Key;
-use oslo::ui::{OsloHelper, abbr, dropdown, editor, marks, settings};
+use oslo::ui::{OsloHelper, abbr, dropdown, editor, settings};
 
 /// What the shell plugs into an editing session.
 pub struct ShellAssist<'a> {
     /// The completion and hinting machinery, borrowed rather than rebuilt: it carries the
     /// frecency table and the command index, and a second copy would rank differently.
     helper: Option<&'a OsloHelper>,
-    /// How wide the prompt prints.
-    ///
-    /// The **real** width. Under rustyline the dropdown had to guess it by rendering a default
-    /// prompt, because the editor never told anyone where the line started — so a custom prompt
-    /// put the menu in the wrong column. Here it is simply known.
+    /// Displayed prompt width used to place the completion menu.
     prompt_cols: usize,
     /// History, newest last — the same order the editor's own store keeps.
     history: Vec<String>,
@@ -82,6 +67,7 @@ fn key_name(key: Key) -> Option<String> {
         Key::End => "end".to_string(),
         Key::PageUp => "pageup".to_string(),
         Key::PageDown => "pagedown".to_string(),
+        Key::Function(number @ 1..=12) => format!("f{number}"),
         // The chords `term` folded into shared names. A config that bound `ctrl-a` means the
         // chord, so the name has to come back out even though the key arrived as `Home`.
         Key::Clear => "ctrl-u".to_string(),
@@ -124,6 +110,8 @@ fn hook_key_name(key: Key) -> (String, Option<char>) {
         Key::End => ("end".to_string(), None),
         Key::PageUp => ("pageup".to_string(), None),
         Key::PageDown => ("pagedown".to_string(), None),
+        Key::Function(number @ 1..=12) => (format!("f{number}"), None),
+        Key::Function(_) => ("ignored".to_string(), None),
         // Reported, because a hook watching keystrokes may reasonably want to know the window
         // moved under it — but it is not a key and is named so that no config mistakes it for one.
         Key::Resized => ("resized".to_string(), None),
@@ -137,12 +125,12 @@ fn hook_key_name(key: Key) -> (String, Option<char>) {
 /// that `line.text:sub(1, line.cursor)` works, and Lua's own string functions count bytes. The two
 /// agree for ASCII and diverge on the first accented letter, which is why this is not skipped.
 fn byte_cursor(line: &str, cursor: usize) -> usize {
-    line.chars().take(cursor).map(char::len_utf8).sum()
+    oslo::ui::edit::display::char_to_byte(line, cursor)
 }
 
 /// The byte index a handler answered with, back into a character index for the buffer.
 fn char_cursor(line: &str, at: usize) -> usize {
-    line.char_indices().take_while(|(i, _)| *i < at).count()
+    oslo::ui::edit::display::byte_to_char(line, at)
 }
 
 /// A handler's answer as the editor wants it: text, a character cursor, and whether to run it.
@@ -219,20 +207,7 @@ impl Assist for ShellAssist<'_> {
         if line.is_empty() {
             return String::new();
         }
-        // `OSC 133;B` first, so it lands between the prompt and the typed text, which is where it
-        // means anything. It prints nothing, so it costs no cells.
-        let mut painted = marks::input_start();
-        painted.push_str(&helper.paint(line));
-        painted
-    }
-
-    /// The ghost suggestion, from `oslo.suggest.sources` in order.
-    ///
-    /// Only at the end of the line: a suggestion is text that *continues* what you have typed, and
-    /// appending it after a cursor sitting mid-line would be a claim about the wrong position.
-    fn hint(&mut self, line: &str, cursor: usize) -> Option<String> {
-        let text = self.hint_text(line, cursor)?;
-        Some(self.helper?.paint_hint(&text))
+        helper.paint(line)
     }
 
     /// The suggestion as plain text, which is what accepting it inserts.
@@ -244,9 +219,21 @@ impl Assist for ShellAssist<'_> {
         helper.suggest(line, line.len())
     }
 
+    fn paint_hint(&mut self, text: &str) -> String {
+        self.helper
+            .map(|helper| helper.paint_hint(text))
+            .unwrap_or_else(|| text.to_string())
+    }
+
     /// Tab. Runs the whole interaction — the dropdown draws itself and takes its own keys — and
     /// answers with the line it produced.
-    fn complete(&mut self, line: &str, cursor: usize, _back: bool) -> Option<(String, usize)> {
+    fn complete(
+        &mut self,
+        line: &str,
+        cursor: usize,
+        _back: bool,
+        keys: &mut oslo::ui::term::Keys,
+    ) -> Option<(String, usize)> {
         let helper = self.helper?;
         // The dropdown works in bytes; the editor's cursor is in characters.
         let pos: usize = line.chars().take(cursor).map(char::len_utf8).sum();
@@ -272,9 +259,12 @@ impl Assist for ShellAssist<'_> {
             candidates.into_iter().next()?
         } else {
             let indent = self.prompt_cols + dropdown::visible_len(&line[..start]);
-            let Some(chosen) =
-                dropdown::DropdownMenu::select_interactive(candidates, indent, &line[start..pos])
-            else {
+            let Some(chosen) = dropdown::DropdownMenu::select_interactive(
+                candidates,
+                indent,
+                &line[start..pos],
+                keys,
+            ) else {
                 // Esc, or a key that closed the menu. Distinct from "nothing matched": the choice
                 // was offered and declined, which is the moment a hook wants to know about.
                 fire(hooks::at::COMPLETION_CANCEL, &[("word", &line[start..pos])]);
@@ -527,6 +517,14 @@ mod tests {
         );
         assert_eq!(hook_key_name(Key::Ctrl('k')).0, "ctrl-k");
         assert_eq!(hook_key_name(Key::Ctrl('k')).1, None);
+        for number in 1..=12 {
+            let name = format!("f{number}");
+            assert_eq!(
+                key_name(Key::Function(number)).as_deref(),
+                Some(name.as_str())
+            );
+            assert_eq!(hook_key_name(Key::Function(number)).0, name);
+        }
     }
 
     /// The cursor crosses the boundary between the editor, which counts characters, and Lua, which
@@ -543,5 +541,12 @@ mod tests {
         for at in 0..=line.chars().count() {
             assert_eq!(char_cursor(line, byte_cursor(line, at)), at, "round trip");
         }
+
+        let clustered = "ae\u{301}👍🏽z";
+        assert_eq!(byte_cursor(clustered, 2), 1);
+        assert_eq!(char_cursor(clustered, 2), 1);
+        let after_accent = "ae\u{301}".len();
+        assert_eq!(char_cursor(clustered, after_accent), 3);
+        assert_eq!(byte_cursor(clustered, 3), after_accent);
     }
 }

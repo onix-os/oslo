@@ -5,71 +5,20 @@
 //! over the prompt (R9.4).
 
 use nix::libc;
+use unicode_segmentation::UnicodeSegmentation;
+use unicode_width::UnicodeWidthStr;
 
 /// Column count assumed when the terminal will not say how wide it is.
 pub const FALLBACK_COLS: usize = 80;
 
 /// How many terminal cells `s` occupies, ignoring SGR escape sequences.
 ///
-/// This is an approximation of Unicode's East Asian Width plus emoji presentation — enough for
-/// the icons and file names a completion list actually contains, and deliberately dependency
-/// free. The two rules that decide the icon column are handled exactly: a variation selector
-/// U+FE0F forces the character before it to emoji (two-cell) presentation, and zero-width
-/// joiners and combining marks add nothing.
 pub fn display_width(s: &str) -> usize {
-    let mut width = 0usize;
-    let mut in_esc = false;
-    let mut prev: Option<char> = None;
-
-    for c in s.chars() {
-        if in_esc {
-            // CSI sequences end at their final byte; SGR (`m`) is all this code emits.
-            if c.is_ascii_alphabetic() {
-                in_esc = false;
-            }
-            continue;
-        }
-        match c {
-            '\x1b' => in_esc = true,
-            // Emoji presentation selector: widens the character it follows to two cells.
-            '\u{fe0f}' => {
-                if let Some(p) = prev
-                    && char_width(p) == 1
-                {
-                    width += 1;
-                }
-            }
-            _ => width += char_width(c),
-        }
-        if !in_esc {
-            prev = Some(c);
-        }
-    }
-    width
-}
-
-fn char_width(c: char) -> usize {
-    let cp = c as u32;
-    match cp {
-        // Zero width: joiners, text/emoji selectors, combining marks.
-        0x200b..=0x200f | 0xfe00..=0xfe0f | 0x0300..=0x036f | 0x1ab0..=0x1aff => 0,
-        // Wide: CJK, Hangul, fullwidth forms.
-        0x1100..=0x115f
-        | 0x2e80..=0x303e
-        | 0x3041..=0x33ff
-        | 0x3400..=0x4dbf
-        | 0x4e00..=0x9fff
-        | 0xa000..=0xa4cf
-        | 0xac00..=0xd7a3
-        | 0xf900..=0xfaff
-        | 0xfe30..=0xfe6f
-        | 0xff00..=0xff60
-        | 0xffe0..=0xffe6 => 2,
-        // Wide: the emoji blocks the icon set draws from.
-        0x1f300..=0x1faff | 0x1f000..=0x1f0ff | 0x26a1 | 0x2b1b..=0x2b1c | 0x2b50 => 2,
-        _ if cp < 0x20 => 0,
-        _ => 1,
-    }
+    let visible: String = without_escapes(s)
+        .chars()
+        .filter(|character| !character.is_control())
+        .collect();
+    UnicodeWidthStr::width(visible.as_str())
 }
 
 /// Kept for callers that measure a prompt before indenting the dropdown under it; cells, not
@@ -86,22 +35,9 @@ pub fn visible_len(s: &str) -> usize {
 /// wrap this module exists to prevent. Assumes plain text; labels and descriptions carry no
 /// escapes of their own.
 fn cells(s: &str) -> Vec<(String, usize)> {
-    let mut out: Vec<(String, usize)> = Vec::new();
-    for c in s.chars() {
-        let w = char_width(c);
-        if w == 0
-            && let Some(last) = out.last_mut()
-        {
-            // U+FE0F promotes its base to emoji (two-cell) presentation.
-            if c == '\u{fe0f}' && last.1 == 1 {
-                last.1 = 2;
-            }
-            last.0.push(c);
-            continue;
-        }
-        out.push((c.to_string(), w));
-    }
-    out
+    s.graphemes(true)
+        .map(|text| (text.to_string(), UnicodeWidthStr::width(text)))
+        .collect()
 }
 
 /// Cut `s` down to `max` cells, marking the cut with `…` so the reader knows something was
@@ -301,6 +237,15 @@ mod tests {
         // Never leaves half a wide character behind, and never exceeds the budget.
         assert_eq!(display_width(&truncate_to_width("📁📁📁", 5)), 5);
         assert_eq!(display_width(&truncate_to_width("⚙️ cargo", 4)), 4);
+        for grapheme in ["e\u{301}", "👍🏽", "👨‍👩‍👧‍👦", "🇳🇱", "1️⃣", "⚙️", "क्‍ष", "日"]
+        {
+            let width = display_width(grapheme);
+            assert_eq!(
+                truncate_to_width(&format!("{grapheme}tail"), width + 1),
+                format!("{grapheme}…"),
+                "{grapheme:?}"
+            );
+        }
     }
 
     #[test]

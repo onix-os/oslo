@@ -128,7 +128,6 @@ struct Canned {
     at: usize,
     /// What was on the line when the walk started, so coming back down can restore it.
     typed: Option<String>,
-    completion: Option<(String, usize)>,
     /// What the ghost suggestion would add, if anything.
     hint: Option<String>,
 }
@@ -137,13 +136,6 @@ impl Assist for Canned {
     /// As the real one does: no suggestion unless the cursor is at the end of the line.
     fn hint_text(&mut self, line: &str, cursor: usize) -> Option<String> {
         (cursor >= line.chars().count()).then(|| self.hint.clone())?
-    }
-    /// What is *drawn*. The real one paints it; plain here so a test can look for the text.
-    fn hint(&mut self, line: &str, cursor: usize) -> Option<String> {
-        self.hint_text(line, cursor)
-    }
-    fn complete(&mut self, _l: &str, _c: usize, _b: bool) -> Option<(String, usize)> {
-        self.completion.clone()
     }
     fn history_prev(&mut self, line: &str) -> Option<String> {
         let entry = self.history.get(self.at)?.clone();
@@ -218,23 +210,19 @@ fn history_that_runs_out_changes_nothing() {
     assert_eq!(s.buffer.text(), "typed");
 }
 
-/// Completion replaces the line and places the cursor where the completer asked.
+/// Completion is delegated to the outer loop that owns the terminal reader.
 #[test]
-fn completion_replaces_the_line() {
-    let mut a = Canned {
-        completion: Some(("git checkout ".to_string(), 13)),
-        ..Canned::default()
-    };
+fn completion_requests_the_shared_modal() {
+    let mut a = Canned::default();
     let mut s = Session {
         vi: None,
         ..Session::new("git ch", 6)
     };
     assert_eq!(
         s.apply(Key::ToggleScope, &mut a),
-        Step::Continue { redraw: true }
+        Step::OpenCompletion { backwards: false }
     );
-    assert_eq!(s.buffer.text(), "git checkout ");
-    assert_eq!(s.buffer.cursor(), 13);
+    assert_eq!(s.buffer.text(), "git ch");
 }
 
 /// Ctrl-L asks for the screen to be cleared, which the loop does — the buffer is untouched.
@@ -357,6 +345,68 @@ fn the_last_frame_of_a_line_has_no_ghost() {
         "{:?}",
         finished.text
     );
+}
+
+#[test]
+fn editor_frames_encode_untrusted_controls_but_keep_raw_text() {
+    let raw = "echo \x1b]52;c;owned\x07\r\t\0\x7f";
+    let s = Session {
+        vi: None,
+        ..Session::new(raw, raw.chars().count())
+    };
+    let frame = super::draw("$ ", "", &s, &mut NoAssist, true);
+    assert!(
+        !frame.text.contains('\x1b'),
+        "raw escape reached frame: {frame:?}"
+    );
+    assert!(
+        !frame.text.contains('\x07'),
+        "raw BEL reached frame: {frame:?}"
+    );
+    assert!(frame.text.contains("^[]52;c;owned^G^M^I^@^?"));
+    assert_eq!(s.buffer.text(), raw);
+}
+
+#[test]
+fn untrusted_suggestion_controls_are_encoded_before_styling() {
+    let mut assist = Canned {
+        hint: Some("\x1b]0;owned\x07".into()),
+        ..Canned::default()
+    };
+    let s = Session {
+        vi: None,
+        ..Session::new("echo", 4)
+    };
+    let frame = super::draw("$ ", "", &s, &mut assist, true);
+    assert!(!frame.text.contains("\x1b]0;owned"));
+    assert!(frame.text.contains("^[]0;owned^G"));
+}
+
+#[test]
+fn hooks_receive_raw_controls_instead_of_display_notation() {
+    struct RawHook;
+    impl Assist for RawHook {
+        fn watches_keys(&mut self) -> bool {
+            true
+        }
+
+        fn key_hook(&mut self, _key: Key, line: &str, cursor: usize) -> Option<KeyHook> {
+            assert_eq!(line, "echo \x1b]0;owned\x07");
+            assert_eq!(cursor, line.chars().count());
+            Some(KeyHook::Swallow)
+        }
+    }
+
+    let raw = "echo \x1b]0;owned\x07";
+    let mut session = Session {
+        vi: None,
+        ..Session::new(raw, raw.chars().count())
+    };
+    assert_eq!(
+        session.apply(Key::Function(1), &mut RawHook),
+        Step::Continue { redraw: false }
+    );
+    assert_eq!(session.buffer.text(), raw);
 }
 
 /// A Lua binding may run the line, not only fill it in.
@@ -526,4 +576,17 @@ fn the_key_hook_can_submit() {
     };
     assert_eq!(s.apply(Key::Ctrl('o'), &mut Go), Step::Accept);
     assert_eq!(s.buffer.text(), "ll");
+}
+
+#[test]
+fn multiline_paste_inserts_without_submitting() {
+    let mut session = Session {
+        vi: None,
+        ..Session::new("echo ", 5)
+    };
+    assert_eq!(
+        session.paste("one\necho two"),
+        Step::Continue { redraw: true }
+    );
+    assert_eq!(session.buffer.text(), "echo one\necho two");
 }
