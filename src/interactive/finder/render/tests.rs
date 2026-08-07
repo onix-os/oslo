@@ -188,11 +188,12 @@ fn the_scope_badge_uses_accent_on_zero() {
         confirm: None,
         profile: "default",
     };
-    let pager = theme::Pager::default();
-    let bar = search_bar(&f, &pager, pager.bg, 80, Depth::Ansi256);
+    // Through the whole frame now that the bar is `Look`'s, which is the better test anyway: it
+    // asserts on what reaches the terminal rather than on one function's return.
+    let drawn = frame(&f);
     assert!(
-        bar.contains("\x1b[38;5;0;48;5;1m[global]\x1b[0m"),
-        "scope badge has the wrong colours: {bar:?}"
+        drawn.contains("\x1b[38;5;0;48;5;1m[global]\x1b[0m"),
+        "scope badge has the wrong colours: {drawn:?}"
     );
 }
 

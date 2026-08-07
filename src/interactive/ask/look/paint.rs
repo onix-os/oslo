@@ -111,6 +111,18 @@ impl Look {
     /// Every row begins with `\r\n`, which is what makes the row count exact — see
     /// `super::super::Inline`.
     pub fn frame(&self, rows: &[Row], view: &View<'_>) -> String {
+        self.rows(rows, view)
+            .iter()
+            .map(|row| format!("\r\n\r\x1b[K{row}"))
+            .collect()
+    }
+
+    /// The same rows, painted but not yet joined into a frame.
+    ///
+    /// The inline widgets want them separated by `\r\n` with an erase on each; the history finder
+    /// draws top-down on a screen it owns and wants them the other way round. Both want the *rows*
+    /// to be identical, which is the whole reason this is one function rather than two renderers.
+    pub fn rows(&self, rows: &[Row], view: &View<'_>) -> Vec<String> {
         let depth = theme::depth();
         // Measured across the *whole* list rather than the visible window, so the columns do not
         // shift under you as it scrolls — which is the one thing that would undo the alignment
@@ -136,15 +148,11 @@ impl Look {
             true => self.filter_rows(view, depth),
             false => Vec::new(),
         };
-        let ordered: Vec<String> = match (view.filtering, self.filter_at) {
+        match (view.filtering, self.filter_at) {
             (false, _) => list,
             (true, Where::Top) => [filter, gap, list].concat(),
             (true, Where::Bottom) => [list, gap, filter].concat(),
-        };
-        ordered
-            .iter()
-            .map(|row| format!("\r\n\r\x1b[K{row}"))
-            .collect()
+        }
     }
 
     /// One row: the marker, the lead, the meta columns, the text with its matches marked, and the
