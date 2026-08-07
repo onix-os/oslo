@@ -143,7 +143,7 @@ jammdb = "0.11"
 # A one-package workspace, stated explicitly so `cargo fmt --all` and the 600-line limit apply
 # to this crate and nothing else. `fuzz/` declares its own empty [workspace] to stay out.
 [workspace]
-members = ["crates/brush-parser", "crates/full_moon", "crates/full_moon_derive"]
+members = ["crates/brush-parser", "crates/full_moon", "crates/full_moon/derive"]
 
 
 

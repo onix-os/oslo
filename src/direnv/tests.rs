@@ -27,6 +27,17 @@ fn shell() -> Mutex<Environment> {
 ///
 /// A read/write lock rather than a plain mutex, so the fifteen tests that only *depend* on the
 /// feature being on still run concurrently with each other. Only the one that changes it is alone.
+/// **Tests build with [`Direnv::adopting`] and no record, never [`Direnv::new`].**
+///
+/// `new` reads the carried undo record out of the *process* environment, and a load writes it
+/// there — that is the whole point of it, since a child inherits `environ` and nothing else. One
+/// shell has one `Direnv` and constructs it before anything is loaded, so the two never meet.
+///
+/// A test binary is not one shell. Dozens of these run at once in one process, and a load in any
+/// of them would be adopted by every `Direnv` built afterwards, which showed up as this file
+/// failing about one run in five. Saying "inherited nothing" is both the fix and what these tests
+/// mean: each is a shell starting fresh.
+///
 /// Hold while a test needs the `direnv` feature left alone.
 fn feature_unchanged() -> std::sync::RwLockReadGuard<'static, ()> {
     crate::feature::TEST_STATE
@@ -83,7 +94,7 @@ fn an_unallowed_file_is_not_read_and_is_reported_once() {
     let project = tempfile::tempdir().expect("temp dir");
     rc_in(project.path(), find::NAME, "SECRET=leaked\n");
 
-    let mut direnv = Direnv::new(store.path().to_str(), None);
+    let mut direnv = Direnv::adopting(store.path().to_str(), None, None);
     let env = shell();
 
     let events = direnv.arrive(&env, project.path(), &mut pairs_into(&env), &mut || {});
@@ -122,7 +133,7 @@ fn an_alias_a_directory_defined_leaves_with_it() {
 
     let env = shell();
     env.lock().unwrap().set_alias("keep", "echo untouched");
-    let mut direnv = Direnv::new(store.path().to_str(), None);
+    let mut direnv = Direnv::adopting(store.path().to_str(), None, None);
     direnv.permissions().allow(&path).expect("allow");
 
     direnv.arrive(&env, project.path(), &mut pairs_into(&env), &mut || {});
@@ -169,7 +180,7 @@ fn a_local_variable_the_directory_exported_comes_back_local() {
     let env = shell();
     // Set, but deliberately not exported.
     env.lock().unwrap().set_var("OSLO_T_LOCAL", "mine", false);
-    let mut direnv = Direnv::new(store.path().to_str(), None);
+    let mut direnv = Direnv::adopting(store.path().to_str(), None, None);
     direnv.permissions().allow(&path).expect("allow");
 
     direnv.arrive(&env, project.path(), &mut pairs_into(&env), &mut || {});
@@ -210,7 +221,7 @@ fn a_path_a_project_added_does_not_follow_you_out() {
 
     let env = shell();
     env.lock().unwrap().set_var("PATH", "/usr/bin", true);
-    let mut direnv = Direnv::new(store.path().to_str(), None);
+    let mut direnv = Direnv::adopting(store.path().to_str(), None, None);
     direnv.permissions().allow(&path).expect("allow");
 
     direnv.arrive(&env, project.path(), &mut pairs_into(&env), &mut || {});
@@ -237,7 +248,7 @@ fn arriving_loads_and_leaving_puts_everything_back() {
         "DATABASE_URL=postgres://local\n",
     );
 
-    let mut direnv = Direnv::new(store.path().to_str(), None);
+    let mut direnv = Direnv::adopting(store.path().to_str(), None, None);
     direnv.permissions().allow(&path).expect("allow");
     let env = shell();
     env.lock().unwrap().set_var("EDITOR", "vim", true);
@@ -271,7 +282,7 @@ fn one_project_never_leaks_into_the_next() {
     let one = rc_in(first.path(), find::NAME, "ONLY_IN_FIRST=1\n");
     let two = rc_in(second.path(), find::NAME, "ONLY_IN_SECOND=2\n");
 
-    let mut direnv = Direnv::new(store.path().to_str(), None);
+    let mut direnv = Direnv::adopting(store.path().to_str(), None, None);
     direnv.permissions().allow(&one).expect("allow");
     direnv.permissions().allow(&two).expect("allow");
     let env = shell();
@@ -295,7 +306,7 @@ fn staying_put_does_no_work() {
     let project = tempfile::tempdir().expect("temp dir");
     let path = rc_in(project.path(), find::NAME, "OSLO_T_STAY=1\n");
 
-    let mut direnv = Direnv::new(store.path().to_str(), None);
+    let mut direnv = Direnv::adopting(store.path().to_str(), None, None);
     direnv.permissions().allow(&path).expect("allow");
     let env = shell();
 
@@ -325,7 +336,7 @@ fn denying_what_is_loaded_unloads_it() {
     let project = tempfile::tempdir().expect("temp dir");
     let path = rc_in(project.path(), find::NAME, "OSLO_T_DENY=1\n");
 
-    let mut direnv = Direnv::new(store.path().to_str(), None);
+    let mut direnv = Direnv::adopting(store.path().to_str(), None, None);
     direnv.permissions().allow(&path).expect("allow");
     let env = shell();
     direnv.arrive(&env, project.path(), &mut pairs_into(&env), &mut || {});
@@ -355,7 +366,7 @@ fn allowing_loads_without_moving() {
     let project = tempfile::tempdir().expect("temp dir");
     let path = rc_in(project.path(), find::NAME, "OSLO_T_NOW=1\n");
 
-    let mut direnv = Direnv::new(store.path().to_str(), None);
+    let mut direnv = Direnv::adopting(store.path().to_str(), None, None);
     let env = shell();
     direnv.arrive(&env, project.path(), &mut pairs_into(&env), &mut || {});
     assert_eq!(
@@ -384,7 +395,7 @@ fn walking_deeper_stays_loaded() {
     std::fs::create_dir_all(&deep).expect("mkdir");
     let path = rc_in(project.path(), find::NAME, "OSLO_T_DEEP=1\n");
 
-    let mut direnv = Direnv::new(store.path().to_str(), None);
+    let mut direnv = Direnv::adopting(store.path().to_str(), None, None);
     direnv.permissions().allow(&path).expect("allow");
     let env = shell();
 
@@ -405,7 +416,7 @@ fn an_edit_revokes_and_the_environment_comes_back_out() {
     let project = tempfile::tempdir().expect("temp dir");
     let path = rc_in(project.path(), find::NAME, "OSLO_T_EDIT_A=1\n");
 
-    let mut direnv = Direnv::new(store.path().to_str(), None);
+    let mut direnv = Direnv::adopting(store.path().to_str(), None, None);
     direnv.permissions().allow(&path).expect("allow");
     let env = shell();
     direnv.arrive(&env, project.path(), &mut pairs_into(&env), &mut || {});
@@ -458,7 +469,7 @@ fn turning_the_feature_off_unloads_the_loaded_environment() {
     let path = rc_in(project.path(), find::NAME, "OSLO_T_FEATURE=loaded\n");
 
     let env = shell();
-    let mut direnv = Direnv::new(store.path().to_str(), None);
+    let mut direnv = Direnv::adopting(store.path().to_str(), None, None);
     direnv.permissions().allow(&path).expect("allow");
 
     direnv.arrive(&env, project.path(), &mut pairs_into(&env), &mut || {});

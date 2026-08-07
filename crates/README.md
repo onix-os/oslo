@@ -1,16 +1,19 @@
 # Vendored parsers
 
-Two parsers oslo does not write and does not want to depend on remotely. Both are hard forks: the
-source is here, oslo builds it as a workspace member, and there is no upstream to sync with.
+Two parsers oslo does not write and does not want to depend on remotely. `full_moon` carries its
+proc-macro in `full_moon/derive`: a `proc-macro = true` crate can only export macros, so it cannot
+live *inside* another crate, so nesting the directory is as close to one unit as cargo permits.
 
-**oslo is MIT. `full_moon` and `full_moon_derive` are MPL-2.0 and remain so.** See *Licences* below
+Both are hard forks: the source is here, oslo builds it as a workspace member, and there is no upstream to sync with.
+
+**oslo is MIT. `full_moon` and `full_moon/derive` are MPL-2.0 and remain so.** See *Licences* below
 before copying anything out of this directory.
 
 | crate | upstream | licence | why it is here |
 |---|---|---|---|
 | `brush-parser` | [reubeno/brush](https://github.com/reubeno/brush) | MIT | POSIX/bash tokenizer and parser |
 | `full_moon` | [Kampfkarren/full-moon](https://github.com/Kampfkarren/full-moon) | **MPL-2.0** | Lua parser |
-| `full_moon_derive` | as above | **MPL-2.0** | proc-macro `full_moon` needs; not published as a standalone path dep |
+|`full_moon/derive` | as above | **MPL-2.0** | proc-macro `full_moon` needs; not published as a standalone path dep |
 
 ## Why vendored
 
@@ -35,7 +38,6 @@ Three non-optional dependencies, none of which survived into the linked binary:
   deleted; `Parser::new` is the constructor and always was.
 * **`tracing`** — 8 crates. Eight `tracing::debug!` calls, none reachable without a subscriber that
   oslo never installs.
-
 * **`thiserror`** — now optional, and reached only by the `diagnostics` feature, where `miette`
   genuinely needs it. Three enums and two newtypes, twenty-eight messages, written out by hand in
   `error.rs` and `tokenizer.rs`. It was the last thing wanting `syn 3`, so the build now compiles
@@ -48,7 +50,7 @@ alternative parser that was never finished and never enabled.
 
 Everything else is upstream's, unmodified.
 
-## What was removed from `full_moon_derive`
+## What was removed from `full_moon/derive`
 
 `indexmap`, which nothing in the crate referenced — a dead entry in the manifest dragging
 `hashbrown 0.12` behind it. And `syn 1` to `syn 2`, which needed one function rewritten:
@@ -71,7 +73,7 @@ to read against upstream later.
 
 `brush-parser` is MIT, © 2024 reuben olinsky. `LICENSE` beside it is upstream's, unchanged.
 
-`full_moon` and `full_moon_derive` are **MPL-2.0**, © the full-moon authors. MPL is file-level
+`full_moon` and `full_moon/derive` are **MPL-2.0**, © the full-moon authors. MPL is file-level
 copyleft: those files stay MPL however they are combined, and any modification to them must remain
 available in source form. That is compatible with oslo being MIT — MPL is designed for exactly this
 — but it is a real obligation and it does not evaporate because the code sits in this tree. The

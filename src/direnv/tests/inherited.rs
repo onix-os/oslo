@@ -21,11 +21,11 @@ fn an_inherited_environment_is_unloaded_by_the_shell_that_inherits_it() {
     let store = tempfile::tempdir().expect("temp dir");
     let project = tempfile::tempdir().expect("temp dir");
     let elsewhere = tempfile::tempdir().expect("temp dir");
-    let path = rc_in(project.path(), find::NAME, "PROJ=A\n");
+    let path = rc_in(project.path(), find::NAME, "OSLO_T_CARRY_OUT=A\n");
 
     // The parent: standing in the project, with its environment loaded.
     let parent_env = shell();
-    let mut parent = Direnv::new(store.path().to_str(), None);
+    let mut parent = Direnv::adopting(store.path().to_str(), None, None);
     parent.permissions().allow(&path).expect("allow");
     parent.arrive(
         &parent_env,
@@ -33,13 +33,16 @@ fn an_inherited_environment_is_unloaded_by_the_shell_that_inherits_it() {
         &mut pairs_into(&parent_env),
         &mut || {},
     );
-    assert_eq!(var(&parent_env, "PROJ").as_deref(), Some("A"));
+    assert_eq!(var(&parent_env, "OSLO_T_CARRY_OUT").as_deref(), Some("A"));
     let carried = var(&parent_env, carry::NAME).expect("the record is exported for children");
 
     // The child: a fresh shell, holding the variables because it inherited them, and standing
     // somewhere else entirely.
     let child_env = shell();
-    child_env.lock().unwrap().set_var("PROJ", "A", true);
+    child_env
+        .lock()
+        .unwrap()
+        .set_var("OSLO_T_CARRY_OUT", "A", true);
     let mut child = Direnv::adopting(store.path().to_str(), None, Some(&carried));
     assert_eq!(
         child.active(),
@@ -53,7 +56,7 @@ fn an_inherited_environment_is_unloaded_by_the_shell_that_inherits_it() {
         &mut || {},
     );
     assert_eq!(
-        var(&child_env, "PROJ"),
+        var(&child_env, "OSLO_T_CARRY_OUT"),
         None,
         "the inherited variable must not follow it out"
     );
@@ -73,10 +76,10 @@ fn a_child_that_starts_in_the_project_keeps_it() {
     let store = tempfile::tempdir().expect("temp dir");
     let project = tempfile::tempdir().expect("temp dir");
     let elsewhere = tempfile::tempdir().expect("temp dir");
-    let path = rc_in(project.path(), find::NAME, "PROJ=A\n");
+    let path = rc_in(project.path(), find::NAME, "OSLO_T_CARRY_IN=A\n");
 
     let parent_env = shell();
-    let mut parent = Direnv::new(store.path().to_str(), None);
+    let mut parent = Direnv::adopting(store.path().to_str(), None, None);
     parent.permissions().allow(&path).expect("allow");
     parent.arrive(
         &parent_env,
@@ -87,7 +90,10 @@ fn a_child_that_starts_in_the_project_keeps_it() {
     let carried = var(&parent_env, carry::NAME).expect("a record");
 
     let child_env = shell();
-    child_env.lock().unwrap().set_var("PROJ", "A", true);
+    child_env
+        .lock()
+        .unwrap()
+        .set_var("OSLO_T_CARRY_IN", "A", true);
     let mut child = Direnv::adopting(store.path().to_str(), None, Some(&carried));
     let events = child.arrive(
         &child_env,
@@ -99,7 +105,7 @@ fn a_child_that_starts_in_the_project_keeps_it() {
         events.is_empty(),
         "nothing to do, and nothing said: {events:?}"
     );
-    assert_eq!(var(&child_env, "PROJ").as_deref(), Some("A"));
+    assert_eq!(var(&child_env, "OSLO_T_CARRY_IN").as_deref(), Some("A"));
 
     child.arrive(
         &child_env,
@@ -108,7 +114,7 @@ fn a_child_that_starts_in_the_project_keeps_it() {
         &mut || {},
     );
     assert_eq!(
-        var(&child_env, "PROJ"),
+        var(&child_env, "OSLO_T_CARRY_IN"),
         None,
         "and it still leaves properly"
     );
