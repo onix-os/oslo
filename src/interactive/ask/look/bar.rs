@@ -19,7 +19,7 @@
 use super::{Look, View, Width};
 use crate::interactive::dropdown::width::truncate_to_width;
 use crate::interactive::prompt::printed_width;
-use crate::interactive::theme::{self, Color, Style};
+use crate::interactive::theme::{self, Style};
 
 impl Look {
     /// A widget that is one row rather than a list: `input`, and anything else that asks for a
@@ -89,16 +89,6 @@ impl Look {
             bg: self.surface.or(style.bg),
             ..style
         };
-        // **A drawn caret, not the real one.** The terminal cursor is hidden while a widget is
-        // open — an inline one repaints its whole block per keystroke and would drag the cursor
-        // across all of it — so the caret is part of the frame and cannot end up a cell out of
-        // step with the text.
-        let caret = Style {
-            fg: Some(Color::Indexed(0)),
-            bg: Some(Color::Indexed(1)),
-            ..Style::default()
-        };
-
         // Measured from `plain`, not from the painted sweep: the rendered one is mostly escapes,
         // and counting those as cells is how the right-hand slot ends up off the edge.
         let (sweep, sweep_cells) = match self.scanner {
@@ -120,24 +110,54 @@ impl Look {
             + 1;
         let room = view.cols.saturating_sub(fixed).max(1);
 
-        let (typed, style) = match view.query.is_empty() {
-            true => (truncate_to_width(&self.placeholder, room), self.muted),
-            false => (truncate_to_width(view.query, room), self.row),
+        // **The caret is where you are typing, which on an empty field is the beginning.** It sat
+        // after the placeholder, so an untouched filter looked like a cursor parked at the end of
+        // the words "type to filter" rather than in front of them, waiting.
+        //
+        // Drawn by the shared `with_caret`, so it takes the shape `oslo.vi.cursor_insert` asks
+        // for — a widget with its own hard-coded block left the shell with two different cursors
+        // depending on which one you were in.
+        let (body, cells) = match view.query.is_empty() {
+            true => {
+                let shown = truncate_to_width(&self.placeholder, room);
+                let mut chars = shown.chars();
+                let first = chars.next().unwrap_or(' ');
+                (
+                    format!(
+                        "{}{}",
+                        super::super::with_caret(&first.to_string(), 0),
+                        on(self.muted).paint(chars.as_str(), depth)
+                    ),
+                    printed_width(&shown).max(1),
+                )
+            }
+            false => {
+                let shown = truncate_to_width(view.query, room);
+                let cells = printed_width(&shown) + 1;
+                (
+                    format!(
+                        "{}{}",
+                        on(self.row).paint(&shown, depth),
+                        // Past the last character, so it reads as "typing continues here".
+                        super::super::with_caret("", 0)
+                    ),
+                    cells,
+                )
+            }
         };
         let gap = match self.width {
-            Width::Full => room.saturating_sub(printed_width(&typed)),
+            Width::Full => (room + 1).saturating_sub(cells),
             Width::Content => 0,
         };
         let pad = " ".repeat(self.pad);
 
         format!(
-            "{}{}{}{}{}{}{}{}{}",
+            "{}{}{}{}{}{}{}{}",
             on(Style::default()).paint(&pad, depth),
             sweep,
             on(self.accent).paint(&self.prompt, depth),
             left,
-            on(style).paint(&typed, depth),
-            caret.paint(" ", depth),
+            body,
             on(Style::default()).paint(&" ".repeat(gap), depth),
             right,
             on(Style::default()).paint(&pad, depth),

@@ -35,6 +35,21 @@ pub struct Panel {
     column: usize,
 }
 
+/// Begin an atomic update, so the terminal cannot show a half-drawn frame.
+///
+/// DEC mode 2026: a terminal that understands it buffers everything until the matching end and
+/// presents the result in one go; one that does not ignores both, so this costs nothing anywhere.
+///
+/// It matters wherever a frame is more than one write — reserve rows, move, erase, redraw — which
+/// is every widget that draws through this module. Without it the terminal is free to render
+/// halfway through a rewrite, and that is what tearing *is*: on a list it reads as the rows
+/// flickering or jumping.
+///
+/// Here rather than in one widget because both things that draw whole frames need it, and having
+/// only one of them do it is how the finder came to look steady while `ui filter` did not.
+pub const SYNC_BEGIN: &str = "\x1b[?2026h";
+pub const SYNC_END: &str = "\x1b[?2026l";
+
 impl Panel {
     /// A panel drawn from `column`.
     pub fn at(column: usize) -> Panel {

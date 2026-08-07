@@ -51,6 +51,7 @@ mod style;
 mod table;
 mod write;
 
+use crate::interactive::paint::{SYNC_BEGIN, SYNC_END};
 use crate::interactive::term::Pressed;
 pub use choose::{Choice, choose, filter};
 pub use confirm::{Confirm, confirm};
@@ -159,7 +160,19 @@ impl Inline {
             n => format!("{}{frame}", "\r\n\r\x1b[K".repeat(n)),
         };
         let rows = frame.matches("\r\n").count();
-        show(&self.panel.draw(&frame, rows));
+        // **One atomic update.** A frame is reserve-rows, move, erase, redraw — dozens of writes
+        // that the terminal is otherwise free to render halfway through. That is what tearing is,
+        // and on a list it reads as the rows flickering or jumping. It showed up the moment the
+        // scanner made these redraw on a timer rather than only on a keystroke, but it was always
+        // there on a fast typist.
+        //
+        // DEC mode 2026: a terminal that understands it buffers everything until the matching end
+        // and presents the result in one go; one that does not ignores both, so this costs nothing
+        // anywhere. The finder has drawn this way from the start — see `finder::render`.
+        show(&format!(
+            "{SYNC_BEGIN}{}{SYNC_END}",
+            self.panel.draw(&frame, rows)
+        ));
     }
 
     /// Erase everything drawn, exactly.
@@ -219,7 +232,7 @@ pub(crate) fn awaited(keys: &mut crate::interactive::term::Keys, tick: Option<i3
     }
 }
 
-/// `text` with a block cursor drawn on the character at `at`.
+/// `text` with the cursor drawn on the character at `at`.
 ///
 /// The real terminal cursor is hidden for every widget — an inline one repaints its whole block on
 /// each keystroke and the cursor is dragged across all of it — so a text field has to draw its own.
@@ -227,27 +240,64 @@ pub(crate) fn awaited(keys: &mut crate::interactive::term::Keys, tick: Option<i3
 /// reason beyond flicker: the caret is *part of the frame*, so it cannot end up a cell out of step
 /// with the text the way a separate `ESC [ n C` can.
 ///
-/// At the end of the text the block sits on a space, which is how you can tell "typing at the end"
+/// **The shape is the one the config asked for.** `oslo.vi.cursor_insert` names a `DECSCUSR` shape
+/// that a real cursor would take, and a drawn one that ignored it left the shell with two
+/// different cursors depending on which widget you were in. Since the terminal is not drawing this
+/// one, each shape is emulated: a block reverses the cell, an underline underlines it, and a bar
+/// is a thin rule down its left edge.
+///
+/// At the end of the text the caret sits on a space, which is how you can tell "typing at the end"
 /// from "on the last character".
 pub(crate) fn with_caret(text: &str, at: usize) -> String {
-    let ui = crate::interactive::theme::current().ui;
+    // Insert, because a text field is where you insert. The blink variants are drawn steady: a
+    // frame is redrawn on a keystroke, not on a timer, so a blinking caret would blink only while
+    // you typed — which reads as a rendering fault rather than as a cursor.
+    let shape = crate::interactive::settings::current().vi.cursors.insert;
+    caret_over(text, at, shape)
+}
+
+/// [`with_caret`] with the shape given rather than read.
+///
+/// Split out so the three shapes can be tested without a config: reading a global inside the thing
+/// under test means only whichever shape happens to be the default is ever exercised.
+fn caret_over(text: &str, at: usize, shape: crate::interactive::vi::Cursor) -> String {
+    use crate::interactive::theme::Style;
+    use crate::interactive::vi::Cursor;
+
     let depth = crate::interactive::theme::depth();
-    let block = crate::interactive::theme::Style {
-        reverse: true,
-        ..crate::interactive::theme::Style::default()
-    };
     let chars: Vec<char> = text.chars().collect();
     let at = at.min(chars.len());
     let before: String = chars[..at].iter().collect();
     let under = chars.get(at).copied().unwrap_or(' ');
     let after: String = chars.iter().skip(at + 1).collect();
-    let _ = ui;
-    format!(
-        "{}{}{}",
-        before,
-        block.paint(&under.to_string(), depth),
-        after
-    )
+    // Whatever the shape, it occupies exactly the one cell the character does. A caret that took a
+    // second cell would shift the text under it every time it moved, and the row is measured in
+    // cells everywhere else.
+    let reversed = Style {
+        reverse: true,
+        ..Style::default()
+    };
+    let (marked, style) = match shape {
+        // A real bar sits *between* cells and costs no width; drawn, it has to live in one. So it
+        // is a bar wherever there is an empty cell to be one in — the end of a line, which is
+        // where a caret spends nearly all its time — and reverses the character otherwise rather
+        // than hiding it.
+        Cursor::Bar | Cursor::BlinkBar if under == ' ' => (
+            "▏".to_string(),
+            crate::interactive::theme::current().ui.accent,
+        ),
+        Cursor::Underline | Cursor::BlinkUnderline => (
+            under.to_string(),
+            Style {
+                underline: true,
+                // Under a space an underline is the whole cursor, and a bare `SGR 4` on a blank
+                // cell is invisible in some terminals. The accent gives it something to draw.
+                ..crate::interactive::theme::current().ui.accent
+            },
+        ),
+        _ => (under.to_string(), reversed),
+    };
+    format!("{}{}{}", before, style.paint(&marked, depth), after)
 }
 
 #[cfg(test)]
@@ -275,31 +325,84 @@ mod tests {
         out
     }
 
+    use crate::interactive::vi::Cursor;
+
+    /// Whether any SGR in `drawn` sets attribute `code`.
+    ///
+    /// Matched as a parameter rather than as the literal `\x1b[4m`, because a shape carries the
+    /// accent colour with it and the terminal is sent all of them at once: `\x1b[1;4;95m`.
+    fn sets(drawn: &str, code: &str) -> bool {
+        drawn.split('\x1b').any(|part| {
+            part.strip_prefix('[')
+                .and_then(|p| p.split_once('m'))
+                .is_some_and(|(params, _)| params.split(';').any(|p| p == code))
+        })
+    }
+
     /// The caret is part of the text, so it can never be a cell out of step with it.
     #[test]
     fn the_caret_marks_the_character_it_is_on() {
         // Reverse video around exactly one character, and the rest untouched.
-        let drawn = with_caret("abc", 1);
+        let drawn = caret_over("abc", 1, Cursor::Block);
         assert!(drawn.contains("\x1b[7m"), "not reversed: {drawn:?}");
         assert_eq!(plain(&drawn), "abc", "the text changed: {drawn:?}");
     }
 
-    /// Past the end it sits on a space, which is how "typing at the end" looks different from
-    /// "on the last character".
+    /// Past the end it sits on the cell after the text, which is how "typing at the end" looks
+    /// different from "on the last character".
     #[test]
-    fn at_the_end_the_caret_is_a_space() {
-        let drawn = with_caret("ab", 2);
-        assert_eq!(plain(&drawn), "ab ", "{drawn:?}");
+    fn at_the_end_the_caret_is_the_next_cell() {
+        assert_eq!(plain(&caret_over("ab", 2, Cursor::Block)), "ab ");
         // And an index past even that cannot panic — a cursor arriving from shell code is a
         // number somebody could have written.
-        assert_eq!(plain(&with_caret("ab", 99)), "ab ");
-        assert_eq!(plain(&with_caret("", 0)), " ");
+        assert_eq!(plain(&caret_over("ab", 99, Cursor::Block)), "ab ");
+        assert_eq!(plain(&caret_over("", 0, Cursor::Block)), " ");
+    }
+
+    /// **The shape is the one the config asked for.** A widget drawing its own hard-coded block
+    /// left the shell with two different cursors depending on which one you were in.
+    #[test]
+    fn the_caret_takes_the_configured_shape() {
+        let block = caret_over("ab", 0, Cursor::Block);
+        assert!(sets(&block, "7"), "not reversed: {block:?}");
+
+        let under = caret_over("ab", 0, Cursor::Underline);
+        assert!(sets(&under, "4"), "not underlined: {under:?}");
+        assert!(!sets(&under, "7"), "and not also reversed: {under:?}");
+        assert_eq!(plain(&under), "ab", "the character is still readable");
+
+        // A bar is a bar where there is an empty cell to be one in.
+        assert_eq!(plain(&caret_over("ab", 2, Cursor::Bar)), "ab▏");
+        // And reverses the character rather than hiding it where there is not.
+        let over_text = caret_over("ab", 0, Cursor::Bar);
+        assert_eq!(plain(&over_text), "ab", "{over_text:?}");
+        assert!(sets(&over_text, "7"), "{over_text:?}");
+    }
+
+    /// Whatever the shape, it costs exactly one cell. A caret that took two would shift the text
+    /// under it every time it moved, and every row here is measured in cells.
+    #[test]
+    fn every_shape_is_one_cell_wide() {
+        use crate::interactive::prompt::printed_width;
+        for shape in [
+            Cursor::Block,
+            Cursor::BlinkBlock,
+            Cursor::Underline,
+            Cursor::BlinkUnderline,
+            Cursor::Bar,
+            Cursor::BlinkBar,
+        ] {
+            for (text, at, want) in [("abc", 1, 3), ("abc", 3, 4), ("", 0, 1)] {
+                let drawn = caret_over(text, at, shape);
+                assert_eq!(printed_width(&drawn), want, "{shape:?} on {text:?}@{at}");
+            }
+        }
     }
 
     /// A multibyte character is one cell, not one byte — slicing by byte would panic on it.
     #[test]
     fn the_caret_counts_characters_not_bytes() {
-        assert_eq!(plain(&with_caret("héllo", 1)), "héllo");
-        assert_eq!(plain(&with_caret("→x", 0)), "→x");
+        assert_eq!(plain(&caret_over("héllo", 1, Cursor::Block)), "héllo");
+        assert_eq!(plain(&caret_over("→x", 0, Cursor::Block)), "→x");
     }
 }

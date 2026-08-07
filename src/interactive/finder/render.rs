@@ -39,6 +39,7 @@
 use super::Scope;
 use super::rank::{Ranked, ago};
 use crate::interactive::dropdown::width::{pad_to_width, truncate_to_width};
+use crate::interactive::paint::{SYNC_BEGIN, SYNC_END};
 use crate::interactive::prompt::printed_width;
 use crate::interactive::theme::{self, Color, Depth, Style};
 
@@ -113,18 +114,6 @@ impl Frame<'_> {
 pub(super) fn visible_rows(rows: usize) -> usize {
     rows.saturating_sub(CHROME_ROWS).max(1)
 }
-
-/// Begin an atomic update, so the terminal cannot show a half-drawn frame.
-///
-/// DEC mode 2026: a terminal that understands it buffers everything until the matching end and
-/// presents the result in one go; one that does not ignores both, so this costs nothing anywhere.
-///
-/// It matters here because the finder redraws on a timer now, not only on a keystroke — the
-/// screen is rewritten many times a second, and without this the terminal is free to render
-/// halfway through a rewrite. That is what tearing *is*, and on a list it reads as the rows
-/// flickering or jumping.
-const SYNC_BEGIN: &str = "\x1b[?2026h";
-const SYNC_END: &str = "\x1b[?2026l";
 
 /// The whole screen, as one string of escapes.
 pub fn frame(f: &Frame<'_>) -> String {
