@@ -630,7 +630,6 @@ dependencies = [
  "derive_more",
  "full_moon_derive",
  "paste",
- "serde",
  "smol_str",
 ]
 

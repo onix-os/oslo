@@ -53,7 +53,7 @@ tokio = { version = "1", features = ["rt-multi-thread", "net"], optional = true 
 # This replaced `mlua`, which is a *binding* to the reference Lua written in C: it vendored and
 # compiled 30k lines of C into the binary, so a static musl build needed a C toolchain, and Lua
 # values lived in a separate VM that the shell could only pass strings across. See PLAN-LUA.md.
-full_moon = { version = "1", features = ["lua54"] }
+full_moon = { version = "1", default-features = false, features = ["lua54"] }
 # `resource` is what `ulimit` reads and sets limits through, and what `times` reads getrusage(2)
 # through. Without it both had to parse /proc by hand.
 # `poll` is declared here rather than arriving by accident. It used to come from rustyline's own
