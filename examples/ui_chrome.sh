@@ -2,17 +2,19 @@
 #
 #   oslo examples/ui_chrome.sh
 #
-# Four options, and they compose. `examples/ui_tour.sh` shows the widgets themselves; this one
+# Six options, and they compose. `examples/ui_tour.sh` shows the widgets themselves; this one
 # shows what can be wrapped around any of them:
 #
 #   --no-legend                    hide the `↑↓ move • enter choose` row
 #   --border B [--border-fg C]     rounded / square / double / thick
+#   --padding-x N / --padding-y N  blank cells inside the border
+#   --legend-gap N                 blank rows between the content and the legend
 #   --border-fit content|full      hug the content, or reach the edges of the terminal
 #   --fullscreen                   draw on the alternate screen, out of the scrollback
 #   --align-x / --align-y / --align   start|left|top, center, end|right|bottom
 #
-# The same four are Lua table fields — `legend`, `border`, `fit`, `fullscreen`, `align_x`,
-# `align_y` — on every `oslo.ui.*` widget. One parser builds the same `Chrome` for both, so a
+# The same are Lua table fields — `legend`, `border`, `fit`, `fullscreen`, `align_x`,
+# `align_y`, `padding_x`, `padding_y`, `legend_gap` — on every `oslo.ui.*` widget. One parser builds the same `Chrome` for both, so a
 # prompt looks identical whether shell or Lua asked for it.
 #
 # Every step reports its exit status, because that status *is* the interface: 0 answered,
@@ -24,7 +26,7 @@ step=0
 say() {
     step=$((step + 1))
     printf '\n'
-    ui style --border rounded --padding "0 1" --border-fg 5 "$step/10  $1"
+    ui style --border rounded --padding "0 1" --border-fg 5 "$step/12  $1"
 }
 note() { ui log --level info "$1"; }
 pause() {
@@ -116,3 +118,19 @@ note "table status $?"
 
 printf '\n'
 ui style --border double --padding "0 1" --border-fg 2 "that is all of them"
+
+# --------------------------------------------------------------- spacing
+
+say "spacing: the padding and the gap are numbers, not facts"
+# A cell of padding is the default, because text touching the wall of its own box reads as a
+# rendering fault. Zero puts it back against the wall; more gives it room.
+ui choose --border rounded --border-fg 4 --padding-x 0 --header "padding-x 0" alpha beta
+ui choose --border rounded --border-fg 4 --padding-x 3 --header "padding-x 3" alpha beta
+ui choose --border rounded --border-fg 4 --padding-y 1 --header "padding-y 1" alpha beta
+pause
+
+say "--legend-gap: how far the keys sit from the content"
+# One blank row by default. Run together, the thing you are answering and the note *about* the
+# widget read as one block and the eye has to work out which part is which.
+ui choose --border rounded --border-fg 5 --legend-gap 0 --header "no gap" alpha beta
+ui choose --border rounded --border-fg 5 --legend-gap 2 --header "two rows of gap" alpha beta

@@ -10,7 +10,7 @@
 //! page cache — and caching it would mean showing a file that has since been deleted, which for a
 //! file picker is the one wrong answer worth avoiding. Moving into a directory rereads it.
 
-use super::{Answer, Inline, footer_for, footer_rows};
+use super::{Answer, Inline};
 use crate::interactive::dropdown::width::{terminal_cols, terminal_rows, truncate_to_width};
 use crate::interactive::matching::{Fuzzed, Fuzzy};
 use crate::interactive::term::{Key, Keys, Restore, Screen};
@@ -107,7 +107,7 @@ pub fn file(spec: &Browse) -> Answer<String> {
     loop {
         // Two rows above (the path and the query), the footer below, and one spare so the block
         // can never fill the screen exactly.
-        let chrome = 2 + footer_rows(&spec.chrome);
+        let chrome = 2 + spec.chrome.extra_rows();
         let height = spec
             .height
             .min(shown.len().max(1))
@@ -167,13 +167,10 @@ pub fn file(spec: &Browse) -> Answer<String> {
             };
             frame.push_str(&format!("\r\n\r\x1b[K{text}"));
         }
-        let bottom = footer_for(
-            &spec.chrome,
+        panel.draw(
             &frame,
             &[("↑↓", "move"), ("←→", "in/out"), ("enter", "choose")],
         );
-        frame.push_str(&bottom);
-        panel.draw(&frame);
 
         let Some(pressed) = keys.read() else {
             panel.close();

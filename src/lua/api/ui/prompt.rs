@@ -119,6 +119,12 @@ fn chrome_of(t: &Table) -> Result<Chrome, crate::lua::eval::LuaError> {
         chrome.legend = shown;
     }
     chrome.fullscreen = flag(t, "fullscreen") || flag(t, "alt");
+    // Absent keeps the default rather than zeroing it: a caller who set only `border` still wants
+    // the cell of padding that makes a box readable. `size` clamps at zero rather than one, which
+    // is the whole reason it exists — `padding_x = 0` must mean none.
+    chrome.padding_x = size(t, "padding_x", chrome.padding_x);
+    chrome.padding_y = size(t, "padding_y", chrome.padding_y);
+    chrome.legend_gap = size(t, "legend_gap", chrome.legend_gap);
     if let Some(name) = maybe(t, "border") {
         chrome.border = Border::parse(&name)
             .ok_or_else(|| crate::lua::eval::LuaError::new(format!("{name}: not a border")))?;

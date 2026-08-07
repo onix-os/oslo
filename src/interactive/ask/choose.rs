@@ -16,7 +16,7 @@
 //! Space checks a row, Enter takes everything checked — or the row under the cursor when nothing
 //! is. That last rule is what stops "I pressed Enter and got nothing" from being a state.
 
-use super::{Answer, Inline, footer_for, footer_rows};
+use super::{Answer, Inline};
 use crate::interactive::dropdown::width::{terminal_cols, terminal_rows, truncate_to_width};
 use crate::interactive::matching::{Fuzzed, Fuzzy};
 use crate::interactive::term::{Key, Keys, Restore, Screen};
@@ -92,7 +92,7 @@ fn run(spec: &Choice) -> Answer<Vec<String>> {
         // filter row when there are any. Computed from the same booleans the drawing uses, so the
         // clamp and the frame cannot disagree; a hard-coded constant here is how two of these
         // widgets ended up reserving a row they never drew.
-        let chrome = footer_rows(&spec.chrome)
+        let chrome = spec.chrome.extra_rows()
             + usize::from(!spec.header.is_empty())
             + usize::from(spec.filter);
         let height = spec
@@ -174,9 +174,7 @@ fn run(spec: &Choice) -> Answer<Vec<String>> {
         } else {
             &[("↑↓", "move"), ("enter", "confirm"), ("esc", "cancel")]
         };
-        let bottom = footer_for(&spec.chrome, &frame, keys_shown);
-        frame.push_str(&bottom);
-        panel.draw(&frame);
+        panel.draw(&frame, keys_shown);
 
         let Some(pressed) = keys.read() else {
             panel.close();

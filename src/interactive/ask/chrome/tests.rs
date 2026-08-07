@@ -12,7 +12,7 @@ fn frame(rows: &[&str]) -> String {
 
 /// The rows of a wrapped frame, with the redraw escapes taken back off.
 fn drawn(chrome: &Chrome, rows: &[&str]) -> Vec<String> {
-    super::rows_of(&chrome.wrap(&frame(rows)))
+    super::rows_of(&chrome.wrap(&frame(rows), &[]))
 }
 
 /// Default chrome changes nothing at all. Every widget drew this way before the module existed and
@@ -24,7 +24,11 @@ fn default_chrome_leaves_the_frame_alone() {
     assert_eq!(drawn(&chrome, &["one", "two"]), vec!["one", "two"]);
 }
 
-/// A border hugs the widest row, and every row is padded to it so the right edge is straight.
+/// A border hugs the widest row, with a cell of padding each side, and every row is squared off so
+/// the right edge is straight.
+///
+/// The padding is the default and not decoration: text touching the wall of its own box reads as a
+/// rendering fault.
 #[test]
 fn a_content_border_hugs_the_widest_row() {
     let chrome = Chrome {
@@ -33,10 +37,176 @@ fn a_content_border_hugs_the_widest_row() {
     };
     let rows = drawn(&chrome, &["short", "much longer row"]);
     assert_eq!(rows.len(), 4, "two rows plus a lid at each end: {rows:?}");
-    assert_eq!(rows[0], "┌───────────────┐");
-    assert_eq!(rows[1], "│short          │");
-    assert_eq!(rows[2], "│much longer row│");
-    assert_eq!(rows[3], "└───────────────┘");
+    assert_eq!(rows[0], "┌─────────────────┐");
+    assert_eq!(rows[1], "│ short           │");
+    assert_eq!(rows[2], "│ much longer row │");
+    assert_eq!(rows[3], "└─────────────────┘");
+}
+
+/// Padding is a number, not a fact. Zero puts the text back against the wall.
+#[test]
+fn padding_is_configurable() {
+    let none = Chrome {
+        border: Border::Square,
+        padding_x: 0,
+        ..Chrome::default()
+    };
+    assert_eq!(drawn(&none, &["hi"])[1], "│hi│");
+
+    let wide = Chrome {
+        border: Border::Square,
+        padding_x: 3,
+        ..Chrome::default()
+    };
+    assert_eq!(drawn(&wide, &["hi"])[1], "│   hi   │");
+
+    let tall = Chrome {
+        border: Border::Square,
+        padding_y: 1,
+        ..Chrome::default()
+    };
+    let rows = drawn(&tall, &["hi"]);
+    assert_eq!(rows.len(), 5, "a blank row above and below: {rows:?}");
+    // Trimmed of the walls as well as the spaces — `│` is not whitespace.
+    let inside = |row: &str| row.trim_matches(|c| c == '│' || c == ' ').to_string();
+    assert_eq!(inside(&rows[1]), "", "{rows:?}");
+    assert_eq!(inside(&rows[2]), "hi", "{rows:?}");
+    assert_eq!(inside(&rows[3]), "", "{rows:?}");
+}
+
+/// **Padding needs a border.** Without one it would be an indent, which `align_x` already is, and a
+/// widget that quietly moved two cells right for no visible reason is a bug nobody can name.
+#[test]
+fn padding_without_a_border_does_nothing() {
+    let chrome = Chrome {
+        padding_x: 4,
+        padding_y: 2,
+        ..Chrome::default()
+    };
+    assert_eq!(drawn(&chrome, &["hi"]), vec!["hi"]);
+}
+
+// ------------------------------------------------------------------ the legend
+
+/// The rule spans the box it is in, wall to wall.
+///
+/// It used to be measured from the content *above* it, before the border was applied — so in a box
+/// it came out a fifth of the width and read as damage rather than as a tear-off line.
+#[test]
+fn the_rule_reaches_both_walls() {
+    let chrome = Chrome {
+        border: Border::Square,
+        ..Chrome::default()
+    };
+    // Content narrower than the legend, so the box is sized by the keys and the rule has to reach
+    // past the content to both walls — the case the old measure-the-content-above rule got wrong.
+    let keys = [("↑↓", "move"), ("enter", "confirm"), ("esc", "cancel")];
+    let rows = super::rows_of(&chrome.wrap(&frame(&["a", "b"]), &keys));
+    let rule = rows
+        .iter()
+        .find(|r| r.contains('-'))
+        .expect("a rule somewhere");
+    // Every row is the same width, rule included: it spans wall to wall rather than stopping at
+    // whatever the content above it happened to be.
+    assert_eq!(printed(rule), printed(&rows[0]), "ragged: {rule:?}");
+    let bare = rule.trim_matches(|c| c == '│' || c == ' ');
+    assert!(
+        printed(bare) > 20,
+        "the rule should span the legend, not the content: {bare:?}"
+    );
+}
+
+/// A blank row between the content and the rule, so the thing you are answering and the note about
+/// the widget do not read as one block.
+#[test]
+fn there_is_a_gap_above_the_legend() {
+    let chrome = Chrome::default();
+    let rows = super::rows_of(&chrome.wrap(&frame(&["a"]), &[("q", "quit")]));
+    assert_eq!(rows.len(), 4, "content, gap, rule, keys: {rows:?}");
+    assert_eq!(rows[1].trim(), "", "no gap: {rows:?}");
+}
+
+/// The gap is a number too.
+#[test]
+fn the_gap_is_configurable() {
+    let none = Chrome {
+        legend_gap: 0,
+        ..Chrome::default()
+    };
+    assert_eq!(
+        super::rows_of(&none.wrap(&frame(&["a"]), &[("q", "quit")])).len(),
+        3
+    );
+    let wide = Chrome {
+        legend_gap: 3,
+        ..Chrome::default()
+    };
+    assert_eq!(
+        super::rows_of(&wide.wrap(&frame(&["a"]), &[("q", "quit")])).len(),
+        6
+    );
+}
+
+/// With the legend off there is no gap and no rule either — the rows go back to the content.
+#[test]
+fn no_legend_means_no_gap_and_no_rule() {
+    let chrome = Chrome {
+        legend: false,
+        ..Chrome::default()
+    };
+    let rows = super::rows_of(&chrome.wrap(&frame(&["a"]), &[("q", "quit")]));
+    assert_eq!(rows, vec!["a"]);
+    assert_eq!(chrome.legend_rows(), 0);
+}
+
+/// What a widget reserves matches what is drawn. A window sized against a different number is how
+/// a widget eats rows of the caller's transcript, one per keystroke.
+#[test]
+fn the_reserved_rows_match_the_drawn_ones() {
+    for chrome in [
+        Chrome::default(),
+        Chrome {
+            border: Border::Square,
+            ..Chrome::default()
+        },
+        Chrome {
+            border: Border::Square,
+            padding_y: 2,
+            legend_gap: 0,
+            ..Chrome::default()
+        },
+        Chrome {
+            legend: false,
+            ..Chrome::default()
+        },
+    ] {
+        let content = ["a", "b", "c"];
+        let rows = super::rows_of(&chrome.wrap(&frame(&content), &[("q", "quit")]));
+        assert_eq!(
+            rows.len(),
+            content.len() + chrome.extra_rows(),
+            "reserved {} but drew {} for {chrome:?}",
+            chrome.extra_rows(),
+            rows.len()
+        );
+    }
+}
+
+/// **The leading row a frame carries is the caller's, not content.** Every widget's frame starts
+/// with `\r\n` because it draws on the row below the prompt; counting it as a row put a blank line
+/// inside the top of every box.
+#[test]
+fn the_leading_row_is_not_content() {
+    let chrome = Chrome {
+        border: Border::Square,
+        ..Chrome::default()
+    };
+    let with_lead = chrome.wrap(&format!("\r\n{}", frame(&["hi"])), &[]);
+    assert!(with_lead.starts_with("\r\n"), "the lead is kept");
+    let rows = super::rows_of(&with_lead);
+    // "", top, content, bottom — and no blank row between the top and the content.
+    assert_eq!(rows.len(), 4, "{rows:?}");
+    assert!(rows[2].contains("hi"), "a blank row crept in: {rows:?}");
 }
 
 /// Every row of a bordered frame is the same width — the thing that is wrong the moment a caller

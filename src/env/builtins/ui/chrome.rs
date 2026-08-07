@@ -30,6 +30,27 @@ pub(super) fn chrome_flag(chrome: &mut Chrome, args: &[String], at: &mut usize) 
         // Off, not on: the legend is drawn by default and this is the only spelling that stops it.
         "--no-legend" => chrome.legend = false,
         "--fullscreen" | "--alt" => chrome.fullscreen = true,
+        "--padding-x" => match take(args, at).parse::<usize>() {
+            Ok(n) => chrome.padding_x = n,
+            Err(_) => {
+                eprintln!("oslo: ui: --padding-x wants a number");
+                return Chromed::Bad(2);
+            }
+        },
+        "--padding-y" => match take(args, at).parse::<usize>() {
+            Ok(n) => chrome.padding_y = n,
+            Err(_) => {
+                eprintln!("oslo: ui: --padding-y wants a number");
+                return Chromed::Bad(2);
+            }
+        },
+        "--legend-gap" => match take(args, at).parse::<usize>() {
+            Ok(n) => chrome.legend_gap = n,
+            Err(_) => {
+                eprintln!("oslo: ui: --legend-gap wants a number");
+                return Chromed::Bad(2);
+            }
+        },
         "--border" => match Border::parse(&take(args, at)) {
             Some(border) => chrome.border = border,
             None => {

@@ -13,7 +13,8 @@
 //! It is deliberately not a `less` replacement: no search, no marks, no half-page scroll. Up and
 //! down, page up and down, home and end, and `q`.
 
-use super::{Answer, legend, show};
+use super::chrome::legend_text;
+use super::{Answer, show};
 use crate::interactive::dropdown::width::{terminal_cols, terminal_rows, truncate_to_width};
 use crate::interactive::term::{Key, Keys, Restore, Screen};
 use crate::interactive::theme;
@@ -53,7 +54,7 @@ pub fn pager(spec: &Pager) -> Answer<()> {
     loop {
         let rows = terminal_rows();
         // The title bar above, and the footer — a blank row and the keys — below.
-        let window = rows.saturating_sub(1 + super::FOOTER_ROWS).max(1);
+        let window = rows.saturating_sub(1 + spec.chrome.legend_rows()).max(1);
         let last = lines.len().saturating_sub(window);
         top = top.min(last);
 
@@ -81,7 +82,7 @@ pub fn pager(spec: &Pager) -> Answer<()> {
         frame.push_str(&format!(
             "\x1b[2K{}\r\n\x1b[2K{}",
             ui.muted.paint("- ".repeat(cols / 2).trim_end(), depth),
-            legend(&[("↑↓", "scroll"), ("q", "quit")])
+            legend_text(&[("↑↓", "scroll"), ("q", "quit")])
         ));
         show(&frame);
 

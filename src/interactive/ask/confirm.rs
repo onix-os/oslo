@@ -11,7 +11,7 @@
 //! one row. Three kinds of text on one line read as a sentence that does not parse:
 //! `carry on?  next  stop here  ←→ choose • enter confirm`.
 
-use super::{Answer, Inline, footer_for};
+use super::{Answer, Inline};
 use crate::interactive::term::{Key, Keys, Restore, Screen};
 use crate::interactive::theme;
 
@@ -74,19 +74,16 @@ pub fn confirm(spec: &Confirm) -> Answer<bool> {
         // rather than one, because a question, the thing you are answering it with, and the list
         // of keys are three different kinds of text — run together on one line they read as a
         // sentence that does not parse.
-        let mut frame = format!(
+        let frame = format!(
             "\r\n\r\x1b[K {}\r\n\r\x1b[K\r\n\r\x1b[K  {}  {}",
             ui.question.paint(&spec.question, depth),
             button(&spec.yes, yes),
             button(&spec.no, !yes),
         );
-        let bottom = footer_for(
-            &spec.chrome,
+        panel.draw(
             &frame,
             &[("←→", "choose"), ("y/n", "answer"), ("enter", "confirm")],
         );
-        frame.push_str(&bottom);
-        panel.draw(&frame);
 
         let Some(pressed) = keys.read() else {
             panel.close();

@@ -145,8 +145,8 @@ impl Inline {
     /// The count comes from the frame *after* it has been wrapped, so a border's two extra rows are
     /// reserved and erased like any others. Computing it from the unwrapped frame is how a bordered
     /// widget would eat two rows of the transcript per keystroke.
-    pub(crate) fn draw(&mut self, frame: &str) {
-        let frame = self.chrome.wrap(frame);
+    pub(crate) fn draw(&mut self, frame: &str, keys: &[(&str, &str)]) {
+        let frame = self.chrome.wrap(frame, keys);
         let rows = frame.matches("\r\n").count();
         // Vertical placement is blank rows above, and only on a screen this widget owns. Inline,
         // pushing the frame down would scroll the caller's transcript rather than move anything.
@@ -213,102 +213,6 @@ pub(crate) fn with_caret(text: &str, at: usize) -> String {
     )
 }
 
-/// The bottom of a widget: a dashed rule, then the keys.
-///
-/// The rule is not decoration. The rows above it are the thing you are answering — a list, a
-/// document, a pair of buttons — and the row below is a note *about* the widget. Run together they
-/// read as one block and the eye has to work out which part is which.
-///
-/// **The rule is as wide as the widest row above it**, which is why this takes the frame rather
-/// than a width: measured from what was actually drawn, it cannot fall out of step with the
-/// content the way a width passed in by each caller would. `- ` rather than `─`, so it reads as a
-/// tear-off line rather than as a border the widget does not have.
-///
-/// One helper rather than each widget appending its own, because that is exactly the kind of
-/// detail that drifts: `confirm` had the question, the buttons and the keys all on one line while
-/// its siblings had them on three.
-pub(crate) fn footer(frame: &str, keys: &[(&str, &str)]) -> String {
-    let ui = crate::interactive::theme::current().ui;
-    let depth = crate::interactive::theme::depth();
-    // As wide as the content and never wider, ending on a dash. The pattern is cut to the width
-    // and then any trailing space dropped — turning that space into a dash instead gave `- - - --`
-    // on an even-width row, which reads as a typo.
-    let width = widest(frame);
-    let rule: String = "- ".repeat(width.div_ceil(2)).chars().take(width).collect();
-    let rule = rule.trim_end();
-    format!(
-        "\r\n\r\x1b[K{}\r\n\r\x1b[K{}",
-        ui.muted.paint(rule, depth),
-        legend(keys)
-    )
-}
-
-/// How many rows [`footer`] draws, for a caller sizing its window.
-pub(crate) const FOOTER_ROWS: usize = 2;
-
-/// [`footer`], or nothing at all when the legend has been turned off.
-///
-/// One helper rather than an `if` at each of the five call sites, for the reason `footer` itself is
-/// one: a widget that got the condition subtly different would draw a rule with no keys under it,
-/// which reads as a bug in the widget rather than as a setting.
-pub(crate) fn footer_for(chrome: &chrome::Chrome, frame: &str, keys: &[(&str, &str)]) -> String {
-    match chrome.legend {
-        true => footer(frame, keys),
-        false => String::new(),
-    }
-}
-
-/// How many rows the footer will take, given the chrome. Zero with the legend off.
-///
-/// Every widget sizes its window against this, so turning the legend off gives the list the two
-/// rows back rather than leaving a gap where the keys used to be.
-pub(crate) fn footer_rows(chrome: &chrome::Chrome) -> usize {
-    match chrome.legend {
-        true => FOOTER_ROWS,
-        false => 0,
-    }
-}
-
-/// The printed width of the widest row in `frame`.
-///
-/// Rows are separated by `\r\n` and each carries its own `\r` and erase escape; those are
-/// stripped before measuring, because they are instructions rather than anything on screen.
-/// [`crate::interactive::prompt::printed_width`] already ignores colour.
-fn widest(frame: &str) -> usize {
-    frame
-        .split("\r\n")
-        .map(|row| {
-            let row = row.trim_start_matches('\r');
-            let row = row.strip_prefix("\x1b[K").unwrap_or(row);
-            crate::interactive::prompt::printed_width(row)
-        })
-        .max()
-        .unwrap_or(0)
-}
-
-/// The key legend along the bottom of a widget.
-///
-/// Always shown, and dim. A prompt whose keys you have to guess is one you leave by closing the
-/// window; the row a legend costs is cheaper than that once.
-///
-/// `key what` pairs joined by ` • `, which is gum's separator and readable enough that the pairs
-/// do not run together at a glance.
-pub(crate) fn legend(keys: &[(&str, &str)]) -> String {
-    let ui = crate::interactive::theme::current().ui;
-    let depth = crate::interactive::theme::depth();
-    let parts: Vec<String> = keys
-        .iter()
-        .map(|(key, what)| {
-            format!(
-                "{} {}",
-                ui.accent.paint(key, depth),
-                ui.muted.paint(what, depth)
-            )
-        })
-        .collect();
-    parts.join(&ui.muted.paint(" • ", depth))
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -332,45 +236,6 @@ mod tests {
             }
         }
         out
-    }
-
-    /// The rule is measured from the frame, not from a number the caller passed — so it cannot
-    /// disagree with what was drawn.
-    #[test]
-    fn the_rule_matches_the_widest_row() {
-        let frame = "\r\n\r\x1b[Kshort\r\n\r\x1b[Kmuch much longer row";
-        let rule = plain(&footer(frame, &[("q", "quit")]))
-            .lines()
-            .find(|l| l.contains('-'))
-            .unwrap_or_default()
-            .trim()
-            .to_string();
-        // Never wider than the content, and within one cell of it — a rule that overhangs the
-        // thing it is under looks like a mistake, one that stops a cell short does not.
-        let content = "much much longer row".len();
-        let drawn = crate::interactive::prompt::printed_width(&rule);
-        assert!(
-            drawn <= content && drawn + 1 >= content,
-            "{drawn} vs {content}: {rule:?}"
-        );
-        assert!(rule.ends_with('-'), "{rule:?}");
-        assert!(!rule.contains("--"), "doubled dash: {rule:?}");
-    }
-
-    /// Colour must not count toward the width, or a styled row makes the rule too long.
-    #[test]
-    fn colour_does_not_widen_the_rule() {
-        let plain_frame = "\r\n\r\x1b[Kabcd";
-        let painted = "\r\n\r\x1b[K\x1b[1;31mabcd\x1b[0m";
-        assert_eq!(widest(plain_frame), widest(painted));
-        assert_eq!(widest(plain_frame), 4);
-    }
-
-    /// The erase escape and the carriage return are instructions, not content.
-    #[test]
-    fn the_row_prefix_is_not_measured() {
-        assert_eq!(widest("\r\n\r\x1b[Kab"), 2);
-        assert_eq!(widest(""), 0);
     }
 
     /// The caret is part of the text, so it can never be a cell out of step with it.
@@ -399,12 +264,5 @@ mod tests {
     fn the_caret_counts_characters_not_bytes() {
         assert_eq!(plain(&with_caret("héllo", 1)), "héllo");
         assert_eq!(plain(&with_caret("→x", 0)), "→x");
-    }
-
-    /// Two rows: the rule and the keys. Anything sizing a window depends on that being exact.
-    #[test]
-    fn the_footer_is_two_rows() {
-        let drawn = footer("\r\n\r\x1b[Kx", &[("q", "quit")]);
-        assert_eq!(drawn.matches("\r\n").count(), FOOTER_ROWS);
     }
 }

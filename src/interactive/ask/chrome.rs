@@ -88,6 +88,15 @@ pub struct Chrome {
     pub border: Border,
     pub border_style: Style,
     pub fit: Fit,
+    /// Blank rows between the content and the legend's rule.
+    ///
+    /// One by default. Run together, the thing you are answering and the note *about* the widget
+    /// read as one block and the eye has to work out which part is which.
+    pub legend_gap: usize,
+    /// Blank columns inside the border, each side.
+    pub padding_x: usize,
+    /// Blank rows inside the border, top and bottom.
+    pub padding_y: usize,
     /// Draw on the alternate screen, which the terminal keeps out of the scrollback.
     pub fullscreen: bool,
     pub align_x: Place,
@@ -103,6 +112,12 @@ impl Default for Chrome {
             border: Border::None,
             border_style: Style::default(),
             fit: Fit::Content,
+            legend_gap: 1,
+            // A box whose text touches its own walls looks like a mistake, and one cell is what
+            // every other box-drawing tool settles on. Vertical padding is off: a widget is
+            // already several rows tall and two more is a lot of screen for a prompt.
+            padding_x: 1,
+            padding_y: 0,
             fullscreen: false,
             align_x: Place::Start,
             align_y: Place::Start,
@@ -119,26 +134,139 @@ impl Chrome {
         !self.fullscreen && self.border == Border::None && self.align_x == Place::Start
     }
 
-    /// Wrap `frame` in whatever this asks for.
-    ///
-    /// Rows are separated by `\r\n`, and each carries its own `\r\x1b[K` so a redraw erases what it
-    /// replaces. Both are rebuilt here rather than preserved, because a bordered row is a different
-    /// row: it starts at the border, not at the content.
-    pub fn wrap(&self, frame: &str) -> String {
-        let rows = rows_of(frame);
-        let rows = match self.border {
-            Border::None => rows,
-            border => self.boxed(&rows, border),
-        };
-        let rows = self.indent(rows);
-        rows.iter()
-            .map(|row| format!("\r\x1b[K{row}"))
-            .collect::<Vec<_>>()
-            .join("\r\n")
+    /// Cells of padding inside the border, each side. Only with a border — without one it would be
+    /// an indent, which `align_x` already is.
+    fn pad_x(&self) -> usize {
+        match self.border {
+            Border::None => 0,
+            _ => self.padding_x,
+        }
     }
 
-    /// The rows a bordered frame has.
-    fn boxed(&self, rows: &[String], border: Border) -> Vec<String> {
+    fn pad_y(&self) -> usize {
+        match self.border {
+            Border::None => 0,
+            _ => self.padding_y,
+        }
+    }
+
+    /// How many rows the legend block adds: the gap, the rule and the keys.
+    ///
+    /// Zero with the legend off, so turning it off gives a list those rows back rather than leaving
+    /// a hole where they were. Widgets size their window against this.
+    pub fn legend_rows(&self) -> usize {
+        match self.legend {
+            false => 0,
+            true => self.legend_gap + 2,
+        }
+    }
+
+    /// Every row the chrome adds around a frame, for a caller sizing its window.
+    pub fn extra_rows(&self) -> usize {
+        let border = match self.border {
+            Border::None => 0,
+            _ => 2,
+        };
+        self.legend_rows() + border + self.pad_y() * 2
+    }
+
+    /// Wrap `frame` in whatever this asks for, and put `keys` under it.
+    ///
+    /// **The legend is built here rather than by the widget**, and that is what makes its rule the
+    /// right width: the rule has to span the finished box, which is not known until the legend's
+    /// own width has been counted. A widget appending its own footer could only measure the content
+    /// above it, so inside a border the rule came out a fifth of the width and read as damage.
+    pub fn wrap(&self, frame: &str, keys: &[(&str, &str)]) -> String {
+        // A frame begins with `\r\n` — a widget draws on the row *below* the prompt — so the first
+        // split is the caller's own row rather than content. Treating it as a row is what put a
+        // blank line inside the top of every box.
+        let lead = frame.starts_with("\r\n");
+        let mut rows = rows_of(frame);
+        if lead && rows.first().is_some_and(|first| first.is_empty()) {
+            rows.remove(0);
+        }
+
+        let legend = self.legend && !keys.is_empty();
+        if legend {
+            rows.extend(std::iter::repeat_n(String::new(), self.legend_gap));
+            // A placeholder: the rule cannot be sized until the legend under it has been measured.
+            rows.push(String::new());
+            rows.push(legend_text(keys));
+        }
+
+        let inside = self.inside_width(&rows);
+        if legend {
+            let at = rows.len() - 2;
+            rows[at] = self.rule(inside);
+        }
+
+        let rows = self.padded(rows, inside);
+        let rows = match self.border {
+            Border::None => rows,
+            border => self.boxed(&rows, border, inside + self.pad_x() * 2),
+        };
+        let rows = self.indent(rows);
+
+        let body = rows
+            .iter()
+            .map(|row| format!("\r\x1b[K{row}"))
+            .collect::<Vec<_>>()
+            .join("\r\n");
+        match lead {
+            true => format!("\r\n{body}"),
+            false => body,
+        }
+    }
+
+    /// The width the content is laid out to, before padding and border.
+    fn inside_width(&self, rows: &[String]) -> usize {
+        let widest = rows.iter().map(|r| printed(r)).max().unwrap_or(0);
+        match self.fit {
+            Fit::Content => widest,
+            // The terminal, less the two border columns and the padding each side. A `Full` box
+            // that ignored its own padding would run off the right-hand edge by exactly that much.
+            Fit::Full => width::terminal_cols()
+                .saturating_sub(2 + self.pad_x() * 2)
+                .max(widest),
+        }
+    }
+
+    /// The tear-off rule above the legend, exactly as wide as the space it sits in.
+    ///
+    /// `- ` rather than `─`, so it reads as a tear-off rather than as a second border. Cut to the
+    /// width and any trailing space dropped: turning that space into a dash gave `- - - --` on an
+    /// even width, which reads as a typo.
+    fn rule(&self, inside: usize) -> String {
+        let pattern: String = "- "
+            .repeat(inside.div_ceil(2))
+            .chars()
+            .take(inside)
+            .collect();
+        let muted = theme::current().ui.muted;
+        muted.paint(pattern.trim_end(), theme::depth())
+    }
+
+    /// Every row to the same width, plus the blank rows above and below.
+    ///
+    /// Done here rather than inside `boxed` so that an *unbordered* frame is squared off too — a
+    /// block that is not rectangular shears the moment `align_x` moves it.
+    fn padded(&self, rows: Vec<String>, inside: usize) -> Vec<String> {
+        let side = " ".repeat(self.pad_x());
+        let blank = format!("{side}{}{side}", " ".repeat(inside));
+        let mut out = Vec::with_capacity(rows.len() + self.pad_y() * 2);
+        out.extend(std::iter::repeat_n(blank.clone(), self.pad_y()));
+        for row in rows {
+            // Measured in printed cells, not bytes: a coloured row is mostly escape sequences, and
+            // padding by byte length is how a box comes out ragged.
+            let fill = inside.saturating_sub(printed(&row));
+            out.push(format!("{side}{row}{}{side}", " ".repeat(fill)));
+        }
+        out.extend(std::iter::repeat_n(blank, self.pad_y()));
+        out
+    }
+
+    /// The rows a bordered frame has. `width` is the inside, padding included.
+    fn boxed(&self, rows: &[String], border: Border, width: usize) -> Vec<String> {
         let Some(glyphs) = border.glyphs() else {
             return rows.to_vec();
         };
@@ -153,26 +281,11 @@ impl Chrome {
         let depth = theme::depth();
         let paint = |s: &str| self.border_style.paint(s, depth);
 
-        // The inside width: the widest row, or the terminal minus the two border columns.
-        let widest = rows.iter().map(|r| printed(r)).max().unwrap_or(0);
-        let inside = match self.fit {
-            Fit::Content => widest,
-            Fit::Full => width::terminal_cols().saturating_sub(2).max(widest.min(1)),
-        };
-
-        let rule = horizontal.repeat(inside);
+        let rule = horizontal.repeat(width);
         let mut out = Vec::with_capacity(rows.len() + 2);
         out.push(paint(&format!("{top_left}{rule}{top_right}")));
         for row in rows {
-            // Padded to the inside width so the right-hand edge is straight, measured in printed
-            // cells rather than bytes — a coloured row is mostly escape sequences.
-            let pad = inside.saturating_sub(printed(row));
-            out.push(format!(
-                "{}{row}{}{}",
-                paint(vertical),
-                " ".repeat(pad),
-                paint(vertical)
-            ));
+            out.push(format!("{}{row}{}", paint(vertical), paint(vertical)));
         }
         out.push(paint(&format!("{bottom_left}{rule}{bottom_right}")));
         out
@@ -234,3 +347,23 @@ pub fn leave_fullscreen() {
 
 #[cfg(test)]
 mod tests;
+
+/// `key what` pairs joined by ` • `, dim.
+///
+/// Lives here rather than in `super` because the rule above it has to be sized against it, and the
+/// two were in different files for exactly as long as the rule was the wrong width.
+pub(super) fn legend_text(keys: &[(&str, &str)]) -> String {
+    let ui = theme::current().ui;
+    let depth = theme::depth();
+    let parts: Vec<String> = keys
+        .iter()
+        .map(|(key, what)| {
+            format!(
+                "{} {}",
+                ui.accent.paint(key, depth),
+                ui.muted.paint(what, depth)
+            )
+        })
+        .collect();
+    parts.join(&ui.muted.paint(" • ", depth))
+}

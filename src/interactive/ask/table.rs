@@ -10,7 +10,7 @@
 //! The answer is the **whole row**, in its original text. A widget that answered with a field
 //! would have to be told which one, and a caller that wants a field can `cut` the row it got back.
 
-use super::{Answer, Inline, footer_for, footer_rows};
+use super::{Answer, Inline};
 use crate::interactive::dropdown::width::{
     pad_to_width, terminal_cols, terminal_rows, truncate_to_width,
 };
@@ -110,7 +110,7 @@ pub fn table(spec: &Table) -> Answer<String> {
     loop {
         // Computed from the same booleans the frame draws with, so the clamp and the frame cannot
         // disagree — a hard-coded constant here is how this reserved a row it never used.
-        let chrome = footer_rows(&spec.chrome)
+        let chrome = spec.chrome.extra_rows()
             + usize::from(!spec.headers.is_empty())
             + usize::from(spec.filter);
         let height = spec
@@ -174,9 +174,7 @@ pub fn table(spec: &Table) -> Answer<String> {
             };
             frame.push_str(&format!("\r\n\r\x1b[K{text}"));
         }
-        let bottom = footer_for(&spec.chrome, &frame, &[("↑↓", "move"), ("enter", "choose")]);
-        frame.push_str(&bottom);
-        panel.draw(&frame);
+        panel.draw(&frame, &[("↑↓", "move"), ("enter", "choose")]);
 
         let Some(pressed) = keys.read() else {
             panel.close();
