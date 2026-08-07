@@ -166,3 +166,91 @@ fn ages_read_as_the_shortest_true_thing() {
     // A clock that went backwards must not print a negative.
     assert_eq!(ago(now, now + 500), "now");
 }
+
+/// **A command that begins with what you typed beats one that merely shares letters**, however
+/// recently the other was run. Typing the first characters of a command you use daily and not
+/// getting it is the thing that makes a finder feel broken.
+#[test]
+fn a_prefix_beats_a_scatter_however_fresh() {
+    let commands = [
+        // Matches `car` only by scattering: c…a…r. Run seconds ago.
+        command("codex --always-run", 1, 999, "/a"),
+        command("cargo test", 1, 100, "/a"),
+    ];
+    let ranked = rank(&commands, "car", "/a", Fuzzy::Smart);
+    assert_eq!(ranked[0].command.line, "cargo test", "{:?}", lines(&ranked));
+}
+
+/// Within one kind of match, recency still decides — that half of the rule is unchanged.
+#[test]
+fn recency_orders_within_a_kind() {
+    let commands = [
+        command("cargo build", 50, 100, "/a"),
+        command("cargo test", 1, 900, "/a"),
+        command("cargo run", 1, 500, "/a"),
+    ];
+    let ranked = rank(&commands, "car", "/a", Fuzzy::Smart);
+    assert_eq!(
+        lines(&ranked),
+        ["cargo test", "cargo run", "cargo build"],
+        "all three are prefixes, so the newest wins"
+    );
+}
+
+/// An acronym is deliberate — nobody types `gco` by accident — so it outranks a command that
+/// merely contains those letters somewhere.
+#[test]
+fn an_acronym_outranks_a_substring() {
+    let commands = [
+        command("git commit --amend", 1, 999, "/a"),
+        command("git checkout origin", 1, 100, "/a"),
+    ];
+    let ranked = rank(&commands, "gco", "/a", Fuzzy::Smart);
+    assert_eq!(
+        ranked[0].command.line,
+        "git checkout origin",
+        "{:?}",
+        lines(&ranked)
+    );
+}
+
+/// A word in the middle is findable: `test` should reach `cargo test` without the query having to
+/// start the line.
+#[test]
+fn a_word_prefix_is_reachable() {
+    let commands = [
+        command("attest the thing", 1, 999, "/a"),
+        command("cargo test", 1, 100, "/a"),
+    ];
+    let ranked = rank(&commands, "test", "/a", Fuzzy::Smart);
+    assert_eq!(ranked[0].command.line, "cargo test", "{:?}", lines(&ranked));
+}
+
+/// The exact line you typed is the one you meant, whatever else is newer.
+#[test]
+fn an_exact_line_comes_first() {
+    let commands = [
+        command("make verify --now", 9, 999, "/a"),
+        command("make verify", 1, 100, "/a"),
+    ];
+    let ranked = rank(&commands, "make verify", "/a", Fuzzy::Smart);
+    assert_eq!(
+        ranked[0].command.line,
+        "make verify",
+        "{:?}",
+        lines(&ranked)
+    );
+}
+
+/// The `cd` case that started this: with everything in the same kind, recency and habit decide and
+/// the scorer's opinion about string shapes does not.
+#[test]
+fn the_cd_case_is_ordered_by_use_not_by_shape() {
+    let commands = [
+        command("cd docs/", 2, 100, "/a"),
+        command("cd rush", 23, 500, "/a"),
+        command("cd bin", 2, 900, "/a"),
+    ];
+    let ranked = rank(&commands, "cd", "/a", Fuzzy::Smart);
+    assert_eq!(lines(&ranked), ["cd bin", "cd rush", "cd docs/"]);
+}
