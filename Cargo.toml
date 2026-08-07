@@ -85,10 +85,10 @@ regex = { version = "1", default-features = false, features = [
 # a static binary, which rules out lua-cjson and every Lua JSON parser that wraps it. `serde_json`
 # is pure Rust, so it works where those cannot. See PLAN-LUA.md.
 serde_json = "1"
+thiserror = "2.0"
+which = "7.0"
 unicode-segmentation = "1.12"
 unicode-width = "0.2"
-which = "7.0"
-thiserror = "2.0"
 
 # Used for *parsing only* — its AST is converted straight into oslo's own in
 # `src/parser/brush_adapter/`, and nothing else from brush executes anything. Every builtin here is
@@ -165,9 +165,20 @@ lto = "thin"
 codegen-units = 1
 strip = "symbols"
 
-# No `[profile.release.package."*"] opt-level = "s"` either, though it is the obvious next setting
-# and it was built and measured. Compiling only the dependencies for size is worth 2.32 MiB
-# (18,326,960 -> 15,893,936) and costs 14% on the parser loop and 3% on the arithmetic loop,
-# because `brush-parser` is a dependency and thin LTO inlines it into oslo's hot path. That is a
-# trade for the owner to make, not a cleanup — the numbers and the untested refinement that may
-# make it free are in docs/research/footprint.md.
+# **The dependencies are compiled for size; oslo and its parser are not.**
+#
+# Compiling everything below this crate for size was measured once and deferred, because it cost
+# 14% on the parser loop and 3% on the arithmetic loop. The reason was known even then: thin LTO
+# inlines `brush-parser` into oslo's hot path, so shrinking it shrinks the loop that runs on every
+# line typed. Nothing else oslo depends on is on that path.
+#
+# So the exception is named rather than the rule abandoned. `"*"` takes the size setting; the
+# parser is put back to `3` beside it, and cargo applies the more specific entry. That is the
+# refinement the earlier note said was untested — it is tested now, and the numbers are in the
+# commit that made this change.
+[profile.release.package."*"]
+opt-level = "s"
+
+# The one dependency on the hot path, and the whole reason `"*"` above needed an exception.
+[profile.release.package.brush-parser]
+opt-level = 3
