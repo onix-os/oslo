@@ -10,10 +10,9 @@
 //! The answer is the **whole row**, in its original text. A widget that answered with a field
 //! would have to be told which one, and a caller that wants a field can `cut` the row it got back.
 
+use super::look::{Row, View};
 use super::{Answer, Inline};
-use crate::interactive::dropdown::width::{
-    pad_to_width, terminal_cols, terminal_rows, truncate_to_width,
-};
+use crate::interactive::dropdown::width::{pad_to_width, terminal_rows, truncate_to_width};
 use crate::interactive::matching::{Fuzzed, Fuzzy};
 use crate::interactive::term::{Key, Keys, Restore, Screen};
 use crate::interactive::theme;
@@ -33,6 +32,8 @@ pub struct Table {
     pub fuzzy: Fuzzy,
     /// The legend, the border, the screen and where on it. See `super::chrome`.
     pub chrome: super::chrome::Chrome,
+    /// Where the filter sits and what colour the rows take. See `super::look`.
+    pub look: super::look::Look,
 }
 
 impl Default for Table {
@@ -45,6 +46,7 @@ impl Default for Table {
             filter: true,
             fuzzy: Fuzzy::Smart,
             chrome: super::chrome::Chrome::default(),
+            look: super::look::Look::default(),
         }
     }
 }
@@ -112,7 +114,7 @@ pub fn table(spec: &Table) -> Answer<String> {
         // disagree — a hard-coded constant here is how this reserved a row it never used.
         let chrome = spec.chrome.extra_rows()
             + usize::from(!spec.headers.is_empty())
-            + usize::from(spec.filter);
+            + spec.look.extra_rows(spec.filter);
         let height = spec
             .height
             .min(shown.len().max(1))
@@ -126,7 +128,7 @@ pub fn table(spec: &Table) -> Answer<String> {
             offset = selected + 1 - height;
         }
 
-        let cols = terminal_cols();
+        let cols = spec.chrome.room();
         let render = |fields: &[String]| -> String {
             let mut line = String::new();
             for (index, width) in widths.iter().enumerate() {
@@ -134,7 +136,7 @@ pub fn table(spec: &Table) -> Answer<String> {
                 line.push_str(&pad_to_width(&truncate_to_width(field, *width), *width));
                 line.push_str("  ");
             }
-            truncate_to_width(line.trim_end(), cols.saturating_sub(2))
+            truncate_to_width(line.trim_end(), cols)
         };
 
         let mut frame = String::new();
@@ -144,36 +146,27 @@ pub fn table(spec: &Table) -> Answer<String> {
                 ui.question.paint(&render(&spec.headers), depth)
             ));
         }
-        if spec.filter {
-            frame.push_str(&format!(
-                "\r\n\r\x1b[K{} {}",
-                ui.accent.paint("❯", depth),
-                if query.is_empty() {
-                    ui.muted.paint("type to filter", depth)
-                } else {
-                    query.clone()
-                }
-            ));
-        }
-        for row in 0..height {
-            let text = match shown.get(offset + row) {
-                Some(&index) => {
-                    let here = offset + row == selected;
-                    format!(
-                        "{}{}",
-                        ui.accent.paint(if here { "❯ " } else { "  " }, depth),
-                        if here {
-                            ui.accent
-                        } else {
-                            theme::Style::default()
-                        }
-                        .paint(&render(&spec.rows[index]), depth)
-                    )
-                }
-                None => String::new(),
-            };
-            frame.push_str(&format!("\r\n\r\x1b[K{text}"));
-        }
+        // The columns are already aligned by `render`; the look decides what colour they take and
+        // where the filter sits, exactly as it does for `choose`. One renderer, so the two lists
+        // cannot drift apart.
+        let rows: Vec<Row> = shown
+            .iter()
+            .map(|&index| Row::new(render(&spec.rows[index])))
+            .collect();
+        frame.push_str(&spec.look.frame(
+            &rows,
+            &View {
+                selected,
+                offset,
+                height,
+                query: &query,
+                matched: shown.len(),
+                total: spec.rows.len(),
+                marked: 0,
+                cols,
+                filtering: spec.filter,
+            },
+        ));
         panel.draw(&frame, &[("↑↓", "move"), ("enter", "choose")]);
 
         let Some(pressed) = keys.read() else {

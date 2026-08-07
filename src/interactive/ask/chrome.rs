@@ -170,6 +170,25 @@ impl Chrome {
         self.legend_rows() + border + self.pad_y() * 2
     }
 
+    /// Cells a row has across, once the border and the padding have taken theirs.
+    ///
+    /// A widget that wants full-width rows — a stripe or a selection reaching both edges — has to
+    /// know this before it paints, and only the chrome knows what it is about to take. Guessing
+    /// `terminal_cols() - 2` is what left striped rows running under the right-hand border.
+    ///
+    /// One cell is held back for the same reason `inside_width` holds one: a row exactly
+    /// as wide as the terminal leaves the cursor in the auto-wrap pending state, and the `\r\n`
+    /// after it then costs two rows instead of one.
+    pub fn room(&self) -> usize {
+        let border = match self.border {
+            Border::None => 0,
+            _ => 2,
+        };
+        width::terminal_cols()
+            .saturating_sub(border + self.pad_x() * 2 + 1)
+            .max(1)
+    }
+
     /// Wrap `frame` in whatever this asks for, and put `keys` under it.
     ///
     /// **The legend is built here rather than by the widget**, and that is what makes its rule the

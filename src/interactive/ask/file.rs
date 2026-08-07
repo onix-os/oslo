@@ -10,8 +10,9 @@
 //! page cache — and caching it would mean showing a file that has since been deleted, which for a
 //! file picker is the one wrong answer worth avoiding. Moving into a directory rereads it.
 
+use super::look::{Row, View};
 use super::{Answer, Inline};
-use crate::interactive::dropdown::width::{terminal_cols, terminal_rows, truncate_to_width};
+use crate::interactive::dropdown::width::{terminal_rows, truncate_to_width};
 use crate::interactive::matching::{Fuzzed, Fuzzy};
 use crate::interactive::term::{Key, Keys, Restore, Screen};
 use crate::interactive::theme;
@@ -37,6 +38,8 @@ pub struct Browse {
     pub fuzzy: Fuzzy,
     /// The legend, the border, the screen and where on it. See `super::chrome`.
     pub chrome: super::chrome::Chrome,
+    /// Where the filter sits and what colour the rows take. See `super::look`.
+    pub look: super::look::Look,
 }
 
 impl Default for Browse {
@@ -48,6 +51,7 @@ impl Default for Browse {
             height: 12,
             fuzzy: Fuzzy::Smart,
             chrome: super::chrome::Chrome::default(),
+            look: super::look::Look::default(),
         }
     }
 }
@@ -105,9 +109,9 @@ pub fn file(spec: &Browse) -> Answer<String> {
     let mut panel = Inline::with_chrome(spec.chrome.clone());
 
     loop {
-        // Two rows above (the path and the query), the footer below, and one spare so the block
-        // can never fill the screen exactly.
-        let chrome = 2 + spec.chrome.extra_rows();
+        // The path above, whatever the look puts around the list, the footer below, and one spare
+        // so the block can never fill the screen exactly.
+        let chrome = 1 + spec.chrome.extra_rows() + spec.look.extra_rows(true);
         let height = spec
             .height
             .min(shown.len().max(1))
@@ -121,52 +125,43 @@ pub fn file(spec: &Browse) -> Answer<String> {
             offset = selected + 1 - height;
         }
 
-        let cols = terminal_cols();
+        let cols = spec.chrome.room();
         let mut frame = String::new();
         frame.push_str(&format!(
             "\r\n\r\x1b[K{}",
-            ui.question.paint(
-                &truncate_to_width(&at.display().to_string(), cols.saturating_sub(2)),
-                depth,
-            )
+            ui.question
+                .paint(&truncate_to_width(&at.display().to_string(), cols), depth)
         ));
-        frame.push_str(&format!(
-            "\r\n\r\x1b[K{} {}",
-            ui.accent.paint("❯", depth),
-            if query.is_empty() {
-                ui.muted.paint("type to filter", depth)
-            } else {
-                query.clone()
-            }
-        ));
-        for row in 0..height {
-            let text = match shown.get(offset + row) {
-                Some(&index) => {
-                    let entry = &entries[index];
-                    let here = offset + row == selected;
-                    // A trailing slash says which rows Right will go into, without a second column.
-                    let label = if entry.directory {
-                        format!("{}/", entry.name)
-                    } else {
-                        entry.name.clone()
-                    };
-                    format!(
-                        "{}{}",
-                        ui.accent.paint(if here { "❯ " } else { "  " }, depth),
-                        if here {
-                            ui.accent
-                        } else if entry.directory {
-                            ui.question
-                        } else {
-                            theme::Style::default()
-                        }
-                        .paint(&truncate_to_width(&label, cols.saturating_sub(2)), depth)
-                    )
+        let rows: Vec<Row> = shown
+            .iter()
+            .map(|&index| {
+                let entry = &entries[index];
+                Row {
+                    // A trailing slash says which rows Right will go into, without a second
+                    // column.
+                    text: match entry.directory {
+                        true => format!("{}/", entry.name),
+                        false => entry.name.clone(),
+                    },
+                    tint: entry.directory.then_some(ui.question),
+                    ..Row::new(String::new())
                 }
-                None => String::new(),
-            };
-            frame.push_str(&format!("\r\n\r\x1b[K{text}"));
-        }
+            })
+            .collect();
+        frame.push_str(&spec.look.frame(
+            &rows,
+            &View {
+                selected,
+                offset,
+                height,
+                query: &query,
+                matched: shown.len(),
+                total: entries.len(),
+                marked: 0,
+                cols,
+                filtering: true,
+            },
+        ));
         panel.draw(
             &frame,
             &[("↑↓", "move"), ("←→", "in/out"), ("enter", "choose")],

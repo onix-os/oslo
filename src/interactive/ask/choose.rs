@@ -16,8 +16,9 @@
 //! Space checks a row, Enter takes everything checked — or the row under the cursor when nothing
 //! is. That last rule is what stops "I pressed Enter and got nothing" from being a state.
 
+use super::look::{Row, View};
 use super::{Answer, Inline};
-use crate::interactive::dropdown::width::{terminal_cols, terminal_rows, truncate_to_width};
+use crate::interactive::dropdown::width::{terminal_rows, truncate_to_width};
 use crate::interactive::matching::{Fuzzed, Fuzzy};
 use crate::interactive::term::{Key, Keys, Restore, Screen};
 use crate::interactive::theme;
@@ -37,6 +38,8 @@ pub struct Choice {
     pub fuzzy: Fuzzy,
     /// The legend, the border, the screen and where on it. See `super::chrome`.
     pub chrome: super::chrome::Chrome,
+    /// Where the filter sits and what colour the rows take. See `super::look`.
+    pub look: super::look::Look,
 }
 
 impl Default for Choice {
@@ -49,6 +52,7 @@ impl Default for Choice {
             height: 10,
             fuzzy: Fuzzy::Smart,
             chrome: super::chrome::Chrome::default(),
+            look: super::look::Look::default(),
         }
     }
 }
@@ -88,13 +92,13 @@ fn run(spec: &Choice) -> Answer<Vec<String>> {
     let mut panel = Inline::with_chrome(spec.chrome.clone());
 
     loop {
-        // The chrome is whatever this frame will actually draw — the legend, plus a header and a
-        // filter row when there are any. Computed from the same booleans the drawing uses, so the
-        // clamp and the frame cannot disagree; a hard-coded constant here is how two of these
-        // widgets ended up reserving a row they never drew.
+        // The chrome is whatever this frame will actually draw — the legend, plus a header and
+        // whatever rows the look puts around the list. Computed from the same values the drawing
+        // uses, so the clamp and the frame cannot disagree; a hard-coded constant here is how two
+        // of these widgets ended up reserving a row they never drew.
         let chrome = spec.chrome.extra_rows()
             + usize::from(!spec.header.is_empty())
-            + usize::from(spec.filter);
+            + spec.look.extra_rows(spec.filter);
         let height = spec
             .height
             .min(shown.len().max(1))
@@ -110,10 +114,10 @@ fn run(spec: &Choice) -> Answer<Vec<String>> {
 
         // Every row starts with `\r\n`, which is what makes the row count exact — see `Inline`.
         let mut frame = String::new();
-        let cols = terminal_cols();
-        // Chrome is truncated like everything else: a header or a query longer than the terminal
-        // wraps, and a wrapped row is two physical rows the count knows nothing about.
-        let room = cols.saturating_sub(2);
+        // Truncated like everything else: a header or a query longer than the terminal wraps, and
+        // a wrapped row is two physical rows the count knows nothing about. The width comes from
+        // the chrome, which is the only thing that knows what the border and padding will take.
+        let room = spec.chrome.room();
 
         if !spec.header.is_empty() {
             frame.push_str(&format!(
@@ -122,48 +126,37 @@ fn run(spec: &Choice) -> Answer<Vec<String>> {
                     .paint(&truncate_to_width(&spec.header, room), depth)
             ));
         }
-        if spec.filter {
-            frame.push_str(&format!(
-                "\r\n\r\x1b[K{} {}",
-                ui.accent.paint("❯", depth),
-                if query.is_empty() {
-                    ui.muted.paint("type to filter", depth)
-                } else {
-                    truncate_to_width(&query, room)
-                }
-            ));
-        }
-        for row in 0..height {
-            let text = match shown.get(offset + row) {
-                Some(&item) => {
-                    let here = offset + row == selected;
-                    // **The caret and the checkbox are two columns, not one.** They answer
-                    // different questions — where you are, and what is chosen — and folding them
-                    // together left `--multi` with no cursor at all.
-                    let caret = if here { "❯ " } else { "  " };
-                    let box_ = if spec.multi {
-                        if checked[item] { "◉ " } else { "◯ " }
-                    } else {
-                        ""
-                    };
-                    let width = room.saturating_sub(2 + box_.chars().count());
-                    let label = truncate_to_width(&spec.items[item], width);
-                    format!(
-                        "{}{}{}",
-                        ui.accent.paint(caret, depth),
-                        if checked[item] { ui.accent } else { ui.muted }.paint(box_, depth),
-                        if here {
-                            ui.accent
-                        } else {
-                            theme::Style::default()
-                        }
-                        .paint(&label, depth)
-                    )
-                }
-                None => String::new(),
-            };
-            frame.push_str(&format!("\r\n\r\x1b[K{text}"));
-        }
+        // **The caret and the checkbox are two columns, not one.** They answer different
+        // questions — where you are, and what is chosen — and folding them together left
+        // `--multi` with no cursor at all. The caret is the look's marker; the box is the lead.
+        let rows: Vec<Row> = shown
+            .iter()
+            .map(|&item| Row {
+                text: spec.items[item].clone(),
+                lead: match spec.multi {
+                    true if checked[item] => "◉ ".to_string(),
+                    true => "◯ ".to_string(),
+                    false => String::new(),
+                },
+                marked: checked[item],
+                trail: String::new(),
+                tint: None,
+            })
+            .collect();
+        frame.push_str(&spec.look.frame(
+            &rows,
+            &View {
+                selected,
+                offset,
+                height,
+                query: &query,
+                matched: shown.len(),
+                total: spec.items.len(),
+                marked: checked.iter().filter(|c| **c).count(),
+                cols: room,
+                filtering: spec.filter,
+            },
+        ));
         let keys_shown: &[(&str, &str)] = if spec.multi {
             &[
                 ("↑↓", "move"),

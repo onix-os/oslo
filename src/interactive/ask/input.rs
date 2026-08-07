@@ -13,7 +13,7 @@
 //! oslo's whole `readline`, and hosting it here would mean two things to keep in step for the rest
 //! of the shell's life.
 
-use super::{Answer, show, with_caret};
+use super::{Answer, Inline, with_caret};
 use crate::interactive::term::{Key, Keys, Restore, Screen};
 use crate::interactive::theme;
 
@@ -35,6 +35,12 @@ pub struct Input {
     pub required: bool,
     /// The legend, the border, the screen and where on it. See `super::chrome`.
     pub chrome: super::chrome::Chrome,
+    /// The colours the row takes, and whether it sits on a surface. See `super::look`.
+    ///
+    /// Only the parts of a look that mean anything to a single row: `accent` paints the prompt,
+    /// `surface` tints the row, `surface_rows` turns it into a panel. There is no list here, so
+    /// the stripe and the marker have nothing to colour.
+    pub look: super::look::Look,
 }
 
 /// Ask for one line.
@@ -54,9 +60,9 @@ pub fn input(spec: &Input) -> Answer<String> {
     let mut line: Vec<char> = spec.default.clone().unwrap_or_default().chars().collect();
     let mut cursor = line.len();
     let mut keys = Keys::on(raw.fd());
-    // Everything this widget draws lives on one row, so a redraw is a carriage return and an
-    // erase — no cursor arithmetic, and nothing that can drift out of step with the terminal.
-    show("\r\x1b[K");
+    // Drawn through `Inline` like every other widget, so a border is a border here too. It used to
+    // write its own row directly, which is why `ui input --border` took the flag and drew nothing.
+    let mut panel = Inline::with_chrome(spec.chrome.clone());
 
     loop {
         let shown: String = if spec.password {
@@ -78,20 +84,19 @@ pub fn input(spec: &Input) -> Answer<String> {
         } else {
             with_caret(&shown, cursor)
         };
-        show(&format!(
-            "\r\x1b[K{}{}",
-            ui.question.paint(&spec.prompt, depth),
-            body
-        ));
+        panel.draw(
+            &spec.look.one_row(&spec.prompt, &body, spec.chrome.room()),
+            &[],
+        );
 
         let Some(pressed) = keys.read() else {
-            show("\r\x1b[K");
+            panel.close();
             return Answer::Cancelled;
         };
         match pressed {
             // An abort is a cancel here: there is an answer to decline either way.
             Key::Cancel | Key::Abort => {
-                show("\r\x1b[K");
+                panel.close();
                 return Answer::Cancelled;
             }
             Key::Accept => {
@@ -99,17 +104,20 @@ pub fn input(spec: &Input) -> Answer<String> {
                 if spec.required && answer.is_empty() {
                     // Say why, on the same row, and go on asking. Refusing silently reads as the
                     // key not having worked.
-                    show(&format!(
-                        "\r\x1b[K{}{}",
-                        ui.question.paint(&spec.prompt, depth),
-                        ui.error.paint("required", depth)
-                    ));
+                    panel.draw(
+                        &spec.look.one_row(
+                            &spec.prompt,
+                            &ui.error.paint("required", depth),
+                            spec.chrome.room(),
+                        ),
+                        &[],
+                    );
                     continue;
                 }
                 // Erased, not echoed: the caller prints the answer to stdout and that is the one
                 // record of it. Echoing here as well put the answer on screen twice, once from
                 // each stream — and made `x=$(ui input)` leave a stray copy behind.
-                show("\r\x1b[K");
+                panel.close();
                 return Answer::Given(answer);
             }
             Key::Char(c) => {

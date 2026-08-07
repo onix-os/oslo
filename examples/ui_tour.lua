@@ -167,7 +167,8 @@ end
 -- And that a name anyone would write is accepted. `confirm` is the one widget that works without a
 -- terminal — it falls back to a line — so this is the one that can be exercised here.
 print("  every widget takes: legend, border, border_fg, fit, fullscreen, align_x, align_y")
-print("  see examples/ui_chrome.sh")
+print("  every list also takes: look, filter_at, reverse, slot_left/right, stripe, sel_bg, …")
+print("  see examples/ui_chrome.sh and examples/ui_look.sh")
 
 heading("asking")
 -- `confirm` works without a terminal: the raw-mode widget falls back to an ordinary line, so a
@@ -196,6 +197,39 @@ else
   local status = oslo.ui.spin{ title = "working", command = { "sleep", "1" } }
   print("  spin     -> exit " .. tostring(status))
 end
+
+-- ---------------------------------------------------------------- look
+
+-- How a list is drawn: the filter's end, the slots beside it, the row colours. The same names as
+-- the shell's `--filter-at`, `--slot-right`, `--stripe`. See `examples/ui_look.sh`.
+--
+-- These are checked by whether they are *accepted*, because a look that draws nothing visible is
+-- exactly the bug worth catching: a misspelt field silently doing nothing is how `look = "histry"`
+-- would leave you staring at a plain list with no error to explain it.
+local function accepts(what, fields)
+  fields.items = { "alpha", "beta" }
+  local ok = pcall(oslo.ui.filter, fields)
+  check(what, ok, true)
+end
+
+accepts("the history preset", { look = "history" })
+accepts("the menu preset", { look = "menu" })
+accepts("a preset with fields changed", {
+  look = "history", slot_right = " {n}/{total} ", stripe = 236, list_pad = 2,
+})
+accepts("every colour field", {
+  sel_fg = 0, sel_bg = 4, row_fg = 7, row_bg = 0, hit_fg = 0, hit_bg = 3, accent = 5, surface = 236,
+})
+accepts("placement and size", {
+  filter_at = "bottom", reverse = true, list_width = "full", surface_rows = 3, list_gap = 1,
+})
+accepts("stripe = false turns a preset's stripe off", { look = "history", stripe = false })
+
+-- And refused by name rather than ignored, which is the other half of the same rule.
+check("a bad preset is refused", pcall(oslo.ui.filter, { items = { "a" }, look = "histry" }), false)
+check("a bad colour is refused", pcall(oslo.ui.filter, { items = { "a" }, stripe = "puce" }), false)
+check("a bad filter_at is refused",
+  pcall(oslo.ui.filter, { items = { "a" }, filter_at = "sideways" }), false)
 
 -- ----------------------------------------------------------------
 

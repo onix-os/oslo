@@ -13,6 +13,10 @@
 #   --fullscreen                   draw on the alternate screen, out of the scrollback
 #   --align-x / --align-y / --align   start|left|top, center, end|right|bottom
 #
+# This script is about what goes *around* a widget. `examples/ui_look.sh` is the other half — how
+# the list inside it is drawn: which end the filter sits at, what is beside it, and what colour the
+# rows take. Together they are what makes the history browser a `ui filter` with options set.
+#
 # The same are Lua table fields — `legend`, `border`, `fit`, `fullscreen`, `align_x`,
 # `align_y`, `padding_x`, `padding_y`, `legend_gap` — on every `oslo.ui.*` widget. One parser builds the same `Chrome` for both, so a
 # prompt looks identical whether shell or Lua asked for it.

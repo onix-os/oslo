@@ -41,14 +41,14 @@ fn field(table: &Table, name: &str) -> String {
 }
 
 /// An optional string field.
-fn maybe(table: &Table, name: &str) -> Option<String> {
+pub(super) fn maybe(table: &Table, name: &str) -> Option<String> {
     match table.get(&Value::str(name)) {
         Value::Str(s) => Some(s.to_string()),
         _ => None,
     }
 }
 
-fn flag(table: &Table, name: &str) -> bool {
+pub(super) fn flag(table: &Table, name: &str) -> bool {
     matches!(table.get(&Value::str(name)), Value::Bool(true))
 }
 
@@ -65,7 +65,7 @@ fn count(table: &Table, name: &str, fallback: usize) -> usize {
 /// Separate from [`count`] because clamping these to one is a bug you cannot see until you compare
 /// the two languages: `oslo.ui.style{padding_x = 0}` drew a column of padding where the shell's
 /// `ui style --padding "0 0"` drew none. Same widget, same theme, different box.
-fn size(table: &Table, name: &str, fallback: usize) -> usize {
+pub(super) fn size(table: &Table, name: &str, fallback: usize) -> usize {
     match table.get(&Value::str(name)) {
         Value::Number(n) => n.as_int().map(|i| i.max(0) as usize).unwrap_or(fallback),
         _ => fallback,
@@ -191,6 +191,7 @@ pub fn install(ui: &mut Table) {
             password: flag(&t, "password"),
             required: flag(&t, "required"),
             chrome: chrome_of(&t)?,
+            look: super::look::look_of(&t)?,
         });
         // `nil` for both cancelled and no-terminal. Lua has one absent value and a script says
         // `if not answer then return end`; splitting the two would mean every caller checking a
@@ -243,9 +244,13 @@ pub fn install(ui: &mut Table) {
     });
 
     // oslo.ui.choose{items=, header=, multi=, height=} -> string, list, or nil
-    put(ui, "choose", |_, args| ok(list_widget(&args, false)));
+    put(ui, "choose", |_, args| {
+        list_widget(&args, false).map(|v| vec![v])
+    });
     // The same, narrowed as you type.
-    put(ui, "filter", |_, args| ok(list_widget(&args, true)));
+    put(ui, "filter", |_, args| {
+        list_widget(&args, true).map(|v| vec![v])
+    });
 
     // oslo.ui.write{header=, placeholder=, default=} -> string or nil
     put(ui, "write", |_, args| {
@@ -286,6 +291,7 @@ pub fn install(ui: &mut Table) {
                 height: count(&t, "height", 12),
                 fuzzy: crate::interactive::settings::current().completion.fuzzy,
                 chrome: chrome_of(&t)?,
+                look: super::look::look_of(&t)?,
             }) {
                 Answer::Given(path) => Value::str(&path),
                 _ => Value::Nil,
@@ -311,6 +317,7 @@ pub fn install(ui: &mut Table) {
                 filter: !flag(&t, "no_filter"),
                 fuzzy: crate::interactive::settings::current().completion.fuzzy,
                 chrome: chrome_of(&t)?,
+                look: super::look::look_of(&t)?,
             }) {
                 Answer::Given(row) => Value::str(&row),
                 _ => Value::Nil,
@@ -530,7 +537,11 @@ pub fn install(ui: &mut Table) {
 }
 
 /// `choose` and `filter`, which differ only in whether typing narrows the list.
-fn list_widget(args: &[Value], filtering: bool) -> Value {
+///
+/// The two parsers are asked with `?` rather than `unwrap_or_default`: a misspelt colour or a
+/// preset that does not exist has to be an error a script can see. Defaulting quietly is how
+/// `look = "histry"` would draw the plain list and leave nothing at all to explain why.
+fn list_widget(args: &[Value], filtering: bool) -> Result<Value, crate::lua::eval::LuaError> {
     let t = spec(args);
     let t = t.borrow();
     let mut chosen = items(&t, "items");
@@ -547,14 +558,15 @@ fn list_widget(args: &[Value], filtering: bool) -> Value {
         filter: filtering,
         height: count(&t, "height", 10),
         fuzzy: crate::interactive::settings::current().completion.fuzzy,
-        chrome: chrome_of(&t).unwrap_or_default(),
+        chrome: chrome_of(&t)?,
+        look: super::look::look_of(&t)?,
     };
     let answer = if filtering {
         filter(&settings)
     } else {
         choose(&settings)
     };
-    match answer {
+    Ok(match answer {
         // A single pick answers with the string; `multi` answers with a list, even of one. A
         // caller that asked for many is written to loop, and handing it a bare string on the day
         // one thing was checked would break that.
@@ -563,7 +575,7 @@ fn list_widget(args: &[Value], filtering: bool) -> Value {
         }
         Answer::Given(picked) => picked.first().map(Value::str).unwrap_or(Value::Nil),
         _ => Value::Nil,
-    }
+    })
 }
 
 /// The positional entries of a table: `{"a", "b", "c"}`.
