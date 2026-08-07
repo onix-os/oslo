@@ -6,6 +6,12 @@ use std::time::{Duration, Instant};
 
 const MAX_REPLY: usize = 4096;
 const MAX_TOTAL: usize = 16384;
+/// How long to keep reading after the last query has been answered.
+///
+/// A terminal answering for itself is already silent by now, so this is what a plain session pays
+/// at startup — once. Anything emulating a terminal in between answers first and forwards second,
+/// and this is the room its replies need to arrive in rather than land in the first prompt.
+const SETTLE_MS: u64 = 20;
 static STARTUP_PENDING: Mutex<Vec<u8>> = Mutex::new(Vec::new());
 
 /// How the bytes collected for one possible reply should be handled.
@@ -110,8 +116,28 @@ where
     let deadline = Instant::now() + Duration::from_millis(timeout_ms);
     let mut replies = Vec::new();
     let mut total = 0usize;
-    while Instant::now() < deadline {
-        let remaining = deadline.saturating_duration_since(Instant::now());
+    // **The completion test shortens the wait; it does not end it.**
+    //
+    // `complete` is "someone answered the last thing we asked", and the caller uses a reply that
+    // every terminal gives — so a single terminal answering it means the earlier queries are done,
+    // because a terminal answers in order. Ending the read there was the obvious next step and it
+    // is wrong, because *someone* is not *the terminal*.
+    //
+    // Anything that emulates a terminal will answer from its own emulation while the queries it
+    // forwarded are still in flight: a multiplexer, a session over ssh, `script`, an editor's
+    // embedded terminal. The read stopped, and the real replies arrived afterwards — into the line
+    // editor, where an answer about the keyboard protocol is indistinguishable from somebody
+    // pressing keys.
+    //
+    // So completion starts a short settle instead. A terminal on its own goes quiet immediately
+    // and pays the settle once at startup; anything with a layer in between gets its late replies
+    // read, classified, and — since they arrive before the settle expires — actually believed.
+    // Bytes that are not replies are preserved either way, so a keystroke typed into the window is
+    // never eaten.
+    let mut settled: Option<Instant> = None;
+    while Instant::now() < settled.unwrap_or(deadline).min(deadline) {
+        let until = settled.unwrap_or(deadline).min(deadline);
+        let remaining = until.saturating_duration_since(Instant::now());
         if !wait(fd, remaining) {
             break;
         }
@@ -127,8 +153,8 @@ where
         }
         if let Some(found) = broker.push(byte) {
             replies.push(found);
-            if complete(&replies) {
-                break;
+            if settled.is_none() && complete(&replies) {
+                settled = Some(Instant::now() + Duration::from_millis(SETTLE_MS));
             }
         }
     }
@@ -370,5 +396,101 @@ mod tests {
         preserve_startup_input(b"typed".to_vec());
         assert_eq!(take_startup_input(), b"typed");
         assert!(take_startup_input().is_empty());
+    }
+}
+
+#[cfg(test)]
+mod settle_tests {
+    use super::*;
+    use std::io::Write;
+
+    /// A pty pair, so the read loop is driven by a real descriptor rather than a mock.
+    fn pty() -> (std::fs::File, std::fs::File) {
+        let pair = nix::pty::openpty(None, None).expect("openpty");
+        (pair.master.into(), pair.slave.into())
+    }
+
+    /// Every reply is a complete `\x1b[…c`, so `classify` stays trivial and the test is about the
+    /// loop rather than about parsing.
+    fn da1(bytes: &[u8]) -> ReplyMatch {
+        match (bytes.starts_with(b"\x1b["), bytes.ends_with(b"c")) {
+            (true, true) => ReplyMatch::Complete,
+            (true, false) => ReplyMatch::Prefix,
+            _ => match b"\x1b[".starts_with(bytes) {
+                true => ReplyMatch::Prefix,
+                false => ReplyMatch::Reject,
+            },
+        }
+    }
+
+    /// **The reply that satisfies `complete` does not end the read.**
+    ///
+    /// This is the whole bug. Something between the shell and the terminal answers first, from its
+    /// own emulation, and the terminal's real replies are still in flight. Stopping there left them
+    /// to arrive during the first prompt, where a report about the keyboard protocol is
+    /// indistinguishable from somebody typing.
+    #[test]
+    fn a_late_reply_is_still_collected() {
+        let (mut master, slave) = pty();
+        let fd = std::os::fd::AsRawFd::as_raw_fd(&slave);
+        // The impostor answers at once; the real terminal answers a few milliseconds later.
+        master.write_all(b"\x1b[?1;2c").expect("write");
+        master.flush().expect("flush");
+        let writer = std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(5));
+            let _ = master.write_all(b"\x1b[?62;4c");
+            let _ = master.flush();
+            master
+        });
+
+        let (replies, pending) = query_sequences(fd, b"\x1b[c", 200, da1, |seen| !seen.is_empty());
+        let _ = writer.join();
+
+        assert_eq!(replies.len(), 2, "the late reply was dropped: {replies:?}");
+        assert_eq!(replies[1], b"\x1b[?62;4c", "{replies:?}");
+        assert!(
+            pending.is_empty(),
+            "nothing was mistaken for input: {pending:?}"
+        );
+    }
+
+    /// A reply arriving after the settle has expired is *input*, not a reply — and is handed back
+    /// rather than swallowed. Losing a keystroke would be the opposite bug.
+    #[test]
+    fn anything_after_the_settle_is_returned_as_input() {
+        let (mut master, slave) = pty();
+        let fd = std::os::fd::AsRawFd::as_raw_fd(&slave);
+        master.write_all(b"\x1b[?1;2c").expect("write");
+        master.flush().expect("flush");
+        let (replies, _) = query_sequences(fd, b"\x1b[c", 200, da1, |seen| !seen.is_empty());
+        assert_eq!(replies.len(), 1);
+
+        // Typed after the shell stopped listening; the next read must still see it.
+        master.write_all(b"ls\n").expect("write");
+        master.flush().expect("flush");
+        let mut buffer = [0u8; 3];
+        let read = unsafe { nix::libc::read(fd, buffer.as_mut_ptr().cast(), 3) };
+        assert_eq!(read, 3, "the keystrokes were consumed");
+        assert_eq!(&buffer, b"ls\n");
+    }
+
+    /// A terminal answering only for itself goes quiet, so a plain session pays the settle once
+    /// and no more — it must not sit out the whole timeout.
+    #[test]
+    fn a_quiet_terminal_does_not_wait_out_the_timeout() {
+        let (mut master, slave) = pty();
+        let fd = std::os::fd::AsRawFd::as_raw_fd(&slave);
+        master.write_all(b"\x1b[?1;2c").expect("write");
+        master.flush().expect("flush");
+
+        let start = Instant::now();
+        let (replies, _) = query_sequences(fd, b"\x1b[c", 2_000, da1, |seen| !seen.is_empty());
+        let took = start.elapsed();
+
+        assert_eq!(replies.len(), 1);
+        assert!(
+            took < Duration::from_millis(500),
+            "waited {took:?} for a terminal that had finished"
+        );
     }
 }
