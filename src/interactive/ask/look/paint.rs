@@ -13,7 +13,7 @@
 use super::{Look, Where, Width};
 use crate::interactive::dropdown::width::{pad_to_width, truncate_to_width};
 use crate::interactive::prompt::printed_width;
-use crate::interactive::theme::{self, Color, Style};
+use crate::interactive::theme::{self, Style};
 
 /// One line of a list, as the widget knows it.
 pub struct Row {
@@ -26,6 +26,12 @@ pub struct Row {
     pub marked: bool,
     /// Drawn hard right on the row, after the text: an age, a count, a directory.
     pub trail: String,
+    /// Fixed-width columns before the text: how long ago, how many times, how big.
+    ///
+    /// Right-aligned as a block and sized across the whole list, so they form columns down the
+    /// screen even though the text beside them varies wildly in length. That alignment is the
+    /// entire reason to have them — the eye can scan one column without reading the others.
+    pub meta: Vec<String>,
     /// This row's own foreground, when it is not the selected one — a directory in a file list, a
     /// failed job in a job list. The look still owns the background, so a tinted row is still
     /// striped and still highlights when you land on it.
@@ -40,9 +46,38 @@ impl Row {
             lead: String::new(),
             marked: false,
             trail: String::new(),
+            meta: Vec::new(),
             tint: None,
         }
     }
+}
+
+/// One width per metadata column, from every row in the list.
+///
+/// Capped, because a column is a ruler and a ruler that takes half the screen is not one. Twelve
+/// cells holds `999999×` and `2025-01-01` and stops well short of crowding out the text.
+fn meta_widths(rows: &[Row]) -> Vec<usize> {
+    let columns = rows.iter().map(|r| r.meta.len()).max().unwrap_or(0);
+    (0..columns)
+        .map(|index| {
+            rows.iter()
+                .filter_map(|row| row.meta.get(index))
+                .map(|field| printed_width(field))
+                .max()
+                .unwrap_or(0)
+                .min(12)
+        })
+        .collect()
+}
+
+/// Right-align `text` in exactly `width` cells, truncating if it does not fit.
+///
+/// Truncation matters as much as padding: a command run a million times renders `999999×`, and one
+/// cell of overflow wraps the row — after which every row below it is a line out of place.
+fn pad_left(text: &str, width: usize) -> String {
+    let text = truncate_to_width(text, width);
+    let used = printed_width(&text);
+    format!("{}{}", " ".repeat(width.saturating_sub(used)), text)
 }
 
 /// Where the list is, so the renderer does not have to be told twice.
@@ -63,6 +98,11 @@ pub struct View<'a> {
     pub cols: usize,
     /// Whether there is a filter row at all.
     pub filtering: bool,
+    /// How long the widget has been open, for the scanner.
+    ///
+    /// Passed in rather than read from a clock so a frame is a pure function of its input and can
+    /// be tested without one — the same reason the finder's own frame takes `now`.
+    pub elapsed_ms: u64,
 }
 
 impl Look {
@@ -72,9 +112,13 @@ impl Look {
     /// `super::super::Inline`.
     pub fn frame(&self, rows: &[Row], view: &View<'_>) -> String {
         let depth = theme::depth();
+        // Measured across the *whole* list rather than the visible window, so the columns do not
+        // shift under you as it scrolls — which is the one thing that would undo the alignment
+        // they exist for.
+        let meta = meta_widths(rows);
         let mut list: Vec<String> = (0..view.height)
             .map(|at| match rows.get(view.offset + at) {
-                Some(row) => self.list_row(row, view.offset + at, view, depth),
+                Some(row) => self.list_row(row, view.offset + at, view, &meta, depth),
                 // A blank row still takes the surface it would have had, so a half-empty list is a
                 // block with space in it rather than a block that stops early.
                 None => self.blank(view),
@@ -103,47 +147,16 @@ impl Look {
             .collect()
     }
 
-    /// A widget that is one row rather than a list: `input`, and anything else that asks for a
-    /// line rather than a choice.
-    ///
-    /// Shares the surface with a filter row, which is the point — `ui input --surface 236
-    /// --surface-rows 3` and `ui filter --surface 236 --surface-rows 3` are the same panel, so a
-    /// script can put a form together out of both without them disagreeing about what a surface
-    /// looks like. `body` is already painted and already carries its own caret.
-    pub fn one_row(&self, prompt: &str, body: &str, cols: usize) -> String {
-        let depth = theme::depth();
-        let on = |style: Style| Style {
-            bg: self.surface.or(style.bg),
-            ..style
-        };
-        let pad = " ".repeat(self.pad);
-        let used = self.pad * 2 + printed_width(prompt) + printed_width(body);
-        let fill = match self.width {
-            Width::Full => cols.saturating_sub(used),
-            Width::Content => 0,
-        };
-        let row = format!(
-            "{}{}{}{}{}",
-            on(Style::default()).paint(&pad, depth),
-            on(self.accent).paint(prompt, depth),
-            body,
-            on(Style::default()).paint(&" ".repeat(fill), depth),
-            on(Style::default()).paint(&pad, depth),
-        );
-        let blank = on(Style::default()).paint(&" ".repeat(cols), depth);
-        let middle = self.surface_rows / 2;
-        (0..self.surface_rows.max(1))
-            .map(|at| match at == middle {
-                true => row.clone(),
-                false => blank.clone(),
-            })
-            .map(|row| format!("\r\x1b[K{row}"))
-            .collect::<Vec<_>>()
-            .join("\r\n")
-    }
-
-    /// One row: the marker, the lead, the text with its matches marked, and the trail.
-    fn list_row(&self, row: &Row, at: usize, view: &View<'_>, depth: theme::Depth) -> String {
+    /// One row: the marker, the lead, the meta columns, the text with its matches marked, and the
+    /// trail.
+    fn list_row(
+        &self,
+        row: &Row,
+        at: usize,
+        view: &View<'_>,
+        meta_widths: &[usize],
+        depth: theme::Depth,
+    ) -> String {
         let here = at == view.selected;
         // The stripe is a property of the row's place in the *list*, so it is the absolute index
         // that decides it. Using the visible one would make the stripes crawl as the list scrolls.
@@ -180,8 +193,24 @@ impl Look {
             false => on(self.muted).paint(&row.lead, depth),
         };
 
-        let trail = Look::slot(&row.trail, view);
-        let used = self.pad * 2 + marker_cells + printed_width(&row.lead) + printed_width(&trail);
+        // Right-aligned in their measured columns, then one space before the text. Painted on the
+        // row's own background like everything else: a metadata column that kept the terminal
+        // background would punch a hole through a striped row.
+        let mut meta = String::new();
+        let mut meta_cells = 0usize;
+        for (index, width) in meta_widths.iter().enumerate() {
+            let field = row.meta.get(index).map(String::as_str).unwrap_or("");
+            let cell = format!("{} ", pad_left(field, *width));
+            meta_cells += width + 1;
+            meta.push_str(&on(self.meta_style).paint(&cell, depth));
+        }
+
+        let trail = Look::fill(&row.trail, view);
+        let used = self.pad * 2
+            + marker_cells
+            + printed_width(&row.lead)
+            + meta_cells
+            + printed_width(&trail);
         let room = view.cols.saturating_sub(used).max(1);
         let shown = truncate_to_width(&row.text, room);
         // Padded before painting, so the background reaches the trail rather than stopping at the
@@ -192,10 +221,11 @@ impl Look {
         };
 
         format!(
-            "{}{}{}{}{}{}",
+            "{}{}{}{}{}{}{}",
             on(Style::default()).paint(&pad, depth),
             marker,
             lead,
+            meta,
             self.hits(&text, &shown, view.query, on(base), depth),
             on(self.muted).paint(&trail, depth),
             on(Style::default()).paint(&pad, depth),
@@ -246,72 +276,5 @@ impl Look {
             out.push_str(&base.paint(&run, depth));
         }
         out
-    }
-
-    /// The filter: its surface, the query, and whatever the slots say.
-    fn filter_rows(&self, view: &View<'_>, depth: theme::Depth) -> Vec<String> {
-        let on = |style: Style| Style {
-            bg: self.surface.or(style.bg),
-            ..style
-        };
-        let blank = on(Style::default()).paint(&" ".repeat(view.cols), depth);
-        // The query goes in the middle of the surface, which is what makes three rows read as a
-        // panel with something in it rather than as a line with two spare rows.
-        let middle = self.surface_rows / 2;
-        (0..self.surface_rows.max(1))
-            .map(|row| match row == middle {
-                true => self.query_row(view, depth),
-                false => blank.clone(),
-            })
-            .collect()
-    }
-
-    /// The row the query is on: prompt, what has been typed, a caret, then the slots.
-    fn query_row(&self, view: &View<'_>, depth: theme::Depth) -> String {
-        let on = |style: Style| Style {
-            bg: self.surface.or(style.bg),
-            ..style
-        };
-        let caret = Style {
-            fg: Some(Color::Indexed(0)),
-            bg: Some(Color::Indexed(1)),
-            ..Style::default()
-        };
-
-        let left = Look::slot(&self.left, view);
-        let right = Look::slot(&self.right, view);
-        let fixed = self.pad * 2
-            + printed_width(&self.prompt)
-            + printed_width(&left)
-            + printed_width(&right)
-            // The caret is part of the input and has to fit.
-            + 1;
-        let room = view.cols.saturating_sub(fixed).max(1);
-
-        let (typed, style) = match view.query.is_empty() {
-            true => (truncate_to_width(&self.placeholder, room), self.muted),
-            false => (truncate_to_width(view.query, room), self.row),
-        };
-        let gap = match self.width {
-            Width::Full => room.saturating_sub(printed_width(&typed)),
-            Width::Content => 0,
-        };
-        let pad = " ".repeat(self.pad);
-
-        format!(
-            "{}{}{}{}{}{}{}{}",
-            on(Style::default()).paint(&pad, depth),
-            on(self.accent).paint(&self.prompt, depth),
-            on(self.muted).paint(&left, depth),
-            on(style).paint(&typed, depth),
-            // **A drawn caret, not the real one.** The terminal cursor is hidden while a widget is
-            // open — an inline one repaints its whole block per keystroke and would drag the
-            // cursor across all of it — so the caret is part of the frame and cannot end up a cell
-            // out of step with the text.
-            caret.paint(" ", depth),
-            on(Style::default()).paint(&" ".repeat(gap), depth),
-            on(self.muted).paint(&right, depth),
-            on(Style::default()).paint(&pad, depth),
-        )
     }
 }

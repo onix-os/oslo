@@ -10,11 +10,11 @@
 //! The answer is the **whole row**, in its original text. A widget that answered with a field
 //! would have to be told which one, and a caller that wants a field can `cut` the row it got back.
 
-use super::look::{Row, View};
+use super::look::{Row, Step, View};
 use super::{Answer, Inline};
 use crate::interactive::dropdown::width::{pad_to_width, terminal_rows, truncate_to_width};
 use crate::interactive::matching::{Fuzzed, Fuzzy};
-use crate::interactive::term::{Key, Keys, Restore, Screen};
+use crate::interactive::term::{Key, Keys, Pressed, Restore, Screen};
 use crate::interactive::theme;
 
 /// How the table is asked.
@@ -108,6 +108,7 @@ pub fn table(spec: &Table) -> Answer<String> {
     let mut offset = 0usize;
     let mut keys = Keys::on(raw_mode.fd());
     let mut panel = Inline::with_chrome(spec.chrome.clone());
+    let since = super::Since::now();
 
     loop {
         // Computed from the same booleans the frame draws with, so the clamp and the frame cannot
@@ -129,9 +130,11 @@ pub fn table(spec: &Table) -> Answer<String> {
         }
 
         let cols = spec.chrome.room();
-        let render = |fields: &[String]| -> String {
+        // `from` is how many leading fields the look has taken as metadata columns; their widths
+        // are skipped here so the rest still line up against the widths measured for them.
+        let render = |fields: &[String], from: usize| -> String {
             let mut line = String::new();
-            for (index, width) in widths.iter().enumerate() {
+            for (index, width) in widths.iter().skip(from).enumerate() {
                 let field = fields.get(index).map(String::as_str).unwrap_or("");
                 line.push_str(&pad_to_width(&truncate_to_width(field, *width), *width));
                 line.push_str("  ");
@@ -139,19 +142,30 @@ pub fn table(spec: &Table) -> Answer<String> {
             truncate_to_width(line.trim_end(), cols)
         };
 
+        let meta = spec.look.meta_columns.min(widths.len());
         let mut frame = String::new();
         if !spec.headers.is_empty() {
+            let headers = &spec.headers[meta.min(spec.headers.len())..];
             frame.push_str(&format!(
                 "\r\n\r\x1b[K  {}",
-                ui.question.paint(&render(&spec.headers), depth)
+                ui.question.paint(&render(headers, meta), depth)
             ));
         }
-        // The columns are already aligned by `render`; the look decides what colour they take and
-        // where the filter sits, exactly as it does for `choose`. One renderer, so the two lists
-        // cannot drift apart.
+        // The look decides what colour the rows take and where the filter sits, exactly as it does
+        // for `choose`. One renderer, so the two lists cannot drift apart.
+        //
+        // `meta_columns` splits each row: the first N fields become right-aligned metadata columns
+        // and the rest is the text. That is the whole difference between a table and the history
+        // browser — `1d  118×  cargo test` is three fields with the first two as columns.
         let rows: Vec<Row> = shown
             .iter()
-            .map(|&index| Row::new(render(&spec.rows[index])))
+            .map(|&index| {
+                let fields = &spec.rows[index];
+                Row {
+                    meta: fields.iter().take(meta).cloned().collect(),
+                    ..Row::new(render(&fields[meta.min(fields.len())..], meta))
+                }
+            })
             .collect();
         frame.push_str(&spec.look.frame(
             &rows,
@@ -165,13 +179,18 @@ pub fn table(spec: &Table) -> Answer<String> {
                 marked: 0,
                 cols,
                 filtering: spec.filter,
+                elapsed_ms: since.ms(),
             },
         ));
         panel.draw(&frame, &[("↑↓", "move"), ("enter", "choose")]);
 
-        let Some(pressed) = keys.read() else {
-            panel.close();
-            return Answer::Cancelled;
+        let pressed = match super::awaited(&mut keys, spec.look.tick_ms()) {
+            Pressed::Key(key) => key,
+            Pressed::Timeout => continue,
+            Pressed::Ended => {
+                panel.close();
+                return Answer::Cancelled;
+            }
         };
         match pressed {
             // An abort is a cancel here: there is an answer to decline either way.
@@ -187,10 +206,11 @@ pub fn table(spec: &Table) -> Answer<String> {
                     None => Answer::Cancelled,
                 };
             }
-            Key::Up => selected = selected.saturating_sub(1),
-            Key::Down => selected = (selected + 1).min(shown.len().saturating_sub(1)),
-            Key::PageUp | Key::Home => selected = 0,
-            Key::PageDown | Key::End => selected = shown.len().saturating_sub(1),
+            // The arrows follow the screen, not the list — see `Look::step`.
+            key if spec.look.step(key).is_some() => {
+                let step = spec.look.step(key).unwrap_or(Step::Back);
+                selected = step.from(selected, shown.len());
+            }
             Key::Char(c) if spec.filter => {
                 query.push(c);
                 shown = narrow(spec, &query);

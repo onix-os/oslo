@@ -16,11 +16,11 @@
 //! Space checks a row, Enter takes everything checked — or the row under the cursor when nothing
 //! is. That last rule is what stops "I pressed Enter and got nothing" from being a state.
 
-use super::look::{Row, View};
+use super::look::{Row, Step, View};
 use super::{Answer, Inline};
 use crate::interactive::dropdown::width::{terminal_rows, truncate_to_width};
 use crate::interactive::matching::{Fuzzed, Fuzzy};
-use crate::interactive::term::{Key, Keys, Restore, Screen};
+use crate::interactive::term::{Key, Keys, Pressed, Restore, Screen};
 use crate::interactive::theme;
 
 /// How a list is asked.
@@ -90,6 +90,7 @@ fn run(spec: &Choice) -> Answer<Vec<String>> {
     let mut offset = 0usize;
     let mut keys = Keys::on(raw.fd());
     let mut panel = Inline::with_chrome(spec.chrome.clone());
+    let since = super::Since::now();
 
     loop {
         // The chrome is whatever this frame will actually draw — the legend, plus a header and
@@ -139,8 +140,7 @@ fn run(spec: &Choice) -> Answer<Vec<String>> {
                     false => String::new(),
                 },
                 marked: checked[item],
-                trail: String::new(),
-                tint: None,
+                ..Row::new(String::new())
             })
             .collect();
         frame.push_str(&spec.look.frame(
@@ -155,6 +155,7 @@ fn run(spec: &Choice) -> Answer<Vec<String>> {
                 marked: checked.iter().filter(|c| **c).count(),
                 cols: room,
                 filtering: spec.filter,
+                elapsed_ms: since.ms(),
             },
         ));
         let keys_shown: &[(&str, &str)] = if spec.multi {
@@ -169,9 +170,15 @@ fn run(spec: &Choice) -> Answer<Vec<String>> {
         };
         panel.draw(&frame, keys_shown);
 
-        let Some(pressed) = keys.read() else {
-            panel.close();
-            return Answer::Cancelled;
+        // A look that animates comes back on its own to draw the next frame; one that does not
+        // blocks, exactly as before. See `super::awaited`.
+        let pressed = match super::awaited(&mut keys, spec.look.tick_ms()) {
+            Pressed::Key(key) => key,
+            Pressed::Timeout => continue,
+            Pressed::Ended => {
+                panel.close();
+                return Answer::Cancelled;
+            }
         };
         match pressed {
             // An abort is a cancel here: there is an answer to decline either way.
@@ -210,10 +217,12 @@ fn run(spec: &Choice) -> Answer<Vec<String>> {
                 // reason it is right: there is exactly one record, and `$(…)` captures it.
                 return Answer::Given(picked);
             }
-            Key::Up => selected = selected.saturating_sub(1),
-            Key::Down => selected = (selected + 1).min(shown.len().saturating_sub(1)),
-            Key::PageUp | Key::Home => selected = 0,
-            Key::PageDown | Key::End => selected = shown.len().saturating_sub(1),
+            // The arrows follow the screen: a reversed list draws index 0 at the bottom, so Up has
+            // to walk *towards* the far end of it. See `Look::step`.
+            key if spec.look.step(key).is_some() => {
+                let step = spec.look.step(key).unwrap_or(Step::Back);
+                selected = step.from(selected, shown.len());
+            }
             // Tab always toggles; space only when there is no query to type into. Swallowing
             // space unconditionally made multi-word filtering impossible in the one widget that
             // offers both.

@@ -9,6 +9,8 @@
 #   --filter-at top|bottom    which end the query sits at
 #   --reverse                 the list grows towards the filter, best match nearest
 #   --slot-left / --slot-right   text beside the query: {n} {total} {index} {query} {marked}
+#   --badge T [--badge-fg/-bg]   a coloured pill, dropped in wherever a slot says {badge}
+#   --scanner [--scanner-width N]  the sweep that says the widget is live
 #   --surface C               the colour under the filter row, edge to edge
 #   --surface-rows N          1 is a line, 3 is a panel you type into
 #   --stripe C                a quiet ruler on every other row
@@ -16,13 +18,14 @@
 #   --row-fg / --row-bg       the rest of them
 #   --hit-fg / --hit-bg       the characters the query matched
 #   --accent C                the marker and the prompt
+#   --meta-columns N [--meta-fg C]  leading table fields as right-aligned columns
 #   --marker S / --prompt S / --placeholder S
 #   --list-width content|full whether a row's colour stops at its text or reaches the edge
 #   --list-gap N / --list-pad N
 #
 # The same are Lua table fields — `look`, `filter_at`, `reverse`, `slot_left`, `slot_right`,
-# `surface`, `stripe`, `sel_fg`, `list_width` — on every `oslo.ui` list widget. One parser builds
-# the same `Look` for both.
+# `badge`, `scanner`, `meta_columns`, `surface`, `stripe`, `sel_fg`, `list_width` — on every
+# `oslo.ui` list widget. One parser builds the same `Look` for both.
 #
 # The point of the last step is that the history browser is not a different program: it is this
 # list with the filter at the bottom, the rows growing up towards it, a tinted surface under the
@@ -34,7 +37,7 @@ step=0
 say() {
     step=$((step + 1))
     printf '\n'
-    ui style --border rounded --padding "0 1" --border-fg 5 "$step/9  $1"
+    ui style --border rounded --padding "0 1" --border-fg 5 "$step/12  $1"
 }
 note() { ui log --level info "$1"; }
 pause() {
@@ -60,6 +63,21 @@ fake_history() {
         "git rebase -i origin/main"
 }
 
+# The same, with the two columns the real history keeps: how long ago, and how many times.
+fake_runs() {
+    printf '%s\n' \
+        "1d|118×|cargo test" \
+        "5h|41×|cargo build --release" \
+        "2h|3×|git status" \
+        "3d|7×|make verify" \
+        "1w|2×|nix develop --command oslo" \
+        "2w|1×|rg --hidden --glob '!.git' TODO" \
+        "4h|9×|docker compose up -d postgres" \
+        "6d|22×|ssh deploy@build-01" \
+        "1h|64×|git rebase -i origin/main" \
+        "3w|999999×|echo the column is capped"
+}
+
 # --------------------------------------------------------------------- default
 
 say "the default: filter on top, no colour, rows as wide as their text"
@@ -73,6 +91,25 @@ say "--filter-at bottom --reverse: the query where the cursor already is"
 # The list grows *upward*, so the best match sits against the bar rather than at the far end of
 # the block from it. This is the one change that turns a menu into a finder.
 fake_history | ui filter --filter-at bottom --reverse --height 6
+note "status $?"
+pause
+
+say "--scanner: the sweep that says the widget is live"
+# It matters most where the list is doing work you cannot see. Without it a search bar reads as
+# frozen while you think about what to type. It costs one redraw per frame, so it is off unless
+# asked for — an animation that wakes an idle prompt is worth having only while it is watched.
+fake_history | ui filter --filter-at bottom --reverse --height 6 \
+    --scanner --surface 236 --surface-rows 3 --list-width full
+note "status $?"
+pause
+
+say "--badge: the one part of the bar with a background"
+# Because it is the only part that is a *state you can change from here*. The profile and the
+# counter are facts about what you are looking at; the scope is a thing you toggle. `{badge}` says
+# where in the slot it goes, so it can sit either side of the query.
+fake_history | ui filter --filter-at bottom --reverse --height 6 --list-width full \
+    --surface 236 --surface-rows 3 --scanner \
+    --badge "[global]" --badge-bg 4 --slot-right "{badge} || {n}/{total} "
 note "status $?"
 pause
 
@@ -125,14 +162,30 @@ pause
 
 # ------------------------------------------------------------- and all of it
 
-say "the history browser, rebuilt out of options"
-# A preset is a starting point, so this is that look plus a border, the whole screen, and a
-# counter — which is the part worth seeing. Nothing here is special-cased for history; the same
-# flags work on `ui choose`, `ui file` and `ui table`.
-fake_history | ui filter --look history --fullscreen --align-y bottom \
-    --border rounded --border-fg 4 --border-fit full \
-    --slot-left "history @ " --slot-right " {n}/{total} " \
-    --placeholder "type to search" --height 10
+say "--meta-columns: how long ago, and how many times"
+# The leading fields of a table become right-aligned columns before the text, sized across the
+# whole list. That alignment is the entire point: the eye can scan one column without reading the
+# others, even though the command beside them varies wildly in length.
+fake_runs | ui table --look history -s '|' --meta-columns 2 --height 6 --badge "[global]"
+note "status $?"
+pause
+
+say "the history browser, all of it"
+# Nothing here is special-cased. This is `ui table` with the history look, two metadata columns,
+# a scope badge and a profile in the left slot — which is every part of the real one:
+#
+#   ❯ 1d  118×  cargo test                            ← rows growing up towards the bar
+#   ⬝⬝⬝⬝⬝⬝⬝⬝⬝  ❯❯  cargo t▌      oslo @ [global] || 12/840
+#   └ scanner     └ query        └ left slot, badge, counter
+fake_runs | ui table --look history -s '|' --meta-columns 2 \
+    --fullscreen --align-y bottom --height 12 \
+    --slot-left "oslo @ " --badge "[global]" --placeholder "type to search"
+note "status $?"
+pause
+
+say "and the same look on a different widget"
+# The point of it being a widget rather than a program: `ui file` takes every one of these too.
+ui file --look history --height 10 --badge "[files]" --slot-left "browsing @ "
 note "status $?"
 
 printf '\n'

@@ -7,6 +7,7 @@
 
 use super::take;
 use crate::interactive::ask::look::{Look, Preset, Where, Width};
+use crate::interactive::scanner::Scanner;
 use crate::interactive::theme::{Color, Style};
 
 /// What happened when a widget's option loop offered a flag to the shared look parser.
@@ -94,6 +95,41 @@ pub(super) fn look_flag(look: &mut Look, args: &[String], at: &mut usize) -> Loo
         "--hit-bg" => match colour(args, at) {
             Some(c) => look.hit.bg = Some(c),
             None => return bad("--hit-bg wants a colour"),
+        },
+        // The sweep at the head of the filter row. A width rather than a bare switch, because the
+        // one thing anyone changes about it is how far the head travels.
+        "--scanner" => {
+            look.scanner = Some(Scanner {
+                width: 9,
+                ..Scanner::default()
+            })
+        }
+        "--scanner-width" => match number(args, at) {
+            Some(n) => {
+                look.scanner = Some(Scanner {
+                    width: n.clamp(2, 32) as u8,
+                    ..look.scanner.unwrap_or_default()
+                })
+            }
+            None => return bad("--scanner-width wants a number"),
+        },
+        "--no-scanner" => look.scanner = None,
+        "--badge" => look.badge = take(args, at),
+        "--badge-fg" => match colour(args, at) {
+            Some(c) => look.badge_style.fg = Some(c),
+            None => return bad("--badge-fg wants a colour"),
+        },
+        "--badge-bg" => match colour(args, at) {
+            Some(c) => look.badge_style.bg = Some(c),
+            None => return bad("--badge-bg wants a colour"),
+        },
+        "--meta-columns" => match number(args, at) {
+            Some(n) => look.meta_columns = n,
+            None => return bad("--meta-columns wants a number"),
+        },
+        "--meta-fg" => match colour(args, at) {
+            Some(c) => look.meta_style = Style::fg(c),
+            None => return bad("--meta-fg wants a colour"),
         },
         _ => return Looked::NotMine,
     }

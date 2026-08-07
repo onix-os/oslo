@@ -23,8 +23,11 @@
 //! facts *about* itself: how many rows matched, which profile is being searched, where you are in
 //! the list. Without them every widget that wanted a counter had to grow its own flag.
 
+use crate::interactive::scanner::Scanner;
+use crate::interactive::term::Key;
 use crate::interactive::theme::{self, Color, Style};
 
+mod bar;
 mod paint;
 #[cfg(test)]
 #[path = "look/tests.rs"]
@@ -126,8 +129,17 @@ impl Preset {
                     },
                     row: pager.text,
                     width: Width::Full,
-                    prompt: "❯❯ ".to_string(),
-                    right: " {n}/{total} ".to_string(),
+                    prompt: "  ❯❯  ".to_string(),
+                    // `{badge} || 12/840`, with the badge the only part carrying a background.
+                    right: "{badge} || {n}/{total} ".to_string(),
+                    // One cell wider than hexe's default. The bar has the room, and a longer track
+                    // gives the sweep somewhere to travel — at eight the head turns round almost
+                    // as soon as it leaves.
+                    scanner: Some(Scanner {
+                        width: 9,
+                        ..Scanner::default()
+                    }),
+                    meta_style: pager.column(1, false),
                     gap: 1,
                     pad: 1,
                     ..plain
@@ -165,7 +177,7 @@ pub struct Look {
     pub filter_at: Where,
     /// Draw the list from the far end, so the best match is the row nearest the filter.
     pub reverse: bool,
-    /// Template drawn at the left of the filter row, after the prompt. See [`Look::slot`].
+    /// Template drawn at the left of the filter row, after the prompt. See [`Look::fill`].
     pub left: String,
     /// Template drawn hard against the right of the filter row.
     pub right: String,
@@ -199,6 +211,29 @@ pub struct Look {
     pub muted: Style,
     /// Whether a row's colour stops at its text or reaches the edge.
     pub width: Width,
+    /// An animated sweep at the head of the filter row, drawn where a spinner would go.
+    ///
+    /// It says the widget is live. That matters most where the list is doing work you cannot see —
+    /// searching a large history — and it is the reason the finder's bar does not read as frozen
+    /// while you think about what to type. Costs a redraw every [`Scanner::step_ms`], which is why
+    /// it is off unless asked for.
+    pub scanner: Option<Scanner>,
+    /// A piece of a slot with its own colour, substituted wherever `{badge}` appears.
+    ///
+    /// **The one part of the bar with a background**, because it is the only part that is a *state
+    /// you can change from here* rather than a fact about what you are looking at. That is the
+    /// distinction the finder draws between `[global]` and `12/840`, and it is worth keeping: a
+    /// second coloured pill beside it would make both read as decoration.
+    pub badge: String,
+    pub badge_style: Style,
+    /// The fixed-width columns before a row's text: how long ago, how many times, how big.
+    ///
+    /// Right-aligned as a block, always, so they form columns down the screen even though the text
+    /// beside them varies wildly in length — which is the whole reason to have them. The eye can
+    /// then scan one column without reading the others.
+    pub meta_style: Style,
+    /// How many of a row's fields are metadata rather than text. Only `table` has fields to split.
+    pub meta_columns: usize,
 }
 
 impl Default for Look {
@@ -228,6 +263,17 @@ impl Default for Look {
             },
             muted: ui.muted,
             width: Width::Content,
+            scanner: None,
+            badge: String::new(),
+            // Foreground 0 on background 1: the terminal's own palette, so it belongs to whatever
+            // scheme is in use, and inverted enough to read against a tinted surface.
+            badge_style: Style {
+                fg: Some(Color::Indexed(0)),
+                bg: Some(Color::Indexed(1)),
+                ..Style::default()
+            },
+            meta_style: ui.muted,
+            meta_columns: 0,
         }
     }
 }
@@ -264,7 +310,7 @@ impl Look {
     /// * `{index}` — where the cursor is, counting from one
     /// * `{query}` — what has been typed
     /// * `{marked}` — how many rows are checked
-    pub fn slot(template: &str, view: &View<'_>) -> String {
+    pub fn fill(template: &str, view: &View<'_>) -> String {
         if !template.contains('{') {
             return template.to_string();
         }
@@ -276,11 +322,77 @@ impl Look {
             .replace("{marked}", &view.marked.to_string())
     }
 
+    /// How long a widget may wait for a key before it has to redraw, in milliseconds.
+    ///
+    /// `None` means nothing moves on its own and the widget can block until something is typed —
+    /// which is what every one of them did before the scanner existed, and what they should go
+    /// back to doing the moment it is off. An animation that costs a wakeup on an idle prompt is
+    /// worth having only while it is being looked at.
+    pub fn tick_ms(&self) -> Option<i32> {
+        self.scanner.map(|s| s.step_ms.max(1) as i32)
+    }
+
     /// Rows this look adds around the list, so a widget can reserve them before drawing.
     pub fn extra_rows(&self, filtering: bool) -> usize {
         match filtering {
             true => self.surface_rows + self.gap,
             false => 0,
+        }
+    }
+
+    /// Where a movement key should take the cursor.
+    ///
+    /// **The arrows follow the screen, not the list.** A reversed list is drawn from the far end,
+    /// so index 0 is the *bottom* row — and moving to index 1 walks the cursor upward. Left to the
+    /// widgets, Up moved the highlight down and Down moved it up, which is not a preference to be
+    /// argued about: the key is named for a direction and the cursor went the other way.
+    ///
+    /// Decided here rather than in each widget so `choose`, `table` and `file` cannot disagree
+    /// about it — they did, once, and only one of them was right.
+    pub fn step(&self, key: Key) -> Option<Step> {
+        let step = match key {
+            Key::Up => Step::Back,
+            Key::Down => Step::On,
+            Key::PageUp | Key::Home => Step::First,
+            Key::PageDown | Key::End => Step::Last,
+            _ => return None,
+        };
+        Some(match self.reverse {
+            true => step.flipped(),
+            false => step,
+        })
+    }
+}
+
+/// What a movement key does to the cursor, once the list's own direction is accounted for.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Step {
+    /// Towards index zero.
+    Back,
+    /// Away from index zero.
+    On,
+    First,
+    Last,
+}
+
+impl Step {
+    fn flipped(self) -> Step {
+        match self {
+            Step::Back => Step::On,
+            Step::On => Step::Back,
+            Step::First => Step::Last,
+            Step::Last => Step::First,
+        }
+    }
+
+    /// `selected` after this step, over a list of `len` rows.
+    pub fn from(self, selected: usize, len: usize) -> usize {
+        let last = len.saturating_sub(1);
+        match self {
+            Step::Back => selected.saturating_sub(1),
+            Step::On => (selected + 1).min(last),
+            Step::First => 0,
+            Step::Last => last,
         }
     }
 }

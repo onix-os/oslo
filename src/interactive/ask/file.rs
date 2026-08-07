@@ -10,11 +10,11 @@
 //! page cache — and caching it would mean showing a file that has since been deleted, which for a
 //! file picker is the one wrong answer worth avoiding. Moving into a directory rereads it.
 
-use super::look::{Row, View};
+use super::look::{Row, Step, View};
 use super::{Answer, Inline};
 use crate::interactive::dropdown::width::{terminal_rows, truncate_to_width};
 use crate::interactive::matching::{Fuzzed, Fuzzy};
-use crate::interactive::term::{Key, Keys, Restore, Screen};
+use crate::interactive::term::{Key, Keys, Pressed, Restore, Screen};
 use crate::interactive::theme;
 use std::path::{Path, PathBuf};
 
@@ -107,6 +107,7 @@ pub fn file(spec: &Browse) -> Answer<String> {
     let mut offset = 0usize;
     let mut keys = Keys::on(raw.fd());
     let mut panel = Inline::with_chrome(spec.chrome.clone());
+    let since = super::Since::now();
 
     loop {
         // The path above, whatever the look puts around the list, the footer below, and one spare
@@ -160,6 +161,7 @@ pub fn file(spec: &Browse) -> Answer<String> {
                 marked: 0,
                 cols,
                 filtering: true,
+                elapsed_ms: since.ms(),
             },
         ));
         panel.draw(
@@ -167,9 +169,13 @@ pub fn file(spec: &Browse) -> Answer<String> {
             &[("↑↓", "move"), ("←→", "in/out"), ("enter", "choose")],
         );
 
-        let Some(pressed) = keys.read() else {
-            panel.close();
-            return Answer::Cancelled;
+        let pressed = match super::awaited(&mut keys, spec.look.tick_ms()) {
+            Pressed::Key(key) => key,
+            Pressed::Timeout => continue,
+            Pressed::Ended => {
+                panel.close();
+                return Answer::Cancelled;
+            }
         };
 
         // Moving between directories is three things at once: reread, refilter, and put the
@@ -249,10 +255,11 @@ pub fn file(spec: &Browse) -> Answer<String> {
                     );
                 }
             }
-            Key::Up => selected = selected.saturating_sub(1),
-            Key::Down => selected = (selected + 1).min(shown.len().saturating_sub(1)),
-            Key::PageUp | Key::Home => selected = 0,
-            Key::PageDown | Key::End => selected = shown.len().saturating_sub(1),
+            // The arrows follow the screen, not the list — see `Look::step`.
+            key if spec.look.step(key).is_some() => {
+                let step = spec.look.step(key).unwrap_or(Step::Back);
+                selected = step.from(selected, shown.len());
+            }
             Key::Char(c) => {
                 query.push(c);
                 shown = narrow(&entries, &query, spec.fuzzy);

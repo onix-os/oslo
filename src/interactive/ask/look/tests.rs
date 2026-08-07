@@ -5,7 +5,12 @@ use super::*;
 /// The frame's rows, with the redraw escapes and the colour taken back off.
 fn drawn(look: &Look, rows: &[&str], view: &View<'_>) -> Vec<String> {
     let rows: Vec<Row> = rows.iter().map(|r| Row::new(*r)).collect();
-    look.frame(&rows, view)
+    rendered(look, &rows, view)
+}
+
+/// The frame's rows for a list of already-built [`Row`]s, escapes and redraws stripped.
+fn rendered(look: &Look, rows: &[Row], view: &View<'_>) -> Vec<String> {
+    look.frame(rows, view)
         .split("\r\n")
         .skip(1)
         .map(|row| {
@@ -13,6 +18,15 @@ fn drawn(look: &Look, rows: &[&str], view: &View<'_>) -> Vec<String> {
             plain(row.strip_prefix("\x1b[K").unwrap_or(row))
         })
         .collect()
+}
+
+/// The row the query is on, which is not the last row of a three-row surface.
+fn bar_of(rows: &[String]) -> String {
+    rows.iter()
+        .rev()
+        .find(|row| !row.trim().is_empty())
+        .cloned()
+        .unwrap_or_default()
 }
 
 /// Escapes stripped, so a test can assert on what is on screen.
@@ -47,6 +61,7 @@ fn view(height: usize, total: usize) -> View<'static> {
         marked: 0,
         cols: 40,
         filtering: false,
+        elapsed_ms: 0,
     }
 }
 
@@ -194,9 +209,9 @@ fn the_slots_are_filled_from_the_list() {
 #[test]
 fn a_slot_without_fields_is_left_alone() {
     let v = view(1, 1);
-    assert_eq!(Look::slot("plain text", &v), "plain text");
-    assert_eq!(Look::slot("", &v), "");
-    assert_eq!(Look::slot("{unknown}", &v), "{unknown}");
+    assert_eq!(Look::fill("plain text", &v), "plain text");
+    assert_eq!(Look::fill("", &v), "");
+    assert_eq!(Look::fill("{unknown}", &v), "{unknown}");
 }
 
 /// Three rows of surface is a panel with the query in the middle. One row is a line. Either way
@@ -245,6 +260,7 @@ fn the_cursor_and_the_checkbox_are_two_columns() {
             lead: "◉ ".to_string(),
             marked: true,
             trail: String::new(),
+            meta: Vec::new(),
             tint: None,
         },
         Row {
@@ -252,6 +268,7 @@ fn the_cursor_and_the_checkbox_are_two_columns() {
             lead: "◯ ".to_string(),
             marked: false,
             trail: String::new(),
+            meta: Vec::new(),
             tint: None,
         },
     ];
@@ -278,6 +295,7 @@ fn a_trail_keeps_its_room() {
         lead: String::new(),
         marked: false,
         trail: " 118×".to_string(),
+        meta: Vec::new(),
         tint: None,
     }];
     let drawn: Vec<String> = look
@@ -326,4 +344,195 @@ fn an_empty_list_is_survivable() {
         ..view(1, 1)
     };
     assert_eq!(drawn(&Look::default(), &["wide"], &narrow).len(), 1);
+}
+
+/// **The arrows follow the screen, not the list.** A reversed list draws index 0 at the bottom, so
+/// Up has to walk towards the far end of it. Without this the highlight moved down when you
+/// pressed Up — which is not a preference to argue about.
+#[test]
+fn the_arrows_follow_the_screen() {
+    let plain = Look::default();
+    assert_eq!(plain.step(Key::Up), Some(Step::Back));
+    assert_eq!(plain.step(Key::Down), Some(Step::On));
+    assert_eq!(plain.step(Key::Home), Some(Step::First));
+    assert_eq!(plain.step(Key::End), Some(Step::Last));
+
+    let up = Look {
+        reverse: true,
+        ..Look::default()
+    };
+    assert_eq!(up.step(Key::Up), Some(Step::On), "Up must go up the screen");
+    assert_eq!(up.step(Key::Down), Some(Step::Back));
+    assert_eq!(up.step(Key::Home), Some(Step::Last));
+    assert_eq!(up.step(Key::End), Some(Step::First));
+}
+
+/// Keys that are not movement stay the widget's own business.
+#[test]
+fn a_key_that_does_not_move_is_not_claimed() {
+    let look = Look::default();
+    for key in [Key::Accept, Key::Cancel, Key::Char('a'), Key::Left] {
+        assert_eq!(look.step(key), None, "{key:?}");
+    }
+}
+
+/// A step lands inside the list and cannot walk off either end.
+#[test]
+fn a_step_stays_inside_the_list() {
+    assert_eq!(Step::Back.from(0, 5), 0, "no wrap at the top");
+    assert_eq!(Step::On.from(4, 5), 4, "no wrap at the bottom");
+    assert_eq!(Step::On.from(0, 5), 1);
+    assert_eq!(Step::Back.from(3, 5), 2);
+    assert_eq!(Step::Last.from(0, 5), 4);
+    assert_eq!(Step::First.from(4, 5), 0);
+    // An empty list is a real state: the filter matched nothing and a key still arrives.
+    assert_eq!(Step::Last.from(0, 0), 0);
+    assert_eq!(Step::On.from(0, 0), 0);
+}
+
+/// The metadata columns are right-aligned and sized across the whole list, so they form columns
+/// down the screen rather than shifting per row.
+#[test]
+fn the_meta_columns_line_up() {
+    let look = Look {
+        width: Width::Full,
+        ..Look::default()
+    };
+    let rows = vec![
+        Row {
+            meta: vec!["1d".to_string(), "118×".to_string()],
+            ..Row::new("cargo test")
+        },
+        Row {
+            meta: vec!["5h".to_string(), "3×".to_string()],
+            ..Row::new("git status")
+        },
+    ];
+    let drawn = rendered(&look, &rows, &view(2, 2));
+    assert!(drawn[0].starts_with("❯ 1d 118× cargo test"), "{drawn:?}");
+    // Right-aligned in the same width, so `3×` is pushed over to sit under `118×`.
+    assert!(drawn[1].starts_with("  5h   3× git status"), "{drawn:?}");
+}
+
+/// Sized across the whole list rather than the visible window: a column that resized as the list
+/// scrolled would undo the alignment it exists for.
+#[test]
+fn the_meta_widths_do_not_change_as_the_list_scrolls() {
+    let look = Look {
+        width: Width::Full,
+        ..Look::default()
+    };
+    let rows: Vec<Row> = [("1d", "1×"), ("2d", "999999×"), ("3d", "7×")]
+        .iter()
+        .map(|(when, runs)| Row {
+            meta: vec![when.to_string(), runs.to_string()],
+            ..Row::new("a command")
+        })
+        .collect();
+    let at = |offset: usize| {
+        let v = View {
+            offset,
+            height: 1,
+            ..view(1, 3)
+        };
+        rendered(&look, &rows, &v)
+            .first()
+            .cloned()
+            .unwrap_or_default()
+    };
+    // The first row is drawn in a column wide enough for `999999×`, which is not on screen.
+    let first = at(0);
+    let last = at(2);
+    // In cells, not bytes: the marker is a multibyte character and `find` counts bytes, which
+    // would make the two rows look misaligned when they are not.
+    let column_of = |row: &str| {
+        crate::interactive::prompt::printed_width(row.split("a command").next().unwrap_or(""))
+    };
+    assert_eq!(column_of(&first), column_of(&last), "{first:?} {last:?}");
+}
+
+/// The badge is the one part of the bar with a background, because it is the only part that is a
+/// state you can change rather than a fact about what you are looking at.
+#[test]
+fn the_badge_is_painted_where_the_slot_puts_it() {
+    let look = Look {
+        filter_at: Where::Bottom,
+        right: "{badge} || {n}/{total}".to_string(),
+        badge: "[global]".to_string(),
+        ..Look::default()
+    };
+    let mut v = view(1, 9);
+    v.filtering = true;
+    v.matched = 4;
+    let painted = look.frame(&[Row::new("a")], &v);
+    // Its own colour, and the counter beside it in the muted one.
+    assert!(painted.contains("[global]"), "{painted:?}");
+    assert!(
+        painted.contains("48;5;1m[global]"),
+        "no badge bg: {painted:?}"
+    );
+    let rows = drawn(&look, &["a"], &v);
+    assert!(rows.last().is_some_and(|r| r.contains("4/9")), "{rows:?}");
+}
+
+/// A badge nobody asked for leaves no hole where `{badge}` was.
+#[test]
+fn an_unset_badge_leaves_no_marker_behind() {
+    let look = Look {
+        filter_at: Where::Bottom,
+        right: "{badge} {n}".to_string(),
+        ..Look::default()
+    };
+    let mut v = view(1, 3);
+    v.filtering = true;
+    let rows = drawn(&look, &["a"], &v);
+    let bar = rows.last().expect("a filter row");
+    assert!(!bar.contains("{badge}"), "{bar:?}");
+    assert!(bar.contains('3'), "the rest of the slot survives: {bar:?}");
+}
+
+/// The scanner is what says the widget is live. It costs a redraw per frame, so a look without one
+/// must go back to blocking — an animation that wakes an idle prompt is worth having only while
+/// something is animating.
+#[test]
+fn only_a_scanner_asks_for_a_tick() {
+    assert_eq!(Look::default().tick_ms(), None);
+    let ticking = Preset::History.look();
+    assert!(ticking.scanner.is_some());
+    assert!(ticking.tick_ms().is_some_and(|ms| ms > 0), "a real delay");
+    assert_eq!(Preset::Menu.look().tick_ms(), None);
+}
+
+/// The sweep moves with the clock, and the row it is on stays the width it was — a frame that
+/// changed width as it animated would shake the whole bar.
+#[test]
+fn the_sweep_moves_without_moving_anything_else() {
+    let look = Preset::History.look();
+    let bar_at = |elapsed_ms: u64| {
+        let v = View {
+            filtering: true,
+            elapsed_ms,
+            ..view(1, 1)
+        };
+        bar_of(&drawn(&look, &["a"], &v))
+    };
+    let (first, later) = (bar_at(0), bar_at(400));
+    assert_ne!(first, later, "the sweep should have moved");
+    assert_eq!(
+        crate::interactive::prompt::printed_width(&first),
+        crate::interactive::prompt::printed_width(&later),
+        "{first:?} {later:?}"
+    );
+}
+
+/// The history preset is the finder's shape, not an approximation of it: sweep, badge slot,
+/// counter, stripes, and rows that grow towards the bar.
+#[test]
+fn the_history_preset_has_the_whole_bar() {
+    let look = Preset::History.look();
+    assert!(look.scanner.is_some(), "the sweep says it is live");
+    assert!(look.right.contains("{badge}"), "somewhere for the scope");
+    assert!(look.right.contains("{n}/{total}"), "the counter");
+    assert_eq!(look.prompt.trim(), "❯❯", "where typing starts");
+    assert_eq!(look.surface_rows, 3, "a panel, not a line");
 }

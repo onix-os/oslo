@@ -51,6 +51,7 @@ mod style;
 mod table;
 mod write;
 
+use crate::interactive::term::Pressed;
 pub use choose::{Choice, choose, filter};
 pub use confirm::{Confirm, confirm};
 pub use file::{Browse, Want, file};
@@ -181,6 +182,40 @@ impl Drop for Inline {
         if self.took_the_screen {
             chrome::leave_fullscreen();
         }
+    }
+}
+
+/// A clock for the widgets that draw something moving.
+///
+/// One type rather than an `Instant` threaded through each loop, because the only thing any of
+/// them wants is the elapsed milliseconds and the only thing that can go wrong is forgetting to
+/// start it.
+pub(crate) struct Since(std::time::Instant);
+
+impl Since {
+    pub(crate) fn now() -> Since {
+        Since(std::time::Instant::now())
+    }
+
+    pub(crate) fn ms(&self) -> u64 {
+        self.0.elapsed().as_millis() as u64
+    }
+}
+
+/// The next key, or the deadline for the next frame.
+///
+/// `tick` is `None` for a widget whose frame only changes when you touch it, and that case blocks
+/// exactly as before — an animation that costs a wakeup on an idle prompt is worth having only
+/// while there is something animating. With a tick, [`crate::interactive::term::Pressed::Timeout`]
+/// means "nothing was typed, draw the next frame", which is a different answer from `Ended` and
+/// has to stay that way.
+pub(crate) fn awaited(keys: &mut crate::interactive::term::Keys, tick: Option<i32>) -> Pressed {
+    match tick {
+        Some(ms) => keys.read_within(ms),
+        None => match keys.read() {
+            Some(key) => Pressed::Key(key),
+            None => Pressed::Ended,
+        },
     }
 }
 

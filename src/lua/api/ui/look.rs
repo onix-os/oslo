@@ -14,6 +14,7 @@
 //! ```
 
 use crate::interactive::ask::look::{Look, Preset, Where, Width};
+use crate::interactive::scanner::Scanner;
 use crate::interactive::theme::{Color, Style};
 use crate::lua::eval::LuaError;
 use crate::lua::eval::value::{Table, Value};
@@ -97,6 +98,34 @@ pub(crate) fn look_of(t: &Table) -> Result<Look, LuaError> {
     }
     if let Some(c) = colour(t, "accent")? {
         look.accent = Style::fg(c);
+    }
+    if let Some(c) = colour(t, "meta_fg")? {
+        look.meta_style = Style::fg(c);
+    }
+    look.meta_columns = size(t, "meta_columns", look.meta_columns);
+
+    // `scanner = false` turns a preset's sweep off; a number is its width; `true` is the default
+    // one. Three spellings because a bare `scanner = true` is what anyone writes first and a width
+    // is the only thing anyone changes.
+    match t.get(&Value::str("scanner")) {
+        Value::Bool(false) => look.scanner = None,
+        Value::Bool(true) => look.scanner = Some(Scanner::default()),
+        Value::Number(n) => {
+            look.scanner = Some(Scanner {
+                width: n.as_int().unwrap_or(9).clamp(2, 32) as u8,
+                ..look.scanner.unwrap_or_default()
+            })
+        }
+        _ => {}
+    }
+    if let Some(text) = maybe(t, "badge") {
+        look.badge = text;
+    }
+    if let Some(c) = colour(t, "badge_fg")? {
+        look.badge_style.fg = Some(c);
+    }
+    if let Some(c) = colour(t, "badge_bg")? {
+        look.badge_style.bg = Some(c);
     }
     Ok(look)
 }

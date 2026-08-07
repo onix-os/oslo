@@ -167,7 +167,8 @@ end
 -- And that a name anyone would write is accepted. `confirm` is the one widget that works without a
 -- terminal — it falls back to a line — so this is the one that can be exercised here.
 print("  every widget takes: legend, border, border_fg, fit, fullscreen, align_x, align_y")
-print("  every list also takes: look, filter_at, reverse, slot_left/right, stripe, sel_bg, …")
+print("  every list also takes: look, filter_at, reverse, slot_left/right, badge, scanner,")
+print("                        meta_columns, stripe, sel_bg, list_width, …")
 print("  see examples/ui_chrome.sh and examples/ui_look.sh")
 
 heading("asking")
@@ -224,12 +225,21 @@ accepts("placement and size", {
   filter_at = "bottom", reverse = true, list_width = "full", surface_rows = 3, list_gap = 1,
 })
 accepts("stripe = false turns a preset's stripe off", { look = "history", stripe = false })
+accepts("the sweep, on and sized and off", { scanner = true })
+accepts("a scanner width", { scanner = 12 })
+accepts("no scanner over a preset that has one", { look = "history", scanner = false })
+accepts("a badge and its colours", {
+  badge = "[global]", badge_fg = 0, badge_bg = 4, slot_right = "{badge} || {n}/{total}",
+})
+accepts("metadata columns", { meta_columns = 2, meta_fg = 8 })
 
 -- And refused by name rather than ignored, which is the other half of the same rule.
 check("a bad preset is refused", pcall(oslo.ui.filter, { items = { "a" }, look = "histry" }), false)
 check("a bad colour is refused", pcall(oslo.ui.filter, { items = { "a" }, stripe = "puce" }), false)
 check("a bad filter_at is refused",
   pcall(oslo.ui.filter, { items = { "a" }, filter_at = "sideways" }), false)
+check("a bad badge colour is refused",
+  pcall(oslo.ui.filter, { items = { "a" }, badge_bg = "chartreuse" }), false)
 
 -- ----------------------------------------------------------------
 
