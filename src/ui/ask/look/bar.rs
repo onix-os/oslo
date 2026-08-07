@@ -125,7 +125,7 @@ impl Look {
                 (
                     format!(
                         "{}{}",
-                        super::super::with_caret(&first.to_string(), 0),
+                        super::super::with_caret_on(&first.to_string(), 0, self.surface),
                         on(self.muted).paint(chars.as_str(), depth)
                     ),
                     printed_width(&shown).max(1),
@@ -139,7 +139,7 @@ impl Look {
                         "{}{}",
                         on(self.row).paint(&shown, depth),
                         // Past the last character, so it reads as "typing continues here".
-                        super::super::with_caret("", 0)
+                        super::super::with_caret_on("", 0, self.surface)
                     ),
                     cells,
                 )

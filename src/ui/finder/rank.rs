@@ -1,20 +1,26 @@
 //! Which command the finder shows first.
 //!
-//! Three signals, in the order they matter. The order is the whole design, so it is written down
-//! rather than left in a comparator:
+//! **The query filters; recency orders.** Those are two jobs and the score only does the first.
 //!
-//! 1. **How well the text matches.** Nothing else can outrank this. A finder that put a
-//!    frequently-run command above a better match for what you typed would be arguing with you
-//!    about what you meant, and you are the one holding the keyboard.
-//! 2. **How often you have run it.** Among comparable matches, the habit wins. This is what makes
-//!    `git status` beat `git stash pop` when you have typed `git s`.
-//! 3. **Where you are.** A command last run in the directory you are standing in — or anywhere
-//!    under it — is more likely to be the one you want than the same command from an unrelated
-//!    checkout.
+//! 1. **When you last ran it.** The list is newest-first, whether or not you have typed anything.
+//! 2. **How often you have run it.** Among commands last used at the same moment — which in
+//!    practice means the same second — the habit wins.
+//! 3. **Where you are.** A command last run in the directory you are standing in, or anywhere
+//!    under it, comes before the same command from an unrelated checkout.
 //!
-//! Recency is the tie-break rather than a signal of its own. It decides the order of the list
-//! *before* you type anything, which is when it is the only thing there is to go on; once there is
-//! a query, "matches well and I run it constantly" beats "I ran something once, recently".
+//! # This used to sort by the match score, and it was wrong
+//!
+//! The reasoning was that nothing should outrank how well the text matches, because a finder that
+//! put a frequent command above a better match would be arguing with you about what you meant.
+//! What that misses is that *every* row in the list already matches — the score's job was done at
+//! the filter — and among things that all match, "how well" is a number about string shapes, not
+//! about what you are likely to want next.
+//!
+//! It reads as broken because it is not stable in the way a person is. Typing `cd` put `cd docs/`,
+//! run twice a day ago, above `cd rush`, run twenty-three times two hours ago: the scorer preferred
+//! one string over the other for reasons that have nothing to do with you, and the answer changed
+//! shape as you typed. Newest-first is the rule you can hold in your head, it is the same rule the
+//! empty list already followed, and the thing you most often want is the thing you just did.
 
 use crate::track::history::Command;
 use crate::ui::matching::{Fuzzed, Fuzzy};
@@ -62,11 +68,12 @@ pub fn rank(commands: &[Command], query: &str, cwd: &str, fuzzy: Fuzzy) -> Vec<R
         .collect();
 
     ranked.sort_by(|a, b| {
-        b.score
-            .cmp(&a.score)
+        b.command
+            .last_at
+            .cmp(&a.command.last_at)
             .then(b.command.runs.cmp(&a.command.runs))
             .then(b.here.cmp(&a.here))
-            .then(b.command.last_at.cmp(&a.command.last_at))
+            .then(b.score.cmp(&a.score))
             // Total, so two openings of the same store list the same way. Without this the order
             // among equals is the hash map's, which changes between runs.
             .then(a.command.line.cmp(&b.command.line))

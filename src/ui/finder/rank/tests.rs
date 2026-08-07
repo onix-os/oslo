@@ -34,27 +34,64 @@ fn an_empty_query_keeps_the_order_it_was_given() {
     assert_eq!(lines(&ranked), ["newest", "middle", "oldest"]);
 }
 
-/// The match beats the habit. A finder that put a frequently-run command above a better match
-/// would be arguing about what you meant.
+/// **The query filters; recency orders.** A match typed once an hour ago comes before one typed
+/// five hundred times last week, because the thing you most often want is the thing you just did.
 #[test]
-fn a_better_match_outranks_a_more_frequent_command() {
+fn the_most_recent_match_comes_first() {
     let commands = [
         command("git stash pop", 500, 100, "/a"),
-        command("gs", 1, 100, "/a"),
+        command("gs", 1, 200, "/a"),
     ];
     let ranked = rank(&commands, "gs", "/a", Fuzzy::Smart);
     assert_eq!(ranked[0].command.line, "gs", "{:?}", lines(&ranked));
 }
 
-/// Among comparable matches, the habit wins — `git status` over something typed once.
+/// Among commands last run at the same moment, the habit wins.
 #[test]
-fn frequency_breaks_a_tie_between_equal_matches() {
+fn frequency_breaks_a_tie_between_equally_recent_commands() {
     let commands = [
         command("git stall", 1, 500, "/a"),
-        command("git status", 300, 100, "/a"),
+        command("git status", 300, 500, "/a"),
     ];
     let ranked = rank(&commands, "git sta", "/a", Fuzzy::Smart);
     assert_eq!(ranked[0].command.line, "git status", "{:?}", lines(&ranked));
+}
+
+/// **The score no longer orders anything, and this is the case that made that necessary.**
+///
+/// Typing `cd` used to put `cd docs/` — run twice, a day ago — above `cd rush`, run twenty-three
+/// times two hours ago, because the scorer preferred one string's shape over the other's. Every
+/// row in the list already matches by the time it is sorted; "how well" is then a number about
+/// strings rather than about what you want next, and the order it produces reads as arbitrary
+/// because it is.
+#[test]
+fn a_stale_match_does_not_outrank_a_fresh_one() {
+    let commands = [
+        command("cd docs/", 2, 100, "/a"),
+        command("cd rush", 23, 500, "/a"),
+        command("cd bin", 2, 900, "/a"),
+    ];
+    let ranked = rank(&commands, "cd", "/a", Fuzzy::Smart);
+    assert_eq!(
+        lines(&ranked),
+        ["cd bin", "cd rush", "cd docs/"],
+        "newest first, whatever the scorer thinks of the strings"
+    );
+}
+
+/// Filtering still filters: recency orders what matched, and cannot promote what did not.
+#[test]
+fn recency_orders_the_matches_and_nothing_else() {
+    let commands = [
+        command("npm install", 1, 900, "/a"),
+        command("cargo test", 1, 100, "/a"),
+    ];
+    let ranked = rank(&commands, "cargo", "/a", Fuzzy::Smart);
+    assert_eq!(
+        lines(&ranked),
+        ["cargo test"],
+        "the newer one did not match"
+    );
 }
 
 /// And where you are breaks the tie after that.

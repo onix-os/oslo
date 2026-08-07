@@ -249,18 +249,38 @@ pub(crate) fn awaited(keys: &mut crate::ui::term::Keys, tick: Option<i32>) -> Pr
 /// At the end of the text the caret sits on a space, which is how you can tell "typing at the end"
 /// from "on the last character".
 pub(crate) fn with_caret(text: &str, at: usize) -> String {
+    with_caret_on(text, at, None)
+}
+
+/// [`with_caret`], on a surface.
+///
+/// **A caret drawn with no background punches a hole in the panel it sits on.** The row around it
+/// carries the input surface; the caret carried the terminal's own colour, so on a tinted bar it
+/// showed as a black cell in the middle of an otherwise continuous block — the one cell that did
+/// not belong. The same rule as everything else painted on a surface: every cell of a coloured row
+/// is painted, gaps included.
+pub(crate) fn with_caret_on(
+    text: &str,
+    at: usize,
+    surface: Option<crate::ui::theme::Color>,
+) -> String {
     // Insert, because a text field is where you insert. The blink variants are drawn steady: a
     // frame is redrawn on a keystroke, not on a timer, so a blinking caret would blink only while
     // you typed — which reads as a rendering fault rather than as a cursor.
     let shape = crate::ui::settings::current().vi.cursors.insert;
-    caret_over(text, at, shape)
+    caret_over(text, at, shape, surface)
 }
 
 /// [`with_caret`] with the shape given rather than read.
 ///
 /// Split out so the three shapes can be tested without a config: reading a global inside the thing
 /// under test means only whichever shape happens to be the default is ever exercised.
-fn caret_over(text: &str, at: usize, shape: crate::ui::vi::Cursor) -> String {
+fn caret_over(
+    text: &str,
+    at: usize,
+    shape: crate::ui::vi::Cursor,
+    surface: Option<crate::ui::theme::Color>,
+) -> String {
     use crate::ui::theme::Style;
     use crate::ui::vi::Cursor;
 
@@ -296,7 +316,23 @@ fn caret_over(text: &str, at: usize, shape: crate::ui::vi::Cursor) -> String {
         ),
         _ => (under.to_string(), reversed),
     };
-    format!("{}{}{}", before, style.paint(&marked, depth), after)
+    // The surface goes under the caret and under the text either side of it, so the whole run is
+    // one continuous block. A reversed cell keeps its own colours: reversing *is* the mark, and
+    // giving it the surface as a background would leave nothing to reverse against.
+    let on = |style: Style| match style.reverse {
+        true => style,
+        false => Style {
+            bg: surface.or(style.bg),
+            ..style
+        },
+    };
+    let plain = on(Style::default());
+    format!(
+        "{}{}{}",
+        plain.paint(&before, depth),
+        on(style).paint(&marked, depth),
+        plain.paint(&after, depth)
+    )
 }
 
 #[cfg(test)]
@@ -342,7 +378,7 @@ mod tests {
     #[test]
     fn the_caret_marks_the_character_it_is_on() {
         // Reverse video around exactly one character, and the rest untouched.
-        let drawn = caret_over("abc", 1, Cursor::Block);
+        let drawn = caret_over("abc", 1, Cursor::Block, None);
         assert!(drawn.contains("\x1b[7m"), "not reversed: {drawn:?}");
         assert_eq!(plain(&drawn), "abc", "the text changed: {drawn:?}");
     }
@@ -351,29 +387,29 @@ mod tests {
     /// different from "on the last character".
     #[test]
     fn at_the_end_the_caret_is_the_next_cell() {
-        assert_eq!(plain(&caret_over("ab", 2, Cursor::Block)), "ab ");
+        assert_eq!(plain(&caret_over("ab", 2, Cursor::Block, None)), "ab ");
         // And an index past even that cannot panic — a cursor arriving from shell code is a
         // number somebody could have written.
-        assert_eq!(plain(&caret_over("ab", 99, Cursor::Block)), "ab ");
-        assert_eq!(plain(&caret_over("", 0, Cursor::Block)), " ");
+        assert_eq!(plain(&caret_over("ab", 99, Cursor::Block, None)), "ab ");
+        assert_eq!(plain(&caret_over("", 0, Cursor::Block, None)), " ");
     }
 
     /// **The shape is the one the config asked for.** A widget drawing its own hard-coded block
     /// left the shell with two different cursors depending on which one you were in.
     #[test]
     fn the_caret_takes_the_configured_shape() {
-        let block = caret_over("ab", 0, Cursor::Block);
+        let block = caret_over("ab", 0, Cursor::Block, None);
         assert!(sets(&block, "7"), "not reversed: {block:?}");
 
-        let under = caret_over("ab", 0, Cursor::Underline);
+        let under = caret_over("ab", 0, Cursor::Underline, None);
         assert!(sets(&under, "4"), "not underlined: {under:?}");
         assert!(!sets(&under, "7"), "and not also reversed: {under:?}");
         assert_eq!(plain(&under), "ab", "the character is still readable");
 
         // A bar is a bar where there is an empty cell to be one in.
-        assert_eq!(plain(&caret_over("ab", 2, Cursor::Bar)), "ab▏");
+        assert_eq!(plain(&caret_over("ab", 2, Cursor::Bar, None)), "ab▏");
         // And reverses the character rather than hiding it where there is not.
-        let over_text = caret_over("ab", 0, Cursor::Bar);
+        let over_text = caret_over("ab", 0, Cursor::Bar, None);
         assert_eq!(plain(&over_text), "ab", "{over_text:?}");
         assert!(sets(&over_text, "7"), "{over_text:?}");
     }
@@ -392,7 +428,7 @@ mod tests {
             Cursor::BlinkBar,
         ] {
             for (text, at, want) in [("abc", 1, 3), ("abc", 3, 4), ("", 0, 1)] {
-                let drawn = caret_over(text, at, shape);
+                let drawn = caret_over(text, at, shape, None);
                 assert_eq!(printed_width(&drawn), want, "{shape:?} on {text:?}@{at}");
             }
         }
@@ -401,7 +437,7 @@ mod tests {
     /// A multibyte character is one cell, not one byte — slicing by byte would panic on it.
     #[test]
     fn the_caret_counts_characters_not_bytes() {
-        assert_eq!(plain(&caret_over("héllo", 1, Cursor::Block)), "héllo");
-        assert_eq!(plain(&caret_over("→x", 0, Cursor::Block)), "→x");
+        assert_eq!(plain(&caret_over("héllo", 1, Cursor::Block, None)), "héllo");
+        assert_eq!(plain(&caret_over("→x", 0, Cursor::Block, None)), "→x");
     }
 }
