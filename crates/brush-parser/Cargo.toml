@@ -1,0 +1,33 @@
+# Vendored from https://github.com/reubeno/brush (brush-parser 0.4.0), MIT.
+# Copyright (c) 2024 reuben olinsky — see LICENSE beside this file.
+#
+# A hard fork, not a mirror: the dependencies below are a third of what upstream declares. See
+# the note at the top of src/lib.rs for what was removed and why.
+[package]
+name = "brush-parser"
+description = "POSIX/bash shell tokenizer and parsers (vendored, trimmed)"
+version = "0.4.0"
+authors = ["reuben olinsky"]
+edition = "2024"
+license = "MIT"
+repository = "https://github.com/reubeno/brush"
+
+[lib]
+bench = false
+
+[features]
+arbitrary = ["dep:arbitrary"]
+debug-tracing = ["peg/trace"]
+diagnostics = ["dep:miette", "dep:thiserror"]
+serde = ["dep:serde"]
+
+[dependencies]
+arbitrary = { version = "1.4.2", optional = true, features = ["derive"] }
+indenter = "0.3.4"
+miette = { version = "7.6.0", optional = true, default-features = false, features = [
+    "derive",
+] }
+peg = "0.8.6"
+serde = { version = "1.0.228", optional = true, features = ["derive", "rc"] }
+thiserror = { version = "2.0.18", optional = true }
+utf8-chars = "3.0.6"

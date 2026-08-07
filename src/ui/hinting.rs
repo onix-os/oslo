@@ -23,9 +23,7 @@ enum Origin {
 }
 
 impl OsloHelper {
-    /// The completion of the command name being typed, or `None`.
-    ///
-    /// Returns the *tail* to append, which is what rustyline draws past the cursor.
+    /// Return the command-name suffix to draw after the cursor.
     pub fn command_hint(&self, line: &str, pos: usize) -> Option<String> {
         let word = current_word(line, pos);
         // A half-typed quoted argument is a filename, not a command, and guessing at it in grey

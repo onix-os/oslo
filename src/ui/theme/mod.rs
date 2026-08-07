@@ -18,10 +18,6 @@ pub use from_lua::read_lua_theme;
 use std::sync::RwLock;
 
 /// The theme in force.
-///
-/// Process-wide rather than threaded through the helper, because the three consumers are reached
-/// from rustyline callbacks that own no state of ours. Written once when the config loads and read
-/// on every keystroke, which is what `RwLock` is for.
 static THEME: RwLock<Option<Theme>> = RwLock::new(None);
 
 /// The colour depth in force, decided once.

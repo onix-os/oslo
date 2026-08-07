@@ -22,6 +22,7 @@ fn ranked(line: &str, runs: i64, last_at: i64, dir: &str, here: bool) -> Ranked 
             host: String::new(),
             root: None,
         },
+        quality: crate::ui::matching::Quality::Scattered,
         score: 0,
         here,
     }

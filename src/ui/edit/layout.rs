@@ -1,11 +1,4 @@
-//! Where every cell of the edited row goes.
-//!
-//! Pure, and the reason the rest of this is worth doing. rustyline measures the prompt once, keeps
-//! the number, and lays every later frame out against it — which is why oslo cannot redraw a
-//! prompt, cannot change its width mid-line, cannot put an OSC marker in `$PS1`, and has to draw
-//! the right prompt from inside the highlighter. Owning this function removes all four at once.
-//!
-//! # What it answers
+//! Computes the cell layout of an edited row.
 //!
 //! Given a prompt, the text, where the cursor is in it, a ghost hint and the terminal width:
 //! how many rows the block occupies, and which row and column the cursor sits in. The caller
@@ -20,13 +13,11 @@
 //!
 //! # The pending wrap
 //!
-//! A row filled exactly to the last column leaves the cursor *in* that column with the wrap still
-//! pending; it has not moved to the next row yet. Counting it as a row consumed walks the cursor
-//! one line too far and eats the line above the prompt — the same family as the bug
-//! [`crate::ui::paint`] exists to prevent. [`super::super::dropdown::physical_rows`]
-//! already encodes the rule, and every count here goes through it.
+//! A row filled exactly to the last column keeps a pending wrap. Row counts use
+//! [`super::super::dropdown::physical_rows`] to preserve that state.
 
 use crate::ui::dropdown::{display_width, physical_rows};
+use crate::ui::edit::display::DisplayMap;
 
 /// Everything the row is drawn from.
 #[derive(Debug, Clone, Default)]
@@ -67,18 +58,34 @@ pub fn prompt_width(prompt: &str) -> usize {
     display_width(prompt)
 }
 
+fn advance_cells(start: usize, text: &str, cols: usize) -> usize {
+    let plain = crate::ui::dropdown::width::without_escapes(text);
+    super::display::advance_cells(start, &plain, cols)
+}
+
+pub fn cursor_for_cell(
+    prompt: &str,
+    raw: &str,
+    cols: usize,
+    target_row: usize,
+    target_col: usize,
+) -> usize {
+    let prompt_cells = advance_cells(0, prompt, cols.max(1));
+    DisplayMap::new(raw).cursor_for_cell(prompt_cells, cols, target_row, target_col)
+}
+
 /// Lay the row out.
 pub fn place(row: &Row) -> Placed {
     let cols = row.cols.max(1);
-    let prompt_cells = display_width(row.prompt);
+    let prompt_cells = advance_cells(0, row.prompt, cols);
 
     // Where the cursor sits, in cells from the start of the prompt. Measured from the *plain*
     // text so a colour escape between two characters cannot move it.
     let before: String = row.plain.chars().take(row.cursor).collect();
-    let cursor_cells = prompt_cells + display_width(&before);
+    let cursor_cells = advance_cells(prompt_cells, &before, cols);
 
-    let line_cells = prompt_cells + display_width(row.plain);
-    let hint_cells = display_width(row.hint);
+    let line_cells = advance_cells(prompt_cells, row.plain, cols);
+    let used = advance_cells(line_cells, row.hint, cols);
 
     let mut out = String::new();
     out.push_str(row.prompt);
@@ -88,7 +95,6 @@ pub fn place(row: &Row) -> Placed {
     // The right prompt goes on the first row only, and only when there is a gap to put it in.
     // One column of breathing room, so it never abuts the text — and if it does not fit it is
     // simply not drawn, which is the only honest answer for something optional.
-    let used = line_cells + hint_cells;
     if !row.right.is_empty() && used < cols {
         let right_cells = display_width(row.right);
         // Strictly less, so there is always at least one blank column between the line and the

@@ -6,6 +6,55 @@
 
 use super::*;
 
+#[test]
+fn movement_and_deletion_use_extended_graphemes() {
+    for grapheme in ["e\u{301}", "👍🏽", "👨‍👩‍👧‍👦", "🇳🇱", "1️⃣", "क्‍ष"]
+    {
+        let text = format!("a{grapheme}z");
+        let mut buffer = Buffer::from_text(&text);
+        buffer.move_left();
+        assert_eq!(buffer.at_cursor(), Some('z'));
+        buffer.move_left();
+        assert_eq!(buffer.cursor(), 1, "{grapheme:?}");
+        buffer.move_right();
+        assert_eq!(buffer.at_cursor(), Some('z'), "{grapheme:?}");
+        buffer.move_left();
+        assert!(buffer.delete());
+        assert_eq!(buffer.text(), "az", "{grapheme:?}");
+
+        let mut buffer = Buffer::from_text(&text);
+        buffer.move_left();
+        assert!(buffer.backspace());
+        assert_eq!(buffer.text(), "az", "{grapheme:?}");
+        assert_eq!(buffer.cursor(), 1);
+    }
+}
+
+#[test]
+fn external_and_undo_cursors_are_grapheme_boundaries() {
+    let text = "ae\u{301}z";
+    let mut buffer = Buffer::new();
+    buffer.set(text, 2);
+    assert_eq!(buffer.cursor(), 1);
+    buffer.set_cursor(2);
+    assert_eq!(buffer.cursor(), 1);
+    buffer.snapshot();
+    buffer.delete();
+    assert!(buffer.undo());
+    assert_eq!(buffer.text(), text);
+    assert_eq!(buffer.cursor(), 1);
+}
+
+#[test]
+fn transpose_and_replace_do_not_split_graphemes() {
+    let mut buffer = Buffer::from_text("ae\u{301}👍🏽");
+    assert!(buffer.transpose());
+    assert_eq!(buffer.text(), "a👍🏽e\u{301}");
+    buffer.set_cursor(1);
+    assert!(buffer.replace_at_cursor('x'));
+    assert_eq!(buffer.text(), "axe\u{301}");
+}
+
 /// A buffer written as `"before|after"`, so a test reads like the line it describes.
 fn buf(spec: &str) -> Buffer {
     let (before, after) = spec

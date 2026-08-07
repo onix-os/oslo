@@ -6,6 +6,7 @@
 //! arrives here, which is what lets the state machine be tested with [`NoAssist`] and nothing else.
 
 use super::{Bound, Key, KeyHook};
+use crate::ui::term::Keys;
 
 /// What the shell supplies to an editing session.
 ///
@@ -18,24 +19,24 @@ pub trait Assist {
         line.to_string()
     }
 
-    /// Ghost text shown after the cursor, already styled.
-    fn hint(&mut self, _line: &str, _cursor: usize) -> Option<String> {
-        None
-    }
-
     /// The same suggestion **without** styling, for accepting it into the line.
-    ///
-    /// Separate from [`Assist::hint`] because that one is painted, and inserting escapes into the
-    /// command would put them in the history and in what runs.
     fn hint_text(&mut self, _line: &str, _cursor: usize) -> Option<String> {
         None
     }
 
-    /// Run completion, answering the line and cursor it produced.
-    ///
-    /// The whole interaction belongs to the implementation — oslo's dropdown draws itself and
-    /// takes its own keys — because a menu is a different mode, not a keystroke.
-    fn complete(&mut self, _line: &str, _cursor: usize, _back: bool) -> Option<(String, usize)> {
+    /// Apply trusted styling to terminal-safe suggestion text.
+    fn paint_hint(&mut self, text: &str) -> String {
+        text.to_string()
+    }
+
+    /// Run completion through the editor's shared terminal event stream.
+    fn complete(
+        &mut self,
+        _line: &str,
+        _cursor: usize,
+        _back: bool,
+        _keys: &mut Keys,
+    ) -> Option<(String, usize)> {
         None
     }
 

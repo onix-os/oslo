@@ -176,6 +176,7 @@ pub fn open(
             // A resize redraws on the next loop pass, which reads the size afresh.
             Key::Ctrl(_)
             | Key::Alt(_)
+            | Key::Function(_)
             | Key::Ignored
             | Key::Resized
             | Key::Home

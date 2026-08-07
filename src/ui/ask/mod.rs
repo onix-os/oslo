@@ -377,6 +377,7 @@ mod tests {
     /// The caret is part of the text, so it can never be a cell out of step with it.
     #[test]
     fn the_caret_marks_the_character_it_is_on() {
+        let _depth = crate::ui::theme::held_at(crate::ui::theme::Depth::Ansi256);
         // Reverse video around exactly one character, and the rest untouched.
         let drawn = caret_over("abc", 1, Cursor::Block, None);
         assert!(drawn.contains("\x1b[7m"), "not reversed: {drawn:?}");
@@ -398,6 +399,7 @@ mod tests {
     /// left the shell with two different cursors depending on which one you were in.
     #[test]
     fn the_caret_takes_the_configured_shape() {
+        let _depth = crate::ui::theme::held_at(crate::ui::theme::Depth::Ansi256);
         let block = caret_over("ab", 0, Cursor::Block, None);
         assert!(sets(&block, "7"), "not reversed: {block:?}");
 

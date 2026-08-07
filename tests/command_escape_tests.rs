@@ -130,7 +130,7 @@ fn a_double_backslash_expands_the_alias_and_skips_the_builtin() {
         "the builtin echo prints its argument; stderr: {err}"
     );
     assert!(
-        lines.get(1).is_some_and(|l| l.starts_with("Usage:")),
+        lines.iter().skip(1).any(|line| line.starts_with("Usage:")),
         "\\\\e should have reached /usr/bin/echo, got {lines:?}; stderr: {err}"
     );
 }

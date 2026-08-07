@@ -1,34 +1,40 @@
 //! Which command the finder shows first.
 //!
-//! **The query filters; recency orders.** Those are two jobs and the score only does the first.
+//! **The kind of match decides the group; recency decides the order inside it.**
 //!
-//! 1. **When you last ran it.** The list is newest-first, whether or not you have typed anything.
-//! 2. **How often you have run it.** Among commands last used at the same moment — which in
-//!    practice means the same second — the habit wins.
-//! 3. **Where you are.** A command last run in the directory you are standing in, or anywhere
-//!    under it, comes before the same command from an unrelated checkout.
+//! 1. **How it matched** — see [`Quality`]. Exact, then prefix, then acronym, then word-prefix,
+//!    then substring, then the scattered fuzzy fallback. Coarse on purpose: these are differences
+//!    a person can see, not a number.
+//! 2. **When you last ran it**, within that group.
+//! 3. **How often**, then **where you were**, then the fuzzy score as a final tie-break.
 //!
-//! # This used to sort by the match score, and it was wrong
+//! With nothing typed every row is in the same group, so the list is plain newest-first.
 //!
-//! The reasoning was that nothing should outrank how well the text matches, because a finder that
-//! put a frequent command above a better match would be arguing with you about what you meant.
-//! What that misses is that *every* row in the list already matches — the score's job was done at
-//! the filter — and among things that all match, "how well" is a number about string shapes, not
-//! about what you are likely to want next.
+//! # Both of the simple rules are wrong, and both were tried
 //!
-//! It reads as broken because it is not stable in the way a person is. Typing `cd` put `cd docs/`,
-//! run twice a day ago, above `cd rush`, run twenty-three times two hours ago: the scorer preferred
-//! one string over the other for reasons that have nothing to do with you, and the answer changed
-//! shape as you typed. Newest-first is the rule you can hold in your head, it is the same rule the
-//! empty list already followed, and the thing you most often want is the thing you just did.
+//! **Sorting by the match score alone** put `cd docs/`, run twice a day ago, above `cd rush`, run
+//! twenty-three times two hours ago. Every row in the list already matches — the score's job
+//! finished at the filter — so ordering by it means ordering by a statement about the shapes of two
+//! strings, and the answer changes shape as you type.
+//!
+//! **Sorting by recency alone** has the opposite failure, and it is worse: a command that merely
+//! shares some letters, run a minute ago, outranks one that begins with exactly what you asked for.
+//! Typing the first three characters of a command you run daily and not getting it is the thing
+//! that makes a finder feel broken.
+//!
+//! Neither signal may overrule the other, so neither is a sort key on its own. The kinds are ranked
+//! and recency orders within them, which gives a rule you can hold in your head: *things that start
+//! with what I typed, newest first; then things that contain it, newest first.*
 
 use crate::track::history::Command;
-use crate::ui::matching::{Fuzzed, Fuzzy};
+use crate::ui::matching::{Fuzzed, Fuzzy, Quality};
 
 /// A command with the numbers the list is ordered by.
 #[derive(Debug, Clone)]
 pub struct Ranked {
     pub command: Command,
+    /// What kind of match this is — the primary sort key. See `Quality`.
+    pub quality: Quality,
     /// The fuzzy score, or 0 when nothing was typed.
     pub score: i32,
     /// Whether the command's directory is the one the shell is in, or an ancestor of it.
@@ -47,6 +53,7 @@ pub fn rank(commands: &[Command], query: &str, cwd: &str, fuzzy: Fuzzy) -> Vec<R
             .map(|command| Ranked {
                 here: is_here(&command.dir, cwd),
                 command: command.clone(),
+                quality: Quality::Scattered,
                 score: 0,
             })
             .collect();
@@ -58,19 +65,20 @@ pub fn rank(commands: &[Command], query: &str, cwd: &str, fuzzy: Fuzzy) -> Vec<R
     let mut ranked: Vec<Ranked> = commands
         .iter()
         .filter_map(|command| {
-            let score = pattern.score(&command.line)?;
+            let (quality, score) = pattern.rank(&command.line)?;
             Some(Ranked {
                 here: is_here(&command.dir, cwd),
                 command: command.clone(),
+                quality,
                 score,
             })
         })
         .collect();
 
     ranked.sort_by(|a, b| {
-        b.command
-            .last_at
-            .cmp(&a.command.last_at)
+        a.quality
+            .cmp(&b.quality)
+            .then(b.command.last_at.cmp(&a.command.last_at))
             .then(b.command.runs.cmp(&a.command.runs))
             .then(b.here.cmp(&a.here))
             .then(b.score.cmp(&a.score))

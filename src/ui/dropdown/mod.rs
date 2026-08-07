@@ -33,8 +33,7 @@ pub use width::{
     visible_len,
 };
 
-use nix::sys::termios::{LocalFlags, SetArg, tcgetattr, tcsetattr};
-use std::io::{self, Write};
+use crate::ui::term::{InputEvent, Key, Keys};
 
 #[derive(Debug, Clone)]
 pub struct CompletionCandidate {
@@ -102,68 +101,6 @@ pub struct DropdownMenu {
     pub indent_cols: usize,
 }
 
-/// Read whatever keys are waiting, straight from the terminal.
-///
-/// **Not `io::stdin()`.** That goes through Rust's own 8KiB buffered reader: asking it for three
-/// bytes issues one `read(2)` for up to 8192 and parks everything past the third in a private
-/// buffer. The line editor reads the terminal through its own reader and never looks there, so
-/// those bytes were lost to it outright — and the *next* time this menu opened, the leftovers came
-/// back instantly as a keypress, which is a dropdown that appears and vanishes in the same frame.
-///
-/// Reading the descriptor directly takes exactly what is there and leaves nothing behind.
-fn read_keys(buf: &mut [u8]) -> usize {
-    // One byte first. Reading a blockful and keeping what it wants is what lost the keys typed
-    // *behind* a Tab: those bytes were consumed here and never reached the line editor.
-    if read_byte(&mut buf[..1]) == 0 {
-        return 0;
-    }
-    if buf[0] != 27 {
-        return 1;
-    }
-    // An escape. Either the user pressed Esc, or an arrow key is arriving as `ESC [ A` — which a
-    // terminal writes in one go. Wait briefly for the rest: long enough that a real sequence is
-    // never split, short enough that a bare Esc closes the menu without a pause.
-    if !waiting(25) || read_byte(&mut buf[1..2]) != 1 {
-        return 1;
-    }
-    // Only a real introducer means more is coming. Anything else is a key the user typed straight
-    // after Esc, and reading further would eat more of what they typed — the menu takes the Esc,
-    // and one character is the most that can be lost.
-    if buf[1] != b'[' && buf[1] != b'O' {
-        return 1;
-    }
-    if waiting(25) && read_byte(&mut buf[2..3]) == 1 {
-        return 3;
-    }
-    2
-}
-
-/// One byte from the terminal, retrying if a signal interrupts.
-fn read_byte(buf: &mut [u8]) -> usize {
-    loop {
-        // SAFETY: a one-byte slice this call owns, read from the terminal's own descriptor.
-        let n = unsafe { nix::libc::read(0, buf.as_mut_ptr().cast(), buf.len()) };
-        if n >= 0 {
-            return n as usize;
-        }
-        // A window resize, most likely — not the user closing the menu.
-        if std::io::Error::last_os_error().kind() != std::io::ErrorKind::Interrupted {
-            return 0;
-        }
-    }
-}
-
-/// Whether another byte is already waiting, within `ms`.
-fn waiting(ms: i32) -> bool {
-    let mut fds = nix::libc::pollfd {
-        fd: 0,
-        events: nix::libc::POLLIN,
-        revents: 0,
-    };
-    // SAFETY: one descriptor, its own length, and a timeout — nothing borrowed beyond the call.
-    unsafe { nix::libc::poll(&mut fds, 1, ms) > 0 }
-}
-
 impl DropdownMenu {
     pub fn new(candidates: Vec<CompletionCandidate>, indent_cols: usize) -> Self {
         Self {
@@ -178,6 +115,7 @@ impl DropdownMenu {
         candidates: Vec<CompletionCandidate>,
         indent_cols: usize,
         typed: &str,
+        keys: &mut Keys,
     ) -> Option<CompletionCandidate> {
         if candidates.is_empty() {
             return None;
@@ -196,14 +134,6 @@ impl DropdownMenu {
         let wanted = crate::ui::settings::current().completion.max_rows;
         menu.max_visible = wanted.min(width::terminal_rows().saturating_sub(3)).max(1);
 
-        let stdin = io::stdin();
-        let orig_termios = tcgetattr(&stdin).ok()?;
-        let mut raw_termios = orig_termios.clone();
-        raw_termios.local_flags.remove(LocalFlags::ICANON);
-        raw_termios.local_flags.remove(LocalFlags::ECHO);
-        let _ = tcsetattr(&stdin, SetArg::TCSANOW, &raw_termios);
-
-        let mut stdout = io::stdout();
         // Rows currently reserved below the prompt. See the comment in the loop.
         let mut reserved = 0usize;
 
@@ -230,66 +160,61 @@ impl DropdownMenu {
             // Where the cursor is: past the prompt and whatever of the word has been typed. Coming
             // back is a *move* rather than a terminal restore, so the column has to be known.
             let column = indent_cols + display_width(typed);
-            let _ = write!(stdout, "{}", reserve_rows(num_lines, &mut reserved));
-            let _ = write!(stdout, "{}", draw_below(&rendered, num_lines, column));
-            let _ = stdout.flush();
+            write_fd(keys.fd(), reserve_rows(num_lines, &mut reserved).as_bytes());
+            write_fd(
+                keys.fd(),
+                draw_below(&rendered, num_lines, column).as_bytes(),
+            );
 
-            let mut buf = [0u8; 8];
-            let n = read_keys(&mut buf);
-
-            if n == 0 {
+            let Some(event) = keys.read_event() else {
                 break None;
-            }
-
-            if n == 1 {
-                match buf[0] {
-                    13 | 10 | 32 => {
-                        // Enter or Space
-                        break Some(menu.candidates[menu.selected_index].clone());
-                    }
-                    9 => {
-                        // Tab cycles down
-                        menu.selected_index = (menu.selected_index + 1) % menu.candidates.len();
-                    }
-                    27 => {
-                        // Esc
-                        break None;
-                    }
-                    _ => break None,
+            };
+            match event {
+                InputEvent::Key(Key::Accept | Key::Char(' ')) => {
+                    break Some(menu.candidates[menu.selected_index].clone());
                 }
-            } else if n >= 3 && buf[0] == 27 && buf[1] == 91 {
-                match buf[2] {
-                    65 => {
-                        // Up Arrow
-                        if menu.selected_index > 0 {
-                            menu.selected_index -= 1;
-                        } else {
-                            menu.selected_index = menu.candidates.len() - 1;
-                        }
-                    }
-                    66 => {
-                        // Down Arrow
-                        menu.selected_index = (menu.selected_index + 1) % menu.candidates.len();
-                    }
-                    _ => break None,
+                InputEvent::Key(Key::ToggleScope | Key::Down) => {
+                    menu.selected_index = (menu.selected_index + 1) % menu.candidates.len();
                 }
-            } else {
-                break None;
+                InputEvent::Key(Key::BackTab | Key::Up) => {
+                    menu.selected_index = menu
+                        .selected_index
+                        .checked_sub(1)
+                        .unwrap_or(menu.candidates.len() - 1);
+                }
+                InputEvent::Key(Key::Cancel) => break None,
+                InputEvent::Resized | InputEvent::Key(Key::Resized) => continue,
+                other => {
+                    keys.unread_event(other);
+                    break None;
+                }
             }
         };
 
         // Erase what was drawn, from one row below the prompt to the end of the screen. `\x1b[B`
         // rather than a newline: the reserved rows already exist, and a newline at the bottom of
         // the screen would scroll again.
-        let _ = write!(
-            stdout,
-            "{}",
-            erase_below(reserved, indent_cols + display_width(typed))
+        write_fd(
+            keys.fd(),
+            erase_below(reserved, indent_cols + display_width(typed)).as_bytes(),
         );
-        let _ = stdout.flush();
-
-        let _ = tcsetattr(&stdin, SetArg::TCSANOW, &orig_termios);
         selected
+    }
+}
+
+fn write_fd(fd: i32, mut bytes: &[u8]) {
+    while !bytes.is_empty() {
+        // SAFETY: `bytes` is live and the editor owns a writable terminal descriptor.
+        let written = unsafe { nix::libc::write(fd, bytes.as_ptr().cast(), bytes.len()) };
+        if written > 0 {
+            bytes = &bytes[written as usize..];
+        } else if written < 0
+            && std::io::Error::last_os_error().kind() == std::io::ErrorKind::Interrupted
+        {
+            continue;
+        } else {
+            break;
+        }
     }
 }
 
@@ -364,6 +289,11 @@ fn erase_below(reserved: usize, column: usize) -> String {
 #[cfg(test)]
 mod frame_tests {
     use super::*;
+    use std::os::fd::AsRawFd;
+
+    fn candidate(name: &str) -> CompletionCandidate {
+        CompletionCandidate::new(name.to_string(), name.to_string(), None)
+    }
 
     /// The rows are reserved before anything is drawn into them, and only the shortfall is added.
     #[test]
@@ -430,5 +360,92 @@ mod frame_tests {
         assert!(!erase.contains("\x1b7"), "{erase:?}");
         // Nothing was drawn, so there is nothing to erase.
         assert_eq!(erase_below(0, 19), "");
+    }
+
+    #[test]
+    fn selection_reads_complete_events_from_the_shared_reader() {
+        for pending in [b"\x1b[B\r".as_slice(), b"\x1b[57353u\r".as_slice()] {
+            let (reader, _writer) = nix::unistd::pipe().expect("pipe");
+            let mut keys = Keys::editor(reader.as_raw_fd(), pending.to_vec(), false);
+            let selected = DropdownMenu::select_interactive(
+                vec![candidate("one"), candidate("two")],
+                0,
+                "",
+                &mut keys,
+            )
+            .expect("selection");
+            assert_eq!(selected.replacement, "two");
+        }
+    }
+
+    #[test]
+    fn dismissing_events_are_replayed_exactly_once() {
+        for (pending, expected) in [
+            (b"x".to_vec(), InputEvent::Key(Key::Char('x'))),
+            (b"\x03".to_vec(), InputEvent::Key(Key::Abort)),
+            (
+                b"\x1b[200~echo hi\x1b[201~".to_vec(),
+                InputEvent::Paste("echo hi".to_string()),
+            ),
+            (b"\x1b[I".to_vec(), InputEvent::Focus(true)),
+        ] {
+            let (reader, _writer) = nix::unistd::pipe().expect("pipe");
+            let mut keys = Keys::editor(reader.as_raw_fd(), pending, false);
+            assert!(
+                DropdownMenu::select_interactive(
+                    vec![candidate("one"), candidate("two")],
+                    0,
+                    "",
+                    &mut keys,
+                )
+                .is_none()
+            );
+            assert_eq!(keys.read_event(), Some(expected));
+        }
+    }
+
+    #[test]
+    fn resize_redraws_and_mouse_is_replayed() {
+        let (reader, _writer) = nix::unistd::pipe().expect("pipe");
+        let mut keys = Keys::editor(reader.as_raw_fd(), Vec::new(), false);
+        let click = crate::ui::term::mouse::Event {
+            button: crate::ui::term::mouse::Button::Left,
+            column: 4,
+            row: 2,
+            pressed: true,
+            shift: false,
+            alt: false,
+            ctrl: false,
+        };
+        keys.unread_event(InputEvent::Resized);
+        keys.unread_event(InputEvent::Mouse(click));
+        assert!(
+            DropdownMenu::select_interactive(
+                vec![candidate("one"), candidate("two")],
+                0,
+                "",
+                &mut keys,
+            )
+            .is_none()
+        );
+        assert_eq!(keys.read_event(), Some(InputEvent::Mouse(click)));
+    }
+
+    #[test]
+    fn escape_does_not_consume_the_following_event() {
+        let (reader, _writer) = nix::unistd::pipe().expect("pipe");
+        let mut keys = Keys::editor(reader.as_raw_fd(), Vec::new(), false);
+        keys.unread_event(InputEvent::Key(Key::Cancel));
+        keys.unread_event(InputEvent::Key(Key::Char('x')));
+        assert!(
+            DropdownMenu::select_interactive(
+                vec![candidate("one"), candidate("two")],
+                0,
+                "",
+                &mut keys,
+            )
+            .is_none()
+        );
+        assert_eq!(keys.read_event(), Some(InputEvent::Key(Key::Char('x'))));
     }
 }

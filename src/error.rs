@@ -6,38 +6,32 @@
 //! [`ShellError::control_flow_status`] is for — collapsing them all to 1 is exactly the bug
 //! behind `( exit 3 )` reporting 1.
 
-use thiserror::Error;
-
-#[derive(Error, Debug)]
+/// Written out rather than derived.
+///
+/// `thiserror` was one derive, in this one file, and it brings `syn`, `quote` and `proc-macro2`
+/// into every build of the crate — three of the slowest dependencies there are, compiled before
+/// anything else can start, to generate the sixty lines below. A shell with one error type does
+/// not need a macro to write them.
+#[derive(Debug)]
 pub enum ShellError {
-    #[error("Syntax error: {0}")]
     SyntaxError(String),
 
-    #[error("Expansion error: {0}")]
     ExpansionError(String),
 
-    #[error("Execution error: {0}")]
     ExecutionError(String),
 
-    #[error("IO error: {0}")]
-    Io(#[from] std::io::Error),
+    Io(std::io::Error),
 
-    #[error("Lua error: {0}")]
-    Lua(#[from] crate::lua::eval::LuaError),
+    Lua(crate::lua::eval::LuaError),
 
-    #[error("POSIX error: {0}")]
-    Nix(#[from] nix::Error),
+    Nix(nix::Error),
 
-    #[error("Builtin exit requested with code: {0}")]
     Exit(i32),
 
-    #[error("Return called with code: {0}")]
     Return(i32),
 
-    #[error("Break called with depth: {0}")]
     Break(usize),
 
-    #[error("Continue called with depth: {0}")]
     Continue(usize),
 
     /// A **utility error**: the command failed in one of the ways POSIX 2.8.1 calls fatal to a
@@ -59,7 +53,6 @@ pub enum ShellError {
     /// **The diagnostic is already on stderr when this is raised.** Whoever detected the error
     /// printed it, in the wording that error deserves; `context` exists so that a path which
     /// renders the error anyway says something true rather than nothing.
-    #[error("{context}")]
     UtilityError {
         /// What went wrong, for rendering only — never the primary report.
         context: String,
@@ -68,6 +61,58 @@ pub enum ShellError {
         /// The status the *shell* exits with where POSIX says it must not carry on.
         fatal: i32,
     },
+}
+
+impl std::fmt::Display for ShellError {
+    /// The wording is the derive's, character for character: these strings reach the user through
+    /// `oslo: {error}` and a shell's diagnostics are part of its interface.
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ShellError::SyntaxError(m) => write!(f, "Syntax error: {m}"),
+            ShellError::ExpansionError(m) => write!(f, "Expansion error: {m}"),
+            ShellError::ExecutionError(m) => write!(f, "Execution error: {m}"),
+            ShellError::Io(e) => write!(f, "IO error: {e}"),
+            ShellError::Lua(e) => write!(f, "Lua error: {e}"),
+            ShellError::Nix(e) => write!(f, "POSIX error: {e}"),
+            ShellError::Exit(c) => write!(f, "Builtin exit requested with code: {c}"),
+            ShellError::Return(c) => write!(f, "Return called with code: {c}"),
+            ShellError::Break(d) => write!(f, "Break called with depth: {d}"),
+            ShellError::Continue(d) => write!(f, "Continue called with depth: {d}"),
+            ShellError::UtilityError { context, .. } => write!(f, "{context}"),
+        }
+    }
+}
+
+impl std::error::Error for ShellError {
+    /// The three wrapped errors keep their chain, which is what `#[from]` gave them. Everything
+    /// else carries a `String` and has no source to point at.
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            ShellError::Io(e) => Some(e),
+            ShellError::Lua(e) => Some(e),
+            ShellError::Nix(e) => Some(e),
+            _ => None,
+        }
+    }
+}
+
+// The three `#[from]` conversions, so `?` still works on the errors the shell actually propagates.
+impl From<std::io::Error> for ShellError {
+    fn from(e: std::io::Error) -> Self {
+        ShellError::Io(e)
+    }
+}
+
+impl From<crate::lua::eval::LuaError> for ShellError {
+    fn from(e: crate::lua::eval::LuaError) -> Self {
+        ShellError::Lua(e)
+    }
+}
+
+impl From<nix::Error> for ShellError {
+    fn from(e: nix::Error) -> Self {
+        ShellError::Nix(e)
+    }
 }
 
 impl ShellError {

@@ -117,9 +117,13 @@ pub fn action(key: Key) -> Action {
         Key::Alt('c') => Action::Capitalise,      // capitalize-word
 
         // A resize is not an edit: the loop redraws on it and the buffer is untouched.
-        Key::Ctrl(_) | Key::Alt(_) | Key::PageUp | Key::PageDown | Key::Resized | Key::Ignored => {
-            Action::None
-        }
+        Key::Ctrl(_)
+        | Key::Alt(_)
+        | Key::Function(_)
+        | Key::PageUp
+        | Key::PageDown
+        | Key::Resized
+        | Key::Ignored => Action::None,
     }
 }
 

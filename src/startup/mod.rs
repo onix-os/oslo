@@ -27,4 +27,5 @@ mod read;
 pub mod recall;
 pub mod repl;
 mod report;
+mod terminal;
 mod tracking;

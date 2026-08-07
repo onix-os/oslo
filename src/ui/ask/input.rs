@@ -150,6 +150,7 @@ pub fn input(spec: &Input) -> Answer<String> {
             | Key::Down
             | Key::ToggleScope
             | Key::BackTab
+            | Key::Function(_)
             | Key::Ctrl(_)
             | Key::Alt(_)
             | Key::Resized

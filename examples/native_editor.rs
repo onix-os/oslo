@@ -31,12 +31,16 @@ impl Assist for Demo {
         }
     }
 
-    fn hint(&mut self, line: &str, _cursor: usize) -> Option<String> {
+    fn hint_text(&mut self, line: &str, _cursor: usize) -> Option<String> {
         if line.is_empty() {
             return None;
         }
         let found = self.history.iter().find(|h| h.starts_with(line))?;
-        Some(format!("\x1b[90m{}\x1b[0m", &found[line.len()..]))
+        Some(found[line.len()..].to_string())
+    }
+
+    fn paint_hint(&mut self, text: &str) -> String {
+        format!("\x1b[90m{text}\x1b[0m")
     }
 
     fn history_prev(&mut self, line: &str) -> Option<String> {

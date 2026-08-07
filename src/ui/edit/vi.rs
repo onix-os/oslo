@@ -1,25 +1,8 @@
-//! Vi mode: modes, motions, operators and counts.
-//!
-//! Pure, like the rest of the editor — [`Vi::apply`] takes a key and a [`Buffer`] and mutates the
-//! buffer. That is what makes a keymap this large tractable: `d2w` is three keystrokes and one
-//! assertion, not something to be discovered by typing at a prompt.
-//!
-//! # oslo owns the mode now
-//!
-//! [`crate::ui::vi`] has a function called `after_key` that *guesses* which mode the
-//! editor is in by watching keys go past. It exists because rustyline owned the mode and would not
-//! say — so the prompt's mode indicator was always one keystroke behind, and the guess had to be
-//! close enough. Nothing here guesses: the mode is a field.
-//!
-//! # What is here
+//! Vi editing modes, motions, operators and counts.
 //!
 //! Motions `h l 0 ^ $ w W b B e E f F t T ; ,`, with counts. Operators `d c y` over any of those,
 //! and doubled (`dd`, `cc`, `yy`). The single-key edits `x X D C s S r p P ~`. Entering insert
 //! with `i I a A`, replace with `R`, and undo with `u`.
-//!
-//! Not here, and deliberately: registers beyond the one kill buffer, `.` repeat, visual mode, and
-//! marks. Each is a feature in its own right rather than a gap in this one, and a shell line is
-//! not where people reach for them.
 
 use super::buffer::Buffer;
 use crate::ui::term::Key;
@@ -99,8 +82,8 @@ impl Vi {
         let mut to = at;
         let mut inclusive = false;
         match key {
-            'h' => to = to.saturating_sub(count),
-            'l' => to = (to + count).min(len),
+            'h' => to = buf.move_graphemes_from(to, -(count as isize)),
+            'l' => to = buf.move_graphemes_from(to, count as isize),
             '0' => to = 0,
             '$' => to = len,
             '^' => {
@@ -121,7 +104,7 @@ impl Vi {
             // `e` lands *on* the last character of the word, not after it.
             'e' | 'E' => {
                 for _ in 0..count {
-                    to = word_end(buf, to, key == 'E').saturating_sub(1);
+                    to = buf.previous_grapheme(word_end(buf, to, key == 'E'));
                 }
                 inclusive = true;
             }
@@ -134,6 +117,7 @@ impl Vi {
             }
             _ => return None,
         }
+        to = super::display::clamp_char_boundary(&buf.text(), to);
         Some(Aim { to, inclusive })
     }
 
@@ -331,12 +315,12 @@ impl Vi {
             }
             'x' => {
                 buf.snapshot();
-                let to = (buf.cursor() + count).min(buf.len());
+                let to = buf.move_graphemes_from(buf.cursor(), count as isize);
                 redrew(buf.cut(buf.cursor(), to))
             }
             'X' => {
                 buf.snapshot();
-                let from = buf.cursor().saturating_sub(count);
+                let from = buf.move_graphemes_from(buf.cursor(), -(count as isize));
                 redrew(buf.cut(from, buf.cursor()))
             }
             'D' => {
@@ -347,13 +331,13 @@ impl Vi {
             'C' => {
                 buf.snapshot();
                 let end = buf.len();
-                let cut = buf.cut(buf.cursor(), end);
+                buf.cut(buf.cursor(), end);
                 self.mode = Mode::Insert;
-                redrew(cut || true)
+                redrew(true)
             }
             's' => {
                 buf.snapshot();
-                let to = (buf.cursor() + count).min(buf.len());
+                let to = buf.move_graphemes_from(buf.cursor(), count as isize);
                 buf.cut(buf.cursor(), to);
                 self.mode = Mode::Insert;
                 redrew(true)
@@ -438,7 +422,14 @@ impl Vi {
     /// forward: `dF x` already reaches back *to* the `x` by making it the start of the range.
     fn operate_over(&mut self, op: char, at: usize, aim: Aim, buf: &mut Buffer) -> Outcome {
         let (from, to) = if aim.to >= at {
-            (at, aim.to + usize::from(aim.inclusive))
+            (
+                at,
+                if aim.inclusive {
+                    buf.next_grapheme(aim.to)
+                } else {
+                    aim.to
+                },
+            )
         } else {
             (aim.to, at)
         };
@@ -450,9 +441,9 @@ impl Vi {
         let changed = match op {
             'd' => buf.cut(from, to),
             'c' => {
-                let cut = buf.cut(from, to);
+                buf.cut(from, to);
                 self.mode = Mode::Insert;
-                cut || true
+                true
             }
             'y' => {
                 let copied = buf.copy(from, to);
@@ -493,9 +484,10 @@ fn find(buf: &Buffer, at: usize, op: char, target: char, count: usize) -> Option
             (0..found).rev().find(|i| buf.char_at(*i) == Some(target))?
         };
     }
+    let found = super::display::clamp_char_boundary(&buf.text(), found);
     Some(match op {
-        't' => found.saturating_sub(1),
-        'T' => found + 1,
+        't' => buf.previous_grapheme(found),
+        'T' => buf.next_grapheme(found),
         _ => found,
     })
 }

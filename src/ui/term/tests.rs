@@ -6,6 +6,23 @@
 use super::*;
 
 #[test]
+fn line_mode_has_balanced_bracketed_paste_controls() {
+    assert_eq!(BRACKETED_PASTE_ENABLE, b"\x1b[?2004h");
+    assert_eq!(BRACKETED_PASTE_DISABLE, b"\x1b[?2004l");
+}
+
+#[test]
+fn line_mode_blocks_for_at_least_one_input_byte() {
+    let pty = nix::pty::openpty(None, None).expect("open pty");
+    let mut inherited = nix::sys::termios::tcgetattr(&pty.slave).expect("read termios");
+    inherited.control_chars[nix::libc::VMIN] = 0;
+    inherited.control_chars[nix::libc::VTIME] = 0;
+    let raw = editor_termios(&inherited);
+    assert_eq!(raw.control_chars[nix::libc::VMIN], 1);
+    assert_eq!(raw.control_chars[nix::libc::VTIME], 0);
+}
+
+#[test]
 fn the_arrows_and_the_keys_beside_them() {
     assert_eq!(key(b"\x1b[A"), Key::Up);
     assert_eq!(key(b"\x1b[B"), Key::Down);
@@ -20,6 +37,93 @@ fn the_arrows_and_the_keys_beside_them() {
     // The application-cursor spellings a terminal switches to inside a full-screen program.
     assert_eq!(key(b"\x1bOA"), Key::Up);
     assert_eq!(key(b"\x1bOD"), Key::Left);
+}
+
+#[test]
+fn function_keys_decode_without_colliding_with_reports() {
+    let legacy = [
+        (b"\x1bOP".as_slice(), 1),
+        (b"\x1bOQ".as_slice(), 2),
+        (b"\x1bOR".as_slice(), 3),
+        (b"\x1bOS".as_slice(), 4),
+        (b"\x1b[15~".as_slice(), 5),
+        (b"\x1b[17~".as_slice(), 6),
+        (b"\x1b[18~".as_slice(), 7),
+        (b"\x1b[19~".as_slice(), 8),
+        (b"\x1b[20~".as_slice(), 9),
+        (b"\x1b[21~".as_slice(), 10),
+        (b"\x1b[23~".as_slice(), 11),
+        (b"\x1b[24~".as_slice(), 12),
+    ];
+    for (sequence, number) in legacy {
+        assert_eq!(key(sequence), Key::Function(number), "F{number}");
+        assert_eq!(
+            parse(sequence),
+            Parsed::Took(sequence.len(), Key::Function(number))
+        );
+        for at in 1..sequence.len() {
+            assert_eq!(parse(&sequence[..at]), Parsed::Partial, "F{number} at {at}");
+        }
+        let mut adjacent = sequence.to_vec();
+        adjacent.push(b'x');
+        assert_eq!(
+            parse(&adjacent),
+            Parsed::Took(sequence.len(), Key::Function(number))
+        );
+    }
+    for number in 1..=4 {
+        let sequence = format!("\x1b[{}~", number + 10);
+        assert_eq!(key(sequence.as_bytes()), Key::Function(number));
+    }
+    for (sequence, number) in [
+        (b"\x1b[P".as_slice(), 1),
+        (b"\x1b[Q".as_slice(), 2),
+        (b"\x1b[S".as_slice(), 4),
+    ] {
+        assert_eq!(key(sequence), Key::Function(number), "Kitty F{number}");
+        assert_eq!(
+            parse(sequence),
+            Parsed::Took(sequence.len(), Key::Function(number))
+        );
+        for at in 1..sequence.len() {
+            assert_eq!(
+                parse(&sequence[..at]),
+                Parsed::Partial,
+                "Kitty F{number} at {at}"
+            );
+        }
+        let mut adjacent = sequence.to_vec();
+        adjacent.push(b'x');
+        assert_eq!(
+            parse(&adjacent),
+            Parsed::Took(sequence.len(), Key::Function(number))
+        );
+    }
+    for (number, parameters, final_byte) in [
+        (1, "1", 'P'),
+        (2, "1", 'Q'),
+        (3, "13", '~'),
+        (4, "1", 'S'),
+        (5, "15", '~'),
+        (6, "17", '~'),
+        (7, "18", '~'),
+        (8, "19", '~'),
+        (9, "20", '~'),
+        (10, "21", '~'),
+        (11, "23", '~'),
+        (12, "24", '~'),
+    ] {
+        let sequence = format!("\x1b[{parameters};1{final_byte}");
+        assert_eq!(key(sequence.as_bytes()), Key::Function(number));
+        let press = format!("\x1b[{parameters};1:1{final_byte}");
+        assert_eq!(key(press.as_bytes()), Key::Function(number));
+    }
+    assert_eq!(key(b"\x1b[R"), Key::Ignored, "CSI R is a report final");
+    assert_eq!(key(b"\x1b[15;2~"), Key::Ignored, "modified F5");
+    assert_eq!(key(b"\x1b[15;1:2~"), Key::Ignored, "repeat F5");
+    assert_eq!(key(b"\x1b[15;1:3~"), Key::Ignored, "release F5");
+    assert_eq!(key(b"\x1b[10~"), Key::Ignored, "F0 is unsupported");
+    assert_eq!(key(b"\x1b[25~"), Key::Ignored, "F13 is unsupported");
 }
 
 /// The control characters every readline-shaped thing binds, so a widget does not have to.
@@ -67,11 +171,11 @@ fn text_is_text() {
 fn a_mouse_report_is_swallowed() {
     let report = b"\x1b[<35;56;12M";
     match parse(report) {
+        Parsed::Mouse(used, _) => assert_eq!(used, report.len(), "the whole report must go"),
         Parsed::Took(used, Key::Ignored) | Parsed::Discard(used) => {
             assert_eq!(used, report.len(), "the whole report must go")
         }
-        Parsed::Took(_, other) => panic!("a mouse report became {other:?}"),
-        Parsed::Partial => panic!("a complete report was called partial"),
+        other => panic!("mouse parse: {other:?}"),
     }
     // The X10 encoding, whose three trailing bytes are not part of the sequence by any rule.
     match parse(b"\x1b[M\x20\x21\x22") {
@@ -81,15 +185,89 @@ fn a_mouse_report_is_swallowed() {
 }
 
 #[test]
+fn unsolicited_mouse_is_swallowed_unless_enabled() {
+    use std::os::fd::AsRawFd;
+
+    let (reader, writer) = nix::unistd::pipe().expect("a pipe");
+    nix::unistd::write(&writer, b"\x1b[<0;12;7Mx").expect("mouse and text");
+    let mut keys = Keys::on(reader.as_raw_fd());
+    assert_eq!(keys.read_event(), Some(InputEvent::Key(Key::Char('x'))));
+
+    let (reader, writer) = nix::unistd::pipe().expect("a pipe");
+    nix::unistd::write(&writer, b"\x1b[<0;12;7M").expect("mouse");
+    let mut keys = Keys::editor(reader.as_raw_fd(), Vec::new(), true);
+    assert!(matches!(keys.read_event(), Some(InputEvent::Mouse(_))));
+}
+
+#[test]
+fn unread_events_are_returned_in_fifo_order() {
+    use std::os::fd::AsRawFd;
+
+    let (reader, _writer) = nix::unistd::pipe().expect("a pipe");
+    let mut keys = Keys::on(reader.as_raw_fd());
+    keys.unread_event(InputEvent::Key(Key::Char('x')));
+    keys.unread_event(InputEvent::Paste("two".to_string()));
+    assert_eq!(keys.read_event(), Some(InputEvent::Key(Key::Char('x'))));
+    assert_eq!(
+        keys.read_event(),
+        Some(InputEvent::Paste("two".to_string()))
+    );
+}
+
+#[test]
 fn bracketed_paste_markers_are_swallowed() {
-    for marker in [b"\x1b[200~".as_slice(), b"\x1b[201~".as_slice()] {
-        match parse(marker) {
-            Parsed::Took(used, Key::Ignored) | Parsed::Discard(used) => {
-                assert_eq!(used, marker.len())
-            }
-            other => panic!("paste marker leaked: {other:?}"),
+    assert_eq!(parse(b"\x1b[200~"), Parsed::PasteStart(6));
+    match parse(b"\x1b[201~") {
+        Parsed::Took(used, Key::Ignored) | Parsed::Discard(used) => assert_eq!(used, 6),
+        other => panic!("paste end leaked: {other:?}"),
+    }
+}
+
+#[test]
+fn bracketed_paste_is_one_owned_event() {
+    use std::os::fd::AsRawFd;
+
+    let (reader, writer) = nix::unistd::pipe().expect("a pipe");
+    nix::unistd::write(&writer, b"\x1b[200~echo one\necho two\x1b[201~x").expect("paste");
+    let mut keys = Keys::on(reader.as_raw_fd());
+    assert_eq!(
+        keys.read_event(),
+        Some(InputEvent::Paste("echo one\necho two".to_string()))
+    );
+    assert_eq!(keys.read_event(), Some(InputEvent::Key(Key::Char('x'))));
+}
+
+#[test]
+fn empty_and_escape_filled_pastes_are_owned_events() {
+    use std::os::fd::AsRawFd;
+
+    let (reader, writer) = nix::unistd::pipe().expect("a pipe");
+    nix::unistd::write(
+        &writer,
+        b"\x1b[200~\x1b[201~\x1b[200~a\x1b[31mb\x1b[0m\x1b[201~",
+    )
+    .expect("pastes");
+    let mut keys = Keys::on(reader.as_raw_fd());
+    assert_eq!(keys.read_event(), Some(InputEvent::Paste(String::new())));
+    assert_eq!(
+        keys.read_event(),
+        Some(InputEvent::Paste("a\x1b[31mb\x1b[0m".to_string()))
+    );
+}
+
+#[test]
+fn every_split_paste_marker_waits() {
+    for at in 1..b"\x1b[200~".len() {
+        assert_eq!(parse(&b"\x1b[200~"[..at]), Parsed::Partial, "split {at}");
+    }
+    let mut paste = paste::Paste::new();
+    for byte in b"line one\nline two\x1b[201~" {
+        let done = paste.push(*byte);
+        if *byte != b'~' {
+            assert!(!done);
         }
     }
+    assert_eq!(paste.finish(), Ok("line one\nline two".to_string()));
 }
 
 #[test]
@@ -102,6 +280,17 @@ fn an_osc_reply_is_swallowed() {
         Parsed::Discard(used) => assert_eq!(used, 10),
         other => panic!("osc with BEL leaked: {other:?}"),
     }
+}
+
+#[test]
+fn a_late_csi_query_reply_is_swallowed_whole() {
+    use std::os::fd::AsRawFd;
+
+    let (reader, writer) = nix::unistd::pipe().expect("a pipe");
+    nix::unistd::write(&writer, b"\x1b[?1ux").expect("late reply and text");
+    let mut keys = Keys::on(reader.as_raw_fd());
+    assert_eq!(keys.read_event(), Some(InputEvent::Key(Key::Ignored)));
+    assert_eq!(keys.read_event(), Some(InputEvent::Key(Key::Char('x'))));
 }
 
 /// A sequence that has not all arrived waits instead of being read as text. This is the half of
@@ -206,4 +395,31 @@ fn an_escape_sequence_assembles_one_byte_at_a_time() {
     let mut keys = Keys::on(reader.as_raw_fd());
     assert_eq!(keys.read(), Some(Key::Up), "three bytes, one key");
     assert_eq!(keys.read(), Some(Key::Char('x')));
+}
+
+#[test]
+fn a_nonblocking_terminal_waits_instead_of_becoming_eof() {
+    use std::os::fd::AsRawFd;
+
+    let (reader, writer) = nix::unistd::pipe().expect("a pipe");
+    // SAFETY: the descriptor is live and the command changes only its file status flags.
+    unsafe {
+        let flags = nix::libc::fcntl(reader.as_raw_fd(), nix::libc::F_GETFL);
+        assert!(flags >= 0);
+        assert_eq!(
+            nix::libc::fcntl(
+                reader.as_raw_fd(),
+                nix::libc::F_SETFL,
+                flags | nix::libc::O_NONBLOCK,
+            ),
+            0
+        );
+    }
+    std::thread::spawn(move || {
+        std::thread::sleep(std::time::Duration::from_millis(20));
+        nix::unistd::write(&writer, b"x").expect("write after poll");
+    });
+
+    let mut keys = Keys::on(reader.as_raw_fd());
+    assert_eq!(keys.read_event(), Some(InputEvent::Key(Key::Char('x'))));
 }

@@ -91,6 +91,26 @@
             pkgs.mold
             pkgs.pkg-config
 
+            # Working out where the binary and the source went. Each answers a different question,
+            # and the first two answer it about *different* things — which is the reason to have
+            # both rather than pick one.
+            #
+            #   cargo-bloat     which functions and which crates the machine code came from.
+            #                   Needs symbols, so it wants a build with `strip` off.
+            #   bloaty          the same question asked of a finished ELF, section by section,
+            #                   and the only one of these that can diff two binaries.
+            #   cargo-machete   dependencies declared and never named in the source. Fast, and
+            #                   occasionally wrong about a crate reached only through a macro.
+            #   cargo-udeps     the same, decided by the compiler rather than by grep, so it is
+            #                   right where machete guesses — at the cost of a nightly rebuild.
+            #   tokei           lines by language and by directory, for the half of this that is
+            #                   about source rather than about the binary.
+            pkgs.cargo-bloat
+            pkgs.bloaty
+            pkgs.cargo-machete
+            pkgs.cargo-udeps
+            pkgs.tokei
+
             nixGLAlias
             nixVulkanAlias
             nixglPkgs.nixGLIntel

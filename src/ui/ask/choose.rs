@@ -19,7 +19,7 @@
 use super::look::{Row, Step, View};
 use super::{Answer, Inline};
 use crate::ui::dropdown::width::{terminal_rows, truncate_to_width};
-use crate::ui::matching::{Fuzzed, Fuzzy};
+use crate::ui::matching::{Fuzzed, Fuzzy, Quality};
 use crate::ui::term::{Key, Keys, Pressed, Restore, Screen};
 use crate::ui::theme;
 
@@ -265,15 +265,21 @@ fn narrow(spec: &Choice, query: &str) -> Vec<usize> {
         return (0..spec.items.len()).collect();
     }
     let pattern = Fuzzed::new(query, spec.fuzzy);
-    let mut scored: Vec<(i32, usize)> = spec
+    let mut scored: Vec<(Quality, i32, usize)> = spec
         .items
         .iter()
         .enumerate()
-        .filter_map(|(i, item)| pattern.score(item).map(|s| (s, i)))
+        .filter_map(|(i, item)| pattern.rank(item).map(|(q, s)| (q, s, i)))
         .collect();
-    // Best first, then the original order — so a list the caller sorted stays sorted among equals.
-    scored.sort_by(|a, b| b.0.cmp(&a.0).then(a.1.cmp(&b.1)));
-    scored.into_iter().map(|(_, i)| i).collect()
+    // **Kind first, the same order the history finder uses.** A list filtered here and a list
+    // filtered there should not disagree about which match is better, and `--look history` exists
+    // to make this widget *be* the history browser.
+    //
+    // There is no recency to order within a kind — these items are whatever the caller piped in —
+    // so the score breaks the tie, and then the original order, which keeps a list the caller
+    // sorted sorted among equals.
+    scored.sort_by(|a, b| a.0.cmp(&b.0).then(b.1.cmp(&a.1)).then(a.2.cmp(&b.2)));
+    scored.into_iter().map(|(_, _, i)| i).collect()
 }
 
 #[cfg(test)]

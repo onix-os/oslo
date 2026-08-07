@@ -135,9 +135,6 @@ impl Cursors {
 }
 
 /// Whether vi mode is on, and which mode the editor is in.
-///
-/// Process-global rather than threaded through: the prompt, the highlighter and the key handler
-/// all need it, and they are reached from three different places in rustyline's callbacks.
 static ENABLED: AtomicU8 = AtomicU8::new(0);
 static MODE: AtomicU8 = AtomicU8::new(0);
 

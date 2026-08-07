@@ -1,15 +1,4 @@
-//! Where the command history lives, how much of it is kept, and the `history` builtin
-//! (PLAN R9.11).
-//!
-//! Three separate defects were behind this file. rustyline's default `max_history_size` is 100,
-//! so a session silently forgot its 101st command; `history_ignore_space` was off, so the
-//! ` password …` convention did nothing; and the whole file was rewritten on exit, so two
-//! sessions open at once each ended with only their own commands.
-//!
-//! The `history` builtin has to read what the *line editor* holds, and `BuiltinFn` is a bare
-//! `fn` pointer with nowhere to put a captured editor. So the REPL publishes a snapshot here
-//! after every line, and the builtin reads that. The alternative — teaching the library about
-//! the editor — would put rustyline in the dependency path of every `Environment`.
+//! Command-history settings, snapshots and the `history` builtin.
 
 /// How many jobs `\j` in a `$PS1` reports.
 ///
@@ -113,12 +102,7 @@ fn home(env: &Environment) -> Option<PathBuf> {
     }
 }
 
-/// A line the editor must not remember.
-///
-/// rustyline applies `history_ignore_space` in `History::add`, which only sees what we hand it —
-/// and what we hand it is the line *after* history expansion, which never starts with a space.
-/// So the test has to be made against the line as typed, here, or ` secret` is stored despite
-/// the leading space that exists precisely to prevent that.
+/// Return whether the original line is excluded by `history.ignore_space`.
 pub fn is_secret(raw_line: &str) -> bool {
     // `oslo.history.ignore_space = false` turns the leading-space convention off, for somebody who
     // pastes indented lines and would rather keep them. It used to be hardcoded on, so the setting

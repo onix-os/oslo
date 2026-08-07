@@ -1,7 +1,4 @@
-//! Building the candidate list for Tab.
-//!
-//! Split out of the rustyline glue so that the interesting part — which candidates, spelled how —
-//! can be called from a test with no terminal attached.
+//! Builds completion candidates for Tab.
 
 use super::OsloHelper;
 use super::command_index::CommandIndex;
@@ -146,11 +143,7 @@ fn config_candidates(
 }
 
 impl OsloHelper {
-    /// The candidates for the word at `pos`, together with the byte offset they replace from.
-    ///
-    /// Every replacement is already quoted for the context it lands in: the old code handed
-    /// rustyline a bare `entry.file_name()`, so `wc -c My<TAB>` produced `wc -c My File.txt` and
-    /// three "no such file" errors.
+    /// Return context-quoted candidates and their replacement byte offset.
     pub fn candidates(&self, line: &str, pos: usize) -> (usize, Vec<CompletionCandidate>) {
         let word = brace_segment(current_word(line, pos));
         let mut out = Vec::new();

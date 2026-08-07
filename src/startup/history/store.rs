@@ -1,7 +1,4 @@
-//! The lines this session has seen, and the file they are appended to.
-//!
-//! What rustyline's `FileHistory` did, minus the parts oslo never used. The whole surface is four
-//! operations — load, add, entries, clear — because that is all the shell ever asked of it.
+//! Session history and its append-only backing file.
 //!
 //! # Appended, never rewritten
 //!

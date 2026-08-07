@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.2.20] - 2026-08-07
+
+### <!-- 0 -->⛰️  Features
+
+- Strange things
+- Strange things
+
+### <!-- 1 -->🐛 Bug Fixes
+
+- A reply ends the wait, not the listening
+- Ask nothing through a multiplexer
+- Rank by the kind of match, then by recency
+
+### <!-- 4 -->⚡ Performance
+
+- Size-optimise dependencies, except the parser
+
+### Build
+
+- The lua derive lives inside full_moon
+- Drop thiserror from both parsers and oslo
+- Full_moon_derive on syn 2, without indexmap
+- Vendor both parsers and strip what they dragged in
+- Full_moon without its serde default
+
 ## [0.2.19] - 2026-08-07
 
 ### <!-- 0 -->⛰️  Features

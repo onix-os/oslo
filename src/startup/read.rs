@@ -55,6 +55,9 @@ pub(super) fn read_command(
     // the end — `$READLINE_POINT` is how a plugin says "leave the cursor here", and a picker that
     // inserts a word mid-line needs it.
     let mut typed_point = 0usize;
+    // Language and vi redraws reuse the current prompt region. Only accepting an incomplete
+    // physical line opens a continuation region inside the same interaction.
+    let mut announce_prompt = Some(oslo::ui::marks::PromptKind::Primary);
 
     loop {
         // Every line starts in insert mode as far as the editor is concerned, so the mode this
@@ -137,6 +140,14 @@ pub(super) fn read_command(
         // The title goes back to the directory now that nothing is running, and the working
         // directory is (re)announced — the first prompt of a session is the only chance to tell
         // the terminal where it started.
+        let semantic_prompt = match announce_prompt.take() {
+            Some(oslo::ui::marks::PromptKind::Primary) => oslo::ui::marks::prompt_start(),
+            Some(oslo::ui::marks::PromptKind::Continuation) => {
+                oslo::ui::marks::continuation_prompt_start()
+            }
+            Some(oslo::ui::marks::PromptKind::Right) => String::new(),
+            None => String::new(),
+        };
         print!(
             "{}{}{}",
             oslo::ui::marks::working_directory(&crate::startup::repl::cwd()),
@@ -147,7 +158,7 @@ pub(super) fn read_command(
                 )
                 .unwrap_or_else(|| { oslo::ui::prompt::tilde(&crate::startup::repl::cwd()) })
             ),
-            oslo::ui::marks::prompt_start()
+            semantic_prompt
         );
         let _ = std::io::Write::flush(&mut std::io::stdout());
 
@@ -162,9 +173,7 @@ pub(super) fn read_command(
             let mut assist = super::native::ShellAssist::new(
                 history,
                 Some(helper),
-                // The real printed width, which is what puts the completion menu under the word
-                // it is completing. rustyline never told anyone where the line started, so the
-                // dropdown had to guess by rendering a default prompt.
+                // Position the completion menu from the prompt's displayed width.
                 oslo::ui::prompt::printed_width(&prompt),
                 Some(mode::TOGGLE_KEY.to_string()),
             );
@@ -277,10 +286,6 @@ pub(super) fn read_command(
             let _ = std::io::Write::flush(&mut std::io::stdout());
         }
 
-        // The language toggle used to be caught up with here, because rustyline's key handler
-        // could repaint the prompt but not tell the loop. The native editor returns
-        // `Outcome::ToggleLanguage` instead and the switch happens where it is made, above.
-
         if buffer.is_empty() {
             if raw.trim().is_empty() {
                 return Input::Nothing;
@@ -345,6 +350,7 @@ pub(super) fn read_command(
             };
         }
         buffer.push('\n');
+        announce_prompt = Some(oslo::ui::marks::PromptKind::Continuation);
     }
 }
 

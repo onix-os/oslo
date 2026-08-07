@@ -1,19 +1,13 @@
-//! The line-editing state machine, and the loop that drives it.
+//! The line-editing state machine and terminal loop.
 //!
-//! Split so the interesting half is testable: [`Session::apply`] takes one key and mutates the
-//! line, and knows nothing about terminals. The loop underneath only reads keys and writes bytes.
-//!
-//! # What the shell plugs in
-//!
-//! Everything oslo-specific — highlighting, ghost hints, the completion dropdown, history — comes
-//! through [`Assist`]. That is deliberate: those are the parts that already exist and work, and
-//! the point of this module is to stop rustyline owning the *layout*, not to rewrite completion.
+//! [`Session::apply`] updates editor state without terminal access. [`Assist`] supplies
+//! highlighting, hints, completion and history.
 
 use super::buffer::{Buffer, Case};
 use super::keymap::{Action, action};
 use super::screen;
 pub use crate::ui::term::Key;
-use crate::ui::term::{Keys, Restore, Screen};
+use crate::ui::term::{InputEvent, Keys, PasteError, Restore, Screen};
 use std::io::Write;
 
 mod assist;
@@ -72,6 +66,8 @@ pub enum Step {
     /// Shift-Tab: the prompt should switch between shell and Lua. Handled by the read loop, which
     /// is the only thing that knows what a language *is*.
     ToggleLanguage,
+    /// Open the completion modal through the outer loop's shared input reader.
+    OpenCompletion { backwards: bool },
 }
 
 /// The line being edited, and where in history it came from.
@@ -96,13 +92,16 @@ impl Session {
         }
     }
 
-    /// The mode a prompt should show, when there is one.
-    ///
-    /// **Read, not guessed.** `crate::ui::vi::after_key` exists to infer this by watching
-    /// keystrokes go past, because rustyline owned the mode and would not say — so the indicator
-    /// was always one key behind. Here it is simply the field.
+    /// Return the current vi mode stored by this session.
     pub fn mode(&self) -> Option<super::vi::Mode> {
         self.vi.as_ref().map(|vi| vi.mode)
+    }
+
+    pub fn paste(&mut self, text: &str) -> Step {
+        self.buffer.insert_str(text);
+        Step::Continue {
+            redraw: !text.is_empty(),
+        }
     }
 
     /// Carry out a binding the config asked for.
@@ -112,15 +111,7 @@ impl Session {
             Bound::ToggleLanguage => Step::ToggleLanguage,
             Bound::ClearScreen => Step::ClearScreen,
             Bound::Interrupt => Step::Interrupted,
-            Bound::Complete => {
-                match assist.complete(&self.buffer.text(), self.buffer.cursor(), false) {
-                    Some((line, cursor)) => {
-                        self.buffer.set(&line, cursor);
-                        changed(true)
-                    }
-                    None => changed(false),
-                }
-            }
+            Bound::Complete => Step::OpenCompletion { backwards: false },
             Bound::SearchHistory => match assist.search_history(&self.buffer.text()) {
                 Some(line) => {
                     let end = line.chars().count();
@@ -312,16 +303,9 @@ impl Session {
             Action::Lower => changed(self.buffer.case_word(Case::Lower)),
             Action::Capitalise => changed(self.buffer.case_word(Case::Title)),
 
-            Action::Complete | Action::CompleteBack => {
-                let back = matches!(action(key), Action::CompleteBack);
-                match assist.complete(&self.buffer.text(), self.buffer.cursor(), back) {
-                    Some((line, cursor)) => {
-                        self.buffer.set(&line, cursor);
-                        changed(true)
-                    }
-                    None => changed(false),
-                }
-            }
+            Action::Complete | Action::CompleteBack => Step::OpenCompletion {
+                backwards: matches!(action(key), Action::CompleteBack),
+            },
             Action::HistoryPrev => match assist.history_prev(&self.buffer.text()) {
                 Some(line) => {
                     let end = line.chars().count();
@@ -392,7 +376,7 @@ pub fn read_line(
     initial: (&str, usize),
     assist: &mut dyn Assist,
 ) -> Outcome {
-    let Some(raw) = Restore::enter(Screen::Line) else {
+    let Some(mut raw) = Restore::enter(Screen::Line) else {
         // No terminal: the line comes off stdin with no editing, which is what a piped script
         // needs and what `read` already does elsewhere.
         //
@@ -400,7 +384,9 @@ pub fn read_line(
         return read_plain(&render().0);
     };
     let mut session = Session::new(initial.0, initial.1);
-    let mut keys = Keys::on(raw.fd());
+    let mouse_events = raw.mouse_events();
+    let mut keys = Keys::editor(raw.fd(), raw.take_pending(), mouse_events);
+    let synchronized = crate::ui::term::capability::snapshot().synchronized_output;
     let mut at_row = 0usize;
     let mut out = std::io::stderr();
     let mut drawn = false;
@@ -435,7 +421,8 @@ pub fn read_line(
         let (prompt, right) = (prompt.as_str(), right.as_str());
 
         let placed = draw(prompt, right, &session, assist, true);
-        let _ = out.write_all(screen::redraw(at_row, &placed.text, into_at(&placed)).as_bytes());
+        let frame = screen::redraw(at_row, &placed.text, into_at(&placed));
+        let _ = out.write_all(crate::ui::paint::Frame::new(&frame, synchronized).as_bytes());
         let _ = out.flush();
         at_row = placed.cursor_row;
 
@@ -445,6 +432,7 @@ pub fn read_line(
         // prompt is displayed" has to mean.
         if !drawn {
             drawn = true;
+            let _ = out.write_all(crate::ui::marks::input_start().as_bytes());
             // The cursor is shown again here, not on entry. A language switch hides it while the
             // other language's prompt is being built — otherwise it sits at column one in plain
             // sight for however long that takes — and this is the first moment there is something
@@ -454,11 +442,77 @@ pub fn read_line(
             crate::lua::engine::fire_at_here(crate::lua::api::hooks::at::POST_PROMPT, &[]);
         }
 
-        let Some(key) = next_key(&mut keys, &mut idle) else {
+        let Some(input) = next_input(&mut keys, &mut idle) else {
             return Outcome::Eof;
+        };
+        let key = match input {
+            InputEvent::Key(key) => key,
+            InputEvent::Resized => Key::Resized,
+            InputEvent::Paste(text) => {
+                let _ = session.paste(&text);
+                continue;
+            }
+            InputEvent::PasteRejected(error) => {
+                let reason = match error {
+                    PasteError::TooLarge => "paste exceeds 1 MiB",
+                    PasteError::InvalidUtf8 => "paste is not valid UTF-8",
+                };
+                let _ = out.write_all(format!("\r\noslo: {reason}\r\n").as_bytes());
+                let _ = out.flush();
+                at_row = 0;
+                continue;
+            }
+            InputEvent::Focus(_) => continue,
+            InputEvent::Mouse(event) => {
+                if event.pressed
+                    && event.button == crate::ui::term::mouse::Button::Left
+                    && !event.shift
+                    && !event.alt
+                    && !event.ctrl
+                {
+                    let capabilities = crate::ui::term::capability::snapshot();
+                    if capabilities.semantic_clicks {
+                        let cursor = super::layout::cursor_for_cell(
+                            prompt,
+                            &session.buffer.text(),
+                            crate::ui::dropdown::terminal_cols(),
+                            event.row,
+                            event.column,
+                        );
+                        session.buffer.set_cursor(cursor);
+                    } else if capabilities.legacy_clicks {
+                        let (position, pending) = crate::ui::term::mouse::cursor_position(raw.fd());
+                        keys.extend_pending(pending);
+                        if let Some((cursor_row, _)) = position {
+                            let top = cursor_row.saturating_sub(placed.cursor_row);
+                            if let Some(row) = event.row.checked_sub(top) {
+                                let cursor = super::layout::cursor_for_cell(
+                                    prompt,
+                                    &session.buffer.text(),
+                                    crate::ui::dropdown::terminal_cols(),
+                                    row,
+                                    event.column,
+                                );
+                                session.buffer.set_cursor(cursor);
+                            }
+                        }
+                    }
+                }
+                continue;
+            }
         };
         match session.apply(key, assist) {
             Step::Continue { .. } => {}
+            Step::OpenCompletion { backwards } => {
+                if let Some((line, cursor)) = assist.complete(
+                    &session.buffer.text(),
+                    session.buffer.cursor(),
+                    backwards,
+                    &mut keys,
+                ) {
+                    session.buffer.set(&line, cursor);
+                }
+            }
             Step::ToggleLanguage => {
                 // **No blank frame here any more.** This used to erase the block and return, and
                 // the caller then rendered the other language's prompt and re-entered — so the
@@ -470,8 +524,9 @@ pub fn read_line(
                 // block. Writing the *current* frame does that and leaves the row looking exactly
                 // as it did, so there is nothing to see between the two draws.
                 let placed = draw(prompt, right, &session, assist, true);
-                let _ = out
-                    .write_all(screen::redraw(at_row, &placed.text, into_at(&placed)).as_bytes());
+                let frame = screen::redraw(at_row, &placed.text, into_at(&placed));
+                let _ =
+                    out.write_all(crate::ui::paint::Frame::new(&frame, synchronized).as_bytes());
                 // Up to the first row of the block and to column one, which is where the caller's
                 // next draw begins counting from.
                 if placed.cursor_row > 0 {
@@ -501,8 +556,9 @@ pub fn read_line(
                     let _ = out.write_all(shape.escape().as_bytes());
                 }
                 let placed = draw(prompt, right, &session, assist, false);
-                let _ = out
-                    .write_all(screen::redraw(at_row, &placed.text, into_at(&placed)).as_bytes());
+                let frame = screen::redraw(at_row, &placed.text, into_at(&placed));
+                let _ =
+                    out.write_all(crate::ui::paint::Frame::new(&frame, synchronized).as_bytes());
                 let _ = out.write_all(screen::finish(placed.cursor_row, placed.rows).as_bytes());
                 let _ = out.flush();
                 return Outcome::Line(session.buffer.text());
@@ -523,7 +579,7 @@ pub fn read_line(
     }
 }
 mod frame;
-use frame::{draw, first_word, into_at, next_key, read_plain};
+use frame::{draw, first_word, into_at, next_input, read_plain};
 
 #[cfg(test)]
 #[path = "session/tests.rs"]

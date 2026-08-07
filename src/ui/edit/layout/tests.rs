@@ -1,8 +1,4 @@
-//! Where the cursor lands, checked without a terminal.
-//!
-//! Every one of these is a bug oslo has already paid for once through rustyline owning the layout:
-//! a prompt whose width was measured wrong, a wrapped line whose cursor walked too far, a right
-//! prompt that overlapped the text. Here they are arithmetic.
+//! Cursor and row placement without a terminal.
 
 use super::*;
 
@@ -27,8 +23,7 @@ fn a_short_line_is_one_row_and_the_cursor_follows_the_text() {
     assert_eq!(p.text, "$ echo hi");
 }
 
-/// **Colour in the prompt must not move the cursor.** This is the measurement rustyline gets by
-/// being handed a pre-measured number, and the one a naive `len()` gets wrong by ten cells.
+/// Prompt colour escapes occupy no cells.
 #[test]
 fn escapes_in_the_prompt_are_not_cells() {
     let plain = place(&row("$ ", "ls", 2, 80));
@@ -79,6 +74,31 @@ fn wide_characters_take_two_columns() {
 fn a_combining_mark_is_not_a_column() {
     let p = place(&row("", "e\u{0301}", 2, 80));
     assert_eq!(p.cursor_col, 1, "e plus a combining acute is one cell");
+}
+
+#[test]
+fn emoji_clusters_have_terminal_width_without_splitting() {
+    for grapheme in ["👍🏽", "👨‍👩‍👧‍👦", "🇳🇱", "1️⃣", "⚙️"] {
+        let cursor = grapheme.chars().count();
+        let p = place(&row("", grapheme, cursor, 80));
+        assert_eq!(p.cursor_col, 2, "{grapheme:?}");
+    }
+}
+
+#[test]
+fn a_wide_cluster_wraps_before_the_final_single_cell() {
+    let p = place(&row("", "a日", 2, 2));
+    assert_eq!(p.rows, 2);
+    assert_eq!((p.cursor_row, p.cursor_col), (2, 0));
+    assert_eq!(cursor_for_cell("", "a日", 2, 0, 1), 1);
+    assert_eq!(cursor_for_cell("", "a日", 2, 1, 1), 2);
+}
+
+#[test]
+fn explicit_newlines_advance_to_the_next_terminal_row() {
+    let p = place(&row("$ ", "one\ntwo", 7, 10));
+    assert_eq!((p.cursor_row, p.cursor_col), (1, 3));
+    assert_eq!(p.rows, 2);
 }
 
 #[test]
@@ -161,4 +181,35 @@ fn colour_in_the_line_is_drawn_but_not_measured() {
     let p = place(&r);
     assert_eq!(p.cursor_col, 6, "2 prompt + 4 characters");
     assert!(p.text.contains("\x1b[32m"), "the colour is still drawn");
+}
+
+#[test]
+fn clicks_map_through_wrapping_and_prompt_cells() {
+    assert_eq!(cursor_for_cell("$ ", "abcdefgh", 5, 0, 0), 0);
+    assert_eq!(cursor_for_cell("$ ", "abcdefgh", 5, 0, 4), 2);
+    assert_eq!(cursor_for_cell("$ ", "abcdefgh", 5, 1, 2), 5);
+    assert_eq!(cursor_for_cell("$ ", "abcdefgh", 5, 9, 4), 8);
+}
+
+#[test]
+fn clicks_map_wide_combining_and_multiline_text() {
+    assert_eq!(cursor_for_cell("", "日x", 10, 0, 0), 0);
+    assert_eq!(cursor_for_cell("", "日x", 10, 0, 1), 1);
+    assert_eq!(cursor_for_cell("", "e\u{301}x", 10, 0, 1), 2);
+    assert_eq!(cursor_for_cell("$ ", "one\ntwo", 10, 1, 2), 6);
+}
+
+#[test]
+fn clicks_clamp_around_primary_continuation_and_right_prompts() {
+    assert_eq!(cursor_for_cell("PRIMARY> ", "abc", 20, 0, 0), 0);
+    assert_eq!(cursor_for_cell("PRIMARY> ", "abc", 20, 0, 19), 3);
+    assert_eq!(cursor_for_cell("> ", "one\ntwo", 10, 1, 0), 4);
+    assert_eq!(cursor_for_cell("> ", "one\ntwo", 10, 1, 9), 7);
+}
+
+#[test]
+fn click_mapping_uses_the_current_width_after_resize() {
+    let line = "abcdefghij";
+    assert_eq!(cursor_for_cell("$ ", line, 8, 1, 1), 7);
+    assert_eq!(cursor_for_cell("$ ", line, 5, 1, 1), 4);
 }

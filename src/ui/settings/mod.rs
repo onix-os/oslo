@@ -43,10 +43,6 @@ pub struct Settings {
     /// different order each run would be maddening to compare.
     pub dirs: Vec<(String, String)>,
     /// `oslo.keys`: key name to action name, both as written.
-    ///
-    /// Kept as strings rather than resolved here because binding needs rustyline types, and this
-    /// module is meant to be readable without one. [`super::keys`] turns them into bindings and
-    /// reports the ones it does not recognise.
     pub keys: Vec<(String, String)>,
 }
 
@@ -420,10 +416,7 @@ pub fn current() -> Settings {
 }
 
 pub fn install(settings: Settings) {
-    // Vi mode is a process-wide fact — the prompt reads it to draw its indicator, and the editor
-    // reads it to decide whether to have modes at all. Published here because this is the moment
-    // the config is known; it used to be set while binding rustyline's keys, which is a place that
-    // no longer exists.
+    // Publish vi mode before the prompt or editor reads the installed settings.
     super::vi::set_enabled(settings.vi.enabled);
     // `oslo.misc.color_depth` is applied here rather than read where colour is painted: the depth
     // is cached on first use, so a config that sets it after something has already drawn would be

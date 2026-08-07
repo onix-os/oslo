@@ -66,10 +66,10 @@ check "the shell survived signalling it" "alive" "alive"
 
 echo "-- the Lua half, on musl"
 cat >/tmp/t.lua <<'LUA'
-local r = oslo.capture("uname -s")
+local r = oslo.proc.capture("uname -s")
 print("captured=" .. r.out .. " status=" .. r.status)
 print("argv=" .. (arg[1] or "none"))
-oslo.exit(0)
+oslo.proc.exit(0)
 LUA
 check "Lua runs and captures" "$(/bin/sh /tmp/t.lua fromvm)" "captured=Linux status=0
 argv=fromvm"

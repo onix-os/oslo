@@ -151,6 +151,7 @@ fn a_content_width_row_stops_at_its_text() {
 /// crawl as the list scrolls under them.
 #[test]
 fn the_stripe_does_not_crawl_when_the_list_scrolls() {
+    let _depth = crate::ui::theme::held_at(crate::ui::theme::Depth::Ansi256);
     let look = Look {
         width: Width::Full,
         stripe: Some(Style {
@@ -301,7 +302,7 @@ fn a_trail_keeps_its_room() {
         .map(plain)
         .collect();
     assert!(drawn[0].ends_with(" 118×"), "{drawn:?}");
-    assert_eq!(crate::ui::prompt::printed_width(&drawn[0]), 40);
+    assert_eq!(crate::ui::prompt::printed_width(&drawn[0]), 40, "{drawn:?}");
 }
 
 /// The preset is the combination, not the sugar: a bottom filter without `reverse` puts the best
@@ -450,6 +451,7 @@ fn the_meta_widths_do_not_change_as_the_list_scrolls() {
 /// state you can change rather than a fact about what you are looking at.
 #[test]
 fn the_badge_is_painted_where_the_slot_puts_it() {
+    let _depth = crate::ui::theme::held_at(crate::ui::theme::Depth::Ansi256);
     let look = Look {
         filter_at: Where::Bottom,
         right: "{badge} || {n}/{total}".to_string(),

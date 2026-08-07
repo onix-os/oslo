@@ -277,7 +277,7 @@ fn an_accepted_completion_is_counted() {
     let h = helper(env_with_path(dir.path()));
 
     assert_eq!(h.frecency_score("zzsingle"), 0.0);
-    // Exactly one candidate, so rustyline inserts it: that is an acceptance.
+    // A single completion is accepted without opening the menu.
     let (_, pairs) = h.complete_word("zzsing", 6);
     assert_eq!(pairs.len(), 1);
     assert!(h.frecency_score("zzsingle") > 0.0);

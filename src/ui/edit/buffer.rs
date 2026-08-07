@@ -5,12 +5,12 @@
 //! terminal, which is the whole reason oslo can replace a line editor at all: the parts that are
 //! hard to get right are the parts that can be checked in a unit test.
 //!
-//! # Characters, not bytes
+//! # Graphemes, stored as characters
 //!
 //! The cursor is an index into a `Vec<char>`. A shell line is short, so the copying a `Vec<char>`
-//! costs is irrelevant beside never having to ask whether an index is on a character boundary —
-//! and a cursor that can land mid-character is how editors corrupt UTF-8. Display *width* is a
-//! separate question, answered in [`super::layout`], because one character is not one cell.
+//! costs is irrelevant. Cursor indices remain character offsets for the surrounding APIs, but are
+//! always clamped to extended-grapheme boundaries. Display *width* is a separate question,
+//! answered in [`super::layout`], because one grapheme is not necessarily one cell.
 //!
 //! # Two kinds of word, on purpose
 //!
@@ -21,6 +21,8 @@
 //!   what makes it the key for taking back a path you just typed.
 //!
 //! Collapsing them into one would break one of the two habits, and both are decades old.
+
+use super::display;
 
 /// What kind of character this is, for word motions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -109,7 +111,7 @@ impl Buffer {
             return false;
         };
         self.chars = text;
-        self.cursor = cursor.min(self.chars.len());
+        self.cursor = display::clamp_char_boundary(&self.text(), cursor.min(self.chars.len()));
         true
     }
 
@@ -125,7 +127,7 @@ impl Buffer {
 
     /// Put the cursor at `at`, clamped to the line.
     pub fn set_cursor(&mut self, at: usize) {
-        self.cursor = at.min(self.chars.len());
+        self.cursor = display::clamp_char_boundary(&self.text(), at.min(self.chars.len()));
     }
 
     /// Remove `from..to` into the kill buffer, leaving the cursor at `from`.
@@ -138,6 +140,13 @@ impl Buffer {
 
     /// Copy `from..to` into the kill buffer without removing it — vi's `y`.
     pub fn copy(&mut self, from: usize, to: usize) -> bool {
+        let text = self.text();
+        let from = display::clamp_char_boundary(&text, from.min(self.chars.len()));
+        let to = if to >= self.chars.len() {
+            self.chars.len()
+        } else {
+            display::next_boundary(&text, to.saturating_sub(1))
+        };
         if from >= to {
             return false;
         }
@@ -150,7 +159,8 @@ impl Buffer {
         if self.cursor >= self.chars.len() {
             return false;
         }
-        self.chars[self.cursor] = c;
+        let end = self.next_grapheme(self.cursor);
+        self.chars.splice(self.cursor..end, [c]);
         true
     }
 
@@ -180,12 +190,13 @@ impl Buffer {
     /// Used when a history entry, a finder choice or a key handler supplies a whole new line.
     pub fn set(&mut self, text: &str, cursor: usize) {
         self.chars = text.chars().collect();
-        self.cursor = cursor.min(self.chars.len());
+        self.cursor = display::clamp_char_boundary(text, cursor.min(self.chars.len()));
     }
 
     pub fn insert(&mut self, c: char) {
+        let intended = self.cursor + 1;
         self.chars.insert(self.cursor, c);
-        self.cursor += 1;
+        self.cursor = display::next_boundary(&self.text(), intended.saturating_sub(1));
     }
 
     /// Insert a run at once — a paste, or an accepted completion.
@@ -194,9 +205,13 @@ impl Buffer {
     /// should be one shift of the tail, not a thousand.
     pub fn insert_str(&mut self, text: &str) {
         let incoming: Vec<char> = text.chars().collect();
+        if incoming.is_empty() {
+            return;
+        }
         let at = self.cursor;
         self.chars.splice(at..at, incoming.iter().copied());
-        self.cursor += incoming.len();
+        let intended = at + incoming.len();
+        self.cursor = display::next_boundary(&self.text(), intended.saturating_sub(1));
     }
 
     /// Delete the character before the cursor. Answers whether there was one.
@@ -204,8 +219,9 @@ impl Buffer {
         if self.cursor == 0 {
             return false;
         }
-        self.cursor -= 1;
-        self.chars.remove(self.cursor);
+        let from = self.previous_grapheme(self.cursor);
+        self.chars.drain(from..self.cursor);
+        self.cursor = from;
         true
     }
 
@@ -214,18 +230,31 @@ impl Buffer {
         if self.cursor >= self.chars.len() {
             return false;
         }
-        self.chars.remove(self.cursor);
+        let end = self.next_grapheme(self.cursor);
+        self.chars.drain(self.cursor..end);
         true
     }
 
     pub fn move_left(&mut self) {
-        self.cursor = self.cursor.saturating_sub(1);
+        self.cursor = self.previous_grapheme(self.cursor);
     }
 
     pub fn move_right(&mut self) {
         if self.cursor < self.chars.len() {
-            self.cursor += 1;
+            self.cursor = self.next_grapheme(self.cursor);
         }
+    }
+
+    pub fn previous_grapheme(&self, at: usize) -> usize {
+        display::previous_boundary(&self.text(), at.min(self.chars.len()))
+    }
+
+    pub fn next_grapheme(&self, at: usize) -> usize {
+        display::next_boundary(&self.text(), at.min(self.chars.len()))
+    }
+
+    pub fn move_graphemes_from(&self, at: usize, count: isize) -> usize {
+        display::move_boundaries(&self.text(), at.min(self.chars.len()), count)
     }
 
     pub fn move_home(&mut self) {
@@ -245,7 +274,7 @@ impl Buffer {
         while at > 0 && class(self.chars[at - 1]) == Class::Word {
             at -= 1;
         }
-        at
+        display::clamp_char_boundary(&self.text(), at)
     }
 
     /// Where `M-f` lands: forward over non-word characters, then over the word.
@@ -258,7 +287,11 @@ impl Buffer {
         while at < len && class(self.chars[at]) == Class::Word {
             at += 1;
         }
-        at
+        if at == self.chars.len() {
+            at
+        } else {
+            display::next_boundary(&self.text(), at.saturating_sub(1))
+        }
     }
 
     /// Where `C-w` reaches: back over whitespace, then over everything that is not whitespace.
@@ -273,7 +306,7 @@ impl Buffer {
         while at > 0 && class(self.chars[at - 1]) != Class::Space {
             at -= 1;
         }
-        at
+        display::clamp_char_boundary(&self.text(), at)
     }
 
     pub fn move_word_left(&mut self) {
@@ -286,6 +319,13 @@ impl Buffer {
 
     /// Remove `from..to`, remembering it as the kill.
     fn kill_range(&mut self, from: usize, to: usize) -> bool {
+        let text = self.text();
+        let from = display::clamp_char_boundary(&text, from.min(self.chars.len()));
+        let to = if to >= self.chars.len() {
+            self.chars.len()
+        } else {
+            display::next_boundary(&text, to.saturating_sub(1))
+        };
         if from >= to {
             return false;
         }
@@ -342,20 +382,38 @@ impl Buffer {
     /// At the end of the line it swaps the last two, which is what readline does and what the
     /// typo it exists for actually needs.
     pub fn transpose(&mut self) -> bool {
-        let len = self.chars.len();
-        if len < 2 {
+        let text = self.text();
+        let boundaries: Vec<usize> =
+            unicode_segmentation::UnicodeSegmentation::graphemes(text.as_str(), true)
+                .scan(0usize, |at, grapheme| {
+                    let start = *at;
+                    *at += grapheme.chars().count();
+                    Some(start)
+                })
+                .chain(std::iter::once(self.chars.len()))
+                .collect();
+        if boundaries.len() < 3 {
             return false;
         }
-        let right = if self.cursor >= len {
-            len - 1
+        let cursor_index = boundaries
+            .binary_search(&self.cursor)
+            .unwrap_or_else(|index| index.saturating_sub(1));
+        let right_index = if cursor_index >= boundaries.len() - 1 {
+            boundaries.len() - 2
         } else {
-            self.cursor
+            cursor_index
         };
-        if right == 0 {
+        if right_index == 0 {
             return false;
         }
-        self.chars.swap(right - 1, right);
-        self.cursor = (right + 1).min(len);
+        let left_start = boundaries[right_index - 1];
+        let middle = boundaries[right_index];
+        let right_end = boundaries[right_index + 1];
+        let left = self.chars[left_start..middle].to_vec();
+        let right = self.chars[middle..right_end].to_vec();
+        self.chars
+            .splice(left_start..right_end, right.into_iter().chain(left));
+        self.cursor = right_end;
         true
     }
 

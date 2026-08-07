@@ -1,6 +1,6 @@
 [package]
 name = "oslo"
-version = "0.2.19"
+version = "0.2.20"
 edition = "2024"
 # Edition 2024 alone needs 1.85, but the codebase uses let-chains in edition-2024 position
 # (stabilised in 1.88) and brush-parser declares 1.88 too. Bump this only alongside the MSRV
@@ -53,7 +53,7 @@ tokio = { version = "1", features = ["rt-multi-thread", "net"], optional = true 
 # This replaced `mlua`, which is a *binding* to the reference Lua written in C: it vendored and
 # compiled 30k lines of C into the binary, so a static musl build needed a C toolchain, and Lua
 # values lived in a separate VM that the shell could only pass strings across. See PLAN-LUA.md.
-full_moon = { version = "1", features = ["lua54"] }
+full_moon = { path = "crates/full_moon", default-features = false, features = ["lua54"] }
 # `resource` is what `ulimit` reads and sets limits through, and what `times` reads getrusage(2)
 # through. Without it both had to parse /proc by hand.
 # `poll` is declared here rather than arriving by accident. It used to come from rustyline's own
@@ -86,7 +86,8 @@ regex = { version = "1", default-features = false, features = [
 # is pure Rust, so it works where those cannot. See PLAN-LUA.md.
 serde_json = "1"
 which = "7.0"
-thiserror = "2.0"
+unicode-segmentation = "1.12"
+unicode-width = "0.2"
 
 # Used for *parsing only* — its AST is converted straight into oslo's own in
 # `src/parser/brush_adapter/`, and nothing else from brush executes anything. Every builtin here is
@@ -103,7 +104,7 @@ thiserror = "2.0"
 # brush's tokenizer takes the longest match and fuses them into the single `;;` that ends a `case`
 # item, so the arithmetic-for rule never sees the two `;` it asks for. That is a loud syntax error
 # rather than a wrong answer — see tests/differential/expected_fail.rs.
-brush-parser = { git = "https://github.com/bresilla/brush", branch = "oslo-integration" }
+brush-parser = { path = "crates/brush-parser" }
 # The allow list for directory environments is keyed by a hash of the rc file's path *and* its
 # contents, which is what makes editing an allowed file revoke it. Pure Rust, so it does not cost
 # the static musl build a C toolchain.
@@ -142,6 +143,7 @@ jammdb = "0.11"
 # A one-package workspace, stated explicitly so `cargo fmt --all` and the 600-line limit apply
 # to this crate and nothing else. `fuzz/` declares its own empty [workspace] to stay out.
 [workspace]
+members = ["crates/brush-parser", "crates/full_moon", "crates/full_moon/derive"]
 
 
 
@@ -163,9 +165,20 @@ lto = "thin"
 codegen-units = 1
 strip = "symbols"
 
-# No `[profile.release.package."*"] opt-level = "s"` either, though it is the obvious next setting
-# and it was built and measured. Compiling only the dependencies for size is worth 2.32 MiB
-# (18,326,960 -> 15,893,936) and costs 14% on the parser loop and 3% on the arithmetic loop,
-# because `brush-parser` is a dependency and thin LTO inlines it into oslo's hot path. That is a
-# trade for the owner to make, not a cleanup — the numbers and the untested refinement that may
-# make it free are in docs/research/footprint.md.
+# **The dependencies are compiled for size; oslo and its parser are not.**
+#
+# Compiling everything below this crate for size was measured once and deferred, because it cost
+# 14% on the parser loop and 3% on the arithmetic loop. The reason was known even then: thin LTO
+# inlines `brush-parser` into oslo's hot path, so shrinking it shrinks the loop that runs on every
+# line typed. Nothing else oslo depends on is on that path.
+#
+# So the exception is named rather than the rule abandoned. `"*"` takes the size setting; the
+# parser is put back to `3` beside it, and cargo applies the more specific entry. That is the
+# refinement the earlier note said was untested — it is tested now, and the numbers are in the
+# commit that made this change.
+[profile.release.package."*"]
+opt-level = "s"
+
+# The one dependency on the hot path, and the whole reason `"*"` above needed an exception.
+[profile.release.package.brush-parser]
+opt-level = 3

@@ -8,6 +8,9 @@
 //! Kept apart from the candidate builders because it is the one piece of completion that can be
 //! reasoned about — and tested — without a filesystem, a `$PATH` or a terminal.
 
+mod quality;
+pub use quality::Quality;
+
 /// A prefix match that ignores case.
 ///
 /// Folded per character rather than by lowercasing both strings: a `String` per candidate would be
@@ -188,6 +191,45 @@ impl<'a> Fuzzed<'a> {
         }
         score_with(candidate, &self.wanted, cap)
     }
+
+    /// What kind of match this is, and how good a one — from a single fold of the candidate.
+    ///
+    /// Both together because folding is the cost: the caller is a loop over every command in the
+    /// history, once per keystroke, and asking twice would double the only allocation in it.
+    pub fn rank(&self, candidate: &str) -> Option<(Quality, i32)> {
+        let cap = self.cap?;
+        if self.typed.is_empty() {
+            return Some((Quality::Scattered, 0));
+        }
+        let have: Vec<char> = candidate.chars().flat_map(char::to_lowercase).collect();
+        if self.wanted.len() > have.len() {
+            return None;
+        }
+        let score =
+            align(&have, &self.wanted, cap, true).max(align(&have, &self.wanted, cap, false))?;
+        Some((Quality::of(&have, &self.wanted), score))
+    }
+}
+
+const SEPARATORS: [char; 8] = ['/', '-', '_', '.', ' ', ':', '@', '='];
+
+fn starts_word(have: &[char], index: usize) -> bool {
+    index == 0
+        || index
+            .checked_sub(1)
+            .and_then(|before| have.get(before))
+            .is_some_and(|c| SEPARATORS.contains(c))
+}
+
+/// Whether `wanted` is the initials of the candidate's words, in order and without skipping one.
+///
+/// `gco` is `git checkout origin`. `gio` is not, because it would have to skip `checkout` — and a
+/// query that skips words is a scatter, which is what the last tier is for.
+fn is_acronym(have: &[char], wanted: &[char]) -> bool {
+    let mut initials = (0..have.len())
+        .filter(|&i| starts_word(have, i))
+        .map(|i| have[i]);
+    wanted.iter().all(|&want| initials.next() == Some(want))
 }
 
 fn score_with(candidate: &str, wanted: &[char], cap: usize) -> Option<i32> {
@@ -210,19 +252,13 @@ fn score_with(candidate: &str, wanted: &[char], cap: usize) -> Option<i32> {
 
 /// One alignment pass. `prefer_boundaries` chooses between the two failure modes above.
 fn align(have: &[char], wanted: &[char], cap: usize, prefer_boundaries: bool) -> Option<i32> {
-    const SEPARATORS: [char; 6] = ['/', '-', '_', '.', ' ', ':'];
     let mut score = 0i32;
     let mut at = 0usize;
     let mut previous: Option<usize> = None;
     let mut first: Option<usize> = None;
 
-    let starts_word = |index: usize| {
-        index == 0
-            || index
-                .checked_sub(1)
-                .and_then(|before| have.get(before))
-                .is_some_and(|c| SEPARATORS.contains(c))
-    };
+    // The shared definition, so the score and the kind agree about where a word begins.
+    let starts_word = |index: usize| super::matching::starts_word(have, index);
 
     for &want in wanted {
         let earliest = have[at..].iter().position(|&have| have == want)? + at;
