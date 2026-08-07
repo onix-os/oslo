@@ -1,0 +1,17 @@
+[package]
+name = "full_moon_derive"
+version = "0.11.0"
+authors = ["Kampfkarren <kampfkarren@gmail.com>"]
+description = "Internally used for the full_moon project. Do not use."
+license = "MPL-2.0"
+repository = "https://github.com/Kampfkarren/full-moon"
+edition = "2018"
+
+[lib]
+proc-macro = true
+
+[dependencies]
+indexmap = "1.3"
+proc-macro2 = "1.0"
+quote = "1.0"
+syn = { version = "1.0.16", features = ["extra-traits"] }
