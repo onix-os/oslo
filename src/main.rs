@@ -5,8 +5,8 @@ mod startup;
 
 // History expansion belongs to the *binary's* prompt, never to the library: it rewrites a line
 // before it is parsed, so reaching it from `-c` or a script would let data turn into a different
-// command. Declaring it here rather than from `interactive::mod` is what makes that unreachable.
-#[path = "interactive/history_expand.rs"]
+// command. Declaring it here rather than from `ui::mod` is what makes that unreachable.
+#[path = "ui/history_expand.rs"]
 mod history_expand;
 
 use cli::{Action, Invocation};
@@ -294,7 +294,7 @@ fn run_streamed(env: &mut Environment, script: &str) -> i32 {
 /// The buffer is emptied after every complete command, so each re-parse covers one command's worth
 /// of text rather than the whole file.
 fn run_line_at_a_time(env: &mut Environment, script: &str) -> i32 {
-    use oslo::interactive::syntax::{InputStatus, classify};
+    use oslo::ui::syntax::{InputStatus, classify};
 
     let mut buffer = String::new();
     let mut status = 0;

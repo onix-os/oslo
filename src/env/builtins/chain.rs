@@ -53,6 +53,11 @@ fn report() -> i32 {
         eprintln!("oslo: chain: nothing has run yet");
         return 1;
     }
+    // The config gets first refusal. **Fired from inside a builtin**, so a handler may draw
+    // anything it likes but must not reach for shell state — see `ui::report`.
+    if drawn_by_config(&segments) {
+        return 0;
+    }
     // The widest link decides the column, so the outcomes line up however long the commands are.
     let width = segments.iter().map(|s| s.text.len()).max().unwrap_or(0);
     let mut total = 0;
@@ -100,6 +105,36 @@ fn report() -> i32 {
         );
     }
     0
+}
+
+/// Whether an `on-report` handler drew this instead.
+///
+/// The same `segments` table `pre-record` hands over, so a config that already walks one for a
+/// filter walks the same shape here.
+fn drawn_by_config(segments: &[segments::Segment]) -> bool {
+    use crate::ui::report::{self, int, rows, text};
+    if !report::watched() {
+        return false;
+    }
+    let links = rows(
+        segments
+            .iter()
+            .map(|link| {
+                let mut row = vec![
+                    ("text", text(&link.text)),
+                    ("op", text(link.join.written())),
+                    ("ran", crate::lua::eval::value::Value::Bool(link.ran())),
+                    ("ms", int(link.duration_ms)),
+                ];
+                // Absent rather than a number when it never ran: any number here reads as a status.
+                if let Some(status) = link.status {
+                    row.push(("status", int(i64::from(status))));
+                }
+                row
+            })
+            .collect(),
+    );
+    report::handled("chain", vec![("segments", links)])
 }
 
 /// The chain from the link that failed onwards, ready to run again.

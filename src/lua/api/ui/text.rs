@@ -13,8 +13,8 @@
 //! Rust and is shared with the dropdown rather than being left for a config to approximate.
 
 use super::super::util::{ok, put, text};
-use crate::interactive::dropdown::width;
 use crate::lua::eval::value::{Number, Table, Value};
+use crate::ui::dropdown::width;
 
 /// An optional non-negative integer argument.
 fn count(args: &[Value], at: usize) -> Option<usize> {

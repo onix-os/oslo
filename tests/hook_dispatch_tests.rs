@@ -77,6 +77,7 @@ fn constant_names() -> HashMap<usize, &'static str> {
         (at::TIME_REPORT, "TIME_REPORT"),
         (at::COMMAND_NOT_FOUND, "COMMAND_NOT_FOUND"),
         (at::IDLE_TIMEOUT, "IDLE_TIMEOUT"),
+        (at::ON_REPORT, "ON_REPORT"),
         (at::PRE_RECORD, "PRE_RECORD"),
         (at::ON_EXIT, "ON_EXIT"),
         (at::ON_KEY, "ON_KEY"),

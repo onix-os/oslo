@@ -9,7 +9,7 @@
 //!
 //! A builtin rather than a program on `$PATH`, because it needs the terminal the shell already
 //! owns and because a shell that ships its own prompts should not need one installed beside it.
-//! [`crate::interactive::ask`] is where the widgets live; this is the command line onto them.
+//! [`crate::ui::ask`] is where the widgets live; this is the command line onto them.
 //!
 //! # The three rules a script depends on
 //!
@@ -25,13 +25,16 @@
 
 use crate::env::Environment;
 use crate::error::Result;
-use crate::interactive::ask::{
-    Align, Answer, As, Border, Browse, Choice, Confirm, Entry, Input, Level, Pager, Spin, Styling,
-    Table, Want, Write, choose, confirm, file, filter, format, horizontal, input, line, pager,
-    parse_table, spin, style, table, vertical, write,
+mod chrome;
+mod lists;
+mod look;
+use crate::ui::ask::{
+    Align, Answer, As, Border, Confirm, Entry, Input, Level, Pager, Spin, Styling, Write, confirm,
+    format, horizontal, input, line, pager, spin, style, vertical, write,
 };
-use crate::interactive::matching::Fuzzy;
-use crate::interactive::theme;
+use crate::ui::theme;
+use chrome::{Chromed, chrome_flag};
+use lists::{from_stdin_raw, run_choose, run_file, run_table};
 use std::io::BufRead;
 
 pub fn builtin_ui(env: &mut Environment, args: &[String]) -> Result<i32> {
@@ -106,6 +109,34 @@ fn report(answer: Answer<Vec<String>>) -> i32 {
     }
 }
 
+/// A flag the widget itself did not claim, offered to the chrome and then to the look.
+///
+/// One helper rather than the same two `match`es in each of five option loops — which is how
+/// `ui file` came to accept `--border` and not `--stripe`.
+pub(super) enum Shared {
+    Took,
+    NotMine,
+    Bad(i32),
+}
+
+pub(super) fn shared_flag(
+    chrome: &mut crate::ui::ask::chrome::Chrome,
+    look: &mut crate::ui::ask::look::Look,
+    args: &[String],
+    at: &mut usize,
+) -> Shared {
+    match chrome_flag(chrome, args, at) {
+        Chromed::Took => return Shared::Took,
+        Chromed::Bad(status) => return Shared::Bad(status),
+        Chromed::NotMine => {}
+    }
+    match look::look_flag(look, args, at) {
+        look::Looked::Took => Shared::Took,
+        look::Looked::Bad(status) => Shared::Bad(status),
+        look::Looked::NotMine => Shared::NotMine,
+    }
+}
+
 fn run_input(args: &[String]) -> i32 {
     let mut spec = Input::default();
     let mut at = 0;
@@ -117,6 +148,16 @@ fn run_input(args: &[String]) -> i32 {
             "--password" => spec.password = true,
             "--required" => spec.required = true,
             other => {
+                // The widget's own options are matched first, so `input`'s `--prompt` keeps its
+                // meaning and the look's identically named field is never reached from here.
+                match shared_flag(&mut spec.chrome, &mut spec.look, args, &mut at) {
+                    Shared::Took => {
+                        at += 1;
+                        continue;
+                    }
+                    Shared::Bad(status) => return status,
+                    Shared::NotMine => {}
+                }
                 eprintln!("oslo: ui input: {other}: unknown option");
                 return 2;
             }
@@ -136,6 +177,15 @@ fn run_confirm(args: &[String]) -> i32 {
             "--no" => spec.no = take(args, &mut at),
             "--default" => spec.default = true,
             other if other.starts_with("--") => {
+                // The shared options first — see `chrome_flag`.
+                match chrome_flag(&mut spec.chrome, args, &mut at) {
+                    Chromed::Took => {
+                        at += 1;
+                        continue;
+                    }
+                    Chromed::Bad(status) => return status,
+                    Chromed::NotMine => {}
+                }
                 eprintln!("oslo: ui confirm: {other}: unknown option");
                 return 2;
             }
@@ -153,41 +203,6 @@ fn run_confirm(args: &[String]) -> i32 {
         Answer::Given(false) => 1,
         other => other.status(),
     }
-}
-
-fn run_choose(args: &[String], filtering: bool) -> i32 {
-    let mut spec = Choice {
-        filter: filtering,
-        fuzzy: crate::interactive::settings::current().completion.fuzzy,
-        ..Choice::default()
-    };
-    let mut items = Vec::new();
-    let mut at = 0;
-    while at < args.len() {
-        match args[at].as_str() {
-            "--header" => spec.header = take(args, &mut at),
-            "--multi" | "--no-limit" => spec.multi = true,
-            "--height" => spec.height = take(args, &mut at).parse().unwrap_or(spec.height).max(1),
-            "--exact" => spec.fuzzy = Fuzzy::Off,
-            other if other.starts_with("--") => {
-                eprintln!("oslo: ui: {other}: unknown option");
-                return 2;
-            }
-            other => items.push(other.to_string()),
-        }
-        at += 1;
-    }
-    // Operands win; stdin is the fallback, so `ls | ui choose` and `ui choose a b` both work.
-    spec.items = if items.is_empty() {
-        from_stdin()
-    } else {
-        items
-    };
-    report(if filtering {
-        filter(&spec)
-    } else {
-        choose(&spec)
-    })
 }
 
 fn run_style(args: &[String]) -> i32 {
@@ -236,7 +251,7 @@ fn run_style(args: &[String]) -> i32 {
 }
 
 /// The option's argument, leaving `at` on it so the caller's `+= 1` lands past it.
-fn take(args: &[String], at: &mut usize) -> String {
+pub(super) fn take(args: &[String], at: &mut usize) -> String {
     *at += 1;
     args.get(*at).cloned().unwrap_or_default()
 }
@@ -286,6 +301,15 @@ fn run_write(args: &[String]) -> i32 {
             "--placeholder" => spec.placeholder = take(args, &mut at),
             "--value" | "--default" => spec.default = Some(take(args, &mut at)),
             other => {
+                // The shared options first — see `chrome_flag`.
+                match chrome_flag(&mut spec.chrome, args, &mut at) {
+                    Chromed::Took => {
+                        at += 1;
+                        continue;
+                    }
+                    Chromed::Bad(status) => return status,
+                    Chromed::NotMine => {}
+                }
                 eprintln!("oslo: ui write: {other}: unknown option");
                 return 2;
             }
@@ -293,26 +317,6 @@ fn run_write(args: &[String]) -> i32 {
         at += 1;
     }
     report(write(&spec).map(|text| vec![text]))
-}
-
-fn run_file(args: &[String]) -> i32 {
-    let mut spec = Browse::default();
-    let mut at = 0;
-    while at < args.len() {
-        match args[at].as_str() {
-            "--all" | "--hidden" => spec.hidden = true,
-            "--directory" | "--dir" => spec.want = Want::Directories,
-            "--both" => spec.want = Want::Both,
-            "--height" => spec.height = take(args, &mut at).parse().unwrap_or(spec.height).max(1),
-            other if other.starts_with("--") => {
-                eprintln!("oslo: ui file: {other}: unknown option");
-                return 2;
-            }
-            other => spec.start = std::path::PathBuf::from(other),
-        }
-        at += 1;
-    }
-    report(file(&spec).map(|path| vec![path]))
 }
 
 fn run_format(args: &[String]) -> i32 {
@@ -444,6 +448,15 @@ fn run_pager(args: &[String]) -> i32 {
             "--title" => spec.title = take(args, &mut at),
             "--wrap" => spec.wrap = true,
             other if other.starts_with("--") => {
+                // The shared options first — see `chrome_flag`.
+                match chrome_flag(&mut spec.chrome, args, &mut at) {
+                    Chromed::Took => {
+                        at += 1;
+                        continue;
+                    }
+                    Chromed::Bad(status) => return status,
+                    Chromed::NotMine => {}
+                }
                 eprintln!("oslo: ui pager: {other}: unknown option");
                 return 2;
             }
@@ -490,44 +503,4 @@ fn run_spin(args: &[String]) -> i32 {
         at += 1;
     }
     spin(&spec)
-}
-
-fn run_table(args: &[String]) -> i32 {
-    let mut separator = ',';
-    let mut header_row = false;
-    let mut spec = Table::default();
-    let mut at = 0;
-    while at < args.len() {
-        match args[at].as_str() {
-            "--separator" | "-s" => separator = take(args, &mut at).chars().next().unwrap_or(','),
-            "--header-row" | "--headers" => header_row = true,
-            "--height" => spec.height = take(args, &mut at).parse().unwrap_or(spec.height).max(1),
-            "--no-filter" => spec.filter = false,
-            other => {
-                eprintln!("oslo: ui table: {other}: unknown option");
-                return 2;
-            }
-        }
-        at += 1;
-    }
-    let (mut rows, mut raw) = parse_table(&from_stdin_raw(), separator);
-    if header_row && !rows.is_empty() {
-        spec.headers = rows.remove(0);
-        raw.remove(0);
-    }
-    spec.rows = rows;
-    spec.raw = raw;
-    spec.fuzzy = crate::interactive::settings::current().completion.fuzzy;
-    report(table(&spec).map(|row| vec![row]))
-}
-
-/// Everything on stdin, newlines and all — for the widgets that take a document rather than items.
-fn from_stdin_raw() -> String {
-    use std::io::{IsTerminal, Read};
-    if std::io::stdin().is_terminal() {
-        return String::new();
-    }
-    let mut text = String::new();
-    let _ = std::io::stdin().lock().read_to_string(&mut text);
-    text
 }

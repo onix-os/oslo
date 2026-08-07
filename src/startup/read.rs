@@ -10,7 +10,7 @@ use crate::startup::mode::{self, Line, Mode};
 use crate::startup::{history, prompt, rc};
 use oslo::Environment;
 use oslo::LuaEngine;
-use oslo::interactive::InputStatus;
+use oslo::ui::InputStatus;
 use std::sync::{Arc, Mutex};
 
 /// One trip round the prompt.
@@ -36,7 +36,7 @@ pub(super) enum Input {
 /// prompt, instead of the hard syntax error `for i in 1 2 3` used to produce the moment you
 /// pressed Enter.
 pub(super) fn read_command(
-    helper: &oslo::interactive::OsloHelper,
+    helper: &oslo::ui::OsloHelper,
     history: &super::history::store::History,
     env_struct: &Arc<Mutex<Environment>>,
     lua: &LuaEngine,
@@ -61,16 +61,16 @@ pub(super) fn read_command(
         // module remembers has to start there too. Before the prompt is *rendered*, not after:
         // leaving a line in normal mode otherwise drew the next prompt saying `N` while the editor
         // was already back in insert, and it stayed wrong until the first keystroke.
-        oslo::interactive::vi::reset();
+        oslo::ui::vi::reset();
         // The shape too: the terminal is still drawing whatever the last line ended in, and a
         // block cursor over a line you are typing into says normal mode when it is insert.
         // Only to a terminal: a cursor-shape escape written down a pipe is not a cursor shape,
         // it is two stray bytes in somebody's output.
-        let settings = oslo::interactive::settings::current();
+        let settings = oslo::ui::settings::current();
         // `vi::enabled` rather than the setting, so the `vi` feature is asked about here too — the
         // cursor and the key bindings must not disagree about which mode the editor is in.
         if settings.vi.enabled
-            && oslo::interactive::vi::enabled()
+            && oslo::ui::vi::enabled()
             && std::io::IsTerminal::is_terminal(&std::io::stdout())
         {
             print!("{}", settings.vi.cursors.insert.escape());
@@ -101,15 +101,12 @@ pub(super) fn read_command(
         {
             // Whether what is about to be drawn is oslo's own prompt. A `$PS1`, a Lua prompt or
             // the continuation prompt is not, and must not be redrawn as one.
-            let builtin = prompt
-                == oslo::interactive::prompt::render_default_left_prompt(
-                    last_status,
-                    reading.name(),
-                );
-            oslo::interactive::prompt::note_row(
+            let builtin =
+                prompt == oslo::ui::prompt::render_default_left_prompt(last_status, reading.name());
+            oslo::ui::prompt::note_row(
                 reading.name(),
                 last_status,
-                oslo::interactive::prompt::printed_width(&prompt),
+                oslo::ui::prompt::printed_width(&prompt),
                 builtin,
             );
             // What this prompt looks like in each vi mode, so a mode change mid-line can redraw
@@ -119,18 +116,18 @@ pub(super) fn read_command(
             // Only when the width does not move: the editor measures the prompt once and lays the
             // row out against that number for the life of the line, so a variant of a different
             // size would put the text a cell away from where the editor believes it is.
-            if !builtin && oslo::interactive::vi::enabled() {
-                let width = oslo::interactive::prompt::printed_width(&prompt);
+            if !builtin && oslo::ui::vi::enabled() {
+                let width = oslo::ui::prompt::printed_width(&prompt);
                 let variants = ["I", "N", "R"]
                     .into_iter()
                     .filter_map(|mode| {
                         let ctx = prompt::segment_context(last_status, reading, Some(mode));
                         let text = lua.render_with("prompt.left", &ctx)?;
-                        (oslo::interactive::prompt::printed_width(&text) == width)
+                        (oslo::ui::prompt::printed_width(&text) == width)
                             .then(|| (mode.to_string(), text))
                     })
                     .collect();
-                oslo::interactive::row::set_variants(variants);
+                oslo::ui::row::set_variants(variants);
             }
         }
 
@@ -142,17 +139,15 @@ pub(super) fn read_command(
         // the terminal where it started.
         print!(
             "{}{}{}",
-            oslo::interactive::marks::working_directory(&crate::startup::repl::cwd()),
-            oslo::interactive::marks::title(
+            oslo::ui::marks::working_directory(&crate::startup::repl::cwd()),
+            oslo::ui::marks::title(
                 &lua.render_with(
                     "prompt.title",
                     &prompt::segment_context(last_status, reading, None)
                 )
-                .unwrap_or_else(|| {
-                    oslo::interactive::prompt::tilde(&crate::startup::repl::cwd())
-                })
+                .unwrap_or_else(|| { oslo::ui::prompt::tilde(&crate::startup::repl::cwd()) })
             ),
-            oslo::interactive::marks::prompt_start()
+            oslo::ui::marks::prompt_start()
         );
         let _ = std::io::Write::flush(&mut std::io::stdout());
 
@@ -170,7 +165,7 @@ pub(super) fn read_command(
                 // The real printed width, which is what puts the completion menu under the word
                 // it is completing. rustyline never told anyone where the line started, so the
                 // dropdown had to guess by rendering a default prompt.
-                oslo::interactive::prompt::printed_width(&prompt),
+                oslo::ui::prompt::printed_width(&prompt),
                 Some(mode::TOGGLE_KEY.to_string()),
             );
             assist.begin();
@@ -196,7 +191,7 @@ pub(super) fn read_command(
                         .render_with("prompt.right", &facts)
                         .or_else(|| rc::rps1(&mut env_struct.lock().unwrap()))
                         .unwrap_or_else(|| {
-                            oslo::interactive::prompt::render_default_right_prompt(
+                            oslo::ui::prompt::render_default_right_prompt(
                                 last_status,
                                 super::repl::last_command_duration(),
                             )
@@ -204,15 +199,11 @@ pub(super) fn read_command(
                     (left, right)
                 }
             };
-            match oslo::interactive::edit::session::read_line(
-                &mut render,
-                (&typed, cursor),
-                &mut assist,
-            ) {
-                oslo::interactive::edit::session::Outcome::Line(line) => line,
+            match oslo::ui::edit::session::read_line(&mut render, (&typed, cursor), &mut assist) {
+                oslo::ui::edit::session::Outcome::Line(line) => line,
                 // Switch and reopen with the same text and cursor, so the line survives the
                 // switch — which is what makes a toggle usable mid-command.
-                oslo::interactive::edit::session::Outcome::ToggleLanguage { text, cursor } => {
+                oslo::ui::edit::session::Outcome::ToggleLanguage { text, cursor } => {
                     // **Hidden across the switch.** The editor puts the cursor back at the top of
                     // the block so the next draw can count from there, and then *returns* — which
                     // restores the terminal and makes the cursor visible again. It then sits at
@@ -255,10 +246,10 @@ pub(super) fn read_command(
                 }
                 // A partial multi-line command is abandoned whole, which is what Ctrl-C means
                 // when you are three lines into a `for` loop you no longer want.
-                oslo::interactive::edit::session::Outcome::Interrupted => {
+                oslo::ui::edit::session::Outcome::Interrupted => {
                     return Input::Interrupted;
                 }
-                oslo::interactive::edit::session::Outcome::Eof => return Input::Eof,
+                oslo::ui::edit::session::Outcome::Eof => return Input::Eof,
             }
         };
 
@@ -279,7 +270,7 @@ pub(super) fn read_command(
         {
             print!(
                 "{}{}{}\r\n",
-                oslo::interactive::row::rewind_after_readline(&raw),
+                oslo::ui::row::rewind_after_readline(&raw),
                 short,
                 raw
             );
@@ -328,7 +319,7 @@ pub(super) fn read_command(
             // **Only this language's lines.** The editor's history holds both, and `!!` expanding
             // to a Lua line at a shell prompt produces something that cannot run — the same
             // crossing the ghost suggestion and the arrow keys were fixed for.
-            let previous: Vec<String> = oslo::interactive::recall::for_language(reading.name());
+            let previous: Vec<String> = oslo::ui::recall::for_language(reading.name());
             match expand_history(line, &previous) {
                 Some(expanded) => expanded,
                 None => return Input::Nothing,
@@ -362,7 +353,7 @@ pub(super) fn read_command(
 /// The body of a here-document is **data**, and history expansion rewrites a line before it is
 /// parsed — so `cat > note <<EOF` followed by a line containing `!` would silently write some
 /// earlier command into the file instead of what was typed. bash does not expand there, and
-/// [`oslo::interactive::syntax::opens_here_document`] exists precisely to tell "unfinished
+/// [`oslo::ui::syntax::opens_here_document`] exists precisely to tell "unfinished
 /// because a document is open" from "unfinished because a quote is open". It had no callers at
 /// all, so every heredoc body typed at oslo's prompt was being rewritten (PLAN C8).
 ///
@@ -384,7 +375,7 @@ impl HeredocTracker {
     /// the cost is a `!!` that has to be typed out in full, against a `!` inside a heredoc
     /// quietly becoming somebody else's command.
     pub(super) fn observe(&mut self, line: &str) {
-        self.0 |= oslo::interactive::syntax::opens_here_document(line);
+        self.0 |= oslo::ui::syntax::opens_here_document(line);
     }
 }
 
@@ -401,9 +392,6 @@ impl HeredocTracker {
 pub(super) fn is_complete(source: &str, mode: Mode) -> bool {
     match mode {
         Mode::Lua => oslo::lua::eval::is_complete(source),
-        Mode::Shell => !matches!(
-            oslo::interactive::syntax::classify(source),
-            InputStatus::Incomplete
-        ),
+        Mode::Shell => !matches!(oslo::ui::syntax::classify(source), InputStatus::Incomplete),
     }
 }

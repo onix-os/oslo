@@ -3,7 +3,7 @@
 //! # The bug this exists to catch
 //!
 //! A setting arrives in two steps, and only one of them was ever checked. The Rust side reads the
-//! table back in `interactive::settings::from_lua`; the *Lua* side has to be able to reach it
+//! table back in `ui::settings::from_lua`; the *Lua* side has to be able to reach it
 //! first, and `oslo.misc.welcome = false` is an ordinary Lua assignment — index `oslo` by `misc`,
 //! then set a field. If `oslo.misc` does not exist, indexing `nil` raises and **the whole config
 //! file dies at that line**, silently taking every setting after it with it.

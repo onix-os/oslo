@@ -6,7 +6,7 @@
 //!
 //! Run with `cargo bench --bench fuzzy` (release, so the numbers mean something).
 
-use oslo::interactive::matching::{Fuzzed, Fuzzy, fuzzy_score};
+use oslo::ui::matching::{Fuzzed, Fuzzy, fuzzy_score};
 use std::time::Instant;
 
 /// Roughly what a `$PATH` looks like: many names, most of them not matching.

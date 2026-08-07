@@ -21,7 +21,7 @@
 
 use crate::cli::tools::TOOLS;
 use oslo::env::options::ALL;
-use oslo::interactive::theme::{Color, Depth, Style};
+use oslo::ui::theme::{Color, Depth, Style};
 use std::fmt::Write as _;
 
 /// How this run should be painted.

@@ -16,7 +16,7 @@ pub fn apply(lua: &LuaEngine) {
     for problem in problems {
         eprintln!("oslo: {problem}");
     }
-    oslo::interactive::theme::install(theme);
+    oslo::ui::theme::install(theme);
 
     let (settings, problems) = lua.read_settings();
     for problem in problems {
@@ -38,18 +38,18 @@ pub fn apply(lua: &LuaEngine) {
     // the config no longer defines — but only when the config defines any, so a shell whose
     // abbreviations all come from `abbr` at the prompt does not lose them to a config reload.
     if !settings.abbr.is_empty() {
-        oslo::interactive::abbr::clear();
+        oslo::ui::abbr::clear();
         for (name, expansion, anywhere) in &settings.abbr {
             let placement = if *anywhere {
-                oslo::interactive::abbr::Placement::Anywhere
+                oslo::ui::abbr::Placement::Anywhere
             } else {
-                oslo::interactive::abbr::Placement::Command
+                oslo::ui::abbr::Placement::Command
             };
-            oslo::interactive::abbr::add(name, expansion, placement);
+            oslo::ui::abbr::add(name, expansion, placement);
         }
     }
 
-    oslo::interactive::settings::install(settings);
+    oslo::ui::settings::install(settings);
 
     // Installed rather than read: unlike a theme, this one is a *function*, and it has to be
     // called once per visible row on every frame the dropdown draws.

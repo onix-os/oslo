@@ -16,9 +16,9 @@ use oslo::env::builtins::run_exit_trap;
 use oslo::env::options::ShellOption;
 use oslo::error::ShellError;
 use oslo::exec::{JobManager, eval_command_list};
-use oslo::interactive::OsloHelper;
 use oslo::lua::api::hooks;
 use oslo::parser::parse_with_aliases;
+use oslo::ui::OsloHelper;
 use std::sync::{Arc, Mutex};
 
 // A sibling file rather than an entry in `startup::mod`, and a child module rather than a peer,
@@ -40,17 +40,17 @@ pub fn run_repl(login: bool) -> ! {
     oslo::exec::pipeline::set_interactive(true);
     // Semantic marks (OSC 133), so a terminal or multiplexer can see where each command's output
     // starts and stops. oslo only declares the boundaries; folding them is the job of whatever
-    // owns the grid. See `oslo::interactive::marks`.
-    oslo::interactive::marks::enable(true);
+    // owns the grid. See `oslo::ui::marks`.
+    oslo::ui::marks::enable(true);
     // A resize should redraw the line, and a blocked `read` does not notice one on its own. See
     // `term::watch_for_resize` — installed here rather than in the library so that a script, which
     // has no line to redraw, does not acquire a signal handler it will never use.
-    oslo::interactive::term::watch_for_resize();
+    oslo::ui::term::watch_for_resize();
     // Asked once, before anything is drawn: the terminal's background decides whether the syntax
     // palette should be the dark one. A terminal that does not answer leaves the default standing
-    // — see `oslo::interactive::query` for why the *silence* is the case worth engineering for.
-    if let Some(background) = oslo::interactive::query::background() {
-        oslo::interactive::theme::set_background(background);
+    // — see `oslo::ui::query` for why the *silence* is the case worth engineering for.
+    if let Some(background) = oslo::ui::query::background() {
+        oslo::ui::theme::set_background(background);
     }
 
     let mut interactive_env = Environment::new();
@@ -95,7 +95,7 @@ pub fn run_repl(login: bool) -> ! {
     // and it is the difference between the first Tab being instant and it being the one keystroke
     // that visibly stalls.
     if let Some(path) = env_struct.lock().unwrap().get_var("PATH") {
-        oslo::interactive::command_index::warm(path.to_string());
+        oslo::ui::command_index::warm(path.to_string());
     }
 
     // The command log keeps the language each line was typed in, which a flat file cannot:
@@ -140,7 +140,7 @@ pub fn run_repl(login: bool) -> ! {
     // A greeting of your own replaces the banner outright, fish's `fish_greeting`. It is a
     // separate setting from `welcome` rather than an empty-string special case, because "say
     // nothing" and "say this" are different intentions and one of them should not be spelled `""`.
-    let misc = oslo::interactive::settings::current().misc;
+    let misc = oslo::ui::settings::current().misc;
     match &misc.greeting {
         Some(greeting) => println!("{greeting}"),
         None if misc.welcome => {
@@ -162,7 +162,31 @@ pub fn run_repl(login: bool) -> ! {
     let mut universal_stamp = oslo::env::universal::changed_at();
     oslo::env::universal::apply(&mut env_struct.lock().unwrap());
 
+    // The directory whose `.env.lua` is loaded. Seeded from the arrival above, so the first prompt
+    // does not run it a second time.
+    let mut settled = here.clone();
+
     loop {
+        // **Where the shell notices it has moved, by any route at all.**
+        //
+        // The directory environment used to be reconciled in one place only: after a command line
+        // whose start and end directories differed. That misses every other way of moving —
+        // a key binding that jumps, a Lua hook, a `cd` in a sourced file, anything that does not
+        // straddle a whole command — and what is left behind is not nothing. It is the previous
+        // project's `$PATH`, its exported variables and its aliases, in a shell standing somewhere
+        // else. An alias like `_b` then still builds the repository you walked out of, and the
+        // only cure was a `cd` round trip to force the check to run.
+        //
+        // Comparing against the directory last *settled* rather than against where the last
+        // command happened to start makes the route irrelevant: however the shell got here, the
+        // prompt before you type is the moment it has to be true. `arrive` itself is cheap when
+        // nothing has changed, and this only calls it when the directory actually differs.
+        let here = current_directory();
+        if here != settled {
+            environments::arrive(&env_struct, &lua, std::path::Path::new(&here));
+            settled = here;
+        }
+
         // Another shell may have set a universal variable since the last prompt. A `stat` decides
         // whether to read the file, so the common case — nobody changed anything — costs one
         // syscall per prompt rather than a parse.
@@ -269,7 +293,7 @@ pub fn run_repl(login: bool) -> ! {
                 };
                 // The title says what is running while it runs, and goes back to the directory
                 // when the prompt returns. A row of tabs then says what each is *doing*.
-                announce(&oslo::interactive::marks::title(
+                announce(&oslo::ui::marks::title(
                     &lua.render_with(
                         "prompt.title",
                         &prompt::title_context(last_status, current, &text),
@@ -277,7 +301,7 @@ pub fn run_repl(login: bool) -> ! {
                     .unwrap_or_else(|| title_for_command(&text)),
                 ));
                 // Everything after this belongs to the command, not to the prompt.
-                print!("{}", oslo::interactive::marks::output_start());
+                print!("{}", oslo::ui::marks::output_start());
                 let _ = std::io::Write::flush(&mut std::io::stdout());
                 let started = std::time::Instant::now();
 
@@ -319,7 +343,7 @@ pub fn run_repl(login: bool) -> ! {
                         track.clear();
                         track.forget_runs();
                     }
-                    oslo::interactive::recall::clear();
+                    oslo::ui::recall::clear();
                     publish_history(&history);
                 }
 
@@ -344,20 +368,18 @@ pub fn run_repl(login: bool) -> ! {
                 // leaves something behind and this carries it out.
                 oslo::lua::engine::run_deferred_hooks();
 
+                // Where the command left the shell, for the tracker below.
+                //
+                // Nothing is reconciled here any more: the directory environment and the
+                // terminal's idea of where we are are both brought into line at the top of the
+                // loop, before the next prompt, along with every other way of moving. Doing it in
+                // two places meant they disagreed the moment one learned about a route the other
+                // did not, which is exactly how this broke.
+                //
+                // The `post-change-dir` hook is separate and stays where it is: it fires from
+                // `attempt_directory`, which every `cd`, `pushd`, `popd` and jump passes through,
+                // so it catches a move made inside a function or a subshell too.
                 let after = current_directory();
-                if after != before {
-                    // Before the `cd` hook, so a Lua hook that reads an environment variable sees
-                    // the one this directory sets rather than the one the last directory did.
-                    environments::arrive(&env_struct, &lua, std::path::Path::new(&after));
-                    // The `post-change-dir` hook is **not** fired here. It fires from
-                    // `attempt_directory`, which every `cd`, `pushd`, `popd` and jump passes
-                    // through — so it also catches a move made inside a function or a subshell,
-                    // which comparing the directory across a whole command line cannot see. Firing
-                    // in both places would fire it twice for every ordinary `cd`.
-                    // The terminal is told too, so a new split or tab opens here rather than in
-                    // `$HOME`. One write, only when the directory actually changed.
-                    announce(&oslo::interactive::marks::working_directory(&after));
-                }
                 let elapsed = started.elapsed();
                 note_command_duration(elapsed);
                 // A chain that stopped part-way says where, and what would carry on from there.
@@ -371,7 +393,7 @@ pub fn run_repl(login: bool) -> ! {
                 // else prints, so nothing that follows lands inside it.
                 print!(
                     "{}",
-                    oslo::interactive::marks::command_end(res.as_ref().copied().unwrap_or(1))
+                    oslo::ui::marks::command_end(res.as_ref().copied().unwrap_or(1))
                 );
                 let _ = std::io::Write::flush(&mut std::io::stdout());
                 // **Fired whether the command succeeded or not.** It used to run only on `Ok`, so
@@ -502,7 +524,7 @@ mod tests {
     #[test]
     fn a_multi_line_command_feeds_the_frecency_table() {
         use oslo::Environment;
-        use oslo::interactive::OsloHelper;
+        use oslo::ui::OsloHelper;
         use std::sync::{Arc, Mutex};
 
         // Not interactive, so the table is in memory and no file in `$HOME` is touched.

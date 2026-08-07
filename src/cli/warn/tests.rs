@@ -68,7 +68,7 @@ fn the_box_is_red_only_when_colour_is_wanted() {
     };
     assert!(!box_of(&facts, Paint::plain(), 0).contains('\x1b'));
 
-    let painted = box_of(&facts, Paint::at(oslo::interactive::theme::Depth::True), 0);
+    let painted = box_of(&facts, Paint::at(oslo::ui::theme::Depth::True), 0);
     assert!(painted.contains("38;2;224;64;64"), "{painted:?}");
 }
 

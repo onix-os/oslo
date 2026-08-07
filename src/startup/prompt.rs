@@ -23,14 +23,14 @@ pub fn segment_context(
         status: last_status,
         duration_ms: super::repl::last_command_duration().map(|d| d.as_millis() as u64),
         cwd: super::repl::cwd(),
-        branch: oslo::interactive::prompt::git_branch(),
+        branch: oslo::ui::prompt::git_branch(),
         user: whoami(),
         host: hostname(),
         language: mode.name().to_string(),
         vimode: vimode
             .map(str::to_string)
-            .or_else(|| oslo::interactive::vi::mode().map(|m| m.name().to_string())),
-        cols: oslo::interactive::dropdown::terminal_cols(),
+            .or_else(|| oslo::ui::vi::mode().map(|m| m.name().to_string())),
+        cols: oslo::ui::dropdown::terminal_cols(),
         // The real count. Hardcoded `0` until now, which made a `jobs` segment in a prompt — the
         // reason the field exists — always draw nothing. Every prompt tool reads this; in bash it
         // is `jobs -p | wc -l` and in zsh `${#jobstates}`.
@@ -98,7 +98,7 @@ pub fn primary_prompt(
             // Lua ones: it describes a shell prompt, and drawing `oslo$` in front of something
             // that is not a shell command is exactly the confusion this segment exists to stop.
             if mode == Mode::Lua {
-                oslo::interactive::prompt::render_default_left_prompt(last_status, mode.name())
+                oslo::ui::prompt::render_default_left_prompt(last_status, mode.name())
             } else {
                 rc::ps1(&mut env_struct.lock().unwrap(), last_status)
             }

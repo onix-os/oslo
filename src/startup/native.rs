@@ -1,6 +1,6 @@
 //! oslo's own machinery behind the native editor's [`Assist`].
 //!
-//! The bridge between [`oslo::interactive::edit`], which knows how to edit and draw a line, and
+//! The bridge between [`oslo::ui::edit`], which knows how to edit and draw a line, and
 //! everything the shell already had — the syntax highlighter, the history, the environment. None
 //! of that is new; it was reachable all along behind rustyline's traits, which is why this file is
 //! mostly plumbing rather than logic.
@@ -11,10 +11,10 @@
 //! that was the only place a cursor move did not confuse the layout. The native editor takes it as
 //! an argument, which is what it always should have been.
 
-use oslo::interactive::edit::session::{Assist, Bound, KeyHook};
-use oslo::interactive::term::Key;
-use oslo::interactive::{OsloHelper, abbr, dropdown, editor, marks, settings};
 use oslo::lua::api::hooks;
+use oslo::ui::edit::session::{Assist, Bound, KeyHook};
+use oslo::ui::term::Key;
+use oslo::ui::{OsloHelper, abbr, dropdown, editor, marks, settings};
 
 /// What the shell plugs into an editing session.
 pub struct ShellAssist<'a> {
@@ -171,7 +171,7 @@ fn fire(index: usize, fields: &[(&str, &str)]) {
 /// caller should carry on as though it had never been asked. That is a different answer from
 /// `Some(Cancelled)`, which means the user looked and declined, and where carrying on would
 /// scroll their line away as if Esc had done something.
-fn open_finder(seed: &str) -> Option<oslo::interactive::finder::Outcome> {
+fn open_finder(seed: &str) -> Option<oslo::ui::finder::Outcome> {
     let settings = settings::current();
     if !settings.finder.enabled || !oslo::feature::on(oslo::feature::at::FINDER) {
         return None;
@@ -180,7 +180,7 @@ fn open_finder(seed: &str) -> Option<oslo::interactive::finder::Outcome> {
     // Only this language's commands. The editor's history holds both, and offering a Lua line at a
     // shell prompt produces something that cannot run — the same crossing the ghost suggestion and
     // the arrow keys are already filtered for.
-    let language = oslo::interactive::prompt::language().unwrap_or_else(|| "sh".to_string());
+    let language = oslo::ui::prompt::language().unwrap_or_else(|| "sh".to_string());
     let commands: Vec<_> = track
         .commands(settings.finder.limit)
         .into_iter()
@@ -200,10 +200,9 @@ fn open_finder(seed: &str) -> Option<oslo::interactive::finder::Outcome> {
     // the finder because everything above can decline — no store, nothing remembered, disabled by
     // config — and a hook that fired for a search that never appeared would be lying.
     fire(hooks::at::HISTORY_OPEN, &[("seed", seed)]);
-    let outcome =
-        oslo::interactive::finder::open(&commands, &cwd, now, settings.completion.fuzzy, seed);
+    let outcome = oslo::ui::finder::open(&commands, &cwd, now, settings.completion.fuzzy, seed);
     match &outcome {
-        Some(oslo::interactive::finder::Outcome::Chosen { line, .. }) => {
+        Some(oslo::ui::finder::Outcome::Chosen { line, .. }) => {
             fire(hooks::at::HISTORY_SELECT, &[("line", line)]);
             fire(hooks::at::HISTORY_CLOSE, &[("chosen", "true")]);
         }
@@ -307,25 +306,19 @@ impl Assist for ShellAssist<'_> {
         let settings = settings::current();
 
         if let Some((_, action)) = settings.keys.iter().find(|(bound, _)| *bound == name) {
-            return match oslo::interactive::keys::action(action) {
-                Some(oslo::interactive::keys::Action::ToggleLanguage) => {
-                    Some(Bound::ToggleLanguage)
-                }
-                Some(oslo::interactive::keys::Action::ClearScreen) => Some(Bound::ClearScreen),
-                Some(oslo::interactive::keys::Action::HistorySearchBackward) => {
-                    Some(Bound::SearchHistory)
-                }
-                Some(oslo::interactive::keys::Action::AcceptSuggestion) => Some(Bound::AcceptHint),
-                Some(oslo::interactive::keys::Action::AcceptSuggestionWord) => {
-                    Some(Bound::AcceptHintWord)
-                }
-                Some(oslo::interactive::keys::Action::Interrupt) => Some(Bound::Interrupt),
-                Some(oslo::interactive::keys::Action::Complete) => Some(Bound::Complete),
-                Some(oslo::interactive::keys::Action::LuaHandler) => Some(Bound::Lua(name)),
+            return match oslo::ui::keys::action(action) {
+                Some(oslo::ui::keys::Action::ToggleLanguage) => Some(Bound::ToggleLanguage),
+                Some(oslo::ui::keys::Action::ClearScreen) => Some(Bound::ClearScreen),
+                Some(oslo::ui::keys::Action::HistorySearchBackward) => Some(Bound::SearchHistory),
+                Some(oslo::ui::keys::Action::AcceptSuggestion) => Some(Bound::AcceptHint),
+                Some(oslo::ui::keys::Action::AcceptSuggestionWord) => Some(Bound::AcceptHintWord),
+                Some(oslo::ui::keys::Action::Interrupt) => Some(Bound::Interrupt),
+                Some(oslo::ui::keys::Action::Complete) => Some(Bound::Complete),
+                Some(oslo::ui::keys::Action::LuaHandler) => Some(Bound::Lua(name)),
                 // Unbound on purpose. Answering `None` here rather than with a do-nothing `Bound`
                 // is what makes it reach the *defaults* below and cancel them too — which is the
                 // whole point, since Shift-Tab is bound before any config has run.
-                Some(oslo::interactive::keys::Action::Nothing) => return None,
+                Some(oslo::ui::keys::Action::Nothing) => return None,
                 // An action name oslo does not know was already reported when the config was
                 // read; doing nothing here is better than doing something arbitrary.
                 None => None,
@@ -410,8 +403,8 @@ impl Assist for ShellAssist<'_> {
         // Chosen, but **not run**: you may want to edit it first, which is the contract every
         // other recall in the shell has.
         match open_finder(line)? {
-            oslo::interactive::finder::Outcome::Chosen { line, .. } => Some(line),
-            oslo::interactive::finder::Outcome::Cancelled => None,
+            oslo::ui::finder::Outcome::Chosen { line, .. } => Some(line),
+            oslo::ui::finder::Outcome::Cancelled => None,
         }
     }
 
@@ -423,10 +416,10 @@ impl Assist for ShellAssist<'_> {
             // Whatever is already on the line seeds the search: pressing Up after typing `ls`
             // means "the `ls` I ran before".
             match open_finder(line) {
-                Some(oslo::interactive::finder::Outcome::Chosen { line, .. }) => return Some(line),
+                Some(oslo::ui::finder::Outcome::Chosen { line, .. }) => return Some(line),
                 // Looked and declined: leave the line exactly as it was rather than falling
                 // through to a walk, which would scroll it away as if Esc had done something.
-                Some(oslo::interactive::finder::Outcome::Cancelled) => return None,
+                Some(oslo::ui::finder::Outcome::Cancelled) => return None,
                 // Could not open — no terminal, or nothing remembered yet. Walk the history the
                 // ordinary way, which is what Up meant before the finder existed.
                 None => {}

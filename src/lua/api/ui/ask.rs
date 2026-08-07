@@ -65,26 +65,13 @@ pub fn install(ui: &mut Table) {
         }
     });
 
-    // oslo.ui.confirm(question, [default_true]) -> boolean
-    put(ui, "confirm", |_, args| {
-        let question = text(&args, 1, "oslo.ui.confirm")?;
-        let default = matches!(args.get(1), Some(Value::Bool(true)));
-        let hint = if default { "[Y/n]" } else { "[y/N]" };
-        loop {
-            show(&format!("{question} {hint} "));
-            match line() {
-                None => return ok(Value::Bool(default)),
-                Some(answer) => match answer.trim().to_ascii_lowercase().as_str() {
-                    "" => return ok(Value::Bool(default)),
-                    "y" | "yes" => return ok(Value::Bool(true)),
-                    "n" | "no" => return ok(Value::Bool(false)),
-                    // Anything else is asked again rather than guessed at. This is the one place a
-                    // wrong guess is expensive: the caller is about to do something on the answer.
-                    _ => eprintln!("please answer y or n"),
-                },
-            }
-        }
-    });
+    // **`oslo.ui.confirm` is not installed here.** It was, and `ui::prompt` installs a `confirm` of
+    // its own *after* this runs, so this one was unreachable for as long as both existed — and the
+    // survivor needs a terminal, so `oslo.ui.confirm` answered `nil` down a pipe where this would
+    // have asked and got an answer.
+    //
+    // One name, both behaviours: the raw-mode widget now falls back to [`on_a_line`] when there is
+    // no tty, which is what this module's own docs say the pair is for.
 
     // oslo.ui.select(items, [prompt]) -> index, value  (nil when nothing was chosen)
     put(ui, "select", |_, args| {
@@ -137,6 +124,30 @@ pub fn install(ui: &mut Table) {
             }
         }
     });
+}
+
+/// Ask a yes/no question in ordinary lines, and keep asking until the answer is one of them.
+///
+/// The fallback `ui::prompt`'s `confirm` uses when there is no terminal to take. It works down a
+/// pipe, over a serial console, and in a script whose output is being logged — and what was asked
+/// stays in the transcript where it can be scrolled back to.
+pub(super) fn on_a_line(question: &str, default: bool) -> bool {
+    let hint = if default { "[Y/n]" } else { "[y/N]" };
+    loop {
+        show(&format!("{question} {hint} "));
+        match line() {
+            // End of input takes the default rather than looping for ever on a closed stdin.
+            None => return default,
+            Some(answer) => match answer.trim().to_ascii_lowercase().as_str() {
+                "" => return default,
+                "y" | "yes" => return true,
+                "n" | "no" => return false,
+                // Anything else is asked again rather than guessed at. This is the one place a
+                // wrong guess is expensive: the caller is about to act on the answer.
+                _ => eprintln!("please answer y or n"),
+            },
+        }
+    }
 }
 
 #[cfg(test)]

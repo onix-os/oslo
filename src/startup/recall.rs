@@ -14,12 +14,12 @@ use super::mode::Mode;
 /// recalled set backwards: the first Up offered the oldest command in the database instead of the
 /// most recent one.
 pub(super) fn seed_history(entries: impl Iterator<Item = (String, String)>) {
-    oslo::interactive::recall::seed(entries.collect());
+    oslo::ui::recall::seed(entries.collect());
 }
 
 /// Remember a line typed this session, so a later language switch still finds it.
 pub(super) fn remember_history(line: &str, mode: Mode) {
-    oslo::interactive::recall::remember(line, mode.name());
+    oslo::ui::recall::remember(line, mode.name());
 }
 
 // There was a `load_history_for` here that cleared the editor's history and refilled it with one
@@ -31,6 +31,6 @@ pub(super) fn remember_history(line: &str, mode: Mode) {
 //
 // And it was never the right mechanism: the language can change mid-line, from a key handler that
 // cannot reach the editor at all. Everything that must follow the language — the ghost suggestion,
-// the Up/Down walk, history expansion — reads [`oslo::interactive::recall`] directly instead, which
+// the Up/Down walk, history expansion — reads [`oslo::ui::recall`] directly instead, which
 // is correct the instant the prompt changes. The editor's own history stays the complete record,
 // which is what `$HISTFILE` should receive.

@@ -16,8 +16,14 @@ pub(super) fn slow_command_notice(
     elapsed: std::time::Duration,
     result: &Result<i32, ShellError>,
 ) -> String {
-    let after = oslo::interactive::settings::current().notify.after;
+    let after = oslo::ui::settings::current().notify.after;
     if after == 0 || elapsed.as_secs() < after || !oslo::feature::on(oslo::feature::at::NOTIFY) {
+        return String::new();
+    }
+    // The config gets first refusal. **This one fires from the read loop with nothing locked**, so
+    // a handler here may use the whole `oslo.*` API — unlike `chain`, `job` and `time`, which fire
+    // from inside a builtin or the executor. See `oslo::ui::report`.
+    if drawn_by_config(text, elapsed, result) {
         return String::new();
     }
     let status = result.as_ref().copied().unwrap_or(1);
@@ -26,12 +32,12 @@ pub(super) fn slow_command_notice(
     } else {
         format!("failed ({status})")
     };
-    let took = oslo::interactive::prompt::notable_duration(elapsed)
+    let took = oslo::ui::prompt::notable_duration(elapsed)
         .unwrap_or_else(|| format!("{}s", elapsed.as_secs()));
     // The first word, as the title bar gets: a notification is narrow too.
     let what = text.split_whitespace().next().unwrap_or("command");
     let body = format!("{outcome} after {took}");
-    let words = oslo::interactive::settings::current().notify_text;
+    let words = oslo::ui::settings::current().notify_text;
     let fill = |template: &str| {
         template
             .replace("{cmd}", text)
@@ -57,5 +63,27 @@ pub(super) fn slow_command_notice(
             .spawn();
         return String::new();
     }
-    oslo::interactive::marks::notify(title, &body)
+    oslo::ui::marks::notify(title, &body)
+}
+
+/// Whether an `on-report` handler dealt with the slow-command notice instead.
+fn drawn_by_config(
+    text: &str,
+    elapsed: std::time::Duration,
+    result: &Result<i32, ShellError>,
+) -> bool {
+    use oslo::ui::report::{self, int, text as string};
+    if !report::watched() {
+        return false;
+    }
+    let status = result.as_ref().copied().unwrap_or(1);
+    report::handled(
+        "slow",
+        vec![
+            ("text", string(text)),
+            ("duration_ms", int(elapsed.as_millis() as i64)),
+            ("status", int(i64::from(status))),
+            ("ok", oslo::lua::eval::value::Value::Bool(status == 0)),
+        ],
+    )
 }

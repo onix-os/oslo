@@ -113,7 +113,7 @@ pub fn lookup(name: &str) -> Option<PathBuf> {
 /// assigning to `PATH` invalidates every entry in the table by definition.
 pub fn forget_all() {
     TABLE.with(|t| t.borrow_mut().clear());
-    crate::interactive::invalidate_command_cache();
+    crate::ui::invalidate_command_cache();
 }
 
 /// Record that `name` resolved to `path`, and count the lookup that found it.
@@ -218,7 +218,7 @@ mod tests {
     /// forget would be contradicting itself.
     #[test]
     fn resetting_also_drops_the_completion_cache() {
-        use crate::interactive::command_index::CommandIndex;
+        use crate::ui::command_index::CommandIndex;
         use std::sync::Arc;
 
         let dir = tempfile::tempdir().unwrap();

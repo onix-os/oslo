@@ -26,7 +26,7 @@
 //! The alternative is one narrow range per directory of the worktree, which reads strictly fewer
 //! rows. It is not taken because the count of directories under one root is unbounded — a monorepo
 //! somebody has worked all over is hundreds of seeks — where the secondary range is always one.
-//! The cost profile is therefore the one `interactive::recall::nearby` measured and built its memo
+//! The cost profile is therefore the one `ui::recall::nearby` measured and built its memo
 //! against, and that memo stays correct.
 //!
 //! # Contract item 9: there is one ranking, and it is in Rust

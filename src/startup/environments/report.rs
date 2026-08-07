@@ -8,8 +8,8 @@
 
 use oslo::direnv::Event;
 use oslo::direnv::diff::Change;
-use oslo::interactive::dropdown::width;
-use oslo::interactive::theme::{self, Color, Style};
+use oslo::ui::block::Block;
+use oslo::ui::theme::{self, Color, Style};
 use std::path::Path;
 
 /// The label every line starts with, so the block reads as one thing.
@@ -67,18 +67,29 @@ fn collapse(output: &str) -> Vec<(String, usize)> {
 
 /// Print the rc file's own output, indented under the file it came from.
 pub(super) fn detail(output: &str) {
-    let rail = paint("│", Style::fg(Color::Indexed(240)));
-    let dim = Style {
-        dim: true,
-        ..Style::default()
-    };
+    let mut block = Block::new("");
     for (line, count) in collapse(output) {
         let times = match count {
             1 => String::new(),
-            n => paint(&format!("  ×{n}"), Style::fg(Color::Indexed(240))),
+            n => format!("  ×{n}"),
         };
-        println!("  {rail} {}{times}", paint(&line, dim));
+        block.note(format!("{line}{times}"));
     }
+    print(&block);
+}
+
+/// The block, one write.
+///
+/// One `print!` rather than a `println!` per row: a block assembled across several statements must
+/// not interleave with whatever the rc file itself is writing, and a partial block on the screen is
+/// worse than a late one.
+fn print(block: &Block) {
+    let lines = block.lines();
+    if lines.is_empty() {
+        return;
+    }
+    println!("{}", lines.join("\n"));
+    let _ = std::io::Write::flush(&mut std::io::stdout());
 }
 
 /// The environment a directory changed, grouped by what happened to it.
@@ -91,10 +102,8 @@ pub(super) fn detail(output: &str) {
 /// Each row is cut to the terminal with a count of what was dropped. A Nix dev shell adds
 /// thirty-five variables, and printed in full that is four wrapped lines of noise on every `cd` —
 /// which is how a useful message becomes one nobody reads.
-fn rail_rows(changed: &[(String, Change)], aliases: &[(String, Change)]) -> Vec<String> {
+fn rail_rows(block: &mut Block, changed: &[(String, Change)], aliases: &[(String, Change)]) {
     let grey = Style::fg(Color::Indexed(240));
-    let rail = paint("│", grey);
-    let mut rows = Vec::new();
 
     for kind in [Change::Removed, Change::Modified, Change::Added] {
         let names: Vec<&str> = changed
@@ -110,55 +119,27 @@ fn rail_rows(changed: &[(String, Change)], aliases: &[(String, Change)]) -> Vec<
             Change::Modified => (Style::fg(slot(YELLOW)), "changed"),
             Change::Added => (Style::fg(slot(GREEN)), "added"),
         };
-        // 2 indent + rail + space + 7 label + 2 = the fixed part of the row.
-        let budget = width::terminal_cols().saturating_sub(14);
-        let (shown, hidden) = fit_names(&names, budget);
-        // Padded so the names start in the same column on every row; a ragged left edge is the
-        // difference between a list you can scan and one you have to read.
-        let mut row = format!("  {rail} {} {shown}", paint(&format!("{label:<7}"), style));
-        if hidden > 0 {
-            row.push_str(&paint(&format!(" +{hidden}"), grey));
-        }
-        rows.push(row);
+        // `Count` is the default and the right one here: the names are a list, and past the edge
+        // of the terminal the number of them is the information rather than the next name.
+        block.styled_row(label, style, names.join(" "), Style::default());
     }
 
     if !aliases.is_empty() {
         let names: Vec<&str> = aliases.iter().map(|(name, _)| name.as_str()).collect();
-        let (shown, hidden) = fit_names(&names, width::terminal_cols().saturating_sub(14));
-        let mut row = format!(
-            "  {rail} {} {shown}",
-            paint(&format!("{:<7}", "aliases"), grey)
-        );
-        if hidden > 0 {
-            row.push_str(&paint(&format!(" +{hidden}"), grey));
-        }
-        rows.push(row);
+        block.styled_row("aliases", grey, names.join(" "), Style::default());
     }
-    rows
 }
 
-/// As many names as fit in `budget` cells, and how many did not.
-fn fit_names(names: &[&str], budget: usize) -> (String, usize) {
-    let mut out = String::new();
-    let mut used = 0usize;
-    let mut shown = 0usize;
-    for name in names {
-        let w = name.chars().count() + usize::from(shown > 0);
-        if used + w > budget && shown > 0 {
-            break;
-        }
-        if shown > 0 {
-            out.push(' ');
-        }
-        out.push_str(name);
-        used += w;
-        shown += 1;
-    }
-    (out, names.len() - shown)
-}
-
-/// One event, as one line.
+/// One event, as one block.
+///
+/// **The config gets first refusal.** `on-report` is handed the same fields this renders from, and
+/// a handler that says it drew the event stops this drawing anything — see
+/// `startup::report::handled`. Everything below is the default, for a shell whose config has no
+/// opinion.
 pub(super) fn event(event: &Event) {
+    if crate::startup::report::handled(event) {
+        return;
+    }
     let grey = Style::fg(Color::Indexed(240));
     match event {
         Event::Loaded {
@@ -167,64 +148,55 @@ pub(super) fn event(event: &Event) {
             aliases,
         } => {
             let label = paint(LABEL, Style::fg(slot(GREEN)));
-            println!("{label} {}", paint(&short(owner), Style::default()));
-            for row in rail_rows(changed, aliases) {
-                println!("{row}");
-            }
+            let mut block = Block::new(format!(
+                "{label} {}",
+                paint(&short(owner), Style::default())
+            ));
+            rail_rows(&mut block, changed, aliases);
+            print(&block);
         }
         Event::Unloaded { owner } => {
-            println!(
+            print(&Block::new(format!(
                 "{} {}",
                 paint(LABEL, grey),
                 paint(&format!("left {}", short(owner)), grey)
-            );
+            )));
         }
         // The one line here that is a security decision, so it is the one that gets a colour you
         // cannot skim past, and it says what to type rather than making you remember.
         Event::Blocked { path } => {
-            let label = paint(
-                LABEL,
-                Style {
-                    bold: true,
-                    ..Style::fg(slot(YELLOW))
-                },
-            );
-            println!(
-                "{label} {} {}",
+            let loud = Style {
+                bold: true,
+                ..Style::fg(slot(YELLOW))
+            };
+            let mut block = Block::new(format!(
+                "{} {} {}",
+                paint(LABEL, loud),
                 paint(&short(path), Style::default()),
                 paint("is not allowed yet", grey)
-            );
-            println!(
-                "  {} {}",
-                paint("→", grey),
-                paint(
-                    "direnv allow",
-                    Style {
-                        bold: true,
-                        ..Style::fg(slot(YELLOW))
-                    }
-                )
-            );
+            ));
+            block.styled_row("→", grey, "direnv allow", loud);
+            print(&block);
         }
         Event::Denied { path } => {
-            println!(
+            print(&Block::new(format!(
                 "{} {} {}",
                 paint(LABEL, Style::fg(slot(RED))),
                 paint(&short(path), Style::default()),
                 paint("is denied", grey)
-            );
+            )));
         }
         Event::Failed { path, problem } => {
             let name = path
                 .file_name()
                 .map(|n| n.to_string_lossy().to_string())
                 .unwrap_or_else(|| short(path));
-            println!(
+            print(&Block::new(format!(
                 "{} {} {}",
                 paint(LABEL, Style::fg(slot(RED))),
                 paint(&name, Style::default()),
                 paint(problem, grey)
-            );
+            )));
         }
     }
 }

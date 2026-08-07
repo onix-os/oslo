@@ -21,7 +21,6 @@ pub mod exec;
 pub mod expand;
 /// Parts of the shell a config can turn off and on again while it runs.
 pub mod feature;
-pub mod interactive;
 pub mod lexer;
 pub mod lua;
 pub mod parser;
@@ -30,11 +29,12 @@ pub mod parser;
 #[cfg(feature = "ssh")]
 pub mod ssh;
 pub mod track;
+pub mod ui;
 
 pub use env::Environment;
 pub use error::{Result, ShellError};
 pub use exec::{JobManager, eval_command_list};
-pub use interactive::OsloHelper;
 pub use lexer::Lexer;
 pub use lua::LuaEngine;
 pub use parser::parse_bash_script;
+pub use ui::OsloHelper;

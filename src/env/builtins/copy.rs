@@ -22,7 +22,7 @@
 
 use crate::env::Environment;
 use crate::error::Result;
-use crate::interactive::marks;
+use crate::ui::marks;
 use std::io::{Read, Write};
 
 pub fn builtin_copy(_env: &mut Environment, args: &[String]) -> Result<i32> {

@@ -14,10 +14,10 @@
 //! A string works too, for a prompt that never changes.
 
 use super::util::{ok, put, text};
-use crate::interactive::theme::{self, Color, Style};
 use crate::lua::engine::Registry;
 use crate::lua::eval::LuaError;
 use crate::lua::eval::value::{Table, Value};
+use crate::ui::theme::{self, Color, Style};
 use std::rc::Rc;
 
 /// Registry keys the prompt lives under.
@@ -44,17 +44,13 @@ pub(crate) const TRANSIENT: &str = "prompt.transient";
 /// Called with `command` set while a command is in flight and `nil` at a prompt.
 pub(crate) const TITLE: &str = "prompt.title";
 
-/// Add `oslo.prompt`, `oslo.ui.style`, `oslo.git` and `oslo.path.shorten`.
-pub fn install(oslo: &mut Table, ui: &mut Table, registry: &Registry) {
+/// Add `oslo.prompt`, `oslo.git` and `oslo.path.shorten`.
+pub fn install(oslo: &mut Table, _ui: &mut Table, registry: &Registry) {
     oslo.set(Value::str("prompt"), build(registry));
-    // Painting text is `oslo.ui`; the prompt's own configuration stays `oslo.prompt`, which is a
-    // table a config assigns into rather than a function it calls.
-    put(ui, "style", |_, args| {
-        let body = text(&args, 1, "oslo.ui.style")?;
-        ok(Value::str(
-            style_from(args.get(1)).paint(&body, theme::depth()),
-        ))
-    });
+    // **`oslo.ui.style` is not installed here.** It used to be, and `ui::prompt` installs one of
+    // the same name *after* this runs — so this one was overwritten before any config could reach
+    // it, and had been dead for as long as both existed. The survivor does everything this did and
+    // more (borders, padding, width), and now accepts this one's two-argument call shape too.
     oslo.set(Value::str("git"), git());
     // The fine-grained shape: a prompt as a list of named, prioritised pieces rather than one
     // opaque string. See `super::segment`.
@@ -130,7 +126,6 @@ fn key_for(field: &str) -> Option<&'static str> {
     }
 }
 
-/// A style written as `oslo.ui.style(text, "green")` or `oslo.ui.style(text, {fg = …, bold = true})`.
 /// The `oslo.theme` table, whose `styles` field names colours.
 ///
 /// `__newindex` again, for the reason `oslo.prompt` needs it: a plain table would accept the
@@ -189,36 +184,13 @@ pub fn style_named(name: &str) -> Style {
     }
 }
 
-fn style_from(value: Option<&Value>) -> Style {
-    match value {
-        Some(Value::Str(name)) => Color::parse(name).map(Style::fg).unwrap_or_default(),
-        Some(Value::Table(table)) => {
-            let table = table.borrow();
-            let colour = |key: &str| match table.get(&Value::str(key)) {
-                Value::Str(name) => Color::parse(&name),
-                _ => None,
-            };
-            Style {
-                fg: colour("fg"),
-                bg: colour("bg"),
-                bold: table.get(&Value::str("bold")).truthy(),
-                dim: table.get(&Value::str("dim")).truthy(),
-                italic: table.get(&Value::str("italic")).truthy(),
-                underline: table.get(&Value::str("underline")).truthy(),
-                reverse: table.get(&Value::str("reverse")).truthy(),
-            }
-        }
-        _ => Style::default(),
-    }
-}
-
 /// `oslo.git` — what a prompt asks about a repository.
 fn git() -> Value {
     let mut git = Table::new();
 
     // oslo.git.branch() -> "main", a short hash when detached, or nil outside a repository.
     put(&mut git, "branch", |_, _| {
-        ok(match crate::interactive::prompt::git_branch() {
+        ok(match crate::ui::prompt::git_branch() {
             Some(branch) => Value::str(branch),
             None => Value::Nil,
         })
@@ -226,7 +198,7 @@ fn git() -> Value {
 
     // oslo.git.root() -> the working tree's top directory, or nil.
     put(&mut git, "root", |_, _| {
-        ok(match crate::interactive::prompt::git_root() {
+        ok(match crate::ui::prompt::git_root() {
             Some(root) => Value::str(root.display().to_string()),
             None => Value::Nil,
         })
@@ -250,12 +222,12 @@ pub fn shorten(table: &mut Table) {
             .and_then(|n| n.as_int())
             .unwrap_or(1)
             .max(0) as usize;
-        ok(Value::str(crate::interactive::prompt::shorten(&path, keep)))
+        ok(Value::str(crate::ui::prompt::shorten(&path, keep)))
     });
 
     // oslo.path.home(path) -> the same path with $HOME written as `~`.
     put(table, "home", |_, args| {
         let path = text(&args, 1, "oslo.path.home")?;
-        ok(Value::str(crate::interactive::prompt::tilde(&path)))
+        ok(Value::str(crate::ui::prompt::tilde(&path)))
     });
 }

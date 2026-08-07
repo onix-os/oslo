@@ -1,7 +1,7 @@
 //! `oslo.ui.input`, `.confirm`, `.choose`, `.filter`, `.style` — the raw-mode widgets, from Lua.
 //!
 //! The same code the `ui` builtin runs, so a prompt looks and behaves identically whether the
-//! script asking is shell or Lua. [`crate::interactive::ask`] is where they live; this is the
+//! script asking is shell or Lua. [`crate::ui::ask`] is where they live; this is the
 //! binding.
 //!
 //! # These are not [`super::ask`]
@@ -21,13 +21,14 @@
 //! table is also how the caller writes only the two they care about.
 
 use super::super::util::{ok, put};
-use crate::interactive::ask::{
+use crate::lua::eval::value::{Table, Value};
+use crate::ui::ask::chrome::{Chrome, Fit, Place};
+use crate::ui::ask::{
     Align, Answer, As, Border, Browse, Choice, Confirm, Entry, Input, Level, Pager, Spin, Styling,
     Table as Rows, Want, Write, choose, confirm, file, filter, format, horizontal, input, line,
     pager, parse_table, spin, style, table, vertical, write,
 };
-use crate::interactive::theme;
-use crate::lua::eval::value::{Table, Value};
+use crate::ui::theme;
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -40,14 +41,14 @@ fn field(table: &Table, name: &str) -> String {
 }
 
 /// An optional string field.
-fn maybe(table: &Table, name: &str) -> Option<String> {
+pub(super) fn maybe(table: &Table, name: &str) -> Option<String> {
     match table.get(&Value::str(name)) {
         Value::Str(s) => Some(s.to_string()),
         _ => None,
     }
 }
 
-fn flag(table: &Table, name: &str) -> bool {
+pub(super) fn flag(table: &Table, name: &str) -> bool {
     matches!(table.get(&Value::str(name)), Value::Bool(true))
 }
 
@@ -64,7 +65,7 @@ fn count(table: &Table, name: &str, fallback: usize) -> usize {
 /// Separate from [`count`] because clamping these to one is a bug you cannot see until you compare
 /// the two languages: `oslo.ui.style{padding_x = 0}` drew a column of padding where the shell's
 /// `ui style --padding "0 0"` drew none. Same widget, same theme, different box.
-fn size(table: &Table, name: &str, fallback: usize) -> usize {
+pub(super) fn size(table: &Table, name: &str, fallback: usize) -> usize {
     match table.get(&Value::str(name)) {
         Value::Number(n) => n.as_int().map(|i| i.max(0) as usize).unwrap_or(fallback),
         _ => fallback,
@@ -80,6 +81,87 @@ fn spec(args: &[Value]) -> Rc<RefCell<Table>> {
         Some(Value::Table(t)) => Rc::clone(t),
         _ => Rc::new(RefCell::new(Table::new())),
     }
+}
+
+/// The named entries of a table, as `(name, text)` pairs.
+///
+/// **Numbers and booleans count.** This used to take only `Value::Str`, so
+/// `oslo.ui.log{fields = {count = 12}}` dropped the field on the floor — and a count, a status or a
+/// duration is exactly what anyone logs first. A value that cannot be a word at all (a table, a
+/// function) is still skipped, because `fields = {x = {}}` is a mistake rather than a value.
+fn named_values(table: &Table) -> Vec<(String, String)> {
+    let mut out = Vec::new();
+    for (key, value) in table.pairs() {
+        let Value::Str(name) = &key else { continue };
+        let text = match &value {
+            Value::Str(s) => s.to_string(),
+            Value::Number(n) => n.to_string(),
+            Value::Bool(b) => b.to_string(),
+            _ => continue,
+        };
+        out.push((name.to_string(), text));
+    }
+    out
+}
+
+/// The chrome fields every widget accepts: `legend`, `border`, `fit`, `fullscreen`, `align_x`,
+/// `align_y`.
+///
+/// Read from the same options table the widget's own fields come from, because they *are* the
+/// widget's fields as far as a caller is concerned — nobody wants to pass two tables to ask a
+/// question. A name that is not a placement is refused rather than defaulted: `align_x = "centre"`
+/// works, `align_x = "centred"` says so.
+fn chrome_of(t: &Table) -> Result<Chrome, crate::lua::eval::LuaError> {
+    let mut chrome = Chrome::default();
+    // Absent leaves the default on, so `legend = false` is the only spelling that turns it off and
+    // `legend = nil` cannot mean "off" by accident.
+    if let Value::Bool(shown) = t.get(&Value::str("legend")) {
+        chrome.legend = shown;
+    }
+    chrome.fullscreen = flag(t, "fullscreen") || flag(t, "alt");
+    // Absent keeps the default rather than zeroing it: a caller who set only `border` still wants
+    // the cell of padding that makes a box readable. `size` clamps at zero rather than one, which
+    // is the whole reason it exists — `padding_x = 0` must mean none.
+    chrome.padding_x = size(t, "padding_x", chrome.padding_x);
+    chrome.padding_y = size(t, "padding_y", chrome.padding_y);
+    chrome.legend_gap = size(t, "legend_gap", chrome.legend_gap);
+    if let Some(name) = maybe(t, "border") {
+        chrome.border = Border::parse(&name)
+            .ok_or_else(|| crate::lua::eval::LuaError::new(format!("{name}: not a border")))?;
+    }
+    if let Some(colour) = maybe(t, "border_fg") {
+        chrome.border_style =
+            theme::Style::fg(theme::Color::parse(&colour).ok_or_else(|| {
+                crate::lua::eval::LuaError::new(format!("{colour}: not a colour"))
+            })?);
+    }
+    for (field, slot) in [("fit", 0), ("border_fit", 0)] {
+        let _ = slot;
+        if let Some(name) = maybe(t, field) {
+            chrome.fit = Fit::parse(&name).ok_or_else(|| {
+                crate::lua::eval::LuaError::new(format!("{name}: fit is \"content\" or \"full\""))
+            })?;
+        }
+    }
+    for (field, axis) in [("align_x", true), ("align_y", false)] {
+        if let Some(name) = maybe(t, field) {
+            let place = Place::parse(&name)
+                .ok_or_else(|| crate::lua::eval::LuaError::new(format!("{name}: not a {field}")))?;
+            if axis {
+                chrome.align_x = place;
+            } else {
+                chrome.align_y = place;
+            }
+        }
+    }
+    // `align = "center"` sets both, which is what anyone centring a full-screen widget means.
+    if let Some(name) = maybe(t, "align") {
+        let place = Place::parse(&name)
+            .ok_or_else(|| crate::lua::eval::LuaError::new(format!("{name}: not an alignment")))?;
+        chrome.align_x = place;
+        chrome.align_y = place;
+    }
+    Ok(chrome)
 }
 
 /// A list field: `{items = {"a", "b"}}`.
@@ -108,6 +190,8 @@ pub fn install(ui: &mut Table) {
             default: maybe(&t, "default").or_else(|| maybe(&t, "value")),
             password: flag(&t, "password"),
             required: flag(&t, "required"),
+            chrome: chrome_of(&t)?,
+            look: super::look::look_of(&t)?,
         });
         // `nil` for both cancelled and no-terminal. Lua has one absent value and a script says
         // `if not answer then return end`; splitting the two would mean every caller checking a
@@ -136,8 +220,22 @@ pub fn install(ui: &mut Table) {
                     settings.no = n;
                 }
                 settings.default = flag(&t, "default");
+                // **Parsed before anything is asked.** A bad `align` must be a diagnostic, not a
+                // question answered and then thrown away — and this is the one widget that would
+                // otherwise ask first, because it falls back to a line without a terminal.
+                settings.chrome = chrome_of(&t)?;
             }
             _ => {}
+        }
+        // **Without a terminal, ask on a line rather than answering nothing.** The raw-mode widget
+        // needs a tty it can take; `super::ask` needs only stdin, works down a pipe and over a
+        // serial console, and leaves the question in the transcript. One name, both behaviours —
+        // and it is what `ui/mod.rs` says the pair is for.
+        if !std::io::IsTerminal::is_terminal(&std::io::stdin()) {
+            return ok(Value::Bool(super::ask::on_a_line(
+                &settings.question,
+                settings.default,
+            )));
         }
         ok(match confirm(&settings) {
             Answer::Given(yes) => Value::Bool(yes),
@@ -146,9 +244,13 @@ pub fn install(ui: &mut Table) {
     });
 
     // oslo.ui.choose{items=, header=, multi=, height=} -> string, list, or nil
-    put(ui, "choose", |_, args| ok(list_widget(&args, false)));
+    put(ui, "choose", |_, args| {
+        list_widget(&args, false).map(|v| vec![v])
+    });
     // The same, narrowed as you type.
-    put(ui, "filter", |_, args| ok(list_widget(&args, true)));
+    put(ui, "filter", |_, args| {
+        list_widget(&args, true).map(|v| vec![v])
+    });
 
     // oslo.ui.write{header=, placeholder=, default=} -> string or nil
     put(ui, "write", |_, args| {
@@ -159,6 +261,7 @@ pub fn install(ui: &mut Table) {
                 header: field(&t, "header"),
                 placeholder: field(&t, "placeholder"),
                 default: maybe(&t, "default").or_else(|| maybe(&t, "value")),
+                chrome: chrome_of(&t)?,
             }) {
                 Answer::Given(text) => Value::str(&text),
                 _ => Value::Nil,
@@ -186,7 +289,9 @@ pub fn install(ui: &mut Table) {
                 want,
                 hidden: flag(&t, "hidden"),
                 height: count(&t, "height", 12),
-                fuzzy: crate::interactive::settings::current().completion.fuzzy,
+                fuzzy: crate::ui::settings::current().completion.fuzzy,
+                chrome: chrome_of(&t)?,
+                look: super::look::look_of(&t)?,
             }) {
                 Answer::Given(path) => Value::str(&path),
                 _ => Value::Nil,
@@ -210,7 +315,9 @@ pub fn install(ui: &mut Table) {
                 raw,
                 height: count(&t, "height", 10),
                 filter: !flag(&t, "no_filter"),
-                fuzzy: crate::interactive::settings::current().completion.fuzzy,
+                fuzzy: crate::ui::settings::current().completion.fuzzy,
+                chrome: chrome_of(&t)?,
+                look: super::look::look_of(&t)?,
             }) {
                 Answer::Given(row) => Value::str(&row),
                 _ => Value::Nil,
@@ -227,6 +334,7 @@ pub fn install(ui: &mut Table) {
                 title: field(&t, "title"),
                 text: field(&t, "text"),
                 wrap: flag(&t, "wrap"),
+                chrome: chrome_of(&t)?,
             }),
             Answer::Given(())
         )))
@@ -268,11 +376,7 @@ pub fn install(ui: &mut Table) {
                 }
                 time = maybe(&t, "time");
                 if let Value::Table(pairs) = t.get(&Value::str("fields")) {
-                    for (key, value) in pairs.borrow().pairs() {
-                        if let (Value::Str(k), Value::Str(v)) = (&key, &value) {
-                            fields.push((k.to_string(), v.to_string()));
-                        }
-                    }
+                    fields.extend(named_values(&pairs.borrow()));
                     // Table iteration has no order, and a log line whose fields moved between runs
                     // is one nobody can diff.
                     fields.sort();
@@ -325,11 +429,7 @@ pub fn install(ui: &mut Table) {
                     }
                 }
                 if let Value::Table(pairs) = t.get(&Value::str("fields")) {
-                    for (key, value) in pairs.borrow().pairs() {
-                        if let (Value::Str(k), Value::Str(v)) = (&key, &value) {
-                            values.push((k.to_string(), v.to_string()));
-                        }
-                    }
+                    values.extend(named_values(&pairs.borrow()));
                     // Sorted for the same reason `log`'s fields are: table iteration has no order,
                     // and `template` applies replacements in sequence — so overlapping keys would
                     // render differently between two runs of the same script.
@@ -375,9 +475,29 @@ pub fn install(ui: &mut Table) {
         ))
     });
 
-    // oslo.ui.style(text | {text=, border=, fg=, bg=, bold=, padding_x=, padding_y=, width=})
+    // oslo.ui.style(text | {text=, …}) or oslo.ui.style(text, {…})
+    //
+    // **Both call shapes, and the second one is a bug fix.** `oslo.ui.style("hi", {fg="green"})`
+    // used to take the string, drop the spec on the floor and hand back unpainted text — every
+    // option silently ignored. It is the shape anyone writes first, and it is the shape the other
+    // `oslo.ui.style` (in `api::prompt`, which this one shadows) accepted.
     put(ui, "style", |_, args| {
         let mut settings = Styling::default();
+        // The spec is argument two when the text came first, and argument one otherwise.
+        let leading_text = matches!(args.first(), Some(Value::Str(_)));
+        let args: Vec<Value> = match (leading_text, args.get(1)) {
+            (true, Some(Value::Table(spec))) => {
+                // The caller's spec, with the text folded in, so everything below reads one table
+                // whichever shape was written.
+                let mut merged = Table::new();
+                for (key, value) in spec.borrow().pairs() {
+                    merged.set(key, value);
+                }
+                merged.set(Value::str("text"), args[0].clone());
+                vec![Value::table(merged)]
+            }
+            _ => args,
+        };
         match args.first() {
             Some(Value::Str(text)) => settings.text = text.to_string(),
             Some(Value::Table(_)) => {
@@ -417,7 +537,11 @@ pub fn install(ui: &mut Table) {
 }
 
 /// `choose` and `filter`, which differ only in whether typing narrows the list.
-fn list_widget(args: &[Value], filtering: bool) -> Value {
+///
+/// The two parsers are asked with `?` rather than `unwrap_or_default`: a misspelt colour or a
+/// preset that does not exist has to be an error a script can see. Defaulting quietly is how
+/// `look = "histry"` would draw the plain list and leave nothing at all to explain why.
+fn list_widget(args: &[Value], filtering: bool) -> Result<Value, crate::lua::eval::LuaError> {
     let t = spec(args);
     let t = t.borrow();
     let mut chosen = items(&t, "items");
@@ -433,14 +557,16 @@ fn list_widget(args: &[Value], filtering: bool) -> Value {
         multi,
         filter: filtering,
         height: count(&t, "height", 10),
-        fuzzy: crate::interactive::settings::current().completion.fuzzy,
+        fuzzy: crate::ui::settings::current().completion.fuzzy,
+        chrome: chrome_of(&t)?,
+        look: super::look::look_of(&t)?,
     };
     let answer = if filtering {
         filter(&settings)
     } else {
         choose(&settings)
     };
-    match answer {
+    Ok(match answer {
         // A single pick answers with the string; `multi` answers with a list, even of one. A
         // caller that asked for many is written to loop, and handing it a bare string on the day
         // one thing was checked would break that.
@@ -449,7 +575,7 @@ fn list_widget(args: &[Value], filtering: bool) -> Value {
         }
         Answer::Given(picked) => picked.first().map(Value::str).unwrap_or(Value::Nil),
         _ => Value::Nil,
-    }
+    })
 }
 
 /// The positional entries of a table: `{"a", "b", "c"}`.

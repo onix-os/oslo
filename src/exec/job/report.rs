@@ -78,16 +78,20 @@ pub(super) fn announce_changes(jobs: &mut JobTable) {
             continue;
         }
         job.notified = true;
-        let line = describe(job, marker);
-        eprintln!("{}", line);
+        let status = match job.state {
+            JobState::Completed(code) => code,
+            _ => 0,
+        };
+        // **Asked before the line is printed**, or a handler could only ever add to the notice
+        // rather than replace it. `on-report` is the "how should this look" question; the
+        // `on-job-finish` hook below is the "this happened" one, and both fire.
+        if !drawn_by_config(id, job.pgid.as_raw(), &job.command, status, ended) {
+            eprintln!("{}", describe(job, marker));
+        }
         if ended {
             // `on-job-finish`, beside the `[1]+ Done` line rather than instead of it, and only for
             // a job that *ended* — a stopped job is announced here too but it has not finished,
             // and `fg` may yet resume it.
-            let status = match job.state {
-                JobState::Completed(code) => code,
-                _ => 0,
-            };
             crate::lua::engine::fire_at_here(
                 crate::lua::api::hooks::at::JOB_FINISH,
                 &[
@@ -103,6 +107,28 @@ pub(super) fn announce_changes(jobs: &mut JobTable) {
     for id in retire {
         jobs.remove(id);
     }
+}
+
+/// Whether an `on-report` handler drew this job's notice instead.
+///
+/// `ended` separates the two things this line can be: a job that finished, and one that merely
+/// stopped and which `fg` may yet resume. A handler that only wants to announce completions checks
+/// it rather than guessing from the status, which is zero for both.
+fn drawn_by_config(id: usize, pid: i32, command: &str, status: i32, ended: bool) -> bool {
+    use crate::ui::report::{self, int, text};
+    if !report::watched() {
+        return false;
+    }
+    report::handled(
+        "job",
+        vec![
+            ("id", int(id as i64)),
+            ("pid", int(i64::from(pid))),
+            ("text", text(command)),
+            ("status", int(i64::from(status))),
+            ("ended", crate::lua::eval::value::Value::Bool(ended)),
+        ],
+    )
 }
 
 #[cfg(test)]

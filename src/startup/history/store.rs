@@ -104,7 +104,7 @@ impl History {
     fn report(&self, path: &Path, e: std::io::Error) {
         eprintln!(
             "oslo: {}: {}",
-            oslo::interactive::marks::path(&path.display().to_string()),
+            oslo::ui::marks::path(&path.display().to_string()),
             e
         );
     }

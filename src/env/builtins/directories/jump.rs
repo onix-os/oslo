@@ -13,10 +13,10 @@
 
 use super::chdir::{PathMode, attempt_directory, logical_pwd};
 use crate::env::scope::Environment;
-use crate::interactive::prompt::git_root;
 use crate::track;
 use crate::track::Track;
 use crate::track::score::{Query, Ranked, rank};
+use crate::ui::prompt::git_root;
 use std::path::Path;
 use std::time::{SystemTime, UNIX_EPOCH};
 

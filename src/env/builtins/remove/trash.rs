@@ -17,7 +17,7 @@
 //! Which means walking it. The walk stops as soon as the total passes the cap, so the expensive
 //! case — a huge tree, which is destroyed anyway — is also the one that stops early.
 
-use crate::interactive::settings::Rm;
+use crate::ui::settings::Rm;
 use std::io;
 use std::path::{Path, PathBuf};
 

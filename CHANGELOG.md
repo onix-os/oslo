@@ -1,5 +1,35 @@
 # Changelog
 
+## [0.2.19] - 2026-08-07
+
+### <!-- 0 -->⛰️  Features
+
+- The scanner, the badge and the meta columns
+- A look for lists, and history is one of them
+- Legend, border, fullscreen and placement per widget
+- On-report covers all five of the shell's blocks
+- Oslo.ui.block, and on-report for direnv
+
+### <!-- 1 -->🐛 Bug Fixes
+
+- Recency orders the list; the caret keeps its surface
+- Carry the undo record to child shells
+- Reconcile the directory environment at the prompt
+- The caret follows the cursor setting, and one atomic frame
+- Tabs, the full-width box and the legend rule
+- The box, the rule and the spacing around a widget
+- Three oslo.ui names that shadowed or dropped
+- Oslo.ui.style was installed twice and painted neither
+
+### <!-- 2 -->🚜 Refactor
+
+- Src/interactive is src/ui
+- The history screen is a ui look
+
+### <!-- 3 -->📚 Documentation
+
+- Oslo.ui.block and on-report
+
 ## [0.2.18] - 2026-08-06
 
 ### <!-- 0 -->⛰️  Features

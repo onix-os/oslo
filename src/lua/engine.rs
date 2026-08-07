@@ -431,18 +431,18 @@ impl LuaEngine {
     }
 
     /// Read `oslo.theme` as it stands, and what was wrong with it.
-    pub fn read_theme(&self) -> (crate::interactive::theme::Theme, Vec<String>) {
+    pub fn read_theme(&self) -> (crate::ui::theme::Theme, Vec<String>) {
         let oslo = self.interp.global("oslo");
         let theme = match &oslo {
             Value::Table(table) => table.borrow().get(&Value::str("theme")),
             _ => Value::Nil,
         };
-        crate::interactive::theme::read_lua_theme(&theme)
+        crate::ui::theme::read_lua_theme(&theme)
     }
 
     /// Read `oslo.completion`, `oslo.suggest` and `oslo.history` as they stand.
-    pub fn read_settings(&self) -> (crate::interactive::settings::Settings, Vec<String>) {
-        crate::interactive::settings::read_lua_settings(&self.interp.global("oslo"))
+    pub fn read_settings(&self) -> (crate::ui::settings::Settings, Vec<String>) {
+        crate::ui::settings::read_lua_settings(&self.interp.global("oslo"))
     }
 
     /// Install `oslo.completion.columns` as the dropdown's column provider.
@@ -477,13 +477,12 @@ impl LuaEngine {
                 }
             };
             let text = segment::spans_to_text(&produced, &|body, style| {
-                crate::lua::api::prompt::style_named(style)
-                    .paint(body, crate::interactive::theme::depth())
+                crate::lua::api::prompt::style_named(style).paint(body, crate::ui::theme::depth())
             });
             if text.is_empty() {
                 continue;
             }
-            let width = crate::interactive::prompt::printed_width(&text);
+            let width = crate::ui::prompt::printed_width(&text);
             pieces.push(segment::Rendered {
                 name,
                 priority,

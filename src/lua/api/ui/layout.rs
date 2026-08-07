@@ -7,8 +7,8 @@
 
 use super::super::util::{ok, put};
 use super::text::align_to;
-use crate::interactive::dropdown::width;
 use crate::lua::eval::value::{Number, Table, Value};
+use crate::ui::dropdown::width;
 
 /// The strings in a Lua sequence, in order, skipping anything that is not one.
 fn strings(value: &Value) -> Vec<String> {
@@ -56,8 +56,17 @@ pub fn install(ui: &mut Table) {
         ok(Value::table(out))
     });
 
-    // oslo.ui.table(rows, [{ headers = {...}, align = {...}, gap = n, width = n }]) -> { "line", … }
-    put(ui, "table", |_, args| {
+    // oslo.ui.grid(rows, [{ headers = {...}, align = {...}, gap = n, width = n }]) -> { "line", … }
+    //
+    // **Named `grid`, not `table`, and that is a bug fix.** This was `oslo.ui.table` and
+    // `ui::prompt` installs a `table` of its own *after* this runs — a completely different
+    // function, the interactive row picker — so this one was unreachable for as long as both
+    // existed. `oslo.ui.table(rows, opts)` reached the picker, which answers `nil` without a
+    // terminal, so a script asking for a formatted table quietly got nothing.
+    //
+    // The picker keeps `table` because the `ui` builtin's `table` is the picker too, and the two
+    // surfaces should not disagree about what a name means. This one is a grid of cells.
+    put(ui, "grid", |_, args| {
         let rows: Vec<Vec<String>> = match args.first() {
             Some(Value::Table(t)) => t.borrow().sequence().iter().map(strings).collect(),
             _ => Vec::new(),

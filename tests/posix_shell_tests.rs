@@ -414,7 +414,7 @@ mod in_process {
     /// this binary changes it either — the cwd tests all live in `process_global`.
     #[test]
     fn test_interactive_prompt() {
-        let left = oslo::interactive::prompt::render_default_left_prompt(0, "sh");
+        let left = oslo::ui::prompt::render_default_left_prompt(0, "sh");
         assert!(!left.is_empty());
         // The right prompt was deleted in PLAN R9.7: nothing ever drew it, so this assertion was
         // the only thing keeping its renderer alive.
@@ -423,19 +423,19 @@ mod in_process {
     #[test]
     fn test_dropdown_menu_render() {
         let candidates = vec![
-            oslo::interactive::dropdown::CompletionCandidate::new(
+            oslo::ui::dropdown::CompletionCandidate::new(
                 "cargo".to_string(),
                 "cargo".to_string(),
                 Some("Rust package manager".to_string()),
             ),
-            oslo::interactive::dropdown::CompletionCandidate::new(
+            oslo::ui::dropdown::CompletionCandidate::new(
                 "cd".to_string(),
                 "cd".to_string(),
                 Some("Change working directory".to_string()),
             ),
         ];
         let (rendered, lines) =
-            oslo::interactive::dropdown::render_vertical_dropdown(&candidates, 0, 8, 0, "");
+            oslo::ui::dropdown::render_vertical_dropdown(&candidates, 0, 8, 0, "");
         assert!(rendered.contains("cargo"));
         assert!(rendered.contains("cd"));
         // Two candidates, two rows: the menu has no border above or below them.

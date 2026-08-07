@@ -16,11 +16,11 @@
 //! for the one kind it cares about without having to reimplement the rest.
 //!
 //! The function runs **once per visible row per frame** — fifteen calls while an arrow key is held,
-//! not once per candidate. See [`crate::interactive::dropdown`]'s `columns` module for why that
+//! not once per candidate. See [`crate::ui::dropdown`]'s `columns` module for why that
 //! distinction is what makes a `stat` per row affordable at all.
 
-use crate::interactive::dropdown::{CompletionCandidate, Facts, human_age, human_mode, human_size};
 use crate::lua::eval::{Interp, Table, Value};
+use crate::ui::dropdown::{CompletionCandidate, Facts, human_age, human_mode, human_size};
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -131,7 +131,7 @@ fn cell_text(value: &Value) -> String {
 /// dropped the function goes back to the built-in columns rather than keeping the old one.
 pub fn install(interp: &Rc<Interp>) {
     let Value::Table(oslo) = interp.global("oslo") else {
-        crate::interactive::dropdown::set_provider(None);
+        crate::ui::dropdown::set_provider(None);
         return;
     };
     let function = match oslo.borrow().get(&Value::str("completion")) {
@@ -139,7 +139,7 @@ pub fn install(interp: &Rc<Interp>) {
         _ => Value::Nil,
     };
     if !matches!(function, Value::Function(_)) {
-        crate::interactive::dropdown::set_provider(None);
+        crate::ui::dropdown::set_provider(None);
         return;
     }
 
@@ -148,7 +148,7 @@ pub fn install(interp: &Rc<Interp>) {
     // function that raises would otherwise scroll the same message past the prompt sixty times a
     // second while an arrow key is held.
     let complained = std::cell::Cell::new(false);
-    crate::interactive::dropdown::set_provider(Some(Rc::new(
+    crate::ui::dropdown::set_provider(Some(Rc::new(
         move |cand: &CompletionCandidate, facts: &Facts| {
             let arg = candidate_table(cand, facts);
             match interp.call(&function, vec![arg]) {
@@ -178,7 +178,7 @@ pub fn install(interp: &Rc<Interp>) {
 /// ```
 pub fn install_command_completer(interp: &Rc<Interp>) {
     let Value::Table(oslo) = interp.global("oslo") else {
-        crate::interactive::completion::set_command_completer(None);
+        crate::ui::completion::set_command_completer(None);
         return;
     };
     let table = match oslo.borrow().get(&Value::str("completion")) {
@@ -186,13 +186,13 @@ pub fn install_command_completer(interp: &Rc<Interp>) {
         _ => Value::Nil,
     };
     let Value::Table(table) = table else {
-        crate::interactive::completion::set_command_completer(None);
+        crate::ui::completion::set_command_completer(None);
         return;
     };
 
     let interp = Rc::clone(interp);
     let complained = std::cell::Cell::new(false);
-    crate::interactive::completion::set_command_completer(Some(Rc::new(
+    crate::ui::completion::set_command_completer(Some(Rc::new(
         move |command: &str, prior: &[&str], current: &str| {
             let function = table.borrow().get(&Value::str(command));
             if !matches!(function, Value::Function(_)) {
@@ -258,9 +258,9 @@ mod tests {
         let ast = parse(source).expect("the test chunk must parse");
         interp.run_ast(&ast).expect("the test chunk must run");
         install(&interp);
-        let out = crate::interactive::dropdown::columns_for(cand, facts);
-        let builtin = crate::interactive::dropdown::builtin_columns(cand, facts);
-        crate::interactive::dropdown::set_provider(None);
+        let out = crate::ui::dropdown::columns_for(cand, facts);
+        let builtin = crate::ui::dropdown::builtin_columns(cand, facts);
+        crate::ui::dropdown::set_provider(None);
         (out != builtin).then_some(out)
     }
 

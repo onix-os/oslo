@@ -25,20 +25,23 @@
 //! erase themselves, so the transcript above them is untouched.
 
 mod ask;
+mod block;
 mod layout;
+mod look;
 mod prompt;
 mod text;
 
 use super::util::{ok, put};
-use crate::interactive::dropdown::width;
-use crate::interactive::theme;
 use crate::lua::eval::value::{Number, Table, Value};
+use crate::ui::dropdown::width;
+use crate::ui::theme;
 use std::io::IsTerminal;
 
 /// Build `oslo.ui`, minus the pieces other modules contribute (`style`, `prompt`).
 pub fn install(ui: &mut Table) {
     terminal(ui);
     text::install(ui);
+    block::install(ui);
     layout::install(ui);
     ask::install(ui);
     prompt::install(ui);
@@ -79,7 +82,7 @@ fn terminal(ui: &mut Table) {
 
 #[cfg(test)]
 mod tests {
-    use crate::interactive::dropdown::width;
+    use crate::ui::dropdown::width;
 
     /// Neither dimension may be zero, whatever the environment does.
     ///

@@ -148,7 +148,7 @@ fn bad_mode(path: &Path) -> Option<u32> {
 
 /// The colour a warning is drawn in.
 ///
-/// True red, given as RGB and left to [`crate::interactive::theme::Depth`] to fold down for a
+/// True red, given as RGB and left to [`crate::ui::theme::Depth`] to fold down for a
 /// terminal that cannot take it — 256 quantises it, 16 lands on plain red, and a `NO_COLOR` run
 /// gets the box with no colour at all. A warning has to survive all four.
 const RED: (u8, u8, u8) = (224, 64, 64);
