@@ -195,15 +195,19 @@ impl Chrome {
         }
 
         let inside = self.inside_width(&rows);
+        // Where the rule ends up once `padded` has put `padding_y` blank rows above it — `boxed`
+        // draws that one row wall to wall rather than inside the walls.
+        let mut rule_at = None;
         if legend {
             let at = rows.len() - 2;
             rows[at] = self.rule(inside);
+            rule_at = Some(at + self.pad_y());
         }
 
         let rows = self.padded(rows, inside);
         let rows = match self.border {
             Border::None => rows,
-            border => self.boxed(&rows, border, inside + self.pad_x() * 2),
+            border => self.boxed(&rows, border, inside + self.pad_x() * 2, rule_at),
         };
         let rows = self.indent(rows);
 
@@ -223,10 +227,16 @@ impl Chrome {
         let widest = rows.iter().map(|r| printed(r)).max().unwrap_or(0);
         match self.fit {
             Fit::Content => widest,
-            // The terminal, less the two border columns and the padding each side. A `Full` box
-            // that ignored its own padding would run off the right-hand edge by exactly that much.
+            // The terminal, less the two border columns, the padding each side, **and one cell
+            // more**.
+            //
+            // That last cell is not timidity. A row whose printed width is exactly the terminal's
+            // leaves the cursor in the auto-wrap pending state, and the `\r\n` that follows then
+            // costs two rows rather than one — so `Panel` reserves N rows, the terminal consumes
+            // 2N, and the bottom of the box is scrolled away. The symptom is a missing
+            // bottom-right corner, and then a missing bottom edge entirely.
             Fit::Full => width::terminal_cols()
-                .saturating_sub(2 + self.pad_x() * 2)
+                .saturating_sub(3 + self.pad_x() * 2)
                 .max(widest),
         }
     }
@@ -266,7 +276,17 @@ impl Chrome {
     }
 
     /// The rows a bordered frame has. `width` is the inside, padding included.
-    fn boxed(&self, rows: &[String], border: Border, width: usize) -> Vec<String> {
+    ///
+    /// `rule_at` is the row that separates the content from the legend. Inside a box it is drawn
+    /// as a line between the two side walls, because a dashed rule that stops short of them reads
+    /// as a rendering fault rather than as a separator.
+    fn boxed(
+        &self,
+        rows: &[String],
+        border: Border,
+        width: usize,
+        rule_at: Option<usize>,
+    ) -> Vec<String> {
         let Some(glyphs) = border.glyphs() else {
             return rows.to_vec();
         };
@@ -277,6 +297,8 @@ impl Chrome {
             bottom_right,
             horizontal,
             vertical,
+            left_tee,
+            right_tee,
         ] = glyphs;
         let depth = theme::depth();
         let paint = |s: &str| self.border_style.paint(s, depth);
@@ -284,8 +306,11 @@ impl Chrome {
         let rule = horizontal.repeat(width);
         let mut out = Vec::with_capacity(rows.len() + 2);
         out.push(paint(&format!("{top_left}{rule}{top_right}")));
-        for row in rows {
-            out.push(format!("{}{row}{}", paint(vertical), paint(vertical)));
+        for (at, row) in rows.iter().enumerate() {
+            match rule_at == Some(at) {
+                true => out.push(paint(&format!("{left_tee}{rule}{right_tee}"))),
+                false => out.push(format!("{}{row}{}", paint(vertical), paint(vertical))),
+            }
         }
         out.push(paint(&format!("{bottom_left}{rule}{bottom_right}")));
         out
@@ -315,15 +340,60 @@ impl Chrome {
     }
 }
 
-/// The rows of a frame, with the redraw escapes stripped.
+/// The rows of a frame, with the redraw escapes stripped and tabs expanded.
 fn rows_of(frame: &str) -> Vec<String> {
     frame
         .split("\r\n")
         .map(|row| {
             let row = row.trim_start_matches('\r');
-            row.strip_prefix("\x1b[K").unwrap_or(row).to_string()
+            untabbed(row.strip_prefix("\x1b[K").unwrap_or(row))
         })
         .collect()
+}
+
+/// Tabs replaced by the spaces they would have printed as.
+///
+/// A tab is one character but eight columns, so a row containing one measures narrower than it
+/// draws and then runs past the right wall of its own box. Nothing downstream can correct for
+/// that — the terminal, not the frame, decides where a tab lands — so the tab is spent here,
+/// while the row is still the only thing on it.
+fn untabbed(row: &str) -> String {
+    if !row.contains('\t') {
+        return row.to_string();
+    }
+    const STOP: usize = 8;
+    let mut out = String::with_capacity(row.len());
+    let mut col = 0usize;
+    let mut chars = row.chars().peekable();
+    while let Some(c) = chars.next() {
+        match c {
+            '\t' => {
+                let spaces = STOP - col % STOP;
+                out.push_str(&" ".repeat(spaces));
+                col += spaces;
+            }
+            '\x1b' => {
+                out.push(c);
+                // An escape occupies no column; copy it through to its final byte.
+                if chars.peek() == Some(&'[') {
+                    out.push(chars.next().unwrap_or('['));
+                    for c in chars.by_ref() {
+                        out.push(c);
+                        if !c.is_ascii_digit() && c != ';' {
+                            break;
+                        }
+                    }
+                } else if let Some(c) = chars.next() {
+                    out.push(c);
+                }
+            }
+            _ => {
+                out.push(c);
+                col += printed(&c.to_string());
+            }
+        }
+    }
+    out
 }
 
 /// A row's width in cells, ignoring colour.

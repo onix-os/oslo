@@ -37,13 +37,13 @@ impl Border {
     }
 
     /// Corners and edges: top-left, top-right, bottom-left, bottom-right, horizontal, vertical.
-    pub(super) fn glyphs(self) -> Option<[&'static str; 6]> {
+    pub(super) fn glyphs(self) -> Option<[&'static str; 8]> {
         Some(match self {
             Border::None => return None,
-            Border::Rounded => ["╭", "╮", "╰", "╯", "─", "│"],
-            Border::Square => ["┌", "┐", "└", "┘", "─", "│"],
-            Border::Double => ["╔", "╗", "╚", "╝", "═", "║"],
-            Border::Thick => ["┏", "┓", "┗", "┛", "━", "┃"],
+            Border::Rounded => ["╭", "╮", "╰", "╯", "─", "│", "├", "┤"],
+            Border::Square => ["┌", "┐", "└", "┘", "─", "│", "├", "┤"],
+            Border::Double => ["╔", "╗", "╚", "╝", "═", "║", "╠", "╣"],
+            Border::Thick => ["┏", "┓", "┗", "┛", "━", "┃", "┣", "┫"],
         })
     }
 }
@@ -105,7 +105,7 @@ pub fn style(spec: &Styling) -> String {
         body.push(" ".repeat(inner));
     }
 
-    let Some([tl, tr, bl, br, h, v]) = spec.border.glyphs() else {
+    let Some([tl, tr, bl, br, h, v, ..]) = spec.border.glyphs() else {
         // No border: the text is styled and padded and nothing else. Each line separately, so a
         // multi-line string does not carry one escape across a newline — which is what makes a
         // styled block survive being piped through `head`.

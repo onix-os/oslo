@@ -113,7 +113,9 @@ note "input status $?"
 ui confirm --border square --border-fg 2 --no-legend "confirm, boxed and quiet"
 note "confirm status $?"
 
-printf 'one\ttwo\nthree\tfour\n' | ui table --border rounded --border-fg 6 --fullscreen --align center
+# Columns are split on `--separator`, a comma by default. Piping tab-separated text without
+# saying so is one field per row, tab and all — which is why this passes what it means.
+printf 'one,two\nthree,four\n' | ui table --border rounded --border-fg 6 --fullscreen --align center
 note "table status $?"
 
 printf '\n'

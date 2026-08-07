@@ -104,12 +104,12 @@ fn the_rule_reaches_both_walls() {
     let rows = super::rows_of(&chrome.wrap(&frame(&["a", "b"]), &keys));
     let rule = rows
         .iter()
-        .find(|r| r.contains('-'))
+        .find(|r| r.contains('├'))
         .expect("a rule somewhere");
     // Every row is the same width, rule included: it spans wall to wall rather than stopping at
     // whatever the content above it happened to be.
     assert_eq!(printed(rule), printed(&rows[0]), "ragged: {rule:?}");
-    let bare = rule.trim_matches(|c| c == '│' || c == ' ');
+    let bare = rule.trim_matches(|c| c == '├' || c == '┤');
     assert!(
         printed(bare) > 20,
         "the rule should span the legend, not the content: {bare:?}"
@@ -253,7 +253,36 @@ fn a_full_border_is_wider_than_the_content() {
     let narrow = printed(&drawn(&hug, &["x"])[0]);
     let wide = printed(&drawn(&full, &["x"])[0]);
     assert!(wide > narrow, "full {wide} should exceed content {narrow}");
-    assert_eq!(wide, width::terminal_cols(), "and reach the edge");
+    // **One cell short of the edge, deliberately.** A row exactly as wide as the terminal leaves
+    // the cursor in the auto-wrap pending state, so the `\r\n` after it costs two rows instead of
+    // one — the panel reserves N and the terminal eats 2N, and the bottom of the box scrolls away.
+    assert_eq!(
+        wide,
+        width::terminal_cols() - 1,
+        "a full-width box must stop one cell short, or it loses its bottom edge"
+    );
+}
+
+/// **Every row of a full-width box, not just the lid.** The wrap only bites on rows that are
+/// exactly the terminal's width, so a box whose lid was short but whose content rows were not would
+/// fail in the same way and be much harder to see.
+#[test]
+fn no_row_of_a_full_box_reaches_the_last_column() {
+    let chrome = Chrome {
+        border: Border::Rounded,
+        fit: Fit::Full,
+        ..Chrome::default()
+    };
+    let keys = [("↑↓", "move"), ("enter", "choose")];
+    let rows = super::rows_of(&chrome.wrap(&frame(&["a", "bb"]), &keys));
+    for row in &rows {
+        assert!(
+            printed(row) < width::terminal_cols(),
+            "{} of {} cells: {row:?}",
+            printed(row),
+            width::terminal_cols()
+        );
+    }
 }
 
 /// Centring moves the whole frame right by half the slack, and every row by the same amount — a
@@ -348,4 +377,74 @@ fn an_empty_frame_is_survivable() {
     };
     let rows = drawn(&chrome, &[""]);
     assert_eq!(rows.len(), 3, "{rows:?}");
+}
+
+/// A tab is one character and eight columns. Left in, a row measures narrower than it draws and
+/// runs past the right wall — the box is sized for `one<TAB>two` at five cells and the terminal
+/// prints eleven.
+#[test]
+fn a_tab_is_spent_before_the_row_is_measured() {
+    let chrome = Chrome {
+        border: Border::Square,
+        ..Chrome::default()
+    };
+    let rows = drawn(&chrome, &["one\ttwo"]);
+    assert!(!rows[1].contains('\t'), "{rows:?}");
+    assert_eq!(printed(&rows[1]), printed(&rows[0]), "{rows:?}");
+    assert_eq!(rows[1], "│ one     two │", "{rows:?}");
+}
+
+/// Every row of a box is the same width, tabs or not — including the lids.
+#[test]
+fn a_tab_does_not_shear_the_box() {
+    let chrome = Chrome {
+        border: Border::Rounded,
+        ..Chrome::default()
+    };
+    let rows = drawn(&chrome, &["a\tb", "a longer row without one"]);
+    let widths: Vec<usize> = rows.iter().map(|row| printed(row)).collect();
+    assert!(widths.windows(2).all(|w| w[0] == w[1]), "{widths:?}");
+}
+
+/// Inside a box the legend separator runs wall to wall. A dashed rule that stops a cell short of
+/// the right wall reads as a rendering fault rather than as a separator.
+#[test]
+fn the_legend_rule_touches_both_walls() {
+    let chrome = Chrome {
+        border: Border::Square,
+        ..Chrome::default()
+    };
+    let rows = super::rows_of(&chrome.wrap(&frame(&["pick one"]), &[("enter", "choose")]));
+    let rule = rows
+        .iter()
+        .find(|row| row.contains('├'))
+        .unwrap_or_else(|| panic!("no rule: {rows:?}"));
+    assert!(rule.ends_with('┤'), "{rule:?}");
+    assert_eq!(printed(rule), printed(&rows[0]), "{rows:?}");
+}
+
+/// The tees follow the border style — a double box gets a double rule, not a light one.
+#[test]
+fn the_rule_is_drawn_in_the_border_it_belongs_to() {
+    let chrome = Chrome {
+        border: Border::Double,
+        ..Chrome::default()
+    };
+    let rows = super::rows_of(&chrome.wrap(&frame(&["pick one"]), &[("enter", "choose")]));
+    assert!(rows.iter().any(|row| row.contains('╠')), "{rows:?}");
+}
+
+/// Padding above the content moves the rule down with it; the rule row is found by index, and an
+/// index that drifts would put the separator through the middle of the legend.
+#[test]
+fn padding_does_not_move_the_rule_off_its_row() {
+    let chrome = Chrome {
+        border: Border::Square,
+        padding_y: 2,
+        ..Chrome::default()
+    };
+    let rows = super::rows_of(&chrome.wrap(&frame(&["pick one"]), &[("enter", "choose")]));
+    let at = rows.iter().position(|row| row.contains('├'));
+    // Below it: the legend, the two padded rows and the lid.
+    assert_eq!(at, Some(rows.len() - 5), "{rows:?}");
 }
