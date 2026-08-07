@@ -162,7 +162,31 @@ pub fn run_repl(login: bool) -> ! {
     let mut universal_stamp = oslo::env::universal::changed_at();
     oslo::env::universal::apply(&mut env_struct.lock().unwrap());
 
+    // The directory whose `.env.lua` is loaded. Seeded from the arrival above, so the first prompt
+    // does not run it a second time.
+    let mut settled = here.clone();
+
     loop {
+        // **Where the shell notices it has moved, by any route at all.**
+        //
+        // The directory environment used to be reconciled in one place only: after a command line
+        // whose start and end directories differed. That misses every other way of moving —
+        // a key binding that jumps, a Lua hook, a `cd` in a sourced file, anything that does not
+        // straddle a whole command — and what is left behind is not nothing. It is the previous
+        // project's `$PATH`, its exported variables and its aliases, in a shell standing somewhere
+        // else. An alias like `_b` then still builds the repository you walked out of, and the
+        // only cure was a `cd` round trip to force the check to run.
+        //
+        // Comparing against the directory last *settled* rather than against where the last
+        // command happened to start makes the route irrelevant: however the shell got here, the
+        // prompt before you type is the moment it has to be true. `arrive` itself is cheap when
+        // nothing has changed, and this only calls it when the directory actually differs.
+        let here = current_directory();
+        if here != settled {
+            environments::arrive(&env_struct, &lua, std::path::Path::new(&here));
+            settled = here;
+        }
+
         // Another shell may have set a universal variable since the last prompt. A `stat` decides
         // whether to read the file, so the common case — nobody changed anything — costs one
         // syscall per prompt rather than a parse.
@@ -344,20 +368,18 @@ pub fn run_repl(login: bool) -> ! {
                 // leaves something behind and this carries it out.
                 oslo::lua::engine::run_deferred_hooks();
 
+                // Where the command left the shell, for the tracker below.
+                //
+                // Nothing is reconciled here any more: the directory environment and the
+                // terminal's idea of where we are are both brought into line at the top of the
+                // loop, before the next prompt, along with every other way of moving. Doing it in
+                // two places meant they disagreed the moment one learned about a route the other
+                // did not, which is exactly how this broke.
+                //
+                // The `post-change-dir` hook is separate and stays where it is: it fires from
+                // `attempt_directory`, which every `cd`, `pushd`, `popd` and jump passes through,
+                // so it catches a move made inside a function or a subshell too.
                 let after = current_directory();
-                if after != before {
-                    // Before the `cd` hook, so a Lua hook that reads an environment variable sees
-                    // the one this directory sets rather than the one the last directory did.
-                    environments::arrive(&env_struct, &lua, std::path::Path::new(&after));
-                    // The `post-change-dir` hook is **not** fired here. It fires from
-                    // `attempt_directory`, which every `cd`, `pushd`, `popd` and jump passes
-                    // through — so it also catches a move made inside a function or a subshell,
-                    // which comparing the directory across a whole command line cannot see. Firing
-                    // in both places would fire it twice for every ordinary `cd`.
-                    // The terminal is told too, so a new split or tab opens here rather than in
-                    // `$HOME`. One write, only when the directory actually changed.
-                    announce(&oslo::ui::marks::working_directory(&after));
-                }
                 let elapsed = started.elapsed();
                 note_command_duration(elapsed);
                 // A chain that stopped part-way says where, and what would carry on from there.
