@@ -99,49 +99,49 @@ where
     }
 }
 
+/// The first `#[name(...)]` hint on `attrs`, read as either `#[name(word)]` or
+/// `#[name(key = "value")]`.
+///
+/// Rewritten for syn 2, which removed `Attribute::parse_meta` and `NestedMeta` in favour of
+/// `parse_nested_meta`. That is a callback rather than a list, so "the first entry wins" — which
+/// is what the old loop meant by returning out of it — is expressed by keeping the first hit and
+/// ignoring the rest.
 pub fn search_hint<T: Hint>(name: &str, attrs: &[syn::Attribute]) -> Option<T> {
-    macro_rules! path_ident {
-        ($path:expr) => {
-            match $path.get_ident() {
-                Some(ident) => ident,
-                None => continue,
-            }
-        };
-    }
+    let mut found = None;
 
     for attr in attrs {
-        let meta = match attr.parse_meta() {
-            Ok(meta) => meta,
-            Err(_) => continue,
-        };
-
-        if path_ident!(meta.path()) != name {
+        if !attr.path().is_ident(name) {
             continue;
-        };
-
-        if let syn::Meta::List(list) = meta {
-            for nested in list.nested {
-                match nested {
-                    syn::NestedMeta::Meta(syn::Meta::Path(path)) => {
-                        return T::unit(path_ident!(path).to_string());
-                    }
-
-                    syn::NestedMeta::Meta(syn::Meta::NameValue(name_value)) => {
-                        return T::key_value(
-                            path_ident!(name_value.path).to_string(),
-                            match name_value.lit {
-                                syn::Lit::Str(lit_str) => lit_str.value(),
-
-                                other => unimplemented!("nested meta value: {:#?}", other),
-                            },
-                        );
-                    }
-
-                    other => unimplemented!("unknown attribute: {:#?}", other),
-                }
+        }
+        // A malformed hint is skipped rather than fatal, as it was before: these attributes are
+        // also read by other derives on the same type, and one of them not understanding an entry
+        // is not an error in this one.
+        let _ = attr.parse_nested_meta(|meta| {
+            if found.is_some() {
+                return Ok(());
             }
+            let Some(ident) = meta.path.get_ident() else {
+                return Ok(());
+            };
+            let key = ident.to_string();
+
+            // `key = "value"` if a value follows, and a bare word otherwise. syn 2 signals which
+            // by whether the input is at an `=`, so the shape is decided here rather than by the
+            // two enum variants the old code matched on.
+            found = match meta.value() {
+                Ok(value) => {
+                    let literal: syn::LitStr = value.parse()?;
+                    T::key_value(key, literal.value())
+                }
+                Err(_) => T::unit(key),
+            };
+            Ok(())
+        });
+
+        if found.is_some() {
+            break;
         }
     }
 
-    None
+    found
 }
