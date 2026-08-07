@@ -21,7 +21,7 @@ proc-macros — each its own dylib to compile and link before oslo's own code ca
 of it reached the binary. `cargo build` was paying for code that dead-code elimination then threw
 away.
 
-After trimming: **72 crates, 13 proc-macros.**
+After trimming: **65 crates, 9 proc-macros, and one version of `syn` instead of three.**
 
 ## What was removed from `brush-parser`
 
@@ -36,10 +36,28 @@ Three non-optional dependencies, none of which survived into the linked binary:
 * **`tracing`** — 8 crates. Eight `tracing::debug!` calls, none reachable without a subscriber that
   oslo never installs.
 
+* **`thiserror`** — now optional, and reached only by the `diagnostics` feature, where `miette`
+  genuinely needs it. Three enums and two newtypes, twenty-eight messages, written out by hand in
+  `error.rs` and `tokenizer.rs`. It was the last thing wanting `syn 3`, so the build now compiles
+  exactly one version of `syn`. Every diagnostic was compared against the previous binary character
+  for character before the derive came out: the wording is what a user sees when a script will not
+  parse, and it has not changed.
+
 Also removed: the `winnow-parser` feature and `parser/winnow_str.rs`, a twenty-line stub for an
 alternative parser that was never finished and never enabled.
 
 Everything else is upstream's, unmodified.
+
+## What was removed from `full_moon_derive`
+
+`indexmap`, which nothing in the crate referenced — a dead entry in the manifest dragging
+`hashbrown 0.12` behind it. And `syn 1` to `syn 2`, which needed one function rewritten:
+`search_hint`, whose `parse_meta`/`NestedMeta` were removed in syn 2 in favour of a
+`parse_nested_meta` callback.
+
+**The crate itself stays.** It generates `Node` and `Visit` for 57 and 44 types; replacing it means
+writing several thousand lines of mechanical recursion to do what 926 lines of generator already
+does. That is copying out a macro's output by hand, not removing a dependency.
 
 ## What was removed from `full_moon`
 

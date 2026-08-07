@@ -81,65 +81,51 @@ pub(crate) struct TokenizeResult {
 }
 
 /// Represents an error that occurred during tokenization.
-#[derive(thiserror::Error, Debug)]
+#[derive(Debug)]
 pub enum TokenizerError {
     /// An unterminated escape sequence was encountered at the end of the input stream.
-    #[error("unterminated escape sequence")]
     UnterminatedEscapeSequence,
 
     /// An unterminated single-quoted substring was encountered at the end of the input stream.
-    #[error("unterminated single quote at {0}")]
     UnterminatedSingleQuote(SourcePosition),
 
     /// An unterminated ANSI C-quoted substring was encountered at the end of the input stream.
-    #[error("unterminated ANSI C quote at {0}")]
     UnterminatedAnsiCQuote(SourcePosition),
 
     /// An unterminated double-quoted substring was encountered at the end of the input stream.
-    #[error("unterminated double quote at {0}")]
     UnterminatedDoubleQuote(SourcePosition),
 
     /// An unterminated back-quoted substring was encountered at the end of the input stream.
-    #[error("unterminated backquote near {0}")]
     UnterminatedBackquote(SourcePosition),
 
     /// An unterminated extended glob (extglob) pattern was encountered at the end of the input
     /// stream.
-    #[error("unterminated extglob near {0}")]
     UnterminatedExtendedGlob(SourcePosition),
 
     /// An unterminated variable expression was encountered at the end of the input stream.
-    #[error("unterminated variable expression")]
     UnterminatedVariable,
 
     /// An unterminated command substitiion was encountered at the end of the input stream.
-    #[error("unterminated command substitution")]
     UnterminatedCommandSubstitution,
 
     /// An unterminated arithmetic or other expansion was encountered at the end of the input
     /// stream.
-    #[error("unterminated expansion")]
     UnterminatedExpansion,
 
     /// An error occurred decoding UTF-8 characters in the input stream.
-    #[error("failed to decode UTF-8 characters")]
     FailedDecoding,
 
     /// An I/O here tag was missing.
-    #[error("missing here tag for here document body")]
     MissingHereTagForDocumentBody,
 
     /// The indicated I/O here tag was missing.
-    #[error("missing here tag '{0}'")]
     MissingHereTag(String),
 
     /// An unterminated here document sequence was encountered at the end of the input stream.
-    #[error("unterminated here document sequence; tag(s) [{0}] found at: [{1}]")]
     UnterminatedHereDocuments(String, String),
 
     /// An I/O error occurred while reading from the input stream.
-    #[error("failed to read input")]
-    ReadError(#[from] std::io::Error),
+    ReadError(std::io::Error),
 }
 
 impl TokenizerError {
@@ -1784,5 +1770,50 @@ HERE2
         assert_eq!(unquote_str(r"'hello'"), "hello");
         assert_eq!(unquote_str(r#""hel\"lo""#), r#"hel"lo"#);
         assert_eq!(unquote_str(r"'hel\'lo'"), r"hel'lo");
+    }
+}
+
+// The `Display` and `Error` impls the `thiserror` derive used to generate for `TokenizerError`.
+// The wording is the derive's, message for message: a shell's diagnostics are its interface, and
+// these are what you see when a quote is left open.
+impl std::fmt::Display for TokenizerError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::UnterminatedEscapeSequence => write!(f, "unterminated escape sequence"),
+            Self::UnterminatedSingleQuote(p) => write!(f, "unterminated single quote at {p}"),
+            Self::UnterminatedAnsiCQuote(p) => write!(f, "unterminated ANSI C quote at {p}"),
+            Self::UnterminatedDoubleQuote(p) => write!(f, "unterminated double quote at {p}"),
+            Self::UnterminatedBackquote(p) => write!(f, "unterminated backquote near {p}"),
+            Self::UnterminatedExtendedGlob(p) => write!(f, "unterminated extglob near {p}"),
+            Self::UnterminatedVariable => write!(f, "unterminated variable expression"),
+            Self::UnterminatedCommandSubstitution => write!(f, "unterminated command substitution"),
+            Self::UnterminatedExpansion => write!(f, "unterminated expansion"),
+            Self::FailedDecoding => write!(f, "failed to decode UTF-8 characters"),
+            Self::MissingHereTagForDocumentBody => {
+                write!(f, "missing here tag for here document body")
+            }
+            Self::MissingHereTag(tag) => write!(f, "missing here tag '{tag}'"),
+            Self::UnterminatedHereDocuments(tags, positions) => write!(
+                f,
+                "unterminated here document sequence; tag(s) [{tags}] found at: [{positions}]"
+            ),
+            Self::ReadError(_) => write!(f, "failed to read input"),
+        }
+    }
+}
+
+impl std::error::Error for TokenizerError {
+    /// Only `ReadError` wrapped anything; it is the one variant that carried `#[from]`.
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::ReadError(e) => Some(e),
+            _ => None,
+        }
+    }
+}
+
+impl From<std::io::Error> for TokenizerError {
+    fn from(e: std::io::Error) -> Self {
+        Self::ReadError(e)
     }
 }

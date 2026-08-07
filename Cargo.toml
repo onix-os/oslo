@@ -85,7 +85,6 @@ regex = { version = "1", default-features = false, features = [
 # a static binary, which rules out lua-cjson and every Lua JSON parser that wraps it. `serde_json`
 # is pure Rust, so it works where those cannot. See PLAN-LUA.md.
 serde_json = "1"
-thiserror = "2.0"
 which = "7.0"
 unicode-segmentation = "1.12"
 unicode-width = "0.2"
