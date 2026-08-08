@@ -40,7 +40,7 @@ pub(super) fn slow_command_notice(
     // The first word, as the title bar gets: a notification is narrow too.
     let what = text.split_whitespace().next().unwrap_or("command");
     let body = format!("{outcome} after {took}");
-    let words = oslo_ui::settings::current().notify_text;
+    let words = oslo_ui::settings::current().notify_text.clone();
     let fill = |template: &str| {
         template
             .replace("{cmd}", text)

@@ -44,7 +44,7 @@ pub struct Settings {
 /// editing anything. `oslo.history` fills in what the environment did not say — which until now it
 /// did not do at all, having been parsed, validated, tested and then read by nothing.
 pub fn settings(env: &Environment) -> Settings {
-    let configured = oslo_ui::settings::current().history;
+    let configured = oslo_ui::settings::current().history.clone();
 
     let file = match env.get_var("HISTFILE") {
         Some("") => None,

@@ -20,7 +20,7 @@ pub(super) fn remember(history: &mut History, text: &str, secret: bool) {
 /// `ls` means only `ls`, and `ls *` means every `ls`. The line is compared as typed, without
 /// trimming: a line the user indented is `ignore_space`'s business, not this one's.
 fn ignored(text: &str) -> bool {
-    let patterns = oslo_ui::settings::current().history.ignore;
+    let patterns = oslo_ui::settings::current().history.ignore.clone();
     patterns
         .iter()
         .any(|pattern| oslo_shell::expand::glob::ShellPattern::from_unquoted(pattern).matches(text))

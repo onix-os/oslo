@@ -127,7 +127,7 @@ pub fn run_repl(login: bool) -> ! {
     // A greeting of your own replaces the banner outright, fish's `fish_greeting`. It is a
     // separate setting from `welcome` rather than an empty-string special case, because "say
     // nothing" and "say this" are different intentions and one of them should not be spelled `""`.
-    let misc = oslo_ui::settings::current().misc;
+    let misc = oslo_ui::settings::current().misc.clone();
     match &misc.greeting {
         Some(greeting) => println!("{greeting}"),
         None if misc.welcome => {

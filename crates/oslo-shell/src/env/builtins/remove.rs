@@ -92,10 +92,11 @@ fn mode_for(env: &Environment, options: &Options) -> Mode {
             trash: None,
         };
     }
-    let settings = oslo_ui::settings::current().builtin.rm;
+    let all = oslo_ui::settings::current();
+    let settings = &all.builtin.rm;
     Mode {
         loose: true,
-        trash: settings.to_tmp.then(|| trash::Trash::new(&settings)),
+        trash: settings.to_tmp.then(|| trash::Trash::new(settings)),
     }
 }
 

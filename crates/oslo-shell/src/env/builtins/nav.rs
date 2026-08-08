@@ -20,7 +20,7 @@ pub fn builtin_nav(env: &mut Environment, args: &[String]) -> Result<i32> {
     }
 
     let all = settings::current();
-    let configured = all.builtin.nav;
+    let configured = &all.builtin.nav;
     let mut look = Preset::History.look();
     look.filter_at = configured.filter_at;
     look.reverse = configured.reverse;

@@ -448,7 +448,10 @@ pub use from_lua::read_lua_settings;
 
 use std::sync::RwLock;
 
-static SETTINGS: RwLock<Option<Settings>> = RwLock::new(None);
+static SETTINGS: RwLock<Option<std::sync::Arc<Settings>>> = RwLock::new(None);
+
+/// What [`current`] answers before a config has been installed.
+static UNCONFIGURED: std::sync::OnceLock<std::sync::Arc<Settings>> = std::sync::OnceLock::new();
 
 /// The settings in force.
 ///
@@ -456,12 +459,15 @@ static SETTINGS: RwLock<Option<Settings>> = RwLock::new(None);
 /// could beat the config that is read after the command line. Both flags are gone and so is it:
 /// `oslo.vi.enabled` is the only place the editing mode lives, which means there is no longer a
 /// second source for the two to disagree from — and one less piece of process-wide mutable state.
-pub fn current() -> Settings {
-    SETTINGS
-        .read()
-        .ok()
-        .and_then(|s| s.clone())
-        .unwrap_or_default()
+/// Shared rather than copied: the editor asks two to four times per keystroke, and a `Settings`
+/// carries every abbreviation and every key binding the config declared.
+pub fn current() -> std::sync::Arc<Settings> {
+    if let Ok(guard) = SETTINGS.read()
+        && let Some(settings) = guard.as_ref()
+    {
+        return std::sync::Arc::clone(settings);
+    }
+    std::sync::Arc::clone(UNCONFIGURED.get_or_init(|| std::sync::Arc::new(Settings::default())))
 }
 
 pub fn install(settings: Settings) {
@@ -476,7 +482,7 @@ pub fn install(settings: Settings) {
         super::theme::set_depth(depth);
     }
     if let Ok(mut slot) = SETTINGS.write() {
-        *slot = Some(settings);
+        *slot = Some(std::sync::Arc::new(settings));
     }
 }
 

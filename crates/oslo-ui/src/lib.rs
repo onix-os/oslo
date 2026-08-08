@@ -42,7 +42,6 @@ use dropdown::CompletionCandidate;
 use frecency_store::FrecencyStore;
 use shell::Shell;
 use spec::SpecRegistry;
-use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
 
 /// Completion kinds worth remembering.
@@ -133,24 +132,16 @@ impl OsloHelper {
         if line.is_empty() {
             return String::new();
         }
-        let (path, builtins, functions) = {
-            let Ok(env) = self.env.lock() else {
-                return line.to_string();
-            };
-            let path = env.var("PATH").unwrap_or_default().to_string();
-            // Snapshotted rather than queried per word: the closures below run once per command
-            // word and would each take the lock again while this one is still held.
-            let builtins: HashSet<String> = env.builtin_names().into_iter().collect();
-            let functions: HashSet<String> = env
-                .functions()
-                .keys()
-                .chain(env.aliases().keys())
-                .cloned()
-                .collect();
-            (path, builtins, functions)
+        // **The guard is held for the whole paint**, so the closures below can ask the environment
+        // directly. Snapshotting into two `HashSet`s existed only because they each re-took the
+        // lock; it cost a `String` and a hash per builtin, function and alias — around 170 of them
+        // — on every keystroke, to answer two or three `contains` calls.
+        let Ok(env) = self.env.lock() else {
+            return line.to_string();
         };
-        let is_builtin = |name: &str| builtins.contains(name);
-        let is_function = |name: &str| functions.contains(name);
+        let path = env.var("PATH").unwrap_or_default().to_string();
+        let is_builtin = |name: &str| env.is_builtin(name);
+        let is_function = |name: &str| env.is_function(name) || env.alias(name).is_some();
         let ctx = highlight::Context {
             path: &path,
             is_builtin: &is_builtin,
@@ -175,7 +166,7 @@ impl OsloHelper {
         if !oslo_base::feature::on(oslo_base::feature::at::SUGGEST) {
             return None;
         }
-        for source in settings::current().suggest.sources {
+        for source in &settings::current().suggest.sources {
             let found = match source {
                 // oslo's own set, not a flat editor history: `recall` is language-filtered and
                 // knows which directory you are standing in, so `cargo run --ex` answers with
