@@ -127,8 +127,15 @@ pub mod at {
 /// Which features are **off**. Bit `n` is `FEATURES[n]`. See the module note on why it is inverted.
 static DISABLED: AtomicU32 = AtomicU32::new(0);
 
-#[cfg(test)]
-pub(crate) static TEST_STATE: std::sync::RwLock<()> = std::sync::RwLock::new(());
+/// Serialises the tests that turn a feature off, in every crate that has any.
+///
+/// **Behind a feature rather than `#[cfg(test)]`, because the bitset is process-wide and the tests
+/// that touch it are not all in this crate.** `cfg(test)` is set only while *this* crate's own
+/// tests compile, so the moment `feature` moved down here the shell's tests could no longer reach
+/// the lock they share — and a lock half the racers cannot see is not a lock. `oslo` enables
+/// `testing` from its dev-dependencies, so a release build still has neither of these.
+#[cfg(any(test, feature = "testing"))]
+pub static TEST_STATE: std::sync::RwLock<()> = std::sync::RwLock::new(());
 
 /// Whether the feature at `index` is in force.
 pub fn on(index: usize) -> bool {
@@ -183,8 +190,10 @@ pub fn listing() -> Vec<(&'static str, bool, &'static str)> {
 }
 
 /// Put every feature back on. For tests, which share one process and therefore one bitset.
-#[cfg(test)]
-pub(crate) fn reset() {
+///
+/// Reachable across crates for the same reason as [`TEST_STATE`].
+#[cfg(any(test, feature = "testing"))]
+pub fn reset() {
     DISABLED.store(0, Ordering::Relaxed);
 }
 

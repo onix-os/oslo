@@ -1148,6 +1148,7 @@ dependencies = [
  "jammdb",
  "maki",
  "nix",
+ "oslo-base",
  "oslo-lua",
  "regex",
  "serde_json",
@@ -1157,6 +1158,17 @@ dependencies = [
  "unicode-segmentation",
  "unicode-width 0.2.2",
  "which",
+]
+
+[[package]]
+name = "oslo-base"
+version = "0.2.21"
+dependencies = [
+ "jammdb",
+ "nix",
+ "oslo-lua",
+ "regex",
+ "tempfile",
 ]
 
 [[package]]

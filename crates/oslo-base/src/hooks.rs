@@ -19,7 +19,7 @@
 //! *interpreter* is the bottom of this stack and the Lua *API* is the top, and only the first is
 //! named here. The same edge already exists as `ShellError::Lua`.
 
-use crate::lua::eval::value::{Table, Value};
+use oslo_lua::value::{Table, Value};
 use std::sync::OnceLock;
 
 /// The moments something on a hot path has to ask about, by index.

@@ -12,16 +12,19 @@
 /// checked against the stack oslo actually provides.
 pub const INTERPRETER_STACK: usize = 16 * 1024 * 1024;
 
-pub mod ast;
+/// The bottom of the stack, which is its own crate.
+///
+/// The syntax tree, the error type, the feature bits, the hook registry and the tracking store —
+/// five things that do not know there is a shell above them. Kept reachable under the names they
+/// had, so `crate::ast::…` and `crate::error::…` still read the same in the thousand places that
+/// use them; the alternative was a rename that said nothing.
+pub use oslo_base::{ast, error, feature, hooks, track};
+
 pub mod data;
 pub mod direnv;
 pub mod env;
-pub mod error;
 pub mod exec;
 pub mod expand;
-/// Parts of the shell a config can turn off and on again while it runs.
-pub mod feature;
-pub mod hooks;
 pub mod lexer;
 pub mod lua;
 pub mod parser;
@@ -29,7 +32,6 @@ pub mod parser;
 /// is still undecided.
 #[cfg(feature = "ssh")]
 pub mod ssh;
-pub mod track;
 pub mod ui;
 
 pub use env::Environment;

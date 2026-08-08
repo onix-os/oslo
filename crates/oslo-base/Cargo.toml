@@ -1,0 +1,35 @@
+[package]
+name = "oslo-base"
+version = "0.2.21"
+edition = "2024"
+rust-version = "1.88"
+license = "MIT"
+description = "The bottom of oslo: the syntax tree, the error type, feature bits, the hook registry, and the tracking store."
+
+[dependencies]
+# The interpreter, for the two things down here that carry a Lua value: `ShellError::Lua` and the
+# payload a hook is fired with. Both point downward — this crate names the Lua *evaluator*, never
+# the Lua *API*, which sits at the top of the stack.
+oslo-lua = { path = "../oslo-lua" }
+
+# `track` only. Kept behind `track::kv` rather than named at call sites: the crate has one
+# maintainer, and a single point of contact is what makes replacing it a change to one file.
+jammdb = "0.11"
+
+# `track`'s query matching. Trimmed to the same feature set the shell uses, and for the same
+# measured reasons — see the note in the root manifest.
+regex = { version = "1", default-features = false, features = [
+    "std", "unicode-case", "unicode-gencat", "unicode-perl",
+    "perf-literal", "perf-inline",
+] }
+
+# `ShellError::Nix` and the hostname a session is recorded under.
+nix = { version = "0.29", features = ["hostname"] }
+
+[features]
+# Exposes the lock and the reset that serialise tests touching the process-wide feature bitset.
+# Enabled by `oslo`'s dev-dependencies, so it is absent from any build that is not a test.
+testing = []
+
+[dev-dependencies]
+tempfile = "3.17"

@@ -105,6 +105,7 @@ unicode-width = "0.2"
 # item, so the arithmetic-for rule never sees the two `;` it asks for. That is a loud syntax error
 # rather than a wrong answer — see tests/differential/expected_fail.rs.
 brush-parser = { path = "vendor/brush-parser" }
+oslo-base = { path = "crates/oslo-base" }
 oslo-lua = { path = "crates/oslo-lua" }
 # The allow list for directory environments is keyed by a hash of the rc file's path *and* its
 # contents, which is what makes editing an allowed file revoke it. Pure Rust, so it does not cost
@@ -141,10 +142,17 @@ tempfile = "3.17"
 # documented upstream.
 jammdb = "0.11"
 
-# A one-package workspace, stated explicitly so `cargo fmt --all` and the 600-line limit apply
-# to this crate and nothing else. `fuzz/` declares its own empty [workspace] to stay out.
+# The same crate as above, with the switch that exposes the lock serialising tests which touch the
+# process-wide feature bitset. Cargo unifies the two when it builds a test and does not when it
+# builds the shell, so a release binary carries neither the lock nor the reset.
+[dev-dependencies]
+oslo-base = { path = "crates/oslo-base", features = ["testing"] }
+
+# The crates oslo is built from, and the ones it vendors. `fuzz/` declares its own empty
+# [workspace] to stay out.
 [workspace]
 members = [
+  "crates/oslo-base",
   "crates/oslo-lua",
   "vendor/brush-parser",
   "vendor/full_moon",

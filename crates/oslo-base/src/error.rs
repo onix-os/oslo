@@ -22,7 +22,7 @@ pub enum ShellError {
 
     Io(std::io::Error),
 
-    Lua(crate::lua::eval::LuaError),
+    Lua(oslo_lua::LuaError),
 
     Nix(nix::Error),
 
@@ -103,8 +103,8 @@ impl From<std::io::Error> for ShellError {
     }
 }
 
-impl From<crate::lua::eval::LuaError> for ShellError {
-    fn from(e: crate::lua::eval::LuaError) -> Self {
+impl From<oslo_lua::LuaError> for ShellError {
+    fn from(e: oslo_lua::LuaError) -> Self {
         ShellError::Lua(e)
     }
 }
@@ -188,7 +188,7 @@ impl ShellError {
     /// shell survives it — `None` for every other error.
     ///
     /// The point is the *diagnostic*: a utility error's message is already on stderr, so a caller
-    /// that let it reach [`crate::exec::pipeline::report_error_status`] would print it twice.
+    /// that let it reach `exec::pipeline::report_error_status` would print it twice.
     /// `command` and `builtin` reach a builtin without going through
     /// `crate::exec::simple::posix`, and POSIX 2.9.1.1 says `command` strips a special builtin of
     /// exactly the property that would have made the error fatal, so folding here is also the

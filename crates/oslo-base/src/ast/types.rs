@@ -354,7 +354,7 @@ pub struct Pipeline {
     /// A property of the pipeline rather than of a command, because that is what `time` measures:
     /// `time a | b` times the whole pipe, not `a`. It changes nothing about what the pipeline
     /// runs, what it writes to stdout, or the status it reports — see
-    /// [`crate::exec::pipeline::eval_pipeline`].
+    /// `exec::pipeline::eval_pipeline`.
     pub timed: bool,
     pub commands: Vec<Command>,
 }
