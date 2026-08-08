@@ -76,7 +76,7 @@ fn exec_stmt(interp: &Interp, statement: &Stmt, scope: &Rc<Scope>) -> LuaResult<
             // own name already exists — that is what makes `local function f() return f() end`
             // recurse instead of finding nil.
             scope.declare(Rc::clone(&name), Value::Nil);
-            let function = expr::make_closure(local.body(), scope, Some(Rc::clone(&name)));
+            let function = expr::make_closure(interp, local.body(), scope, Some(Rc::clone(&name)));
             scope.declare(name, function);
             Ok(Flow::Normal)
         }
@@ -91,7 +91,7 @@ fn exec_stmt(interp: &Interp, statement: &Stmt, scope: &Rc<Scope>) -> LuaResult<
             }
 
             let label: Rc<str> = Rc::from(parts.join(".").as_str());
-            let mut function = expr::make_closure(declaration.body(), scope, Some(label));
+            let mut function = expr::make_closure(interp, declaration.body(), scope, Some(label));
 
             // `function t.a.b:m()` gains an implicit `self`, and lands in `t.a.b` under `m`.
             if method.is_some() {
@@ -117,8 +117,7 @@ fn exec_stmt(interp: &Interp, statement: &Stmt, scope: &Rc<Scope>) -> LuaResult<
 
         Stmt::FunctionCall(call) => {
             // A call as a statement: results are discarded, but the call still happens.
-            let expression = Expression::FunctionCall(call.clone());
-            expr::eval_multi(interp, &expression, scope)?;
+            expr::call_function(interp, call, scope)?;
             Ok(Flow::Normal)
         }
 
