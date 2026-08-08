@@ -318,7 +318,7 @@ pub fn expand_word(env: &mut Environment, word: &Word) -> Result<Vec<String>> {
     let fields = expand_word_fields(env, word)?;
     let ifs = ifs_of(env);
     for field in fields {
-        for split in split_field(&ifs, field) {
+        for split in split_field(ifs, field) {
             if glob {
                 out.extend(expand_glob(&split));
             } else {
@@ -331,8 +331,7 @@ pub fn expand_word(env: &mut Environment, word: &Word) -> Result<Vec<String>> {
     // because `echo =foo` in a script has to print `=foo` the way every other `/bin/sh` does.
     if env.interactive() {
         for field in &mut out {
-            let expanded = crate::expand::sugar::expand_field(env, field);
-            if &expanded != field {
+            if let Some(expanded) = crate::expand::sugar::expand_field(env, field) {
                 *field = expanded;
             }
         }

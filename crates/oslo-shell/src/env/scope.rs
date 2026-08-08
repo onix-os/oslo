@@ -511,6 +511,14 @@ impl Environment {
     pub fn get_positional(&self) -> &[String] {
         &self.positional
     }
+
+    /// Install `params` as `$1…` and hand back what was there.
+    ///
+    /// What a function call wants. Reading the caller's parameters out and putting them back
+    /// afterwards copied every one of them twice per call; both halves are moves here.
+    pub fn swap_positional(&mut self, params: Vec<String>) -> Vec<String> {
+        std::mem::replace(&mut self.positional, params)
+    }
 }
 
 /// The editor's view of the shell.

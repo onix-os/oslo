@@ -447,8 +447,7 @@ fn call_function(
         return Ok(report_redirect_failure(&e));
     }
 
-    let old_pos = env.get_positional().to_vec();
-    env.set_positional(words[1..].to_vec());
+    let old_pos = env.swap_positional(words[1..].to_vec());
     env.push_scope();
     let res = eval_command(env, body);
     env.pop_scope();

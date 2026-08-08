@@ -160,7 +160,7 @@ impl Splitter<'_> {
 /// `names` must not be empty; the caller handles `REPLY` and `-N`, neither of which splits.
 pub fn assign_fields(env: &mut Environment, names: &[String], line: &InputLine) {
     let ifs = ifs_of(env);
-    let splitter = Splitter { ifs: &ifs, line };
+    let splitter = Splitter { ifs, line };
 
     let mut pos = 0;
     let leading = names
@@ -185,7 +185,7 @@ pub fn assign_fields(env: &mut Environment, names: &[String], line: &InputLine) 
 /// Every field the line splits into, for `read -a`.
 pub fn all_fields(env: &Environment, line: &InputLine) -> Vec<String> {
     let ifs = ifs_of(env);
-    let splitter = Splitter { ifs: &ifs, line };
+    let splitter = Splitter { ifs, line };
     splitter.fields_in(0, splitter.len())
 }
 

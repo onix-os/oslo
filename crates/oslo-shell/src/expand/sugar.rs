@@ -57,19 +57,20 @@ pub fn named_dir(name: &str) -> Option<String> {
 
 /// Apply the interactive shorthands to one already-expanded field.
 ///
-/// Returns the field unchanged when nothing applies, which is the overwhelmingly common case and
-/// the only case in a script.
-pub fn expand_field(env: &Environment, field: &str) -> String {
+/// `None` when the field is not one of these — which is every field of almost every command.
+/// Answering with the field copied back meant a `String` per argument per interactive command, to
+/// say that nothing had happened.
+pub fn expand_field(env: &Environment, field: &str) -> Option<String> {
     if !env.interactive() {
-        return field.to_string();
+        return None;
     }
     if let Some(rest) = field.strip_prefix('=') {
-        return equals(rest).unwrap_or_else(|| field.to_string());
+        return equals(rest);
     }
     if let Some(rest) = field.strip_prefix('@') {
-        return at_name(rest).unwrap_or_else(|| field.to_string());
+        return at_name(rest);
     }
-    field.to_string()
+    None
 }
 
 /// `=name` — where that command lives, or `None` if it is not a command.
@@ -108,13 +109,18 @@ mod tests {
         env
     }
 
+    /// What the field becomes: the rewrite, or the field itself when there was none.
+    fn field(env: &Environment, text: &str) -> String {
+        expand_field(env, text).unwrap_or_else(|| text.to_string())
+    }
+
     /// The safety property: a script sees none of this, because `echo =foo` has to print `=foo`
     /// the way every other `/bin/sh` does.
     #[test]
     fn a_script_gets_none_of_it() {
         let env = Environment::new();
-        assert_eq!(expand_field(&env, "=sh"), "=sh");
-        assert_eq!(expand_field(&env, "@work"), "@work");
+        assert_eq!(field(&env, "=sh"), "=sh");
+        assert_eq!(field(&env, "@work"), "@work");
     }
 
     /// `=name` resolves to a path, and a name that resolves to nothing is left alone — which is
@@ -122,19 +128,19 @@ mod tests {
     #[test]
     fn equals_resolves_a_command_and_ignores_everything_else() {
         let env = interactive();
-        let resolved = expand_field(&env, "=sh");
+        let resolved = field(&env, "=sh");
         assert!(resolved.starts_with('/'), "{resolved:?}");
         assert!(resolved.ends_with("/sh"), "{resolved:?}");
 
         assert_eq!(
-            expand_field(&env, "=definitely-not-a-command"),
+            field(&env, "=definitely-not-a-command"),
             "=definitely-not-a-command"
         );
-        assert_eq!(expand_field(&env, "="), "=");
+        assert_eq!(field(&env, "="), "=");
         // A path is not a command name; `=./x` is left for the filesystem to answer for.
-        assert_eq!(expand_field(&env, "=/bin/sh"), "=/bin/sh");
+        assert_eq!(field(&env, "=/bin/sh"), "=/bin/sh");
         // And a word that merely contains `=` is untouched: `FOO=bar` must survive.
-        assert_eq!(expand_field(&env, "FOO=bar"), "FOO=bar");
+        assert_eq!(field(&env, "FOO=bar"), "FOO=bar");
     }
 
     #[test]
@@ -145,14 +151,11 @@ mod tests {
             "/home/u/work".to_string(),
         )]));
 
-        assert_eq!(expand_field(&env, "@work"), "/home/u/work");
-        assert_eq!(
-            expand_field(&env, "@work/src/main.rs"),
-            "/home/u/work/src/main.rs"
-        );
+        assert_eq!(field(&env, "@work"), "/home/u/work");
+        assert_eq!(field(&env, "@work/src/main.rs"), "/home/u/work/src/main.rs");
         // An unregistered name is left alone, as an unresolved `=` is.
-        assert_eq!(expand_field(&env, "@nowhere"), "@nowhere");
-        assert_eq!(expand_field(&env, "@"), "@");
+        assert_eq!(field(&env, "@nowhere"), "@nowhere");
+        assert_eq!(field(&env, "@"), "@");
 
         set_named_dirs(HashMap::new());
     }

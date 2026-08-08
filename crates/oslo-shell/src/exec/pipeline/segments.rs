@@ -247,6 +247,12 @@ pub fn last_chain() -> Vec<Segment> {
 /// `None` when the line succeeded, when nothing ran, or when it was not a chain — in each case
 /// there is nothing to resume *from*, which is different from having nothing to resume.
 pub fn resumable() -> Option<String> {
+    // The length is asked first because taking the buffer clones every segment in it, and a single
+    // command — which is what most lines are — has nothing to rebuild from anyway. This runs after
+    // every interactive command.
+    if !was_a_chain() {
+        return None;
+    }
     rebuild_from(&taken())
 }
 

@@ -4,8 +4,8 @@ use crate::env::Environment;
 use crate::expand::word::{Field, Origin, Run};
 
 /// The active IFS, defaulting to space/tab/newline when the variable is unset.
-pub fn ifs_of(env: &Environment) -> String {
-    env.get_var("IFS").unwrap_or(" \t\n").to_string()
+pub fn ifs_of(env: &Environment) -> &str {
+    env.get_var("IFS").unwrap_or(" \t\n")
 }
 
 /// Split one field on IFS, honouring where each run came from.
