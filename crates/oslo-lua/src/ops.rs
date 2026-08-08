@@ -204,6 +204,11 @@ pub fn compare(interp: &Interp, op: &str, lhs: &Value, rhs: &Value) -> LuaResult
     // Numbers compare numerically, strings lexicographically, and the two never compare with each
     // other — `1 < "2"` is an error in Lua, not a coercion.
     if let (Value::Number(a), Value::Number(b)) = (lhs, rhs) {
+        // **Two integers compare as integers.** Going through `f64` first is lossy above 2^53, so
+        // `math.maxinteger - 1 < math.maxinteger` compared two equal floats and answered false.
+        if let (Number::Int(x), Number::Int(y)) = (a, b) {
+            return Ok(if op == "<" { x < y } else { x <= y });
+        }
         let (x, y) = (a.as_float(), b.as_float());
         return Ok(if op == "<" { x < y } else { x <= y });
     }

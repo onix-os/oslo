@@ -6,7 +6,7 @@
 
 use super::expr::{self, first, line_of, unsupported};
 use super::scope::Scope;
-use super::value::Value;
+use super::value::{Number, Value};
 use super::{Flow, Interp, LuaError, LuaResult, ops};
 use full_moon::ast::{Block, Expression, LastStmt, Stmt, Var};
 use std::rc::Rc;
@@ -177,21 +177,26 @@ fn exec_stmt(interp: &Interp, statement: &Stmt, scope: &Rc<Scope>) -> LuaResult<
         }
 
         Stmt::NumericFor(numeric) => {
+            // **Each bound is evaluated exactly once.** Asking for the number and then asking
+            // again whether it was an integer ran `for i = 1, f()` with `f` called twice, and
+            // looped to the second answer.
             let start = number(interp, numeric.start(), scope, "'for' initial value")?;
             let limit = number(interp, numeric.end(), scope, "'for' limit")?;
             let step = match numeric.step() {
                 Some(e) => number(interp, e, scope, "'for' step")?,
-                None => 1.0,
+                None => Number::Int(1),
             };
-            if step == 0.0 {
+            if step.as_float() == 0.0 {
                 return Err(LuaError::new("'for' step is zero"));
             }
 
             // Kept as f64 for the loop test, but handed to the body as an integer when every part
             // was one — otherwise `for i = 1, 3` would bind `1.0` and `t[i]` would miss.
-            let integral = is_int(interp, numeric.start(), scope)
-                && is_int(interp, numeric.end(), scope)
-                && numeric.step().is_none_or(|e| is_int(interp, e, scope));
+            let integral = matches!(
+                (start, limit, step),
+                (Number::Int(_), Number::Int(_), Number::Int(_))
+            );
+            let (start, limit, step) = (start.as_float(), limit.as_float(), step.as_float());
 
             let name: Rc<str> = Rc::from(numeric.index_variable().token().to_string().as_str());
             let mut current = start;
@@ -357,22 +362,11 @@ fn number(
     expression: &Expression,
     scope: &Rc<Scope>,
     what: &str,
-) -> LuaResult<f64> {
+) -> LuaResult<Number> {
     let value = expr::eval(interp, expression, scope)?;
     value
         .as_number()
-        .map(|n| n.as_float())
         .ok_or_else(|| LuaError::new(format!("{what} must be a number")))
-}
-
-/// Whether a for-loop bound is an integer, deciding what the loop variable binds as.
-fn is_int(interp: &Interp, expression: &Expression, scope: &Rc<Scope>) -> bool {
-    matches!(
-        expr::eval(interp, expression, scope)
-            .ok()
-            .and_then(|v| v.as_number()),
-        Some(super::value::Number::Int(_))
-    )
 }
 
 /// Discard everything but the first value — used where a statement wants one.
