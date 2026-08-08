@@ -393,7 +393,12 @@ impl Default for Nav {
             height: 0,
             hidden: false,
             filter_at: super::ask::Where::Bottom,
-            reverse: true,
+            // **Downward, because the path is above it.** A reversed list grows towards the filter
+            // and leaves its unused rows at the top — which is right for the history finder, whose
+            // filter is the only thing above it, and wrong here: those rows land between the path
+            // and the first entry. On a tall terminal that was seven blank lines splitting the
+            // widget in half.
+            reverse: false,
             scanner: true,
         }
     }

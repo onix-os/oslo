@@ -18,6 +18,40 @@ fn directories_sort_first_and_hidden_entries_are_optional() {
     assert!(all.iter().any(|entry| entry.name == ".hidden"));
 }
 
+/// **An empty directory still has a path to show.**
+///
+/// The width is taken from the widest row, and a directory with no rows has none — so the box
+/// collapsed to a single column and the heading rendered as one `…`, which is what the whole
+/// widget became the moment you walked into an empty directory. The path is part of the block and
+/// has to count towards its width like anything else.
+#[test]
+fn a_directory_with_nothing_in_it_is_still_as_wide_as_its_path() {
+    let look = crate::ui::ask::look::Preset::History.look();
+    let gutter = look.pad + crate::ui::prompt::printed_width(&look.marker);
+    let view = View {
+        selected: 0,
+        offset: 0,
+        height: 0,
+        query: "",
+        matched: 0,
+        total: 0,
+        marked: 0,
+        cols: 0,
+        filtering: false,
+        elapsed_ms: 0,
+    };
+
+    let empty = look.natural_width(&[], &view);
+    assert_eq!(empty, 0, "nothing to measure");
+
+    let path = "/tmp/somewhere/with/a/reasonably/long/name";
+    let needed = empty.max(crate::ui::prompt::printed_width(path) + gutter);
+    assert!(
+        needed >= path.len(),
+        "the box must not be narrower than the path it is showing: {needed}"
+    );
+}
+
 #[test]
 fn filtering_ranks_names() {
     let entries = vec![

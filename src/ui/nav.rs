@@ -50,6 +50,13 @@ enum Mode {
 struct State {
     at: PathBuf,
     entries: Vec<Entry>,
+    /// How wide the listing wants to be, measured once per directory.
+    ///
+    /// **Across every entry, not the ones the filter currently matches**, or the block would be as
+    /// wide as the longest surviving name and would resize and re-centre under the cursor on every
+    /// keystroke. Cached because it means formatting every row, which a directory of ten thousand
+    /// files should not do per keypress.
+    natural: Option<usize>,
     error: Option<String>,
     hidden: bool,
     query: String,
@@ -72,6 +79,7 @@ impl State {
             shown: (0..entries.len()).collect(),
             at,
             entries,
+            natural: None,
             error,
             hidden: spec.hidden,
             query: String::new(),
@@ -93,6 +101,7 @@ impl State {
     fn load(&mut self, to: PathBuf, highlight: Option<String>) {
         self.at = to.canonicalize().unwrap_or(to);
         (self.entries, self.error) = read(&self.at, self.hidden);
+        self.natural = None;
         self.shown = (0..self.entries.len()).collect();
         self.selected = highlight
             .and_then(|name| self.entries.iter().position(|entry| entry.name == name))
@@ -107,6 +116,7 @@ impl State {
         let old_selected = self.selected;
         let selected_name = highlight.or_else(|| self.selected_name());
         (self.entries, self.error) = read(&self.at, self.hidden);
+        self.natural = None;
         self.shown = (0..self.entries.len()).collect();
         self.selected = selected_name
             .and_then(|name| self.entries.iter().position(|entry| entry.name == name))
@@ -252,11 +262,19 @@ pub fn open(spec: &Navigator, mut remove: impl FnMut(&Path) -> bool) -> Outcome 
         let extra = 1 + chrome_rows + look.extra_rows(filtering);
         let available = terminal_rows.saturating_sub(extra + 1).max(1);
         let height = match spec.height {
+            // Half the screen is the *ceiling*, not the size. A directory of nine entries asking
+            // for twenty-four rows drew fifteen blank ones, and the block read as a list with a
+            // hole in it rather than as a list.
+            //
+            // Measured against everything here rather than what the filter currently matches, so
+            // typing does not resize the widget and move it under the cursor: the block is as tall
+            // as the directory, and filtering empties rows inside it.
             0 if spec.chrome.fullscreen => terminal_rows
                 .saturating_div(2)
                 .saturating_sub(extra)
                 .max(1)
-                .min(available),
+                .min(available)
+                .min(state.entries.len().max(1)),
             0 => available.min(state.shown.len().max(1)).min(14),
             wanted => wanted.min(available),
         };
@@ -267,12 +285,63 @@ pub fn open(spec: &Navigator, mut remove: impl FnMut(&Path) -> bool) -> Outcome 
             state.offset = state.selected + 1 - height;
         }
 
+        let rows: Vec<Row> = state
+            .shown
+            .iter()
+            .map(|&index| row_of(&state.entries[index], ui.question))
+            .collect();
+
+        // What the listing would take if nothing were stretched. `cols` is not read for this, and
+        // neither is the height: only the counts a trail template could interpolate.
+        let natural = match state.natural {
+            Some(width) => width,
+            None => {
+                let all: Vec<Row> = state
+                    .entries
+                    .iter()
+                    .map(|entry| row_of(entry, ui.question))
+                    .collect();
+                let width = look
+                    .natural_width(
+                        &all,
+                        &View {
+                            selected: 0,
+                            offset: 0,
+                            height: 0,
+                            query: "",
+                            matched: state.entries.len(),
+                            total: state.entries.len(),
+                            marked: 0,
+                            cols: 0,
+                            filtering,
+                            elapsed_ms: 0,
+                        },
+                    )
+                    .max(1);
+                state.natural = Some(width);
+                width
+            }
+        };
+
+        // **The path counts towards the width as much as the listing does.** An empty directory has
+        // no rows to measure, so a width taken from the listing alone collapsed to a single column
+        // and the heading rendered as one ellipsis — the whole widget reduced to `…` the moment you
+        // opened a directory with nothing in it.
+        let gutter = look.pad + crate::ui::prompt::printed_width(&look.marker);
+        let needed =
+            natural.max(crate::ui::prompt::printed_width(&state.at.display().to_string()) + gutter);
+
         let room = spec.chrome.room();
         let cols = match spec.width {
+            // Half the terminal is the ceiling here too, and for the same reason it is one
+            // vertically: rows are padded out to whatever width they are given, so a hundred-column
+            // box holding forty-six columns of listing put fifty blank cells between every filename
+            // and its age.
             0 => crate::ui::dropdown::width::terminal_cols()
                 .saturating_div(2)
                 .max(1)
-                .min(room),
+                .min(room)
+                .min(needed),
             wanted => wanted.min(room).max(1),
         };
         // **The heading starts where the rows start.**
@@ -281,7 +350,6 @@ pub fn open(spec: &Navigator, mut remove: impl FnMut(&Path) -> bool) -> Outcome 
         // and had neither, so the path sat that many cells to the left of everything under it and
         // the block read as two things that had come apart. The offset is taken from the look
         // rather than written down, so a wider marker or more padding moves both together.
-        let gutter = look.pad + crate::ui::prompt::printed_width(&look.marker);
         let inset = " ".repeat(gutter);
         let cols = cols.max(gutter + 1);
         let told = cols - gutter;
@@ -299,11 +367,6 @@ pub fn open(spec: &Navigator, mut remove: impl FnMut(&Path) -> bool) -> Outcome 
             None => ui.question.paint(&path, depth),
         };
         let mut frame = format!("\r\n\r\x1b[K{inset}{heading}");
-        let rows: Vec<Row> = state
-            .shown
-            .iter()
-            .map(|&index| row_of(&state.entries[index], ui.question))
-            .collect();
         frame.push_str(&look.frame(
             &rows,
             &View {

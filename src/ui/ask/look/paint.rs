@@ -155,6 +155,30 @@ impl Look {
         }
     }
 
+    /// How wide these rows would be if nothing were stretched to fill.
+    ///
+    /// [`Width::Full`] pads every row out to `view.cols`, which is what makes a selected row's
+    /// colour reach both edges — and on a wide terminal it is also what puts fifty blank columns
+    /// between a filename and its age, because the trail is right-aligned to that edge. A widget
+    /// free to choose its own width asks this first and takes the smaller of the two.
+    ///
+    /// `view.cols` is not read; only the counts a trail template might interpolate are.
+    pub fn natural_width(&self, rows: &[Row], view: &View<'_>) -> usize {
+        let meta: usize = meta_widths(rows).iter().map(|width| width + 1).sum();
+        let marker = printed_width(&self.marker);
+        rows.iter()
+            .map(|row| {
+                self.pad * 2
+                    + marker
+                    + printed_width(&row.lead)
+                    + meta
+                    + printed_width(&Look::fill(&row.trail, view))
+                    + printed_width(&row.text)
+            })
+            .max()
+            .unwrap_or(0)
+    }
+
     /// One row: the marker, the lead, the meta columns, the text with its matches marked, and the
     /// trail.
     fn list_row(
