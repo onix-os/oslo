@@ -112,6 +112,10 @@ fn permit(argument: Option<&String>, allow: bool) -> i32 {
 /// variables with no record of how to remove them. Forgetting is enough — the next directory check
 /// finds no loaded state, so it loads, and the load takes its own snapshot.
 fn reload(_env: &mut Environment) -> i32 {
+    // The remembered dev-shell evaluation too. It is keyed on the flake's own files, so `reload` is
+    // the only way to say "something it cannot see has changed" — a new nix, or an input the flake
+    // reads that is not one of the files being watched.
+    direnv::devshell::forget();
     direnv::with(|direnv| direnv.invalidate());
     direnv::request_reload();
     println!("direnv: reloading");
