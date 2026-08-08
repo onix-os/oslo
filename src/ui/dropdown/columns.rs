@@ -222,7 +222,24 @@ fn columns_and_source(cand: &CompletionCandidate, facts: &Facts) -> (Vec<String>
 /// eighty-column terminal with a deep prompt that is the difference between a row that says
 /// `examples/  dir  12 items` and one that says `examples/` followed by blanks.
 pub fn columns_for_rows(candidates: &[CompletionCandidate]) -> Vec<Vec<String>> {
-    let descriptions = crate::ui::settings::current().completion.descriptions;
+    with_descriptions(
+        candidates,
+        crate::ui::settings::current().completion.descriptions,
+    )
+}
+
+/// [`columns_for_rows`], told whether descriptions are on rather than reading it.
+///
+/// **The setting is process-wide, and reading it here made this untestable without writing it.**
+/// The test below did exactly that, and every other test rendering at the same moment read what it
+/// had installed: `long_labels_and_descriptions_are_ellipsised` failed about once in ten full runs
+/// because it happened to render while descriptions were off, in a listing it never asked for.
+/// Taking the answer as an argument leaves the shell's own startup as the only writer of that
+/// global, which is the only way a test suite that runs in parallel can share one.
+pub(crate) fn with_descriptions(
+    candidates: &[CompletionCandidate],
+    descriptions: bool,
+) -> Vec<Vec<String>> {
     let mut rows: Vec<Vec<String>> = candidates
         .iter()
         .map(|c| {
@@ -380,16 +397,10 @@ mod tests {
         c.description = Some("run it".to_string());
         c.detail = Some("git status".to_string());
 
-        crate::ui::settings::install(crate::ui::settings::Settings {
-            completion: crate::ui::settings::Completion {
-                descriptions: false,
-                ..Default::default()
-            },
-            ..Default::default()
-        });
-        let off = columns_for_rows(std::slice::from_ref(&c));
-        crate::ui::settings::install(Default::default());
-        let on = columns_for_rows(std::slice::from_ref(&c));
+        // Asked directly rather than through the installed settings. Writing those from a test
+        // reaches every other test in the process; see `with_descriptions`.
+        let off = with_descriptions(std::slice::from_ref(&c), false);
+        let on = with_descriptions(std::slice::from_ref(&c), true);
 
         assert_eq!(off, vec![vec!["git status".to_string()]]);
         assert_eq!(
