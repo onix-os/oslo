@@ -6,7 +6,7 @@ mod startup;
 // History expansion belongs to the *binary's* prompt, never to the library: it rewrites a line
 // before it is parsed, so reaching it from `-c` or a script would let data turn into a different
 // command. Declaring it here rather than from `ui::mod` is what makes that unreachable.
-#[path = "ui/history_expand.rs"]
+
 mod history_expand;
 
 use cli::{Action, Invocation};

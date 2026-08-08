@@ -107,6 +107,7 @@ unicode-width = "0.2"
 brush-parser = { path = "vendor/brush-parser" }
 oslo-base = { path = "crates/oslo-base" }
 oslo-lua = { path = "crates/oslo-lua" }
+oslo-ui = { path = "crates/oslo-ui" }
 # The allow list for directory environments is keyed by a hash of the rc file's path *and* its
 # contents, which is what makes editing an allowed file revoke it. Pure Rust, so it does not cost
 # the static musl build a C toolchain.
@@ -147,6 +148,7 @@ jammdb = "0.11"
 # builds the shell, so a release binary carries neither the lock nor the reset.
 [dev-dependencies]
 oslo-base = { path = "crates/oslo-base", features = ["testing"] }
+oslo-ui = { path = "crates/oslo-ui", features = ["testing"] }
 
 # The crates oslo is built from, and the ones it vendors. `fuzz/` declares its own empty
 # [workspace] to stay out.
@@ -154,6 +156,7 @@ oslo-base = { path = "crates/oslo-base", features = ["testing"] }
 members = [
   "crates/oslo-base",
   "crates/oslo-lua",
+  "crates/oslo-ui",
   "vendor/brush-parser",
   "vendor/full_moon",
   "vendor/full_moon/derive",

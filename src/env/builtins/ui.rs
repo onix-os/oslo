@@ -276,18 +276,6 @@ fn from_stdin() -> Vec<String> {
         .collect()
 }
 
-impl<T> Answer<T> {
-    /// Map the value, keeping the status. Lets `input`'s single string be reported by the same
-    /// code that reports `choose`'s list.
-    fn map<U>(self, f: impl FnOnce(T) -> U) -> Answer<U> {
-        match self {
-            Answer::Given(value) => Answer::Given(f(value)),
-            Answer::Cancelled => Answer::Cancelled,
-            Answer::NoTerminal => Answer::NoTerminal,
-        }
-    }
-}
-
 #[cfg(test)]
 #[path = "ui/tests.rs"]
 mod tests;

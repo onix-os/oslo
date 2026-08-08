@@ -20,6 +20,9 @@ pub const INTERPRETER_STACK: usize = 16 * 1024 * 1024;
 /// use them; the alternative was a rename that said nothing.
 pub use oslo_base::{ast, error, feature, hooks, nesting, track};
 
+#[cfg(test)]
+mod ui_tests;
+
 pub mod data;
 pub mod direnv;
 pub mod env;
@@ -32,7 +35,9 @@ pub mod parser;
 /// is still undecided.
 #[cfg(feature = "ssh")]
 pub mod ssh;
-pub mod ui;
+/// The interface layer, which is its own crate: the line editor, completion, the dropdown, the
+/// widgets, theming and the finder. Kept reachable under the name it had.
+pub use oslo_ui as ui;
 
 pub use env::Environment;
 pub use error::{Result, ShellError};
