@@ -46,8 +46,10 @@ pub(super) fn prompt_command(env_struct: &Arc<Mutex<Environment>>, last_status: 
     }
 
     env.last_status = last_status;
-    let outcome = parse_with_aliases(&text, &|name| env.get_alias(name).map(str::to_string))
-        .and_then(|ast| eval_command_list(&mut env, &ast));
+    let outcome = parse_with_aliases(&text, !env.get_aliases().is_empty(), &|name| {
+        env.get_alias(name).map(str::to_string)
+    })
+    .and_then(|ast| eval_command_list(&mut env, &ast));
     if let Err(e) = outcome {
         eprintln!("oslo: PROMPT_COMMAND: {e}");
     }

@@ -331,7 +331,7 @@ pub fn run_repl(login: bool) -> ! {
                         oslo_shell::exec::pipeline::segments::arm();
                         let mut env_guard = env_struct.lock().unwrap();
                         let res = absorb_loop_control(
-                            parse_with_aliases(&text, &|n| {
+                            parse_with_aliases(&text, !env_guard.get_aliases().is_empty(), &|n| {
                                 env_guard.get_alias(n).map(str::to_string)
                             })
                             .and_then(|ast| eval_command_list(&mut env_guard, &ast)),

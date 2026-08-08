@@ -62,8 +62,9 @@ pub fn open(
     command: &str,
     reads_from_command: bool,
 ) -> Result<(String, Substitution)> {
-    let ast =
-        crate::syntax::parse_with_aliases(command, &|n| env.get_alias(n).map(str::to_string))?;
+    let ast = crate::syntax::parse_with_aliases(command, !env.get_aliases().is_empty(), &|n| {
+        env.get_alias(n).map(str::to_string)
+    })?;
     let (reader, writer) =
         pipe().map_err(|e| ShellError::ExecutionError(format!("process substitution: {e}")))?;
     let (ours, theirs) = if reads_from_command {

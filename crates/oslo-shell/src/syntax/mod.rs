@@ -18,7 +18,8 @@ pub use brush_adapter::parse_bash_script;
 /// so it cannot be a step the executor performs afterwards; see [`alias`].
 pub fn parse_with_aliases(
     source: &str,
+    any_defined: bool,
     lookup: &dyn Fn(&str) -> Option<String>,
 ) -> oslo_base::error::Result<oslo_base::ast::CommandList> {
-    parse_bash_script(&alias::substitute(source, lookup))
+    parse_bash_script(&alias::substitute(source, any_defined, lookup))
 }

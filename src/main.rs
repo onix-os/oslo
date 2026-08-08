@@ -280,7 +280,9 @@ fn run_whole(env: &mut Environment, script: &str) -> i32 {
 /// is the only way to run the lines before the mistake, which is what
 /// [`Reading::Streamed`] exists for.
 fn run_streamed(env: &mut Environment, script: &str) -> i32 {
-    if let Ok(ast) = parse_with_aliases(script, &|n| env.get_alias(n).map(str::to_string)) {
+    if let Ok(ast) = parse_with_aliases(script, !env.get_aliases().is_empty(), &|n| {
+        env.get_alias(n).map(str::to_string)
+    }) {
         return match absorb_loop_control(eval_command_list(env, &ast)) {
             Ok(status) => status,
             Err(e) => exit_error_status(e),
@@ -336,7 +338,9 @@ fn run_line_at_a_time(env: &mut Environment, script: &str) -> i32 {
 ///
 /// `Err` carries the status the shell should exit with; the caller stops there.
 fn run_chunk(env: &mut Environment, source: &str) -> std::result::Result<i32, i32> {
-    let ast = match parse_with_aliases(source, &|n| env.get_alias(n).map(str::to_string)) {
+    let ast = match parse_with_aliases(source, !env.get_aliases().is_empty(), &|n| {
+        env.get_alias(n).map(str::to_string)
+    }) {
         Ok(ast) => ast,
         Err(e) => {
             eprintln!("oslo: {}", e);

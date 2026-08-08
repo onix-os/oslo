@@ -141,7 +141,9 @@ pub fn builtin_eval(env: &mut Environment, args: &[String]) -> Result<i32> {
     // call to bound it, so `eval` carries the same nesting counter `source` does.
     env.enter_nested_script()?;
     let result =
-        match crate::syntax::parse_with_aliases(&code, &|n| env.get_alias(n).map(str::to_string)) {
+        match crate::syntax::parse_with_aliases(&code, !env.get_aliases().is_empty(), &|n| {
+            env.get_alias(n).map(str::to_string)
+        }) {
             Ok(ast) => eval_command_list(env, &ast),
             // A syntax error in evaluated text is the *builtin's* failure, not the script's: bash
             // reports it, gives `eval` status 2, and carries on with the next command.
@@ -173,17 +175,18 @@ pub fn builtin_source(env: &mut Environment, args: &[String]) -> Result<i32> {
     // counter is entered only after the file is known to be readable, so a missing file still
     // costs nothing, and exited on every path out so a `return` cannot leave it drifting.
     env.enter_nested_script()?;
-    let result = match crate::syntax::parse_with_aliases(&content, &|n| {
-        env.get_alias(n).map(str::to_string)
-    }) {
-        Ok(ast) => eval_command_list(env, &ast),
-        // As with `eval`: the sourced file failing to parse leaves `source` with status 2 and
-        // the calling script still running.
-        Err(e) => {
-            eprintln!("oslo: {}: {}", file_path, e);
-            Ok(2)
-        }
-    };
+    let result =
+        match crate::syntax::parse_with_aliases(&content, !env.get_aliases().is_empty(), &|n| {
+            env.get_alias(n).map(str::to_string)
+        }) {
+            Ok(ast) => eval_command_list(env, &ast),
+            // As with `eval`: the sourced file failing to parse leaves `source` with status 2 and
+            // the calling script still running.
+            Err(e) => {
+                eprintln!("oslo: {}: {}", file_path, e);
+                Ok(2)
+            }
+        };
     env.exit_nested_script();
 
     // `return` ends a sourced script early and supplies its status.

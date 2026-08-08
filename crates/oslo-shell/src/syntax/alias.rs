@@ -33,6 +33,7 @@ use scan::{
     Balance, Quote, is_assignment, is_function_definition, is_plain_name, split_words, unquote,
     word_end,
 };
+use std::borrow::Cow;
 use std::collections::HashMap;
 
 /// How deep a chain of aliases may go before this gives up and emits the text as it stands.
@@ -63,11 +64,20 @@ enum Case {
 /// Substitute aliases throughout `source`.
 ///
 /// `lookup` answers what the *environment* knows; definitions the text makes for itself are found
-/// by this scanner and take effect from the line after they appear.
-pub fn substitute(source: &str, lookup: &dyn Fn(&str) -> Option<String>) -> String {
+/// by this scanner and take effect from the line after they appear. `any_defined` says whether the
+/// environment holds any alias at all, which is what makes the early-out below possible.
+pub fn substitute<'a>(
+    source: &'a str,
+    any_defined: bool,
+    lookup: &dyn Fn(&str) -> Option<String>,
+) -> Cow<'a, str> {
     // Almost every program contains no alias at all, and the scan is not free. A source with no
     // `alias` command in it can only be affected by an alias the environment already holds, so
-    // when there are none of those either there is nothing to do.
+    // when there are none of those either there is nothing to do — and returning the source
+    // borrowed skips the full copy the scanner would otherwise make of every line typed.
+    if !any_defined && !source.contains("alias") {
+        return Cow::Borrowed(source);
+    }
     let mut scanner = Scanner {
         lookup,
         defined: HashMap::new(),
@@ -84,7 +94,7 @@ pub fn substitute(source: &str, lookup: &dyn Fn(&str) -> Option<String>) -> Stri
         word_list: false,
     };
     scanner.run(source);
-    scanner.out
+    Cow::Owned(scanner.out)
 }
 
 struct Scanner<'a> {

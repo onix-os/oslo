@@ -7,7 +7,7 @@ fn with(aliases: &[(&str, &str)], source: &str) -> String {
         .iter()
         .map(|(k, v)| ((*k).to_string(), (*v).to_string()))
         .collect();
-    substitute(source, &|name| table.get(name).cloned())
+    substitute(source, !table.is_empty(), &|name| table.get(name).cloned()).into_owned()
 }
 
 /// Nothing to substitute must come back byte-for-byte, whatever the text contains.
@@ -206,7 +206,7 @@ fn hostile_input_terminates() {
         .map(|i| format!("alias a{i}='a{}'\n", i + 1))
         .collect();
     let source = format!("{deep}a0\n");
-    let out = substitute(&source, &|_| None);
+    let out = substitute(&source, false, &|_| None);
     assert!(out.contains("a0") || out.contains("a39"));
 
     unchanged("echo \"unterminated\n");
