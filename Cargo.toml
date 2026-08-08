@@ -1,6 +1,6 @@
 [package]
 name = "oslo"
-version = "0.2.20"
+version = "0.2.21"
 edition = "2024"
 # Edition 2024 alone needs 1.85, but the codebase uses let-chains in edition-2024 position
 # (stabilised in 1.88) and brush-parser declares 1.88 too. Bump this only alongside the MSRV

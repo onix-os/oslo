@@ -1,5 +1,32 @@
 # Changelog
 
+## [0.2.21] - 2026-08-08
+
+### <!-- 0 -->⛰️  Features
+
+- Time the phases of a prompt
+- Read .envrc with direnv's stdlib
+- A directory navigator widget
+
+### <!-- 1 -->🐛 Bug Fixes
+
+- Size the block to what it shows
+- The terminal names the shifted key
+
+### <!-- 4 -->⚡ Performance
+
+- Make the async prompt cache usable
+- Warm the command table before forking
+- Share and cache the nix dev shell
+
+### <!-- 6 -->🧪 Testing
+
+- Widen the margin on the settle window
+- Hold the colour depth while asserting
+- Stop a test writing the settings global
+- Restore the deferred ratchet rows
+- A child re-runs the file it inherits
+
 ## [0.2.20] - 2026-08-07
 
 ### <!-- 0 -->⛰️  Features
