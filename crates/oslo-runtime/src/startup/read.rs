@@ -43,6 +43,10 @@ pub(super) fn read_command(
     last_status: i32,
     current: &mut Mode,
 ) -> Input {
+    // A Ctrl-C that arrived while the last command was finishing belongs to that command, not to
+    // the one about to be typed. Nothing else drains the flag, so leaving it set made the next
+    // command abort at its first boundary with 130 and no output.
+    oslo_shell::exec::job::forget_interrupt();
     let mut buffer = String::new();
     let mut secret = false;
     let mut heredoc = HeredocTracker::default();

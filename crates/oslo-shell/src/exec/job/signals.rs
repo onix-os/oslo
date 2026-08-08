@@ -120,6 +120,18 @@ pub fn interrupt_pending() -> bool {
     local || delivered
 }
 
+/// Drop an interrupt that arrived before the shell asked for the next command.
+///
+/// A SIGINT is only ever *cleared* by [`interrupt_pending`], and the only caller of that is the
+/// command boundary in [`crate::exec::pipeline::eval_command_list`]. So a signal delivered while
+/// the previous command was finishing, or while the prompt was being drawn, stayed set until the
+/// *next* command reached its first boundary — which then reported it as interrupted and returned
+/// 130 without running anything, leaving the flag clear so the retry worked. A keystroke from
+/// before the command was typed cannot sensibly cancel it, so the REPL forgets it at the prompt.
+pub fn forget_interrupt() {
+    let _ = interrupt_pending();
+}
+
 /// Ask the evaluator running on *this* thread to unwind at its next command boundary.
 ///
 /// Exists so the interrupt path can be tested without signalling a multi-threaded test binary,

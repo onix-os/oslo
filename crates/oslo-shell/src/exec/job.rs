@@ -34,7 +34,8 @@ pub use control::{
 pub use report::describe;
 pub use resume::{continue_in_background, foreground_job};
 pub use signals::{
-    install_shell_signals, interrupt_pending, note_interrupt, reset_signals_for_child,
+    forget_interrupt, install_shell_signals, interrupt_pending, note_interrupt,
+    reset_signals_for_child,
 };
 pub use table::{Job, JobState, JobTable, reap_background_jobs, with_jobs};
 

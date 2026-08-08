@@ -115,6 +115,20 @@ mod tests {
         assert_eq!(env.last_status, INTERRUPTED_STATUS);
     }
 
+    /// The bug that made a command silently not run: an interrupt left over from *before* the
+    /// command was typed used to abort it at its first boundary, reporting 130 with no output —
+    /// and the retry then worked, because the aborted command had drained the flag on its way out.
+    /// Forgetting it at the prompt is what the REPL does before every read.
+    #[test]
+    fn an_interrupt_from_before_the_prompt_does_not_abort_the_next_command() {
+        let _ = job::interrupt_pending();
+        job::note_interrupt();
+        job::forget_interrupt();
+        let (status, env) = run("true");
+        assert_eq!(status, 0, "the command ran");
+        assert_eq!(env.last_status, 0);
+    }
+
     /// R7.2, the finding itself: a loop that never enters the kernel must still be interruptible
     /// *after it has started*. A poll that only ran once, before the loop, would leave this
     /// spinning forever — which is exactly what the shell did.
