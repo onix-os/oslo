@@ -242,3 +242,66 @@ fn an_abbreviation_without_an_expansion_is_named() {
     assert!(problems[0].contains("bad"), "{problems:?}");
     assert_eq!(settings.abbr.len(), 1, "the rest still apply");
 }
+
+#[test]
+fn nav_settings_are_read_with_the_ui_vocabulary() {
+    let (settings, problems) = settings_from(
+        "oslo = { builtin = { nav = {
+            fullscreen = false,
+            position = 'center',
+            width = 52,
+            border = 'rounded',
+            border_fg = 'cyan',
+            border_fit = 'content',
+            legend = false,
+            legend_gap = 2,
+            padding_x = 3,
+            padding_y = 1,
+            height = 12,
+            hidden = true,
+            filter_at = 'top',
+            reverse = false,
+            scanner = false,
+        } } }",
+    );
+    assert!(problems.is_empty(), "{problems:?}");
+    let nav = settings.builtin.nav;
+    assert!(!nav.fullscreen);
+    assert_eq!(nav.position, crate::ui::ask::chrome::Place::Center);
+    assert_eq!(nav.width, 52);
+    assert_eq!(nav.border, crate::ui::ask::Border::Rounded);
+    assert_eq!(nav.border_fg, crate::ui::theme::Color::parse("cyan"));
+    assert_eq!(nav.border_fit, crate::ui::ask::chrome::Fit::Content);
+    assert!(!nav.legend);
+    assert_eq!(nav.legend_gap, 2);
+    assert_eq!(nav.padding_x, 3);
+    assert_eq!(nav.padding_y, 1);
+    assert_eq!(nav.height, 12);
+    assert!(nav.hidden);
+    assert_eq!(nav.filter_at, crate::ui::ask::Where::Top);
+    assert!(!nav.reverse);
+    assert!(!nav.scanner);
+}
+
+#[test]
+fn invalid_nav_presentation_names_keep_the_defaults() {
+    let (settings, problems) = settings_from(
+        "oslo = { builtin = { nav = {
+            position = 'sideways', border = 'fancy', border_fit = 'wide-ish',
+            border_fg = 'puce', filter_at = 'middle',
+        } } }",
+    );
+    assert_eq!(problems.len(), 5, "{problems:?}");
+    assert_eq!(settings.builtin.nav, Nav::default());
+}
+
+#[test]
+fn nav_defaults_to_a_centered_quiet_half_screen() {
+    let nav = Nav::default();
+    assert!(nav.fullscreen);
+    assert_eq!(nav.position, crate::ui::ask::chrome::Place::Center);
+    assert_eq!(nav.width, 0);
+    assert_eq!(nav.height, 0);
+    assert_eq!(nav.border_fit, crate::ui::ask::chrome::Fit::Content);
+    assert!(!nav.legend);
+}

@@ -182,7 +182,7 @@ mod tests {
             "cd", "pwd", "echo", "export", "unset", "set", "shift", "exit", "break", "continue",
             "return", "alias", "unalias", "type", "eval", "source", ".", "read", "local", "pushd",
             "popd", "dirs", "readonly", "test", "[", "[[", "trap", "umask", "wait", "kill", "true",
-            "false",
+            "false", "nav",
         ] {
             assert!(env.is_builtin(name), "{name} should be a builtin");
             assert!(

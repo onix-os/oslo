@@ -31,6 +31,7 @@ mod io;
 mod jobs;
 mod r#let;
 mod mapfile;
+mod nav;
 mod process;
 mod remove;
 mod shopt;
@@ -154,6 +155,7 @@ pub fn register_default_builtins(env: &mut Environment) {
     env.register_custom_builtin("copy", copy::builtin_copy);
     env.register_custom_builtin("abbr", abbr::builtin_abbr);
     env.register_custom_builtin("ui", ui::builtin_ui);
+    env.register_custom_builtin("nav", nav::builtin_nav);
     // The directory ring: where you have been. Walking it is `cd -` and `cd -N`, so the only
     // builtin left is the one that shows you the numbers those take. Separate from `pushd`/`popd`,
     // which are explicit and which scripts rely on.

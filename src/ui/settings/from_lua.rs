@@ -282,6 +282,78 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
         }
     }
 
+    if let Value::Table(table) = oslo.get(&Value::str("builtin"))
+        && let Value::Table(nav) = table.borrow().get(&Value::str("nav"))
+    {
+        let nav = nav.borrow();
+        let settings = &mut settings.builtin.nav;
+        flag(&nav, "fullscreen", &mut settings.fullscreen);
+        flag(&nav, "legend", &mut settings.legend);
+        flag(&nav, "hidden", &mut settings.hidden);
+        flag(&nav, "reverse", &mut settings.reverse);
+        flag(&nav, "scanner", &mut settings.scanner);
+        if let Some(n) = number(&nav, "height") {
+            settings.height = n.max(0) as usize;
+        }
+        if let Some(n) = number(&nav, "width") {
+            settings.width = n.max(0) as usize;
+        }
+        if let Some(n) = number(&nav, "legend_gap") {
+            settings.legend_gap = n.max(0) as usize;
+        }
+        if let Some(n) = number(&nav, "padding_x") {
+            settings.padding_x = n.max(0) as usize;
+        }
+        if let Some(n) = number(&nav, "padding_y") {
+            settings.padding_y = n.max(0) as usize;
+        }
+        if let Value::Str(name) = nav.get(&Value::str("position")) {
+            settings.position = match name.as_ref() {
+                "top" | "start" => crate::ui::ask::chrome::Place::Start,
+                "center" | "centre" | "middle" => crate::ui::ask::chrome::Place::Center,
+                "bottom" | "end" => crate::ui::ask::chrome::Place::End,
+                other => {
+                    problems.push(format!(
+                        "oslo.builtin.nav.position: '{other}' is not a position; use top, center or bottom"
+                    ));
+                    settings.position
+                }
+            };
+        }
+        if let Value::Str(name) = nav.get(&Value::str("border")) {
+            match crate::ui::ask::Border::parse(&name) {
+                Some(border) => settings.border = border,
+                None => problems.push(format!(
+                    "oslo.builtin.nav.border: '{name}' is not a border; use none, rounded, square, double or thick"
+                )),
+            }
+        }
+        if let Value::Str(name) = nav.get(&Value::str("border_fit")) {
+            match crate::ui::ask::chrome::Fit::parse(&name) {
+                Some(fit) => settings.border_fit = fit,
+                None => problems.push(format!(
+                    "oslo.builtin.nav.border_fit: '{name}' is not a fit; use content or full"
+                )),
+            }
+        }
+        if let Value::Str(name) = nav.get(&Value::str("border_fg")) {
+            match crate::ui::theme::Color::parse(&name) {
+                Some(colour) => settings.border_fg = Some(colour),
+                None => problems.push(format!(
+                    "oslo.builtin.nav.border_fg: '{name}' is not a colour"
+                )),
+            }
+        }
+        if let Value::Str(name) = nav.get(&Value::str("filter_at")) {
+            match crate::ui::ask::Where::parse(&name) {
+                Some(place) => settings.filter_at = place,
+                None => problems.push(format!(
+                    "oslo.builtin.nav.filter_at: '{name}' is not a placement; use top or bottom"
+                )),
+            }
+        }
+    }
+
     if let Value::Table(table) = oslo.get(&Value::str("history")) {
         let table = table.borrow();
         if let Some(n) = number(&table, "size") {

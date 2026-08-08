@@ -155,6 +155,19 @@ the score, so the most-visited candidate wins however badly it matched. Here *ma
 primary key* and frecency only orders equal matches, so `cd rust` cannot land in `prust`. Each of
 the four is a named passing test.
 
+### Navigate the filesystem
+
+```sh
+nav              # start here
+nav /var/log     # start somewhere else
+```
+
+`nav` is a centered, history-styled filesystem navigator. Typing starts filtering immediately;
+Up and Down move through the matches, Right or Enter opens a directory, and Left goes to its
+parent. Delete asks first, then removes through oslo's own `rm` builtin, including its trash
+settings. The key legend is hidden until `?` toggles it. Esc changes the shell to the directory
+on screen; Ctrl-C cancels without moving it.
+
 ### What it remembers
 
 A second database, beside the history one, recording where you go and what you run there:
@@ -515,6 +528,22 @@ oslo.abbr.brc = { "~/.config/oslo/config.lua", anywhere = true }
 oslo.builtin.rm.to_tmp     = false    -- move removals aside instead of destroying them
 oslo.builtin.rm.max_to_tmp = 100      -- MB; anything larger is destroyed
 oslo.builtin.rm.trash      = "/tmp"
+
+oslo.builtin.nav.fullscreen = true       -- alternate screen; false draws inline
+oslo.builtin.nav.position   = "center"   -- top / center / bottom
+oslo.builtin.nav.width      = 0          -- 0 uses the middle half of the terminal
+oslo.builtin.nav.height     = 0          -- 0 uses the middle half of a full screen
+oslo.builtin.nav.border     = "none"     -- none / rounded / square / double / thick
+oslo.builtin.nav.border_fg  = nil
+oslo.builtin.nav.border_fit = "content"  -- content / full
+oslo.builtin.nav.legend     = false      -- ? toggles it while nav is open
+oslo.builtin.nav.legend_gap = 1
+oslo.builtin.nav.padding_x  = 1
+oslo.builtin.nav.padding_y  = 0
+oslo.builtin.nav.hidden     = false
+oslo.builtin.nav.filter_at  = "bottom"   -- top / bottom
+oslo.builtin.nav.reverse    = true
+oslo.builtin.nav.scanner    = true
 ```
 
 ### `rm`

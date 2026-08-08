@@ -175,6 +175,10 @@ impl Inline {
         ));
     }
 
+    pub(crate) fn show_legend(&mut self, shown: bool) {
+        self.chrome.legend = shown;
+    }
+
     /// Erase everything drawn, exactly.
     pub(crate) fn close(&mut self) {
         show(&self.panel.close());
