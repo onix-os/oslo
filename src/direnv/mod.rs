@@ -1,10 +1,17 @@
-//! Directory environments: one `.env.lua` per project.
+//! Directory environments: one `.env.lua` or `.envrc` per project.
 //!
 //! `direnv`, built in. See `docs/research/direnv.md` for what was read and what was deliberately not
 //! copied; the short version is that most of direnv's machinery exists because it is an external
 //! binary talking to a shell it did not write, and oslo *is* the shell. There is no bash subprocess,
 //! no prompt hook and no `eval` protocol: the state lives in memory and the load happens on the
 //! `cd` path.
+//!
+//! **Both names are read.** `.env.lua` is oslo's own, in the language the rest of the configuration
+//! is written in. `.envrc` is direnv's, and it is read because a project's `.envrc` is checked in
+//! and shared and not yours to convert — refusing it would mean every repository that already has
+//! one is a repository oslo cannot be used in. It is shell, so it runs in this shell, against
+//! direnv's stdlib reimplemented in [`stdlib`]; the personal `~/.config/direnv/direnvrc` is sourced
+//! first, from [`rcfile`]. Neither is a subprocess and neither is an `eval` protocol.
 //!
 //! Two things *are* copied, because neither is incidental to being an external binary:
 //!
@@ -32,9 +39,12 @@
 
 pub mod allow;
 pub mod carry;
+pub mod devshell;
 pub mod diff;
 pub mod find;
 mod handle;
+pub mod rcfile;
+pub mod stdlib;
 
 pub use handle::{install, installed, request_reload, take_reload_request, with};
 
@@ -51,8 +61,13 @@ use std::time::SystemTime;
 struct Loaded {
     /// The directory the rc files live in.
     owner: PathBuf,
-    /// The file as it was when it was read, so an edit reloads it.
-    watch: (PathBuf, Stamp),
+    /// The files as they were when they were read, so an edit to any of them reloads.
+    ///
+    /// A list rather than the rc alone, because `watch_file`, `dotenv` and `source_env` each add a
+    /// file the environment now depends on. Watching only the `.envrc` is the oldest direnv bug
+    /// report there is: a project whose `.env` is edited and whose shell goes on holding the values
+    /// from before it.
+    watch: Vec<(PathBuf, Stamp)>,
     /// The variables to put back on the way out, each with the export flag it had.
     undo: Diff<(String, bool)>,
     /// The aliases to put back on the way out.
@@ -110,38 +125,44 @@ impl Direnv {
 
     /// [`Direnv::new`], told what it inherited rather than reading it from the environment.
     ///
-    /// **An environment inherited from a parent counts as loaded.** Without this a shell spawned
-    /// from inside a project — a new pane, a nested `oslo`, an editor's terminal — starts believing
-    /// nothing is loaded while holding every variable that project set. It then carries them into
-    /// every directory it visits and no `cd` can shift them, because there is nothing recorded to
-    /// put back.
+    /// **An environment inherited from a parent is something this shell is holding.** Without the
+    /// record a shell spawned from inside a project — a new pane, a nested `oslo`, an editor's
+    /// terminal — starts believing nothing is loaded while holding every variable that project set.
+    /// It then carries them into every directory it visits and no `cd` can shift them, because
+    /// there is nothing recorded to put back. Adopting it means anywhere else unloads exactly as
+    /// walking out would have. See [`carry`].
     ///
-    /// Adopting the record makes the first arrival do the right thing by the ordinary path: still
-    /// in that directory and the owner matches, so nothing happens; anywhere else and it unloads
-    /// exactly as walking out would have. See [`carry`].
+    /// **An inherited environment is adopted stale, so the first arrival re-runs the file even
+    /// when the directory matches.** `execve` carries variables and nothing else, so a child
+    /// standing in the project it inherited holds that project's `$PATH` while having none of its
+    /// aliases, prompt or functions — the whole Lua half of the file never ran here. Treating that
+    /// as loaded is what made `_b` report `command not found` in a shell whose `$PATH` was already
+    /// the project's, with no `cd` able to fix it because the owner always matched. Being stale
+    /// routes it through unload-then-load: the carried undo puts the variables back first, so the
+    /// file runs against the environment it was written for rather than on top of its own output.
     ///
     /// Split from `new` so a test can hand it a record instead of writing one into the process's
     /// own environment — which is shared by every test running beside it.
     pub fn adopting(xdg_data: Option<&str>, home: Option<&str>, carried: Option<&str>) -> Direnv {
+        let loaded = carried.and_then(carry::decode).map(|carried| Loaded {
+            // The *file*, so what is watched is what would be re-read. The record carries a
+            // directory; a directory's own stamp moves whenever anything inside it is written.
+            // Whichever of the two names governs it — and none, if the file has since been
+            // deleted, in which case the arrival unloads.
+            watch: find::here(&carried.owner)
+                .map(|rc| vec![(rc.path.clone(), stamp(&rc.path))])
+                .unwrap_or_default(),
+            owner: carried.owner,
+            undo: carried.undo,
+            // A child inherits variables and never aliases: `execve` carries the environment
+            // and nothing else. Undoing aliases it was never given would restore the
+            // *parent's* aliases into a shell that never had them.
+            aliases: Diff::default(),
+        });
         Direnv {
             allow: Allow::new(xdg_data, home),
-            loaded: carried.and_then(carry::decode).map(|carried| Loaded {
-                // The *file*, stamped as it is now. Stamping the directory instead made every
-                // adopted environment look edited, so a child standing in the project it inherited
-                // unloaded and re-ran the file rather than simply keeping it.
-                watch: {
-                    let file = carried.owner.join(find::NAME);
-                    let when = stamp(&file);
-                    (file, when)
-                },
-                owner: carried.owner,
-                undo: carried.undo,
-                // A child inherits variables and never aliases: `execve` carries the environment
-                // and nothing else. Undoing aliases it was never given would restore the
-                // *parent's* aliases into a shell that never had them.
-                aliases: Diff::default(),
-            }),
-            stale: false,
+            stale: loaded.is_some(),
+            loaded,
             told: Vec::new(),
         }
     }
@@ -246,8 +267,7 @@ impl Direnv {
         let Some(loaded) = &self.loaded else {
             return false;
         };
-        let (path, when) = &loaded.watch;
-        stamp(path) != *when
+        loaded.watch.iter().any(|(path, when)| stamp(path) != *when)
     }
 
     /// Put back everything the loaded environment changed.
@@ -319,9 +339,19 @@ impl Direnv {
         let Some((before, aliases_before)) = lock(env).map(|guard| shell_state(&guard)) else {
             return Vec::new();
         };
-        let watch = (rc.path.clone(), stamp(&rc.path));
+        // Stamped *before* the run, so a file edited while it is being read is noticed rather than
+        // recorded as already current.
+        let mut watch = vec![(rc.path.clone(), stamp(&rc.path))];
         // No lock held here. See the note on `arrive`.
         let outcome = run(rc);
+        // Whatever the file asked for while it ran: `watch_file`, and the files `dotenv` and
+        // `source_env` read on its behalf. Only knowable now, which is why this is not one list.
+        watch.extend(
+            stdlib::take_watches()
+                .into_iter()
+                .map(|path| (stamp(&path), path))
+                .map(|(when, path)| (path, when)),
+        );
         let Some((after, aliases_after)) = lock(env).map(|guard| shell_state(&guard)) else {
             return Vec::new();
         };
@@ -385,10 +415,36 @@ fn shell_state(env: &Environment) -> (Vars, BTreeMap<String, String>) {
     (
         env.all_vars()
             .into_iter()
+            .filter(|(name, _, _)| !maintained(name))
             .map(|(name, value, exported)| (name, (value, exported)))
             .collect(),
         env.get_aliases().clone().into_iter().collect(),
     )
+}
+
+/// Variables the shell keeps for itself, which a directory environment neither sets nor undoes.
+///
+/// Reading a file moves `LINENO`, so an `.envrc` that assigned nothing at all still came out of the
+/// diff having "changed" it — announced on arrival and dutifully restored on the way out. `PWD` and
+/// `OLDPWD` are the same mistake with teeth: an `.envrc` runs with the working directory set to its
+/// own, so both differ across the load by construction, and putting them "back" on the way out
+/// would be a directory environment quietly moving the shell.
+fn maintained(name: &str) -> bool {
+    const NAMES: &[&str] = &[
+        "_",
+        "BASHPID",
+        "EPOCHREALTIME",
+        "EPOCHSECONDS",
+        "LINENO",
+        "OLDPWD",
+        "PIPESTATUS",
+        "PPID",
+        "PWD",
+        "RANDOM",
+        "SECONDS",
+        "SHLVL",
+    ];
+    NAMES.contains(&name)
 }
 
 /// The environment, or `None` if another holder has poisoned or is holding the lock.

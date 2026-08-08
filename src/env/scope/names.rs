@@ -54,6 +54,13 @@ impl Environment {
         self.builtins.register(name, func);
     }
 
+    /// Take a builtin back out again, answering whether there was one.
+    ///
+    /// The other half of the entry point, for builtins with a lifetime shorter than the shell's.
+    pub fn unregister_custom_builtin(&mut self, name: &str) -> bool {
+        self.builtins.unregister(name)
+    }
+
     /// The implementation registered for `name`, if any. Prefer [`Self::exec_custom_builtin`]:
     /// this exists for callers that need to know a builtin is callable without calling it.
     pub fn get_builtin(&self, name: &str) -> Option<BuiltinFn> {

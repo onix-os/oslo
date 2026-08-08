@@ -9,7 +9,7 @@ mod report;
 
 use oslo::Environment;
 use oslo::LuaEngine;
-use oslo::direnv::find::Rc;
+use oslo::direnv::find::{self, Rc};
 use oslo::direnv::{self, Direnv, Event};
 use std::cell::RefCell;
 use std::io::{Read, Seek, Write};
@@ -67,7 +67,10 @@ pub(super) fn arrive(env: &Mutex<Environment>, lua: &LuaEngine, dir: &Path) {
             dir,
             &mut |rc| {
                 base_prompt = Some(lua.prompt_handler());
-                let (outcome, output) = capturing(|| source_lua(lua, rc));
+                let (outcome, output) = capturing(|| match rc.kind {
+                    find::Kind::Lua => source_lua(lua, rc),
+                    find::Kind::Shell => source_envrc(env, rc),
+                });
                 said.push_str(&output);
                 outcome
             },
@@ -149,4 +152,49 @@ fn source_lua(lua: &LuaEngine, rc: &Rc) -> Result<(), String> {
     let source = std::fs::read_to_string(&rc.path).map_err(|e| e.to_string())?;
     lua.eval_as(&source, &rc.path.to_string_lossy())
         .map_err(|e| e.to_string())
+}
+
+/// Run an `.envrc`, which is shell, with direnv's stdlib in scope.
+///
+/// Three things have to be true for a file written for direnv to behave the way it does there, and
+/// each one is a bug if it is missing:
+///
+/// * **the working directory is the file's own.** direnv `cd`s before it runs, and half the files
+///   in the world say `PATH_add ./bin` or `dotenv .env` — resolved against wherever you happened to
+///   be standing, those name nothing. Restored afterwards whatever happens, including on a panic,
+///   because a shell left in a directory the user did not walk into is a far worse outcome than an
+///   `.envrc` that failed.
+/// * **the personal `direnvrc` is sourced first**, so the `use_` and `layout_` functions it defines
+///   are there when the project's file calls them.
+/// * **the stdlib is in scope only for this**, installed here and removed on the way out.
+fn source_envrc(env: &Mutex<Environment>, rc: &Rc) -> Result<(), String> {
+    let Some(home) = rc.path.parent().map(Path::to_path_buf) else {
+        return Err("the file has no directory".to_string());
+    };
+    let came_from = std::env::current_dir().ok();
+    std::env::set_current_dir(&home).map_err(|e| e.to_string())?;
+
+    let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        let mut guard = env.lock().map_err(|_| "the environment is locked")?;
+        direnv::stdlib::install(&mut guard);
+        direnv::rcfile::load(&mut guard);
+        let status = oslo::env::builtins::builtin_source(
+            &mut guard,
+            &["source".to_string(), rc.path.to_string_lossy().into_owned()],
+        );
+        direnv::stdlib::remove(&mut guard);
+        match status {
+            Ok(0) => Ok(()),
+            Ok(code) => Err(format!("exited {code}")),
+            Err(problem) => Err(problem.to_string()),
+        }
+    }));
+
+    if let Some(back) = came_from {
+        let _ = std::env::set_current_dir(back);
+    }
+    match outcome {
+        Ok(result) => result,
+        Err(panic) => std::panic::resume_unwind(panic),
+    }
 }

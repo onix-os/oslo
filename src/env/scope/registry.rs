@@ -69,6 +69,17 @@ impl BuiltinRegistry {
             .insert(name.trim().to_string(), Builtin::Native(func));
     }
 
+    /// Remove a builtin, answering whether there was one.
+    ///
+    /// For builtins that exist only for the length of something: direnv's stdlib is in scope while
+    /// an `.envrc` runs and nowhere else, which is direnv's own rule and also the only honest one
+    /// — `PATH_add` offered at the prompt would be a command that edits an environment no file is
+    /// holding open. Registration stays the single way in, so what this removes is exactly what
+    /// `type`, completion and the dispatcher stop seeing.
+    pub fn unregister(&mut self, name: &str) -> bool {
+        self.table.remove(name.trim()).is_some()
+    }
+
     fn register_dynamic(&mut self, name: &str, func: DynBuiltin) {
         self.table
             .insert(name.trim().to_string(), Builtin::Dynamic(func));
@@ -98,9 +109,11 @@ impl BuiltinRegistry {
     /// that can disagree with each other. Nothing is removed from the table: the bit is a mask, so
     /// turning the feature back on restores the builtin exactly as it was registered.
     ///
-    /// The word then falls through to `$PATH` like any other, which is the point for `direnv` —
-    /// oslo's builtin cannot read an `.envrc` and the real one can. That is the same route
-    /// `\direnv` already takes; see `exec::simple::escape`.
+    /// The word then falls through to `$PATH` like any other — the same route `\direnv` already
+    /// takes; see `exec::simple::escape`. This was written for `direnv` specifically, so that an
+    /// `.envrc` directory could be handed to the real one, and that reason is gone: oslo reads
+    /// `.envrc` itself now. The mechanism stays because it is general and because handing a name
+    /// back to `$PATH` is the right way to turn any builtin off.
     fn entry(&self, name: &str) -> Option<&Builtin> {
         if crate::feature::builtin_is_off(name) {
             return None;

@@ -360,9 +360,9 @@ passing, so a stale entry cannot survive. Unit and integration tests run alongsi
 
 ## Directory environments
 
-A `.env.lua` in a project, found by walking up from where you are, nearest ancestor wins. **Leaving
-puts everything back** — including variables the file unset, and variables that had no value before
-and end up with none again rather than with an empty one.
+A `.env.lua` or a `.envrc` in a project, found by walking up from where you are, nearest ancestor
+wins. **Leaving puts everything back** — including variables the file unset, and variables that had
+no value before and end up with none again rather than with an empty one.
 
 ```lua
 -- .env.lua
@@ -398,10 +398,25 @@ the same variables. `nix` withholds `HOME` and four others from the shell form b
 would wreck the shell you are in — `HOME` in a derivation is `/homeless-shelter` — and `--json`
 applies no such filter.
 
-**Lua, and only Lua.** `.envrc` and `.env` were both supported for a while and both are gone:
-`.envrc` meant either shipping direnv's 1,400-line stdlib or failing on every real file that says
-`use flake`, and `.env` is a second grammar for what one Lua line already says. There is no bash
-subprocess and no serialised diff in your environment — oslo *is* the shell.
+**`.envrc` too, with direnv's stdlib.** A project's `.envrc` is checked in and shared and is not
+yours to convert, so oslo reads it — as shell, in this shell, with `PATH_add`, `use flake`,
+`layout python`, `dotenv`, `source_up`, `watch_file` and the rest reimplemented in Rust rather than
+shipped as 1,400 lines of bash. Your `~/.config/direnv/direnvrc` and `direnv/lib/*.sh` are sourced
+first, so the `use_` and `layout_` functions you already wrote are there when a project calls them.
+
+```sh
+# .envrc — works as written, no conversion
+use flake
+PATH_add ./bin
+dotenv_if_exists .env
+watch_file schema.sql
+```
+
+A directory with both is governed by `.env.lua`: a repository that has both almost always has the
+`.envrc` for everyone else, and running both would apply one environment twice. The stdlib exists
+while an `.envrc` is loading and nowhere else — `PATH_add` at the prompt would edit an environment
+no file is holding open. Either way there is no bash subprocess and no serialised diff in your
+environment beyond the undo record: oslo *is* the shell.
 
 Because it is Lua, a directory can set more than variables — an alias for its test command, say —
 and **aliases are restored on the way out too**, so a project's `t` cannot follow you into the next
