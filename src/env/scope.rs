@@ -542,3 +542,49 @@ impl Environment {
         &self.positional
     }
 }
+
+/// The editor's view of the shell.
+///
+/// **The store implements the interface rather than the editor holding the store.** Completion and
+/// highlighting need to ask eight questions — what is `$PS2`, what is on `$PATH`, which names are
+/// builtins, aliases or functions — and holding an `Environment` to ask them pointed the interface
+/// layer at the shell, which is built on top of it. See [`crate::ui::shell::Shell`].
+impl crate::ui::shell::Shell for Environment {
+    fn interactive(&self) -> bool {
+        Environment::interactive(self)
+    }
+
+    fn var(&self, name: &str) -> Option<&str> {
+        self.get_var(name)
+    }
+
+    fn vars(&self) -> HashMap<String, String> {
+        self.get_all_vars()
+    }
+
+    fn is_builtin(&self, name: &str) -> bool {
+        Environment::is_builtin(self, name)
+    }
+
+    fn builtin_names(&self) -> Vec<String> {
+        Environment::builtin_names(self)
+            .map(str::to_string)
+            .collect()
+    }
+
+    fn alias(&self, name: &str) -> Option<&str> {
+        self.get_alias(name)
+    }
+
+    fn aliases(&self) -> &HashMap<String, String> {
+        self.get_aliases()
+    }
+
+    fn is_function(&self, name: &str) -> bool {
+        self.get_function(name).is_some()
+    }
+
+    fn functions(&self) -> &HashMap<String, Command> {
+        self.get_functions()
+    }
+}

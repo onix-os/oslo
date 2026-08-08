@@ -235,7 +235,7 @@ impl OsloHelper {
 
     fn variable_candidates(&self, prefix: &str, quote: Quote, out: &mut Vec<CompletionCandidate>) {
         let env = self.env.lock().unwrap();
-        for name in env.get_all_vars().keys() {
+        for name in env.vars().keys() {
             if matches_prefix(name, prefix, self.case_sensitive()) {
                 let value = format!("${}", name);
                 out.push(CompletionCandidate {
@@ -266,11 +266,11 @@ impl OsloHelper {
             let env = self.env.lock().unwrap();
             let mut names: Vec<(String, &str, Option<String>)> = Vec::new();
             for b in env.builtin_names() {
-                if matches_prefix(b, stem, self.case_sensitive()) {
+                if matches_prefix(&b, stem, self.case_sensitive()) {
                     names.push((b.to_string(), "builtin", None));
                 }
             }
-            for (name, target) in env.get_aliases() {
+            for (name, target) in env.aliases() {
                 if matches_prefix(name, stem, self.case_sensitive()) {
                     // What it expands to travels with it: that is the one thing about an alias
                     // its name does not tell you, and it is why aliases keep a second column
@@ -278,12 +278,12 @@ impl OsloHelper {
                     names.push((name.clone(), "alias", Some(target.clone())));
                 }
             }
-            for f in env.get_functions().keys() {
+            for f in env.functions().keys() {
                 if matches_prefix(f, stem, self.case_sensitive()) {
                     names.push((f.clone(), "function", None));
                 }
             }
-            (env.get_var("PATH").unwrap_or_default().to_string(), names)
+            (env.var("PATH").unwrap_or_default().to_string(), names)
         };
 
         for (name, kind, detail) in shell_names {
@@ -329,7 +329,7 @@ impl OsloHelper {
         };
         let mut current = name.to_string();
         for _ in 0..16 {
-            let Some(expansion) = env.get_alias(&current) else {
+            let Some(expansion) = env.alias(&current) else {
                 break;
             };
             let Some(first) = expansion.split_whitespace().next() else {

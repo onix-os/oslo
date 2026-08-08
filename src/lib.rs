@@ -18,7 +18,7 @@ pub const INTERPRETER_STACK: usize = 16 * 1024 * 1024;
 /// five things that do not know there is a shell above them. Kept reachable under the names they
 /// had, so `crate::ast::…` and `crate::error::…` still read the same in the thousand places that
 /// use them; the alternative was a rename that said nothing.
-pub use oslo_base::{ast, error, feature, hooks, track};
+pub use oslo_base::{ast, error, feature, hooks, nesting, track};
 
 pub mod data;
 pub mod direnv;

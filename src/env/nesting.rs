@@ -12,7 +12,7 @@ use crate::error::{Result, ShellError};
 ///
 /// Measured, not guessed: a debug build overflows its 8 MiB stack somewhere between 300 and 400
 /// levels of plain function recursion, and a nested *program* burns the same stack at the same
-/// time, so the limits here and in [`crate::parser::nesting`] have to fit in one budget together.
+/// time, so the limits here and in [`crate::nesting`] have to fit in one budget together.
 /// 100 is an order of magnitude more than recursive shell code actually uses.
 pub const MAX_FUNCTION_DEPTH: usize = 100;
 

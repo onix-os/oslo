@@ -24,6 +24,8 @@ pub mod error;
 /// Parts of the shell a config can turn off and on again while it runs.
 pub mod feature;
 pub mod hooks;
+/// The depth guard every parse passes through, and the heredoc scan that feeds alias expansion.
+pub mod nesting;
 pub mod track;
 
 pub use error::{Result, ShellError};

@@ -28,7 +28,7 @@
 
 mod scan;
 
-use super::nesting::heredoc_delimiters;
+use crate::nesting::heredoc_delimiters;
 use scan::{
     Balance, Quote, is_assignment, is_function_definition, is_plain_name, split_words, unquote,
     word_end,

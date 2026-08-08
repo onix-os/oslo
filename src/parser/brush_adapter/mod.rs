@@ -45,8 +45,8 @@ use std::io::Cursor;
 pub fn parse_bash_script(script: &str) -> Result<oslo_ast::CommandList> {
     // Before brush sees the text, not after: brush is recursive descent, so absurdly nested input
     // overflows the stack inside `parse_program` and aborts the process before any error of ours
-    // could be produced. See [`crate::parser::nesting`].
-    crate::parser::nesting::check_nesting(script)?;
+    // could be produced. See [`crate::nesting`].
+    crate::nesting::check_nesting(script)?;
 
     let script_buf = format!("{}\n", script);
     let cursor = Cursor::new(script_buf.as_bytes());

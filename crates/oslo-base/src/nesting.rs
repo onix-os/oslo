@@ -15,7 +15,9 @@
 
 mod heredoc;
 
-pub(crate) use heredoc::heredoc_delimiters;
+/// Public because alias expansion, which is a crate above this one, has to know where a heredoc
+/// body starts — words inside one are data and must not be expanded.
+pub use heredoc::heredoc_delimiters;
 
 use crate::error::{Result, ShellError};
 use heredoc::strip_heredoc_bodies;
@@ -24,7 +26,7 @@ use heredoc::strip_heredoc_bodies;
 ///
 /// Measured, not guessed: a debug build overflows its 8 MiB stack somewhere between 400 and 600
 /// levels of `{ …; }`, and a nested program burns that stack at the same time as the function-call
-/// and `source` chains bounded in [`crate::env::nesting`], so all three limits share one budget.
+/// and `source` chains bounded in `env::nesting`, so all three limits share one budget.
 /// Real scripts do not come close: the deepest nesting in a large shell codebase is single digits.
 pub const MAX_INPUT_NESTING: usize = 100;
 

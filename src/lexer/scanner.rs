@@ -10,7 +10,7 @@ use crate::lexer::token::Token;
 ///
 /// The raw scanners below recurse once per nesting level, so input like `$($($(…` would abort the
 /// process on a stack overflow before any diagnostic could be printed — the same failure mode
-/// [`crate::parser::nesting`] exists to prevent. Real words nest a handful of levels at most.
+/// [`crate::nesting`] exists to prevent. Real words nest a handful of levels at most.
 const MAX_WORD_NESTING: usize = 64;
 
 #[allow(clippy::should_implement_trait, clippy::collapsible_if)]

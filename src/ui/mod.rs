@@ -26,6 +26,7 @@ pub mod report;
 pub mod row;
 pub mod scanner;
 pub mod settings;
+pub mod shell;
 pub mod spec;
 pub mod syntax;
 pub mod term;
@@ -40,9 +41,9 @@ pub use command_index::invalidate as invalidate_command_cache;
 pub use syntax::{DEFAULT_PS2, InputStatus};
 pub use words::{Quote, Word, current_word, extract_current_word};
 
-use crate::env::Environment;
 use dropdown::CompletionCandidate;
 use frecency_store::FrecencyStore;
+use shell::Shell;
 use spec::SpecRegistry;
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex};
@@ -54,7 +55,7 @@ use std::sync::{Arc, Mutex};
 const RANKED_KINDS: &[&str] = &["command", "builtin", "subcommand"];
 
 pub struct OsloHelper {
-    env: Arc<Mutex<Environment>>,
+    env: Arc<Mutex<dyn Shell>>,
     spec_registry: SpecRegistry,
     frecency: FrecencyStore,
     /// Whether Tab may take the terminal over to draw the dropdown.
@@ -75,7 +76,10 @@ impl OsloHelper {
     /// takes the terminal over, and the frecency table is read from and appended to a file in
     /// `$HOME`. `$-` is the signal rather than `isatty`, because `cargo test` inherits a terminal
     /// on stdin and a test must not write to the user's home directory.
-    pub fn new(env: Arc<Mutex<Environment>>) -> Self {
+    /// Generic so the coercion happens here rather than at every call site: a caller hands over
+    /// whatever it already holds and this is the one place that forgets the concrete type.
+    pub fn new<S: Shell + 'static>(env: Arc<Mutex<S>>) -> Self {
+        let env: Arc<Mutex<dyn Shell>> = env;
         let interactive = env.lock().unwrap().interactive();
         let frecency = if interactive {
             FrecencyStore::load(FrecencyStore::default_path())
@@ -110,7 +114,7 @@ impl OsloHelper {
         self.env
             .lock()
             .unwrap()
-            .get_var("PS2")
+            .var("PS2")
             .map(str::to_string)
             .unwrap_or_else(|| DEFAULT_PS2.to_string())
     }
@@ -136,14 +140,14 @@ impl OsloHelper {
             let Ok(env) = self.env.lock() else {
                 return line.to_string();
             };
-            let path = env.get_var("PATH").unwrap_or_default().to_string();
+            let path = env.var("PATH").unwrap_or_default().to_string();
             // Snapshotted rather than queried per word: the closures below run once per command
             // word and would each take the lock again while this one is still held.
-            let builtins: HashSet<String> = env.builtin_names().map(str::to_string).collect();
+            let builtins: HashSet<String> = env.builtin_names().into_iter().collect();
             let functions: HashSet<String> = env
-                .get_functions()
+                .functions()
                 .keys()
-                .chain(env.get_aliases().keys())
+                .chain(env.aliases().keys())
                 .cloned()
                 .collect();
             (path, builtins, functions)

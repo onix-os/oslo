@@ -38,7 +38,7 @@ pub fn classify(input: &str) -> InputStatus {
     // Guard the same stack overflow `parse_bash_script` guards: brush is recursive descent, and a
     // pasted line of ten thousand open parentheses would abort the process from inside the
     // validator, where there is no error path at all.
-    if crate::parser::nesting::check_nesting(input).is_err() {
+    if crate::nesting::check_nesting(input).is_err() {
         return InputStatus::Invalid;
     }
 

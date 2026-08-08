@@ -45,10 +45,9 @@ impl OsloHelper {
         }
 
         let env = self.env.lock().unwrap();
-        let path = env.get_var("PATH").unwrap_or_default().to_string();
-        let is_shell_name = |n: &str| {
-            env.is_builtin(n) || env.get_alias(n).is_some() || env.get_function(n).is_some()
-        };
+        let path = env.var("PATH").unwrap_or_default().to_string();
+        let is_shell_name =
+            |n: &str| env.is_builtin(n) || env.alias(n).is_some() || env.is_function(n);
 
         // If what has been typed already names a command, it is not a prefix of the answer — it
         // *is* the answer. This is the `exit` case: bash shows nothing, and so should we.
@@ -72,12 +71,12 @@ impl OsloHelper {
         };
 
         for name in env.builtin_names() {
+            consider(&name, Origin::Shell, self.frecency.score(&name));
+        }
+        for name in env.aliases().keys() {
             consider(name, Origin::Shell, self.frecency.score(name));
         }
-        for name in env.get_aliases().keys() {
-            consider(name, Origin::Shell, self.frecency.score(name));
-        }
-        for name in env.get_functions().keys() {
+        for name in env.functions().keys() {
             consider(name, Origin::Shell, self.frecency.score(name));
         }
         drop(env);

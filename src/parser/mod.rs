@@ -8,7 +8,6 @@
 //! guesses.
 pub mod alias;
 pub mod brush_adapter;
-pub mod nesting;
 
 pub use brush_adapter::parse_bash_script;
 
