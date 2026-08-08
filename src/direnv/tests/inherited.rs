@@ -67,16 +67,27 @@ fn an_inherited_environment_is_unloaded_by_the_shell_that_inherits_it() {
     );
 }
 
-/// A child that starts *in* the same project keeps what it inherited, and unloads it on the way
-/// out like any other shell. Adopting must not mean reloading: running the file again would double
-/// every `path_add` in it.
+/// **A child that starts *in* the same project runs the file itself.**
+///
+/// `execve` carries variables and nothing else, so such a child holds the project's `$PATH` and has
+/// none of its aliases, prompt or functions — the Lua half of the file never ran there. Counting
+/// that as loaded is what left `_b` reporting `command not found` in a shell whose `$PATH` was
+/// already the project's, with no `cd` able to fix it because the owner always matched.
+///
+/// Re-running is only safe because it unloads first, which is the point this guards: the variable
+/// has to come back with the value the file sets, not that value applied on top of the inherited
+/// one. That doubling is what the old keep-it-as-is behaviour was written to avoid.
 #[test]
-fn a_child_that_starts_in_the_project_keeps_it() {
+fn a_child_that_starts_in_the_project_runs_the_file_itself() {
     let _feature = feature_unchanged();
     let store = tempfile::tempdir().expect("temp dir");
     let project = tempfile::tempdir().expect("temp dir");
     let elsewhere = tempfile::tempdir().expect("temp dir");
-    let path = rc_in(project.path(), find::NAME, "OSLO_T_CARRY_IN=A\n");
+    let path = rc_in(
+        project.path(),
+        find::NAME,
+        "OSLO_T_CARRY_IN=A\nalias _b=make build\n",
+    );
 
     let parent_env = shell();
     let mut parent = Direnv::adopting(store.path().to_str(), None, None);
@@ -95,17 +106,27 @@ fn a_child_that_starts_in_the_project_keeps_it() {
         .unwrap()
         .set_var("OSLO_T_CARRY_IN", "A", true);
     let mut child = Direnv::adopting(store.path().to_str(), None, Some(&carried));
-    let events = child.arrive(
+    assert_eq!(
+        child_env.lock().unwrap().get_aliases().get("_b"),
+        None,
+        "an alias is not something a child can inherit"
+    );
+    child.arrive(
         &child_env,
         project.path(),
         &mut pairs_into(&child_env),
         &mut || {},
     );
-    assert!(
-        events.is_empty(),
-        "nothing to do, and nothing said: {events:?}"
+    assert_eq!(
+        child_env.lock().unwrap().get_aliases().get("_b").cloned(),
+        Some("make build".to_string()),
+        "so the child has to run the file to get one"
     );
-    assert_eq!(var(&child_env, "OSLO_T_CARRY_IN").as_deref(), Some("A"));
+    assert_eq!(
+        var(&child_env, "OSLO_T_CARRY_IN").as_deref(),
+        Some("A"),
+        "and the variable it did inherit is set once, not applied over itself"
+    );
 
     child.arrive(
         &child_env,
@@ -117,6 +138,11 @@ fn a_child_that_starts_in_the_project_keeps_it() {
         var(&child_env, "OSLO_T_CARRY_IN"),
         None,
         "and it still leaves properly"
+    );
+    assert_eq!(
+        child_env.lock().unwrap().get_aliases().get("_b"),
+        None,
+        "taking with it the alias it ran itself"
     );
 }
 
