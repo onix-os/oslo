@@ -1150,6 +1150,7 @@ dependencies = [
  "nix",
  "oslo-base",
  "oslo-lua",
+ "oslo-runtime",
  "oslo-shell",
  "oslo-ui",
  "regex",
@@ -1178,6 +1179,20 @@ name = "oslo-lua"
 version = "0.2.21"
 dependencies = [
  "full_moon",
+]
+
+[[package]]
+name = "oslo-runtime"
+version = "0.2.21"
+dependencies = [
+ "nix",
+ "oslo-base",
+ "oslo-lua",
+ "oslo-shell",
+ "oslo-ui",
+ "regex",
+ "serde_json",
+ "tempfile",
 ]
 
 [[package]]

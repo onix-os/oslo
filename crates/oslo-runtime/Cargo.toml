@@ -1,0 +1,34 @@
+[package]
+name = "oslo-runtime"
+version = "0.2.21"
+edition = "2024"
+rust-version = "1.88"
+license = "MIT"
+description = "oslo's runtime: the Lua API a config is written against, the interpreter that owns it, and startup."
+
+[dependencies]
+oslo-base = { path = "../oslo-base" }
+oslo-lua = { path = "../oslo-lua" }
+oslo-shell = { path = "../oslo-shell" }
+oslo-ui = { path = "../oslo-ui" }
+
+# Terminal setup at startup, and the signal handling the read loop installs.
+nix = { version = "0.29", features = [
+    "process", "signal", "term", "fs", "user", "poll",
+] }
+
+# `oslo.re`, and history's own matching.
+regex = { version = "1", default-features = false, features = [
+    "std", "unicode-case", "unicode-gencat", "unicode-perl",
+    "perf-literal", "perf-inline",
+] }
+
+# `oslo.json`.
+serde_json = "1"
+
+# Capturing an rc file's own output so it can be printed under the file that produced it.
+tempfile = "3.17"
+
+[dev-dependencies]
+oslo-base = { path = "../oslo-base", features = ["testing"] }
+oslo-ui = { path = "../oslo-ui", features = ["testing"] }

@@ -107,6 +107,7 @@ unicode-width = "0.2"
 brush-parser = { path = "vendor/brush-parser" }
 oslo-base = { path = "crates/oslo-base" }
 oslo-lua = { path = "crates/oslo-lua" }
+oslo-runtime = { path = "crates/oslo-runtime" }
 oslo-shell = { path = "crates/oslo-shell" }
 oslo-ui = { path = "crates/oslo-ui" }
 # The allow list for directory environments is keyed by a hash of the rc file's path *and* its
@@ -157,6 +158,7 @@ oslo-ui = { path = "crates/oslo-ui", features = ["testing"] }
 members = [
   "crates/oslo-base",
   "crates/oslo-lua",
+  "crates/oslo-runtime",
   "crates/oslo-shell",
   "crates/oslo-ui",
   "vendor/brush-parser",
