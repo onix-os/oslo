@@ -57,6 +57,29 @@ fn bench_paint(helper: &OsloHelper) {
     );
 }
 
+/// The ghost suggestion, which is the other thing every keystroke asks for.
+///
+/// A command word rather than a path, so the `$PATH` index is what answers — a few thousand names
+/// on a normal machine, and the reason this is worth a benchmark at all.
+fn bench_hint(helper: &OsloHelper) {
+    let keys = prefixes("cargo");
+
+    let mut samples = Vec::new();
+    for _ in 0..7 {
+        let started = Instant::now();
+        for _ in 0..200 {
+            for key in &keys {
+                std::hint::black_box(helper.command_hint(key, key.len()));
+            }
+        }
+        samples.push(started.elapsed().as_secs_f64() / (200 * keys.len()) as f64);
+    }
+    println!(
+        "hint       {:>8.2} us/keystroke   (command word, against all of $PATH)",
+        median(samples) * 1e6
+    );
+}
+
 fn bench_settings() {
     let mut samples = Vec::new();
     for _ in 0..7 {
@@ -79,5 +102,6 @@ fn main() {
     std::hint::black_box(helper.paint("cargo"));
 
     bench_paint(&helper);
+    bench_hint(&helper);
     bench_settings();
 }

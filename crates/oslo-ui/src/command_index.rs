@@ -56,6 +56,8 @@ struct Key {
 struct Entry {
     key: Key,
     names: Arc<HashSet<String>>,
+    /// The same names in order, so a prefix is a range rather than a scan. See [`CommandIndex::sorted`].
+    sorted: Arc<Vec<String>>,
     checked_at: Instant,
 }
 
@@ -102,12 +104,41 @@ impl CommandIndex {
         }
 
         let names = Arc::new(scan(path));
+        let mut ordered: Vec<String> = names.iter().cloned().collect();
+        ordered.sort_unstable();
         *guard = Some(Entry {
             key,
             names: Arc::clone(&names),
+            sorted: Arc::new(ordered),
             checked_at: Instant::now(),
         });
         names
+    }
+
+    /// Every executable on `path`, in order.
+    ///
+    /// **What a prefix search wants.** The set answers membership in one step but has no order, so
+    /// finding the names starting with `car` meant a `starts_with` against all of them — a few
+    /// thousand per keystroke, for the ghost suggestion. Sorted, the answer is a contiguous range
+    /// found by binary search. Built with the set, from the same scan, and shared the same way.
+    pub fn sorted(path: &str) -> Arc<Vec<String>> {
+        // Filling the cache is `executables`' job; this only ever reads what that left behind, and
+        // asks for it first so the two can never disagree about which scan they are describing.
+        let _ = Self::executables(path);
+        match cache().lock().unwrap().as_ref() {
+            Some(entry) => Arc::clone(&entry.sorted),
+            None => Arc::new(Vec::new()),
+        }
+    }
+
+    /// The names on `path` that start with `stem`, as a slice of [`Self::sorted`].
+    pub fn starting_with(sorted: &[String], stem: &str) -> std::ops::Range<usize> {
+        let first = sorted.partition_point(|name| name.as_str() < stem);
+        let past = sorted[first..]
+            .iter()
+            .position(|name| !name.starts_with(stem))
+            .map_or(sorted.len(), |n| first + n);
+        first..past
     }
 
     /// Whether a bare command name resolves to something runnable.

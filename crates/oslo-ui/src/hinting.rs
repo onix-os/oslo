@@ -85,7 +85,11 @@ impl OsloHelper {
         }
         drop(env);
 
-        for name in CommandIndex::executables(&path).iter() {
+        // A binary search rather than a walk: `$PATH` holds a few thousand names here and only the
+        // ones sharing the typed prefix can win.
+        let sorted = CommandIndex::sorted(&path);
+        let range = CommandIndex::starting_with(&sorted, stem);
+        for name in &sorted[range] {
             consider(name, Origin::External);
         }
 
