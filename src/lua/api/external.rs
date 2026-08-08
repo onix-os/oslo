@@ -100,6 +100,14 @@ fn fill(arg: &str, ctx: &Context) -> String {
     out
 }
 
+/// Which prompt an answer belongs to.
+///
+/// The arguments **as written**, before `$status` and the rest are filled in, so the identity does
+/// not move when the shell's state does. See the note in [`render`].
+fn key_of(spec: &Spec) -> String {
+    format!("{} {}", spec.command, spec.args.join(" "))
+}
+
 /// The last output each command produced, so a slow or async run has something to show.
 fn cache() -> &'static Mutex<HashMap<String, String>> {
     static CACHE: OnceLock<Mutex<HashMap<String, String>>> = OnceLock::new();
@@ -122,7 +130,19 @@ fn remember(key: &str, value: String) {
 /// than drawing an empty line.
 pub fn render(spec: &Spec, ctx: &Context) -> Option<String> {
     let args: Vec<String> = spec.args.iter().map(|a| fill(a, ctx)).collect();
-    let key = format!("{} {}", spec.command, args.join(" "));
+    // **Keyed on the spec, not on the arguments it was filled with.**
+    //
+    // This is what makes `async` usable. The promise is "whatever it said last time, now" — but
+    // the key used to be the *substituted* argv, so any argument that moves between prompts made
+    // every lookup a miss, and a miss means the shell falls back to a prompt of its own. Every
+    // real prompt moves at least one: `$status` after a failure, `$jobs` on a background job,
+    // `$duration_ms` after almost every command. So `async` answered `None` forever and the tool
+    // it was told to run asynchronously had to be made synchronous to be seen at all — paying its
+    // full cost on the path of every keystroke, which is the one thing the option exists to avoid.
+    //
+    // The raw args identify which prompt this is (a left and a right differ by `--right`) and stay
+    // put across prompts, which is exactly the identity wanted: last output for *this* prompt.
+    let key = key_of(spec);
 
     if spec.asynchronous {
         // Whatever it said last time, now; the fresh run lands in the cache for the next prompt.
@@ -155,6 +175,15 @@ fn spawn(command: String, args: Vec<String>, key: String) {
 /// Run a command with a deadline, returning its stdout with the trailing newline trimmed.
 fn run(command: &str, args: &[String], timeout: Duration) -> Option<String> {
     use std::process::{Command, Stdio};
+    // Resolved through the shell's own table rather than left to `execvp`, which tries every
+    // `$PATH` entry in turn and pays for the miss on each one. This runs from a prompt, so the
+    // same name is looked up on every prompt for the life of the session; on a Nix dev shell's
+    // 48-entry `$PATH` that is 48 `execve` calls each time against one.
+    let resolved = crate::env::builtins::hash_lookup(command);
+    let command: &std::ffi::OsStr = match &resolved {
+        Some(path) => path.as_os_str(),
+        None => std::ffi::OsStr::new(command),
+    };
     let mut child = Command::new(command)
         .args(args)
         .stdin(Stdio::null())
@@ -210,6 +239,45 @@ mod tests {
             language: "lua".to_string(),
             ..Context::default()
         }
+    }
+
+    /// **The cache key does not move when the shell's state does.**
+    ///
+    /// This is the whole of `async`. Keyed on the filled arguments, a prompt passing `$status` or
+    /// `$duration_ms` — which is every prompt worth writing — missed on every lookup, answered
+    /// `None`, and was replaced by the shell's own fallback. The only way to see such a tool at
+    /// all was `async = false`, paying its full cost between every keystroke and the screen.
+    #[test]
+    fn an_asynchronous_prompt_is_found_again_after_the_status_changes() {
+        let spec = Spec {
+            command: "hexe".to_string(),
+            args: vec!["prompt".to_string(), "--status=$status".to_string()],
+            timeout: Duration::from_millis(400),
+            asynchronous: true,
+        };
+        let first = key_of(&spec);
+
+        let mut later = ctx();
+        later.status = 127;
+        later.duration_ms = Some(90_000);
+        assert_eq!(
+            first,
+            key_of(&spec),
+            "a failed command must not lose the prompt its own tool drew"
+        );
+
+        // And two prompts are still told apart, or a right prompt would answer with a left one.
+        let right = Spec {
+            command: "hexe".to_string(),
+            args: vec![
+                "prompt".to_string(),
+                "--right".to_string(),
+                "--status=$status".to_string(),
+            ],
+            timeout: Duration::from_millis(400),
+            asynchronous: true,
+        };
+        assert_ne!(first, key_of(&right));
     }
 
     /// The tool is told what the shell knows, without the config plumbing it through the
