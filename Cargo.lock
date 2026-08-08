@@ -1148,6 +1148,7 @@ dependencies = [
  "jammdb",
  "maki",
  "nix",
+ "oslo-lua",
  "regex",
  "serde_json",
  "sha2",
@@ -1156,6 +1157,13 @@ dependencies = [
  "unicode-segmentation",
  "unicode-width 0.2.2",
  "which",
+]
+
+[[package]]
+name = "oslo-lua"
+version = "0.2.21"
+dependencies = [
+ "full_moon",
 ]
 
 [[package]]

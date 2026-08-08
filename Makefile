@@ -77,8 +77,17 @@ r: run
 example:
 	@$(CARGO) run --example $(EXAMPLE)
 
+# oslo's own crates, and not the vendored ones.
+#
+# **Not plain `--workspace`.** The crates under `vendor/` carry their upstream test modules, whose
+# dev-dependencies were never vendored, so `--workspace` fails to compile before it runs anything
+# of ours. Nor is it plain `cargo test`: that is the root package alone, and the moment code moved
+# into `crates/` its tests silently stopped running — a suite that quietly shrinks is worse than
+# one that fails. Excluding by name states which code is somebody else's; see `vendor/README.md`.
+OURS := --workspace --exclude brush-parser --exclude full_moon --exclude full_moon_derive
+
 test:
-	@$(CARGO) test --all-targets
+	@$(CARGO) test --all-targets $(OURS)
 
 test-terminal:
 	@$(CARGO) test --test terminal_semantics_tests
@@ -86,7 +95,7 @@ test-terminal:
 t: test
 
 check:
-	@$(CARGO) check --all-targets
+	@$(CARGO) check --all-targets $(OURS)
 
 check-all:
 	@$(CARGO) check --all-targets --all-features
@@ -98,10 +107,10 @@ fmt-check:
 	@$(CARGO) fmt --all -- --check
 
 clippy:
-	@$(CARGO) clippy --all-targets --all-features -- -D warnings
+	@$(CARGO) clippy --all-targets --all-features $(OURS) -- -D warnings
 
 rustdoc:
-	@RUSTDOCFLAGS="-Dwarnings" $(CARGO) doc --all-features --no-deps
+	@RUSTDOCFLAGS="-Dwarnings" $(CARGO) doc --all-features --no-deps $(OURS)
 
 test-all:
 	@$(CARGO) test --all-targets --all-features
