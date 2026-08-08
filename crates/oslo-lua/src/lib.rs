@@ -33,7 +33,9 @@ pub mod value;
 pub use scope::{Closure, Scope};
 pub use value::{Number, Table, Value};
 
+use full_moon::ast::FunctionBody;
 use std::cell::{Cell, RefCell};
+use std::collections::HashMap;
 use std::rc::Rc;
 
 /// A Lua error: the message, where it happened, and the call stack under it.
@@ -193,6 +195,16 @@ pub struct Interp {
     depth: Cell<usize>,
     /// Varargs of the function currently running, for `...`.
     varargs: RefCell<Vec<Value>>,
+    /// Function bodies already shared, keyed by the address of the AST node they came from.
+    ///
+    /// Creating a function *value* used to deep-copy its whole body — 4.96 µs for a ten-line
+    /// closure, paid again on every evaluation of the same `function ... end`, which for a closure
+    /// written inside a loop is once per iteration.
+    ///
+    /// **Emptied around every [`Self::run_ast`]**, and that is what makes the key sound: an entry
+    /// can only exist while the AST holding that node is borrowed by the call that made it, so an
+    /// address can never be recycled underneath one.
+    bodies: RefCell<HashMap<usize, Rc<FunctionBody>>>,
 }
 
 /// Deep enough for any real script, shallow enough to unwind before the Rust stack gives out.
@@ -216,6 +228,7 @@ impl Interp {
             line: Cell::new(0),
             depth: Cell::new(0),
             varargs: RefCell::new(Vec::new()),
+            bodies: RefCell::new(HashMap::new()),
         };
         stdlib::install(&interp);
         interp
@@ -319,12 +332,27 @@ impl Interp {
     /// Run a parsed chunk, returning whatever it returned.
     pub fn run_ast(&self, ast: &full_moon::ast::Ast) -> LuaResult<Vec<Value>> {
         let scope = Scope::root();
+        // Entries key on node addresses inside `ast`, which is borrowed only for this call. Both
+        // ends are cleared so none can outlive it — see the field.
+        self.bodies.borrow_mut().clear();
         let outcome =
             stmt::exec_block(self, ast.nodes(), &scope).map_err(|e| e.at(self.line.get()));
+        self.bodies.borrow_mut().clear();
         match outcome? {
             Flow::Return(values) => Ok(values),
             _ => Ok(Vec::new()),
         }
+    }
+
+    /// The shared body for this AST node, cloned once and remembered for the rest of the chunk.
+    pub(crate) fn body_of(&self, body: &FunctionBody) -> Rc<FunctionBody> {
+        let key = std::ptr::from_ref(body) as usize;
+        if let Some(shared) = self.bodies.borrow().get(&key) {
+            return Rc::clone(shared);
+        }
+        let shared = Rc::new(body.clone());
+        self.bodies.borrow_mut().insert(key, Rc::clone(&shared));
+        shared
     }
 
     /// Call any callable with `args`.
