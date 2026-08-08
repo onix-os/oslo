@@ -92,6 +92,18 @@ pub(super) fn convert_words_from_str(word_str: &str) -> Result<Vec<oslo_ast::Wor
         return Ok(Vec::new());
     }
 
+    // **A word with nothing in it to lex is its own literal.** Most words are `ls`, `-la`,
+    // `src/main.rs`: no expansion, no quoting, no escape, nothing that splits. Finding that out
+    // through the lexer costs a `Vec<char>` of the whole word and a token vector on top, for every
+    // word of every command. Deliberately conservative — a glob or a brace goes the long way even
+    // though it would very likely come back the same.
+    const NEEDS_LEXING: &[char] = &[
+        '$', '`', '\'', '"', '~', '\\', '*', '?', '[', ']', '{', '}', ' ', '\t', '\n',
+    ];
+    if !trimmed.contains(NEEDS_LEXING) {
+        return Ok(vec![oslo_ast::Word::from_literal(trimmed)]);
+    }
+
     let mut lexer = crate::lexer::Lexer::new(trimmed);
     let mut words = Vec::new();
 
