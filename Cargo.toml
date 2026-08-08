@@ -203,3 +203,11 @@ opt-level = "s"
 # The one dependency on the hot path, and the whole reason `"*"` above needed an exception.
 [profile.release.package.brush-parser]
 opt-level = 3
+
+# **`"*"` does not reach oslo's own crates, and that is cargo's rule rather than luck.**
+#
+# Worth writing down, because it is the obvious thing to get wrong once the shell is five crates:
+# `profile.package."*"` matches *dependencies*, not workspace members, so `oslo-shell` and the rest
+# keep this profile's `opt-level = 3` and are not quietly compiled for size along with everything
+# else. Checked rather than assumed — setting `oslo-ui` to `"z"` moves the binary 5.96 MB → 5.77 MB,
+# so a per-member override does take effect when one is written; there simply is not one.
