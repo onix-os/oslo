@@ -96,8 +96,8 @@ impl Timer {
         // `on-time-report`: only a `time`-prefixed pipeline reaches here, which is what separates
         // this from `post-cmd` — that one fires for everything and carries wall-clock only. These
         // are the three clocks, and they were asked for.
-        crate::lua::engine::fire_at_here(
-            crate::lua::api::hooks::at::TIME_REPORT,
+        crate::hooks::fire_at_here(
+            crate::hooks::at::TIME_REPORT,
             &[
                 ("real_ms", &real.as_millis().to_string()),
                 ("user_ms", &user.as_millis().to_string()),

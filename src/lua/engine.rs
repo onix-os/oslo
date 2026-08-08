@@ -205,6 +205,16 @@ impl Default for LuaEngine {
 
 impl LuaEngine {
     pub fn new() -> Result<Self> {
+        // **The moment the shell gains a way to reach a hook.** Everything below this layer fires
+        // through `crate::hooks`, which knows the moments and nothing else; this is where the four
+        // functions that can actually run one are handed over. Before it — a script, `sh -c`, a
+        // test that never builds an engine — every hook is a relaxed load and a return.
+        crate::hooks::install(crate::hooks::Dispatch {
+            watched: crate::lua::api::hooks::watched,
+            fire: hooks::fire_at_here,
+            answer: hooks::answer_hook_with,
+            ask: hooks::ask_hook_here,
+        });
         Ok(Self {
             interp: Rc::new(Interp::new("=(oslo lua)")),
             registry: Rc::new(RefCell::new(HashMap::new())),

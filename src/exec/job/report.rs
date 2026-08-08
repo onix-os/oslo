@@ -92,8 +92,8 @@ pub(super) fn announce_changes(jobs: &mut JobTable) {
             // `on-job-finish`, beside the `[1]+ Done` line rather than instead of it, and only for
             // a job that *ended* — a stopped job is announced here too but it has not finished,
             // and `fg` may yet resume it.
-            crate::lua::engine::fire_at_here(
-                crate::lua::api::hooks::at::JOB_FINISH,
+            crate::hooks::fire_at_here(
+                crate::hooks::at::JOB_FINISH,
                 &[
                     ("id", &id.to_string()),
                     ("pid", &job.pgid.as_raw().to_string()),

@@ -23,6 +23,17 @@ use std::path::PathBuf;
 pub use array::{ShellArray, array_literal_body};
 pub use registry::{BuiltinFn, is_special_builtin};
 
+/// One running process substitution: the descriptor the caller was given, and the child feeding it.
+///
+/// **Declared here, beside the list that holds it, rather than in `exec::procsub` where it is
+/// opened and closed.** The store is the bottom of the shell's dependency graph — nothing it holds
+/// may point back up at the executor — and this was the single field that did. Two OS handles is
+/// all it is; the machinery that fills them in stays with the code that forks.
+pub struct Substitution {
+    pub fd: std::os::fd::RawFd,
+    pub child: nix::unistd::Pid,
+}
+
 /// What a call frame entered without a name reads as, in `caller`'s output.
 ///
 /// bash's own spelling for the same gap: `f() { caller; }; f` in `bash -c` prints `1 NULL`,
@@ -72,7 +83,7 @@ pub struct Environment {
     /// Lives here because the descriptor has to outlive *expansion* — the program opens
     /// `/dev/fd/N` only once every word is expanded and the command runs — but must not outlive
     /// the command. `crate::exec::simple` closes them when it is done.
-    pub procsubs: Vec<crate::exec::procsub::Substitution>,
+    pub procsubs: Vec<Substitution>,
     signal_traps: HashMap<String, String>,
     /// Traps this shell inherited and then reset because it is a subshell.
     ///

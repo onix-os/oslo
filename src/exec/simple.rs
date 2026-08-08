@@ -384,8 +384,8 @@ fn nothing_to_run(
     // "nvim is in package neovim", or install it and run it — and a handler that resolved the
     // situation answers with the status to report. Everyone else bolts this on as a shell
     // function; here it is a hook.
-    if let Some(status) = crate::lua::engine::ask_hook_here(
-        crate::lua::api::hooks::at::COMMAND_NOT_FOUND,
+    if let Some(status) = crate::hooks::ask_hook_here(
+        crate::hooks::at::COMMAND_NOT_FOUND,
         vec![crate::lua::eval::value::Value::str(cmd_name)],
     ) {
         return Ok(status);

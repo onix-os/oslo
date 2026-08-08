@@ -159,37 +159,11 @@ pub const HOOKS: &[Hook] = &[
 
 /// The moments something on a hot path has to ask about, by index into [`HOOKS`].
 ///
-/// Named because the check is in a loop that runs per keystroke, per mode change or per prompt —
-/// somewhere a string comparison against twenty names would be real work for nothing. A test
-/// asserts each one still points at the name it is called after.
-pub mod at {
-    pub const PRE_CMD: usize = 0;
-    pub const POST_CMD: usize = 1;
-    pub const PRE_CHANGE_DIR: usize = 2;
-    pub const POST_CHANGE_DIR: usize = 3;
-    pub const PRE_PROMPT: usize = 4;
-    pub const POST_PROMPT: usize = 5;
-    pub const PRE_MODE_CHANGE: usize = 6;
-    pub const POST_MODE_CHANGE: usize = 7;
-    pub const HISTORY_OPEN: usize = 8;
-    pub const HISTORY_CLOSE: usize = 9;
-    pub const HISTORY_SELECT: usize = 10;
-    pub const COMPLETION_START: usize = 11;
-    pub const COMPLETION_CANCEL: usize = 12;
-    pub const COMPLETION_SELECT: usize = 13;
-    pub const JOB_FINISH: usize = 14;
-    pub const TIME_REPORT: usize = 15;
-    /// The one moment that had no constant, which is why its fire site named it by *alias* — and
-    /// so looked up a key nothing is ever stored under. See `ask_hook_here`.
-    pub const COMMAND_NOT_FOUND: usize = 16;
-    pub const IDLE_TIMEOUT: usize = 17;
-    /// Just before a finished line is written down. May replace what is recorded, or refuse it.
-    /// How a report the shell was about to print should look. See `startup::report`.
-    pub const ON_REPORT: usize = 18;
-    pub const PRE_RECORD: usize = 19;
-    pub const ON_EXIT: usize = 20;
-    pub const ON_KEY: usize = 21;
-}
+/// **One set of indices, kept where the shell can see them.** These live in [`crate::hooks`], which
+/// depends on nothing, because the editor and the executor fire hooks and must not have to see this
+/// module to do it. Re-exported here so that the names and the table they index into still read
+/// together, and so `HOOKS` remains the thing they are checked against — see the test below.
+pub use crate::hooks::at;
 
 /// Which hooks have ever had a handler attached.
 ///

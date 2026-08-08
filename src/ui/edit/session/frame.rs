@@ -21,7 +21,7 @@ use crate::ui::term::{InputEvent, Keys};
 /// tick. It resets the moment a key arrives, so walking away twice reports twice.
 pub(super) fn next_input(keys: &mut Keys, reported: &mut bool) -> Option<InputEvent> {
     let seconds = crate::ui::settings::current().misc.idle_timeout;
-    if seconds == 0 || !crate::lua::api::hooks::watched(crate::lua::api::hooks::at::IDLE_TIMEOUT) {
+    if seconds == 0 || !crate::hooks::watched(crate::hooks::at::IDLE_TIMEOUT) {
         return keys.read_event();
     }
     let ms = seconds.saturating_mul(1000).min(i32::MAX as u64) as i32;
@@ -34,8 +34,8 @@ pub(super) fn next_input(keys: &mut Keys, reported: &mut bool) -> Option<InputEv
             crate::ui::term::EventPressed::Timeout => {
                 if !*reported {
                     *reported = true;
-                    crate::lua::engine::fire_at_here(
-                        crate::lua::api::hooks::at::IDLE_TIMEOUT,
+                    crate::hooks::fire_at_here(
+                        crate::hooks::at::IDLE_TIMEOUT,
                         &[("seconds", &seconds.to_string())],
                     );
                 }

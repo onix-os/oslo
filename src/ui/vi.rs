@@ -217,8 +217,8 @@ pub fn observe(mode: Mode, cursors: &Cursors) -> Option<&'static str> {
             ("from", previous.name()),
             ("to", mode.name()),
         ];
-        crate::lua::engine::fire_at_here(crate::lua::api::hooks::at::PRE_MODE_CHANGE, &fields);
-        crate::lua::engine::fire_at_here(crate::lua::api::hooks::at::POST_MODE_CHANGE, &fields);
+        crate::hooks::fire_at_here(crate::hooks::at::PRE_MODE_CHANGE, &fields);
+        crate::hooks::fire_at_here(crate::hooks::at::POST_MODE_CHANGE, &fields);
     }
     escape_for_change(previous, mode, cursors)
 }

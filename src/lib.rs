@@ -21,6 +21,7 @@ pub mod exec;
 pub mod expand;
 /// Parts of the shell a config can turn off and on again while it runs.
 pub mod feature;
+pub mod hooks;
 pub mod lexer;
 pub mod lua;
 pub mod parser;

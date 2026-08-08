@@ -47,7 +47,7 @@
 //! cause. That is the same contract `pre-cmd` and `pre-change-dir` already have, and the reason
 //! every field a handler could want is passed in rather than looked up.
 
-use crate::lua::api::hooks;
+use crate::hooks;
 use crate::lua::eval::value::{Table, Value};
 
 /// Whether a config drew this report itself.
@@ -68,7 +68,7 @@ pub fn handled(kind: &str, fields: Vec<(&str, Value)>) -> bool {
         table.set(Value::str(name), value);
     }
     matches!(
-        crate::lua::engine::answer_hook_with(hooks::at::ON_REPORT, vec![Value::table(table)]),
+        hooks::answer_hook_with(hooks::at::ON_REPORT, vec![Value::table(table)]),
         Some(Value::Bool(true))
     )
 }

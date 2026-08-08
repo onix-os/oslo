@@ -231,8 +231,8 @@ pub fn attempt_directory(
     // actually been in" is written down. Recorded from `cd`'s own arm it silently omitted every
     // `pushd` and `popd`, and every `cd` inside a shell function.
     super::ring::record(&landing.pwd);
-    crate::lua::engine::fire_at_here(
-        crate::lua::api::hooks::at::POST_CHANGE_DIR,
+    crate::hooks::fire_at_here(
+        crate::hooks::at::POST_CHANGE_DIR,
         &[("from", &origin), ("to", &landing.pwd)],
     );
     Ok(landing.display)
@@ -245,9 +245,9 @@ pub fn attempt_directory(
 /// hook does not pay for the question on every `cd`.
 fn refused(from: &str, to: &str) -> bool {
     matches!(
-        crate::lua::engine::answer_hook_with(
-            crate::lua::api::hooks::at::PRE_CHANGE_DIR,
-            vec![crate::lua::engine::LuaEngine::hook_fields(&[
+        crate::hooks::answer_hook_with(
+            crate::hooks::at::PRE_CHANGE_DIR,
+            vec![crate::hooks::fields(&[
                 ("from", crate::lua::eval::value::Value::str(from)),
                 ("to", crate::lua::eval::value::Value::str(to)),
             ])],

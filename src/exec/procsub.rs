@@ -28,7 +28,7 @@ use crate::exec::pipeline::status_of;
 use nix::fcntl::{FcntlArg, FdFlag, fcntl};
 use nix::sys::wait::{WaitPidFlag, WaitStatus, waitpid};
 use nix::unistd::{ForkResult, Pid, close, dup2, fork, pipe};
-use std::os::fd::{IntoRawFd, RawFd};
+use std::os::fd::IntoRawFd;
 use std::sync::Mutex;
 
 /// Children of process substitutions that have ended their command but not yet been reaped.
@@ -44,10 +44,10 @@ use std::sync::Mutex;
 static UNREAPED: Mutex<Vec<Pid>> = Mutex::new(Vec::new());
 
 /// One running substitution: the descriptor the caller was given, and the child feeding it.
-pub struct Substitution {
-    fd: RawFd,
-    child: Pid,
-}
+///
+/// Declared beside the list that holds it, in [`crate::env::scope`], so that the store depends on
+/// nothing above it. Opened and closed here, where the forking is.
+pub use crate::env::scope::Substitution;
 
 /// Start `command` on a pipe and return the `/dev/fd/N` path naming it, plus the handle that
 /// keeps it alive.

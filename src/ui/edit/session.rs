@@ -439,7 +439,7 @@ pub fn read_line(
             // for it to sit *in*. Unconditional, and harmless when it was never hidden.
             let _ = out.write_all(b"\x1b[?25h");
             let _ = out.flush();
-            crate::lua::engine::fire_at_here(crate::lua::api::hooks::at::POST_PROMPT, &[]);
+            crate::hooks::fire_at_here(crate::hooks::at::POST_PROMPT, &[]);
         }
 
         let Some(input) = next_input(&mut keys, &mut idle) else {
