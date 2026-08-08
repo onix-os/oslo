@@ -145,10 +145,28 @@ pub fn render(spec: &Spec, ctx: &Context) -> Option<String> {
     let key = key_of(spec);
 
     if spec.asynchronous {
-        // Whatever it said last time, now; the fresh run lands in the cache for the next prompt.
+        // **Wait a little, then give up — rather than never waiting at all.**
+        //
+        // Returning the previous output unconditionally is the obvious reading of "asynchronous"
+        // and it is wrong for a prompt: the arguments carry `$status`, `$duration_ms` and `$jobs`,
+        // so a prompt drawn from the last run reports the status of the command *before* the one
+        // that just finished. A `✗ 127` arriving one command late is worse than a prompt that took
+        // a moment, because it is not wrong in a way you can see.
+        //
+        // So the run starts in the background and this waits `timeout_ms` for it. On a quiet
+        // machine the tool answers well inside that and the prompt is both fresh and correct; when
+        // it does not — a loaded machine, a cold git cache — the last good answer is drawn
+        // immediately and the run goes on to fill the cache for next time. The stale prompt becomes
+        // the exception rather than the rule, and the stall never exceeds the deadline the config
+        // already declares.
         let previous = remembered(&key);
-        spawn(spec.command.clone(), args, key);
-        return previous;
+        let ready = spawn(spec.command.clone(), args, key);
+        return match ready.recv_timeout(spec.timeout) {
+            Ok(Some(fresh)) => Some(fresh),
+            // It failed, or it is still running. Either way the last good answer beats a blank
+            // prompt, and the thread will cache whatever it eventually produces.
+            Ok(None) | Err(_) => previous,
+        };
     }
 
     match run(&spec.command, &args, spec.timeout) {
@@ -161,15 +179,29 @@ pub fn render(spec: &Spec, ctx: &Context) -> Option<String> {
     }
 }
 
-/// Run it in the background, keeping the result for the next prompt.
-fn spawn(command: String, args: Vec<String>, key: String) {
+/// Run it in the background, keeping the result for the next prompt and announcing it on the way.
+///
+/// The channel is how [`render`] can wait a little for a *fresh* answer without giving up the
+/// background run if it does not arrive: whoever is listening may stop listening, and the thread
+/// goes on to cache the result regardless. A send into a dropped receiver is an error this
+/// deliberately ignores.
+///
+/// The thread's own deadline stays generous and is not the caller's: a hung tool costs one thread
+/// rather than the prompt, and the next run replaces whatever this one eventually says.
+fn spawn(
+    command: String,
+    args: Vec<String>,
+    key: String,
+) -> std::sync::mpsc::Receiver<Option<String>> {
+    let (ready, waiting) = std::sync::mpsc::channel();
     std::thread::spawn(move || {
-        // No deadline here: nothing is waiting for it, and a hung tool costs one thread rather
-        // than the prompt. The next run replaces whatever this one eventually says.
-        if let Some(out) = run(&command, &args, Duration::from_secs(10)) {
+        let out = run(&command, &args, Duration::from_secs(10));
+        if let Some(out) = out.clone() {
             remember(&key, out);
         }
+        let _ = ready.send(out);
     });
+    waiting
 }
 
 /// Run a command with a deadline, returning its stdout with the trailing newline trimmed.
