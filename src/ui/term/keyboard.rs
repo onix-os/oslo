@@ -1,7 +1,12 @@
 use super::input::Key;
 use std::sync::atomic::{AtomicU8, Ordering};
 
-pub const PUSH_DISAMBIGUATE: &str = "\x1b[>1u";
+/// Disambiguate escape codes (1), and report alternate keys (4).
+///
+/// The second flag is what makes a shifted key legible. Without it the terminal names only the
+/// base key — `3` for Shift+3 — and a shell has no way back to `#`, because which character the
+/// shift layer produces is a property of the keymap, not of the codepoint. Asking costs one byte.
+pub const PUSH_ENHANCEMENTS: &str = "\x1b[>5u";
 pub const POP: &str = "\x1b[<u";
 
 static SUPPORT: AtomicU8 = AtomicU8::new(0);
@@ -22,12 +27,14 @@ pub fn decode(sequence: &[u8]) -> Key {
         return Key::Ignored;
     };
     let mut fields = body.split(';');
-    let Some(code) = fields.next().and_then(|s| s.split(':').next()) else {
+    let mut key = fields.next().unwrap_or_default().split(':');
+    let Some(code) = key.next().and_then(|s| s.parse::<u32>().ok()) else {
         return Key::Ignored;
     };
-    let Some(code) = code.parse::<u32>().ok() else {
-        return Key::Ignored;
-    };
+    let shifted = key
+        .next()
+        .and_then(|s| s.parse::<u32>().ok())
+        .and_then(char::from_u32);
     let modifier_field = fields.next().unwrap_or("1");
     let mut modifier_parts = modifier_field.split(':');
     let modifiers = modifier_parts
@@ -64,8 +71,17 @@ pub fn decode(sequence: &[u8]) -> Key {
     let Some(mut character) = char::from_u32(code) else {
         return Key::Ignored;
     };
+    // The terminal's own shifted key wins; uppercasing is the fallback for one that reports none,
+    // and it is only ever right for a letter. Applying it to `3` yields `3`, which is how Shift+3
+    // stopped producing `#`.
     if shift {
-        character = character.to_uppercase().next().unwrap_or(character);
+        character = match shifted {
+            Some(alternate) => alternate,
+            None if character.is_alphabetic() => {
+                character.to_uppercase().next().unwrap_or(character)
+            }
+            None => character,
+        };
     }
     if ctrl && !shift {
         control(character)
@@ -140,6 +156,18 @@ mod tests {
         assert_eq!(decode(b"\x1b[57350;1:1u"), Key::Left);
         assert_eq!(decode(b"\x1b[107;5:2u"), Key::Ignored);
         assert_eq!(decode(b"\x1b[107;5:3u"), Key::Ignored);
+    }
+
+    #[test]
+    fn a_shifted_key_is_the_one_the_terminal_names() {
+        assert_eq!(decode(b"\x1b[51:35;2u"), Key::Char('#'));
+        assert_eq!(decode(b"\x1b[50:64;2u"), Key::Char('@'));
+        assert_eq!(decode(b"\x1b[97:65;2u"), Key::Char('A'));
+        assert_eq!(decode(b"\x1b[59:246;2u"), Key::Char('ö'));
+        assert_eq!(decode(b"\x1b[97;2u"), Key::Char('A'));
+        assert_eq!(decode(b"\x1b[51;2u"), Key::Char('3'));
+        assert_eq!(decode(b"\x1b[51::51;2u"), Key::Char('3'));
+        assert_eq!(decode(b"\x1b[51u"), Key::Char('3'));
     }
 
     #[test]

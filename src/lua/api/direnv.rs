@@ -5,177 +5,20 @@
 //! which tells a reader nothing about which of them belong together. `fs`, `json`, `path`, `proc`
 //! and `re` were already tables; this is the same idea applied to the directory environment.
 //!
-//! # `oslo.direnv.nix_develop` — the environment of a Nix dev shell, without entering one.
+//! # Thin, on purpose
 //!
-//! direnv's `use flake` is four lines of shell (`stdlib.sh`):
-//!
-//! ```sh
-//! watch_file flake.nix; watch_file flake.lock
-//! eval "$(nix print-dev-env --profile "$(direnv_layout_dir)/flake-profile" "$@")"
-//! nix profile wipe-history --profile "$(direnv_layout_dir)/flake-profile"
-//! ```
-//!
-//! The `eval` is the whole trick: `nix print-dev-env` emits **bash** that sets the environment, and
-//! direnv hands it to the bash it is already running inside. oslo will not do that — evaluating a
-//! hundred kilobytes of generated bash on every arrival is exactly the sort of thing a directory
-//! environment must not do — so this uses `--json`, which is the same information as data.
-//!
-//! # The trap in `--json`, which cost an afternoon to find
-//!
-//! **The two forms do not contain the same variables.** Deriving the difference on nix 2.34 against
-//! this repository's own flake:
-//!
-//! ```text
-//! in --json but never emitted as bash:  HOME NIX_ENFORCE_PURITY NIX_LOG_FD TERM TZ
-//! ```
-//!
-//! `nix` filters those out of the shell form because setting them would wreck the shell you are
-//! standing in — `HOME` inside a derivation is `/homeless-shelter`. The JSON form applies no such
-//! filter; it is a faithful dump of the builder's environment. So anything built on `--json` has to
-//! reproduce that list, and a version that does not will silently repoint `$HOME` the moment you
-//! `cd` into a flake. [`IGNORED`] is that list, widened to nix's full documented set so a variable
-//! that is merely absent from this flake cannot appear in another one and break it.
-//!
-//! # The rule behind both of the bugs this module has had
-//!
-//! **`print-dev-env`'s bash output is curated for a shell to consume; `--json` is a raw dump of the
-//! builder.** Everything the bash form does *besides* assigning values is invisible to `--json`:
-//!
-//! * variables it declines to emit at all — `HOME`, `TERM`, `TZ` and two more, handled by
-//!   [`IGNORED`];
-//! * statements it runs after the assignments — the `PATH` restore, handled by [`keeping_yours`].
-//!
-//! Both bugs were the same mistake twice: treating a snapshot of values as if it were the script.
-//! A third difference of this kind is likely, so when something loaded from a flake behaves oddly,
-//! diff the two forms before looking anywhere else — that is how both of these were found.
-//!
-//! # Why this is in Rust when nothing else is
-//!
-//! It could be written in Lua — `oslo.proc.capture`, `oslo.json` and `oslo.env.set` are all there, and
-//! about forty lines would do it. It is here because of the paragraph above: the failure mode is
-//! severe, silent, and not something you would think to test. A recipe everyone copies is a list
-//! everyone copies wrong.
+//! Every function here is a call into [`crate::direnv`], which is also what an `.envrc` reaches
+//! through [`crate::direnv::stdlib`]. That matters more than it looks: `nix_develop` and `use flake`
+//! do the same delicate thing — take a dev shell's environment from `nix print-dev-env --json`
+//! while withholding the handful of variables that would wreck the shell you are standing in — and
+//! two copies of that list is two chances to get it wrong, silently, in a way nobody would think to
+//! test. See [`crate::direnv::devshell`] for what those are and why.
 
 use super::util::{put, text};
+use crate::direnv::{devshell, stdlib};
 use crate::env::Environment;
 use crate::lua::eval::{LuaError, Table, Value};
 use std::sync::{Arc, Mutex};
-
-/// Variables that must never be taken from a dev shell into the shell you are using.
-///
-/// The first five are what nix itself withholds from the bash form. The rest are the remainder of
-/// nix's own `ignoreVars` (`src/nix/develop.cc`) — absent from this flake, but present in others,
-/// and each one would be a different flavour of broken: `PWD` and `OLDPWD` would lie about where
-/// you are, `SHELL` would point at the store's bash, `TMPDIR` at a build directory that no longer
-/// exists, `SHLVL` would corrupt the nesting count.
-const IGNORED: &[&str] = &[
-    "BASHOPTS",
-    "EUID",
-    "HOME",
-    "HOSTNAME",
-    "NIX_BUILD_TOP",
-    "NIX_ENFORCE_PURITY",
-    "NIX_LOG_FD",
-    "NIX_REMOTE",
-    "OLDPWD",
-    "PPID",
-    "PWD",
-    "SHELL",
-    "SHELLOPTS",
-    "SHLVL",
-    "SSL_CERT_FILE",
-    "TEMP",
-    "TEMPDIR",
-    "TERM",
-    "TMP",
-    "TMPDIR",
-    "TZ",
-    "UID",
-    "_",
-];
-
-/// Whether this variable may be carried out of the dev shell.
-fn wanted(name: &str) -> bool {
-    !IGNORED.contains(&name)
-        // `BASH_FUNC_x%%` and friends are exported bash functions. oslo's functions are not bash's,
-        // and importing the encoding would put unrunnable text in the environment of every child.
-        && !name.starts_with("BASH_FUNC_")
-}
-
-/// The exported variables of a dev shell, from `nix print-dev-env --json` output.
-///
-/// Only `type == "exported"`. A `var` is shell-local to the builder — `SHELL` arrives that way —
-/// and an `array` is a bash array, which is a shape a POSIX environment cannot hold. Both are
-/// dropped rather than flattened into something that looks like a value and is not.
-pub fn exported_from(json: &str) -> Result<Vec<(String, String)>, String> {
-    let parsed: serde_json::Value = serde_json::from_str(json).map_err(|e| e.to_string())?;
-    let Some(variables) = parsed.get("variables").and_then(|v| v.as_object()) else {
-        return Err(
-            "no `variables` in the output; is this `nix print-dev-env --json`?".to_string(),
-        );
-    };
-    let mut out = Vec::new();
-    for (name, entry) in variables {
-        if !wanted(name) {
-            continue;
-        }
-        if entry.get("type").and_then(|t| t.as_str()) != Some("exported") {
-            continue;
-        }
-        if let Some(value) = entry.get("value").and_then(|v| v.as_str()) {
-            out.push((name.clone(), value.to_string()));
-        }
-    }
-    out.sort();
-    Ok(out)
-}
-
-/// The dev shell's `PATH`, with everything of yours that it does not already have, behind it.
-///
-/// **This is not our invention — it is a line `--json` cannot carry.** The bash form of
-/// `print-dev-env` is bookended:
-///
-/// ```sh
-/// line    3:  nix_saved_PATH="$PATH"                           # save yours
-/// line   91:  PATH='/nix/store/…gcc-wrapper/bin:…'             # replace with the dev shell's
-/// line 2195:  PATH="$PATH${nix_saved_PATH:+:$nix_saved_PATH}"  # and put yours back, behind it
-/// ```
-///
-/// direnv `eval`s that script, so line 2195 runs and a zsh user keeps `clear` and `git`. `--json`
-/// is a snapshot of *values*: line 2195 is a statement, and `nix_saved_PATH` is not among its 144
-/// variables at all. So the append has to be done here, or it does not happen.
-///
-/// Without it, a dev shell's `PATH` is a *build* environment — 36 store entries for this
-/// repository's flake, with `ls` and `grep` because coreutils is a build input, and no `clear`, no
-/// `git`, and nothing you installed. `cd` into the project and the shell quietly loses half its
-/// commands, which is exactly what happened the first time this was used for real.
-fn keeping_yours(dev: &str, outer: &str) -> String {
-    let mut out: Vec<&str> = dev.split(':').filter(|e| !e.is_empty()).collect();
-    for entry in outer.split(':').filter(|e| !e.is_empty()) {
-        if !out.contains(&entry) {
-            out.push(entry);
-        }
-    }
-    out.join(":")
-}
-
-/// The command direnv runs, with the profile that keeps the shell from being garbage-collected.
-///
-/// `--profile` is not decoration: without it the dev shell's store paths have no GC root, and the
-/// next `nix store gc` deletes the toolchain out from under a directory that still points at it.
-/// direnv puts the profile under its layout directory and so do we.
-fn command(installable: &str, profile: &str) -> String {
-    format!(
-        "nix --extra-experimental-features 'nix-command flakes' print-dev-env --json \
-         --profile {} {}",
-        shell_quote(profile),
-        shell_quote(installable)
-    )
-}
-
-fn shell_quote(word: &str) -> String {
-    format!("'{}'", word.replace('\'', "'\\''"))
-}
 
 /// Build the `oslo.direnv` table.
 pub fn build(env: &Arc<Mutex<Environment>>) -> Value {
@@ -193,40 +36,19 @@ fn path_add(it: &mut Table, env: &Arc<Mutex<Environment>>) {
     // the project's own tool loses to the system one. Relative paths resolve against the current
     // directory, because a directory environment saying `./bin` means *its* bin.
     //
-    // Idempotent: a directory already on the front is not added twice, so a reload does not grow
-    // the variable each time.
+    // Idempotent, so a reload does not grow the variable each time. This is `PATH_add` from an
+    // `.envrc` under another name — one implementation, so the two cannot drift.
     let env = Arc::clone(env);
     put(it, "path_add", move |_, args| {
-        let dir = text(&args, 1, "oslo.direnv.path_add")?;
+        let dir = text(&args, 1, "oslo.direnv.path_add")?.to_string();
         let name = match args.get(1) {
             Some(Value::Str(name)) => name.to_string(),
             _ => "PATH".to_string(),
         };
-        let dir: String = dir.to_string();
-        let joined = match std::path::Path::new(&dir).is_absolute() {
-            true => std::path::PathBuf::from(&dir),
-            false => std::env::current_dir().unwrap_or_default().join(&dir),
-        };
-        // Normalised lexically, not with `canonicalize`: the directory may not exist yet (a build
-        // tree that has not been made), and canonicalising would fail there and also resolve
-        // symlinks the user wrote deliberately. `components()` drops the `.` in `./bin`, which is
-        // what makes `path_add("bin")` and `path_add("./bin")` the same entry — without it the
-        // idempotence check below compares two spellings of one directory and adds it twice.
-        let absolute = joined
-            .components()
-            .collect::<std::path::PathBuf>()
-            .to_string_lossy()
-            .to_string();
         let mut guard = crate::lua::engine::borrow_env(&env)?;
-        let current = guard.get_var(&name).unwrap_or_default().to_string();
-        if current.split(':').any(|entry| entry == absolute) {
-            return Ok(vec![Value::str(current)]);
-        }
-        let joined = match current.is_empty() {
-            true => absolute,
-            false => format!("{absolute}:{current}"),
-        };
-        guard.set_var(&name, &joined, true);
+        stdlib::prepend_into(&mut guard, &name, &[dir])
+            .map_err(|e| LuaError::new(format!("oslo.direnv.path_add: {e}")))?;
+        let joined = guard.get_var(&name).unwrap_or_default().to_string();
         Ok(vec![Value::str(joined)])
     });
 }
@@ -240,133 +62,13 @@ fn nix_develop(it: &mut Table, env: &Arc<Mutex<Environment>>) {
             Some(Value::Str(_)) => text(&args, 1, "oslo.direnv.nix_develop")?.to_string(),
             _ => ".".to_string(),
         };
-        let profile = ".direnv/flake-profile".to_string();
-        if let Some(parent) = std::path::Path::new(&profile).parent() {
-            let _ = std::fs::create_dir_all(parent);
-        }
-
-        let json = {
+        let count = {
             let mut guard = crate::lua::engine::borrow_env(&env)?;
-            crate::exec::eval_command_substitution(&mut guard, &command(&installable, &profile))
+            devshell::apply(&mut guard, &installable)
                 .map_err(|e| LuaError::new(format!("oslo.direnv.nix_develop: {e}")))?
         };
-        if json.trim().is_empty() {
-            return Err(LuaError::new(
-                "oslo.direnv.nix_develop: `nix print-dev-env` produced nothing — is nix installed, and \
-                 does this directory have a flake?",
-            ));
-        }
-
-        let exported = exported_from(&json).map_err(LuaError::new)?;
-        let count = exported.len();
-        {
-            let mut guard = crate::lua::engine::borrow_env(&env)?;
-            let outer_path = guard.get_var("PATH").unwrap_or_default().to_string();
-            for (name, value) in exported {
-                if name == "PATH" {
-                    guard.set_var(&name, &keeping_yours(&value, &outer_path), true);
-                    continue;
-                }
-                guard.set_var(&name, &value, true);
-            }
-        }
         Ok(vec![Value::Number(crate::lua::eval::Number::Int(
             count as i64,
         ))])
     });
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    /// The variable that makes this worth writing in Rust.
-    ///
-    /// `HOME` is `/homeless-shelter` inside a derivation. `nix print-dev-env` withholds it from the
-    /// bash form; `--json` does not. Taking it would repoint `$HOME` for the whole session the
-    /// moment somebody `cd`s into a flake, and nothing about the symptom would point back here.
-    #[test]
-    fn the_builders_home_never_escapes() {
-        let json = r#"{"variables":{
-            "HOME":{"type":"exported","value":"/homeless-shelter"},
-            "CC":{"type":"exported","value":"/nix/store/x/bin/gcc"}
-        }}"#;
-        let got = exported_from(json).expect("parses");
-        assert_eq!(
-            got,
-            vec![("CC".to_string(), "/nix/store/x/bin/gcc".to_string())]
-        );
-    }
-
-    /// Every name nix withholds from the shell form, checked as a set rather than one by one.
-    #[test]
-    fn the_whole_ignore_list_is_dropped() {
-        let entries: Vec<String> = IGNORED
-            .iter()
-            .map(|name| format!(r#""{name}":{{"type":"exported","value":"x"}}"#))
-            .collect();
-        let json = format!(r#"{{"variables":{{{}}}}}"#, entries.join(","));
-        assert!(exported_from(&json).expect("parses").is_empty());
-    }
-
-    /// Only `exported`. A `var` is builder-local and an `array` has no POSIX shape.
-    #[test]
-    fn only_exported_variables_are_taken() {
-        let json = r#"{"variables":{
-            "KEPT":{"type":"exported","value":"yes"},
-            "LOCAL":{"type":"var","value":"no"},
-            "LIST":{"type":"array","value":["a","b"]}
-        }}"#;
-        let got = exported_from(json).expect("parses");
-        assert_eq!(got, vec![("KEPT".to_string(), "yes".to_string())]);
-    }
-
-    /// An exported bash function is not a value oslo can carry.
-    #[test]
-    fn exported_bash_functions_are_dropped() {
-        let json = r#"{"variables":{
-            "BASH_FUNC_genericBuild%%":{"type":"exported","value":"() { :; }"}
-        }}"#;
-        assert!(exported_from(json).expect("parses").is_empty());
-    }
-
-    /// A profile path is what stops the toolchain being garbage-collected out from under you.
-    #[test]
-    fn the_command_names_a_profile_and_quotes_its_arguments() {
-        let built = command(".", ".direnv/flake-profile");
-        assert!(
-            built.contains("--profile '.direnv/flake-profile'"),
-            "{built}"
-        );
-        assert!(built.contains("print-dev-env --json"), "{built}");
-        // An installable with a quote in it must not end the quoting.
-        assert!(!command("it's", ".direnv/p").contains("'it's'"));
-    }
-
-    /// The bug this exists for: a dev shell must not take your commands away.
-    #[test]
-    fn your_own_path_survives_behind_the_dev_shells() {
-        let merged = keeping_yours(
-            "/nix/store/cc/bin:/nix/store/ld/bin",
-            "/usr/bin:/home/u/.local/bin",
-        );
-        assert_eq!(
-            merged, "/nix/store/cc/bin:/nix/store/ld/bin:/usr/bin:/home/u/.local/bin",
-            "the toolchain wins, and `clear` still resolves"
-        );
-    }
-
-    /// A reload must not grow `$PATH` a copy at a time.
-    #[test]
-    fn an_entry_in_both_appears_once() {
-        assert_eq!(keeping_yours("/a:/b", "/b:/c"), "/a:/b:/c");
-        assert_eq!(keeping_yours("/a", ""), "/a");
-        assert_eq!(keeping_yours("", "/c"), "/c");
-    }
-
-    #[test]
-    fn output_that_is_not_print_dev_env_is_refused_by_name() {
-        let problem = exported_from(r#"{"something":{}}"#).expect_err("must refuse");
-        assert!(problem.contains("print-dev-env"), "{problem}");
-    }
 }

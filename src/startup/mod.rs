@@ -28,4 +28,5 @@ pub mod recall;
 pub mod repl;
 mod report;
 mod terminal;
+pub mod timing;
 mod tracking;

@@ -51,21 +51,21 @@ oslo.prompt.left = function() return "> " end
 fn negotiated_keyboard_modes_are_balanced_on_editor_exits() {
     let mut shell = PtyShell::spawn("xterm-256color");
     shell.send(b"\x1b[?1u\x1b[?62;52;c");
-    shell.wait_for_occurrences(oslo::ui::term::keyboard::PUSH_DISAMBIGUATE.as_bytes(), 1);
+    shell.wait_for_occurrences(oslo::ui::term::keyboard::PUSH_ENHANCEMENTS.as_bytes(), 1);
 
     shell.send(b"true\n");
-    shell.wait_for_occurrences(oslo::ui::term::keyboard::PUSH_DISAMBIGUATE.as_bytes(), 2);
+    shell.wait_for_occurrences(oslo::ui::term::keyboard::PUSH_ENHANCEMENTS.as_bytes(), 2);
     shell.send(b"\x1b[Z");
-    shell.wait_for_occurrences(oslo::ui::term::keyboard::PUSH_DISAMBIGUATE.as_bytes(), 3);
+    shell.wait_for_occurrences(oslo::ui::term::keyboard::PUSH_ENHANCEMENTS.as_bytes(), 3);
     shell.send(b"\x03");
-    shell.wait_for_occurrences(oslo::ui::term::keyboard::PUSH_DISAMBIGUATE.as_bytes(), 4);
+    shell.wait_for_occurrences(oslo::ui::term::keyboard::PUSH_ENHANCEMENTS.as_bytes(), 4);
     shell.send(b"\x04");
     shell.wait_for_exit();
 
     let pushes = shell
         .transcript
-        .windows(oslo::ui::term::keyboard::PUSH_DISAMBIGUATE.len())
-        .filter(|window| *window == oslo::ui::term::keyboard::PUSH_DISAMBIGUATE.as_bytes())
+        .windows(oslo::ui::term::keyboard::PUSH_ENHANCEMENTS.len())
+        .filter(|window| *window == oslo::ui::term::keyboard::PUSH_ENHANCEMENTS.as_bytes())
         .count();
     let pops = shell
         .transcript
@@ -283,4 +283,94 @@ fn noninteractive_terminal_status_is_inert() {
     let mut transcript = output.stdout;
     transcript.extend(output.stderr);
     assert!(!transcript.contains(&0x1b), "{}", visible(&transcript));
+}
+
+#[test]
+fn nav_escape_after_navigation_changes_the_shell_directory() {
+    let config = r#"
+oslo.misc.welcome = false
+oslo.prompt.left = function() return "> " end
+oslo.builtin.nav.fullscreen = false
+oslo.builtin.nav.scanner = false
+oslo.builtin.nav.height = 8
+"#;
+    let mut shell = PtyShell::configured("xterm-256color", false, config);
+    let first = shell._home.path().join("first");
+    let second = first.join("second");
+    std::fs::create_dir_all(&second).expect("create navigation tree");
+    shell.wait_for_marks(2);
+
+    shell.send(b"nav\n");
+    shell.wait_for_plain_text("first/");
+    shell.send(b"\x1b[C");
+    shell.wait_for_plain_text("second/");
+    shell.send(b"\x1b[C");
+    shell.wait_for_plain_text(&second.to_string_lossy());
+    shell.send(b"\x1b");
+    shell.wait_for_marks(6);
+    shell.send(b"pwd\n");
+    shell.wait_for_plain_text(&second.to_string_lossy());
+    shell.send(b"exit\n");
+    shell.wait_for_exit();
+}
+
+#[test]
+fn nav_escape_changes_to_its_starting_directory() {
+    let config = r#"
+oslo.misc.welcome = false
+oslo.builtin.nav.fullscreen = false
+oslo.builtin.nav.scanner = false
+"#;
+    let mut shell = PtyShell::configured("xterm-256color", false, config);
+    let target = shell._home.path().join("target");
+    std::fs::create_dir(&target).expect("create target");
+    shell.wait_for_marks(2);
+
+    shell.send(format!("nav {}\n", target.display()).as_bytes());
+    shell.wait_for_plain_text(&target.to_string_lossy());
+    shell.send(b"\x1b");
+    shell.wait_for_marks(6);
+    shell.send(b"pwd\n");
+    shell.wait_for_plain_text(&target.to_string_lossy());
+    shell.send(b"exit\n");
+    shell.wait_for_exit();
+}
+
+#[test]
+fn nav_typing_filters_and_delete_uses_the_internal_rm() {
+    let config = r#"
+oslo.misc.welcome = false
+oslo.prompt.left = function() return "> " end
+oslo.builtin.nav.scanner = false
+oslo.builtin.rm.to_tmp = true
+oslo.builtin.rm.trash = os.getenv("HOME") .. "/trash"
+"#;
+    let mut shell = PtyShell::configured("xterm-256color", false, config);
+    let quick = shell._home.path().join("quick");
+    std::fs::create_dir(&quick).expect("create entry to navigate into");
+    std::fs::write(quick.join("inside"), "move this to trash").expect("create removable file");
+    shell.wait_for_marks(2);
+
+    shell.send(b"nav\n");
+    shell.wait_for_plain_text("quick/");
+    assert!(!String::from_utf8_lossy(&shell.transcript).contains("filter @"));
+    assert!(!String::from_utf8_lossy(&shell.transcript).contains("type filter"));
+
+    shell.send(b"?");
+    shell.wait_for_plain_text("type filter");
+    shell.send(b"?q");
+    shell.wait_for_plain_text("filter @");
+    shell.send(b"\n");
+    shell.wait_for_plain_text(&quick.to_string_lossy());
+
+    shell.send(b"\x1b[3~");
+    shell.wait_for_plain_text("delete inside?");
+    shell.send(b"y");
+    shell.drain_for(Duration::from_millis(50));
+    shell.send(b"\x1b");
+    shell.wait_for_marks(6);
+    shell.send(b"test ! -e inside && test -e ../trash/inside && echo trashed\n");
+    shell.wait_for_plain_text("trashed");
+    shell.send(b"exit\n");
+    shell.wait_for_exit();
 }

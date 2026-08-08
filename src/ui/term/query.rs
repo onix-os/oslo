@@ -436,8 +436,13 @@ mod settle_tests {
         // The impostor answers at once; the real terminal answers a few milliseconds later.
         master.write_all(b"\x1b[?1;2c").expect("write");
         master.flush().expect("flush");
+        // **A millisecond, not five.** The reply only has to arrive inside the settle window, and
+        // the assertion holds however early it lands — so the margin is what matters and the delay
+        // is not. At five, the whole suite running sixteen tests wide could overshoot `SETTLE_MS`
+        // and the late reply became input, which is a correct outcome for a reply that really was
+        // that late and a wrong one for a test claiming otherwise.
         let writer = std::thread::spawn(move || {
-            std::thread::sleep(Duration::from_millis(5));
+            std::thread::sleep(Duration::from_millis(1));
             let _ = master.write_all(b"\x1b[?62;4c");
             let _ = master.flush();
             master

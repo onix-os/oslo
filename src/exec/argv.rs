@@ -50,6 +50,30 @@ pub struct Outcome {
     pub signal: Option<i32>,
 }
 
+/// Resolve `argv[0]` **before** forking, so the shell's own table learns where it lives.
+///
+/// **Every function in this file forks and then resolves the command in the child**, which execs
+/// and dies — so the hash table, which lives in the shell process, was never warmed by anything
+/// spawned this way. The lookup happened, was paid for, and was thrown away with the child.
+///
+/// A prompt calling `oslo.run{"hexe", …}` therefore re-walked `$PATH` on every prompt. `execvp`
+/// tries each entry in turn, so with a Nix dev shell's 48-entry `$PATH` and the binary near the
+/// end that is 48 `execve` calls per spawn, five spawns per prompt, forever: measured at 242
+/// wasted `execve` per command in this repository. One lookup here in the parent makes the next
+/// one a table hit and the child's exec a single `execve`.
+///
+/// A word with a `/` is not a search, and a builtin or function is not one either; those are left
+/// alone rather than being taught to the table as commands they are not.
+fn warm(env: &Environment, argv: &[String]) {
+    let Some(name) = argv.first() else {
+        return;
+    };
+    if name.contains('/') || env.get_builtin(name).is_some() || env.get_function(name).is_some() {
+        return;
+    }
+    let _ = crate::env::builtins::hash_lookup(name);
+}
+
 /// Run `argv`, capturing whatever `capture` asks for.
 pub fn run(env: &mut Environment, argv: &[String], capture: Capture) -> Result<Outcome> {
     if argv.is_empty() {
@@ -57,6 +81,8 @@ pub fn run(env: &mut Environment, argv: &[String], capture: Capture) -> Result<O
             "oslo.run: the command list is empty".to_string(),
         ));
     }
+
+    warm(env, argv);
 
     // Nothing to capture means nothing to fork for, and running in this shell is what makes
     // `sh.cd("/tmp")` and `sh.export(…)` affect the shell rather than a child that then exits.
@@ -139,6 +165,7 @@ pub fn spawn_reading(
             "oslo.lines: the command list is empty".to_string(),
         ));
     }
+    warm(env, argv);
     let (reader, writer) = pipe_pair()?;
     flush_stdout();
 
@@ -233,6 +260,7 @@ fn spawn_pipeline(
 
     for (i, argv) in stages.iter().enumerate() {
         let last = i + 1 == stages.len();
+        warm(env, argv);
         let downstream = if last { None } else { Some(pipe_pair()?) };
 
         // Safety: as in `capture_run` — the child only rearranges descriptors it owns before

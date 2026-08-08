@@ -185,6 +185,7 @@ pub(super) fn read_command(
                 let language = *current;
                 let reading_now = reading;
                 move || -> (String, String) {
+                    let _timed = crate::startup::timing::open("prompt-left");
                     let left = if at_start {
                         prompt::primary_prompt(env_struct, lua, last_status, language)
                     } else {
@@ -195,6 +196,8 @@ pub(super) fn read_command(
                         })
                         .unwrap_or_else(|| rc::ps2(&mut env_struct.lock().unwrap()))
                     };
+                    drop(_timed);
+                    let _timed = crate::startup::timing::open("prompt-right");
                     let facts = prompt::segment_context(last_status, reading_now, None);
                     let right = lua
                         .render_with("prompt.right", &facts)

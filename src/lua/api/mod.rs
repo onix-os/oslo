@@ -112,6 +112,10 @@ pub fn install(interp: &Rc<Interp>, registry: &Registry, env: Arc<Mutex<Environm
         Value::str("rm"),
         Value::Table(Rc::new(RefCell::new(Table::new()))),
     );
+    builtin.set(
+        Value::str("nav"),
+        Value::Table(Rc::new(RefCell::new(Table::new()))),
+    );
     oslo.set(
         Value::str("builtin"),
         Value::Table(Rc::new(RefCell::new(builtin))),

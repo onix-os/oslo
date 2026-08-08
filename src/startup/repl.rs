@@ -9,7 +9,7 @@ use crate::startup::integration;
 use crate::startup::mode::Mode;
 use crate::startup::read::{Input, read_command};
 use crate::startup::recall::{remember_history, seed_history};
-use crate::startup::{config, environments, history, lua_init, mode, prompt, rc, tracking};
+use crate::startup::{config, environments, history, lua_init, mode, prompt, rc, timing, tracking};
 use oslo::Environment;
 use oslo::LuaEngine;
 use oslo::env::builtins::run_exit_trap;
@@ -168,31 +168,43 @@ pub fn run_repl(login: bool) -> ! {
         // command happened to start makes the route irrelevant: however the shell got here, the
         // prompt before you type is the moment it has to be true. `arrive` itself is cheap when
         // nothing has changed, and this only calls it when the directory actually differs.
-        let here = current_directory();
-        if here != settled {
-            environments::arrive(&env_struct, &lua, std::path::Path::new(&here));
-            settled = here;
-        }
+        // What the *previous* cycle cost, printed where the lag was felt: after the key that ended
+        // the last line and before this prompt is drawn. Reporting after the read instead would
+        // land the line only once the next key had already been pressed.
+        timing::report();
+
+        timing::phase("direnv", || {
+            let here = current_directory();
+            if here != settled {
+                environments::arrive(&env_struct, &lua, std::path::Path::new(&here));
+                settled = here;
+            }
+        });
 
         // Another shell may have set a universal variable since the last prompt. A `stat` decides
         // whether to read the file, so the common case — nobody changed anything — costs one
         // syscall per prompt rather than a parse.
-        universal_stamp =
-            oslo::env::universal::refresh(&mut env_struct.lock().unwrap(), universal_stamp);
+        universal_stamp = timing::phase("universal", || {
+            oslo::env::universal::refresh(&mut env_struct.lock().unwrap(), universal_stamp)
+        });
 
-        publish_terminal_size(&env_struct);
+        timing::phase("size", || publish_terminal_size(&env_struct));
 
         // A prompt is about to be drawn. This is bash's `PROMPT_COMMAND` and zsh's `precmd`, and
         // the hook a prompt integration written in Lua needs — the shell-side one already exists
         // as `$PROMPT_COMMAND` below.
-        lua.fire_at(hooks::at::PRE_PROMPT, Vec::new());
+        timing::phase("pre-prompt", || {
+            lua.fire_at(hooks::at::PRE_PROMPT, Vec::new())
+        });
 
         // `$PROMPT_COMMAND` runs before every prompt. It is the other half of the DEBUG trap —
         // together they are bash's preexec/precmd pair, and every integration written for bash is
         // built on the two of them: starship redraws `PS1` here, hexe reports the command that
         // just finished. Fired before `read_command` rather than after a command, so it also runs
         // for the first prompt of the session, which is where a prompt integration draws itself.
-        integration::prompt_command(&env_struct, last_status);
+        timing::phase("prompt-command", || {
+            integration::prompt_command(&env_struct, last_status)
+        });
 
         let mut interaction = oslo::ui::marks::Interaction::begin();
         match read_command(

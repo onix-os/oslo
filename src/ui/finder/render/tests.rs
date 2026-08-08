@@ -191,6 +191,12 @@ fn the_scope_badge_uses_accent_on_zero() {
     };
     // Through the whole frame now that the bar is `Look`'s, which is the better test anyway: it
     // asserts on what reaches the terminal rather than on one function's return.
+    //
+    // The depth is held here rather than left to `frame_of`, which this one does not go through —
+    // and the escapes below are 256-colour ones. Without it this asserted against whatever depth
+    // another test had last set, and failed about once in ten full runs on a colour that was
+    // perfectly correct for the depth it actually got. See `theme::held_at`.
+    let _held = crate::ui::theme::held_at(crate::ui::theme::Depth::Ansi256);
     let drawn = frame(&f);
     assert!(
         drawn.contains("\x1b[38;5;0;48;5;1m[global]\x1b[0m"),
