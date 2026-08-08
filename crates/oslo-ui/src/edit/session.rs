@@ -391,6 +391,10 @@ pub fn read_line(
     let mut out = std::io::stderr();
     let mut drawn = false;
     let mut idle = false;
+    // Whether the next frame has to be built. A key that moved nothing — a cursor already at the
+    // end pressed End again, a refused vi key — used to repaint anyway, and building the frame is
+    // where the hint lookup and the layout pass live. The first frame always draws.
+    let mut repaint = true;
     // Rendered once up front, then only when an input to it has moved.
     let (mut prompt, mut right) = render();
     let mut seen = crate::prompt::generation();
@@ -416,14 +420,19 @@ pub fn read_line(
         if now != seen {
             seen = now;
             (prompt, right) = render();
+            // A prompt that rebuilt itself has to reach the screen even if the last key moved
+            // nothing — an async prompt arriving is exactly that case.
+            repaint = true;
         }
         let (prompt, right) = (prompt.as_str(), right.as_str());
 
-        let placed = draw(prompt, right, &session, assist, true);
-        let frame = screen::redraw(at_row, &placed.text, into_at(&placed));
-        let _ = out.write_all(crate::paint::Frame::new(&frame, synchronized).as_bytes());
-        let _ = out.flush();
-        at_row = placed.cursor_row;
+        if repaint {
+            let placed = draw(prompt, right, &session, assist, true);
+            let frame = screen::redraw(at_row, &placed.text, into_at(&placed));
+            let _ = out.write_all(crate::paint::Frame::new(&frame, synchronized).as_bytes());
+            let _ = out.flush();
+            at_row = placed.cursor_row;
+        }
 
         // **`post-prompt`: the prompt is now on the screen.** Once per line, not once per frame —
         // the loop redraws on every keystroke, and a hook firing there would be an `on-key` with a
@@ -441,6 +450,8 @@ pub fn read_line(
             oslo_base::hooks::fire_at_here(oslo_base::hooks::at::POST_PROMPT, &[]);
         }
 
+        // Anything that is not an ordinary key redraws; only `Step::Continue` below may say no.
+        repaint = true;
         let Some(input) = next_input(&mut keys, &mut idle) else {
             return Outcome::Eof;
         };
@@ -483,7 +494,7 @@ pub fn read_line(
                         let (position, pending) = crate::term::mouse::cursor_position(raw.fd());
                         keys.extend_pending(pending);
                         if let Some((cursor_row, _)) = position {
-                            let top = cursor_row.saturating_sub(placed.cursor_row);
+                            let top = cursor_row.saturating_sub(at_row);
                             if let Some(row) = event.row.checked_sub(top) {
                                 let cursor = super::layout::cursor_for_cell(
                                     prompt,
@@ -501,7 +512,7 @@ pub fn read_line(
             }
         };
         match session.apply(key, assist) {
-            Step::Continue { .. } => {}
+            Step::Continue { redraw } => repaint = redraw,
             Step::OpenCompletion { backwards } => {
                 if let Some((line, cursor)) = assist.complete(
                     &session.buffer.text(),
