@@ -51,21 +51,21 @@ oslo.prompt.left = function() return "> " end
 fn negotiated_keyboard_modes_are_balanced_on_editor_exits() {
     let mut shell = PtyShell::spawn("xterm-256color");
     shell.send(b"\x1b[?1u\x1b[?62;52;c");
-    shell.wait_for_occurrences(oslo::ui::term::keyboard::PUSH_DISAMBIGUATE.as_bytes(), 1);
+    shell.wait_for_occurrences(oslo::ui::term::keyboard::PUSH_ENHANCEMENTS.as_bytes(), 1);
 
     shell.send(b"true\n");
-    shell.wait_for_occurrences(oslo::ui::term::keyboard::PUSH_DISAMBIGUATE.as_bytes(), 2);
+    shell.wait_for_occurrences(oslo::ui::term::keyboard::PUSH_ENHANCEMENTS.as_bytes(), 2);
     shell.send(b"\x1b[Z");
-    shell.wait_for_occurrences(oslo::ui::term::keyboard::PUSH_DISAMBIGUATE.as_bytes(), 3);
+    shell.wait_for_occurrences(oslo::ui::term::keyboard::PUSH_ENHANCEMENTS.as_bytes(), 3);
     shell.send(b"\x03");
-    shell.wait_for_occurrences(oslo::ui::term::keyboard::PUSH_DISAMBIGUATE.as_bytes(), 4);
+    shell.wait_for_occurrences(oslo::ui::term::keyboard::PUSH_ENHANCEMENTS.as_bytes(), 4);
     shell.send(b"\x04");
     shell.wait_for_exit();
 
     let pushes = shell
         .transcript
-        .windows(oslo::ui::term::keyboard::PUSH_DISAMBIGUATE.len())
-        .filter(|window| *window == oslo::ui::term::keyboard::PUSH_DISAMBIGUATE.as_bytes())
+        .windows(oslo::ui::term::keyboard::PUSH_ENHANCEMENTS.len())
+        .filter(|window| *window == oslo::ui::term::keyboard::PUSH_ENHANCEMENTS.as_bytes())
         .count();
     let pops = shell
         .transcript

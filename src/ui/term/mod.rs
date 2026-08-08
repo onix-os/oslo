@@ -117,7 +117,7 @@ impl Restore {
             Screen::Line => BRACKETED_PASTE_ENABLE,
         });
         if kitty_keyboard {
-            let _ = out.write_all(keyboard::PUSH_DISAMBIGUATE.as_bytes());
+            let _ = out.write_all(keyboard::PUSH_ENHANCEMENTS.as_bytes());
             EDITOR_KITTY_ACTIVE.with(|active| active.set(true));
         }
         if legacy_mouse {
@@ -175,7 +175,7 @@ impl Drop for Restore {
         let _ = tcsetattr(handle, SetArg::TCSANOW, &self.original);
         if self.resume_kitty_keyboard {
             let mut out = io::stderr();
-            let _ = out.write_all(keyboard::PUSH_DISAMBIGUATE.as_bytes());
+            let _ = out.write_all(keyboard::PUSH_ENHANCEMENTS.as_bytes());
             let _ = out.flush();
             EDITOR_KITTY_ACTIVE.with(|active| active.set(true));
         }
