@@ -19,6 +19,7 @@ use registry::BuiltinRegistry;
 use std::collections::{HashMap, HashSet};
 use std::env;
 use std::path::PathBuf;
+use std::sync::Arc;
 
 pub use array::{ShellArray, array_literal_body};
 pub use registry::{BuiltinFn, is_special_builtin};
@@ -74,7 +75,7 @@ pub struct Environment {
     /// Exit status of the last command substitution, until something consumes it.
     substitution_status: Option<i32>,
     aliases: HashMap<String, String>,
-    functions: HashMap<String, Command>,
+    functions: HashMap<String, Arc<Command>>,
     /// Every builtin this shell has. The one list consulted by [`Self::is_builtin`], the
     /// dispatcher in `exec::simple` and `type`; see the `registry` submodule.
     builtins: BuiltinRegistry,
@@ -584,7 +585,7 @@ impl oslo_ui::shell::Shell for Environment {
         self.get_function(name).is_some()
     }
 
-    fn functions(&self) -> &HashMap<String, Command> {
+    fn functions(&self) -> &HashMap<String, Arc<Command>> {
         self.get_functions()
     }
 }

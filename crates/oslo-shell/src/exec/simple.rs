@@ -235,7 +235,7 @@ fn run_command_word(
         return run_builtin(env, name, words, redirections);
     }
 
-    if let Some(func_body) = env.get_function(name).cloned() {
+    if let Some(func_body) = env.shared_function(name) {
         return call_function_command(env, &func_body, words, redirections);
     }
 
@@ -283,7 +283,7 @@ pub(super) fn call_named_function(
     words: &[String],
     redirections: &[Redirection],
 ) -> Result<i32> {
-    let Some(body) = env.get_function(name).cloned() else {
+    let Some(body) = env.shared_function(name) else {
         return Ok(127);
     };
     call_function_command(env, &body, words, redirections)

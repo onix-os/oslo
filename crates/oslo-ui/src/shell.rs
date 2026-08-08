@@ -55,5 +55,5 @@ pub trait Shell: Send {
     fn is_function(&self, name: &str) -> bool;
 
     /// Every function, for completion and for painting.
-    fn functions(&self) -> &HashMap<String, Command>;
+    fn functions(&self) -> &HashMap<String, std::sync::Arc<Command>>;
 }

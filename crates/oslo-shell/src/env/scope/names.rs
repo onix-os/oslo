@@ -25,7 +25,7 @@ impl Environment {
     }
 
     pub fn set_function(&mut self, name: &str, body: Command) {
-        self.functions.insert(name.to_string(), body);
+        self.functions.insert(name.to_string(), Arc::new(body));
     }
 
     /// Forget the function `name`; `true` if there was one.
@@ -39,10 +39,20 @@ impl Environment {
     }
 
     pub fn get_function(&self, name: &str) -> Option<&Command> {
-        self.functions.get(name)
+        self.functions.get(name).map(|body| &**body)
     }
 
-    pub fn get_functions(&self) -> &HashMap<String, Command> {
+    /// The body, shared rather than copied.
+    ///
+    /// **What calling a function costs.** A body is a recursive tree down to its `String`s, and
+    /// the caller needs it owned because running it borrows the environment mutably — so every
+    /// call used to deep-copy the entire function. A sixty-line helper called from a prompt is
+    /// hundreds of allocations per call, for a body nothing ever mutates.
+    pub fn shared_function(&self, name: &str) -> Option<Arc<Command>> {
+        self.functions.get(name).map(Arc::clone)
+    }
+
+    pub fn get_functions(&self) -> &HashMap<String, Arc<Command>> {
         &self.functions
     }
 
