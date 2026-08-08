@@ -63,6 +63,18 @@ fn globstar_enabled() -> bool {
 /// quoting decides per character whether `*` is a metacharacter: `echo "a"*` must glob on the
 /// trailing `*` and `echo "a*"` must not glob at all.
 pub fn expand_glob(field: &[Run]) -> Vec<String> {
+    // **Asked before anything is built.** Almost every field is a plain word — `ls`, `-la`,
+    // `src/main.rs` — and discovering that used to cost a `(char, bool)` vector for the whole
+    // field, a `Vec` per path component and a compiled pattern for each, per argument of every
+    // command. No metacharacter in a globbing run means no `Pattern` and no `Globstar`, which is
+    // exactly the test the slow path ends up making.
+    if !field
+        .iter()
+        .any(|run| run.globs() && run.text.contains(['*', '?', '[']))
+    {
+        return vec![field_text(field)];
+    }
+
     let chars: Vec<(char, bool)> = field
         .iter()
         .flat_map(|run| run.text.chars().map(move |ch| (ch, run.globs())))
