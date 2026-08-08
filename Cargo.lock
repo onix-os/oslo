@@ -1150,6 +1150,7 @@ dependencies = [
  "nix",
  "oslo-base",
  "oslo-lua",
+ "oslo-shell",
  "oslo-ui",
  "regex",
  "serde_json",
@@ -1177,6 +1178,22 @@ name = "oslo-lua"
 version = "0.2.21"
 dependencies = [
  "full_moon",
+]
+
+[[package]]
+name = "oslo-shell"
+version = "0.2.21"
+dependencies = [
+ "brush-parser",
+ "nix",
+ "oslo-base",
+ "oslo-lua",
+ "oslo-ui",
+ "regex",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "which",
 ]
 
 [[package]]

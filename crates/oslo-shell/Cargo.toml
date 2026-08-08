@@ -1,0 +1,47 @@
+[package]
+name = "oslo-shell"
+version = "0.2.21"
+edition = "2024"
+rust-version = "1.88"
+license = "MIT"
+description = "oslo's shell: syntax adaptation, expansion, execution, builtins, the structured pipeline and directory environments."
+
+[dependencies]
+oslo-base = { path = "../oslo-base" }
+oslo-lua = { path = "../oslo-lua" }
+# The widgets the `ui` builtin drives, and the settings a builtin reads.
+oslo-ui = { path = "../oslo-ui" }
+
+# Nearly everything the executor does: fork, exec, wait, signals, terminal control, `ulimit`'s
+# limits and `times`'s getrusage.
+nix = { version = "0.29", features = [
+    "process", "signal", "term", "fs", "user", "resource", "hostname", "poll",
+] }
+
+# `[[ str =~ ere ]]`. See the root manifest for why the feature set is trimmed.
+regex = { version = "1", default-features = false, features = [
+    "std", "unicode-case", "unicode-gencat", "unicode-perl",
+    "perf-literal", "perf-inline",
+] }
+
+# The structured pipeline's JSON, and a core capability rather than a library a user can install:
+# a C module cannot load into a static binary.
+serde_json = "1"
+
+# Command resolution for `command -v` and the direnv stdlib's `has`.
+which = "7.0"
+
+# Parsing only — its AST is converted straight into oslo's in `syntax/brush_adapter/`. Vendored;
+# see `vendor/README.md`.
+brush-parser = { path = "../../vendor/brush-parser" }
+
+# The allow list for directory environments, keyed by a hash of the rc file's path and contents.
+sha2 = "0.10"
+
+# Not a dev-dependency: an `.envrc`'s own output is captured to a scratch file so it can be printed
+# under the file that produced it. A pipe would block once it filled, with nothing draining it.
+tempfile = "3.17"
+
+[dev-dependencies]
+oslo-base = { path = "../oslo-base", features = ["testing"] }
+oslo-ui = { path = "../oslo-ui", features = ["testing"] }

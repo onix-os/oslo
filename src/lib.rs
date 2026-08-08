@@ -23,14 +23,15 @@ pub use oslo_base::{ast, error, feature, hooks, nesting, track};
 #[cfg(test)]
 mod ui_tests;
 
-pub mod data;
-pub mod direnv;
-pub mod env;
-pub mod exec;
-pub mod expand;
-pub mod lexer;
+/// The shell, which is its own crate: syntax adaptation, expansion, execution, the builtins, the
+/// structured pipeline and directory environments. Kept reachable under the names they had —
+/// except `parser`, which is `syntax` now: there is one shell parser and it is brush's.
+pub use oslo_shell::{data, direnv, env, exec, expand, lexer, syntax};
+
+/// The old name for [`syntax`], because a great deal of the tree still says it.
+pub use oslo_shell::syntax as parser;
+
 pub mod lua;
-pub mod parser;
 /// SSH, behind the `ssh` feature — off by default. See the module docs for what it costs and what
 /// is still undecided.
 #[cfg(feature = "ssh")]

@@ -35,7 +35,6 @@ mod run;
 pub(crate) mod segment;
 mod shell;
 pub(crate) mod tool;
-pub(crate) mod tools;
 mod ui;
 
 pub mod hooks;

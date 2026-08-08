@@ -58,7 +58,12 @@ pub fn install(oslo: &mut Table) {
         let accepts = shape_of(&spec.get(&Value::str("accepts")), Shape::Nothing)?;
         let produces = shape_of(&spec.get(&Value::str("produces")), Shape::Rows)?;
 
-        TOOLS.with(|slot| slot.borrow_mut().insert(name.to_string(), rows));
+        // The handler goes into the pipeline's own table as an opaque closure, so that asking
+        // "is there a tool called this" does not mean reaching up into the Lua API. See
+        // `crate::data::custom`.
+        TOOLS.with(|slot| slot.borrow_mut().insert(name.to_string(), rows.clone()));
+        let handler = std::rc::Rc::new(move |argv: &[String]| run_rows(&rows, argv));
+        crate::data::custom::register(&name, handler);
         crate::data::tool::register(&name, accepts, produces);
         Ok(vec![Value::Bool(true)])
     });
@@ -96,19 +101,21 @@ fn shape_of(value: &Value, default: Shape) -> Result<Shape, LuaError> {
     }
 }
 
-/// Run a Lua tool's `rows` function, or `None` if no tool of that name was registered.
-pub fn rows_of(name: &str, argv: &[String]) -> Option<Result<Vec<Record>, String>> {
-    let handler = TOOLS.with(|slot| slot.borrow().get(name).cloned())?;
+/// Call a Lua tool's `rows` function with `argv`, and read back what it returned.
+///
+/// The body of the closure handed to [`crate::data::custom::register`]. The pipeline calls it
+/// without knowing it is Lua, which is the whole point of the split.
+fn run_rows(handler: &Value, argv: &[String]) -> Result<Vec<Record>, String> {
     let mut list = Table::new();
     for (i, word) in argv.iter().enumerate() {
         list.set(Value::int(i as i64 + 1), Value::str(word));
     }
     let argv = Value::Table(std::rc::Rc::new(RefCell::new(list)));
 
-    Some(match crate::lua::engine::call_here(&handler, vec![argv]) {
+    match crate::lua::engine::call_here(handler, vec![argv]) {
         Ok(values) => Ok(records_of(values.first().unwrap_or(&Value::Nil))),
-        Err(e) => Err(format!("{name}: {e}")),
-    })
+        Err(e) => Err(e.to_string()),
+    }
 }
 
 /// A Lua list of tables as records.

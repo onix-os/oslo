@@ -107,6 +107,7 @@ unicode-width = "0.2"
 brush-parser = { path = "vendor/brush-parser" }
 oslo-base = { path = "crates/oslo-base" }
 oslo-lua = { path = "crates/oslo-lua" }
+oslo-shell = { path = "crates/oslo-shell" }
 oslo-ui = { path = "crates/oslo-ui" }
 # The allow list for directory environments is keyed by a hash of the rc file's path *and* its
 # contents, which is what makes editing an allowed file revoke it. Pure Rust, so it does not cost
@@ -156,6 +157,7 @@ oslo-ui = { path = "crates/oslo-ui", features = ["testing"] }
 members = [
   "crates/oslo-base",
   "crates/oslo-lua",
+  "crates/oslo-shell",
   "crates/oslo-ui",
   "vendor/brush-parser",
   "vendor/full_moon",

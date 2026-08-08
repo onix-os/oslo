@@ -60,6 +60,7 @@ pub(crate) fn state_is_held() -> bool {
 
 /// The interpreter on this thread, if there is one, as a handle that can outlive the borrow.
 pub fn interpreter_handle() -> Option<Rc<Interp>> {
+    // Published into `oslo_lua::current` as well, for callers below this crate. See there.
     ACTIVE.with(|slot| slot.borrow().as_ref().map(|(interp, _)| Rc::clone(interp)))
 }
 
@@ -228,6 +229,11 @@ impl LuaEngine {
         ACTIVE.with(|slot| {
             *slot.borrow_mut() = Some((Rc::clone(&self.interp), Rc::clone(&self.registry)))
         });
+        // The same interpreter, published where code *below* this crate can reach it. A `where`
+        // filter in a structured pipeline wants the config's interpreter so a predicate can call a
+        // function the config defined, and the pipeline is part of the shell — it cannot ask
+        // upward. See `oslo_lua::current`.
+        crate::lua::eval::current::publish(Some(Rc::clone(&self.interp)));
         // The same publication, for the question "can a hook act right now". Kept beside the
         // interpreter because the two are set up and torn down together.
         SHELL_STATE.with(|slot| *slot.borrow_mut() = Some(Arc::clone(&env)));

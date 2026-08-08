@@ -427,3 +427,33 @@ pub fn is_complete(source: &str) -> bool {
             .all(|e| e.range().1.bytes() >= source.trim_end().len()),
     }
 }
+
+/// The interpreter parked on this thread, if there is one.
+///
+/// **Here rather than in the engine that publishes it**, because the things that ask are not all
+/// above the engine. A `where` filter in a structured pipeline wants the *config's* interpreter so
+/// that a predicate can call a function the config defined — and the pipeline is part of the
+/// shell, which the Lua API sits on top of. Asking upward was the last edge keeping the shell and
+/// that API in one crate.
+///
+/// Thread-local because an interpreter is: something running on a thread that never published one
+/// finds nothing here and makes its own, rather than reaching into another thread's state.
+pub mod current {
+    use crate::Interp;
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    thread_local! {
+        static CURRENT: RefCell<Option<Rc<Interp>>> = const { RefCell::new(None) };
+    }
+
+    /// Publish `interp` as this thread's, or clear it with `None`.
+    pub fn publish(interp: Option<Rc<Interp>>) {
+        CURRENT.with(|slot| *slot.borrow_mut() = interp);
+    }
+
+    /// A handle to it that can outlive the borrow.
+    pub fn handle() -> Option<Rc<Interp>> {
+        CURRENT.with(|slot| slot.borrow().clone())
+    }
+}
