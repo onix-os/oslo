@@ -56,12 +56,16 @@ impl OsloHelper {
         }
 
         let mut best: Option<Ranked> = None;
-        let mut consider = |name: &str, origin: Origin, score: f64| {
+        // The score is looked up *inside*, after the prefix test, because it takes a lock. Passed
+        // in as an argument it was evaluated for every name the caller enumerated — a lock per
+        // builtin, alias and function on every keystroke — whatever the prefix said.
+        let frecency = &self.frecency;
+        let mut consider = |name: &str, origin: Origin| {
             if !name.starts_with(stem) || name.len() == stem.len() {
                 return;
             }
             let candidate = Ranked {
-                score,
+                score: frecency.score(name),
                 origin,
                 name: name.to_string(),
             };
@@ -71,22 +75,18 @@ impl OsloHelper {
         };
 
         for name in env.builtin_names() {
-            consider(&name, Origin::Shell, self.frecency.score(&name));
+            consider(&name, Origin::Shell);
         }
         for name in env.aliases().keys() {
-            consider(name, Origin::Shell, self.frecency.score(name));
+            consider(name, Origin::Shell);
         }
         for name in env.functions().keys() {
-            consider(name, Origin::Shell, self.frecency.score(name));
+            consider(name, Origin::Shell);
         }
         drop(env);
 
         for name in CommandIndex::executables(&path).iter() {
-            // The score lookup is behind the prefix test on purpose: it takes a lock, and 3373
-            // lock acquisitions per keystroke is the cost this whole change exists to remove.
-            if name.starts_with(stem) {
-                consider(name, Origin::External, self.frecency.score(name));
-            }
+            consider(name, Origin::External);
         }
 
         best.map(|b| b.name[stem.len()..].to_string())
