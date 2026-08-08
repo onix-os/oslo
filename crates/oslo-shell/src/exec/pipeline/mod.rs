@@ -157,7 +157,7 @@ fn run_list_items(env: &mut Environment, cmd_list: &CommandList) -> Result<i32> 
         // `eval` string) carry 0 and leave whatever the enclosing script set, which is what a
         // reader of `$LINENO` inside a function expects to see.
         if item.line > 0 {
-            env.set_var("LINENO", &item.line.to_string(), false);
+            env.note_line(item.line);
         }
         // R7.4: a command boundary is the one moment the shell is provably not waiting for a
         // foreground child, which is what makes reaping every finished background job here safe.
