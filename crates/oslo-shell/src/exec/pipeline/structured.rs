@@ -58,6 +58,13 @@ fn plan_pipeline(pipeline: &Pipeline) -> Vec<Sink> {
             }
         })
         .collect();
+    // **Nothing structured here, so do not ask the terminal.** `is_terminal` is an `ioctl`, and it
+    // was being issued for every pipeline the shell ran — one failing syscall per simple command,
+    // including a bare `x=1` — to decide the last sink of a plan in which nothing carries rows.
+    // A pipeline of plain commands has the same answer either way: bytes all the way down.
+    if stages.iter().all(|stage| !stage.in_process) {
+        return vec![Sink::Text; stages.len()];
+    }
     crate::data::plan(
         &stages,
         std::io::IsTerminal::is_terminal(&std::io::stdout()),
@@ -70,6 +77,14 @@ fn plan_pipeline(pipeline: &Pipeline) -> Vec<Sink> {
 /// planning the same pipeline twice would report twice as many as were actually taken — which
 /// matters because that count is what the POSIX assertion reads.
 pub(super) fn structured_sinks(pipeline: &Pipeline) -> Option<Vec<Sink>> {
+    // **Asked before anything is built.** Planning allocates a `Vec` of stages, clones every
+    // command word, locks the registry once per stage, and issues an `ioctl` to ask whether stdout
+    // is a terminal. With nothing registered the answer is `None` for every pipeline, so all of
+    // that was spent to learn nothing — measured at one failing `ioctl` per simple command, on the
+    // hottest path the shell has.
+    if !crate::data::tool::any_registered() {
+        return None;
+    }
     let sinks = plan_pipeline(pipeline);
     sinks.contains(&Sink::Rows).then_some(sinks)
 }

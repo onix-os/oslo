@@ -16,7 +16,7 @@
 
 use nix::sys::wait::{WaitPidFlag, WaitStatus, waitpid};
 use nix::unistd::Pid;
-use std::sync::atomic::{AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicU8, AtomicUsize, Ordering};
 use std::sync::{Mutex, MutexGuard, OnceLock};
 
 /// Where a job is in its life.
@@ -398,7 +398,7 @@ fn forget_children(n: usize) {
 /// A status that turns out to belong to a known job is still recorded, so `$!` and `jobs` stay
 /// right if the sweep gets there first.
 fn reap_orphans_as_init() {
-    if nix::unistd::getpid().as_raw() != 1 {
+    if !is_init() {
         return;
     }
     with_jobs(|jobs| {
@@ -414,6 +414,35 @@ fn reap_orphans_as_init() {
         }
     });
 }
+
+/// Whether this process is PID 1, answered once rather than asked of the kernel per command.
+///
+/// **This was a `getpid(2)` on every command boundary** — measured at one syscall per simple
+/// command, including bare assignments — spent to discover that a shell is not init, which is the
+/// answer for every shell but one and never changes within a process.
+///
+/// `forgot_which_process_i_am` is what keeps that safe across `fork`: a child inherits this cache
+/// along with everything else, and a child of init is *not* init. Every forked child already calls
+/// [`super::reset_signals_for_child`], so the reset has one place to live.
+fn is_init() -> bool {
+    match KNOWN_INIT.load(Ordering::Relaxed) {
+        0 => {
+            let init = nix::unistd::getpid().as_raw() == 1;
+            KNOWN_INIT.store(if init { 2 } else { 1 }, Ordering::Relaxed);
+            init
+        }
+        2 => true,
+        _ => false,
+    }
+}
+
+/// Forget the cached answer, because this process is no longer the one that computed it.
+pub(crate) fn forgot_which_process_i_am() {
+    KNOWN_INIT.store(0, Ordering::Relaxed);
+}
+
+/// 0 = not yet asked, 1 = not init, 2 = init.
+static KNOWN_INIT: AtomicU8 = AtomicU8::new(0);
 
 pub fn reap_background_jobs() {
     // Orphans first, and *before* the early return below: as PID 1 there are children to reap even

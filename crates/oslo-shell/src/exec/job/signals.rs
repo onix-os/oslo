@@ -40,6 +40,8 @@ const RESET_IN_CHILD: [Signal; 6] = [
 /// Only `sigaction`, `sigprocmask` and `close` are used, all async-signal-safe, so this is legal
 /// in the window after `fork` where almost nothing else is.
 pub fn reset_signals_for_child() {
+    // This process is not the one that cached whether it is init. See `table::is_init`.
+    super::table::forgot_which_process_i_am();
     let dfl = SigAction::new(SigHandler::SigDfl, SaFlags::empty(), SigSet::empty());
     for sig in RESET_IN_CHILD {
         // Errors are unreportable here (the child has not exec'd yet and stderr may belong to a

@@ -9,6 +9,7 @@
 
 use super::plan::Shape;
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, OnceLock};
 
 /// What a registered tool can take and give.
@@ -23,10 +24,24 @@ fn registry() -> &'static Mutex<HashMap<String, Tool>> {
     TOOLS.get_or_init(|| Mutex::new(HashMap::new()))
 }
 
+/// Whether anything has been declared at all.
+///
+/// **The question asked before the planner does any work.** Planning a pipeline costs a `Vec` per
+/// stage, a `String` clone of every command word, a lock on the registry, and an `ioctl` to ask
+/// whether stdout is a terminal — and until something is registered the answer is `None` for every
+/// pipeline ever written, so all of it was spent to learn nothing. One relaxed load answers it
+/// instead, which is the same shape as the feature bitset and the hook registry.
+pub fn any_registered() -> bool {
+    REGISTERED.load(Ordering::Relaxed)
+}
+
+static REGISTERED: AtomicBool = AtomicBool::new(false);
+
 /// Declare a tool.
 pub fn register(name: &str, accepts: Shape, produces: Shape) {
     if let Ok(mut t) = registry().lock() {
         t.insert(name.to_string(), Tool { accepts, produces });
+        REGISTERED.store(true, Ordering::Relaxed);
     }
 }
 
@@ -40,6 +55,7 @@ pub fn lookup(name: &str) -> Option<Tool> {
 pub fn clear() {
     if let Ok(mut t) = registry().lock() {
         t.clear();
+        REGISTERED.store(false, Ordering::Relaxed);
     }
 }
 
