@@ -53,7 +53,7 @@ tokio = { version = "1", features = ["rt-multi-thread", "net"], optional = true 
 # This replaced `mlua`, which is a *binding* to the reference Lua written in C: it vendored and
 # compiled 30k lines of C into the binary, so a static musl build needed a C toolchain, and Lua
 # values lived in a separate VM that the shell could only pass strings across. See PLAN-LUA.md.
-full_moon = { path = "crates/full_moon", default-features = false, features = ["lua54"] }
+full_moon = { path = "vendor/full_moon", default-features = false, features = ["lua54"] }
 # `resource` is what `ulimit` reads and sets limits through, and what `times` reads getrusage(2)
 # through. Without it both had to parse /proc by hand.
 # `poll` is declared here rather than arriving by accident. It used to come from rustyline's own
@@ -104,7 +104,7 @@ unicode-width = "0.2"
 # brush's tokenizer takes the longest match and fuses them into the single `;;` that ends a `case`
 # item, so the arithmetic-for rule never sees the two `;` it asks for. That is a loud syntax error
 # rather than a wrong answer — see tests/differential/expected_fail.rs.
-brush-parser = { path = "crates/brush-parser" }
+brush-parser = { path = "vendor/brush-parser" }
 # The allow list for directory environments is keyed by a hash of the rc file's path *and* its
 # contents, which is what makes editing an allowed file revoke it. Pure Rust, so it does not cost
 # the static musl build a C toolchain.
@@ -143,7 +143,7 @@ jammdb = "0.11"
 # A one-package workspace, stated explicitly so `cargo fmt --all` and the 600-line limit apply
 # to this crate and nothing else. `fuzz/` declares its own empty [workspace] to stay out.
 [workspace]
-members = ["crates/brush-parser", "crates/full_moon", "crates/full_moon/derive"]
+members = ["vendor/brush-parser", "vendor/full_moon", "vendor/full_moon/derive"]
 
 
 

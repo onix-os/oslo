@@ -1,6 +1,6 @@
 //! Implements a tokenizer and parsers for POSIX / bash shell syntax.
 
-// Vendored code is not restyled — see crates/README.md.
+// Vendored code is not restyled — see vendor/README.md.
 #![allow(clippy::collapsible_if)]
 // TODO(unwrap): remove or scope this allow attribute
 #![allow(clippy::unwrap_used)]

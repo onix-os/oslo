@@ -1,5 +1,10 @@
 # Vendored parsers
 
+**Everything under `vendor/` is somebody else's code**, kept close to upstream and deliberately not
+restyled — which is what the blanket lint allowances at the top of these crates rest on. oslo's own
+crates live in `crates/`. The two directories used to be one, and the distinction was worth more
+than the shorter path: a rule that applies to half a directory is a rule nobody can apply.
+
 Two parsers oslo does not write and does not want to depend on remotely. `full_moon` carries its
 proc-macro in `full_moon/derive`: a `proc-macro = true` crate can only export macros, so it cannot
 live *inside* another crate, so nesting the directory is as close to one unit as cargo permits.
