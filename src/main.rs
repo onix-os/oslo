@@ -1,20 +1,20 @@
 //! The `oslo` binary: argument handling, script execution, and the interactive REPL.
 
 mod cli;
-mod startup;
 
-// History expansion belongs to the *binary's* prompt, never to the library: it rewrites a line
-// before it is parsed, so reaching it from `-c` or a script would let data turn into a different
-// command. Declaring it here rather than from `ui::mod` is what makes that unreachable.
-#[path = "ui/history_expand.rs"]
-mod history_expand;
+// Startup, the Lua API and history expansion all live at the top of the stack now, in
+// `oslo-runtime`. History expansion in particular must stay reachable only from the interactive
+// prompt — it rewrites a line before it is parsed, so a `-c` or a script able to reach it would let
+// data turn into a different command — and being above everything the shell can be driven through
+// is what makes that impossible rather than merely unlikely.
+use oslo_runtime::absorb_loop_control;
+use oslo_runtime::startup;
 
 use cli::{Action, Invocation};
-use history_expand::Expansion;
 use oslo::env::Environment;
 use oslo::env::builtins::run_exit_trap;
 use oslo::env::options::ShellOption;
-use oslo::error::{Result, ShellError};
+use oslo::error::ShellError;
 use oslo::exec::eval_command_list;
 use oslo::parser::parse_with_aliases;
 use startup::language::{self, Language};
@@ -390,42 +390,6 @@ fn exit_error_status(err: ShellError) -> i32 {
             let status = e.fatal_exit_status();
             eprintln!("oslo: {}", e);
             status
-        }
-    }
-}
-
-/// `break`, `continue` and `return` outside any loop or function are a no-op, not an error.
-///
-/// They unwind as errors so nested command lists can pass them up; if nothing catches one it has
-/// reached the top level, where bash silently ignores it rather than printing a diagnostic.
-fn absorb_loop_control(result: Result<i32>) -> Result<i32> {
-    match result {
-        Err(ShellError::Break(_)) | Err(ShellError::Continue(_)) => Ok(0),
-        Err(ShellError::Return(code)) => Ok(code),
-        other => other,
-    }
-}
-
-/// Resolve `!`/`^` history references in a line typed at the prompt.
-///
-/// `None` means the line must not run: a reference that cannot be resolved is a mistake, and bash
-/// answers it by discarding the line, printing the reason, and leaving `$?` untouched — nothing
-/// ran, so nothing should have changed. A rewritten line is echoed to stderr first, because the
-/// user has to be able to see what `!!` turned into before it takes effect.
-fn expand_history(line: &str, history: &[String]) -> Option<String> {
-    match history_expand::expand(line, history) {
-        Ok(Expansion::Unchanged) => Some(line.to_string()),
-        Ok(Expansion::Expanded(expanded)) => {
-            eprintln!("{}", expanded);
-            // `^a^b` can leave nothing behind; an empty line is not a command.
-            if expanded.trim().is_empty() {
-                return None;
-            }
-            Some(expanded)
-        }
-        Err(err) => {
-            eprintln!("oslo: {}", err);
-            None
         }
     }
 }

@@ -1,40 +1,55 @@
-/// The stack oslo runs its own work on, rather than whatever `ulimit -s` happens to be.
-///
-/// oslo's Lua is a tree-walker: a Lua function calling a Lua function is a chain of Rust frames,
-/// so Lua's recursion depth is bounded by the Rust stack. Real Lua is not — it keeps Lua-to-Lua
-/// calls on its own heap-allocated stack — so the only way to give a script a predictable limit is
-/// to stop depending on the ambient one. A shell inherits its stack from whoever spawned it, which
-/// under a service manager can be as little as 512 KiB.
-///
-/// The reservation is virtual: pages are committed as they are touched, so an `oslo` that never
-/// runs Lua pays nothing for this. `crate::lua::eval` refuses at a depth chosen to fit well inside
-/// it, and `lua_eval_tests` runs its depth cases on a thread of exactly this size so the limit is
-/// checked against the stack oslo actually provides.
-pub const INTERPRETER_STACK: usize = 16 * 1024 * 1024;
+//! oslo, as one name.
+//!
+//! The shell is six crates now, each depending only on those below it:
+//!
+//! | crate | what it is |
+//! |---|---|
+//! | [`oslo_lua`] | a Lua 5.4 evaluator in pure Rust, with no dependency but its parser |
+//! | [`oslo_base`] | the syntax tree, the error type, feature bits, the hook registry, the store |
+//! | [`oslo_ui`] | the line editor, completion, the dropdown, widgets, theming, the finder |
+//! | [`oslo_shell`] | syntax adaptation, expansion, execution, the builtins, directory environments |
+//! | [`oslo_runtime`] | the Lua API a config is written against, and starting up |
+//!
+//! This crate is the facade over all five. It exists so that `oslo::env`, `oslo::ui` and the rest
+//! keep meaning what they always meant — to a test, to an example, to anything outside the tree —
+//! while the code behind them lives where the compiler can check that it only reaches downward.
+//! Nothing is implemented here.
 
-pub mod ast;
-pub mod data;
-pub mod direnv;
-pub mod env;
-pub mod error;
-pub mod exec;
-pub mod expand;
-/// Parts of the shell a config can turn off and on again while it runs.
-pub mod feature;
-pub mod lexer;
-pub mod lua;
-pub mod parser;
+/// The bottom of the stack: the syntax tree, the error type, the feature bits, the hook registry
+/// and the tracking store.
+pub use oslo_base::{ast, error, feature, hooks, nesting, track};
+
+/// The shell: syntax adaptation, expansion, execution, the builtins, the structured pipeline and
+/// directory environments.
+pub use oslo_shell::{data, direnv, env, exec, expand, lexer, syntax};
+
+/// The old name for [`syntax`], because a great deal of the tree still says it. There is one shell
+/// parser and it is brush's; `syntax` is the conversion into oslo's own tree.
+pub use oslo_shell::syntax as parser;
+
+/// The interface layer: the line editor, completion, the dropdown, the widgets, theming and the
+/// finder.
+pub use oslo_ui as ui;
+
+/// The Lua API a config is written against, and the interpreter that owns it.
+pub use oslo_runtime::lua;
+
 /// SSH, behind the `ssh` feature — off by default. See the module docs for what it costs and what
 /// is still undecided.
 #[cfg(feature = "ssh")]
 pub mod ssh;
-pub mod track;
-pub mod ui;
+
+/// Helper-level tests for the editor, driven against a real `Environment`.
+///
+/// Here rather than in `oslo-ui` because that is the point of them: the crate under test knows the
+/// shell only through a trait, and these are what check the wiring to the real one.
+#[cfg(test)]
+mod ui_tests;
 
 pub use env::Environment;
 pub use error::{Result, ShellError};
 pub use exec::{JobManager, eval_command_list};
 pub use lexer::Lexer;
-pub use lua::LuaEngine;
+pub use oslo_runtime::{INTERPRETER_STACK, LuaEngine};
 pub use parser::parse_bash_script;
 pub use ui::OsloHelper;

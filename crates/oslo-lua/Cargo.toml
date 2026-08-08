@@ -1,0 +1,18 @@
+[package]
+name = "oslo-lua"
+version = "0.2.21"
+edition = "2024"
+rust-version = "1.88"
+license = "MIT"
+description = "A Lua 5.4 evaluator in pure Rust, with no dependencies beyond its parser."
+repository = "https://github.com/bresilla/oslo"
+
+# `full_moon` parses; everything here runs. Between them there is no C, which is what lets oslo
+# speak Lua from a statically linked musl binary with no toolchain on the machine.
+#
+# The only dependency, on purpose: this crate is worth having on its own, and an evaluator that
+# dragged a shell in with it would not be.
+[dependencies]
+full_moon = { path = "../../vendor/full_moon", default-features = false, features = [
+  "lua54",
+] }

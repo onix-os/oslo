@@ -1148,11 +1148,78 @@ dependencies = [
  "jammdb",
  "maki",
  "nix",
+ "oslo-base",
+ "oslo-lua",
+ "oslo-runtime",
+ "oslo-shell",
+ "oslo-ui",
  "regex",
  "serde_json",
  "sha2",
  "tempfile",
  "tokio",
+ "unicode-segmentation",
+ "unicode-width 0.2.2",
+ "which",
+]
+
+[[package]]
+name = "oslo-base"
+version = "0.2.21"
+dependencies = [
+ "jammdb",
+ "nix",
+ "oslo-lua",
+ "regex",
+ "tempfile",
+]
+
+[[package]]
+name = "oslo-lua"
+version = "0.2.21"
+dependencies = [
+ "full_moon",
+]
+
+[[package]]
+name = "oslo-runtime"
+version = "0.2.21"
+dependencies = [
+ "nix",
+ "oslo-base",
+ "oslo-lua",
+ "oslo-shell",
+ "oslo-ui",
+ "regex",
+ "serde_json",
+ "tempfile",
+]
+
+[[package]]
+name = "oslo-shell"
+version = "0.2.21"
+dependencies = [
+ "brush-parser",
+ "nix",
+ "oslo-base",
+ "oslo-lua",
+ "oslo-ui",
+ "regex",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "which",
+]
+
+[[package]]
+name = "oslo-ui"
+version = "0.2.21"
+dependencies = [
+ "brush-parser",
+ "nix",
+ "oslo-base",
+ "oslo-lua",
+ "tempfile",
  "unicode-segmentation",
  "unicode-width 0.2.2",
  "which",
