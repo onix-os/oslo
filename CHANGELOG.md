@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.2.24] - 2026-08-09
+
+### <!-- 1 -->🐛 Bug Fixes
+
+- Pass use flake arguments through to nix
+
 ## [0.2.23] - 2026-08-09
 
 ### <!-- 1 -->🐛 Bug Fixes
