@@ -1,4 +1,5 @@
 use super::*;
+use std::time::SystemTime;
 
 #[test]
 fn directories_sort_first_and_hidden_entries_are_optional() {
@@ -196,4 +197,24 @@ fn an_empty_query_never_walks_anywhere() {
     let mut state = State::new(&spec);
     state.walk_into_the_only_match(&spec);
     assert_eq!(state.at, root.path().canonicalize().expect("canonical"));
+}
+
+/// What `.` does when the key loop calls it: the listing is re-read the other way round.
+#[test]
+fn toggling_hidden_re_reads_the_directory() {
+    let root = tempfile::tempdir().expect("tempdir");
+    std::fs::write(root.path().join("plain"), "x").expect("file");
+    std::fs::write(root.path().join(".secret"), "x").expect("hidden file");
+
+    let mut state = State::new(&walker(root.path(), true, 1000));
+    assert!(!state.entries.iter().any(|e| e.name == ".secret"));
+
+    state.hidden = !state.hidden;
+    state.reload(None);
+    assert!(state.entries.iter().any(|e| e.name == ".secret"));
+    assert!(state.entries.iter().any(|e| e.name == "plain"));
+
+    state.hidden = !state.hidden;
+    state.reload(None);
+    assert!(!state.entries.iter().any(|e| e.name == ".secret"));
 }

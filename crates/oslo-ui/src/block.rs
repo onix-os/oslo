@@ -262,7 +262,37 @@ fn paint(text: &str, style: Style, decorated: bool) -> String {
 }
 
 /// As many whitespace-separated items of `text` as fit in `budget`, and how many did not.
+/// **Room for the ` +N` is kept back**, the way [`cut_to`] keeps a cell for its `…`. The caller
+/// appends that counter after this returns, so an answer that filled the budget exactly overflowed
+/// the row by the counter's width and wrapped — `+76` arriving on a line of its own under a row
+/// that looked like it had ended.
+///
+/// The counter's width depends on how many are hidden, and how many are hidden depends on the room
+/// left for the counter, so this settles rather than computing once: reserve, fit again, and stop
+/// as soon as the reservation covers what the count actually needs. It grows monotonically, so it
+/// stops — two rounds, unless hiding a few more items pushes the number to another digit.
 fn fit_items(text: &str, budget: usize) -> (String, usize) {
+    let mut reserved = 0usize;
+    loop {
+        let (shown, hidden) = fit_within(text, budget.saturating_sub(reserved));
+        if hidden == 0 {
+            return (shown, 0);
+        }
+        let needed = counter_width(hidden);
+        if needed <= reserved {
+            return (shown, hidden);
+        }
+        reserved = needed;
+    }
+}
+
+/// The cells ` +{hidden}` spends: the space, the `+`, and the digits.
+fn counter_width(hidden: usize) -> usize {
+    " +".len() + hidden.to_string().len()
+}
+
+/// As many items as fit in `budget` outright, with nothing kept back.
+fn fit_within(text: &str, budget: usize) -> (String, usize) {
     let items: Vec<&str> = text.split_whitespace().collect();
     let mut out = String::new();
     let mut used = 0usize;

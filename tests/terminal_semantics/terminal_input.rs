@@ -412,3 +412,33 @@ oslo.builtin.nav.type_nav = { enabled = true, settle_ms = 2000 }
     shell.send(b"exit\n");
     shell.wait_for_exit();
 }
+
+/// `.` shows and hides the dotfiles. It is a browse-mode shortcut: once a filter is being typed a
+/// dot is just a character, because `Cargo.toml` has to be typeable.
+#[test]
+fn nav_dot_toggles_hidden_entries_while_browsing() {
+    let config = r#"
+oslo.misc.welcome = false
+oslo.prompt.left = function() return "> " end
+oslo.builtin.nav.scanner = false
+oslo.builtin.nav.type_nav = { enabled = false }
+"#;
+    let mut shell = PtyShell::configured("xterm-256color", false, config);
+    std::fs::write(shell._home.path().join("visible"), "x").expect("a plain file");
+    std::fs::write(shell._home.path().join(".secret"), "x").expect("a hidden file");
+    shell.wait_for_marks(2);
+
+    shell.send(b"nav\n");
+    shell.wait_for_plain_text("visible");
+    assert!(!String::from_utf8_lossy(&shell.transcript).contains(".secret"));
+
+    shell.send(b".");
+    shell.wait_for_plain_text(".secret");
+    // And it is a toggle, not a one-way door: the filter never opened for it.
+    assert!(!String::from_utf8_lossy(&shell.transcript).contains("filter @"));
+
+    shell.send(b"\x1b");
+    shell.wait_for_marks(6);
+    shell.send(b"exit\n");
+    shell.wait_for_exit();
+}
