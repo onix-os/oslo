@@ -79,15 +79,15 @@ fn filtering_ranks_names() {
 fn an_extension_chooses_the_mark_and_a_directory_always_wins() {
     let icons = crate::settings::Icons {
         directory: "■".to_string(),
-        file: "×".to_string(),
+        file: "≡".to_string(),
         by_extension: vec![("rs".to_string(), "R".to_string())],
     };
     assert_eq!(icons.of("main.rs", false), "R");
     // Matched without regard to case, because `README.MD` is the same kind of file as `readme.md`.
     assert_eq!(icons.of("MAIN.RS", false), "R");
-    assert_eq!(icons.of("Makefile", false), "×");
+    assert_eq!(icons.of("Makefile", false), "≡");
     // A name that merely begins with a dot has no extension — `.gitignore` is not a `gitignore`.
-    assert_eq!(icons.of(".gitignore", false), "×");
+    assert_eq!(icons.of(".gitignore", false), "≡");
     // A directory called `src.rs` is still a directory.
     assert_eq!(icons.of("src.rs", true), "■");
 }

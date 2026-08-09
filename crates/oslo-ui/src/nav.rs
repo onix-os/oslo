@@ -487,13 +487,17 @@ pub fn open(spec: &Navigator, mut remove: impl FnMut(&Path) -> bool) -> Outcome 
     }
 }
 
-/// One row: a mark, the name, its size, and how long ago it changed.
+/// One row: a mark, the name, and — hard right — how big it is and how long ago it changed.
 ///
 /// **The `dir`/`file` word and the `rwxrwxr-x` mode are gone.** Both were `ls -l` habits rather
 /// than answers anybody wanted here: the kind is already said by the trailing `/` on a directory
 /// and `@` on a link, and nine characters of mode is a question a file browser is rarely asked —
 /// while together they pushed the name a third of the way across the row. What replaces them is
 /// one configurable mark; see [`Icons`].
+///
+/// The size moved to the right for the same reason. A file browser is read down the *names*, and
+/// anything to the left of them is something the eye has to skip on every row to get there. On the
+/// right it sits beside the age, which is the other number, and the names all start in one place.
 fn row_of(entry: &Entry, directory_style: theme::Style, icons: &Icons) -> Row {
     let name = match (entry.directory, entry.symlink) {
         (true, true) => format!("{}@/", entry.name),
@@ -501,15 +505,20 @@ fn row_of(entry: &Entry, directory_style: theme::Style, icons: &Icons) -> Row {
         (false, true) => format!("{}@", entry.name),
         (false, false) => entry.name.clone(),
     };
-    // In the column the `dir`/`file` word used to hold, so the mark leads the row and lines up
-    // down the list. An icon set to the empty string costs no column at all — `meta` is sized
-    // across the whole listing, so turning the marks off is something the configuration can say.
     Row {
-        meta: vec![
-            icons.of(&entry.name, entry.directory).to_string(),
+        // The one column left of the name, where the `dir`/`file` word was, so the mark leads the
+        // row and lines up down the list. An icon set to the empty string costs no column at all —
+        // `meta` is sized across the listing — so turning the marks off is something a config can
+        // actually say.
+        meta: vec![icons.of(&entry.name, entry.directory).to_string()],
+        // Padded rather than merely concatenated: `trail` is one string drawn hard right, so two
+        // numbers only read as two columns if each is given a fixed width of its own. Five holds
+        // every size `human_size` produces (`1023B`), four holds every age (`11mo`).
+        trail: format!(
+            "  {:>5}  {:>4}",
             human_size(entry.size),
-        ],
-        trail: format!("  {}", human_age(entry.modified)),
+            human_age(entry.modified)
+        ),
         tint: entry.directory.then_some(directory_style),
         ..Row::new(name)
     }

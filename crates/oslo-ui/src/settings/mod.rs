@@ -383,10 +383,20 @@ pub struct Nav {
 ///
 /// ```lua
 /// oslo.builtin.nav.icons = {
-///   dir = "■", file = "×",
-///   ext = { rs = "🦀", md = "≡", lua = "☾" },
+///   dir = "■", file = "≡",
+///   ext = { <extension> = <mark>, ... },
 /// }
 /// ```
+///
+/// **Two marks are built in and no more.** `ext` starts empty: which mark a `.rs` or a `.md`
+/// deserves is a matter of taste, of the font you run, and of what you actually work on — so it
+/// belongs in a config file, not in this file. Nothing here should have to be edited to change how
+/// a listing looks.
+///
+/// **One cell wide, or the column stops being one.** The marks are right-aligned as a block with
+/// the rest of the row measured against them, and an emoji is two cells — so a listing where one
+/// row is marked with an emoji and the others are not has that row's name starting a column over
+/// from everybody else's.
 ///
 /// This replaced two columns of `ls -l` that were there because they were easy rather than because
 /// anybody read them: a `dir`/`file` word, which the name already says by ending in `/`, and a
@@ -409,7 +419,8 @@ impl Default for Icons {
             // Geometry rather than a glyph from a patched font: these have to land on a terminal
             // that has never heard of Nerd Fonts, which is most of the terminals a shell runs in.
             directory: "■".to_string(),
-            file: "×".to_string(),
+            file: "≡".to_string(),
+            // Empty on purpose. Per-extension marks are configuration, not a list maintained here.
             by_extension: Vec::new(),
         }
     }
