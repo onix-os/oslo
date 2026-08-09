@@ -341,26 +341,45 @@ fn two_terminals_appending_at_once_lose_no_lines_and_reuse_no_ids() {
     assert_eq!(ids.len(), 60, "and every line got an id of its own");
 }
 
-/// A file here that this build cannot read — an older oslo's database, or one a disk corrupted —
-/// must not cost the shell its history for ever. It starts fresh and the old bytes stay on disk.
-///
-/// The bytes below are a SQLite header because that is what an older oslo left, but nothing in
-/// [`History::open`] knows about SQLite: the test is really "something that is not ours".
 #[test]
-fn a_history_from_an_older_oslo_is_kept_and_the_shell_starts_fresh() {
+fn concurrent_first_opens_share_one_history() {
+    let dir = tempfile::tempdir().expect("a temp dir");
+    let path = dir.path().join("history.db");
+    let workers = 32;
+    let barrier = std::sync::Barrier::new(workers);
+
+    std::thread::scope(|scope| {
+        for worker in 0..workers {
+            let barrier = &barrier;
+            let path = &path;
+            scope.spawn(move || {
+                barrier.wait();
+                let history = crate::track::Track::open(path).expect("history opens");
+                assert!(
+                    history
+                        .append(&format!("line {worker}"), MODE_SHELL)
+                        .is_some()
+                );
+            });
+        }
+    });
+
+    let history = crate::track::Track::open(&path).expect("history reopens");
+    assert_eq!(history.recent(workers).len(), workers);
+    assert!(!path.with_extension("db.unreadable").exists());
+}
+
+#[test]
+fn an_unreadable_history_is_left_untouched() {
     let dir = tempfile::tempdir().expect("a temp dir");
     let path = dir.path().join("history.db");
     let mut foreign = b"SQLite format 3\0".to_vec();
     foreign.resize(16 * 1024, 0);
     std::fs::write(&path, &foreign).expect("written");
 
-    let history = crate::track::Track::open(&path).expect("the shell still gets a history");
-    assert!(history.recent(10).is_empty());
-    assert!(history.append("ls", MODE_SHELL).is_some());
-    assert_eq!(history.recent(10).len(), 1);
-
-    let aside = dir.path().join("history.db.unreadable");
-    assert_eq!(std::fs::read(&aside).expect("still there"), foreign);
+    assert!(crate::track::Track::open(&path).is_none());
+    assert_eq!(std::fs::read(&path).expect("still there"), foreign);
+    assert!(!dir.path().join("history.db.unreadable").exists());
 }
 
 /// The bound, at the size where it actually has to work.

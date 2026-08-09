@@ -160,24 +160,8 @@ pub struct Track {
 
 impl Track {
     /// Open, creating the file and its directory if they are not there.
-    ///
-    /// The privacy ordering — the directory closed first, the file tightened before anything can
-    /// have been written through it — belongs to [`super::kv`] now, along with the header check
-    /// that stops a SQLite file left by an older oslo from being handed to an engine that panics
-    /// on one. Both are the seam's, because both are facts about the engine rather than about
-    /// what oslo stores.
     pub fn open(path: &Path) -> Option<Track> {
-        // A file here that is not ours — an older build's database, or something a disk corrupted
-        // — is renamed aside rather than opened or deleted. Without that, `Store::open` refuses it
-        // for ever and the shell silently has no history and no ranking until somebody finds the
-        // file by hand. `rename` within one directory is atomic, so two terminals starting together
-        // cannot both move it: the loser finds nothing at the source and does nothing.
-        if path.is_file()
-            && !crate::track::kv::is_a_database(path)
-            && let Some(name) = path.file_name().and_then(|name| name.to_str())
-        {
-            let _ = std::fs::rename(path, path.with_file_name(format!("{name}.unreadable")));
-        }
+        let _open_lock = super::kv::open_lock(path)?;
         let store = Store::open(path)?;
         let found = store.read(|r| Some(meta(r, SCHEMA).unwrap_or(0)))?;
         let writable = found <= SCHEMA_VERSION;

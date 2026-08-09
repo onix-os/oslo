@@ -17,6 +17,10 @@ use tagdata::{
     DB, Data, Error as TagdataError, MergeConflictPolicy, MergeOptions, OpenOptions, Tx,
 };
 
+pub(super) fn open_lock(path: &Path) -> Option<std::fs::File> {
+    file::open_lock(path)
+}
+
 /// The buckets in the tracking database.
 ///
 /// An enum rather than a string at the call site: a typo in `"run"` is not a compile error, it is
@@ -153,14 +157,7 @@ impl Store {
     /// has no store", which is a supported way to run.
     pub fn open(path: &Path) -> Option<Store> {
         file::prepare_directory(path)?;
-        if !file::is_a_database(path) {
-            return None;
-        }
-        let db = catch_unwind(AssertUnwindSafe(|| {
-            OpenOptions::new().pagesize(file::PAGE_SIZE).open(path).ok()
-        }))
-        .ok()
-        .flatten()?;
+        let db = file::open(path)?;
         file::make_private(path)?;
         Some(Store {
             path: path.to_path_buf(),

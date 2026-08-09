@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.2.26] - 2026-08-09
+
+### <!-- 1 -->🐛 Bug Fixes
+
+- Database issue n cleanup
+
 ## [0.2.25] - 2026-08-09
 
 ### <!-- 0 -->⛰️  Features
