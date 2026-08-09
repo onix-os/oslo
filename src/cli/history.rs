@@ -1,3 +1,6 @@
+mod help;
+
+use crate::cli::help::Paint;
 use oslo::track::{
     EventId, HistoryCompletion, HistoryEvent, HistoryFilter, HistoryMatch, HistorySegment,
     HistoryStatus, Track, status_file, sync_files, verify_file,
@@ -29,6 +32,15 @@ fn execute(args: &[String]) -> Result<(), String> {
         return Ok(());
     }
     let rest = &args[1..];
+    // Handle help before subcommand argument parsing.
+    if rest
+        .first()
+        .is_some_and(|a| matches!(a.as_str(), "-h" | "--help"))
+        && let Some(help) = help::subcommand(command, Paint::detect())
+    {
+        print!("{help}");
+        return Ok(());
+    }
     match command {
         "path" => path_command(rest),
         "status" => status_command(rest),
@@ -46,7 +58,7 @@ fn execute(args: &[String]) -> Result<(), String> {
         "backup" => backup_command(rest),
         _ => Err(format!(
             "usage: unknown subcommand {command:?}\n\n{}",
-            help()
+            help::text(Paint::plain())
         )),
     }
 }
@@ -412,11 +424,7 @@ fn expect_empty(args: &[String], command: &str) -> Result<(), String> {
 }
 
 fn print_help() {
-    print!("{}", help());
-}
-
-fn help() -> &'static str {
-    "USAGE\n  oslo history <subcommand> [...]\n\nSUBCOMMANDS\n  path\n  status [FILE] [--json]\n  list [QUERY] [-n N] [--oldest] [--json] [--null]\n  search QUERY [-n N] [--exact|--prefix|--contains] [filters]\n  show EVENT_ID [--json]\n  stats [--host HOST] [--since DURATION] [--json]\n  verify [FILE] [--json]\n  sync OTHER|FILE1 FILE2 [--dry-run] [--json]\n  delete EVENT_ID... [--yes]\n  clear --yes\n  prune [--dry-run] [--yes]\n  export [FILE|-] [--format jsonl|text]\n  import FILE [--dry-run]\n  backup FILE\n"
+    print!("{}", help::text(Paint::detect()));
 }
 
 #[cfg(test)]
