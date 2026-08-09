@@ -21,18 +21,43 @@ use crate::term::{InputEvent, Keys};
 /// tick. It resets the moment a key arrives, so walking away twice reports twice.
 pub(super) fn next_input(keys: &mut Keys, reported: &mut bool) -> Option<InputEvent> {
     let seconds = crate::settings::current().misc.idle_timeout;
-    if seconds == 0 || !oslo_base::hooks::watched(oslo_base::hooks::at::IDLE_TIMEOUT) {
+    let idle_hook = seconds != 0 && oslo_base::hooks::watched(oslo_base::hooks::at::IDLE_TIMEOUT);
+    // **A blocking wait is only safe when nothing else can change the screen.** An asynchronous
+    // prompt is rebuilt off this thread, and a wait with no deadline cannot notice it finishing —
+    // so the fresh prompt sat in the cache until the next keystroke, and the prompt on screen went
+    // on describing the command before last.
+    if !idle_hook && !crate::prompt::refreshing() {
         return keys.read_event();
     }
-    let ms = seconds.saturating_mul(1000).min(i32::MAX as u64) as i32;
+
+    // Short enough that a prompt lands as soon as it exists, long enough to be nothing: this only
+    // runs while an answer is outstanding, which is a few tens of milliseconds after a command.
+    const REFRESH_SLICE_MS: i32 = 15;
+    let idle_ms = seconds.saturating_mul(1000).min(i32::MAX as u64) as i32;
+    let seen = crate::prompt::generation();
+    let mut waited: i64 = 0;
     loop {
-        match keys.read_event_within(ms) {
+        let refreshing = crate::prompt::refreshing();
+        let slice = match (refreshing, idle_hook) {
+            (true, _) => REFRESH_SLICE_MS,
+            (false, true) => idle_ms,
+            // Nothing left to wait for but a key, and the idle hook is not installed.
+            (false, false) => return keys.read_event(),
+        };
+        match keys.read_event_within(slice) {
             crate::term::EventPressed::Event(event) => {
                 *reported = false;
                 return Some(event);
             }
+            crate::term::EventPressed::Ended => return None,
             crate::term::EventPressed::Timeout => {
-                if !*reported {
+                // The run finished and produced something different. Hand the loop a turn so it
+                // can redraw; it is not a key and nothing binds it.
+                if crate::prompt::generation() != seen {
+                    return Some(InputEvent::PromptRefreshed);
+                }
+                waited = waited.saturating_add(slice as i64);
+                if idle_hook && !*reported && waited >= idle_ms as i64 {
                     *reported = true;
                     oslo_base::hooks::fire_at_here(
                         oslo_base::hooks::at::IDLE_TIMEOUT,
@@ -40,7 +65,6 @@ pub(super) fn next_input(keys: &mut Keys, reported: &mut bool) -> Option<InputEv
                     );
                 }
             }
-            crate::term::EventPressed::Ended => return None,
         }
     }
 }

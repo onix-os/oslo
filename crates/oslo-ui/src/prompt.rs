@@ -505,3 +505,30 @@ pub fn invalidate() {
 pub fn generation() -> u64 {
     PROMPT_GENERATION.load(std::sync::atomic::Ordering::Relaxed)
 }
+
+/// How many background prompt runs have been started and not yet finished.
+static REFRESHING: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
+
+/// Say that a prompt is being rebuilt somewhere off this thread.
+///
+/// **What makes an asynchronous prompt visible at all.** The editor waits for a keystroke, and a
+/// blocking wait cannot notice a generation bump — so the answer a background run produced sat in
+/// the cache until the next key was pressed, which for the last prompt of a session is never. This
+/// tells the input wait to come up for air while an answer may still be coming.
+pub fn refresh_started() {
+    REFRESHING.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+}
+
+/// Say that one finished, however it ended.
+pub fn refresh_finished() {
+    let _ = REFRESHING.fetch_update(
+        std::sync::atomic::Ordering::SeqCst,
+        std::sync::atomic::Ordering::SeqCst,
+        |n| Some(n.saturating_sub(1)),
+    );
+}
+
+/// Whether an answer may still arrive for a prompt already on screen.
+pub fn refreshing() -> bool {
+    REFRESHING.load(std::sync::atomic::Ordering::SeqCst) > 0
+}

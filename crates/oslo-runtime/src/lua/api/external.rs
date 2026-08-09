@@ -25,7 +25,7 @@
 
 use crate::lua::context::Context;
 use oslo_lua::value::Value;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::{Mutex, OnceLock};
 use std::time::Duration;
 
@@ -124,6 +124,28 @@ fn remember(key: &str, value: String) {
     }
 }
 
+/// Prompts whose tool has already missed its deadline once.
+fn overran() -> &'static Mutex<HashSet<String>> {
+    static SLOW: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
+    SLOW.get_or_init(|| Mutex::new(HashSet::new()))
+}
+
+/// Whether waiting for this prompt is known to be a waste of the deadline.
+fn known_slow(key: &str) -> bool {
+    overran().lock().is_ok_and(|slow| slow.contains(key))
+}
+
+/// Record whether the tool answered inside its deadline this time.
+fn note_deadline(key: &str, in_time: bool) {
+    if let Ok(mut slow) = overran().lock() {
+        if in_time {
+            slow.remove(key);
+        } else {
+            slow.insert(key.to_string());
+        }
+    }
+}
+
 /// Run the tool and return what it printed.
 ///
 /// `None` when it could not be run at all, so the caller falls back to a prompt of its own rather
@@ -160,12 +182,38 @@ pub fn render(spec: &Spec, ctx: &Context) -> Option<String> {
         // the exception rather than the rule, and the stall never exceeds the deadline the config
         // already declares.
         let previous = remembered(&key);
-        let ready = spawn(spec.command.clone(), args, key);
+
+        // **A deadline that has already been missed is not waited for again.**
+        //
+        // The wait above is only worth making while there is a chance of a fresh answer. A tool
+        // that reliably takes longer than its deadline — `hexe shp prompt` at ~33 ms against a
+        // 10 ms one — loses that bet every time, and the shell pays the full deadline before
+        // drawing exactly the answer it already had. Two prompts, left and right, made that
+        // `2 × timeout_ms` on every command for nothing.
+        //
+        // So the first miss is remembered, and after it this returns the last answer immediately
+        // and lets the background run refresh it. The outcome is identical — the same cached text
+        // is drawn either way — and the deadline is no longer spent to reach it. A tool that
+        // becomes fast again clears the mark on its next answer, so this recovers on its own.
+        if known_slow(&key)
+            && let Some(text) = previous
+        {
+            let _ = spawn(spec.command.clone(), args, key);
+            return Some(text);
+        }
+
+        let ready = spawn(spec.command.clone(), args, key.clone());
         return match ready.recv_timeout(spec.timeout) {
-            Ok(Some(fresh)) => Some(fresh),
+            Ok(Some(fresh)) => {
+                note_deadline(&key, true);
+                Some(fresh)
+            }
             // It failed, or it is still running. Either way the last good answer beats a blank
             // prompt, and the thread will cache whatever it eventually produces.
-            Ok(None) | Err(_) => previous,
+            Ok(None) | Err(_) => {
+                note_deadline(&key, false);
+                remembered(&key)
+            }
         };
     }
 
@@ -194,11 +242,31 @@ fn spawn(
     key: String,
 ) -> std::sync::mpsc::Receiver<Option<String>> {
     let (ready, waiting) = std::sync::mpsc::channel();
+    // Counted before the thread starts, so the editor cannot decide to block for a keystroke in
+    // the window between asking for a refresh and the refresh being under way.
+    oslo_ui::prompt::refresh_started();
     std::thread::spawn(move || {
         let out = run(&command, &args, Duration::from_secs(10));
-        if let Some(out) = out.clone() {
-            remember(&key, out);
+        if let Some(fresh) = out.clone() {
+            let changed = remembered(&key).as_deref() != Some(fresh.as_str());
+            remember(&key, fresh);
+            // **An answer that arrives after the prompt was drawn still gets shown.**
+            //
+            // Without this, a tool slower than its deadline could never be seen for the command
+            // it described: the prompt was drawn from the previous answer, this one replaced it
+            // in the cache, and the *next* prompt drew it — one command late. For a prompt whose
+            // arguments carry `$status` and `$duration_ms` that is the failure the deadline
+            // exists to avoid, arriving by a different route.
+            //
+            // Bumping the generation is what the editor already watches to redraw a prompt whose
+            // inputs moved, so the fresh text lands on screen as soon as it exists. Only when it
+            // differs, or a stable prompt would repaint itself forever.
+            if changed {
+                oslo_ui::prompt::invalidate();
+            }
         }
+        // After the cache and the generation, so a waiter that wakes on this sees both.
+        oslo_ui::prompt::refresh_finished();
         let _ = ready.send(out);
     });
     waiting

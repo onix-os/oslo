@@ -43,6 +43,9 @@ pub enum InputEvent {
     Resized,
     Focus(bool),
     Mouse(super::mouse::Event),
+    /// A background prompt run finished while the editor was waiting. Not a keystroke and never
+    /// reaches a binding — it exists so the loop gets a turn to notice and redraw.
+    PromptRefreshed,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -283,7 +286,8 @@ impl Keys {
                 InputEvent::Paste(_)
                 | InputEvent::PasteRejected(_)
                 | InputEvent::Focus(_)
-                | InputEvent::Mouse(_) => {}
+                | InputEvent::Mouse(_)
+                | InputEvent::PromptRefreshed => {}
             }
         }
     }
