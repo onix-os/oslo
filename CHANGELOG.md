@@ -1,5 +1,54 @@
 # Changelog
 
+## [0.2.22] - 2026-08-09
+
+### <!-- 1 -->🐛 Bug Fixes
+
+- Two correctness bugs in for and compare
+- Stale interrupt no longer eats a command
+
+### <!-- 2 -->🚜 Refactor
+
+- The top of the stack becomes oslo-runtime
+- The shell becomes oslo-shell
+- The interface layer becomes oslo-ui
+- Ask the shell through a trait, not a store
+- The bottom of the stack becomes oslo-base
+- The interpreter becomes oslo-lua
+- Reach a hook without knowing Lua exists
+
+### <!-- 3 -->📚 Documentation
+
+- Note what the dependency glob does not match
+
+### <!-- 4 -->⚡ Performance
+
+- An async prompt lands without a keystroke
+- Stop rendering a spawned prompt 4 times
+- Find a prefix by search, not by scan
+- Stop rebuilding the world on every keystroke
+- Drop five copies from the command path
+- A plain word skips the lexer
+- Publish LINENO and PIPESTATUS only on change
+- A word with no wildcard skips the walk
+- Share a function body instead of copying
+- Share a function body across closures
+- A call statement no longer clones its AST
+- Score only the names that match
+- Honour the redraw flag a key returns
+- Skip the scan when nothing is aliased
+- Stop asking the kernel twice per command
+- An async prompt waits, briefly, for a fresh one
+- Fat LTO now that the shell is six crates
+
+### <!-- 6 -->🧪 Testing
+
+- Measure what one keystroke costs
+
+### <!-- 7 -->⚙️ Miscellaneous Tasks
+
+- Keep other people's code in vendor/
+
 ## [0.2.21] - 2026-08-08
 
 ### <!-- 0 -->⛰️  Features

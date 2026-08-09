@@ -29,14 +29,22 @@ use oslo::lua::api::hooks::{HOOKS, at};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-fn source_dir() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("src")
+/// Where oslo's own code lives: the binary, and every crate it is built from.
+///
+/// **`crates` as well as `src`, and that is not bookkeeping.** This walk is the whole test — it
+/// looks for the place each hook is fired from — so a directory missing from it is a hook that
+/// silently stops being checked. When the interface layer moved out of `src/`, three hooks
+/// (`post-prompt`, `on-idle-timeout`, `on-report`) went with it and this failed rather than
+/// quietly passing, which is the behaviour to keep. `vendor` is somebody else's and fires nothing.
+fn source_dirs() -> Vec<PathBuf> {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+    vec![root.join("src"), root.join("crates")]
 }
 
-/// Every `.rs` file under `src/`, as one string per file.
+/// Every `.rs` file of oslo's own, as one string per file.
 fn sources() -> Vec<(PathBuf, String)> {
     let mut found = Vec::new();
-    let mut stack = vec![source_dir()];
+    let mut stack = source_dirs();
     while let Some(dir) = stack.pop() {
         for entry in std::fs::read_dir(&dir).unwrap_or_else(|e| panic!("read {dir:?}: {e}")) {
             let path = entry.expect("dir entry").path();

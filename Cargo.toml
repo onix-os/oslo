@@ -1,6 +1,6 @@
 [package]
 name = "oslo"
-version = "0.2.21"
+version = "0.2.22"
 edition = "2024"
 # Edition 2024 alone needs 1.85, but the codebase uses let-chains in edition-2024 position
 # (stabilised in 1.88) and brush-parser declares 1.88 too. Bump this only alongside the MSRV
@@ -53,7 +53,7 @@ tokio = { version = "1", features = ["rt-multi-thread", "net"], optional = true 
 # This replaced `mlua`, which is a *binding* to the reference Lua written in C: it vendored and
 # compiled 30k lines of C into the binary, so a static musl build needed a C toolchain, and Lua
 # values lived in a separate VM that the shell could only pass strings across. See PLAN-LUA.md.
-full_moon = { path = "crates/full_moon", default-features = false, features = ["lua54"] }
+full_moon = { path = "vendor/full_moon", default-features = false, features = ["lua54"] }
 # `resource` is what `ulimit` reads and sets limits through, and what `times` reads getrusage(2)
 # through. Without it both had to parse /proc by hand.
 # `poll` is declared here rather than arriving by accident. It used to come from rustyline's own
@@ -104,7 +104,12 @@ unicode-width = "0.2"
 # brush's tokenizer takes the longest match and fuses them into the single `;;` that ends a `case`
 # item, so the arithmetic-for rule never sees the two `;` it asks for. That is a loud syntax error
 # rather than a wrong answer — see tests/differential/expected_fail.rs.
-brush-parser = { path = "crates/brush-parser" }
+brush-parser = { path = "vendor/brush-parser" }
+oslo-base = { path = "crates/oslo-base" }
+oslo-lua = { path = "crates/oslo-lua" }
+oslo-runtime = { path = "crates/oslo-runtime" }
+oslo-shell = { path = "crates/oslo-shell" }
+oslo-ui = { path = "crates/oslo-ui" }
 # The allow list for directory environments is keyed by a hash of the rc file's path *and* its
 # contents, which is what makes editing an allowed file revoke it. Pure Rust, so it does not cost
 # the static musl build a C toolchain.
@@ -140,10 +145,26 @@ tempfile = "3.17"
 # documented upstream.
 jammdb = "0.11"
 
-# A one-package workspace, stated explicitly so `cargo fmt --all` and the 600-line limit apply
-# to this crate and nothing else. `fuzz/` declares its own empty [workspace] to stay out.
+# The same crate as above, with the switch that exposes the lock serialising tests which touch the
+# process-wide feature bitset. Cargo unifies the two when it builds a test and does not when it
+# builds the shell, so a release binary carries neither the lock nor the reset.
+[dev-dependencies]
+oslo-base = { path = "crates/oslo-base", features = ["testing"] }
+oslo-ui = { path = "crates/oslo-ui", features = ["testing"] }
+
+# The crates oslo is built from, and the ones it vendors. `fuzz/` declares its own empty
+# [workspace] to stay out.
 [workspace]
-members = ["crates/brush-parser", "crates/full_moon", "crates/full_moon/derive"]
+members = [
+  "crates/oslo-base",
+  "crates/oslo-lua",
+  "crates/oslo-runtime",
+  "crates/oslo-shell",
+  "crates/oslo-ui",
+  "vendor/brush-parser",
+  "vendor/full_moon",
+  "vendor/full_moon/derive",
+]
 
 
 
@@ -154,6 +175,11 @@ name = "fuzzy"
 path = "bench/fuzzy.rs"
 harness = false
 
+[[bench]]
+name = "keystroke"
+path = "bench/keystroke.rs"
+harness = false
+
 # Measured, not assumed — the before/after is in PERF_AND_CODE.md.
 #
 # No `panic = "abort"`, deliberately, though it is the obvious fourth setting: `catch_unwind` in
@@ -161,7 +187,24 @@ harness = false
 # restore never runs — a panic inside a `.env.lua` would kill the shell with its own message
 # written into a temp file nobody ever reads. A silent death is worse than a slightly larger binary.
 [profile.release]
-lto = "thin"
+# **Fat, since the shell became six crates.**
+#
+# `codegen-units = 1` used to mean the whole shell was one optimisation unit, because the whole
+# shell was one crate. Splitting it made five, and thin LTO optimises across units far less
+# thoroughly than being inside one — the static musl binary grew 5.77 MB → 6.09 MB with no code
+# added. Fat LTO does the cross-module work properly and gets it back:
+#
+# ```text
+#                thin      fat
+#   one crate    5.77 MB   5.49 MB
+#   six crates   6.09 MB   5.68 MB
+# ```
+#
+# So the split costs 0.19 MB rather than 0.32, and what ships is *smaller* than what shipped before
+# it — 5.68 against 5.77. The price is link time: a release relink went 33.8 s → 46.0 s. That is
+# paid by `make build` and by CI, not by `make dev`, which is the inner loop and does not use this
+# profile at all.
+lto = "fat"
 codegen-units = 1
 strip = "symbols"
 
@@ -182,3 +225,11 @@ opt-level = "s"
 # The one dependency on the hot path, and the whole reason `"*"` above needed an exception.
 [profile.release.package.brush-parser]
 opt-level = 3
+
+# **`"*"` does not reach oslo's own crates, and that is cargo's rule rather than luck.**
+#
+# Worth writing down, because it is the obvious thing to get wrong once the shell is five crates:
+# `profile.package."*"` matches *dependencies*, not workspace members, so `oslo-shell` and the rest
+# keep this profile's `opt-level = 3` and are not quietly compiled for size along with everything
+# else. Checked rather than assumed — setting `oslo-ui` to `"z"` moves the binary 5.96 MB → 5.77 MB,
+# so a per-member override does take effect when one is written; there simply is not one.

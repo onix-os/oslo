@@ -511,3 +511,51 @@ fn incomplete_input_is_distinguishable_from_a_syntax_error() {
     assert!(eval::is_complete("return 1 +/ 2"));
     assert!(eval::is_complete("x = = 2"));
 }
+
+#[test]
+fn a_numeric_for_evaluates_each_bound_exactly_once() {
+    // Asking for the number and then asking again whether it was an integer called `f` twice and
+    // looped to the second answer.
+    returns(
+        "(function() local n = 0 \
+           local function f() n = n + 1 return 3 end \
+           for _ = 1, f() do end \
+           return n end)()",
+        "1",
+    );
+    returns(
+        "(function() local n = 0 \
+           local function g() n = n + 1 return 1 end \
+           for _ = g(), 2, g() do end \
+           return n end)()",
+        "2",
+    );
+}
+
+#[test]
+fn a_numeric_for_still_binds_the_lua_subtypes() {
+    returns(
+        "(function() for i = 1, 1 do return math.type(i) end end)()",
+        "integer",
+    );
+    returns(
+        "(function() for i = 1.0, 1 do return math.type(i) end end)()",
+        "float",
+    );
+    returns(
+        "(function() for i = 1, 1, 1.0 do return math.type(i) end end)()",
+        "float",
+    );
+}
+
+#[test]
+fn integers_compare_as_integers_rather_than_through_f64() {
+    // Above 2^53 the two sides land on the same float, so the comparison used to answer false.
+    returns("math.maxinteger - 1 < math.maxinteger", "true");
+    returns("math.mininteger < math.mininteger + 1", "true");
+    returns("math.maxinteger <= math.maxinteger", "true");
+    // Mixed and float operands keep the f64 path.
+    returns("1 < 2.5", "true");
+    returns("2.5 <= 2.5", "true");
+    returns("-1 < 0.5", "true");
+}
