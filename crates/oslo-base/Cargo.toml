@@ -15,6 +15,21 @@ oslo-lua = { path = "../oslo-lua" }
 # `track` only. All engine access stays behind `track::kv`.
 tagdata = { git = "https://github.com/robolibs/tagdata", tag = "0.1.3", features = ["maintenance"] }
 getrandom = "0.4"
+# The predictor behind command prediction and repair. Pure Rust with no dependencies of its own,
+# which is why it can be here at the bottom of the stack beside the history it reads.
+#
+# **Two of its four default features, and the two it does not get are measured rather than
+# guessed.** On the static musl binary, against a 6,327,232-byte baseline: the crate itself costs
+# 296 KB, `snapshot` 8 KB, `recent-cache` 36 KB, `surface-indexes` 100 KB and `explanations` 4 KB.
+# `snapshot` is what keeps the model off the startup path and `recent-cache` is what makes a
+# prediction follow what you are doing now, so both earn their bytes. `surface-indexes` only
+# changes candidate generation inside `predict_aligned`, which is repair — nothing calls it yet,
+# and 100 KB is too much to pay in advance of measuring what it buys. `explanations` answers why a
+# prediction was made, which is a question a debugging tool asks and a ghost suggestion does not.
+vista = { path = "../../vendor/vista", default-features = false, features = [
+    "snapshot",
+    "recent-cache",
+] }
 sha2 = "0.10"
 
 # `track`'s query matching. Trimmed to the same feature set the shell uses, and for the same

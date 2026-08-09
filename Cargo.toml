@@ -138,6 +138,7 @@ members = [
   "vendor/brush-parser",
   "vendor/full_moon",
   "vendor/full_moon/derive",
+  "vendor/vista",
 ]
 
 

@@ -26,6 +26,7 @@ pub mod feature;
 pub mod hooks;
 /// The depth guard every parse passes through, and the heredoc scan that feeds alias expansion.
 pub mod nesting;
+pub mod predict;
 pub mod track;
 
 pub use error::{Result, ShellError};
