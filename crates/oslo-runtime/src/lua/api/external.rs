@@ -124,6 +124,12 @@ fn remember(key: &str, value: String) {
     }
 }
 
+/// How long the *first* answer is waited for, whatever the configured deadline says.
+///
+/// Long enough for a prompt tool doing real work on a slow machine, short enough that a hung one
+/// is still noticed at startup rather than never.
+const FIRST_ANSWER: Duration = Duration::from_secs(2);
+
 /// Prompts whose tool has already missed its deadline once.
 fn overran() -> &'static Mutex<HashSet<String>> {
     static SLOW: OnceLock<Mutex<HashSet<String>>> = OnceLock::new();
@@ -203,9 +209,25 @@ pub fn render(spec: &Spec, ctx: &Context) -> Option<String> {
         }
 
         let ready = spawn(spec.command.clone(), args, key.clone());
-        return match ready.recv_timeout(spec.timeout) {
+        // **With nothing to fall back to, the deadline is not worth keeping.**
+        //
+        // Answering `None` makes the caller draw oslo's *own* prompt instead — a different prompt
+        // of a different width. The editor lays the row out against the width it was given, so the
+        // next redraw writes in the wrong place and the screen doubles up: the symptom is a
+        // session that flips between two prompts and repeats the output of the last command.
+        //
+        // A session has exactly one cold prompt, and the module doc already says that one waits.
+        // Every prompt after it has an answer to show, and keeps the short deadline.
+        let deadline = match previous {
+            Some(_) => spec.timeout,
+            None => spec.timeout.max(FIRST_ANSWER),
+        };
+        let started = std::time::Instant::now();
+        return match ready.recv_timeout(deadline) {
+            // Judged against the *configured* deadline, not the one actually waited for, so a
+            // first answer that only arrived because of the grace above is still recorded as slow.
             Ok(Some(fresh)) => {
-                note_deadline(&key, true);
+                note_deadline(&key, started.elapsed() <= spec.timeout);
                 Some(fresh)
             }
             // It failed, or it is still running. Either way the last good answer beats a blank
