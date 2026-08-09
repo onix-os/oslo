@@ -2,6 +2,7 @@ pub mod api;
 pub mod columns;
 pub mod context;
 pub mod engine;
+pub mod parsed;
 
 /// The interpreter, which is its own crate.
 ///

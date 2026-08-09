@@ -420,6 +420,23 @@ fn shell(
     //
     // Answers `true`, or `false` and a message — a missing `~/.profile` is the ordinary case on a
     // fresh machine and must not stop the rest of the config from loading.
+    // `oslo.quote(word)` — one word, safe to paste back into a command line.
+    //
+    // **The other half of `c.commands`.** Reading a line as data is only useful if it can be
+    // written back, and a handler that rebuilds one by concatenating words is wrong the moment a
+    // path has a space in it: `cat 'a dir'` parses to the single word `a dir`, and returning
+    // `"ls " .. word` hands the shell two arguments and an error. That is not a hypothetical —
+    // it is what the first configuration written against `c.commands` did.
+    //
+    // The same quoting `printf %q` produces, because there should be one answer to "how does this
+    // shell write a word" and it should not depend on which half of the shell is asking.
+    put(oslo, "quote", |_, args| {
+        let word = text(&args, 1, "oslo.quote")?;
+        Ok(vec![Value::str(oslo_shell::env::builtins::shell_quote(
+            &word,
+        ))])
+    });
+
     let env_source = Arc::clone(env);
     put(oslo, "source", move |_, args| {
         let path = text(&args, 1, "oslo.source")?;

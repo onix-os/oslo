@@ -59,7 +59,7 @@ pub use directories::{builtin_cd, builtin_dirs, builtin_popd, builtin_pushd, bui
 pub use exec::builtin_exec;
 pub use getopts::builtin_getopts;
 pub use hash::builtin_hash;
-pub use io::{builtin_echo, builtin_printf, builtin_read};
+pub use io::{builtin_echo, builtin_printf, builtin_read, shell_quote};
 pub use jobs::{builtin_bg, builtin_disown, builtin_fg, builtin_jobs, builtin_wait};
 pub use r#let::builtin_let;
 pub use mapfile::builtin_mapfile;
