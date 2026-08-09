@@ -306,6 +306,13 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
         if let Some(n) = number(&nav, "padding_y") {
             settings.padding_y = n.max(0) as usize;
         }
+        if let Value::Table(walk) = nav.get(&Value::str("type_nav")) {
+            let walk = walk.borrow();
+            flag(&walk, "enabled", &mut settings.type_nav.enabled);
+            if let Some(ms) = number(&walk, "settle_ms") {
+                settings.type_nav.settle = std::time::Duration::from_millis(ms.max(0) as u64);
+            }
+        }
         if let Value::Table(icons) = nav.get(&Value::str("icons")) {
             let icons = icons.borrow();
             if let Value::Str(mark) = icons.get(&Value::str("dir")) {

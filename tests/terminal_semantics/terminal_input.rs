@@ -342,6 +342,9 @@ fn nav_typing_filters_and_delete_uses_the_internal_rm() {
 oslo.misc.welcome = false
 oslo.prompt.left = function() return "> " end
 oslo.builtin.nav.scanner = false
+-- This is about the filter and about `rm`. With type-and-navigate on, `q` would walk straight
+-- into the only match and there would be no filter left to look at — which is its own test.
+oslo.builtin.nav.type_nav = { enabled = false }
 oslo.builtin.rm.to_tmp = true
 oslo.builtin.rm.trash = os.getenv("HOME") .. "/trash"
 "#;
@@ -371,6 +374,41 @@ oslo.builtin.rm.trash = os.getenv("HOME") .. "/trash"
     shell.wait_for_marks(6);
     shell.send(b"test ! -e inside && test -e ../trash/inside && echo trashed\n");
     shell.wait_for_plain_text("trashed");
+    shell.send(b"exit\n");
+    shell.wait_for_exit();
+}
+
+/// Typing a name until nothing else matches walks into it, with no Enter — and the rest of the
+/// word typed behind it is dropped rather than becoming a filter in the directory just entered.
+#[test]
+fn nav_walks_into_the_only_match_and_swallows_the_rest_of_the_word() {
+    let config = r#"
+oslo.misc.welcome = false
+oslo.prompt.left = function() return "> " end
+oslo.builtin.nav.scanner = false
+oslo.builtin.nav.type_nav = { enabled = true, settle_ms = 2000 }
+"#;
+    let mut shell = PtyShell::configured("xterm-256color", false, config);
+    let fuzz = shell._home.path().join("fuzz");
+    std::fs::create_dir(&fuzz).expect("create the directory to walk into");
+    // Shares `fu`, so `fuzz` is only unambiguous at `fuz` — one character short of the word.
+    std::fs::create_dir(shell._home.path().join("fudge")).expect("create the near miss");
+    std::fs::write(fuzz.join("landed"), "here").expect("create a file to see inside");
+    shell.wait_for_marks(2);
+
+    shell.send(b"nav\n");
+    shell.wait_for_plain_text("fuzz/");
+
+    // The whole word at once, as it would arrive from a keyboard.
+    shell.send(b"fuzz");
+    shell.wait_for_plain_text(&fuzz.to_string_lossy());
+    // Inside, and unfiltered: the trailing `z` did not become a search for `z`.
+    shell.wait_for_plain_text("landed");
+
+    shell.send(b"\x1b");
+    shell.wait_for_marks(6);
+    shell.send(b"pwd\n");
+    shell.wait_for_plain_text(&fuzz.to_string_lossy());
     shell.send(b"exit\n");
     shell.wait_for_exit();
 }

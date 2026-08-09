@@ -4,7 +4,7 @@ use crate::ask::look::{Row, Step, View};
 use crate::ask::{Inline, Look};
 use crate::dropdown::{human_age, human_size};
 use crate::matching::{Fuzzed, Fuzzy};
-use crate::settings::Icons;
+use crate::settings::{Icons, TypeNav};
 use crate::term::{Key, Keys, Pressed, Restore, Screen};
 use crate::{ask, theme};
 use std::path::{Path, PathBuf};
@@ -21,6 +21,8 @@ pub struct Navigator {
     pub fuzzy: Fuzzy,
     /// What is drawn in front of each name; see [`Icons`].
     pub icons: Icons,
+    /// Whether filtering down to one directory walks into it; see [`TypeNav`].
+    pub type_nav: TypeNav,
     pub chrome: ask::chrome::Chrome,
     pub look: Look,
 }
@@ -67,6 +69,8 @@ struct State {
     offset: usize,
     mode: Mode,
     legend: bool,
+    /// When the last automatic entry happened, while its deadline still matters.
+    settled_at: Option<std::time::Instant>,
 }
 
 impl State {
@@ -89,6 +93,7 @@ impl State {
             offset: 0,
             mode: Mode::Browse,
             legend: spec.chrome.legend,
+            settled_at: None,
         }
     }
 
@@ -129,6 +134,43 @@ impl State {
         self.shown = narrow(&self.entries, &self.query, fuzzy);
         self.selected = 0;
         self.offset = 0;
+    }
+
+    /// Walk into the last directory standing, if the filter has left exactly one.
+    ///
+    /// **Directories only, and never on an empty query.** A lone matching *file* is left where it
+    /// is — opening it would mean picking a program, and being wrong about that costs more than a
+    /// keystroke — and a directory that happens to hold one entry must not swallow you the moment
+    /// you arrive, which is what filtering on nothing would mean.
+    fn walk_into_the_only_match(&mut self, spec: &Navigator) {
+        if !spec.type_nav.enabled || self.query.is_empty() {
+            return;
+        }
+        let [only] = self.shown[..] else {
+            return;
+        };
+        let entry = &self.entries[only];
+        if !entry.directory {
+            return;
+        }
+        let into = self.at.join(&entry.name);
+        self.load(into, None);
+        // The rest of the word is still coming; see [`TypeNav`].
+        self.settled_at = Some(std::time::Instant::now());
+    }
+
+    /// Whether a typed character now belongs to the word that walked us in here, not to a search.
+    fn still_settling(&mut self, spec: &Navigator) -> bool {
+        let Some(entered) = self.settled_at else {
+            return false;
+        };
+        if entered.elapsed() < spec.type_nav.settle {
+            return true;
+        }
+        // Asked once and then forgotten, so a widget left open for an hour is not still consulting
+        // an instant from when it opened.
+        self.settled_at = None;
+        false
     }
 
     fn leave_mode(&mut self) {
@@ -408,6 +450,14 @@ pub fn open(spec: &Navigator, mut remove: impl FnMut(&Path) -> bool) -> Outcome 
             }
         };
 
+        // **The tail of the word that just walked us in here is not a search.** Dropped rather
+        // than buffered: those characters were meant for a directory that has already been left.
+        // Only characters — every other key works straight through, so this can never read as a
+        // widget that has stopped responding. See [`TypeNav`].
+        if matches!(pressed, Key::Char(_)) && state.still_settling(spec) {
+            continue;
+        }
+
         if state.mode == Mode::Delete {
             match pressed {
                 Key::Char('y' | 'Y') | Key::Delete => state.commit_delete(&mut remove),
@@ -453,6 +503,7 @@ pub fn open(spec: &Navigator, mut remove: impl FnMut(&Path) -> bool) -> Outcome 
                 Key::Char(c) => {
                     state.query.push(c);
                     state.refilter(spec.fuzzy);
+                    state.walk_into_the_only_match(spec);
                 }
                 _ => {}
             }
@@ -481,6 +532,8 @@ pub fn open(spec: &Navigator, mut remove: impl FnMut(&Path) -> bool) -> Outcome 
                 state.query.push(c);
                 state.mode = Mode::Filter;
                 state.refilter(spec.fuzzy);
+                // A single letter can be enough on its own, in a directory holding one `src/`.
+                state.walk_into_the_only_match(spec);
             }
             _ => {}
         }
