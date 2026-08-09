@@ -34,8 +34,8 @@
 //!
 //! SQL had `INTEGER PRIMARY KEY AUTOINCREMENT`. A key-value store has no such thing, so
 //! `next_id` keeps a counter in `meta` and increments it inside the same transaction that uses
-//! it — which is what makes it safe between terminals, since the seam's `flock` means only one
-//! writer exists at a time and the counter is read and written under it.
+//! it — which is what makes it safe between terminals, since Tagdata permits only one writer at a
+//! time and the counter is read and written under it.
 //!
 //! Ids are never reused. A directory that is forgotten takes its id with it rather than freeing it
 //! for the next one, because a stale index row pointing at a recycled id would attach one
@@ -48,7 +48,7 @@ use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 /// The schema this binary writes.
-pub const SCHEMA_VERSION: i64 = 2;
+pub const SCHEMA_VERSION: i64 = 3;
 
 /// The largest single contribution to `dwell_ms` or `total_ms`.
 ///
@@ -140,9 +140,7 @@ pub struct Step<'a> {
 
 /// An open store.
 pub struct Track {
-    /// A path and a promise about the file — no descriptor, no lock, no map. See the seam's note:
-    /// holding a handle would take a blocking `flock` for the life of the shell and hang the next
-    /// terminal at its prompt, for ever.
+    /// The open tracking database.
     pub(super) store: Store,
     /// False for a file written by a version this binary does not understand: keep reading it,
     /// stop writing to it. Dropping and recreating somebody else's data is never the answer.
@@ -184,11 +182,44 @@ impl Track {
         let found = store.read(|r| Some(meta(r, SCHEMA).unwrap_or(0)))?;
         let writable = found <= SCHEMA_VERSION;
         if writable && found != SCHEMA_VERSION {
-            store.write(|w| set_meta(w, SCHEMA, SCHEMA_VERSION))?;
+            super::sync::migrate(&store, found)?;
         }
         Some(Track {
             store,
             writable,
+            since_trim: std::sync::atomic::AtomicUsize::new(0),
+            current: Mutex::new(None),
+            home: std::env::var("HOME").ok().filter(|home| !home.is_empty()),
+        })
+    }
+
+    pub fn open_existing(path: &Path, read_only: bool) -> Result<Track, String> {
+        Self::open_existing_mode(path, read_only, !read_only)
+    }
+
+    pub(super) fn open_existing_unmodified(path: &Path, read_only: bool) -> Result<Track, String> {
+        Self::open_existing_mode(path, read_only, false)
+    }
+
+    fn open_existing_mode(
+        path: &Path,
+        read_only: bool,
+        ensure_private: bool,
+    ) -> Result<Track, String> {
+        let store = Store::open_existing(path, read_only)?;
+        let found = store.read_checked(|reader| Ok(meta(reader, SCHEMA).unwrap_or(0)))?;
+        if found != SCHEMA_VERSION {
+            return Err(format!(
+                "{}: schema {found} is not supported; expected {SCHEMA_VERSION}",
+                path.display()
+            ));
+        }
+        if ensure_private {
+            store.ensure_private()?;
+        }
+        Ok(Track {
+            store,
+            writable: !read_only,
             since_trim: std::sync::atomic::AtomicUsize::new(0),
             current: Mutex::new(None),
             home: std::env::var("HOME").ok().filter(|home| !home.is_empty()),
@@ -247,6 +278,12 @@ pub(super) fn insert_dir(writer: &Writer<'_, '_>, row: &DirRow) -> Option<u64> {
     Some(id)
 }
 
+pub(super) fn insert_imported_dir(writer: &Writer<'_, '_>, row: &DirRow) -> Option<u64> {
+    let id = next_id(writer)?;
+    writer.put(Tree::Dir, key::dir(id), row.encode())?;
+    Some(id)
+}
+
 /// Write a directory's row and bring its three index buckets into line with it.
 ///
 /// `was` is the row as it stood, or `None` for one being inserted. It is asked for rather than
@@ -263,6 +300,9 @@ pub(super) fn put_dir(
     row: &DirRow,
 ) -> Option<()> {
     writer.put(Tree::Dir, key::dir(id), row.encode())?;
+    if row.remote {
+        return Some(());
+    }
     if was.is_none() {
         writer.put(Tree::DirByPath, key::by_path(&row.path), key::id(id))?;
         writer.put(Tree::DirByBase, key::by_base(&row.base, id), Vec::new())?;
@@ -286,7 +326,7 @@ pub(super) fn put_dir(
 /// The next directory id, taken from the counter and put back one higher.
 ///
 /// Read and written inside the caller's transaction, so two terminals cannot be handed the same
-/// id: the seam's `flock` means only one writer exists at a time, and a transaction that does not
+/// id: Tagdata permits only one writer at a time, and a transaction that does not
 /// commit does not consume a number either.
 fn next_id(writer: &Writer<'_, '_>) -> Option<u64> {
     let next = meta(writer, NEXT_DIR).unwrap_or(1).max(1);

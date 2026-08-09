@@ -284,22 +284,7 @@ fn a_store_from_a_newer_version_is_never_swept() {
     assert_eq!(rows(&newer, Tree::Run), 1);
 }
 
-/// The cascade against a bucket deep enough to have a branch of branches, which is the only size
-/// at which jammdb 0.11's empty-node defect shows up.
-///
-/// It is worth having as its own test because of *how* that defect fails. A cascade that deleted a
-/// directory's rows in one transaction does not crash and does not error — the transaction is
-/// thrown away, the write answers `None`, and the sweep reports that it forgot a directory it did
-/// not touch. Every other test here uses a few hundred rows in a shallow bucket and passes either
-/// way, so this is the one that says the chunking is load-bearing rather than tidy.
-///
-/// Three things about the shape are load-bearing, and all three were found by watching the test
-/// stop failing when they were changed. Every directory stays *under* the cap, or the cap shrinks
-/// the doomed one to five hundred rows before the cascade ever reaches it. The neighbours are there
-/// to keep the bucket deep while one directory's worth is taken out of it. And the doomed directory
-/// is recorded **last**, so it has the highest id and its rows are the tail of the bucket: deleting
-/// from the middle does not reproduce the defect, and a version of this test that put it first
-/// passed against the very code it is here to reject.
+/// A cascade large enough to span multiple deletion chunks.
 ///
 /// Verified by reverting `forget_directory` to one transaction, at which point this fails with the
 /// directory still present and the sweep having reported it gone.

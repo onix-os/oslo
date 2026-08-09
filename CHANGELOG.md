@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.2.25] - 2026-08-09
+
+### <!-- 0 -->⛰️  Features
+
+- Align history subcommand help
+- Add portable sync tooling
+- Show a slow rc file working as it works
+- Switched the DB
+- Type a name and walk into it
+- A configurable mark instead of mode and kind
+
+### <!-- 1 -->🐛 Bug Fixes
+
+- Rm never offers a path it already deleted
+- Keep room for the +N a counted row adds
+- Read one scan, not two halves of different ones
+
+## Unreleased
+
+### <!-- 2 -->🚜 Refactor
+
+- Move tracking storage from jammdb to Tagdata
+
 ## [0.2.24] - 2026-08-09
 
 ### <!-- 1 -->🐛 Bug Fixes
@@ -753,4 +776,3 @@
 - Add tokio and turso for the history database
 - Track the brush integration branch
 - Track the brush fork until #1253 lands
-

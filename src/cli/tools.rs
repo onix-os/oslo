@@ -103,6 +103,9 @@ pub fn from_name(name: &str) -> Option<&'static Tool> {
 /// A stub that *says* it is a stub beats one that accepts arguments and ignores them: this way a
 /// script built against a tool that does not do its job yet fails now rather than silently.
 pub fn run(tool: &'static Tool, args: &[String]) -> i32 {
+    if tool.name == "history" {
+        return crate::cli::history::run(args);
+    }
     let paint = crate::cli::help::Paint::detect();
     if args.iter().any(|a| a == "--help" || a == "-h") {
         print!("{}", help(tool, paint));

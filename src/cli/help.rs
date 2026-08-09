@@ -43,9 +43,7 @@ impl Paint {
         Paint { depth }
     }
 
-    /// No colour at all. Tests only — a real run always asks [`Paint::detect`], which reaches the
-    /// same answer for a pipe without anybody having to remember to.
-    #[cfg(test)]
+    /// No colour.
     pub fn plain() -> Paint {
         Paint { depth: Depth::None }
     }
@@ -104,16 +102,8 @@ impl Paint {
 /// The width the description column starts at. Wide enough for `--profile=NAME`.
 const COLUMN: usize = 20;
 
-/// One `flag  description` line, with the description aligned.
-///
-/// Padded on the *unpainted* width. Escapes have no width on screen but plenty in a `String`, so
-/// padding the painted text would leave every coloured column ragged.
-///
-/// **The description is left unpainted.** It is the text somebody is here to read; dimming it
-/// makes the whole page grey on a terminal that renders colour 8 close to the background, and
-/// grey-on-grey is the exact complaint that got bold removed from the finder's matches. Colour is
-/// for the thing you type and for asides — not for the body.
-fn row(key: &str, painted_key: String, about: &str) -> String {
+/// Formats an aligned help row.
+pub(crate) fn row(key: &str, painted_key: String, about: &str) -> String {
     let pad = COLUMN.saturating_sub(key.chars().count());
     format!("  {}{}{}\n", painted_key, " ".repeat(pad), about)
 }

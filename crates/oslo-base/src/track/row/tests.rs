@@ -11,6 +11,8 @@ fn a_directory() -> DirRow {
         last_visit: 1_700_000_000,
         dwell_ms: 91_000,
         missing_since: None,
+        host: "machine".to_string(),
+        remote: false,
     }
 }
 
@@ -18,6 +20,22 @@ fn a_directory() -> DirRow {
 fn a_directory_reads_back_as_the_row_it_was_written_from() {
     let row = a_directory();
     assert_eq!(DirRow::decode(&row.encode()), Some(row));
+}
+
+#[test]
+fn a_directory_without_origin_fields_is_local_legacy_data() {
+    let old = Key::new()
+        .signed(1)
+        .signed(2)
+        .signed(3)
+        .signed(NEVER)
+        .text("/w/old")
+        .text("old")
+        .text("/w")
+        .done();
+    let row = DirRow::decode(&old).expect("legacy directory");
+    assert!(row.host.is_empty());
+    assert!(!row.remote);
 }
 
 /// The two nulls, which SQL spelled and this has to encode. Neither may come back as a zero,
@@ -90,7 +108,10 @@ fn the_newer_fields_round_trip() {
 fn absorbing_a_run_adds_the_counters_and_keeps_the_worst_time() {
     let mut row = RunRow::first("cargo build".to_string(), Some(0), 100, 30);
     row.absorb(&RunRow::first("cargo build".to_string(), Some(1), 200, 90));
-    row.absorb(&RunRow::first("cargo build".to_string(), Some(0), 300, 10));
+    let mut newest = RunRow::first("cargo build".to_string(), Some(0), 300, 10);
+    newest.session = "new-session".to_string();
+    newest.host = "new-host".to_string();
+    row.absorb(&newest);
 
     assert_eq!(row.runs, 3);
     assert_eq!(row.fails, 1);
@@ -98,6 +119,8 @@ fn absorbing_a_run_adds_the_counters_and_keeps_the_worst_time() {
     assert_eq!(row.last_status, Some(0), "and so does its status");
     assert_eq!(row.total_ms, 130, "time adds up");
     assert_eq!(row.max_ms, 90, "and the worst of it is remembered");
+    assert_eq!(row.session, "new-session");
+    assert_eq!(row.host, "new-host");
     assert_eq!(RunRow::decode(&row.encode()), Some(row));
 }
 

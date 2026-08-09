@@ -1,14 +1,14 @@
 //! Whose history this is.
 //!
-//! Both stores are named after a **profile** rather than after what they contain: `default.db` and
-//! `default.kv`, not `history.db` and `track.kv`.
+//! The store is named after a **profile** rather than after what it contains: `default.kv`, not
+//! `history.db` or `track.kv`.
 //!
 //! # Why a name at all
 //!
 //! Because more than one thing runs commands through this shell. An agent that shells out — and
 //! they all do — writes thousands of lines into the same history a person is trying to search, and
 //! into the same frecency table that decides what `cd` and Tab suggest. `oslo --profile=claude` gives it
-//! its own pair of stores: its history is still recorded, still searchable by pointing another
+//! its own store: its history is still recorded, still searchable by pointing another
 //! shell at the same profile, and no longer mixed into yours.
 //!
 //! It is a *profile*, not a lock. Nothing stops two shells sharing one, which is what makes
@@ -93,7 +93,7 @@ pub fn store_path(xdg_data: Option<&str>, home: Option<&str>, extension: &str) -
     Some(base.join("oslo").join(format!("{}.{extension}", current())))
 }
 
-/// The directory both stores live in.
+/// The directory profile stores live in.
 pub fn store_dir(xdg_data: Option<&str>, home: Option<&str>) -> Option<PathBuf> {
     let base = match xdg_data {
         Some(dir) if !dir.trim().is_empty() => PathBuf::from(dir),
@@ -104,7 +104,7 @@ pub fn store_dir(xdg_data: Option<&str>, home: Option<&str>) -> Option<PathBuf> 
 
 /// Every profile that has a tracking store, sorted, with the current one always present.
 ///
-/// Found by listing rather than recorded anywhere: a profile *is* a pair of files, so the
+/// Found by listing rather than recorded anywhere: a profile *is* a database file, so the
 /// directory is the only thing that could be authoritative. The current profile is included even
 /// with nothing written yet, or a brand-new shell would have nothing to switch away from.
 pub fn available() -> Vec<String> {

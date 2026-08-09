@@ -77,6 +77,28 @@ impl CommandIndex {
     ///
     /// The result is shared, not copied: callers filter it by prefix without allocating.
     pub fn executables(path: &str) -> Arc<HashSet<String>> {
+        Self::both(path).0
+    }
+
+    /// Every executable on `path`, in order.
+    ///
+    /// **What a prefix search wants.** The set answers membership in one step but has no order, so
+    /// finding the names starting with `car` meant a `starts_with` against all of them — a few
+    /// thousand per keystroke, for the ghost suggestion. Sorted, the answer is a contiguous range
+    /// found by binary search. Built with the set, from the same scan, and shared the same way.
+    pub fn sorted(path: &str) -> Arc<Vec<String>> {
+        Self::both(path).1
+    }
+
+    /// The two views of one scan, taken under a single lock.
+    ///
+    /// **Both, together, or neither.** These used to be two calls: fill the cache, drop the lock,
+    /// take it again to read the sorted half. The cache holds *one* entry for whichever `$PATH` was
+    /// asked for last, and something else asks between those two locks — `warm` is a background
+    /// thread doing exactly this at startup. The second lock then answered from a different
+    /// directory's scan, or from an entry that had been replaced with one for another path
+    /// entirely, and the caller got names that were not on its `$PATH` or none at all.
+    fn both(path: &str) -> (Arc<HashSet<String>>, Arc<Vec<String>>) {
         let generation = GENERATION.load(Ordering::Relaxed);
         let mut guard = cache().lock().unwrap();
 
@@ -85,7 +107,7 @@ impl CommandIndex {
                 && entry.key.path == path
                 && entry.checked_at.elapsed() < REVALIDATE_AFTER;
             if fresh {
-                return Arc::clone(&entry.names);
+                return (Arc::clone(&entry.names), Arc::clone(&entry.sorted));
             }
         }
 
@@ -100,35 +122,20 @@ impl CommandIndex {
         {
             // Nothing moved; renew the lease rather than re-reading the directories.
             entry.checked_at = Instant::now();
-            return Arc::clone(&entry.names);
+            return (Arc::clone(&entry.names), Arc::clone(&entry.sorted));
         }
 
         let names = Arc::new(scan(path));
         let mut ordered: Vec<String> = names.iter().cloned().collect();
         ordered.sort_unstable();
+        let sorted = Arc::new(ordered);
         *guard = Some(Entry {
             key,
             names: Arc::clone(&names),
-            sorted: Arc::new(ordered),
+            sorted: Arc::clone(&sorted),
             checked_at: Instant::now(),
         });
-        names
-    }
-
-    /// Every executable on `path`, in order.
-    ///
-    /// **What a prefix search wants.** The set answers membership in one step but has no order, so
-    /// finding the names starting with `car` meant a `starts_with` against all of them — a few
-    /// thousand per keystroke, for the ghost suggestion. Sorted, the answer is a contiguous range
-    /// found by binary search. Built with the set, from the same scan, and shared the same way.
-    pub fn sorted(path: &str) -> Arc<Vec<String>> {
-        // Filling the cache is `executables`' job; this only ever reads what that left behind, and
-        // asks for it first so the two can never disagree about which scan they are describing.
-        let _ = Self::executables(path);
-        match cache().lock().unwrap().as_ref() {
-            Some(entry) => Arc::clone(&entry.sorted),
-            None => Arc::new(Vec::new()),
-        }
+        (names, sorted)
     }
 
     /// The names on `path` that start with `stem`, as a slice of [`Self::sorted`].
@@ -297,9 +304,9 @@ mod tests {
     }
 
     /// The cache is one global slot; two tests using different `$PATH`s would evict each other.
-    static SERIAL: Mutex<()> = Mutex::new(());
+    pub(super) static SERIAL: Mutex<()> = Mutex::new(());
 
-    fn make_exe(dir: &std::path::Path, name: &str) {
+    pub(super) fn make_exe(dir: &std::path::Path, name: &str) {
         let p = dir.join(name);
         let mut f = fs::File::create(&p).unwrap();
         f.write_all(b"#!/bin/sh\n").unwrap();
@@ -357,5 +364,53 @@ mod tests {
         assert!(CommandIndex::executables(a.path().to_str().unwrap()).contains("oslo-in-a"));
         assert!(CommandIndex::executables(b.path().to_str().unwrap()).contains("oslo-in-b"));
         assert!(!CommandIndex::executables(b.path().to_str().unwrap()).contains("oslo-in-a"));
+    }
+}
+
+#[cfg(test)]
+mod paired_tests {
+    use super::*;
+
+    /// **The set and the sorted list must describe the same `$PATH`, under concurrency.**
+    ///
+    /// They were fetched under two separate locks: fill the cache, drop the lock, take it again to
+    /// read the ordered half. The cache holds *one* entry — for whichever path was asked for last —
+    /// so anything asking in between left the second lock answering from a different directory's
+    /// scan. That is not hypothetical: [`warm`] is a background thread doing exactly this while the
+    /// first prompt is being typed at.
+    ///
+    /// A loop against a thread rather than a single call, because the window is only as wide as one
+    /// lock release; the buggy version fails this within a few dozen rounds.
+    #[test]
+    fn the_ordered_view_belongs_to_the_path_it_was_asked_for() {
+        let _guard = super::tests::SERIAL
+            .lock()
+            .unwrap_or_else(|e| e.into_inner());
+        let mine = tempfile::tempdir().unwrap();
+        let theirs = tempfile::tempdir().unwrap();
+        super::tests::make_exe(mine.path(), "only-in-mine");
+        super::tests::make_exe(theirs.path(), "only-in-theirs");
+        let mine = mine.path().to_str().unwrap().to_string();
+        let elsewhere = theirs.path().to_str().unwrap().to_string();
+
+        invalidate();
+        let stop = Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let signal = Arc::clone(&stop);
+        let hammer = std::thread::spawn(move || {
+            while !signal.load(Ordering::Relaxed) {
+                let _ = CommandIndex::executables(&elsewhere);
+            }
+        });
+
+        for _ in 0..2000 {
+            let ordered = CommandIndex::sorted(&mine);
+            assert!(
+                !ordered.iter().any(|name| name == "only-in-theirs"),
+                "the ordered view came from another path's scan: {ordered:?}"
+            );
+        }
+
+        stop.store(true, Ordering::Relaxed);
+        hammer.join().expect("the other caller finishes");
     }
 }

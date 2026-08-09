@@ -69,7 +69,7 @@ impl Outcome {
 const NEVER_RAN: i64 = -1;
 
 /// The key: the log row's id descending, then the segment index.
-fn slot(history_id: u64, segment: u32) -> Vec<u8> {
+pub(super) fn slot(history_id: u64, segment: u32) -> Vec<u8> {
     Key::with_capacity(16)
         .int(u64::MAX - history_id)
         .int(u64::from(segment))
@@ -77,11 +77,11 @@ fn slot(history_id: u64, segment: u32) -> Vec<u8> {
 }
 
 /// The span covering every segment of one log row.
-fn span_of(history_id: u64) -> Span {
+pub(super) fn span_of(history_id: u64) -> Span {
     Span::prefix(Key::with_capacity(8).int(u64::MAX - history_id).done())
 }
 
-fn encode(outcome: &Outcome) -> Vec<u8> {
+pub(super) fn encode(outcome: &Outcome) -> Vec<u8> {
     Key::with_capacity(outcome.text.len() + 40)
         .text(&outcome.join)
         .text(&outcome.text)
@@ -91,7 +91,7 @@ fn encode(outcome: &Outcome) -> Vec<u8> {
         .done()
 }
 
-fn decode(key: &[u8], value: &[u8]) -> Option<Outcome> {
+pub(super) fn decode(key: &[u8], value: &[u8]) -> Option<Outcome> {
     let mut fields = Fields::of(key);
     let _slot = fields.int()?;
     let segment = fields.int()? as u32;
@@ -168,10 +168,8 @@ pub struct Place {
 impl super::Track {
     /// The newest `limit` lines, oldest first, joined to what each of them did.
     ///
-    /// **One transaction for all three buckets.** The store holds no handle open, so every
-    /// `read` is an `open` + `flock` + `close`; asking for the log, the outcomes and the
-    /// directories separately would pay that three times, and the open alone is 11 µs of a 15 µs
-    /// read. This is the call something replaying history should make, and the only one.
+    /// One transaction covers all three buckets so the log, outcomes and directories come from the
+    /// same snapshot.
     ///
     /// **The chain's *shape* is not stored and is not returned.** The line is here and
     /// `parse_bash_script` is in this same binary, so a caller that wants the structure re-derives
@@ -255,7 +253,7 @@ impl super::Track {
                 for row in rows {
                     writer.put(Tree::Outcome, slot(history_id, row.segment), encode(row))?;
                 }
-                Some(())
+                super::sync::complete_local(writer, history_id, rows)
             })
             .is_some()
     }
@@ -271,15 +269,6 @@ impl super::Track {
                 )
             })
             .unwrap_or_default()
-    }
-
-    /// Drop every outcome belonging to one log row.
-    ///
-    /// For a line a `pre-record` rule refused: the row goes, so what it did must go with it.
-    pub(super) fn drop_outcome(&self, history_id: u64) -> bool {
-        self.store
-            .delete_span_in_chunks(Tree::Outcome, &span_of(history_id));
-        true
     }
 
     /// Drop outcomes for every log row older than the newest `max`.

@@ -2,13 +2,15 @@
 
 use crate::ask::look::{Row, Step, View};
 use crate::ask::{Inline, Look};
-use crate::dropdown::{human_age, human_mode, human_size};
-use crate::matching::{Fuzzed, Fuzzy};
+
+use crate::matching::Fuzzy;
+use crate::settings::{Icons, TypeNav};
+
+mod listing;
 use crate::term::{Key, Keys, Pressed, Restore, Screen};
 use crate::{ask, theme};
-use std::os::unix::fs::PermissionsExt;
+use listing::{Entry, narrow, read, row_of};
 use std::path::{Path, PathBuf};
-use std::time::SystemTime;
 
 #[derive(Debug, Clone)]
 pub struct Navigator {
@@ -19,6 +21,10 @@ pub struct Navigator {
     /// Zero uses the middle half of a full screen or up to fourteen inline rows.
     pub height: usize,
     pub fuzzy: Fuzzy,
+    /// What is drawn in front of each name; see [`Icons`].
+    pub icons: Icons,
+    /// Whether filtering down to one directory walks into it; see [`TypeNav`].
+    pub type_nav: TypeNav,
     pub chrome: ask::chrome::Chrome,
     pub look: Look,
 }
@@ -28,16 +34,6 @@ pub enum Outcome {
     ChangeTo(PathBuf),
     Cancelled,
     NoTerminal,
-}
-
-#[derive(Debug, Clone)]
-struct Entry {
-    name: String,
-    directory: bool,
-    symlink: bool,
-    size: u64,
-    mode: u32,
-    modified: SystemTime,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -66,6 +62,8 @@ struct State {
     offset: usize,
     mode: Mode,
     legend: bool,
+    /// When the last automatic entry happened, while its deadline still matters.
+    settled_at: Option<std::time::Instant>,
 }
 
 impl State {
@@ -88,6 +86,7 @@ impl State {
             offset: 0,
             mode: Mode::Browse,
             legend: spec.chrome.legend,
+            settled_at: None,
         }
     }
 
@@ -128,6 +127,43 @@ impl State {
         self.shown = narrow(&self.entries, &self.query, fuzzy);
         self.selected = 0;
         self.offset = 0;
+    }
+
+    /// Walk into the last directory standing, if the filter has left exactly one.
+    ///
+    /// **Directories only, and never on an empty query.** A lone matching *file* is left where it
+    /// is — opening it would mean picking a program, and being wrong about that costs more than a
+    /// keystroke — and a directory that happens to hold one entry must not swallow you the moment
+    /// you arrive, which is what filtering on nothing would mean.
+    fn walk_into_the_only_match(&mut self, spec: &Navigator) {
+        if !spec.type_nav.enabled || self.query.is_empty() {
+            return;
+        }
+        let [only] = self.shown[..] else {
+            return;
+        };
+        let entry = &self.entries[only];
+        if !entry.directory {
+            return;
+        }
+        let into = self.at.join(&entry.name);
+        self.load(into, None);
+        // The rest of the word is still coming; see [`TypeNav`].
+        self.settled_at = Some(std::time::Instant::now());
+    }
+
+    /// Whether a typed character now belongs to the word that walked us in here, not to a search.
+    fn still_settling(&mut self, spec: &Navigator) -> bool {
+        let Some(entered) = self.settled_at else {
+            return false;
+        };
+        if entered.elapsed() < spec.type_nav.settle {
+            return true;
+        }
+        // Asked once and then forgotten, so a widget left open for an hour is not still consulting
+        // an instant from when it opened.
+        self.settled_at = None;
+        false
     }
 
     fn leave_mode(&mut self) {
@@ -185,34 +221,6 @@ impl State {
             self.error = Some("delete failed".to_string());
         }
     }
-}
-
-fn read(at: &Path, hidden: bool) -> (Vec<Entry>, Option<String>) {
-    let entries = match std::fs::read_dir(at) {
-        Ok(entries) => entries,
-        Err(error) => return (Vec::new(), Some(error.to_string())),
-    };
-    let mut out: Vec<Entry> = entries
-        .filter_map(std::result::Result::ok)
-        .filter_map(|entry| {
-            let name = entry.file_name().to_string_lossy().into_owned();
-            if !hidden && name.starts_with('.') {
-                return None;
-            }
-            let path = entry.path();
-            let metadata = path.symlink_metadata().ok()?;
-            Some(Entry {
-                directory: path.is_dir(),
-                symlink: metadata.file_type().is_symlink(),
-                size: metadata.len(),
-                mode: metadata.permissions().mode(),
-                modified: metadata.modified().unwrap_or(SystemTime::UNIX_EPOCH),
-                name,
-            })
-        })
-        .collect();
-    out.sort_by(|a, b| b.directory.cmp(&a.directory).then(a.name.cmp(&b.name)));
-    (out, None)
 }
 
 pub fn open(spec: &Navigator, mut remove: impl FnMut(&Path) -> bool) -> Outcome {
@@ -288,7 +296,7 @@ pub fn open(spec: &Navigator, mut remove: impl FnMut(&Path) -> bool) -> Outcome 
         let rows: Vec<Row> = state
             .shown
             .iter()
-            .map(|&index| row_of(&state.entries[index], ui.question))
+            .map(|&index| row_of(&state.entries[index], ui.question, &spec.icons))
             .collect();
 
         // What the listing would take if nothing were stretched. `cols` is not read for this, and
@@ -299,7 +307,7 @@ pub fn open(spec: &Navigator, mut remove: impl FnMut(&Path) -> bool) -> Outcome 
                 let all: Vec<Row> = state
                     .entries
                     .iter()
-                    .map(|entry| row_of(entry, ui.question))
+                    .map(|entry| row_of(entry, ui.question, &spec.icons))
                     .collect();
                 let width = look
                     .natural_width(
@@ -390,6 +398,7 @@ pub fn open(spec: &Navigator, mut remove: impl FnMut(&Path) -> bool) -> Outcome 
                 ("←→", "back/open"),
                 ("↵", "open"),
                 ("del", "delete"),
+                (".", "hidden"),
                 ("esc", "cd+quit"),
                 ("?", "hide"),
             ],
@@ -406,6 +415,14 @@ pub fn open(spec: &Navigator, mut remove: impl FnMut(&Path) -> bool) -> Outcome 
                 return Outcome::Cancelled;
             }
         };
+
+        // **The tail of the word that just walked us in here is not a search.** Dropped rather
+        // than buffered: those characters were meant for a directory that has already been left.
+        // Only characters — every other key works straight through, so this can never read as a
+        // widget that has stopped responding. See [`TypeNav`].
+        if matches!(pressed, Key::Char(_)) && state.still_settling(spec) {
+            continue;
+        }
 
         if state.mode == Mode::Delete {
             match pressed {
@@ -452,6 +469,7 @@ pub fn open(spec: &Navigator, mut remove: impl FnMut(&Path) -> bool) -> Outcome 
                 Key::Char(c) => {
                     state.query.push(c);
                     state.refilter(spec.fuzzy);
+                    state.walk_into_the_only_match(spec);
                 }
                 _ => {}
             }
@@ -475,54 +493,25 @@ pub fn open(spec: &Navigator, mut remove: impl FnMut(&Path) -> bool) -> Outcome 
             }
             Key::Delete => state.begin_delete(),
             Key::Char('?') => state.legend = !state.legend,
+            // **Only while browsing.** A dot is the commonest character in a filename — `Cargo.toml`
+            // cannot be typed if it always means something else — so once a filter is being typed
+            // it goes into the filter like any other character. Before that there is nothing it
+            // could be part of, which is exactly where the shortcut belongs.
+            Key::Char('.') => {
+                state.hidden = !state.hidden;
+                state.reload(None);
+            }
             Key::Char(c) => {
                 state.query.clear();
                 state.query.push(c);
                 state.mode = Mode::Filter;
                 state.refilter(spec.fuzzy);
+                // A single letter can be enough on its own, in a directory holding one `src/`.
+                state.walk_into_the_only_match(spec);
             }
             _ => {}
         }
     }
-}
-
-fn row_of(entry: &Entry, directory_style: theme::Style) -> Row {
-    let kind = match (entry.directory, entry.symlink) {
-        (true, true) => "link/",
-        (true, false) => "dir",
-        (false, true) => "link",
-        (false, false) => "file",
-    };
-    let name = match (entry.directory, entry.symlink) {
-        (true, true) => format!("{}@/", entry.name),
-        (true, false) => format!("{}/", entry.name),
-        (false, true) => format!("{}@", entry.name),
-        (false, false) => entry.name.clone(),
-    };
-    Row {
-        meta: vec![
-            kind.to_string(),
-            human_mode(entry.mode),
-            human_size(entry.size),
-        ],
-        trail: format!("  {}", human_age(entry.modified)),
-        tint: entry.directory.then_some(directory_style),
-        ..Row::new(name)
-    }
-}
-
-fn narrow(entries: &[Entry], query: &str, fuzzy: Fuzzy) -> Vec<usize> {
-    if query.is_empty() {
-        return (0..entries.len()).collect();
-    }
-    let pattern = Fuzzed::new(query, fuzzy);
-    let mut scored: Vec<(i32, usize)> = entries
-        .iter()
-        .enumerate()
-        .filter_map(|(index, entry)| pattern.score(&entry.name).map(|score| (score, index)))
-        .collect();
-    scored.sort_by(|a, b| b.0.cmp(&a.0).then(a.1.cmp(&b.1)));
-    scored.into_iter().map(|(_, index)| index).collect()
 }
 
 #[cfg(test)]

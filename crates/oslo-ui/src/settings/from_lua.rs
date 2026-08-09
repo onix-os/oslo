@@ -132,6 +132,17 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
         if let Value::Str(key) = table.get(&Value::str("accept_word")) {
             settings.suggest.accept_word = Some(key.to_string());
         }
+        if let Value::Table(list) = table.get(&Value::str("skip_history")) {
+            settings.suggest.skip_history = list
+                .borrow()
+                .sequence()
+                .iter()
+                .filter_map(|value| match value {
+                    Value::Str(name) => Some(name.to_string()),
+                    _ => None,
+                })
+                .collect();
+        }
     }
 
     if let Value::Table(table) = oslo.get(&Value::str("misc")) {
@@ -305,6 +316,39 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
         }
         if let Some(n) = number(&nav, "padding_y") {
             settings.padding_y = n.max(0) as usize;
+        }
+        if let Value::Table(walk) = nav.get(&Value::str("type_nav")) {
+            let walk = walk.borrow();
+            flag(&walk, "enabled", &mut settings.type_nav.enabled);
+            if let Some(ms) = number(&walk, "settle_ms") {
+                settings.type_nav.settle = std::time::Duration::from_millis(ms.max(0) as u64);
+            }
+        }
+        if let Value::Table(icons) = nav.get(&Value::str("icons")) {
+            let icons = icons.borrow();
+            if let Value::Str(mark) = icons.get(&Value::str("dir")) {
+                settings.icons.directory = mark.to_string();
+            }
+            if let Value::Str(mark) = icons.get(&Value::str("file")) {
+                settings.icons.file = mark.to_string();
+            }
+            if let Value::Table(by_extension) = icons.get(&Value::str("ext")) {
+                for (key, value) in by_extension.borrow().pairs() {
+                    match (&key, &value) {
+                        // Lowercased once here rather than at every row: an extension is matched
+                        // case-insensitively, and `README.MD` should read like `readme.md`.
+                        (Value::Str(extension), Value::Str(mark)) => settings
+                            .icons
+                            .by_extension
+                            .push((extension.to_ascii_lowercase(), mark.to_string())),
+                        _ => problems.push(
+                            "oslo.builtin.nav.icons.ext: every entry must be an extension \
+                             mapped to what to draw"
+                                .to_string(),
+                        ),
+                    }
+                }
+            }
         }
         if let Value::Str(name) = nav.get(&Value::str("position")) {
             settings.position = match name.as_ref() {

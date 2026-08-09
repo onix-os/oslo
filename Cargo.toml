@@ -1,11 +1,9 @@
 [package]
 name = "oslo"
-version = "0.2.24"
+version = "0.2.25"
 edition = "2024"
-# Edition 2024 alone needs 1.85, but the codebase uses let-chains in edition-2024 position
-# (stabilised in 1.88) and brush-parser declares 1.88 too. Bump this only alongside the MSRV
-# job in .github/workflows/tests.yml, which pins the same toolchain.
-rust-version = "1.88"
+# Minimum supported Rust version, mirrored by the MSRV job in .github/workflows/tests.yml.
+rust-version = "1.89"
 description = "oslo"
 license = "MIT"
 readme = "README.md"
@@ -15,9 +13,7 @@ publish = false
 path = "src/lib.rs"
 
 [features]
-# **Nothing is on by default, and that is the point.** A default build has to stay what it is: one
-# static musl binary, no C toolchain, 142 crates. See `docs/research/footprint.md`'s reasoning, and
-# the note above `jammdb` for what happened the last time a dependency was allowed to be large.
+# A default build produces one static musl binary without a C toolchain.
 default = []
 
 # `ssh` — an SSH client in the shell, behind a switch.
@@ -113,7 +109,7 @@ oslo-ui = { path = "crates/oslo-ui" }
 # The allow list for directory environments is keyed by a hash of the rc file's path *and* its
 # contents, which is what makes editing an allowed file revoke it. Pure Rust, so it does not cost
 # the static musl build a C toolchain.
-# **0.10, deliberately.** `jammdb` pulls `sha3 0.10`, which is built on `digest 0.10`; asking for
+# **0.10, deliberately.** `tagdata` pulls `sha3 0.10`, which is built on `digest 0.10`; asking for
 # `sha2 0.11` meant a second copy of the whole framework — `digest`, `block-buffer` and
 # `crypto-common` each linked twice — for no benefit. SHA-256 is SHA-256, so the version here
 # changes no hash and therefore invalidates no `.envrc` that has already been allowed.
@@ -123,28 +119,6 @@ sha2 = "0.10"
 # A pipe would be the obvious choice and is the wrong one — nothing drains it while the rc file
 # runs, so a chatty `.envrc` would block forever on its own output once the pipe filled.
 tempfile = "3.17"
-# The store's key-value engine, and the reason `turso` is gone: pure Rust, one file, no C, no
-# `simsimd`, no allocator. Bolt/LMDB's design — a copy-on-write B+tree with two alternating meta
-# pages, which is what makes a `kill -9` cost the transaction in flight and nothing else.
-#
-# What went with it, and why the line above this one is now blank: `turso` was 13.3 MB of an
-# 18.3 MB binary and it compiled C into it. `turso_core` names `simsimd` — a SIMD distance
-# library in C — as a non-optional dependency on every target but wasm, so its build script ran
-# `gcc` and linked a 275 KB `libsimsimd.a`. That contradicted the reason `mlua` was dropped and
-# `sha2` was chosen (see the comment above `sha2`), and no feature flag could un-contradict it;
-# turning off `fts` and `mimalloc` took 4.43 MiB off and left the compiler where it was. `tokio`
-# went at the same moment and for the same reason: it was there only because turso's API is async
-# and oslo's REPL is not, so both `OnceLock<Runtime>`s and every `block_on` existed to bridge that
-# and nothing else. See docs/research/footprint.md.
-#
-# Every call to it is behind `src/track/kv/`, and nothing else may `use jammdb`. That is not
-# tidiness: `redb` and `sanakirja` were measured as alternatives and either could win a rerun, and
-# jammdb is one maintainer at 0.11. Read that module's note before changing this line — three of
-# its facts (a blocking `flock` held for the life of the handle, a panic rather than an error on
-# any file that is not a database, an 8 MiB growth step) are load-bearing and none of them is
-# documented upstream.
-jammdb = "0.11"
-
 # The same crate as above, with the switch that exposes the lock serialising tests which touch the
 # process-wide feature bitset. Cargo unifies the two when it builds a test and does not when it
 # builds the shell, so a release binary carries neither the lock nor the reset.

@@ -2,7 +2,7 @@
 //!
 //! Lives in the **same store** as the aggregate, in its own [`Tree::History`] bucket. It used to be
 //! a second file — `history.db` beside `track.kv` — because it used to be a second *engine*,
-//! SQLite where the aggregate was jammdb. Both have been jammdb for a while, so the split was
+//! SQLite where the aggregate used a separate key-value database. They were later unified, so the split was
 //! paying for nothing: two opens, two file handles, two floors on disk, and two commits per
 //! command with no atomicity between them. A crash between the two left a line in your history
 //! that never happened for ranking, or the reverse.
@@ -72,7 +72,7 @@ const FIRST_ID: u64 = 1;
 ///
 /// See the module note. `u64::MAX - id` rather than a reversed comparison because the store
 /// compares bytes and has no idea what a key means.
-fn slot(id: u64) -> Vec<u8> {
+pub(super) fn slot(id: u64) -> Vec<u8> {
     Key::with_capacity(8).int(u64::MAX - id).done()
 }
 
@@ -94,7 +94,7 @@ fn id_of(key: &[u8]) -> Option<u64> {
 /// after them as optional, so a row written by an older oslo reads back with the new fields at
 /// their defaults and a row written by a newer one is still readable here. That is what makes
 /// adding a field a non-event rather than a migration.
-fn encode(entry: &Entry, at: u64) -> Vec<u8> {
+pub(super) fn encode(entry: &Entry, at: u64) -> Vec<u8> {
     Key::with_capacity(entry.line.len() + entry.mode.len() + 28)
         .text(&entry.line)
         .text(&entry.mode)
@@ -111,6 +111,28 @@ fn encode(entry: &Entry, at: u64) -> Vec<u8> {
 /// the key — so it needs this module's encoding rather than a second copy of it.
 pub(super) fn entry_of(value: &[u8]) -> Option<Entry> {
     decode(value)
+}
+
+pub(super) fn stored_entry(key: &[u8], value: &[u8]) -> Option<(u64, Entry, u64)> {
+    let id = id_of(key)?;
+    let mut fields = Fields::of(value);
+    let line = fields.text()?.into_owned();
+    let mode = fields.text()?.into_owned();
+    let at = fields.int().unwrap_or(0);
+    let session = fields.int().unwrap_or(0) as u32;
+    let seq = fields.int().unwrap_or(0) as u32;
+    let rewritten = fields.int().unwrap_or(0) != 0;
+    Some((
+        id,
+        Entry {
+            line,
+            mode,
+            session,
+            seq,
+            rewritten,
+        },
+        at,
+    ))
 }
 
 /// A row read back, or `None` if it is not one — a truncated value costs one recalled line rather
@@ -176,9 +198,9 @@ impl super::Track {
         row.seq = TYPED.fetch_add(1, Ordering::Relaxed) + 1;
         self.store.write(|writer| {
             let id = next_id(writer);
-            writer
-                .put(Tree::History, slot(id), encode(&row, at))
-                .map(|()| id)
+            writer.put(Tree::History, slot(id), encode(&row, at))?;
+            super::sync::append_local(writer, id, &row, at)?;
+            Some(id)
         })
     }
 
@@ -195,13 +217,15 @@ impl super::Track {
         self.store
             .write(|writer| {
                 let key = slot(history_id);
-                let mut row = decode(&writer.get(Tree::History, &key)?)?;
+                let value = writer.get(Tree::History, &key)?;
+                let (_, mut row, at) = stored_entry(&key, &value)?;
                 if row.line == line {
                     return Some(());
                 }
                 row.line = line.to_string();
                 row.rewritten = true;
-                writer.put(Tree::History, key, encode(&row, now()))
+                writer.put(Tree::History, key, encode(&row, at))?;
+                super::sync::rewrite_local(writer, history_id, line)
             })
             .is_some()
     }
@@ -213,11 +237,12 @@ impl super::Track {
     pub fn drop_line(&self, history_id: u64) -> bool {
         self.store
             .write(|writer| {
+                super::sync::tombstone_local(writer, history_id)?;
                 writer.delete(Tree::History, &slot(history_id));
+                writer.delete_span(Tree::Outcome, &super::outcome::span_of(history_id));
                 Some(())
             })
             .is_some()
-            && self.drop_outcome(history_id)
     }
 
     /// This shell's session ordinal, allocated from `Tree::Meta` on first use.
@@ -276,7 +301,12 @@ impl super::Track {
     pub fn clear(&self) -> bool {
         self.store
             .write(|writer| {
+                let ids = writer.collect(Tree::History, &Span::all(), |key, _| id_of(key));
+                for id in ids {
+                    super::sync::tombstone_local(writer, id)?;
+                }
                 writer.clear(Tree::History);
+                writer.clear(Tree::Outcome);
                 Some(())
             })
             .is_some()
@@ -288,25 +318,27 @@ impl super::Track {
     /// no upper end — the whole of the trim is naming the key where that span starts. Nothing is
     /// read beyond it.
     ///
-    /// The deleting is `Store::delete_span_in_chunks` and not the one-transaction version, which
-    /// is not a preference. A single transaction that deletes a hundred rows from a bucket of a few
-    /// thousand panics inside jammdb and deletes *nothing*; the seam has the measurements. A
-    /// history at the default `HISTSIZE` of ten thousand is exactly that shape, every hundred lines
-    /// typed, for the rest of the machine's life — so this is the difference between a bound and
-    /// the appearance of one.
+    /// Deletion uses `Store::delete_span_in_chunks` so long histories release the writer between
+    /// chunks.
     pub fn trim(&self, max: usize) -> bool {
-        let Some(first_doomed) = self.store.read(|reader| {
+        let Some((first_doomed, doomed_ids)) = self.store.read(|reader| {
             let mut kept = 0;
             let mut first_doomed = None;
+            let mut doomed_ids = Vec::new();
             reader.scan(Tree::History, &Span::all(), |key, _| {
                 if kept >= max {
-                    first_doomed = Some(key.to_vec());
-                    return Walk::Stop;
+                    if first_doomed.is_none() {
+                        first_doomed = Some(key.to_vec());
+                    }
+                    if let Some(id) = id_of(key) {
+                        doomed_ids.push(id);
+                    }
+                    return Walk::On;
                 }
                 kept += 1;
                 Walk::On
             });
-            Some(first_doomed)
+            Some((first_doomed, doomed_ids))
         }) else {
             return false;
         };
@@ -314,6 +346,20 @@ impl super::Track {
             // Already inside the bound, which is nearly every call: nothing is written at all.
             None => true,
             Some(from) => {
+                for ids in doomed_ids.chunks(256) {
+                    if self
+                        .store
+                        .write(|writer| {
+                            for id in ids {
+                                super::sync::hide_local(writer, *id)?;
+                            }
+                            Some(())
+                        })
+                        .is_none()
+                    {
+                        return false;
+                    }
+                }
                 // **Before the rows themselves**, because the span is computed from the log's own
                 // keys: once the line is gone there is nothing left to say which outcomes belonged
                 // to it, and they would sit there for ever in a store with no `VACUUM`.
@@ -348,7 +394,7 @@ impl super::Track {
 ///
 /// One row read, because the newest is the first row. Taken inside the same write transaction as
 /// the `put` that uses it, which is what stops two terminals appending under one id.
-fn next_id(reader: &super::kv::Reader<'_, '_>) -> u64 {
+pub(super) fn next_id(reader: &super::kv::Reader<'_, '_>) -> u64 {
     reader
         .find(Tree::History, &Span::all(), |key, _| id_of(key))
         .map_or(FIRST_ID, |newest| newest.saturating_add(1))

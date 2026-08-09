@@ -3,10 +3,7 @@
 //! The REPL loop already computes every input this needs within sixty lines of each other and then
 //! throws all but two of them away. So the whole write path is one call at the end of the loop
 //! taking a struct built from locals that already exist; nothing is threaded through anything, and
-//! nothing here runs on a worker thread. Measured through the seam at 27.9 µs for the whole thing —
-//! open the file, take the transaction, write, commit, close — which is not something a shell can
-//! feel next to the fork and exec of the command itself, and a queue would introduce a
-//! shutdown-drain problem for a store whose whole value is that it survives a `kill -9`.
+//! nothing here runs on a worker thread. Each prompt commits its tracking changes synchronously.
 //!
 //! # Contract item 3: the upsert is a read, an add and a put
 //!
@@ -18,14 +15,12 @@
 //! replaces said the opposite. Under SQLite the increment had to be written *in SQL* — `dwell_ms =
 //! dwell_ms + ?` rather than a read-then-write in Rust — precisely so that two shells in one
 //! directory would add up instead of clobbering each other. Here a read-then-write is safe for a
-//! reason SQLite could not offer: the seam holds a whole-file exclusive `flock` for the duration of
-//! the transaction, so no other terminal can read the row between this read and this write. The
-//! rule that follows is the seam's and it is respected everywhere in this file — **no transaction
-//! stays open for long**, because every other terminal's next keystroke queues behind it.
+//! reason SQLite could not offer: Tagdata permits one writer transaction at a time, so no other
+//! terminal can write the row between this read and this write.
 //!
 //! A crash between two of these writes cannot leave a run attributed to a directory whose arrival
-//! was never recorded: jammdb writes no page until `commit`, so a transaction that does not finish
-//! wrote nothing at all.
+//! was never recorded: Tagdata publishes no transaction until `commit`, so an unfinished
+//! transaction writes nothing.
 //!
 //! # One open interval, and it is not in the store
 //!

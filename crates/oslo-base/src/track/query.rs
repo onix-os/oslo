@@ -3,11 +3,8 @@
 //! Four questions, and every one of them is a **seek to a lower bound and a walk to an upper one**.
 //! That is the single most performance-relevant decision in `src/track/`, and it survives the move
 //! off SQL unchanged: `argv LIKE 'cargo run --ex%'` and `for row in bucket { if starts_with(..) }`
-//! are the same mistake in two languages and both are O(rows in the bucket). Measured through the
-//! seam: the whole read — open the file, take the transaction, walk the range, close — is 15.1 µs
-//! against 25,000 rows. Three orders of magnitude of headroom on a per-keystroke budget is what
-//! makes a cache unnecessary, and therefore what makes a cache-coherence problem between terminals
-//! impossible.
+//! are the same mistake in two languages and both are O(rows in the bucket). Indexed range reads
+//! keep the per-keystroke path independent of the total bucket size.
 //!
 //! # Contract item 1: what did I run *here*
 //!

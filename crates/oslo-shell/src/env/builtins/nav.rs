@@ -51,6 +51,8 @@ pub fn builtin_nav(env: &mut Environment, args: &[String]) -> Result<i32> {
         width: configured.width,
         height: configured.height,
         fuzzy: all.completion.fuzzy,
+        icons: configured.icons.clone(),
+        type_nav: configured.type_nav,
         chrome,
         look,
     };

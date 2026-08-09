@@ -11,7 +11,7 @@
 //! # This file is what bounds the file now, and the number is 8 MiB
 //!
 //! Under turso the sweep was tidiness with a WAL problem attached. It is not tidiness here.
-//! jammdb allocates in one 8 MiB step and never gives it back — measured, 400 rows fit in the
+//! Tagdata allocates in one 8 MiB step — measured, 400 rows fit in the
 //! 128 KiB a fresh store is born with, and somewhere between 500 and 1,000 rows the file jumps to
 //! 8.5 MiB and stays there for good. There is no `VACUUM` and no way to shrink it. So
 //! the per-directory cap and the ninety-day rule are the difference between a store that costs 128 KiB
@@ -19,13 +19,9 @@
 //! be the headline of this module is gone entirely: there is no write-ahead log, no `-wal`, no
 //! `-shm`. One file.
 //!
-//! # Nothing here holds a transaction open
+//! # Transactions stay short
 //!
-//! This is the rule the seam asks for and it shapes every function below. The engine takes a
-//! **whole-file exclusive lock** for the duration of a transaction, read or write, so a sweep that
-//! ran as one transaction would queue every other terminal's next keystroke behind it. So the
-//! sweep is a sequence of short transactions: read what has to go, let go of the lock, delete it in
-//! chunks, let go again between each.
+//! The sweep uses short transactions so another process can start a transaction between chunks.
 //!
 //! The longest single lock the sweep takes is one pass over every `run` row — the age rule and the
 //! cap each need one — which is a few milliseconds against the 25,000 rows the store is designed to
@@ -46,7 +42,7 @@
 //! `oslo.track.forget(path)`, it is that function and nothing more.
 //!
 //! It is deliberately **not** one transaction — see the note on the function, which is the one
-//! place in this module where a jammdb defect rather than a design decision picks the shape.
+//! place in this module where the storage chunk budget picks the shape.
 
 use super::db::{LAST_PRUNE, Track, now, put_dir, read_dir, set_meta};
 use super::kv::{Reader, Span, Tree, Walk};
@@ -75,13 +71,59 @@ const RUNS_PER_DIR: usize = 500;
 /// How many directories one transaction marks as missing before letting go of the file.
 ///
 /// Only the marks, which are `put`s: every *delete* in this module goes through the seam's own
-/// budget instead, because a delete large enough to empty a node is thrown away rather than
-/// refused. Small enough that the longest anybody waits is a fraction of a millisecond, large
+/// budget instead. Small enough that the longest anybody waits is a fraction of a millisecond, large
 /// enough that an unplugged disk full of remembered directories is a handful of commits rather
 /// than one `fsync` per directory.
 const CHUNK: usize = 256;
 
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct PrunePreview {
+    pub run_rows: usize,
+    pub missing_directories: usize,
+    pub expired_directories: usize,
+}
+
 impl Track {
+    pub fn sweep_preview(&self) -> PrunePreview {
+        let at = now();
+        let mut runs = self
+            .store
+            .read(|reader| Some(stale_runs(reader, at - RUN_MAX_AGE)))
+            .unwrap_or_default();
+        runs.extend(
+            self.store
+                .read(|reader| Some(over_the_cap(reader)))
+                .unwrap_or_default(),
+        );
+        runs.sort();
+        runs.dedup();
+        let directories: Vec<DirRow> = self
+            .store
+            .read(|reader| {
+                Some(reader.collect(Tree::Dir, &Span::all(), |_, value| {
+                    let row = DirRow::decode(value)?;
+                    (!row.remote).then_some(row)
+                }))
+            })
+            .unwrap_or_default();
+        let missing_directories = directories
+            .iter()
+            .filter(|row| !Path::new(&row.path).is_dir())
+            .count();
+        let expired_directories = directories
+            .iter()
+            .filter(|row| {
+                row.missing_since
+                    .is_some_and(|since| since < at - GONE_MAX_AGE)
+            })
+            .count();
+        PrunePreview {
+            run_rows: runs.len(),
+            missing_directories,
+            expired_directories,
+        }
+    }
+
     /// Run the sweep now, whatever the stamp says.
     ///
     /// Answers how many `run` rows it removed, which is only of interest to a test — nothing in the
@@ -156,7 +198,11 @@ impl Track {
             .store
             .read(|reader| {
                 Some(reader.collect(Tree::Dir, &Span::all(), |key, value| {
-                    Some((field::leading_id(key)?, DirRow::decode(value)?.path))
+                    let row = DirRow::decode(value)?;
+                    if row.remote {
+                        return None;
+                    }
+                    Some((field::leading_id(key)?, row.path))
                 }))
             })
             .unwrap_or_default();
@@ -182,7 +228,8 @@ impl Track {
             .read(|reader| {
                 Some(reader.collect(Tree::Dir, &Span::all(), |key, value| {
                     let row = DirRow::decode(value)?;
-                    (row.missing_since? < at - GONE_MAX_AGE).then(|| field::leading_id(key))?
+                    (!row.remote && row.missing_since? < at - GONE_MAX_AGE)
+                        .then(|| field::leading_id(key))?
                 }))
             })
             .unwrap_or_default();
@@ -194,10 +241,9 @@ impl Track {
     /// Contract item 4: a directory, everything that was ever run in it, and every index entry
     /// naming either.
     ///
-    /// **Not one transaction, and it must not be one.** A directory at the cap is five hundred run
-    /// rows and five hundred index entries, and jammdb 0.11 throws away a transaction that deletes
-    /// that much in one go — silently, so the cascade would look like it had happened. See
-    /// [`super::kv::Store::delete_span_in_chunks`], which is where that was measured.
+    /// A directory at the cap is five hundred run rows and five hundred index entries, so the
+    /// deletion is split into bounded transactions by
+    /// [`super::kv::Store::delete_span_in_chunks`].
     ///
     /// What replaces the atomicity is an order in which every intermediate state is one the store
     /// can be left in. The index entries go before the rows they name; the runs go before the

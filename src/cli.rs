@@ -8,6 +8,7 @@
 //! else, so `oslo --version` read the caller's stdin and exited 0.
 
 pub mod help;
+pub mod history;
 pub mod tools;
 pub mod warn;
 

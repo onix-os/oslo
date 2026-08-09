@@ -121,7 +121,7 @@ fn allhist_records_a_dash_c_command_in_both_stores() {
     let text = std::fs::read_to_string(&hist).expect("the history file");
     assert!(text.contains("echo recorded"), "$HISTFILE: {text:?}");
 
-    // **The bytes, not the file.** jammdb pre-allocates 131072 bytes the moment it opens one, so
+    // **The bytes, not the file.** Tagdata pre-allocates 131072 bytes the moment it opens one, so
     // asserting the store *exists* passes whether or not anything was ever written to it — which
     // is exactly the kind of assertion that reports success for a feature that does nothing.
     let store = dir.path().join("oslo").join("default.kv");

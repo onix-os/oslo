@@ -305,3 +305,59 @@ fn nav_defaults_to_a_centered_quiet_half_screen() {
     assert_eq!(nav.border_fit, crate::ask::chrome::Fit::Content);
     assert!(!nav.legend);
 }
+
+/// The two nav knobs a config is most likely to reach for, and the defaults they replace.
+#[test]
+fn nav_marks_and_type_navigation_are_configurable() {
+    let (settings, problems) = settings_from(
+        "oslo = { builtin = { nav = {
+            icons = { dir = 'D', file = 'F', ext = { RS = 'r', md = 'm' } },
+            type_nav = { enabled = false, settle_ms = 1200 },
+        } } }",
+    );
+    assert!(problems.is_empty(), "{problems:?}");
+    let nav = &settings.builtin.nav;
+
+    assert_eq!(nav.icons.directory, "D");
+    assert_eq!(nav.icons.file, "F");
+    // Extensions are folded to lower case as they are read, so the lookup never has to.
+    assert_eq!(nav.icons.of("main.rs", false), "r");
+    assert_eq!(nav.icons.of("README.MD", false), "m");
+    assert_eq!(nav.icons.of("Makefile", false), "F");
+    assert_eq!(nav.icons.of("src", true), "D");
+
+    assert!(!nav.type_nav.enabled);
+    assert_eq!(nav.type_nav.settle, std::time::Duration::from_millis(1200));
+}
+
+/// Naming one nav setting must not blank the rest — the merge rule the whole module follows.
+#[test]
+fn nav_marks_left_unset_keep_their_defaults() {
+    let (settings, problems) = settings_from("oslo = { builtin = { nav = { hidden = true } } }");
+    assert!(problems.is_empty(), "{problems:?}");
+    let nav = &settings.builtin.nav;
+    assert_eq!(nav.icons.directory, "■");
+    assert_eq!(nav.icons.file, "≡");
+    assert!(nav.icons.by_extension.is_empty(), "no marks are built in");
+    assert!(nav.type_nav.enabled, "on by default");
+}
+
+/// `rm` is skipped by default, and the list is a list rather than a hard-coded name.
+#[test]
+fn the_commands_whose_history_is_not_offered_are_configurable() {
+    let stock = Settings::default();
+    assert_eq!(stock.suggest.skip_history, vec!["rm".to_string()]);
+
+    let (settings, problems) =
+        settings_from("oslo = { suggest = { skip_history = { 'shred', 'trash' } } }");
+    assert!(problems.is_empty(), "{problems:?}");
+    assert_eq!(
+        settings.suggest.skip_history,
+        vec!["shred".to_string(), "trash".to_string()]
+    );
+
+    // An empty list is a real answer — "offer history for everything" — and not a missing setting.
+    let (none, problems) = settings_from("oslo = { suggest = { skip_history = {} } }");
+    assert!(problems.is_empty(), "{problems:?}");
+    assert!(none.suggest.skip_history.is_empty());
+}

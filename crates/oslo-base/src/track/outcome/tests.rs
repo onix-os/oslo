@@ -127,7 +127,7 @@ fn trimming_the_log_takes_the_outcomes_too() {
 }
 
 /// **The one call a replay makes.** Oldest first, each line joined to what it did, in a single
-/// transaction — the store holds no handle open, so three separate reads would be three opens.
+/// transaction so all three buckets are read from one snapshot.
 #[test]
 fn observations_come_back_in_order_with_what_each_line_did() {
     let (_dir, track) = temp_db();

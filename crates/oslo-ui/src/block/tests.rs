@@ -217,3 +217,60 @@ fn the_policy_names_are_the_ones_a_config_writes() {
 fn width_of(s: &str) -> usize {
     crate::dropdown::width::display_width(s)
 }
+
+/// **A counted row must fit the width it was given, counter and all.**
+///
+/// The items were fitted to the whole budget and the ` +N` appended afterwards, so a row that
+/// filled its width exactly overflowed by the counter and the terminal wrapped it — `+76` alone on
+/// the next line, under a row that looked finished. Every width is checked because the failure
+/// only appears when the items happen to land near the edge.
+#[test]
+fn a_counted_row_never_overflows_its_width() {
+    let many: String = (0..90).map(|n| format!("VAR_{n} ")).collect();
+    // From the width where one item and its counter can both fit. Below that a row deliberately
+    // shows one item and overflows rather than saying nothing but `+89`; see `fit_within`.
+    for columns in 24..100 {
+        let mut b = block("direnv ~/p", columns);
+        b.row("added", many.trim()).overflow(Overflow::Count);
+        for line in b.lines() {
+            assert!(
+                crate::dropdown::width::display_width(&line) <= columns,
+                "at width {columns}: {} cells in {line:?}",
+                crate::dropdown::width::display_width(&line),
+            );
+        }
+    }
+}
+
+/// The counter still says the truth once room has been kept for it: shown plus hidden is what
+/// went in, so keeping the row inside its width cannot quietly lose an item.
+#[test]
+fn what_is_shown_and_what_is_counted_still_add_up() {
+    let items: Vec<String> = (0..40).map(|n| format!("V{n}")).collect();
+    let text = items.join(" ");
+    for columns in 24..80 {
+        let mut b = block("head", columns);
+        b.row("added", &text).overflow(Overflow::Count);
+        let line = b.lines().pop().expect("a row");
+        let hidden: usize = line
+            .rsplit_once(" +")
+            .map(|(_, n)| n.trim().parse().expect("a number"))
+            .unwrap_or(0);
+        let shown = items
+            .iter()
+            .filter(|item| line.split_whitespace().any(|word| word == item.as_str()))
+            .count();
+        assert_eq!(shown + hidden, items.len(), "at width {columns}: {line:?}");
+    }
+}
+
+/// Narrower than one item and its counter, a row still says something rather than nothing. The
+/// overflow above is bounded by that promise, not by a missing reservation.
+#[test]
+fn a_row_too_narrow_for_anything_still_shows_one_item() {
+    let mut b = block("head", 12);
+    b.row("added", "ALPHA BETA GAMMA").overflow(Overflow::Count);
+    let line = b.lines().pop().expect("a row");
+    assert!(line.contains("ALPHA"), "{line:?}");
+    assert!(line.ends_with("+2"), "{line:?}");
+}

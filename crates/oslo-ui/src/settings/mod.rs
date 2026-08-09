@@ -10,6 +10,9 @@
 
 use super::matching::Fuzzy;
 
+mod nav;
+pub use nav::{Icons, Nav, TypeNav};
+
 /// Everything configurable that is not a colour.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Settings {
@@ -299,6 +302,16 @@ pub struct Suggest {
     pub accept: Option<String>,
     /// The key that takes one word of it.
     pub accept_word: Option<String>,
+    /// Commands whose past lines are not worth offering back.
+    ///
+    /// **Because their arguments consume themselves.** `rm z` suggested `rm zzz-old-notes` from
+    /// history — a path that does not exist any more, *because the suggested command deleted it*.
+    /// Accepting a ghost is one keystroke, and for `rm` that is one keystroke aiming a destructive
+    /// command at whatever the name happens to match now.
+    ///
+    /// Only the history source is skipped. The filesystem still completes the argument, which is
+    /// the answer that was wanted in the first place.
+    pub skip_history: Vec<String>,
 }
 
 impl Default for Suggest {
@@ -309,6 +322,7 @@ impl Default for Suggest {
             sources: vec![Source::History, Source::Completion, Source::Path],
             accept: None,
             accept_word: None,
+            skip_history: vec!["rm".to_string()],
         }
     }
 }
@@ -354,54 +368,6 @@ impl Default for History {
 pub struct Builtins {
     pub rm: Rm,
     pub nav: Nav,
-}
-
-/// `oslo.builtin.nav` — presentation and navigation defaults for `nav`.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Nav {
-    pub fullscreen: bool,
-    pub position: super::ask::chrome::Place,
-    pub width: usize,
-    pub border: super::ask::Border,
-    pub border_fg: Option<super::theme::Color>,
-    pub border_fit: super::ask::chrome::Fit,
-    pub legend: bool,
-    pub legend_gap: usize,
-    pub padding_x: usize,
-    pub padding_y: usize,
-    /// Zero uses the middle half of a full screen or up to fourteen inline rows.
-    pub height: usize,
-    pub hidden: bool,
-    pub filter_at: super::ask::Where,
-    pub reverse: bool,
-    pub scanner: bool,
-}
-
-impl Default for Nav {
-    fn default() -> Self {
-        Nav {
-            fullscreen: true,
-            position: super::ask::chrome::Place::Center,
-            width: 0,
-            border: super::ask::Border::None,
-            border_fg: None,
-            border_fit: super::ask::chrome::Fit::Content,
-            legend: false,
-            legend_gap: 1,
-            padding_x: 1,
-            padding_y: 0,
-            height: 0,
-            hidden: false,
-            filter_at: super::ask::Where::Bottom,
-            // **Downward, because the path is above it.** A reversed list grows towards the filter
-            // and leaves its unused rows at the top — which is right for the history finder, whose
-            // filter is the only thing above it, and wrong here: those rows land between the path
-            // and the first entry. On a tall terminal that was seven blank lines splitting the
-            // widget in half.
-            reverse: false,
-            scanner: true,
-        }
-    }
 }
 
 /// `oslo.builtin.rm` — what the `rm` builtin does with what it removes.

@@ -2,7 +2,7 @@
 name = "oslo-shell"
 version = "0.2.21"
 edition = "2024"
-rust-version = "1.88"
+rust-version = "1.89"
 license = "MIT"
 description = "oslo's shell: syntax adaptation, expansion, execution, builtins, the structured pipeline and directory environments."
 
