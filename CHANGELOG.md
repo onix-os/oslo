@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.2.27] - 2026-08-09
+
+### <!-- 0 -->⛰️  Features
+
+- Provide parsed shell command data to Lua
+
 ## [0.2.26] - 2026-08-09
 
 ### <!-- 1 -->🐛 Bug Fixes
