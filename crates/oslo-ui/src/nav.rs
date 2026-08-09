@@ -2,11 +2,11 @@
 
 use crate::ask::look::{Row, Step, View};
 use crate::ask::{Inline, Look};
-use crate::dropdown::{human_age, human_mode, human_size};
+use crate::dropdown::{human_age, human_size};
 use crate::matching::{Fuzzed, Fuzzy};
+use crate::settings::Icons;
 use crate::term::{Key, Keys, Pressed, Restore, Screen};
 use crate::{ask, theme};
-use std::os::unix::fs::PermissionsExt;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
@@ -19,6 +19,8 @@ pub struct Navigator {
     /// Zero uses the middle half of a full screen or up to fourteen inline rows.
     pub height: usize,
     pub fuzzy: Fuzzy,
+    /// What is drawn in front of each name; see [`Icons`].
+    pub icons: Icons,
     pub chrome: ask::chrome::Chrome,
     pub look: Look,
 }
@@ -36,7 +38,6 @@ struct Entry {
     directory: bool,
     symlink: bool,
     size: u64,
-    mode: u32,
     modified: SystemTime,
 }
 
@@ -205,7 +206,7 @@ fn read(at: &Path, hidden: bool) -> (Vec<Entry>, Option<String>) {
                 directory: path.is_dir(),
                 symlink: metadata.file_type().is_symlink(),
                 size: metadata.len(),
-                mode: metadata.permissions().mode(),
+
                 modified: metadata.modified().unwrap_or(SystemTime::UNIX_EPOCH),
                 name,
             })
@@ -288,7 +289,7 @@ pub fn open(spec: &Navigator, mut remove: impl FnMut(&Path) -> bool) -> Outcome 
         let rows: Vec<Row> = state
             .shown
             .iter()
-            .map(|&index| row_of(&state.entries[index], ui.question))
+            .map(|&index| row_of(&state.entries[index], ui.question, &spec.icons))
             .collect();
 
         // What the listing would take if nothing were stretched. `cols` is not read for this, and
@@ -299,7 +300,7 @@ pub fn open(spec: &Navigator, mut remove: impl FnMut(&Path) -> bool) -> Outcome 
                 let all: Vec<Row> = state
                     .entries
                     .iter()
-                    .map(|entry| row_of(entry, ui.question))
+                    .map(|entry| row_of(entry, ui.question, &spec.icons))
                     .collect();
                 let width = look
                     .natural_width(
@@ -486,23 +487,26 @@ pub fn open(spec: &Navigator, mut remove: impl FnMut(&Path) -> bool) -> Outcome 
     }
 }
 
-fn row_of(entry: &Entry, directory_style: theme::Style) -> Row {
-    let kind = match (entry.directory, entry.symlink) {
-        (true, true) => "link/",
-        (true, false) => "dir",
-        (false, true) => "link",
-        (false, false) => "file",
-    };
+/// One row: a mark, the name, its size, and how long ago it changed.
+///
+/// **The `dir`/`file` word and the `rwxrwxr-x` mode are gone.** Both were `ls -l` habits rather
+/// than answers anybody wanted here: the kind is already said by the trailing `/` on a directory
+/// and `@` on a link, and nine characters of mode is a question a file browser is rarely asked —
+/// while together they pushed the name a third of the way across the row. What replaces them is
+/// one configurable mark; see [`Icons`].
+fn row_of(entry: &Entry, directory_style: theme::Style, icons: &Icons) -> Row {
     let name = match (entry.directory, entry.symlink) {
         (true, true) => format!("{}@/", entry.name),
         (true, false) => format!("{}/", entry.name),
         (false, true) => format!("{}@", entry.name),
         (false, false) => entry.name.clone(),
     };
+    // In the column the `dir`/`file` word used to hold, so the mark leads the row and lines up
+    // down the list. An icon set to the empty string costs no column at all — `meta` is sized
+    // across the whole listing, so turning the marks off is something the configuration can say.
     Row {
         meta: vec![
-            kind.to_string(),
-            human_mode(entry.mode),
+            icons.of(&entry.name, entry.directory).to_string(),
             human_size(entry.size),
         ],
         trail: format!("  {}", human_age(entry.modified)),

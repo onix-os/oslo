@@ -375,6 +375,65 @@ pub struct Nav {
     pub filter_at: super::ask::Where,
     pub reverse: bool,
     pub scanner: bool,
+    /// What is drawn in front of each name.
+    pub icons: Icons,
+}
+
+/// `oslo.builtin.nav.icons` — the mark in front of a name, and what it is for a given extension.
+///
+/// ```lua
+/// oslo.builtin.nav.icons = {
+///   dir = "■", file = "×",
+///   ext = { rs = "🦀", md = "≡", lua = "☾" },
+/// }
+/// ```
+///
+/// This replaced two columns of `ls -l` that were there because they were easy rather than because
+/// anybody read them: a `dir`/`file` word, which the name already says by ending in `/`, and a
+/// `rwxrwxr-x` mode, which is nine characters answering a question a file browser is rarely asked.
+/// A single mark says the same thing in one column and leaves the row to the name.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Icons {
+    pub directory: String,
+    pub file: String,
+    /// Per-extension marks, extension (without the dot, lowercased) to what is drawn.
+    ///
+    /// A `Vec` in declared order rather than a map, like [`Settings::abbr`]: it is installed once,
+    /// and a map would only add a question about which of two entries for the same extension wins.
+    pub by_extension: Vec<(String, String)>,
+}
+
+impl Default for Icons {
+    fn default() -> Self {
+        Icons {
+            // Geometry rather than a glyph from a patched font: these have to land on a terminal
+            // that has never heard of Nerd Fonts, which is most of the terminals a shell runs in.
+            directory: "■".to_string(),
+            file: "×".to_string(),
+            by_extension: Vec::new(),
+        }
+    }
+}
+
+impl Icons {
+    /// The mark for a name, by extension when one is configured and by kind otherwise.
+    pub fn of(&self, name: &str, directory: bool) -> &str {
+        if directory {
+            return &self.directory;
+        }
+        // `Path::extension` rather than splitting on the last dot: `.gitignore` is a name that
+        // begins with one, not a file with a `gitignore` extension, and it should read as a file.
+        if let Some(extension) = std::path::Path::new(name)
+            .extension()
+            .and_then(|e| e.to_str())
+        {
+            let wanted = extension.to_ascii_lowercase();
+            if let Some((_, icon)) = self.by_extension.iter().find(|(ext, _)| *ext == wanted) {
+                return icon;
+            }
+        }
+        &self.file
+    }
 }
 
 impl Default for Nav {
@@ -400,6 +459,7 @@ impl Default for Nav {
             // widget in half.
             reverse: false,
             scanner: true,
+            icons: Icons::default(),
         }
     }
 }

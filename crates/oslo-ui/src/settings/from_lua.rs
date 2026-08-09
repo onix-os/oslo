@@ -306,6 +306,32 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
         if let Some(n) = number(&nav, "padding_y") {
             settings.padding_y = n.max(0) as usize;
         }
+        if let Value::Table(icons) = nav.get(&Value::str("icons")) {
+            let icons = icons.borrow();
+            if let Value::Str(mark) = icons.get(&Value::str("dir")) {
+                settings.icons.directory = mark.to_string();
+            }
+            if let Value::Str(mark) = icons.get(&Value::str("file")) {
+                settings.icons.file = mark.to_string();
+            }
+            if let Value::Table(by_extension) = icons.get(&Value::str("ext")) {
+                for (key, value) in by_extension.borrow().pairs() {
+                    match (&key, &value) {
+                        // Lowercased once here rather than at every row: an extension is matched
+                        // case-insensitively, and `README.MD` should read like `readme.md`.
+                        (Value::Str(extension), Value::Str(mark)) => settings
+                            .icons
+                            .by_extension
+                            .push((extension.to_ascii_lowercase(), mark.to_string())),
+                        _ => problems.push(
+                            "oslo.builtin.nav.icons.ext: every entry must be an extension \
+                             mapped to what to draw"
+                                .to_string(),
+                        ),
+                    }
+                }
+            }
+        }
         if let Value::Str(name) = nav.get(&Value::str("position")) {
             settings.position = match name.as_ref() {
                 "top" | "start" => crate::ask::chrome::Place::Start,
