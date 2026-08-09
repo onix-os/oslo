@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.2.25] - 2026-08-09
+
+### <!-- 0 -->⛰️  Features
+
+- Align history subcommand help
+- Add portable sync tooling
+- Show a slow rc file working as it works
+- Switched the DB
+- Type a name and walk into it
+- A configurable mark instead of mode and kind
+
+### <!-- 1 -->🐛 Bug Fixes
+
+- Rm never offers a path it already deleted
+- Keep room for the +N a counted row adds
+- Read one scan, not two halves of different ones
+
 ## Unreleased
 
 ### <!-- 2 -->🚜 Refactor
