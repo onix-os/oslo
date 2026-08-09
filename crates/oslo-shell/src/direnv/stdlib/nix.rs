@@ -36,13 +36,16 @@ pub fn use_dispatch(env: &mut Environment, args: &[String]) -> Result<i32> {
 
 /// `use flake [installable]` — the environment of a flake's dev shell.
 pub fn use_flake(env: &mut Environment, args: &[String]) -> Result<i32> {
-    let installable = args.get(1).map(String::as_str).unwrap_or(".");
+    // Everything after `use flake` belongs to `nix print-dev-env`, installable and flags alike —
+    // `use flake --option warn-dirty false` is a real line in a real `.envrc`. Reading the first
+    // one as the installable passed `--option` to nix as a flake to build.
+    let forwarded = &args[1.min(args.len())..];
     // Both, and before the work: a `flake.lock` that moves is a different dev shell, and a file
     // that fails to build should still reload when you fix the flake that broke it.
     let base = here();
     watch(&base.join("flake.nix"));
     watch(&base.join("flake.lock"));
-    match devshell::apply(env, installable) {
+    match devshell::apply(env, forwarded) {
         Ok(count) => {
             eprintln!("direnv: use flake: {count} variables");
             Ok(0)
@@ -62,8 +65,8 @@ pub fn use_nix(env: &mut Environment, args: &[String]) -> Result<i32> {
     for name in ["shell.nix", "default.nix"] {
         watch(&base.join(name));
     }
-    let installable = args.get(1).map(String::as_str).unwrap_or(".");
-    match devshell::apply(env, installable) {
+    let forwarded = &args[1.min(args.len())..];
+    match devshell::apply(env, forwarded) {
         Ok(count) => {
             eprintln!("direnv: use nix: {count} variables");
             Ok(0)

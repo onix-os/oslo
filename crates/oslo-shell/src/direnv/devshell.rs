@@ -153,13 +153,26 @@ fn keeping_yours(dev: &str, outer: &str) -> String {
 /// `--profile` is not decoration: without it the dev shell's store paths have no GC root, and the
 /// next `nix store gc` deletes the toolchain out from under a directory that still points at it.
 /// direnv puts the profile under its layout directory and so do we.
-pub fn command(installable: &str, profile: &str) -> String {
-    format!(
-        "nix --extra-experimental-features 'nix-command flakes' print-dev-env --json \
-         --profile {} {}",
+///
+/// **`args` is passed through verbatim, and nothing here reads it.** direnv's `use_flake` ends in
+/// `nix print-dev-env --profile "$profile" "$@"`, which is what makes
+/// `use flake --option warn-dirty false` work: the flags are nix's, not direnv's. Taking the first
+/// argument as the installable instead turned that line into `print-dev-env … '--option'` and nix
+/// answered "flag '--option' requires 2 argument(s), but only 0 were given" — a message about a
+/// flag the `.envrc` never asked to be alone.
+///
+/// An empty list is left empty rather than defaulting to `.`: `print-dev-env` already resolves the
+/// current directory's flake, which is how a bare `use flake` works in direnv too.
+pub fn command(args: &[String], profile: &str) -> String {
+    let mut out = format!(
+        "nix --extra-experimental-features 'nix-command flakes' print-dev-env --json --profile {}",
         shell_quote(profile),
-        shell_quote(installable)
-    )
+    );
+    for arg in args {
+        out.push(' ');
+        out.push_str(&shell_quote(arg));
+    }
+    out
 }
 
 fn shell_quote(word: &str) -> String {
@@ -191,12 +204,12 @@ pub fn profile() -> String {
 /// The files that decide what the dev shell contains.
 const INPUTS: &[&str] = &["flake.nix", "flake.lock", "shell.nix", "default.nix"];
 
-/// What the cached answer was computed from: the installable, and every input as it stood.
+/// What the cached answer was computed from: the arguments, and every input as it stood.
 ///
 /// Length and mtime, the same pair the rc files are stamped with and for the same reason — mtime
 /// alone has one-second granularity on some filesystems.
-fn key(root: &Path, installable: &str) -> String {
-    let mut key = format!("1 {installable}");
+fn key(root: &Path, args: &[String]) -> String {
+    let mut key = format!("1 {}", args.join(" "));
     for name in INPUTS {
         let stamp = std::fs::metadata(root.join(name))
             .ok()
@@ -230,20 +243,20 @@ fn cache(root: &Path) -> PathBuf {
 /// Keyed on the inputs rather than timed out, so editing `flake.nix` re-evaluates immediately and
 /// nothing else does. `direnv reload` drops it outright, which is the escape hatch for the case
 /// this cannot see: nix itself, or something the flake reads that is not one of [`INPUTS`].
-fn cached(installable: &str) -> Option<String> {
+fn cached(args: &[String]) -> Option<String> {
     let root = root();
     let text = std::fs::read_to_string(cache(&root)).ok()?;
     let (head, body) = text.split_once('\n')?;
-    (head == key(&root, installable)).then(|| body.to_string())
+    (head == key(&root, args)).then(|| body.to_string())
 }
 
-fn remember(installable: &str, json: &str) {
+fn remember(args: &[String], json: &str) {
     let root = root();
     let path = cache(&root);
     if let Some(parent) = path.parent() {
         let _ = std::fs::create_dir_all(parent);
     }
-    if std::fs::write(&path, format!("{}\n{json}", key(&root, installable))).is_err() {
+    if std::fs::write(&path, format!("{}\n{json}", key(&root, args))).is_err() {
         return;
     }
     // **Owner-only.** This is a verbatim dump of a dev shell's environment, which for a good many
@@ -258,17 +271,16 @@ pub fn forget() {
     let _ = std::fs::remove_file(cache(&root()));
 }
 
-/// Run `nix print-dev-env` for `installable` and apply what it exports. Answers how many.
+/// Run `nix print-dev-env` with `args` and apply what it exports. Answers how many.
 ///
 /// The one implementation, called by `use flake` from an `.envrc` and by
 /// `oslo.direnv.nix_develop()` from a `.env.lua`.
-pub fn apply(env: &mut Environment, installable: &str) -> Result<usize, String> {
-    let json = match cached(installable) {
+pub fn apply(env: &mut Environment, args: &[String]) -> Result<usize, String> {
+    let json = match cached(args) {
         Some(remembered) => remembered,
         None => {
-            let fresh =
-                crate::exec::eval_command_substitution(env, &command(installable, &profile()))
-                    .map_err(|e| e.to_string())?;
+            let fresh = crate::exec::eval_command_substitution(env, &command(args, &profile()))
+                .map_err(|e| e.to_string())?;
             if fresh.trim().is_empty() {
                 return Err(
                     "`nix print-dev-env` produced nothing — is nix installed, and does this \
@@ -279,7 +291,7 @@ pub fn apply(env: &mut Environment, installable: &str) -> Result<usize, String> 
             // Written only after it parses, so a truncated or error-shaped answer is not the thing
             // every later arrival is served from.
             exported_from(&fresh)?;
-            remember(installable, &fresh);
+            remember(args, &fresh);
             fresh
         }
     };
@@ -336,7 +348,7 @@ mod tests {
 
     #[test]
     fn the_command_names_a_profile_and_quotes_its_arguments() {
-        let got = command("..#dev shell", ".direnv/flake-profile");
+        let got = command(&[String::from("..#dev shell")], ".direnv/flake-profile");
         assert!(got.contains("--profile '.direnv/flake-profile'"));
         assert!(got.ends_with("'..#dev shell'"));
     }
@@ -364,24 +376,79 @@ mod tests {
         let root = project.path();
         std::fs::write(root.join("flake.nix"), "{ }").expect("write");
 
-        let first = key(root, ".");
-        assert_eq!(first, key(root, "."), "nothing changed, nothing to re-do");
-        assert_ne!(first, key(root, "..#other"), "another shell, another key");
+        let first = key(root, &[String::from(".")]);
+        assert_eq!(
+            first,
+            key(root, &[String::from(".")]),
+            "nothing changed, nothing to re-do"
+        );
+        assert_ne!(
+            first,
+            key(root, &[String::from("..#other")]),
+            "another shell, another key"
+        );
 
         std::fs::write(root.join("flake.nix"), "{ inputs = {}; }").expect("write");
-        assert_ne!(first, key(root, "."), "an edited flake must re-evaluate");
+        assert_ne!(
+            first,
+            key(root, &[String::from(".")]),
+            "an edited flake must re-evaluate"
+        );
     }
 
     /// A project with no flake at all still has a stable key rather than a changing one.
     #[test]
     fn a_project_with_no_inputs_is_still_answerable() {
         let project = tempfile::tempdir().expect("temp dir");
-        assert_eq!(key(project.path(), "."), key(project.path(), "."));
+        assert_eq!(
+            key(project.path(), &[String::from(".")]),
+            key(project.path(), &[String::from(".")])
+        );
     }
 
     #[test]
     fn output_that_is_not_print_dev_env_is_refused_by_name() {
         let problem = exported_from(r#"{"nope":1}"#).expect_err("refused");
         assert!(problem.contains("print-dev-env"), "{problem}");
+    }
+}
+
+#[cfg(test)]
+mod command_tests {
+    use super::command;
+
+    fn args(list: &[&str]) -> Vec<String> {
+        list.iter().map(|s| (*s).to_string()).collect()
+    }
+
+    /// `use flake --option warn-dirty false` is a real line in a real `.envrc`, and every word
+    /// after `use flake` belongs to `nix`. Reading the first one as the installable sent nix a
+    /// lone `--option`, which it rejects for wanting two arguments it was never given.
+    #[test]
+    fn every_argument_reaches_nix_in_order() {
+        let built = command(
+            &args(&["--option", "warn-dirty", "false"]),
+            "/p/flake-profile",
+        );
+        assert!(
+            built.ends_with("'--option' 'warn-dirty' 'false'"),
+            "{built}"
+        );
+        assert!(built.contains("--profile '/p/flake-profile'"), "{built}");
+    }
+
+    /// A bare `use flake` names nothing, and `print-dev-env` resolves this directory itself —
+    /// which is what direnv relies on, its `"$@"` being empty in exactly this case.
+    #[test]
+    fn no_arguments_means_no_installable_rather_than_a_dot() {
+        let built = command(&[], "/p/flake-profile");
+        assert!(built.ends_with("--profile '/p/flake-profile'"), "{built}");
+    }
+
+    /// A named installable still arrives, and quoting survives a word that would otherwise split.
+    #[test]
+    fn an_installable_and_an_awkward_word_are_quoted() {
+        let built = command(&args(&[".#other", "a b"]), "/p");
+        assert!(built.ends_with("'.#other' 'a b'"), "{built}");
     }
 }

@@ -58,13 +58,15 @@ fn nix_develop(it: &mut Table, env: &Arc<Mutex<Environment>>) {
     put(it, "nix_develop", move |_, args| {
         // `oslo.direnv.nix_develop()` means this directory's flake; a string names another installable,
         // exactly as `use flake ..#other` does.
-        let installable = match args.first() {
-            Some(Value::Str(_)) => text(&args, 1, "oslo.direnv.nix_develop")?.to_string(),
-            _ => ".".to_string(),
+        let forwarded = match args.first() {
+            Some(Value::Str(_)) => vec![text(&args, 1, "oslo.direnv.nix_develop")?.to_string()],
+            // Nothing named: `print-dev-env` resolves this directory's flake by itself, which is
+            // what a bare `use flake` relies on too.
+            _ => Vec::new(),
         };
         let count = {
             let mut guard = crate::lua::engine::borrow_env(&env)?;
-            devshell::apply(&mut guard, &installable)
+            devshell::apply(&mut guard, &forwarded)
                 .map_err(|e| LuaError::new(format!("oslo.direnv.nix_develop: {e}")))?
         };
         Ok(vec![Value::Number(oslo_lua::Number::Int(count as i64))])
