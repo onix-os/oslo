@@ -52,4 +52,3 @@ compile_commands.json
 # The other directories cargo builds from, so no global pattern can quietly empty one of them.
 !bench/**
 !tests/**
-!examples/**

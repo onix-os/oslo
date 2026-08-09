@@ -250,9 +250,7 @@ fn the_sweep_is_the_only_thing_holding_the_file_down() {
 
     assert!(track.sweep() >= 200);
     assert_eq!(rows(&track, Tree::Run), RUNS_PER_DIR);
-    // One file, and nothing beside it: the `-wal` this module used to exist to truncate is not
-    // there to be forgotten.
-    let beside: Vec<String> = std::fs::read_dir(dir.path().join("nested"))
+    let mut beside: Vec<String> = std::fs::read_dir(dir.path().join("nested"))
         .expect("the directory is there")
         .map(|entry| {
             entry
@@ -262,7 +260,11 @@ fn the_sweep_is_the_only_thing_holding_the_file_down() {
                 .into_owned()
         })
         .collect();
-    assert_eq!(beside, vec!["track.kv".to_string()]);
+    beside.sort();
+    assert_eq!(
+        beside,
+        vec!["track.kv".to_string(), "track.kv.lock".to_string()]
+    );
 }
 
 /// A file written by a version this binary does not understand is read, never rewritten — and

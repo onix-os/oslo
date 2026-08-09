@@ -1,10 +1,11 @@
 //! Tracking database file validation and permissions.
 
-use std::fs::Permissions;
-use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
-use std::path::Path;
+use std::fs::{File, OpenOptions as FileOpenOptions, Permissions};
+use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt, PermissionsExt};
+use std::panic::{AssertUnwindSafe, catch_unwind};
+use std::path::{Path, PathBuf};
 
-use tagdata::FormatInfo;
+use tagdata::{DB, FormatInfo, OpenOptions};
 
 /// The mode of the tracking database.
 pub(super) const PRIVATE: u32 = 0o600;
@@ -14,6 +15,39 @@ pub(super) const PRIVATE_DIR: u32 = 0o700;
 
 /// The page size used for new tracking databases.
 pub(super) const PAGE_SIZE: u64 = 4096;
+
+pub(super) fn open(path: &Path) -> Option<DB> {
+    if !is_a_database(path) {
+        return None;
+    }
+    catch_unwind(AssertUnwindSafe(|| {
+        OpenOptions::new().pagesize(PAGE_SIZE).open(path).ok()
+    }))
+    .ok()
+    .flatten()
+}
+
+/// Locks database initialization.
+pub(super) fn open_lock(path: &Path) -> Option<File> {
+    prepare_directory(path)?;
+    let lock_path = lock_path(path);
+    let lock = FileOpenOptions::new()
+        .read(true)
+        .write(true)
+        .create(true)
+        .mode(PRIVATE)
+        .open(&lock_path)
+        .ok()?;
+    make_private(&lock_path)?;
+    lock.lock().ok()?;
+    Some(lock)
+}
+
+fn lock_path(path: &Path) -> PathBuf {
+    let mut lock_path = path.as_os_str().to_os_string();
+    lock_path.push(".lock");
+    lock_path.into()
+}
 
 /// Creates the database directory and restricts it to the current user.
 pub(super) fn prepare_directory(path: &Path) -> Option<()> {

@@ -25,7 +25,6 @@ CARGO := cargo
 TARGET ?= x86_64-unknown-linux-musl
 STATIC_RUSTFLAGS := -C target-feature=+crt-static
 BIN := target/$(TARGET)/release/$(PROJECT_NAME)
-EXAMPLE ?= main
 PREFIX ?= $(HOME)/.local
 
 HAS_REL := $(shell command -v git-rel 2>/dev/null)
@@ -34,7 +33,7 @@ $(info ------------------------------------------)
 $(info Project: $(PROJECT_NAME) v$(PROJECT_VERSION))
 $(info ------------------------------------------)
 
-.PHONY: build b dev check-static compile c run r example test test-terminal t check check-all test-all check-loc check-readme print-name clippy rustdoc fmt fmt-check clean verify vm vm-distro vm-arch install uninstall release help h
+.PHONY: build b dev check-static compile c run r test test-terminal t check check-all test-all check-loc check-readme print-name clippy rustdoc fmt fmt-check clean verify vm vm-distro vm-arch install uninstall release help h
 
 build:
 	@RUSTFLAGS="$(STATIC_RUSTFLAGS)" $(CARGO) build --release --target $(TARGET) --bin $(PROJECT_NAME)
@@ -73,9 +72,6 @@ run:
 	@$(CARGO) run --bin $(PROJECT_NAME) -- $(ARGS)
 
 r: run
-
-example:
-	@$(CARGO) run --example $(EXAMPLE)
 
 # oslo's own crates, and not the vendored ones.
 #
@@ -198,10 +194,9 @@ help:
 	@echo "Usage: make [target]"
 	@echo
 	@echo "Available targets:"
-	@echo "  build        Build the shell and library"
+	@echo "  build        Build the release binary"
 	@echo "  compile      Clean and rebuild"
 	@echo "  run          Run the shell (make run ARGS='-c \"echo hi\"')"
-	@echo "  example      Run a development example (make example EXAMPLE=main)"
 	@echo "  test         Run all tests"
 	@echo "  test-terminal Run terminal PTY transcript tests"
 	@echo "  check        Run cargo check on all targets"
