@@ -38,3 +38,18 @@ compile_commands.json
 # repository. A directory has to be re-included before anything inside it can be.
 !src/**/
 !src/**
+
+# **And `crates/`, for the same reason.** The rules above were written for a tree where all the
+# source lived in `src/`; the six-crate split moved most of it to `crates/` and these
+# re-inclusions did not follow. `crates/oslo-shell/src/data/custom.rs` then matched the global
+# `**/data` rule, was never added, and CI failed to compile a file that existed on one machine —
+# the same failure the comment above describes, in its new home.
+#
+# `vendor/` is deliberately not listed: it is somebody else's code and is added explicitly.
+!crates/**/
+!crates/**
+
+# The other directories cargo builds from, so no global pattern can quietly empty one of them.
+!bench/**
+!tests/**
+!examples/**
