@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.2.23] - 2026-08-09
+
+### <!-- 1 -->🐛 Bug Fixes
+
+- Never swap in a prompt of another width
+- Add the source file a global ignore swallowed
+
 ## [0.2.22] - 2026-08-09
 
 ### <!-- 1 -->🐛 Bug Fixes
