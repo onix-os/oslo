@@ -1,7 +1,7 @@
 //! Tracking database file validation and permissions.
 
 use std::fs::Permissions;
-use std::os::unix::fs::PermissionsExt;
+use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
 use std::path::Path;
 
 use tagdata::FormatInfo;
@@ -28,6 +28,45 @@ pub(super) fn prepare_directory(path: &Path) -> Option<()> {
 /// Restricts the database file to the current user.
 pub(super) fn make_private(path: &Path) -> Option<()> {
     std::fs::set_permissions(path, Permissions::from_mode(PRIVATE)).ok()
+}
+
+pub(super) fn backup(db: &tagdata::DB, destination: &Path) -> Result<(), String> {
+    if destination.exists() {
+        return Err(format!("{}: output already exists", destination.display()));
+    }
+    let parent = destination
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
+    let mut nonce = [0; 8];
+    getrandom::fill(&mut nonce)
+        .map_err(|error| format!("cannot name backup staging directory: {error}"))?;
+    let staging_dir = parent.join(format!(
+        ".oslo-backup-{}-{:016x}",
+        std::process::id(),
+        u64::from_ne_bytes(nonce)
+    ));
+    std::fs::DirBuilder::new()
+        .mode(PRIVATE_DIR)
+        .create(&staging_dir)
+        .map_err(|error| format!("{}: {error}", staging_dir.display()))?;
+    let staged = staging_dir.join("snapshot.kv");
+    let result = (|| {
+        db.backup_to(&staged)
+            .map_err(|error| format!("{}: {error}", destination.display()))?;
+        make_private(&staged)
+            .ok_or_else(|| format!("{}: cannot set mode 0600", destination.display()))?;
+        std::fs::hard_link(&staged, destination)
+            .map_err(|error| format!("{}: {error}", destination.display()))?;
+        if let Err(error) = std::fs::File::open(parent).and_then(|dir| dir.sync_all()) {
+            let _ = std::fs::remove_file(destination);
+            return Err(format!("{}: {error}", parent.display()));
+        }
+        Ok(())
+    })();
+    let _ = std::fs::remove_file(&staged);
+    let _ = std::fs::remove_dir(&staging_dir);
+    result
 }
 
 /// Whether `path` is absent or contains a supported Tagdata database.
@@ -70,6 +109,20 @@ mod tests {
             .expect("the database opens");
 
         assert!(is_a_database(&path));
+    }
+
+    #[test]
+    fn another_tagdata_page_size_is_refused() {
+        let dir = tempfile::tempdir().expect("a temp dir");
+        let path = dir.path().join("other-page-size.kv");
+        let db = tagdata::OpenOptions::new()
+            .pagesize(8192)
+            .open(&path)
+            .expect("the fixture opens");
+        drop(db);
+
+        assert!(!is_a_database(&path));
+        assert!(super::super::Store::open_existing(&path, true).is_err());
     }
 
     #[test]

@@ -13,7 +13,9 @@ pub use range::{Span, upper_bound};
 
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::path::{Path, PathBuf};
-use tagdata::{DB, Data, OpenOptions, Tx};
+use tagdata::{
+    DB, Data, Error as TagdataError, MergeConflictPolicy, MergeOptions, OpenOptions, Tx,
+};
 
 /// The buckets in the tracking database.
 ///
@@ -52,6 +54,12 @@ pub enum Tree {
     /// itself; `1..` are its links. Keyed with the *same* descending encoding as `History`, so one
     /// threshold trims both and the two can never drift apart.
     Outcome,
+    /// Stable portable history events shared between databases.
+    SyncEvent,
+    /// Local history ids mapped to stable event ids.
+    HistoryEvent,
+    /// Stable event ids mapped to local projection state.
+    EventProjection,
 }
 
 impl Tree {
@@ -67,11 +75,14 @@ impl Tree {
             Tree::Meta => "meta",
             Tree::History => "hist",
             Tree::Outcome => "out",
+            Tree::SyncEvent => "sync_event",
+            Tree::HistoryEvent => "hist_event",
+            Tree::EventProjection => "event_projection",
         }
     }
 
     /// Every bucket, for a sweep or a migration that has to visit all of them.
-    pub fn all() -> [Tree; 9] {
+    pub fn all() -> [Tree; 12] {
         [
             Tree::Dir,
             Tree::DirByPath,
@@ -82,6 +93,9 @@ impl Tree {
             Tree::Meta,
             Tree::History,
             Tree::Outcome,
+            Tree::SyncEvent,
+            Tree::HistoryEvent,
+            Tree::EventProjection,
         ]
     }
 }
@@ -110,6 +124,16 @@ pub enum Walk {
 pub struct Store {
     path: PathBuf,
     db: DB,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct StoreStats {
+    pub file_bytes: u64,
+    pub page_size: u64,
+    pub allocated_pages: u64,
+    pub free_pages: u64,
+    pub pending_pages: u64,
+    pub active_readers: u64,
 }
 
 impl std::fmt::Debug for Store {
@@ -144,6 +168,32 @@ impl Store {
         })
     }
 
+    pub fn open_existing(path: &Path, read_only: bool) -> Result<Store, String> {
+        if !path.is_file() {
+            return Err(format!("{}: database does not exist", path.display()));
+        }
+        let info = tagdata::FormatInfo::inspect(path)
+            .map_err(|error| format!("{}: {error}", path.display()))?;
+        if info.page_size != file::PAGE_SIZE {
+            return Err(format!(
+                "{}: page size {} is not supported",
+                path.display(),
+                info.page_size
+            ));
+        }
+        let mut options = OpenOptions::new().pagesize(file::PAGE_SIZE);
+        if read_only {
+            options = options.read_only();
+        }
+        let db = catch_unwind(AssertUnwindSafe(|| options.open(path)))
+            .map_err(|_| format!("{}: database open panicked", path.display()))?
+            .map_err(|error| format!("{}: {error}", path.display()))?;
+        Ok(Store {
+            path: path.to_path_buf(),
+            db,
+        })
+    }
+
     /// Where the store is.
     pub fn path(&self) -> &Path {
         &self.path
@@ -156,6 +206,26 @@ impl Store {
             .unwrap_or(0)
     }
 
+    pub fn verify(&self) -> Result<(), String> {
+        self.db
+            .verify()
+            .map_err(|error| format!("{}: {error}", self.path.display()))
+    }
+
+    pub fn stats(&self) -> Result<StoreStats, String> {
+        self.db
+            .stats()
+            .map(|stats| StoreStats {
+                file_bytes: stats.file_bytes,
+                page_size: stats.page_size,
+                allocated_pages: stats.allocated_pages,
+                free_pages: stats.free_pages,
+                pending_pages: stats.pending_pages,
+                active_readers: stats.active_readers,
+            })
+            .map_err(|error| format!("{}: {error}", self.path.display()))
+    }
+
     /// Read from the store.
     ///
     /// The transaction is opened, `work` is run against it and it is dropped. A read transaction is
@@ -165,6 +235,18 @@ impl Store {
         catch_unwind(AssertUnwindSafe(|| work(&Reader { tx: &tx })))
             .ok()
             .flatten()
+    }
+
+    pub fn read_checked<T>(
+        &self,
+        work: impl FnOnce(&Reader<'_, '_>) -> Result<T, String>,
+    ) -> Result<T, String> {
+        let tx = self
+            .db
+            .tx(false)
+            .map_err(|error| format!("{}: {error}", self.path.display()))?;
+        catch_unwind(AssertUnwindSafe(|| work(&Reader { tx: &tx })))
+            .map_err(|_| format!("{}: read transaction panicked", self.path.display()))?
     }
 
     /// Write to the store, committing when `work` answers `Some` and discarding when it answers
@@ -185,6 +267,95 @@ impl Store {
         .ok()
         .flatten()?;
         tx.commit().ok().map(|()| value)
+    }
+
+    pub fn write_checked<T>(
+        &self,
+        work: impl FnOnce(&Writer<'_, '_>) -> Result<T, String>,
+    ) -> Result<T, String> {
+        let tx = self
+            .db
+            .tx(true)
+            .map_err(|error| format!("{}: {error}", self.path.display()))?;
+        let value = catch_unwind(AssertUnwindSafe(|| {
+            let writer = Writer(Reader { tx: &tx });
+            work(&writer)
+        }))
+        .map_err(|_| format!("{}: write transaction panicked", self.path.display()))??;
+        tx.commit()
+            .map_err(|error| format!("{}: {error}", self.path.display()))?;
+        Ok(value)
+    }
+
+    pub fn merge_sync_from(
+        &self,
+        source: &Store,
+        overwrite: bool,
+        destination_wins: impl Fn(&[u8], &[u8], &[u8]) -> Result<bool, String>,
+    ) -> Result<(), String> {
+        let source_tx = source
+            .db
+            .tx(false)
+            .map_err(|error| format!("{}: {error}", source.path.display()))?;
+        let source_bucket = match source_tx.get_bucket(Tree::SyncEvent.name()) {
+            Ok(bucket) => bucket,
+            Err(TagdataError::BucketMissing) => return Ok(()),
+            Err(error) => return Err(format!("{}: {error}", source.path.display())),
+        };
+        let destination_tx = self
+            .db
+            .tx(true)
+            .map_err(|error| format!("{}: {error}", self.path.display()))?;
+        let destination = destination_tx
+            .get_or_create_bucket(Tree::SyncEvent.name())
+            .map_err(|error| format!("{}: {error}", self.path.display()))?;
+        let policy = if overwrite {
+            MergeConflictPolicy::Overwrite
+        } else {
+            MergeConflictPolicy::KeepExisting
+        };
+        let mut preserved = Vec::new();
+        if overwrite {
+            for data in source_bucket.cursor() {
+                let Data::KeyValue(source_pair) = data else {
+                    continue;
+                };
+                let Some(Data::KeyValue(destination_pair)) = destination.get(source_pair.key())
+                else {
+                    continue;
+                };
+                if destination_wins(
+                    source_pair.key(),
+                    destination_pair.value(),
+                    source_pair.value(),
+                )? {
+                    preserved.push((
+                        source_pair.key().to_vec(),
+                        destination_pair.value().to_vec(),
+                    ));
+                }
+            }
+        }
+        destination
+            .merge_from(&source_bucket, MergeOptions::new().conflict_policy(policy))
+            .map_err(|error| format!("{}: {error}", self.path.display()))?;
+        for (key, value) in preserved {
+            destination
+                .put(key, value)
+                .map_err(|error| format!("{}: {error}", self.path.display()))?;
+        }
+        destination_tx
+            .commit()
+            .map_err(|error| format!("{}: {error}", self.path.display()))
+    }
+
+    pub fn backup_to(&self, destination: &Path) -> Result<(), String> {
+        file::backup(&self.db, destination)
+    }
+
+    pub fn ensure_private(&self) -> Result<(), String> {
+        file::make_private(&self.path)
+            .ok_or_else(|| format!("{}: cannot set mode 0600", self.path.display()))
     }
 
     /// Remove every row in `span`, a small chunk to a transaction, and answer how many went.

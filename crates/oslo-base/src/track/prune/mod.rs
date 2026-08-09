@@ -76,7 +76,54 @@ const RUNS_PER_DIR: usize = 500;
 /// than one `fsync` per directory.
 const CHUNK: usize = 256;
 
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct PrunePreview {
+    pub run_rows: usize,
+    pub missing_directories: usize,
+    pub expired_directories: usize,
+}
+
 impl Track {
+    pub fn sweep_preview(&self) -> PrunePreview {
+        let at = now();
+        let mut runs = self
+            .store
+            .read(|reader| Some(stale_runs(reader, at - RUN_MAX_AGE)))
+            .unwrap_or_default();
+        runs.extend(
+            self.store
+                .read(|reader| Some(over_the_cap(reader)))
+                .unwrap_or_default(),
+        );
+        runs.sort();
+        runs.dedup();
+        let directories: Vec<DirRow> = self
+            .store
+            .read(|reader| {
+                Some(reader.collect(Tree::Dir, &Span::all(), |_, value| {
+                    let row = DirRow::decode(value)?;
+                    (!row.remote).then_some(row)
+                }))
+            })
+            .unwrap_or_default();
+        let missing_directories = directories
+            .iter()
+            .filter(|row| !Path::new(&row.path).is_dir())
+            .count();
+        let expired_directories = directories
+            .iter()
+            .filter(|row| {
+                row.missing_since
+                    .is_some_and(|since| since < at - GONE_MAX_AGE)
+            })
+            .count();
+        PrunePreview {
+            run_rows: runs.len(),
+            missing_directories,
+            expired_directories,
+        }
+    }
+
     /// Run the sweep now, whatever the stamp says.
     ///
     /// Answers how many `run` rows it removed, which is only of interest to a test — nothing in the
@@ -151,7 +198,11 @@ impl Track {
             .store
             .read(|reader| {
                 Some(reader.collect(Tree::Dir, &Span::all(), |key, value| {
-                    Some((field::leading_id(key)?, DirRow::decode(value)?.path))
+                    let row = DirRow::decode(value)?;
+                    if row.remote {
+                        return None;
+                    }
+                    Some((field::leading_id(key)?, row.path))
                 }))
             })
             .unwrap_or_default();
@@ -177,7 +228,8 @@ impl Track {
             .read(|reader| {
                 Some(reader.collect(Tree::Dir, &Span::all(), |key, value| {
                     let row = DirRow::decode(value)?;
-                    (row.missing_since? < at - GONE_MAX_AGE).then(|| field::leading_id(key))?
+                    (!row.remote && row.missing_since? < at - GONE_MAX_AGE)
+                        .then(|| field::leading_id(key))?
                 }))
             })
             .unwrap_or_default();

@@ -66,6 +66,8 @@ pub(super) struct DirRow {
     pub dwell_ms: i64,
     /// When the directory was first noticed to be gone, or `None` while it is still there.
     pub missing_since: Option<i64>,
+    pub host: String,
+    pub remote: bool,
 }
 
 impl DirRow {
@@ -79,6 +81,27 @@ impl DirRow {
             last_visit: 0,
             dwell_ms: 0,
             missing_since: None,
+            host: super::session::host(),
+            remote: false,
+        }
+    }
+
+    pub fn imported(path: &str, root: Option<&str>, host: &str) -> DirRow {
+        let trimmed = path.trim_end_matches('/');
+        let base = trimmed
+            .rsplit_once('/')
+            .map_or(trimmed, |(_, base)| base)
+            .to_lowercase();
+        DirRow {
+            path: path.to_string(),
+            base,
+            root: root.map(str::to_string),
+            visits: 0,
+            last_visit: 0,
+            dwell_ms: 0,
+            missing_since: None,
+            host: host.to_string(),
+            remote: true,
         }
     }
 
@@ -91,6 +114,8 @@ impl DirRow {
             .text(&self.path)
             .text(&self.base)
             .text(self.root.as_deref().unwrap_or(""))
+            .text(&self.host)
+            .int(u64::from(self.remote))
             .done()
     }
 
@@ -103,6 +128,11 @@ impl DirRow {
         let path = fields.text()?.into_owned();
         let base = fields.text()?.into_owned();
         let root = fields.text()?;
+        let host = fields
+            .text()
+            .map(|host| host.into_owned())
+            .unwrap_or_default();
+        let remote = fields.int().unwrap_or(0) != 0;
         Some(DirRow {
             path,
             base,
@@ -111,6 +141,8 @@ impl DirRow {
             last_visit,
             dwell_ms,
             missing_since,
+            host,
+            remote,
         })
     }
 }
@@ -172,6 +204,8 @@ impl RunRow {
         self.last_status = next.last_status;
         self.total_ms += next.total_ms;
         self.max_ms = self.max_ms.max(next.max_ms);
+        self.session = next.session.clone();
+        self.host = next.host.clone();
     }
 
     /// Whether this line is worth offering back.

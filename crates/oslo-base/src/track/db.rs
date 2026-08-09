@@ -48,7 +48,7 @@ use std::sync::Mutex;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 /// The schema this binary writes.
-pub const SCHEMA_VERSION: i64 = 2;
+pub const SCHEMA_VERSION: i64 = 3;
 
 /// The largest single contribution to `dwell_ms` or `total_ms`.
 ///
@@ -182,11 +182,44 @@ impl Track {
         let found = store.read(|r| Some(meta(r, SCHEMA).unwrap_or(0)))?;
         let writable = found <= SCHEMA_VERSION;
         if writable && found != SCHEMA_VERSION {
-            store.write(|w| set_meta(w, SCHEMA, SCHEMA_VERSION))?;
+            super::sync::migrate(&store, found)?;
         }
         Some(Track {
             store,
             writable,
+            since_trim: std::sync::atomic::AtomicUsize::new(0),
+            current: Mutex::new(None),
+            home: std::env::var("HOME").ok().filter(|home| !home.is_empty()),
+        })
+    }
+
+    pub fn open_existing(path: &Path, read_only: bool) -> Result<Track, String> {
+        Self::open_existing_mode(path, read_only, !read_only)
+    }
+
+    pub(super) fn open_existing_unmodified(path: &Path, read_only: bool) -> Result<Track, String> {
+        Self::open_existing_mode(path, read_only, false)
+    }
+
+    fn open_existing_mode(
+        path: &Path,
+        read_only: bool,
+        ensure_private: bool,
+    ) -> Result<Track, String> {
+        let store = Store::open_existing(path, read_only)?;
+        let found = store.read_checked(|reader| Ok(meta(reader, SCHEMA).unwrap_or(0)))?;
+        if found != SCHEMA_VERSION {
+            return Err(format!(
+                "{}: schema {found} is not supported; expected {SCHEMA_VERSION}",
+                path.display()
+            ));
+        }
+        if ensure_private {
+            store.ensure_private()?;
+        }
+        Ok(Track {
+            store,
+            writable: !read_only,
             since_trim: std::sync::atomic::AtomicUsize::new(0),
             current: Mutex::new(None),
             home: std::env::var("HOME").ok().filter(|home| !home.is_empty()),
@@ -245,6 +278,12 @@ pub(super) fn insert_dir(writer: &Writer<'_, '_>, row: &DirRow) -> Option<u64> {
     Some(id)
 }
 
+pub(super) fn insert_imported_dir(writer: &Writer<'_, '_>, row: &DirRow) -> Option<u64> {
+    let id = next_id(writer)?;
+    writer.put(Tree::Dir, key::dir(id), row.encode())?;
+    Some(id)
+}
+
 /// Write a directory's row and bring its three index buckets into line with it.
 ///
 /// `was` is the row as it stood, or `None` for one being inserted. It is asked for rather than
@@ -261,6 +300,9 @@ pub(super) fn put_dir(
     row: &DirRow,
 ) -> Option<()> {
     writer.put(Tree::Dir, key::dir(id), row.encode())?;
+    if row.remote {
+        return Some(());
+    }
     if was.is_none() {
         writer.put(Tree::DirByPath, key::by_path(&row.path), key::id(id))?;
         writer.put(Tree::DirByBase, key::by_base(&row.base, id), Vec::new())?;

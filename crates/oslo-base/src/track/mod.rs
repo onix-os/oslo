@@ -36,6 +36,7 @@ pub mod history;
 pub mod log;
 pub mod profile;
 pub mod session;
+pub mod sync;
 // The one module that knows which key-value engine is underneath. Read its note before touching
 // it: nothing else may `use tagdata`, so that moving engines again is a day of rewriting one
 // directory. Named `kv` rather than `store` because `store()` below is already the accessor for
@@ -52,7 +53,12 @@ pub mod write;
 
 pub use db::{Run, Step, Track, Visit};
 pub use outcome::Outcome;
+pub use prune::PrunePreview;
 pub use redact::head_of;
+pub use sync::{
+    EventId, HistoryCompletion, HistoryEvent, HistoryFilter, HistoryMatch, HistorySegment,
+    HistoryStatus, ImportReport, SyncReport, status_file, sync_files, verify_file,
+};
 
 use std::path::PathBuf;
 use std::sync::OnceLock;
