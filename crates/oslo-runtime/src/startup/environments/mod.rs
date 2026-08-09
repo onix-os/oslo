@@ -5,6 +5,7 @@
 //! module about directories. So this is where a `.env.lua` is actually run, and where the result is
 //! reported.
 
+mod live;
 mod report;
 
 use crate::lua::LuaEngine;
@@ -100,11 +101,18 @@ pub(super) fn arrive(env: &Mutex<Environment>, lua: &LuaEngine, dir: &Path) {
     }
 }
 
-/// Run `f` with stdout and stderr redirected, and hand back what it wrote.
+/// Run `f` with stdout and stderr redirected, and hand back what it wrote *and has not shown*.
 ///
 /// A temporary file rather than a pipe, deliberately: a pipe has a fixed capacity and nothing is
 /// draining it while the rc file runs, so an `.envrc` chatty enough to fill it would block forever
 /// on its own output. A file has no such limit and the whole thing is read once at the end.
+///
+/// **Read once at the end is not enough for a rc file that takes a minute.** `use flake` against a
+/// cold store fetches and builds, saying so the whole way, and every word of that went into a file
+/// nobody was reading — so the shell printed nothing until it was over and a long build was
+/// indistinguishable from a hang. [`live`] tails the same file while `f` runs and puts what has
+/// arrived on the real terminal; what it showed is subtracted here, so nothing is printed twice.
+/// Nothing is shown at all for a file that finishes quickly.
 ///
 /// Both descriptors are restored whatever happens, including when the evaluator panics, because
 /// leaving the shell's stdout pointing at a deleted temp file would silently swallow everything
@@ -119,13 +127,21 @@ fn capturing<T>(f: impl FnOnce() -> T) -> (T, String) {
     let (Ok(saved_out), Ok(saved_err)) = (nix::unistd::dup(out), nix::unistd::dup(err)) else {
         return (f(), String::new());
     };
+    // Both measured before the redirect: afterwards stdout is the scratch file, which is not a
+    // terminal and has no width. A shell whose output is piped shows no progress — there is nobody
+    // watching it arrive, and it would land in the middle of somebody's data.
+    let watching = std::io::IsTerminal::is_terminal(&std::io::stdout());
+    let columns = oslo_ui::dropdown::width::terminal_cols();
     let _ = nix::unistd::dup2(scratch.as_raw_fd(), out);
     let _ = nix::unistd::dup2(scratch.as_raw_fd(), err);
+    let live = watching.then(|| live::Live::start(&scratch, saved_out, columns));
 
     let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(f));
 
     let _ = std::io::stdout().flush();
     let _ = std::io::stderr().flush();
+    // Before the saved descriptors are reclaimed below, because the tail writes to one of them.
+    let shown = live.map_or(0, live::Live::stop);
     // Reclaimed as owned so the duplicates are closed rather than leaked: this runs on every `cd`,
     // and a descriptor per directory change would exhaust the table in an afternoon.
     let saved_out = unsafe { std::os::fd::OwnedFd::from_raw_fd(saved_out) };
@@ -136,6 +152,13 @@ fn capturing<T>(f: impl FnOnce() -> T) -> (T, String) {
     let mut said = String::new();
     let _ = scratch.seek(std::io::SeekFrom::Start(0));
     let _ = scratch.read_to_string(&mut said);
+    // Only what the tail did not already put on screen. The boundary is a `\n` it counted, so it
+    // lands on a character boundary; the check is there because a lossy decode of invalid UTF-8
+    // could have moved it, and printing the lot twice beats slicing a string in half.
+    let said = match said.is_char_boundary(shown) {
+        true => said.split_off(shown),
+        false => said,
+    };
 
     match outcome {
         Ok(value) => (value, said),
