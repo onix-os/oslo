@@ -13,7 +13,7 @@ mod read_input;
 mod read_split;
 
 pub use echo::builtin_echo;
-pub use printf::builtin_printf;
+pub use printf::{builtin_printf, shell_quote};
 pub use read::builtin_read;
 
 use std::io::Write;

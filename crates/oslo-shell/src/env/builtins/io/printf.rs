@@ -369,7 +369,7 @@ impl Spec {
 ///
 /// A control character has no backslash spelling outside `$'...'`, which is where those go; a
 /// string that needs nothing is printed as itself, and an empty one as `''` so it does not vanish.
-fn shell_quote(text: &str) -> String {
+pub fn shell_quote(text: &str) -> String {
     if text.is_empty() {
         return "''".to_string();
     }

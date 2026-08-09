@@ -374,6 +374,16 @@ impl LuaEngine {
         t.set(Value::str("text"), Value::str(text));
         t.set(Value::str("cwd"), Value::str(cwd));
         t.set(Value::str("mode"), Value::str(mode));
+        // **Parsed only when somebody is listening.** The line is parsed again a moment later by
+        // the shell either way, so this is one extra parse per command — worth nothing to a config
+        // that asks for it and worth avoiding entirely for the far more common one that does not.
+        // Absent rather than empty when the line does not parse; see `lua::parsed`.
+        if mode == "sh"
+            && oslo_base::hooks::watched(oslo_base::hooks::at::PRE_CMD)
+            && let Some(commands) = crate::lua::parsed::commands_of(text)
+        {
+            t.set(Value::str("commands"), commands);
+        }
         Value::table(t)
     }
 
