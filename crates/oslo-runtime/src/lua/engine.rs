@@ -413,6 +413,19 @@ impl LuaEngine {
     }
 
     /// As [`render`](Self::render), with the facts a segment's `render(ctx)` is given.
+    /// Whether rendering `key` again is free, in the sense of not starting a process.
+    ///
+    /// A string, a segment list or a Lua function is answered in this process; `{ command = … }`
+    /// forks and execs whatever the user named. Callers that render a prompt *speculatively* —
+    /// for a mode the user may never enter — have to know the difference, because doing that to an
+    /// external prompt multiplies its cost by however many speculations they make.
+    pub fn prompt_is_free(&self, key: &str) -> bool {
+        match self.registry.borrow().get(key) {
+            Some(value) => crate::lua::api::external::spec_of(value).is_none(),
+            None => true,
+        }
+    }
+
     pub fn render_with(&self, key: &str, ctx: &Context) -> Option<String> {
         let value = self.registry.borrow().get(key).cloned()?;
         if let Value::Str(text) = &value {

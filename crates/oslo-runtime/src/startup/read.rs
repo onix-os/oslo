@@ -117,13 +117,20 @@ pub(super) fn read_command(
                 builtin,
             );
             // What this prompt looks like in each vi mode, so a mode change mid-line can redraw
-            // it. Only the mode changes while a line is being typed; everything else a prompt
-            // shows is fixed for the line, so a handful of variants covers it.
+            // it without asking whoever owns the prompt to produce it again.
+            //
+            // **Only for a prompt that costs nothing to render.** The claim this rested on — that
+            // rendering the variants "costs the same Lua either way and cannot spawn anything" —
+            // is false for `prompt.left = { command = … }`, which is a process per render. It made
+            // every prompt spawn the user's prompt program three more times, for a mode change
+            // that mostly never comes: measured at 91 ms per spawn here, so 273 ms added to every
+            // command whether or not Esc was ever pressed. A mode change is redrawn by the
+            // generation counter instead, which re-renders once, when it actually happens.
             //
             // Only when the width does not move: the editor measures the prompt once and lays the
             // row out against that number for the life of the line, so a variant of a different
             // size would put the text a cell away from where the editor believes it is.
-            if !builtin && oslo_ui::vi::enabled() {
+            if !builtin && oslo_ui::vi::enabled() && lua.prompt_is_free("prompt.left") {
                 let width = oslo_ui::prompt::printed_width(&prompt);
                 let variants = ["I", "N", "R"]
                     .into_iter()
@@ -135,6 +142,10 @@ pub(super) fn read_command(
                     })
                     .collect();
                 oslo_ui::row::set_variants(variants);
+            } else {
+                // Nothing prepared: `row::repaint` leaves the row alone and the mode letter
+                // catches up when the prompt is next drawn.
+                oslo_ui::row::set_variants(Vec::new());
             }
         }
 
