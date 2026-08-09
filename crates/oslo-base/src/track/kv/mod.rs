@@ -1,61 +1,7 @@
-//! Every `jammdb` call oslo makes, and nothing else.
+//! The Tagdata boundary for tracking storage.
 //!
-//! **This module is a seam.** Nothing outside `src/track/kv/` may `use jammdb`, and that is not
-//! tidiness. jammdb was picked after twelve stores were measured; `redb` and `sanakirja` were both
-//! real candidates and either could win a rerun, and jammdb itself is one maintainer at 0.11. The
-//! engine is therefore held at one boundary so that moving again is a day of rewriting this
-//! directory rather than a week of chasing `Data::KeyValue` through the shell. If you find
-//! yourself wanting a `Tx` in `write.rs`, add a method here instead.
-//!
-//! # One file, and no handle held open
-//!
-//! This is the one place where the plan changed under measurement, so it is stated first.
-//!
-//! jammdb was chosen for multi-process access — oslo is a shell, several terminals are open at
-//! once, and every one of them uses the store. What `DB::open` actually does is take a **blocking
-//! exclusive `flock`** and hold it for the life of the `DB` value (`db.rs:247`, `fs4::lock_exclusive`,
-//! `flock(LOCK_EX)`). Measured here: a second process opening the same file blocked for 3.49 s and
-//! returned the moment the first dropped its handle. A shell that held the handle for its lifetime
-//! would therefore hang every *other* terminal at startup, for ever — worse than `redb`, which at
-//! least refuses with an error a shell can degrade on.
-//!
-//! So the store holds no handle. [`Store`] is a path and a promise about the file; every
-//! [`Store::read`] and [`Store::write`] opens, works and closes, and the `flock` becomes what it
-//! should have been all along — the mutual exclusion between terminals, taken for microseconds and
-//! released by the kernel even on `kill -9`.
-//!
-//! The cost of that was the thing to check, and it is affordable. Measured on a release build
-//! against 25,000 rows, median of two hundred, through the API below rather than around it:
-//!
-//! ```text
-//! whole read    open + tx + prefix range + close    15.1 us
-//! whole write   open + tx + put + commit + close    27.9 us     (the commit is an fsync)
-//! ```
-//!
-//! Broken down, the open-and-mmap is 11 us of the read and the range scan itself is 5 us; with the
-//! handle held the scan alone is 1.5 us, and that 13.6 us of difference is the whole price of
-//! several terminals working. turso answered the same question in 13 us with its handle held open
-//! and its 13.3 MB of engine, so this is not a regression at the prompt either.
-//!
-//! Under contention: three processes writing flat out committed 900 rows to one file with none
-//! lost, worst single operation 1.3 ms. The rule that buys is worth writing down for whoever adds
-//! the prune sweep — **no operation may hold a transaction open for long**, because every other
-//! terminal's next keystroke is queued behind it. A sweep over every directory belongs in chunks,
-//! not in one write.
-//!
-//! # A read answers nothing rather than failing
-//!
-//! `super::db`'s rule, unchanged: a shell whose tracker will not open is a working shell with a
-//! dumber `cd`. Every method here answers `Option`, and every failure — a busy file, a corrupt
-//! page, a bucket that does not exist yet — is `None`. There is no caller that could act on more.
-//!
-//! # Panics are caught, because jammdb's are not errors
-//!
-//! Measured on 0.11.0: `DB::open` **panics** rather than erroring on every file that is not a
-//! database, and a truncated one opens cleanly and panics on the read. `super::kv::file`
-//! refuses the foreseeable cases by reading the header first; the `catch_unwind` around each
-//! operation is for the rest. A panic here is a store that answers `None` — never a shell that
-//! stops.
+//! Tracking failures return `None`, leaving the shell usable without history or ranking. Database
+//! transactions stay inside this module and long deletions are split into short write transactions.
 
 mod file;
 mod key;
@@ -65,11 +11,11 @@ pub use file::is_a_database;
 pub use key::{Fields, Key};
 pub use range::{Span, upper_bound};
 
-use jammdb::{Data, OpenOptions, Tx};
 use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::path::{Path, PathBuf};
+use tagdata::{DB, Data, OpenOptions, Tx};
 
-/// The buckets the store keeps, and the only names jammdb is ever given.
+/// The buckets in the tracking database.
 ///
 /// An enum rather than a string at the call site: a typo in `"run"` is not a compile error, it is
 /// a second bucket that is always empty, and the symptom is "it stopped suggesting anything".
@@ -109,7 +55,7 @@ pub enum Tree {
 }
 
 impl Tree {
-    /// The name jammdb knows it by. Kept short: it is stored in the file once per bucket.
+    /// The persisted bucket name.
     fn name(self) -> &'static str {
         match self {
             Tree::Dir => "dir",
@@ -140,12 +86,7 @@ impl Tree {
     }
 }
 
-/// The most bytes of rows one transaction may delete, and the reason it is a quarter of a page.
-///
-/// jammdb merges a node the moment it holds less than `pagesize / 4` (`node.rs`, `needs_merging`),
-/// so every node a transaction *starts* with holds at least that much — and a transaction that
-/// removes less than that from a bucket therefore cannot be the one that empties a node. Emptying a
-/// node is the thing that panics; see [`Store::delete_span_in_chunks`].
+/// The approximate row bytes removed in one write transaction.
 const DELETE_BUDGET: usize = (file::PAGE_SIZE / 4) as usize;
 
 /// What one row costs a leaf beyond its own key and value: `size_of::<LeafElement>()`, which is a
@@ -164,14 +105,20 @@ pub enum Walk {
     Stop,
 }
 
-/// An open store: a path, a directory that is closed to everybody else, and a file that has been
-/// checked to be one of ours.
-///
-/// Holds no file descriptor, no lock and no memory map — see the module note. Cheap to clone, and
-/// safe to keep for the life of the shell precisely *because* it holds nothing.
-#[derive(Debug, Clone)]
+/// An open tracking store.
+#[derive(Clone)]
 pub struct Store {
     path: PathBuf,
+    db: DB,
+}
+
+impl std::fmt::Debug for Store {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("Store")
+            .field("path", &self.path)
+            .finish_non_exhaustive()
+    }
 }
 
 impl Store {
@@ -185,17 +132,16 @@ impl Store {
         if !file::is_a_database(path) {
             return None;
         }
-        let store = Store {
-            path: path.to_path_buf(),
-        };
-        // Open once here so that a file jammdb refuses is refused now, at startup, rather than on
-        // the first keystroke — and so that there is a file to make private, which `DB::open`
-        // creates whether or not anything is written through it. A *read* transaction on purpose:
-        // committing an empty write one would cost every shell an `fsync` at startup to prove a
-        // thing the open has already proved.
-        store.enter(false, |_| Some(()))?;
+        let db = catch_unwind(AssertUnwindSafe(|| {
+            OpenOptions::new().pagesize(file::PAGE_SIZE).open(path).ok()
+        }))
+        .ok()
+        .flatten()?;
         file::make_private(path)?;
-        Some(store)
+        Some(Store {
+            path: path.to_path_buf(),
+            db,
+        })
     }
 
     /// Where the store is.
@@ -204,10 +150,6 @@ impl Store {
     }
 
     /// How large the file has grown, in bytes.
-    ///
-    /// Worth watching rather than ignoring: jammdb allocates in 8 MiB steps and never gives one
-    /// back, so a store that outgrows its initial thirty-two pages jumps from 128 KiB to 8.5 MiB
-    /// and stays there. That is what makes the per-directory cap load-bearing rather than tidy.
     pub fn size(&self) -> u64 {
         std::fs::metadata(&self.path)
             .map(|meta| meta.len())
@@ -217,13 +159,12 @@ impl Store {
     /// Read from the store.
     ///
     /// The transaction is opened, `work` is run against it and it is dropped. A read transaction is
-    /// never committed — there is nothing to commit — so a `None` from `work` costs nothing but the
-    /// open.
+    /// never committed because it changes nothing.
     pub fn read<T>(&self, work: impl FnOnce(&Reader<'_, '_>) -> Option<T>) -> Option<T> {
-        self.enter(false, |tx| {
-            let reader = Reader { tx: &tx };
-            work(&reader)
-        })
+        let tx = self.db.tx(false).ok()?;
+        catch_unwind(AssertUnwindSafe(|| work(&Reader { tx: &tx })))
+            .ok()
+            .flatten()
     }
 
     /// Write to the store, committing when `work` answers `Some` and discarding when it answers
@@ -234,48 +175,21 @@ impl Store {
     /// directory whose arrival was never recorded, which is the property the SQL version got from
     /// `BEGIN`/`COMMIT`.
     ///
-    /// A discarded transaction has written nothing — jammdb writes no page until `commit`, so
-    /// dropping is the rollback.
+    /// Dropping an uncommitted transaction rolls it back.
     pub fn write<T>(&self, work: impl FnOnce(&Writer<'_, '_>) -> Option<T>) -> Option<T> {
-        self.enter(true, |tx| {
-            let done = {
-                let writer = Writer(Reader { tx: &tx });
-                work(&writer)
-            };
-            let value = done?;
-            tx.commit().ok().map(|()| value)
-        })
+        let tx = self.db.tx(true).ok()?;
+        let value = catch_unwind(AssertUnwindSafe(|| {
+            let writer = Writer(Reader { tx: &tx });
+            work(&writer)
+        }))
+        .ok()
+        .flatten()?;
+        tx.commit().ok().map(|()| value)
     }
 
     /// Remove every row in `span`, a small chunk to a transaction, and answer how many went.
     ///
-    /// **Use this rather than [`Writer::delete_span`] for anything that is not a handful of rows.**
-    /// The reason is a defect in jammdb 0.11 that costs a silent no-op rather than a crash, which
-    /// is the worst way for a bound to fail — measured here, not read anywhere:
-    ///
-    /// ```text
-    /// 3,500 rows, delete the last 100 in one transaction   -> panic, nothing deleted
-    /// 3,500 rows, 25 at a time                             -> all 100 deleted
-    /// 10,100 rows, delete the last 100 in one transaction  -> panic, nothing deleted
-    /// 10,100 rows, 25 at a time                            -> all 100 deleted
-    /// ```
-    ///
-    /// The panic is `node.rs:412`, `first_key` on an empty node. `merge_nodes` refuses to merge a
-    /// node away when its parent holds exactly one branch (`bucket.rs:875`, `if branches.len() == 1
-    /// { continue }`), so a leaf that a transaction emptied outright survives to `spill`, which
-    /// sorts children by their first key and finds it has none. It needs a bucket deep enough to
-    /// have a branch of branches, which is why it never shows up in a small test — and
-    /// `Store::enter`'s `catch_unwind` turns it into `None`, so the caller sees a delete that
-    /// simply did not happen.
-    ///
-    /// The avoidance is exact rather than superstitious: a node jammdb has not already merged holds
-    /// at least a quarter of a page (`node.rs`, `needs_merging`), so a transaction that removes less
-    /// than that cannot be the one that empties a node. `DELETE_BUDGET` is that quarter page and
-    /// the chunk is measured in bytes rather than rows, because a history line can be a paragraph
-    /// and twenty of those are not twenty of anything else.
-    ///
-    /// Letting go between chunks is the module note's other rule kept as well: a cascade over a
-    /// directory with thousands of runs is many short locks instead of one long one.
+    /// Use this for long sweeps so other processes can acquire the writer between chunks.
     pub fn delete_span_in_chunks(&self, tree: Tree, span: &Span) -> usize {
         let mut gone = 0;
         let mut previous: Option<Vec<u8>> = None;
@@ -333,10 +247,7 @@ impl Store {
     /// and the only way to name them is one at a time. `super::prune` derives each from the primary
     /// key it is already deleting.
     ///
-    /// Same budget, same defect, same rule: a transaction that removes less than a quarter page
-    /// from a bucket cannot be the one that empties a node, and emptying a node is what silently
-    /// throws the whole transaction away. Keys this store never held cost their overhead against
-    /// the budget and nothing else, which is the safe direction to be wrong in.
+    /// Missing keys still count toward the chunk budget.
     pub fn delete_keys_in_chunks(&self, tree: Tree, keys: &[Vec<u8>]) -> usize {
         let mut gone = 0;
         let mut rest = keys;
@@ -363,31 +274,11 @@ impl Store {
         }
         gone
     }
-
-    /// Open the file, run one transaction against it and close everything.
-    ///
-    /// `work` is handed the transaction by value so that it can `commit`, which consumes it. The
-    /// `catch_unwind` is the module note's last paragraph: jammdb panics where it should error, and
-    /// a panicking read must cost a suggestion rather than the shell. Nothing is left half-written
-    /// by one, because a transaction that never reached `commit` never wrote a page.
-    fn enter<T>(&self, writable: bool, work: impl FnOnce(Tx<'_>) -> Option<T>) -> Option<T> {
-        catch_unwind(AssertUnwindSafe(|| {
-            let db = OpenOptions::new()
-                .pagesize(file::PAGE_SIZE)
-                .open(&self.path)
-                .ok()?;
-            let tx = db.tx(writable).ok()?;
-            work(tx)
-        }))
-        .ok()
-        .flatten()
-    }
 }
 
 /// A transaction that can be read.
 ///
-/// The lifetimes are jammdb's and callers never name them: `'r` is the borrow of the transaction,
-/// `'tx` the transaction's own.
+/// `'r` is the transaction borrow and `'tx` is the engine transaction lifetime.
 pub struct Reader<'r, 'tx> {
     tx: &'r Tx<'tx>,
 }
@@ -495,10 +386,7 @@ impl<'r, 'tx> std::ops::Deref for Writer<'r, 'tx> {
 impl Writer<'_, '_> {
     /// Put `value` under `key`, creating the bucket if this is the first row in it.
     ///
-    /// Both are taken by value rather than borrowed, which is jammdb's requirement and not a
-    /// choice: `Bucket::put` wants bytes that outlive the transaction, so a `&[u8]` pointing at a
-    /// local does not compile. Building the key with [`Key`] already produces the `Vec` this
-    /// wants.
+    /// Keys and values are owned for the transaction lifetime.
     pub fn put(&self, tree: Tree, key: Vec<u8>, value: Vec<u8>) -> Option<()> {
         let bucket = self.0.tx.get_or_create_bucket(tree.name()).ok()?;
         bucket.put(key, value).ok()?;
@@ -515,13 +403,7 @@ impl Writer<'_, '_> {
 
     /// Remove every row in `span`, in this transaction.
     ///
-    /// **Bounded spans only — a few rows, and never a whole index.** A transaction that empties a
-    /// leaf node outright panics inside jammdb and deletes nothing at all, which is measured and
-    /// explained on [`Store::delete_span_in_chunks`]. That is the one to use for a cascade or a
-    /// sweep; this one is for the two or three rows a single write knows it is replacing.
-    ///
-    /// Two passes on purpose: the keys are collected first and deleted afterwards, because
-    /// deleting from under a cursor that is still walking is not a supported thing to do.
+    /// Keys are collected before deletion so the active range iterator is not mutated.
     pub fn delete_span(&self, tree: Tree, span: &Span) -> usize {
         let doomed: Vec<Vec<u8>> = self.0.collect(tree, span, |key, _| Some(key.to_vec()));
         let mut gone = 0;

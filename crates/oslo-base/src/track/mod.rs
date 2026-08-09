@@ -13,7 +13,7 @@
 //! would double the
 //! write cost and double the privacy surface for a chronology that already exists — and the store
 //! underneath has no `VACUUM`, so a file that grows is a permanent high-water mark. That argument
-//! got sharper rather than weaker when the engine changed: jammdb grows in one 8 MiB step and
+//! got sharper rather than weaker when the engine changed: Tagdata grows in one 8 MiB step and
 //! never gives it back, so the aggregate and the bounds in [`prune`] are what stand between oslo
 //! and 8.5 MiB for ever. An aggregate is bounded by distinct *behaviour* rather than by time:
 //! repeats, which are the entire point of the ranking, cost nothing after the first. What it gives
@@ -37,7 +37,7 @@ pub mod log;
 pub mod profile;
 pub mod session;
 // The one module that knows which key-value engine is underneath. Read its note before touching
-// it: nothing else may `use jammdb`, so that moving engines again is a day of rewriting one
+// it: nothing else may `use tagdata`, so that moving engines again is a day of rewriting one
 // directory. Named `kv` rather than `store` because `store()` below is already the accessor for
 // this module's process-global, and a module and a function sharing a name is a thing to read
 // twice.

@@ -304,9 +304,7 @@ fn asking_for_no_lines_reads_none() {
 /// one transaction. They are, so a hundred lines typed into two shells at once are a hundred lines
 /// under a hundred ids.
 ///
-/// Two `History` values rather than two threads sharing one, because that is what two terminals
-/// are: separate opens of the same path, contending on the file's own lock. `flock` belongs to the
-/// open file description rather than to the process, so this really does exercise it.
+/// Two `History` values use separate handles to the same path, matching two terminals.
 #[test]
 fn two_terminals_appending_at_once_lose_no_lines_and_reuse_no_ids() {
     let dir = tempfile::tempdir().expect("a temp dir");
@@ -368,12 +366,9 @@ fn a_history_from_an_older_oslo_is_kept_and_the_shell_starts_fresh() {
 /// The bound, at the size where it actually has to work.
 ///
 /// A history at the default `HISTSIZE` is thousands of rows deep, and a hundred lines later the
-/// trim has to remove a hundred of them. Doing that in one transaction panics inside jammdb and
-/// removes none — measured on this exact shape, which is why [`History::trim`] deletes in chunks.
-/// Nothing else in this file is large enough to notice, so if the chunking is ever undone this is
-/// the test that says so.
+/// trim removes a hundred of them across bounded transactions.
 #[test]
-fn the_bound_holds_on_a_history_deep_enough_for_one_delete_to_fail() {
+fn the_bound_holds_on_a_large_history() {
     let (_dir, history) = temp_db();
     for i in 1..=3_500 {
         assert!(

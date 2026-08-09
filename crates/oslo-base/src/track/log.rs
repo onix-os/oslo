@@ -2,7 +2,7 @@
 //!
 //! Lives in the **same store** as the aggregate, in its own [`Tree::History`] bucket. It used to be
 //! a second file — `history.db` beside `track.kv` — because it used to be a second *engine*,
-//! SQLite where the aggregate was jammdb. Both have been jammdb for a while, so the split was
+//! SQLite where the aggregate used a separate key-value database. They were later unified, so the split was
 //! paying for nothing: two opens, two file handles, two floors on disk, and two commits per
 //! command with no atomicity between them. A crash between the two left a line in your history
 //! that never happened for ranking, or the reverse.
@@ -288,12 +288,8 @@ impl super::Track {
     /// no upper end — the whole of the trim is naming the key where that span starts. Nothing is
     /// read beyond it.
     ///
-    /// The deleting is `Store::delete_span_in_chunks` and not the one-transaction version, which
-    /// is not a preference. A single transaction that deletes a hundred rows from a bucket of a few
-    /// thousand panics inside jammdb and deletes *nothing*; the seam has the measurements. A
-    /// history at the default `HISTSIZE` of ten thousand is exactly that shape, every hundred lines
-    /// typed, for the rest of the machine's life — so this is the difference between a bound and
-    /// the appearance of one.
+    /// Deletion uses `Store::delete_span_in_chunks` so long histories release the writer between
+    /// chunks.
     pub fn trim(&self, max: usize) -> bool {
         let Some(first_doomed) = self.store.read(|reader| {
             let mut kept = 0;

@@ -1,7 +1,7 @@
 //! What the seam promises, tested against a real file.
 //!
 //! Every test here opens a database in a temporary directory, because the properties being claimed
-//! — the mode of the file, the lock it does not hold, the transaction it does not commit — are all
+//! — the mode of the file, multi-handle coordination, and transaction rollback — are all
 //! properties of the file rather than of the code that writes it.
 
 use super::*;
@@ -28,9 +28,7 @@ fn mode_of(path: &Path) -> u32 {
         & 0o777
 }
 
-/// The privacy rule, and the ordering jammdb forces on it. Under turso the file had to be created
-/// before the engine saw the path; here that panics, so the directory is closed first and the file
-/// is tightened before `open` hands anybody a `Store` to write through.
+/// The directory and database are private before `open` returns a writable store.
 #[test]
 fn the_store_is_private_before_any_caller_can_write_to_it() {
     let (dir, store) = store();
@@ -38,9 +36,7 @@ fn the_store_is_private_before_any_caller_can_write_to_it() {
     assert_eq!(mode_of(&dir.path().join("nested")), 0o700);
 }
 
-/// turso needed a `-wal` and an `-shm` kept private beside the database, and getting that wrong
-/// leaked the newest rows. jammdb writes one file. If that ever stops being true, the mode of
-/// whatever appears is nobody's job, and this is where it is noticed.
+/// Tagdata keeps data and coordination in one file.
 #[test]
 fn the_store_is_one_file_with_nothing_beside_it() {
     let (dir, store) = store();
@@ -66,28 +62,7 @@ fn the_store_is_one_file_with_nothing_beside_it() {
     assert!(store.size() > 0);
 }
 
-/// The property the whole design rests on, asserted directly rather than inferred: an open store
-/// holds no lock on its file, so another terminal can take one. If someone ever makes `Store` hold
-/// a `DB`, this fails here instead of hanging somebody's second shell.
-#[test]
-fn an_open_store_holds_no_lock_for_another_terminal_to_wait_on() {
-    use nix::fcntl::{Flock, FlockArg};
-
-    let (_dir, store) = store();
-    store
-        .write(|w| w.put(Tree::Run, run_key(1, "sh", "cargo build"), b"1".to_vec()))
-        .expect("the write commits");
-
-    let file = std::fs::File::open(store.path()).expect("the file opens");
-    let taken = Flock::lock(file, FlockArg::LockExclusiveNonblock);
-    assert!(
-        taken.is_ok(),
-        "nothing is holding the file, so another terminal's lock is free to take"
-    );
-}
-
-/// Two stores against one file, interleaved, which is the shape of two terminals. Every operation
-/// opens and closes, so neither ever waits on the other for longer than one transaction.
+/// Two stores against one file, interleaved, which is the shape of two terminals.
 #[test]
 fn two_stores_on_one_file_both_write_and_both_see_the_other() {
     let dir = tempfile::tempdir().expect("a temp dir");
@@ -123,6 +98,65 @@ fn two_stores_on_one_file_both_write_and_both_see_the_other() {
     };
     assert_eq!(rows(&first), 20, "nothing was lost");
     assert_eq!(rows(&second), 20, "and each sees the other's work");
+}
+
+const MULTI_PROCESS_TEST: &str =
+    "track::kv::tests::separate_processes_write_through_persistent_handles_without_loss";
+#[test]
+fn separate_processes_write_through_persistent_handles_without_loss() {
+    if let (Ok(path), Ok(writer)) = (
+        std::env::var("OSLO_STORE_MULTI_PROCESS_PATH"),
+        std::env::var("OSLO_STORE_MULTI_PROCESS_WRITER"),
+    ) {
+        let writer: u64 = writer.parse().expect("a writer number");
+        let store = Store::open(Path::new(&path)).expect("the child opens the store");
+        store
+            .write(|tx| {
+                for row in 0..50u64 {
+                    tx.put(
+                        Tree::Run,
+                        run_key(writer, "sh", &format!("writer-{writer}-{row}")),
+                        vec![writer as u8; 1024],
+                    )?;
+                }
+                Some(())
+            })
+            .expect("the child commits");
+        return;
+    }
+    let dir = tempfile::tempdir().expect("a temp dir");
+    let path = dir.path().join("track.kv");
+    let store = Store::open(&path).expect("the parent keeps the store open");
+    let executable = std::env::current_exe().expect("the test binary");
+    let mut children = (0..4u64)
+        .map(|writer| {
+            std::process::Command::new(&executable)
+                .args(["--exact", MULTI_PROCESS_TEST])
+                .env("OSLO_STORE_MULTI_PROCESS_PATH", &path)
+                .env("OSLO_STORE_MULTI_PROCESS_WRITER", writer.to_string())
+                .stdout(std::process::Stdio::null())
+                .stderr(std::process::Stdio::null())
+                .spawn()
+                .expect("a writer process")
+        })
+        .collect::<Vec<_>>();
+    for child in &mut children {
+        assert!(child.wait().expect("the child exits").success());
+    }
+    store
+        .read(|reader| {
+            assert_eq!(reader.count(Tree::Run, &Span::all()), 200);
+            for writer in 0..4u64 {
+                for row in 0..50u64 {
+                    assert!(reader.has(
+                        Tree::Run,
+                        &run_key(writer, "sh", &format!("writer-{writer}-{row}"))
+                    ));
+                }
+            }
+            Some(())
+        })
+        .expect("the original handle refreshes and reads every row");
 }
 
 /// The write helper exists so that no caller has to remember to commit. `Some` commits.
@@ -165,6 +199,26 @@ fn a_write_that_answers_nothing_leaves_the_store_as_it_found_it() {
         assert!(r.has(Tree::Run, &kept), "and so was the delete");
         Some(())
     });
+}
+
+#[test]
+fn a_panicking_write_does_not_poison_the_store() {
+    let (_dir, store) = store();
+    let abandoned = run_key(1, "sh", "abandoned");
+    let answered: Option<()> = store.write(|w| {
+        w.put(Tree::Run, abandoned.clone(), b"never".to_vec())?;
+        panic!("stop the transaction");
+    });
+
+    assert_eq!(answered, None);
+    assert_eq!(
+        store.read(|r| Some(r.has(Tree::Run, &abandoned))),
+        Some(false)
+    );
+    assert_eq!(
+        store.write(|w| w.put(Tree::Run, run_key(1, "sh", "after"), b"kept".to_vec())),
+        Some(())
+    );
 }
 
 /// The half-open range, end to end through the composite key: a seek to the lower bound and a walk
@@ -273,7 +327,7 @@ fn a_store_with_nothing_in_it_answers_nothing_rather_than_failing() {
         .expect("a read of an empty store is still a read");
 }
 
-/// The cascade. jammdb has no foreign keys, so dropping a directory's runs is this code's job, and
+/// Tagdata has no foreign keys, so dropping a directory's runs is this code's job, and
 /// it is a range delete over the `dir_id` the composite key begins with. It must take everything
 /// belonging to that directory and nothing belonging to its neighbours — including the one whose
 /// `dir_id` is the very next number.
@@ -336,10 +390,7 @@ fn clearing_one_bucket_leaves_the_others_standing() {
     );
 }
 
-/// A file that is not one of ours is refused rather than opened. Measured on jammdb 0.11.0:
-/// `DB::open` *panics* on one, so this is the difference between an upgrade that quietly stops
-/// tracking and an upgrade that will not start a shell — and every existing oslo has a SQLite file
-/// at exactly this path.
+/// A file that is not a supported Tagdata database is refused rather than modified.
 #[test]
 fn a_file_that_is_not_one_of_ours_is_refused_and_left_alone() {
     let dir = tempfile::tempdir().expect("a temp dir");
@@ -370,7 +421,7 @@ fn every_bucket_is_named_once() {
     assert_eq!(names.len(), all, "two buckets share a name: {names:?}");
 }
 
-/// The growth note, pinned to a number. jammdb allocates in 8 MiB steps and never gives one back,
+/// The growth note, pinned to a number. Tagdata allocates in 8 MiB steps,
 /// so a store bounded at a few hundred rows costs 128 KiB and one that is not costs 8.5 MiB for
 /// ever. That is what makes the per-directory cap load-bearing rather than tidy, and this is the
 /// measurement that says so.
@@ -396,7 +447,7 @@ fn a_small_store_stays_small_and_a_large_one_takes_a_whole_step() {
     write(0, 400);
     assert!(
         store.size() <= 128 * 1024,
-        "four hundred rows fit in the file jammdb starts with, and oslo's real store is smaller \
+        "four hundred rows fit in the file Tagdata starts with, and oslo's real store is smaller \
          than that: {} bytes",
         store.size()
     );
@@ -411,16 +462,15 @@ fn a_small_store_stays_small_and_a_large_one_takes_a_whole_step() {
 
 /// The name libtest knows the crash test by, which is how the parent re-invokes the binary to get
 /// a *real* second process to kill. A thread would not do: `kill -9` is the thing being tested, and
-/// what makes it survivable is that the kernel unmaps the pages and drops the `flock` on a process
-/// that is not there to clean up after itself.
+/// what makes it survivable is that the kernel releases Tagdata's locks for a dead process.
 const CRASH_TEST: &str = "track::kv::tests::the_store_survives_a_shell_killed_mid_write";
 
 /// The environment variable that turns that test into the child half of itself.
 const CRASH_CHILD: &str = "OSLO_STORE_CRASH_CHILD";
 
 /// Contract item 7. A shell is killed all the time — a closed terminal, an OOM, a `kill -9` on a
-/// hung pipeline — and it must cost at most the transaction that was in flight. jammdb writes no
-/// page until `commit` and alternates two meta pages, so the worst case is the last write; the file
+/// hung pipeline — and it must cost at most the transaction that was in flight. Tagdata publishes
+/// through alternating metadata pages, so the worst case is the last write; the file
 /// itself must still open, still hold everything committed before the kill, and still take writes.
 #[test]
 fn the_store_survives_a_shell_killed_mid_write() {
@@ -494,13 +544,7 @@ fn the_store_survives_a_shell_killed_mid_write() {
     );
 }
 
-/// A span too large for one transaction, deleted anyway.
-///
-/// `Writer::delete_span` panics inside jammdb — and therefore deletes nothing — when the rows it
-/// removes empty a leaf node of a bucket deep enough to have a branch of branches. Measured: 3,500
-/// rows, delete the last 100 in one transaction, nothing goes. `Store::delete_span_in_chunks` keeps
-/// each transaction under a quarter page and gets all of them. The rows go in one transaction each,
-/// because that is how a shell writes them and the tree shape is what the defect turns on.
+/// A span larger than the deletion budget is removed across multiple transactions.
 #[test]
 fn a_span_too_large_for_one_transaction_is_deleted_in_pieces() {
     let (_dir, store) = store();
@@ -530,9 +574,9 @@ fn a_span_too_large_for_one_transaction_is_deleted_in_pieces() {
 }
 
 /// The chunk is measured in bytes rather than rows, so one enormous value is one transaction and
-/// does not take a quarter page of small ones with it.
+/// does not take a full chunk of small ones with it.
 #[test]
-fn a_chunk_is_a_quarter_page_of_rows_however_big_the_rows_are() {
+fn the_chunk_budget_handles_large_values() {
     let (_dir, store) = store();
     store
         .write(|w| {

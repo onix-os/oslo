@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### <!-- 2 -->🚜 Refactor
+
+- Move tracking storage from jammdb to Tagdata
+
 ## [0.2.24] - 2026-08-09
 
 ### <!-- 1 -->🐛 Bug Fixes
@@ -753,4 +759,3 @@
 - Add tokio and turso for the history database
 - Track the brush integration branch
 - Track the brush fork until #1253 lands
-

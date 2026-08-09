@@ -168,10 +168,8 @@ pub struct Place {
 impl super::Track {
     /// The newest `limit` lines, oldest first, joined to what each of them did.
     ///
-    /// **One transaction for all three buckets.** The store holds no handle open, so every
-    /// `read` is an `open` + `flock` + `close`; asking for the log, the outcomes and the
-    /// directories separately would pay that three times, and the open alone is 11 µs of a 15 µs
-    /// read. This is the call something replaying history should make, and the only one.
+    /// One transaction covers all three buckets so the log, outcomes and directories come from the
+    /// same snapshot.
     ///
     /// **The chain's *shape* is not stored and is not returned.** The line is here and
     /// `parse_bash_script` is in this same binary, so a caller that wants the structure re-derives

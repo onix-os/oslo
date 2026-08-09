@@ -37,7 +37,6 @@
 /// The client library, re-exported so the fork is reached through one name.
 ///
 /// Everything that uses SSH goes through this module rather than naming `maki` directly — the same
-/// rule `src/track/kv/` states for `jammdb`, and for the same reason: the crate is a fork of a
-/// project with one maintainer, and a single point of contact is what makes replacing it a change
-/// to one file rather than to every call site.
+/// rule `oslo-base/src/track/kv/` states for `tagdata`: callers use this boundary instead of the
+/// dependency directly.
 pub use maki;

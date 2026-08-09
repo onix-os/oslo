@@ -34,8 +34,8 @@
 //!
 //! SQL had `INTEGER PRIMARY KEY AUTOINCREMENT`. A key-value store has no such thing, so
 //! `next_id` keeps a counter in `meta` and increments it inside the same transaction that uses
-//! it — which is what makes it safe between terminals, since the seam's `flock` means only one
-//! writer exists at a time and the counter is read and written under it.
+//! it — which is what makes it safe between terminals, since Tagdata permits only one writer at a
+//! time and the counter is read and written under it.
 //!
 //! Ids are never reused. A directory that is forgotten takes its id with it rather than freeing it
 //! for the next one, because a stale index row pointing at a recycled id would attach one
@@ -140,9 +140,7 @@ pub struct Step<'a> {
 
 /// An open store.
 pub struct Track {
-    /// A path and a promise about the file — no descriptor, no lock, no map. See the seam's note:
-    /// holding a handle would take a blocking `flock` for the life of the shell and hang the next
-    /// terminal at its prompt, for ever.
+    /// The open tracking database.
     pub(super) store: Store,
     /// False for a file written by a version this binary does not understand: keep reading it,
     /// stop writing to it. Dropping and recreating somebody else's data is never the answer.
@@ -286,7 +284,7 @@ pub(super) fn put_dir(
 /// The next directory id, taken from the counter and put back one higher.
 ///
 /// Read and written inside the caller's transaction, so two terminals cannot be handed the same
-/// id: the seam's `flock` means only one writer exists at a time, and a transaction that does not
+/// id: Tagdata permits only one writer at a time, and a transaction that does not
 /// commit does not consume a number either.
 fn next_id(writer: &Writer<'_, '_>) -> Option<u64> {
     let next = meta(writer, NEXT_DIR).unwrap_or(1).max(1);
