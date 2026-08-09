@@ -132,6 +132,17 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
         if let Value::Str(key) = table.get(&Value::str("accept_word")) {
             settings.suggest.accept_word = Some(key.to_string());
         }
+        if let Value::Table(list) = table.get(&Value::str("skip_history")) {
+            settings.suggest.skip_history = list
+                .borrow()
+                .sequence()
+                .iter()
+                .filter_map(|value| match value {
+                    Value::Str(name) => Some(name.to_string()),
+                    _ => None,
+                })
+                .collect();
+        }
     }
 
     if let Value::Table(table) = oslo.get(&Value::str("misc")) {

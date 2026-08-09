@@ -302,6 +302,16 @@ pub struct Suggest {
     pub accept: Option<String>,
     /// The key that takes one word of it.
     pub accept_word: Option<String>,
+    /// Commands whose past lines are not worth offering back.
+    ///
+    /// **Because their arguments consume themselves.** `rm z` suggested `rm zzz-old-notes` from
+    /// history — a path that does not exist any more, *because the suggested command deleted it*.
+    /// Accepting a ghost is one keystroke, and for `rm` that is one keystroke aiming a destructive
+    /// command at whatever the name happens to match now.
+    ///
+    /// Only the history source is skipped. The filesystem still completes the argument, which is
+    /// the answer that was wanted in the first place.
+    pub skip_history: Vec<String>,
 }
 
 impl Default for Suggest {
@@ -312,6 +322,7 @@ impl Default for Suggest {
             sources: vec![Source::History, Source::Completion, Source::Path],
             accept: None,
             accept_word: None,
+            skip_history: vec!["rm".to_string()],
         }
     }
 }

@@ -341,3 +341,23 @@ fn nav_marks_left_unset_keep_their_defaults() {
     assert!(nav.icons.by_extension.is_empty(), "no marks are built in");
     assert!(nav.type_nav.enabled, "on by default");
 }
+
+/// `rm` is skipped by default, and the list is a list rather than a hard-coded name.
+#[test]
+fn the_commands_whose_history_is_not_offered_are_configurable() {
+    let stock = Settings::default();
+    assert_eq!(stock.suggest.skip_history, vec!["rm".to_string()]);
+
+    let (settings, problems) =
+        settings_from("oslo = { suggest = { skip_history = { 'shred', 'trash' } } }");
+    assert!(problems.is_empty(), "{problems:?}");
+    assert_eq!(
+        settings.suggest.skip_history,
+        vec!["shred".to_string(), "trash".to_string()]
+    );
+
+    // An empty list is a real answer — "offer history for everything" — and not a missing setting.
+    let (none, problems) = settings_from("oslo = { suggest = { skip_history = {} } }");
+    assert!(problems.is_empty(), "{problems:?}");
+    assert!(none.suggest.skip_history.is_empty());
+}

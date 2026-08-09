@@ -153,6 +153,21 @@ impl OsloHelper {
         highlight::paint(line, &ctx)
     }
 
+    /// Whether this line's command is one whose past arguments are worthless to offer back.
+    ///
+    /// See [`settings::Suggest::skip_history`]. Judged on the first word alone, which is the
+    /// command being run; anything a pipeline does further along is a different command with its
+    /// own answer, and a ghost only ever continues the line as a whole.
+    fn consumes_its_arguments(line: &str, names: &[String]) -> bool {
+        let Some(command) = line.split_whitespace().next() else {
+            return false;
+        };
+        // By the name as run, so `/bin/rm` and `rm` are the same command to a person who typed one
+        // of them and meant the other.
+        let command = command.rsplit('/').next().unwrap_or(command);
+        names.iter().any(|name| name == command)
+    }
+
     /// The ghost suggestion for `line`, in `oslo.suggest.sources` order, as plain text.
     ///
     /// Only at the end of the line: a suggestion *continues* what you have typed, so offering one
@@ -166,12 +181,15 @@ impl OsloHelper {
         if !oslo_base::feature::on(oslo_base::feature::at::SUGGEST) {
             return None;
         }
-        for source in &settings::current().suggest.sources {
+        let settings = settings::current();
+        let recallable = !Self::consumes_its_arguments(line, &settings.suggest.skip_history);
+        for source in &settings.suggest.sources {
             let found = match source {
                 // oslo's own set, not a flat editor history: `recall` is language-filtered and
                 // knows which directory you are standing in, so `cargo run --ex` answers with
                 // this project's example.
-                settings::Source::History => recall::suggest(line),
+                settings::Source::History if recallable => recall::suggest(line),
+                settings::Source::History => None,
                 settings::Source::Completion => self.command_hint(line, pos),
                 settings::Source::Path => self.path_hint(line, pos),
             };
