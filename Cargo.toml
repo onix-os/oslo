@@ -33,6 +33,19 @@ default = []
 #   edge or spreads is the design question this feature exists to answer.
 ssh = ["dep:maki", "dep:tokio"]
 
+# `vista` — the model behind the ghost prediction and the correction.
+#
+# **Off, for the same shape of reason `ssh` is.** What it buys is real and measured
+# (`docs/features/prediction-and-repair.md`), but it is a dependency oslo does not otherwise need
+# and 433 KB on a binary meant to be `/bin/sh`: 6,323,168 bytes without it against 6,766,848 with.
+# Without it the ghost comes from history, completions and `$PATH` — the sources that read what is
+# already on the machine — and the shell learns nothing, writes no model and reads none.
+#
+# With it, the model becomes a fourth suggestion source and brings `oslo.repair`, `oslo.predict.*`
+# and the correction drawn after a mistyped line. A config that wants to work in both builds asks
+# before using them: `if oslo.repair then … end`.
+vista = ["oslo-base/vista", "oslo-runtime/vista", "oslo-ui/vista"]
+
 [dependencies]
 # A fork of `makiko`, the one pure-Rust SSH client — no `cc`, no `ring`, no `-sys` crate that is
 # really C. Forked rather than depended on because upstream was last touched in March 2025, and a
@@ -161,6 +174,7 @@ harness = false
 name = "predict"
 path = "bench/predict.rs"
 harness = false
+required-features = ["vista"]
 
 # Measured, not assumed — the before/after is in PERF_AND_CODE.md.
 #

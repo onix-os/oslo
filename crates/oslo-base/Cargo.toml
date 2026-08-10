@@ -6,6 +6,7 @@ rust-version = "1.89"
 license = "MIT"
 description = "The bottom of oslo: the syntax tree, the error type, feature bits, the hook registry, and the tracking store."
 
+
 [dependencies]
 # The interpreter, for the two things down here that carry a Lua value: `ShellError::Lua` and the
 # payload a hook is fired with. Both point downward — this crate names the Lua *evaluator*, never
@@ -31,7 +32,7 @@ getrandom = "0.4"
 # **A commit, not a branch**, so a push upstream cannot change what oslo builds without an edit
 # here. Named `vista` locally while the package is `vista-recall`, which is what keeps every
 # `use vista::…` in this crate reading the way it did when the crate had one name.
-vista = { package = "vista-recall", git = "https://github.com/bresilla/vista", rev = "8ec5fa733de21f9aa21bda280241d4d638e27860", default-features = false, features = [
+vista = { package = "vista-recall", git = "https://github.com/bresilla/vista", rev = "8ec5fa733de21f9aa21bda280241d4d638e27860", optional = true, default-features = false, features = [
     "snapshot",
     "recent-cache",
 ] }
@@ -48,6 +49,11 @@ regex = { version = "1", default-features = false, features = [
 nix = { version = "0.29", features = ["hostname"] }
 
 [features]
+default = []
+# `vista` — the model behind ghost prediction and repair. Off, and the switch is here rather than
+# in the shell because this is where the crate it needs is named: without the feature
+# `vista-recall` is not compiled, not fetched, and not in the binary.
+vista = ["dep:vista"]
 # Exposes the lock and the reset that serialise tests touching the process-wide feature bitset.
 # Enabled by `oslo`'s dev-dependencies, so it is absent from any build that is not a test.
 testing = []

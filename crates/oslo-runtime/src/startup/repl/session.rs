@@ -82,13 +82,16 @@ pub(super) fn settle_stores(settings: &history::Settings) {
     //
     // Nothing is written for a session that keeps no history, which is the same gate the model was
     // read behind in `Tracker::start`. A model in this process at all means the gate let it in.
-    if !oslo_base::predict::ready() {
-        return;
-    }
-    if let Some(path) = oslo_base::predict::default_path(
-        std::env::var("XDG_DATA_HOME").ok().as_deref(),
-        std::env::var("HOME").ok().as_deref(),
-    ) {
-        oslo_base::predict::save_shared(&path);
+    #[cfg(feature = "vista")]
+    {
+        if !oslo_base::predict::ready() {
+            return;
+        }
+        if let Some(path) = oslo_base::predict::default_path(
+            std::env::var("XDG_DATA_HOME").ok().as_deref(),
+            std::env::var("HOME").ok().as_deref(),
+        ) {
+            oslo_base::predict::save_shared(&path);
+        }
     }
 }

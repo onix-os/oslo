@@ -21,6 +21,7 @@ pub mod paint;
 pub mod prompt;
 pub mod query;
 pub mod recall;
+#[cfg(feature = "vista")]
 pub mod repair;
 /// `on-report` — letting a config draw what the shell was going to draw.
 pub mod report;
@@ -198,10 +199,18 @@ impl OsloHelper {
                 // `recall` returns, since both continue what has been typed rather than replace
                 // it. Costs about 4 µs against the hint's 2.3 (`bench/predict.rs`), and nothing
                 // at all before the snapshot has loaded.
+                //
+                // **The name stays readable without the feature**, answering nothing rather than
+                // refusing to parse. A config is shared between machines and a build without
+                // `predict` should not reject one written for a build with it — an unusable source
+                // is skipped exactly like a source that had nothing to say.
+                #[cfg(feature = "vista")]
                 settings::Source::Prediction => oslo_base::predict::suggest_here(Some(line), 1)
                     .into_iter()
                     .find(|guess| guess.line.len() > line.len() && guess.line.starts_with(line))
                     .map(|guess| guess.line[line.len()..].to_string()),
+                #[cfg(not(feature = "vista"))]
+                settings::Source::Prediction => None,
             };
             if found.is_some() {
                 return found;
@@ -224,6 +233,7 @@ impl OsloHelper {
     /// **Only in shell**, for the same reason the command hint is: everything it can offer is a
     /// shell command, and proposing one at a Lua prompt would be proposing something that cannot
     /// run in the language being typed.
+    #[cfg(feature = "vista")]
     pub fn repair(&self, line: &str) -> Option<String> {
         if prompt::language().is_some_and(|language| language != "sh") {
             return None;
@@ -240,6 +250,7 @@ impl OsloHelper {
     /// Two styles, and they are one colour: the arrow and the words that were already right are the
     /// ordinary ghost, and the corrected words are that same colour reversed. See
     /// [`repair::annotate`] for why the bracketed words are the only thing emphasised.
+    #[cfg(feature = "vista")]
     pub fn paint_repair(&self, typed: &str, fixed: &str) -> String {
         let theme = theme::current();
         repair::annotate(

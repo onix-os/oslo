@@ -87,6 +87,7 @@ fn bench_hint(helper: &OsloHelper) {
 /// nor the start of one reaches the edit distance over every name on `$PATH`. Measure only the
 /// second and the feature looks fifteen times more expensive than the repaint it sits in; measure
 /// only the first and the worst case is hidden.
+#[cfg(feature = "vista")]
 fn bench_repair(helper: &OsloHelper) {
     for (line, what) in [
         ("cargo build --release", "a real command, the ordinary case"),
@@ -133,6 +134,7 @@ fn main() {
 
     bench_paint(&helper);
     bench_hint(&helper);
+    #[cfg(feature = "vista")]
     bench_repair(&helper);
     bench_settings();
 }

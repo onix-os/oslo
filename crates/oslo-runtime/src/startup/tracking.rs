@@ -73,6 +73,7 @@ impl Tracker {
         // costs 9.5 ms at ten thousand commands — several times oslo's whole startup, to produce
         // what a file already has. Detached like the sweep below: a prompt drawn before it lands
         // has nothing to predict from, and every command that runs feeds it regardless.
+        #[cfg(feature = "vista")]
         if let Some(path) = oslo_base::predict::default_path(
             std::env::var("XDG_DATA_HOME").ok().as_deref(),
             std::env::var("HOME").ok().as_deref(),
@@ -372,6 +373,7 @@ pub(super) fn record_outcome(history_id: u64, result: &Result<i32, ShellError>, 
     // exist until here. This is what lets it learn that a failure was followed by a retyping,
     // which is the whole of what repair is built on. Outside the store check: a shell with no
     // tracking database still has a model.
+    #[cfg(feature = "vista")]
     oslo_base::predict::settle(status);
     let Some(track) = track::store() else {
         return;

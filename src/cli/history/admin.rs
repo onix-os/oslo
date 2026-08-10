@@ -192,6 +192,7 @@ pub(super) fn clear_command(args: &[String]) -> Result<(), String> {
     // The predictor's snapshot is a distillation of exactly what was just deleted. A shell that
     // kept it would still be able to suggest a line the user asked it to forget, which is the
     // same leak as not clearing at all — only harder to notice.
+    #[cfg(feature = "vista")]
     if let Some(path) = oslo_base::predict::default_path(
         std::env::var("XDG_DATA_HOME").ok().as_deref(),
         std::env::var("HOME").ok().as_deref(),

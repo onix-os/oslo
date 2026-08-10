@@ -225,6 +225,10 @@ impl Assist for ShellAssist<'_> {
             .unwrap_or_else(|| text.to_string())
     }
 
+    // Without the model there is nothing to correct a line *to*, so the editor's default applies:
+    // `repair_text` answers `None` and nothing is ever drawn after the line. The keys keep their
+    // ordinary meanings, because `take_repair` is only reached when this returns something.
+    #[cfg(feature = "vista")]
     fn repair_text(&mut self, line: &str, cursor: usize) -> Option<String> {
         let helper = self.helper?;
         // At the end of the line only, like the suggestion: a correction offered while the cursor
@@ -235,6 +239,7 @@ impl Assist for ShellAssist<'_> {
         helper.repair(line)
     }
 
+    #[cfg(feature = "vista")]
     fn paint_repair(&mut self, typed: &str, fixed: &str) -> String {
         self.helper
             .map(|helper| helper.paint_repair(typed, fixed))

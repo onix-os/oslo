@@ -4,6 +4,15 @@ One model of the commands you actually run, answering two questions: *what are y
 (a ghost suggestion) and *what did you mean* (the correction, which is what `thefuck` does with two
 hundred hand-written rules and this does with none).
 
+> **Behind `--features vista`, and off by default.** It costs 433 KB — 6,323,168 bytes without it
+> against 6,766,848 with — on a binary meant to be `/bin/sh`, and everything else the shell does
+> works without it. A default build suggests from history, completions and `$PATH`; it learns
+> nothing, writes no model and reads none, and `oslo.repair` and `oslo.predict` are simply absent.
+>
+> ```sh
+> cargo build --release --features vista
+> ```
+
 <!-- demo:begin -->
 [![prediction-and-repair demo](https://asciinema.org/a/1262745.svg)](https://asciinema.org/a/1262745)
 <!-- demo:end -->

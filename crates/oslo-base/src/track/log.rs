@@ -218,6 +218,7 @@ impl super::Track {
         // A secret line never reaches this because it is never appended at all — the exclusion is
         // a property of the log rather than a rule repeated here, which is the strongest form it
         // could take.
+        #[cfg(feature = "vista")]
         if id.is_some() {
             crate::predict::record(&row, at as i64);
         }

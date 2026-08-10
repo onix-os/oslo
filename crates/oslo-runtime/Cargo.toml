@@ -5,6 +5,12 @@ edition = "2024"
 rust-version = "1.89"
 license = "MIT"
 description = "oslo's runtime: the Lua API a config is written against, the interpreter that owns it, and startup."
+[features]
+default = []
+# `vista` — the model behind the ghost prediction, the correction hint and `oslo.repair`. Off by
+# default; see the note on `oslo-base`.
+vista = ["oslo-base/vista", "oslo-ui/vista"]
+
 
 [dependencies]
 oslo-base = { path = "../oslo-base" }

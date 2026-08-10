@@ -246,6 +246,13 @@ what pressing a key will do.
 
 ## What you were about to type
 
+**Behind `--features vista`, and off by default.** A default build suggests from history,
+completions and `$PATH` — everything below this line needs the flag, which costs 433 KB:
+
+```sh
+cargo build --release --features vista
+```
+
 ```lua
 oslo.suggest.sources = { "predict", "history", "path" }
 ```
@@ -1017,6 +1024,32 @@ make verify       # fmt, line limits, README paths, tests, clippy, rustdoc — a
 make install      # to /usr/local/bin
 nix build         # static musl binary
 ```
+
+### Optional features
+
+Both are off, and both are off for the same reason: a shell that is going to be `/bin/sh` should
+carry what every session needs and nothing else.
+
+| feature | costs | brings |
+|---|---:|---|
+| `vista` | 433 KB | the model: `predict` as a suggestion source, `oslo.repair`, `oslo.predict.*`, and the correction drawn after a mistyped line |
+| `ssh` | ~600 KB | an SSH client in the shell. Unfinished — see the note in `Cargo.toml` |
+
+```sh
+cargo build --release --features vista
+```
+
+A config is written to work either way, because a build without the feature simply does not have
+the name:
+
+```lua
+oslo.keys["f4"] = function(line)
+  return oslo.repair and oslo.repair(line.text) or line.text
+end
+```
+
+`oslo.suggest.sources` still *parses* `"predict"` without the feature — a config is shared between
+machines, and a source that cannot answer is skipped exactly like one that had nothing to say.
 
 Every `.rs` file is under 600 lines, enforced by `scripts/check-loc.sh`.
 
