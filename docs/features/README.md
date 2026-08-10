@@ -7,6 +7,22 @@ and why it is built that way.
 Every claim in here was checked against the source. Where a design was forced by a measurement or by
 a bug, the document says so, because those are the sentences worth reading twice.
 
+## Two binaries
+
+A release publishes two per architecture, and one page below describes something only the first has:
+
+| | |
+|---|---|
+| `oslo` | every optional feature. `make build` |
+| `oslo-minimal` | none of them — the floor a distribution would ship as `/bin/sh`. `make build TYPE=minimal` |
+
+**[Prediction and repair](prediction-and-repair.md) is `oslo` only.** It is behind the `vista`
+cargo feature, so `oslo-minimal` has no model: it learns nothing, writes no `.model` file, offers no
+`predict` suggestions, draws no correction after a mistyped line, and has neither `oslo.repair` nor
+`oslo.predict`. Everything else on this page is in both. A config written for one runs under the
+other — `oslo.suggest.sources` still accepts `"predict"` and simply gets no answer from it — as long
+as it asks before calling a name: `if oslo.repair then … end`.
+
 Each document opens with a recording of the feature actually running. They are not screencasts
 somebody performed: every one is a script in [`scripts/demo`](../../scripts/demo/), driven into a
 real shell by [`record.sh`](../../scripts/demo/record.sh), so any of them can be made again after

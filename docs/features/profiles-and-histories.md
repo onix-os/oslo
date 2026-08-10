@@ -29,7 +29,8 @@ profile::store_path(xdg_data, home, ext)
         └─ $XDG_DATA_HOME/oslo/   (or ~/.local/share/oslo/), created 0700
              ├── claude.kv        events + projection + directories + run rows   0600
              ├── claude.kv.lock   held while the store is being opened
-             └── claude.model     the predictor's snapshot
+             └── claude.model     the predictor's snapshot — `oslo` only, never written by
+                                  `oslo-minimal`, which has no model
 ```
 
 **A name is a letter, then letters, digits, `_` or `-`, and at most 64 characters.** Nothing looser,

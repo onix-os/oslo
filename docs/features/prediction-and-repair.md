@@ -4,14 +4,25 @@ One model of the commands you actually run, answering two questions: *what are y
 (a ghost suggestion) and *what did you mean* (the correction, which is what `thefuck` does with two
 hundred hand-written rules and this does with none).
 
-> **Behind `--features vista`, and off by default.** It costs 433 KB — 6,323,168 bytes without it
-> against 6,766,848 with — on a binary meant to be `/bin/sh`, and everything else the shell does
-> works without it. A default build suggests from history, completions and `$PATH`; it learns
-> nothing, writes no model and reads none, and `oslo.repair` and `oslo.predict` are simply absent.
+> ## This is in `oslo`, not in `oslo-minimal`
+>
+> Everything on this page is behind the **`vista`** cargo feature, which is off by default. A
+> release publishes two binaries per architecture and they differ in exactly this:
+>
+> | | has the model | `oslo.repair`, `oslo.predict` | ghost from |
+> |---|---|---|---|
+> | `oslo` | yes | yes | the model, then history, completions, `$PATH` |
+> | `oslo-minimal` | no | **absent** | history, completions, `$PATH` |
 >
 > ```sh
-> cargo build --release --features vista
+> make build                  # the full binary, every feature
+> make build TYPE=minimal     # the floor: no model, nothing to learn from
 > ```
+>
+> It costs 433 KB — 6,323,168 bytes without it against 6,766,848 with — on a binary meant to be
+> `/bin/sh`, which is the whole argument for a distribution shipping `oslo-minimal` as the system
+> shell. Without it the shell learns nothing, writes no model and reads none; a config that has to
+> work under both asks before using the names, `if oslo.repair then … end`.
 
 <!-- demo:begin -->
 [![prediction-and-repair demo](https://asciinema.org/a/1262745.svg)](https://asciinema.org/a/1262745)

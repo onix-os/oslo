@@ -37,6 +37,8 @@ about what pressing Right will do.
    ├───────────────────────────────────────────────────────────────────────────┤
    │ predict     the vista model; answers a whole line, kept only if that      │
    │             line starts with what you typed                               │
+   │             ONLY in a build with the `vista` feature — `oslo`, not        │
+   │             `oslo-minimal`. Elsewhere this row answers nothing.           │
    └───────────────────────────────────────────────────────────────────────────┘
                  │
                  │  the first source with an answer wins outright — no merging,
@@ -100,6 +102,23 @@ and it is **not in the default order** until it has been measured against the hi
 real corpus. Because vista matches on containment rather than prefix, `suggest` keeps only the
 guesses that genuinely start with the typed line.
 
+**And it is the only source that is not in every build.** `predict` needs the `vista` cargo
+feature, which the published `oslo` has and `oslo-minimal` does not; see
+[prediction-and-repair](prediction-and-repair.md). The other three read what is already on the
+machine — your history, the completion specs, the filesystem — so they are always there.
+
+The name still *parses* in a build without the model, answering nothing rather than refusing the
+config. That is deliberate: a config is shared between machines, and a source that cannot answer is
+skipped exactly like one that had nothing to say. The practical consequence is that the line below
+is a safe thing to write on a machine you have not checked:
+
+```lua
+oslo.suggest.sources = { "predict", "history", "path" }
+```
+
+Under `oslo` the model answers first; under `oslo-minimal` it is silently skipped and history
+answers. Nothing errors either way.
+
 ### Drawing and accepting
 
 The tail is painted in `theme.syntax.autosuggestion` — an explicit grey, index 240 dark and 250
@@ -132,7 +151,7 @@ means different things in different projects, and a flat history only knows whic
 
 ```lua
 oslo.suggest.sources = { "history", "completion", "path" }   -- the default order
-oslo.suggest.sources = { "predict", "history", "path" }      -- ask the model first
+oslo.suggest.sources = { "predict", "history", "path" }      -- ask the model first; `oslo` only
 oslo.suggest.sources = {}                                    -- no suggestions at all
 
 oslo.suggest.skip_history = { "rm", "shred", "trash" }       -- {} means every command
@@ -146,8 +165,9 @@ oslo.theme = { syntax = { autosuggestion = { fg = "244", italic = true } } }
 ```
 
 Source names: `history`; `completion` or `completions`; `path`, `paths` or `file`; `predict` or
-`prediction`. A name nothing answers to is reported when the config is read rather than silently
-turning a source off. Duplicates are dropped and the written order is kept.
+`prediction` — the last of which needs the `vista` feature to *answer*, though it always parses.
+A name nothing answers to is reported when the config is read rather than silently turning a source
+off. Duplicates are dropped and the written order is kept.
 
 `oslo.keys` is consulted before `oslo.suggest.accept`, so a key named in both does what `oslo.keys`
 says. To turn suggestions off for a while without losing what the config said:
@@ -189,6 +209,9 @@ first time and 0.8 ms once the answer had been remembered — 86 µs on the slow
 - Nothing is suggested from the middle of a line, or for an empty one.
 - A multi-line history entry is never offered, from either the store or the flat set. Ghost text is
   one row, and printing embedded newlines would strand the tail under the prompt.
+- The `predict` source is absent from a build without the `vista` feature, which includes the
+  published `oslo-minimal`. It is named in the config either way and simply answers nothing there,
+  so a shared config does not break — but nothing announces that it is inert.
 - The `predict` source carries no language filter — `Model::next` sends only the partial line, so
   the mode a command was learnt under does not narrow the query. `path` is not language-filtered
   either; only `history` and `completion` are.

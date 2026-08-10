@@ -85,7 +85,7 @@ command:
 | the line on screen | `gco main` | `git checkout main` |
 | the command log and `$HISTFILE` | `gco main` | `git checkout main` |
 | what the finder recalls | `gco main` | `git checkout main` |
-| what the prediction model learns | `gco main` | `git checkout main` |
+| what the prediction model learns (`oslo` only) | `gco main` | `git checkout main` |
 | what runs | `git checkout main` | `git checkout main` |
 
 The log is written from the line you accepted, so an alias puts the shortcut in your history and an

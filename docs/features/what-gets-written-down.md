@@ -116,6 +116,11 @@ consecutively and the model reads them as consecutive commands: it learns a tran
 happened. That is a known hole, written down in `predict/mod.rs` rather than papered over. Advancing
 the counter for a line that is not written would make the omission visible; it is not done today.
 
+Everything in that paragraph is about a build that *has* a model. `seq` is written either way — it
+is a property of the log, not of the predictor — but in `oslo-minimal` nothing reads it, because the
+`vista` feature is off and there is no model to mislead. See
+[prediction-and-repair](prediction-and-repair.md).
+
 ### The log is a projection of events
 
 Every write to the log also writes a portable event, and the local rows are derived from those
