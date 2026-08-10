@@ -240,7 +240,9 @@ fn vscode_selects_one_rich_lifecycle() {
     shell.wait_for_text("\x1b]633;B\x1b\\");
     shell.send(b"true\n");
     shell.wait_for_text("\x1b]633;D;0\x1b\\");
-    shell.wait_for_text("\x1b]633;B\x1b\\");
+    // The *second* `B`: one per prompt, and the first is still in the transcript, so waiting for
+    // it by text alone returns immediately and leaves the trailing marks to a 50 ms race.
+    shell.wait_for_text_count("\x1b]633;B\x1b\\", 2);
     shell.drain_for(Duration::from_millis(50));
 
     assert_eq!(vscode_kinds(&shell.transcript), "ABECDAB");
