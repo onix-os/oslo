@@ -33,7 +33,7 @@ $(info ------------------------------------------)
 $(info Project: $(PROJECT_NAME) v$(PROJECT_VERSION))
 $(info ------------------------------------------)
 
-.PHONY: build b dev check-static compile c run r test test-terminal t check check-all test-all check-loc check-readme print-name clippy rustdoc fmt fmt-check clean verify vm vm-distro vm-arch install uninstall release help h
+.PHONY: build build-full b dev check-static compile c run r test test-terminal t check check-all test-all check-loc check-readme print-name clippy rustdoc fmt fmt-check clean verify vm vm-distro vm-arch install uninstall release help h
 
 build:
 	@RUSTFLAGS="$(STATIC_RUSTFLAGS)" $(CARGO) build --release --target $(TARGET) --bin $(PROJECT_NAME)
@@ -41,6 +41,13 @@ build:
 	@ls -l "$(BIN)" | awk '{printf "%s  %.2f MB\n", $$NF, $$5/1048576}'
 
 b: build
+
+# The same binary with every optional feature a user should have. See `full` in Cargo.toml for why
+# this is not `--all-features`.
+build-full:
+	@RUSTFLAGS="$(STATIC_RUSTFLAGS)" $(CARGO) build --release --target $(TARGET) --bin $(PROJECT_NAME) --features full
+	@$(MAKE) --no-print-directory check-static
+	@ls -l "$(BIN)" | awk '{printf "%s  %.2f MB\n", $$NF, $$5/1048576}'
 
 # "Static" is a claim about the ELF, so check the ELF. `ldd` is not enough: it prints
 # "statically linked" for a musl binary that still has an INTERP and will not start.
@@ -126,13 +133,17 @@ check-loc:
 check-readme:
 	@./scripts/check-readme.sh
 
-# The `[features]` section this note used to wait for now exists — `ssh`, off by default — so the
-# feature *is* built by the gate: `clippy` already runs `--all-features`, which compiles `maki` and
-# everything under it. `check-all` is kept for running that alone.
+# Both optional features — `ssh` and `vista` — are *compiled* by the gate, because `clippy` and
+# `rustdoc` run `--all-features`. `check-all` is kept for running that alone.
 #
 # `verify` still runs plain `check` and `test`, which is deliberate: the shipped artifact is the
 # default build, and a gate that only ever exercised `--all-features` would stop testing the thing
-# people actually get. The feature is compiled, not tested — it has nothing to test yet.
+# people actually get.
+#
+# **`vista` has tests that plain `verify` does not run**, unlike `ssh`, which has nothing to test
+# yet. They are one command, and worth it before touching the model or the editor's hint path:
+#
+#     PATH=/tmp/realbash:$PATH cargo test --features vista --all-targets $(OURS)
 # The VMs are deliberately *not* in `verify`: each needs a musl toolchain, qemu and the network,
 # and takes minutes. They answer questions a checkout cannot — whether the release artifact runs as
 # PID 1 on a foreign userland, and whether a distro's own init system runs on it.
@@ -200,6 +211,7 @@ help:
 	@echo "  test         Run all tests"
 	@echo "  test-terminal Run terminal PTY transcript tests"
 	@echo "  check        Run cargo check on all targets"
+	@echo "  build-full   Static release with every user-facing feature (vista)"
 	@echo "  check-all    Run cargo check on all targets/all features"
 	@echo "  test-all     Run cargo test on all targets/all features"
 	@echo "  clippy       Run clippy with warnings denied"
