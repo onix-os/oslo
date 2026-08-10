@@ -173,6 +173,13 @@ pub enum Source {
     Completion,
     /// A file or directory.
     Path,
+    /// What the model thinks comes next.
+    ///
+    /// **Not in the default order.** It is the only source that can offer a line you have not
+    /// typed *here* before, which is its value and its risk, and it is worth having only once it
+    /// has been measured against `History` on a real history rather than assumed to be better.
+    /// Ask for it by name until then.
+    Prediction,
 }
 
 impl Source {
@@ -181,6 +188,7 @@ impl Source {
             "history" => Some(Source::History),
             "completion" | "completions" => Some(Source::Completion),
             "path" | "paths" | "file" => Some(Source::Path),
+            "predict" | "prediction" => Some(Source::Prediction),
             _ => None,
         }
     }

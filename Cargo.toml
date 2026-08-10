@@ -138,6 +138,7 @@ members = [
   "vendor/brush-parser",
   "vendor/full_moon",
   "vendor/full_moon/derive",
+  "vendor/vista",
 ]
 
 
@@ -152,6 +153,11 @@ harness = false
 [[bench]]
 name = "keystroke"
 path = "bench/keystroke.rs"
+harness = false
+
+[[bench]]
+name = "predict"
+path = "bench/predict.rs"
 harness = false
 
 # Measured, not assumed — the before/after is in PERF_AND_CODE.md.

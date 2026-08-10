@@ -21,6 +21,7 @@ pub mod paint;
 pub mod prompt;
 pub mod query;
 pub mod recall;
+pub mod repair;
 /// `on-report` — letting a config draw what the shell was going to draw.
 pub mod report;
 pub mod row;
@@ -192,6 +193,15 @@ impl OsloHelper {
                 settings::Source::History => None,
                 settings::Source::Completion => self.command_hint(line, pos),
                 settings::Source::Path => self.path_hint(line, pos),
+                // The model, which knows what usually follows what you have been doing. It
+                // answers with a whole line, so what is offered is the remainder — the same shape
+                // `recall` returns, since both continue what has been typed rather than replace
+                // it. Costs about 4 µs against the hint's 2.3 (`bench/predict.rs`), and nothing
+                // at all before the snapshot has loaded.
+                settings::Source::Prediction => oslo_base::predict::suggest_here(Some(line), 1)
+                    .into_iter()
+                    .find(|guess| guess.line.len() > line.len() && guess.line.starts_with(line))
+                    .map(|guess| guess.line[line.len()..].to_string()),
             };
             if found.is_some() {
                 return found;
@@ -207,6 +217,38 @@ impl OsloHelper {
     pub fn paint_hint(&self, hint: &str) -> String {
         let theme = theme::current();
         theme.syntax.autosuggestion.paint(hint, theme::depth())
+    }
+
+    /// What the line probably should have said, or nothing when it looks fine.
+    ///
+    /// **Only in shell**, for the same reason the command hint is: everything it can offer is a
+    /// shell command, and proposing one at a Lua prompt would be proposing something that cannot
+    /// run in the language being typed.
+    pub fn repair(&self, line: &str) -> Option<String> {
+        if prompt::language().is_some_and(|language| language != "sh") {
+            return None;
+        }
+        let env = self.env.lock().unwrap();
+        let path = env.var("PATH").unwrap_or_default().to_string();
+        let known =
+            |name: &str| env.is_builtin(name) || env.alias(name).is_some() || env.is_function(name);
+        repair::of(line, &path, &known)
+    }
+
+    /// Draw the correction that goes after a mistyped line, marking only what changed.
+    ///
+    /// Two styles, and they are one colour: the arrow and the words that were already right are the
+    /// ordinary ghost, and the corrected words are that same colour reversed. See
+    /// [`repair::annotate`] for why the bracketed words are the only thing emphasised.
+    pub fn paint_repair(&self, typed: &str, fixed: &str) -> String {
+        let theme = theme::current();
+        repair::annotate(
+            typed,
+            fixed,
+            &theme.syntax.autosuggestion,
+            &theme.syntax.repair,
+            theme::depth(),
+        )
     }
 
     /// Complete the word at `pos`, recording an unambiguous answer as an acceptance.

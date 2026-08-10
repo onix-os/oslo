@@ -1,0 +1,32 @@
+# Abbreviations: a short word that becomes the real command as you type the space after it.
+cols 120
+rows 20
+speed 0.08
+
+run abbr gco 'git checkout'
+run abbr gc 'git commit -m "%"'
+wait 0.8
+
+# The space is the trigger, and the expansion supplies its own — one edit, no flicker.
+type gco
+wait 1.6
+key Space
+wait 2.2
+type main
+wait 0.8
+key Enter
+wait 1.8
+
+# % says where the cursor lands: inside the quotes.
+type gc
+wait 1.4
+key Space
+wait 2.4
+type parser: handle empty input
+wait 2.2
+key C-c
+wait 0.8
+
+# What was inserted is text, so history holds the command, never the shortcut.
+run history | tail -2
+wait 3.0

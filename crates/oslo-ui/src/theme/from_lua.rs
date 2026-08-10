@@ -174,7 +174,29 @@ fn read_syntax(table: &oslo_lua::Table, into: &mut Syntax, problems: &mut Vec<St
         &mut into.autosuggestion,
         problems,
     );
+    // `repair` inherits `autosuggestion` **reversed** unless named, the same rule `builtin` follows
+    // for `command` and for the same reason: the correction is the ghost's colour turned inside
+    // out, so a theme that recolours the ghost and says nothing about the repair should not end up
+    // with two unrelated greys on the same line.
+    let ghosted = !matches!(table.get(&Value::str("autosuggestion")), Value::Nil);
+    match style(
+        &table.get(&Value::str("repair")),
+        &format!("{p}.repair"),
+        problems,
+    ) {
+        Some(chosen) => into.repair = chosen,
+        None if ghosted => into.repair = reversed(into.autosuggestion),
+        None => {}
+    }
     field(table, "match_bracket", p, &mut into.match_bracket, problems);
+}
+
+/// A style as its own inverse: the same colour, swapped with the background.
+fn reversed(style: Style) -> Style {
+    Style {
+        reverse: true,
+        ..style
+    }
 }
 
 fn read_pager(table: &oslo_lua::Table, into: &mut Pager, problems: &mut Vec<String>) {
@@ -379,7 +401,8 @@ mod tests {
                  option = '25', glob = '26', number = '27', assignment = '28',
                  single_quote = '29', double_quote = '30', escape = '31',
                  operator = '32', redirection = '33', ['end'] = '34', comment = '35',
-                 variable = '36', autosuggestion = '37', match_bracket = '38'
+                 variable = '36', autosuggestion = '37', match_bracket = '38',
+                 repair = '39'
                },
                pager = {
                  bg = '#101010', text = '40', text_sel = '41', sel_bg = '#202020',
@@ -420,11 +443,12 @@ mod tests {
             ("comment", s.comment != ds.comment),
             ("variable", s.variable != ds.variable),
             ("autosuggestion", s.autosuggestion != ds.autosuggestion),
+            ("repair", s.repair != ds.repair),
             ("match_bracket", s.match_bracket != ds.match_bracket),
         ];
         assert_eq!(
             syntax.len(),
-            22,
+            23,
             "a syntax role was added without a case here"
         );
 

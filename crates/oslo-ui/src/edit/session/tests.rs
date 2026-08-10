@@ -8,8 +8,8 @@ use super::*;
 
 /// Feed a sequence of keys and hand back the line.
 fn run(start: &str, keys: &[Key]) -> (Session, Vec<Step>) {
-    // The emacs keymap, explicitly: vi mode is the default, and these assert what a key does when
-    // it is *not* a vi command.
+    // The emacs keymap, explicitly rather than by default: these assert what a key does when it is
+    // *not* a vi command, and a session built from the config follows whatever `oslo.vi.enabled` says.
     let mut session = Session {
         vi: None,
         ..Session::new(start, start.chars().count())
@@ -130,12 +130,17 @@ struct Canned {
     typed: Option<String>,
     /// What the ghost suggestion would add, if anything.
     hint: Option<String>,
+    /// What the line should have said, if it looks mistyped.
+    repair: Option<String>,
 }
 
 impl Assist for Canned {
     /// As the real one does: no suggestion unless the cursor is at the end of the line.
     fn hint_text(&mut self, line: &str, cursor: usize) -> Option<String> {
         (cursor >= line.chars().count()).then(|| self.hint.clone())?
+    }
+    fn repair_text(&mut self, line: &str, cursor: usize) -> Option<String> {
+        (cursor >= line.chars().count()).then(|| self.repair.clone())?
     }
     fn history_prev(&mut self, line: &str) -> Option<String> {
         let entry = self.history.get(self.at)?.clone();
@@ -590,3 +595,6 @@ fn multiline_paste_inserts_without_submitting() {
     );
     assert_eq!(session.buffer.text(), "echo one\necho two");
 }
+
+#[path = "tests/taking.rs"]
+mod taking;

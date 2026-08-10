@@ -1,0 +1,26 @@
+# rm: recoverable at a prompt, POSIX rm everywhere else.
+cols 120
+rows 20
+speed 0.08
+
+# A file and a non-empty directory, no -r, and nothing is unlinked: both are moved aside.
+run rm -v Cargo.toml build
+wait 1.8
+run ls /tmp/build
+wait 1.6
+
+# Which makes a mistake one mv away from undone.
+run mv /tmp/Cargo.toml /tmp/build .
+wait 0.8
+
+clear
+run # POSIX rm: ask for it, or be a script
+wait 0.6
+run rm -s build
+wait 2.2
+
+# And a script never had anything else.
+run echo rm build > clean.sh
+wait 0.6
+run /proc/$$/exe clean.sh
+wait 2.2

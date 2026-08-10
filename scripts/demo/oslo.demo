@@ -1,0 +1,49 @@
+# The README recording: four things no other shell does, in under a minute.
+cols 120
+rows 20
+speed 0.06
+
+# 1. The pipe carries rows, and the filter is Lua.
+run ls /usr/lib | where 'not is_dir and size > 1e6' | sort-by size | last 3 | cols name size_human
+wait 2.6
+clear
+
+# 2. One prompt, two languages. Shift-Tab keeps the line exactly where it is.
+run export greeting=hello
+wait 0.7
+type print(greeting .. " from lua")
+wait 1.6
+key BTab
+wait 1.8
+key Enter
+wait 1.8
+key BTab
+wait 1.0
+clear
+
+# 3. It learns what you run, and offers it back.
+run echo deploy --target staging
+wait 1.0
+type echo dep
+wait 2.4
+key Right
+wait 1.2
+key Enter
+wait 1.5
+clear
+
+# 4. And it knows what you meant. `lsblk` has never been run here — that one comes from $PATH.
+type lsvlk
+wait 2.4
+key Right
+wait 1.0
+key Enter
+wait 1.6
+
+# The other half: a command that has already run, and failed.
+run ehco deploy --target staging
+wait 1.2
+key F4
+wait 2.4
+key Enter
+wait 1.8

@@ -1,0 +1,41 @@
+# nav: walk the tree by typing, and leave the shell where you stopped.
+cols 120
+rows 20
+speed 0.08
+
+run pwd
+wait 0.8
+
+run nav
+wait 2.0
+
+# ↑↓ move, → walks in, ← comes back — and the row you came from is still selected.
+key Down
+key Down
+key Up
+wait 1.4
+key Right
+wait 2.2
+key Left
+wait 1.8
+
+# . toggles dotfiles, ? toggles the legend.
+type .
+wait 2.4
+type .
+wait 0.8
+type ?
+wait 2.6
+type ?
+wait 1.0
+
+# Typing a name that leaves one directory standing walks into it, with no Enter — and the
+# rest of the word, the "c" here, is dropped rather than searched for in the new directory.
+type src
+wait 2.6
+
+# Escape cds the shell to whatever is on screen.
+key Escape
+wait 1.4
+run pwd
+wait 2.0

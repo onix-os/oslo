@@ -1,0 +1,36 @@
+# Directory environments: an .envrc is inert until you allow it, and comes back out when you leave.
+#
+# No `;` in a typed line — tmux send-keys reads a lone `;` as a command separator and eats it.
+#
+# Re-recording note: `direnv allow` writes a token keyed on this file's path *and* contents, so the
+# blocked beat only plays on a store that has not already allowed this exact .envrc. Delete
+# $XDG_DATA_HOME/oslo/direnv/allow/$({ echo $PWD/api/.envrc; cat api/.envrc; } | sha256sum) first.
+cols 120
+rows 20
+speed 0.05
+
+# Point the personal direnvrc somewhere empty, so the report is the project's own doing and not
+# whatever the person recording keeps in ~/.config/direnv.
+run export DIRENV_CONFIG=/none
+clear
+
+# A project with an .envrc written for direnv — PATH_add and all — and no direnv installed.
+run mkdir -p api/bin && printf 'export DATABASE_URL=postgres:///app_dev\nPATH_add ./bin\n' > api/.envrc
+wait 1.0
+
+# Walking in does not run it. A file that arrives with a repository does not get to execute.
+run cd api
+wait 2.3
+
+run direnv allow
+wait 2.8
+
+run echo $DATABASE_URL
+wait 1.5
+
+# Walking out puts the environment back exactly as it was.
+run cd ~
+wait 2.3
+
+run echo "[$DATABASE_URL]"
+wait 1.8

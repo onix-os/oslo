@@ -1,0 +1,28 @@
+# Hooks: moments in the shell's life that a config — or the prompt — attaches to.
+cols 120
+rows 20
+speed 0.04
+
+# The config's own pre-cmd handler rewrites the line before it runs.
+run # pre-cmd rewrites: cat on a directory means ls
+wait 1.0
+run cat src
+wait 1.8
+
+# A handler attached from the prompt. `cd` is the alias for post-change-dir.
+run = oslo.on.cd(function(d) print("[A] "..d.to) end)
+wait 0.8
+run cd src
+wait 2.0
+
+# Attaching again adds; it never replaces. Both fire, in the order they attached.
+run = h = oslo.on.cd(function() print("[B] too") end)
+wait 0.8
+run cd ..
+wait 2.2
+
+# The handle takes that one back off and leaves the other one alone.
+run = h:remove()
+wait 0.8
+run cd docs
+wait 2.2

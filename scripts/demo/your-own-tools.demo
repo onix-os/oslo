@@ -1,0 +1,24 @@
+# Your own tools: a Lua tool that makes rows, and a Lua builtin the shell treats as its own.
+cols 120
+rows 20
+speed 0.035
+
+# `=` sends one line to Lua. Three lines of it and /proc/mounts is a source of rows.
+run =oslo.register_tool{name="mounts", rows=function() local r={} for _,l in ipairs(oslo.fs.lines("/proc/mounts")) do local d,p,k=l:match("(%S+) (%S+) (%S+)") r[#r+1]={device=d,point=p,kind=k} end return r end}
+wait 0.6
+run mounts | where 'kind == "ext4"' | cols point device
+wait 2.2
+
+# The registry is read by the pipeline planner and by nothing else.
+run mounts   # a tool is not a command on its own
+wait 2.0
+
+clear
+
+# The other half: a builtin, in every sense the shell has one.
+run =oslo.register_builtin("hi", function(argv) print("hi " .. (argv[2] or "there")) end)
+wait 0.6
+run type hi
+wait 1.5
+run hi world | tr a-z A-Z
+wait 2.0

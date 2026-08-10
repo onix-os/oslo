@@ -225,6 +225,22 @@ impl Assist for ShellAssist<'_> {
             .unwrap_or_else(|| text.to_string())
     }
 
+    fn repair_text(&mut self, line: &str, cursor: usize) -> Option<String> {
+        let helper = self.helper?;
+        // At the end of the line only, like the suggestion: a correction offered while the cursor
+        // is mid-word is about a line the user has not finished saying.
+        if cursor < line.chars().count() {
+            return None;
+        }
+        helper.repair(line)
+    }
+
+    fn paint_repair(&mut self, typed: &str, fixed: &str) -> String {
+        self.helper
+            .map(|helper| helper.paint_repair(typed, fixed))
+            .unwrap_or_else(|| fixed.to_string())
+    }
+
     /// Tab. Runs the whole interaction — the dropdown draws itself and takes its own keys — and
     /// answers with the line it produced.
     fn complete(

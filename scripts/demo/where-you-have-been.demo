@@ -1,0 +1,26 @@
+# Where you have been: the directory ring, cd -N, cd root, and cd by a name you have visited.
+cols 120
+rows 20
+speed 0.08
+
+run cd src
+run cd ../docs
+run cd ../build
+wait 0.8
+
+# every move the shell made, newest first, numbered by how far back it is
+run dirh
+wait 2.6
+
+# that number is the one cd takes
+run cd -2
+wait 2.2
+
+# no docs in here — but the shell has been in one
+run ls
+wait 1.6
+run cd docs
+wait 2.4
+
+run cd root
+wait 2.2

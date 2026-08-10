@@ -1,0 +1,25 @@
+# Structured pipelines: the same pipe, carrying rows instead of bytes.
+cols 120
+rows 20
+speed 0.05
+
+# What every shell does: sort compares the rendered size as text, so K lands after M.
+run # bytes on the pipe
+wait 0.6
+run ls -lh /usr/lib | sort -k5 | tail -3
+wait 2.2
+
+# oslo's own verbs on the same question: sort-by orders by the number of bytes.
+run # rows on the pipe
+wait 0.6
+run ls /usr/lib | sort-by size | last 3 | cols name size_human
+wait 2.8
+clear
+
+# The filter is Lua, and every column of the row is one of its variables.
+run ls /usr/lib | where 'not is_dir and size > 1e6' | cols name size_human
+wait 2.6
+
+# The way out: the same rows as data, sizes as their exact byte counts.
+run ls /usr/lib | sort-by size | last 2 | cols name size | to json
+wait 2.6
