@@ -200,6 +200,12 @@ pub struct Syntax {
     pub comment: Style,
     pub variable: Style,
     pub autosuggestion: Style,
+    /// The correction drawn after a line that looks mistyped.
+    ///
+    /// Reversed rather than coloured, and that is the whole design: a ghost suggestion is text you
+    /// might be about to have, so it recedes; this is the shell disagreeing with what you typed,
+    /// which is the opposite job. `oslo.theme.styles` overrides it like any other entry.
+    pub repair: Style,
     pub match_bracket: Style,
 }
 
@@ -257,6 +263,10 @@ impl Syntax {
             comment: rgb(0x6e, 0x77, 0x81),
             // Light in both palettes, and for the same reason: it has to read as not-yet-text.
             autosuggestion: Style::fg(Color::Indexed(250)),
+            repair: Style {
+                reverse: true,
+                ..Style::default()
+            },
             match_bracket: Style {
                 bold: true,
                 ..Style::default()
@@ -347,6 +357,10 @@ impl Default for Syntax {
             // say how far behind. The cost of naming an exact grey is that a sixteen-colour
             // terminal rounds it to whichever slot is nearest, which is not necessarily a dim one.
             autosuggestion: Style::fg(Color::Indexed(240)),
+            repair: Style {
+                reverse: true,
+                ..Style::default()
+            },
             match_bracket: Style {
                 bold: true,
                 ..Style::default()

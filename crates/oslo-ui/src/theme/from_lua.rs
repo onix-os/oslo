@@ -174,6 +174,7 @@ fn read_syntax(table: &oslo_lua::Table, into: &mut Syntax, problems: &mut Vec<St
         &mut into.autosuggestion,
         problems,
     );
+    field(table, "repair", p, &mut into.repair, problems);
     field(table, "match_bracket", p, &mut into.match_bracket, problems);
 }
 
@@ -379,7 +380,8 @@ mod tests {
                  option = '25', glob = '26', number = '27', assignment = '28',
                  single_quote = '29', double_quote = '30', escape = '31',
                  operator = '32', redirection = '33', ['end'] = '34', comment = '35',
-                 variable = '36', autosuggestion = '37', match_bracket = '38'
+                 variable = '36', autosuggestion = '37', match_bracket = '38',
+                 repair = '39'
                },
                pager = {
                  bg = '#101010', text = '40', text_sel = '41', sel_bg = '#202020',
@@ -420,11 +422,12 @@ mod tests {
             ("comment", s.comment != ds.comment),
             ("variable", s.variable != ds.variable),
             ("autosuggestion", s.autosuggestion != ds.autosuggestion),
+            ("repair", s.repair != ds.repair),
             ("match_bracket", s.match_bracket != ds.match_bracket),
         ];
         assert_eq!(
             syntax.len(),
-            22,
+            23,
             "a syntax role was added without a case here"
         );
 

@@ -29,7 +29,36 @@
 //! cost a keystroke instead of a command.
 
 use super::util::{put, text};
+use crate::lua::engine::borrow_env;
 use oslo_lua::value::{Number, Table, Value};
+use oslo_shell::env::Environment;
+use oslo_ui::shell::Shell;
+use std::sync::{Arc, Mutex};
+
+/// `oslo.repair(line)` — the corrected line, or nil.
+///
+/// **Not `oslo.predict.repair`, and the difference is the whole reason it exists.** That one asks
+/// the model, which can only ever offer a command you have run. This asks the model *and* `$PATH`:
+/// `lsvlk` is a misspelling of a real program whether or not it has ever been typed here, and on a
+/// shell with no history the spelling check is the only one of the two that can answer at all.
+///
+/// This is what a key binding should call. It is the same answer the editor draws after the line.
+pub fn install(oslo: &mut Table, env: &Arc<Mutex<Environment>>) {
+    let env = Arc::clone(env);
+    put(oslo, "repair", move |_, args| {
+        let line = text(&args, 1, "oslo.repair")?;
+        let guard = borrow_env(&env)?;
+        let path = guard.var("PATH").unwrap_or_default().to_string();
+        let known = |name: &str| {
+            guard.is_builtin(name) || guard.alias(name).is_some() || guard.is_function(name)
+        };
+        Ok(vec![
+            oslo_ui::repair::of(&line, &path, &known)
+                .map(Value::str)
+                .unwrap_or(Value::Nil),
+        ])
+    });
+}
 
 /// Build the `oslo.predict` table.
 pub fn build() -> Value {

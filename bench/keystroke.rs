@@ -80,6 +80,36 @@ fn bench_hint(helper: &OsloHelper) {
     );
 }
 
+/// The repair hint, which every keystroke asks for **when there is no suggestion to draw**.
+///
+/// Both cases, because the gap between them is the design. A word that is a *prefix* of something
+/// runnable is answered by a binary search and costs nothing; only a word that is neither a command
+/// nor the start of one reaches the edit distance over every name on `$PATH`. Measure only the
+/// second and the feature looks fifteen times more expensive than the repaint it sits in; measure
+/// only the first and the worst case is hidden.
+fn bench_repair(helper: &OsloHelper) {
+    for (line, what) in [
+        ("cargo build --release", "a real command, the ordinary case"),
+        ("lsvlk", "a misspelling, edit distance over all of $PATH"),
+    ] {
+        let keys = prefixes(line);
+        let mut samples = Vec::new();
+        for _ in 0..7 {
+            let started = Instant::now();
+            for _ in 0..200 {
+                for key in &keys {
+                    std::hint::black_box(helper.repair(key));
+                }
+            }
+            samples.push(started.elapsed().as_secs_f64() / (200 * keys.len()) as f64);
+        }
+        println!(
+            "repair     {:>8.2} us/keystroke   ({what})",
+            median(samples) * 1e6
+        );
+    }
+}
+
 fn bench_settings() {
     let mut samples = Vec::new();
     for _ in 0..7 {
@@ -103,5 +133,6 @@ fn main() {
 
     bench_paint(&helper);
     bench_hint(&helper);
+    bench_repair(&helper);
     bench_settings();
 }

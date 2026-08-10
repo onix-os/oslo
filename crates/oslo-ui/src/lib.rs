@@ -21,6 +21,7 @@ pub mod paint;
 pub mod prompt;
 pub mod query;
 pub mod recall;
+pub mod repair;
 /// `on-report` — letting a config draw what the shell was going to draw.
 pub mod report;
 pub mod row;
@@ -216,6 +217,29 @@ impl OsloHelper {
     pub fn paint_hint(&self, hint: &str) -> String {
         let theme = theme::current();
         theme.syntax.autosuggestion.paint(hint, theme::depth())
+    }
+
+    /// What the line probably should have said, or nothing when it looks fine.
+    ///
+    /// **Only in shell**, for the same reason the command hint is: everything it can offer is a
+    /// shell command, and proposing one at a Lua prompt would be proposing something that cannot
+    /// run in the language being typed.
+    pub fn repair(&self, line: &str) -> Option<String> {
+        if prompt::language().is_some_and(|language| language != "sh") {
+            return None;
+        }
+        let env = self.env.lock().unwrap();
+        let path = env.var("PATH").unwrap_or_default().to_string();
+        let known =
+            |name: &str| env.is_builtin(name) || env.alias(name).is_some() || env.is_function(name);
+        repair::of(line, &path, &known)
+    }
+
+    /// Paint a correction in the repair style — reversed by default, so it reads as a disagreement
+    /// with the line rather than as more of it.
+    pub fn paint_repair(&self, text: &str) -> String {
+        let theme = theme::current();
+        theme.syntax.repair.paint(text, theme::depth())
     }
 
     /// Complete the word at `pos`, recording an unambiguous answer as an acceptance.

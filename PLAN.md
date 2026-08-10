@@ -114,6 +114,7 @@ All measured with a probe reachable from `main`, vendored, one feature at a time
 | After Phase 1 core | 6,327,232 | 0 | model unreachable from `main`; LTO drops it |
 | After Phase 2 | 6,844,608 | +517,376 | first checkpoint where it is reachable |
 | After Phases 3–4 | 6,852,800 | +525,568 | repair and `oslo.predict`, 8 KB |
+| After the inline hint | 6,861,024 | +533,792 | drawn correction and `oslo.repair`, 8 KB |
 
 `surface-indexes` is not taken, and Phase 3 is where that was settled rather than assumed. Built
 both ways against the case it exists for — a repair whose candidate is not a substring of anything
@@ -283,6 +284,40 @@ failed": `cargo build` that failed to compile is among the most predictive lines
 it is learned and marked failed. The line is narrower — it never *was* a command. The same rule
 stops a typo being suggested back at you for ever, which `RunRow::worth_suggesting` already refuses
 to do for the same reason.
+
+### The trigger that was actually wanted
+
+The key binding works, and it is still not what a person reaching for this wants: you have to *know*
+the line is wrong and *remember* the key. So the correction is drawn after the line as it is typed —
+reversed, because it is the shell disagreeing with text you already have rather than offering text
+you might be about to have — and Right takes it under the rule that already accepts a suggestion.
+Never both at once: a continuation exists when what was typed *starts* something, a correction when
+it *near-misses* something.
+
+**And `$PATH` had to join the model.** `lsvlk` is the case everybody tries first, and the model
+could not answer it — it had never seen `lsblk` run. `command_index::nearest` already knew, because
+it is what writes *did you mean lsblk?* after the failure. `oslo_ui::repair` asks both: the spelling
+of the command word first, since it works on a shell with no history, then the model for the whole
+line. `oslo.repair(line)` is the composed answer; `oslo.predict.repair` stays the model alone.
+
+**A likeness gate on the model's half.** `predict_aligned` will answer a well-formed line with a
+different command, which is a fine prediction and a terrible repair — drawn under every line anyone
+types, it would be a permanent second opinion. A proposal has to be within a bounded edit distance
+of what is on the line. Two edits by ten characters, not one, because the commonest typo of all is a
+transposition and Levenshtein charges two for it.
+
+**It sits on the keystroke path, so it was measured.** `nearest` walks every name on `$PATH`:
+
+| | µs/keystroke |
+|---|---:|
+| repaint, for scale | 2.1 |
+| ghost suggestion | 2.2 |
+| repair, first attempt | **30.4** |
+| repair, once a prefix of a real command is not a mistake | **0.22** |
+
+A word that begins something runnable is unfinished rather than wrong, and a binary search says so
+before the edit distance is reached. Typing `cargo build` now scans nothing at all; only a genuine
+near-miss pays the 30 µs, which is a keystroke that is about to show you something.
 
 ## Phase 4 — Lua
 

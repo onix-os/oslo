@@ -247,23 +247,39 @@ kept as a small file beside the history. It reads in a tenth of a millisecond at
 written once on the way out, so it costs the prompt nothing. A session that keeps no history
 (`HISTFILE=""`) neither reads it nor writes it, and `oslo history clear` deletes it.
 
-The same model answers the other question — what a line that failed was *meant* to be:
+## What you probably meant
 
-```lua
-oslo.keys["f4"] = function(line)
-  local fixed = oslo.predict.repair(line.text, 1)[1]
-  return fixed and fixed.line or line.text
-end
+```
+$ lsvlk lsblk
 ```
 
-`ehco install ripgrep` becomes `echo install ripgrep`, **in the editor**, because nothing here runs
-anything — the correction lands on your input line and Enter is still yours. There are no rules to
-maintain: a repair can only ever be built out of commands you have really run, which is the safety
-property a rule engine cannot offer. `oslo.predict.next(partial, n)` asks the other direction, and
-both answer a list of `{ line, probability }`.
+A line that looks mistyped is answered **before you run it**: the correction is drawn after the
+text, reversed, and Right takes it. It is a different claim from the ghost suggestion and so it is
+drawn differently — one is text you might be about to have, the other is the shell disagreeing with
+text you already have. They never appear at once, and the same key accepts whichever is showing.
+
+Two things know what you meant, and both are asked:
+
+- **`$PATH`**, for the command word. `lsvlk` is a misspelling of a real program whether or not it
+  has ever been typed here, so this works on a shell with no history at all.
+- **the model**, for the rest of the line. `echo hello wrold` needs something that has watched you
+  work, and only a proposal close enough to be a *retyping* is offered — a different command is a
+  prediction, not a correction.
+
+```lua
+oslo.keys["f4"] = function(line) return oslo.repair(line.text) or line.text end
+oslo.theme.styles["repair"] = { fg = "yellow" }   -- reversed by default
+```
+
+**Nothing here runs anything.** The correction lands on your input line and Enter is still yours,
+which is what makes a wrong guess cost a keystroke instead of a command. There are no rules to
+maintain either: a repair can only ever be built out of `$PATH` and commands you have really run.
 
 A command that never *was* a command — `ehco`, or anything else that exits 127 — is not learned, so
 a typo is never suggested back to you and stays repairable.
+
+`oslo.predict.next(partial, n)` and `oslo.predict.repair(line, n)` ask the model directly, and both
+answer a list of `{ line, probability }`.
 
 ## Your own tools
 
