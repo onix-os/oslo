@@ -174,8 +174,29 @@ fn read_syntax(table: &oslo_lua::Table, into: &mut Syntax, problems: &mut Vec<St
         &mut into.autosuggestion,
         problems,
     );
-    field(table, "repair", p, &mut into.repair, problems);
+    // `repair` inherits `autosuggestion` **reversed** unless named, the same rule `builtin` follows
+    // for `command` and for the same reason: the correction is the ghost's colour turned inside
+    // out, so a theme that recolours the ghost and says nothing about the repair should not end up
+    // with two unrelated greys on the same line.
+    let ghosted = !matches!(table.get(&Value::str("autosuggestion")), Value::Nil);
+    match style(
+        &table.get(&Value::str("repair")),
+        &format!("{p}.repair"),
+        problems,
+    ) {
+        Some(chosen) => into.repair = chosen,
+        None if ghosted => into.repair = reversed(into.autosuggestion),
+        None => {}
+    }
     field(table, "match_bracket", p, &mut into.match_bracket, problems);
+}
+
+/// A style as its own inverse: the same colour, swapped with the background.
+fn reversed(style: Style) -> Style {
+    Style {
+        reverse: true,
+        ..style
+    }
 }
 
 fn read_pager(table: &oslo_lua::Table, into: &mut Pager, problems: &mut Vec<String>) {

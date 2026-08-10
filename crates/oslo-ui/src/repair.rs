@@ -17,6 +17,7 @@
 //! and the same bounded edit distance decides it.
 
 use crate::command_index::{self, CommandIndex};
+use crate::theme::{Depth, Style};
 
 /// The corrected line, or nothing when there is no reason to think it is wrong.
 ///
@@ -84,6 +85,32 @@ fn plausible(typed: &str, proposal: &str) -> bool {
         return false;
     }
     command_index::edit_distance(typed, proposal, budget).is_some_and(|found| found <= budget)
+}
+
+/// The correction as it is drawn after the line: `-> [systemctl] status`.
+///
+/// **Only the words that changed are in brackets.** A correction shown whole makes you re-read the
+/// entire line to find the one character that moved; bracketed, the difference is the thing your
+/// eye lands on and the rest is there for context. That is also why the two styles are what they
+/// are — the brackets carry the emphasis, so the words around them are the ordinary ghost and do
+/// not compete with it.
+///
+/// Word-aligned by position, which is all a repair needs: a correction is a near-miss of the line,
+/// so the words are already in step. Anything past the end of the typed line counts as changed.
+pub fn annotate(typed: &str, fixed: &str, ghost: &Style, changed: &Style, depth: Depth) -> String {
+    let before: Vec<&str> = typed.split_whitespace().collect();
+    let mut out = ghost.paint("-> ", depth);
+    for (at, word) in fixed.split_whitespace().enumerate() {
+        if at > 0 {
+            out.push_str(&ghost.paint(" ", depth));
+        }
+        if before.get(at) == Some(&word) {
+            out.push_str(&ghost.paint(word, depth));
+        } else {
+            out.push_str(&changed.paint(&format!("[{word}]"), depth));
+        }
+    }
+    out
 }
 
 #[cfg(test)]

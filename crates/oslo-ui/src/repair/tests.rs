@@ -132,3 +132,63 @@ fn a_longer_line_may_differ_by_more() {
         "systemctl restart bluetoothd"
     ));
 }
+
+/// **Only the words that changed are bracketed**, and the arrow and the rest stay ghost.
+///
+/// Asserted on the plain text with styling off, so it is about *what is marked* rather than about
+/// which escape says so.
+#[test]
+fn only_the_changed_words_are_bracketed() {
+    let plain = Style::default();
+    let drawn = |typed, fixed| annotate(typed, fixed, &plain, &plain, Depth::None);
+
+    assert_eq!(drawn("lsvlk", "lsblk"), "-> [lsblk]");
+    assert_eq!(
+        drawn("systemclt status", "systemctl status"),
+        "-> [systemctl] status",
+        "the word that was already right is not marked"
+    );
+    assert_eq!(
+        drawn("echo hello wrold", "echo hello world"),
+        "-> echo hello [world]"
+    );
+}
+
+/// A correction longer than what was typed marks the words it added.
+#[test]
+fn a_word_with_nothing_to_compare_to_is_a_change() {
+    let plain = Style::default();
+    assert_eq!(
+        annotate("ls -l", "ls -l -a", &plain, &plain, Depth::None),
+        "-> ls -l [-a]"
+    );
+}
+
+/// The two styles are one colour: the ghost, and the ghost reversed.
+#[test]
+fn the_correction_is_the_ghost_inverted() {
+    let ghost = crate::theme::Syntax::default().autosuggestion;
+    let repair = crate::theme::Syntax::default().repair;
+    assert_eq!(repair.fg, ghost.fg, "the same colour");
+    assert!(repair.reverse && !ghost.reverse, "turned inside out");
+}
+
+/// The escapes themselves, because "the ghost's colour, reversed" is a claim about bytes.
+///
+/// The correction span carries `7` *and* the same colour the arrow does. Reverse alone would leave
+/// it whatever the terminal's default foreground happens to be, which is not the ghost's grey and
+/// is a different block on every colour scheme.
+#[test]
+fn the_correction_carries_the_ghost_colour_and_the_reverse() {
+    let s = crate::theme::Syntax::default();
+    assert_eq!(
+        annotate(
+            "lsvlk",
+            "lsblk",
+            &s.autosuggestion,
+            &s.repair,
+            Depth::Ansi256
+        ),
+        "\x1b[38;5;240m-> \x1b[0m\x1b[7;38;5;240m[lsblk]\x1b[0m"
+    );
+}

@@ -235,11 +235,20 @@ impl OsloHelper {
         repair::of(line, &path, &known)
     }
 
-    /// Paint a correction in the repair style — reversed by default, so it reads as a disagreement
-    /// with the line rather than as more of it.
-    pub fn paint_repair(&self, text: &str) -> String {
+    /// Draw the correction that goes after a mistyped line, marking only what changed.
+    ///
+    /// Two styles, and they are one colour: the arrow and the words that were already right are the
+    /// ordinary ghost, and the corrected words are that same colour reversed. See
+    /// [`repair::annotate`] for why the bracketed words are the only thing emphasised.
+    pub fn paint_repair(&self, typed: &str, fixed: &str) -> String {
         let theme = theme::current();
-        theme.syntax.repair.paint(text, theme::depth())
+        repair::annotate(
+            typed,
+            fixed,
+            &theme.syntax.autosuggestion,
+            &theme.syntax.repair,
+            theme::depth(),
+        )
     }
 
     /// Complete the word at `pos`, recording an unambiguous answer as an acceptance.

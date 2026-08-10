@@ -116,16 +116,16 @@ pub(super) fn draw(
     })
 }
 
-/// The correction, drawn after the line as ` lsblk ` rather than appended to it.
+/// The correction, drawn after the line as ` -> [lsblk]` rather than appended to it.
 ///
-/// **Spaces inside the styling, not outside.** The style is reversed, so the padding is what stops
-/// the correction touching the text it is about — a block that starts flush against the last
-/// character reads as part of the word.
+/// The leading space is outside the styling and the arrow is inside it: the gap belongs to the line
+/// rather than to the annotation, and a reversed block that starts flush against the last character
+/// typed would read as part of that word.
 fn repair(session: &Session, assist: &mut dyn Assist) -> Option<String> {
     let raw = session.buffer.text();
     let fixed = assist.repair_text(&raw, session.buffer.cursor())?;
     let safe = DisplayMap::new(&fixed);
-    Some(assist.paint_repair(&format!(" {} ", safe.plain())))
+    Some(format!(" {}", assist.paint_repair(&raw, safe.plain())))
 }
 
 pub(super) fn into_at(placed: &layout::Placed) -> screen::At {

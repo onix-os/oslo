@@ -263,9 +263,11 @@ impl Syntax {
             comment: rgb(0x6e, 0x77, 0x81),
             // Light in both palettes, and for the same reason: it has to read as not-yet-text.
             autosuggestion: Style::fg(Color::Indexed(250)),
+            // The ghost's own colour, turned inside out: the correction is the same kind of
+            // not-yet-text, saying the opposite thing about it.
             repair: Style {
                 reverse: true,
-                ..Style::default()
+                ..Style::fg(Color::Indexed(250))
             },
             match_bracket: Style {
                 bold: true,
@@ -359,7 +361,7 @@ impl Default for Syntax {
             autosuggestion: Style::fg(Color::Indexed(240)),
             repair: Style {
                 reverse: true,
-                ..Style::default()
+                ..Style::fg(Color::Indexed(240))
             },
             match_bracket: Style {
                 bold: true,

@@ -235,10 +235,10 @@ impl Assist for ShellAssist<'_> {
         helper.repair(line)
     }
 
-    fn paint_repair(&mut self, text: &str) -> String {
+    fn paint_repair(&mut self, typed: &str, fixed: &str) -> String {
         self.helper
-            .map(|helper| helper.paint_repair(text))
-            .unwrap_or_else(|| text.to_string())
+            .map(|helper| helper.paint_repair(typed, fixed))
+            .unwrap_or_else(|| fixed.to_string())
     }
 
     /// Tab. Runs the whole interaction — the dropdown draws itself and takes its own keys — and

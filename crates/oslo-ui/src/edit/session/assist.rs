@@ -38,9 +38,13 @@ pub trait Assist {
         None
     }
 
-    /// Apply trusted styling to terminal-safe repair text.
-    fn paint_repair(&mut self, text: &str) -> String {
-        text.to_string()
+    /// Draw the correction that goes after the line, given what was typed and what it should say.
+    ///
+    /// **Both, because the drawing is a comparison.** Only the words that changed are marked, so
+    /// this cannot be a function of the correction alone — and doing the diff here rather than in
+    /// the layout keeps the editor unaware of what a word is.
+    fn paint_repair(&mut self, _typed: &str, fixed: &str) -> String {
+        fixed.to_string()
     }
 
     /// Run completion through the editor's shared terminal event stream.

@@ -197,7 +197,7 @@ is what makes a cache unnecessary, and a cache stale between two terminals impos
 
 ### Colours
 
-Every one of the 54 roles — 22 syntax, 19 dropdown, 7 prompt, 5 widget — is settable, and each
+Every one of the 55 roles — 23 syntax, 19 dropdown, 7 prompt, 5 widget — is settable, and each
 takes an index or an RGB triplet:
 
 ```lua
@@ -250,13 +250,17 @@ written once on the way out, so it costs the prompt nothing. A session that keep
 ## What you probably meant
 
 ```
-$ lsvlk lsblk
+$ systemclt status -> [systemctl] status
 ```
 
-A line that looks mistyped is answered **before you run it**: the correction is drawn after the
-text, reversed, and Right takes it. It is a different claim from the ghost suggestion and so it is
-drawn differently — one is text you might be about to have, the other is the shell disagreeing with
-text you already have. They never appear at once, and the same key accepts whichever is showing.
+A line that looks mistyped is answered **before you run it**, and Right takes the correction. It is
+a different claim from the ghost suggestion and so it is drawn differently — one is text you might
+be about to have, the other is the shell disagreeing with text you already have. They never appear
+at once, and the same key accepts whichever is showing.
+
+**Only the words that changed are bracketed**, in the ghost's own colour reversed; the arrow and the
+words that were already right stay in the plain ghost grey. A correction shown whole makes you
+re-read the line to find the one character that moved.
 
 Two things know what you meant, and both are asked:
 
@@ -268,7 +272,7 @@ Two things know what you meant, and both are asked:
 
 ```lua
 oslo.keys["f4"] = function(line) return oslo.repair(line.text) or line.text end
-oslo.theme.styles["repair"] = { fg = "yellow" }   -- reversed by default
+oslo.theme = { syntax = { repair = { fg = "yellow", reverse = true } } }  -- follows the ghost otherwise
 ```
 
 **Nothing here runs anything.** The correction lands on your input line and Enter is still yours,
