@@ -5,6 +5,10 @@ and an **aggregate**, folded by directory and command line. The log knows the or
 happened in, the aggregate how often and how recently, and folding throws the first away — which is
 why there are two.
 
+<!-- demo:begin -->
+[![what-gets-written-down demo](https://asciinema.org/a/1262754.svg)](https://asciinema.org/a/1262754)
+<!-- demo:end -->
+
 ## How it works
 
 A command's exit status, its duration and the directory it ran in do not exist when the line is

@@ -5,6 +5,10 @@ what it is running, where a prompt ends and output begins, and which extra input
 editor may use. It exists because a terminal cannot infer any of that from the bytes it is shown —
 scrollback is just text unless the shell says otherwise.
 
+<!-- demo:begin -->
+[![terminal-integration demo](https://asciinema.org/a/1262750.svg)](https://asciinema.org/a/1262750)
+<!-- demo:end -->
+
 ## How it works
 
 Three things are decided before the first prompt is drawn, in this order: what the host *is*

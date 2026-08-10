@@ -4,6 +4,10 @@
 top of the working tree, and a name you have visited before. All of it hangs off the failure of an
 ordinary `cd`, so nothing a script does changes meaning.
 
+<!-- demo:begin -->
+[![where-you-have-been demo](https://asciinema.org/a/1262755.svg)](https://asciinema.org/a/1262755)
+<!-- demo:end -->
+
 ## How it works
 
 `builtin_cd` is a ladder and the order of its rungs is the whole safety argument. Options, arity,

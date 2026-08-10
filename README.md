@@ -10,6 +10,14 @@ oslo build.lua             # a Lua script — same command, no flag
 oslo -c 'echo hello'       # run a command
 ```
 
+<!-- demo:begin -->
+[![oslo](https://asciinema.org/a/1262743.svg)](https://asciinema.org/a/1262743)
+<!-- demo:end -->
+
+Rows on the pipe, two languages at one prompt, a shell that learns what you run — and knows what you
+meant. Every feature has its own recording in [docs/features](docs/features/), each made by a script
+in [scripts/demo](scripts/demo/) so it can be made again after the code changes.
+
 ---
 
 ## Two languages, one prompt

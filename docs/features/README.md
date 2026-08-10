@@ -7,6 +7,18 @@ and why it is built that way.
 Every claim in here was checked against the source. Where a design was forced by a measurement or by
 a bug, the document says so, because those are the sentences worth reading twice.
 
+Each document opens with a recording of the feature actually running. They are not screencasts
+somebody performed: every one is a script in [`scripts/demo`](../../scripts/demo/), driven into a
+real shell by [`record.sh`](../../scripts/demo/record.sh), so any of them can be made again after
+the code changes and a recording that stops matching the shell is a bug in one or the other.
+
+```sh
+scripts/demo/fixture.sh                          # the directory the demos run in
+scripts/demo/record.sh scripts/demo/nav.demo     # re-record one
+scripts/demo/publish.sh nav                      # upload it, remember the id
+scripts/demo/embed.sh                            # put the players back in the documents
+```
+
 ## The two languages
 
 | | |

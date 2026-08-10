@@ -5,6 +5,10 @@ decides which one an edge carries **before any stage runs**, by reading what eac
 never by looking at the bytes, because by the time output exists the producer has already chosen a
 form and paid to render it.
 
+<!-- demo:begin -->
+[![structured-pipelines demo](https://asciinema.org/a/1262749.svg)](https://asciinema.org/a/1262749)
+<!-- demo:end -->
+
 ## How it works
 
 Every command word is looked up in a registry of declarations. A declaration is two shapes: what

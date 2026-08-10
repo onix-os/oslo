@@ -1,0 +1,28 @@
+# Two languages, one prompt: Shift-Tab flips the prompt between sh and Lua, and = borrows Lua for one line.
+cols 120
+rows 20
+speed 0.08
+
+run export greeting=hello
+wait 1.0
+
+# A Lua line, typed at a shell prompt.
+type print(greeting)
+wait 2.0
+
+# Shift-Tab: the prompt marker turns from $ into λ and the line is left exactly where it was.
+key BTab
+wait 2.5
+key Enter
+wait 2.2
+
+# Back to shell.
+key BTab
+wait 1.8
+
+run # one Lua line, without leaving the shell prompt
+wait 1.2
+run =name = 'world'
+wait 1.4
+run echo hello $name
+wait 2.5

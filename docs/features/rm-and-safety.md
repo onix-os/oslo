@@ -5,6 +5,10 @@ unlinking it, and it takes a directory without `-r`. **In a script it is POSIX `
 else**, because a builtin by that name shadows `/bin/rm` for everything the shell runs, and oslo is
 meant to be `/bin/sh` on a distribution.
 
+<!-- demo:begin -->
+[![rm-and-safety demo](https://asciinema.org/a/1262747.svg)](https://asciinema.org/a/1262747)
+<!-- demo:end -->
+
 ## How it works
 
 Three decisions, in order: what the options are, what this shell is allowed to do, and what happens

@@ -1,0 +1,30 @@
+# Colours: one theme for everything the shell draws, and it answers to what is really there.
+cols 120
+rows 20
+speed 0.06
+
+# Every token painted by its role: command, option, string, glob, redirection, and the two
+# paths that exist get underlined.
+run grep -n "fn" src/*.rs > build/output.log
+wait 1.4
+
+# The same line, misspelt. The command that is not on $PATH goes red, the directory that is
+# not there loses its underline — before anything has run.
+type grpe -n "fn" src/*.rs > buidl/output.log
+wait 2.4
+key C-u
+wait 0.5
+
+# The palette is config, merged over the defaults and read once, when a shell starts.
+run mkdir -p /tmp/th/oslo
+run echo 'oslo.theme.syntax = {command="#ff79c6",valid_path="#ffb86c"}' > /tmp/th/oslo/config.lua
+wait 0.8
+run XDG_CONFIG_HOME=/tmp/th oslo
+wait 1.5
+
+# Same line, one shell later, in the colours that config named.
+type grep -n "fn" src/*.rs > build/output.log
+wait 2.6
+key C-u
+run exit
+wait 0.4

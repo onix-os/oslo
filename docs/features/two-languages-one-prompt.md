@@ -5,6 +5,10 @@ them without disturbing the line you are typing. It exists because a shell that 
 language by looking at the line would decide what `print(1)` means from whatever happens to be
 installed, and a shell whose meaning depends on that is one you cannot write scripts against.
 
+<!-- demo:begin -->
+[![two-languages-one-prompt demo](https://asciinema.org/a/1262753.svg)](https://asciinema.org/a/1262753)
+<!-- demo:end -->
+
 ## How it works
 
 The language is a single value in the read loop, `current` in

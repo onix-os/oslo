@@ -4,6 +4,10 @@ A profile is a database file, named by `$OSLO_PROFILE`. It exists because more t
 commands through this shell, and an agent that shells out writes thousands of lines into the
 history a person is trying to search.
 
+<!-- demo:begin -->
+[![profiles-and-histories demo](https://asciinema.org/a/1262746.svg)](https://asciinema.org/a/1262746)
+<!-- demo:end -->
+
 ## How it works
 
 There is no registry, no state file and no command that creates a profile. The variable names one,

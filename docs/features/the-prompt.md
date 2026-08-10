@@ -5,6 +5,10 @@ pieces** rather than one string. A string is opaque: once the prompt is one, not
 branch from the user's name, restyle one part, or drop the least important piece when the terminal
 is narrow — it can only be truncated, and truncation always eats the end.
 
+<!-- demo:begin -->
+[![the-prompt demo](https://asciinema.org/a/1262752.svg)](https://asciinema.org/a/1262752)
+<!-- demo:end -->
+
 ## How it works
 
 The facts are gathered once and handed to whatever is going to draw with them: `segment_context`

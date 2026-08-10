@@ -1,0 +1,22 @@
+# Terminal integration: what oslo tells the emulator it is running inside.
+cols 120
+rows 20
+speed 0.05
+
+# The snapshot is decided once, before the first prompt. Printing it re-queries nothing.
+run status terminal
+wait 2.8
+clear
+
+# The window title is oslo's, and a Lua function decides it.
+run =oslo.prompt.title = function(p) return "oslo> " .. (p.command or p.cwd) end
+wait 1.0
+run tmux display-message -p "title: #{pane_title}"
+wait 2.6
+clear
+
+# The marks themselves: one oslo session recorded by script(1), then the OSC it wrote.
+run printf "echo hi\nexit\n" | script -qc oslo /tmp/marks.log >/dev/null 2>&1
+wait 1.2
+run tr '\033' '\n' < /tmp/marks.log | grep '^]\(0\|7\|133\);'
+wait 4.0

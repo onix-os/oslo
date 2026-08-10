@@ -6,6 +6,10 @@ function kept in its own file**, read the first time it is called. They land in 
 tables, and which one answers for a name something else already owns is decided by which table is
 consulted, not by any rule about precedence between them.
 
+<!-- demo:begin -->
+[![your-own-tools demo](https://asciinema.org/a/1262756.svg)](https://asciinema.org/a/1262756)
+<!-- demo:end -->
+
 ## How it works
 
 A command word is resolved twice by two entirely separate mechanisms, and that is the fact the whole

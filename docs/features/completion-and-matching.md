@@ -5,6 +5,10 @@ than a prefix test — it asks whether what you typed could have been an abbrevi
 candidate, not whether the candidate begins with it — and the dropdown that shows the answers is a
 table with a kind badge and a column per kind, not a column of bare names.
 
+<!-- demo:begin -->
+[![completion-and-matching demo](https://asciinema.org/a/1262734.svg)](https://asciinema.org/a/1262734)
+<!-- demo:end -->
+
 ## How it works
 
 Tab finds the word under the cursor, decides which source answers for it, filters and sorts what

@@ -5,6 +5,10 @@ from a library. There is no `readline` and no `rustyline`, which is what makes t
 hard to get right (grapheme boundaries, wrapping, the pending wrap, a right prompt that does not
 fight the multiplexer) things that can be asserted in a unit test with no terminal anywhere.
 
+<!-- demo:begin -->
+[![line-editor demo](https://asciinema.org/a/1262740.svg)](https://asciinema.org/a/1262740)
+<!-- demo:end -->
+
 ## How it works
 
 The editor is three pure layers with one impure loop on top. `Buffer` holds the text and the cursor

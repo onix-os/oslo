@@ -5,6 +5,10 @@ handed to a config unchanged; `on-report` is the hook that is given what the she
 and can answer "I drew it myself". Between them a config can change how the shell looks rather than
 only whether a message appears.
 
+<!-- demo:begin -->
+[![drawing demo](https://asciinema.org/a/1262736.svg)](https://asciinema.org/a/1262736)
+<!-- demo:end -->
+
 ## How it works
 
 A block is a headline and a rail of labelled rows. Nothing in `block.rs` writes to a terminal —

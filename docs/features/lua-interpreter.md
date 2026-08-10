@@ -6,6 +6,10 @@ ships as a single statically linked musl binary and speaking Lua had to cost no 
 crate it replaced, `mlua`, binds the reference interpreter: it compiles some thirty thousand lines of
 C into the binary, and it keeps Lua values in a VM the shell can only pass strings across.
 
+<!-- demo:begin -->
+[![lua-interpreter demo](https://asciinema.org/a/1262741.svg)](https://asciinema.org/a/1262741)
+<!-- demo:end -->
+
 ## How it works
 
 `full_moon` parses and nothing else. Everything after the AST is oslo's own — a tree walker, not a

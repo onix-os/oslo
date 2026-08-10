@@ -5,6 +5,10 @@ line as you type it, the completion dropdown, the built-in prompt and the input 
 because the first three were each carrying their own hardcoded escapes, which is how a shell ends
 up with two different ideas of what a builtin looks like.
 
+<!-- demo:begin -->
+[![theme demo](https://asciinema.org/a/1262751.svg)](https://asciinema.org/a/1262751)
+<!-- demo:end -->
+
 ## How it works
 
 A theme is 54 roles in four groups. Each role is a `Style` — an optional foreground, an optional

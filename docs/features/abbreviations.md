@@ -5,6 +5,10 @@ A short word that becomes a long one as you type the space after it: `gco ` leav
 language feature, and a shell that promises scripts see POSIX behaviour should not reach for a
 language feature to save four keystrokes.
 
+<!-- demo:begin -->
+[![abbreviations demo](https://asciinema.org/a/1262733.svg)](https://asciinema.org/a/1262733)
+<!-- demo:end -->
+
 ## How it works
 
 The space key is the trigger, and it is handled *before* the space is inserted, because the

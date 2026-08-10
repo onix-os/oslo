@@ -10,6 +10,10 @@ nav              # start here
 nav /var/log     # start somewhere else
 ```
 
+<!-- demo:begin -->
+[![nav demo](https://asciinema.org/a/1262742.svg)](https://asciinema.org/a/1262742)
+<!-- demo:end -->
+
 ## How it works
 
 One loop: read the directory, draw a frame, wait for a key. Nothing is carried across directories —

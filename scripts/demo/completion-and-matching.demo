@@ -1,0 +1,40 @@
+# Completion: Tab answers with a table, and matching escalates until a pass finds something.
+cols 120
+rows 20
+speed 0.06
+
+run # Tab: a table of answers.
+type cat src/
+key Tab
+wait 1.8
+key Down
+key Down
+wait 1.0
+key Enter
+wait 0.6
+key Enter
+wait 2.0
+clear
+
+run # exact prefix wins the list
+type cat
+key Tab
+wait 2.2
+key C-c
+wait 0.4
+
+run # nothing starts with g-l
+type g-l
+key Tab
+wait 2.4
+key Enter
+wait 1.2
+key C-c
+wait 0.4
+
+run # no separator: fuzzy
+type sshkgn
+key Tab
+wait 2.2
+key C-c
+wait 0.4

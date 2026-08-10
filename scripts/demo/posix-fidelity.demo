@@ -1,0 +1,31 @@
+# POSIX fidelity: the same script to bash and to oslo, then the mode that comes from argv[0].
+cols 120
+rows 20
+speed 0.05
+
+# Expansion, case conversion, arithmetic: one script, two shells, one answer.
+run printf 'v=abc\necho "${v^^} $((2**10)) ${v/b/X}"\n' > fid.sh
+wait 0.3
+run /usr/bin/bash fid.sh
+wait 1.0
+run oslo fid.sh
+wait 1.4
+
+clear
+
+# --posix is a real mode, not a label: a special builtin's utility error ends the shell,
+# so `alive` never prints — which is what bash --posix does with the same script.
+run printf 'export A-B=1\necho alive\n' > probe.sh
+wait 0.3
+run oslo probe.sh
+wait 1.2
+run oslo --posix probe.sh
+wait 1.3
+run /usr/bin/bash --posix probe.sh
+wait 1.5
+
+# And sh is a personality, not a path: the same binary under another name, no flag.
+run ln -sf /usr/bin/oslo sh
+wait 0.2
+run ./sh probe.sh
+wait 2.0

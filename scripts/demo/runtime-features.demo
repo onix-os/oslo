@@ -1,0 +1,39 @@
+# Runtime features: parts of the shell switched off and back on by name, from Lua.
+cols 120
+rows 20
+speed 0.05
+
+run cat README.md
+wait 0.6
+
+# The ghost completes the line from history.
+type cat READ
+wait 2.8
+key C-u
+wait 0.3
+
+run =oslo.feature.set("suggest", false)
+wait 0.5
+type cat READ
+wait 2.2
+key C-u
+wait 0.3
+
+# A feature masks the config, it never writes it — back on gives the ghost back.
+run =oslo.feature.set("suggest", true)
+wait 0.5
+type cat READ
+wait 2.4
+key Right
+wait 0.6
+key Enter
+wait 1.0
+
+clear
+# Turning off a feature that names a builtin hands the word back to $PATH.
+run type rm
+wait 1.2
+run =oslo.feature.set("rm", false)
+wait 0.3
+run type rm
+wait 1.8

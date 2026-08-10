@@ -5,6 +5,10 @@ oslo is meant to be `/bin/sh` on a machine, which means every `postinst`, every 
 careful": it is 416 scripts run under oslo and under bash and compared byte for byte, plus a rule
 that every extension oslo added is unreachable from shell written before oslo existed.
 
+<!-- demo:begin -->
+[![posix-fidelity demo](https://asciinema.org/a/1262744.svg)](https://asciinema.org/a/1262744)
+<!-- demo:end -->
+
 ## How it works
 
 Correctness is measured rather than asserted, because the failure mode that matters cannot be seen

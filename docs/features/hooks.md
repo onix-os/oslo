@@ -4,6 +4,10 @@ Twenty-two moments in a shell's life that a config can attach to, from `pre-cmd`
 keystroke. They exist so that a prompt integration, a `direnv` clone or a package-manager handler is
 a function in your config rather than a shell function that has to be re-sourced into every session.
 
+<!-- demo:begin -->
+[![hooks demo](https://asciinema.org/a/1262739.svg)](https://asciinema.org/a/1262739)
+<!-- demo:end -->
+
 ## How it works
 
 `oslo.on.<name>(f)` adds `f` to a list and answers with a handle. **Handlers accumulate; they never

@@ -1,0 +1,27 @@
+# Drawing: oslo.ui.block, and the on-report hook taking over what the shell draws.
+cols 120
+rows 20
+speed 0.04
+
+# What the shell draws by itself — bash's shape, column for column.
+run time sleep 1
+wait 1.5
+
+# Shift-Tab reads the next line as Lua. The same renderer, handed to a config unchanged:
+# a headline, a rail, a label column — and nothing on screen until done().
+key BTab
+wait 0.8
+run b = oslo.ui.block("direnv  .env.lua")
+run b:row("changed", "PATH CARGO_HOME")
+run b:row("aliases", ("_b _c _r _t _v "):rep(8))
+wait 1.0
+run b:done()
+wait 2.0
+
+# on-report is handed what the shell was about to print. Returning true means "I drew it".
+run oslo.on.on_report(function(r) if r.kind ~= "time" then return end local t = oslo.ui.block("time"); t:row("real", r.real_ms.."ms"); t:done() return true end)
+wait 0.8
+key BTab
+wait 0.8
+run time sleep 1
+wait 2.6

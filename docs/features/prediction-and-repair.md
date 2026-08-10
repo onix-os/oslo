@@ -4,6 +4,10 @@ One model of the commands you actually run, answering two questions: *what are y
 (a ghost suggestion) and *what did you mean* (the correction, which is what `thefuck` does with two
 hundred hand-written rules and this does with none).
 
+<!-- demo:begin -->
+[![prediction-and-repair demo](https://asciinema.org/a/1262745.svg)](https://asciinema.org/a/1262745)
+<!-- demo:end -->
+
 ## How it works
 
 The model is a [vista](https://github.com/bresilla/vista) predictor, vendored at `vendor/vista`. It

@@ -1,0 +1,23 @@
+# Prediction and repair: the inline correction, and fixing what already ran.
+cols 120
+rows 20
+speed 0.08
+
+run echo hello world
+wait 0.6
+
+# $PATH spelling: lsblk has never been run here, and it is still offered.
+type lsvlk
+wait 2.2
+key Right
+wait 1.2
+key Enter
+wait 1.8
+
+# And the other half: a command that has already run and failed.
+run ehco hello world
+wait 1.4
+key F4
+wait 2.2
+key Enter
+wait 1.5

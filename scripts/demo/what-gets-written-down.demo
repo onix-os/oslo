@@ -1,0 +1,23 @@
+# What gets written down: one row per link, including the link that never ran.
+cols 120
+rows 20
+speed 0.05
+
+# One line, three links. `echo no` never runs — and that is a third thing, not 0 and not a failure.
+run true && echo ok || echo no
+wait 1.5
+
+run oslo history search --exact --json 'true && echo ok || echo no' | jq -c '.[0].completion.segments[]'
+wait 2.8
+
+clear
+run # a leading space: not remembered
+wait 0.5
+run   echo my-passphrase
+wait 1.2
+run echo remembered
+wait 1.0
+
+# The editor's copy has no entry for it, and the log has no row for it either.
+run history | tail -3 && oslo history search --exact '  echo my-passphrase' | wc -l
+wait 2.5

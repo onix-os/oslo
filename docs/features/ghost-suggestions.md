@@ -4,6 +4,10 @@ The grey text drawn past the cursor: what the rest of the line would be if you k
 so that the commands you already run are one keystroke away instead of a search, and it is built out
 of four sources you order yourself rather than one hard-wired guess.
 
+<!-- demo:begin -->
+[![ghost-suggestions demo](https://asciinema.org/a/1262737.svg)](https://asciinema.org/a/1262737)
+<!-- demo:end -->
+
 ## How it works
 
 `OsloHelper::suggest` is asked on every keystroke. It answers with a **tail** — the characters that

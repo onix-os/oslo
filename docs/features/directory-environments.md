@@ -5,6 +5,10 @@ walk out. oslo reads both itself — no `direnv` binary, no bash subprocess, no 
 `eval` protocol — because most of direnv's machinery exists to let an external program talk to a
 shell it did not write, and **oslo is the shell**.
 
+<!-- demo:begin -->
+[![directory-environments demo](https://asciinema.org/a/1262735.svg)](https://asciinema.org/a/1262735)
+<!-- demo:end -->
+
 ## How it works
 
 The state lives in memory and the work happens on the `cd` path. All of it is one function,

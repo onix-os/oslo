@@ -5,6 +5,10 @@ deliberately not a second way to configure them: **a feature is a mask over your
 never an assignment to it**, so turning one back on gives you back whatever the config said rather
 than a hardcoded default.
 
+<!-- demo:begin -->
+[![runtime-features demo](https://asciinema.org/a/1262748.svg)](https://asciinema.org/a/1262748)
+<!-- demo:end -->
+
 ## How it works
 
 The whole state is one process-wide `AtomicU32` in `oslo_base::feature`, holding which features are

@@ -6,6 +6,10 @@ usual ways of getting an old command back — walking the list one entry at a ti
 search that shows you one match at a time — both require you to already know what you are looking
 for.
 
+<!-- demo:begin -->
+[![history-finder demo](https://asciinema.org/a/1262738.svg)](https://asciinema.org/a/1262738)
+<!-- demo:end -->
+
 ## How it works
 
 Up is handled by `history_prev`, which opens the finder only on the *first* press of a fresh line:
