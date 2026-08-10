@@ -196,12 +196,26 @@ impl super::Track {
         let mut row = entry.clone();
         row.session = self.session_ordinal();
         row.seq = TYPED.fetch_add(1, Ordering::Relaxed) + 1;
-        self.store.write(|writer| {
+        let id = self.store.write(|writer| {
             let id = next_id(writer);
             writer.put(Tree::History, slot(id), encode(&row, at))?;
             super::sync::append_local(writer, id, &row, at)?;
             Some(id)
-        })
+        });
+        // **The predictor learns exactly what the log records, here and nowhere else.**
+        //
+        // Teaching the model from the REPL instead would mean a second place that has to know a
+        // command happened, and the two would drift the first time anything else appended. It
+        // would also have to be told the session and position, which are assigned above and which
+        // a caller could get wrong.
+        //
+        // A secret line never reaches this because it is never appended at all — the exclusion is
+        // a property of the log rather than a rule repeated here, which is the strongest form it
+        // could take.
+        if id.is_some() {
+            crate::predict::record(&row, at as i64);
+        }
+        id
     }
 
     /// Replace what the row at `history_id` says was typed, and mark it as rewritten.

@@ -17,7 +17,7 @@
 
 /// The bottom of the stack: the syntax tree, the error type, the feature bits, the hook registry
 /// and the tracking store.
-pub use oslo_base::{ast, error, feature, hooks, nesting, track};
+pub use oslo_base::{ast, error, feature, hooks, nesting, predict, track};
 
 /// The shell: syntax adaptation, expansion, execution, the builtins, the structured pipeline and
 /// directory environments.

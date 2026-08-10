@@ -28,10 +28,3 @@ surface-indexes = []
 name = "predictor"
 path = "tests/predictor.rs"
 required-features = ["evaluation", "research"]
-
-[profile.release]
-opt-level = "z"
-lto = "fat"
-codegen-units = 1
-panic = "abort"
-strip = "symbols"

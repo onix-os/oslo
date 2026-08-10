@@ -112,11 +112,14 @@ All measured with a probe reachable from `main`, vendored, one feature at a time
 | `+ explanations` (all four) | 6,781,888 | +454,656 | 4 KB |
 | **Chosen: `snapshot`, `recent-cache`** | **6,675,392** | **+340 KB** | |
 | After Phase 1 core | 6,327,232 | 0 | model unreachable from `main`; LTO drops it |
-| After Phase 2 | TBD | TBD | first checkpoint where it is reachable |
+| After Phase 2 | 6,844,608 | +517,376 | first checkpoint where it is reachable |
+| After Phases 3–4 | 6,852,800 | +525,568 | repair and `oslo.predict`, 8 KB |
 
-`surface-indexes` is not taken. It only changes candidate generation inside `predict_aligned` —
-repair, which is Phase 3 — and 100 KB is a quarter of the whole integration to pay before anything
-calls it. Phase 3 measures what it buys and decides then.
+`surface-indexes` is not taken, and Phase 3 is where that was settled rather than assumed. Built
+both ways against the case it exists for — a repair whose candidate is not a substring of anything
+in history — it cost the measured 100 KB and **did not change the answer**: still empty. What
+actually decides whether repair can answer is whether the mistyped line is itself in the model, and
+the fix for that is [`predict::ran`], which costs nothing. The feature stays out.
 
 **A dead-code probe measures nothing.** The first attempt read +0 bytes because LTO removed the
 unreachable call, and the Phase 1 row above reads 0 for the same reason and honestly: the module
@@ -181,11 +184,12 @@ No user-visible behaviour. A model that learns and can be inspected.
 - [x] **Feature-trimmed and measured**, one at a time, into the ledger above.
 - [x] **`crates/oslo-base/src/predict/`** — `Model`, mapping `Entry` to `Observation`, with
       `next()` for prediction and `repair()` for the aligned rebuild. Eight tests.
-- [ ] Snapshot beside the history database, `0600`, same as the frecency and dev-shell caches. It
-      holds command text, so it is exactly as sensitive as history itself. `Model::save` exists and
-      is tested; where the file lives and when it is written does not.
-- [ ] Load: `read_snapshot` back into a `Model`, and the decision below about startup.
-- [ ] `oslo history stats --predict` or similar: something that proves it learned without a UI.
+- [x] Snapshot beside the history database, `0600`, same as the frecency and dev-shell caches. It
+      holds command text, so it is exactly as sensitive as history itself. Written once on the way
+      out; `oslo history clear` deletes it, and a session with no history never writes one.
+- [x] Load: `read_snapshot` on a background thread from `Tracker::start`, behind the same
+      `keeps_a_record` gate the history store is behind. Absent until it lands; nothing waits.
+- [x] `Model::learned()` and `Model::corrections()` — what it was shown, and what it made of it.
 
 ### What the mapping turned out to be
 
@@ -251,14 +255,48 @@ The `thefuck` feature, and the one that needs the most care because it proposes 
 **Acceptance:** on a corpus of real failures, the top candidate is the intended command often
 enough to be worth a keystroke — and *never* silently runs.
 
+### What this phase turned out to be
+
+**The trigger did not need to be built.** `oslo.keys[k] = function(line) … end` already replaces the
+line being edited with what a Lua function returns, so the whole interaction is four lines of
+config — and it lands in the editor by construction, which is the property point 3 asks for.
+Building a native binding beside it would have been a second way to say the same thing, with a key
+chosen by oslo rather than by the user.
+
+**A failure has to be reported, or nothing is learned from it.** vista forms a correction pair from
+an observation marked failed followed by the retyping. oslo was sending `outcome: Vec::new()` for
+every command, so that machinery was inert — silently, since prediction still worked. It reports the
+status now, which meant moving the observation from where the line is *logged* (before it runs, so
+there is no status) to the command boundary, where `record` holds and `settle` learns.
+
+**Then the measurement that changed the design.** Once failures were learned, repair for the line
+that had just failed answered *nothing* — the typo is in the model as a command like any other, so
+there is nothing to align it to. This is the case the whole feature exists for. Two candidate fixes:
+
+| | binary | fixes it |
+|---|---:|---|
+| `surface-indexes` | +100 KB | **no** — still empty |
+| don't learn what never ran (`predict::ran`) | +0 | yes |
+
+So a line that exits 127 or 126, or never reached execution, is not learned. Not "a line that
+failed": `cargo build` that failed to compile is among the most predictive lines a shell sees, and
+it is learned and marked failed. The line is narrower — it never *was* a command. The same rule
+stops a typo being suggested back at you for ever, which `RunRow::worth_suggesting` already refuses
+to do for the same reason.
+
 ## Phase 4 — Lua
 
 Only after the shapes have settled, and only what a config genuinely cannot do otherwise:
 
 ```lua
-oslo.predict.next(n)          -- what the model thinks comes next
-oslo.predict.repair(line, n)  -- candidates for a failed line
+oslo.predict.next(partial, n)  -- what the model thinks comes next
+oslo.predict.repair(line, n)   -- candidates for a failed line
+oslo.predict.ready()           -- whether there is a model to ask yet
 ```
+
+Both answer a list of `{ line, probability }`, best first and possibly empty. `ready()` is there
+because "no model yet" and "nothing matched" are both an empty list, and only one of them is worth
+saying anything about.
 
 The pieces a config needs to *use* these already landed: `c.commands` gives the parsed line as
 data, and `oslo.quote` writes a word back safely.

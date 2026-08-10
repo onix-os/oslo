@@ -236,6 +236,35 @@ because that is the only thing it can honestly be: the editor draws a hint as te
 the cursor, so a suggestion that *replaces* your line cannot be shown as one without lying about
 what pressing a key will do.
 
+## What you were about to type
+
+```lua
+oslo.suggest.sources = { "predict", "history", "path" }
+```
+
+`predict` is a model of what *this* shell does, learned from the commands you have actually run and
+kept as a small file beside the history. It reads in a tenth of a millisecond at startup and is
+written once on the way out, so it costs the prompt nothing. A session that keeps no history
+(`HISTFILE=""`) neither reads it nor writes it, and `oslo history clear` deletes it.
+
+The same model answers the other question — what a line that failed was *meant* to be:
+
+```lua
+oslo.keys["f4"] = function(line)
+  local fixed = oslo.predict.repair(line.text, 1)[1]
+  return fixed and fixed.line or line.text
+end
+```
+
+`ehco install ripgrep` becomes `echo install ripgrep`, **in the editor**, because nothing here runs
+anything — the correction lands on your input line and Enter is still yours. There are no rules to
+maintain: a repair can only ever be built out of commands you have really run, which is the safety
+property a rule engine cannot offer. `oslo.predict.next(partial, n)` asks the other direction, and
+both answer a list of `{ line, probability }`.
+
+A command that never *was* a command — `ehco`, or anything else that exits 127 — is not learned, so
+a typo is never suggested back to you and stays repairable.
+
 ## Your own tools
 
 ```lua

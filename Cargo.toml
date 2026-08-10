@@ -155,6 +155,11 @@ name = "keystroke"
 path = "bench/keystroke.rs"
 harness = false
 
+[[bench]]
+name = "predict"
+path = "bench/predict.rs"
+harness = false
+
 # Measured, not assumed — the before/after is in PERF_AND_CODE.md.
 #
 # No `panic = "abort"`, deliberately, though it is the obvious fourth setting: `catch_unwind` in

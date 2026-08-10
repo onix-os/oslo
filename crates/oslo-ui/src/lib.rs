@@ -192,6 +192,15 @@ impl OsloHelper {
                 settings::Source::History => None,
                 settings::Source::Completion => self.command_hint(line, pos),
                 settings::Source::Path => self.path_hint(line, pos),
+                // The model, which knows what usually follows what you have been doing. It
+                // answers with a whole line, so what is offered is the remainder — the same shape
+                // `recall` returns, since both continue what has been typed rather than replace
+                // it. Costs about 4 µs against the hint's 2.3 (`bench/predict.rs`), and nothing
+                // at all before the snapshot has loaded.
+                settings::Source::Prediction => oslo_base::predict::suggest_here(Some(line), 1)
+                    .into_iter()
+                    .find(|guess| guess.line.len() > line.len() && guess.line.starts_with(line))
+                    .map(|guess| guess.line[line.len()..].to_string()),
             };
             if found.is_some() {
                 return found;
