@@ -37,7 +37,10 @@ ssh = ["dep:maki", "dep:tokio"]
 # A fork of `makiko`, the one pure-Rust SSH client — no `cc`, no `ring`, no `-sys` crate that is
 # really C. Forked rather than depended on because upstream was last touched in March 2025, and a
 # shell that ships this needs to be able to fix it. Optional, and reached only through `src/ssh.rs`.
-maki = { git = "https://github.com/onix-os/maki", branch = "master", optional = true }
+# **Pinned to a commit, not to a branch.** `branch = "master"` meant that a push to the fork changed
+# what oslo built, without a commit here saying so — a build that was green yesterday failing today
+# for a reason not in this repository's history. Moving it is now a deliberate edit to this line.
+maki = { git = "https://github.com/onix-os/maki", rev = "acfe78e19c411fef56f58f2b0bff9e48c511bb89", optional = true }
 # Only ever with `ssh`. `maki` pulls `tokio` for its `sync` primitives on its own; what oslo needs
 # on top is a runtime and a socket, which is what these two features are.
 tokio = { version = "1", features = ["rt-multi-thread", "net"], optional = true }

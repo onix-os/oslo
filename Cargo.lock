@@ -939,7 +939,7 @@ checksum = "0ceec5bc11778974d1bcb055b18002eba7f4b3518b6a0081b3af5f21666da9ad"
 [[package]]
 name = "maki"
 version = "0.2.6-pre"
-source = "git+https://github.com/onix-os/maki?branch=master#e7398b758d046340ce1c28249a6882543555dc6a"
+source = "git+https://github.com/onix-os/maki?rev=acfe78e19c411fef56f58f2b0bff9e48c511bb89#acfe78e19c411fef56f58f2b0bff9e48c511bb89"
 dependencies = [
  "aes",
  "aes-gcm",
