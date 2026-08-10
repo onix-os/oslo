@@ -12,7 +12,9 @@ got wrong, and both read the same history oslo already keeps.
 - **Measured cost:** **+340 KB** on the static musl binary, with the two features taken; every
   feature measured separately in the ledger below.
 - **MSRV: settled.** vista declared 1.97.1 and did not need it; it now declares 1.89, oslo's own.
-- **Dependency form: vendored** at `vendor/vista`, provisionally; see Phase 1.
+- **Dependency form: a pinned git dependency.** Vendored at `vendor/vista` for one cycle while
+  upstream declared an MSRV oslo could not meet; once that was fixed it became an ordinary
+  `git` + `rev` dependency on `vista-recall`.
 
 The previous contents of this file — the Tagdata history plan, marked implemented and audited on
 2026-08-09 — are in git at `git show HEAD:PLAN.md`.
@@ -177,7 +179,8 @@ Two things to decide while implementing:
 
 No user-visible behaviour. A model that learns and can be inspected.
 
-- [x] **Dependency form: vendored**, `vendor/vista`, beside `brush-parser` and `full_moon`.
+- [x] **Dependency form settled**: a `git` + `rev` dependency on `vista-recall`, after a spell
+      vendored beside `brush-parser` and `full_moon`.
       A git dependency was the recommendation and remains the better end state, but it would have
       to point at a vista whose MSRV fix is pushed, and nothing can be built against a path outside
       the repo in CI. Vendoring is buildable today, carries the fix, and is two lines to reverse.

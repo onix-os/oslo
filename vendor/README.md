@@ -9,9 +9,9 @@ Two parsers oslo does not write and does not want to depend on remotely. `full_m
 proc-macro in `full_moon/derive`: a `proc-macro = true` crate can only export macros, so it cannot
 live *inside* another crate, so nesting the directory is as close to one unit as cargo permits.
 
-The two parsers are hard forks: the source is here, oslo builds it as a workspace member, and there
-is no upstream to sync with. `vista` is not — it is oslo's own dependency, still developed
-elsewhere, and the copy here is pinned to a named commit. See *Pinning* below.
+Both are hard forks: the source is here, oslo builds it as a workspace member, and there is no
+upstream to sync with. That is what separates them from an ordinary dependency, and the reason
+`vista` briefly sat here and no longer does — see *Not here* below.
 
 **oslo is MIT. `full_moon` and `full_moon/derive` are MPL-2.0 and remain so.** See *Licences* below
 before copying anything out of this directory.
@@ -21,29 +21,18 @@ before copying anything out of this directory.
 | `brush-parser` | [reubeno/brush](https://github.com/reubeno/brush) | MIT | POSIX/bash tokenizer and parser |
 | `full_moon` | [Kampfkarren/full-moon](https://github.com/Kampfkarren/full-moon) | **MPL-2.0** | Lua parser |
 |`full_moon/derive` | as above | **MPL-2.0** | proc-macro `full_moon` needs; not published as a standalone path dep |
-| `vista` | [bresilla/vista](https://github.com/bresilla/vista) | MIT | the prediction and repair model |
 
-## Pinning
+## Not here
 
-**Nothing here moves because something upstream moved.** A vendored crate is a stronger pin than a
-git revision: a revision still has to be fetched and can be force-pushed out from under you, and
-this cannot be fetched at all. What a revision gives that a copy does not is *provenance* — being
-able to say which upstream commit this is, and what was changed on the way in. So it is written
-down:
+`vista` — the prediction and repair model — was copied in here for one release cycle and is now an
+ordinary git dependency of `oslo-base`, pinned to a commit. It was never a fork: it is oslo's own
+crate, developed in its own repository and still moving. The copy existed only because the version
+of it oslo needed declared an MSRV higher than oslo's own, which a `git` dependency would have
+imposed on everyone building the shell. That was fixed upstream, so the copy had nothing left to
+justify it.
 
-| crate | upstream commit | changed on the way in |
-|---|---|---|
-| `vista` | `17e5e5d1c7888fc26beb7c0a5e7a452a97d7b8db` (`main`) | `examples/`, `docs/`, `tools/` dropped; the three `[[example]]` entries and `[profile.release]` removed from the manifest |
-
-`vendor/vista/src` is byte-for-byte that commit; the delta is the manifest and the directories a
-dependency has no use for. `[profile.release]` in particular is ignored by cargo outside a
-workspace root, so keeping it would have been a line that reads as configuration and is not.
-
-**One difference is not cosmetic.** That commit declares `rust-version = "1.97.1"`, which vista does
-not need — it builds on 1.85 — and which is higher than the `1.89` oslo itself declares. The
-vendored manifest says `1.89`. Depending on that commit over git instead would therefore raise
-oslo's real MSRV to 1.97.1 while its own manifest still claimed 1.89, so the fix belongs upstream
-before this can become an ordinary `git` + `rev` dependency.
+The rule it illustrates is the one this directory runs on: **something is vendored because it is
+forked, not because it needs pinning.** A revision pins a dependency perfectly well.
 
 ## Why vendored
 

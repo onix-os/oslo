@@ -10,7 +10,8 @@ hundred hand-written rules and this does with none).
 
 ## How it works
 
-The model is a [vista](https://github.com/bresilla/vista) predictor, vendored at `vendor/vista`. It
+The model is a [vista](https://github.com/bresilla/vista) predictor — the `vista-recall` crate, a
+git dependency pinned to a commit. It
 is fed from the command log oslo already keeps, so nothing new is written to make prediction work.
 
 A command's exit status does not exist when the command is logged, and that single fact shapes the
@@ -258,5 +259,5 @@ which the vista crate itself is 296 KB.
 | `crates/oslo-ui/src/edit/session/accept.rs` | `take_hint` and `take_repair` |
 | `crates/oslo-runtime/src/lua/api/predict.rs` | `oslo.repair`, `oslo.last_failed`, `oslo.predict.*` |
 | `crates/oslo-runtime/src/startup/tracking.rs` | `Tracker::start` warms it; `record_outcome` settles it |
-| `vendor/vista/` | the predictor |
+| `vista-recall` (git, pinned) | the predictor |
 | `bench/predict.rs`, `bench/keystroke.rs` | the numbers above |

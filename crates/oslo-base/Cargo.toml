@@ -24,9 +24,14 @@ getrandom = "0.4"
 # `snapshot` is what keeps the model off the startup path and `recent-cache` is what makes a
 # prediction follow what you are doing now, so both earn their bytes. `surface-indexes` only
 # changes candidate generation inside `predict_aligned`, which is repair — nothing calls it yet,
-# and 100 KB is too much to pay in advance of measuring what it buys. `explanations` answers why a
-# prediction was made, which is a question a debugging tool asks and a ghost suggestion does not.
-vista = { path = "../../vendor/vista", default-features = false, features = [
+# and 100 KB is too much to pay in advance of measuring what it buys — Phase 3 measured it and it
+# still did not earn them. `explanations` answers why a prediction was made, which is a question a
+# debugging tool asks and a ghost suggestion does not.
+#
+# **A commit, not a branch**, so a push upstream cannot change what oslo builds without an edit
+# here. Named `vista` locally while the package is `vista-recall`, which is what keeps every
+# `use vista::…` in this crate reading the way it did when the crate had one name.
+vista = { package = "vista-recall", git = "https://github.com/bresilla/vista", rev = "8ec5fa733de21f9aa21bda280241d4d638e27860", default-features = false, features = [
     "snapshot",
     "recent-cache",
 ] }

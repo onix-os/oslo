@@ -1135,7 +1135,7 @@ dependencies = [
  "sha2",
  "tagdata",
  "tempfile",
- "vista",
+ "vista-recall",
 ]
 
 [[package]]
@@ -2026,8 +2026,9 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 
 [[package]]
-name = "vista"
+name = "vista-recall"
 version = "0.1.0"
+source = "git+https://github.com/bresilla/vista?rev=8ec5fa733de21f9aa21bda280241d4d638e27860#8ec5fa733de21f9aa21bda280241d4d638e27860"
 
 [[package]]
 name = "walkdir"
