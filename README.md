@@ -1027,8 +1027,10 @@ nix build         # static musl binary
 
 ### Optional features
 
-Both are off, and both are off for the same reason: a shell that is going to be `/bin/sh` should
-carry what every session needs and nothing else.
+Both are off *by default*, and off for the same reason: a shell that is going to be `/bin/sh`
+should carry what every session needs and nothing else. `make build` turns them on, because
+somebody building from source is asking for the shell rather than for the floor; the published
+release artifact is the default build.
 
 Measured on the static musl binary, against a 6,323,168-byte default:
 
@@ -1038,8 +1040,8 @@ Measured on the static musl binary, against a 6,323,168-byte default:
 | `ssh` | **+0** | an SSH client — unfinished. Nothing reaches `src/ssh.rs` yet, so the linker discards `maki` and `tokio` whole and the binary is byte-for-byte the default one. It will cost about 0.6 MB the day something calls it |
 
 ```sh
-cargo build --release --features vista
-make build-all                          # static release, every feature on
+make build                  # static release, every feature on
+make build TYPE=minimal     # static release, none of them
 ```
 
 **There are no others**, and in particular none that exist to serve the test suite —

@@ -14,10 +14,15 @@ CARGO := cargo
 
 # What a release is: one file that runs anywhere, with no loader and no libc to find.
 #
-# `make build` produces exactly what the release workflow produces, and for a reason beyond
-# tidiness — oslo is meant to be somebody's *login shell*, and a login shell linked against a
-# /nix/store glibc stops existing the day `nix-collect-garbage` runs. There is no recovering from
-# that from inside the session it breaks.
+# `make build` links exactly the way the release workflow links, and for a reason beyond tidiness —
+# oslo is meant to be somebody's *login shell*, and a login shell linked against a /nix/store glibc
+# stops existing the day `nix-collect-garbage` runs. There is no recovering from that from inside
+# the session it breaks.
+#
+# **They no longer agree on features.** `make build` is `--all-features`; the release workflow
+# builds the default, so a published artifact is what `make build TYPE=minimal` produces. That is a
+# decision about what a release *is*, not an oversight — but the two lines are in different files
+# and nothing checks that they still mean what you think, so it is written down here.
 #
 # `RUSTFLAGS` and the deliberately-absent linker override are copied from
 # `.github/workflows/release.yml`; the comment there explains why pointing this at `musl-gcc`
@@ -33,25 +38,28 @@ $(info ------------------------------------------)
 $(info Project: $(PROJECT_NAME) v$(PROJECT_VERSION))
 $(info ------------------------------------------)
 
-.PHONY: build build-all b dev check-static compile c run r test test-terminal t check check-all test-all check-loc check-readme print-name clippy rustdoc fmt fmt-check clean verify vm vm-distro vm-arch install uninstall release help h
+.PHONY: build b dev check-static compile c run r test test-terminal t check check-all test-all check-loc check-readme print-name clippy rustdoc fmt fmt-check clean verify vm vm-distro vm-arch install uninstall release help h
 
-build:
-	@RUSTFLAGS="$(STATIC_RUSTFLAGS)" $(CARGO) build --release --target $(TARGET) --bin $(PROJECT_NAME)
-	@$(MAKE) --no-print-directory check-static
-	@ls -l "$(BIN)" | awk '{printf "%s  %.2f MB\n", $$NF, $$5/1048576}'
-
-b: build
-
-# The same binary with every optional feature switched on.
+# What `build` compiles: everything, unless asked for the other one.
+#
+#     make build                 every optional feature — the shell as it is meant to be used
+#     make build TYPE=minimal    none of them — the floor, and what a distribution wants for /bin/sh
 #
 # `--all-features` means what it says here and nothing more, because nothing in this workspace has
 # a feature that exists to serve tests: the two that did are ordinary `pub` items now, reachable by
 # `cargo test` across crates and dropped from the binary by the linker because nothing else calls
 # them. A build flag should never decide whether test scaffolding ships.
-build-all:
-	@RUSTFLAGS="$(STATIC_RUSTFLAGS)" $(CARGO) build --release --target $(TARGET) --bin $(PROJECT_NAME) --all-features
+BUILD_FEATURES := --all-features
+ifeq ($(TYPE),minimal)
+    BUILD_FEATURES :=
+endif
+
+build:
+	@RUSTFLAGS="$(STATIC_RUSTFLAGS)" $(CARGO) build --release --target $(TARGET) --bin $(PROJECT_NAME) $(BUILD_FEATURES)
 	@$(MAKE) --no-print-directory check-static
 	@ls -l "$(BIN)" | awk '{printf "%s  %.2f MB\n", $$NF, $$5/1048576}'
+
+b: build
 
 # "Static" is a claim about the ELF, so check the ELF. `ldd` is not enough: it prints
 # "statically linked" for a musl binary that still has an INTERP and will not start.
@@ -140,9 +148,9 @@ check-readme:
 # Both optional features — `ssh` and `vista` — are *compiled* by the gate, because `clippy` and
 # `rustdoc` run `--all-features`. `check-all` is kept for running that alone.
 #
-# `verify` still runs plain `check` and `test`, which is deliberate: the shipped artifact is the
+# `verify` still runs plain `check` and `test`, which is deliberate: the *published* artifact is the
 # default build, and a gate that only ever exercised `--all-features` would stop testing the thing
-# people actually get.
+# people download.
 #
 # **`vista` has tests that plain `verify` does not run**, unlike `ssh`, which has nothing to test
 # yet. They are one command, and worth it before touching the model or the editor's hint path:
@@ -216,7 +224,7 @@ help:
 	@echo "  test         Run all tests"
 	@echo "  test-terminal Run terminal PTY transcript tests"
 	@echo "  check        Run cargo check on all targets"
-	@echo "  build-all    Static release with every optional feature on"
+	@echo "  build        Static release, all features (TYPE=minimal for none)"
 	@echo "  check-all    Run cargo check on all targets/all features"
 	@echo "  test-all     Run cargo test on all targets/all features"
 	@echo "  clippy       Run clippy with warnings denied"
