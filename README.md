@@ -270,17 +270,34 @@ Two things know what you meant, and both are asked:
   work, and only a proposal close enough to be a *retyping* is offered — a different command is a
   prediction, not a correction.
 
+### And the one that already ran
+
+```
+$ git stauts --short
+$ <F4>
+$ git status --short
+```
+
+The correction you actually want is usually of a command you have **already run and watched fail** —
+by then it is not on the line to be fixed. `oslo.repair()` with no argument answers for that one:
+
 ```lua
-oslo.keys["f4"] = function(line) return oslo.repair(line.text) or line.text end
+oslo.keys["f4"] = function(line)
+  if line.text == "" then return oslo.repair() or "" end   -- the command that just failed
+  return oslo.repair(line.text) or line.text               -- the one being typed
+end
 oslo.theme = { syntax = { repair = { fg = "yellow", reverse = true } } }  -- follows the ghost otherwise
 ```
+
+It lands in the editor like everything else here — oslo never re-runs a command for you.
 
 **Nothing here runs anything.** The correction lands on your input line and Enter is still yours,
 which is what makes a wrong guess cost a keystroke instead of a command. There are no rules to
 maintain either: a repair can only ever be built out of `$PATH` and commands you have really run.
 
-A command that never *was* a command — `ehco`, or anything else that exits 127 — is not learned, so
-a typo is never suggested back to you and stays repairable.
+**Only a command that worked is learned.** A mistyped line inside the model is a command like any
+other, and repair for it goes quiet — which would break the case above, since you ask *after* the
+failure. It also means a typo is never suggested back to you.
 
 `oslo.predict.next(partial, n)` and `oslo.predict.repair(line, n)` ask the model directly, and both
 answer a list of `{ line, probability }`.

@@ -279,11 +279,33 @@ there is nothing to align it to. This is the case the whole feature exists for. 
 | `surface-indexes` | +100 KB | **no** — still empty |
 | don't learn what never ran (`predict::ran`) | +0 | yes |
 
-So a line that exits 127 or 126, or never reached execution, is not learned. Not "a line that
-failed": `cargo build` that failed to compile is among the most predictive lines a shell sees, and
-it is learned and marked failed. The line is narrower — it never *was* a command. The same rule
-stops a typo being suggested back at you for ever, which `RunRow::worth_suggesting` already refuses
-to do for the same reason.
+So a line that exits 127 or 126, or never reached execution, is not learned.
+
+### The rule was too narrow, and the trigger was still missing
+
+Both found by using it. A key on the input line only ever fixes what you are *typing* — but the
+repair anybody actually reaches for is of the command they have already run and watched fail, and by
+then it is not on the line to correct. That needs two things:
+
+1. **`oslo.repair()` with no argument**, answering for the last line that failed. One line is kept,
+   set at the command boundary and cleared by the next success, so it always means "the thing you
+   just watched go wrong". A secret line never reaches it, because it is never logged and so never
+   held.
+2. **Learning only what succeeded**, because the first rule was measured against the wrong case:
+
+   | model | `repair("git stauts --short")` |
+   |---|---|
+   | `git status --short` ×3 | `git status --short`, p = 0.98 |
+   | the same, plus the typo learned as a failed command | nothing |
+
+   Excluding 126, 127 and never-ran covered a wrong *command word*; it left the far commoner case —
+   a real command with a mistyped argument, `sudo apt updare` — learned at exit 1 and therefore
+   unrepairable at the exact prompt where the repair was wanted.
+
+The cost is stated rather than hidden: `cargo build` that failed to compile is not learned, so it is
+not offered until a run of it succeeds; and vista's correction pairs, which need a failed
+observation to form, are given up along with the outcome feature that fed them. They only reordered
+candidates that already existed. This decides whether any exist at all.
 
 ### The trigger that was actually wanted
 

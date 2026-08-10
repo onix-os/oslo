@@ -12,21 +12,20 @@
 //!
 //! # Why this is enough to build the repair on
 //!
-//! `repair` is the whole of the `thefuck` feature that oslo needs to provide. What to *do* with a
-//! candidate — offer it, put it on the line, ask first — is a decision about the interaction, and
-//! a config can already express all of it: `oslo.keys` binds a key to a Lua function whose return
-//! value replaces the line being edited. So
+//! What to *do* with a candidate — offer it, put it on the line, ask first — is a decision about
+//! the interaction, and a config can already express all of it: `oslo.keys` binds a key to a Lua
+//! function whose return value replaces the line being edited. With [`install`]'s `oslo.repair`,
+//! which asks `$PATH` as well as the model, both halves of `thefuck` are five lines:
 //!
 //! ```lua
 //! oslo.keys["f4"] = function(line)
-//!   local fixed = oslo.predict.repair(line.text, 1)[1]
-//!   return fixed and fixed.line or line.text
+//!   if line.text == "" then return oslo.repair() or "" end   -- the command that just failed
+//!   return oslo.repair(line.text) or line.text               -- the one being typed
 //! end
 //! ```
 //!
-//! is a working correction key in four lines, and the line lands in the editor where Enter is
-//! still yours. **Nothing here runs anything**, which is the property that makes a wrong answer
-//! cost a keystroke instead of a command.
+//! **Nothing here runs anything**, which is the property that makes a wrong answer cost a keystroke
+//! instead of a command: the correction lands in the editor and Enter is still yours.
 
 use super::util::{put, text};
 use crate::lua::engine::borrow_env;
@@ -44,9 +43,29 @@ use std::sync::{Arc, Mutex};
 ///
 /// This is what a key binding should call. It is the same answer the editor draws after the line.
 pub fn install(oslo: &mut Table, env: &Arc<Mutex<Environment>>) {
+    // `oslo.last_failed()` — the command you just watched go wrong, or nil.
+    put(oslo, "last_failed", |_, _| {
+        Ok(vec![
+            oslo_base::predict::last_failed()
+                .map(Value::str)
+                .unwrap_or(Value::Nil),
+        ])
+    });
+
     let env = Arc::clone(env);
     put(oslo, "repair", move |_, args| {
-        let line = text(&args, 1, "oslo.repair")?;
+        // **No argument means the line that just failed**, which is the whole of what `thefuck`
+        // does. A key on the input line can only ever fix what you are still typing; the case
+        // people actually reach for is the command already run, and by then it is not on the line
+        // to be passed in. Nil rather than an error when nothing failed: `oslo.repair()` at a fresh
+        // prompt is a question with an answer, and the answer is "nothing to fix".
+        let line = match args.first() {
+            None | Some(Value::Nil) => match oslo_base::predict::last_failed() {
+                Some(failed) => failed,
+                None => return Ok(vec![Value::Nil]),
+            },
+            _ => text(&args, 1, "oslo.repair")?,
+        };
         let guard = borrow_env(&env)?;
         let path = guard.var("PATH").unwrap_or_default().to_string();
         let known = |name: &str| {

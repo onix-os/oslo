@@ -236,121 +236,76 @@ fn the_model_is_filed_beside_the_history() {
     assert!(default_path(None, None).is_none());
 }
 
-/// **A failure followed by a retyping is what teaches repair.** vista forms a correction pair only
-/// when the earlier observation was marked failed and the next one in the same stream succeeded, so
-/// this is the test that would catch oslo going back to reporting no outcome at all — the model
-/// would still predict, still snapshot, still look healthy, and quietly learn nothing to repair
-/// from.
-#[test]
-fn a_failure_then_a_retyping_teaches_the_correction() {
-    let mut model = Model::new();
-    model.learn_outcome(&entry(1, 1, "sudo apt install fd"), 1, Some(true));
-    model.learn_outcome(&entry(1, 2, "sudo apt instal jq"), 2, Some(false));
-    model.learn_outcome(&entry(1, 3, "sudo apt install jq"), 3, Some(true));
-
-    assert_eq!(
-        model.corrections(),
-        vec![(
-            "sudo apt instal jq".to_string(),
-            "sudo apt install jq".to_string(),
-            1
-        )],
-        "the retyping is the pair"
-    );
-}
-
 /// **A mistyped line must not be in the model, or its own repair goes silent.**
 ///
-/// Measured, and the reason [`ran`] exists: with the typo learned as a command like any other there
-/// is nothing to align it to, and the answer is empty at exactly the prompt where it was wanted.
+/// The measurement behind [`succeeded`], and the reason a *failed* line is not learned rather than
+/// only an unrunnable one. The repair everybody wants is of the command they have already run and
+/// watched fail — so by the time it is asked for, a model that learns failures has swallowed it.
 #[test]
-fn a_line_that_never_ran_is_not_learned() {
+fn a_line_that_failed_is_not_learned() {
     let history = [
-        entry(1, 1, "sudo apt install fd"),
-        entry(1, 2, "sudo apt install jq"),
+        entry(1, 1, "git status --short"),
+        entry(1, 2, "git status --short"),
+        entry(1, 3, "git status --short"),
     ];
+    let typo = "git stauts --short";
 
     let mut clean = Model::new();
     clean.learn_all(&history);
-    assert!(
-        clean
-            .repair(1, 3, "sudo apt instal jq", 3)
-            .iter()
-            .any(|g| g.line == "sudo apt install jq"),
+    assert_eq!(
+        clean.repair(1, 4, typo, 3).first().map(|g| g.line.as_str()),
+        Some("git status --short"),
         "the repair this whole feature is for"
     );
 
     let mut polluted = Model::new();
     polluted.learn_all(&history);
-    polluted.learn_outcome(&entry(1, 3, "sudo apt instal jq"), 3, Some(false));
+    polluted.learn(&entry(1, 4, typo), 4);
     assert!(
-        polluted.repair(1, 4, "sudo apt instal jq", 3).is_empty(),
-        "if this ever stops being true, `ran` can be relaxed"
+        polluted.repair(1, 5, typo, 3).is_empty(),
+        "if this ever stops being true, `succeeded` can be relaxed"
     );
 }
 
-/// The rule itself: what could not be run is dropped, what ran and failed is kept.
+/// The rule itself. Only a command that worked is worth predicting or aligning against.
 #[test]
-fn only_lines_that_reached_a_command_are_learned() {
-    assert!(!ran(Some(127)), "no such command");
-    assert!(!ran(Some(126)), "not executable");
-    assert!(!ran(None), "never reached execution");
-    assert!(ran(Some(0)));
-    // A compile error is not a typo. Losing `cargo build` would cost more than every typo saved.
-    assert!(ran(Some(101)));
-}
-
-/// The same two lines with no outcome reported teach no correction pair.
-///
-/// Not a complaint about the prediction — `predict_aligned` can still answer from surface
-/// similarity. What must differ is the *pairing*, so this asserts on the correction log itself
-/// rather than on a ranking that has two ways to be right.
-#[test]
-fn without_an_outcome_nothing_is_paired() {
-    let mut silent = Model::new();
-    silent.learn(&entry(1, 1, "cargo buidl"), 1);
-    silent.learn(&entry(1, 2, "cargo build"), 2);
-    assert!(silent.corrections().is_empty());
-
-    let mut told = Model::new();
-    told.learn_outcome(&entry(1, 1, "cargo buidl"), 1, Some(false));
-    told.learn_outcome(&entry(1, 2, "cargo build"), 2, Some(true));
-    assert_eq!(told.corrections().len(), 1);
-}
-
-/// A line that succeeded is not the correction of the line before it.
-///
-/// Otherwise every ordinary pair of commands would be filed as a retyping, and the correction log
-/// would be noise rather than evidence.
-#[test]
-fn an_ordinary_pair_is_not_a_correction() {
-    let mut model = Model::new();
-    model.learn_outcome(&entry(1, 1, "cargo build"), 1, Some(true));
-    model.learn_outcome(&entry(1, 2, "cargo test"), 2, Some(true));
-    assert!(model.corrections().is_empty());
+fn only_a_line_that_worked_is_learned() {
+    assert!(succeeded(Some(0)));
+    assert!(!succeeded(Some(127)), "no such command");
+    assert!(!succeeded(Some(1)), "the typo case, and the whole point");
+    assert!(!succeeded(None), "never reached execution");
 }
 
 /// The held line is learned at the command boundary, not when it was logged.
-///
-/// Both halves matter: nothing before `settle`, because the status does not exist yet, and the
-/// status once it does.
 #[test]
 fn a_line_is_learned_when_its_status_arrives() {
     forget_shared();
-    record(&entry(9, 1, "cargo buidl"), 1);
+    record(&entry(9, 1, "cargo build"), 1);
     assert!(!ready(), "learning before the status is what this prevents");
 
-    settle(Some(101));
-    assert!(ready(), "the boundary is what learns it");
-    record(&entry(9, 2, "cargo build"), 2);
     settle(Some(0));
+    assert!(ready(), "the boundary is what learns it");
 
     // The position moved on with the line, not with the status: the next prompt asks from it and
     // cannot wait for a command that is still running.
-    assert_eq!(position(), (9, 3));
-    assert!(
-        !suggest(9, 3, Some("cargo b"), 3).is_empty(),
-        "both lines should have reached the model"
-    );
+    assert_eq!(position(), (9, 2));
+    forget_shared();
+}
+
+/// **What just failed is remembered, and a success forgets it.**
+///
+/// One line rather than a history: a correction older than the last command is not a correction
+/// anybody asked for, and offering to fix something that has scrolled off screen is worse than
+/// offering nothing.
+#[test]
+fn the_last_failure_is_remembered_until_something_works() {
+    forget_shared();
+    record(&entry(8, 1, "ehco alpha"), 1);
+    settle(Some(127));
+    assert_eq!(last_failed().as_deref(), Some("ehco alpha"));
+
+    record(&entry(8, 2, "echo alpha"), 2);
+    settle(Some(0));
+    assert_eq!(last_failed(), None, "a success clears it");
     forget_shared();
 }

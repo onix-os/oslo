@@ -28,6 +28,9 @@
 //!   transition that never occurred — see the note on [`crate::track::log::Entry::seq`].
 //! * **A secret line is not learned**, because it was never recorded to begin with. That is a
 //!   property of the log rather than a rule here, which is the strongest form it could take.
+//! * **Only a command that worked is learned.** See `succeeded` below: a mistyped line inside the model
+//!   is a command like any other, and repair for it goes silent — which is fatal for the case the
+//!   feature exists for, since you ask after the failure rather than before it.
 
 use crate::track::log::Entry;
 use vista::{Config, Feature, Item, Observation, Position, Predictor, Query, StreamId};
@@ -67,21 +70,11 @@ impl Model {
     /// Returns whether it was taken. A line with no session — written before sessions were
     /// recorded — is skipped rather than filed under a shared stream 0, which would teach the
     /// model transitions between unrelated shells.
+    ///
+    /// **Everything in here succeeded**, which is `succeeded`'s job rather than this one's; see
+    /// that note for the measurement behind it. It is the reason no outcome feature is attached:
+    /// a field whose value is the same for every observation tells the model nothing.
     pub fn learn(&mut self, entry: &Entry, at: i64) -> bool {
-        self.learn_outcome(entry, at, None)
-    }
-
-    /// Learn one recorded command, saying whether it worked.
-    ///
-    /// **`ok` is what makes repair possible at all.** vista learns a correction from a failure
-    /// followed by a retyping — it pairs an observation marked failed with the next one in the same
-    /// stream — so a shell that reports no outcome teaches it no corrections, however much history
-    /// it replays. The name `success` is not oslo's choice: it is one of the outcome names vista
-    /// reads as a quality, and spelling it anything else would make the feature inert but silent.
-    ///
-    /// `None` is neither success nor failure, and is what a replayed log row gets: the old rows
-    /// predate outcomes, and inventing one would teach the model a fact nobody recorded.
-    pub fn learn_outcome(&mut self, entry: &Entry, at: i64, ok: Option<bool>) -> bool {
         if entry.session == 0 || entry.seq == 0 || entry.line.trim().is_empty() {
             return false;
         }
@@ -91,14 +84,7 @@ impl Model {
             position: Position(u64::from(entry.seq)),
             timestamp: at,
             context: vec![Feature::categorical("mode", entry.mode.clone())],
-            outcome: ok
-                .map(|ok| {
-                    vec![Feature::categorical(
-                        "success",
-                        if ok { "true" } else { "false" },
-                    )]
-                })
-                .unwrap_or_default(),
+            outcome: Vec::new(),
         };
         let taken = self.predictor.observe(observation).is_ok();
         if taken {
@@ -161,19 +147,6 @@ impl Model {
     /// How many observations were taken.
     pub fn learned(&self) -> usize {
         self.learned
-    }
-
-    /// The retypings this model has watched: what was typed, what was run instead, how often.
-    ///
-    /// The evidence behind a repair, rather than the repair itself. Exposed because "the model
-    /// learned nothing to correct from" and "the model had nothing to say about this line" look
-    /// identical from `repair` alone, and only one of them is a bug.
-    pub fn corrections(&self) -> Vec<(String, String, u64)> {
-        self.predictor
-            .corrections()
-            .into_iter()
-            .map(|(pair, count)| (pair.typed.value, pair.corrected.value, count))
-            .collect()
     }
 
     /// Write the model where it can be read back without replaying history.
@@ -377,11 +350,8 @@ pub fn record(entry: &Entry, at: i64) {
     note_position(entry.session, entry.seq.saturating_add(1));
     if let Ok(mut held) = HELD.write() {
         // A previous line still held means its command boundary never came — a shell killed
-        // mid-command, or a path that logs without running. Learn it outcome-less rather than
-        // drop it: the sequence matters more than the one fact nobody recorded.
-        if let Some((entry, at)) = held.take() {
-            learn(&entry, at, None);
-        }
+        // mid-command, or a path that logs without running. It is dropped rather than learned:
+        // only what is known to have worked goes in, and nobody ever said this one did.
         *held = Some((entry.clone(), at));
     }
 }
@@ -392,37 +362,67 @@ pub fn record(entry: &Entry, at: i64) {
 /// which is neither outcome. Called once per command; a second call with nothing held does nothing.
 pub fn settle(status: Option<i32>) {
     let held = HELD.write().ok().and_then(|mut held| held.take());
-    if let Some((entry, at)) = held
-        && ran(status)
-    {
-        learn(&entry, at, status.map(|status| status == 0));
+    let Some((entry, at)) = held else {
+        return;
+    };
+    if let Ok(mut slot) = FAILED.write() {
+        // Set on a failure and **cleared on a success**, so it always means "the command you just
+        // watched go wrong" rather than something from ten prompts ago. Offering to fix a line that
+        // has scrolled off is worse than offering nothing: you would have to read it to find out
+        // what was being proposed.
+        *slot = (status != Some(0)).then(|| entry.line.clone());
+    }
+    if succeeded(status) {
+        learn(&entry, at);
     }
 }
 
-/// Whether the line got as far as being a command at all.
+/// The line that just failed, for whatever offers to fix it after the fact.
 ///
-/// **A line that never ran is not learned, and this is what keeps repair working.** Measured: once
-/// a mistyped line is in the model as something that has been run, repair for that exact line
-/// answers nothing — it is a command like any other, so there is nothing to align it *to*. Which is
-/// the case that matters, because you ask for a repair immediately after the failure that prompted
-/// it. Dropping these also stops a typo being offered as a suggestion for ever, which the
-/// tracker's `RunRow::worth_suggesting` already refuses to do for the same reason.
+/// **The half of repair that a key on the input line cannot reach.** Correcting what you are typing
+/// is the easy case; the one people actually want is the command they have already run and watched
+/// fail, which is no longer on the line to correct. This is the only record of it that survives the
+/// prompt, and it holds one line rather than a history because a correction older than the last
+/// command is not a correction anybody asked for.
 ///
-/// **Not "it failed".** `cargo build` that failed to compile and `git push` that was rejected are
-/// among the most predictive lines a shell sees, and they are learned — marked failed, which is
-/// what the outcome weight and vista's correction pairs are for. The line drawn here is narrower:
-/// 127 is no such command, 126 is not executable, and `None` never reached execution. A real
-/// program can exit 127, and the cost of that is one line not learned.
-fn ran(status: Option<i32>) -> bool {
-    !matches!(status, None | Some(126) | Some(127))
+/// A secret line never reaches here, because it is never appended to the log and so is never held.
+static FAILED: std::sync::RwLock<Option<String>> = std::sync::RwLock::new(None);
+
+/// What just failed, or nothing when the last command worked.
+pub fn last_failed() -> Option<String> {
+    FAILED.read().ok().and_then(|slot| slot.clone())
+}
+
+/// Whether the line worked. Only these are learned.
+///
+/// **A line that failed is not learned, and that is what keeps it repairable.** Measured, twice,
+/// and the second measurement overturned the first rule this function had:
+///
+/// | model | `repair("git stauts --short")` |
+/// |---|---|
+/// | `git status --short` ×3 | `git status --short`, p = 0.98 |
+/// | the same, plus the typo as a failed command | nothing |
+///
+/// Once a mistyped line is in the model it is a command like any other, so there is nothing to
+/// align it *to*. That is fatal rather than unfortunate, because the repair everybody actually
+/// wants is of the command they have already run and watched fail — by then it has been learned.
+/// An earlier version excluded only 126, 127 and lines that never ran, which fixed the case where
+/// the *command word* was wrong and left this one broken.
+///
+/// **The cost is real and smaller.** `cargo build` that failed to compile is not learned, so it is
+/// not offered until a run of it succeeds. Against that: a typo is never suggested back to you —
+/// which the tracker's `RunRow::worth_suggesting` already refuses to do for the same reason — and
+/// vista's correction pairs, which need a failed observation to form, are given up. They only ever
+/// reordered candidates that already existed; this decides whether any exist at all.
+fn succeeded(status: Option<i32>) -> bool {
+    status == Some(0)
 }
 
 /// Teach the shared model, creating it if the snapshot has not arrived — a shell with no history
 /// still learns from the session it is having, which is the only history a first run has.
-fn learn(entry: &Entry, at: i64, ok: Option<bool>) {
+fn learn(entry: &Entry, at: i64) {
     if let Ok(mut slot) = shared().write() {
-        slot.get_or_insert_with(Model::new)
-            .learn_outcome(entry, at, ok);
+        slot.get_or_insert_with(Model::new).learn(entry, at);
     }
 }
 
