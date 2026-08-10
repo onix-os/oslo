@@ -33,10 +33,16 @@ pub struct Entry {
     pub session: u32,
     /// Position within that session, from one. `0` for a row written before this existed.
     ///
-    /// **Not redundant with the row's id**, which is global and ascending. A secret command is
-    /// never appended and so consumes no id — the global sequence has no gap to show for it, and
-    /// anything replaying the log would splice the neighbours together and learn a transition that
-    /// never happened. A per-session counter that *does* skip is what makes the omission visible.
+    /// **Not redundant with the row's id**, which is global and ascending across every session
+    /// while this counts within one.
+    ///
+    /// **A secret command leaves no gap here.** The counter is advanced by `Track::append_entry`,
+    /// which a secret line never reaches — so it consumes neither an id nor a position, and nothing
+    /// reading the log afterwards can tell that something happened in between. Anything that treats
+    /// consecutive rows as consecutive commands — the predictor does — therefore splices the
+    /// neighbours together and learns a transition that never occurred. Advancing the counter for a
+    /// line that is not written would make the omission visible at the cost of nothing else; it is
+    /// not done today, and this comment previously claimed it was.
     pub seq: u32,
     /// Whether what is stored is what was typed.
     ///

@@ -22,10 +22,10 @@
 //!   the right behaviour for a shell (the history source has always offered other shells' lines)
 //!   but it is not what "the session is the stream" would lead you to expect, so it is written
 //!   down and pinned by a test.
-//! * **`seq` skips, and the skip is the point.** A secret command is never appended, so a
-//!   per-session counter that jumps from 4 to 6 is the log saying *something happened here that
-//!   you cannot see*. Handing that gap to the model unchanged is what stops it learning a
-//!   transition that never occurred — see the note on [`crate::track::log::Entry::seq`].
+//! * **A secret command leaves no gap, and that is a known hole.** `seq` is advanced only when a
+//!   row is appended, so a line you hid consumes no position and the model sees the commands either
+//!   side of it as consecutive — learning a transition that never occurred. The comment here used
+//!   to claim the counter skipped; it does not. See [`crate::track::log::Entry::seq`].
 //! * **A secret line is not learned**, because it was never recorded to begin with. That is a
 //!   property of the log rather than a rule here, which is the strongest form it could take.
 //! * **Only a command that worked is learned.** See `succeeded` below: a mistyped line inside the model

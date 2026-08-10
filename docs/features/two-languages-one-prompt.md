@@ -1,0 +1,223 @@
+# Two languages, one prompt
+
+oslo's prompt reads one language at a time — POSIX shell or Lua — and Shift-Tab switches between
+them without disturbing the line you are typing. It exists because a shell that guessed the
+language by looking at the line would decide what `print(1)` means from whatever happens to be
+installed, and a shell whose meaning depends on that is one you cannot write scripts against.
+
+## How it works
+
+The language is a single value in the read loop, `current` in
+`startup::read::read_command`. It lives for the whole session: switching is a property of the
+session, not of one line. A second value, `reading`, is the language *this* command is being read
+in — it follows `current` until a `=` or `!` prefix sends one line the other way.
+
+Everything outside the loop learns the language from a different place. `oslo-ui` keeps one
+process-wide record of what the prompt on screen says, written by `prompt::note_row` before each
+line is read and read back by `prompt::language`. That indirection is not decoration: **the
+suggestion, the completion filter and the history finder all live in the library and have no way to
+reach the loop's variable**, and the language can change in the middle of a line from a key handler
+that cannot reach the editor either.
+
+```
+Shift-Tab  ─►  Key::BackTab  ─►  ShellAssist::binding  ─►  Bound::ToggleLanguage
+                                        │
+                        (an oslo.keys entry is consulted first, so
+                         "none" cancels the default outright)
+                                        ▼
+                              Session::perform  ─►  Step::ToggleLanguage
+                                        │
+   read_line: repaint the CURRENT frame, move the cursor to the top of the
+              block, return — the row never goes blank
+                                        ▼
+                    Outcome::ToggleLanguage { text, cursor }
+                                        │
+   read_command:  hide the cursor            \x1b[?25l
+                  fire pre-mode-change       { kind = "language", from, to }
+                  *current = current.other()
+                  fire post-mode-change
+                  reading = *current
+                  typed = text                 ← the line, kept
+                  typed_point = byte index of cursor
+                                        │
+                  ┌─────────────────────┘
+                  ▼
+   note_row(reading.name(), …)   ← every library-side lookup now answers for the new one
+   render the prompt again        (same prompt; the language is one segment of it)
+   read_line(render, (&typed, cursor), assist)
+```
+
+Three details in that path were each forced by a defect.
+
+The editor **repaints the frame it already has** before returning, instead of erasing the block. It
+used to erase, and the screen then held an empty row for however long the caller took to render the
+other language's prompt — which for a prompt built by running another program reads as the whole
+prompt flashing dark. The cursor is hidden across the gap for the same reason: `read_line` restores
+the terminal on the way out, which makes the cursor visible again at column one while the next
+prompt is being built.
+
+The cursor position crosses the boundary twice converted: the editor counts **characters**, the
+loop stores a **byte** offset in `typed_point`, and `read_line` is handed a character index again.
+The two agree for ASCII and diverge on the first accented letter.
+
+Both languages share one prompt with the language as a segment, and the built-in prompt is padded
+to one width across every name in `prompt::LANGUAGES` (`["sh", "lua"]`). The editor is told the
+prompt's width once, when the line starts, and every piece of arithmetic afterwards — where the
+cursor is, where the ghost hint goes, where a wrapped row breaks — comes off that number. A `lua`
+segment one cell wider than `sh` would put the text a cell away from where the editor believes it
+is. The width is measured across the list rather than hard-coded, so adding a language cannot
+quietly bring the shifting back.
+
+### The two prefixes
+
+`=` and `!` are read off the first line only, after it has been trimmed and before anything parses
+it, and only when something follows — a bare `=` is not a Lua chunk, and `!` alone is how history
+expansion is spelled.
+
+```
+first physical line, typed at a prompt reading mode M
+        │
+        ├─ M = shell → escape is '='        ├─ M = lua → escape is '!'
+        │
+        ├─ line starts with the escape AND the rest is not blank?
+        │      yes ──► Line::OneOff { mode: M.other(), text }   ← mode unchanged
+        │      no  ──► Line::Normal(line)                       ← run as M
+        │
+        └─ a continuation line is never re-examined: by then the language is decided
+```
+
+Neither prefix touches `current`, so the prompt comes back in the language it was already in. Both
+languages share one namespace, so `export greeting=hello` then `=print(greeting)` prints `hello`,
+and `=name = 'world'` then `echo $name` prints `world` (`tests/lua_mode_tests.rs`).
+
+### What follows the language, and what does not
+
+The full remembered set is `(line, language)` pairs in `oslo_ui::recall`, seeded at startup from
+the command log — which keeps a mode column of `"sh"` or `"lua"` — and appended to as you type.
+
+| behaviour | per language | how |
+|---|---|---|
+| ghost suggestion from history | yes | `recall::suggest` asks `prompt::language()` first |
+| suggestion from the local store | yes | the `run` index is keyed `(dir, mode, argv)` |
+| history finder (Up, Ctrl-R) | yes | rows filtered on `command.mode` |
+| command-name ghost hint | shell only | `hinting.rs` answers `None` when the language is not `sh` |
+| command-name completion | shell only | `completion.rs`, in command position only |
+| path, variable and config completion | both | still meaningful in Lua, so not gated |
+| repair (the "did you mean" line) | shell only | everything it can offer is a shell command |
+| `!!` and friends | shell only, shell lines only | `recall::for_language` supplies the set |
+| completeness check under `PS2` | yes | shell parser or Lua parser, by `reading` |
+| `$HISTFILE` | no, deliberately | stays a flat file so anything that reads it still works |
+
+There was once a `load_history_for` that cleared the editor's history and refilled it with one
+language. It is gone, and both reasons matter: it **corrupted `$HISTFILE`** — the editor appends
+the entries added since the last clear, so re-seeding N lines wrote all N again on the next command,
+once at startup and again on every toggle — and it could not work anyway, since the language can
+change mid-line from somewhere that cannot reach the editor.
+
+## What makes it different
+
+oslo's log keeps the language beside each line, in a mode column, because recalling a Lua line
+while the prompt is in shell mode has to run it as Lua — a flat list of lines with nothing recorded
+about what each one was cannot answer that. `$HISTFILE` is still written and still flat, so
+anything that reads it keeps working.
+
+`PS1` is honoured for shell lines and cannot win for Lua ones. It describes a shell prompt, and
+drawing `oslo$` in front of something that is not a shell command is exactly the confusion the
+language segment exists to stop.
+
+The toggle is Shift-Tab because `BackTab` is the only key in the Tab family a terminal delivers
+distinctly. Ctrl-Tab is indistinguishable from Tab in the legacy encoding every terminal still
+falls back to, so binding it would silently do nothing on a plain tty.
+
+## Configuration
+
+The key. There is no `$OSLO_TOGGLE_KEY`; bindings live in one table so there is no second place for
+them to disagree from.
+
+```lua
+-- "toggle-mode" is the same action under another name.
+oslo.keys["f2"] = "toggle-language"     -- another key as well
+oslo.keys["shift-tab"] = "none"         -- and this turns the default off
+```
+
+The language a session starts in. Both spellings reach the same shell variable.
+
+```sh
+export OSLO_DEFAULT_MODE=lua
+```
+
+```lua
+oslo.opts.set("default_mode", "lua")
+```
+
+Watching the switch. One hook covers vi-mode changes too, so a handler that cares about only one
+reads `kind`.
+
+```lua
+-- m is { kind = "language", from = "sh", to = "lua" }
+oslo.on.pre_mode_change(function(m)  end)
+oslo.on.post_mode_change(function(m) end)
+```
+
+Drawing it. A prompt function is handed `language`, and `$OSLO_MODE` carries the same word for a
+shell-side prompt.
+
+```lua
+oslo.prompt.left = function(p) return p.language .. " ❯ " end
+```
+
+## Measurements
+
+Both numbers are recorded in the source at the point they changed a decision.
+
+| measured | result | where |
+|---|---|---|
+| one spawn of an external prompt program | 91 ms | `startup/read.rs` — why the mode-change redraw is not three extra renders |
+| store suggestion keyed by directory + language | 33 µs | `recall/nearby.rs`, release, 25,000 rows / 3,000 directories |
+| the same widened to the worktree | 1.8 ms for `cargo run --ex`, 7.1 ms for `c` | as above; 69 ms over one 26-character line, which is why it is memoised |
+
+## What it cannot do
+
+**Syntax colouring is not per language.** One shell highlighter paints both prompts; there is no
+Lua lexer behind the editor. Nine reserved words overlap (`if`, `then`, `else`, `for`, `while`,
+`until`, `do`, `in`, `function`), which is why a Lua line looks plausible rather than right:
+`local`, `end` and `nil` get no colour of their own.
+
+The plain Up/Down walk is **not** filtered by language. It reads the editor's own history, which is
+the complete `$HISTFILE`-backed list. By default this never shows, because Up opens the history
+finder and that filters on the mode column — but with `oslo.finder.enabled = false` the walk offers
+lines from both languages.
+
+A one-off prefix changes only how the line is run. While you are typing `=print(1)` at a shell
+prompt the row still says `sh`, so the suggestion, completion and colouring are the shell's for
+that line; only once it is accepted is it read as Lua.
+
+The prefix is read before any parsing, so a first line whose first character is `=` is never a
+shell line, and in Lua mode a first line starting with `!` is never Lua. Lua spells negation `not`
+and inequality `~=`, so nothing valid is lost there; in shell, a command literally named `=` is out
+of reach.
+
+Toggling part-way through an unfinished multi-line command switches the language the *rest* of that
+command is read in, and the completeness check then asks the other parser about the whole buffer.
+Nothing warns about this.
+
+The toggle needs a terminal: with no tty, `read_line` reads a plain line off stdin and no key is
+ever seen, which is why `tests/lua_mode_tests.rs` covers the prefixes and `$OSLO_DEFAULT_MODE` but
+not the key.
+
+## Where it lives
+
+| path | what |
+|---|---|
+| `crates/oslo-runtime/src/startup/mode.rs` | `Mode`, `classify`, `starting_mode`, `TOGGLE_KEY` |
+| `crates/oslo-runtime/src/startup/read.rs` | `read_command` — the loop that owns `current` and `reading`; `is_complete` |
+| `crates/oslo-ui/src/edit/session.rs` | `Bound::ToggleLanguage`, `Step::ToggleLanguage`, `Outcome::ToggleLanguage`, `read_line` |
+| `crates/oslo-ui/src/row.rs` | `note_row`, `language`, `repaint` — the process-wide prompt-row record |
+| `crates/oslo-ui/src/recall/mod.rs` | `seed`, `remember`, `for_language`, `suggest` |
+| `crates/oslo-ui/src/recall/nearby.rs` | `from_store` — the directory-and-language keyed query |
+| `crates/oslo-runtime/src/startup/recall.rs` | `seed_history`, `remember_history` |
+| `crates/oslo-runtime/src/startup/native.rs` | `ShellAssist::binding`, `open_finder` |
+| `crates/oslo-ui/src/keys.rs` | `Action::ToggleLanguage`, `Action::Nothing` |
+| `crates/oslo-ui/src/prompt.rs` | `LANGUAGES`, `measured_width`, `render_default_left_prompt` |
+| `crates/oslo-runtime/src/startup/prompt.rs` | `primary_prompt`, `segment_context` |
+| `tests/lua_mode_tests.rs` | the prefixes, the shared namespace, per-language completeness |

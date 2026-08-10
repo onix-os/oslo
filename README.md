@@ -59,10 +59,10 @@ Structure flows only between two stages that **both** declare they understand it
 that can carry a declaration is one oslo invented. A script written before oslo existed cannot name
 one, so every edge in it plans to bytes.
 
-That is not a promise, it is a build failure: `tests/posix_stays_on_the_byte_path.rs` runs all 408
+That is not a promise, it is a build failure: `tests/posix_stays_on_the_byte_path.rs` runs all 416
 corpus scripts and requires zero structured edges. There is no new pipe operator either — `a |> b`
 is already valid POSIX, so the operator would itself be the hazard. Design:
-`docs/research/dual-channel-pipe.md`.
+`docs/features/structured-pipelines.md`.
 
 ## The prompt
 
@@ -197,7 +197,7 @@ is what makes a cache unnecessary, and a cache stale between two terminals impos
 
 ### Colours
 
-Every one of the 55 roles — 23 syntax, 19 dropdown, 7 prompt, 5 widget — is settable, and each
+Every one of the 54 roles — 23 syntax, 19 dropdown, 7 prompt, 5 widget — is settable, and each
 takes an index or an RGB triplet:
 
 ```lua
@@ -419,7 +419,7 @@ The language is the real thing: pipelines, redirections including heredocs and h
 control flow, functions, `${var:-d}` and the rest of parameter expansion, arithmetic, globbing,
 field splitting, job control with proper process groups and `tcsetpgrp`.
 
-Correctness is measured rather than asserted. 408 scripts in `tests/corpus` run under both oslo and
+Correctness is measured rather than asserted. 416 scripts in `tests/corpus` run under both oslo and
 bash and are compared byte for byte, with known differences listed in
 `tests/differential/expected_fail.rs` as a two-way ratchet — the suite fails if a listed case starts
 passing, so a stale entry cannot survive. Unit and integration tests run alongside it.
@@ -585,7 +585,7 @@ oslo.misc.greeting      = nil         -- a line of your own instead of the banne
 oslo.misc.escape_delay  = 25          -- ms to wait for the rest of an escape sequence; raise on ssh
 oslo.misc.color_depth   = nil         -- truecolor / 256 / 16 / none, when detection is wrong
 
-oslo.vi.enabled         = true        -- vi mode; false for emacs only
+oslo.vi.enabled         = false       -- vi mode; true for vi, false for emacs only
 oslo.vi.cursor_insert   = "line"      -- block / line / underscore, each + " blink"
 oslo.vi.cursor_normal   = "block"
 oslo.vi.cursor_replace  = "underscore"
@@ -623,7 +623,7 @@ oslo.builtin.nav.padding_x  = 1
 oslo.builtin.nav.padding_y  = 0
 oslo.builtin.nav.hidden     = false
 oslo.builtin.nav.filter_at  = "bottom"   -- top / bottom
-oslo.builtin.nav.reverse    = true
+oslo.builtin.nav.reverse    = false
 oslo.builtin.nav.scanner    = true
 ```
 

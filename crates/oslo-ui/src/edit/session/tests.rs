@@ -8,8 +8,8 @@ use super::*;
 
 /// Feed a sequence of keys and hand back the line.
 fn run(start: &str, keys: &[Key]) -> (Session, Vec<Step>) {
-    // The emacs keymap, explicitly: vi mode is the default, and these assert what a key does when
-    // it is *not* a vi command.
+    // The emacs keymap, explicitly rather than by default: these assert what a key does when it is
+    // *not* a vi command, and a session built from the config follows whatever `oslo.vi.enabled` says.
     let mut session = Session {
         vi: None,
         ..Session::new(start, start.chars().count())
