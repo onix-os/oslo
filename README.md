@@ -1030,14 +1030,22 @@ nix build         # static musl binary
 Both are off, and both are off for the same reason: a shell that is going to be `/bin/sh` should
 carry what every session needs and nothing else.
 
+Measured on the static musl binary, against a 6,323,168-byte default:
+
 | feature | costs | brings |
 |---|---:|---|
-| `vista` | 433 KB | the model: `predict` as a suggestion source, `oslo.repair`, `oslo.predict.*`, and the correction drawn after a mistyped line |
-| `ssh` | ~600 KB | an SSH client in the shell. Unfinished — see the note in `Cargo.toml` |
+| `vista` | +433 KB | the model: `predict` as a suggestion source, `oslo.repair`, `oslo.predict.*`, and the correction drawn after a mistyped line |
+| `ssh` | **+0** | an SSH client — unfinished. Nothing reaches `src/ssh.rs` yet, so the linker discards `maki` and `tokio` whole and the binary is byte-for-byte the default one. It will cost about 0.6 MB the day something calls it |
 
 ```sh
 cargo build --release --features vista
+make build-all                          # static release, every feature on
 ```
+
+**There are no others**, and in particular none that exist to serve the test suite —
+`--all-features` turns on exactly the two above. Test-only helpers that other crates' tests need
+are ordinary `pub` items the linker drops from the binary, not features, because a build flag
+should never decide whether test scaffolding ships.
 
 A config is written to work either way, because a build without the feature simply does not have
 the name:

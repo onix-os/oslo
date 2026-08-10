@@ -56,7 +56,6 @@ default = []
 vista = ["dep:vista"]
 # Exposes the lock and the reset that serialise tests touching the process-wide feature bitset.
 # Enabled by `oslo`'s dev-dependencies, so it is absent from any build that is not a test.
-testing = []
 
 [dev-dependencies]
 tempfile = "3.17"

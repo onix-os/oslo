@@ -73,7 +73,11 @@ pub fn set_depth(depth: Depth) {
 ///
 /// The same in-process global-state trap as `environ`, and the same answer: serialise the tests
 /// that touch it rather than hope they do not overlap.
-#[cfg(any(test, feature = "testing"))]
+/// Unconditional rather than behind a cargo feature, which it used to be: the tests that need it
+/// are in other crates, and a feature that exists to serve tests is one `--all-features` turns on —
+/// which would compile test scaffolding into a release binary because somebody asked for
+/// "everything". Nothing outside a test calls it, so the linker drops it.
+#[doc(hidden)]
 #[must_use = "the depth is only held while the guard lives; `let _ = ` drops it immediately"]
 pub fn held_at(depth: Depth) -> std::sync::MutexGuard<'static, ()> {
     static SERIAL: std::sync::Mutex<()> = std::sync::Mutex::new(());

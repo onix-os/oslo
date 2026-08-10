@@ -33,7 +33,7 @@ $(info ------------------------------------------)
 $(info Project: $(PROJECT_NAME) v$(PROJECT_VERSION))
 $(info ------------------------------------------)
 
-.PHONY: build build-full b dev check-static compile c run r test test-terminal t check check-all test-all check-loc check-readme print-name clippy rustdoc fmt fmt-check clean verify vm vm-distro vm-arch install uninstall release help h
+.PHONY: build build-all b dev check-static compile c run r test test-terminal t check check-all test-all check-loc check-readme print-name clippy rustdoc fmt fmt-check clean verify vm vm-distro vm-arch install uninstall release help h
 
 build:
 	@RUSTFLAGS="$(STATIC_RUSTFLAGS)" $(CARGO) build --release --target $(TARGET) --bin $(PROJECT_NAME)
@@ -42,10 +42,14 @@ build:
 
 b: build
 
-# The same binary with every optional feature a user should have. See `full` in Cargo.toml for why
-# this is not `--all-features`.
-build-full:
-	@RUSTFLAGS="$(STATIC_RUSTFLAGS)" $(CARGO) build --release --target $(TARGET) --bin $(PROJECT_NAME) --features full
+# The same binary with every optional feature switched on.
+#
+# `--all-features` means what it says here and nothing more, because nothing in this workspace has
+# a feature that exists to serve tests: the two that did are ordinary `pub` items now, reachable by
+# `cargo test` across crates and dropped from the binary by the linker because nothing else calls
+# them. A build flag should never decide whether test scaffolding ships.
+build-all:
+	@RUSTFLAGS="$(STATIC_RUSTFLAGS)" $(CARGO) build --release --target $(TARGET) --bin $(PROJECT_NAME) --all-features
 	@$(MAKE) --no-print-directory check-static
 	@ls -l "$(BIN)" | awk '{printf "%s  %.2f MB\n", $$NF, $$5/1048576}'
 
@@ -144,6 +148,7 @@ check-readme:
 # yet. They are one command, and worth it before touching the model or the editor's hint path:
 #
 #     PATH=/tmp/realbash:$PATH cargo test --features vista --all-targets $(OURS)
+#
 # The VMs are deliberately *not* in `verify`: each needs a musl toolchain, qemu and the network,
 # and takes minutes. They answer questions a checkout cannot — whether the release artifact runs as
 # PID 1 on a foreign userland, and whether a distro's own init system runs on it.
@@ -211,7 +216,7 @@ help:
 	@echo "  test         Run all tests"
 	@echo "  test-terminal Run terminal PTY transcript tests"
 	@echo "  check        Run cargo check on all targets"
-	@echo "  build-full   Static release with every user-facing feature (vista)"
+	@echo "  build-all    Static release with every optional feature on"
 	@echo "  check-all    Run cargo check on all targets/all features"
 	@echo "  test-all     Run cargo test on all targets/all features"
 	@echo "  clippy       Run clippy with warnings denied"

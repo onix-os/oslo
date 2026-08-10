@@ -46,17 +46,6 @@ ssh = ["dep:maki", "dep:tokio"]
 # before using them: `if oslo.repair then … end`.
 vista = ["oslo-base/vista", "oslo-runtime/vista", "oslo-ui/vista"]
 
-# `full` — every optional feature a *user* should be able to have, in one name. `make build-full`.
-#
-# **Not `--all-features`, and the difference matters.** That switch also turns on `testing` in
-# `oslo-base` and `oslo-ui`, which exists to expose the locks that serialise tests against
-# process-wide state; shipping it puts test scaffolding in a release binary. `--all-features` is
-# right for `clippy`, `rustdoc` and `test-all`, which is where the Makefile uses it, and wrong for
-# anything anybody runs.
-#
-# `ssh` is deliberately absent until it is finished — see its note above. When it is, it joins here.
-full = ["vista"]
-
 [dependencies]
 # A fork of `makiko`, the one pure-Rust SSH client — no `cc`, no `ring`, no `-sys` crate that is
 # really C. Forked rather than depended on because upstream was last touched in March 2025, and a
@@ -150,8 +139,8 @@ tempfile = "3.17"
 # process-wide feature bitset. Cargo unifies the two when it builds a test and does not when it
 # builds the shell, so a release binary carries neither the lock nor the reset.
 [dev-dependencies]
-oslo-base = { path = "crates/oslo-base", features = ["testing"] }
-oslo-ui = { path = "crates/oslo-ui", features = ["testing"] }
+oslo-base = { path = "crates/oslo-base" }
+oslo-ui = { path = "crates/oslo-ui" }
 
 # The crates oslo is built from, and the ones it vendors. `fuzz/` declares its own empty
 # [workspace] to stay out.
