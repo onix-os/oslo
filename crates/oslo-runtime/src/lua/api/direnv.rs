@@ -57,16 +57,31 @@ fn nix_develop(it: &mut Table, env: &Arc<Mutex<Environment>>) {
     let env = Arc::clone(env);
     put(it, "nix_develop", move |_, args| {
         // `oslo.direnv.nix_develop()` means this directory's flake; a string names another installable,
-        // exactly as `use flake ..#other` does.
-        let forwarded = match args.first() {
-            Some(Value::Str(_)) => vec![text(&args, 1, "oslo.direnv.nix_develop")?.to_string()],
+        // exactly as `use flake ..#other` does. A table asks for options.
+        let (forwarded, hook) = match args.first() {
+            Some(Value::Str(_)) => (
+                vec![text(&args, 1, "oslo.direnv.nix_develop")?.to_string()],
+                false,
+            ),
+            // `nix_develop{ hook = true }`, and optionally the installable beside it.
+            Some(Value::Table(options)) => {
+                let options = options.borrow();
+                let named = match options.get(&Value::str("flake")) {
+                    Value::Str(name) => vec![name.to_string()],
+                    _ => Vec::new(),
+                };
+                (
+                    named,
+                    matches!(options.get(&Value::str("hook")), Value::Bool(true)),
+                )
+            }
             // Nothing named: `print-dev-env` resolves this directory's flake by itself, which is
             // what a bare `use flake` relies on too.
-            _ => Vec::new(),
+            _ => (Vec::new(), false),
         };
         let count = {
             let mut guard = crate::lua::engine::borrow_env(&env)?;
-            devshell::apply(&mut guard, &forwarded)
+            devshell::apply_with(&mut guard, &forwarded, hook)
                 .map_err(|e| LuaError::new(format!("oslo.direnv.nix_develop: {e}")))?
         };
         Ok(vec![Value::Number(oslo_lua::Number::Int(count as i64))])

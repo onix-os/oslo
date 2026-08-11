@@ -276,6 +276,17 @@ pub fn forget() {
 /// The one implementation, called by `use flake` from an `.envrc` and by
 /// `oslo.direnv.nix_develop()` from a `.env.lua`.
 pub fn apply(env: &mut Environment, args: &[String]) -> Result<usize, String> {
+    apply_with(env, args, false)
+}
+
+/// The same, and then `shellHook` if `hook` asks for it.
+///
+/// **Off unless asked, because it is somebody else's script.** The variables a flake exports are
+/// data; `shellHook` is a bash program that runs on every entry to the directory — it can print,
+/// write files, start things. `nix develop` and nix-direnv run it and plain direnv does not; oslo
+/// sides with plain direnv by default and lets a project opt in, so that `cd` into a clone of
+/// somebody else's repository is not an invitation.
+pub fn apply_with(env: &mut Environment, args: &[String], hook: bool) -> Result<usize, String> {
     let json = match cached(args) {
         Some(remembered) => remembered,
         None => {
@@ -298,12 +309,26 @@ pub fn apply(env: &mut Environment, args: &[String]) -> Result<usize, String> {
     let exported = exported_from(&json)?;
     let count = exported.len();
     let outer_path = env.get_var("PATH").unwrap_or_default().to_string();
+    let mut script = None;
     for (name, value) in exported {
         if name == "PATH" {
             env.set_var(&name, &keeping_yours(&value, &outer_path), true);
             continue;
         }
+        if hook && name == "shellHook" {
+            script = Some(value.clone());
+        }
         env.set_var(&name, &value, true);
+    }
+    // **After the variables, not before.** The hook is written expecting the shell it is entering:
+    // the flake's own `$MESHTASTIC_PROTO_DIR` and the rest have to be set for it to have anything
+    // to say. Run through oslo rather than bash — a `.env.lua` project has already chosen this
+    // shell, and shelling out would make the hook's `$PATH` a different one from the caller's.
+    if let Some(script) = script.filter(|s| !s.trim().is_empty())
+        && let Err(err) =
+            crate::env::builtins::builtin_eval(env, &["eval".to_string(), "--".to_string(), script])
+    {
+        return Err(format!("shellHook: {err}"));
     }
     Ok(count)
 }
@@ -410,6 +435,19 @@ mod tests {
     fn output_that_is_not_print_dev_env_is_refused_by_name() {
         let problem = exported_from(r#"{"nope":1}"#).expect_err("refused");
         assert!(problem.contains("print-dev-env"), "{problem}");
+    }
+
+    /// `shellHook` is exported like anything else, so it lands in the environment either way. What
+    /// the flag decides is whether it is also *run*.
+    #[test]
+    fn the_hook_is_a_variable_before_it_is_a_script() {
+        let json = r#"{"variables":{"shellHook":{"type":"exported","value":"echo hi"},
+                       "CC":{"type":"exported","value":"gcc"}}}"#;
+        let got = exported_from(json).expect("parsed");
+        assert!(
+            got.contains(&("shellHook".to_string(), "echo hi".to_string())),
+            "the hook is still imported as a variable: {got:?}"
+        );
     }
 }
 

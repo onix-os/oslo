@@ -141,6 +141,20 @@ in `devshell.rs` is that list — `HOME`, `PWD`, `OLDPWD`, `SHELL`, `SHLVL`, `TE
 encoding oslo cannot run. The `$PATH` the dev shell reports is also merged with your own rather
 than replacing it; without that, a `cd` into a flake silently loses half the commands you had.
 
+**`shellHook` is not run unless a project asks.** It is exported like any other variable, so it
+lands in the environment — but it is a bash program rather than data, and running it means executing
+somebody else's script on every entry to the directory. `nix develop` runs it and so does
+nix-direnv; plain direnv does not, and neither does oslo. A project that wants it says so:
+
+```lua
+oslo.direnv.nix_develop{ hook = true }              -- this directory's flake
+oslo.direnv.nix_develop{ flake = "..#other", hook = true }
+```
+
+It runs **after** the variables are set, because a hook is written expecting the shell it is
+entering — and through oslo rather than through bash, so the `$PATH` it sees is the one the caller
+will have.
+
 ### While it runs
 
 Output is captured to a temporary file so it can be printed under the line naming the rc file — a
