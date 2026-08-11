@@ -6,6 +6,20 @@ rust-version = "1.89"
 license = "MIT"
 description = "oslo's shell: syntax adaptation, expansion, execution, builtins, the structured pipeline and directory environments."
 
+[features]
+default = []
+# `tab` — named sessions that keep running when the terminal they were in goes away. Off by
+# default; a build without it has no keeper, no client and no runtime directory, and the key that
+# opens the finder does nothing.
+scratch = []
+# `direnv` — directory environments: `.env.lua`, `.envrc`, and the dev shell an `.envrc` can ask
+# for. Off by default; a build without it never reads a directory file and never runs one.
+direnv = []
+# `nix` — everything that knows what a Nix dev shell is: `nix print-dev-env`, importing its
+# variables, its shell-local state and its functions. Independent of `direnv`: the two meet only
+# where a directory file asks for a dev shell, and that overlap needs both.
+nix = []
+
 [dependencies]
 oslo-base = { path = "../oslo-base" }
 oslo-lua = { path = "../oslo-lua" }

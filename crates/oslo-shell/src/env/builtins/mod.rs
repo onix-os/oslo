@@ -23,6 +23,7 @@ mod control;
 mod copy;
 mod declare;
 mod directories;
+#[cfg(feature = "direnv")]
 mod direnv;
 mod exec;
 mod getopts;
@@ -34,10 +35,14 @@ mod mapfile;
 mod nav;
 mod process;
 mod remove;
+#[cfg(feature = "scratch")]
+mod scratch;
 mod shopt;
 mod spawn;
 mod status;
 mod suspend;
+#[cfg(feature = "scratch")]
+pub use scratch::tool as scratch_tool;
 mod times;
 mod ui;
 mod ulimit;
@@ -156,10 +161,14 @@ pub fn register_default_builtins(env: &mut Environment) {
     env.register_custom_builtin("abbr", abbr::builtin_abbr);
     env.register_custom_builtin("ui", ui::builtin_ui);
     env.register_custom_builtin("nav", nav::builtin_nav);
+    // The finder the key opens, for a prompt counting tabs and for a name already known.
+    #[cfg(feature = "scratch")]
+    env.register_custom_builtin("scratch", scratch::builtin_scratch);
     // The directory ring: where you have been. Walking it is `cd -` and `cd -N`, so the only
     // builtin left is the one that shows you the numbers those take. Separate from `pushd`/`popd`,
     // which are explicit and which scripts rely on.
     env.register_custom_builtin("dirh", directories::ring::builtin_dirh);
+    #[cfg(feature = "direnv")]
     env.register_custom_builtin("direnv", direnv::builtin_direnv);
 
     // Job control. `wait` is registered above but belongs with these: all five read one table.

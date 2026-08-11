@@ -82,7 +82,7 @@ fn prefix_form(content: &str) -> Result<Option<WordPart>> {
     let mut chars = content.chars();
     let expansion_type = match chars.next() {
         Some('#') => ParamExpansion::Length,
-        Some('!') => ParamExpansion::Indirect,
+        Some('!') => return indirect_form(chars.as_str()).map(Some),
         _ => return Ok(None),
     };
     let name = chars.as_str();
@@ -90,6 +90,27 @@ fn prefix_form(content: &str) -> Result<Option<WordPart>> {
         return Ok(None);
     }
     reference(name, expansion_type).map(Some)
+}
+
+/// `${!name}` and `${!name<op>word}`.
+///
+/// **The operator is split off the remainder, not left in the name.** Without this the whole of
+/// `!v:-d` was carried through as a parameter name, which is not one — so every combined form
+/// answered `bad substitution`, including the `${!hooksSlice+…}` that stdenv's `runHook` is built
+/// on. What remains after the `!` is an ordinary body, so it is parsed as one.
+fn indirect_form(body: &str) -> Result<WordPart> {
+    if body.is_empty() {
+        // `${!}` is the last background pid, not an indirection.
+        return reference("!", ParamExpansion::Normal);
+    }
+    let inner = match find_param_operator(body) {
+        Some((idx, op)) => {
+            let expansion = operator_expansion(op, &body[idx + op.len()..])?;
+            return reference(&body[..idx], ParamExpansion::Indirect(Box::new(expansion)));
+        }
+        None => ParamExpansion::Normal,
+    };
+    reference(body, ParamExpansion::Indirect(Box::new(inner)))
 }
 
 #[cfg(test)]
@@ -206,7 +227,10 @@ mod tests {
     #[test]
     fn the_prefix_operators_need_a_name_after_them() {
         assert_eq!(op_of("${#v}", "v"), ParamExpansion::Length);
-        assert_eq!(op_of("${!v}", "v"), ParamExpansion::Indirect);
+        assert_eq!(
+            op_of("${!v}", "v"),
+            ParamExpansion::Indirect(Box::new(ParamExpansion::Normal))
+        );
         // `${#}` is `$#` and `${!}` is `$!` — a marker with nothing after it is the parameter.
         assert_eq!(op_of("${#}", "#"), ParamExpansion::Normal);
         assert_eq!(op_of("${!}", "!"), ParamExpansion::Normal);
@@ -217,7 +241,10 @@ mod tests {
     /// the expander as a non-name so it errors, not as something that quietly expands.
     #[test]
     fn the_name_listing_form_is_left_as_a_bad_name() {
-        assert_eq!(op_of("${!pre*}", "pre*"), ParamExpansion::Indirect);
+        assert_eq!(
+            op_of("${!pre*}", "pre*"),
+            ParamExpansion::Indirect(Box::new(ParamExpansion::Normal))
+        );
     }
 
     #[test]
@@ -488,7 +515,11 @@ mod tests {
         );
         assert_eq!(
             ref_of("${!a[@]}"),
-            ("a".into(), Subscript::All, ParamExpansion::Indirect)
+            (
+                "a".into(),
+                Subscript::All,
+                ParamExpansion::Indirect(Box::new(ParamExpansion::Normal))
+            )
         );
     }
 

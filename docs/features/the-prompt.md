@@ -165,12 +165,12 @@ segment that renders nothing, silently.
 ## Configuration
 
 ```lua
-oslo.prompt.left         = function(p) return p.cwd .. " ❯ " end
+oslo.prompt.left         = function(p) return p.cwd .. " > " end
 oslo.prompt.right        = function(p)
   return p.duration_ms and (p.duration_ms .. "ms") or ""
 end
 oslo.prompt.continuation = function() return "… " end
-oslo.prompt.transient    = function() return "❯ " end
+oslo.prompt.transient    = function() return "> " end
 oslo.prompt.title        = function(p) return p.command or p.cwd end
 oslo.prompt.left         = nil   -- back to $PS1 / the built-in prompt
 ```

@@ -413,7 +413,7 @@ fn parameter(name: &str, expansion: &ParamExpansion) -> String {
     match expansion {
         ParamExpansion::Normal => format!("${{{}}}", name),
         ParamExpansion::Length => format!("${{#{}}}", name),
-        ParamExpansion::Indirect => format!("${{!{}}}", name),
+        ParamExpansion::Indirect(inner) => parameter(&format!("!{name}"), inner),
         ParamExpansion::DefaultValue {
             default,
             assign_if_unset,

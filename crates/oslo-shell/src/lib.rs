@@ -26,11 +26,21 @@
 //! and "the interpreter parked on this thread" moved into `oslo-lua`, which owns the type.
 
 pub mod data;
+#[cfg(feature = "direnv")]
 pub mod direnv;
 pub mod env;
 pub mod exec;
 pub mod expand;
 pub mod lexer;
+/// A Nix dev shell, imported without entering one.
+///
+/// **Not called `nix`**, because a module of that name at the crate root shadows the `nix` *crate*
+/// for every `nix::unistd::…` path in this crate — `expand::tilde` and `exec` are full of them. The
+/// cargo feature is `nix`; only the module wears the longer name.
+#[cfg(feature = "nix")]
+pub mod nix_shell;
+#[cfg(feature = "scratch")]
+pub mod scratch;
 /// The brush→oslo adapter and the nesting guard. There is one shell parser and it is brush's;
 /// this is the conversion into oslo's own tree, which is why it is not called `parser`.
 pub mod syntax;

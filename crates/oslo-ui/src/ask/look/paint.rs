@@ -32,6 +32,12 @@ pub struct Row {
     /// screen even though the text beside them varies wildly in length. That alignment is the
     /// entire reason to have them — the eye can scan one column without reading the others.
     pub meta: Vec<String>,
+    /// Whether the query matched *this row* at all.
+    ///
+    /// **False for a row the list invented**, such as an offer to create what was typed: its text
+    /// is the query, so every character counts as a match and the whole row comes out painted as
+    /// one — which says "all of this matched" about the one row that matched nothing.
+    pub matchable: bool,
     /// This row's own foreground, when it is not the selected one — a directory in a file list, a
     /// failed job in a job list. The look still owns the background, so a tinted row is still
     /// striped and still highlights when you land on it.
@@ -47,6 +53,7 @@ impl Row {
             marked: false,
             trail: String::new(),
             meta: Vec::new(),
+            matchable: true,
             tint: None,
         }
     }
@@ -81,6 +88,7 @@ fn pad_left(text: &str, width: usize) -> String {
 }
 
 /// Where the list is, so the renderer does not have to be told twice.
+#[derive(Clone, Copy)]
 pub struct View<'a> {
     pub selected: usize,
     /// First visible row, so a long list scrolls under a fixed window.
@@ -111,9 +119,13 @@ impl Look {
     /// Every row begins with `\r\n`, which is what makes the row count exact — see
     /// `super::super::Inline`.
     pub fn frame(&self, rows: &[Row], view: &View<'_>) -> String {
+        // The margin is drawn here rather than inside a row, because it is the one part of the line
+        // that must stay the terminal's own colour: painted, it would be the block reaching further
+        // rather than the block starting later.
+        let margin = " ".repeat(self.margin);
         self.rows(rows, view)
             .iter()
-            .map(|row| format!("\r\n\r\x1b[K{row}"))
+            .map(|row| format!("\r\n\r\x1b[K{margin}{row}"))
             .collect()
     }
 
@@ -124,6 +136,14 @@ impl Look {
     /// to be identical, which is the whole reason this is one function rather than two renderers.
     pub fn rows(&self, rows: &[Row], view: &View<'_>) -> Vec<String> {
         let depth = theme::depth();
+        // Narrowed by **one** margin, not two. The caller's width already stops short of the right
+        // edge — `Chrome::room` keeps a column back so a row exactly the terminal's width cannot
+        // leave the cursor in the auto-wrap pending state — so taking two would open a gap on the
+        // right twice the size of the one on the left, which is the asymmetry this exists to close.
+        let view = &View {
+            cols: view.cols.saturating_sub(self.margin),
+            ..*view
+        };
         // Measured across the *whole* list rather than the visible window, so the columns do not
         // shift under you as it scrolls — which is the one thing that would undo the alignment
         // they exist for.
@@ -258,7 +278,10 @@ impl Look {
             marker,
             lead,
             meta,
-            self.hits(&text, &shown, view.query, on(base), depth),
+            match row.matchable {
+                true => self.hits(&text, &shown, view.query, on(base), depth),
+                false => on(base).paint(&text, depth),
+            },
             on(self.muted).paint(&trail, depth),
             on(Style::default()).paint(&pad, depth),
         )

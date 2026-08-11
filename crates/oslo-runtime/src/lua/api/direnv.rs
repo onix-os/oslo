@@ -16,13 +16,18 @@
 
 use super::util::{put, text};
 use oslo_lua::{LuaError, Table, Value};
-use oslo_shell::direnv::{devshell, stdlib};
+use oslo_shell::direnv::stdlib;
 use oslo_shell::env::Environment;
+#[cfg(feature = "nix")]
+use oslo_shell::nix_shell as devshell;
 use std::sync::{Arc, Mutex};
 
 /// Build the `oslo.direnv` table.
 pub fn build(env: &Arc<Mutex<Environment>>) -> Value {
     let mut it = Table::new();
+    // `oslo.direnv.nix_develop` is the seam: a directory file asking for a dev shell. It needs
+    // both halves, and a build with only one of them simply does not offer the name.
+    #[cfg(feature = "nix")]
     nix_develop(&mut it, env);
     path_add(&mut it, env);
     Value::table(it)
@@ -53,20 +58,40 @@ fn path_add(it: &mut Table, env: &Arc<Mutex<Environment>>) {
     });
 }
 
+#[cfg(feature = "nix")]
 fn nix_develop(it: &mut Table, env: &Arc<Mutex<Environment>>) {
     let env = Arc::clone(env);
     put(it, "nix_develop", move |_, args| {
         // `oslo.direnv.nix_develop()` means this directory's flake; a string names another installable,
-        // exactly as `use flake ..#other` does.
-        let forwarded = match args.first() {
-            Some(Value::Str(_)) => vec![text(&args, 1, "oslo.direnv.nix_develop")?.to_string()],
+        // exactly as `use flake ..#other` does. A table asks for options.
+        let (forwarded, want) = match args.first() {
+            Some(Value::Str(_)) => (
+                vec![text(&args, 1, "oslo.direnv.nix_develop")?.to_string()],
+                devshell::Want::default(),
+            ),
+            // `nix_develop{ hook = true, functions = true }`, and optionally the installable.
+            Some(Value::Table(options)) => {
+                let options = options.borrow();
+                let named = match options.get(&Value::str("flake")) {
+                    Value::Str(name) => vec![name.to_string()],
+                    _ => Vec::new(),
+                };
+                let on = |key: &str| matches!(options.get(&Value::str(key)), Value::Bool(true));
+                (
+                    named,
+                    devshell::Want {
+                        hook: on("hook"),
+                        functions: on("functions"),
+                    },
+                )
+            }
             // Nothing named: `print-dev-env` resolves this directory's flake by itself, which is
             // what a bare `use flake` relies on too.
-            _ => Vec::new(),
+            _ => (Vec::new(), devshell::Want::default()),
         };
         let count = {
             let mut guard = crate::lua::engine::borrow_env(&env)?;
-            devshell::apply(&mut guard, &forwarded)
+            devshell::apply_with(&mut guard, &forwarded, want)
                 .map_err(|e| LuaError::new(format!("oslo.direnv.nix_develop: {e}")))?
         };
         Ok(vec![Value::Number(oslo_lua::Number::Int(count as i64))])

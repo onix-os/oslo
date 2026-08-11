@@ -5,6 +5,30 @@ walk out. oslo reads both itself — no `direnv` binary, no bash subprocess, no 
 `eval` protocol — because most of direnv's machinery exists to let an external program talk to a
 shell it did not write, and **oslo is the shell**.
 
+> ## This is in `oslo`, not in `oslo-minimal`
+>
+> Everything on this page is behind the **`direnv`** cargo feature, which is off by default.
+>
+> | | `cd` into a project |
+> |---|---|
+> | `oslo` | reads `.env.lua` / `.envrc`, loads and unloads |
+> | `oslo-minimal` | is just `cd` |
+>
+> ```sh
+> make build                  # the full binary, every feature
+> make build TYPE=minimal     # no directory environments at all
+> ```
+>
+> It costs **256 KB** — 6,081,344 bytes without it against 6,343,648 with — the largest of the four
+> optional features, and the reason it is off is not the size. This is the one part of the shell
+> that **reads a file on arrival in a directory and can run what it finds there**. That is a
+> different kind of trust from anything else oslo does unprompted, and a `/bin/sh` on a
+> distribution should not do it because a shell somewhere else wanted it to.
+>
+> Without the feature there is no `direnv` builtin — the word falls through to `$PATH`, so the real
+> direnv still works if it is installed — no `oslo.direnv` API, no `.env.lua` or `.envrc` reading,
+> and no dev shell import.
+
 <!-- demo:begin -->
 [![directory-environments demo](https://asciinema.org/a/1262735.svg)](https://asciinema.org/a/1262735)
 <!-- demo:end -->
@@ -140,6 +164,68 @@ in `devshell.rs` is that list — `HOME`, `PWD`, `OLDPWD`, `SHELL`, `SHLVL`, `TE
 `TMP*`/`TEMP*` family, `NIX_*` build variables and a few more — plus exported bash functions, whose
 encoding oslo cannot run. The `$PATH` the dev shell reports is also merged with your own rather
 than replacing it; without that, a `cd` into a flake silently loses half the commands you had.
+
+**`shellHook` is not run unless a project asks.** It is exported like any other variable, so it
+lands in the environment — but it is a bash program rather than data, and running it means executing
+somebody else's script on every entry to the directory. `nix develop` runs it and so does
+nix-direnv; plain direnv does not, and neither does oslo. A project that wants it says so:
+
+```lua
+oslo.direnv.nix_develop{ hook = true }              -- this directory's flake
+oslo.direnv.nix_develop{ flake = "..#other", hook = true }
+```
+
+It runs **after** the variables are set, because a hook is written expecting the shell it is
+entering — and through oslo rather than through bash, so the `$PATH` it sees is the one the caller
+will have.
+
+### The functions, which are the other half of a dev shell
+
+`print-dev-env --json` has **two** top-level keys, and `variables` is the smaller one. For an
+ordinary flake:
+
+| | count |
+|---|---|
+| `variables`, `exported` — imported | 93 |
+| `variables`, `var` / `array` — dropped | 32 / 22 |
+| **`bashFunctions`** | **110** |
+
+Those 110 are stdenv's build system: `genericBuild`, `runHook`, every `*Phase`,
+`substituteInPlace`, `patchShebangs`, `moveToOutput`, the `nix*Log` family. Without them a dev shell
+is a set of paths; with them it is somewhere you can build.
+
+```lua
+oslo.direnv.nix_develop{ functions = true }
+```
+
+All 110 parse, and **98 of them run with no shell-level error**. `runHook`, `runPhase`,
+`genericBuild`, `substituteInPlace` and `printPhases` were each checked against bash and produce
+byte-identical output — so a phase sequence runs here the way it does inside `nix develop`:
+
+```
+> phases="one two"; genericBuild
+Running phase: one
+ONE
+Running phase: two
+TWO
+```
+
+Getting there took four things the shell was missing, each found by running the functions rather
+than reading them:
+
+| | what stdenv needs it for |
+|---|---|
+| `${!v<op>}` | `runHook` is `${!hooksSlice+"${!hooksSlice}"}` |
+| an indirection naming an **array** | that `hooksSlice` holds `preConfigureHooks[@]` |
+| `${a[@]+alt}` and `${a[@]:-d}` | the same line — the array is the thing being tested |
+| `local -a` | `substituteInPlace` declares one on its first line |
+
+Arrays themselves were never the problem: oslo has had them, and `a=(x y)`, `a+=(z)`, `${a[@]}`,
+`${#a[@]}` all matched bash before any of this. What was missing were those four forms around them.
+
+Defined **before** `shellHook`, since a hook calling `runHook` or `addToSearchPath` is ordinary.
+One `eval` for all of them rather than 110 — 40 ms for 66 KB in a debug build, which is the whole
+cost of the option.
 
 ### While it runs
 

@@ -433,7 +433,9 @@ fn format_param(name: &str, expansion: &ParamExpansion) -> String {
             let pat = pattern.as_ref().map(format_word).unwrap_or_default();
             format!("${{{name}{op}{pat}}}")
         }
-        ParamExpansion::Indirect => format!("${{!{name}}}"),
+        // The `!` belongs to the reference, so the inner form is rendered against a name that
+        // already carries it — `${!v:-d}` rather than `${!v}:-d`.
+        ParamExpansion::Indirect(inner) => format_param(&format!("!{name}"), inner),
     }
 }
 

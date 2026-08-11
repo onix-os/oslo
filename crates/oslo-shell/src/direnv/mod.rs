@@ -39,7 +39,6 @@
 
 pub mod allow;
 pub mod carry;
-pub mod devshell;
 pub mod diff;
 pub mod find;
 mod handle;

@@ -21,6 +21,7 @@ use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
 mod convert;
+#[cfg(feature = "direnv")]
 mod direnv;
 pub(crate) mod external;
 /// `oslo.feature` — turning parts of the shell off and on while it runs.
@@ -104,6 +105,7 @@ pub fn install(interp: &Rc<Interp>, registry: &Registry, env: Arc<Mutex<Environm
         "dirs",
         "theme",
         "abbr",
+        "scratch",
     ] {
         if matches!(oslo.get(&Value::str(name)), Value::Nil) {
             oslo.set(
@@ -174,6 +176,7 @@ pub fn install(interp: &Rc<Interp>, registry: &Registry, env: Arc<Mutex<Environm
     extend(&mut oslo, "proc", process);
     oslo.set(Value::str("sys"), Value::table(system));
     oslo.set(Value::str("ui"), Value::table(ui));
+    #[cfg(feature = "direnv")]
     oslo.set(Value::str("direnv"), direnv::build(&env));
     let oslo = Value::table(oslo);
     publish(interp, &oslo);

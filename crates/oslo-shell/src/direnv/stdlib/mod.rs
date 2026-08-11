@@ -26,10 +26,12 @@
 //! its documented interface, so that files written for it work unchanged.
 
 mod layout;
+#[cfg(feature = "nix")]
 mod nix;
 mod paths;
 mod report;
 mod sourcing;
+mod using;
 
 #[cfg(test)]
 mod tests;
@@ -72,22 +74,31 @@ const STDLIB: &[(&str, BuiltinFn)] = &[
     ("source_up_if_exists", sourcing::source_up_if_exists),
     ("dotenv", sourcing::dotenv),
     ("dotenv_if_exists", sourcing::dotenv_if_exists),
-    ("use", nix::use_dispatch),
-    ("use_flake", nix::use_flake),
-    ("use_nix", nix::use_nix),
+    ("use", using::use_dispatch),
     ("layout", layout::dispatch),
 ];
 
+/// The handlers that only exist in a build that knows what a Nix dev shell is.
+///
+/// A separate table because a `const` array cannot have a `#[cfg]` on one of its elements, and the
+/// alternative — registering a `use_flake` that answers "this build has no nix" — would be a word
+/// the shell offers and cannot do.
+#[cfg(feature = "nix")]
+const NIX_STDLIB: &[(&str, BuiltinFn)] =
+    &[("use_flake", nix::use_flake), ("use_nix", nix::use_nix)];
+#[cfg(not(feature = "nix"))]
+const NIX_STDLIB: &[(&str, BuiltinFn)] = &[];
+
 /// Put the stdlib in scope.
 pub fn install(env: &mut Environment) {
-    for (name, func) in STDLIB {
+    for (name, func) in STDLIB.iter().chain(NIX_STDLIB) {
         env.register_custom_builtin(name, *func);
     }
 }
 
 /// Take it back out.
 pub fn remove(env: &mut Environment) {
-    for (name, _) in STDLIB {
+    for (name, _) in STDLIB.iter().chain(NIX_STDLIB) {
         env.unregister_custom_builtin(name);
     }
 }

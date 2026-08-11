@@ -1,6 +1,6 @@
 [package]
 name = "oslo"
-version = "0.2.27"
+version = "0.2.28"
 edition = "2024"
 # Minimum supported Rust version, mirrored by the MSRV job in .github/workflows/tests.yml.
 rust-version = "1.89"
@@ -45,6 +45,35 @@ ssh = ["dep:maki", "dep:tokio"]
 # and the correction drawn after a mistyped line. A config that wants to work in both builds asks
 # before using them: `if oslo.repair then … end`.
 vista = ["oslo-base/vista", "oslo-runtime/vista", "oslo-ui/vista"]
+
+# `tab` — named sessions that keep running when the terminal they were in goes away, reached with
+# one key. See `PLAN.md` and `docs/features/tab.md`.
+#
+# **Off, because it is a second process and a pty for every session that uses it, and because a
+# shell meant to be `/bin/sh` should not carry a multiplexer nobody asked for.** Unlike `ssh` and
+# `vista` it adds no dependency at all — it is `nix`, which oslo already links — so what it costs is
+# code and the runtime directory, not crates.
+#
+# Without it the key is unbound and the settings are accepted and ignored, so one config works in
+# both builds with nothing to ask.
+scratch = ["oslo-shell/scratch", "oslo-runtime/scratch"]
+
+# `direnv` — directory environments.
+#
+# **Off, and the largest of the four.** It reads a file on every arrival in a directory and can run
+# what it finds there, which is a different kind of trust from anything else the shell does on its
+# own. A build without it has no `direnv` builtin, no `oslo.direnv` API, no `.env.lua` or `.envrc`
+# reading, and no dev shell import — `cd` is `cd`.
+direnv = ["oslo-shell/direnv", "oslo-runtime/direnv"]
+
+# `nix` — a Nix dev shell, imported without entering one.
+#
+# **Independent of `direnv`, on purpose.** Today the only way in is a directory file asking for it,
+# but nothing about reading `nix print-dev-env` needs a directory file — and the things worth adding
+# next (flake-output completion, a prompt segment naming the shell you are in) need one even less.
+# Where the two meet — `use flake` in an `.envrc`, `oslo.direnv.nix_develop` in a `.env.lua` — the
+# entry point asks for both.
+nix = ["oslo-shell/nix", "oslo-runtime/nix"]
 
 [dependencies]
 # A fork of `makiko`, the one pure-Rust SSH client — no `cc`, no `ring`, no `-sys` crate that is

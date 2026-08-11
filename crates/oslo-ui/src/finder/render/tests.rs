@@ -107,7 +107,7 @@ fn the_search_bar_sits_inside_its_surface() {
     let lines: Vec<&str> = seen.lines().collect();
     // From the bottom: the margin produces no line, so the surface is the last three.
     let query_row = lines.len() - 2;
-    // The scanner stands where the `❯` used to, so the query row is the one carrying it.
+    // The scanner stands where the `>` used to, so the query row is the one carrying it.
     assert!(
         lines[query_row].contains('■') || lines[query_row].contains('⬝'),
         "no scanner on the query row: {:?}",
@@ -265,7 +265,7 @@ fn a_tiny_terminal_still_renders() {
     let matches = [ranked("one", 1, 1, "/", false)];
     for rows in [1, 2, 3] {
         let rendered = frame_of(&matches, "q", rows);
-        assert!(plain(&rendered).contains('❯'), "rows={rows}");
+        assert!(plain(&rendered).contains('>'), "rows={rows}");
     }
 }
 
@@ -296,7 +296,7 @@ fn exactly_one_row_carries_the_marker() {
     let seen = plain(&rendered);
     // The search bar uses the same glyph, so only the list rows are counted.
     let list: Vec<&str> = seen.lines().take(seen.lines().count() - 3).collect();
-    let marked: Vec<&&str> = list.iter().filter(|l| l.contains('❯')).collect();
+    let marked: Vec<&&str> = list.iter().filter(|l| l.contains('>')).collect();
     assert_eq!(marked.len(), 1, "exactly one marker: {list:?}");
     assert!(
         marked[0].contains("second"),

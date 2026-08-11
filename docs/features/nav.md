@@ -27,14 +27,14 @@ The frame is the path, the listing, and — only once you are filtering — a fi
       ▼ starts where the names start rather than three cells to their left.
       /home/bresilla/data/code/tools/rush   [all]    ← where you are; [all] = hidden on
     ■  crates/                              4.0K   2d
-  ❯ ■  docs/                                4.0K  17h  ← the row the cursor is on
+  > ■  docs/                                4.0K  17h  ← the row the cursor is on
     ≡  Cargo.toml                           892B    3d
     ≡  README.md                             31K    1h
     │  │                                    │       │
     │  └ name; directories first, then by name; `/` for a directory, `@` for a link
     └ the mark, one cell, chosen by extension                 size ┘   age ┘  hard right
 
-  ❯❯  filter @ doc                                     1/47   ← only while filtering
+  >>  filter @ doc                                     1/47   ← only while filtering
 ```
 
 The `dir`/`file` word and the `rwxrwxr-x` mode that a first version drew are both gone. **A file
