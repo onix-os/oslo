@@ -26,6 +26,7 @@
 //! and "the interpreter parked on this thread" moved into `oslo-lua`, which owns the type.
 
 pub mod data;
+#[cfg(feature = "direnv")]
 pub mod direnv;
 pub mod env;
 pub mod exec;

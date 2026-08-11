@@ -23,6 +23,7 @@ mod control;
 mod copy;
 mod declare;
 mod directories;
+#[cfg(feature = "direnv")]
 mod direnv;
 mod exec;
 mod getopts;
@@ -167,6 +168,7 @@ pub fn register_default_builtins(env: &mut Environment) {
     // builtin left is the one that shows you the numbers those take. Separate from `pushd`/`popd`,
     // which are explicit and which scripts rely on.
     env.register_custom_builtin("dirh", directories::ring::builtin_dirh);
+    #[cfg(feature = "direnv")]
     env.register_custom_builtin("direnv", direnv::builtin_direnv);
 
     // Job control. `wait` is registered above but belongs with these: all five read one table.
