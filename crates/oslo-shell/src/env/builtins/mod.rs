@@ -40,6 +40,8 @@ mod status;
 mod suspend;
 #[cfg(feature = "tab")]
 mod tab;
+#[cfg(feature = "tab")]
+pub use tab::tool as tab_tool;
 mod times;
 mod ui;
 mod ulimit;

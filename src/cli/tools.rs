@@ -50,6 +50,15 @@ pub const TOOLS: &[Tool] = &[
         name: "hook",
         about: "list and test the shell hooks",
     },
+    // **A tool as well as a builtin, and the two are not redundant.** The builtin is what a person
+    // types at an oslo prompt; this is what anything *else* asks — a prompt segment, a status bar,
+    // a script — and those reach oslo through `io.popen` or `sh -c`, where a builtin does not
+    // exist and the name resolves to whatever is on `$PATH` instead.
+    #[cfg(feature = "tab")]
+    Tool {
+        name: "tab",
+        about: "list the named sessions, or go into one",
+    },
 ];
 
 /// The tool a first *operand* names, if it safely names one.
@@ -105,6 +114,12 @@ pub fn from_name(name: &str) -> Option<&'static Tool> {
 pub fn run(tool: &'static Tool, args: &[String]) -> i32 {
     if tool.name == "history" {
         return crate::cli::history::run(args);
+    }
+    // The same code the builtin runs, so the two answers cannot disagree about what is running.
+    // `args` here has no command name in front of it, which the builtin's does.
+    #[cfg(feature = "tab")]
+    if tool.name == "tab" {
+        return oslo::env::builtins::tab_tool(args);
     }
     let paint = crate::cli::help::Paint::detect();
     if args.iter().any(|a| a == "--help" || a == "-h") {

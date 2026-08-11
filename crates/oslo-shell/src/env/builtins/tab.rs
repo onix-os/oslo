@@ -18,25 +18,40 @@ use oslo_base::error::Result;
 const REPLAY: u64 = 8192;
 
 pub fn builtin_tab(_env: &mut Environment, args: &[String]) -> Result<i32> {
-    let key = oslo_ui::settings::current().tab.key.clone();
     // **`args[0]` is the name the builtin was called by**, as it is for every builtin here. Reading
     // it as an operand made `tab -l` mean "go into a tab called tab", which created one and then
     // failed on a terminal it did not have.
-    match args.get(1).map(String::as_str) {
+    Ok(run(args.get(1..).unwrap_or_default()))
+}
+
+/// `oslo tab …`, for everything that is not an oslo prompt.
+///
+/// **A builtin cannot answer a prompt segment.** A status bar, a `io.popen`, an `sh -c` — all of
+/// them reach a *program*, and inside `/bin/sh` the word `tab` finds whatever is on `$PATH`, which
+/// on a machine with tab-rs installed is tab-rs. One body, two doors, so the two can never disagree
+/// about which sessions are running.
+pub fn tool(args: &[String]) -> i32 {
+    run(args)
+}
+
+/// The operands, whichever door they came through.
+fn run(args: &[String]) -> i32 {
+    let key = oslo_ui::settings::current().tab.key.clone();
+    match args.first().map(String::as_str) {
         // The finder, exactly as the key opens it.
-        None => Ok(open(&key)),
-        Some("-l" | "--list" | "ls") => Ok(list()),
+        None => open(&key),
+        Some("-l" | "--list" | "ls") => list(),
         Some("-h" | "--help") => {
             println!("{USAGE}");
-            Ok(0)
+            0
         }
         // **Not a flag, so it is a name.** Refusing anything unrecognised would make `tab -x` and
         // `tab my-tab` fail the same way, and only one of those is a mistake.
         Some(flag) if flag.starts_with('-') => {
             eprintln!("oslo: tab: {flag}: unknown option\n{USAGE}");
-            Ok(2)
+            2
         }
-        Some(name) => Ok(enter_named(&key, name)),
+        Some(name) => enter_named(&key, name),
     }
 }
 
