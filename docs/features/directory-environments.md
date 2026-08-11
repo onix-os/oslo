@@ -5,6 +5,30 @@ walk out. oslo reads both itself — no `direnv` binary, no bash subprocess, no 
 `eval` protocol — because most of direnv's machinery exists to let an external program talk to a
 shell it did not write, and **oslo is the shell**.
 
+> ## This is in `oslo`, not in `oslo-minimal`
+>
+> Everything on this page is behind the **`direnv`** cargo feature, which is off by default.
+>
+> | | `cd` into a project |
+> |---|---|
+> | `oslo` | reads `.env.lua` / `.envrc`, loads and unloads |
+> | `oslo-minimal` | is just `cd` |
+>
+> ```sh
+> make build                  # the full binary, every feature
+> make build TYPE=minimal     # no directory environments at all
+> ```
+>
+> It costs **256 KB** — 6,081,344 bytes without it against 6,343,648 with — the largest of the four
+> optional features, and the reason it is off is not the size. This is the one part of the shell
+> that **reads a file on arrival in a directory and can run what it finds there**. That is a
+> different kind of trust from anything else oslo does unprompted, and a `/bin/sh` on a
+> distribution should not do it because a shell somewhere else wanted it to.
+>
+> Without the feature there is no `direnv` builtin — the word falls through to `$PATH`, so the real
+> direnv still works if it is installed — no `oslo.direnv` API, no `.env.lua` or `.envrc` reading,
+> and no dev shell import.
+
 <!-- demo:begin -->
 [![directory-environments demo](https://asciinema.org/a/1262735.svg)](https://asciinema.org/a/1262735)
 <!-- demo:end -->
