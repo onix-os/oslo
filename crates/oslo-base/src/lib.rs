@@ -28,6 +28,8 @@ pub mod hooks;
 pub mod nesting;
 #[cfg(feature = "vista")]
 pub mod predict;
+/// A database a config or a plugin owns, kept apart from oslo's own.
+pub mod store;
 pub mod track;
 
 pub use error::{Result, ShellError};

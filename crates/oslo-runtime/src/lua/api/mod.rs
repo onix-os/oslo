@@ -21,6 +21,7 @@ use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
 mod convert;
+mod db;
 #[cfg(feature = "direnv")]
 mod direnv;
 pub(crate) mod external;
@@ -152,6 +153,7 @@ pub fn install(interp: &Rc<Interp>, registry: &Registry, env: Arc<Mutex<Environm
     // `oslo.feature` — a namespace of functions rather than a settings table, because a feature is
     // not configuration. It is a runtime mask over configuration, and the two must not look alike.
     oslo.set(Value::str("feature"), feature::build(registry));
+    oslo.set(Value::str("db"), db::build());
     oslo.set(Value::str("json"), json::build());
     oslo.set(Value::str("re"), re::build());
     oslo.set(Value::str("proc"), proc::build_proc());
