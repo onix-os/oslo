@@ -28,7 +28,13 @@ for cast in "${targets[@]}"; do
     [ -f "$cast" ] || { echo "no cast for $slug" >&2; continue; }
 
     # Already published, and the recording has not been made again since.
-    if existing=$(awk -v s="$slug" '$1 == s {print $2}' "$MAP") && [ -n "$existing" ]; then
+    #
+    # **The second half of that is a real check, not a comment.** It used to skip on the name alone,
+    # so a re-recorded demo could never be uploaded again and the document kept pointing at the old
+    # one — silently, which is the worst way to be wrong about what a page shows. The map is
+    # rewritten by every publish, so its own timestamp is when each of these last went up.
+    existing=$(awk -v s="$slug" '$1 == s {print $2}' "$MAP")
+    if [ -n "$existing" ] && [ ! "$cast" -nt "$MAP" ]; then
         echo "$slug already at https://asciinema.org/a/$existing"
         continue
     fi
@@ -39,6 +45,11 @@ for cast in "${targets[@]}"; do
         continue
     fi
     id="${url##*/}"
+    # The old row goes first, or `sort -u` below would keep both and the next read would take
+    # whichever sorted first — which is the old one as often as not.
+    if [ -n "$existing" ]; then
+        awk -v s="$slug" '$1 != s' "$MAP" > "$MAP.new" && mv "$MAP.new" "$MAP"
+    fi
     printf '%s\t%s\n' "$slug" "$id" >> "$MAP"
     echo "$slug -> $url"
     # asciinema.org is somebody else's server; a burst of uploads is rude.

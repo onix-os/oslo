@@ -29,7 +29,7 @@ One key reaches all of it, and it means the same thing wherever you press it.
 > it ask `if oslo.scratch then` before setting a key would be a question with only one useful answer.
 
 <!-- demo:begin -->
-[![scratch demo](https://asciinema.org/a/1262807.svg)](https://asciinema.org/a/1262807)
+[![scratch demo](https://asciinema.org/a/1262816.svg)](https://asciinema.org/a/1262816)
 <!-- demo:end -->
 
 ## What the key does
