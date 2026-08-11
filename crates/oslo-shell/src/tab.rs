@@ -5,6 +5,8 @@
 
 pub mod detach;
 pub mod dir;
+pub mod keeper;
+pub mod log;
 pub mod name;
 pub mod store;
 pub mod wire;
