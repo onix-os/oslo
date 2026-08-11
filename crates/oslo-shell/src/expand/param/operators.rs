@@ -141,7 +141,7 @@ pub(super) fn apply(
         // `${!name}` reads `name`'s value and expands *that* parameter. Only the second lookup
         // may come up empty: bash makes a `name` that does not *hold a name* a fatal expansion
         // error, and it names a different culprit depending on which step failed.
-        ParamExpansion::Indirect => match val {
+        ParamExpansion::Indirect(inner) => match val {
             None => {
                 return Err(ShellError::ExpansionError(format!(
                     "{name}: invalid indirect expansion"
@@ -153,7 +153,10 @@ pub(super) fn apply(
                     "{indirect}: invalid variable name"
                 )));
             }
-            Some(indirect) => env.get_param(&indirect).unwrap_or_default(),
+            // **Applied to the second parameter, not the first.** `${!v:-d}` asks whether the
+            // thing `v` names is set, so the operator has to run against that one — testing `v`
+            // instead would answer about the pointer rather than the target.
+            Some(indirect) => return apply(env, &Target::Param(&indirect), inner),
         },
     };
 

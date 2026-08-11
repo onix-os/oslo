@@ -92,7 +92,7 @@ fn whole_array(
         }
 
         // `${!a[@]}` lists the indices *in use*. A sparse array is why this is not `0..len`.
-        ParamExpansion::Indirect => indices,
+        ParamExpansion::Indirect(_) => indices,
 
         // `${a[@]:1:2}` selects *elements*. Slicing the joined text instead would answer with a
         // string cut mid-element, which is exactly the shape of the `"${@:2}"` corruption.
@@ -261,7 +261,11 @@ mod tests {
     fn length_counts_elements_and_indices_list_them() {
         let got = fields(&["a", "b", "c"], Subscript::All, ParamExpansion::Length);
         assert_eq!(got, Ok(vec!["3".to_string()]));
-        let got = fields(&["a", "b"], Subscript::All, ParamExpansion::Indirect);
+        let got = fields(
+            &["a", "b"],
+            Subscript::All,
+            ParamExpansion::Indirect(Box::new(ParamExpansion::Normal)),
+        );
         assert_eq!(got, Ok(vec!["0".to_string(), "1".to_string()]));
     }
 
@@ -276,7 +280,7 @@ mod tests {
             &mut env,
             "oslo_sparse",
             &Subscript::All,
-            &ParamExpansion::Indirect,
+            &ParamExpansion::Indirect(Box::new(ParamExpansion::Normal)),
             true,
         )
         .unwrap();
