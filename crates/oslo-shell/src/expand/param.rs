@@ -191,6 +191,39 @@ fn expand_to_string(
     operators::apply(env, &Target::Param(name), expansion_type)
 }
 
+/// `${!v}` where `v` holds `name[subscript]` — one string, joined as `$*` would.
+///
+/// **The result is one field, not the array's.** An indirection is expanded in a string context by
+/// the time it reaches here, and the caller wants a value rather than a list. `"${!s}"` in bash
+/// with `s="a[@]"` is likewise a single word.
+pub(crate) fn expand_indirect_array(
+    env: &mut Environment,
+    reference: &str,
+    expansion_type: &ParamExpansion,
+) -> Result<String> {
+    let (name, subscript) = reference
+        .split_once('[')
+        .map(|(name, rest)| (name, rest.trim_end_matches(']')))
+        .unwrap_or((reference, "@"));
+    let parsed = match subscript {
+        "@" => oslo_base::ast::Subscript::All,
+        "*" => oslo_base::ast::Subscript::Joined,
+        index => oslo_base::ast::Subscript::Index(oslo_base::ast::Word::from_literal(index)),
+    };
+    let fields = array::expand_array_ref(env, name, &parsed, expansion_type, true)?;
+    Ok(fields
+        .into_iter()
+        .map(|field| {
+            field
+                .into_iter()
+                .map(|run| run.text)
+                .collect::<Vec<_>>()
+                .join("")
+        })
+        .collect::<Vec<_>>()
+        .join(" "))
+}
+
 /// Can `name` be looked up as a parameter at all?
 ///
 /// This is the guard that turns an unimplemented `${...}` form into a diagnostic. The lexer's

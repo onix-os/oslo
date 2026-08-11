@@ -6,7 +6,7 @@ use crate::env::builtins::arrays::array_elements;
 use crate::env::scope::{Environment, array_literal_body, is_valid_identifier};
 use oslo_base::error::Result;
 
-const LOCAL_USAGE: &str = "usage: local [-irx] name[=value] ...";
+const LOCAL_USAGE: &str = "usage: local [-airx] name[=value] ...";
 const READONLY_USAGE: &str = "usage: readonly [-p] [name[=value] ...]";
 
 /// Split `name=value` into its halves; a bare name has no value, which is not the same as an
@@ -18,7 +18,7 @@ fn split_assignment(arg: &str) -> (&str, Option<&str>) {
     }
 }
 
-/// `local [-irx] name[=value] ...`.
+/// `local [-airx] name[=value] ...`.
 ///
 /// The options are parsed rather than assigned to: `local -r x=1` used to create a variable
 /// literally called `-r` and then a second one called `x`.
@@ -35,7 +35,7 @@ pub fn builtin_local(env: &mut Environment, args: &[String]) -> Result<i32> {
         return Ok(1);
     }
 
-    let opts = match options::parse(args, "irx") {
+    let opts = match options::parse(args, "airx") {
         Ok(o) => o,
         Err(letter) => return Err(options::invalid("local", letter, LOCAL_USAGE)),
     };
@@ -54,6 +54,11 @@ pub fn builtin_local(env: &mut Environment, args: &[String]) -> Result<i32> {
         let assigned = if let Some(body) = value.and_then(array_literal_body) {
             let array = array_elements(env, body)?;
             env.set_local_array(name, array)
+        } else if opts.has('a') && value.is_none() {
+            // `local -a x` declares an empty array. Without this it declared an empty *string*, so
+            // the `x+=(a b)` that follows appended to a scalar and the array never existed —
+            // which is how `substituteInPlace` failed at its first line.
+            env.set_local_array(name, crate::env::scope::ShellArray::default())
         } else if opts.has('x') {
             env.set_local_exported_var(name, value.unwrap_or_default())
         } else {
@@ -246,5 +251,20 @@ mod tests {
             0
         );
         assert!(!env.is_readonly("-p"));
+    }
+
+    /// `local -a x` declares an *array*, which is what `x+=(a b)` on the next line needs. It used
+    /// to declare an empty string, so the append made a scalar and the array never existed —
+    /// stdenv's `substituteInPlace` fails on its first line without this.
+    #[test]
+    fn local_dash_a_declares_an_array() {
+        let mut env = in_a_function();
+        assert_eq!(
+            builtin_local(&mut env, &words(&["local", "-a", "ARR"])).unwrap(),
+            0
+        );
+        assert!(env.get_array("ARR").is_some(), "ARR is an array");
+        assert_eq!(env.get_array("ARR").map(|a| a.values().count()), Some(0));
+        env.pop_scope();
     }
 }

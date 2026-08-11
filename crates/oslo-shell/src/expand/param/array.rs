@@ -106,6 +106,34 @@ fn whole_array(
             operators::map_elements(env, &values, operator)?
         }
 
+        // **`${a[@]+alt}` and `${a[@]:-d}` test the array, then answer with a word.** An array is
+        // "set" when it has at least one element, so the whole list collapses to whichever branch
+        // wins — the result is the word, not the array. stdenv's `runHook` is written
+        // `${!hooksSlice+"${!hooksSlice}"}`, so a shell without these two cannot run a hook.
+        ParamExpansion::UseAlternative {
+            alternative,
+            test_null,
+        } => {
+            let present = present(&values, *test_null);
+            let text = if present {
+                crate::expand::word::expand_word_to_string(env, alternative)?
+            } else {
+                return Ok(Vec::new());
+            };
+            vec![text]
+        }
+        ParamExpansion::DefaultValue {
+            default,
+            assign_if_unset: false,
+            test_null,
+        } => {
+            if present(&values, *test_null) {
+                values
+            } else {
+                vec![crate::expand::word::expand_word_to_string(env, default)?]
+            }
+        }
+
         // What is left is the `${a[@]:-d}`, `${a[@]:=d}`, `${a[@]+alt}` and `${a[@]?msg}` family.
         // Their list semantics are real bash and are not implemented; answering with a
         // plausible-looking string would be worse than saying so.
@@ -216,6 +244,17 @@ fn check_nounset(
     )))
 }
 
+/// Whether a whole array counts as set, for the `+` and `:-` families.
+///
+/// An array with no elements is unset; the `:` variants also treat one whose every element is
+/// empty as unset, which is the same distinction `${x-d}` and `${x:-d}` draw for a scalar.
+fn present(values: &[String], test_null: bool) -> bool {
+    if values.is_empty() {
+        return false;
+    }
+    !test_null || values.iter().any(|value| !value.is_empty())
+}
+
 #[cfg(test)]
 mod tests {
     use super::expand_array_ref;
@@ -313,18 +352,48 @@ mod tests {
         assert_eq!(got, Ok(vec![String::new()]));
     }
 
-    /// The forms oslo does not implement must say so rather than answer something plausible.
-    /// `${a[@]:-d}` is list-valued in bash and oslo has no list semantics for it yet.
+    /// `${a[@]:-d}` and `${a[@]+alt}` test the array and answer with a word — bash's list
+    /// semantics, and what stdenv's `runHook` is written on.
     #[test]
-    fn an_unimplemented_whole_array_operator_is_an_error() {
-        let op = ParamExpansion::DefaultValue {
+    fn the_default_and_alternative_forms_test_the_whole_array() {
+        let alt = |test_null| ParamExpansion::UseAlternative {
+            alternative: Word::from_literal("yes"),
+            test_null,
+        };
+        // A non-empty array is set.
+        assert_eq!(
+            fields(&["a", "b"], Subscript::All, alt(false)),
+            Ok(vec!["yes".to_string()])
+        );
+        // An empty one is not, and answers with no field at all.
+        assert_eq!(fields(&[], Subscript::All, alt(false)), Ok(Vec::new()));
+        // `:` also treats an array of empty strings as unset.
+        assert_eq!(fields(&[""], Subscript::All, alt(true)), Ok(Vec::new()));
+
+        let def = ParamExpansion::DefaultValue {
             default: Word::from_literal("d"),
             assign_if_unset: false,
             test_null: true,
         };
+        assert_eq!(
+            fields(&["a", "b"], Subscript::All, def.clone()),
+            Ok(vec!["a".to_string(), "b".to_string()])
+        );
+        assert_eq!(fields(&[], Subscript::All, def), Ok(vec!["d".to_string()]));
+    }
+
+    /// What is still unimplemented must say so rather than answer something plausible: the
+    /// assigning `${a[@]:=d}` and the erroring `${a[@]?msg}` have list semantics oslo lacks.
+    #[test]
+    fn an_unimplemented_whole_array_operator_is_an_error() {
+        let op = ParamExpansion::DefaultValue {
+            default: Word::from_literal("d"),
+            assign_if_unset: true,
+            test_null: true,
+        };
         assert!(fields(&["a", "b"], Subscript::All, op).is_err());
-        let op = ParamExpansion::UseAlternative {
-            alternative: Word::from_literal("d"),
+        let op = ParamExpansion::ErrorIfUnset {
+            message: Word::from_literal("m"),
             test_null: true,
         };
         assert!(fields(&[], Subscript::Joined, op).is_err());
