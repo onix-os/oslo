@@ -143,48 +143,60 @@ fn ask(scratches: &dyn backend::Scratches, inside: Option<&str>) -> io::Result<O
         Answer::NoTerminal => None,
     })
 }
-
-/// The history finder's colours and its box to type in, and none of the rest of it.
+/// tab-rs's finder, in oslo's colours.
 ///
-/// **The same renderer, so the two cannot drift** — `Preset::History` is where the tinted filter
-/// row and the selection colours live, and a second list with its own idea of them would be a
-/// second thing to keep in step with the theme. What is dropped is dropped because this list is
-/// short and known:
+/// The shape is copied deliberately, because it is the one that reads as a *search* rather than as
+/// a list with a label on it: the query on the first row where the cursor already is, what it found
+/// on the second, and the names below with nothing drawn around them.
 ///
-/// * **No scanner.** The bar says a long search is still running. Scratches are a directory listing of
-///   a handful of names; there is never a wait to report.
-/// * **No counts or badge.** `2/3` earns its place against a thousand history lines. Here the whole
-///   list is on the screen and you can see how many there are.
-/// * **Rows as wide as their text.** Full-width stripes read as a ruler through a long list. Across
-///   three names they read as three bars reaching the edge of the terminal for no reason.
+/// ```text
+///   >>  ap            what you are typing
+///       1/3           what it found
+///     work
+///   >   api           the one Enter takes
+/// ```
+///
+/// What is oslo's rather than tab-rs's is every colour — the accent on the prompt and the marker,
+/// the muted grey on the count, the underline on a matched run — so this follows the theme like
+/// everything else instead of hard-coding blue as tab-rs does.
 fn look(_inside: Option<&str>) -> oslo_ui::ask::look::Look {
+    use oslo_ui::ask::look::{Where, Width};
     use oslo_ui::theme::Style;
-    let mut look = oslo_ui::ask::Preset::History.look();
-    look.scanner = None;
-    look.right = String::new();
-    look.badge = String::new();
-    look.width = oslo_ui::ask::look::Width::Content;
-    look.placeholder = "type to filter, or a name for a new one".to_string();
-    // **The box keeps the width of its own empty state.** With no legend under it there is nothing
-    // else to measure against, and a panel sized to the query alone shrank as the query got
-    // shorter — the thing that made it look broken in the first place. The widest this is ever
-    // asked to be is the placeholder, so that is the floor.
-    look.min_width = look.pad * 2
-        + oslo_ui::prompt::printed_width(&look.prompt)
-        + oslo_ui::prompt::printed_width(&look.placeholder)
-        // The caret, which is part of the input and always has a cell.
-        + 1;
-    // **The marker is the whole of the selection.** A highlighted band works down a long history
-    // where the eye needs catching; across four names it is a slab of colour saying something you
-    // can already see. What is left is the `>` in front, which is where the eye goes anyway.
-    // **Nothing between the box and what is around it.** The three rows of surface are the box —
-    // a tinted row above and below the query is what makes it read as somewhere to type rather
-    // than as a line. What is removed is the air *outside* it: the blank row between the list and
-    // the filter here, and the one between the filter and the rule in `chrome`.
-    look.gap = 0;
-    look.selected = Style::default();
-    look.stripe = None;
-    look
+    let ui = oslo_ui::theme::current().ui;
+
+    oslo_ui::ask::look::Look {
+        // Top, and not reversed: the list reads downward from what you typed.
+        filter_at: Where::Top,
+        reverse: false,
+        prompt: ">>  ".to_string(),
+        placeholder: "type to filter, or a name for a new one".to_string(),
+        // `1/3` under the query, as tab-rs puts it.
+        under: "    {n}/{total}".to_string(),
+        // Nothing drawn around any of it: no surface, no stripe, no band on the selected row. The
+        // marker and the colour of the name are the whole of the selection.
+        surface: None,
+        surface_rows: 1,
+        stripe: None,
+        selected: Style {
+            bold: true,
+            ..ui.accent
+        },
+        marker: "> ".to_string(),
+        width: Width::Content,
+        gap: 0,
+        pad: 0,
+        scanner: None,
+        left: String::new(),
+        right: String::new(),
+        badge: String::new(),
+        // A matched run is underlined rather than painted, which is tab-rs's mark and the one that
+        // survives a name that is mostly match.
+        hit: Style {
+            underline: true,
+            ..Style::default()
+        },
+        ..oslo_ui::ask::look::Look::default()
+    }
 }
 
 /// Carry on as the caller, or — in the process that turned out to be the shell — become one.

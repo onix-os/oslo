@@ -211,6 +211,12 @@ pub struct Look {
     pub muted: Style,
     /// Whether a row's colour stops at its text or reaches the edge.
     pub width: Width,
+    /// A row of its own under the filter, templated like [`Look::left`] — `{n}`, `{total}`.
+    ///
+    /// **A row rather than a slot on the filter line**, which is the difference between a finder
+    /// that reads as a search and one that reads as a list with a label on it. Empty draws nothing
+    /// and costs no row, so nothing that does not ask for it changes.
+    pub under: String,
     /// The narrowest the filter surface may be, whatever [`Width::Content`] measures.
     ///
     /// **Set to the legend's width by the widget that draws one.** Without it a panel sized to its
@@ -272,6 +278,7 @@ impl Default for Look {
             muted: ui.muted,
             width: Width::Content,
             min_width: 0,
+            under: String::new(),
             scanner: None,
             badge: String::new(),
             // Foreground 0 on background 1: the terminal's own palette, so it belongs to whatever
@@ -344,7 +351,7 @@ impl Look {
     /// Rows this look adds around the list, so a widget can reserve them before drawing.
     pub fn extra_rows(&self, filtering: bool) -> usize {
         match filtering {
-            true => self.surface_rows + self.gap,
+            true => self.surface_rows + self.gap + usize::from(!self.under.is_empty()),
             false => 0,
         }
     }

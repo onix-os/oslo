@@ -55,10 +55,17 @@ impl Look {
     /// The filter: its surface, the query, and whatever the slots say.
     pub(super) fn filter_rows(&self, view: &View<'_>, depth: theme::Depth) -> Vec<String> {
         let row = self.query_row(view, depth);
-        self.surfaced(&row, view.cols, depth)
+        let mut rows: Vec<String> = self
+            .surfaced(&row, view.cols, depth)
             .split("\r\n")
             .map(|row| row.trim_start_matches('\r').replace("\x1b[K", ""))
-            .collect()
+            .collect();
+        // What the search found, on its own row under the query. Counted in `extra_rows`, so the
+        // list above it is one shorter rather than one row of it falling off the screen.
+        if !self.under.is_empty() {
+            rows.push(self.muted.paint(&Look::fill(&self.under, view), depth));
+        }
+        rows
     }
 
     /// `row` in the middle of however many rows of surface this look asks for.
