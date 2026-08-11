@@ -169,23 +169,6 @@ pub fn list() -> io::Result<Vec<(String, Meta)>> {
     Ok(found)
 }
 
-/// Move a tab's files to a new name.
-///
-/// The socket keeps working: renaming the file does not touch the listening descriptor, and a
-/// client connecting to the new path reaches the same inode. The lock follows for the same reason —
-/// an `flock` belongs to the open file description, not to the path it was opened through.
-pub fn rename(from: &str, to: &str) {
-    let (old, new) = (Paths::new(from), Paths::new(to));
-    for (a, b) in [
-        (old.sock(), new.sock()),
-        (old.meta(), new.meta()),
-        (old.log(), new.log()),
-        (old.lock(), new.lock()),
-    ] {
-        let _ = std::fs::rename(a, b);
-    }
-}
-
 /// Remove what a dead tab left behind. Best effort by nature — this is tidying, not bookkeeping.
 pub fn sweep(name: &str) {
     let paths = Paths::new(name);

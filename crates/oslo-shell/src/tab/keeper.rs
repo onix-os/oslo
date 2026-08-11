@@ -133,8 +133,7 @@ fn keep(name: &str, cap: u64) -> io::Result<Role> {
 
             let ended = serve(&listener, pty.master, &paths, cap);
             // The shell has gone, so the tab has. Tidying here is what keeps the common case from
-            // relying on the next `tab` to sweep — under whatever it is called *now*, which is not
-            // always what it was called when it started.
+            // relying on the next attach to sweep.
             drop(listener);
             store::sweep(ended.as_deref().unwrap_or(name));
             let result = ended.map(|_| Role::Caller(child));
@@ -195,9 +194,7 @@ fn serve(
     cap: u64,
 ) -> io::Result<String> {
     let mut log = log::Log::open(&paths.log(), cap)?;
-    // The name can change while the tab is running; the keeper follows it so that the files it
-    // sweeps on the way out are the ones it actually owns.
-    let mut called = paths.name.clone();
+    let called = paths.name.clone();
     let mut client: Option<UnixStream> = None;
     let mut buffer = [0u8; CHUNK];
     // What has arrived from the client but is not yet a whole message. See `wire::take`.
@@ -270,15 +267,6 @@ fn serve(
                             // the pty is the only thing that can tell the programs inside.
                             wire::Message::Resize { rows, cols } => {
                                 resize(master.as_fd(), rows, cols)
-                            }
-                            // Named on the way out. The files move with it, and the keeper starts
-                            // answering to the new name — including when it tidies up, which is why
-                            // it is told rather than the files being moved behind its back.
-                            wire::Message::Rename(to) => {
-                                if super::name::valid(&to) && !store::alive(&to) {
-                                    store::rename(&called, &to);
-                                    called = to;
-                                }
                             }
                         }
                     }

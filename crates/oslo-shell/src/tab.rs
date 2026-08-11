@@ -3,6 +3,7 @@
 //! One key reaches all of it — `^\` by default — and it means the same thing in a tab and out of
 //! one: show the finder. What the finder is asked for is the only difference.
 
+pub mod client;
 pub mod detach;
 pub mod dir;
 pub mod keeper;

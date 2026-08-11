@@ -21,17 +21,11 @@ pub const MAX: usize = 8192;
 
 const DATA: u8 = 0x00;
 const RESIZE: u8 = 0x01;
-const RENAME: u8 = 0x02;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Message {
     Data(Vec<u8>),
-    Resize {
-        rows: u16,
-        cols: u16,
-    },
-    /// What to call this tab from now on. Sent when you name it on the way out.
-    Rename(String),
+    Resize { rows: u16, cols: u16 },
 }
 
 /// Frame `bytes` as one or more data messages.
@@ -51,20 +45,6 @@ pub fn resize(rows: u16, cols: u16) -> Vec<u8> {
     out.push(RESIZE);
     out.extend_from_slice(&rows.to_be_bytes());
     out.extend_from_slice(&cols.to_be_bytes());
-    out
-}
-
-/// Frame a new name for the tab.
-///
-/// **The keeper has to be told, rather than the files simply being moved.** Renaming them behind
-/// its back would work until the tab ended, at which point it would tidy up under the name it was
-/// given at birth and leave the renamed ones behind for ever.
-pub fn rename(name: &str) -> Vec<u8> {
-    let bytes = name.as_bytes();
-    let mut out = Vec::with_capacity(bytes.len() + 3);
-    out.push(RENAME);
-    out.extend_from_slice(&(bytes.len() as u16).to_be_bytes());
-    out.extend_from_slice(bytes);
     out
 }
 
@@ -92,15 +72,6 @@ fn parse(bytes: &[u8]) -> Option<(Message, usize)> {
             let end = 3 + len;
             (bytes.len() >= end).then(|| (Message::Data(bytes[3..end].to_vec()), end))
         }
-        RENAME => {
-            let len = u16::from_be_bytes([*bytes.get(1)?, *bytes.get(2)?]) as usize;
-            let end = 3 + len;
-            if bytes.len() < end {
-                return None;
-            }
-            let name = String::from_utf8(bytes[3..end].to_vec()).ok()?;
-            Some((Message::Rename(name), end))
-        }
         RESIZE => {
             let rows = u16::from_be_bytes([*bytes.get(1)?, *bytes.get(2)?]);
             let cols = u16::from_be_bytes([*bytes.get(3)?, *bytes.get(4)?]);
@@ -116,7 +87,7 @@ fn parse(bytes: &[u8]) -> Option<(Message, usize)> {
 pub fn corrupt(buffer: &[u8]) -> bool {
     buffer
         .first()
-        .is_some_and(|kind| *kind != DATA && *kind != RESIZE && *kind != RENAME)
+        .is_some_and(|kind| *kind != DATA && *kind != RESIZE)
 }
 
 #[cfg(test)]
