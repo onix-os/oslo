@@ -1,182 +1,219 @@
-# oslo.nix
+# Plugins
 
-Everything `nix` can answer as JSON, reachable from Lua as ordinary tables. Behind the `nix` cargo
-feature, which already exists and today has no way in.
+Something you install once and then have, written in Lua, using only public `oslo.*` API. Not a new
+extension mechanism — oslo already has most of one — but the three things missing from it, plus a
+way to install and trust the result.
 
-**No subcommand.** `oslo nix …` is not part of this and will not be. The feature's whole surface is
-a Lua table, so what it grows into is decided in a config or a plugin rather than in Rust.
+**The test this design has to pass**: the secrets feature, deleted from this tree on 2026-08-12,
+must be expressible as a plugin with no Rust change. It is the honest test because it needed a
+database, a command, and the ability to stop a command being written down — one of which oslo could
+not do at all.
 
-## The shape, and why it is generic
+## What already exists
 
-The obvious design is a function per useful nix command — `oslo.nix.metadata()`, `oslo.nix.show()`,
-`oslo.nix.config()`. Three measurements say not to.
-
-**The `--json` surface is 23 commands wide and version-shaped.** On nix 2.34.6, grepping every
-subcommand's own help for `--json` finds these:
-
-```
-build            derivation show  flake metadata   fmt              path-info
-config show      eval             flake prefetch   formatter run    print-dev-env
-                 flake archive    flake show       help-stores      profile list
-nar ls           realisation info search           store info       store ls
-store make-content-addressed      store prefetch-file               flake info
-```
-
-Twenty-three hand-written wrappers is a lot of Rust to maintain against a tool that is explicit
-about its interface being unstable, and every nix release moves the list.
-
-**The help text lies.** `nix registry list --help` advertises `--json`; `nix registry list --json`
-answers `error: unrecognised flag '--json'` and exits 1. A generated wrapper list would have shipped
-a function that cannot work. A generic call reports that as a value and the config decides.
-
-**The conversion is already written.** `from_json` in `crates/oslo-runtime/src/lua/api/json.rs:58`
-turns any `serde_json::Value` into Lua — arrays and objects tagged with `__json` so they round-trip,
-`null` decoded as `false` rather than `nil` so a null field does not vanish. It is private; making
-it `pub(super)` is the entire bridge. There is no second JSON path to get wrong.
-
-So: **one call in Rust, names in Lua.**
-
-```lua
-oslo.nix.run{"flake", "metadata"}     -- the primitive: any nix command, JSON in, table out
-oslo.nix.metadata()                   -- written in Lua, on top of run
-```
-
-The named helpers are Lua because that is what makes them extensible. A plugin adding
-`oslo.nix.closure_size()` is a Lua file, not a patch to the shell.
-
-## What the primitive does
-
-```lua
-local doc, err = oslo.nix.run{"flake", "metadata", "--flake", "nixpkgs", cache = true, timeout = 30}
-```
+More than it looks, and none of it should be rebuilt.
 
 | | |
 |---|---|
-| argv | the positional entries, passed to `nix` verbatim — never through a shell |
-| `--json` | appended once, unless the caller already wrote it |
-| experimental features | `--extra-experimental-features 'nix-command flakes'`, as `nix_shell::command` already does |
-| returns | the decoded document, or `nil, message` |
+| `oslo.register_builtin(name, f)` | a Lua function *is* a shell builtin, ahead of `$PATH`, with its return value as the exit status |
+| `oslo.register_tool{…}` | a command that produces rows, so `foo \| where …` works |
+| `oslo.on.*` | 19 hook points, including `pre_cmd` and `post_cmd` |
+| `oslo.completion.for_command` | per-command completion |
+| `oslo.keys`, `oslo.prompt`, `oslo.ui.*` | keybindings, prompt segments, the widget set |
+| `package.path` | already prefers `~/.config/oslo/lua`, so `require "foo"` works today |
+| `conf.d/*.lua` | already documented as the place "a plugin, a package manager or a dotfile repo" adds a line without editing a file it does not own |
+| `kv::Store::open(path)` | a database at an arbitrary path, private-mode, with transactions — **Rust only** |
 
-**`Command::new("nix")`, not the shell.** `nix_shell::apply_with` runs its one fixed command through
-`eval_command_substitution`, which needs an `Environment` and a quoting function
-(`nix_shell.rs:133`). This takes argv from a Lua list, where quoting is a hazard and not a
-convenience, and it must work from any Lua context.
+A plugin that wants to add a command and a keybinding needs nothing new. That is why this plan is
+short.
 
-**Exit status is a value, not an error.** `registry list --json` fails; `flake metadata` in a
-directory with no flake fails. Both are answers a config wants to branch on, so a non-zero exit
-returns `nil, stderr`.
+## The three gaps
 
-### timeout
+**1. The database has no Lua surface.** `kv::Store` exists and is used by history and tracking;
+nothing in `oslo.*` reaches it.
 
-Required, because of one measurement: **`nix search nixpkgs ripgrep --json` took 46 seconds** on a
-cold eval cache. Anything that can block a prompt for 46 seconds needs a ceiling it cannot exceed by
-default. Default 60 s, `timeout = n` to change it, and exceeding it is `nil, "timed out"`.
+**2. No hook can stop a command being recorded.** `pre_cmd` may observe or rewrite; it cannot say
+"run this, and write nothing down". This is why a privacy plugin is impossible today, and it is the
+gap that decides whether this design passes its own test.
 
-## Caching, and how little of it is ours
+**3. Nothing installs anything.** `require "foo"` works if you put the file there yourself. There is
+no notion of a plugin as a unit with a name, a version, a home, and a decision about whether you
+trust it.
 
-The cold/warm gap is real but nix mostly closes it itself:
+## Decisions taken
 
-| command | cold | warm |
-|---|---|---|
-| `flake metadata` | 264 ms | **27 ms** |
-| `flake show` | 455 ms | **34 ms** |
-| `config show` | — | 22 ms |
-| `search nixpkgs ripgrep` | 46 s | (evaluation cache) |
+Settled with the user before writing this, and each closes off a design that would otherwise be
+rediscovered later:
 
-An earlier read of this said `flake show` costs 455 ms and needed caching on the flake's
-`fingerprint`. That was the cold number. Warm it is 34 ms, because nix keeps its own evaluation
-cache — so the fingerprint scheme would have been machinery bolted on top of a cache that already
-works.
+1. **A plugin's command is a builtin inside oslo. There is no `oslo <plugin>` subcommand.** This is
+   the decision the rest of the plan rests on: `oslo -c` and the tool dispatcher do not read
+   `config.lua`, and making them would put plugin loading on the startup path of every
+   non-interactive shell in every script.
+2. **One database file per plugin.** Uninstall is `rm`; no key collisions; no plugin can read
+   another's data by guessing a prefix.
+3. **Key→value with transactions**, a thin wrapper over the existing store. Values are opaque
+   strings; a plugin wanting structure uses `oslo.json`.
+4. **A manifest names the builtins; the plugin's Lua runs on first use.** Ten plugins must not cost
+   ten chunks of Lua on every prompt.
+5. **Installed from a local path or a git revision.** No registry, no name resolution service.
+6. **Trust is a hash gate**, the one `.envrc` already uses: allow is keyed on the contents, so an
+   update is a different hash and asks again.
+7. **A veto suppresses everything oslo writes down** — history, `$HISTFILE`, tracking, frecency,
+   terminal marks, notices and `set -x`. Not a subset: a credential that leaks into frecency is
+   still leaked.
 
-What is left for oslo is the cold case and `search`. `cache = true` opts in, reusing the key
-`nix_shell::key` already computes — argv plus length-and-mtime of `flake.nix`, `flake.lock`,
-`shell.nix`, `default.nix` (`nix_shell.rs:174`). Editing the flake re-evaluates immediately, nothing
-else does. Off by default: a config asking for `store info` wants the store's answer, not last
-week's.
+## The design
 
-**Cached documents are not secrets, and `print-dev-env` is.** `nix_shell::remember` writes `0o600`
-because a dev shell's environment holds tokens (`nix_shell.rs:224`). This cache inherits that mode
-rather than reasoning about which documents deserve it.
+### Where a plugin lives
 
-## What Lua gets, layer by layer
+```text
+$XDG_DATA_HOME/oslo/plugins/
+  index.json              generated; the only file startup reads
+  <name>/
+    plugin.lua            the manifest: a table, no side effects
+    init.lua              the plugin proper, run on first use
+    …
+$XDG_DATA_HOME/oslo/plugins/<name>.kv    its database, if it opens one
+```
 
-**Rust — one function.** `oslo.nix.run`. Plus `oslo.nix.available()`, which answers whether the
-`nix` binary is on `$PATH` at all, so a config can be written once and run on a machine without nix.
+### The manifest, and why there is also an index
 
-**Lua — the named helpers**, shipped as defaults and replaceable:
+`plugin.lua` returns a table and does nothing else:
 
 ```lua
-oslo.nix.metadata(flake)   -- flake metadata:  description, dirty, path, url
-oslo.nix.inputs(flake)     -- the lock's nodes, each with its pin date and age in days
-oslo.nix.outputs(flake)    -- flake show, flattened: devShells, packages, apps per system
-oslo.nix.shells(flake)     -- just the devShell names for the current system
-oslo.nix.config()          -- config show
-oslo.nix.dirty()           -- true when metadata has a dirtyRevision
+return {
+  name     = "secrets",
+  version  = "0.1.0",
+  entry    = "init.lua",
+  builtins = { "secret" },        -- names to reserve; the file runs when one is called
+  tools    = { "stale" },         -- same, for row-producing tools
+  requires = ">= 0.2.29",
+}
 ```
 
-`inputs` is the one worth having. The lock alone — no evaluation, 27 ms — knows exactly how stale a
-project is, and nothing in the shell tells you today:
+**The index is generated because reading manifests is not free.** A Lua manifest is the right thing
+to *write* in a Lua-first shell, but reading ten of them at startup means ten parses to learn ten
+lists of names. `oslo plugin install` therefore writes every manifest's declarations into one
+`index.json`, and startup reads that single file — `serde_json` is already a dependency, and the
+index is generated, so nobody hand-writes JSON.
 
+If the index is missing or older than a plugin's manifest, it is rebuilt. A stale index is a
+performance bug, never a correctness one.
+
+### Loading
+
+At interactive startup, for each entry in the index, oslo registers a **stub** builtin under each
+declared name. Calling one:
+
+1. checks the trust hash for that plugin, refusing with a message if it does not match;
+2. runs the plugin's `entry`, which calls the real `oslo.register_builtin`;
+3. replaces the stub, and re-dispatches the call.
+
+So an unused plugin costs one line in a JSON file, and a used one costs its own Lua once per
+session. A plugin whose entry does not register the name it declared is an error naming both.
+
+**Nothing outside the interactive shell loads plugins**, per decision 1. `oslo -c 'secret get x'`
+does not work and is not meant to.
+
+### `oslo.db`
+
+```lua
+local db = oslo.db.open("secrets")        -- $XDG_DATA_HOME/oslo/plugins/secrets.kv, mode 0600
+db:set("k", "v")
+local v = db:get("k")                      -- string, or nil
+db:delete("k")
+for k in db:keys("prefix/") do … end
+db:write(function(w)                       -- one transaction; nothing lands if it errors
+  w:set("a", "1")
+  w:set("b", "2")
+end)
 ```
-flake-utils    pinned 2024-11-13    636 days
-nanopb-src     pinned 2024-12-01    618 days
-nixpkgs        pinned 2026-04-09    125 days
-systems        pinned 2023-04-09   1220 days
+
+`open` takes a *name*, not a path: a plugin cannot open another plugin's database or point one at
+`/etc`. The name is validated the way a plugin name is.
+
+### The veto
+
+`pre_cmd` may return a table instead of a string:
+
+```lua
+oslo.on.pre_cmd(function(c)
+  if looks_like_a_credential(c.text) then
+    return { record = false }              -- runs; nothing is written down
+  end
+end)
 ```
 
-That is `locks.nodes[*].locked.lastModified`, arithmetic against now, and nothing else.
+Returning a string still means "run this instead", unchanged. `{ text = …, record = false }` does
+both. `record = false` suppresses every sink listed in decision 7, which is the list
+`Sensitivity::is_private` already gates in the REPL — the seam exists, and this hands it to Lua.
 
-## The two things built on it
+**The risk, stated plainly**: a plugin with a wrong predicate silently stops recording anything, and
+the symptom is an empty history with no error. The mitigation is that the veto is per command and
+never sticky, and that `oslo plugin list` says which plugins can use it.
 
-Both are the doors discussed instead of a subcommand. Both are thin once `run` exists.
+### `oslo plugin`
 
-**Completion for the real `nix` binary.** `oslo.completion.for_command` is already the supported
-hook (`crates/oslo-ui/src/completion.rs:110`, the same mechanism the docs describe for `git`), so
-this is a shipped Lua file, not new Rust: on `nix build .#<TAB>`, `nix develop .#<TAB>`,
-`nix run .#<TAB>`, complete from `oslo.nix.outputs()`. 34 ms warm is inside a keystroke's budget;
-cold it is 455 ms once, which is what `cache = true` is for here.
+```text
+oslo plugin install <path|github:user/repo@rev>
+oslo plugin list
+oslo plugin remove <name>
+oslo plugin allow <name>          # after an update changes the hash
+```
 
-**A prompt fact.** `oslo.git` is a native provider a config turns into a segment
-(`crates/oslo-runtime/src/lua/api/prompt.rs:54`). Here the provider is `oslo.nix.metadata` and
-`oslo.nix.inputs`, and the config decides whether a 1220-day pin is worth a character on screen.
-Nothing is shown by default.
+`install` copies or clones to the plugin directory, reads the manifest, refuses a name that collides
+with an installed plugin or a shell keyword, writes the index, and asks for trust once — showing the
+builtins it will reserve. It never runs the plugin's code.
+
+`remove` deletes the directory and rewrites the index. **It leaves the database**, and says so: that
+is the user's data, and a plugin manager that deletes your password vault because you reinstalled it
+is a plugin manager nobody should run.
 
 ## Order
 
 Each step ends with `make verify` green and is its own commit.
 
-1. **`from_json` becomes `pub(super)`.** One word, no behaviour.
-2. **`oslo.nix` with `run` and `available`**, gated on `#[cfg(feature = "nix")]` at
-   `lua/api/mod.rs`, beside the `direnv` table it will sit next to (`mod.rs:179`). Tests for: argv
-   passthrough, `--json` not doubled, non-zero exit as `nil, msg`, timeout, nix absent.
-3. **The cache**, `cache = true`, reusing `nix_shell::key`. Needs that function to be `pub(crate)`
-   and `nix_shell.rs` is at 545 of 600 lines, so the key and cache functions move to
-   `nix_shell/cache.rs` in this step.
-4. **The Lua helpers** — `metadata`, `inputs`, `outputs`, `shells`, `config`, `dirty`.
-5. **Completion for `nix`**, as a Lua file on `for_command`.
-6. **Documentation** — `docs/features/` gets a page, and `README.md` the feature row.
+1. **`oslo.db`** — the Lua surface over `kv::Store`. Self-contained, useful on its own, no policy.
+2. **The veto** — `pre_cmd` returning a table, and the REPL honouring `record = false`. Tests must
+   cover every sink in decision 7, because the failure mode is silent.
+3. **The manifest and the index** — reading, validating, rebuilding when stale. No loading yet.
+4. **Stub registration and load-on-first-use**, including the trust check at load.
+5. **`oslo plugin`** — install, list, remove, allow.
+6. **Documentation**, and a worked plugin: the deleted secrets feature, rebuilt as one, as proof the
+   design passes its own test.
 
 ## Verification
 
-- `make verify` after every step. `make test` runs `--all-features`, so these tests do run.
-- **`make build TYPE=minimal` must still build**, and `oslo-minimal` must have no `oslo.nix` — the
-  same contract `scratch` and `direnv` have.
-- **The tests cannot require nix.** CI has no nix, so `run` is tested against a fake `nix` on
-  `$PATH`, and `available()` is what the helpers check. A test that shells out to real nix is a test
-  that fails on someone else's machine.
-- Binary-size delta measured against `develop`, as the other three features were.
+- `make verify` after every step; `make build TYPE=minimal` still builds.
+- **Startup cost, measured against `develop`.** Loading eight Lua chunks at startup was measured at
+  8 µs against 1,810 µs in a debug build when `nix.lua` was added — the index must stay in that
+  class, and step 4 is where it could stop being.
+- A plugin that vetoes must be shown, by test, to keep the command out of *each* of: editor history,
+  `$HISTFILE`, the tracking store, frecency, terminal marks, notices, `set -x`.
+- A plugin whose files changed must refuse to load until `oslo plugin allow`.
 
 ## What this does not do
 
-- **No subcommand, now or later.** If something wants to be typed, it is a Lua tool via
-  `register_tool`, in a config.
-- **No evaluation of the Nix language.** `rnix` parses the language, but flake outputs need
-  *evaluating* — melodi's flake computes `devShells.x86_64-linux.default` in a `let … in`. Only nix
-  can answer that, which is why this shells out.
-- **No crate.** `nix_rs` is 205 crates and brings back `tokio`, to replace roughly a hundred lines
-  that already work.
-- **Nothing runs on its own.** No prompt segment, no completion, no cache is populated unless a
-  config asks. Arriving in a flake directory with this feature on and nothing configured behaves
-  exactly as it does today.
-- **It does not make nix fast.** A cold `search` is 46 seconds and this cannot change that; it can
-  only refuse to wait forever.
+- **No `oslo <plugin>` subcommand**, now or later. Decision 1.
+- **No registry and no dependency resolution.** A plugin that needs another one says so in prose.
+- **No sandbox.** A plugin is Lua with the full `oslo.*` API, which includes running commands. The
+  hash gate decides *whether* you trust it, not what it may do once you have.
+- **No isolation of failure beyond what hooks already give.** A handler that errors is reported and
+  the rest still run; a plugin that hangs hangs the shell.
+
+## The feature line, decided
+
+**`oslo.db` and the veto are in every build. Installing and loading plugins is behind the `plugin`
+cargo feature.**
+
+The line is drawn where the *policy* starts. A database and a hook that can decline to write
+something down are capabilities — small, self-contained, and useful to a config that will never
+install anything. Putting them behind a switch would give oslo two dialects, where a config file has
+to ask whether `oslo.db` exists before using it.
+
+Installing is different in kind: it fetches somebody's code, decides whether to trust it, and
+reserves builtin names on their behalf. A `/bin/sh` on a distribution has no use for any of that,
+and it is exactly the sort of thing that should be absent rather than merely unused.
+
+So `oslo-minimal` has `oslo.db`, has the veto, and has no `oslo plugin` and no plugin loading —
+steps 1 and 2 carry no `#[cfg]`, steps 3 to 5 are entirely behind one.
