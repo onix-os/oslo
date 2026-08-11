@@ -199,8 +199,6 @@ pub fn short(paint: Paint) -> String {
     }
 
     s.push_str(&tools_section(paint));
-    #[cfg(feature = "scratch")]
-    s.push_str(&sessions_section(paint));
     s.push_str(&environment_section(paint));
 
     let _ = write!(
@@ -257,38 +255,6 @@ fn tools_section(paint: Paint) -> String {
         s,
         "\n  {}",
         paint.dim("`oslo ./history` and `oslo -- history` read the name as a path instead.")
-    );
-    s
-}
-
-/// Tabs, in a build that has them.
-///
-/// **A section rather than a line in `TOOLS`**, because `scratch` is not one: a tool is `oslo <name>`
-/// and reachable from anywhere, and this is a builtin that only means anything at an interactive
-/// prompt. Absent entirely without the feature, so the help never offers a word that does nothing.
-#[cfg(feature = "scratch")]
-fn sessions_section(paint: Paint) -> String {
-    let mut s = String::new();
-    let _ = writeln!(
-        s,
-        "\n{}  {}",
-        paint.head("SCRATCHES"),
-        paint.dim("named sessions that outlive the terminal they were opened in")
-    );
-    for (key, about) in [
-        ("scratch", "open the finder — the same one `^\\` opens"),
-        (
-            "scratch NAME",
-            "go into that one, making it if it is not running",
-        ),
-        ("scratch -l", "every one, on its own line"),
-    ] {
-        s.push_str(&row(key, paint.key(key), about));
-    }
-    let _ = writeln!(
-        s,
-        "\n  {}",
-        paint.dim("`$SCRATCH` is the one you are in, for a prompt to read.")
     );
     s
 }

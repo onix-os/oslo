@@ -119,6 +119,15 @@ pub fn run(tool: &'static Tool, args: &[String]) -> i32 {
     // `args` here has no command name in front of it, which the builtin's does.
     #[cfg(feature = "scratch")]
     if tool.name == "scratch" {
+        // The overview page is this crate's, like `history`'s, so the two read alike. Everything
+        // else is the shell's, and is the same code the builtin runs.
+        if args.iter().any(|a| a == "--help" || a == "-h") {
+            print!(
+                "{}",
+                crate::cli::scratch::text(crate::cli::help::Paint::detect())
+            );
+            return 0;
+        }
         return oslo::env::builtins::scratch_tool(args);
     }
     let paint = crate::cli::help::Paint::detect();
