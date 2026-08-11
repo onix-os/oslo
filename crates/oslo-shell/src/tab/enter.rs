@@ -83,8 +83,10 @@ fn ask(tabs: &dyn backend::Tabs, inside: Option<&str>) -> io::Result<Option<Stri
         // you have tabs, and a panel sized for a thousand lines would be mostly empty air.
         height: 8,
         chrome: oslo_ui::ask::chrome::Chrome {
-            // No blank row between the filter and the rule under it, for the same reason there is
-            // none above the filter: four things stacked with air between them read as four things.
+            // **No legend.** It lists three keys, two of which are the ones every list in the shell
+            // already uses; against four names it is more rows of explanation than of answer. The
+            // box keeps its width without it — see `look`.
+            legend: false,
             legend_gap: 0,
             ..oslo_ui::ask::chrome::Chrome::default()
         },
@@ -129,12 +131,22 @@ fn look(_inside: Option<&str>) -> oslo_ui::ask::look::Look {
     look.badge = String::new();
     look.width = oslo_ui::ask::look::Width::Content;
     look.placeholder = "type to filter, or a name for a new one".to_string();
+    // **The box keeps the width of its own empty state.** With no legend under it there is nothing
+    // else to measure against, and a panel sized to the query alone shrank as the query got
+    // shorter — the thing that made it look broken in the first place. The widest this is ever
+    // asked to be is the placeholder, so that is the floor.
+    look.min_width = look.pad * 2
+        + oslo_ui::prompt::printed_width(&look.prompt)
+        + oslo_ui::prompt::printed_width(&look.placeholder)
+        // The caret, which is part of the input and always has a cell.
+        + 1;
     // **The marker is the whole of the selection.** A highlighted band works down a long history
     // where the eye needs catching; across four names it is a slab of colour saying something you
     // can already see. What is left is the `>` in front, which is where the eye goes anyway.
-    // One row of surface, not three, and nothing between it and the list: the blank rows were a
-    // panel for a screen-sized search, and here they are two empty lines in a box four lines tall.
-    look.surface_rows = 1;
+    // **Nothing between the box and what is around it.** The three rows of surface are the box —
+    // a tinted row above and below the query is what makes it read as somewhere to type rather
+    // than as a line. What is removed is the air *outside* it: the blank row between the list and
+    // the filter here, and the one between the filter and the rule in `chrome`.
     look.gap = 0;
     look.selected = Style::default();
     look.stripe = None;
