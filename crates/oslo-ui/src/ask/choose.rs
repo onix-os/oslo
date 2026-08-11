@@ -150,6 +150,27 @@ fn run(spec: &Choice) -> Answer<Outcome> {
     let mut panel = Inline::with_chrome(spec.chrome.clone());
     let since = super::Since::now();
 
+    let keys_shown: &[(&str, &str)] = if spec.multi {
+        &[
+            ("up/down", "move"),
+            ("space", "check"),
+            ("enter", "confirm"),
+            ("esc", "cancel"),
+        ]
+    } else {
+        &[("up/down", "move"), ("enter", "confirm"), ("esc", "cancel")]
+    };
+    // **The filter is told how wide the legend is.** The box is as wide as its widest row, and
+    // that row is nearly always the legend — so a surface measured only against its own text sat
+    // narrower than the rule beneath it, and shrank further as the query got shorter.
+    let look = super::look::Look {
+        min_width: match spec.chrome.legend {
+            true => crate::prompt::printed_width(&super::chrome::legend_text(keys_shown)),
+            false => spec.look.min_width,
+        },
+        ..spec.look.clone()
+    };
+
     loop {
         // The chrome is whatever this frame will actually draw — the legend, plus a header and
         // whatever rows the look puts around the list. Computed from the same values the drawing
@@ -157,7 +178,7 @@ fn run(spec: &Choice) -> Answer<Outcome> {
         // of these widgets ended up reserving a row they never drew.
         let chrome = spec.chrome.extra_rows()
             + usize::from(!spec.header.is_empty())
-            + spec.look.extra_rows(spec.filter);
+            + look.extra_rows(spec.filter);
         let height = spec
             .height
             .min(shown.len().max(1))
@@ -194,6 +215,7 @@ fn run(spec: &Choice) -> Answer<Outcome> {
                 if item == CREATE_ROW {
                     return Row {
                         text: create_label(spec, &query),
+                        matchable: false,
                         ..Row::new(String::new())
                     };
                 }
@@ -209,7 +231,7 @@ fn run(spec: &Choice) -> Answer<Outcome> {
                 }
             })
             .collect();
-        frame.push_str(&spec.look.frame(
+        frame.push_str(&look.frame(
             &rows,
             &View {
                 selected,
@@ -226,21 +248,11 @@ fn run(spec: &Choice) -> Answer<Outcome> {
                 elapsed_ms: since.ms(),
             },
         ));
-        let keys_shown: &[(&str, &str)] = if spec.multi {
-            &[
-                ("↑↓", "move"),
-                ("space", "check"),
-                ("enter", "confirm"),
-                ("esc", "cancel"),
-            ]
-        } else {
-            &[("↑↓", "move"), ("enter", "confirm"), ("esc", "cancel")]
-        };
         panel.draw(&frame, keys_shown);
 
         // A look that animates comes back on its own to draw the next frame; one that does not
         // blocks, exactly as before. See `super::awaited`.
-        let pressed = match super::awaited(&mut keys, spec.look.tick_ms()) {
+        let pressed = match super::awaited(&mut keys, look.tick_ms()) {
             Pressed::Key(key) => key,
             Pressed::Timeout => continue,
             Pressed::Ended => {
@@ -291,8 +303,8 @@ fn run(spec: &Choice) -> Answer<Outcome> {
             }
             // The arrows follow the screen: a reversed list draws index 0 at the bottom, so Up has
             // to walk *towards* the far end of it. See `Look::step`.
-            key if spec.look.step(key).is_some() => {
-                let step = spec.look.step(key).unwrap_or(Step::Back);
+            key if look.step(key).is_some() => {
+                let step = look.step(key).unwrap_or(Step::Back);
                 selected = step.from(selected, shown.len());
             }
             // Tab always toggles; space only when there is no query to type into. Swallowing

@@ -82,10 +82,16 @@ fn ask(tabs: &dyn backend::Tabs, inside: Option<&str>) -> io::Result<Option<Stri
         // Short on purpose. This is a list of sessions, not of history — there are as many rows as
         // you have tabs, and a panel sized for a thousand lines would be mostly empty air.
         height: 8,
+        chrome: oslo_ui::ask::chrome::Chrome {
+            // No blank row between the filter and the rule under it, for the same reason there is
+            // none above the filter: four things stacked with air between them read as four things.
+            legend_gap: 0,
+            ..oslo_ui::ask::chrome::Chrome::default()
+        },
         ..Choice::default()
     };
 
-    Ok(match pick_or_create(&spec, "new tab {}") {
+    Ok(match pick_or_create(&spec, "{}") {
         Answer::Given(Pick::Chosen(name)) => Some(name),
         // Refused rather than quietly rewritten: a name is part of a path, and a name you did not
         // type is one you cannot find again. See `name::valid`.
@@ -126,6 +132,10 @@ fn look(_inside: Option<&str>) -> oslo_ui::ask::look::Look {
     // **The marker is the whole of the selection.** A highlighted band works down a long history
     // where the eye needs catching; across four names it is a slab of colour saying something you
     // can already see. What is left is the `>` in front, which is where the eye goes anyway.
+    // One row of surface, not three, and nothing between it and the list: the blank rows were a
+    // panel for a screen-sized search, and here they are two empty lines in a box four lines tall.
+    look.surface_rows = 1;
+    look.gap = 0;
     look.selected = Style::default();
     look.stripe = None;
     look

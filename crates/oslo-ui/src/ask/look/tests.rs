@@ -258,6 +258,7 @@ fn the_cursor_and_the_checkbox_are_two_columns() {
             marked: true,
             trail: String::new(),
             meta: Vec::new(),
+            matchable: true,
             tint: None,
         },
         Row {
@@ -266,6 +267,7 @@ fn the_cursor_and_the_checkbox_are_two_columns() {
             marked: false,
             trail: String::new(),
             meta: Vec::new(),
+            matchable: true,
             tint: None,
         },
     ];
@@ -293,6 +295,7 @@ fn a_trail_keeps_its_room() {
         marked: false,
         trail: " 118×".to_string(),
         meta: Vec::new(),
+        matchable: true,
         tint: None,
     }];
     let drawn: Vec<String> = look

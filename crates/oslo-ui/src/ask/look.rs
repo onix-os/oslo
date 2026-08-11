@@ -211,6 +211,14 @@ pub struct Look {
     pub muted: Style,
     /// Whether a row's colour stops at its text or reaches the edge.
     pub width: Width,
+    /// The narrowest the filter surface may be, whatever [`Width::Content`] measures.
+    ///
+    /// **Set to the legend's width by the widget that draws one.** Without it a panel sized to its
+    /// own text shrank as the query got shorter, so the tinted box breathed in and out under a rule
+    /// that stayed put — and an empty query left it narrower than the keys listed beneath it. A
+    /// floor is the whole fix: it never reaches past what the box is already, and never retreats
+    /// behind it.
+    pub min_width: usize,
     /// An animated sweep at the head of the filter row, drawn where a spinner would go.
     ///
     /// It says the widget is live. That matters most where the list is doing work you cannot see —
@@ -263,6 +271,7 @@ impl Default for Look {
             },
             muted: ui.muted,
             width: Width::Content,
+            min_width: 0,
             scanner: None,
             badge: String::new(),
             // Foreground 0 on background 1: the terminal's own palette, so it belongs to whatever

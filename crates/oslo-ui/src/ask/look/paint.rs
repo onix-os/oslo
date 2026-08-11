@@ -32,6 +32,12 @@ pub struct Row {
     /// screen even though the text beside them varies wildly in length. That alignment is the
     /// entire reason to have them — the eye can scan one column without reading the others.
     pub meta: Vec<String>,
+    /// Whether the query matched *this row* at all.
+    ///
+    /// **False for a row the list invented**, such as an offer to create what was typed: its text
+    /// is the query, so every character counts as a match and the whole row comes out painted as
+    /// one — which says "all of this matched" about the one row that matched nothing.
+    pub matchable: bool,
     /// This row's own foreground, when it is not the selected one — a directory in a file list, a
     /// failed job in a job list. The look still owns the background, so a tinted row is still
     /// striped and still highlights when you land on it.
@@ -47,6 +53,7 @@ impl Row {
             marked: false,
             trail: String::new(),
             meta: Vec::new(),
+            matchable: true,
             tint: None,
         }
     }
@@ -258,7 +265,10 @@ impl Look {
             marker,
             lead,
             meta,
-            self.hits(&text, &shown, view.query, on(base), depth),
+            match row.matchable {
+                true => self.hits(&text, &shown, view.query, on(base), depth),
+                false => on(base).paint(&text, depth),
+            },
             on(self.muted).paint(&trail, depth),
             on(Style::default()).paint(&pad, depth),
         )
