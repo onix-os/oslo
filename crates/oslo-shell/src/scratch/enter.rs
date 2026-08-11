@@ -159,6 +159,11 @@ fn ask(scratches: &dyn backend::Scratches, inside: Option<&str>) -> io::Result<O
 /// What is oslo's rather than tab-rs's is every colour — the accent on the prompt and the marker,
 /// the muted grey on the count, the underline on a matched run — so this follows the theme like
 /// everything else instead of hard-coding blue as tab-rs does.
+/// `">>  "`, and the two padding cells the box carries either side of it.
+const PROMPT_CELLS: usize = 4 + 2;
+/// The placeholder, which is the widest the query row is ever asked to be.
+const PLACEHOLDER_CELLS: usize = 38;
+
 fn look(_inside: Option<&str>) -> oslo_ui::ask::look::Look {
     use oslo_ui::ask::look::{Where, Width};
     use oslo_ui::theme::Style;
@@ -170,12 +175,14 @@ fn look(_inside: Option<&str>) -> oslo_ui::ask::look::Look {
         reverse: false,
         prompt: ">>  ".to_string(),
         placeholder: "type to filter, or a name for a new one".to_string(),
-        // `1/3` under the query, as tab-rs puts it.
+        // `1/3` under the query, as tab-rs puts it — below the box rather than inside it, so the
+        // tint is the thing you type in and nothing else.
         under: "    {n}/{total}".to_string(),
-        // Nothing drawn around any of it: no surface, no stripe, no band on the selected row. The
-        // marker and the colour of the name are the whole of the selection.
-        surface: None,
-        surface_rows: 1,
+        // The box is back, and at the top: a tinted row above and below the query is what makes it
+        // read as somewhere to type. Nothing else is drawn — no stripe down the list, no band on
+        // the selected row; the marker and the colour of the name are the whole of the selection.
+        surface: oslo_ui::theme::current().pager.bg,
+        surface_rows: 3,
         stripe: None,
         selected: Style {
             bold: true,
@@ -183,8 +190,11 @@ fn look(_inside: Option<&str>) -> oslo_ui::ask::look::Look {
         },
         marker: "> ".to_string(),
         width: Width::Content,
+        // The box keeps the width of its own empty state, or it would breathe in and out as the
+        // query got shorter — which is what made it look broken before.
+        min_width: PROMPT_CELLS + PLACEHOLDER_CELLS + 1,
         gap: 0,
-        pad: 0,
+        pad: 1,
         scanner: None,
         left: String::new(),
         right: String::new(),
