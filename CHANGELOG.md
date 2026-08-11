@@ -1,5 +1,81 @@
 # Changelog
 
+## [0.2.28] - 2026-08-11
+
+### <!-- 0 -->⛰️  Features
+
+- Import what a dev shell's functions read
+- Put directory environments behind a feature
+- What a dev shell's build system needs
+- Indirect expansion composes with an operator
+- Import a dev shell's functions on request
+- Run shellHook when a project asks
+- Full width, with the history list's stripes
+- The filter box, on top of the list
+- Draw the finder the way tab-rs does
+- Oslo tab, for whatever is not an oslo prompt
+- A tab builtin, in the help behind the feature
+- Draw the finder like the history one
+- A daemon backend behind oslo.tab.daemon
+- Open the finder from a prompt
+- A create row in the list widget
+- The client, matching the key in both encodings
+- The keeper, its pty and the output log
+- The runtime directory, store and wire format
+- Add the feature flag and oslo.tab settings
+- Put the model behind a vista feature, off
+- Fix the command that just failed
+- Bracket only the words that changed
+- Show the correction as you type
+- Repair failed lines from history
+- Vendor vista and build the model
+
+### <!-- 1 -->🐛 Bug Fixes
+
+- Scratch is a tool row, not a section
+- The same margin on both sides of a full-width list
+- Keep the filter box, drop what is around it
+- Filter box no narrower than its legend
+- Ascii chevron, caret on its surface, narrow panel
+- Keep the scrollback of the shell you left
+- Give each tab the screen to itself
+- Never return into the caller from a failed keeper
+- Decode ctrl chords above the alphabet
+
+### <!-- 2 -->🚜 Refactor
+
+- Split nix out of direnv into its own feature
+- Rename the tab feature to scratch
+
+### <!-- 3 -->📚 Documentation
+
+- Say which binary reads a directory file
+- A dev shell's phases run here now
+- Correct what stops a dev shell's functions
+- Re-record the demo for the new finder
+- Record and embed the demo
+- The tab feature
+- Plan the tab feature
+- Say which binary has the model
+- Record a demo for every feature
+- One document per feature
+
+### <!-- 6 -->🧪 Testing
+
+- Wait for the second prompt mark, not the first
+
+### <!-- 7 -->⚙️ Miscellaneous Tasks
+
+- Release both oslo and oslo-minimal
+
+### Build
+
+- Run the tests behind a feature
+- Testing helpers are not a cargo feature
+- Add a full feature and make build-full
+- Depend on vista-recall by commit, drop the copy
+- Pin maki to a commit, record vista's
+
 ## [0.2.27] - 2026-08-09
 
 ### <!-- 0 -->⛰️  Features
