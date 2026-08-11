@@ -28,6 +28,8 @@ pub(crate) mod external;
 pub mod feature;
 mod fs;
 mod json;
+#[cfg(feature = "nix")]
+mod nix;
 mod path;
 #[cfg(feature = "vista")]
 mod predict;
@@ -178,6 +180,8 @@ pub fn install(interp: &Rc<Interp>, registry: &Registry, env: Arc<Mutex<Environm
     oslo.set(Value::str("ui"), Value::table(ui));
     #[cfg(feature = "direnv")]
     oslo.set(Value::str("direnv"), direnv::build(&env));
+    #[cfg(feature = "nix")]
+    oslo.set(Value::str("nix"), nix::build());
     let oslo = Value::table(oslo);
     publish(interp, &oslo);
     interp.set_global("oslo", oslo);

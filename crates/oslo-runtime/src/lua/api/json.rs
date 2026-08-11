@@ -55,7 +55,11 @@ pub fn build() -> Value {
 }
 
 /// A decoded JSON document as Lua values.
-fn from_json(value: &Json) -> Value {
+///
+/// Shared with `oslo.nix`, which decodes what `nix --json` writes. **One decoder, not two**: the
+/// `null` and empty-table decisions above are the sort a second implementation would make
+/// differently without anyone noticing until a document round-tripped wrong.
+pub(super) fn from_json(value: &Json) -> Value {
     match value {
         // JSON `null` decodes to `false`, not `nil`. `nil` in a table is indistinguishable from
         // an absent key, so a null field would silently disappear from the document — and a

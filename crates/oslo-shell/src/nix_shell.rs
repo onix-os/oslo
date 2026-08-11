@@ -49,6 +49,7 @@
 
 use crate::env::Environment;
 
+pub mod json;
 mod read;
 pub use read::exported_from;
 use read::{functions_from, locals_from};
