@@ -55,11 +55,17 @@ oslo.nix.run = function(argv)
       } },
     }
   elseif what == "flake show" then
-    return { __json = "object", devShells = { __json = "object",
-      ["x86_64-linux"] = { __json = "object",
-        default = { __json = "object" }, tooling = { __json = "object" } },
-      ["aarch64-linux"] = { __json = "object", default = { __json = "object" } },
-    } }
+    return { __json = "object",
+      devShells = { __json = "object",
+        ["x86_64-linux"] = { __json = "object",
+          default = { __json = "object" }, tooling = { __json = "object" } },
+        ["aarch64-linux"] = { __json = "object", default = { __json = "object" } },
+      },
+      packages = { __json = "object",
+        ["x86_64-linux"] = { __json = "object",
+          hello = { __json = "object", description = "the usual greeting" } },
+      },
+    }
   elseif what == "config show" then
     return { __json = "object",
       system = { __json = "object", value = "x86_64-linux" } }
@@ -143,6 +149,59 @@ fn a_failure_travels_out_as_nil_and_a_message() {
         print(shells, err)
         "#);
     assert_eq!(out, "nil\terror: no flake here\n");
+}
+
+/// `prior[1]` is the command itself, so the subcommand is `prior[2]`.
+#[test]
+fn the_outputs_a_subcommand_can_take_are_the_ones_offered() {
+    let out = case(
+        r#"
+        local function show(sub, current)
+          local found = oslo.nix.complete({ "nix", sub }, current)
+          local names = {}
+          for _, c in ipairs(found or {}) do names[#names + 1] = c[1] end
+          print(sub, current, #names == 0 and "-" or table.concat(names, ","))
+        end
+        show("develop", ".#")
+        show("build", ".#")
+        show("develop", ".#too")
+        "#,
+    );
+    assert_eq!(
+        out,
+        "develop\t.#\t.#default,.#tooling\n\
+         build\t.#\t.#hello\n\
+         develop\t.#too\t.#tooling\n"
+    );
+}
+
+#[test]
+fn a_flag_and_an_unknown_subcommand_fall_through_to_oslo() {
+    let out = case(
+        r#"
+        print(oslo.nix.complete({ "nix", "build" }, "--op"))
+        print(oslo.nix.complete({ "nix", "flake" }, ".#"))
+        "#,
+    );
+    assert_eq!(out, "nil\nnil\n");
+}
+
+/// Evaluating somebody else's flake on a keystroke is how a Tab becomes a 46-second wait.
+#[test]
+fn a_named_flake_is_not_evaluated_for_a_keystroke() {
+    let out = case(r#"print(oslo.nix.complete({ "nix", "build" }, "nixpkgs#hel"))"#);
+    assert_eq!(out, "nil\n");
+}
+
+#[test]
+fn a_candidate_carries_its_description_when_the_flake_gives_one() {
+    let out = case(
+        r#"
+        local found = oslo.nix.complete({ "nix", "build" }, ".#")
+        print(found[1][1], found[1][2])
+        "#,
+    );
+    assert_eq!(out, ".#hello\tthe usual greeting\n");
 }
 
 /// The point of writing them in Lua: a config replaces one, and everything else keeps working.

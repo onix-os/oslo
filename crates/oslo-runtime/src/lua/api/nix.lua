@@ -108,4 +108,56 @@ return function(nix)
     if not system then return {} end
     return keys(outputs.devShells[system])
   end
+
+  -- Which outputs each subcommand can be given, in the order they are offered.
+  local WANTS = {
+    develop = { "devShells" },
+    build = { "packages", "checks" },
+    run = { "apps", "packages" },
+    shell = { "packages" },
+    profile = { "packages" },
+    bundle = { "packages" },
+  }
+
+  --- Complete `nix build .#<TAB>` and its relatives, from the flake's own outputs.
+  ---
+  --- Not installed by anything: oslo completes nothing for `nix` unless a config says so, which is
+  --- one line.
+  ---
+  ---     oslo.completion.for_command.nix = oslo.nix.complete
+  ---
+  --- Answers `nil` to fall through to oslo's ordinary completion — files and flags — for every
+  --- subcommand and word this has nothing to say about.
+  function nix.complete(argv, current)
+    local wants = WANTS[argv[2]]
+    -- A flag is oslo's business, not this one's.
+    if not wants or current:sub(1, 1) == "-" then return nil end
+
+    local ref, stem = current:match("^(.-)#(.*)$")
+    if not ref then ref, stem = ".", current end
+    -- **Only the flake you are standing in.** `nix flake show nixpkgs` evaluates the whole of
+    -- nixpkgs; the same class of query took 46 seconds here when it was `nix search`. Nothing that
+    -- runs on a keystroke may risk that, so a named flake falls through to ordinary completion.
+    if ref ~= "." and ref ~= "" then return nil end
+
+    -- Cached, because this runs per Tab. Warm, nix answers `flake show` in 34 ms and the cache in
+    -- well under one; cold it is 455 ms, which is a wait nobody should pay twice.
+    local outputs = nix.outputs { cache = true }
+    local system = nix.system { cache = true }
+    if not outputs or not system then return nil end
+
+    local found = {}
+    for _, kind in ipairs(wants) do
+      local by_system = outputs[kind]
+      local here = type(by_system) == "table" and by_system[system]
+      for _, name in ipairs(keys(here)) do
+        if name:sub(1, #stem) == stem then
+          local about = type(here[name]) == "table" and here[name].description
+          if about == "" then about = nil end
+          found[#found + 1] = { ref .. "#" .. name, about }
+        end
+      end
+    end
+    return found
+  end
 end
