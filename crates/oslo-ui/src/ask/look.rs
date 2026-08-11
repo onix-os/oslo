@@ -211,6 +211,14 @@ pub struct Look {
     pub muted: Style,
     /// Whether a row's colour stops at its text or reaches the edge.
     pub width: Width,
+    /// Columns of untouched terminal down each side of every row.
+    ///
+    /// **Because the right-hand one is not optional.** `Chrome` reserves a column at the right edge
+    /// — a row exactly the terminal's width leaves the cursor in the auto-wrap pending state, and
+    /// the `\r\n` after it then costs two rows instead of one. So a full-width block already has a
+    /// gap on the right and none on the left, which reads as a block that failed to reach the edge
+    /// rather than as one with a margin. This puts the same gap on the other side.
+    pub margin: usize,
     /// A row of its own under the filter, templated like [`Look::left`] — `{n}`, `{total}`.
     ///
     /// **A row rather than a slot on the filter line**, which is the difference between a finder
@@ -278,6 +286,7 @@ impl Default for Look {
             muted: ui.muted,
             width: Width::Content,
             min_width: 0,
+            margin: 0,
             under: String::new(),
             scanner: None,
             badge: String::new(),

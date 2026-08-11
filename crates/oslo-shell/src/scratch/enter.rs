@@ -191,6 +191,9 @@ fn look(_inside: Option<&str>) -> oslo_ui::ask::look::Look {
         },
         marker: "> ".to_string(),
         width: Width::Full,
+        // One column each side. `Chrome` already keeps one at the right edge, and a block flush
+        // against the left with a gap at the right reads as one that failed to reach the edge.
+        margin: 1,
         gap: 0,
         pad: 1,
         scanner: None,
