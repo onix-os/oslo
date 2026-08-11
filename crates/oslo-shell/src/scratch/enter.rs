@@ -159,15 +159,11 @@ fn ask(scratches: &dyn backend::Scratches, inside: Option<&str>) -> io::Result<O
 /// What is oslo's rather than tab-rs's is every colour — the accent on the prompt and the marker,
 /// the muted grey on the count, the underline on a matched run — so this follows the theme like
 /// everything else instead of hard-coding blue as tab-rs does.
-/// `">>  "`, and the two padding cells the box carries either side of it.
-const PROMPT_CELLS: usize = 4 + 2;
-/// The placeholder, which is the widest the query row is ever asked to be.
-const PLACEHOLDER_CELLS: usize = 38;
-
 fn look(_inside: Option<&str>) -> oslo_ui::ask::look::Look {
     use oslo_ui::ask::look::{Where, Width};
     use oslo_ui::theme::Style;
-    let ui = oslo_ui::theme::current().ui;
+    let theme = oslo_ui::theme::current();
+    let pager = &theme.pager;
 
     oslo_ui::ask::look::Look {
         // Top, and not reversed: the list reads downward from what you typed.
@@ -179,20 +175,22 @@ fn look(_inside: Option<&str>) -> oslo_ui::ask::look::Look {
         // tint is the thing you type in and nothing else.
         under: "    {n}/{total}".to_string(),
         // The box is back, and at the top: a tinted row above and below the query is what makes it
-        // read as somewhere to type. Nothing else is drawn — no stripe down the list, no band on
-        // the selected row; the marker and the colour of the name are the whole of the selection.
-        surface: oslo_ui::theme::current().pager.bg,
+        // read as somewhere to type.
+        surface: pager.bg,
         surface_rows: 3,
-        stripe: None,
+        // The history finder's list, down to the quiet grey on every other row. A stripe is a
+        // ruler across a full-width row — which is why it comes with `Width::Full` and not without:
+        // painted only as far as the text, it reads as a highlighted word rather than a rule.
+        stripe: Some(Style {
+            bg: Some(oslo_ui::theme::Color::Indexed(235)),
+            ..Style::default()
+        }),
         selected: Style {
-            bold: true,
-            ..ui.accent
+            bg: pager.sel_bg,
+            ..pager.text_sel
         },
         marker: "> ".to_string(),
-        width: Width::Content,
-        // The box keeps the width of its own empty state, or it would breathe in and out as the
-        // query got shorter — which is what made it look broken before.
-        min_width: PROMPT_CELLS + PLACEHOLDER_CELLS + 1,
+        width: Width::Full,
         gap: 0,
         pad: 1,
         scanner: None,
