@@ -49,10 +49,13 @@
 
 use crate::env::Environment;
 
+pub mod cache;
+pub mod json;
 mod read;
+pub use cache::forget;
+use cache::{cached, remember};
 pub use read::exported_from;
 use read::{functions_from, locals_from};
-use std::path::{Path, PathBuf};
 
 /// Define them all in one pass.
 ///
@@ -134,104 +137,13 @@ fn shell_quote(word: &str) -> String {
     format!("'{}'", word.replace('\'', "'\\''"))
 }
 
-/// The directory the project's `.direnv` belongs in.
-///
-/// **The rc file's own, not the shell's.** These paths used to be relative to the working
-/// directory, so arriving in a subdirectory of a project scattered a `.direnv` into whichever
-/// directory the shell happened to be standing in — and the profile written there was a different
-/// GC root each time.
-/// **Asked of `direnv` when there is one, and only then.** A project's root is the directory
-/// holding the rc file, which is a `direnv` idea — in a build without it there is no rc file to
-/// own anything, so the working directory is the honest answer and the only one available.
-fn root() -> PathBuf {
-    let here = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-    #[cfg(feature = "direnv")]
-    {
-        crate::direnv::find::applicable(&here)
-            .and_then(|rc| crate::direnv::find::owner(&rc))
-            .unwrap_or(here)
-    }
-    #[cfg(not(feature = "direnv"))]
-    here
-}
-
 /// The profile path, created if it is not there, under the project's `.direnv`.
 pub fn profile() -> String {
-    let profile = root().join(".direnv/flake-profile");
+    let profile = cache::root().join(".direnv/flake-profile");
     if let Some(parent) = profile.parent() {
         let _ = std::fs::create_dir_all(parent);
     }
     profile.to_string_lossy().into_owned()
-}
-
-/// The files that decide what the dev shell contains.
-const INPUTS: &[&str] = &["flake.nix", "flake.lock", "shell.nix", "default.nix"];
-
-/// What the cached answer was computed from: the arguments, and every input as it stood.
-///
-/// Length and mtime, the same pair the rc files are stamped with and for the same reason — mtime
-/// alone has one-second granularity on some filesystems.
-fn key(root: &Path, args: &[String]) -> String {
-    let mut key = format!("1 {}", args.join(" "));
-    for name in INPUTS {
-        let stamp = std::fs::metadata(root.join(name))
-            .ok()
-            .map(|meta| {
-                let when = meta
-                    .modified()
-                    .ok()
-                    .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
-                    .map(|d| d.as_nanos())
-                    .unwrap_or(0);
-                format!("{}:{when}", meta.len())
-            })
-            .unwrap_or_else(|| "-".to_string());
-        key.push(' ');
-        key.push_str(&stamp);
-    }
-    key
-}
-
-/// Where the evaluated environment is kept between runs.
-fn cache(root: &Path) -> PathBuf {
-    root.join(".direnv/dev-env.json")
-}
-
-/// **The evaluation, remembered.** `nix print-dev-env` costs about half a second on a warm store
-/// and several on a cold one, and it is asked the same question every time: this project's flake
-/// has not moved since the last arrival. That is once per `cd` into the project and once per new
-/// shell — a new pane, a nested `oslo` — which is often enough to be the slowest thing the shell
-/// does all day.
-///
-/// Keyed on the inputs rather than timed out, so editing `flake.nix` re-evaluates immediately and
-/// nothing else does. `direnv reload` drops it outright, which is the escape hatch for the case
-/// this cannot see: nix itself, or something the flake reads that is not one of [`INPUTS`].
-fn cached(args: &[String]) -> Option<String> {
-    let root = root();
-    let text = std::fs::read_to_string(cache(&root)).ok()?;
-    let (head, body) = text.split_once('\n')?;
-    (head == key(&root, args)).then(|| body.to_string())
-}
-
-fn remember(args: &[String], json: &str) {
-    let root = root();
-    let path = cache(&root);
-    if let Some(parent) = path.parent() {
-        let _ = std::fs::create_dir_all(parent);
-    }
-    if std::fs::write(&path, format!("{}\n{json}", key(&root, args))).is_err() {
-        return;
-    }
-    // **Owner-only.** This is a verbatim dump of a dev shell's environment, which for a good many
-    // projects means tokens and connection strings. It sits inside the working tree, where the
-    // umask would otherwise have left it world-readable on a shared machine.
-    use std::os::unix::fs::PermissionsExt;
-    let _ = std::fs::set_permissions(&path, std::fs::Permissions::from_mode(0o600));
-}
-
-/// Drop the remembered evaluation, for `direnv reload`.
-pub fn forget() {
-    let _ = std::fs::remove_file(cache(&root()));
 }
 
 /// Run `nix print-dev-env` with `args` and apply what it exports. Answers how many.
@@ -257,6 +169,68 @@ pub struct Want {
     pub functions: bool,
 }
 
+/// Why `print-dev-env` said nothing, **asked of nix rather than guessed at**.
+///
+/// This used to answer "is nix installed, and does this directory have a flake?" — two guesses, and
+/// on the commonest failure both are wrong. `use flake .#tooling` in a project whose shell is called
+/// `dev` reaches here with nix installed and a flake right there; nix's own message names the four
+/// attribute paths it looked for and not one that exists. So oslo said something untrue while the
+/// useful fact — *what this flake actually offers* — was one query away.
+///
+/// **Only on the failure path.** A `flake show` costs 34 ms warm and 455 ms cold, and paying that
+/// on every arrival in a directory to prepare for an error that will not happen is exactly the sort
+/// of tax a directory environment must not levy. Nothing here runs while `use flake` is working.
+fn why_nothing(args: &[String]) -> String {
+    if !json::available() {
+        return "nix is not installed".to_string();
+    }
+    match shells_here() {
+        Some(names) if !names.is_empty() => format!(
+            "no dev shell called `{}`. This flake offers: {}",
+            asked_for(args),
+            names.join(", ")
+        ),
+        Some(_) => "this flake defines no dev shell for this system".to_string(),
+        // The flake could not be read at all — nix has already said why on its own stderr, and
+        // repeating a guess over the top of a real diagnostic helps nobody.
+        None => "`nix print-dev-env` produced nothing; nix's own message says why".to_string(),
+    }
+}
+
+/// The dev shell the line asked for, as it would be named in the flake.
+///
+/// `use flake .#tooling` asks for `tooling`; a bare `use flake` asks for `default`, which is what
+/// nix resolves an installable with no attribute to. Flags are skipped, because
+/// `use flake --option warn-dirty false` names no shell at all.
+fn asked_for(args: &[String]) -> String {
+    args.iter()
+        .find(|arg| !arg.starts_with('-'))
+        .and_then(|installable| installable.split_once('#'))
+        .map(|(_, attribute)| attribute.to_string())
+        .unwrap_or_else(|| "default".to_string())
+}
+
+/// The dev shells this flake offers for this machine.
+///
+/// **A second implementation of `oslo.nix.shells`, and deliberately.** That one is Lua, and the Lua
+/// layer sits *above* the shell — this is an error message inside the shell, which cannot call up
+/// into it. The duplication is bounded by what it is for: the worst a drifted copy can do is name
+/// the wrong shells in a diagnostic.
+fn shells_here() -> Option<Vec<String>> {
+    let system = local_system()?;
+    let shown = json::run(&["flake".to_string(), "show".to_string()], json::TIMEOUT).ok()?;
+    let parsed: serde_json::Value = serde_json::from_str(&shown).ok()?;
+    let shells = parsed.get("devShells")?.get(system)?.as_object()?;
+    Some(shells.keys().cloned().collect())
+}
+
+/// The system nix builds for here — `x86_64-linux`.
+fn local_system() -> Option<String> {
+    let shown = json::run(&["config".to_string(), "show".to_string()], json::TIMEOUT).ok()?;
+    let parsed: serde_json::Value = serde_json::from_str(&shown).ok()?;
+    Some(parsed.get("system")?.get("value")?.as_str()?.to_string())
+}
+
 /// The same as [`apply`], plus whatever `want` asks for.
 pub fn apply_with(env: &mut Environment, args: &[String], want: Want) -> Result<usize, String> {
     let json = match cached(args) {
@@ -265,11 +239,7 @@ pub fn apply_with(env: &mut Environment, args: &[String], want: Want) -> Result<
             let fresh = crate::exec::eval_command_substitution(env, &command(args, &profile()))
                 .map_err(|e| e.to_string())?;
             if fresh.trim().is_empty() {
-                return Err(
-                    "`nix print-dev-env` produced nothing — is nix installed, and does this \
-                            directory have a flake?"
-                        .to_string(),
-                );
+                return Err(why_nothing(args));
             }
             // Written only after it parses, so a truncated or error-shaped answer is not the thing
             // every later arrival is served from.
@@ -328,6 +298,29 @@ pub fn apply_with(env: &mut Environment, args: &[String], want: Want) -> Result<
 mod tests {
     use super::read::{IGNORED, usable_name};
     use super::*;
+
+    /// The name in the diagnostic has to be the one the line asked for, or the message is another
+    /// guess of the kind this replaced.
+    #[test]
+    fn the_shell_a_line_asked_for_is_the_one_named_back() {
+        let words =
+            |list: &[&str]| -> Vec<String> { list.iter().map(|w| (*w).to_string()).collect() };
+        assert_eq!(asked_for(&words(&[".#tooling"])), "tooling");
+        assert_eq!(asked_for(&words(&["..#other"])), "other");
+        // No attribute named at all is `default`, which is what nix resolves it to.
+        assert_eq!(asked_for(&words(&[])), "default");
+        assert_eq!(asked_for(&words(&["."])), "default");
+        // `use flake --option warn-dirty false` names no shell; the flag must not be read as one.
+        assert_eq!(
+            asked_for(&words(&["--option", "warn-dirty false"])),
+            "default"
+        );
+        assert_eq!(
+            asked_for(&words(&["--option", "warn-dirty false", ".#dev"])),
+            "default",
+            "the flag's own value is not an installable either"
+        );
+    }
 
     #[test]
     fn the_builders_home_never_escapes() {
@@ -440,48 +433,6 @@ mod tests {
     #[test]
     fn an_entry_in_both_appears_once() {
         assert_eq!(keeping_yours("/x", "/x"), "/x");
-    }
-
-    /// **An edited flake re-evaluates, and an untouched one does not.**
-    ///
-    /// The whole value of the cache is that it is keyed rather than timed, and the whole risk is
-    /// serving a dev shell that no longer matches the flake that describes it. The root is a
-    /// parameter precisely so this can be asked without moving the process's working directory,
-    /// which every other test running beside it shares.
-    #[test]
-    fn the_key_moves_when_an_input_does_and_not_otherwise() {
-        let project = tempfile::tempdir().expect("temp dir");
-        let root = project.path();
-        std::fs::write(root.join("flake.nix"), "{ }").expect("write");
-
-        let first = key(root, &[String::from(".")]);
-        assert_eq!(
-            first,
-            key(root, &[String::from(".")]),
-            "nothing changed, nothing to re-do"
-        );
-        assert_ne!(
-            first,
-            key(root, &[String::from("..#other")]),
-            "another shell, another key"
-        );
-
-        std::fs::write(root.join("flake.nix"), "{ inputs = {}; }").expect("write");
-        assert_ne!(
-            first,
-            key(root, &[String::from(".")]),
-            "an edited flake must re-evaluate"
-        );
-    }
-
-    /// A project with no flake at all still has a stable key rather than a changing one.
-    #[test]
-    fn a_project_with_no_inputs_is_still_answerable() {
-        let project = tempfile::tempdir().expect("temp dir");
-        assert_eq!(
-            key(project.path(), &[String::from(".")]),
-            key(project.path(), &[String::from(".")])
-        );
     }
 
     #[test]
