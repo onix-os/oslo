@@ -1,0 +1,33 @@
+# Profiles: one shell, several histories. $OSLO_PROFILE names the database file.
+cols 120
+rows 20
+speed 0.055
+
+run oslo history path
+wait 1.2
+run grep -c fn src/lib.rs
+wait 1.0
+
+# An agent's shell. The variable is inherited by everything it spawns.
+run OSLO_PROFILE=agent oslo
+wait 0.8
+run oslo history path
+wait 1.6
+run grep -c fn src/parser.rs
+wait 1.2
+run exit
+wait 1.5
+clear
+
+# Back in my own history: the same question, asked of one store and then the next.
+type grep -c
+wait 0.6
+key C-r
+wait 2.4
+key Tab
+wait 2.8
+key Escape
+wait 1.0
+# The prompt comes back with the line as it was; clear it so the shell is left empty.
+key C-u
+wait 0.4

@@ -72,4 +72,26 @@ pub(super) fn settle_stores(settings: &history::Settings) {
     if let Some(db) = oslo_base::track::store() {
         db.trim(settings.max_size.max(1));
     }
+    // The predictor's snapshot, written once on the way out rather than after every command.
+    //
+    // It costs well under a millisecond and is about 31 KB, but it is still a file write, and a
+    // shell that did it per command would be doing it for nothing — the model is only *read* at
+    // the next start. Best effort, like the trim: another shell writing at the same instant means
+    // one of the two saves wins, and the loser costs a session's learning rather than anything a
+    // user would notice.
+    //
+    // Nothing is written for a session that keeps no history, which is the same gate the model was
+    // read behind in `Tracker::start`. A model in this process at all means the gate let it in.
+    #[cfg(feature = "vista")]
+    {
+        if !oslo_base::predict::ready() {
+            return;
+        }
+        if let Some(path) = oslo_base::predict::default_path(
+            std::env::var("XDG_DATA_HOME").ok().as_deref(),
+            std::env::var("HOME").ok().as_deref(),
+        ) {
+            oslo_base::predict::save_shared(&path);
+        }
+    }
 }

@@ -36,3 +36,7 @@ oslo.env.set_alias("_c", "make check")
 oslo.env.set_alias("_r", "make run")
 oslo.env.set_alias("_t", "make test")
 oslo.env.set_alias("_v", "make verify")
+-- `_b` builds with every optional feature; this one builds with none of them. Worth having beside
+-- it rather than as a flag to remember, because the two answer different questions — `_b` is the
+-- shell as it is meant to be used, `_m` is the floor a distribution would ship as /bin/sh.
+oslo.env.set_alias("_m", "make build TYPE=minimal")

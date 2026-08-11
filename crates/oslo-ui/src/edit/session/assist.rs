@@ -29,6 +29,24 @@ pub trait Assist {
         text.to_string()
     }
 
+    /// The whole line as it should probably read, when what is typed looks mistyped.
+    ///
+    /// A *replacement* for the line rather than a continuation of it, which is what separates it
+    /// from [`Assist::hint_text`] and why it is drawn differently: one is text you may be about to
+    /// have, the other is the shell disagreeing with text you already have.
+    fn repair_text(&mut self, _line: &str, _cursor: usize) -> Option<String> {
+        None
+    }
+
+    /// Draw the correction that goes after the line, given what was typed and what it should say.
+    ///
+    /// **Both, because the drawing is a comparison.** Only the words that changed are marked, so
+    /// this cannot be a function of the correction alone — and doing the diff here rather than in
+    /// the layout keeps the editor unaware of what a word is.
+    fn paint_repair(&mut self, _typed: &str, fixed: &str) -> String {
+        fixed.to_string()
+    }
+
     /// Run completion through the editor's shared terminal event stream.
     fn complete(
         &mut self,

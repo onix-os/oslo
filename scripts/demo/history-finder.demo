@@ -1,0 +1,32 @@
+# The history finder: Up is a list first and a search second.
+cols 120
+rows 24
+speed 0.08
+
+run git status --short
+run git log --oneline -3
+run grep -rn fn src
+clear
+wait 0.6
+
+# Up on a fresh line: every command the store knows, newest first, the best match nearest the bar.
+key Up
+wait 3.0
+
+# The rows were read once, when it opened, so the query narrows them on the keystroke.
+type git
+wait 2.5
+
+# Right is not a cursor — it narrows the scope, and the counter on the bar follows it.
+key Right
+wait 1.0
+key Right
+wait 2.5
+key Right
+wait 2.2
+
+# Enter puts the line back on the prompt, unrun, for you to accept.
+key Enter
+wait 2.0
+key Enter
+wait 2.0

@@ -136,27 +136,6 @@ impl Session {
         }
     }
 
-    /// Take the ghost suggestion into the line — all of it, or one word.
-    ///
-    /// The suggestion is *what would be drawn now*, asked for again rather than remembered from
-    /// the last frame — a remembered one can be stale by exactly the keystroke that accepted it.
-    ///
-    /// `false` when there was nothing to take, so a key that also means something else can fall
-    /// through to that meaning.
-    fn take_hint(&mut self, whole: bool, assist: &mut dyn Assist) -> bool {
-        let line = self.buffer.text();
-        let Some(hint) = assist.hint_text(&line, self.buffer.cursor()) else {
-            return false;
-        };
-        let take = if whole { hint } else { first_word(&hint) };
-        if take.is_empty() {
-            return false;
-        }
-        self.buffer.move_end();
-        self.buffer.insert_str(&take);
-        true
-    }
-
     /// Apply one key.
     pub fn apply(&mut self, key: Key, assist: &mut dyn Assist) -> Step {
         let changed = |yes: bool| Step::Continue { redraw: yes };
@@ -223,9 +202,13 @@ impl Session {
         //
         // Above vi rather than in the keymap because vi sees the key first and would move the
         // cursor before the keymap ever ran.
+        //
+        // A correction is taken by the same key under the same rule, and only when there was no
+        // suggestion to take — the two are drawn in the same place and never at once, so one key
+        // accepting whichever is showing is the only thing that could be meant.
         if key == Key::Right
             && self.mode() != Some(super::vi::Mode::Normal)
-            && self.take_hint(true, assist)
+            && (self.take_hint(true, assist) || self.take_repair(assist))
         {
             return changed(true);
         }
@@ -589,6 +572,7 @@ pub fn read_line(
         }
     }
 }
+mod accept;
 mod frame;
 use frame::{draw, first_word, into_at, next_input, read_plain};
 

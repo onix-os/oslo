@@ -189,6 +189,17 @@ pub(super) fn clear_command(args: &[String]) -> Result<(), String> {
         return Err("usage: oslo history clear --yes".to_string());
     }
     println!("deleted\t{}", open_current(false)?.clear_events()?);
+    // The predictor's snapshot is a distillation of exactly what was just deleted. A shell that
+    // kept it would still be able to suggest a line the user asked it to forget, which is the
+    // same leak as not clearing at all — only harder to notice.
+    #[cfg(feature = "vista")]
+    if let Some(path) = oslo_base::predict::default_path(
+        std::env::var("XDG_DATA_HOME").ok().as_deref(),
+        std::env::var("HOME").ok().as_deref(),
+    ) && let Err(err) = oslo_base::predict::forget_saved(&path)
+    {
+        return Err(format!("clear model: {err}"));
+    }
     Ok(())
 }
 

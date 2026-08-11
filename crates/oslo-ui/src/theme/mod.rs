@@ -73,7 +73,11 @@ pub fn set_depth(depth: Depth) {
 ///
 /// The same in-process global-state trap as `environ`, and the same answer: serialise the tests
 /// that touch it rather than hope they do not overlap.
-#[cfg(any(test, feature = "testing"))]
+/// Unconditional rather than behind a cargo feature, which it used to be: the tests that need it
+/// are in other crates, and a feature that exists to serve tests is one `--all-features` turns on —
+/// which would compile test scaffolding into a release binary because somebody asked for
+/// "everything". Nothing outside a test calls it, so the linker drops it.
+#[doc(hidden)]
 #[must_use = "the depth is only held while the guard lives; `let _ = ` drops it immediately"]
 pub fn held_at(depth: Depth) -> std::sync::MutexGuard<'static, ()> {
     static SERIAL: std::sync::Mutex<()> = std::sync::Mutex::new(());
@@ -200,6 +204,12 @@ pub struct Syntax {
     pub comment: Style,
     pub variable: Style,
     pub autosuggestion: Style,
+    /// The correction drawn after a line that looks mistyped.
+    ///
+    /// Reversed rather than coloured, and that is the whole design: a ghost suggestion is text you
+    /// might be about to have, so it recedes; this is the shell disagreeing with what you typed,
+    /// which is the opposite job. `oslo.theme.styles` overrides it like any other entry.
+    pub repair: Style,
     pub match_bracket: Style,
 }
 
@@ -257,6 +267,12 @@ impl Syntax {
             comment: rgb(0x6e, 0x77, 0x81),
             // Light in both palettes, and for the same reason: it has to read as not-yet-text.
             autosuggestion: Style::fg(Color::Indexed(250)),
+            // The ghost's own colour, turned inside out: the correction is the same kind of
+            // not-yet-text, saying the opposite thing about it.
+            repair: Style {
+                reverse: true,
+                ..Style::fg(Color::Indexed(250))
+            },
             match_bracket: Style {
                 bold: true,
                 ..Style::default()
@@ -347,6 +363,10 @@ impl Default for Syntax {
             // say how far behind. The cost of naming an exact grey is that a sixteen-colour
             // terminal rounds it to whichever slot is nearest, which is not necessarily a dim one.
             autosuggestion: Style::fg(Color::Indexed(240)),
+            repair: Style {
+                reverse: true,
+                ..Style::fg(Color::Indexed(240))
+            },
             match_bracket: Style {
                 bold: true,
                 ..Style::default()

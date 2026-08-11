@@ -62,6 +62,24 @@ impl Tracker {
         if !keeps_a_record(settings) {
             return tracker;
         }
+        // The predictor's snapshot, read on a thread of its own — and behind the same gate, which
+        // is why it is here rather than in the loop. A model is a distillation of the history, so
+        // a session that keeps no history must not read one or write one either; `HISTFILE=""`
+        // meaning "no trace" and leaving a file of every command behind would be worse than not
+        // offering the switch.
+        //
+        // **Read, never rebuilt.** Measured in `bench/predict.rs`: the snapshot costs 0.1 ms and
+        // stays about 31 KB whatever the history holds, while building the same model from history
+        // costs 9.5 ms at ten thousand commands — several times oslo's whole startup, to produce
+        // what a file already has. Detached like the sweep below: a prompt drawn before it lands
+        // has nothing to predict from, and every command that runs feeds it regardless.
+        #[cfg(feature = "vista")]
+        if let Some(path) = oslo_base::predict::default_path(
+            std::env::var("XDG_DATA_HOME").ok().as_deref(),
+            std::env::var("HOME").ok().as_deref(),
+        ) {
+            oslo_base::predict::warm(path);
+        }
         track::install(
             track::default_path(
                 std::env::var("XDG_DATA_HOME").ok().as_deref(),
@@ -350,16 +368,15 @@ fn segment_table() -> crate::lua::eval::value::Value {
 /// that was not a chain records one row for itself and no links, which is the common case and
 /// costs one small write.
 pub(super) fn record_outcome(history_id: u64, result: &Result<i32, ShellError>, elapsed: Duration) {
+    let status = outcome_status(result);
+    // The predictor held this line when the log wrote it, because a command's status does not
+    // exist until here. This is what lets it learn that a failure was followed by a retyping,
+    // which is the whole of what repair is built on. Outside the store check: a shell with no
+    // tracking database still has a model.
+    #[cfg(feature = "vista")]
+    oslo_base::predict::settle(status);
     let Some(track) = track::store() else {
         return;
-    };
-    let status = match result {
-        Ok(status) => Some(*status),
-        // A line that never reached execution has no status, and saying so is the point: `None`
-        // here means the same as it does on a link that was short-circuited past.
-        Err(ShellError::SyntaxError(_)) => None,
-        Err(ShellError::Exit(code)) => Some(*code),
-        Err(err) => Some(err.failure_status()),
     };
     let mut rows = vec![track::Outcome::line(
         track.current_dir_id(),
@@ -379,6 +396,18 @@ pub(super) fn record_outcome(history_id: u64, result: &Result<i32, ShellError>, 
         }));
     }
     track.record_outcome(history_id, &rows);
+}
+
+/// What the line reported, in the shape the outcome row and the model both take.
+fn outcome_status(result: &Result<i32, ShellError>) -> Option<i32> {
+    match result {
+        Ok(status) => Some(*status),
+        // A line that never reached execution has no status, and saying so is the point: `None`
+        // here means the same as it does on a link that was short-circuited past.
+        Err(ShellError::SyntaxError(_)) => None,
+        Err(ShellError::Exit(code)) => Some(*code),
+        Err(err) => Some(err.failure_status()),
+    }
 }
 
 #[cfg(test)]

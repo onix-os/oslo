@@ -155,6 +155,19 @@ impl CommandIndex {
     pub fn contains(path: &str, name: &str) -> bool {
         !name.contains('/') && Self::executables(path).contains(name)
     }
+
+    /// Whether anything runnable *starts with* `stem` — a half-typed command rather than a wrong
+    /// one.
+    ///
+    /// A binary search over the sorted index, so it costs what a lookup costs. That is the point:
+    /// [`nearest`] walks the whole index measuring edit distances, and this answers "still typing"
+    /// before that work is reached. Typing `cargo` asks it five times and scans nothing.
+    pub fn has_prefix(path: &str, stem: &str) -> bool {
+        if stem.is_empty() || stem.contains('/') {
+            return false;
+        }
+        !Self::starting_with(&Self::sorted(path), stem).is_empty()
+    }
 }
 
 /// The runnable name most like `name`, if one is close enough to be worth suggesting.
@@ -190,7 +203,7 @@ pub fn nearest(path: &str, name: &str) -> Option<String> {
 ///
 /// Returns `Some(distance)` always; the `Option` is for the caller's `?` convenience on an empty
 /// index. Rows are kept as two vectors rather than a matrix because only the previous one matters.
-fn edit_distance(a: &str, b: &str, budget: usize) -> Option<usize> {
+pub(crate) fn edit_distance(a: &str, b: &str, budget: usize) -> Option<usize> {
     let a: Vec<char> = a.chars().collect();
     let b: Vec<char> = b.chars().collect();
     let mut previous: Vec<usize> = (0..=b.len()).collect();

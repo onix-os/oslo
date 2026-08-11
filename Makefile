@@ -14,10 +14,15 @@ CARGO := cargo
 
 # What a release is: one file that runs anywhere, with no loader and no libc to find.
 #
-# `make build` produces exactly what the release workflow produces, and for a reason beyond
-# tidiness — oslo is meant to be somebody's *login shell*, and a login shell linked against a
-# /nix/store glibc stops existing the day `nix-collect-garbage` runs. There is no recovering from
-# that from inside the session it breaks.
+# `make build` links exactly the way the release workflow links, and for a reason beyond tidiness —
+# oslo is meant to be somebody's *login shell*, and a login shell linked against a /nix/store glibc
+# stops existing the day `nix-collect-garbage` runs. There is no recovering from that from inside
+# the session it breaks.
+#
+# **They no longer agree on features.** `make build` is `--all-features`; the release workflow
+# builds the default, so a published artifact is what `make build TYPE=minimal` produces. That is a
+# decision about what a release *is*, not an oversight — but the two lines are in different files
+# and nothing checks that they still mean what you think, so it is written down here.
 #
 # `RUSTFLAGS` and the deliberately-absent linker override are copied from
 # `.github/workflows/release.yml`; the comment there explains why pointing this at `musl-gcc`
@@ -35,8 +40,22 @@ $(info ------------------------------------------)
 
 .PHONY: build b dev check-static compile c run r test test-terminal t check check-all test-all check-loc check-readme print-name clippy rustdoc fmt fmt-check clean verify vm vm-distro vm-arch install uninstall release help h
 
+# What `build` compiles: everything, unless asked for the other one.
+#
+#     make build                 every optional feature — the shell as it is meant to be used
+#     make build TYPE=minimal    none of them — the floor, and what a distribution wants for /bin/sh
+#
+# `--all-features` means what it says here and nothing more, because nothing in this workspace has
+# a feature that exists to serve tests: the two that did are ordinary `pub` items now, reachable by
+# `cargo test` across crates and dropped from the binary by the linker because nothing else calls
+# them. A build flag should never decide whether test scaffolding ships.
+BUILD_FEATURES := --all-features
+ifeq ($(TYPE),minimal)
+    BUILD_FEATURES :=
+endif
+
 build:
-	@RUSTFLAGS="$(STATIC_RUSTFLAGS)" $(CARGO) build --release --target $(TARGET) --bin $(PROJECT_NAME)
+	@RUSTFLAGS="$(STATIC_RUSTFLAGS)" $(CARGO) build --release --target $(TARGET) --bin $(PROJECT_NAME) $(BUILD_FEATURES)
 	@$(MAKE) --no-print-directory check-static
 	@ls -l "$(BIN)" | awk '{printf "%s  %.2f MB\n", $$NF, $$5/1048576}'
 
@@ -126,13 +145,18 @@ check-loc:
 check-readme:
 	@./scripts/check-readme.sh
 
-# The `[features]` section this note used to wait for now exists — `ssh`, off by default — so the
-# feature *is* built by the gate: `clippy` already runs `--all-features`, which compiles `maki` and
-# everything under it. `check-all` is kept for running that alone.
+# Both optional features — `ssh` and `vista` — are *compiled* by the gate, because `clippy` and
+# `rustdoc` run `--all-features`. `check-all` is kept for running that alone.
 #
-# `verify` still runs plain `check` and `test`, which is deliberate: the shipped artifact is the
+# `verify` still runs plain `check` and `test`, which is deliberate: the *published* artifact is the
 # default build, and a gate that only ever exercised `--all-features` would stop testing the thing
-# people actually get. The feature is compiled, not tested — it has nothing to test yet.
+# people download.
+#
+# **`vista` has tests that plain `verify` does not run**, unlike `ssh`, which has nothing to test
+# yet. They are one command, and worth it before touching the model or the editor's hint path:
+#
+#     PATH=/tmp/realbash:$PATH cargo test --features vista --all-targets $(OURS)
+#
 # The VMs are deliberately *not* in `verify`: each needs a musl toolchain, qemu and the network,
 # and takes minutes. They answer questions a checkout cannot — whether the release artifact runs as
 # PID 1 on a foreign userland, and whether a distro's own init system runs on it.
@@ -200,6 +224,7 @@ help:
 	@echo "  test         Run all tests"
 	@echo "  test-terminal Run terminal PTY transcript tests"
 	@echo "  check        Run cargo check on all targets"
+	@echo "  build        Static release, all features (TYPE=minimal for none)"
 	@echo "  check-all    Run cargo check on all targets/all features"
 	@echo "  test-all     Run cargo test on all targets/all features"
 	@echo "  clippy       Run clippy with warnings denied"

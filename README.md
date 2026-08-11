@@ -10,6 +10,14 @@ oslo build.lua             # a Lua script — same command, no flag
 oslo -c 'echo hello'       # run a command
 ```
 
+<!-- demo:begin -->
+[![oslo](https://asciinema.org/a/1262743.svg)](https://asciinema.org/a/1262743)
+<!-- demo:end -->
+
+Rows on the pipe, two languages at one prompt, a shell that learns what you run — and knows what you
+meant. Every feature has its own recording in [docs/features](docs/features/), each made by a script
+in [scripts/demo](scripts/demo/) so it can be made again after the code changes.
+
 ---
 
 ## Two languages, one prompt
@@ -59,10 +67,10 @@ Structure flows only between two stages that **both** declare they understand it
 that can carry a declaration is one oslo invented. A script written before oslo existed cannot name
 one, so every edge in it plans to bytes.
 
-That is not a promise, it is a build failure: `tests/posix_stays_on_the_byte_path.rs` runs all 408
+That is not a promise, it is a build failure: `tests/posix_stays_on_the_byte_path.rs` runs all 416
 corpus scripts and requires zero structured edges. There is no new pipe operator either — `a |> b`
 is already valid POSIX, so the operator would itself be the hazard. Design:
-`docs/research/dual-channel-pipe.md`.
+`docs/features/structured-pipelines.md`.
 
 ## The prompt
 
@@ -197,7 +205,7 @@ is what makes a cache unnecessary, and a cache stale between two terminals impos
 
 ### Colours
 
-Every one of the 54 roles — 22 syntax, 19 dropdown, 7 prompt, 5 widget — is settable, and each
+Every one of the 54 roles — 23 syntax, 19 dropdown, 7 prompt, 5 widget — is settable, and each
 takes an index or an RGB triplet:
 
 ```lua
@@ -235,6 +243,79 @@ so switching it on cannot push a candidate you actually prefixed down the list.
 because that is the only thing it can honestly be: the editor draws a hint as text appended after
 the cursor, so a suggestion that *replaces* your line cannot be shown as one without lying about
 what pressing a key will do.
+
+## What you were about to type
+
+**Behind `--features vista`, and off by default.** A default build suggests from history,
+completions and `$PATH` — everything below this line needs the flag, which costs 433 KB:
+
+```sh
+cargo build --release --features vista
+```
+
+```lua
+oslo.suggest.sources = { "predict", "history", "path" }
+```
+
+`predict` is a model of what *this* shell does, learned from the commands you have actually run and
+kept as a small file beside the history. It reads in a tenth of a millisecond at startup and is
+written once on the way out, so it costs the prompt nothing. A session that keeps no history
+(`HISTFILE=""`) neither reads it nor writes it, and `oslo history clear` deletes it.
+
+## What you probably meant
+
+```
+$ systemclt status -> [systemctl] status
+```
+
+A line that looks mistyped is answered **before you run it**, and Right takes the correction. It is
+a different claim from the ghost suggestion and so it is drawn differently — one is text you might
+be about to have, the other is the shell disagreeing with text you already have. They never appear
+at once, and the same key accepts whichever is showing.
+
+**Only the words that changed are bracketed**, in the ghost's own colour reversed; the arrow and the
+words that were already right stay in the plain ghost grey. A correction shown whole makes you
+re-read the line to find the one character that moved.
+
+Two things know what you meant, and both are asked:
+
+- **`$PATH`**, for the command word. `lsvlk` is a misspelling of a real program whether or not it
+  has ever been typed here, so this works on a shell with no history at all.
+- **the model**, for the rest of the line. `echo hello wrold` needs something that has watched you
+  work, and only a proposal close enough to be a *retyping* is offered — a different command is a
+  prediction, not a correction.
+
+### And the one that already ran
+
+```
+$ git stauts --short
+$ <F4>
+$ git status --short
+```
+
+The correction you actually want is usually of a command you have **already run and watched fail** —
+by then it is not on the line to be fixed. `oslo.repair()` with no argument answers for that one:
+
+```lua
+oslo.keys["f4"] = function(line)
+  if line.text == "" then return oslo.repair() or "" end   -- the command that just failed
+  return oslo.repair(line.text) or line.text               -- the one being typed
+end
+oslo.theme = { syntax = { repair = { fg = "yellow", reverse = true } } }  -- follows the ghost otherwise
+```
+
+It lands in the editor like everything else here — oslo never re-runs a command for you.
+
+**Nothing here runs anything.** The correction lands on your input line and Enter is still yours,
+which is what makes a wrong guess cost a keystroke instead of a command. There are no rules to
+maintain either: a repair can only ever be built out of `$PATH` and commands you have really run.
+
+**Only a command that worked is learned.** A mistyped line inside the model is a command like any
+other, and repair for it goes quiet — which would break the case above, since you ask *after* the
+failure. It also means a typo is never suggested back to you.
+
+`oslo.predict.next(partial, n)` and `oslo.predict.repair(line, n)` ask the model directly, and both
+answer a list of `{ line, probability }`.
 
 ## Your own tools
 
@@ -353,7 +434,7 @@ The language is the real thing: pipelines, redirections including heredocs and h
 control flow, functions, `${var:-d}` and the rest of parameter expansion, arithmetic, globbing,
 field splitting, job control with proper process groups and `tcsetpgrp`.
 
-Correctness is measured rather than asserted. 408 scripts in `tests/corpus` run under both oslo and
+Correctness is measured rather than asserted. 416 scripts in `tests/corpus` run under both oslo and
 bash and are compared byte for byte, with known differences listed in
 `tests/differential/expected_fail.rs` as a two-way ratchet — the suite fails if a listed case starts
 passing, so a stale entry cannot survive. Unit and integration tests run alongside it.
@@ -519,7 +600,7 @@ oslo.misc.greeting      = nil         -- a line of your own instead of the banne
 oslo.misc.escape_delay  = 25          -- ms to wait for the rest of an escape sequence; raise on ssh
 oslo.misc.color_depth   = nil         -- truecolor / 256 / 16 / none, when detection is wrong
 
-oslo.vi.enabled         = true        -- vi mode; false for emacs only
+oslo.vi.enabled         = false       -- vi mode; true for vi, false for emacs only
 oslo.vi.cursor_insert   = "line"      -- block / line / underscore, each + " blink"
 oslo.vi.cursor_normal   = "block"
 oslo.vi.cursor_replace  = "underscore"
@@ -557,7 +638,7 @@ oslo.builtin.nav.padding_x  = 1
 oslo.builtin.nav.padding_y  = 0
 oslo.builtin.nav.hidden     = false
 oslo.builtin.nav.filter_at  = "bottom"   -- top / bottom
-oslo.builtin.nav.reverse    = true
+oslo.builtin.nav.reverse    = false
 oslo.builtin.nav.scanner    = true
 ```
 
@@ -943,6 +1024,42 @@ make verify       # fmt, line limits, README paths, tests, clippy, rustdoc — a
 make install      # to /usr/local/bin
 nix build         # static musl binary
 ```
+
+### Optional features
+
+Both are off *by default*, and off for the same reason: a shell that is going to be `/bin/sh`
+should carry what every session needs and nothing else. `make build` turns them on, because
+somebody building from source is asking for the shell rather than for the floor; the published
+release artifact is the default build.
+
+Measured on the static musl binary, against a 6,323,168-byte default:
+
+| feature | costs | brings |
+|---|---:|---|
+| `vista` | +433 KB | the model: `predict` as a suggestion source, `oslo.repair`, `oslo.predict.*`, and the correction drawn after a mistyped line |
+| `ssh` | **+0** | an SSH client — unfinished. Nothing reaches `src/ssh.rs` yet, so the linker discards `maki` and `tokio` whole and the binary is byte-for-byte the default one. It will cost about 0.6 MB the day something calls it |
+
+```sh
+make build                  # static release, every feature on
+make build TYPE=minimal     # static release, none of them
+```
+
+**There are no others**, and in particular none that exist to serve the test suite —
+`--all-features` turns on exactly the two above. Test-only helpers that other crates' tests need
+are ordinary `pub` items the linker drops from the binary, not features, because a build flag
+should never decide whether test scaffolding ships.
+
+A config is written to work either way, because a build without the feature simply does not have
+the name:
+
+```lua
+oslo.keys["f4"] = function(line)
+  return oslo.repair and oslo.repair(line.text) or line.text
+end
+```
+
+`oslo.suggest.sources` still *parses* `"predict"` without the feature — a config is shared between
+machines, and a source that cannot answer is skipped exactly like one that had nothing to say.
 
 Every `.rs` file is under 600 lines, enforced by `scripts/check-loc.sh`.
 

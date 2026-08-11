@@ -193,6 +193,36 @@ impl PtyShell {
         }
     }
 
+    /// Wait until `text` has appeared `times` times, not merely once.
+    ///
+    /// **[`Self::wait_for_text`] scans the whole transcript**, so waiting for something the shell
+    /// emits once per prompt returns instantly the second time you ask — the *first* prompt's copy
+    /// is still there. A test that then reads the transcript is really relying on a drain to
+    /// happen to catch the rest, which is a race: `vscode_selects_one_rich_lifecycle` passed on a
+    /// quiet machine for months and failed on a loaded CI runner, one prompt's marks short.
+    fn wait_for_text_count(&mut self, text: &str, times: usize) {
+        let deadline = Instant::now() + TIMEOUT;
+        while String::from_utf8_lossy(&self.transcript)
+            .matches(text)
+            .count()
+            < times
+        {
+            let remaining = deadline.saturating_duration_since(Instant::now());
+            assert!(
+                !remaining.is_zero(),
+                "timed out waiting for {times} of {text:?}: {:?}",
+                visible(&self.transcript)
+            );
+            match self.output.recv_timeout(remaining) {
+                Ok(bytes) => self.transcript.extend(bytes),
+                Err(error) => panic!(
+                    "pty ended before {times} of {text:?}: {error:?}: {}",
+                    visible(&self.transcript)
+                ),
+            }
+        }
+    }
+
     fn wait_for_plain_text(&mut self, text: &str) {
         let deadline = Instant::now() + TIMEOUT;
         loop {

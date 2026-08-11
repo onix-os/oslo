@@ -1,0 +1,23 @@
+# The prompt: five render keys, each a function of the same facts.
+cols 120
+rows 20
+speed 0.05
+
+# The configured prompt already reads the exit status: a failure marks it.
+run false
+wait 1.8
+
+# The prompt is a list of named pieces, not a string — replaced here at the prompt itself.
+run =oslo.prompt.left = { oslo.segment{name="dir", render=function(c) return {{text=c.cwd, style="prompt.cwd"}} end}, oslo.segment{name="git", render=function(c) return " "..(c.branch or "no repo").." ❯ " end} }
+wait 2.2
+
+# Both pieces are functions of the context: the branch is nil outside a work tree.
+run cd /etc
+wait 1.8
+run cd -
+wait 1.8
+
+# Unset both keys and oslo's own pair is underneath: user@host, vi mode and language on the
+# left, and on the right the branch and the directory, laid out at the edge.
+run =oslo.prompt.left, oslo.prompt.right = nil, nil
+wait 2.5

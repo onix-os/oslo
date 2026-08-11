@@ -94,6 +94,11 @@ pub(super) fn draw(
                 let safe = DisplayMap::new(&hint);
                 assist.paint_hint(safe.plain())
             })
+            // Only when there is no suggestion, which costs nothing to arrange: a continuation
+            // exists when what was typed is the *start* of something, and a repair exists when it
+            // is a near-miss of something. Drawing both would put two different futures for the
+            // same line in the same place.
+            .or_else(|| repair(session, assist))
             .unwrap_or_default()
     } else {
         String::new()
@@ -109,6 +114,18 @@ pub(super) fn draw(
         // next keystroke without a `SIGWINCH` handler to get wrong.
         cols: terminal_cols(),
     })
+}
+
+/// The correction, drawn after the line as ` -> [lsblk]` rather than appended to it.
+///
+/// The leading space is outside the styling and the arrow is inside it: the gap belongs to the line
+/// rather than to the annotation, and a reversed block that starts flush against the last character
+/// typed would read as part of that word.
+fn repair(session: &Session, assist: &mut dyn Assist) -> Option<String> {
+    let raw = session.buffer.text();
+    let fixed = assist.repair_text(&raw, session.buffer.cursor())?;
+    let safe = DisplayMap::new(&fixed);
+    Some(format!(" {}", assist.paint_repair(&raw, safe.plain())))
 }
 
 pub(super) fn into_at(placed: &layout::Placed) -> screen::At {

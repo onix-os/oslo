@@ -28,6 +28,8 @@ pub mod feature;
 mod fs;
 mod json;
 mod path;
+#[cfg(feature = "vista")]
+mod predict;
 mod proc;
 pub(crate) mod prompt;
 mod re;
@@ -64,6 +66,14 @@ pub fn install(interp: &Rc<Interp>, registry: &Registry, env: Arc<Mutex<Environm
     oslo.set(Value::str("path"), paths);
     prompt::install(&mut oslo, &mut ui, registry);
     tool::install(&mut oslo);
+    // `oslo.predict.*`, `oslo.repair` and `oslo.last_failed` exist only in a build that has the
+    // model. A config guards on them the way it guards on any other optional surface:
+    //   if oslo.repair then … end
+    #[cfg(feature = "vista")]
+    {
+        oslo.set(Value::str("predict"), predict::build());
+        predict::install(&mut oslo, &env);
+    }
     // The settings tables exist before the config runs, empty, so that
     // `oslo.completion.max_rows = 5` is an assignment rather than an attempt to index nil. Every
     // one of these is read back after the config by walking the table, so an empty one that the

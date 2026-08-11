@@ -225,6 +225,27 @@ impl Assist for ShellAssist<'_> {
             .unwrap_or_else(|| text.to_string())
     }
 
+    // Without the model there is nothing to correct a line *to*, so the editor's default applies:
+    // `repair_text` answers `None` and nothing is ever drawn after the line. The keys keep their
+    // ordinary meanings, because `take_repair` is only reached when this returns something.
+    #[cfg(feature = "vista")]
+    fn repair_text(&mut self, line: &str, cursor: usize) -> Option<String> {
+        let helper = self.helper?;
+        // At the end of the line only, like the suggestion: a correction offered while the cursor
+        // is mid-word is about a line the user has not finished saying.
+        if cursor < line.chars().count() {
+            return None;
+        }
+        helper.repair(line)
+    }
+
+    #[cfg(feature = "vista")]
+    fn paint_repair(&mut self, typed: &str, fixed: &str) -> String {
+        self.helper
+            .map(|helper| helper.paint_repair(typed, fixed))
+            .unwrap_or_else(|| fixed.to_string())
+    }
+
     /// Tab. Runs the whole interaction — the dropdown draws itself and takes its own keys — and
     /// answers with the line it produced.
     fn complete(

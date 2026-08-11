@@ -6,6 +6,7 @@ rust-version = "1.89"
 license = "MIT"
 description = "The bottom of oslo: the syntax tree, the error type, feature bits, the hook registry, and the tracking store."
 
+
 [dependencies]
 # The interpreter, for the two things down here that carry a Lua value: `ShellError::Lua` and the
 # payload a hook is fired with. Both point downward — this crate names the Lua *evaluator*, never
@@ -15,6 +16,26 @@ oslo-lua = { path = "../oslo-lua" }
 # `track` only. All engine access stays behind `track::kv`.
 tagdata = { git = "https://github.com/robolibs/tagdata", tag = "0.1.3", features = ["maintenance"] }
 getrandom = "0.4"
+# The predictor behind command prediction and repair. Pure Rust with no dependencies of its own,
+# which is why it can be here at the bottom of the stack beside the history it reads.
+#
+# **Two of its four default features, and the two it does not get are measured rather than
+# guessed.** On the static musl binary, against a 6,327,232-byte baseline: the crate itself costs
+# 296 KB, `snapshot` 8 KB, `recent-cache` 36 KB, `surface-indexes` 100 KB and `explanations` 4 KB.
+# `snapshot` is what keeps the model off the startup path and `recent-cache` is what makes a
+# prediction follow what you are doing now, so both earn their bytes. `surface-indexes` only
+# changes candidate generation inside `predict_aligned`, which is repair — nothing calls it yet,
+# and 100 KB is too much to pay in advance of measuring what it buys — Phase 3 measured it and it
+# still did not earn them. `explanations` answers why a prediction was made, which is a question a
+# debugging tool asks and a ghost suggestion does not.
+#
+# **A commit, not a branch**, so a push upstream cannot change what oslo builds without an edit
+# here. Named `vista` locally while the package is `vista-recall`, which is what keeps every
+# `use vista::…` in this crate reading the way it did when the crate had one name.
+vista = { package = "vista-recall", git = "https://github.com/bresilla/vista", rev = "8ec5fa733de21f9aa21bda280241d4d638e27860", optional = true, default-features = false, features = [
+    "snapshot",
+    "recent-cache",
+] }
 sha2 = "0.10"
 
 # `track`'s query matching. Trimmed to the same feature set the shell uses, and for the same
@@ -28,9 +49,13 @@ regex = { version = "1", default-features = false, features = [
 nix = { version = "0.29", features = ["hostname"] }
 
 [features]
+default = []
+# `vista` — the model behind ghost prediction and repair. Off, and the switch is here rather than
+# in the shell because this is where the crate it needs is named: without the feature
+# `vista-recall` is not compiled, not fetched, and not in the binary.
+vista = ["dep:vista"]
 # Exposes the lock and the reset that serialise tests touching the process-wide feature bitset.
 # Enabled by `oslo`'s dev-dependencies, so it is absent from any build that is not a test.
-testing = []
 
 [dev-dependencies]
 tempfile = "3.17"

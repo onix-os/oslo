@@ -34,10 +34,12 @@ which = "7.0"
 
 [dev-dependencies]
 tempfile = "3.17"
-oslo-base = { path = "../oslo-base", features = ["testing"] }
+oslo-base = { path = "../oslo-base" }
 
 [features]
 # Exposes `theme::held_at`, the guard that serialises tests asserting on colour escapes. The depth
 # is one slot for the whole process and the tests that touch it are not all in this crate, so
 # `cfg(test)` — which is set only while *this* crate's tests compile — cannot reach them all.
-testing = []
+# `vista` — the model-backed ghost prediction and the repair hint drawn after the line. Off by
+# default; without it the ghost comes from history, completions and paths alone.
+vista = ["oslo-base/vista"]

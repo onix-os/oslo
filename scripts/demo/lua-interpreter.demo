@@ -1,0 +1,34 @@
+# The Lua interpreter: Lua 5.4 written in Rust, inside the shell binary.
+cols 120
+rows 20
+speed 0.05
+
+run # one binary: a shell, and Lua 5.4
+wait 0.6
+
+# `=` sends one line to Lua and leaves the prompt in shell.
+run =for i = 1, 3 do print("tick " .. i) end
+wait 1.8
+clear
+
+# Shift-Tab switches the prompt itself: sh becomes lua.
+key BTab
+wait 1.2
+
+# A table, iterated in insertion order.
+run for k, v in pairs{ lang = "lua", ver = 5.4 } do print(k, v) end
+wait 1.8
+
+# oslo.fs and oslo.path are the shell reached from Lua; :upper() is the stdlib.
+run for _, f in ipairs(oslo.fs.glob("src/*.rs")) do print(oslo.path.stem(f):upper()) end
+wait 2.0
+
+# One namespace, two spellings: `!` runs a shell line from the Lua prompt.
+run greeting = "hello from Lua"
+wait 0.6
+run !echo $greeting
+wait 2.2
+
+# Back to shell, same session, same binary.
+key BTab
+wait 1.0

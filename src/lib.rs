@@ -15,6 +15,8 @@
 //! while the code behind them lives where the compiler can check that it only reaches downward.
 //! Nothing is implemented here.
 
+#[cfg(feature = "vista")]
+pub use oslo_base::predict;
 /// The bottom of the stack: the syntax tree, the error type, the feature bits, the hook registry
 /// and the tracking store.
 pub use oslo_base::{ast, error, feature, hooks, nesting, track};

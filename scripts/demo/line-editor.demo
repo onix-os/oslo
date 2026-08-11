@@ -1,0 +1,45 @@
+# The line editor: oslo's own buffer and keymap, not readline's.
+cols 120
+rows 20
+speed 0.06
+
+# Graphemes: a flag, a ZWJ family and a keycap are one character each.
+run # one backspace, one grapheme
+wait 0.6
+type echo 🇯🇵👨‍👩‍👧‍👦1️⃣
+wait 1.4
+key BSpace
+wait 1.0
+key BSpace
+wait 1.0
+key BSpace
+wait 1.2
+key C-u
+wait 0.5
+
+# Both readline words: M-DEL takes one run, C-w takes the whole path.
+run # alt-backspace, then ctrl-w
+wait 0.6
+type wc -l /opt/vendor/tools
+wait 1.2
+key M-BSpace
+wait 1.2
+key C-w
+wait 1.1
+type src/*.rs
+wait 0.5
+key Enter
+wait 1.2
+
+# C-a, and the insert lands at the front of the line.
+run # ctrl-a, then type
+wait 0.6
+type src/parser.rs
+wait 1.0
+key C-a
+wait 0.7
+type head -n 2
+key Space
+wait 0.9
+key Enter
+wait 1.4

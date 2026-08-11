@@ -43,5 +43,5 @@ sha2 = "0.10"
 tempfile = "3.17"
 
 [dev-dependencies]
-oslo-base = { path = "../oslo-base", features = ["testing"] }
-oslo-ui = { path = "../oslo-ui", features = ["testing"] }
+oslo-base = { path = "../oslo-base" }
+oslo-ui = { path = "../oslo-ui" }
