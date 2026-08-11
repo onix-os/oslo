@@ -25,7 +25,7 @@
 //! more config read, once, when a tab is made; that is the right price for not shipping a deadlock
 //! that appears under load.
 
-use super::{client, detach, keeper, name as naming, store};
+use super::{client, detach, dir, keeper, name as naming, store};
 use oslo_ui::ask::{Answer, Choice, Pick, pick_or_create};
 use std::io;
 
@@ -44,6 +44,10 @@ pub enum Went {
 /// client can exit. Everything in between — attaching, the key being pressed again inside, moving
 /// to another tab — happens in the loop.
 pub fn open(key: &str, replay: u64) -> io::Result<Went> {
+    // **Before anything reads or writes there.** Listing touches the directory and so does asking
+    // whether a name is alive — which creates its lock file. A check that ran later would have
+    // already left a file in a directory it was about to refuse.
+    dir::open_checked()?;
     let detach = detach::Key::named(key);
     let mut went = Went::Nowhere;
     let mut next = ask(None)?;

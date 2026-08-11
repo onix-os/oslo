@@ -71,12 +71,17 @@ pub fn spawn(name: &str, cap: u64) -> io::Result<Role> {
     // taken before any of oslo's warm threads start.
     match unsafe { fork() }.map_err(errno)? {
         ForkResult::Parent { child } => Ok(Role::Caller(child)),
-        ForkResult::Child => match keep(name, cap)? {
+        ForkResult::Child => match keep(name, cap) {
             // The grandchild: the caller of `spawn` continues here as the shell.
-            Role::Inside => Ok(Role::Inside),
+            Ok(Role::Inside) => Ok(Role::Inside),
             // The keeper has finished serving, which means the tab is over. It must never return
             // to the caller's stack — from here it is a process that only looked like one.
-            Role::Caller(_) => std::process::exit(0),
+            Ok(Role::Caller(_)) => std::process::exit(0),
+            // **And the same is true of a keeper that never started.** Propagating with `?` sent
+            // the error up through the *child's* copy of the caller's stack, so a keeper that
+            // could not bind its socket left behind a second shell — stdio already on `/dev/null`,
+            // reporting the failure to nobody. Only the parent's error is anybody's to see.
+            Err(_) => std::process::exit(1),
         },
     }
 }
