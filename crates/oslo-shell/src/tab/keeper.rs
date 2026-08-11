@@ -152,7 +152,7 @@ fn keep(name: &str, cap: u64) -> io::Result<Role> {
 ///
 /// The shell inside gets the pty a moment later and overwrites its own, so this is only ever about
 /// the keeper — which has nothing to say to anybody and must not hold open what it inherited.
-fn detach_stdio() {
+pub(super) fn detach_stdio() {
     let Ok(null) = std::fs::OpenOptions::new()
         .read(true)
         .write(true)

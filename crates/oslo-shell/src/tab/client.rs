@@ -38,9 +38,16 @@ pub enum Left {
 /// The terminal is put in raw mode for the duration and put back however this returns, including
 /// when it returns an error: a proxy that left a terminal raw would leave a shell that cannot be
 /// typed into.
-pub fn attach(name: &str, detach: detach::Key, replay: u64) -> io::Result<Left> {
+pub fn attach(
+    mut socket: UnixStream,
+    name: &str,
+    detach: detach::Key,
+    replay: u64,
+) -> io::Result<Left> {
+    // **The log is read from the file, not asked for over the socket**, which is what lets the two
+    // backends share this: with a daemon in the way the bytes come through it, but the log is still
+    // a file in the same directory, written by the same keeper.
     let paths = store::Paths::new(name);
-    let mut socket = connect(name)?;
 
     let stdin = io::stdin();
     let restore = Raw::take(stdin.as_fd())?;
@@ -67,11 +74,10 @@ pub fn attach(name: &str, detach: detach::Key, replay: u64) -> io::Result<Left> 
 /// keeper binds its socket a few syscalls later — so a caller that made a tab and attached to it in
 /// the same breath would fail against one that is perfectly healthy. Retrying briefly is the
 /// difference; a tab that is genuinely not there fails just as surely, only a moment later.
-fn connect(name: &str) -> io::Result<UnixStream> {
-    let path = store::Paths::new(name).sock();
+pub fn connect(path: &std::path::Path, name: &str) -> io::Result<UnixStream> {
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
     loop {
-        match UnixStream::connect(&path) {
+        match UnixStream::connect(path) {
             Ok(socket) => return Ok(socket),
             Err(err) if std::time::Instant::now() >= deadline => {
                 return Err(io::Error::other(format!("{name}: {err}")));

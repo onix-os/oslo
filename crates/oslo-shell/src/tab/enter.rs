@@ -25,7 +25,7 @@
 //! more config read, once, when a tab is made; that is the right price for not shipping a deadlock
 //! that appears under load.
 
-use super::{client, detach, dir, keeper, name as naming, store};
+use super::{backend, client, detach, dir, keeper, name as naming};
 use oslo_ui::ask::{Answer, Choice, Pick, pick_or_create};
 use std::io;
 
@@ -48,21 +48,22 @@ pub fn open(key: &str, replay: u64) -> io::Result<Went> {
     // whether a name is alive — which creates its lock file. A check that ran later would have
     // already left a file in a directory it was about to refuse.
     dir::open_checked()?;
+    // Read once, here, so a session cannot end up half in one backend and half in the other
+    // because the setting changed while a tab was attached.
+    let tabs = backend::current(oslo_ui::settings::current().tab.daemon);
     let detach = detach::Key::named(key);
     let mut went = Went::Nowhere;
-    let mut next = ask(None)?;
+    let mut next = ask(&*tabs, None)?;
 
     while let Some(name) = next {
-        if !store::alive(&name) {
-            make(&name)?;
-        }
+        tabs.ensure(&name)?;
         went = Went::ThereAndBack;
-        match client::attach(&name, detach, replay)? {
+        match client::attach(tabs.connect(&name)?, &name, detach, replay)? {
             // The shell inside exited, so there is nothing to go back to and nothing to ask about.
             client::Left::Ended => return Ok(went),
             // The key, pressed inside. The finder opens on the terminal the client has just handed
             // back, and Esc here means leave — which is the one thing it cannot mean outside.
-            client::Left::Detached => next = ask(Some(&name))?,
+            client::Left::Detached => next = ask(&*tabs, Some(&name))?,
         }
     }
     Ok(went)
@@ -73,8 +74,8 @@ pub fn open(key: &str, replay: u64) -> io::Result<Went> {
 /// `inside` is the tab the question is being asked from, which **is listed like any other**: going
 /// back into the one you are in has to be possible, or the key is a trap for anybody who pressed it
 /// by accident.
-fn ask(inside: Option<&str>) -> io::Result<Option<String>> {
-    let running: Vec<String> = store::list()?.into_iter().map(|(name, _)| name).collect();
+fn ask(tabs: &dyn backend::Tabs, inside: Option<&str>) -> io::Result<Option<String>> {
+    let running = tabs.list()?;
     let spec = Choice {
         header: match inside {
             Some(name) => format!("tab · in {name}"),
@@ -101,27 +102,33 @@ fn ask(inside: Option<&str>) -> io::Result<Option<String>> {
     })
 }
 
-/// Make a tab, and become the shell inside it if that is which process this turns out to be.
-fn make(name: &str) -> io::Result<()> {
-    match keeper::spawn(name, oslo_ui::settings::current().tab.log_bytes)? {
+/// Carry on as the caller, or — in the process that turned out to be the shell — become one.
+pub(super) fn become_shell_or(role: keeper::Role, name: &str) -> io::Result<()> {
+    match role {
         keeper::Role::Caller(_) => Ok(()),
-        keeper::Role::Inside => {
-            // `/proc/self/exe` rather than `$SHELL` or a name on `$PATH`: a tab is an oslo, and the
-            // one that made it is the one to run.
-            // SAFETY: a fresh fork about to `exec` — single-threaded, and nothing else can be
-            // reading the environment while it is written.
-            unsafe { std::env::set_var(INSIDE, name) };
-            let me = std::ffi::CString::new("/proc/self/exe").unwrap_or_default();
-            let argv = [
-                std::ffi::CString::new("oslo").unwrap_or_default(),
-                std::ffi::CString::new("-i").unwrap_or_default(),
-            ];
-            let _ = nix::unistd::execv(&me, &argv);
-            // Only reached if the exec failed, and this process must never return into the caller
-            // and start behaving like the shell that made it.
-            std::process::exit(127)
-        }
+        keeper::Role::Inside => exec_inside(name),
     }
+}
+
+/// Become the shell inside a tab. Never returns.
+///
+/// The environment is marked here rather than by the caller, so every path into a tab agrees on
+/// what `$TAB` says.
+pub(super) fn exec_inside(name: &str) -> ! {
+    // SAFETY: a fresh fork about to `exec` — single-threaded, and nothing else can be reading the
+    // environment while it is written.
+    unsafe { std::env::set_var(INSIDE, name) };
+    // `/proc/self/exe` rather than `$SHELL` or a name on `$PATH`: a tab is an oslo, and the one
+    // that made it is the one to run.
+    let me = std::ffi::CString::new("/proc/self/exe").unwrap_or_default();
+    let argv = [
+        std::ffi::CString::new("oslo").unwrap_or_default(),
+        std::ffi::CString::new("-i").unwrap_or_default(),
+    ];
+    let _ = nix::unistd::execv(&me, &argv);
+    // Only reached if the exec failed, and this process must never return into the caller and
+    // start behaving like the shell that made it.
+    std::process::exit(127)
 }
 
 /// The variable a shell inside a tab is marked with.
