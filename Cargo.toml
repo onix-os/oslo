@@ -66,6 +66,15 @@ scratch = ["oslo-shell/scratch", "oslo-runtime/scratch"]
 # reading, and no dev shell import — `cd` is `cd`.
 direnv = ["oslo-shell/direnv", "oslo-runtime/direnv"]
 
+# `nix` — a Nix dev shell, imported without entering one.
+#
+# **Independent of `direnv`, on purpose.** Today the only way in is a directory file asking for it,
+# but nothing about reading `nix print-dev-env` needs a directory file — and the things worth adding
+# next (flake-output completion, a prompt segment naming the shell you are in) need one even less.
+# Where the two meet — `use flake` in an `.envrc`, `oslo.direnv.nix_develop` in a `.env.lua` — the
+# entry point asks for both.
+nix = ["oslo-shell/nix", "oslo-runtime/nix"]
+
 [dependencies]
 # A fork of `makiko`, the one pure-Rust SSH client — no `cc`, no `ring`, no `-sys` crate that is
 # really C. Forked rather than depended on because upstream was last touched in March 2025, and a

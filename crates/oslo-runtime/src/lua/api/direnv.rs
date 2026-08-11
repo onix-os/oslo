@@ -16,13 +16,18 @@
 
 use super::util::{put, text};
 use oslo_lua::{LuaError, Table, Value};
-use oslo_shell::direnv::{devshell, stdlib};
+use oslo_shell::direnv::stdlib;
 use oslo_shell::env::Environment;
+#[cfg(feature = "nix")]
+use oslo_shell::nix_shell as devshell;
 use std::sync::{Arc, Mutex};
 
 /// Build the `oslo.direnv` table.
 pub fn build(env: &Arc<Mutex<Environment>>) -> Value {
     let mut it = Table::new();
+    // `oslo.direnv.nix_develop` is the seam: a directory file asking for a dev shell. It needs
+    // both halves, and a build with only one of them simply does not offer the name.
+    #[cfg(feature = "nix")]
     nix_develop(&mut it, env);
     path_add(&mut it, env);
     Value::table(it)
@@ -53,6 +58,7 @@ fn path_add(it: &mut Table, env: &Arc<Mutex<Environment>>) {
     });
 }
 
+#[cfg(feature = "nix")]
 fn nix_develop(it: &mut Table, env: &Arc<Mutex<Environment>>) {
     let env = Arc::clone(env);
     put(it, "nix_develop", move |_, args| {

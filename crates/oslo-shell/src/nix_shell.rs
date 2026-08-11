@@ -140,11 +140,19 @@ fn shell_quote(word: &str) -> String {
 /// directory, so arriving in a subdirectory of a project scattered a `.direnv` into whichever
 /// directory the shell happened to be standing in — and the profile written there was a different
 /// GC root each time.
+/// **Asked of `direnv` when there is one, and only then.** A project's root is the directory
+/// holding the rc file, which is a `direnv` idea — in a build without it there is no rc file to
+/// own anything, so the working directory is the honest answer and the only one available.
 fn root() -> PathBuf {
     let here = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
-    super::find::applicable(&here)
-        .and_then(|rc| super::find::owner(&rc))
-        .unwrap_or(here)
+    #[cfg(feature = "direnv")]
+    {
+        crate::direnv::find::applicable(&here)
+            .and_then(|rc| crate::direnv::find::owner(&rc))
+            .unwrap_or(here)
+    }
+    #[cfg(not(feature = "direnv"))]
+    here
 }
 
 /// The profile path, created if it is not there, under the project's `.direnv`.
