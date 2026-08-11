@@ -58,30 +58,34 @@ fn nix_develop(it: &mut Table, env: &Arc<Mutex<Environment>>) {
     put(it, "nix_develop", move |_, args| {
         // `oslo.direnv.nix_develop()` means this directory's flake; a string names another installable,
         // exactly as `use flake ..#other` does. A table asks for options.
-        let (forwarded, hook) = match args.first() {
+        let (forwarded, want) = match args.first() {
             Some(Value::Str(_)) => (
                 vec![text(&args, 1, "oslo.direnv.nix_develop")?.to_string()],
-                false,
+                devshell::Want::default(),
             ),
-            // `nix_develop{ hook = true }`, and optionally the installable beside it.
+            // `nix_develop{ hook = true, functions = true }`, and optionally the installable.
             Some(Value::Table(options)) => {
                 let options = options.borrow();
                 let named = match options.get(&Value::str("flake")) {
                     Value::Str(name) => vec![name.to_string()],
                     _ => Vec::new(),
                 };
+                let on = |key: &str| matches!(options.get(&Value::str(key)), Value::Bool(true));
                 (
                     named,
-                    matches!(options.get(&Value::str("hook")), Value::Bool(true)),
+                    devshell::Want {
+                        hook: on("hook"),
+                        functions: on("functions"),
+                    },
                 )
             }
             // Nothing named: `print-dev-env` resolves this directory's flake by itself, which is
             // what a bare `use flake` relies on too.
-            _ => (Vec::new(), false),
+            _ => (Vec::new(), devshell::Want::default()),
         };
         let count = {
             let mut guard = crate::lua::engine::borrow_env(&env)?;
-            devshell::apply_with(&mut guard, &forwarded, hook)
+            devshell::apply_with(&mut guard, &forwarded, want)
                 .map_err(|e| LuaError::new(format!("oslo.direnv.nix_develop: {e}")))?
         };
         Ok(vec![Value::Number(oslo_lua::Number::Int(count as i64))])

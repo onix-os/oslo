@@ -155,6 +155,43 @@ It runs **after** the variables are set, because a hook is written expecting the
 entering — and through oslo rather than through bash, so the `$PATH` it sees is the one the caller
 will have.
 
+### The functions, which are the other half of a dev shell
+
+`print-dev-env --json` has **two** top-level keys, and `variables` is the smaller one. For an
+ordinary flake:
+
+| | count |
+|---|---|
+| `variables`, `exported` — imported | 93 |
+| `variables`, `var` / `array` — dropped | 32 / 22 |
+| **`bashFunctions`** | **110** |
+
+Those 110 are stdenv's build system: `genericBuild`, `runHook`, every `*Phase`,
+`substituteInPlace`, `patchShebangs`, `moveToOutput`, the `nix*Log` family. Without them a dev shell
+is a set of paths; with them it is somewhere you can build.
+
+```lua
+oslo.direnv.nix_develop{ functions = true }
+```
+
+All 110 **parse**. Not all of them **run**, and the split is worth knowing before turning this on:
+
+| | of 110 | why |
+|---|---|---|
+| work today | **57** | plain text and control flow |
+| need bash arrays | 26 | `local -a`, `+=( )`, `${x[@]}` |
+| need `${!var}` | 14 | indirect expansion |
+| need both | 13 | `runHook` is one of these |
+
+So `printWords`, `stripHash`, `concatStringsSep` and fifty-odd others work, while `runHook` answers
+`${hooksSlice+"${!hooksSlice}"}: bad substitution` and `substituteInPlace` stops at `local -a`.
+Arrays are a shape a POSIX environment does not have, so closing that gap is a change to the shell
+rather than to this module.
+
+Defined **before** `shellHook`, since a hook calling `runHook` or `addToSearchPath` is ordinary.
+One `eval` for all of them rather than 110 — 40 ms for 66 KB in a debug build, which is the whole
+cost of the option.
+
 ### While it runs
 
 Output is captured to a temporary file so it can be printed under the line naming the rc file — a

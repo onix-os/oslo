@@ -119,6 +119,64 @@ pub fn exported_from(json: &str) -> Result<Vec<(String, String)>, String> {
     Ok(out)
 }
 
+/// The shell functions a dev shell defines, from `nix print-dev-env --json`.
+///
+/// **A separate top-level key from `variables`**, which is easy to miss and was: `bashFunctions`
+/// held 110 entries for one ordinary flake while oslo read none of them. They are stdenv's build
+/// system — `genericBuild`, `runHook`, every `*Phase`, `substituteInPlace`, `patchShebangs` — and
+/// without them a dev shell is a set of paths rather than a place you can build in.
+///
+/// The value is the body alone: no name, no braces, leading newline. Reconstructing the definition
+/// is this function's whole job, and getting it wrong is silent — a body pasted without braces
+/// parses as a *list of commands* that then runs on import.
+fn functions_from(json: &str) -> Result<Vec<(String, String)>, String> {
+    let parsed: serde_json::Value = serde_json::from_str(json).map_err(|e| e.to_string())?;
+    let Some(functions) = parsed.get("bashFunctions").and_then(|v| v.as_object()) else {
+        // An older nix, or a shell with none. Not an error: there is simply nothing to define.
+        return Ok(Vec::new());
+    };
+    let mut out: Vec<(String, String)> = functions
+        .iter()
+        .filter(|(name, _)| usable_name(name))
+        .filter_map(|(name, body)| Some((name.clone(), body.as_str()?.to_string())))
+        .collect();
+    out.sort();
+    Ok(out)
+}
+
+/// Whether a name can be a shell function's here.
+///
+/// nix emits what bash accepted, and bash accepts names oslo's parser will not — `-` and `.` among
+/// them, from packages that define `pkg-config_hook`-shaped helpers. One that cannot be defined is
+/// skipped rather than allowed to fail the whole import.
+fn usable_name(name: &str) -> bool {
+    !name.is_empty()
+        && !name.starts_with(|c: char| c.is_ascii_digit())
+        && name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == ':')
+}
+
+/// Define them all in one pass.
+///
+/// **One `eval` rather than 110**, because each is a parse and this runs on arrival in a directory.
+/// Measured at 40 ms for 66 KB in a debug build, which is the whole of what this feature costs.
+fn define(env: &mut Environment, functions: &[(String, String)]) -> Result<(), String> {
+    if functions.is_empty() {
+        return Ok(());
+    }
+    let mut source = String::new();
+    for (name, body) in functions {
+        source.push_str(name);
+        source.push_str(" ()\n{\n");
+        source.push_str(body);
+        source.push_str("\n}\n");
+    }
+    crate::env::builtins::builtin_eval(env, &["eval".to_string(), "--".to_string(), source])
+        .map_err(|e| format!("defining the dev shell's functions: {e}"))?;
+    Ok(())
+}
+
 /// The dev shell's `PATH`, with everything of yours that it does not already have, behind it.
 ///
 /// **This is not our invention — it is a line `--json` cannot carry.** The bash form of
@@ -276,17 +334,26 @@ pub fn forget() {
 /// The one implementation, called by `use flake` from an `.envrc` and by
 /// `oslo.direnv.nix_develop()` from a `.env.lua`.
 pub fn apply(env: &mut Environment, args: &[String]) -> Result<usize, String> {
-    apply_with(env, args, false)
+    apply_with(env, args, Want::default())
 }
 
-/// The same, and then `shellHook` if `hook` asks for it.
+/// What a project wants out of the dev shell beyond its exported variables.
 ///
-/// **Off unless asked, because it is somebody else's script.** The variables a flake exports are
-/// data; `shellHook` is a bash program that runs on every entry to the directory — it can print,
-/// write files, start things. `nix develop` and nix-direnv run it and plain direnv does not; oslo
-/// sides with plain direnv by default and lets a project opt in, so that `cd` into a clone of
-/// somebody else's repository is not an invitation.
-pub fn apply_with(env: &mut Environment, args: &[String], hook: bool) -> Result<usize, String> {
+/// **Both are off by default, and for the same reason.** Variables are data; these two are code
+/// that somebody else wrote, run on every arrival in the directory. `nix develop` and nix-direnv
+/// give you them, plain direnv does not, and oslo sides with plain direnv until a project says
+/// otherwise — so that `cd` into a clone of a stranger's repository is not an invitation.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Want {
+    /// Run `shellHook` after the variables are set.
+    pub hook: bool,
+    /// Define the dev shell's shell functions — `runHook`, `buildPhase`, `substituteInPlace` and
+    /// the hundred or so others stdenv brings.
+    pub functions: bool,
+}
+
+/// The same as [`apply`], plus whatever `want` asks for.
+pub fn apply_with(env: &mut Environment, args: &[String], want: Want) -> Result<usize, String> {
     let json = match cached(args) {
         Some(remembered) => remembered,
         None => {
@@ -315,10 +382,17 @@ pub fn apply_with(env: &mut Environment, args: &[String], hook: bool) -> Result<
             env.set_var(&name, &keeping_yours(&value, &outer_path), true);
             continue;
         }
-        if hook && name == "shellHook" {
+        if want.hook && name == "shellHook" {
             script = Some(value.clone());
         }
         env.set_var(&name, &value, true);
+    }
+
+    // **Before the hook**, which is written expecting them: a `shellHook` that calls `runHook` or
+    // `addToSearchPath` is ordinary, and defining the functions afterwards would make that fail for
+    // no reason a reader could see.
+    if want.functions {
+        define(env, &functions_from(&json)?)?;
     }
     // **After the variables, not before.** The hook is written expecting the shell it is entering:
     // the flake's own `$MESHTASTIC_PROTO_DIR` and the rest have to be set for it to have anything
@@ -363,6 +437,39 @@ mod tests {
                        "C":{"type":"exported","value":"3"}}}"#;
         let got = exported_from(json).expect("parsed");
         assert_eq!(got, vec![("C".to_string(), "3".to_string())]);
+    }
+
+    /// The body arrives without a name and without braces. Pasting it as-is would not be a
+    /// definition at all — it would be a list of commands that runs the moment it is imported.
+    #[test]
+    fn a_function_is_rebuilt_from_a_bare_body() {
+        let json = r#"{"bashFunctions":{"runHook":"\n    local h=\"$1\";\n    return 0\n"}}"#;
+        let got = functions_from(json).expect("parsed");
+        assert_eq!(got.len(), 1);
+        assert_eq!(got[0].0, "runHook");
+        assert!(got[0].1.contains("local h="), "the body is kept verbatim");
+        assert!(!got[0].1.contains("runHook ()"), "the name is not in it");
+    }
+
+    /// An older nix, or a shell with no functions. Nothing to define is not a failure.
+    #[test]
+    fn no_functions_key_is_not_an_error() {
+        assert_eq!(
+            functions_from(r#"{"variables":{}}"#).expect("parsed"),
+            Vec::new()
+        );
+    }
+
+    /// bash accepts function names oslo's parser will not. One that cannot be defined is skipped
+    /// rather than allowed to fail the import of the other hundred.
+    #[test]
+    fn a_name_oslo_cannot_define_is_skipped() {
+        for bad in ["pkg-config_hook", "a.b", "9lives", ""] {
+            assert!(!usable_name(bad), "{bad:?} must be skipped");
+        }
+        for good in ["runHook", "_addToEnv", "ccWrapper_addCVars", "a:b"] {
+            assert!(usable_name(good), "{good:?} must be kept");
+        }
     }
 
     #[test]
