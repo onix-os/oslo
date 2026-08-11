@@ -29,6 +29,7 @@ use std::sync::{Arc, Mutex};
 mod editor;
 #[path = "notify.rs"]
 mod notify;
+mod precmd;
 
 use super::history::store::History;
 use editor::{publish_history, remember};
@@ -237,31 +238,6 @@ pub fn run_repl(login: bool) -> ! {
             }
             Input::Command { text, mode, secret } => {
                 eof_count = 0;
-                remember(&mut history, &text, secret);
-                if !secret {
-                    // Kept alongside the editor's own copy so a later language switch, which
-                    // refills that copy from scratch, still finds this line.
-                    remember_history(&text, mode);
-                }
-                // The id the line went into the log under, kept so that what it *did* can be
-                // joined to it once it has finished. `None` for a secret line or a shell with no
-                // store, both of which then record no outcome either.
-                let mut logged_as = None;
-                if let Some(db) = oslo_base::track::store()
-                    && !secret
-                {
-                    logged_as = db.append(
-                        &text,
-                        match mode {
-                            Mode::Lua => oslo_base::track::log::MODE_LUA,
-                            Mode::Shell => oslo_base::track::log::MODE_SHELL,
-                        },
-                    );
-                    // `$HISTSIZE` bounds the log as well as the editor's copy, or the file grows
-                    // without limit while the shell politely forgets. Amortised, because the trim
-                    // is a full scan and this used to be one per line typed.
-                    db.trim_soon(settings.max_size.max(1));
-                }
 
                 // Handed the command as typed, which is what a `precmd` hook is for: logging it,
                 // timing it, or setting a title from it.
@@ -281,35 +257,47 @@ pub fn run_repl(login: bool) -> ! {
                 // it from inside the handler would answer after any `cd` the last command did.
                 let before = current_directory();
                 let about = LuaEngine::command_started(&text, &before, mode.name());
-                // **`pre-cmd` may answer.** A string replaces the line; `false` cancels it. Only
-                // here, at a prompt — a script and `sh -c` never load a config, so no hook exists
-                // to change what they run.
-                let text = match crate::lua::engine::answer_hook_with(
-                    hooks::at::PRE_CMD,
-                    vec![about.clone()],
-                ) {
-                    Some(crate::lua::eval::value::Value::Bool(false)) => {
-                        // Cancelled. 130 is the status a line abandoned at the prompt already
-                        // reports, so nothing downstream needs a new case for this.
-                        last_status = 130;
-                        print!("{}", interaction.abort());
-                        let _ = std::io::Write::flush(&mut std::io::stdout());
-                        continue;
-                    }
-                    Some(crate::lua::eval::value::Value::Str(replacement)) => {
-                        replacement.to_string()
-                    }
-                    _ => text,
+                // The line as typed, kept because history records what you wrote rather than what a
+                // hook rewrote it into — and the rewrite happens two lines below.
+                let entered = text.clone();
+                // **`pre-cmd` may answer.** A string replaces the line; `false` cancels it; a table
+                // does either and may also decline to have the line written down. Only here, at a
+                // prompt — a script and `sh -c` never load a config, so no hook exists to change
+                // what they run.
+                let answer =
+                    crate::lua::engine::answer_hook_with(hooks::at::PRE_CMD, vec![about.clone()]);
+                let Some(answered) = precmd::read(answer, text) else {
+                    // Cancelled. 130 is the status a line abandoned at the prompt already
+                    // reports, so nothing downstream needs a new case for this.
+                    last_status = 130;
+                    print!("{}", interaction.abort());
+                    let _ = std::io::Write::flush(&mut std::io::stdout());
+                    continue;
                 };
+                let text = answered.text;
+                // **The veto joins the leading space rather than running beside it.** Every sink
+                // below already asks this one flag, so a hook declining to be recorded is the same
+                // condition by a second route — and cannot reach a sink the space does not, or miss
+                // one it does. See `precmd::write_down` for why the recording follows the hook.
+                let secret = secret || !answered.record;
+                let logged_as =
+                    precmd::write_down(&mut history, &entered, mode, secret, settings.max_size);
                 // The title says what is running while it runs, and goes back to the directory
                 // when the prompt returns. A row of tabs then says what each is *doing*.
-                announce(&oslo_ui::marks::title(
-                    &lua.render_with(
+                //
+                // **A hidden line is not put in the title either.** The title reaches the terminal,
+                // the multiplexer and whatever is drawing a tab bar — the same audience as the mark
+                // below, by a different route, and hiding one while announcing the other would be a
+                // hole in the same wall.
+                announce(&oslo_ui::marks::title(&if secret {
+                    "private command".to_string()
+                } else {
+                    lua.render_with(
                         "prompt.title",
                         &prompt::title_context(last_status, current, &text),
                     )
-                    .unwrap_or_else(|| title_for_command(&text)),
-                ));
+                    .unwrap_or_else(|| title_for_command(&text))
+                }));
                 // Everything after this belongs to the command, not to the prompt.
                 print!(
                     "{}",
@@ -317,6 +305,11 @@ pub fn run_repl(login: bool) -> ! {
                 );
                 let _ = std::io::Write::flush(&mut std::io::stdout());
                 let started = std::time::Instant::now();
+
+                // Held for exactly as long as the command runs. `set -x` is the one place a hidden
+                // line could still print its own arguments, and it prints them from inside
+                // execution rather than from here — so the decision has to travel with the command.
+                let quiet = secret.then(oslo_base::quiet::Quiet::enter);
 
                 let res = match mode {
                     // A Lua line leaves `$?` where it was unless it asked otherwise: `oslo.proc.exit`
@@ -380,6 +373,8 @@ pub fn run_repl(login: bool) -> ! {
                 // Beside `take_reload_request` above, and for the same reason it exists: a builtin
                 // leaves something behind and this carries it out.
                 crate::lua::engine::run_deferred_hooks();
+                // The command is over, so `set -x` belongs to whatever runs next.
+                drop(quiet);
 
                 // Where the command left the shell, for the tracker below.
                 //
@@ -408,7 +403,12 @@ pub fn run_repl(login: bool) -> ! {
                 if let Some(from) = oslo_shell::exec::pipeline::segments::resumable() {
                     eprintln!("oslo: chain stopped — resume with: {from}");
                 }
-                announce(&notify::slow_command_notice(&text, elapsed, &res));
+                // **A hidden line does not get a desktop notification either**, which would put the
+                // command in a popup and, on most desktops, in a notification history the shell
+                // does not own and cannot clear.
+                if !secret {
+                    announce(&notify::slow_command_notice(&text, elapsed, &res));
+                }
                 // **Fired whether the command succeeded or not.** It used to run only on `Ok`, so
                 // the hook was silent for exactly the commands a hook is most often installed to
                 // notice — a parse error, an `exit`, anything that did not return a status. A

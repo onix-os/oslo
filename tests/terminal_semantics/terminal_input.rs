@@ -135,8 +135,8 @@ fn startup_negotiates_sync_and_notifications_before_one_barrier() {
 fn completion_replays_the_character_that_dismisses_it() {
     let mut shell = PtyShell::spawn("xterm-256color");
     shell.wait_for_marks(2);
-    std::fs::write(shell._home.path().join("apple"), "").expect("apple");
-    std::fs::write(shell._home.path().join("apricot"), "").expect("apricot");
+    std::fs::write(shell.home.path().join("apple"), "").expect("apple");
+    std::fs::write(shell.home.path().join("apricot"), "").expect("apricot");
     shell.send(b"cat a\t");
     shell.wait_for_plain_text("apple");
     shell.send(b"x");
@@ -297,7 +297,7 @@ oslo.builtin.nav.scanner = false
 oslo.builtin.nav.height = 8
 "#;
     let mut shell = PtyShell::configured("xterm-256color", false, config);
-    let first = shell._home.path().join("first");
+    let first = shell.home.path().join("first");
     let second = first.join("second");
     std::fs::create_dir_all(&second).expect("create navigation tree");
     shell.wait_for_marks(2);
@@ -324,7 +324,7 @@ oslo.builtin.nav.fullscreen = false
 oslo.builtin.nav.scanner = false
 "#;
     let mut shell = PtyShell::configured("xterm-256color", false, config);
-    let target = shell._home.path().join("target");
+    let target = shell.home.path().join("target");
     std::fs::create_dir(&target).expect("create target");
     shell.wait_for_marks(2);
 
@@ -351,7 +351,7 @@ oslo.builtin.rm.to_tmp = true
 oslo.builtin.rm.trash = os.getenv("HOME") .. "/trash"
 "#;
     let mut shell = PtyShell::configured("xterm-256color", false, config);
-    let quick = shell._home.path().join("quick");
+    let quick = shell.home.path().join("quick");
     std::fs::create_dir(&quick).expect("create entry to navigate into");
     std::fs::write(quick.join("inside"), "move this to trash").expect("create removable file");
     shell.wait_for_marks(2);
@@ -391,10 +391,10 @@ oslo.builtin.nav.scanner = false
 oslo.builtin.nav.type_nav = { enabled = true, settle_ms = 2000 }
 "#;
     let mut shell = PtyShell::configured("xterm-256color", false, config);
-    let fuzz = shell._home.path().join("fuzz");
+    let fuzz = shell.home.path().join("fuzz");
     std::fs::create_dir(&fuzz).expect("create the directory to walk into");
     // Shares `fu`, so `fuzz` is only unambiguous at `fuz` — one character short of the word.
-    std::fs::create_dir(shell._home.path().join("fudge")).expect("create the near miss");
+    std::fs::create_dir(shell.home.path().join("fudge")).expect("create the near miss");
     std::fs::write(fuzz.join("landed"), "here").expect("create a file to see inside");
     shell.wait_for_marks(2);
 
@@ -426,8 +426,8 @@ oslo.builtin.nav.scanner = false
 oslo.builtin.nav.type_nav = { enabled = false }
 "#;
     let mut shell = PtyShell::configured("xterm-256color", false, config);
-    std::fs::write(shell._home.path().join("visible"), "x").expect("a plain file");
-    std::fs::write(shell._home.path().join(".secret"), "x").expect("a hidden file");
+    std::fs::write(shell.home.path().join("visible"), "x").expect("a plain file");
+    std::fs::write(shell.home.path().join(".secret"), "x").expect("a hidden file");
     shell.wait_for_marks(2);
 
     shell.send(b"nav\n");

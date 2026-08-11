@@ -12,6 +12,9 @@ use std::time::{Duration, Instant};
 
 const TIMEOUT: Duration = Duration::from_secs(5);
 
+#[path = "terminal_semantics/veto.rs"]
+mod veto;
+
 #[derive(Debug)]
 struct Mark {
     kind: u8,
@@ -37,7 +40,7 @@ struct PtyShell {
     input: File,
     output: Receiver<Vec<u8>>,
     transcript: Vec<u8>,
-    _home: tempfile::TempDir,
+    home: tempfile::TempDir,
 }
 
 impl PtyShell {
@@ -145,7 +148,7 @@ impl PtyShell {
             input,
             output,
             transcript: Vec::new(),
-            _home: home,
+            home,
         }
     }
 
