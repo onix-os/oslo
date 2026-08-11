@@ -174,18 +174,30 @@ is a set of paths; with them it is somewhere you can build.
 oslo.direnv.nix_develop{ functions = true }
 ```
 
-All 110 **parse**. What stops some of them running is one thing, not several:
+All 110 parse, and **98 of them run with no shell-level error**. `runHook`, `runPhase`,
+`genericBuild`, `substituteInPlace` and `printPhases` were each checked against bash and produce
+byte-identical output — so a phase sequence runs here the way it does inside `nix develop`:
 
-| | of 110 | state |
-|---|---|---|
-| plain `${!v}` | 17 | works |
-| `${!v<op>}` | 10 | works — see `Indirect` in `ast::ParamExpansion` |
-| **bash arrays** | **39** | **not representable** — `local -a`, `+=( )`, `${x[@]}` |
+```
+> phases="one two"; genericBuild
+Running phase: one
+ONE
+Running phase: two
+TWO
+```
 
-So `printWords`, `stripHash` and `concatStringsSep` work; `substituteInPlace` stops at `local -a`,
-and `runHook` reaches its hook list through `${!hooksSlice}` where the target is `someHooks[@]` — an
-*array* reference, so it needs the same thing. Arrays are a shape a POSIX environment does not have,
-which makes that a change to the shell rather than to this module.
+Getting there took four things the shell was missing, each found by running the functions rather
+than reading them:
+
+| | what stdenv needs it for |
+|---|---|
+| `${!v<op>}` | `runHook` is `${!hooksSlice+"${!hooksSlice}"}` |
+| an indirection naming an **array** | that `hooksSlice` holds `preConfigureHooks[@]` |
+| `${a[@]+alt}` and `${a[@]:-d}` | the same line — the array is the thing being tested |
+| `local -a` | `substituteInPlace` declares one on its first line |
+
+Arrays themselves were never the problem: oslo has had them, and `a=(x y)`, `a+=(z)`, `${a[@]}`,
+`${#a[@]}` all matched bash before any of this. What was missing were those four forms around them.
 
 Defined **before** `shellHook`, since a hook calling `runHook` or `addToSearchPath` is ordinary.
 One `eval` for all of them rather than 110 — 40 ms for 66 KB in a debug build, which is the whole
