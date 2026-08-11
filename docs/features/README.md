@@ -32,6 +32,11 @@ feature — the largest of the three at 256 KB, and off because it is the one pa
 reads a file on arrival in a directory and can run what it finds there. In `oslo-minimal` `cd` is
 just `cd`, and the word `direnv` falls through to `$PATH` so the real one still works.
 
+**[nix, as data](nix.md) is `oslo` only**, behind the `nix` cargo feature — every `nix --json`
+answer as a Lua table. Independent of `direnv`: what the two share, `use flake` and
+`oslo.direnv.nix_develop()`, needs both. In `oslo-minimal` there is no `oslo.nix`, and a config asks
+for it the way it asks about anything optional — `if oslo.nix then … end`.
+
 Everything else on this page is in both binaries.
 
 Each document opens with a recording of the feature actually running. They are not screencasts
@@ -87,6 +92,7 @@ scripts/demo/embed.sh                            # put the players back in the d
 | | |
 |---|---|
 | [Directory environments](directory-environments.md) | `.envrc` read by oslo itself, not handed to direnv |
+| [nix, as data](nix.md) | Every `nix --json` answer as a Lua table, extended in Lua |
 | [The filesystem navigator](nav.md) | `nav`: type to filter, arrows to move, Esc to take the shell there |
 | [rm, and the things that can bite](rm-and-safety.md) | Recoverable at the prompt, POSIX in a script |
 | [Scratches](scratch.md) | Named sessions that outlive the terminal they were opened in |

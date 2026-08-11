@@ -504,6 +504,43 @@ and **aliases are restored on the way out too**, so a project's `t` cannot follo
 one and run the wrong tests. Whatever the file prints is grouped under it, repeats collapsed with a
 count.
 
+## nix, as data
+
+Behind `--features nix`, and independent of `direnv`. Everything `nix` answers as JSON, as ordinary
+Lua tables:
+
+```lua
+oslo.nix.run{"flake", "metadata"}    -- any nix command; the only part written in Rust
+oslo.nix.inputs()                    -- every input, with how old its pin is
+oslo.nix.shells()                    -- the dev shells this machine can enter
+oslo.nix.dirty()                     -- has the flake uncommitted changes
+```
+
+**There is no `oslo nix` subcommand and will not be.** The feature is one generic call plus names
+written in Lua, so a plugin adding `closure_size` is a Lua file rather than a patch to the shell,
+and any helper can be replaced by assigning over it.
+
+Why generic: twenty-three subcommands advertise `--json` and nix says its interface is unstable —
+and the help text is not reliable, since `nix registry list --help` documents a `--json` that the
+command then rejects. A wrapper per command would have shipped one that cannot work.
+
+`oslo.nix.inputs()` is the one that says something you cannot already see, and it reads the lock
+rather than evaluating anything:
+
+```
+systems       github    1220 days
+flake-utils   github     636 days
+nixpkgs       github     125 days
+```
+
+Nothing runs on its own. Completion for the real `nix` binary is opt-in, in one line:
+
+```lua
+oslo.completion.for_command.nix = oslo.nix.complete
+```
+
+`docs/features/nix.md` has the rest.
+
 ## One shell, several histories
 
 ```sh
@@ -1027,16 +1064,20 @@ nix build         # static musl binary
 
 ### Optional features
 
-Both are off *by default*, and off for the same reason: a shell that is going to be `/bin/sh`
+All five are off *by default*, and off for the same reason: a shell that is going to be `/bin/sh`
 should carry what every session needs and nothing else. `make build` turns them on, because
 somebody building from source is asking for the shell rather than for the floor; the published
 release artifact is the default build.
 
-Measured on the static musl binary, against a 6,323,168-byte default:
+Each cost is what turning that one feature *off* takes back out of the full build, measured on the
+static musl binary — 6,081,344 bytes with none of them, 6,902,016 with all five:
 
 | feature | costs | brings |
 |---|---:|---|
 | `vista` | +433 KB | the model: `predict` as a suggestion source, `oslo.repair`, `oslo.predict.*`, and the correction drawn after a mistyped line |
+| `direnv` | +268 KB | `.env.lua` and `.envrc` read on arrival in a directory, the `direnv` builtin, `oslo.direnv` |
+| `nix` | +68 KB | `oslo.nix` — every `nix --json` answer as a Lua table, and flake-output completion |
+| `scratch` | +64 KB | named sessions that outlive their terminal, and the key that finds them |
 | `ssh` | **+0** | an SSH client — unfinished. Nothing reaches `src/ssh.rs` yet, so the linker discards `maki` and `tokio` whole and the binary is byte-for-byte the default one. It will cost about 0.6 MB the day something calls it |
 
 ```sh
@@ -1045,7 +1086,7 @@ make build TYPE=minimal     # static release, none of them
 ```
 
 **There are no others**, and in particular none that exist to serve the test suite —
-`--all-features` turns on exactly the two above. Test-only helpers that other crates' tests need
+`--all-features` turns on exactly the five above. Test-only helpers that other crates' tests need
 are ordinary `pub` items the linker drops from the binary, not features, because a build flag
 should never decide whether test scaffolding ships.
 

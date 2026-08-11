@@ -133,6 +133,22 @@ pub fn install(interp: &Rc<Interp>, registry: &Registry, env: Arc<Mutex<Environm
         Value::str("builtin"),
         Value::Table(Rc::new(RefCell::new(builtin))),
     );
+    // `oslo.completion.for_command` is one level deeper for the same reason: the documented
+    // spelling `oslo.completion.for_command.nix = …` indexes twice. Without this it died on
+    // "attempt to index a nil value" while `oslo.completion.for_command = { … }` worked — the exact
+    // split the settings loop above exists to prevent, one level down where nobody looked.
+    if let Value::Table(completion) = oslo.get(&Value::str("completion")) {
+        let missing = matches!(
+            completion.borrow().get(&Value::str("for_command")),
+            Value::Nil
+        );
+        if missing {
+            completion.borrow_mut().set(
+                Value::str("for_command"),
+                Value::Table(Rc::new(RefCell::new(Table::new()))),
+            );
+        }
+    }
     // `oslo.feature` — a namespace of functions rather than a settings table, because a feature is
     // not configuration. It is a runtime mask over configuration, and the two must not look alike.
     oslo.set(Value::str("feature"), feature::build(registry));
