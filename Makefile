@@ -101,8 +101,12 @@ r: run
 # one that fails. Excluding by name states which code is somebody else's; see `vendor/README.md`.
 OURS := --workspace --exclude brush-parser --exclude full_moon --exclude full_moon_derive
 
+# `--all-features`, like `check` and `clippy` beside it. Without it the tests behind a feature were
+# compiled by `check` and then never *run* — `vista`'s and `tab`'s both — so a suite that looked
+# green covered neither. The same reasoning as the exclusions above: a suite that quietly shrinks is
+# worse than one that fails.
 test:
-	@$(CARGO) test --all-targets $(OURS)
+	@$(CARGO) test --all-targets --all-features $(OURS)
 
 test-terminal:
 	@$(CARGO) test --test terminal_semantics_tests

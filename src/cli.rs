@@ -9,6 +9,8 @@
 
 pub mod help;
 pub mod history;
+#[cfg(feature = "scratch")]
+pub mod scratch;
 pub mod tools;
 pub mod warn;
 

@@ -10,6 +10,9 @@ default = []
 # `vista` — the model behind the ghost prediction, the correction hint and `oslo.repair`. Off by
 # default; see the note on `oslo-base`.
 vista = ["oslo-base/vista", "oslo-ui/vista"]
+# `tab` — the key that opens the tab finder, and what it does with the answer. Off by default; see
+# the note on `oslo-shell`.
+scratch = ["oslo-shell/scratch"]
 
 
 [dependencies]

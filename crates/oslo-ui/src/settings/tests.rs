@@ -361,3 +361,36 @@ fn the_commands_whose_history_is_not_offered_are_configurable() {
     assert!(problems.is_empty(), "{problems:?}");
     assert!(none.suggest.skip_history.is_empty());
 }
+
+/// `oslo.scratch` is read whether or not the build can act on it, so one config works on a machine
+/// with the feature and a machine without.
+#[test]
+fn the_scratch_block_is_read() {
+    let (settings, problems) = settings_from(
+        r#"oslo = { scratch = { key = "ctrl-g", daemon = true, dir = "/run/x", log_bytes = 4096 } }"#,
+    );
+    assert!(problems.is_empty(), "{problems:?}");
+    assert_eq!(settings.scratch.key, "ctrl-g");
+    assert!(settings.scratch.daemon);
+    assert_eq!(settings.scratch.dir, "/run/x");
+    assert_eq!(settings.scratch.log_bytes, 4096);
+}
+
+#[test]
+fn the_scratch_default_is_ctrl_backslash_and_no_daemon() {
+    let (settings, problems) = settings_from("oslo = {}");
+    assert!(problems.is_empty(), "{problems:?}");
+    assert_eq!(settings.scratch, Scratch::default());
+    assert_eq!(settings.scratch.key, "ctrl-\\");
+    assert!(!settings.scratch.daemon);
+}
+
+/// A key nothing can name is reported against the line that wrote it, and the default is kept —
+/// the alternative is a scratch with no way out.
+#[test]
+fn a_scratch_key_that_is_not_a_key_is_reported() {
+    let (settings, problems) = settings_from(r#"oslo = { scratch = { key = "wat" } }"#);
+    assert_eq!(problems.len(), 1, "{problems:?}");
+    assert!(problems[0].contains("oslo.scratch.key"), "{problems:?}");
+    assert_eq!(settings.scratch.key, Scratch::default().key);
+}

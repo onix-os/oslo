@@ -129,7 +129,7 @@ impl Preset {
                     },
                     row: pager.text,
                     width: Width::Full,
-                    prompt: "  ❯❯  ".to_string(),
+                    prompt: "  >>  ".to_string(),
                     // `{badge} || 12/840`, with the badge the only part carrying a background.
                     right: "{badge} || {n}/{total} ".to_string(),
                     // One cell wider than hexe's default. The bar has the room, and a longer track
@@ -211,6 +211,28 @@ pub struct Look {
     pub muted: Style,
     /// Whether a row's colour stops at its text or reaches the edge.
     pub width: Width,
+    /// Columns of untouched terminal down each side of every row.
+    ///
+    /// **Because the right-hand one is not optional.** `Chrome` reserves a column at the right edge
+    /// — a row exactly the terminal's width leaves the cursor in the auto-wrap pending state, and
+    /// the `\r\n` after it then costs two rows instead of one. So a full-width block already has a
+    /// gap on the right and none on the left, which reads as a block that failed to reach the edge
+    /// rather than as one with a margin. This puts the same gap on the other side.
+    pub margin: usize,
+    /// A row of its own under the filter, templated like [`Look::left`] — `{n}`, `{total}`.
+    ///
+    /// **A row rather than a slot on the filter line**, which is the difference between a finder
+    /// that reads as a search and one that reads as a list with a label on it. Empty draws nothing
+    /// and costs no row, so nothing that does not ask for it changes.
+    pub under: String,
+    /// The narrowest the filter surface may be, whatever [`Width::Content`] measures.
+    ///
+    /// **Set to the legend's width by the widget that draws one.** Without it a panel sized to its
+    /// own text shrank as the query got shorter, so the tinted box breathed in and out under a rule
+    /// that stayed put — and an empty query left it narrower than the keys listed beneath it. A
+    /// floor is the whole fix: it never reaches past what the box is already, and never retreats
+    /// behind it.
+    pub min_width: usize,
     /// An animated sweep at the head of the filter row, drawn where a spinner would go.
     ///
     /// It says the widget is live. That matters most where the list is doing work you cannot see —
@@ -245,13 +267,13 @@ impl Default for Look {
             reverse: false,
             left: String::new(),
             right: String::new(),
-            prompt: "❯ ".to_string(),
+            prompt: "> ".to_string(),
             placeholder: "type to filter".to_string(),
             surface: None,
             surface_rows: 1,
             gap: 0,
             pad: 0,
-            marker: "❯ ".to_string(),
+            marker: "> ".to_string(),
             row: Style::default(),
             selected: ui.accent,
             stripe: None,
@@ -263,6 +285,9 @@ impl Default for Look {
             },
             muted: ui.muted,
             width: Width::Content,
+            min_width: 0,
+            margin: 0,
+            under: String::new(),
             scanner: None,
             badge: String::new(),
             // Foreground 0 on background 1: the terminal's own palette, so it belongs to whatever
@@ -335,7 +360,7 @@ impl Look {
     /// Rows this look adds around the list, so a widget can reserve them before drawing.
     pub fn extra_rows(&self, filtering: bool) -> usize {
         match filtering {
-            true => self.surface_rows + self.gap,
+            true => self.surface_rows + self.gap + usize::from(!self.under.is_empty()),
             false => 0,
         }
     }

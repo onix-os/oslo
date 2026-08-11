@@ -167,7 +167,7 @@ Drawing it. A prompt function is handed `language`, and `$OSLO_MODE` carries the
 shell-side prompt.
 
 ```lua
-oslo.prompt.left = function(p) return p.language .. " ❯ " end
+oslo.prompt.left = function(p) return p.language .. " > " end
 ```
 
 ## Measurements

@@ -120,7 +120,7 @@ pub fn measured_width(last_status: i32) -> usize {
 }
 
 /// The built-in left prompt, used when no Lua one is set.
-/// `user@host | N | sh ❯`
+/// `user@host | N | sh >`
 ///
 /// Three segments, each answering a question the others cannot: **who and where** you are logged
 /// in, **which editing mode** the keyboard is in, and **which language** the line will be read as.
@@ -177,7 +177,7 @@ fn render_default_left_prompt_unpadded(last_status: i32, language: &str) -> Stri
         theme.prompt.failed
     };
     out.push(' ');
-    out.push_str(&arrow.paint("❯", depth));
+    out.push_str(&arrow.paint(">", depth));
     out.push(' ');
     out
 }
@@ -237,7 +237,7 @@ pub fn notable_duration(elapsed: Duration) -> Option<String> {
 pub fn render_default_right_prompt(last_status: i32, elapsed: Option<Duration>) -> String {
     let theme = theme::current();
     let depth = theme::depth();
-    // The mirror of the left prompt's `❯`, opening the right side the way that one closes the
+    // The mirror of the left prompt's `>`, opening the right side the way that one closes the
     // left. It takes the same colour, so the pair reads as one frame around the line you type.
     let arrow = if last_status == 0 {
         theme.prompt.ok

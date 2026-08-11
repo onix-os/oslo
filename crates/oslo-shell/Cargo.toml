@@ -6,6 +6,13 @@ rust-version = "1.89"
 license = "MIT"
 description = "oslo's shell: syntax adaptation, expansion, execution, builtins, the structured pipeline and directory environments."
 
+[features]
+default = []
+# `tab` — named sessions that keep running when the terminal they were in goes away. Off by
+# default; a build without it has no keeper, no client and no runtime directory, and the key that
+# opens the finder does nothing.
+scratch = []
+
 [dependencies]
 oslo-base = { path = "../oslo-base" }
 oslo-lua = { path = "../oslo-lua" }

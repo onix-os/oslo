@@ -91,7 +91,7 @@ pub fn primary_prompt(
         .or_else(|| lua.render_prompt())
         .unwrap_or_else(|| {
             // Both languages get the *same* prompt, with the language as one of its segments —
-            // `you@host | N | lua ❯`. A separate `lua>` used to be the only signal, which meant
+            // `you@host | N | lua >`. A separate `lua>` used to be the only signal, which meant
             // switching language threw away the branch, the mode and the directory as well.
             //
             // `PS1` still wins for shell lines, because that is what `PS1` is. It cannot win for

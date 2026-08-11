@@ -72,7 +72,7 @@ fn the_default_look_is_the_old_one() {
     let look = Look::default();
     assert!(look.is_plain());
     let rows = drawn(&look, &["alpha", "beta"], &view(2, 2));
-    assert_eq!(rows, vec!["❯ alpha", "  beta"]);
+    assert_eq!(rows, vec!["> alpha", "  beta"]);
 }
 
 /// A filter at the bottom is drawn after the list, and one at the top before it. This is the
@@ -144,7 +144,7 @@ fn a_full_width_row_reaches_the_edge() {
 #[test]
 fn a_content_width_row_stops_at_its_text() {
     let rows = drawn(&Look::default(), &["short"], &view(1, 1));
-    assert_eq!(rows[0], "❯ short");
+    assert_eq!(rows[0], "> short");
 }
 
 /// The stripe follows the row's place in the list, not its place on screen — otherwise the bands
@@ -258,6 +258,7 @@ fn the_cursor_and_the_checkbox_are_two_columns() {
             marked: true,
             trail: String::new(),
             meta: Vec::new(),
+            matchable: true,
             tint: None,
         },
         Row {
@@ -266,6 +267,7 @@ fn the_cursor_and_the_checkbox_are_two_columns() {
             marked: false,
             trail: String::new(),
             meta: Vec::new(),
+            matchable: true,
             tint: None,
         },
     ];
@@ -275,7 +277,7 @@ fn the_cursor_and_the_checkbox_are_two_columns() {
         .skip(1)
         .map(plain)
         .collect();
-    assert!(drawn[0].contains("❯ ◉ alpha"), "{drawn:?}");
+    assert!(drawn[0].contains("> ◉ alpha"), "{drawn:?}");
     assert!(drawn[1].contains("  ◯ beta"), "{drawn:?}");
 }
 
@@ -293,6 +295,7 @@ fn a_trail_keeps_its_room() {
         marked: false,
         trail: " 118×".to_string(),
         meta: Vec::new(),
+        matchable: true,
         tint: None,
     }];
     let drawn: Vec<String> = look
@@ -406,7 +409,7 @@ fn the_meta_columns_line_up() {
         },
     ];
     let drawn = rendered(&look, &rows, &view(2, 2));
-    assert!(drawn[0].starts_with("❯ 1d 118× cargo test"), "{drawn:?}");
+    assert!(drawn[0].starts_with("> 1d 118× cargo test"), "{drawn:?}");
     // Right-aligned in the same width, so `3×` is pushed over to sit under `118×`.
     assert!(drawn[1].starts_with("  5h   3× git status"), "{drawn:?}");
 }
@@ -530,6 +533,6 @@ fn the_history_preset_has_the_whole_bar() {
     assert!(look.scanner.is_some(), "the sweep says it is live");
     assert!(look.right.contains("{badge}"), "somewhere for the scope");
     assert!(look.right.contains("{n}/{total}"), "the counter");
-    assert_eq!(look.prompt.trim(), "❯❯", "where typing starts");
+    assert_eq!(look.prompt.trim(), ">>", "where typing starts");
     assert_eq!(look.surface_rows, 3, "a panel, not a line");
 }

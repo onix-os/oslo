@@ -7,7 +7,7 @@
 //! # The bar reads left to right
 //!
 //! ```text
-//!  ⬝⬝⬝⬝⬝⬝⬝⬝⬝  ❯❯  cargo t▌                    profile @ [global] || 12/840
+//!  ⬝⬝⬝⬝⬝⬝⬝⬝⬝  >>  cargo t▌                    profile @ [global] || 12/840
 //!  └ scanner   └ prompt └ query               └ left slot, badge, right slot
 //! ```
 //!
@@ -55,10 +55,17 @@ impl Look {
     /// The filter: its surface, the query, and whatever the slots say.
     pub(super) fn filter_rows(&self, view: &View<'_>, depth: theme::Depth) -> Vec<String> {
         let row = self.query_row(view, depth);
-        self.surfaced(&row, view.cols, depth)
+        let mut rows: Vec<String> = self
+            .surfaced(&row, view.cols, depth)
             .split("\r\n")
             .map(|row| row.trim_start_matches('\r').replace("\x1b[K", ""))
-            .collect()
+            .collect();
+        // What the search found, on its own row under the query. Counted in `extra_rows`, so the
+        // list above it is one shorter rather than one row of it falling off the screen.
+        if !self.under.is_empty() {
+            rows.push(self.muted.paint(&Look::fill(&self.under, view), depth));
+        }
+        rows
     }
 
     /// `row` in the middle of however many rows of surface this look asks for.
@@ -71,7 +78,15 @@ impl Look {
             bg: self.surface.or(style.bg),
             ..style
         };
-        let blank = on(Style::default()).paint(&" ".repeat(cols), depth);
+        // **The blank rows are as wide as the row they wrap, not as wide as the terminal.** A
+        // surface that reached the edge while the query row stopped at its text drew a panel in
+        // two different widths — the tint running to the margin above and below a line that did
+        // not. `Width` says which the caller wanted; it now says it about the whole panel.
+        let across = match self.width {
+            Width::Full => cols,
+            Width::Content => printed_width(row).max(self.min_width).min(cols),
+        };
+        let blank = on(Style::default()).paint(&" ".repeat(across), depth);
         let middle = self.surface_rows / 2;
         (0..self.surface_rows.max(1))
             .map(|at| match at == middle {
@@ -145,9 +160,14 @@ impl Look {
                 )
             }
         };
+        // The query row is padded to the floor as well, or the tint above and below it would reach
+        // further than the row between them.
         let gap = match self.width {
             Width::Full => (room + 1).saturating_sub(cells),
-            Width::Content => 0,
+            Width::Content => self
+                .min_width
+                .saturating_sub(fixed + cells)
+                .min(room.saturating_sub(cells)),
         };
         let pad = " ".repeat(self.pad);
 

@@ -5,12 +5,12 @@
 //! for the stages inside a single pipeline, and there is no equivalent for the level above it.
 //!
 //! ```text
-//! ❯ make clean && make build && make test
-//! ❯ chain
+//! > make clean && make build && make test
+//! > chain
 //!    make clean     ok      5ms
 //! && make build     failed  412ms
 //! && make test      skipped
-//! ❯ chain resume
+//! > chain resume
 //! make build && make test
 //! ```
 //!
