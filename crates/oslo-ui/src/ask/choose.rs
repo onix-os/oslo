@@ -216,7 +216,9 @@ fn run(spec: &Choice) -> Answer<Outcome> {
                 offset,
                 height,
                 query: &query,
-                matched: shown.len(),
+                // The create row is not a match. Counting it made an empty search of two tabs
+                // read `1/2`, which says one of them matched when none did.
+                matched: shown.iter().filter(|at| **at != CREATE_ROW).count(),
                 total: spec.items.len(),
                 marked: checked.iter().filter(|c| **c).count(),
                 cols: room,

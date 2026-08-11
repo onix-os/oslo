@@ -77,11 +77,11 @@ pub fn open(key: &str, replay: u64) -> io::Result<Went> {
 fn ask(tabs: &dyn backend::Tabs, inside: Option<&str>) -> io::Result<Option<String>> {
     let running = tabs.list()?;
     let spec = Choice {
-        header: match inside {
-            Some(name) => format!("tab · in {name}"),
-            None => "tab".to_string(),
-        },
         items: running.clone(),
+        look: look(inside),
+        // Short on purpose. This is a list of sessions, not of history — there are as many rows as
+        // you have tabs, and a panel sized for a thousand lines would be mostly empty air.
+        height: 8,
         ..Choice::default()
     };
 
@@ -100,6 +100,22 @@ fn ask(tabs: &dyn backend::Tabs, inside: Option<&str>) -> io::Result<Option<Stri
         // No terminal is not a refusal to answer, it is a place the question cannot be asked.
         Answer::NoTerminal => None,
     })
+}
+
+/// The history finder's look, because this is the same kind of question.
+///
+/// **The same renderer, so the two cannot drift.** `Preset::History` is where the striping, the
+/// tinted filter row, the match marks and the counts live; a second list with its own idea of those
+/// would be a second thing to keep in step with the theme. Only what the preset cannot know is set
+/// here — which tab you are asking from, and that the list is short.
+fn look(inside: Option<&str>) -> oslo_ui::ask::look::Look {
+    let mut look = oslo_ui::ask::Preset::History.look();
+    look.badge = inside.unwrap_or("tab").to_string();
+    // `[work] || 2/3` — where you are and how much of the list you are seeing, on the right, since
+    // both are facts about what you are looking at rather than part of what you are typing.
+    look.right = "{badge} || {n}/{total} ".to_string();
+    look.placeholder = "type to filter, or a name for a new one".to_string();
+    look
 }
 
 /// Carry on as the caller, or — in the process that turned out to be the shell — become one.
