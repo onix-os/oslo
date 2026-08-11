@@ -14,7 +14,9 @@
 //! * [`repl`] — the interactive loop that uses all three.
 //! * `tracking` — what that loop hands [`oslo_base::track`] instead of discarding.
 
+mod arrival;
 pub mod config;
+#[cfg(feature = "direnv")]
 mod environments;
 pub mod history;
 mod integration;
@@ -27,6 +29,7 @@ pub mod rc;
 mod read;
 pub mod recall;
 pub mod repl;
+#[cfg(feature = "direnv")]
 mod report;
 mod terminal;
 pub mod timing;

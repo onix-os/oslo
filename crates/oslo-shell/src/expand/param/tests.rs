@@ -365,16 +365,146 @@ fn case_conversion_covers_both_directions() {
 #[test]
 fn indirection_follows_the_named_parameter() {
     let vars = [("oslo_target", "payload"), ("oslo_ref", "oslo_target")];
-    let got = expand(&vars, "oslo_ref", ParamExpansion::Indirect);
+    let got = expand(
+        &vars,
+        "oslo_ref",
+        ParamExpansion::Indirect(Box::new(ParamExpansion::Normal)),
+    );
     assert_eq!(got, Ok("payload".into()));
     // Only the *inner* parameter may be unset; that is an empty string, not an error.
     let vars = [("oslo_ref", "oslo_nosuchvar")];
-    let got = expand(&vars, "oslo_ref", ParamExpansion::Indirect);
+    let got = expand(
+        &vars,
+        "oslo_ref",
+        ParamExpansion::Indirect(Box::new(ParamExpansion::Normal)),
+    );
     assert_eq!(got, Ok(String::new()));
     // bash aborts the expansion when the referring parameter is unset, or holds anything
     // that is not a name — including the empty string.
     for vars in [vec![], vec![("oslo_ref", "")], vec![("oslo_ref", "a b")]] {
-        let got = expand(&vars, "oslo_ref", ParamExpansion::Indirect);
+        let got = expand(
+            &vars,
+            "oslo_ref",
+            ParamExpansion::Indirect(Box::new(ParamExpansion::Normal)),
+        );
         assert!(got.is_err(), "{vars:?} expanded to {got:?}");
     }
+}
+
+/// `${!v<op>}` — the indirection and the operator compose, and the operator applies to the
+/// parameter the *first* one names.
+///
+/// stdenv's `runHook` is written `${!hooksSlice+"${!hooksSlice}"}`, so a shell without this cannot
+/// run a dev shell's hooks at all. Every case here was checked against bash.
+#[test]
+fn an_indirection_composes_with_an_operator() {
+    let vars = [("s", "greeting"), ("greeting", "hi")];
+    let indirect = |inner| ParamExpansion::Indirect(Box::new(inner));
+
+    // The alternative tests the *target*, not the pointer.
+    assert_eq!(
+        expand(
+            &vars,
+            "s",
+            indirect(ParamExpansion::UseAlternative {
+                alternative: Word::from_literal("yes"),
+                test_null: false,
+            })
+        ),
+        Ok("yes".to_string())
+    );
+    // A default falls through to the target's value when it is set.
+    assert_eq!(
+        expand(
+            &vars,
+            "s",
+            indirect(ParamExpansion::DefaultValue {
+                default: Word::from_literal("no"),
+                assign_if_unset: false,
+                test_null: true,
+            })
+        ),
+        Ok("hi".to_string())
+    );
+    // And a pointer to something unset takes the default.
+    assert_eq!(
+        expand(
+            &[("s", "nothere")],
+            "s",
+            indirect(ParamExpansion::DefaultValue {
+                default: Word::from_literal("no"),
+                assign_if_unset: false,
+                test_null: true,
+            })
+        ),
+        Ok("no".to_string())
+    );
+}
+
+/// `${!s}` where `s` holds `name[@]` — the indirection resolves to an *array reference*, which is
+/// how stdenv's `runHook` reaches its hook list. Checked against bash.
+#[test]
+fn an_indirection_may_name_an_array() {
+    let mut env = Environment::new();
+    env.set_array("h", crate::env::scope::ShellArray::from_values(["p", "q"]));
+    env.set_var("s", "h[@]", false);
+    let indirect = |inner| ParamExpansion::Indirect(Box::new(inner));
+
+    assert_eq!(
+        expand_to_string(&mut env, "s", &indirect(ParamExpansion::Normal))
+            .map_err(|e| e.to_string()),
+        Ok("p q".to_string())
+    );
+    // The `+` form is what `runHook` is written with: set, so the alternative wins.
+    assert_eq!(
+        expand_to_string(
+            &mut env,
+            "s",
+            &indirect(ParamExpansion::UseAlternative {
+                alternative: Word::from_literal("yes"),
+                test_null: false,
+            })
+        )
+        .map_err(|e| e.to_string()),
+        Ok("yes".to_string())
+    );
+    // And an array nothing ever created is unset, so it answers with nothing rather than erroring.
+    env.set_var("s", "missing[@]", false);
+    assert_eq!(
+        expand_to_string(
+            &mut env,
+            "s",
+            &indirect(ParamExpansion::UseAlternative {
+                alternative: Word::from_literal("yes"),
+                test_null: false,
+            })
+        )
+        .map_err(|e| e.to_string()),
+        Ok(String::new())
+    );
+}
+
+/// An unset *positional* used as the pointer is empty, not an error — `${!1}` in a function called
+/// with no arguments, which is the first line of `runHook`, `runPhase` and `substituteStream`.
+#[test]
+fn an_unset_positional_pointer_is_empty() {
+    let mut env = Environment::new();
+    assert_eq!(
+        expand_to_string(
+            &mut env,
+            "1",
+            &ParamExpansion::Indirect(Box::new(ParamExpansion::Normal))
+        )
+        .map_err(|e| e.to_string()),
+        Ok(String::new())
+    );
+    // A named variable that does not exist is still a mistake worth reporting, as in bash.
+    assert!(
+        expand_to_string(
+            &mut env,
+            "nothing",
+            &ParamExpansion::Indirect(Box::new(ParamExpansion::Normal))
+        )
+        .is_err()
+    );
 }

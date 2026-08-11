@@ -58,6 +58,14 @@ vista = ["oslo-base/vista", "oslo-runtime/vista", "oslo-ui/vista"]
 # both builds with nothing to ask.
 scratch = ["oslo-shell/scratch", "oslo-runtime/scratch"]
 
+# `direnv` — directory environments.
+#
+# **Off, and the largest of the four.** It reads a file on every arrival in a directory and can run
+# what it finds there, which is a different kind of trust from anything else the shell does on its
+# own. A build without it has no `direnv` builtin, no `oslo.direnv` API, no `.env.lua` or `.envrc`
+# reading, and no dev shell import — `cd` is `cd`.
+direnv = ["oslo-shell/direnv", "oslo-runtime/direnv"]
+
 [dependencies]
 # A fork of `makiko`, the one pure-Rust SSH client — no `cc`, no `ring`, no `-sys` crate that is
 # really C. Forked rather than depended on because upstream was last touched in March 2025, and a

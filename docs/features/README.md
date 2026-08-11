@@ -27,6 +27,11 @@ cargo feature, so `oslo-minimal` has no model: it learns nothing, writes no `.mo
 opens the finder is unbound and does whatever it otherwise would; the `oslo.scratch` settings are still
 read and simply mean nothing, so one config works under both with nothing to ask.
 
+**[Directory environments](directory-environments.md) are `oslo` only**, behind the `direnv` cargo
+feature — the largest of the three at 256 KB, and off because it is the one part of the shell that
+reads a file on arrival in a directory and can run what it finds there. In `oslo-minimal` `cd` is
+just `cd`, and the word `direnv` falls through to `$PATH` so the real one still works.
+
 Everything else on this page is in both binaries.
 
 Each document opens with a recording of the feature actually running. They are not screencasts

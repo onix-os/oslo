@@ -42,6 +42,7 @@ pub const TOOLS: &[Tool] = &[
         name: "history",
         about: "search, export and prune the command history",
     },
+    #[cfg(feature = "direnv")]
     Tool {
         name: "direnv",
         about: "manage per-directory environments",

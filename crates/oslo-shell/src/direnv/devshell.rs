@@ -48,75 +48,30 @@
 //! diff the two forms before looking anywhere else — that is how both of these were found.
 
 use crate::env::Environment;
+
+mod read;
+pub use read::exported_from;
+use read::{functions_from, locals_from};
 use std::path::{Path, PathBuf};
 
-/// Variables that must never be taken from a dev shell into the shell you are using.
+/// Define them all in one pass.
 ///
-/// The first five are what nix itself withholds from the bash form. The rest are the remainder of
-/// nix's own `ignoreVars` (`src/nix/develop.cc`) — absent from this flake, but present in others,
-/// and each one would be a different flavour of broken: `PWD` and `OLDPWD` would lie about where
-/// you are, `SHELL` would point at the store's bash, `TMPDIR` at a build directory that no longer
-/// exists, `SHLVL` would corrupt the nesting count.
-const IGNORED: &[&str] = &[
-    "BASHOPTS",
-    "EUID",
-    "HOME",
-    "HOSTNAME",
-    "NIX_BUILD_TOP",
-    "NIX_ENFORCE_PURITY",
-    "NIX_LOG_FD",
-    "NIX_REMOTE",
-    "OLDPWD",
-    "PPID",
-    "PWD",
-    "SHELL",
-    "SHELLOPTS",
-    "SHLVL",
-    "SSL_CERT_FILE",
-    "TEMP",
-    "TEMPDIR",
-    "TERM",
-    "TMP",
-    "TMPDIR",
-    "TZ",
-    "UID",
-    "_",
-];
-
-/// Whether this variable may be carried out of the dev shell.
-fn wanted(name: &str) -> bool {
-    !IGNORED.contains(&name)
-        // `BASH_FUNC_x%%` and friends are exported bash functions. oslo's functions are not bash's,
-        // and importing the encoding would put unrunnable text in the environment of every child.
-        && !name.starts_with("BASH_FUNC_")
-}
-
-/// The exported variables of a dev shell, from `nix print-dev-env --json` output.
-///
-/// Only `type == "exported"`. A `var` is shell-local to the builder — `SHELL` arrives that way —
-/// and an `array` is a bash array, which is a shape a POSIX environment cannot hold. Both are
-/// dropped rather than flattened into something that looks like a value and is not.
-pub fn exported_from(json: &str) -> Result<Vec<(String, String)>, String> {
-    let parsed: serde_json::Value = serde_json::from_str(json).map_err(|e| e.to_string())?;
-    let Some(variables) = parsed.get("variables").and_then(|v| v.as_object()) else {
-        return Err(
-            "no `variables` in the output; is this `nix print-dev-env --json`?".to_string(),
-        );
-    };
-    let mut out = Vec::new();
-    for (name, entry) in variables {
-        if !wanted(name) {
-            continue;
-        }
-        if entry.get("type").and_then(|t| t.as_str()) != Some("exported") {
-            continue;
-        }
-        if let Some(value) = entry.get("value").and_then(|v| v.as_str()) {
-            out.push((name.clone(), value.to_string()));
-        }
+/// **One `eval` rather than 110**, because each is a parse and this runs on arrival in a directory.
+/// Measured at 40 ms for 66 KB in a debug build, which is the whole of what this feature costs.
+fn define(env: &mut Environment, functions: &[(String, String)]) -> Result<(), String> {
+    if functions.is_empty() {
+        return Ok(());
     }
-    out.sort();
-    Ok(out)
+    let mut source = String::new();
+    for (name, body) in functions {
+        source.push_str(name);
+        source.push_str(" ()\n{\n");
+        source.push_str(body);
+        source.push_str("\n}\n");
+    }
+    crate::env::builtins::builtin_eval(env, &["eval".to_string(), "--".to_string(), source])
+        .map_err(|e| format!("defining the dev shell's functions: {e}"))?;
+    Ok(())
 }
 
 /// The dev shell's `PATH`, with everything of yours that it does not already have, behind it.
@@ -276,17 +231,26 @@ pub fn forget() {
 /// The one implementation, called by `use flake` from an `.envrc` and by
 /// `oslo.direnv.nix_develop()` from a `.env.lua`.
 pub fn apply(env: &mut Environment, args: &[String]) -> Result<usize, String> {
-    apply_with(env, args, false)
+    apply_with(env, args, Want::default())
 }
 
-/// The same, and then `shellHook` if `hook` asks for it.
+/// What a project wants out of the dev shell beyond its exported variables.
 ///
-/// **Off unless asked, because it is somebody else's script.** The variables a flake exports are
-/// data; `shellHook` is a bash program that runs on every entry to the directory — it can print,
-/// write files, start things. `nix develop` and nix-direnv run it and plain direnv does not; oslo
-/// sides with plain direnv by default and lets a project opt in, so that `cd` into a clone of
-/// somebody else's repository is not an invitation.
-pub fn apply_with(env: &mut Environment, args: &[String], hook: bool) -> Result<usize, String> {
+/// **Both are off by default, and for the same reason.** Variables are data; these two are code
+/// that somebody else wrote, run on every arrival in the directory. `nix develop` and nix-direnv
+/// give you them, plain direnv does not, and oslo sides with plain direnv until a project says
+/// otherwise — so that `cd` into a clone of a stranger's repository is not an invitation.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Want {
+    /// Run `shellHook` after the variables are set.
+    pub hook: bool,
+    /// Define the dev shell's shell functions — `runHook`, `buildPhase`, `substituteInPlace` and
+    /// the hundred or so others stdenv brings.
+    pub functions: bool,
+}
+
+/// The same as [`apply`], plus whatever `want` asks for.
+pub fn apply_with(env: &mut Environment, args: &[String], want: Want) -> Result<usize, String> {
     let json = match cached(args) {
         Some(remembered) => remembered,
         None => {
@@ -315,10 +279,29 @@ pub fn apply_with(env: &mut Environment, args: &[String], hook: bool) -> Result<
             env.set_var(&name, &keeping_yours(&value, &outer_path), true);
             continue;
         }
-        if hook && name == "shellHook" {
+        if want.hook && name == "shellHook" {
             script = Some(value.clone());
         }
         env.set_var(&name, &value, true);
+    }
+
+    // **Before the hook**, which is written expecting them: a `shellHook` that calls `runHook` or
+    // `addToSearchPath` is ordinary, and defining the functions afterwards would make that fail for
+    // no reason a reader could see.
+    if want.functions {
+        // The state before the code that reads it, so a function defined below cannot be called
+        // against a half-built shell by anything that runs in between.
+        let (scalars, arrays) = locals_from(&json)?;
+        for (name, value) in &scalars {
+            env.set_var(name, value, false);
+        }
+        for (name, values) in &arrays {
+            env.set_array(
+                name,
+                crate::env::scope::ShellArray::from_values(values.clone()),
+            );
+        }
+        define(env, &functions_from(&json)?)?;
     }
     // **After the variables, not before.** The hook is written expecting the shell it is entering:
     // the flake's own `$MESHTASTIC_PROTO_DIR` and the rest have to be set for it to have anything
@@ -335,6 +318,7 @@ pub fn apply_with(env: &mut Environment, args: &[String], hook: bool) -> Result<
 
 #[cfg(test)]
 mod tests {
+    use super::read::{IGNORED, usable_name};
     use super::*;
 
     #[test]
@@ -363,6 +347,67 @@ mod tests {
                        "C":{"type":"exported","value":"3"}}}"#;
         let got = exported_from(json).expect("parsed");
         assert_eq!(got, vec![("C".to_string(), "3".to_string())]);
+    }
+
+    /// The body arrives without a name and without braces. Pasting it as-is would not be a
+    /// definition at all — it would be a list of commands that runs the moment it is imported.
+    #[test]
+    fn a_function_is_rebuilt_from_a_bare_body() {
+        let json = r#"{"bashFunctions":{"runHook":"\n    local h=\"$1\";\n    return 0\n"}}"#;
+        let got = functions_from(json).expect("parsed");
+        assert_eq!(got.len(), 1);
+        assert_eq!(got[0].0, "runHook");
+        assert!(got[0].1.contains("local h="), "the body is kept verbatim");
+        assert!(!got[0].1.contains("runHook ()"), "the name is not in it");
+    }
+
+    /// The `var` and `array` entries are two thirds of `variables` and were dropped whole. They are
+    /// not environment — they are stdenv's own state, and its functions are written against them:
+    /// `configurePhase` holds a phase *name*, `preConfigureHooks` is the list `runHook` walks.
+    #[test]
+    fn the_locals_and_arrays_come_across() {
+        let json = r#"{"variables":{
+            "CC":{"type":"exported","value":"gcc"},
+            "prefix":{"type":"var","value":"/nix/store/x"},
+            "preConfigureHooks":{"type":"array","value":["a","b"]},
+            "HOME":{"type":"var","value":"/homeless-shelter"}
+        }}"#;
+        let (scalars, arrays) = locals_from(json).expect("parsed");
+        assert!(scalars.contains(&("prefix".to_string(), "/nix/store/x".to_string())));
+        assert_eq!(
+            arrays,
+            vec![(
+                "preConfigureHooks".to_string(),
+                vec!["a".to_string(), "b".to_string()]
+            )]
+        );
+        // The exported ones are the other function's business, and `IGNORED` still applies —
+        // a builder's `HOME` must not arrive by this door either.
+        assert!(
+            scalars
+                .iter()
+                .all(|(name, _)| name != "CC" && name != "HOME")
+        );
+    }
+    /// An older nix, or a shell with no functions. Nothing to define is not a failure.
+    #[test]
+    fn no_functions_key_is_not_an_error() {
+        assert_eq!(
+            functions_from(r#"{"variables":{}}"#).expect("parsed"),
+            Vec::new()
+        );
+    }
+
+    /// bash accepts function names oslo's parser will not. One that cannot be defined is skipped
+    /// rather than allowed to fail the import of the other hundred.
+    #[test]
+    fn a_name_oslo_cannot_define_is_skipped() {
+        for bad in ["pkg-config_hook", "a.b", "9lives", ""] {
+            assert!(!usable_name(bad), "{bad:?} must be skipped");
+        }
+        for good in ["runHook", "_addToEnv", "ccWrapper_addCVars", "a:b"] {
+            assert!(usable_name(good), "{good:?} must be kept");
+        }
     }
 
     #[test]

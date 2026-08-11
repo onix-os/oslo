@@ -112,7 +112,14 @@ pub enum ParamExpansion {
         all: bool,
     },
     /// `${!name}` — `name` holds the name of the parameter to expand.
-    Indirect,
+    ///
+    /// **The payload is what to do once the second name is known**, because the two compose:
+    /// `${!v:-d}` is "the thing `v` names, defaulted", and `${!v+alt}` is "alt, if the thing `v`
+    /// names is set". stdenv's `runHook` is written with the second form, so the composition is
+    /// not a curiosity — a shell without it cannot run a dev shell's hooks.
+    ///
+    /// `Indirect(Normal)` is the plain `${!name}`.
+    Indirect(Box<ParamExpansion>),
 }
 
 /// Which occurrences `${name/pat/rep}` replaces.

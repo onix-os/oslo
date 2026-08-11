@@ -12,6 +12,9 @@ default = []
 # default; a build without it has no keeper, no client and no runtime directory, and the key that
 # opens the finder does nothing.
 scratch = []
+# `direnv` — directory environments: `.env.lua`, `.envrc`, and the dev shell an `.envrc` can ask
+# for. Off by default; a build without it never reads a directory file and never runs one.
+direnv = []
 
 [dependencies]
 oslo-base = { path = "../oslo-base" }

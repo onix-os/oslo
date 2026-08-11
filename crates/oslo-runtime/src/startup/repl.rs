@@ -11,7 +11,7 @@ use crate::startup::integration;
 use crate::startup::mode::Mode;
 use crate::startup::read::{Input, read_command};
 use crate::startup::recall::{remember_history, seed_history};
-use crate::startup::{config, environments, history, lua_init, mode, prompt, rc, timing, tracking};
+use crate::startup::{arrival, config, history, lua_init, mode, prompt, rc, timing, tracking};
 use oslo_base::error::ShellError;
 use oslo_shell::Environment;
 use oslo_shell::env::builtins::run_exit_trap;
@@ -102,8 +102,8 @@ pub fn run_repl(login: bool) -> ! {
     let mut tracker = tracking::Tracker::start(&here, &settings);
     // The directory environment for wherever the shell was started, which is a directory the user
     // walked into as much as any other — `cd` is not the only way to arrive somewhere.
-    environments::start();
-    environments::arrive(&env_struct, &lua, std::path::Path::new(&here));
+    arrival::start();
+    arrival::arrive(&env_struct, &lua, std::path::Path::new(&here));
     // The mode the prompt is reading. It lives for the whole session: switching language is a
     // property of the session, not of one line.
     let mut current = mode::starting_mode(&env_struct.lock().unwrap());
@@ -176,7 +176,7 @@ pub fn run_repl(login: bool) -> ! {
         timing::phase("direnv", || {
             let here = current_directory();
             if here != settled {
-                environments::arrive(&env_struct, &lua, std::path::Path::new(&here));
+                arrival::arrive(&env_struct, &lua, std::path::Path::new(&here));
                 settled = here;
             }
         });
@@ -366,9 +366,9 @@ pub fn run_repl(login: bool) -> ! {
                 // Lua engine, which lives here and not in a builtin's arguments. So the builtin
                 // leaves a request and this carries it out — before the directory check below, so
                 // that allowing and then `cd`-ing does not do the work twice.
-                if oslo_shell::direnv::take_reload_request() {
+                if arrival::reload_requested() {
                     let here = current_directory();
-                    environments::arrive(&env_struct, &lua, std::path::Path::new(&here));
+                    arrival::arrive(&env_struct, &lua, std::path::Path::new(&here));
                 }
 
                 // **Where a hook that could only watch becomes one that can act.** `post-change-dir`

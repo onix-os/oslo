@@ -1,785 +1,797 @@
-# Plan: Add history-safe secret handling to Oslo
+# Plan: Add a plain secret database with hook-managed encryption
 
 > **Executor instructions**: Follow the phases in order. Run every verification gate before moving
 > on. Do not implement adjacent refactors. If a STOP condition occurs, stop and report it instead of
-> inventing a different security model. Never use a real credential in a test, log, commit, issue or
-> example.
+> inventing another security model. Never use a real credential in a test, log, commit, issue,
+> example, or terminal transcript.
+>
+> **Architecture is fixed**: `oslo secret` is an ordinary client for a separate plaintext Tagdata
+> database. It has no encryption setting, provider, codec, pre-hook, post-hook, age integration, GPG
+> integration, or key handling. Optional encryption is user configuration built from the existing
+> general `oslo.on.pre_cmd` and `oslo.on.post_cmd` hooks in an imported `secrets.lua` module.
 >
 > **Drift check (run first)**:
 >
 > ```sh
-> git diff --stat f9d15a2..HEAD -- \
+> git diff --stat 31a39cc..HEAD -- \
 >   crates/oslo-base/src \
 >   crates/oslo-runtime/src/startup \
->   crates/oslo-runtime/src/lua/engine.rs \
->   crates/oslo-shell/src/env/builtins \
+>   crates/oslo-runtime/src/lua \
 >   crates/oslo-shell/src/exec \
 >   crates/oslo-ui/src/settings \
->   tests
+>   crates/oslo-ui/src/ask/input.rs \
+>   src/cli.rs src/cli src/main.rs \
+>   tests docs/features
 > ```
 >
-> Compare the current code with the evidence in this plan if any in-scope file changed. The checkout
-> was actively receiving unrelated tab/UI refactors while this plan was authored. All tab source and
-> `crates/oslo-ui/src/ask/choose.rs` are out of scope and must remain untouched.
+> If an in-scope file changed, compare the current-state evidence below with the live checkout before
+> editing. STOP if a changed API invalidates a phase; do not force old line numbers onto new code.
 
 ## Status
 
 - **Priority**: P1
 - **Effort**: L
 - **Risk**: HIGH
-- **Depends on**: the active tab refactor being committed or moved aside
+- **Depends on**: none
 - **Category**: security
-- **Planned at**: commit `f9d15a2`, 2026-08-11
+- **Planned at**: commit `31a39cc`, 2026-08-11
 - **Status**: TODO
 
 ## Outcome
 
-After this plan is implemented, Oslo has two separate protections:
+After implementation Oslo has two independent layers:
 
-1. **An automatic privacy gate** classifies a completed interactive command before Oslo remembers,
-   observes or describes it. A detected command executes unchanged but its text is omitted from
-   Oslo-owned history, recall, tracking, prediction inputs, command metadata, hooks, titles,
-   notifications, chain reports and xtrace.
-2. **A `secret` shell builtin** accepts values through the existing masked input widget, stores them
-   through an external secure provider, and supplies named values to an external child through an
-   explicit environment variable or stdin. The value is never an Oslo command argument and never
-   interpolated into shell source.
+1. `oslo secret` reads and writes a dedicated, ordinary Tagdata database containing named values.
+   The tool always sees a normal file and works without any encryption software.
+2. The interactive shell has a conservative privacy gate that prevents high-confidence
+   secret-bearing command lines from entering Oslo-owned history, recall, tracking, terminal marks,
+   notices, frecency, chain reports, or xtrace.
 
-The implementation must describe itself as a safety net, not a complete leak-prevention boundary.
-Plaintext typed into the ordinary editor has already been drawn by the terminal before Enter. With
-the `tab` feature, that draw may already exist in the raw PTY transcript. The strong path is masked
-entry followed by a named reference.
+Users who want encryption create:
+
+```text
+$XDG_CONFIG_HOME/oslo/lua/secrets.lua
+```
+
+and import it from their normal config:
+
+```lua
+require("secrets")
+```
+
+That Lua module attaches to the existing general command hooks. An age-based module can lock the
+vault, decrypt `secrets.db.age` to the ordinary `secrets.db` before a foreground `oslo secret`
+command, then encrypt it again, remove the plaintext file, and release the lock after the command.
+Replacing age with GPG, an SSH-capable age identity, a custom program, or no wrapping at all does
+not change one line of the secret tool.
+
+## Non-negotiable architecture
+
+### `oslo secret` is a normal database tool
+
+The Rust implementation owns only:
+
+- the default plaintext database path;
+- private directory and file permissions;
+- a small schema and ordinary CRUD operations;
+- masked value entry and exact value output;
+- CLI parsing, help, diagnostics, and exit statuses;
+- automatic command-line privacy detection in the interactive shell.
+
+It does **not** own:
+
+- encryption or decryption;
+- keys, recipients, identities, agents, passphrases, or hardware tokens;
+- `age`, `gpg`, `pass`, Secret Service, Vault, or SOPS adapters;
+- an `oslo.secret` Lua settings table;
+- secret-specific pre/post hook types;
+- a daemon;
+- a second executable or a builtin called `secret`.
+
+There is one canonical entry point:
+
+```text
+oslo secret ...
+```
+
+Do not add a bare `secret` builtin. The imported general hook module matches the parsed `oslo
+secret` command before the external Oslo tool process opens its ordinary database.
+
+### Encryption is general hook configuration
+
+Encryption behavior lives entirely in user-owned Lua:
+
+```lua
+oslo.on.pre_cmd(function(command) ... end)
+oslo.on.post_cmd(function(command) ... end)
+```
+
+Do not add any of these:
+
+```lua
+oslo.secret.pre_hook = ...
+oslo.secret.post_hook = ...
+oslo.secret.encryption = ...
+oslo.secret.codec = ...
+oslo.secret.provider = ...
+```
+
+The repository supplies and tests an age-oriented reference module at
+`docs/features/secrets.lua`. A user copies or symlinks that file to
+`$XDG_CONFIG_HOME/oslo/lua/secrets.lua`, edits its ordinary Lua constants, and writes only
+`require("secrets")` in `config.lua`. The module is documentation/configuration, not Rust source and
+is not embedded in the binary.
+
+### No encryption is a supported choice
+
+Without `require("secrets")`, the database remains a mode-`0600` plaintext Tagdata file. Oslo must
+not warn repeatedly, refuse to work, or silently select an encryption tool. The user chose the
+at-rest policy by choosing which general hooks to install.
 
 ## Product contract
 
-### Automatic detection
+### Default paths
 
-Given this shape of interactive command:
-
-```text
-true --token=<synthetic-test-marker>
-```
-
-Oslo must:
-
-- run the command without textual rewriting;
-- optionally report only `secret: command hidden (<rule-id>)`;
-- never print the matched value in its diagnostic;
-- not add the line to `$HISTFILE`, in-memory history, recall or Tagdata;
-- not feed the line to frecency, tracking, prediction or repair;
-- not expose it through semantic command metadata, prompt titles, notifications, Lua observer hooks,
-  chain reports or `set -x`;
-- preserve the leading-space private-history convention as an explicit override;
-- remain conservative: a false positive costs a missing history entry, while execution is unchanged.
-
-Detection does not vault the value. There is no automatic extraction, naming or later reveal of a
-value that happened to appear in a command.
-
-### `secret` builtin
-
-The first implementation exposes exactly these forms:
+The plaintext database path is:
 
 ```text
-secret put NAME
-secret edit NAME
-secret list [PREFIX]
-secret show NAME
-secret rm NAME [--yes]
-secret run [--env VAR=NAME]... [--stdin NAME] -- PROGRAM [ARGUMENT]...
-secret status
-secret help
-secret SUBCOMMAND --help
-```
-
-Rules:
-
-- `put` and `edit` accept no value argument and use masked required input.
-- `show` requires an interactive terminal and confirmation. Its prompt explicitly says the value
-  will enter terminal scrollback and, inside a tab, the tab transcript.
-- `rm` confirms interactively; `--yes` is required when no terminal is available.
-- `list` prints names managed by Oslo, never provider values.
-- `status` prints the selected provider, whether its executable is available, and the metadata-index
-  path. It never performs a lookup and never prints a value.
-- `run` executes an external program only. It does not dispatch shell functions, aliases or builtins.
-  A user needing shell syntax writes `secret run ... -- sh -c '...'` explicitly.
-- `--env VAR=NAME` may be repeated. `VAR` must be a valid exported environment name.
-- `--stdin NAME` may appear at most once. It sends the exact stored bytes and then closes stdin; it
-  does not append a newline.
-- Provider and child programs are invoked directly with argv arrays, never through `/bin/sh -c`.
-- Secret names are metadata. Reject names outside `[A-Za-z0-9][A-Za-z0-9._/-]{0,127}`, including
-  `..` path components, empty path components and absolute paths.
-- There is deliberately no `secret get`, command-substitution shortcut, clipboard command, global
-  output masker or automatic provider fallback in the first version.
-
-## Threat model and guarantees
-
-### Protected
-
-- Accidental persistence in Oslo's flat history, recall and Tagdata history.
-- Later exposure through history search, export, backup or sync because sensitive lines never enter
-  the underlying store.
-- Oslo-generated titles, notifications, semantic marks, hook payloads, chain summaries and xtrace.
-- Secret values appearing in provider or target-process argv.
-- Secret values remaining exported in the parent Oslo process after `secret run`.
-
-### Not protected
-
-- A value typed directly into the ordinary editor before Enter.
-- Terminal scrollback, screen recording, terminal multiplexers and the current raw tab transcript.
-- Output intentionally produced by the target command.
-- A child reading another same-user process's environment where the operating system allows it.
-- A malicious provider executable or malicious target program.
-- Core dumps, swap, kernel compromise or perfect memory erasure.
-- User configuration explicitly granting an observer access to data outside the redacted hook API.
-
-Use stdin injection where a target supports it. Environment injection is a compatibility mechanism,
-not a stronger secrecy boundary.
-
-## Decisions already made
-
-### Do not textually wrap accepted commands
-
-The automatic layer sets execution context equivalent to:
-
-```text
-execute(command, sensitivity = Detected(rule_id))
-```
-
-It must not create a new string such as `secret run -- ...`. Textual wrapping changes how shell
-assignments, builtins, functions, aliases, redirects, pipelines and control operators behave.
-
-### Do not create a native encrypted database
-
-Provider values live outside Tagdata and outside a new Oslo-specific vault. The first providers are
-external programs:
-
-1. `secret-service`, implemented through `secret-tool`;
-2. `pass`, implemented through the `pass` executable.
-
-No provider crate, D-Bus crate, TLS stack, crypto crate or async runtime may be added for this plan.
-
-The default provider is `secret-service`. If `secret-tool` is unavailable or no Secret Service is
-running, the builtin reports the problem and suggests configuring `pass`. It must not silently store
-the same name in another provider.
-
-### Store only a managed-name index locally
-
-`secret list` reads an Oslo-owned metadata index. It does not use `secret-tool search`, because that
-operation can return secret details while listing. The index contains only validated names and the
-provider that owns each name.
-
-Path:
-
-```text
-$XDG_DATA_HOME/oslo/secrets.index
+$XDG_DATA_HOME/oslo/secrets/secrets.db
 ```
 
 or, when `XDG_DATA_HOME` is unset:
 
 ```text
-$HOME/.local/share/oslo/secrets.index
+$HOME/.local/share/oslo/secrets/secrets.db
 ```
 
-The directory is mode `0700`, the file is mode `0600`, writes use a sibling temporary file followed
-by rename, and symlinked files are refused. `put` adds or updates the index only after provider
-success. `rm` removes the row only after provider success. Provider changes made outside Oslo may
-make the index stale; `show` and `run` still treat the provider lookup as authoritative.
+The directory is mode `0700`; the database is mode `0600`. The vault is global to the user and is
+not switched with history profiles. A missing `XDG_DATA_HOME` and `HOME` is an explicit error for
+`oslo secret`; unlike disposable tracking data, secret storage must never fail silently.
 
-Secret names and provider lookup attributes are not confidential. The Secret Service specification
-allows attributes to be stored unencrypted, so names must never contain secret material.
+The age reference module derives these adjacent paths without configuring the Rust tool:
 
-## Configuration
-
-Add a root `oslo.secret` table because the settings span both the interactive REPL and the builtin:
-
-```lua
-oslo.secret = {
-    provider = "secret-service", -- or "pass"
-    detect = true,
-    notice = true,
-    allow = {},
-    patterns = {
-        -- company_token = "a high-confidence regular expression",
-    },
-}
+```text
+secrets.db       ordinary database, present while open
+secrets.db.age   persistent encrypted file
+secrets.db.new   staged encrypted replacement
+secrets.lock/    exclusive lock directory while open
 ```
 
-Exact semantics:
+### CLI
 
-- `provider`: `secret-service` or `pass`; another value is a configuration error and retains the
-  default.
-- `detect`: enables accept-time automatic detection; default `true`.
-- `notice`: prints the safe rule-ID notice for automatically detected lines; default `true`.
-- `allow`: a list of built-in rule IDs to disable. Unknown IDs are configuration errors.
-- `patterns`: a mapping from a public rule ID to a regex. IDs use lowercase letters, digits, `_` and
-  `-`. Invalid regexes are reported during configuration, not after Enter.
+Implement exactly these first-version forms:
 
-Sort custom patterns by rule ID before compiling them so Lua table iteration cannot change which
-rule is reported. The pattern text must never appear in the detection notice.
+```text
+oslo secret path
+oslo secret status
+oslo secret put NAME [--yes]
+oslo secret get NAME
+oslo secret list [PREFIX]
+oslo secret rm NAME [--yes]
+oslo secret help
+oslo secret SUBCOMMAND --help
+```
 
-## Detection rules
+Rules:
 
-Create a small deterministic rule set. Do not import a large provider database. Built-in rule IDs:
+- `path` prints the default plaintext database path and creates nothing.
+- `status` prints the path, whether the plaintext database exists, its schema, entry count, and
+  file size. It creates nothing and never prints a name or value.
+- `put NAME` accepts no value argument. With terminal input it uses the existing `oslo-ui` input
+  widget with `password = true` and `required = true`. With non-terminal stdin it reads the exact
+  bytes up to EOF, rejects an empty value, and stores no implicit newline of its own.
+- `put` replaces an existing value only after an interactive confirmation. In a non-terminal
+  invocation, replacement requires `--yes`; add `put NAME --yes` to the parser even though the
+  overview keeps the common form short.
+- `get NAME` writes the exact stored bytes to stdout without adding a newline. Diagnostics go to
+  stderr. This is an explicit reveal operation: on a terminal the value enters terminal output and
+  scrollback.
+- `list [PREFIX]` writes validated names only, one per line, in bytewise sorted order. It never
+  reads values into the result collection.
+- `rm NAME` confirms interactively. `--yes` is required without a terminal.
+- Missing names are errors. Unknown options/subcommands and malformed usage exit `2`; storage,
+  prompt, or lookup failures exit `1`; success exits `0`.
+- Help uses the same `Paint`, headings, row alignment, terminal detection, and subcommand-help style
+  as `oslo history`.
+- Secret values must never appear in argv, error strings, debug output, JSON, tests, terminal mark
+  payloads, or help examples.
+- Do not add `run`, environment injection, stdin injection into child programs, clipboard support,
+  editing, sync, export, import, or backup in this first version. They are valuable only after the
+  basic storage and privacy boundary is proven, and each adds binary code and leak paths.
 
-| Rule ID | Match |
-|---------|-------|
-| `private-key` | PEM private-key headers or a complete private-key block start |
-| `authorization-header` | case-insensitive `Authorization:` carrying a non-empty value |
-| `credential-url` | a URI authority containing a non-empty `user:password@` pair |
-| `secret-assignment` | an assignment whose name contains `KEY`, `PASS`, `SECRET`, or `TOKEN` and whose value is non-empty |
-| `secret-option` | `--password`, `--passwd`, `--token`, `--secret`, `--api-key`, `--auth`, `--bearer`, or `--credential`, with a glued or following non-empty value |
-| `curl-user-password` | `-u` followed by a non-empty `user:password` pair |
-| `github-token` | known GitHub token prefixes followed by a plausible non-empty body |
-| `aws-access-key` | `AKIA` followed by the expected uppercase/digit shape and length |
-| `jwt` | three non-empty base64url-shaped sections separated by dots, with a JSON-header-shaped first section |
-| `custom-<id>` | one configured local regex |
+### Names and values
 
-Do not promote these existing tracking heuristics into full history suppression:
+Names are metadata. Validate them before opening a write transaction:
 
-- a line merely being longer than 4096 bytes;
-- a line being multiline;
-- any leading assignment regardless of its name;
-- any invocation of `gpg`, `openssl`, `pass`, `vault` or `secret-tool`;
-- generic mixed-case/digit entropy without secret-related context.
+```text
+[A-Za-z0-9][A-Za-z0-9._/-]{0,127}
+```
 
-Those rules currently reduce tracking detail, where a false positive is cheap. Suppressing the whole
-interactive history entry has a higher usability cost and needs credential evidence.
+Additionally reject:
 
-## Internal design
+- absolute paths;
+- empty path components;
+- `.` and `..` components;
+- names ending in `/`;
+- NUL and non-ASCII bytes.
 
-### Sensitivity type
+Values are opaque bytes. Limit one value to 1 MiB so a mistaken pipe cannot make the shell allocate
+without bound. Do not trim, normalize, Unicode-normalize, append, or remove bytes.
 
-Add `crates/oslo-base/src/secret.rs` and export it from `crates/oslo-base/src/lib.rs`:
+### Database format
+
+Use a separate Tagdata file through the existing `oslo-base` key-value seam. No other module may
+`use tagdata` directly.
+
+The database contains:
+
+```text
+meta/kind     = "oslo-secrets"
+meta/schema   = 1
+secret/NAME   = VALUE
+```
+
+Opening an existing file for secrets must refuse:
+
+- a non-Tagdata file;
+- a Tagdata page size Oslo does not support;
+- a missing or different `meta/kind` marker;
+- a newer schema;
+- a symlink at the database path.
+
+Creating the database and writing its marker plus first value happen under one checked write path.
+Read-only commands never create an empty database. Storage errors are returned with the path and
+operation but never the secret value.
+
+### Automatic privacy gate
+
+The automatic layer classifies a completed interactive command before any Oslo-owned persistence or
+frecency update. A private command executes unchanged.
+
+Sensitivity has three states:
 
 ```rust
-#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Sensitivity {
     Public,
     ExplicitPrivate,
     Detected { rule: String },
 }
+```
 
-impl Sensitivity {
-    pub fn is_private(&self) -> bool;
-    pub fn rule(&self) -> Option<&str>;
+`ExplicitPrivate` is the existing leading-space convention. It always wins. A pre-command hook may
+replace the command; classify the replacement too and only promote sensitivity, never downgrade it.
+
+For a private command Oslo must not:
+
+- add it to the editor history or `$HISTFILE`;
+- add it to recall, Tagdata history, outcomes, tracking, prediction, or repair inputs;
+- count its command words toward frecency;
+- expose it in terminal semantic marks, titles, slow-command notices, or chain reports;
+- print expanded arguments through `set -x`.
+
+The command may still be passed to `pre-cmd` and `post-cmd`. These hooks are executable user
+configuration and form a trusted control boundary; the age module cannot operate if the general
+pre-command hook is denied the parsed command it must recognize. Document this exception clearly.
+
+The initial high-confidence detector rules are:
+
+| Rule ID | Match |
+|---|---|
+| `private-key` | a PEM private-key header |
+| `authorization-header` | case-insensitive `Authorization:` with a non-empty value |
+| `credential-url` | URI authority containing non-empty `user:password@` |
+| `secret-assignment` | assignment name containing `KEY`, `PASS`, `SECRET`, or `TOKEN` with a non-empty value |
+| `secret-option` | `--password`, `--passwd`, `--token`, `--secret`, `--api-key`, `--auth`, `--bearer`, or `--credential` with a value |
+| `curl-user-password` | `-u` followed by non-empty `user:password` |
+| `github-token` | a known GitHub token prefix and plausible body |
+| `aws-access-key` | the documented `AKIA` shape and length |
+| `jwt` | three non-empty base64url-shaped sections with a JSON-header-shaped first section |
+
+Do not suppress history merely because a line is long, multiline, invokes `age`/`gpg`, contains the
+word `secret`, or has generic high entropy. `oslo secret get NAME` contains metadata, not the secret
+value, and must remain visible to the imported hook module.
+
+Expose detector tuning under a separate privacy namespace, never under `oslo.secret`:
+
+```lua
+oslo.privacy = {
+    detect = true,
+    notice = true,
+    allow = {},
+    patterns = {},
 }
 ```
 
-The module also owns `Detector`, built-in rule IDs and detection unit tests. `Detector` compiles custom
-regexes once at interactive startup. It takes settings as plain strings so `oslo-base` does not depend
-on `oslo-ui`.
+- `detect`: default `true`.
+- `notice`: default `true`; prints only `private command hidden (<rule-id>)`.
+- `allow`: built-in rule IDs to disable. Unknown IDs are configuration errors.
+- `patterns`: public rule ID to regex source. Compile once at interactive startup, sort by rule ID,
+  and report invalid patterns during configuration.
+- Pattern text and matched text never appear in a notice.
 
-`ExplicitPrivate` always wins. A pre-command hook replacement can promote `Public` to `Detected`, but
-must never downgrade a private command.
+## General `secrets.lua` contract
 
-### Accept-time placement
+The reference file is ordinary configuration and must use only public Oslo Lua APIs plus the
+external `age` executable. It must not require Rust changes when a user swaps commands.
 
-Change `crates/oslo-runtime/src/startup/read.rs` so a completed expanded buffer is classified before
-`OsloHelper::record_command_use`. Replace `Input::Command.secret: bool` with
-`Input::Command.sensitivity: Sensitivity`.
+### Command recognition
 
-Preserve the original leading-space decision before trimming. Run content detection on the completed
-expanded buffer, because that is what executes and what history currently stores.
-
-### One privacy gate for all sinks
-
-In `crates/oslo-runtime/src/startup/repl.rs`, derive one `private` boolean from `Sensitivity` and use it
-for every sink. Do not let each subsystem re-detect the line.
-
-For private commands:
-
-- skip `editor::remember`;
-- skip `remember_history`;
-- skip Tagdata `append`, trim, settlement and outcome rows;
-- skip `OsloHelper::record_command_use`;
-- do not arm the chain recorder and do not print a resumable chain;
-- call terminal `output_start(None)`;
-- render the running title as `private`, without command text;
-- suppress slow-command notifications and `on-report` notification handlers;
-- forget tracking boundaries;
-- suppress `set -x` for the full execution of the top-level private command.
-
-Add an RAII trace-suppression guard in `crates/oslo-shell/src/exec/simple/trace.rs`, exposed through a
-narrow function from `crates/oslo-shell/src/exec/mod.rs`. A depth counter is required so nested
-evaluation cannot re-enable trace early. The default path must remain one cheap branch.
-
-### Hooks
-
-Extend the command-started and command-finished contexts in
-`crates/oslo-runtime/src/lua/engine.rs` with:
+Use `pre-cmd`'s parsed `commands` table; do not split `command.text`. Match only a single,
+foreground, simple command whose literal argv begins:
 
 ```text
-sensitive = true|false
-secret_rule = rule-id or nil
+argv[1] == "oslo"
+argv[2] == "secret"
 ```
 
-For private commands, set `text` to the literal placeholder `<private>`. Never omit the field, because
-existing Lua handlers may assume it is a string. The pre-command hook may still cancel or replace the
-line. Reclassify a replacement before execution and taint it with the original sensitivity so a
-private input cannot become public. Public commands keep the existing raw hook behavior.
+Wrap only subcommands that may open the database: `status`, `put`, `get`, `list`, and `rm`. Do not
+unlock for `path`, `help`, or `--help`.
 
-### Tracking redaction
-
-Keep structural tracking-only rules in `crates/oslo-base/src/track/redact.rs`. Replace duplicated
-credential-specific checks with the shared detector where doing so preserves current head-only
-tracking behavior. Tracking may remain stricter than full history suppression.
-
-### Provider boundary
-
-Add a `secret/` module under `crates/oslo-shell/src/env/builtins/`:
+The current parsed-command payload loses whether the final list item used `&`. Extend
+`crates/oslo-runtime/src/lua/parsed.rs` generically with a boolean `background` field and tests.
+The reference module refuses background commands, pipelines, `&&`, `||`, `;`, multiple commands,
+aliases, variable command names, and nonliteral spellings. The safe supported form is a standalone:
 
 ```text
-secret.rs              command parser and help
-secret/provider.rs     provider trait and selection
-secret/secret_tool.rs  Secret Service argv protocol
-secret/pass.rs         pass argv protocol
-secret/index.rs        validated metadata index
-secret/run.rs          external-child environment/stdin injection
-secret/tests.rs        parser, provider and leak tests
+oslo secret SUBCOMMAND ...
 ```
 
-The provider interface operates on bytes and never implements `Debug` for a value container:
+Do not keep the plaintext database open while unrelated commands run.
 
-```rust
-trait Provider {
-    fn put(&self, name: &SecretName, value: &[u8]) -> io::Result<()>;
-    fn lookup(&self, name: &SecretName) -> io::Result<SecretValue>;
-    fn remove(&self, name: &SecretName) -> io::Result<bool>;
-    fn available(&self) -> bool;
-}
-```
+### Pre-command lifecycle
 
-Do not claim guaranteed memory erasure. Avoid cloning `SecretValue`, never implement `Display` or
-`Debug` for it, keep its scope short and drop it immediately after the provider or child operation.
+The module keeps `active = false` in its Lua closure. When it recognizes a supported command:
 
-### Provider protocols
+1. Refuse if `active` is already true.
+2. Atomically acquire `secrets.lock/` with an external `mkdir` argv call. `oslo.fs.mkdir` is `-p`
+   and therefore cannot be used as the exclusive acquisition primitive.
+3. Write the Oslo PID and timestamp as non-secret diagnostic metadata inside the lock directory.
+4. Refuse if plaintext `secrets.db` already exists. Never overwrite crash residue.
+5. If `secrets.db.age` exists, run age directly with argv to decrypt it to `secrets.db`.
+6. If the encrypted file is absent, permit only `put`; it will create the ordinary database.
+7. Restrict the plaintext database to mode `0600` when it exists.
+8. Set `active = true` only after every precondition succeeds.
+9. Return the original `command.text`, not `nil`. `pre-cmd` uses first-answer-wins semantics; claiming
+   the command prevents a later pre-command handler from cancelling it after plaintext was opened,
+   which would skip `post-cmd` in the current REPL.
 
-`secret-service` uses direct argv equivalent to:
+Any failure before step 8 removes a lock acquired by this invocation, prints a value-free error,
+and returns `false` to cancel execution.
 
-```text
-secret-tool store --label oslo:<name> oslo-app oslo oslo-name <name>
-secret-tool lookup oslo-app oslo oslo-name <name>
-secret-tool clear oslo-app oslo oslo-name <name>
-```
+The import must be the first pre-command handler the user's config attaches. State this beside the
+`require("secrets")` line because hook attachment order is the only ordering mechanism Oslo has.
 
-The value for `store` is written to the child's stdin. Capture lookup stdout internally and remove
-only one provider-added trailing newline. Provider stderr may be summarized on failure, but output
-containing the requested value must never be echoed.
+### Post-command lifecycle
 
-`pass` stores below the fixed `oslo/` prefix:
+The general `post-cmd` handler ignores command text and acts only when its own `active` flag is true:
 
-```text
-pass insert --force --multiline oslo/<name>
-pass show oslo/<name>
-pass rm --force oslo/<name>
-```
+1. Set `active = false` before starting cleanup so a failure cannot make a later unrelated command
+   look owned by this lifecycle.
+2. Confirm plaintext `secrets.db` exists and is a regular non-symlink file.
+3. Refuse an existing or symlinked `secrets.db.new`; never let age overwrite unknown staging data.
+4. Run age directly with argv to encrypt it to `secrets.db.new` using configured public recipients.
+5. Set mode `0600` on the staged ciphertext.
+6. Atomically rename `secrets.db.new` over `secrets.db.age` only after age succeeds.
+7. Remove plaintext `secrets.db` only after the encrypted replacement exists.
+8. Remove `secrets.lock/` last.
 
-Write the stored value through stdin. Validate names before constructing the provider path.
+Never delete or overwrite the previous `secrets.db.age` before the staged encryption succeeds. On
+post-hook failure, preserve the previous ciphertext, the plaintext database, and the lock directory
+for explicit recovery, and print a loud diagnostic naming paths but no values.
 
-### Scoped child execution
+Current `post-cmd` is observational, so a failing post hook cannot replace the already completed
+command's exit status. Do not change the global hook contract in this plan. Document that a close
+failure is reported loudly and leaves the vault locked for recovery even though the original tool
+status is unchanged.
 
-Do not temporarily mutate `std::env` or `Environment`. Extend the existing external spawn path with
-an execution specification containing:
+### Reference age configuration
 
-- resolved program path;
-- argv;
-- a copied base environment from `Environment::get_exported_vars()`;
-- injected secret environment pairs;
-- optional stdin bytes.
+`docs/features/secrets.lua` must keep all policy as editable Lua constants near its top:
 
-The forked child calls `execve` with the constructed environment. The parent never publishes the
-secret. For stdin injection, create a pipe, give the read end to child fd 0, write the secret from the
-parent, close the write end, then wait. Preserve the existing signal reset and wait-status behavior in
-`env/builtins/spawn.rs`; do not create a second incompatible fork/wait implementation.
+- plaintext database path;
+- encrypted file path;
+- staging file path;
+- lock directory path;
+- age executable;
+- age identity path;
+- age recipients file or recipient arguments.
 
-Reject NUL in environment names or values. Stdin injection remains byte-preserving.
+It passes paths and recipients as argv elements through `oslo.run{...}`. It never uses `sh -c`,
+`os.execute`, `io.popen`, command concatenation, a secret environment variable, or a secret argv
+argument. The module handles only age as a concrete example; its accompanying documentation shows
+that GPG/custom behavior is achieved by replacing the two external argv calls, not by configuring
+the Rust tool.
+
+## Threat model
+
+### Protected
+
+- Secret values entered through masked `put` are absent from the command line and Oslo history.
+- High-confidence accidental inline secrets are excluded from Oslo persistence and suggestions.
+- The secret database is separate from all history profiles and history maintenance.
+- With the reference module, the previous encrypted vault stays valid until replacement succeeds.
+- Concurrent interactive Oslo shells using the same module cannot both open the vault.
+- Oslo itself contains no cryptographic implementation, private key, provider SDK, or crypto crate.
+
+### Not protected
+
+- Plaintext typed into the ordinary editor before Enter; the terminal already drew it.
+- The raw PTY transcript of a scratch session, screen recording, or terminal scrollback.
+- `oslo secret get NAME` output intentionally written to stdout.
+- General `pre-cmd` and `post-cmd` handlers, which are trusted executable configuration.
+- A malicious or replaced `age` executable, Lua module, or target executable.
+- Same-user processes while `secrets.db` exists in plaintext.
+- Filesystem journals, snapshots, SSD remanence, swap, or backups that capture the temporary file.
+- `SIGKILL`, power failure, or a shell crash between pre and post hooks. These may leave plaintext
+  plus `secrets.lock/`; the next invocation must refuse to overwrite them.
+- Direct `oslo secret` invocations from Bash, scripts, `sh -c`, or another noninteractive caller.
+  Oslo configs and their general hooks load only in the interactive REPL. Such an invocation sees
+  the ordinary plaintext database if one exists and cannot unlock `secrets.db.age` by itself.
+- Root, kernel compromise, ptrace/memory inspection where permitted, or perfect memory erasure.
+
+This feature must be described as history safety plus optional encrypted-at-rest configuration, not
+as process isolation or a complete secrets manager security boundary.
 
 ## Current-state evidence
 
-- `crates/oslo-runtime/src/startup/read.rs:307-367` derives a `secret` boolean only from leading
-  whitespace and records command frecency before returning the accepted command.
-- `crates/oslo-runtime/src/startup/repl.rs:238-263` gates flat history, recall and Tagdata on that
-  boolean before execution.
-- `crates/oslo-runtime/src/startup/repl.rs:283-317` hands raw text to hooks and title rendering;
-  semantic metadata is already gated.
-- `crates/oslo-runtime/src/startup/repl.rs:408-460` sends raw text to chain reporting,
-  notifications, post-command hooks and tracking unless the leading-space flag was set.
-- `crates/oslo-runtime/src/startup/notify.rs:40-66` can expand `{cmd}` into a notification title or
-  a `/bin/sh -c` notification command.
-- `crates/oslo-shell/src/exec/simple/trace.rs:18-26` prints expanded assignments and argv under
-  `set -x` and currently has no private-command suppression.
-- `crates/oslo-base/src/track/redact.rs:239-352` has useful credential heuristics, but they run when
-  reducing tracking detail rather than before raw history persistence.
-- `crates/oslo-ui/src/ask/input.rs:20-103` already supports masked input and returns the value without
-  drawing it.
-- `crates/oslo-shell/src/env/builtins/ui.rs:140-168` exposes that widget as `ui input --password`.
-- `crates/oslo-shell/src/env/builtins/mod.rs:118-210` is the single default-builtin registry.
-- `crates/oslo-shell/src/env/builtins/spawn.rs:46-84` is the existing fork, exec and wait path for an
-  external program invoked by a builtin.
-- `crates/oslo-shell/src/tab/keeper.rs:201-239` appends PTY output bytes to the tab log.
-- `crates/oslo-shell/src/tab/log.rs:34-59` stores those raw bytes in the capped transcript.
+- `src/cli/tools.rs:28-62` is the single list of `oslo <tool>` names and help descriptions.
+- `src/cli/tools.rs:114-144` dispatches `history` and `scratch`; `secret` needs the same explicit
+  route rather than falling into stub help.
+- `src/cli/history/help.rs` is the required subcommand-help renderer and style exemplar.
+- `crates/oslo-base/src/track/mod.rs:40-45` states that nothing outside `track::kv` may import
+  Tagdata. Preserve that engine boundary.
+- `crates/oslo-base/src/track/kv/mod.rs:30-105` owns bucket names through `Tree`.
+- `crates/oslo-base/src/track/kv/file.rs:10-64` already owns mode `0600`, directory mode `0700`,
+  page-size validation, and database-file preparation.
+- `crates/oslo-ui/src/ask/input.rs:20-58` already provides masked, required terminal input.
+- `crates/oslo-runtime/src/startup/read.rs:313-369` derives the leading-space flag and currently
+  records frecency before returning the command.
+- `crates/oslo-runtime/src/startup/repl.rs:238-263` writes editor history, recall, and Tagdata before
+  the existing `pre-cmd` hook.
+- `crates/oslo-runtime/src/startup/repl.rs:283-303` shows that `pre-cmd` is first-answer-wins and
+  cancellation currently skips directly to the next prompt.
+- `crates/oslo-runtime/src/startup/repl.rs:419-426` fires `post-cmd` after execution and on failures.
+- `crates/oslo-runtime/src/lua/api/hooks.rs:1-28` documents the existing general pre/post command
+  hooks; no new secret-specific moment is needed.
+- `crates/oslo-runtime/src/lua/parsed.rs:44-110` supplies parsed argv to `pre-cmd` but currently
+  loses the final background bit.
+- `crates/oslo-lua/src/stdlib/module.rs:21-40` already searches
+  `$XDG_CONFIG_HOME/oslo/lua/?.lua`, which is why `require("secrets")` needs no loader changes.
 
 ## Scope
 
 ### In scope
 
 - `crates/oslo-base/src/lib.rs`
-- `crates/oslo-base/src/secret.rs` (new)
-- `crates/oslo-base/src/track/redact.rs`
+- `crates/oslo-base/src/privacy.rs` (new)
+- `crates/oslo-base/src/secret/mod.rs` (new)
+- `crates/oslo-base/src/secret/store.rs` (new)
+- `crates/oslo-base/src/secret/tests.rs` (new, if splitting tests keeps files below the LOC gate)
+- `crates/oslo-base/src/track/kv/mod.rs`
+- `crates/oslo-base/src/track/kv/file.rs`
 - `crates/oslo-runtime/src/startup/read.rs`
 - `crates/oslo-runtime/src/startup/repl.rs`
-- `crates/oslo-runtime/src/startup/notify.rs`
 - `crates/oslo-runtime/src/startup/editor.rs`
-- `crates/oslo-runtime/src/startup/prompt.rs`
-- `crates/oslo-runtime/src/lua/engine.rs`
-- `crates/oslo-shell/src/env/builtins/mod.rs`
-- `crates/oslo-shell/src/env/builtins/spawn.rs`
-- `crates/oslo-shell/src/env/builtins/secret.rs` and `secret/` children (new)
-- `crates/oslo-shell/src/exec/mod.rs`
+- `crates/oslo-runtime/src/startup/notify.rs`
+- `crates/oslo-runtime/src/startup/tracking.rs`
+- `crates/oslo-runtime/src/lua/parsed.rs`
 - `crates/oslo-shell/src/exec/simple/trace.rs`
 - `crates/oslo-ui/src/settings/mod.rs`
 - `crates/oslo-ui/src/settings/from_lua.rs`
-- `crates/oslo-ui/src/settings/tests.rs`
-- focused existing tests under `crates/oslo-base`, `crates/oslo-runtime` and `crates/oslo-shell`
-- `tests/startup_tests.rs`
-- `tests/terminal_semantics_tests.rs` and its existing child modules when metadata coverage is needed
+- `crates/oslo-ui/src/settings/privacy.rs` (new if consistent with the current settings split)
+- `src/cli.rs`
+- `src/cli/tools.rs`
+- `src/cli/tools/tests.rs`
+- `src/cli/secret.rs` (new)
+- `src/cli/secret/help.rs` (new)
+- `src/cli/secret/tests.rs` (new)
+- `tests/secret_cli_tests.rs` (new)
+- `tests/secret_privacy_tests.rs` (new)
+- `tests/terminal_semantics_tests.rs` and a focused file under `tests/terminal_semantics/` if needed
+- `tests/config_source_tests.rs`
 - `docs/features/secrets.md` (new)
-- `CHANGELOG.md` only when the implementation is release-ready
+- `docs/features/secrets.lua` (new, the tested reference module)
+- `plans/PLAN_SECRETS.md` status/checklist updates only
 
 ### Out of scope
 
-- All files under `crates/oslo-shell/src/tab/` and the active tab refactor.
-- `crates/oslo-ui/src/ask/choose.rs` and unrelated UI refactoring.
-- Changing the tab log from raw bytes to a semantic transcript.
-- Editing or expanding `README.md`; feature detail belongs in `docs/features/secrets.md`.
-- Native encryption or Tagdata schema changes.
-- Secret sync, sharing, rotation, leases or remote Vault support.
-- macOS Keychain, Windows Credential Manager and clipboard integration.
-- Output masking or rewriting arbitrary child output.
-- Provider SDK dependencies.
-- Changing non-interactive shell history behavior.
+- `README.md` and every existing README file. Do not add secret documentation there.
+- `PLAN.md`, `PLAN_DIVERGES.md`, and other plans.
+- `examples/`; it was intentionally removed and must not be recreated.
+- Cargo dependency additions or feature flags.
+- Native encryption, crypto libraries, provider libraries, D-Bus, TLS, async runtimes, daemons, or
+  network access.
+- A bare `secret` builtin or changes to builtin registration.
+- History database schema, profile layout, sync protocol, import/export format, or existing history
+  CLI behavior.
+- Generic hook ordering, priority, or post-hook status semantics beyond the one parsed-command
+  `background` field required by the configuration module.
+- Clipboard integration, environment injection, child execution, shell substitution shortcuts,
+  output masking, global redaction, secure deletion claims, and automatic extraction of secrets
+  from detected commands.
+- Scratch/tab source and UI refactors unrelated to masked input.
 
 ## Git workflow
 
-- Start only from a worktree with no unrelated modifications in scope.
-- Branch: `feat/secrets` from `develop`.
-- Commits are title-only Conventional Commits, under 50 characters, with no signature or attribution.
-- Recommended commits:
-  1. `test(secret): characterize privacy sinks`
-  2. `feat(secret): gate sensitive commands`
-  3. `feat(secret): add provider storage`
-  4. `feat(secret): inject child secrets`
-  5. `docs(secret): document threat model`
-- Do not push, merge or open a PR unless separately instructed.
-- Code comments describe code behavior only. Do not put design justification or change history in code
-  comments, and keep comments below 20% of implementation lines in each code block.
+- Work on a dedicated feature branch created from the current `develop` unless the operator says
+  otherwise.
+- Commits are title-only Conventional Commits, no body, no signature, no co-author line.
+- Format: `<type>(<optional-scope>): <message>` with the full title at most 50 characters.
+- Suggested logical commits:
+  - `feat(secret): add plain secret database`
+  - `feat(privacy): hide sensitive commands`
+  - `docs(secret): add age hook module`
+- Do not push, merge, or open a pull request unless explicitly requested.
 
 ## Commands
 
 Use the Makefile for every relevant repository task.
 
-| Purpose | Command | Expected result |
-|---------|---------|-----------------|
-| Fast compile gate | `make check` | exit 0 |
+| Purpose | Command | Expected success |
+|---|---|---|
+| Fast compile | `make check` | exit 0 |
+| Full tests | `make test` | exit 0, all Oslo workspace tests pass |
 | Terminal tests | `make test-terminal` | exit 0 |
-| Full repository gate | `make verify` | exit 0 |
-| Minimal release | `make build TYPE=minimal` | exit 0; static, no `INTERP`, no `NEEDED` |
-| All-feature release | `make build` | exit 0; static, no `INTERP`, no `NEEDED` |
+| Formatting check | `make fmt-check` | exit 0 |
+| Lint | `make clippy` | exit 0, no warnings |
+| Documentation compile | `make rustdoc` | exit 0, no warnings |
+| LOC policy | `make check-loc` | exit 0 |
+| Documentation paths | `make check-readme` | exit 0 |
+| Full gate | `make verify` | exit 0 |
+| Minimal static release | `make build TYPE=minimal` | exit 0; no INTERP or NEEDED entries |
 
-Record exact binary bytes with `stat -c %s target/x86_64-unknown-linux-musl/release/oslo` immediately
-after each Makefile build. Do not compare the rounded megabyte line printed by Make.
+Do not use Python to generate, edit, migrate, or inspect files. Use Rust tests, shell commands, and
+patch/edit tools.
 
 ## Implementation phases
 
-### Phase 0: Record the baseline
+### Phase 0: Record baseline and reconcile drift
 
-1. Confirm the active tab refactor is no longer an uncommitted in-scope risk.
-2. Run `make verify` before changes.
-3. Run `make build TYPE=minimal` and record the exact byte count.
-4. Run `make build` and record the exact byte count.
-5. Record `git status --short` with no unrelated in-scope modifications.
+1. Run the drift command from the header.
+2. Run `git status --short` and record unrelated user changes; never overwrite them.
+3. Run `make test`, `make test-terminal`, and `make build TYPE=minimal`.
+4. Record the exact minimal binary byte count from
+   `target/x86_64-unknown-linux-musl/release/oslo` in this plan's implementation notes or commit
+   handoff.
+5. Confirm `age` is not needed for Rust unit tests; hook integration tests use a deterministic fake
+   executable and synthetic values.
 
-**Verify**: both Makefile gates exit 0 and both byte counts are recorded in the implementation PR or
-commit notes, not in a code comment.
+**Verify**: all three Make targets exit `0`; baseline bytes are recorded.
 
-### Phase 1: Characterize every current sink
+### Phase 1: Characterize privacy sinks and hook behavior
 
-Before changing behavior, add synthetic-marker tests proving where the existing leading-space flag
-does and does not gate data. Cover:
+Before changing production behavior, add regression tests proving the current seams:
 
-- flat history file;
-- in-memory `history` output;
-- recall and history expansion;
-- Tagdata raw history and its finder/query surface;
-- command frecency;
-- tracking aggregate and outcomes;
-- semantic output-start metadata;
-- prompt title context;
-- pre-command and post-command Lua hook payloads;
-- slow notification template and `on-report` payload;
-- chain segment and resume text;
-- `set -x` expanded output.
+- an accepted command reaches editor history, recall, Tagdata log/outcome, tracking, and frecency;
+- a leading-space command already skips history/recall/tracking but currently still reaches the
+  early frecency call, characterizing the gap Phase 4 must close;
+- `pre-cmd` sees parsed argv for `oslo secret get synthetic-name`;
+- returning a string from a pre-command handler prevents later handlers from running;
+- cancellation after a handler would skip `post-cmd`, documenting why `secrets.lua` must claim the
+  command after opening;
+- `post-cmd` fires after success and failure;
+- the parsed command table reports the new final `background` boolean correctly.
 
-Every test uses a generated synthetic marker with a stable prefix such as `OSLO_TEST_SECRET_`; never
-use a valid live token.
+Use synthetic markers such as `synthetic-secret-marker`; never use realistic credentials.
 
-**Verify**: `make test-terminal && make test` both exit 0. The new tests must demonstrate the existing
-gaps before production changes; mark gap assertions with the phase they are expected to pass after,
-not with ignored tests that can remain forgotten.
+**Verify**: `make test` and `make test-terminal` exit `0`.
 
-### Phase 2: Add settings and the detector
+### Phase 2: Extend the checked Tagdata seam and add the plain secret store
 
-1. Add `Secret` settings and defaults under `Settings` in `oslo-ui`.
-2. Parse and validate `oslo.secret` in `settings/from_lua.rs`.
-3. Add settings tests for defaults, both providers, disabled detection, notice, allowlists, sorted
-   custom patterns, invalid IDs, invalid regexes and unknown providers.
-4. Add `oslo-base::secret::{Sensitivity, Detector}`.
-5. Split credential evidence from tracking-only minimization in `track/redact.rs`.
-6. Add a table-driven detector suite for every rule, quoting forms, false-positive counterexamples,
-   custom rules and allowlisted rules.
+1. Add a checked create/open function to `track::kv` that returns `Result<Store, String>` with the
+   real path-bearing error. Keep the existing optional tracking open behavior unchanged.
+2. Refuse symlinks before opening or creating a secret database path.
+3. Add `Tree::Secret` and update the exhaustive bucket table/count.
+4. Add `oslo_base::secret` without importing Tagdata directly.
+5. Implement default-path derivation, name validation, schema marker validation, size limit, exact
+   byte storage, sorted prefix listing, checked put/get/remove, status, and private permissions.
+6. Keep read-only opens non-creating. A first `put` may create and initialize the database.
+7. Test wrong kind, future schema, foreign page size, symlink, missing home, exact bytes, overwrite,
+   prefix ordering, removal, size limit, and file modes.
 
-False-positive counterexamples must include:
+**Verify**: `make check` and `make test` exit `0`.
 
-- `openssl version`;
-- `gpg --version`;
-- a non-secret `FOO=bar command` assignment;
-- a long path;
-- a multiline ordinary shell construct;
-- a dotted version string;
-- a mixed-case build identifier without secret context.
+### Phase 3: Implement `oslo secret`
 
-**Verify**: `make check && make test` exit 0.
+1. Register `secret` in `src/cli/tools.rs` and route it explicitly to `src/cli/secret.rs`.
+2. Do not add a builtin registration.
+3. Implement the exact CLI contract and exit statuses above.
+4. Use the existing masked input widget for terminal `put`; use exact stdin bytes for non-terminal
+   `put`.
+5. Render overview and subcommand help through the same style as history.
+6. Add integration tests under a temporary `HOME`/`XDG_DATA_HOME` for every subcommand, first-put
+   creation, exact output, errors, modes, help, no-value argv rejection, no creation by read-only
+   commands, and independence from history profiles.
+7. Add a PTY test proving the entered synthetic value does not appear in the terminal transcript
+   during masked `put`.
 
-### Phase 3: Move classification before persistence
+**Verify**: `make test` and `make test-terminal` exit `0`.
 
-1. Change the accepted input type to carry `Sensitivity`.
-2. Classify the completed expanded buffer before frecency recording.
-3. Retain the original leading-space decision as `ExplicitPrivate`.
-4. Replace every REPL `secret` boolean branch with the centralized sensitivity gate.
-5. Reclassify pre-hook replacements without allowing a downgrade.
-6. Add trace suppression for private top-level execution.
-7. Make hook contexts redacted and add `sensitive` plus `secret_rule`.
-8. Suppress private title, notification, report, chain and metadata text.
-9. Print only the optional safe detection notice.
+### Phase 4: Add one privacy classification path
 
-**Verify**: `make test-terminal && make test` exit 0. All Phase 1 synthetic-marker assertions now pass
-for automatic detection and explicit leading-space privacy.
+1. Add `Sensitivity`, `Detector`, rule IDs, custom rule compilation, and a thread-local execution
+   privacy guard in `oslo-base/src/privacy.rs`.
+2. Add `oslo.privacy` settings using the existing settings conversion/error pattern.
+3. Classify a completed expanded command in `startup/read.rs` before calling
+   `record_command_use`; skip frecency when private.
+4. Replace `Input::Command.secret: bool` with `sensitivity: Sensitivity`.
+5. Use `sensitivity.is_private()` for editor history, recall, Tagdata append/outcome, tracking,
+   `pre-record`, and terminal semantic marks.
+6. Reclassify a `pre-cmd` string replacement and promote the original sensitivity.
+7. For private execution, enter the privacy guard around evaluation. Make xtrace consult this guard
+   and emit nothing while it is active without changing the user's `set -x` option state.
+8. Do not arm pipeline segment/chain recording for a private command.
+9. Replace title and slow-command text with a constant private label; never include the rule pattern
+   or match.
+10. Keep full command payloads for the trusted general `pre-cmd` and `post-cmd` boundary and test
+    that the imported module can still recognize `oslo secret`.
 
-### Phase 4: Add provider storage and reveal UX
+**Verify**: `make check`, `make test`, and `make test-terminal` exit `0`.
 
-1. Register the `secret` builtin in the one default registry.
-2. Implement one source of truth for top-level and subcommand help.
-3. Implement strict argument parsing and `SecretName` validation.
-4. Implement masked `put` and `edit` with the existing `ask::input` widget.
-5. Implement the Secret Service adapter through `secret-tool`.
-6. Implement the `pass` adapter.
-7. Implement the securely created, atomically rewritten managed-name index.
-8. Implement `list`, confirmed TTY-only `show`, confirmed `rm`, and `status`.
-9. Use mock provider executables in tests. Assert the synthetic value is absent from argv and appears
-   only on the provider stdin or captured lookup stdout boundary.
+### Phase 5: Add and test the imported age hook module
 
-Provider failure tests cover missing executable, non-zero exit, closed stdin, invalid UTF-8 error
-messages, missing name, stale index entry and unavailable Secret Service. Diagnostics name the
-provider operation and secret name but never the value.
+1. Extend parsed command metadata with the generic final `background` fact and document it in
+   `docs/features/hooks.md` only if that existing document must describe the public field. Do not
+   touch a README.
+2. Add `docs/features/secrets.lua` implementing the lifecycle exactly as specified.
+3. Add `docs/features/secrets.md` explaining the plain core, final user paths, the one-line import,
+   age constants, no-encryption choice, GPG/custom replacement, supported standalone command shape,
+   crash residue, manual recovery, and honest threat boundary.
+4. In integration tests, copy the exact repository `docs/features/secrets.lua` into a temporary
+   `$XDG_CONFIG_HOME/oslo/lua/secrets.lua`; do not duplicate its body as a Rust string.
+5. Put `require("secrets")` first in the temporary `config.lua`.
+6. Put a deterministic fake `age` executable first on the temporary `PATH`. It copies synthetic
+   bytes and records only operation/path order, never a value.
+7. Prove pre/decrypt/tool/post/encrypt/delete order, first `put`, failed decrypt cancellation,
+   failed encryption preservation, lock contention across two interactive shells, refusal of
+   background/pipeline/chained forms, residue refusal, and the no-import plaintext path.
 
-**Verify**: `make check && make test` exit 0.
+**Verify**: `make test` and `make test-terminal` exit `0`.
 
-### Phase 5: Add scoped child injection
-
-1. Parse repeated `--env VAR=NAME`, optional `--stdin NAME`, mandatory `--`, and external argv.
-2. Resolve every named secret before forking. If any lookup fails, run no child.
-3. Extend the existing spawn path to accept an explicit child environment and optional stdin bytes.
-4. Build the child environment from exported Oslo variables plus injected values without mutating the
-   parent environment.
-5. Use `execve`, preserve current signal reset and wait status, and close every unused pipe end.
-6. Drop retrieved values immediately after spawn completion.
-
-Tests must prove:
-
-- the target sees each requested environment variable;
-- the target receives exact stdin bytes and EOF;
-- the target argv contains no secret value;
-- the provider argv contains no secret value;
-- the parent environment is unchanged before and after success, target failure and provider failure;
-- duplicate target environment names are rejected rather than resolved by order;
-- invalid environment names and NUL-containing environment values are rejected;
-- the target never starts after a partial provider-lookup failure;
-- exit codes and signal statuses match the existing spawn behavior.
-
-**Verify**: `make test-terminal && make test` exit 0.
-
-### Phase 6: Document the honest boundary
-
-Create `docs/features/secrets.md` containing:
-
-- automatic detection behavior and rule IDs;
-- the full `oslo.secret` configuration;
-- every builtin form with examples using fake names and values;
-- provider setup requirements;
-- the recommendation to prefer stdin over environment variables;
-- the fact that Secret Service attributes and secret names are metadata;
-- the ordinary-editor and raw-tab-transcript limitation;
-- the fact that `show` and target output enter scrollback;
-- the explicit statement that detection is a safety net, not a guarantee;
-- recovery instructions for an accidentally entered real secret: rotate it, then remove it from any
-  terminal or external logs; Oslo cannot prove deletion outside its own stores.
-
-Do not expand `README.md` with the feature guide.
-
-**Verify**: `make check-readme && make rustdoc` exit 0.
-
-### Phase 7: Full security and size gate
+### Phase 6: Full security and size gate
 
 1. Run `make verify`.
-2. Run `make build TYPE=minimal`; record exact bytes and compare with Phase 0.
-3. Run `make build`; record exact bytes and compare with Phase 0.
-4. Confirm both binaries remain static through the Makefile's checks.
-5. Inspect `git status --short` and reject any file outside Scope.
-6. Search generated test artifacts and configured scratch stores for the synthetic marker. It may
-   exist only in the mock provider's intentional secret storage and the target's intentional
-   environment/stdin capture.
+2. Run `make build TYPE=minimal` and record the exact after byte count and delta from Phase 0.
+3. Confirm no dependency or feature was added to any Cargo manifest or lockfile.
+4. Inspect the final binary with the existing Makefile static check.
+5. Search the diff for realistic token prefixes, private-key text, value-bearing examples, shell
+   command concatenation, `sh -c`, `oslo.secret`, and direct `use tagdata` outside the existing seam.
+6. Run `git diff --stat` and confirm every changed source file is in scope.
 
-The minimal release binary may grow by at most **131,072 bytes**. If it exceeds that limit, do not
-hide the increase by changing release flags. Remove duplication and unused surface, then measure
-again. If it still exceeds the limit, stop and present the symbol/dependency evidence for a user
-decision.
+The minimal release increase must be reported. If it exceeds 131,072 bytes, STOP and request a size
+review rather than committing the implementation. Do not hide size by removing unrelated features
+or weakening tests.
 
-**Verify**: all Makefile gates exit 0; minimal size delta is at most 131,072 bytes; no new runtime
-dependency appears; no out-of-scope file is modified.
+**Verify**: `make verify` and `make build TYPE=minimal` exit `0`; static check passes; delta is at
+most 131,072 bytes or the work is stopped for review.
 
 ## Test matrix
 
-### Detector
+### Plain store
 
-- One positive and at least two negative cases per built-in rule.
-- Quoted, unquoted, glued-option and separate-option forms.
-- Shell and Lua interactive modes.
-- History-expanded command classified after expansion.
-- Leading-space privacy with detection both enabled and disabled.
-- Custom pattern match, invalid pattern and allowed rule.
-- Notice contains rule ID and never the matched substring.
+- first `put` creates the right path and schema;
+- `path`, `status`, `get`, and `list` do not create a missing database;
+- exact bytes round-trip, including spaces and a final newline from piped stdin;
+- 1 MiB accepted, larger refused without writing;
+- overwrite confirmation/`--yes` behavior;
+- sorted prefix list contains names only;
+- invalid names rejected before any write;
+- missing/wrong kind, future schema, wrong page size, and symlink refused;
+- directory `0700`, file `0600`;
+- history profile changes do not change the secret path.
 
-### Persistence and observation
+### CLI and terminal
 
-- `$HISTFILE` absent marker.
-- `history` builtin absent marker.
-- recall and history expansion cannot recover marker.
-- Tagdata history/search/export/backup input absent marker.
-- frecency and tracking absent marker.
-- predictor receives no private line when the optional feature is enabled.
-- pre/post hook payload text is `<private>` and sensitivity fields are present.
-- title and semantic output-start omit marker.
-- notification command and report hook are not invoked for private commands.
-- chain recorder and `chain resume` retain no private line.
-- xtrace prints no private assignments or argv.
+- tool is listed and safely dispatched through the operand rule;
+- every subcommand and subcommand help page follows main help styling;
+- unknown subcommand/option is status `2`;
+- missing value is status `1`, with no stdout;
+- `get` writes exact bytes and no implicit newline;
+- masked `put` transcript contains bullets or UI chrome but not the synthetic value;
+- no value is accepted as a command-line operand.
 
-### Builtin and providers
+### Privacy
 
-- Every listed subcommand has help and returns status 0 for help.
-- Unknown options/subcommands return status 2 without provider access.
-- Name grammar accepts nested names and rejects traversal/newlines.
-- Masked entry handles accept, empty value, cancel and no terminal.
-- Provider store receives value only on stdin.
-- Provider lookup output is never included in an error.
-- List reads metadata only.
-- Show refuses redirected stdout and confirms on a TTY.
-- Remove updates index only after provider success.
-- Provider selection never falls back silently.
+- each built-in detector rule has positive and near-miss tests;
+- disabled rules and sorted custom patterns are deterministic;
+- notice contains only rule ID;
+- leading-space explicit privacy wins;
+- pre-hook replacement may promote but not downgrade privacy;
+- private commands execute unchanged;
+- private commands do not reach history, recall, Tagdata log/outcome, tracking, frecency, chain,
+  semantic marks, titles, notices, or xtrace;
+- public `oslo secret get synthetic-name` remains recognizable to general pre/post hooks;
+- trusted command hooks still receive command metadata, as documented.
 
-### Scoped execution
+### Imported `secrets.lua`
 
-- Multiple environment injections.
-- Exact stdin injection.
-- Child status and signal propagation.
-- No parent-environment mutation on every exit path.
-- No provider or target argv leak.
-- No shell-source interpolation.
-
-### Known limitation test
-
-Add or retain a test demonstrating that literal text typed in the ordinary editor may appear in the
-raw tab transcript before Enter. Mark it as a documented limitation, not as a passing secrecy claim.
-Separately prove that a value entered through masked `secret put` is absent from the editor and tab
-transcript because it reaches the provider through an internal pipe.
+- `require("secrets")` resolves from `$XDG_CONFIG_HOME/oslo/lua`;
+- standalone foreground recognition uses parsed argv;
+- help/path do not unlock;
+- encrypted existing vault follows lock/decrypt/tool/encrypt/rename/delete/unlock order;
+- first `put` works without an existing encrypted file;
+- another shell is refused while lock directory exists;
+- failed pre-hook cancels the command and cleans only its own partial state;
+- failed post encryption keeps old ciphertext, plaintext, and lock for recovery;
+- stale plaintext is never overwritten;
+- chained, pipeline, multiple-command, and background forms are refused;
+- without import, the ordinary plaintext database works directly.
 
 ## Done criteria
 
-- [ ] `Sensitivity` replaces the interactive `secret: bool` gate.
-- [ ] Classification runs before every Oslo persistence or observation sink.
-- [ ] Explicit leading-space privacy still works.
-- [ ] High-confidence automatic rules have positive and false-positive tests.
-- [ ] Sensitive commands execute unchanged.
-- [ ] Sensitive text is absent from history, recall, Tagdata, frecency, tracking and prediction.
-- [ ] Sensitive text is absent from hooks, title, notification, metadata, chain and xtrace.
-- [ ] `secret put/edit/list/show/rm/run/status` match the documented contract.
-- [ ] Secret values never enter provider argv, target argv or parent exported environment.
-- [ ] Secret Service and `pass` adapters use direct process execution.
-- [ ] Tagdata contains neither secret values nor a secret vault.
-- [ ] No new runtime dependency is added.
-- [ ] `README.md` and tab source files are unchanged.
-- [ ] `make verify` exits 0.
-- [ ] `make test-terminal` exits 0.
-- [ ] `make build TYPE=minimal` and `make build` produce static binaries.
-- [ ] Minimal binary growth is at most 131,072 bytes.
+- [ ] `oslo secret` is a CLI tool, not a builtin.
+- [ ] Its Rust implementation opens only the ordinary default plaintext database.
+- [ ] No encryption/provider/codec/key/hook field exists under `oslo.secret`.
+- [ ] No new Cargo dependency or feature exists.
+- [ ] Tagdata remains imported only through the existing key-value seam.
+- [ ] Values never enter argv and round-trip exactly.
+- [ ] Read-only commands do not create a database.
+- [ ] File and directory permissions are tested.
+- [ ] Automatic private classification happens before frecency and persistence.
+- [ ] Every listed Oslo-owned sink has a negative-leak regression test.
+- [ ] General pre/post command hooks remain the trusted configuration boundary.
+- [ ] `docs/features/secrets.lua` is the exact module integration tests execute.
+- [ ] User config imports it with `require("secrets")`.
+- [ ] Age is an external example only; no age code or key handling is in Rust.
+- [ ] Crash, same-user, scrollback, direct-CLI, filesystem-remanence, and hook-order limits are
+  documented honestly.
+- [ ] No README file, `PLAN.md`, or `examples/` path changed.
+- [ ] `make verify` passes.
+- [ ] `make build TYPE=minimal` is static and the exact size delta is reported.
+- [ ] The size delta is at most 131,072 bytes or implementation stopped for review.
 
 ## STOP conditions
 
 Stop and report instead of improvising if:
 
-- the current input or REPL flow no longer matches the Current-state evidence;
-- an in-scope file contains unrelated uncommitted work;
-- protecting a sink appears to require parsing or rewriting shell source;
-- a provider requires passing a value in argv or through `/bin/sh -c`;
-- provider listing cannot avoid reading values and the metadata index is rejected;
-- scoped injection requires publishing the secret into the parent process environment;
-- xtrace cannot be suppressed for one top-level interactive execution without changing script
-  behavior globally;
-- a test needs a real credential or network access;
-- a new runtime dependency appears necessary;
-- minimal binary growth remains above 131,072 bytes after removing duplication;
-- tab transcript protection would require touching the active tab refactor;
-- a verification gate fails twice after a reasonable correction.
+- current code no longer matches the architectural evidence after drift review;
+- implementing the plain store appears to require a new database or crypto dependency;
+- any implementation needs a secret value in argv, a shell command string, a log, or a temporary
+  test fixture committed with realistic credentials;
+- the only proposed solution moves encryption, age, providers, pre-hooks, or post-hooks into
+  `oslo secret` or an `oslo.secret` configuration table;
+- the implementation requires a bare `secret` builtin;
+- the age module cannot guarantee post cleanup after successful pre setup for the supported
+  standalone foreground shape;
+- a later pre-command handler can cancel after the module opened plaintext; fix the module's
+  first-answer ownership or stop;
+- a failed age encryption would overwrite the old ciphertext or delete the only recoverable
+  plaintext copy;
+- tests require the real age executable, a real identity, a network service, or a real credential;
+- satisfying documentation checks appears to require editing any README file;
+- a relevant Make target fails twice after a reasonable correction;
+- the minimal static binary grows by more than 131,072 bytes;
+- an in-scope source file exceeds the repository LOC policy and cannot be split cleanly.
 
 ## Review checklist
 
-The reviewer must inspect these specifically:
-
-- classification happens before `record_command_use`, history append and hooks;
-- private taint survives pre-hook replacement;
-- no diagnostic formats `SecretValue`;
-- provider and child argv contain names only;
-- parent environment is never temporarily mutated;
-- pipe ends close on every success and failure path;
-- provider stderr cannot echo a looked-up value;
-- `secret show` is the only builtin path that intentionally prints a value;
-- output masking has not been smuggled into pipeline bytes;
-- the documented tab limitation remains explicit;
-- no new dependency or unexplained binary growth appears.
+- Read the Rust secret module without the Lua documentation: it should look like an ordinary,
+  strict key-value database API with no hint of age or hooks.
+- Read `docs/features/secrets.lua` without the Rust source: it should treat `oslo secret` as an
+  external command that happens to open the configured plaintext path.
+- Confirm the module uses parsed argv and direct argv execution, not textual splitting or shell
+  concatenation.
+- Confirm lock acquisition precedes decryption and lock release follows plaintext removal.
+- Confirm old ciphertext survives every failed close path.
+- Confirm a pre-open cancellation cannot bypass the post hook.
+- Confirm private detection changes observation only, never the command text or execution result.
+- Confirm hook visibility is documented as trusted rather than falsely claimed absent.
+- Confirm every diagnostic can be produced without formatting a secret value.
+- Confirm binary-size evidence compares the same minimal build before and after.
 
 ## Maintenance notes
 
-- New history, prediction, telemetry, hook or terminal-metadata sinks must accept `Sensitivity` rather
-  than inventing a separate filter.
-- New providers must implement the same no-shell, no-value-in-argv contract and be measured for
-  binary impact.
-- Provider names and lookup attributes remain public metadata even when values are encrypted.
-- If tab logging later becomes semantic, input-span suppression should be designed in the tab plan;
-  do not weaken this plan's limitation statement until a transcript test proves it.
-- If output masking is reconsidered, it may affect terminal rendering only. It must never modify bytes
-  delivered through pipes, files, command substitution or structured output.
-
-## Research references
-
-- Atuin secret filtering: <https://docs.atuin.sh/main/configuration/config/>
-- detect-secrets detector architecture: <https://github.com/Yelp/detect-secrets>
-- Gitleaks rules and allowlists: <https://github.com/gitleaks/gitleaks>
-- 1Password scoped process injection: <https://developer.1password.com/docs/cli/reference/commands/run/>
-- AWS Vault external storage and temporary credentials: <https://github.com/99designs/aws-vault>
-- Secret Service specification: <https://specifications.freedesktop.org/secret-service/latest-single/>
-- Secret Service lookup attributes are metadata:
-  <https://specifications.freedesktop.org/secret-service/latest/lookup-attributes.html>
-- `secret-tool` command contract: <https://man.archlinux.org/man/core/libsecret/secret-tool.1.en>
-- `pass`: <https://www.passwordstore.org/>
-- SOPS scoped execution patterns: <https://github.com/getsops/sops>
-- Vault Agent and dynamic-secret direction:
-  <https://developer.hashicorp.com/vault/docs/agent-and-proxy/agent>
+- `docs/features/secrets.lua` is policy code. Any change to hook payloads, first-answer semantics,
+  module paths, `oslo.run`, or `oslo.fs` must run its integration tests.
+- The general hooks are interactive-only. If future work wants encrypted access from Bash or
+  scripts, design a general external wrapping mechanism separately; do not smuggle it into the
+  plain database tool.
+- A future `run` subcommand should inject a selected value without putting it in argv and needs its
+  own threat model and size measurement.
+- A future daemon could hold an unlocked vault or kernel lock, but it is not part of this model and
+  would not create trustworthy same-user per-application authorization by itself.
+- If the Tagdata seam moves out of `track::kv`, move both tracking and secrets together so direct
+  engine imports do not multiply again.
+- Secure deletion is not promised. Moving transient plaintext to a runtime filesystem can be
+  considered later, but the agreed first model deliberately gives `oslo secret` one ordinary,
+  stable database path.

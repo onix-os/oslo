@@ -141,11 +141,24 @@ pub(super) fn apply(
         // `${!name}` reads `name`'s value and expands *that* parameter. Only the second lookup
         // may come up empty: bash makes a `name` that does not *hold a name* a fatal expansion
         // error, and it names a different culprit depending on which step failed.
-        ParamExpansion::Indirect => match val {
+        ParamExpansion::Indirect(inner) => match val {
+            // **An unset positional is empty, not an error** — `${!1}` in a function called with
+            // no arguments. bash draws the line here and not at "unset": a *variable* that does
+            // not exist is a mistake worth reporting, and a positional that was simply not passed
+            // is the ordinary case every hook helper is written around. stdenv's `runHook`,
+            // `runPhase` and `substituteStream` all reach this on their first line.
+            None if name.chars().all(|c| c.is_ascii_digit()) => String::new(),
             None => {
                 return Err(ShellError::ExpansionError(format!(
                     "{name}: invalid indirect expansion"
                 )));
+            }
+            // **A subscript is allowed through, because bash allows it and stdenv depends on it.**
+            // `runHook` builds the string `"${hookName%Hook}Hooks[@]"` and expands *that* — so the
+            // thing an indirection names is an array reference as often as it is a plain name, and
+            // rejecting it here is what left every dev shell hook unreachable.
+            Some(indirect) if array_reference(&indirect) => {
+                return crate::expand::param::expand_indirect_array(env, &indirect, inner);
             }
             // An empty value lands here too, which is why the message quotes nothing.
             Some(indirect) if !super::is_param_name(&indirect) => {
@@ -153,7 +166,10 @@ pub(super) fn apply(
                     "{indirect}: invalid variable name"
                 )));
             }
-            Some(indirect) => env.get_param(&indirect).unwrap_or_default(),
+            // **Applied to the second parameter, not the first.** `${!v:-d}` asks whether the
+            // thing `v` names is set, so the operator has to run against that one — testing `v`
+            // instead would answer about the pointer rather than the target.
+            Some(indirect) => return apply(env, &Target::Param(&indirect), inner),
         },
     };
 
@@ -283,6 +299,16 @@ fn eval_operand(env: &mut Environment, word: &Word) -> Result<i64> {
         return Ok(0);
     }
     eval_arithmetic(env, text)
+}
+
+/// Whether an indirection's target names an array element or slice rather than a plain parameter.
+///
+/// Shape only — `a[@]`, `a[0]`, `a[i+1]`. Whether the array exists is the expander's business.
+fn array_reference(text: &str) -> bool {
+    let Some((name, rest)) = text.split_once('[') else {
+        return false;
+    };
+    !name.is_empty() && rest.ends_with(']') && super::is_param_name(name)
 }
 
 #[cfg(test)]
