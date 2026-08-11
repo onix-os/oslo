@@ -40,7 +40,26 @@ pub struct Choice {
     pub chrome: super::chrome::Chrome,
     /// Where the filter sits and what colour the rows take. See `super::look`.
     pub look: super::look::Look,
+    /// Offer what was typed as a new entry, labelled with this. `{}` stands for the query.
+    ///
+    /// **A row, not a second prompt.** The alternative — picking from a list and then being asked
+    /// a separate question for a name — is two widgets to answer one question, and the answer to
+    /// "which one" is often "a new one". The row appears only when the query names nothing already
+    /// in the list, so it never competes with an entry you meant to pick.
+    pub create: Option<String>,
 }
+
+/// What a `pick_or_create` ended with.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Pick {
+    /// A row that was already there.
+    Chosen(String),
+    /// The create row: what was typed, which is not in the list yet.
+    New(String),
+}
+
+/// The row offering to create the query, which has no index into `items`.
+const CREATE_ROW: usize = usize::MAX;
 
 impl Default for Choice {
     fn default() -> Self {
@@ -53,25 +72,64 @@ impl Default for Choice {
             fuzzy: Fuzzy::Smart,
             chrome: super::chrome::Chrome::default(),
             look: super::look::Look::default(),
+            create: None,
         }
     }
 }
 
 /// Show the list and move through it.
 pub fn choose(spec: &Choice) -> Answer<Vec<String>> {
-    run(spec)
+    run(&Choice {
+        create: None,
+        ..spec.clone()
+    })
+    .map(picked)
 }
 
 /// The same list, narrowed as you type.
 pub fn filter(spec: &Choice) -> Answer<Vec<String>> {
     run(&Choice {
         filter: true,
+        create: None,
         ..spec.clone()
+    })
+    .map(picked)
+}
+
+/// The list, narrowed as you type, with a row offering to create what was typed.
+///
+/// Unlike `choose` and `filter` this answers on an **empty** list: a list with nothing in it and a
+/// query typed into it is exactly the case the create row exists for.
+pub fn pick_or_create(spec: &Choice, label: &str) -> Answer<Pick> {
+    run(&Choice {
+        filter: true,
+        multi: false,
+        create: Some(label.to_string()),
+        ..spec.clone()
+    })
+    .map(|outcome| match outcome {
+        Outcome::New(query) => Pick::New(query),
+        Outcome::Picked(mut rows) if !rows.is_empty() => Pick::Chosen(rows.remove(0)),
+        Outcome::Picked(_) => Pick::New(String::new()),
     })
 }
 
-fn run(spec: &Choice) -> Answer<Vec<String>> {
-    if spec.items.is_empty() {
+/// What the loop ended with, before it is shaped into whatever the caller asked for.
+enum Outcome {
+    Picked(Vec<String>),
+    New(String),
+}
+
+/// The rows of an outcome that cannot be a creation, for the two entry points that forbid one.
+fn picked(outcome: Outcome) -> Vec<String> {
+    match outcome {
+        Outcome::Picked(rows) => rows,
+        Outcome::New(query) => vec![query],
+    }
+}
+
+fn run(spec: &Choice) -> Answer<Outcome> {
+    if spec.items.is_empty() && spec.create.is_none() {
         // Nothing to choose from is not a question. Answering "cancelled" keeps
         // `x=$(… | ui choose) || exit` correct when the pipeline produced no lines.
         return Answer::Cancelled;
@@ -132,15 +190,23 @@ fn run(spec: &Choice) -> Answer<Vec<String>> {
         // `--multi` with no cursor at all. The caret is the look's marker; the box is the lead.
         let rows: Vec<Row> = shown
             .iter()
-            .map(|&item| Row {
-                text: spec.items[item].clone(),
-                lead: match spec.multi {
-                    true if checked[item] => "◉ ".to_string(),
-                    true => "◯ ".to_string(),
-                    false => String::new(),
-                },
-                marked: checked[item],
-                ..Row::new(String::new())
+            .map(|&item| {
+                if item == CREATE_ROW {
+                    return Row {
+                        text: create_label(spec, &query),
+                        ..Row::new(String::new())
+                    };
+                }
+                Row {
+                    text: spec.items[item].clone(),
+                    lead: match spec.multi {
+                        true if checked[item] => "◉ ".to_string(),
+                        true => "◯ ".to_string(),
+                        false => String::new(),
+                    },
+                    marked: checked[item],
+                    ..Row::new(String::new())
+                }
             })
             .collect();
         frame.push_str(&spec.look.frame(
@@ -186,6 +252,10 @@ fn run(spec: &Choice) -> Answer<Vec<String>> {
                 panel.close();
                 return Answer::Cancelled;
             }
+            Key::Accept if shown.get(selected) == Some(&CREATE_ROW) => {
+                panel.close();
+                return Answer::Given(Outcome::New(query));
+            }
             Key::Accept => {
                 let picked: Vec<String> = if spec.multi {
                     let explicit: Vec<String> = (0..spec.items.len())
@@ -215,7 +285,7 @@ fn run(spec: &Choice) -> Answer<Vec<String>> {
                 // the caller prints to stdout — is the line left in the transcript. Echoing as
                 // well showed it twice, once from each stream. This is gum's arrangement and the
                 // reason it is right: there is exactly one record, and `$(…)` captures it.
-                return Answer::Given(picked);
+                return Answer::Given(Outcome::Picked(picked));
             }
             // The arrows follow the screen: a reversed list draws index 0 at the bottom, so Up has
             // to walk *towards* the far end of it. See `Look::step`.
@@ -260,6 +330,23 @@ fn run(spec: &Choice) -> Answer<Vec<String>> {
 }
 
 /// The indices matching `query`, best first.
+/// What the create row reads as, with `{}` standing for what has been typed.
+fn create_label(spec: &Choice, query: &str) -> String {
+    spec.create
+        .as_deref()
+        .unwrap_or("create {}")
+        .replace("{}", query)
+}
+
+/// Whether a query should be offered as something new.
+///
+/// **Only when it names nothing already there.** Offering to create `work` while a tab called
+/// `work` is in the list would make Enter ambiguous at the exact moment it matters, which is the
+/// rule tab-rs settled on for the same reason.
+fn offers_create(spec: &Choice, query: &str) -> bool {
+    spec.create.is_some() && !query.is_empty() && !spec.items.iter().any(|item| item == query)
+}
+
 fn narrow(spec: &Choice, query: &str) -> Vec<usize> {
     if query.is_empty() {
         return (0..spec.items.len()).collect();
@@ -279,7 +366,13 @@ fn narrow(spec: &Choice, query: &str) -> Vec<usize> {
     // so the score breaks the tie, and then the original order, which keeps a list the caller
     // sorted sorted among equals.
     scored.sort_by(|a, b| a.0.cmp(&b.0).then(b.1.cmp(&a.1)).then(a.2.cmp(&b.2)));
-    scored.into_iter().map(|(_, _, i)| i).collect()
+    let mut found: Vec<usize> = scored.into_iter().map(|(_, _, i)| i).collect();
+    // Last, so that a fuzzy match on something that exists is what Enter takes by default. Making
+    // a new one is the answer you have to walk to.
+    if offers_create(spec, query) {
+        found.push(CREATE_ROW);
+    }
+    found
 }
 
 #[cfg(test)]
@@ -328,5 +421,60 @@ mod tests {
         let s = spec(&["match one", "match two", "match three"]);
         let found = narrow(&s, "match");
         assert_eq!(found, vec![0, 1, 2]);
+    }
+
+    fn creating(items: &[&str]) -> Choice {
+        Choice {
+            create: Some("create {}".to_string()),
+            ..spec(items)
+        }
+    }
+
+    /// The row is offered for a name the list does not have, and sits last so that Enter still
+    /// takes a real match by default.
+    #[test]
+    fn a_query_naming_nothing_offers_a_new_one() {
+        let s = creating(&["work", "api"]);
+        let found = narrow(&s, "docs");
+        assert_eq!(found, vec![CREATE_ROW]);
+
+        let found = narrow(&s, "wor");
+        assert_eq!(found.first(), Some(&0), "the fuzzy match comes first");
+        assert_eq!(found.last(), Some(&CREATE_ROW), "and the new one is last");
+    }
+
+    /// Offering to create `work` while `work` is right there would make Enter ambiguous exactly
+    /// when it matters.
+    #[test]
+    fn a_query_naming_something_that_exists_does_not() {
+        let s = creating(&["work", "api"]);
+        assert_eq!(narrow(&s, "work"), vec![0]);
+    }
+
+    #[test]
+    fn nothing_typed_is_not_a_new_one() {
+        let s = creating(&["work"]);
+        assert_eq!(narrow(&s, ""), vec![0]);
+    }
+
+    /// A list with nothing in it is still a question when a name can be typed into it — which is
+    /// the first tab there has ever been.
+    #[test]
+    fn an_empty_list_still_offers_the_new_one() {
+        let s = creating(&[]);
+        assert_eq!(narrow(&s, "first"), vec![CREATE_ROW]);
+    }
+
+    #[test]
+    fn the_label_says_what_was_typed() {
+        let s = creating(&[]);
+        assert_eq!(create_label(&s, "docs"), "create docs");
+    }
+
+    /// Without `create` nothing changes, which is what keeps `choose` and `filter` untouched.
+    #[test]
+    fn a_plain_filter_never_offers_one() {
+        let s = spec(&["work"]);
+        assert!(narrow(&s, "docs").is_empty());
     }
 }

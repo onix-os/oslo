@@ -53,7 +53,7 @@ mod write;
 
 use crate::paint::{SYNC_BEGIN, SYNC_END};
 use crate::term::Pressed;
-pub use choose::{Choice, choose, filter};
+pub use choose::{Choice, Pick, choose, filter, pick_or_create};
 pub use confirm::{Confirm, confirm};
 pub use file::{Browse, Want, file};
 pub use format::{As, format};
