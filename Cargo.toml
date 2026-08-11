@@ -1,6 +1,6 @@
 [package]
 name = "oslo"
-version = "0.2.28"
+version = "0.2.29"
 edition = "2024"
 # Minimum supported Rust version, mirrored by the MSRV job in .github/workflows/tests.yml.
 rust-version = "1.89"

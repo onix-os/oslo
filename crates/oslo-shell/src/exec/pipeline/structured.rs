@@ -86,7 +86,32 @@ pub(super) fn structured_sinks(pipeline: &Pipeline) -> Option<Vec<Sink>> {
         return None;
     }
     let sinks = plan_pipeline(pipeline);
-    sinks.contains(&Sink::Rows).then_some(sinks)
+    if sinks.contains(&Sink::Rows) {
+        return Some(sinks);
+    }
+    // **A tool on its own has no edge, and `Sink::Rows` only ever describes an edge.** So a
+    // pipeline of one plans to no rows at all and falls to the byte path, where the name is looked
+    // up on `$PATH`.
+    //
+    // For `ls`, `ps` and `df` that is the right answer and must stay: a bare `ls` is coreutils, and
+    // oslo's row-shaped one is what you get when you ask for structure by piping it somewhere. A
+    // name a config invented has no such counterpart — `oslo.register_tool{name = "stale", …}` then
+    // answered `stale: command not found`, and only `stale | length` ran it, which is not a
+    // discoverable interface for a feature whose whole point is adding a command.
+    lone_custom_tool(pipeline).then_some(sinks)
+}
+
+/// One simple command, naming a tool the *config* registered, with nothing redirected.
+///
+/// Redirections are excluded because [`run`] writes with `println!` — the structured stages do not
+/// fork, so nothing has applied `> file` to this process's stdout, and routing `stale > out` here
+/// would print to the terminal and leave the file empty. The byte path keeps those.
+fn lone_custom_tool(pipeline: &Pipeline) -> bool {
+    let [Command::Simple(simple)] = pipeline.commands.as_slice() else {
+        return false;
+    };
+    simple.redirections.is_empty()
+        && simple_command_name(simple).is_some_and(|name| crate::data::custom::registered(&name))
 }
 
 /// Run a pipeline whose edges carry rows.

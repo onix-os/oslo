@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.2.29] - 2026-08-11
+
+### <!-- 0 -->⛰️  Features
+
+- Complete flake outputs for the nix command
+- The named helpers, written in Lua
+- Cache a json document until the flake moves
+- Oslo.nix.run, any nix json command as Lua
+
+### <!-- 1 -->🐛 Bug Fixes
+
+- Reload drops both caches; name the shells a flake has
+- Run a config-registered tool on its own
+
+### <!-- 3 -->📚 Documentation
+
+- Document the feature and fix for_command
+- Plan the nix feature
+
 ## [0.2.28] - 2026-08-11
 
 ### <!-- 0 -->⛰️  Features
