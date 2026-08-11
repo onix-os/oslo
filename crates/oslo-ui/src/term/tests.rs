@@ -39,6 +39,22 @@ fn the_arrows_and_the_keys_beside_them() {
     assert_eq!(key(b"\x1bOD"), Key::Left);
 }
 
+/// The four control bytes above the alphabet, which a terminal sends bare when it has not been
+/// asked for the Kitty protocol. Without them `^\` is not a chord at all — it falls through to
+/// `text_key`, which has no character to make of a control byte and returns `Ignored`, so the key
+/// does nothing and nothing says why.
+#[test]
+fn the_control_chords_above_the_alphabet() {
+    assert_eq!(key(b"\x1c"), Key::Ctrl('\\'));
+    assert_eq!(key(b"\x1d"), Key::Ctrl(']'));
+    assert_eq!(key(b"\x1e"), Key::Ctrl('^'));
+    assert_eq!(key(b"\x1f"), Key::Ctrl('_'));
+    // The same chords once the terminal is speaking Kitty, which is the other half of the pair.
+    assert_eq!(super::keyboard::decode(b"\x1b[92;5u"), Key::Ctrl('\\'));
+    // Esc is 0x1b and sits just below the range: it keeps its own meaning.
+    assert_eq!(key(b"\x1b"), Key::Cancel);
+}
+
 #[test]
 fn function_keys_decode_without_colliding_with_reports() {
     let legacy = [
@@ -157,8 +173,9 @@ fn text_is_text() {
     assert_eq!(key(b" "), Key::Char(' '));
     assert_eq!(key("é".as_bytes()), Key::Char('é'));
     assert_eq!(key("→".as_bytes()), Key::Char('→'));
-    // A control character nothing binds is not text.
-    assert_eq!(key(b"\x1c"), Key::Ignored);
+    // A control character nothing binds is not text. `0x1c`..`0x1f` are chords and are asserted in
+    // `the_control_chords_above_the_alphabet`; `0x1b` alone is Cancel.
+    assert_eq!(key(b"\x11"), Key::Ctrl('q'));
     assert_eq!(key(&[]), Key::Ignored);
 }
 

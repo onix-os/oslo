@@ -118,6 +118,10 @@ pub fn key(bytes: &[u8]) -> Key {
             _ => Key::Ignored,
         },
         [byte @ 0x01..=0x1a] => Key::Ctrl((byte + b'a' - 1) as char),
+        // The control bytes above the alphabet. A terminal that has not been asked for the Kitty
+        // protocol sends these bare, with nothing to say they were a chord, and without this they
+        // fall through to `text_key` and are inserted as text.
+        [byte @ 0x1c..=0x1f] => Key::Ctrl(br"\]^_"[(byte - 0x1c) as usize] as char),
         [0x1b, 0x7f] => Key::Alt('\x7f'),
         [0x1b, rest @ ..] => text_key(rest, true),
         bytes => text_key(bytes, false),

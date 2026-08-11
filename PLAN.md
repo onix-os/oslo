@@ -37,8 +37,8 @@ the client owns it and the shell is on the far side of a pty, so it is a byte th
 of the stream before forwarding. Same key, same finder, two mechanisms.
 
 **The editor cannot decode it yet.** `term/input.rs:120` turns `0x01..=0x1a` into `Key::Ctrl`, and
-`0x1c` falls past it to `text_key` — so a legacy `^\` is inserted as text rather than recognised as
-a chord. The Kitty path is fine: `keyboard.rs` already decodes `\x1b[92;5u` to `Key::Ctrl('\\')`,
+`0x1c` falls past it to `text_key`, which has no character to make of a control byte and returns
+`Ignored` — so a legacy `^\` does nothing at all, and nothing says why. The Kitty path is fine: `keyboard.rs` already decodes `\x1b[92;5u` to `Key::Ctrl('\\')`,
 which `native.rs:58` names `ctrl-\`, the string a config binds. Since oslo pushes `\x1b[>5u`, most
 terminals take the working path and the gap only shows on one that refuses Kitty — which is exactly
 the kind of silent degradation worth closing first.
