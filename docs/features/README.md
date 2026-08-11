@@ -19,9 +19,15 @@ A release publishes two per architecture, and one page below describes something
 **[Prediction and repair](prediction-and-repair.md) is `oslo` only.** It is behind the `vista`
 cargo feature, so `oslo-minimal` has no model: it learns nothing, writes no `.model` file, offers no
 `predict` suggestions, draws no correction after a mistyped line, and has neither `oslo.repair` nor
-`oslo.predict`. Everything else on this page is in both. A config written for one runs under the
-other — `oslo.suggest.sources` still accepts `"predict"` and simply gets no answer from it — as long
-as it asks before calling a name: `if oslo.repair then … end`.
+`oslo.predict`. A config written for one runs under the other — `oslo.suggest.sources` still accepts
+`"predict"` and simply gets no answer from it — as long as it asks before calling a name:
+`if oslo.repair then … end`.
+
+**[Tabs](tab.md) are `oslo` only**, behind the `tab` cargo feature. In `oslo-minimal` the key that
+opens the finder is unbound and does whatever it otherwise would; the `oslo.tab` settings are still
+read and simply mean nothing, so one config works under both with nothing to ask.
+
+Everything else on this page is in both binaries.
 
 Each document opens with a recording of the feature actually running. They are not screencasts
 somebody performed: every one is a script in [`scripts/demo`](../../scripts/demo/), driven into a
@@ -78,6 +84,7 @@ scripts/demo/embed.sh                            # put the players back in the d
 | [Directory environments](directory-environments.md) | `.envrc` read by oslo itself, not handed to direnv |
 | [The filesystem navigator](nav.md) | `nav`: type to filter, arrows to move, Esc to take the shell there |
 | [rm, and the things that can bite](rm-and-safety.md) | Recoverable at the prompt, POSIX in a script |
+| [Tabs](tab.md) | Named sessions that outlive the terminal they were opened in |
 
 ## Appearance and control
 
