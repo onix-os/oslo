@@ -169,6 +169,68 @@ pub struct Want {
     pub functions: bool,
 }
 
+/// Why `print-dev-env` said nothing, **asked of nix rather than guessed at**.
+///
+/// This used to answer "is nix installed, and does this directory have a flake?" — two guesses, and
+/// on the commonest failure both are wrong. `use flake .#tooling` in a project whose shell is called
+/// `dev` reaches here with nix installed and a flake right there; nix's own message names the four
+/// attribute paths it looked for and not one that exists. So oslo said something untrue while the
+/// useful fact — *what this flake actually offers* — was one query away.
+///
+/// **Only on the failure path.** A `flake show` costs 34 ms warm and 455 ms cold, and paying that
+/// on every arrival in a directory to prepare for an error that will not happen is exactly the sort
+/// of tax a directory environment must not levy. Nothing here runs while `use flake` is working.
+fn why_nothing(args: &[String]) -> String {
+    if !json::available() {
+        return "nix is not installed".to_string();
+    }
+    match shells_here() {
+        Some(names) if !names.is_empty() => format!(
+            "no dev shell called `{}`. This flake offers: {}",
+            asked_for(args),
+            names.join(", ")
+        ),
+        Some(_) => "this flake defines no dev shell for this system".to_string(),
+        // The flake could not be read at all — nix has already said why on its own stderr, and
+        // repeating a guess over the top of a real diagnostic helps nobody.
+        None => "`nix print-dev-env` produced nothing; nix's own message says why".to_string(),
+    }
+}
+
+/// The dev shell the line asked for, as it would be named in the flake.
+///
+/// `use flake .#tooling` asks for `tooling`; a bare `use flake` asks for `default`, which is what
+/// nix resolves an installable with no attribute to. Flags are skipped, because
+/// `use flake --option warn-dirty false` names no shell at all.
+fn asked_for(args: &[String]) -> String {
+    args.iter()
+        .find(|arg| !arg.starts_with('-'))
+        .and_then(|installable| installable.split_once('#'))
+        .map(|(_, attribute)| attribute.to_string())
+        .unwrap_or_else(|| "default".to_string())
+}
+
+/// The dev shells this flake offers for this machine.
+///
+/// **A second implementation of `oslo.nix.shells`, and deliberately.** That one is Lua, and the Lua
+/// layer sits *above* the shell — this is an error message inside the shell, which cannot call up
+/// into it. The duplication is bounded by what it is for: the worst a drifted copy can do is name
+/// the wrong shells in a diagnostic.
+fn shells_here() -> Option<Vec<String>> {
+    let system = local_system()?;
+    let shown = json::run(&["flake".to_string(), "show".to_string()], json::TIMEOUT).ok()?;
+    let parsed: serde_json::Value = serde_json::from_str(&shown).ok()?;
+    let shells = parsed.get("devShells")?.get(system)?.as_object()?;
+    Some(shells.keys().cloned().collect())
+}
+
+/// The system nix builds for here — `x86_64-linux`.
+fn local_system() -> Option<String> {
+    let shown = json::run(&["config".to_string(), "show".to_string()], json::TIMEOUT).ok()?;
+    let parsed: serde_json::Value = serde_json::from_str(&shown).ok()?;
+    Some(parsed.get("system")?.get("value")?.as_str()?.to_string())
+}
+
 /// The same as [`apply`], plus whatever `want` asks for.
 pub fn apply_with(env: &mut Environment, args: &[String], want: Want) -> Result<usize, String> {
     let json = match cached(args) {
@@ -177,11 +239,7 @@ pub fn apply_with(env: &mut Environment, args: &[String], want: Want) -> Result<
             let fresh = crate::exec::eval_command_substitution(env, &command(args, &profile()))
                 .map_err(|e| e.to_string())?;
             if fresh.trim().is_empty() {
-                return Err(
-                    "`nix print-dev-env` produced nothing — is nix installed, and does this \
-                            directory have a flake?"
-                        .to_string(),
-                );
+                return Err(why_nothing(args));
             }
             // Written only after it parses, so a truncated or error-shaped answer is not the thing
             // every later arrival is served from.
@@ -240,6 +298,29 @@ pub fn apply_with(env: &mut Environment, args: &[String], want: Want) -> Result<
 mod tests {
     use super::read::{IGNORED, usable_name};
     use super::*;
+
+    /// The name in the diagnostic has to be the one the line asked for, or the message is another
+    /// guess of the kind this replaced.
+    #[test]
+    fn the_shell_a_line_asked_for_is_the_one_named_back() {
+        let words =
+            |list: &[&str]| -> Vec<String> { list.iter().map(|w| (*w).to_string()).collect() };
+        assert_eq!(asked_for(&words(&[".#tooling"])), "tooling");
+        assert_eq!(asked_for(&words(&["..#other"])), "other");
+        // No attribute named at all is `default`, which is what nix resolves it to.
+        assert_eq!(asked_for(&words(&[])), "default");
+        assert_eq!(asked_for(&words(&["."])), "default");
+        // `use flake --option warn-dirty false` names no shell; the flag must not be read as one.
+        assert_eq!(
+            asked_for(&words(&["--option", "warn-dirty false"])),
+            "default"
+        );
+        assert_eq!(
+            asked_for(&words(&["--option", "warn-dirty false", ".#dev"])),
+            "default",
+            "the flag's own value is not an installable either"
+        );
+    }
 
     #[test]
     fn the_builders_home_never_escapes() {

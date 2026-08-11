@@ -128,6 +128,30 @@ fn the_same_query_from_two_projects_is_two_entries() {
     );
 }
 
+/// **What makes `forget` able to be complete.** It drops a directory rather than a list of files,
+/// so every question ever asked about this project goes with it — including ones this process never
+/// asked. Two projects must not share that directory, or a reload in one would empty the other.
+#[test]
+fn one_projects_documents_live_together_and_apart_from_another_projects() {
+    let (root, base) = project();
+    let (elsewhere, _) = project();
+
+    let show = document_path(base.path(), root.path(), &argv(&["flake", "show"]));
+    let meta = document_path(base.path(), root.path(), &argv(&["flake", "metadata"]));
+    assert_eq!(
+        show.parent(),
+        meta.parent(),
+        "one project, one directory to drop"
+    );
+
+    let theirs = document_path(base.path(), elsewhere.path(), &argv(&["flake", "show"]));
+    assert_ne!(
+        show.parent(),
+        theirs.parent(),
+        "a reload here would empty their cache"
+    );
+}
+
 #[test]
 fn a_document_is_readable_only_by_its_owner() {
     // It can hold whatever a flake evaluates to, and the umask would leave it world-readable.

@@ -90,9 +90,20 @@ pub(super) fn remember(args: &[String], json: &str) {
     write_privately(&path, &format!("{}\n{json}", key(&root, args)));
 }
 
-/// Drop the remembered evaluation, for `direnv reload`.
+/// Drop everything remembered about this project, for `direnv reload`.
+///
+/// **Both caches, which it did not always do.** This removed `dev-env.json` alone, so a reload
+/// re-evaluated the dev shell and then went on serving pre-reload answers to `oslo.nix.run{…,
+/// cache = true}` — a prompt segment could still report the flake as dirty after it was committed.
+/// `reload` has to mean reload, or it means nothing.
 pub fn forget() {
-    let _ = std::fs::remove_file(cache(&root()));
+    let root = root();
+    let _ = std::fs::remove_file(cache(&root));
+    // The whole directory: the documents of one project live together precisely so this can drop
+    // them without knowing which questions were ever asked.
+    if let Some(base) = base() {
+        let _ = std::fs::remove_dir_all(project_dir(&base, &root));
+    }
 }
 
 /// A document `oslo.nix.run{…, cache = true}` asked for, or nothing if it must be fetched.
@@ -151,19 +162,32 @@ fn base() -> Option<PathBuf> {
         .or_else(|| std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".cache")))
 }
 
-/// One document's file: `<base>/oslo/nix/<digest>.json`.
+/// Everything remembered about one project: `<base>/oslo/nix/<digest of its root>`.
 ///
-/// The digest covers the project as well as the arguments, so the same query asked from two
-/// projects is two entries rather than one that alternates.
+/// **A directory per project rather than one flat pile**, so [`forget`] can drop a project's
+/// answers without enumerating the questions. It also keeps two projects asking the same question
+/// apart, instead of one entry that alternates between them.
+fn project_dir(base: &Path, root: &Path) -> PathBuf {
+    base.join("oslo/nix")
+        .join(digest(root.as_os_str().as_encoded_bytes()))
+}
+
+/// One document's file, named for the question that produced it.
 fn document_path(base: &Path, root: &Path, argv: &[String]) -> PathBuf {
+    project_dir(base, root).join(format!("{}.json", digest(argv.join("\u{0}").as_bytes())))
+}
+
+/// A short, stable, filesystem-safe name for a byte string.
+fn digest(of: &[u8]) -> String {
     use sha2::{Digest, Sha256};
     let mut hasher = Sha256::new();
-    hasher.update(root.as_os_str().as_encoded_bytes());
-    hasher.update(b"\n");
-    hasher.update(argv.join("\u{0}").as_bytes());
-    let digest = hasher.finalize();
-    let name: String = digest.iter().take(16).map(|b| format!("{b:02x}")).collect();
-    base.join("oslo/nix").join(format!("{name}.json"))
+    hasher.update(of);
+    hasher
+        .finalize()
+        .iter()
+        .take(16)
+        .map(|b| format!("{b:02x}"))
+        .collect()
 }
 
 /// Write `text` where only its owner can read it, making the directory if it is missing.
