@@ -330,11 +330,22 @@ fn caret_over(
         _ => (under.to_string(), reversed),
     };
     // The surface goes under the caret and under the text either side of it, so the whole run is
-    // one continuous block. A reversed cell keeps its own colours: reversing *is* the mark, and
-    // giving it the surface as a background would leave nothing to reverse against.
-    let on = |style: Style| match style.reverse {
-        true => style,
-        false => Style {
+    // one continuous block.
+    //
+    // **The reversal is done by hand when there is a surface.** `SGR 7` swaps against the
+    // terminal's *default* background, not against the colour the row is painted on — so a caret
+    // left to reverse itself came out as a hole of the default colour in the middle of a tinted
+    // row, which is exactly as wrong as it sounds and reads as a rendering fault. Swapping the two
+    // colours here keeps the mark and keeps it on the surface it is sitting on.
+    let on = |style: Style| match (style.reverse, surface) {
+        (true, Some(under)) => Style {
+            reverse: false,
+            fg: Some(under),
+            bg: crate::theme::current().ui.accent.fg,
+            ..Style::default()
+        },
+        (true, None) => style,
+        (false, _) => Style {
             bg: surface.or(style.bg),
             ..style
         },

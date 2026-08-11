@@ -258,7 +258,7 @@ fn ps1_and_ps2_are_honoured_with_defaults_as_fallback() {
     let unset = repl("for i in 1\ndo\necho x\ndone\n", &vars, dir.path());
     let text = out(&unset);
     assert!(
-        text.contains("❯"),
+        text.contains("sh >"),
         "the built-in prompt is the PS1 fallback: {text:?}"
     );
     assert!(text.contains("> > "), "`> ` is the PS2 fallback: {text:?}");

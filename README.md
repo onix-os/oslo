@@ -26,8 +26,8 @@ Shift+Tab switches between shell and Lua **in place** — your line, your cursor
 where they are.
 
 ```
-bresilla@tron | I | sh  ❯ ls -la                    ❮  (develop)  ~/src/oslo
-bresilla@tron | I | lua ❯ for _, f in ipairs(sh.ls(".")) do print(f.name) end
+bresilla@tron | I | sh  > ls -la                    ❮  (develop)  ~/src/oslo
+bresilla@tron | I | lua > for _, f in ipairs(sh.ls(".")) do print(f.name) end
 ```
 
 Each language keeps its own history, suggestions, completion and syntax colouring. A `=` prefix runs
@@ -188,8 +188,8 @@ A second database, beside the history one, recording where you go and what you r
 Which makes the ghost suggestion answer differently depending on where you are standing:
 
 ```sh
-~/work/alpha ❯ cargo run --ex⏎     # → cargo run --example xyz
-~/work/beta  ❯ cargo run --ex⏎     # → cargo run --example abc
+~/work/alpha > cargo run --ex⏎     # → cargo run --example xyz
+~/work/beta  > cargo run --ex⏎     # → cargo run --example abc
 ```
 
 The exact directory is asked first, then the worktree, then flat history. A line that never once
@@ -648,7 +648,7 @@ oslo.builtin.nav.scanner    = true
 `-r`, and with `to_tmp` on it *moves* what you delete instead of unlinking it.
 
 ```
-~/p ❯ rm -v build notes.txt
+~/p > rm -v build notes.txt
 moved 'build' to '/tmp/build'
 moved 'notes.txt' to '/tmp/notes.txt'
 ```
@@ -715,10 +715,10 @@ the prompt it is the shorter thing to type; `oslo.abbr` is for the ones you want
 Four render keys, each a function returning a string:
 
 ```lua
-oslo.prompt.left         = function(p) return p.cwd .. " ❯ " end
+oslo.prompt.left         = function(p) return p.cwd .. " > " end
 oslo.prompt.right        = function(p) return p.duration_ms and (p.duration_ms .. "ms") or "" end
 oslo.prompt.continuation = function() return "… " end
-oslo.prompt.transient    = function() return "❯ " end   -- redrawn once the line is accepted
+oslo.prompt.transient    = function() return "> " end   -- redrawn once the line is accepted
 oslo.prompt.title        = function(p)                  -- the terminal tab, fish's fish_title
   return p.command and (p.command .. " — " .. p.cwd) or p.cwd
 end
@@ -836,16 +836,16 @@ now records each one — including the links it **never ran**, which is neither 
 and which nothing else in a shell writes down.
 
 ```
-❯ make clean && make build && make test
+> make clean && make build && make test
 oslo: chain stopped — resume with: make build && make test
 
-❯ chain
+> chain
    make clean     ok               5ms
 && make build     failed (2)     412ms
 && make test      skipped
                   total          417ms
 
-❯ chain resume
+> chain resume
 make build && make test
 ```
 

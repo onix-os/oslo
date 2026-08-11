@@ -6,7 +6,7 @@
 //!
 //! ```lua
 //! oslo.prompt.left = function()
-//!   return oslo.ui.style(oslo.path.shorten(oslo.fs.cwd()), "blue") .. " ❯ "
+//!   return oslo.ui.style(oslo.path.shorten(oslo.fs.cwd()), "blue") .. " > "
 //! end
 //! oslo.prompt.right = function() return oslo.ui.style(os.date("%H:%M"), "brightblack") end
 //! ```

@@ -116,12 +116,18 @@ fn ask(tabs: &dyn backend::Tabs, inside: Option<&str>) -> io::Result<Option<Stri
 /// * **Rows as wide as their text.** Full-width stripes read as a ruler through a long list. Across
 ///   three names they read as three bars reaching the edge of the terminal for no reason.
 fn look(_inside: Option<&str>) -> oslo_ui::ask::look::Look {
+    use oslo_ui::theme::Style;
     let mut look = oslo_ui::ask::Preset::History.look();
     look.scanner = None;
     look.right = String::new();
     look.badge = String::new();
     look.width = oslo_ui::ask::look::Width::Content;
     look.placeholder = "type to filter, or a name for a new one".to_string();
+    // **The marker is the whole of the selection.** A highlighted band works down a long history
+    // where the eye needs catching; across four names it is a slab of colour saying something you
+    // can already see. What is left is the `>` in front, which is where the eye goes anyway.
+    look.selected = Style::default();
+    look.stripe = None;
     look
 }
 

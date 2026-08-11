@@ -384,7 +384,7 @@ mod tests {
         let mut env = env_with(&[]);
         env.unset_var("PS1");
         let prompt = ps1(&mut env, 0);
-        assert!(prompt.contains('❯'), "{prompt:?}");
+        assert!(prompt.contains('>'), "{prompt:?}");
     }
 
     #[test]

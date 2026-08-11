@@ -13,9 +13,9 @@
 //! ```text
 //!     2h    3× git status
 //!     5h   41× cargo build --release
-//!   ❯ 1d  118× cargo test                                         ← selected
+//!   > 1d  118× cargo test                                         ← selected
 //!                                                                 ┐
-//!   ⬝⬝⬝⬝⬝⬝⬝⬝⬝  ❯❯  car▏           default @ [global] || 12/840    ├ the surface
+//!   ⬝⬝⬝⬝⬝⬝⬝⬝⬝  >>  car▏           default @ [global] || 12/840    ├ the surface
 //!                                                                 ┘
 //! ```
 //!

@@ -7,7 +7,7 @@
 //! # The bar reads left to right
 //!
 //! ```text
-//!  ⬝⬝⬝⬝⬝⬝⬝⬝⬝  ❯❯  cargo t▌                    profile @ [global] || 12/840
+//!  ⬝⬝⬝⬝⬝⬝⬝⬝⬝  >>  cargo t▌                    profile @ [global] || 12/840
 //!  └ scanner   └ prompt └ query               └ left slot, badge, right slot
 //! ```
 //!
@@ -71,7 +71,15 @@ impl Look {
             bg: self.surface.or(style.bg),
             ..style
         };
-        let blank = on(Style::default()).paint(&" ".repeat(cols), depth);
+        // **The blank rows are as wide as the row they wrap, not as wide as the terminal.** A
+        // surface that reached the edge while the query row stopped at its text drew a panel in
+        // two different widths — the tint running to the margin above and below a line that did
+        // not. `Width` says which the caller wanted; it now says it about the whole panel.
+        let across = match self.width {
+            Width::Full => cols,
+            Width::Content => printed_width(row),
+        };
+        let blank = on(Style::default()).paint(&" ".repeat(across), depth);
         let middle = self.surface_rows / 2;
         (0..self.surface_rows.max(1))
             .map(|at| match at == middle {
