@@ -1,0 +1,44 @@
+# tab: named sessions that keep running when the terminal they were opened in goes away.
+cols 100
+rows 22
+speed 0.06
+
+run echo "the shell you started in"
+wait 1.2
+
+# One key, in a tab or out of one. Nothing is running yet, so type a name for a new one.
+key C-\
+wait 1.8
+type build
+wait 1.6
+key Enter
+wait 2.2
+
+run echo "inside $TAB, on a screen of its own"
+wait 1.8
+
+# The same key from inside. This tab is listed like any other; typing a name makes another.
+key C-\
+wait 1.8
+type logs
+wait 1.4
+key Enter
+wait 2.2
+
+run echo "a second tab. the first is still running"
+wait 1.8
+
+# Both are there. Going back finds the first exactly as it was left.
+key C-\
+wait 1.8
+type build
+wait 1.6
+key Enter
+wait 2.6
+
+# Esc leaves altogether: the tabs keep running, and the shell you started in comes back untouched,
+# scrollback and all.
+key C-\
+wait 1.8
+key Escape
+wait 2.6

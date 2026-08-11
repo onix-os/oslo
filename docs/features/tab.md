@@ -28,13 +28,17 @@ One key reaches all of it, and it means the same thing wherever you press it.
 > The settings are read in both builds on purpose. A config is shared between machines, and making
 > it ask `if oslo.tab then` before setting a key would be a question with only one useful answer.
 
+<!-- demo:begin -->
+[![tab demo](https://asciinema.org/a/1262807.svg)](https://asciinema.org/a/1262807)
+<!-- demo:end -->
+
 ## What the key does
 
 `^\` by default. Press it anywhere.
 
 | where | you press | what happens |
 |---|---|---|
-| outside a tab | `^\` | the finder: every tab, plus a `new tab <what you typed>` row |
+| outside a tab | `^\` | the finder: every tab, plus a row for the name you type |
 | outside, in the finder | Esc | nothing — back to your prompt, line intact, no tab made |
 | outside, in the finder | pick one | attach to it |
 | outside, in the finder | type a name, Enter | make it, attach |
@@ -61,7 +65,7 @@ what somebody meant it to be called. `$TAB` holds the current name, for a prompt
 The same one `ui filter` uses, so it carries the theme, the border and the key handling everything
 else in oslo has — arrows, `^n`/`^p`, fuzzy matching as you type.
 
-The `new tab …` row is **a row, not a second prompt**. It appears only when what you have typed
+The row offering the name you typed is **a row, not a second prompt**. It appears only when what you have typed
 names nothing already in the list, and it sorts last, so Enter still takes a real match by default
 and making a new one is the answer you walk to. Offering to create `work` while a tab called `work`
 is right there would make Enter ambiguous at the exact moment it matters.
