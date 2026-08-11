@@ -181,7 +181,7 @@ pub fn install(interp: &Rc<Interp>, registry: &Registry, env: Arc<Mutex<Environm
     #[cfg(feature = "direnv")]
     oslo.set(Value::str("direnv"), direnv::build(&env));
     #[cfg(feature = "nix")]
-    oslo.set(Value::str("nix"), nix::build());
+    oslo.set(Value::str("nix"), nix::build(interp));
     let oslo = Value::table(oslo);
     publish(interp, &oslo);
     interp.set_global("oslo", oslo);

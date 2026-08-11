@@ -30,8 +30,11 @@ use oslo_lua::{LuaError, LuaResult};
 use oslo_shell::nix_shell::{cache, json};
 use std::time::Duration;
 
+/// The named helpers, in the language they are meant to be replaced in.
+const HELPERS: &str = include_str!("nix.lua");
+
 /// Build the `oslo.nix` table.
-pub fn build() -> Value {
+pub fn build(interp: &oslo_lua::Interp) -> Value {
     let mut nix = Table::new();
 
     // oslo.nix.run{"flake", "metadata", timeout = 30, cache = true} -> table, or nil + message
@@ -57,7 +60,36 @@ pub fn build() -> Value {
         ok(Value::Bool(json::available()))
     });
 
-    Value::table(nix)
+    let table = Value::table(nix);
+    add_helpers(interp, &table);
+    table
+}
+
+/// Run `nix.lua`, which fills the table in with the named helpers.
+///
+/// The chunk is `return function(nix) … end` rather than a script that reaches for a global,
+/// because at this point in startup there is no `oslo` global yet — the table being filled is still
+/// on its way onto it. Handing it in as an argument also means the helpers cannot be confused about
+/// which table they are extending.
+///
+/// **A failure is reported and startup continues.** These are conveniences over `oslo.nix.run`; a
+/// shell that will not start because one of them has a typo is a much worse outcome than a shell
+/// missing `oslo.nix.inputs`.
+fn add_helpers(interp: &oslo_lua::Interp, table: &Value) {
+    let chunk = "oslo.nix";
+    let installed = oslo_lua::parse(HELPERS)
+        .map_err(|e| e.in_chunk(chunk))
+        .and_then(|ast| {
+            interp.set_chunk(chunk);
+            let returned = interp.run_ast(&ast)?;
+            match returned.first() {
+                Some(install) => interp.call(install, vec![table.clone()]),
+                None => Ok(Vec::new()),
+            }
+        });
+    if let Err(e) = installed {
+        eprintln!("oslo: {chunk}: {e}");
+    }
 }
 
 /// One `oslo.nix.run{…}` request.

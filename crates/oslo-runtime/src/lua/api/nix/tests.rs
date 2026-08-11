@@ -72,13 +72,28 @@ fn an_empty_table_is_refused_rather_than_running_a_bare_nix() {
     assert!(refused.to_string().contains("no arguments"), "{refused}");
 }
 
+/// The two Rust names, and the helpers `nix.lua` adds on top of them.
+///
+/// That the chunk parses and runs at all is worth asserting here: it is `include_str!`d, so a typo
+/// in it is not a compile error, and startup only prints a complaint that nothing would read.
 #[test]
-fn the_table_offers_both_names() {
-    let Value::Table(built) = build() else {
+fn the_table_offers_the_primitives_and_the_helpers() {
+    let interp = oslo_lua::Interp::new("test");
+    let Value::Table(built) = build(&interp) else {
         panic!("not a table")
     };
     let built = built.borrow();
-    for name in ["run", "available"] {
+    for name in [
+        "run",
+        "available",
+        "metadata",
+        "outputs",
+        "config",
+        "system",
+        "dirty",
+        "inputs",
+        "shells",
+    ] {
         assert!(
             matches!(built.get(&Value::str(name)), Value::Function(_)),
             "no {name}"
