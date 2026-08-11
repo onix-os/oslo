@@ -31,11 +31,11 @@ pub mod env;
 pub mod exec;
 pub mod expand;
 pub mod lexer;
+#[cfg(feature = "scratch")]
+pub mod scratch;
 /// The brush→oslo adapter and the nesting guard. There is one shell parser and it is brush's;
 /// this is the conversion into oslo's own tree, which is why it is not called `parser`.
 pub mod syntax;
-#[cfg(feature = "tab")]
-pub mod tab;
 
 pub use env::Environment;
 pub use exec::{JobManager, eval_command_list};

@@ -12,7 +12,7 @@ default = []
 vista = ["oslo-base/vista", "oslo-ui/vista"]
 # `tab` — the key that opens the tab finder, and what it does with the answer. Off by default; see
 # the note on `oslo-shell`.
-tab = ["oslo-shell/tab"]
+scratch = ["oslo-shell/scratch"]
 
 
 [dependencies]

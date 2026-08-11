@@ -199,7 +199,7 @@ pub fn short(paint: Paint) -> String {
     }
 
     s.push_str(&tools_section(paint));
-    #[cfg(feature = "tab")]
+    #[cfg(feature = "scratch")]
     s.push_str(&sessions_section(paint));
     s.push_str(&environment_section(paint));
 
@@ -263,32 +263,32 @@ fn tools_section(paint: Paint) -> String {
 
 /// Tabs, in a build that has them.
 ///
-/// **A section rather than a line in `TOOLS`**, because `tab` is not one: a tool is `oslo <name>`
+/// **A section rather than a line in `TOOLS`**, because `scratch` is not one: a tool is `oslo <name>`
 /// and reachable from anywhere, and this is a builtin that only means anything at an interactive
 /// prompt. Absent entirely without the feature, so the help never offers a word that does nothing.
-#[cfg(feature = "tab")]
+#[cfg(feature = "scratch")]
 fn sessions_section(paint: Paint) -> String {
     let mut s = String::new();
     let _ = writeln!(
         s,
         "\n{}  {}",
-        paint.head("TABS"),
+        paint.head("SCRATCHES"),
         paint.dim("named sessions that outlive the terminal they were opened in")
     );
     for (key, about) in [
-        ("tab", "open the finder — the same one `^\\` opens"),
+        ("scratch", "open the finder — the same one `^\\` opens"),
         (
-            "tab NAME",
-            "go into that tab, making it if it is not running",
+            "scratch NAME",
+            "go into that one, making it if it is not running",
         ),
-        ("tab -l", "every tab, one per line"),
+        ("scratch -l", "every one, on its own line"),
     ] {
         s.push_str(&row(key, paint.key(key), about));
     }
     let _ = writeln!(
         s,
         "\n  {}",
-        paint.dim("`$TAB` is the tab you are in, for a prompt to read.")
+        paint.dim("`$SCRATCH` is the one you are in, for a prompt to read.")
     );
     s
 }

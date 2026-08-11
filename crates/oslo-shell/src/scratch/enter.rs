@@ -1,0 +1,228 @@
+//! The key, the finder it opens, and what is done with the answer.
+//!
+//! This is the whole of the feature that anybody sees. Everything else in this module is the
+//! machinery it stands on.
+//!
+//! # One key, two places, one meaning
+//!
+//! Outside a scratch the shell owns the terminal, so the key is an ordinary editor binding and this is
+//! called from a prompt. Inside a scratch the client owns it and the shell is on the far side of a pty,
+//! so the client takes the key out of the stream and calls the same thing. The finder does not know
+//! which happened; only what Esc means differs, and that is the caller's to say.
+//!
+//! ```text
+//!            ┌── pick an existing one ──► attach to it
+//!   ^\ ──►  finder ── type a name ──────► make it, attach
+//!            └── Esc ──────────────────► outside: nothing. inside: leave the scratch running.
+//! ```
+//!
+//! # Why the shell inside is `exec`d rather than forked on
+//!
+//! `spawn` hands the child a choice: carry on as the shell it already is, or become a new one. Here
+//! it must become a new one. The key is pressed at a prompt, long after oslo has started the
+//! threads that warm the `$PATH` index — and `fork` carries only the calling thread, so a child
+//! that carried on would hold locks belonging to threads that do not exist in it. `exec` costs one
+//! more config read, once, when a scratch is made; that is the right price for not shipping a deadlock
+//! that appears under load.
+
+use super::{backend, client, detach, dir, keeper, name as naming};
+use oslo_ui::ask::{Answer, Choice, Pick, pick_or_create};
+use std::io;
+
+/// What the key did, so a caller can tell "nothing happened" from "you are somewhere else now".
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Went {
+    /// The finder was dismissed. Nothing was made, entered or left.
+    Nowhere,
+    /// A scratch was entered and has since been left, or ended.
+    ThereAndBack,
+}
+
+/// Open the finder and act on the answer, until nothing is left to attach to.
+///
+/// **Returns only when the terminal is the caller's again**, so a prompt can be redrawn and a
+/// client can exit. Everything in between — attaching, the key being pressed again inside, moving
+/// to another scratch — happens in the loop.
+pub fn open(key: &str, replay: u64) -> io::Result<Went> {
+    // **Before anything reads or writes there.** Listing touches the directory and so does asking
+    // whether a name is alive — which creates its lock file. A check that ran later would have
+    // already left a file in a directory it was about to refuse.
+    dir::open_checked()?;
+    // Read once, here, so a session cannot end up half in one backend and half in the other
+    // because the setting changed while a scratch was attached.
+    let scratches = backend::current(oslo_ui::settings::current().scratch.daemon);
+    let detach = detach::Key::named(key);
+    let mut went = Went::Nowhere;
+    let mut next = ask(&*scratches, None)?;
+
+    while let Some(name) = next {
+        scratches.ensure(&name)?;
+        went = Went::ThereAndBack;
+        match client::attach(scratches.connect(&name)?, &name, detach, replay)? {
+            // The shell inside exited, so there is nothing to go back to and nothing to ask about.
+            client::Left::Ended => return Ok(went),
+            // The key, pressed inside. The finder opens on the terminal the client has just handed
+            // back, and Esc here means leave — which is the one thing it cannot mean outside.
+            client::Left::Detached => next = ask(&*scratches, Some(&name))?,
+        }
+    }
+    Ok(went)
+}
+
+/// Every scratch there is, without asking anything.
+///
+/// Separate from the finder because the caller is a prompt or a script, and a widget is the wrong
+/// answer to "how many are running".
+pub fn names() -> io::Result<Vec<String>> {
+    dir::open_checked()?;
+    backend::current(oslo_ui::settings::current().scratch.daemon).list()
+}
+
+/// Go straight into `name`, making it if nothing is holding it.
+///
+/// The finder still opens if the key is pressed inside, so this is a way *in* rather than a second
+/// way of choosing: what happens after you arrive is the same either way.
+pub fn open_named(key: &str, replay: u64, name: &str) -> io::Result<Went> {
+    if !naming::valid(name) {
+        return Err(io::Error::other(format!(
+            "{name:?} is not a usable scratch name"
+        )));
+    }
+    dir::open_checked()?;
+    let scratches = backend::current(oslo_ui::settings::current().scratch.daemon);
+    let detach = detach::Key::named(key);
+    let mut next = Some(name.to_string());
+
+    while let Some(name) = next {
+        scratches.ensure(&name)?;
+        match client::attach(scratches.connect(&name)?, &name, detach, replay)? {
+            client::Left::Ended => return Ok(Went::ThereAndBack),
+            client::Left::Detached => next = ask(&*scratches, Some(&name))?,
+        }
+    }
+    Ok(Went::ThereAndBack)
+}
+
+/// The finder, listing every scratch and offering what is typed as a new one.
+///
+/// `inside` is the scratch the question is being asked from, which **is listed like any other**: going
+/// back into the one you are in has to be possible, or the key is a trap for anybody who pressed it
+/// by accident.
+fn ask(scratches: &dyn backend::Scratches, inside: Option<&str>) -> io::Result<Option<String>> {
+    let running = scratches.list()?;
+    let spec = Choice {
+        items: running.clone(),
+        look: look(inside),
+        // Short on purpose. This is a list of sessions, not of history — there are as many rows as
+        // you have scratches, and a panel sized for a thousand lines would be mostly empty air.
+        height: 8,
+        chrome: oslo_ui::ask::chrome::Chrome {
+            // **No legend.** It lists three keys, two of which are the ones every list in the shell
+            // already uses; against four names it is more rows of explanation than of answer. The
+            // box keeps its width without it — see `look`.
+            legend: false,
+            legend_gap: 0,
+            ..oslo_ui::ask::chrome::Chrome::default()
+        },
+        ..Choice::default()
+    };
+
+    Ok(match pick_or_create(&spec, "{}") {
+        Answer::Given(Pick::Chosen(name)) => Some(name),
+        // Refused rather than quietly rewritten: a name is part of a path, and a name you did not
+        // type is one you cannot find again. See `name::valid`.
+        Answer::Given(Pick::New(typed)) if !naming::valid(&typed) => {
+            return Err(io::Error::other(format!(
+                "{typed:?} is not a usable scratch name"
+            )));
+        }
+        Answer::Given(Pick::New(typed)) => Some(typed),
+        // Esc. Outside, the caller has nothing to do; inside, this is how you leave.
+        Answer::Cancelled => None,
+        // No terminal is not a refusal to answer, it is a place the question cannot be asked.
+        Answer::NoTerminal => None,
+    })
+}
+
+/// The history finder's colours and its box to type in, and none of the rest of it.
+///
+/// **The same renderer, so the two cannot drift** — `Preset::History` is where the tinted filter
+/// row and the selection colours live, and a second list with its own idea of them would be a
+/// second thing to keep in step with the theme. What is dropped is dropped because this list is
+/// short and known:
+///
+/// * **No scanner.** The bar says a long search is still running. Scratches are a directory listing of
+///   a handful of names; there is never a wait to report.
+/// * **No counts or badge.** `2/3` earns its place against a thousand history lines. Here the whole
+///   list is on the screen and you can see how many there are.
+/// * **Rows as wide as their text.** Full-width stripes read as a ruler through a long list. Across
+///   three names they read as three bars reaching the edge of the terminal for no reason.
+fn look(_inside: Option<&str>) -> oslo_ui::ask::look::Look {
+    use oslo_ui::theme::Style;
+    let mut look = oslo_ui::ask::Preset::History.look();
+    look.scanner = None;
+    look.right = String::new();
+    look.badge = String::new();
+    look.width = oslo_ui::ask::look::Width::Content;
+    look.placeholder = "type to filter, or a name for a new one".to_string();
+    // **The box keeps the width of its own empty state.** With no legend under it there is nothing
+    // else to measure against, and a panel sized to the query alone shrank as the query got
+    // shorter — the thing that made it look broken in the first place. The widest this is ever
+    // asked to be is the placeholder, so that is the floor.
+    look.min_width = look.pad * 2
+        + oslo_ui::prompt::printed_width(&look.prompt)
+        + oslo_ui::prompt::printed_width(&look.placeholder)
+        // The caret, which is part of the input and always has a cell.
+        + 1;
+    // **The marker is the whole of the selection.** A highlighted band works down a long history
+    // where the eye needs catching; across four names it is a slab of colour saying something you
+    // can already see. What is left is the `>` in front, which is where the eye goes anyway.
+    // **Nothing between the box and what is around it.** The three rows of surface are the box —
+    // a tinted row above and below the query is what makes it read as somewhere to type rather
+    // than as a line. What is removed is the air *outside* it: the blank row between the list and
+    // the filter here, and the one between the filter and the rule in `chrome`.
+    look.gap = 0;
+    look.selected = Style::default();
+    look.stripe = None;
+    look
+}
+
+/// Carry on as the caller, or — in the process that turned out to be the shell — become one.
+pub(super) fn become_shell_or(role: keeper::Role, name: &str) -> io::Result<()> {
+    match role {
+        keeper::Role::Caller(_) => Ok(()),
+        keeper::Role::Inside => exec_inside(name),
+    }
+}
+
+/// Become the shell inside a scratch. Never returns.
+///
+/// The environment is marked here rather than by the caller, so every path into a scratch agrees on
+/// what `$SCRATCH` says.
+pub(super) fn exec_inside(name: &str) -> ! {
+    // SAFETY: a fresh fork about to `exec` — single-threaded, and nothing else can be reading the
+    // environment while it is written.
+    unsafe { std::env::set_var(INSIDE, name) };
+    // `/proc/self/exe` rather than `$SHELL` or a name on `$PATH`: a scratch is an oslo, and the one
+    // that made it is the one to run.
+    let me = std::ffi::CString::new("/proc/self/exe").unwrap_or_default();
+    let argv = [
+        std::ffi::CString::new("oslo").unwrap_or_default(),
+        std::ffi::CString::new("-i").unwrap_or_default(),
+    ];
+    let _ = nix::unistd::execv(&me, &argv);
+    // Only reached if the exec failed, and this process must never return into the caller and
+    // start behaving like the shell that made it.
+    std::process::exit(127)
+}
+
+/// The variable a shell inside a scratch is marked with.
+pub const INSIDE: &str = "SCRATCH";
+
+/// Whether this shell is running inside a scratch, and which one.
+pub fn current() -> Option<String> {
+    std::env::var(INSIDE).ok().filter(|name| !name.is_empty())
+}
+
+#[cfg(test)]
+mod tests;

@@ -56,7 +56,7 @@ vista = ["oslo-base/vista", "oslo-runtime/vista", "oslo-ui/vista"]
 #
 # Without it the key is unbound and the settings are accepted and ignored, so one config works in
 # both builds with nothing to ask.
-tab = ["oslo-shell/tab", "oslo-runtime/tab"]
+scratch = ["oslo-shell/scratch", "oslo-runtime/scratch"]
 
 [dependencies]
 # A fork of `makiko`, the one pure-Rust SSH client — no `cc`, no `ring`, no `-sys` crate that is

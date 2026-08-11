@@ -47,22 +47,22 @@ pub struct Settings {
     pub dirs: Vec<(String, String)>,
     /// `oslo.keys`: key name to action name, both as written.
     pub keys: Vec<(String, String)>,
-    /// `oslo.tab`: named sessions that outlive the terminal they were opened in.
-    pub tab: Tab,
+    /// `oslo.scratch`: named sessions that outlive the terminal they were opened in.
+    pub scratch: Scratch,
 }
 
 /// `oslo.tab` — named sessions that keep running when the terminal goes away.
 ///
 /// ```lua
-/// oslo.tab.key = "ctrl-\\"   -- opens the finder, in a tab or out of one
-/// oslo.tab.daemon = false    -- a keeper per tab, rather than one registry process
+/// oslo.scratch.key = "ctrl-\\"   -- opens the finder, in a tab or out of one
+/// oslo.scratch.daemon = false    -- a keeper per tab, rather than one registry process
 /// ```
 ///
 /// **Read even in a build without the `tab` feature**, where nothing acts on it. A config is
 /// shared between machines and builds; making it ask `if oslo.tab then` before setting a key would
 /// be a question with only one useful answer.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Tab {
+pub struct Scratch {
     /// The key that opens the finder. Only a control chord can be one byte, which is what the
     /// client inside a tab has to match.
     pub key: String,
@@ -74,9 +74,9 @@ pub struct Tab {
     pub log_bytes: u64,
 }
 
-impl Default for Tab {
+impl Default for Scratch {
     fn default() -> Self {
-        Tab {
+        Scratch {
             // `^\`, because nothing in common use binds it — and whatever this is gets swallowed
             // from every program inside a tab, which rules out `^X`: nano's Exit, emacs' prefix.
             key: "ctrl-\\".to_string(),

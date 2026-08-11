@@ -54,9 +54,9 @@ pub const TOOLS: &[Tool] = &[
     // types at an oslo prompt; this is what anything *else* asks — a prompt segment, a status bar,
     // a script — and those reach oslo through `io.popen` or `sh -c`, where a builtin does not
     // exist and the name resolves to whatever is on `$PATH` instead.
-    #[cfg(feature = "tab")]
+    #[cfg(feature = "scratch")]
     Tool {
-        name: "tab",
+        name: "scratch",
         about: "list the named sessions, or go into one",
     },
 ];
@@ -117,9 +117,9 @@ pub fn run(tool: &'static Tool, args: &[String]) -> i32 {
     }
     // The same code the builtin runs, so the two answers cannot disagree about what is running.
     // `args` here has no command name in front of it, which the builtin's does.
-    #[cfg(feature = "tab")]
-    if tool.name == "tab" {
-        return oslo::env::builtins::tab_tool(args);
+    #[cfg(feature = "scratch")]
+    if tool.name == "scratch" {
+        return oslo::env::builtins::scratch_tool(args);
     }
     let paint = crate::cli::help::Paint::detect();
     if args.iter().any(|a| a == "--help" || a == "-h") {

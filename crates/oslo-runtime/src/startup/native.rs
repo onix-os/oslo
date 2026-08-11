@@ -10,7 +10,7 @@ use oslo_ui::{OsloHelper, abbr, dropdown, editor, settings};
 
 /// How much of a tab's output is replayed on attaching: a screenful, roughly, at any sane width.
 /// Enough to land on the screen it was left on, not enough to redraw a session's history.
-#[cfg(feature = "tab")]
+#[cfg(feature = "scratch")]
 const REPLAY: u64 = 8192;
 
 /// What the shell plugs into an editing session.
@@ -190,10 +190,10 @@ impl Assist for ShellAssist<'_> {
     ///
     /// Errors are printed rather than returned: this is a key, and a key that fails has to say so
     /// where it was pressed. The prompt comes back either way.
-    #[cfg(feature = "tab")]
-    fn open_tabs(&mut self) -> bool {
-        use oslo_shell::tab::enter;
-        let key = settings::current().tab.key.clone();
+    #[cfg(feature = "scratch")]
+    fn open_scratch(&mut self) -> bool {
+        use oslo_shell::scratch::enter;
+        let key = settings::current().scratch.key.clone();
         match enter::open(&key, REPLAY) {
             Ok(enter::Went::ThereAndBack) => true,
             Ok(enter::Went::Nowhere) => false,
@@ -293,12 +293,12 @@ impl Assist for ShellAssist<'_> {
         }
 
         // Ranked below `oslo.keys` so that binding the same chord to something else wins, and
-        // above the defaults because `oslo.tab.key` is a statement the config made on purpose.
+        // above the defaults because `oslo.scratch.key` is a statement the config made on purpose.
         // Only in a build that has tabs: elsewhere the setting is read and means nothing, so the
         // key must fall through to whatever it would otherwise have done.
-        #[cfg(feature = "tab")]
-        if settings.tab.key == name {
-            return Some(Bound::OpenTabs);
+        #[cfg(feature = "scratch")]
+        if settings.scratch.key == name {
+            return Some(Bound::OpenScratch);
         }
 
         if settings.suggest.accept.as_deref() == Some(name.as_str()) {

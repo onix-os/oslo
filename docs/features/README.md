@@ -23,8 +23,8 @@ cargo feature, so `oslo-minimal` has no model: it learns nothing, writes no `.mo
 `"predict"` and simply gets no answer from it — as long as it asks before calling a name:
 `if oslo.repair then … end`.
 
-**[Tabs](tab.md) are `oslo` only**, behind the `tab` cargo feature. In `oslo-minimal` the key that
-opens the finder is unbound and does whatever it otherwise would; the `oslo.tab` settings are still
+**[Scratches](scratch.md) are `oslo` only**, behind the `scratch` cargo feature. In `oslo-minimal` the key that
+opens the finder is unbound and does whatever it otherwise would; the `oslo.scratch` settings are still
 read and simply mean nothing, so one config works under both with nothing to ask.
 
 Everything else on this page is in both binaries.
@@ -84,7 +84,7 @@ scripts/demo/embed.sh                            # put the players back in the d
 | [Directory environments](directory-environments.md) | `.envrc` read by oslo itself, not handed to direnv |
 | [The filesystem navigator](nav.md) | `nav`: type to filter, arrows to move, Esc to take the shell there |
 | [rm, and the things that can bite](rm-and-safety.md) | Recoverable at the prompt, POSIX in a script |
-| [Tabs](tab.md) | Named sessions that outlive the terminal they were opened in |
+| [Scratches](scratch.md) | Named sessions that outlive the terminal they were opened in |
 
 ## Appearance and control
 
