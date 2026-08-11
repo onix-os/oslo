@@ -102,18 +102,25 @@ fn ask(tabs: &dyn backend::Tabs, inside: Option<&str>) -> io::Result<Option<Stri
     })
 }
 
-/// The history finder's look, because this is the same kind of question.
+/// The history finder's colours and its box to type in, and none of the rest of it.
 ///
-/// **The same renderer, so the two cannot drift.** `Preset::History` is where the striping, the
-/// tinted filter row, the match marks and the counts live; a second list with its own idea of those
-/// would be a second thing to keep in step with the theme. Only what the preset cannot know is set
-/// here — which tab you are asking from, and that the list is short.
-fn look(inside: Option<&str>) -> oslo_ui::ask::look::Look {
+/// **The same renderer, so the two cannot drift** — `Preset::History` is where the tinted filter
+/// row and the selection colours live, and a second list with its own idea of them would be a
+/// second thing to keep in step with the theme. What is dropped is dropped because this list is
+/// short and known:
+///
+/// * **No scanner.** The bar says a long search is still running. Tabs are a directory listing of
+///   a handful of names; there is never a wait to report.
+/// * **No counts or badge.** `2/3` earns its place against a thousand history lines. Here the whole
+///   list is on the screen and you can see how many there are.
+/// * **Rows as wide as their text.** Full-width stripes read as a ruler through a long list. Across
+///   three names they read as three bars reaching the edge of the terminal for no reason.
+fn look(_inside: Option<&str>) -> oslo_ui::ask::look::Look {
     let mut look = oslo_ui::ask::Preset::History.look();
-    look.badge = inside.unwrap_or("tab").to_string();
-    // `[work] || 2/3` — where you are and how much of the list you are seeing, on the right, since
-    // both are facts about what you are looking at rather than part of what you are typing.
-    look.right = "{badge} || {n}/{total} ".to_string();
+    look.scanner = None;
+    look.right = String::new();
+    look.badge = String::new();
+    look.width = oslo_ui::ask::look::Width::Content;
     look.placeholder = "type to filter, or a name for a new one".to_string();
     look
 }

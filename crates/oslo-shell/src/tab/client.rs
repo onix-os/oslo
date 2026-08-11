@@ -55,7 +55,7 @@ pub fn attach(
     // **The screen belongs to one tab at a time.** Whatever is on it was written by somebody else —
     // the shell you pressed the key in, or the tab you just left — and replaying this tab's output
     // on top of it interleaves two sessions into one screen that belongs to neither.
-    wipe();
+    take_screen();
     // What the tab printed while nobody was watching, so an attach lands on the screen it left
     // rather than on a blank one.
     if replay > 0
@@ -68,9 +68,9 @@ pub fn attach(
     let _ = tell_size(&mut socket);
 
     let outcome = pump(&mut socket, stdin.as_fd(), detach);
-    // And again on the way out, so what comes next — the finder, or the shell that was here before
-    // — does not draw over a screen full of this tab.
-    wipe();
+    // The screen the key was pressed on comes back untouched — its scrollback is the work of
+    // whoever was there, and leaving a tab is not a reason to lose it.
+    give_screen_back();
     drop(restore);
     outcome
 }
@@ -140,16 +140,28 @@ fn pump(socket: &mut UnixStream, stdin: BorrowedFd<'_>, detach: detach::Key) -> 
     }
 }
 
-/// Hand the screen over: reset the terminal, then clear it.
+/// Take the screen for the tab, on the terminal's second one.
 ///
-/// `ESC c` before `ESC [ 2 J` because clearing alone is not enough. What the last session left is
-/// not only characters — it is a scroll region, a charset, colours still in force, a cursor that
-/// may be hidden, an alternate screen it never left. A tab that inherited those would draw wrongly
-/// for reasons nothing on the screen explains. This is the sequence tab-rs sends, for the same
-/// reason and at the same moments.
-fn wipe() {
+/// **The alternate screen rather than a clear.** Both give the tab a blank screen to itself, and
+/// only this one gives the first screen *back*: the terminal keeps it, scrollback and all, and
+/// redraws it untouched on the way out. Clearing instead — which is what tab-rs does, since it has
+/// no shell of its own to return to — threw away the scrollback of the session the key was pressed
+/// in, which is somebody else's work and not a tab's to discard.
+///
+/// **And not `ESC c` to tidy it, however tempting.** A full reset is what tab-rs sends, and on a
+/// real terminal it takes the alternate screen down with it and empties the scrollback — undoing
+/// the one thing this is for. What is left is the state a tab could otherwise inherit and draw
+/// wrongly for: a scroll region somebody set, a hidden cursor, and the screen itself.
+fn take_screen() {
     let mut out = io::stdout();
-    let _ = out.write_all(b"\x1bc\x1b[2J");
+    let _ = out.write_all(b"\x1b[?1049h\x1b[r\x1b[?25h\x1b[H\x1b[2J");
+    let _ = out.flush();
+}
+
+/// Give the first screen back, exactly as it was.
+fn give_screen_back() {
+    let mut out = io::stdout();
+    let _ = out.write_all(b"\x1b[?1049l");
     let _ = out.flush();
 }
 
