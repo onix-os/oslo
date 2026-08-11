@@ -52,6 +52,10 @@ pub fn attach(
     let stdin = io::stdin();
     let restore = Raw::take(stdin.as_fd())?;
 
+    // **The screen belongs to one tab at a time.** Whatever is on it was written by somebody else —
+    // the shell you pressed the key in, or the tab you just left — and replaying this tab's output
+    // on top of it interleaves two sessions into one screen that belongs to neither.
+    wipe();
     // What the tab printed while nobody was watching, so an attach lands on the screen it left
     // rather than on a blank one.
     if replay > 0
@@ -64,6 +68,9 @@ pub fn attach(
     let _ = tell_size(&mut socket);
 
     let outcome = pump(&mut socket, stdin.as_fd(), detach);
+    // And again on the way out, so what comes next — the finder, or the shell that was here before
+    // — does not draw over a screen full of this tab.
+    wipe();
     drop(restore);
     outcome
 }
@@ -131,6 +138,19 @@ fn pump(socket: &mut UnixStream, stdin: BorrowedFd<'_>, detach: detach::Key) -> 
             }
         }
     }
+}
+
+/// Hand the screen over: reset the terminal, then clear it.
+///
+/// `ESC c` before `ESC [ 2 J` because clearing alone is not enough. What the last session left is
+/// not only characters — it is a scroll region, a charset, colours still in force, a cursor that
+/// may be hidden, an alternate screen it never left. A tab that inherited those would draw wrongly
+/// for reasons nothing on the screen explains. This is the sequence tab-rs sends, for the same
+/// reason and at the same moments.
+fn wipe() {
+    let mut out = io::stdout();
+    let _ = out.write_all(b"\x1bc\x1b[2J");
+    let _ = out.flush();
 }
 
 /// Tell the tab how big this terminal is.
