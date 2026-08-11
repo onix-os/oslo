@@ -69,6 +69,40 @@ pub fn open(key: &str, replay: u64) -> io::Result<Went> {
     Ok(went)
 }
 
+/// Every tab there is, without asking anything.
+///
+/// Separate from the finder because the caller is a prompt or a script, and a widget is the wrong
+/// answer to "how many are running".
+pub fn names() -> io::Result<Vec<String>> {
+    dir::open_checked()?;
+    backend::current(oslo_ui::settings::current().tab.daemon).list()
+}
+
+/// Go straight into `name`, making it if nothing is holding it.
+///
+/// The finder still opens if the key is pressed inside, so this is a way *in* rather than a second
+/// way of choosing: what happens after you arrive is the same either way.
+pub fn open_named(key: &str, replay: u64, name: &str) -> io::Result<Went> {
+    if !naming::valid(name) {
+        return Err(io::Error::other(format!(
+            "{name:?} is not a usable tab name"
+        )));
+    }
+    dir::open_checked()?;
+    let tabs = backend::current(oslo_ui::settings::current().tab.daemon);
+    let detach = detach::Key::named(key);
+    let mut next = Some(name.to_string());
+
+    while let Some(name) = next {
+        tabs.ensure(&name)?;
+        match client::attach(tabs.connect(&name)?, &name, detach, replay)? {
+            client::Left::Ended => return Ok(Went::ThereAndBack),
+            client::Left::Detached => next = ask(&*tabs, Some(&name))?,
+        }
+    }
+    Ok(Went::ThereAndBack)
+}
+
 /// The finder, listing every tab and offering what is typed as a new one.
 ///
 /// `inside` is the tab the question is being asked from, which **is listed like any other**: going

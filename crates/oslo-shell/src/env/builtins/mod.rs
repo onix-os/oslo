@@ -38,6 +38,8 @@ mod shopt;
 mod spawn;
 mod status;
 mod suspend;
+#[cfg(feature = "tab")]
+mod tab;
 mod times;
 mod ui;
 mod ulimit;
@@ -156,6 +158,9 @@ pub fn register_default_builtins(env: &mut Environment) {
     env.register_custom_builtin("abbr", abbr::builtin_abbr);
     env.register_custom_builtin("ui", ui::builtin_ui);
     env.register_custom_builtin("nav", nav::builtin_nav);
+    // The finder the key opens, for a prompt counting tabs and for a name already known.
+    #[cfg(feature = "tab")]
+    env.register_custom_builtin("tab", tab::builtin_tab);
     // The directory ring: where you have been. Walking it is `cd -` and `cd -N`, so the only
     // builtin left is the one that shows you the numbers those take. Separate from `pushd`/`popd`,
     // which are explicit and which scripts rely on.
