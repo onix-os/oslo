@@ -47,6 +47,44 @@ pub struct Settings {
     pub dirs: Vec<(String, String)>,
     /// `oslo.keys`: key name to action name, both as written.
     pub keys: Vec<(String, String)>,
+    /// `oslo.tab`: named sessions that outlive the terminal they were opened in.
+    pub tab: Tab,
+}
+
+/// `oslo.tab` — named sessions that keep running when the terminal goes away.
+///
+/// ```lua
+/// oslo.tab.key = "ctrl-\\"   -- opens the finder, in a tab or out of one
+/// oslo.tab.daemon = false    -- a keeper per tab, rather than one registry process
+/// ```
+///
+/// **Read even in a build without the `tab` feature**, where nothing acts on it. A config is
+/// shared between machines and builds; making it ask `if oslo.tab then` before setting a key would
+/// be a question with only one useful answer.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Tab {
+    /// The key that opens the finder. Only a control chord can be one byte, which is what the
+    /// client inside a tab has to match.
+    pub key: String,
+    /// Whether tabs are held by one registry process rather than a keeper each.
+    pub daemon: bool,
+    /// Where the sockets and their bookkeeping live. Empty means the default under `/tmp`.
+    pub dir: String,
+    /// How much of a tab's output to keep, so an attach lands on the screen it left.
+    pub log_bytes: u64,
+}
+
+impl Default for Tab {
+    fn default() -> Self {
+        Tab {
+            // `^\`, because nothing in common use binds it — and whatever this is gets swallowed
+            // from every program inside a tab, which rules out `^X`: nano's Exit, emacs' prefix.
+            key: "ctrl-\\".to_string(),
+            daemon: false,
+            dir: String::new(),
+            log_bytes: 1 << 20,
+        }
+    }
 }
 
 /// `oslo.notify` — a desktop notification when a slow command finishes.

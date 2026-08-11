@@ -46,6 +46,18 @@ ssh = ["dep:maki", "dep:tokio"]
 # before using them: `if oslo.repair then … end`.
 vista = ["oslo-base/vista", "oslo-runtime/vista", "oslo-ui/vista"]
 
+# `tab` — named sessions that keep running when the terminal they were in goes away, reached with
+# one key. See `PLAN.md` and `docs/features/tab.md`.
+#
+# **Off, because it is a second process and a pty for every session that uses it, and because a
+# shell meant to be `/bin/sh` should not carry a multiplexer nobody asked for.** Unlike `ssh` and
+# `vista` it adds no dependency at all — it is `nix`, which oslo already links — so what it costs is
+# code and the runtime directory, not crates.
+#
+# Without it the key is unbound and the settings are accepted and ignored, so one config works in
+# both builds with nothing to ask.
+tab = ["oslo-shell/tab", "oslo-runtime/tab"]
+
 [dependencies]
 # A fork of `makiko`, the one pure-Rust SSH client — no `cc`, no `ring`, no `-sys` crate that is
 # really C. Forked rather than depended on because upstream was last touched in March 2025, and a

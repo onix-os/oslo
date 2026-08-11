@@ -176,6 +176,30 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
         }
     }
 
+    if let Value::Table(table) = oslo.get(&Value::str("tab")) {
+        let table = table.borrow();
+        if let Value::Str(key) = table.get(&Value::str("key")) {
+            // Checked where it is written rather than where it is used, so a typo is reported
+            // against the line that made it instead of leaving a tab nobody can get out of.
+            if crate::keys::is_key_name(&key) {
+                settings.tab.key = key.to_string();
+            } else {
+                problems.push(format!("oslo.tab.key: '{key}' is not a key name"));
+            }
+        }
+        if let Value::Bool(on) = table.get(&Value::str("daemon")) {
+            settings.tab.daemon = on;
+        }
+        if let Value::Str(dir) = table.get(&Value::str("dir")) {
+            settings.tab.dir = dir.to_string();
+        }
+        if let Some(n) = number(&table, "log_bytes")
+            && n >= 0
+        {
+            settings.tab.log_bytes = n as u64;
+        }
+    }
+
     if let Value::Table(table) = oslo.get(&Value::str("finder")) {
         let table = table.borrow();
         if let Value::Bool(on) = table.get(&Value::str("enabled")) {
