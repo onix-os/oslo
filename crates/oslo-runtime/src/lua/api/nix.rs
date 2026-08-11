@@ -27,17 +27,17 @@
 use super::util::{failed, ok, put};
 use oslo_lua::value::{Table, Value};
 use oslo_lua::{LuaError, LuaResult};
-use oslo_shell::nix_shell::json;
+use oslo_shell::nix_shell::{cache, json};
 use std::time::Duration;
 
 /// Build the `oslo.nix` table.
 pub fn build() -> Value {
     let mut nix = Table::new();
 
-    // oslo.nix.run{"flake", "metadata", timeout = 30} -> table, or nil + message
+    // oslo.nix.run{"flake", "metadata", timeout = 30, cache = true} -> table, or nil + message
     put(&mut nix, "run", |_, args| {
         let request = Request::from_lua(args.first())?;
-        match json::run(&request.argv, request.timeout) {
+        match request.answer() {
             Ok(document) => match serde_json::from_str::<serde_json::Value>(&document) {
                 Ok(parsed) => ok(super::json::from_json(&parsed)),
                 // nix answered, but not with JSON. `nix fmt --json` does this: the flag is accepted
@@ -65,6 +65,7 @@ pub fn build() -> Value {
 struct Request {
     argv: Vec<String>,
     timeout: Duration,
+    cache: bool,
 }
 
 impl Request {
@@ -105,7 +106,31 @@ impl Request {
             _ => json::TIMEOUT,
         };
 
-        Ok(Self { argv, timeout })
+        let cache = table.get(&Value::str("cache")).truthy();
+
+        Ok(Self {
+            argv,
+            timeout,
+            cache,
+        })
+    }
+
+    /// The document, from the cache when one was asked for and is still good.
+    ///
+    /// **Written only after it parses.** A truncated or error-shaped answer kept here is one every
+    /// later call is served from, and the caller would have no way to tell why. `nix_shell::apply`
+    /// learned the same lesson and guards its cache the same way.
+    fn answer(&self) -> Result<String, String> {
+        if self.cache
+            && let Some(remembered) = cache::document(&self.argv)
+        {
+            return Ok(remembered);
+        }
+        let fresh = json::run(&self.argv, self.timeout)?;
+        if self.cache && serde_json::from_str::<serde_json::Value>(&fresh).is_ok() {
+            cache::keep(&self.argv, &fresh);
+        }
+        Ok(fresh)
     }
 }
 
