@@ -45,6 +45,9 @@ pub enum Bound {
     AcceptHintWord,
     Interrupt,
     Complete,
+    /// Open the tab finder. Like completion, it wants the terminal to itself, so the session only
+    /// says so and the outer loop does it.
+    OpenTabs,
     /// A Lua function, by the key's name.
     Lua(String),
 }
@@ -68,6 +71,8 @@ pub enum Step {
     ToggleLanguage,
     /// Open the completion modal through the outer loop's shared input reader.
     OpenCompletion { backwards: bool },
+    /// Open the tab finder through the outer loop, which owns the terminal the widget needs.
+    OpenTabs,
 }
 
 /// The line being edited, and where in history it came from.
@@ -112,6 +117,7 @@ impl Session {
             Bound::ClearScreen => Step::ClearScreen,
             Bound::Interrupt => Step::Interrupted,
             Bound::Complete => Step::OpenCompletion { backwards: false },
+            Bound::OpenTabs => Step::OpenTabs,
             Bound::SearchHistory => match assist.search_history(&self.buffer.text()) {
                 Some(line) => {
                     let end = line.chars().count();
@@ -508,6 +514,14 @@ pub fn read_line(
                 ) {
                     session.buffer.set(&line, cursor);
                 }
+            }
+            // A tab may have owned the terminal in the meantime, so the prompt is rebuilt rather
+            // than the row repainted: what is on the screen now was written by something else.
+            Step::OpenTabs => {
+                if assist.open_tabs() {
+                    crate::prompt::invalidate();
+                }
+                repaint = true;
             }
             Step::ToggleLanguage => {
                 // **No blank frame here any more.** This used to erase the block and return, and

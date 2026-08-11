@@ -58,6 +58,16 @@ pub trait Assist {
         None
     }
 
+    /// Open the tab finder, and say whether the terminal was handed to something else while it
+    /// was open.
+    ///
+    /// **The editor cannot do this itself**: a tab is a process holding a pty, which is the shell's
+    /// business and not the line editor's. All the editor knows is that a key was pressed and that
+    /// whatever happened may have repainted the screen.
+    fn open_tabs(&mut self) -> bool {
+        false
+    }
+
     /// The previous history entry, given what is on the line now.
     fn history_prev(&mut self, _line: &str) -> Option<String> {
         None

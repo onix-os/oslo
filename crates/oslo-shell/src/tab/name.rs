@@ -1,30 +1,7 @@
-//! What a tab is called, and what to suggest when you have not decided.
+//! What a tab may be called.
 //!
-//! Greek letters, in order, first one free. A tab is something you name in a hurry — the moment you
-//! reach for it is the moment a build you did not want to lose is already running — so the
-//! suggestion has to be typed over, not thought about.
-
-/// The suggestions, in order. Twenty-four is more tabs than anybody will have open.
-const GREEK: [&str; 24] = [
-    "alpha", "beta", "gamma", "delta", "epsilon", "zeta", "eta", "theta", "iota", "kappa",
-    "lambda", "mu", "nu", "xi", "omicron", "pi", "rho", "sigma", "tau", "upsilon", "phi", "chi",
-    "psi", "omega",
-];
-
-/// The first Greek letter nothing is called yet.
-///
-/// Falls back to `tab-N` once all twenty-four are taken, because refusing to suggest anything at
-/// that point would be a worse answer than an ugly one.
-pub fn suggest<S: AsRef<str>>(taken: &[S]) -> String {
-    let used = |name: &str| taken.iter().any(|t| t.as_ref() == name);
-    if let Some(free) = GREEK.iter().find(|name| !used(name)) {
-        return (*free).to_string();
-    }
-    (1..)
-        .map(|n| format!("tab-{n}"))
-        .find(|name| !used(name))
-        .unwrap_or_default()
-}
+//! There is no suggested name and nothing is ever auto-named: the finder offers to create only what
+//! has been typed into it, so every tab is called what somebody meant it to be called.
 
 /// Whether a name can be a tab's, which is also whether it can be a filename.
 ///

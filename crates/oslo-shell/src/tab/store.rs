@@ -177,14 +177,5 @@ pub fn sweep(name: &str) {
     }
 }
 
-/// The names in use, for [`super::name::suggest`].
-pub fn taken() -> Vec<String> {
-    list()
-        .unwrap_or_default()
-        .into_iter()
-        .map(|(name, _)| name)
-        .collect()
-}
-
 #[cfg(test)]
 mod tests;
