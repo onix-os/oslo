@@ -12,6 +12,9 @@ pub(super) fn fire() {
     if crate::lua::api::timer::any() {
         crate::lua::api::timer::fire_due();
     }
+    // A background process that finished while something else was running. The same safe point, for
+    // the same reason: this is where the shell holds nothing and can call Lua.
+    crate::lua::api::spawn::deliver_if_any();
 }
 
 /// Everything that waited for the command to be over.

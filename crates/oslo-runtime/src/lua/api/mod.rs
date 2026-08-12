@@ -41,6 +41,7 @@ mod re;
 mod run;
 pub(crate) mod segment;
 mod shell;
+pub(crate) mod spawn;
 mod state;
 pub(crate) mod timer;
 pub(crate) mod tool;
@@ -159,6 +160,7 @@ pub fn install(interp: &Rc<Interp>, registry: &Registry, env: Arc<Mutex<Environm
     oslo.set(Value::str("db"), db::build());
     oslo.set(Value::str("state"), state::build());
     timer::install(&mut oslo);
+    spawn::install(&mut oslo);
     builtin::install(&mut oslo);
     oslo.set(Value::str("json"), json::build());
     oslo.set(Value::str("re"), re::build());
@@ -285,6 +287,12 @@ fn commands(oslo: &mut Table, env: &Arc<Mutex<Environment>>) {
     let env_exec = Arc::clone(env);
     put(oslo, "exec", move |_, args| {
         let cmd = text(&args, 1, "oslo.proc.exec")?;
+        // **A command boundary, so anything spawned that has finished is handed back here.**
+        // The read loop delivers between commands, which a *script* never reaches — without this,
+        // `oslo.spawn{ on_exit = f }` in a script would silently never call `f`, which is exactly
+        // the kind of quiet nothing a callback API must not have. Before the borrow below, because
+        // a callback that reaches `oslo.*` would otherwise meet the shell's state already held.
+        spawn::deliver_if_any();
         let mut guard = borrow_env(&env_exec)?;
         let ast = oslo_shell::syntax::parse_bash_script(&cmd)
             .map_err(|e| LuaError::new(format!("oslo.proc.exec: {e}")))?;
