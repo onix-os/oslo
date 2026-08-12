@@ -204,6 +204,10 @@ pub fn install(interp: &Rc<Interp>, registry: &Registry, env: Arc<Mutex<Environm
     oslo.set(Value::str("direnv"), direnv::build(&env));
     #[cfg(feature = "nix")]
     oslo.set(Value::str("nix"), nix::build(interp));
+    // `oslo.plugin.health` — the check a plugin writes about itself, which `oslo plugin doctor`
+    // loads it to ask. Only in a build that can install plugins at all.
+    #[cfg(feature = "plugin")]
+    oslo.set(Value::str("plugin"), crate::plugin::health::build());
     let oslo = Value::table(oslo);
     publish(interp, &oslo);
     interp.set_global("oslo", oslo);

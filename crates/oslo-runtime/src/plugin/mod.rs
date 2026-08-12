@@ -28,6 +28,8 @@
 //! index either: a plugin extends the shell you type at, and a script that depended on one would
 //! break for anybody who had not installed it.
 
+pub mod doctor;
+pub mod health;
 pub mod index;
 pub mod install;
 pub mod manifest;
@@ -110,6 +112,12 @@ pub fn ensure_loaded(line: &str) {
             eprintln!("oslo: plugin {}: {problem}", installed.name);
         }
     }
+}
+
+/// Load one plugin by hand, for the doctor: everything `ensure_loaded` does for a name it saw in a
+/// line, asked for directly.
+pub fn load_one(installed: &index::Installed) -> Result<(), String> {
+    load(installed)
 }
 
 /// Check the plugin still hashes to what was allowed, then run its entry file.

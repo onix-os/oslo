@@ -7,7 +7,7 @@
 pub mod help;
 
 use crate::cli::help::Paint;
-use oslo_runtime::plugin::{index, install, manifest, trust};
+use oslo_runtime::plugin::{doctor, index, install, manifest, trust};
 use std::path::{Path, PathBuf};
 
 pub fn run(args: &[String]) -> i32 {
@@ -31,6 +31,7 @@ pub fn run(args: &[String]) -> i32 {
     }
     match command {
         "list" => list(),
+        "doctor" => doctor_command(rest.first().map(String::as_str)),
         "install" => match rest.first() {
             Some(source) => install_one(source, rest.iter().any(|a| a == "--yes")),
             None => usage("install needs something to install"),
@@ -74,6 +75,76 @@ fn list() -> i32 {
         println!("{:<20} {:<34} {state}", installed.name, names.join(", "));
     }
     0
+}
+
+/// Everything that could be wrong, in one place.
+///
+/// Named for `:checkhealth`, which neovim has for the same reason: "it is installed and nothing
+/// happens" is the question a plugin system is asked most, and the answers are scattered across
+/// lines on stderr that went past while you were reading something else.
+fn doctor_command(one: Option<&str>) -> i32 {
+    // The shell's own names, so the doctor can say when a plugin's command is shadowed by a builtin
+    // — the failure that looks most exactly like nothing happening. A fresh environment has exactly
+    // the native builtins and nothing a config added, which is the right comparison: a config's own
+    // builtin is the user's decision, and only oslo's are a name a plugin can never have.
+    let shell = oslo::env::Environment::new();
+    let taken = |name: &str| shell.is_builtin(name);
+    let mut findings = match one {
+        Some(name) => doctor::report(taken)
+            .into_iter()
+            .filter(|f| f.plugin == name)
+            .collect(),
+        None => doctor::report(taken),
+    };
+    // A plugin's own checks need it loaded, so they are asked for only when one is named — and
+    // loading Lua needs an interpreter, which this process has none of: the engine belongs to the
+    // interactive loop, and `oslo plugin` is a tool. One is built here for the length of the check.
+    if let Some(name) = one {
+        findings.extend(with_lua(|| doctor::checks_from(name)));
+    }
+
+    let paint = Paint::detect();
+    let mut worst = 0;
+    for finding in &findings {
+        let (mark, code) = match finding.state {
+            doctor::State::Ok => (paint.key("ok  "), 0),
+            doctor::State::Warn => (paint.slot("warn"), 1),
+            doctor::State::Bad => (paint.key("BAD "), 2),
+        };
+        worst = worst.max(code);
+        if finding.plugin.is_empty() {
+            println!("{mark}  {}", finding.says);
+        } else {
+            println!("{mark}  {:<16} {}", finding.plugin, finding.says);
+        }
+    }
+    if one.is_none() {
+        println!();
+        println!(
+            "{}",
+            paint.dim("`oslo plugin doctor <name>` loads that plugin and asks its own checks too.")
+        );
+    }
+    // Nothing wrong is 0; a warning is still a working shell, so only a bad finding fails.
+    i32::from(worst == 2)
+}
+
+/// Run `work` with a Lua interpreter installed on this thread.
+///
+/// The doctor is the only part of `oslo plugin` that runs any of a plugin's code, and it does so to
+/// ask a question rather than to be a shell — so the environment it builds is a fresh one that
+/// nothing else sees, and it goes away with the call.
+fn with_lua<T>(work: impl FnOnce() -> T) -> T {
+    let engine = match oslo_runtime::LuaEngine::new() {
+        Ok(engine) => engine,
+        Err(problem) => {
+            eprintln!("oslo plugin: lua: {problem}");
+            return work();
+        }
+    };
+    let env = std::sync::Arc::new(std::sync::Mutex::new(oslo::env::Environment::new()));
+    oslo_runtime::startup::lua_init::install_bindings(&engine, env);
+    work()
 }
 
 /// Copy or clone a plugin in, then record what it declared and what it hashed to.

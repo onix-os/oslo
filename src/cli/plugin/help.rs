@@ -30,6 +30,15 @@ pub(super) const SUBCOMMANDS: &[Sub] = &[
                will not load until `oslo plugin allow` records the new hash.",
     },
     Sub {
+        name: "doctor",
+        args: "[NAME]",
+        about: "check what is installed, and why a plugin might not be working",
+        flags: &[],
+        note: "With a name, the plugin is loaded and its own checks are asked too — the only ones \
+               that know whether the program it shells out to is installed. Without one, nothing is \
+               loaded.",
+    },
+    Sub {
         name: "install",
         args: "PATH|GIT [--yes]",
         about: "copy or clone a plugin in, after showing what it reserves",
