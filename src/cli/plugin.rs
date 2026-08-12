@@ -4,40 +4,52 @@
 //! subcommand, not a plugin's**: a plugin extends the shell you type at, and nothing a plugin
 //! declares is reachable from here.
 
+pub mod help;
+
 use crate::cli::help::Paint;
 use oslo_runtime::plugin::{index, install, manifest, trust};
 use std::path::{Path, PathBuf};
 
 pub fn run(args: &[String]) -> i32 {
     let Some(command) = args.first().map(String::as_str) else {
-        print!("{}", help(Paint::detect()));
+        print!("{}", help::text(Paint::detect()));
         return 2;
     };
+    if matches!(command, "-h" | "--help" | "help") {
+        print!("{}", help::text(Paint::detect()));
+        return 0;
+    }
+    // Handled before the subcommand parses its own arguments, the way `history` does it.
+    let rest = &args[1..];
+    if rest
+        .first()
+        .is_some_and(|a| matches!(a.as_str(), "-h" | "--help"))
+        && let Some(help) = help::subcommand(command, Paint::detect())
+    {
+        print!("{help}");
+        return 0;
+    }
     match command {
-        "--help" | "-h" | "help" => {
-            print!("{}", help(Paint::detect()));
-            0
-        }
         "list" => list(),
-        "install" => match args.get(1) {
-            Some(source) => install_one(source, args.iter().any(|a| a == "--yes")),
+        "install" => match rest.first() {
+            Some(source) => install_one(source, rest.iter().any(|a| a == "--yes")),
             None => usage("install needs something to install"),
         },
-        "remove" => match args.get(1) {
+        "remove" => match rest.first() {
             Some(name) => remove_one(name),
             None => usage("remove needs a plugin name"),
         },
-        "allow" => match args.get(1) {
+        "allow" => match rest.first() {
             Some(name) => allow_one(name),
             None => usage("allow needs a plugin name"),
         },
-        other => usage(&format!("{other}: not a plugin command")),
+        other => usage(&format!("unknown subcommand {other:?}")),
     }
 }
 
 fn usage(message: &str) -> i32 {
-    eprintln!("oslo plugin: {message}");
-    eprintln!("try `oslo plugin --help`");
+    eprintln!("oslo plugin: {message}\n");
+    eprint!("{}", help::text(Paint::plain()));
     2
 }
 
@@ -252,22 +264,4 @@ fn confirm(question: &str) -> bool {
         return false;
     }
     matches!(answer.trim(), "y" | "Y" | "yes")
-}
-
-pub fn help(paint: Paint) -> String {
-    let heading = |text: &str| paint.head(text);
-    format!(
-        "{}\n  oslo plugin <command>\n\n{}\n  \
-         list                     what is installed, and whether it still matches what you allowed\n  \
-         install <path|git>       copy or clone a plugin in, after showing what it reserves\n  \
-         remove <name>            delete it; its database is left where it is\n  \
-         allow <name>             record what it hashes to now, after an update\n\n{}\n  \
-         oslo plugin install ~/src/notes\n  \
-         oslo plugin install github:user/notes@v1.0\n\n\
-         A plugin is Lua. It declares its commands in `plugin.lua`, and the file that implements\n\
-         them runs the first time one of those commands is called — never at startup.\n",
-        heading("Usage"),
-        heading("Commands"),
-        heading("Examples"),
-    )
 }
