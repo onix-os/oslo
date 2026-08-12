@@ -189,8 +189,25 @@ fn row_of(item: &Item, look: &Look, now: i64, name_width: usize, known: &[String
         ..Row::new(format!(
             "{:<name_width$}  {}",
             truncated(&item.name, name_width),
-            item.first
+            detail(item)
         ))
+    }
+}
+
+/// What sits after the name: an alias's body, or a script's language in brackets.
+///
+/// **The brackets say it is not the body.** A script row shows `python3` where an alias row shows
+/// the command it runs, and without a mark the column reads as though the script's body were the
+/// word `python3`. Faint for the same reason: it is a label on the row, not content of it.
+///
+/// `\x1b[2m` and `\x1b[22m` — faint, then back to normal intensity — rather than a colour, because
+/// this has to sit inside whatever the row is already painted with. A colour would have to know the
+/// row's own foreground to put it back; intensity is independent of it, so the same two codes work
+/// on a striped row, a selected row and a muted one.
+fn detail(item: &Item) -> String {
+    match item.kind.as_str() {
+        "func" | "script" => format!("\x1b[2m[[[ {} ]]]\x1b[22m", item.first),
+        _ => item.first.clone(),
     }
 }
 
@@ -274,6 +291,44 @@ mod tests {
         assert_ne!(colour_of("net", &tags).fg, colour_of("git", &tags).fg);
         // One nobody listed still gets a colour rather than a panic.
         assert!(colour_of("unknown", &tags).fg.is_some());
+    }
+
+    fn item(kind: &str, first: &str) -> Item {
+        Item {
+            kind: kind.to_string(),
+            name: "x".to_string(),
+            first: first.to_string(),
+            tags: Vec::new(),
+            created: 0,
+            active: true,
+            session_off: false,
+            stored: true,
+        }
+    }
+
+    /// A script says its language, in brackets and faint; an alias says its body, plainly.
+    #[test]
+    fn only_the_kinds_with_no_body_on_the_row_get_the_brackets() {
+        assert_eq!(detail(&item("alias", "git status")), "git status");
+        assert_eq!(
+            detail(&item("script", "python3")),
+            "\x1b[2m[[[ python3 ]]]\x1b[22m"
+        );
+        assert_eq!(detail(&item("func", "sh")), "\x1b[2m[[[ sh ]]]\x1b[22m");
+    }
+
+    /// **Intensity, not colour**, so the label sits inside whatever the row is painted with and
+    /// leaves it as it found it — a striped row keeps its stripe and a selected row its selection.
+    #[test]
+    fn the_faint_label_changes_nothing_but_intensity() {
+        let painted = detail(&item("script", "bash"));
+        assert!(!painted.contains("38;5;"), "no foreground: {painted:?}");
+        assert!(!painted.contains("\x1b[0m"), "no reset: {painted:?}");
+        assert_eq!(
+            crate::dropdown::width::display_width(&painted),
+            "[[[ bash ]]]".chars().count(),
+            "the escapes take no width, so the column still lines up"
+        );
     }
 
     /// A name longer than the column is cut, not allowed to push every body off the screen.
