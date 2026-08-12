@@ -170,7 +170,10 @@ pub fn frame(f: &Frame<'_>) -> String {
         // about to delete stays under your eye.
         let pager = &theme::current().pager;
         body.extend(std::iter::repeat_n(String::new(), look.gap));
-        body.extend((0..SURFACE_ROWS).map(|row| confirm_row(row, yes, pager, f.cols, depth)));
+        body.extend(
+            (0..SURFACE_ROWS)
+                .map(|row| confirm_row(row, yes, "delete from history?", pager, f.cols, depth)),
+        );
     }
 
     let mut out = String::from(SYNC_BEGIN);
@@ -200,14 +203,23 @@ pub fn frame(f: &Frame<'_>) -> String {
 /// is a question, and a box that has been drawn *around* something is the shape every terminal
 /// program uses to say "answer me". Reusing the same three rows means the list above does not
 /// shift while you decide, so the row you are about to delete stays under your eye.
-fn confirm_row(row: usize, yes: bool, pager: &theme::Pager, cols: usize, depth: Depth) -> String {
+///
+/// `question` is the caller's, because the macro manager asks its own — and two screens that drew
+/// the same box from two copies of this arithmetic would be two boxes that eventually differ.
+pub(crate) fn confirm_row(
+    row: usize,
+    yes: bool,
+    question: &str,
+    pager: &theme::Pager,
+    cols: usize,
+    depth: Depth,
+) -> String {
     let edge = pager.match_;
     let inner = cols.saturating_sub(2);
     match row {
         0 => edge.paint(&format!("╭{}╮", "─".repeat(inner)), depth),
         2 => edge.paint(&format!("╰{}╯", "─".repeat(inner)), depth),
         _ => {
-            let question = "delete from history?";
             let (yes_label, no_label) = ("[ yes ]", "[ no ]");
             // The selected button is filled, the other one is not: one difference, and it is the
             // one being asked about. A colour change alone reads as decoration.
