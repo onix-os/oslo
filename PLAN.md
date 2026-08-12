@@ -231,7 +231,11 @@ Each step ends with `make verify` green and is its own commit.
 3. **Ghost providers, async.** `request`/`reply`, debounce, staleness by generation, `timeout_ms`.
 4. **`on_late` and `settle_ms`.** The three policies, and the test that `fill` never changes drawn
    text.
-5. **Tiers** for `oslo.suggest.sources`, flat list still valid.
+5. ~~**Tiers** for `oslo.suggest.sources`.~~ **Dropped, on inspection.** The ghost takes the first
+   source that answers, so `{{a, b}, {c}}` — try `a` and `b`, and only if both declined try `c` — is
+   exactly what the flat `{a, b, c}` already means. Grouping is worth having where results *merge*,
+   which is why nvim-cmp has `group_index` for its menu; a surface that can draw only one string has
+   nothing to group. It belongs to the dropdown, and it is in step 6.
 6. **Completion providers**, sync then async: additive, kinds, `score_offset`, `fallbacks`,
    `max_items`. Fixes the `for_command` no-kind hole on the way past.
 7. **Context rules** for both, and the guards table.
