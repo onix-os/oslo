@@ -1,233 +1,291 @@
-# Suggestions you can plug into
+# Suggestions you can plug into, and tune
 
 Two things the shell offers as you type — the **ghost** past the cursor and the **dropdown** on Tab —
-are closed. A config can reorder the ghost's four built-in sources and can replace the dropdown for
-one named command; it cannot add to either. This opens both, in a shape that works for a plugin
-answering from a local database *and* for one answering from a language model over a network.
+are closed. A config can reorder the ghost's four built-in sources and replace the dropdown for one
+named command; it cannot add to either, and it cannot say *how* two answers should compete.
+
+This opens both, and the second half is the point: **who wins is the user's decision, not the
+plugin's.** If you want your LLM to beat the model, say so and it does.
 
 **Work on a new branch off `develop`.**
 
-## Why this, and why now
+## Why now
 
 Two plugins nobody can write today:
 
-- **tldr** — 3,000 pages of "here is what people actually do with this command". `git <Tab>` should
-  offer them with descriptions. Half of this is already possible: `oslo.completion.spec` (landed last
-  branch) takes exactly the shape tldr has. The half that is missing is *adding* to a command oslo
-  already knows, and answering for commands generically rather than one name at a time.
-- **an LLM ghost** — regenerating the suggestion as you type, the way an editor does. Nothing about
-  this fits today: the ghost's sources are a Rust enum, and the call is synchronous on the keystroke
-  path, where an answer that takes 300 ms is not an answer at all.
+- **tldr** — 3,000 pages of what people actually do with a command. `git <Tab>` should offer them.
+  Half is already possible (`oslo.completion.spec` takes tldr's shape); what is missing is *adding*
+  to a command oslo already knows, and answering generically rather than one name at a time.
+- **an LLM ghost** — regenerated as you type. Nothing about this fits: the sources are a Rust enum
+  and the call is synchronous on the keystroke path, where a 300 ms answer is not an answer.
 
-The second is the one that decides the design. **A provider that can be slow is the general case**;
-a fast one is the easy special case of it.
+The slow one decides the design. **A provider that can be slow is the general case.**
 
-## What is there now
+## What other systems do
 
-### The ghost
+Six of them, and each is right about something different.
 
-`OsloHelper::suggest` (`crates/oslo-ui/src/lib.rs:177`) walks `oslo.suggest.sources` in order and
-takes the first source that answers:
+| | inline / ghost | menu / dropdown | how two answers compete |
+|---|---|---|---|
+| **zsh-autosuggestions** | `ZSH_AUTOSUGGEST_STRATEGY` array — *"tried successively until a suggestion is found"* | — | first to answer wins |
+| **zsh compsys** | — | `completer` style: an ordered list, the next tried when the previous found nothing | ordered fallback, plus `tag-order` / `group-order` for presentation |
+| **VS Code / Monaco** | `InlineCompletionsProvider.groupId` + `yieldsToGroupIds` | `CompletionItemProvider` | a provider **declares** it yields to another group |
+| **nvim-cmp** | — | `group_index` — a higher group is ignored entirely if a lower one produced anything; `priority` within a group | fallback tiers |
+| **blink.cmp** | — | per provider: `enabled`, `async`, `timeout_ms`, `min_keyword_length`, `max_items`, `score_offset`, `fallbacks`, `transform_items` | a numeric **nudge**, plus explicit fallbacks |
+| **Emacs** | — | `completion-at-point-functions` — sequential, first that answers wins; `cape-capf-super` **merges** several so they appear together | two named modes: sequential *or* merged |
+
+Five lessons worth taking:
+
+1. **The two surfaces need different composition.** Emacs makes it explicit: a list is sequential by
+   default, and merging is a thing you ask for by name. The ghost can only draw one string, so it is
+   first-wins. A menu shows everything, so it is merged. oslo already behaves this way by accident;
+   this makes it deliberate.
+2. **Tiers beat a flat list.** nvim-cmp's `group_index`, zsh's `completer`, blink's `fallbacks` are
+   the same idea: *only ask the next tier if nothing better answered*. This is the shape of the LLM
+   question — put it in a tier and let the user choose the tier.
+3. **VS Code has the right control in the wrong hands.** `yieldsToGroupIds` is declared by the
+   *provider*. That is exactly the complaint: the plugin decides, you do not. Here a provider
+   declares a **default** and the config overrides it.
+4. **A nudge is finer than an order.** blink's `score_offset` composes with ranking instead of
+   replacing it — and oslo already sorts by frecency (`completion.rs:214`), so an offset drops
+   straight in.
+5. **zstyle is the deepest fine control anyone has shipped.** Its context is
+   `:completion:function:completer:command:argument:tag`, and any style can be set for any pattern —
+   so "for `git`, at argument 1, prefer these" is one line. That axis-per-colon idea is what
+   "more fine control" actually means; the syntax is not.
+
+## What oslo has
+
+**The ghost.** `OsloHelper::suggest` (`crates/oslo-ui/src/lib.rs:177`) walks `oslo.suggest.sources`
+and takes the first that answers, over a closed enum: `History | Completion | Path | Prediction`.
+Called from `Assist::hint_text` → `frame::draw`, synchronously, once per keystroke. Guarded by three
+rules worth keeping: end of line only, `sh` only, `feature::on(SUGGEST)`.
+
+**The dropdown.** `OsloHelper::candidates` merges the built-in builders, then
+`oslo.completion.sources` filters by **kind** (`completion.rs:203`), then it sorts by frecency and
+name (`completion.rs:214`). `for_command` (`completion.rs:116`) **replaces** everything for one named
+command and supplies **no kind**, so `sources` filters its candidates out entirely — a known hole.
+
+**The discovery that shapes the plan.** The editor already knows how to wait for an answer that has
+not arrived — built for asynchronous *prompts*. `frame::next_input` (`edit/session/frame.rs:22`):
 
 ```rust
-History | Completion | Path | Prediction     // settings::Source — a closed enum
-```
-
-Reached from `Assist::hint_text` → `frame::draw` (`edit/session/frame.rs:88`), synchronously, once
-per frame — which is once per keystroke. Guarded by three rules worth keeping: end of line only,
-`sh` mode only, and `feature::on(SUGGEST)`.
-
-### The dropdown
-
-`OsloHelper::candidates` gathers; `config_candidates` (`completion.rs:116`) asks
-`oslo.completion.for_command[name]` and **replaces** oslo's own candidates for that command
-(`completion.rs:187`). `spec::custom` holds config-declared specs. `DropdownMenu::select_interactive`
-then owns the terminal and its own key loop.
-
-Three limits, all real:
-
-- per command *by name* — there is no "answer for anything" hook;
-- **replaces**, so a plugin that completes `git` loses oslo's built-in git spec;
-- carries **no kind**, so `oslo.completion.sources` filters every config candidate out
-  (`completion.rs:135` says so).
-
-`on-completion-start` / `-select` / `-cancel` exist and are `answers: false` — observers.
-
-### The part that changes everything
-
-**The editor already knows how to wait for an answer that has not arrived.** `frame::next_input`
-(`edit/session/frame.rs:22`):
-
-```rust
-if !idle_hook && !crate::prompt::refreshing() { return keys.read_event(); }   // block, the default
-…
+if !idle_hook && !prompt::refreshing() { return keys.read_event(); }   // block: the default
 const REFRESH_SLICE_MS: i32 = 15;
-match keys.read_event_within(slice) { …
-    Timeout => if crate::prompt::generation() != seen { return Some(InputEvent::PromptRefreshed); }
+Timeout => if prompt::generation() != seen { return Some(InputEvent::PromptRefreshed); }
 ```
 
-A counter (`prompt::generation`), an outstanding-work count (`prompt::refreshing`), a 15 ms poll
-slice used *only* while something is outstanding, and a synthetic non-key event that makes the loop
-redraw. That is precisely what an asynchronous ghost needs, working in the tree today for
-asynchronous prompts.
+An outstanding count, a generation counter, a 15 ms slice used *only* while something is outstanding,
+and a synthetic event that makes the loop redraw. And `lua/api/external.rs` states the constraint in
+its own words — *"a prompt is on the critical path of every keystroke"* — answered with `timeout_ms`
+plus an `async` mode that uses the previous answer immediately.
 
-`lua/api/external.rs` is the third precedent and states the constraint outright: *"a prompt is on the
-critical path of every keystroke"*, answered with `timeout_ms` and an `async` mode that uses the
-previous output immediately.
-
-**So this plan is mostly generalisation, not invention.**
+**So this is mostly generalisation.**
 
 ## The design
 
-### 1. One channel for "an answer may still be coming"
+### 1. One channel for a late answer
 
-`prompt::refreshing`/`generation` are prompt-specific. Lift the pair into
-`crates/oslo-ui/src/pending.rs` — an outstanding count and a generation, with the prompt as its first
-caller and the ghost and the dropdown as the next two. `next_input` waits in slices when *anything*
-is outstanding and answers `InputEvent::Refreshed` when *any* generation moves.
+Lift `prompt::refreshing`/`generation` into `crates/oslo-ui/src/pending.rs`: an outstanding count and
+a generation, with the prompt as its first caller and the ghost and dropdown as the next two.
+`next_input` waits in slices while *anything* is outstanding. ~60 lines, and nothing below works
+without it.
 
-About 60 lines. Everything below depends on it and nothing below is possible without it.
-
-### 2. Ghost providers
-
-A fifth source, so a plugin's suggestion takes its place in the priority order the user already
-controls:
+### 2. Tiers, not a flat list
 
 ```lua
-oslo.suggest.sources = { "history", "provider", "predict", "path" }
-```
-
-Two forms, because the two cases are genuinely different:
-
-```lua
--- fast: answers now, on the keystroke path. A database lookup, a table, a regex.
-oslo.suggest.provider { name = "tldr", answer = function(ctx) return "…" end }
-
--- slow: answers later. The prompt is not held; the line repaints when it lands.
-oslo.suggest.provider {
-  name = "llm", debounce_ms = 120, timeout_ms = 2000,
-  request = function(ctx, reply) oslo.spawn{ "llm", ctx.line, on_exit = function(out) reply(out) end } end,
+oslo.suggest.sources = {
+  { "history", "predict" },   -- tier 1: instant, local, and only ever something you really ran
+  { "llm" },                  -- tier 2: asked only when tier 1 said nothing
+  { "path" },                 -- tier 3
 }
 ```
 
-`ctx` is `{ line, cursor, cwd, mode, last_status }`. A provider returning `nil` declines and the next
-source is asked, exactly as the built-in sources behave.
+A tier is consulted only if every earlier tier answered nothing — nvim-cmp's `group_index`, zsh's
+`completer`. **The flat list stays valid** and means one tier per entry, so every config written
+today keeps working.
 
-**The continuation invariant is not negotiable.** The ghost is drawn as trailing text and accepted
-with Right, so an answer that is not a continuation of what is typed would be a lie about what the
-key does. An answer that does not start with the line is **refused and reported once** through
-`messages` — not silently trimmed, which would produce a suggestion the plugin never wrote. A plugin
-that wants to *replace* the line is asking for the repair slot, which is a separate question left out
-of this plan.
+Want the LLM to beat history? Put it in tier 1 and give it the offset, or put history in tier 2. It
+is one line either way, and it is *your* line — the plugin does not get a vote.
 
-### 3. Completion providers
+### 3. What happens when the slow one is late — the user decides
 
-Additive, any command or one, and carrying a kind:
+This is the real question. `predict` answers in ~4 µs, an LLM in ~300 ms. Something is already drawn
+when the slow answer lands.
 
 ```lua
+oslo.suggest.provider {
+  name = "llm",
+  on_late = "replace",     -- "fill" (default) | "replace" | "drop"
+  settle_ms = 400,         -- after this, too late to swap under your eyes: treated as "drop"
+}
+```
+
+- **`fill`** — draw only if nothing is drawn. Nothing ever changes under the cursor. The safe default.
+- **`replace`** — swap it in. Text you are looking at changes half a second after you stopped typing.
+  It is a real thing to want, and if you say so, that is what happens.
+- **`drop`** — never draw after the fact; the answer is only used if it arrives before the frame.
+
+`settle_ms` is the guard that makes `replace` liveable: an answer that took four seconds is not
+allowed to rewrite a line you have moved on from.
+
+### 4. A nudge for the dropdown
+
+The menu merges rather than choosing, so tiers are the wrong tool. `score_offset` is the right one —
+added to the frecency score in the existing sort:
+
+```lua
+oslo.completion.provider { name = "tldr", kind = "example", score_offset = 20 }
+```
+
+`fallbacks = { "…" }` covers the other case blink identified: *if I return nothing, ask these*.
+
+### 5. Context rules — zstyle's lesson, in Lua
+
+One order for every situation is not fine control. The axes oslo actually has are the command, the
+argument position, the language, and where you are standing:
+
+```lua
+oslo.suggest.rules = {
+  { when = { command = "git" },        use = { { "llm" }, { "history" } } },
+  { when = { language = "lua" },       use = { { "history" } } },   -- no model, no LLM, in Lua
+  { when = { cwd = "~/work/*" },       use = { { "history" } } },   -- nothing leaves this tree
+}
+
+oslo.completion.rules = {
+  { when = { command = "git", arg = 1 }, offset = { tldr = 50 } },
+  { when = { kind = "file" },            offset = { tldr = -100 } },
+}
+```
+
+First matching rule wins, falling back to the global setting. `when` fields are all optional and
+ANDed; `command` and `cwd` take the shell's own glob. This is `zstyle ':completion:*:*:git:*' …`
+without the colons — the same power, in the language the rest of the config is written in.
+
+### 6. Guards, all borrowed
+
+Per provider, and every one of them earns its place from somebody else's experience:
+
+| | from | why |
+|---|---|---|
+| `min_chars` | blink `min_keyword_length` | do not ask a model about `g` |
+| `max_line` | `ZSH_AUTOSUGGEST_BUFFER_MAX_SIZE` | a pasted 4 KB line is not a prompt for suggestions |
+| `ignore = { "…" }` | `ZSH_AUTOSUGGEST_HISTORY_IGNORE` | glob patterns that silence the provider — and the privacy control |
+| `enabled = function(ctx)` | blink, nvim-cmp | anything the other fields cannot express |
+| `debounce_ms` | every LLM plugin | ten keystrokes in one word is one request, not ten |
+| `timeout_ms` | blink, `external.rs` | and a **sync budget**: a provider that overruns repeatedly is disabled for the session and says which it was |
+| `max_items` | blink | one provider cannot flood the menu |
+
+### 7. The continuation invariant, and trust
+
+**The ghost is drawn as trailing text and accepted with Right**, so an answer that is not a
+continuation of the line would make that key lie. Such an answer is **refused and reported once**
+through `messages`, never trimmed into something the plugin did not write. A provider that wants to
+*replace* the line is asking for the repair slot, which this plan leaves alone.
+
+**A ghost provider sees every keystroke** — including the ones you retyped because a password went
+into the wrong field. An LLM provider sends them off the machine. So:
+
+- `oslo plugin doctor` **names every provider that can see typing**, because "what reads my
+  keystrokes" must have an answer that is not "read the source";
+- `oslo.feature` can kill them mid-session (`SUGGEST` already exists);
+- they are not asked at all when the line is secret, under the leading-space convention, or when
+  `no_trace` is set. The veto work established that every sink asks one flag; this is one more sink.
+
+## The API, whole
+
+```lua
+-- ghost: fast
+oslo.suggest.provider { name = "tldr", answer = function(ctx) return "…" end }
+
+-- ghost: slow
+oslo.suggest.provider {
+  name = "llm", tier = 2, on_late = "fill", settle_ms = 400,
+  debounce_ms = 120, timeout_ms = 2000, min_chars = 3, max_line = 512,
+  ignore = { "* --password *" },
+  request = function(ctx, reply)
+    oslo.spawn { "llm", ctx.line, on_exit = function(out) reply(out) end }
+  end,
+}
+
+-- dropdown
 oslo.completion.provider {
-  name = "tldr",
-  kind = "example",                  -- shown as the badge, and addable to oslo.completion.sources
-  answer = function(ctx)             -- ctx = { command, words, current, cwd }
+  name = "tldr", kind = "example", score_offset = 20, max_items = 10,
+  answer = function(ctx)          -- ctx = { command, words, current, arg, cwd, language }
     return { { display = "git commit --amend", description = "change the last commit" } }
   end,
 }
 ```
 
-- **Adds** rather than replaces. `for_command` keeps its meaning — *I own this command* — and stays
-  the escape hatch for a plugin that wants oslo's own candidates gone.
-- **A kind, declared once**, so `oslo.completion.sources` can name it and the badge column can show
-  it. This also fixes the existing hole where `for_command` candidates carry none.
-- Async by the same two-form shape as the ghost. A dropdown that is already open gains rows when a
-  slow provider answers; `select_interactive` has its own key loop and already polls
-  (`finder/run.rs:92` does the same trick for the scanner animation).
-
-### 4. Staleness, debounce, deadline
-
-The three ways this feature is normally got wrong.
-
-- **Staleness.** Every request carries the generation it was made at. An answer whose generation has
-  moved is dropped, never drawn. Without this, typing `gi`, then `t`, then ` ` shows the answer to
-  `gi` under `git ` — the classic async-suggestion bug.
-- **Debounce.** `debounce_ms` per provider: no request is made until the line has been still that
-  long. A model asked on every keystroke is asked ten times for one word.
-- **Deadline.** `timeout_ms` per provider, and a **sync** provider gets a budget too: one that
-  overruns it repeatedly is disabled for the session and says so through `messages`. A shell that
-  feels broken because somebody's plugin is slow must be able to say which plugin.
-
-### 5. Trust, and the switch
-
-**A ghost provider sees every keystroke** — including the ones you did not run and the ones you
-retyped because you got a password wrong. An LLM provider ships them somewhere. That is a bigger
-privacy surface than anything a plugin can reach today, and it must be:
-
-- named in `oslo plugin doctor`, so "what can see my typing" has an answer;
-- covered by `oslo.feature` (`SUGGEST` already exists) so it can be turned off mid-session;
-- silent under the existing no-trace rules — a provider must not be asked at all when the line is
-  secret, when `HISTFILE=""` set `no_trace`, or when the leading-space convention is in force. The
-  veto work already established that every sink asks one flag; this is one more sink.
+`ctx` for the ghost is `{ line, cursor, cwd, language, last_status }`. Returning `nil` declines and
+the next source is asked — exactly what the built-in sources do.
 
 ## Order
 
 Each step ends with `make verify` green and is its own commit.
 
-1. **`pending`** — lift the prompt's outstanding/generation pair into a shared module; `next_input`
-   waits on any of them. No behaviour change; the prompt tests are the proof.
-2. **Ghost providers, sync only.** The fifth source, the registry, the continuation invariant, the
-   sync budget. Measurable against `bench/keystroke.rs` with no provider installed.
-3. **Ghost providers, async.** `request`/`reply`, debounce, staleness by generation, deadline.
-4. **Completion providers, sync.** Additive, kinds, `sources` integration, and the badge.
-5. **Completion providers, async**, gaining rows into an open dropdown.
-6. **Two worked examples**, both in `examples/plugins/`: `tldr` (sync, `oslo.db`-backed, generated
-   specs plus example candidates) and `echoer` (async, `oslo.spawn`-backed, standing in for an LLM
-   with something that answers slowly and deterministically — so it can be a test).
+1. **`pending`** — lift the outstanding/generation pair out of `prompt.rs`; `next_input` waits on any
+   of them. No behaviour change; the prompt tests are the proof.
+2. **Ghost providers, sync.** Registry, the fifth source, the continuation invariant, the sync
+   budget. Measured against `bench/keystroke.rs` with none installed.
+3. **Ghost providers, async.** `request`/`reply`, debounce, staleness by generation, `timeout_ms`.
+4. **`on_late` and `settle_ms`.** The three policies, and the test that `fill` never changes drawn
+   text.
+5. **Tiers** for `oslo.suggest.sources`, flat list still valid.
+6. **Completion providers**, sync then async: additive, kinds, `score_offset`, `fallbacks`,
+   `max_items`. Fixes the `for_command` no-kind hole on the way past.
+7. **Context rules** for both, and the guards table.
+8. **Two worked examples** in `examples/plugins/`: `tldr` (sync, `oslo.db`-backed) and `slowpoke`
+   (async, `oslo.spawn`-backed — an LLM stand-in that is slow and *deterministic*, so it can be a
+   test).
 
-Steps 1–5 are core and must work in `oslo-minimal`; nothing here is behind a cargo feature, because
-the ghost and the dropdown are not.
+Steps 1–6 are core and work in `oslo-minimal`; nothing here is behind a cargo feature, because the
+ghost and the dropdown are not.
 
 ## Verification
 
 - `bench/keystroke.rs` **before and after step 2**, min-of-N: a shell with no provider installed must
-  not pay for the mechanism. If it does, the registry lookup moves behind a "any providers at all"
-  atomic.
-- **A test that a stale answer is never drawn.** Type, request, type again, answer the first request
-  — the frame must show the second line's suggestion or none, never the first's.
-- **A test that a non-continuation is refused**, and reported exactly once rather than per keystroke.
-- **A test that a slow sync provider is disabled** rather than being paid for on every key.
-- The pty tests are where the async paths belong: `tests/terminal_semantics/` already drives a real
-  editor, and an async ghost that repaints is only observable there.
-- `oslo-minimal` builds and its ghost still works with no providers registered.
+  not pay for the mechanism. If it does, the lookup goes behind an "any providers at all" atomic.
+- **A stale answer is never drawn.** Type, request, type again, answer the first — the frame shows
+  the second line's suggestion or none, never the first's.
+- **`on_late = "fill"` never changes drawn text**, and `"replace"` does, and `settle_ms` stops it.
+- **A non-continuation is refused**, and reported once rather than per keystroke.
+- **A slow sync provider is disabled** rather than paid for on every key.
+- The async paths belong in the pty tests (`tests/terminal_semantics/`) — a ghost that repaints is
+  only observable in a real editor.
+- `oslo-minimal` builds, and its ghost still works with no providers registered.
 
 ## Things that will bite
 
-- **`edit/session.rs` is 595 lines and `completion.rs` is 588** — both cross the 600-line limit on the
-  first step that touches them. Split by subject before adding, not after.
-- **Reentrancy.** `config_candidates` already documents it (`completion.rs:121`): the hook runs Lua,
-  Lua can complete another word, and the outstanding `RefCell` borrow panics. Every new registry has
-  the same hazard and needs the same clone-before-call.
-- **Lua is not `Send`.** A provider's `answer` runs on the shell's thread; only the *work* an async
-  provider starts may leave it, which is why `request`/`reply` is shaped like `oslo.spawn` rather
-  than like a promise. `reply` is delivered at a safe point, not from the worker thread.
-- **`InputEvent::PromptRefreshed` is named for the prompt.** Renaming it touches the editor tests.
-- **The dropdown owns the terminal.** Rows arriving while it is open must not move the selection —
-  a row inserted above where your cursor is means Enter runs something you did not choose.
+- **`edit/session.rs` is 595 lines, `completion.rs` 588, `settings/from_lua.rs` 544.** All three
+  cross 600 on the first step that touches them. Split by subject before adding.
+- **Reentrancy.** `config_candidates` documents it (`completion.rs:121`): the hook runs Lua, Lua can
+  complete another word, and the outstanding `RefCell` borrow panics. Every new registry needs the
+  same clone-before-call.
+- **Lua is not `Send`.** `answer` runs on the shell's thread; only the *work* an async provider
+  starts leaves it. That is why `request`/`reply` is shaped like `oslo.spawn` and `reply` is
+  delivered at a safe point, never from the worker.
+- **`InputEvent::PromptRefreshed` is named for the prompt** — renaming touches the editor tests.
+- **The dropdown owns the terminal.** Rows arriving while it is open must not move the selection: a
+  row inserted above the cursor means Enter runs something you did not choose.
+- **Settings are read two to four times per keystroke** (`bench/keystroke.rs`). Rules are matched on
+  that path and must be compiled once, not parsed per key.
 
 ## What this does not do
 
 - **No repair slot for plugins.** The correction after the line stays the model's.
-- **No replacing the ghost's built-in sources** — a provider joins the order, it does not displace
-  `history`, whose whole value is that it only ever offers something you really ran.
-- **No sandbox.** Unchanged: the trust gate decides whether you run somebody's code. What is new is
-  that the doctor will *say* which plugins can see your typing.
-- **No streaming.** One answer per request. A token-by-token ghost is a different feature and would
-  need the drawing path to accept partial answers.
+- **No streaming.** One answer per request; a token-by-token ghost needs the drawing path to accept
+  partial answers.
+- **No sandbox.** The trust gate still decides whether you run somebody's code. What is new is that
+  the doctor will *say* which plugins can see your typing.
+- **No `tag-order`.** zsh can order *within* a menu by tag; oslo's equivalent would be grouping the
+  dropdown by kind, which is a presentation change and a separate piece of work.
 
-## Open, and worth deciding before step 3
+## Sources
 
-**What an async ghost does about the model.** With `vista` installed, `predict` answers in ~4 µs and
-an LLM answers in ~300 ms. If both are in `sources`, the model's answer is drawn first and then
-replaced when the slow one lands — text under the cursor changing on its own, half a second after you
-stopped typing. The alternatives are: never replace an answer already drawn (the slow provider only
-ever fills a *gap*), or let it replace and accept the flicker. **I would take the first**, but it is
-a decision about how the shell feels rather than about what is correct, and it should be made
-deliberately rather than discovered.
+zsh-autosuggestions `ZSH_AUTOSUGGEST_STRATEGY` / `USE_ASYNC` / `BUFFER_MAX_SIZE` / `*_IGNORE`; zsh
+compsys `completer`, `tag-order`, `group-order` and the `:completion:…` context; VS Code / Monaco
+`InlineCompletionsProvider.groupId` and `yieldsToGroupIds`; nvim-cmp `group_index` and `priority`;
+blink.cmp per-provider `enabled` / `async` / `timeout_ms` / `min_keyword_length` / `max_items` /
+`score_offset` / `fallbacks` / `transform_items`; Emacs `completion-at-point-functions` and
+`cape-capf-super`.
