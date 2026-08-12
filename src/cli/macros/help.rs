@@ -62,19 +62,52 @@ pub(super) const SUBCOMMANDS: &[Sub] = &[
     Sub {
         name: "show",
         args: "[NAME]",
-        about: "the list, narrowed as you type",
+        about: "the manager: the list, narrowed as you type",
         flags: &[
             (
                 "--plain",
                 "one line each on stdout, for a script rather than a person",
             ),
-            ("--edit", "open the one you pick in your editor"),
+            ("←  →", "the tag: all of them, then each one in use"),
+            (
+                "tab",
+                "the source: what is stored, or what your config defines",
+            ),
+            (
+                "enter",
+                "open it in your editor — every kind, including an alias",
+            ),
+            ("del", "forget it, after asking"),
+            ("space", "off for this session; three times, off everywhere"),
         ],
         note: "A function or a script is many lines and a list of many-line entries is not a list, \
                so each is flattened to one row: when it was made, its kind, its name, its first \
                line and its tags. With a NAME it prints that one in full instead. Piped, or with \
                --plain, there is no widget and no colour — a manager only a person can read would \
                be one you cannot script.",
+    },
+    Sub {
+        name: "off",
+        args: "NAME",
+        about: "stop it applying, without forgetting it",
+        flags: &[
+            ("--session", "in this shell only, until it closes"),
+            ("--alias", "only that kind of it; by default, every kind"),
+        ],
+        note: "What Space and Space ×3 do in `show`, spelled out for something that is not a \
+               person. Without `--session` it is off in every shell, now and next time — running \
+               shells notice before their next prompt. An alias you turned off uncovers the one \
+               your configuration defines, if there is one, because off means *this one does not \
+               apply* rather than *this name does nothing*.",
+    },
+    Sub {
+        name: "on",
+        args: "NAME",
+        about: "put one back",
+        flags: &[("--session", "in this shell only")],
+        note: "The other half of `off`, and the same rules. `on --session` cancels a session \
+               switch; it does not turn on something that is off everywhere, because those are two \
+               different switches and one is not a way to override the other.",
     },
     Sub {
         name: "export",

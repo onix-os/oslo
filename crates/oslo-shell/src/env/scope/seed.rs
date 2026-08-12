@@ -36,6 +36,16 @@ impl Environment {
         let shlvl = shlvl.to_string();
         self.vars.insert("SHLVL".to_string(), (shlvl.clone(), true));
         environ_set("SHLVL", &shlvl);
+
+        // **Which session this is, exported so a child can say so too.** `oslo macros` runs as a
+        // child of the shell whose macros it manages, and "off for this session" is a statement
+        // about the *parent*: without a name both processes agree on, the manager would write down
+        // a session nobody is running. `track::session::id` reads this first, so everything oslo
+        // starts — a subshell, a tool, a hook — reports the session it is actually part of.
+        let session = oslo_base::track::session::id();
+        self.vars
+            .insert("OSLO_SESSION".to_string(), (session.clone(), true));
+        environ_set("OSLO_SESSION", &session);
         for (name, value) in [
             ("UID", uid.to_string()),
             ("EUID", euid.to_string()),

@@ -41,6 +41,8 @@ pub(super) fn install(env: &Arc<Mutex<Environment>>) -> Held {
     // **Written before anything is applied over it**, which is the only moment the configuration's
     // own aliases can be told apart from everybody else's.
     publish_what_the_config_defined(env);
+    // A session file outlives the shell that wrote it; a starting shell is where they get tidied.
+    oslo_base::macros::live::session::sweep();
 
     let wanted = oslo_base::macros::live::want();
     let applied = Applied::of(&wanted);

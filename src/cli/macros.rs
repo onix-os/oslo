@@ -33,6 +33,8 @@ pub fn run(args: &[String]) -> i32 {
         "add" => add(rest),
         "remove" | "rm" => remove(rest),
         "show" | "list" => list::show(rest),
+        "off" => switch(rest, false),
+        "on" => switch(rest, true),
         "export" => list::export(rest),
         "import" => list::import(rest),
         other => usage(&format!("unknown subcommand {other:?}")),
@@ -59,6 +61,7 @@ struct Asked {
     edit: bool,
     plain: bool,
     replace: bool,
+    session: bool,
     tags: Vec<String>,
     words: Vec<String>,
 }
@@ -77,6 +80,7 @@ fn parse(args: &[String]) -> Result<Asked, String> {
         edit: false,
         plain: false,
         replace: false,
+        session: false,
         tags: Vec::new(),
         words: Vec::new(),
     };
@@ -108,6 +112,7 @@ fn parse(args: &[String]) -> Result<Asked, String> {
             "--edit" | "-e" => asked.edit = true,
             "--plain" => asked.plain = true,
             "--replace" => asked.replace = true,
+            "--session" | "-s" => asked.session = true,
             "--tag" | "-t" => waiting_for_tag = true,
             // Only a *leading* dash is an option. A body is arbitrary text and often starts with
             // one — `oslo macros add --alias ll '-la'` is a thing somebody will write.
@@ -271,6 +276,57 @@ fn remove(args: &[String]) -> i32 {
         }
         Err(problem) => fail(&problem),
     }
+}
+
+/// `off` and `on` — the screen's Space and Space ×3, for something that is not a person.
+///
+/// Both switches have a spelling here because a manager only a person can drive is one you cannot
+/// put in a script, and because "off for this session" is the one thing a *hook* might want to say.
+fn switch(args: &[String], on: bool) -> i32 {
+    let asked = match parse(args) {
+        Ok(asked) => asked,
+        Err(problem) => return usage(&problem),
+    };
+    let Some(name) = asked.words.first() else {
+        return usage(&format!("{} needs a name", if on { "on" } else { "off" }));
+    };
+    if asked.session {
+        // The session this process is in, which for anything a shell started is the *shell's* —
+        // see `$OSLO_SESSION` in `env::scope::seed`.
+        let session = oslo::track::session::id();
+        return match macros::live::session::set(&session, name, !on) {
+            Ok(()) => {
+                println!(
+                    "{name} is {} in this session",
+                    if on { "on" } else { "off" }
+                );
+                0
+            }
+            Err(problem) => fail(&problem),
+        };
+    }
+
+    let store = match macros::open() {
+        Ok(store) => store,
+        Err(problem) => return fail(&problem),
+    };
+    let kinds = match asked.kind {
+        Some(kind) => vec![kind],
+        None => macros::kinds_of(&store, name),
+    };
+    if kinds.is_empty() {
+        return fail(&format!("nothing called {name}"));
+    }
+    for kind in kinds {
+        if macros::set_active(&store, kind, name, on).is_none() {
+            return fail(&format!("no {} called {name}", kind.word()));
+        }
+    }
+    if let Err(problem) = macros::publish(&store) {
+        return fail(&problem);
+    }
+    println!("{name} is {}", if on { "on" } else { "off" });
+    0
 }
 
 #[cfg(test)]

@@ -13,6 +13,15 @@ use std::sync::OnceLock;
 pub fn id() -> String {
     static ID: OnceLock<String> = OnceLock::new();
     ID.get_or_init(|| {
+        // **`$OSLO_SESSION` first.** A shell exports it, so everything the shell starts — a
+        // subshell, a tool, `oslo macros` — names the session it is part of rather than inventing
+        // one of its own. Without this a child process could not talk about the session it is in:
+        // it would compute an id nobody else has ever heard of.
+        if let Ok(named) = std::env::var("OSLO_SESSION")
+            && !named.trim().is_empty()
+        {
+            return named;
+        }
         let started = std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)
             .map(|d| d.as_secs())

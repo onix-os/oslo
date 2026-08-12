@@ -59,8 +59,15 @@ pub(super) fn try_call(
     }
     let store = macros::open().ok()?;
     let entry = macros::get(&store, Kind::Func, name)
-        .or_else(|| macros::get(&store, Kind::Script, name))?;
+        .or_else(|| macros::get(&store, Kind::Script, name))
+        // **Off is off here too**, and it is read at the moment of the call rather than applied at
+        // startup — which is the whole reason a function and a script need no snapshot: they are
+        // looked up when you use them, so the answer is never stale.
+        .filter(|entry| entry.active)?;
     drop(store);
+    if macros::live::session::is_off(&oslo_base::track::session::id(), name) {
+        return None;
+    }
 
     // The same guard a function call uses, and for its reason: a redirection that cannot be set up
     // fails the command rather than running it with the shell's own streams.

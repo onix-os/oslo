@@ -39,11 +39,11 @@ pub(super) fn show(args: &[String]) -> i32 {
     let paint = Paint::detect();
     let configured = configured_names();
 
-    // **On a terminal it is the list, narrowed as you type** — the same widget the history finder
-    // is, rather than a page of output to read. `--plain` is the way to ask for the page, and a
-    // pipe gets it without asking: `Answer::NoTerminal` falls through to the printing below.
+    // **On a terminal it is the manager**, the same screen the history finder is rather than a page
+    // of output to read. `--plain` is how you ask for the page, and a pipe gets it without asking:
+    // there is no terminal to draw on, so `open` answers `None` and the printing below runs.
     if !asked.plain
-        && let Some(status) = picked(&store, &entries, asked.edit)
+        && let Some(status) = screen(&store)
     {
         return status;
     }
@@ -86,80 +86,114 @@ pub(super) fn show(args: &[String]) -> i32 {
     0
 }
 
-/// The list as a widget: pick one and see it, or edit it.
+/// The manager, opened on the screen.
 ///
-/// `None` when there is no terminal to ask on, which is how a pipe gets the printed list instead.
-fn picked(store: &macros::Store, entries: &[Entry], edit: bool) -> Option<i32> {
-    // **Flattened to one row each.** A function is many lines and a list of many-line entries is
-    // not a list; the whole thing is what opening one shows.
-    let rows: Vec<String> = entries
-        .iter()
-        .map(|entry| {
-            format!(
-                "{:<7} {:<18} {}",
-                entry.kind.word(),
-                entry.name,
-                trimmed(
-                    entry
-                        .body
-                        .lines()
-                        .find(|l| !l.trim().is_empty())
-                        .unwrap_or("")
-                )
-            )
-        })
-        .collect();
-
-    let answer = oslo::ui::ask::filter(&oslo::ui::ask::Choice {
-        header: if edit {
-            "edit which?".to_string()
-        } else {
-            "macros".to_string()
-        },
-        items: rows.clone(),
-        height: 15,
-        ..Default::default()
-    });
-    let chosen = match answer {
-        oslo::ui::ask::Answer::NoTerminal => return None,
-        oslo::ui::ask::Answer::Cancelled => return Some(1),
-        oslo::ui::ask::Answer::Given(chosen) => chosen,
-    };
-    // The rows are positional, so the row that came back names its entry by where it sat.
-    let Some(entry) = chosen
-        .first()
-        .and_then(|row| rows.iter().position(|r| r == row))
-        .and_then(|at| entries.get(at))
-    else {
-        return Some(1);
-    };
-
-    if !edit {
-        println!("{} {}", entry.kind.word(), entry.name);
-        for line in entry.body.lines() {
-            println!("    {line}");
-        }
-        return Some(0);
-    }
-    match crate::cli::editor::edit(&entry.body, entry.kind.extension(&entry.body)) {
-        Ok(None) => {
-            println!("unchanged");
-            Some(0)
-        }
-        Ok(Some(body)) => {
-            let updated = Entry {
-                body,
-                ..entry.clone()
-            };
-            match macros::put_and_publish(store, &updated) {
-                Ok(()) => {
-                    println!("{} {}", updated.kind.word(), updated.name);
-                    Some(0)
+/// `None` when there is no terminal to draw on, which is how a pipe gets the printed list instead.
+///
+/// **Reopened after every edit.** Editing means leaving the alternate screen — `nvim` wants it — so
+/// the screen closes, the editor runs, and it comes back with the query it had. Trying to keep it
+/// open around a child that also drives the terminal is how two programs end up fighting over the
+/// same termios.
+fn screen(store: &macros::Store) -> Option<i32> {
+    let mut query = String::new();
+    loop {
+        let items = items_for(store);
+        let mut backing = Database { store };
+        match oslo::ui::manager::open(items, &query, &mut backing)? {
+            oslo::ui::manager::Outcome::Cancelled => return Some(0),
+            oslo::ui::manager::Outcome::Edit { item, query: q } => {
+                query = q;
+                if let Some(status) = edit_one(store, &item) {
+                    return Some(status);
                 }
-                Err(problem) => Some(fail(&problem)),
             }
         }
+    }
+}
+
+/// Everything the screen shows: the database, then what the configuration defined.
+fn items_for(store: &macros::Store) -> Vec<oslo::ui::manager::Item> {
+    let session = oslo::track::session::id();
+    let stored = macros::all(store).into_iter().map(|entry| (entry, true));
+    let elsewhere = macros::live::from_elsewhere()
+        .into_iter()
+        .map(|entry| (entry, false));
+    stored
+        .chain(elsewhere)
+        .map(|(entry, from_database)| oslo::ui::manager::Item {
+            kind: entry.kind.word().to_string(),
+            first: trimmed(
+                entry
+                    .body
+                    .lines()
+                    .find(|line| !line.trim().is_empty())
+                    .unwrap_or(""),
+            ),
+            session_off: macros::live::session::is_off(&session, &entry.name),
+            stored: from_database,
+            name: entry.name,
+            tags: entry.tags,
+            created: entry.created,
+            active: entry.active,
+        })
+        .collect()
+}
+
+/// Open one in the editor and store what comes back. `Some` only when something went wrong enough
+/// to stop, because an editor that would not open is not a reason to lose the screen.
+fn edit_one(store: &macros::Store, item: &oslo::ui::manager::Item) -> Option<i32> {
+    let Some(kind) = Kind::named(&item.kind) else {
+        return None;
+    };
+    // **A configured alias is copied in before it is edited.** It came from a file this does not
+    // own and cannot write back to; copying it makes it yours, which is also the only way to get
+    // one that can be turned off.
+    let entry = macros::get(store, kind, &item.name).unwrap_or_else(|| {
+        macros::live::from_elsewhere()
+            .into_iter()
+            .find(|e| e.kind == kind && e.name == item.name)
+            .unwrap_or_else(|| Entry::new(kind, &item.name, ""))
+    });
+
+    match crate::cli::editor::edit(&entry.body, kind.extension(&entry.body)) {
+        Ok(None) => None,
+        Ok(Some(body)) => {
+            let updated = Entry { body, ..entry };
+            if let Err(problem) = macros::put_and_publish(store, &updated) {
+                return Some(fail(&problem));
+            }
+            None
+        }
         Err(problem) => Some(fail(&problem)),
+    }
+}
+
+/// The screen's hands: it decides, this does it.
+struct Database<'a> {
+    store: &'a macros::Store,
+}
+
+impl oslo::ui::manager::Backing for Database<'_> {
+    fn act(&mut self, item: &oslo::ui::manager::Item, act: oslo::ui::manager::Act) {
+        use oslo::ui::manager::Act;
+        let Some(kind) = Kind::named(&item.kind) else {
+            return;
+        };
+        match act {
+            Act::Forget => {
+                let _ = macros::remove_and_publish(self.store, kind, &item.name);
+            }
+            Act::Everywhere(active) => {
+                macros::set_active(self.store, kind, &item.name, active);
+                let _ = macros::publish(self.store);
+            }
+            // **The parent's session, not this process's.** `oslo macros` is a child of the shell
+            // whose macros it is managing, and the session it means is the one that will read the
+            // file — which is the shell's.
+            Act::Session(off) => {
+                let _ = macros::live::session::set(&oslo::track::session::id(), &item.name, off);
+            }
+        }
     }
 }
 

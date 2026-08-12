@@ -199,6 +199,35 @@ pub mod session {
         std::fs::write(&path, text).map_err(|e| format!("{}: {e}", path.display()))
     }
 
+    /// Forget the lists of sessions that ended long ago.
+    ///
+    /// A session file outlives its shell — there is no reliable moment to delete one, since a shell
+    /// can be killed — so they are swept by age instead, from a starting shell. A week is well past
+    /// any session still running and well short of anything worth keeping: what it holds is "off
+    /// until this terminal closes".
+    pub fn sweep() {
+        const WEEK: u64 = 7 * 24 * 60 * 60;
+        let Some(directory) = super::super::directory().map(|dir| dir.join("session")) else {
+            return;
+        };
+        let Ok(entries) = std::fs::read_dir(&directory) else {
+            return;
+        };
+        let mine = path();
+        for entry in entries.flatten() {
+            let old = entry
+                .metadata()
+                .and_then(|meta| meta.modified())
+                .map(|when| when.elapsed().map(|since| since.as_secs()).unwrap_or(0) > WEEK)
+                .unwrap_or(false);
+            // Never this shell's own, whatever its timestamp says: a clock that moved backwards is
+            // not a reason to turn somebody's macros back on underneath them.
+            if old && mine.as_deref() != Some(entry.path().as_path()) {
+                let _ = std::fs::remove_file(entry.path());
+            }
+        }
+    }
+
     /// Whether `name` is off in the session `id`.
     pub fn is_off(id: &str, name: &str) -> bool {
         let Some(directory) = super::super::directory().map(|dir| dir.join("session")) else {
