@@ -74,26 +74,48 @@ decides where the work goes:
 | function | a name the command search finds | on first call, like `functions/*.sh` |
 | script | executed from a memfd | on first call |
 
-## The problem this creates, and it is the important one
+## When an alias loads — measured, and settled
 
-**An alias has to be loaded before the first command, and oslo is `/bin/sh`.**
+An alias has to be in hand before the first line is parsed, and oslo is `/bin/sh`. So the question
+was whether a database can be on that path at all. **It cannot**, and it does not have to be. Both
+halves are measured:
 
-`shopt` says `expand_aliases` is permanently on — *"oslo expands aliases in every shell, not only
-interactive ones"* — so a database of aliases means opening a database on **every** `sh -c` a build
-spawns. oslo starts in about 3.5 ms today, and a hundred short-lived shells per `make` is exactly the
-case the rest of the design has been protecting.
+```text
+oslo -c true, static musl                842 µs      (dash: 622 µs)
+opening a key-value store                2.61 ms     min of 50, an existing 60-row database
+reading 60 rows out of it                1.13 ms
+reading 60 aliases from a flat file      3.6 µs
+```
 
-Three ways out. Measure before choosing:
+A store open is **three times a whole shell start**. Adding it to `sh -c` would make oslo five times
+slower than it is and seven times slower than dash, on the exact case — a hundred short-lived shells
+per `make` — that the rest of this design has been protecting.
 
-1. **Interactive only.** Aliases from the database load when somebody is typing; a script sees none.
-   This is what bash does — a non-interactive shell does not expand aliases unless asked — and it
-   would mean `expand_aliases` stops being permanently on and starts answering honestly.
-2. **A snapshot.** The database is the source of truth; a flat file beside it is what a shell reads,
-   rewritten whenever `oslo aliases` changes something. One `read(2)` of a few hundred bytes.
-3. **Pay it.** If a store open is tens of microseconds, this is an argument about nothing.
+**But the second measurement is the one that resolves it.** `config.lua` is read by
+`startup::repl` and by nothing else, so a non-interactive shell **never reads it**:
 
-**Functions and scripts do not have this problem** — both are looked up after the `$PATH` search has
-already failed, so they cost a database open only on a line that was going to fail anyway.
+```text
+$ oslo -c 'gco'          # with alias gco defined in config.lua
+oslo: gco: command not found
+```
+
+Config aliases are already interactive-only. So a database that loads where the config loads is not a
+new restriction — it is the existing one, applied consistently. `shopt expand_aliases` stays honest:
+alias *expansion* does work in every shell, and always did; what a non-interactive shell has never had
+is anything to expand.
+
+**The decision, then:**
+
+- **Aliases and abbreviations load in the interactive loop**, beside `config.lua`. A script sees
+  neither, exactly as today.
+- **Through a flat snapshot, not the database.** The interactive shell already pays 2.6 ms for the
+  tracking store; a second store would double that for something a `read(2)` of 3.6 µs can answer.
+  `oslo aliases` writes the snapshot on every change; a missing or stale one is regenerated from the
+  database, so the database stays the single source of truth and the file stays a cache that can be
+  deleted at any time.
+
+**Functions and scripts need none of this** — both are looked up after the `$PATH` search has already
+failed, so they cost a database open only on a line that was going to fail anyway.
 
 ## Where it lives
 
@@ -157,8 +179,8 @@ not a list. A row is `kind  name  first line`; Enter opens the real thing in the
 
 Each step ends with `make verify` green and is its own commit.
 
-1. **The store, and the measurement above.** How long does opening it take, and does an alias
-   database belong on the `/bin/sh` path at all? The answer decides step 3.
+1. **The store and the snapshot.** The database at `aliases/aliases.db`, its own opener, and the
+   snapshot beside it. The measurement above is done; this is the code it decided.
 2. **`oslo aliases add`/`remove`/`show`** for aliases and abbreviations only — no editor, no scripts.
    The whole surface working end to end for the two simple kinds.
 3. **Loading into a shell**, by whichever route step 1's measurement chose.
@@ -179,12 +201,12 @@ Each step ends with `make verify` green and is its own commit.
 
 - **One store for the user**, at `aliases/aliases.db`. Not per profile.
 - **Config and database both work**, database last, and `show` marks what it shadows.
+- **Interactive only, through a snapshot.** Measured: a store open is 2.6 ms against an 842 µs shell
+  start, and a flat read is 3.6 µs. A non-interactive shell never read `config.lua` either, so this
+  takes nothing away.
 
-## Still open, and worth answering before step 1
+## Still open
 
-1. **Do aliases load in a non-interactive shell?** Bash says no. oslo currently says yes for
-   config-defined ones. The database is what makes the question cost something — see the measurement
-   in step 1.
-2. **Is a stored script on `$PATH`?** Typing `deploy` should probably run it — but resolved *after*
+1. **Is a stored script on `$PATH`?** Typing `deploy` should probably run it — but resolved *after*
    `$PATH`, so a real `deploy` on the system still wins. Same rule as functions, and worth saying out
    loud because it is the opposite of what a dotfiles `bin/` directory does.
