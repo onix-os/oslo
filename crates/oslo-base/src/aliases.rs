@@ -40,7 +40,7 @@
 
 pub mod snapshot;
 
-use crate::track::kv::Store;
+pub use crate::track::kv::Store;
 use std::path::PathBuf;
 
 /// What a stored name is.

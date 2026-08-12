@@ -38,6 +38,15 @@ pub(super) fn show(args: &[String]) -> i32 {
 
     let paint = Paint::detect();
     let configured = configured_aliases();
+
+    // **On a terminal it is the list, narrowed as you type** — the same widget the history finder
+    // is, rather than a page of output to read. `--plain` is the way to ask for the page, and a
+    // pipe gets it without asking: `Answer::NoTerminal` falls through to the printing below.
+    if !asked.plain
+        && let Some(status) = picked(&store, &entries, asked.edit)
+    {
+        return status;
+    }
     for entry in &entries {
         // **Flattened to one line each**, because a function is many lines and a list of many-line
         // entries is not a list. `show NAME` above is where the whole thing lives.
@@ -71,6 +80,83 @@ pub(super) fn show(args: &[String]) -> i32 {
         }
     }
     0
+}
+
+/// The list as a widget: pick one and see it, or edit it.
+///
+/// `None` when there is no terminal to ask on, which is how a pipe gets the printed list instead.
+fn picked(store: &aliases::Store, entries: &[Entry], edit: bool) -> Option<i32> {
+    // **Flattened to one row each.** A function is many lines and a list of many-line entries is
+    // not a list; the whole thing is what opening one shows.
+    let rows: Vec<String> = entries
+        .iter()
+        .map(|entry| {
+            format!(
+                "{:<7} {:<18} {}",
+                entry.kind.word(),
+                entry.name,
+                trimmed(
+                    entry
+                        .body
+                        .lines()
+                        .find(|l| !l.trim().is_empty())
+                        .unwrap_or("")
+                )
+            )
+        })
+        .collect();
+
+    let answer = oslo::ui::ask::filter(&oslo::ui::ask::Choice {
+        header: if edit {
+            "edit which?".to_string()
+        } else {
+            "aliases".to_string()
+        },
+        items: rows.clone(),
+        height: 15,
+        ..Default::default()
+    });
+    let chosen = match answer {
+        oslo::ui::ask::Answer::NoTerminal => return None,
+        oslo::ui::ask::Answer::Cancelled => return Some(1),
+        oslo::ui::ask::Answer::Given(chosen) => chosen,
+    };
+    // The rows are positional, so the row that came back names its entry by where it sat.
+    let Some(entry) = chosen
+        .first()
+        .and_then(|row| rows.iter().position(|r| r == row))
+        .and_then(|at| entries.get(at))
+    else {
+        return Some(1);
+    };
+
+    if !edit {
+        println!("{} {}", entry.kind.word(), entry.name);
+        for line in entry.body.lines() {
+            println!("    {line}");
+        }
+        return Some(0);
+    }
+    match crate::cli::editor::edit(&entry.body, entry.kind.extension(&entry.body)) {
+        Ok(None) => {
+            println!("unchanged");
+            Some(0)
+        }
+        Ok(Some(body)) => {
+            let updated = Entry {
+                body,
+                ..entry.clone()
+            };
+            match aliases::put_and_publish(store, &updated) {
+                Ok(()) => {
+                    println!("{} {}", updated.kind.word(), updated.name);
+                    Some(0)
+                }
+                Err(problem) => Some(fail(&problem)),
+            }
+        }
+        Err(problem) => Some(fail(&problem)),
+    }
 }
 
 /// The aliases `config.lua` defines, so `show` can say which stored ones win over one.
