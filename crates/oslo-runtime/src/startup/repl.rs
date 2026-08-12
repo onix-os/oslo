@@ -9,10 +9,10 @@ use crate::lua::LuaEngine;
 use crate::lua::api::hooks;
 use crate::startup::integration;
 use crate::startup::mode::Mode;
-use crate::startup::plugins;
 use crate::startup::read::{Input, read_command};
 use crate::startup::recall::{remember_history, seed_history};
-use crate::startup::{arrival, config, history, lua_init, mode, prompt, rc, timing, tracking};
+use crate::startup::{arrival, config, history, lua_init, mode, plugins, prompt};
+use crate::startup::{rc, timers, timing, tracking};
 use oslo_base::error::ShellError;
 use oslo_shell::Environment;
 use oslo_shell::env::builtins::run_exit_trap;
@@ -157,6 +157,7 @@ pub fn run_repl(login: bool) -> ! {
     let mut settled = here.clone();
 
     loop {
+        timers::fire();
         // **Where the shell notices it has moved, by any route at all.**
         //
         // The directory environment used to be reconciled in one place only: after a command line
@@ -371,7 +372,7 @@ pub fn run_repl(login: bool) -> ! {
                 //
                 // Beside `take_reload_request` above, and for the same reason it exists: a builtin
                 // leaves something behind and this carries it out.
-                crate::lua::engine::run_deferred_hooks();
+                timers::after_command();
                 // The command is over, so `set -x` belongs to whatever runs next.
                 drop(quiet);
 

@@ -33,5 +33,6 @@ pub mod repl;
 #[cfg(feature = "direnv")]
 mod report;
 mod terminal;
+mod timers;
 pub mod timing;
 mod tracking;
