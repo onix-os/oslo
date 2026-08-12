@@ -608,11 +608,6 @@ A profile is a **directory** — `~/.local/share/oslo/history/<name>/` holding `
 and `hist.model`. So renaming one is `mv`, deleting one is `rm -r`, and copying one to another
 machine is `scp -r`; none of those were quite right when the three files sat flat beside each other.
 
-A home written by an older oslo is brought forward the first time an interactive shell starts:
-each `<name>.kv` is **copied** into its directory, and the old files are left exactly where they are.
-Copied rather than moved because a shell already running is still using them — they are yours to
-delete once nothing is. A store that cannot be read is reported rather than skipped.
-
 There used to be two files, `history.db` and `track.kv`. There is one now. Nothing migrates that
 older pair — delete them.
 

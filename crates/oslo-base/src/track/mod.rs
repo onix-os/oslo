@@ -34,7 +34,6 @@
 pub mod db;
 pub mod history;
 pub mod log;
-pub mod migrate;
 pub mod profile;
 pub mod session;
 pub mod sync;
@@ -98,8 +97,8 @@ pub fn store() -> Option<&'static Track> {
 /// which must run without a store rather than fail.
 ///
 /// One store per profile, holding everything: the event log, the aggregate, the directories. It used
-/// to be `<profile>.kv` flat in `<data>/oslo/`; see [`profile::store_path`] for why it moved and
-/// [`migrate`] for what happens to the old one.
+/// to be `<profile>.kv` flat in `<data>/oslo/`; see [`profile::store_path`] for why it moved.
+/// Nothing adopts a store written under the old name — a file this did not write is yours.
 pub fn default_path(xdg_data: Option<&str>, home: Option<&str>) -> Option<PathBuf> {
     profile::store_path(xdg_data, home, "db")
 }

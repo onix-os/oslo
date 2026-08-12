@@ -114,19 +114,6 @@ pub fn store_dir(xdg_data: Option<&str>, home: Option<&str>) -> Option<PathBuf> 
     Some(base.join("oslo"))
 }
 
-/// Where a profile's store used to live: `<data>/oslo/<profile>.<extension>`.
-///
-/// Only [`super::migrate`] reads this. Kept as its own function rather than spelled out there, so
-/// the two layouts are visibly one decision apart.
-pub fn legacy_path(
-    xdg_data: Option<&str>,
-    home: Option<&str>,
-    name: &str,
-    ext: &str,
-) -> Option<PathBuf> {
-    Some(store_dir(xdg_data, home)?.join(format!("{name}.{ext}")))
-}
-
 /// Every profile that has a tracking store, sorted, with the current one always present.
 ///
 /// Found by listing rather than recorded anywhere: a profile *is* a directory with a store in it, so
@@ -263,11 +250,6 @@ mod tests {
             Some(PathBuf::from(
                 "/home/u/.local/share/oslo/history/claude/hist.model"
             ))
-        );
-        // The old layout, which only the migration looks at.
-        assert_eq!(
-            legacy_path(Some("/x/data"), None, "claude", "kv"),
-            Some(PathBuf::from("/x/data/oslo/claude.kv"))
         );
         unsafe { std::env::remove_var(ENV) };
     }

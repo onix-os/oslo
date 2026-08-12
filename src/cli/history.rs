@@ -64,9 +64,6 @@ fn execute(args: &[String]) -> Result<(), String> {
 }
 
 fn current_path() -> Result<PathBuf, String> {
-    // The second reader of the store, and the one somebody reaches for when the shell has not
-    // started: `oslo history search` in a home an older oslo wrote must not report an empty history.
-    oslo::track::migrate::from_flat_layout();
     oslo::track::default_path(
         std::env::var("XDG_DATA_HOME").ok().as_deref(),
         std::env::var("HOME").ok().as_deref(),

@@ -212,7 +212,6 @@ machine, which is the argument for naming profiles after *roles* rather than per
 | path | what |
 |---|---|
 | `crates/oslo-base/src/track/profile.rs` | `ENV`, `current`, `valid`, `store_path`, `profile_dir`, `history_dir`, `available`, `after` |
-| `crates/oslo-base/src/track/migrate.rs` | bringing a flat `<profile>.kv` forward, once |
 | `crates/oslo-base/src/track/mod.rs` | `default_path` — the `hist.db` of the current profile |
 | `crates/oslo-base/src/predict/mod.rs` | `default_path` — the `hist.model` of the same profile |
 | `crates/oslo-base/src/track/sync.rs` | `HistoryEvent`, `EventId`, `preferred`, the codecs |
