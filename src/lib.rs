@@ -19,7 +19,7 @@
 pub use oslo_base::predict;
 /// The bottom of the stack: the syntax tree, the error type, the feature bits, the hook registry
 /// and the tracking store.
-pub use oslo_base::{ast, error, feature, hooks, messages, nesting, track, version};
+pub use oslo_base::{aliases, ast, error, feature, hooks, messages, nesting, track, version};
 
 #[cfg(feature = "direnv")]
 pub use oslo_shell::direnv;
