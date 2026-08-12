@@ -264,13 +264,6 @@ pub fn is_risky(line: &str) -> bool {
     }
 
     let words: Vec<&str> = line.split_whitespace().collect();
-    // A *leading* assignment specifically, because `GITHUB_TOKEN=... gh ...` is how a credential
-    // reaches a command that has no option for one. `head_of` has already dropped it, so what
-    // survives is the command and its timing.
-    if words.first().is_some_and(|word| is_assignment(word)) {
-        return true;
-    }
-
     let head = head_of(line);
     let mut parts = head.split(' ');
     let command = parts.next().unwrap_or_default();
@@ -306,16 +299,44 @@ fn is_risky_word(word: &str) -> bool {
         return true;
     }
     if is_assignment(word) {
-        let name = word
-            .split('=')
-            .next()
-            .unwrap_or_default()
-            .to_ascii_uppercase();
-        if SECRET_NAMES.iter().any(|secret| name.contains(secret)) {
+        let (name, value) = word.split_once('=').unwrap_or((word, ""));
+        let name = name.to_ascii_uppercase();
+        if SECRET_NAMES.iter().any(|secret| name.contains(secret)) && could_be_a_secret(value) {
             return true;
         }
     }
     is_known_key(word) || looks_like_a_key(word)
+}
+
+/// Whether an assignment's *value* could be the secret, rather than pointing at where one is.
+///
+/// **The name alone is not enough**, and a real line proved it:
+///
+/// ```text
+/// sudo make hardware-smoke SIGN_KEY="$MOK/MOK.priv" SIGN_CERT="$MOK/MOK.der"
+/// ```
+///
+/// `SIGN_KEY` contains `KEY`, so the whole line was reduced to `make` and never appeared in the
+/// history again — while the value it was hiding was `$MOK/MOK.priv`, a path to a file. Three
+/// shapes cannot be the secret and are the overwhelming majority of what people write:
+///
+/// ```text
+/// KEY=            nothing to leak
+/// KEY="$MOK/x"    a variable reference; whatever is secret lives in the variable, not here
+/// KEY=~/x.priv    a path, which names a key rather than being one
+/// ```
+///
+/// A literal — `KEY=hunter2`, `TOKEN=abc123` — still trips it, which is the case the rule is for.
+fn could_be_a_secret(value: &str) -> bool {
+    let value = value.trim_matches(['"', '\'']);
+    if value.is_empty() || value.contains('$') {
+        return false;
+    }
+    // A path, in any of the ways one is written. A base64 secret can hold a `/` too, which is why
+    // this is not the last word on the matter: `is_known_key` and `looks_like_a_key` still read the
+    // value afterwards, so a blob that happens to contain a slash is caught by its shape.
+    let a_path = value.starts_with(['/', '~', '.']) || value.contains('/');
+    !a_path
 }
 
 /// The credential formats that announce themselves.
@@ -506,6 +527,59 @@ mod tests {
         ] {
             assert!(!is_risky(line), "{line} is not a secret");
         }
+    }
+
+    /// **A name that says `KEY` beside a value that is a path.** Reported from a real session: this
+    /// line went missing from the history every time it was run, while the prediction model — which
+    /// learns from a different table — went on suggesting it, so the shell looked like it was
+    /// forgetting on purpose.
+    #[test]
+    fn an_assignment_pointing_at_a_key_file_is_not_a_key() {
+        let line = concat!(
+            r#"sudo make hardware-smoke HARDWARE_SERIALS="$SERIALS" SIGN_FILE="$SIGN" "#,
+            r#"SIGN_HASH=sha512 SIGN_KEY="$MOK/MOK.priv" SIGN_CERT="$MOK/MOK.der""#
+        );
+        assert!(!is_risky(line), "the values are paths and variables");
+        assert_eq!(prepare(line).0, line, "recorded whole");
+
+        for kept in [
+            "make SIGN_KEY=/etc/keys/MOK.priv",
+            "make SIGN_KEY=~/keys/MOK.priv",
+            "make SIGN_KEY=./MOK.priv",
+            "deploy TOKEN=$CI_TOKEN",
+            "deploy API_KEY=",
+        ] {
+            assert!(!is_risky(kept), "{kept} points at a secret, it is not one");
+        }
+    }
+
+    /// And the case the rule is actually for still trips: a literal value beside a telling name.
+    #[test]
+    fn a_literal_beside_a_secret_name_is_still_dropped() {
+        for line in [
+            "deploy API_KEY=abc123",
+            "run PASSWORD=hunter2",
+            "make SIGN_KEY=s3cr3t",
+        ] {
+            assert!(is_risky(line), "{line} carries the value itself");
+        }
+    }
+
+    /// **An assignment in front of a command is not a secret by itself.** It used to be: any line
+    /// starting `FOO=bar` lost its arguments, so `WGPU_BACKEND=vulkan rerun` and
+    /// `RUST_LOG=debug cargo test` were both stored as bare command names. The credential case the
+    /// rule existed for is caught by the value, wherever in the line it sits.
+    #[test]
+    fn a_leading_assignment_is_read_like_any_other_word() {
+        assert!(!is_risky("WGPU_BACKEND=vulkan rerun"));
+        assert!(!is_risky("RUST_LOG=debug cargo test"));
+        assert!(!is_risky("A=1 B=2 make install"));
+
+        assert!(is_risky(
+            "GITHUB_TOKEN=ghp_A1b2C3d4E5f6G7h8I9j0K1l2M3n4O5p6 gh pr list"
+        ));
+        assert!(is_risky("GITHUB_TOKEN=hunter2 gh pr list"));
+        assert!(is_risky("OPENAI_API_KEY=sk-abcdefghijklmnop chat"));
     }
 
     /// The glued `-p<value>` rule cannot tell `-phunter2` from `-print`, and it is not supposed to
