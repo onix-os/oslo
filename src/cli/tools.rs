@@ -121,6 +121,9 @@ pub fn run(tool: &'static Tool, args: &[String]) -> i32 {
     if tool.name == "history" {
         return crate::cli::history::run(args);
     }
+    if tool.name == "config" {
+        return crate::cli::config::run(args);
+    }
     #[cfg(feature = "plugin")]
     if tool.name == "plugin" {
         return crate::cli::plugin::run(args);
