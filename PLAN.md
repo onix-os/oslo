@@ -98,21 +98,41 @@ already failed, so they cost a database open only on a line that was going to fa
 ## Where it lives
 
 ```text
-~/.local/share/oslo/aliases/<profile>/aliases.db
+~/.local/share/oslo/aliases/aliases.db
 ```
 
-As asked — with one question worth answering first. **Should aliases be per profile?** History is,
-because an agent's commands must not pollute the ranking of yours. But aliases are *your tooling*: it
-is not obvious that a shell under `OSLO_PROFILE=claude` should have different ones, and a per-profile
-default means adding an alias in one shell and not finding it in the next.
+**One store for the user, not one per profile.** History is per profile because an agent's commands
+must not pollute the ranking of yours; aliases are the opposite — they are *your tooling*, and adding
+one in this shell and not finding it in the next is the whole of the surprise. A profile changes what
+the shell *remembers*, not what it *knows how to do*.
 
-The alternative is one store for the user, with the profile as an optional scope. Both are one line;
-they are not the same decision.
+That path is not what `oslo_base::store` builds — it puts a database at `<data>/oslo/plugins/<name>.kv`
+— so this needs its own opener beside it. Small, and better than bending the plugin one into a shape
+it does not mean.
 
 **And the trade nobody should discover later:** a database is not a dotfiles repository. Today an
 alias lives in `config.lua` — version-controlled, diffable, copied to a new machine with the rest of
 your configuration. In a database it is none of those. `export`/`import` is the answer, and it belongs
 in the first version rather than bolted on after somebody has fifty of them.
+
+## Aliases written in Lua and in shell still work
+
+`alias gco='git checkout'` in a script and `oslo.alias` in `config.lua` keep working exactly as they
+do now. The database is a *third* source, not a replacement, and three sources need a stated rule.
+
+**The last definition wins, and the order is: config, then database.** That is the ordinary shell
+rule — a second `alias` for a name replaces the first — applied to sources rather than to lines.
+Putting the database last is the deliberate half of the choice: it is the one you can change without
+editing a file, and `oslo aliases add gco …` should take effect because you just asked for it. A
+config that has to be edited and re-sourced would be the more surprising winner.
+
+The cost is that a database entry can silently shadow one you wrote in `config.lua`, so it must not be
+silent: **`oslo aliases show` marks an entry that shadows a configured name**, and says what it
+shadows. Discovering it in the list is fine; discovering it by wondering why your config stopped
+working is not.
+
+`oslo aliases remove` puts the configured one back on the next shell, because removing the database
+row leaves nothing to overwrite it with.
 
 ## Editing
 
@@ -155,11 +175,16 @@ Each step ends with `make verify` green and is its own commit.
   is, so nothing on disk can be quietly redefined — the rule `exec/simple/autoload.rs` already states,
   and for the reason it states.
 
-## Open, and worth answering before step 1
+## Decided
 
-1. **Per profile, or per user?** The path says per profile; the argument above says perhaps not.
-2. **Do aliases load in a non-interactive shell?** Bash says no. oslo currently says yes for
-   config-defined ones. A database is what makes the question cost something.
-3. **Is a stored script on `$PATH`?** Typing `deploy` should probably run it — but resolved *after*
+- **One store for the user**, at `aliases/aliases.db`. Not per profile.
+- **Config and database both work**, database last, and `show` marks what it shadows.
+
+## Still open, and worth answering before step 1
+
+1. **Do aliases load in a non-interactive shell?** Bash says no. oslo currently says yes for
+   config-defined ones. The database is what makes the question cost something — see the measurement
+   in step 1.
+2. **Is a stored script on `$PATH`?** Typing `deploy` should probably run it — but resolved *after*
    `$PATH`, so a real `deploy` on the system still wins. Same rule as functions, and worth saying out
    loud because it is the opposite of what a dotfiles `bin/` directory does.
