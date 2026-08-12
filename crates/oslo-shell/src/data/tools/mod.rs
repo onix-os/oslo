@@ -47,7 +47,11 @@ pub fn run_tool(
 ) -> Option<(i32, Option<Vec<Record>>)> {
     // A tool the config registered. Looked up first so a config can add a name the shell does not
     // know; it cannot replace one it does, because a name already registered keeps its meaning.
-    if let Some(outcome) = crate::data::custom::rows_of(name, words) {
+    //
+    // **The rows that reached this stage are handed over.** They used to be dropped here, which is
+    // what made every Lua tool a source: `notes` was expressible and `redact` was not. The planner
+    // was already deciding the edge from `accepts`; this is the other half of that decision.
+    if let Some(outcome) = crate::data::custom::rows_of(name, words, input.as_deref()) {
         return match outcome {
             Ok(rows) => Some((0, Some(rows))),
             Err(e) => {
