@@ -9,6 +9,7 @@
 #
 # The demo script is a line-per-action file:
 #
+#   env  NAME=value    an environment variable the demo shell starts with
 #   cols 120          terminal width  (default 120)
 #   rows 20           terminal height (default 20)
 #   speed 0.08        seconds between keystrokes while typing
@@ -28,16 +29,27 @@ OUT="${2:-/tmp/oslo-demos/$(basename "${DEMO%.demo}").cast}"
 OSLO="${OSLO_BIN:-$PWD/target/x86_64-unknown-linux-musl/release/oslo}"
 WORK="${DEMO_WORK:-/tmp/oslo-demo-work}"
 SESSION="demo_$(basename "${DEMO%.demo}")_$$"
+# For a demo that wants the binary under test on `$PATH` — `oslo macros …` is a *program*, and
+# without this it would be whichever oslo is installed.
+export OSLO_DIR="$(dirname "$OSLO")"
 
 [ -x "$OSLO" ] || { echo "no oslo binary at $OSLO — run: make build" >&2; exit 1; }
 command -v asciinema >/dev/null || { echo "asciinema is not installed" >&2; exit 1; }
 
-cols=120 rows=20 speed=0.08
+cols=120 rows=20 speed=0.08 env=""
 while read -r verb rest; do
     case "$verb" in
         cols) cols="$rest" ;;
         rows) rows="$rest" ;;
         speed) speed="$rest" ;;
+        # **Put into the launch command, not exported here.** tmux reuses an already-running
+        # server, and a new session inherits *that server's* environment rather than this
+        # script's — so a variable exported around `new-session` silently does nothing, and the
+        # demo records against whatever the person recording happens to have.
+        # `$OSLO_DIR` is substituted here because the tmux server — which may already have been
+        # running — would expand it against its own environment and find nothing. `$PATH` is left
+        # for the launching shell, where it means the same thing either way.
+        env) env="$env ${rest//\$OSLO_DIR/$OSLO_DIR}" ;;
     esac
 done < "$DEMO"
 
@@ -46,7 +58,7 @@ rm -f "$OUT"
 
 tmux kill-session -t "$SESSION" 2>/dev/null || true
 tmux -f /dev/null new-session -d -s "$SESSION" -x "$cols" -y "$rows" -c "$WORK" \
-    "OSLO_PROFILE=demo $OSLO"
+    "OSLO_PROFILE=demo$env $OSLO"
 # The status bar would be baked into every frame of the recording; the escape-time default makes
 # Escape-then-key look like Alt-key to the shell, which matters for any demo that presses Escape.
 tmux set -t "$SESSION" status off
@@ -81,7 +93,7 @@ while IFS= read -r line; do
     rest="${line#* }"
     [ "$verb" = "$line" ] && rest=""
     case "$verb" in
-        ''|'#'*|cols|rows|speed) ;;
+        ''|'#'*|cols|rows|speed|env) ;;
         run)   send_text "$rest"; sleep 0.4; tmux send-keys -t "$SESSION" Enter; sleep 1.2 ;;
         type)  send_text "$rest" ;;
         key)   tmux send-keys -t "$SESSION" "$rest"; sleep 0.5 ;;
