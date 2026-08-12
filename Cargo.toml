@@ -75,6 +75,21 @@ direnv = ["oslo-shell/direnv", "oslo-runtime/direnv"]
 # entry point asks for both.
 nix = ["oslo-shell/nix", "oslo-runtime/nix"]
 
+# `plugin` — installing somebody else's Lua, and loading it on demand.
+#
+# **The line is drawn where the policy starts.** `oslo.db` and the `pre-cmd` veto are in every
+# build: they are capabilities, small and self-contained, and a config that will never install
+# anything can still want them. Putting them behind a switch would give oslo two dialects, where a
+# config has to ask whether `oslo.db` exists before using it.
+#
+# Installing is different in kind. It fetches somebody's code, decides whether to trust it, and
+# reserves builtin names on their behalf — none of which a `/bin/sh` on a distribution has any use
+# for, and all of which should be absent rather than merely unused.
+#
+# Without it there is no `oslo plugin`, no manifest, no index and no loading. Everything a plugin is
+# *written against* is still there, so the same Lua runs from `conf.d` in either binary.
+plugin = ["oslo-runtime/plugin"]
+
 [dependencies]
 # A fork of `makiko`, the one pure-Rust SSH client — no `cc`, no `ring`, no `-sys` crate that is
 # really C. Forked rather than depended on because upstream was last touched in March 2025, and a

@@ -51,6 +51,11 @@ pub const TOOLS: &[Tool] = &[
         name: "hook",
         about: "list and test the shell hooks",
     },
+    #[cfg(feature = "plugin")]
+    Tool {
+        name: "plugin",
+        about: "install, list and remove shell plugins",
+    },
     // **A tool as well as a builtin, and the two are not redundant.** The builtin is what a person
     // types at an oslo prompt; this is what anything *else* asks — a prompt segment, a status bar,
     // a script — and those reach oslo through `io.popen` or `sh -c`, where a builtin does not
@@ -115,6 +120,10 @@ pub fn from_name(name: &str) -> Option<&'static Tool> {
 pub fn run(tool: &'static Tool, args: &[String]) -> i32 {
     if tool.name == "history" {
         return crate::cli::history::run(args);
+    }
+    #[cfg(feature = "plugin")]
+    if tool.name == "plugin" {
+        return crate::cli::plugin::run(args);
     }
     // The same code the builtin runs, so the two answers cannot disagree about what is running.
     // `args` here has no command name in front of it, which the builtin's does.

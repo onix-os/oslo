@@ -104,6 +104,9 @@ pub fn call_here(f: &Value, args: Vec<Value>) -> LuaResult<Vec<Value>> {
 mod borrow;
 /// The hook reach-backs, which every fire site outside this file uses.
 mod hooks;
+/// Running a plugin's entry file on this session's interpreter.
+#[cfg(feature = "plugin")]
+mod plugin;
 /// Hooks held until the shell can act on them. See that module for why.
 mod queue;
 pub(crate) use borrow::borrow_env;
@@ -111,6 +114,8 @@ pub use hooks::{
     answer_hook_here, answer_hook_with, ask_hook_here, fire_at_here, key_hook_here,
     key_hook_watched,
 };
+#[cfg(feature = "plugin")]
+pub(crate) use plugin::load_plugin_file;
 pub use queue::drain as run_deferred_hooks;
 
 /// Turn whatever a Lua builtin returned into an exit status.

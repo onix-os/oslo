@@ -1156,6 +1156,7 @@ dependencies = [
  "oslo-ui",
  "regex",
  "serde_json",
+ "sha2",
  "tempfile",
 ]
 

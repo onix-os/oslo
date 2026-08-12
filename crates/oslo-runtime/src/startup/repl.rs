@@ -9,6 +9,7 @@ use crate::lua::LuaEngine;
 use crate::lua::api::hooks;
 use crate::startup::integration;
 use crate::startup::mode::Mode;
+use crate::startup::plugins;
 use crate::startup::read::{Input, read_command};
 use crate::startup::recall::{remember_history, seed_history};
 use crate::startup::{arrival, config, history, lua_init, mode, prompt, rc, timing, tracking};
@@ -76,6 +77,7 @@ pub fn run_repl(login: bool) -> ! {
         // set, since what is read is the whole `oslo` table each time.
         config::apply(&lua);
     }
+    plugins::start(&env_struct);
 
     let settings = history::settings(&env_struct.lock().unwrap());
     // Start walking `$PATH` now, in the background. Whatever is left to do here — opening the
@@ -282,13 +284,10 @@ pub fn run_repl(login: bool) -> ! {
                 let secret = secret || !answered.record;
                 let logged_as =
                     precmd::write_down(&mut history, &entered, mode, secret, settings.max_size);
-                // The title says what is running while it runs, and goes back to the directory
-                // when the prompt returns. A row of tabs then says what each is *doing*.
-                //
-                // **A hidden line is not put in the title either.** The title reaches the terminal,
-                // the multiplexer and whatever is drawing a tab bar — the same audience as the mark
-                // below, by a different route, and hiding one while announcing the other would be a
-                // hole in the same wall.
+                plugins::before(&text);
+                // The title says what is running while it runs, and goes back to the directory when
+                // the prompt returns. **A hidden line does not reach it either**: the title goes to
+                // the terminal and the multiplexer, the same audience as the mark below.
                 announce(&oslo_ui::marks::title(&if secret {
                     "private command".to_string()
                 } else {

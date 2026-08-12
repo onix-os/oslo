@@ -102,18 +102,31 @@ performance bug, never a correctness one.
 
 ### Loading
 
-At interactive startup, for each entry in the index, oslo registers a **stub** builtin under each
-declared name. Calling one:
+**The stub design in the first draft of this plan does not work, and the shell says why:**
 
-1. checks the trust hash for that plugin, refusing with a message if it does not match;
-2. runs the plugin's `entry`, which calls the real `oslo.register_builtin`;
-3. replaces the stub, and re-dispatches the call.
+```text
+oslo: note: shell state is busy; an oslo.* call that reaches the shell cannot run from here.
+```
 
-So an unused plugin costs one line in a JSON file, and a used one costs its own Lua once per
-session. A plugin whose entry does not register the name it declared is an error naming both.
+A builtin runs *while the shell holds its state*, and `oslo.register_builtin` needs that state to
+register anything — so a plugin loaded from inside a stub builtin can never register the builtin it
+was loaded to provide. That is not a fixable stub; it is the wrong place to load from.
 
-**Nothing outside the interactive shell loads plugins**, per decision 1. `oslo -c 'secret get x'`
-does not work and is not meant to.
+So the loop does it. One step before a line runs, with nothing held, any plugin whose declared name
+appears as a word in the line is loaded: trust hash checked, entry file run, and by the time the
+line executes the real builtin is registered and dispatch finds it like any other.
+
+**Every word, not only the first.** `note x | wc -l` and `true && note y` both need the plugin and
+neither has it at the front. The cost of being generous is a plugin loaded because its name happened
+to appear as a filename — which is a plugin the user installed, doing its job slightly early.
+
+The consequence worth knowing: **a name is not reserved until something mentions it.** `type note`
+before `note` has ever been typed reports it as not found, because it is — the plugin has not run.
+Nothing checks that a plugin delivered what its manifest promised, either; the shell looks the word
+up as usual and "command not found" is the honest answer when it did not.
+
+**Nothing outside the interactive shell loads plugins**, per decision 1. `oslo -c 'note x'` does not
+work and is not meant to.
 
 ### `oslo.db`
 
