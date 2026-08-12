@@ -159,6 +159,42 @@ oslo.completion.for_command = {
 answer for the one kind it cares about. `for_command` *replaces* oslo's own candidates for that
 command rather than adding to them.
 
+### Declaring a spec instead of computing one
+
+```lua
+oslo.completion.spec {
+  command = "notes",
+  desc = "notes kept in the shell",
+  subcommands = {
+    { name = "new",  desc = "start one" },
+    { name = "list", desc = "every note",
+      flags = { { "--since", desc = "only newer than" } } },
+  },
+  flags = { { "-v", "--verbose", desc = "say more" } },
+}
+```
+
+The same shape the four built-in specs are written in, and it goes through the same code at Tab time:
+subcommand matching, the walk down a nested tree, flags scoped to the subcommand you are inside, and
+the description column. `subcommands` nests to any depth, so `docker compose up` is expressible.
+
+A flag's spellings are the array part of its table — `{ "-v", "--verbose", desc = … }` — so it reads
+the way the flag is written; `{ name = "--verbose" }` is accepted as well. An entry that is not a
+table, or that names nothing, is skipped rather than refusing the whole spec: a generated list where
+the third item came out wrong should still complete the other nine.
+
+**A declared spec wins over a built-in one of the same name.** The four compiled in are a starting
+point, not a claim to be right forever — `git` grows subcommands faster than this tree does.
+
+Declaring is not computing, and that is the trade: a spec is data, so it cannot look at the
+filesystem, run a command, or decide anything when Tab is pressed. `for_command` is still there for
+that, and the two compose — a spec answers the *shape* of the command, a function answers what is on
+the machine. There is no `takes = "duration"` on a flag, because nothing in oslo completes the
+argument *to* a flag yet and the field would be a promise the Tab key does not keep.
+
+Until this, a config's only route was `for_command`, and the reason was one word: `CommandSpec` held
+`&'static str`, which a spec built at runtime cannot be stored in at all.
+
 ## Measurements
 
 From `cargo bench --bench fuzzy` on this machine — one short pattern (`gco`, `smart`) scored
@@ -171,6 +207,21 @@ against 3,300 candidates, which is roughly what a `$PATH` holds, averaged over 5
 
 The 60 µs is 22 per cent of the pass, and it is entirely allocation: the scoring itself was never
 the cost. The candidate still has to be folded per call, because it is different every time.
+
+**What it cost to make specs own their strings.** `bench/spec_tab.py` presses Tab on `git comm` in a
+pty forty times and reports the fastest — the deepest walk of this data the shell does, since `git`
+carries the largest spec. Five runs each side, before and after:
+
+| | fastest Tab | binary |
+|---|---|---|
+| `&'static str` | 0.27 ms | 7,077,888 |
+| `String`, plus the `Rc` lookup | 0.27 ms | 7,109,968 |
+
+Nothing visible, which is what was expected and not what was assumed: the walk is a `HashMap` lookup
+and a handful of prefix tests against a tree of a few hundred entries, and it is drawn on a terminal
+either way. The 31 KB is the Lua reader and the second registry, not the string change. Individual
+runs land bimodally at either ~0.28 ms or ~0.50 ms on this machine, on both sides — which is why the
+number quoted is the minimum and not the median.
 
 ## What it cannot do
 
@@ -194,8 +245,12 @@ doing. `sort = "alpha"` also discards the fuzzy pass's own ordering, since the f
 name and nothing else.
 
 Nothing here parses a command's `--help`: the descriptions and the subcommand and flag candidates
-come from the built-in spec registry, so a command with no spec offers no arguments at all, only
-paths.
+come from the spec registry, so a command nobody has written a spec for offers no arguments at all,
+only paths.
+
+A declared spec lives for the session that declared it. There is no file it is read from and nothing
+writes one out, so a spec belongs in `config.lua` or in a plugin — which is where the code that knows
+the command's shape already is.
 
 ## Where it lives
 
@@ -209,6 +264,10 @@ paths.
 | `crates/oslo-ui/src/dropdown/layout.rs` | `compute_layout` — the order width is given up in |
 | `crates/oslo-ui/src/dropdown/render.rs` | `render_vertical_dropdown`, `DEFAULT_ROWS`, `CEILING_ROWS` |
 | `crates/oslo-ui/src/frecency_store.rs` | `FrecencyStore` — the log, the compaction |
+| `crates/oslo-ui/src/spec/mod.rs` | `CommandSpec`, `SubcommandSpec`, `OptionSpec`, `SpecRegistry` |
+| `crates/oslo-ui/src/spec/custom.rs` | the specs a config or a plugin declared |
+| `crates/oslo-ui/src/spec/definitions/` | the four written by hand: `git`, `cargo`, `docker`, `npm` |
+| `crates/oslo-runtime/src/lua/api/spec.rs` | `oslo.completion.spec` — the Lua reader |
 | `crates/oslo-ui/src/spec/frecency.rs` | `FrecencyTracker::get_score` — the formula |
 | `crates/oslo-ui/src/settings/from_lua.rs` | how each `oslo.completion.*` key is read |
 | `crates/oslo-runtime/src/lua/columns.rs` | the `columns` and `for_command` hooks |

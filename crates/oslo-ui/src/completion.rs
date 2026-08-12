@@ -394,14 +394,14 @@ impl OsloHelper {
             for opt in options {
                 for name in &opt.names {
                     if name.starts_with(word.stem.as_str()) {
-                        out.push(self.spec_candidate(word, name, opt.description, "flag"));
+                        out.push(self.spec_candidate(word, name, &opt.description, "flag"));
                     }
                 }
             }
         } else {
             for sub in subcommands {
                 if sub.name.starts_with(word.stem.as_str()) {
-                    out.push(self.spec_candidate(word, sub.name, sub.description, "subcommand"));
+                    out.push(self.spec_candidate(word, &sub.name, &sub.description, "subcommand"));
                 }
             }
         }

@@ -4,51 +4,51 @@ use super::super::{CommandSpec, OptionSpec, SubcommandSpec};
 
 pub(crate) fn spec() -> CommandSpec {
     CommandSpec {
-        name: "npm",
-        description: "Node Package Manager",
+        name: "npm".into(),
+        description: "Node Package Manager".into(),
         subcommands: vec![
             SubcommandSpec {
-                name: "install",
-                description: "Install a package and its dependencies",
+                name: "install".into(),
+                description: "Install a package and its dependencies".into(),
                 subcommands: vec![],
                 options: vec![
                     OptionSpec {
-                        names: vec!["-D", "--save-dev"],
-                        description: "Save to devDependencies",
+                        names: crate::spec::definitions::names(&["-D", "--save-dev"]),
+                        description: "Save to devDependencies".into(),
                     },
                     OptionSpec {
-                        names: vec!["-g", "--global"],
-                        description: "Install globally",
+                        names: crate::spec::definitions::names(&["-g", "--global"]),
+                        description: "Install globally".into(),
                     },
                 ],
             },
             SubcommandSpec {
-                name: "run",
-                description: "Run an arbitrary package script",
+                name: "run".into(),
+                description: "Run an arbitrary package script".into(),
                 subcommands: vec![],
                 options: vec![],
             },
             SubcommandSpec {
-                name: "start",
-                description: "Start a package script",
+                name: "start".into(),
+                description: "Start a package script".into(),
                 subcommands: vec![],
                 options: vec![],
             },
             SubcommandSpec {
-                name: "test",
-                description: "Test a package script",
+                name: "test".into(),
+                description: "Test a package script".into(),
                 subcommands: vec![],
                 options: vec![],
             },
             SubcommandSpec {
-                name: "build",
-                description: "Build a package script",
+                name: "build".into(),
+                description: "Build a package script".into(),
                 subcommands: vec![],
                 options: vec![],
             },
             SubcommandSpec {
-                name: "uninstall",
-                description: "Remove a package",
+                name: "uninstall".into(),
+                description: "Remove a package".into(),
                 subcommands: vec![],
                 options: vec![],
             },

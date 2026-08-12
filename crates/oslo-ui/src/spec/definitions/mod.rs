@@ -14,3 +14,11 @@ use super::CommandSpec;
 pub(crate) fn all() -> Vec<CommandSpec> {
     vec![git::spec(), cargo::spec(), docker::spec(), npm::spec()]
 }
+
+/// Every spelling of one flag, owned.
+///
+/// A helper rather than `.into()` per element, because a flag has one to three spellings and
+/// `vec!["-m".into(), "--message".into()]` is three times the punctuation for the same fact.
+pub(crate) fn names(list: &[&str]) -> Vec<String> {
+    list.iter().map(|name| (*name).to_string()).collect()
+}

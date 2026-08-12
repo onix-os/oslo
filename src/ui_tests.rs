@@ -378,6 +378,37 @@ fn subcommands_come_from_the_spec_for_this_command_not_the_first_one() {
     assert!(flags.iter().any(|f| f.starts_with("--a")), "{flags:?}");
 }
 
+/// **A spec declared at runtime completes exactly like one compiled in.** This is the whole point of
+/// `CommandSpec` owning its strings: before it, the only route was a `for_command` function that had
+/// to re-implement subcommand matching by hand.
+#[test]
+fn a_spec_declared_from_outside_reaches_the_tab_key() {
+    use crate::ui::spec::{CommandSpec, OptionSpec, SubcommandSpec, custom};
+    custom::forget();
+    custom::register(CommandSpec {
+        name: "notes".into(),
+        description: "notes kept in the shell".into(),
+        subcommands: vec![SubcommandSpec {
+            name: "list".into(),
+            description: "every note".into(),
+            subcommands: vec![],
+            options: vec![OptionSpec {
+                names: vec!["--since".into()],
+                description: "only newer than".into(),
+            }],
+        }],
+        options: vec![],
+    });
+    let h = helper(Environment::new());
+
+    assert!(displays(&h, "notes li").contains(&"list".to_string()));
+    assert!(displays(&h, "notes list --si").contains(&"--since".to_string()));
+    custom::forget();
+
+    // And it is gone once forgotten, rather than living on in a registry built at startup.
+    assert!(!displays(&h, "notes li").contains(&"list".to_string()));
+}
+
 #[test]
 fn a_name_that_is_both_a_builtin_and_a_file_is_offered_once() {
     let dir = tempfile::tempdir().unwrap();

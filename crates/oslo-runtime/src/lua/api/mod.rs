@@ -43,6 +43,7 @@ mod run;
 pub(crate) mod segment;
 mod shell;
 pub(crate) mod spawn;
+mod spec;
 mod state;
 pub(crate) mod timer;
 pub(crate) mod tool;
@@ -154,6 +155,9 @@ pub fn install(interp: &Rc<Interp>, registry: &Registry, env: Arc<Mutex<Environm
                 Value::Table(Rc::new(RefCell::new(Table::new()))),
             );
         }
+        // `oslo.completion.spec` — the declarative half. A function in the same table as the
+        // settings, because that is where somebody looks for anything about completion.
+        spec::install(&mut completion.borrow_mut());
     }
     // `oslo.feature` — a namespace of functions rather than a settings table, because a feature is
     // not configuration. It is a runtime mask over configuration, and the two must not look alike.
