@@ -48,6 +48,9 @@ pub fn build() -> Value {
         });
         Ok(vec![Value::Bool(true)])
     });
+    // The other half of the same table: what a plugin says about itself *here* is a health check,
+    // and what it says about itself anywhere is a test.
+    super::test::install(&mut plugin);
     Value::table(plugin)
 }
 

@@ -170,6 +170,37 @@ end)
 opened, so one plugin cannot read another's data — or oslo's own. One file per plugin, mode `0600`,
 which is also what makes uninstalling an `rm`.
 
+## Testing one
+
+```lua
+oslo.plugin.test("a fresh install has no notes", function(t)
+  t.equal(#db:keys(), 0, "the database starts empty")
+  t.ok(db, "the store opened")
+  t.fail("a branch this should not have reached")
+end)
+```
+
+```sh
+oslo plugin test              # the plugin in the current directory
+oslo plugin test ~/src/notes
+```
+
+**A temporary home, which is most of the point.** `$HOME`, `$XDG_DATA_HOME` and `$XDG_CONFIG_HOME`
+point at a directory that is deleted afterwards, so the database really is empty. A test run against
+the author's own home is a test that passes because there are already three notes in there, and the
+failure a user hits on day one is exactly the one that cannot be reproduced.
+
+The plugin is loaded straight out of the directory with **no trust check** — the same trust as
+running a script you have just written, and the alternative would be installing a plugin before being
+allowed to test it. A body that raises is one failure rather than the end of the run, so a report of
+five tests is still worth reading when the second one is broken. A plugin with no tests is not a
+failure: `oslo plugin test` over a directory of them should not stop at the first author who has not
+written any yet.
+
+Same shape as `oslo.plugin.health` on purpose. The difference is what they ask: a health check runs
+against *your* machine and asks whether this plugin can work here; a test runs against a machine with
+nothing on it and asks whether it works at all.
+
 ## The veto
 
 A `pre-cmd` handler may decline to have a line written down:

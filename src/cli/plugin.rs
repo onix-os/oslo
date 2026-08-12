@@ -5,6 +5,7 @@
 //! declares is reachable from here.
 
 pub mod help;
+mod test;
 
 use crate::cli::help::Paint;
 use oslo_runtime::plugin::{doctor, index, install, manifest, trust};
@@ -32,6 +33,8 @@ pub fn run(args: &[String]) -> i32 {
     match command {
         "list" => list(),
         "doctor" => doctor_command(rest.first().map(String::as_str)),
+        // The directory is optional: an author runs this from inside the plugin they are writing.
+        "test" => test::run(rest.first().map(String::as_str)),
         "install" => match rest.first() {
             Some(source) => install_one(source, rest.iter().any(|a| a == "--yes")),
             None => usage("install needs something to install"),

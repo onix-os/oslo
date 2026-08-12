@@ -33,6 +33,8 @@ pub mod health;
 pub mod index;
 pub mod install;
 pub mod manifest;
+/// The assertions a plugin writes about itself, and the harness that runs them.
+pub mod test;
 pub mod trust;
 
 use std::cell::RefCell;
@@ -130,6 +132,20 @@ pub fn ensure_loaded(line: &str) {
 /// line, asked for directly.
 pub fn load_one(installed: &index::Installed) -> Result<(), String> {
     load(installed)
+}
+
+/// Load a plugin straight out of a directory, without it being installed. For `oslo plugin test`.
+///
+/// **No trust check, and that is not a hole.** The gate exists so that code arriving from somewhere
+/// else cannot run without being read; this path runs a directory the author named on their own
+/// command line, which is the same trust as `oslo ./script.lua`. Anything else would mean installing
+/// a plugin before being allowed to test it.
+pub fn load_from(directory: &std::path::Path) -> Result<manifest::Manifest, String> {
+    let manifest = manifest::read(directory)?;
+    test::while_loading(&manifest.name, || {
+        crate::lua::engine::load_plugin_file(&directory.join(&manifest.entry))
+    })?;
+    Ok(manifest)
 }
 
 /// Load every plugin waiting on a hook that is about to fire.

@@ -39,6 +39,18 @@ pub(super) const SUBCOMMANDS: &[Sub] = &[
                loaded.",
     },
     Sub {
+        name: "test",
+        args: "[DIRECTORY]",
+        about: "run a plugin's own assertions, in a home with nothing in it",
+        flags: &[],
+        note: "The directory defaults to the current one, so an author runs this from inside what \
+               they are writing. $HOME, $XDG_DATA_HOME and $XDG_CONFIG_HOME point at a temporary \
+               directory for the run — a test that passes because your own database already has \
+               something in it is the failure a user hits on day one. The plugin is loaded straight \
+               out of the directory without a trust check, which is the same trust as running a \
+               script you just wrote. A plugin declares its tests with `oslo.plugin.test`.",
+    },
+    Sub {
         name: "install",
         args: "PATH|GIT [--yes]",
         about: "copy or clone a plugin in, after showing what it reserves",
