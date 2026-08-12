@@ -39,6 +39,10 @@ about what pressing Right will do.
    │             line starts with what you typed                               │
    │             ONLY in a build with the `vista` feature — `oslo`, not        │
    │             `oslo-minimal`. Elsewhere this row answers nothing.           │
+   ├───────────────────────────────────────────────────────────────────────────┤
+   │ provider    whatever oslo.suggest.provider registered, in registration    │
+   │             order; each answers a whole line, kept only if it continues   │
+   │             what you typed                                                │
    └───────────────────────────────────────────────────────────────────────────┘
                  │
                  │  the first source with an answer wins outright — no merging,
@@ -152,6 +156,7 @@ means different things in different projects, and a flat history only knows whic
 ```lua
 oslo.suggest.sources = { "history", "completion", "path" }   -- the default order
 oslo.suggest.sources = { "predict", "history", "path" }      -- ask the model first; `oslo` only
+oslo.suggest.sources = { "provider", "history" }              -- a plugin first, then your history
 oslo.suggest.sources = {}                                    -- no suggestions at all
 
 oslo.suggest.skip_history = { "rm", "shred", "trash" }       -- {} means every command
@@ -165,7 +170,8 @@ oslo.theme = { syntax = { autosuggestion = { fg = "244", italic = true } } }
 ```
 
 Source names: `history`; `completion` or `completions`; `path`, `paths` or `file`; `predict` or
-`prediction` — the last of which needs the `vista` feature to *answer*, though it always parses.
+`prediction` — which needs the `vista` feature to *answer*, though it always parses; and `provider`
+or `providers`.
 A name nothing answers to is reported when the config is read rather than silently turning a source
 off. Duplicates are dropped and the written order is kept.
 
@@ -175,6 +181,41 @@ says. To turn suggestions off for a while without losing what the config said:
 ```lua
 oslo.feature.set("suggest", false)   -- a mask; turning it back on restores oslo.suggest
 ```
+
+### Your own source
+
+```lua
+oslo.suggest.provider {
+  name = "tldr",
+  answer = function(ctx)          -- ctx = { line, cursor, cwd, language }
+    if ctx.line:match("^git com") then return "git commit --amend" end
+  end,
+}
+oslo.suggest.sources = { "history", "provider", "path" }
+```
+
+**It answers the whole line, not the tail.** That is what a provider naturally has — a page, a table
+of examples, a model all know *the command*, not the seven characters left to type. oslo computes
+the remainder.
+
+**Where it sits is your decision.** Registering puts a provider in front of nothing; it is asked when
+`oslo.suggest.sources` says `provider`, in the position that list gives it. VS Code's inline
+providers work the other way round — `yieldsToGroupIds` is declared by the *provider*, so the plugin
+decides whether it defers to you. That is the part deliberately not copied.
+
+Three rules a provider cannot escape:
+
+- **It must continue the line.** The ghost is drawn as trailing text and Right accepts it, so an
+  answer that is not a continuation would make that key insert something never suggested. Such an
+  answer is refused and reported in `messages` — never trimmed into something the provider did not
+  write.
+- **It must be quick.** This is the keystroke path. One that takes longer than 20 ms more than three
+  times is switched off for the session and says so, because a shell that stutters looks like oslo
+  being slow rather than like a plugin being slow.
+- **Raising is declining.** An error is recorded once and the next source is asked; it never costs
+  you the keystroke.
+
+`oslo.suggest.providers()` lists what is registered, in the order they are asked.
 
 ## Measurements
 
@@ -236,6 +277,9 @@ first time and 0.8 ms once the answer had been remembered — 86 µs on the slow
 | `crates/oslo-ui/src/recall/nearby.rs` | `from_store`, `place`, `remembered_answer`, `forget_answers_for` |
 | `crates/oslo-base/src/track/query.rs` | `Track::suggestion_here`, `Track::suggestion_in_workspace` |
 | `crates/oslo-base/src/track/row.rs` | `RunRow::worked`, `RunRow::standing` |
+| `crates/oslo-ui/src/suggest.rs` | the provider registry, the continuation invariant, the budget |
+| `crates/oslo-runtime/src/lua/api/suggest.rs` | `oslo.suggest.provider` — the Lua reader |
+| `crates/oslo-ui/src/pending.rs` | what the editor waits for when an answer is not ready yet |
 | `crates/oslo-ui/src/settings/mod.rs` | `Source`, `Suggest` |
 | `crates/oslo-ui/src/settings/from_lua.rs` | reading `oslo.suggest` |
 | `crates/oslo-ui/src/edit/session/accept.rs` | `Session::take_hint` |

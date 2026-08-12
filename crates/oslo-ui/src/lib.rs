@@ -32,6 +32,8 @@ pub mod scanner;
 pub mod settings;
 pub mod shell;
 pub mod spec;
+/// Ghost suggestions a config or a plugin supplies.
+pub mod suggest;
 pub mod syntax;
 pub mod term;
 pub mod theme;
@@ -172,6 +174,28 @@ impl OsloHelper {
         names.iter().any(|name| name == command)
     }
 
+    /// Ask the registered providers, building the context they are told about.
+    ///
+    /// **The `any()` test comes first and costs an atomic load.** Every shell until somebody
+    /// installs a provider takes that branch on every keystroke, and it must not pay for a
+    /// mechanism it is not using — building the context alone would mean two lock acquisitions and
+    /// a `String` per key.
+    fn provider_hint(&self, line: &str, pos: usize) -> Option<String> {
+        if !suggest::any() {
+            return None;
+        }
+        let language = prompt::language().unwrap_or_else(|| "sh".to_string());
+        let cwd = std::env::current_dir()
+            .map(|p| p.display().to_string())
+            .unwrap_or_default();
+        suggest::ask(&suggest::Ctx {
+            line: line.to_string(),
+            cursor: pos,
+            cwd,
+            language,
+        })
+    }
+
     /// The ghost suggestion for `line`, in `oslo.suggest.sources` order, as plain text.
     ///
     /// Only at the end of the line: a suggestion *continues* what you have typed, so offering one
@@ -213,6 +237,9 @@ impl OsloHelper {
                     .map(|guess| guess.line[line.len()..].to_string()),
                 #[cfg(not(feature = "vista"))]
                 settings::Source::Prediction => None,
+                // Whatever a config or a plugin registered. Asked in the place the config put it,
+                // so a plugin's answer beats history only if you said it should.
+                settings::Source::Provider => self.provider_hint(line, pos),
             };
             if found.is_some() {
                 return found;

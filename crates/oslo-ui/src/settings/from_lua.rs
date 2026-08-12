@@ -120,7 +120,7 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
                     Some(_) => {}
                     None => problems.push(format!(
                         "oslo.suggest.sources: '{name}' is not a source; \
-                         the sources are history, completion and path"
+                         the sources are history, completion, path, predict and provider"
                     )),
                 }
             }

@@ -45,6 +45,7 @@ mod shell;
 pub(crate) mod spawn;
 mod spec;
 mod state;
+mod suggest;
 pub(crate) mod timer;
 pub(crate) mod tool;
 mod ui;
@@ -158,6 +159,11 @@ pub fn install(interp: &Rc<Interp>, registry: &Registry, env: Arc<Mutex<Environm
         // `oslo.completion.spec` — the declarative half. A function in the same table as the
         // settings, because that is where somebody looks for anything about completion.
         spec::install(&mut completion.borrow_mut());
+    }
+    // `oslo.suggest.provider` — a ghost written in Lua. In the settings table for the same reason:
+    // `oslo.suggest.sources` is next to it, and the two are read together.
+    if let Value::Table(table) = oslo.get(&Value::str("suggest")) {
+        suggest::install(&mut table.borrow_mut());
     }
     // `oslo.feature` — a namespace of functions rather than a settings table, because a feature is
     // not configuration. It is a runtime mask over configuration, and the two must not look alike.

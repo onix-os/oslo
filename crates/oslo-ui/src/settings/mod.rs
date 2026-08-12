@@ -224,6 +224,12 @@ pub enum Source {
     /// has been measured against `History` on a real history rather than assumed to be better.
     /// Ask for it by name until then.
     Prediction,
+    /// Whatever a config or a plugin registered with `oslo.suggest.provider`.
+    ///
+    /// **A source among the sources.** Where a plugin's answer sits relative to your own history is
+    /// one line of `oslo.suggest.sources`, and it is your line — the plugin does not get to decide
+    /// that it outranks what you have actually run.
+    Provider,
 }
 
 impl Source {
@@ -233,6 +239,7 @@ impl Source {
             "completion" | "completions" => Some(Source::Completion),
             "path" | "paths" | "file" => Some(Source::Path),
             "predict" | "prediction" => Some(Source::Prediction),
+            "provider" | "providers" | "plugin" => Some(Source::Provider),
             _ => None,
         }
     }

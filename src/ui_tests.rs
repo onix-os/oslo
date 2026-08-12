@@ -378,6 +378,37 @@ fn subcommands_come_from_the_spec_for_this_command_not_the_first_one() {
     assert!(flags.iter().any(|f| f.starts_with("--a")), "{flags:?}");
 }
 
+/// **A provider's ghost reaches the line, in the position the config gave it.** The whole point of
+/// `Source::Provider`: a plugin joins the order rather than jumping it.
+#[test]
+fn a_registered_provider_answers_the_ghost() {
+    use crate::ui::settings::{self, Source};
+    use crate::ui::suggest::{self, Provider};
+
+    let mut with_provider = settings::current().as_ref().clone();
+    with_provider.suggest.sources = vec![Source::Provider];
+    settings::install(with_provider);
+
+    suggest::forget();
+    suggest::register(Provider {
+        name: "tldr".into(),
+        answer: std::rc::Rc::new(|ctx| {
+            ctx.line
+                .starts_with("git com")
+                .then(|| "git commit --amend".to_string())
+        }),
+    });
+
+    let h = helper(Environment::new());
+    assert_eq!(h.suggest("git com", 7).as_deref(), Some("mit --amend"));
+    // Declining leaves the line alone rather than offering something else's answer.
+    assert_eq!(h.suggest("ls -l", 5), None);
+
+    suggest::forget();
+    assert_eq!(h.suggest("git com", 7), None, "and gone once forgotten");
+    settings::install(settings::Settings::default());
+}
+
 /// **A spec declared at runtime completes exactly like one compiled in.** This is the whole point of
 /// `CommandSpec` owning its strings: before it, the only route was a `for_command` function that had
 /// to re-implement subcommand matching by hand.
