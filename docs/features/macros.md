@@ -18,6 +18,10 @@ two that fit on a line; a function and a script always open the editor.
 An alias in `config.lua` still works, and so does `alias` in a script. This is a second source, not
 a replacement — see [Order](#order-config-first-database-last).
 
+<!-- demo:begin -->
+[![macros demo](https://asciinema.org/a/1262943.svg)](https://asciinema.org/a/1262943)
+<!-- demo:end -->
+
 ## The four kinds, and why there are four
 
 They are not variations on one idea; they differ in *when* they act and in *what sees them*.
