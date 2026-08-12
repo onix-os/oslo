@@ -23,6 +23,7 @@ pub fn run(args: &[String]) -> i32 {
             i32::from(args.is_empty()) * 2
         }
         Some("files") => files(),
+        Some("timing") => timing(),
         Some("which") => match args.get(1) {
             Some(key) => which(key),
             None => {
@@ -56,6 +57,68 @@ fn files() -> i32 {
         Paint::detect().dim("Read in this order; the last to set something wins.")
     );
     0
+}
+
+/// What each file and plugin costs a session at startup.
+///
+/// **The same load the shell does, measured.** A session now reads `conf.d/*.lua`, `config.lua`,
+/// every installed plugin's index entry and whatever those register — five suspects when a shell
+/// feels slow, and until this there was no instrument at all. Neovim grew `--startuptime` for the
+/// same reason: the alternative is commenting lines out until it stops.
+fn timing() -> i32 {
+    let files = config_files();
+    let engine = match oslo_runtime::LuaEngine::new() {
+        Ok(engine) => engine,
+        Err(problem) => {
+            eprintln!("oslo config: lua: {problem}");
+            return 1;
+        }
+    };
+    let env = std::sync::Arc::new(std::sync::Mutex::new(oslo::env::Environment::new()));
+
+    // The bindings themselves are the floor: everything below is measured against a shell that has
+    // already paid for them, so a config that looks expensive is expensive *for a config*.
+    let started = std::time::Instant::now();
+    if !oslo_runtime::startup::lua_init::install_bindings(&engine, env) {
+        return 1;
+    }
+    let bindings = started.elapsed();
+
+    let mut measured: Vec<(String, std::time::Duration)> = Vec::new();
+    for path in &files {
+        let at = std::time::Instant::now();
+        oslo_runtime::startup::lua_init::load_config(&engine, path);
+        measured.push((path.display().to_string(), at.elapsed()));
+    }
+
+    let paint = Paint::detect();
+    println!("{}", paint.head("STARTUP"));
+    println!(
+        "  {:>8.3} ms  {}",
+        ms(bindings),
+        paint.dim("the oslo API itself")
+    );
+    let mut total = bindings;
+    for (what, took) in &measured {
+        total += *took;
+        println!("  {:>8.3} ms  {what}", ms(*took));
+    }
+    println!("  {:>8.3} ms  {}", ms(total), paint.key("total"));
+    if measured.is_empty() {
+        println!("\n  {}", paint.dim("no configuration files"));
+    }
+    // **Not the whole story, and it says so.** A plugin loads when something names it, which is
+    // after this — so a slow plugin shows up in the command that woke it, not here.
+    println!(
+        "\n  {}",
+        paint
+            .dim("Plugins load on first use, so their cost is not here; see `oslo plugin doctor`.")
+    );
+    0
+}
+
+fn ms(took: std::time::Duration) -> f64 {
+    took.as_secs_f64() * 1000.0
 }
 
 /// Which file last set `key`, and to what.
@@ -171,6 +234,11 @@ pub fn help(paint: Paint) -> String {
         "files",
         paint.key("files"),
         "every file a session reads, in order",
+    ));
+    text.push_str(&row(
+        "timing",
+        paint.key("timing"),
+        "what each configuration file costs at startup",
     ));
     text.push_str(&row(
         "which",
