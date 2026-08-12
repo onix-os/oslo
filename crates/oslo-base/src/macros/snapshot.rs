@@ -89,7 +89,14 @@ fn one(line: &str) -> Option<Entry> {
     }
     // **The fields a shell does not need are not in the file.** When it was created and what it is
     // tagged belong to the manager, and a row that reached this file is on by definition.
-    Some(Entry::new(kind, name, &unescape(body)))
+    //
+    // `created` is **0, not now**: this file has no timestamp in it, and stamping the moment it was
+    // read would have the manager report every alias your config defines as made seconds ago. Zero
+    // is what `ago` draws as `—`, which is the truthful answer.
+    Some(Entry {
+        created: 0,
+        ..Entry::new(kind, name, &unescape(body))
+    })
 }
 
 /// Forget the file. The database is untouched, so the next write brings it back.

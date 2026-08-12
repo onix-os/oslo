@@ -31,22 +31,26 @@ pub(super) fn show(args: &[String]) -> i32 {
         return 0;
     }
 
-    if entries.is_empty() {
-        println!("nothing stored yet — `oslo macros add NAME BODY`");
-        return 0;
-    }
-
-    let paint = Paint::detect();
-    let configured = configured_names();
-
     // **On a terminal it is the manager**, the same screen the history finder is rather than a page
     // of output to read. `--plain` is how you ask for the page, and a pipe gets it without asking:
     // there is no terminal to draw on, so `open` answers `None` and the printing below runs.
+    //
+    // **Opened even when nothing is stored**, because the database is not the only source: Tab is
+    // how you reach the aliases your configuration defines, and a screen that refused to open on an
+    // empty database would be hiding the one list you can always look at.
     if !asked.plain
         && let Some(status) = screen(&store)
     {
         return status;
     }
+
+    if entries.is_empty() {
+        println!("nothing stored yet — `oslo macros add --alias NAME BODY`");
+        return 0;
+    }
+
+    let paint = Paint::detect();
+    let configured = configured_names();
     for entry in &entries {
         // **Flattened to one line each**, because a function is many lines and a list of many-line
         // entries is not a list. `show NAME` above is where the whole thing lives.

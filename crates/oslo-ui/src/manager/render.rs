@@ -80,6 +80,20 @@ fn look_of(f: &Frame<'_>) -> Look {
         Some(tag) => format!("[#{tag}]"),
         None => "[all]".to_string(),
     };
+    // **An empty list says which empty list it is.** The screen opens on an empty database on
+    // purpose — the database is not the only source, and Tab is how you reach the other one — so the
+    // one place a person is already looking says where the rest of it went.
+    if f.rows.is_empty() && f.query.is_empty() {
+        look.placeholder = match (f.source, f.tag.is_some()) {
+            (_, true) => "nothing with this tag — ← → for another".to_string(),
+            (Source::Stored, false) => {
+                "nothing stored — tab for what your config defines".to_string()
+            }
+            (Source::Elsewhere, false) => {
+                "your config defines none — tab back to what is stored".to_string()
+            }
+        };
+    }
     look
 }
 
