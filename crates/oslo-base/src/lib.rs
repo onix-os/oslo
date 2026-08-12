@@ -19,6 +19,7 @@
 //! it means deciding who constructs a shell environment, and that is a question about the shell,
 //! not about this crate. It is left where it is until the answer is worth the churn.
 
+pub mod aliases;
 pub mod ast;
 pub mod error;
 /// Parts of the shell a config can turn off and on again while it runs.
