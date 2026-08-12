@@ -1,180 +1,177 @@
-# What a plugin still cannot do
+# Six more, after composition
 
-The plugin system works: a directory of Lua, installed, trusted, loaded on first mention. What it
-cannot do is *compose* — with the pipeline, or with another plugin. This plan is the six things
-missing, in the order they are worth building.
+The last plan closed the gaps that stopped a plugin *composing* — with the pipeline, with another
+plugin, with "later". These are the ones left over: work that happens off the prompt, a pipeline that
+can summarise rather than only select, three ways to find out what a session actually did, and the
+one extension point a shell has that an editor does not.
 
-Measured against neovim, which is the reference for "extensible in Lua" and whose model was read
-rather than remembered: 139 autocommand events plus a `User` event plugins fire themselves, `vim.uv`
-timers and `vim.schedule`, `nvim_create_user_command` with `nargs`/`complete`/`desc`, `vim.health`,
-`vim.notify` with levels, and `vim.g`/`b`/`w`/`t` scopes.
+**Work on a new branch off `feat/compose`**, not `develop`: item 1 lands its callbacks at the safe
+point the timers introduced, and item 2's verbs are the reason a Lua verb was worth allowing.
 
-**Work on a new branch off `develop`.**
+## 1. Nothing can run in the background and call you back
 
-## What oslo already has, and should not rebuild
+`oslo.job` lists, foregrounds, backgrounds and signals — all of them things done to jobs that already
+exist. Lua cannot start work and be told when it is finished, so anything a config wants to *know*
+must be fetched on the spot, blocking whatever asked.
+
+**The cost is already being paid.** The `nix` prompt segment shells out on every draw — measured at
+6 ms — because there is no other way to have an answer ready.
+
+The machinery exists and is walled in. `lua/api/external.rs` already spawns a thread, waits with a
+deadline, and delivers through a channel; it does that for *prompt commands only*, and nothing else
+can reach it.
+
+```lua
+oslo.spawn{ "git", "status", "--porcelain",
+  on_exit = function(out, status) oslo.state.set("git.dirty", out ~= "") end }
+```
+
+**Delivered where timers are.** `startup::timers::fire` already runs Lua at the two moments the shell
+holds nothing; a finished job's callback joins that queue rather than inventing a second one. The
+same honest limitation applies and must be documented: **a callback arrives between commands**, not
+the instant the process exits.
+
+What this is not: a general async runtime. One process, one callback, no promises and no scheduler.
+
+## 2. The pipeline can select but not summarise
+
+Every verb oslo has — `where cols get sort-by first last length each`, plus `to from lines parse` —
+is **selection**. There is no way to reduce a stream to a smaller one.
+
+That is what makes rows worth having over text. `ps | group-by user | count` is the query `ps | grep`
+cannot express, and without it the structured pipeline is a nicer `awk` rather than a different tool.
+
+Add four, in Rust:
 
 | | |
 |---|---|
-| 14 namespaces | `db direnv env feature fs job json nix path predict proc re sys ui` |
-| `oslo.ui` | 30 functions — widgets, tables, pagers, colour, `ask`, `filter`, `spin` |
-| 22 hooks | the real moments of a shell, not a buffer/window vocabulary |
-| `register_builtin`, `register_tool` | a Lua function *is* a builtin, ahead of `$PATH` |
-| a settings namespace per plugin | `oslo.notes = {…}` already passes without complaint |
-| `oslo.db`, the `pre-cmd` veto | a database and the right to decline being recorded |
+| `group-by FIELD` | rows in, one row per distinct value, each carrying its group |
+| `count` | how many rows, or how many per group |
+| `uniq [FIELD]` | distinct rows, or distinct by one field |
+| `stats FIELD` | min, max, sum, mean over a numeric column |
 
-## 1. A Lua tool cannot consume rows — only produce them
+**Rust rather than Lua, even though Lua verbs now work.** These are the ones every pipeline reaches
+for; they must be present in `oslo-minimal`, and they must be fast enough that nobody drops back to
+`sort | uniq -c`.
 
-**The largest gap, and the one that undercuts oslo's flagship feature.**
+**`join` is deliberately excluded.** It needs a *second* input stream, and oslo's pipeline is a line —
+there is no shape for "and also read this". Adding one is a pipeline change, not a verb.
+
+## 3. No way to find out why the shell got slow
+
+There is no startup profiling of any kind. A session now loads `conf.d/*.lua`, `config.lua`, every
+installed plugin, prompt segments and timers — five suspects and no instrument.
+
+`oslo config timing` runs the same load the shell does and reports what each file and each plugin
+cost. Neovim's `--startuptime` for the same reason: "my shell got slow" is otherwise answered by
+commenting lines out until it stops.
+
+The measurement must be of the *real* load, so this belongs beside `oslo config which`, which already
+reproduces it.
+
+## 4. No record of what a session did
+
+Nothing answers "what loaded, what fired, what failed". A plugin that could not load said so once,
+twenty commands ago, and the line is gone.
+
+`oslo messages` — the diagnostics this session produced, newest last, each with what produced it: a
+plugin, a config file, a hook. neovim keeps `:messages` for exactly this, and the plugin work made it
+matter more: a refused trust hash, a shadowed name and a plugin that registered nothing are all
+single lines that scroll.
+
+**A ring buffer in memory, not a log on disk.** What a *session* said is a session-lived fact, and a
+file would be one more thing to rotate, permission and eventually leak something into.
+
+## 5. A plugin author cannot test a plugin
+
+There is no harness. Every plugin written for this tree so far was tested by hand, in a pty, with a
+temporary home — which is not a thing to ask of anybody else.
+
+`oslo plugin test <directory>` loads the plugin into a session with a temporary home and database,
+runs the assertions it declares, and reports. A plugin declares them the way it declares health
+checks, which is a shape that already exists:
+
+```lua
+oslo.plugin.test("notes", function(t)
+  t.equal(note_count(), 0, "a new database is empty")
+end)
+```
+
+This is what turns "I wrote a plugin" into "I maintain a plugin", and it is the difference between a
+plugin ecosystem and a directory of one-offs.
+
+## 6. Completion cannot be declared, only computed
+
+The highest ceiling on this list, and the most work.
+
+oslo has a real completion spec system — `crates/oslo-ui/src/spec/definitions/` ships hand-written
+specs for `git`, `cargo`, `docker` and `npm`, with subcommands, flags and descriptions. **A config
+cannot add one**, and the reason is structural:
 
 ```rust
-// crates/oslo-shell/src/data/custom.rs:38
-pub fn rows_of(name: &str, argv: &[String]) -> Option<Result<Vec<Record>, String>>
+pub struct CommandSpec { pub names: Vec<&'static str>, pub description: &'static str, … }
 ```
 
-`run_tool` has the previous stage's rows in hand and drops them on the floor. `register_tool`
-accepts an `accepts = "rows"` declaration, the planner reads it to decide the edge — and then the
-input never arrives. So **nobody can write `where` in Lua**: structured pipelines are extensible at
-the source and nowhere else, which is the half that matters least. A plugin can offer `notes` but
-never `notes-since`, `redact` or `group-by`.
+`&'static str`. A spec built at runtime from Lua cannot be stored in it at all.
 
-`docs/features/your-own-tools.md` states this outright — "a Lua tool is therefore always a
-producer" — so the fix is closing a documented hole rather than changing a promise.
-
-**The work**: widen `Handler` to take the input rows, hand them to the Lua function as a second
-argument, and convert `Record` into a Lua table on the way in. The reverse conversion already exists
-(`lua/api/tool.rs::records_of`), the planner already respects `accepts`, and `run_tool` already holds
-what is needed.
+So a plugin's only route is `for_command`: a function that must re-implement subcommand matching,
+flag parsing and descriptions by hand, for every command it wants to complete. What it wants to write
+is what fish lets you write:
 
 ```lua
-oslo.register_tool{ name = "redact", accepts = "rows", produces = "rows",
-  rows = function(argv, input)
-    for _, row in ipairs(input) do row.token = "…" end
-    return input
-  end }
+oslo.completion.spec{ command = "notes",
+  subcommands = { { name = "new", desc = "start one" }, { name = "list", desc = "every note" } },
+  flags = { { name = "--since", desc = "only newer than", takes = "duration" } } }
 ```
 
-**The one behaviour change**: a config that already declares `accepts = "rows"` gets its input, where
-before it got nothing. That is the bug being fixed, and no test asserts the old behaviour.
-
-## 2. Plugins cannot talk to each other
-
-Every one of the 22 hooks is a name oslo chose. A plugin cannot announce anything, and nothing can
-listen for what another plugin did — so two plugins compose only through the filesystem.
-
-nvim's answer is one event, `User`, fired with `:doautocmd`; it is what lazy.nvim, telescope and the
-rest coordinate through without depending on each other's internals.
-
-```lua
-oslo.on.emit("notes:saved", { key = k })     -- from the plugin that did something
-oslo.on.user("notes:saved", function(e) … end)  -- from anyone who cares
-```
-
-**The work**: a second registry beside the fixed `at::` indices, keyed by name. Handlers already
-report-and-continue when one raises, which is the behaviour a plugin bus needs. Names are validated
-like a rule id — a typo must be a refusal, not a silent subscription to an event nobody fires.
-
-**Synchronous, like `doautocmd`.** An asynchronous bus needs an ordering story, and the one thing
-worse than no events is events that arrive in an order nobody can predict.
-
-## 3. Nothing means "later"
-
-There is no `after`, no `every`, no "when the prompt comes back". A prompt segment that wants fresh
-data must block the draw or shell out — which is exactly what the `nix` prompt segment does today,
-at 6 ms per draw.
-
-```lua
-local t = oslo.after(500, function() … end)
-local u = oslo.every(30000, function() … end)
-u:stop()
-```
-
-**Fired from the read loop, not from an event loop.** `startup::repl` already drains deferred hooks
-at a point where nothing is held (`run_deferred_hooks`), and that is where these belong. The
-limitation is honest and must be documented: **a timer does not fire while a command is running.**
-The alternative is a real event loop, which means bringing `tokio` back into a shell that
-deliberately deleted it.
-
-## 4. A command cannot describe itself
-
-```lua
-oslo.register_builtin("note", f)   -- a name, a function, and nothing else
-```
-
-No description, no argument spec, no completion — a plugin must separately reach
-`oslo.completion.for_command`, and nothing can ever print what `note` is for. nvim's user commands
-carry `nargs`, `complete` and `desc`.
-
-```lua
-oslo.register_builtin{ name = "note", run = f,
-  desc = "write a note down",
-  complete = function(prior, word) … end }
-```
-
-The two-argument form keeps working; the table form is additive. `type`, the completion dropdown and
-`oslo plugin info` all read the same declaration.
-
-## 5. "It is installed and nothing happens"
-
-The commonest plugin question, and the plugin system added three new ways to reach it: the trust hash
-refused, the name was already claimed by a config, the plugin registered nothing. Each is currently a
-line on stderr the user has to catch as it goes past.
-
-`oslo plugin doctor` checks, per plugin: the index parses, the directory is there, the hash matches,
-the entry file exists, `requires` is satisfied, and no declared name is already taken. A plugin may
-add its own check the way `vim.health` lets one — is `age` installed, is the database writable — by
-registering a function the doctor calls.
-
-## 6. The smaller ones, worth doing together
-
-- **`oslo.state`** — session-lived, structured, not exported. Between an environment variable
-  (a string, inherited by children) and `oslo.db` (durable, on disk) there is nothing, and most
-  plugins want the middle.
-- **Setting provenance.** `oslo config which <key>` — which file set this. Config, `conf.d` and
-  plugins all write now, and "why is my keybinding not working" has no answer.
-- **A description on a keybinding.** `oslo.keys["alt-n"] = { run = f, desc = … }`, so something can
-  list what is bound.
-- **Lazy-load by hook.** A plugin that only matters in a git repository declares
-  `load_on = "post-change-dir"` instead of being loaded because its name appeared in a line.
-
-  Two things fell out of building it. The waking belongs in `api::shell::handlers` — the one
-  function every fire path calls to find a hook's handlers — rather than at wake points sprinkled
-  through the loop: it covers all 22 hooks at once, costs the loop nothing, and loads the plugin
-  *before* the firing it asked for, so its handler hears that one rather than the next. And a
-  waited-on hook has to be marked watched at startup, because a hook nothing is attached to is
-  gated by a bitset and never asked for its handlers at all — without that a plugin sleeps
-  through the very moment it named.
+**The work is making `CommandSpec` own its strings**, then a Lua reader that builds one. The four
+built-in definitions change with it, mechanically. Measure first: the registry is consulted on every
+Tab, and `String` where `&'static str` was is an allocation at build time and a pointer chase at read
+time — expected to be nothing against a `HashMap` lookup and a fuzzy match, but expected is not
+measured.
 
 ## Order
 
 Each step ends with `make verify` green and is its own commit.
 
-1. **Rows into a Lua tool** — the widened handler and the `Record` → Lua conversion.
-2. **User events** — `emit` and `on.user`, with name validation.
-3. **Timers** — `after`, `every`, `stop`, drained from the read loop. The bookkeeping is separate
-   from the firing (`settle` and `fire_due`) because the half worth testing needs no interpreter and
-   the half that fires needs one.
-4. **`register_builtin` in table form** — `desc` and `complete` beside `run`.
-5. **`oslo plugin doctor`**, including a plugin's own check.
-6. **The smaller four**, each its own commit.
+1. **`oslo.spawn`**, delivered at the timers' safe point.
+2. **`group-by`, `count`, `uniq`, `stats`.**
+3. **`oslo config timing`.**
+4. **`oslo messages`.**
+5. **`oslo plugin test`.**
+6. **Declarative completion specs**, last: the largest change, and the only one that touches code
+   every keystroke goes through.
+
+Steps 1, 2 and 6 are core and must work in `oslo-minimal`; 5 is behind `plugin`; 3 and 4 are tools.
 
 ## Verification
 
-- `make verify` after every step, and `cargo test` with no features — steps 1 to 4 are core and must
-  work in `oslo-minimal`; only the doctor is behind `plugin`.
-- **A Lua `where` is the test for step 1**: a plugin verb that filters rows, in the corpus, piped
-  from a built-in producer and into a built-in consumer.
-- **Two plugins, one event** for step 2: one emits, the other counts, neither knows the other exists.
-- **Startup cost measured against `develop`** after step 3. A timer registry read on every prompt is
-  the kind of thing that costs microseconds until it does not.
-- The 600-line rule will bite `data/tools/mod.rs` and `lua/api/hooks.rs`; split by subject.
+- `make verify` after every step, and `cargo test` with no features.
+- **Step 1 needs a test that the callback does not arrive early**: a spawn whose process is still
+  running must not have called back, and one that finished must call back exactly once.
+- **Step 2 belongs in the corpus**, piped from a built-in producer and into a built-in consumer, with
+  the empty stream and the single-row stream as their own cases — an aggregation over nothing is
+  where these usually get it wrong.
+- **Step 6 is measured before and after**: completion latency on a spec-carrying command, min-of-N,
+  against `feat/compose`. If `String` costs anything visible, the change stops there.
+- The 600-line rule will bite `data/tools/mod.rs` again at step 2; split by subject, not by order.
 
 ## What this does not do
 
-- **No 139 events.** nvim's vocabulary is buffers and windows, which a shell does not have. Events
-  nobody fires are worse than none: they read as capability and behave as absence.
-- **No `vim.uv`.** Exposing libuv means an event loop; the timers above ride the read loop instead,
-  and say plainly that they do not fire during a command.
-- **No async bus, no promises, no coroutine scheduler.** oslo is single-threaded through the path
-  every one of these touches, and that is what makes them small.
-- **No sandbox for plugins.** Unchanged from the plugin plan: the trust gate decides whether you run
-  somebody's code, not what it may do afterwards.
+- **No `join`, and no second input stream.** See item 2.
+- **No async runtime.** Item 1 is one process and one callback; there is no promise, no coroutine
+  scheduler, and no way for two callbacks to interleave.
+- **No log on disk.** Item 4 is a session's own memory.
+- **No sandbox.** Unchanged: the trust gate decides whether you run somebody's code.
+
+## Open, and worth deciding rather than omitting
+
+**An external door into a running session.** Neovim's ecosystem exists because *any* program can
+drive it over RPC, and oslo has no equivalent — an editor that wants the shell's working directory,
+or to run something in its context, has nothing to talk to. The precedent is in-tree: the scratch
+daemon already has a socket and a wire protocol.
+
+It is left out of this plan on purpose, because it is larger than the other six together and because
+it may be the wrong shape for a shell: a shell's integration story has always been "it is a process,
+pipe to it", and an RPC surface is a second, permanent interface to keep compatible. Worth an
+explicit decision before anybody starts.
