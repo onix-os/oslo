@@ -166,11 +166,15 @@ either, and a line a rule rewrote carries a flag saying so.
 oslo.history.ignore_space = true              -- a leading space means "do not remember"
 oslo.history.ignore       = { "ls", "cd *" }  -- $HISTIGNORE, whole-line glob patterns
 oslo.history.size         = 10000
-oslo.history.file         = "~/.oslo_history"
+oslo.history.file         = "~/.oslo_history"  -- off unless you set it; an export, never read back
 ```
 
+`file` is for other programs — bash, zsh, anything that reads a `$HISTFILE`. oslo's own history is
+the profile database, so leaving it unset costs nothing: the Up arrow, the finder, the `history`
+builtin and Tab's ranking all come from there.
+
 ```sh
-HISTFILE="" oslo                    # no history file, no store; HISTSIZE=0 too
+HISTFILE="" oslo                    # leave no trace at all: no file *and* no store; HISTSIZE=0 too
 OSLO_PROFILE=claude oslo            # ~/.local/share/oslo/claude.kv, yours untouched
 OSLO_ALLHIST=1 oslo -c 'echo hi'    # log an -c line too; off unless set
 ```

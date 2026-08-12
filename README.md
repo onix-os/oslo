@@ -1051,7 +1051,7 @@ having the `vi` feature enabled — and a handler never has to remember a previo
 `set` on a feature that a `when` predicate owns is refused, because the write would appear to work
 and then be undone by the next `cd`.
 
-**History and the frecency store are deliberately not features.** They are what the command log is
+**History and the frecency ranking are deliberately not features.** They are what the command log is
 built from, and something reading it is entitled to assume it is complete rather than "complete
 except where a config had an opinion" — a gap nobody can see is worse than no data. `redact` and
 `--profile` are the controls that exist for this, and both leave a record that is honestly shaped.

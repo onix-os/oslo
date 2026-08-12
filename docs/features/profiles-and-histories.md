@@ -72,19 +72,26 @@ are asking the same question of a different history — and the bar's right end 
 ```
 ┌─ per profile ─────────────────────┐   ┌─ one copy, whatever the profile ─────┐
 │ <name>.kv                         │   │ ~/.config/oslo/config.lua            │
-│   history events (the finder)     │   │ $HISTFILE — ~/.oslo_history          │
+│   history events (the finder)     │   │ $HISTFILE, if you set one            │
 │   directory and run rows          │   │   (Up arrow, the `history` builtin)  │
 │   what `cd NAME` can jump to      │   │ oslo/universal                       │
 │   what Tab and the ghost recall   │   │ oslo/direnv/{allow,deny}             │
-│ <name>.model                      │   │ $PATH, aliases, functions, env       │
+│   how Tab ranks a command         │   │ $PATH, aliases, functions, env       │
+│ <name>.model                      │   │                                      │
 │   prediction and repair           │   │                                      │
 └───────────────────────────────────┘   └──────────────────────────────────────┘
 ```
 
-**A profile is a store, not a sandbox.** Nothing about the environment changes. The one that
-surprises people is `$HISTFILE`: the Up arrow walks a plain file whose default is `~/.oslo_history`
-and which knows nothing about profiles, so an agent's lines stay out of the finder and out of the
-frecency ranking but still arrive on your Up arrow unless you set `HISTFILE` too.
+**A profile is a store, not a sandbox.** Nothing about the environment changes.
+
+**There is no history file unless you ask for one**, so by default a profile isolates everything a
+shell remembers. `$HISTFILE` — or `oslo.history.file` — is an *export* for other programs, written
+and never read back; the Up arrow, the finder, the `history` builtin and Tab's ranking all come out
+of `<name>.kv`. Two profiles pointed at one `$HISTFILE` therefore share that file and nothing else.
+
+Command ranking used to be the leak instead. It lived in `~/.oslo_frecency`, one file for every
+profile, so an agent's `cd`s stayed out of yours while every command it completed went into the table
+that ranks yours. It is read out of `<name>.kv` now.
 
 ### Between machines
 
@@ -124,8 +131,11 @@ that the invocations you most want covered are the ones you never type.
 export OSLO_PROFILE=claude        # ~/.local/share/oslo/claude.kv
 ```
 
-Export it where the agent runs, not in your own shell. If you want the Up-arrow file separated too,
-say so — it is read from the environment and has no idea what a profile is:
+Export it where the agent runs, not in your own shell. That is the whole of it: the profile decides
+every store the shell reads and writes.
+
+If you also export a `$HISTFILE` for other programs to read, give each profile its own — a file is a
+file and knows nothing about profiles:
 
 ```sh
 export OSLO_PROFILE=claude

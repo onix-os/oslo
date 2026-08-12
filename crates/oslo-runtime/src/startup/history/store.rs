@@ -1,16 +1,25 @@
-//! Session history and its append-only backing file.
+//! Session history, and the `$HISTFILE` it is exported to.
+//!
+//! # The database is the history; the file is an export
+//!
+//! History is read from the profile store — see `History::seed` — and `$HISTFILE` is written so
+//! that *other* programs can see what this shell ran, the way they read bash's or zsh's. There is no
+//! default file: a shell nobody has configured keeps everything and exports nothing.
+//!
+//! The file is never read back. It used to be the source, which meant one fact had two records free
+//! to disagree — and the poorer of the two was winning, since a plain list of lines knows nothing
+//! about the directory, the language, the status or the duration that the store keeps.
 //!
 //! # Appended, never rewritten
 //!
 //! `save_history` writes the whole file, so two shells open at once each ended with only their own
 //! commands (PLAN R9.11). Every line is appended as it is typed instead, which is also what makes a
-//! command that hangs or kills the shell still turn up in the history afterwards.
+//! command that hangs or kills the shell still turn up in the file afterwards.
 //!
-//! # The size limit is applied on load
+//! # The size limit is applied with slack
 //!
-//! Trimming on every append would mean rewriting the file per command. The file is allowed to grow
-//! past the limit between sessions and is trimmed when it is next read, which is the same trade
-//! bash makes and is invisible unless you look at the file.
+//! Trimming on every append would mean rewriting the file per command, so it is allowed to grow past
+//! the limit and rewritten once per `max / 4` commands beyond it.
 
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -27,27 +36,41 @@ pub struct History {
 }
 
 impl History {
-    /// Read `file`, keeping at most `max` entries.
+    /// Open the history that will be written to `file`, keeping at most `max` entries.
     ///
-    /// A missing or unreadable file is an empty history rather than an error: a first run has no
-    /// file, and a shell that refused to start over an unreadable one would be worse than a shell
-    /// that starts without your history.
+    /// **The file is written, not read.** History comes from the profile database — see
+    /// [`Self::seed`] — and `$HISTFILE` exists so that *other* programs can read what this shell
+    /// ran, the way they read bash's or zsh's. Reading it back would give oslo two records of the
+    /// same thing, free to disagree: the file is a plain list of lines, and the database knows the
+    /// directory, the language, the status and the duration.
+    ///
+    /// A missing or unreadable file is not an error. Its existing lines are counted rather than
+    /// parsed, which is all the trimming below needs to know.
     pub fn open(file: Option<PathBuf>, max: usize) -> History {
-        let mut entries: Vec<String> = match &file {
-            Some(path) => std::fs::read_to_string(path)
-                .map(|text| text.lines().map(unescape).collect())
-                .unwrap_or_default(),
-            None => Vec::new(),
-        };
-        entries.retain(|line| !line.is_empty());
-        if max > 0 && entries.len() > max {
-            entries.drain(..entries.len() - max);
-        }
+        let file_lines = file
+            .as_ref()
+            .and_then(|path| std::fs::read_to_string(path).ok())
+            .map(|text| text.lines().filter(|line| !line.is_empty()).count())
+            .unwrap_or(0);
         History {
-            file_lines: entries.len(),
-            entries,
+            file_lines,
+            entries: Vec::new(),
             file,
             max,
+        }
+    }
+
+    /// Fill this history from the store, oldest first.
+    ///
+    /// **The database is where history comes from, whether or not there is a file.** `$HISTFILE` is
+    /// an export for other programs — bash, zsh, anything that reads one — not oslo's own record,
+    /// and a shell that read its history back out of it would have two sources that drift apart.
+    /// The `history` builtin reads this list, and it was the last reader still looking at the file.
+    pub fn seed(&mut self, lines: impl IntoIterator<Item = String>) {
+        self.entries
+            .extend(lines.into_iter().filter(|line| !line.is_empty()));
+        if self.max > 0 && self.entries.len() > self.max {
+            self.entries.drain(..self.entries.len() - self.max);
         }
     }
 
@@ -115,33 +138,14 @@ impl History {
 
 /// One entry, on one line.
 ///
-/// A newline inside a command would be an entry boundary on the next load, splitting one command
-/// into several — so it is written as `\n` and read back. The backslash has to be escaped too, or
-/// a command ending in one would swallow the next line's boundary.
+/// A newline inside a command would be an entry boundary to whatever reads the file, splitting one
+/// command into several — so it is written as `\n`. The backslash has to be escaped too, or a
+/// command ending in one would swallow the next line's boundary.
+///
+/// There is no `unescape` any more. It existed because the file was read back at startup; the
+/// database is the record now, and this direction is all a file that only other programs read needs.
 fn escape(line: &str) -> String {
     line.replace('\\', "\\\\").replace('\n', "\\n")
-}
-
-/// The inverse.
-fn unescape(line: &str) -> String {
-    let mut out = String::with_capacity(line.len());
-    let mut chars = line.chars();
-    while let Some(c) = chars.next() {
-        if c != '\\' {
-            out.push(c);
-            continue;
-        }
-        match chars.next() {
-            Some('n') => out.push('\n'),
-            Some('\\') => out.push('\\'),
-            Some(other) => {
-                out.push('\\');
-                out.push(other);
-            }
-            None => out.push('\\'),
-        }
-    }
-    out
 }
 
 fn append_line(path: &Path, line: &str) -> std::io::Result<()> {
@@ -168,9 +172,67 @@ mod tests {
         history.add("echo two");
         assert_eq!(history.entries(), ["echo one", "echo two"]);
 
-        // A second shell reading the same file sees both.
-        let reopened = History::open(Some(path), 100);
-        assert_eq!(reopened.entries(), ["echo one", "echo two"]);
+        // The file has both, for whatever else reads it.
+        let text = std::fs::read_to_string(&path).expect("file");
+        assert_eq!(text.lines().collect::<Vec<_>>(), ["echo one", "echo two"]);
+    }
+
+    /// **The file is written and never read.** It exists so that other programs can see what this
+    /// shell ran; oslo's own history comes from the database, and reading the file back would give
+    /// one fact two records free to disagree.
+    #[test]
+    fn opening_does_not_read_the_file_back() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("hist");
+        std::fs::write(&path, "echo from an earlier shell\n").expect("write");
+
+        let history = History::open(Some(path.clone()), 100);
+        assert!(
+            history.entries().is_empty(),
+            "the file is not where history comes from"
+        );
+
+        // And what it holds is still counted, so the trim below knows how long it is.
+        let mut history = History::open(Some(path.clone()), 2);
+        history.add(": b");
+        history.add(": c");
+        let text = std::fs::read_to_string(&path).expect("file");
+        assert!(
+            text.lines().count() <= 3,
+            "the existing line counted towards the cap: {text:?}"
+        );
+    }
+
+    /// Where history actually comes from: the database, whether or not a file was asked for.
+    #[test]
+    fn seeding_fills_the_history_from_the_store() {
+        let mut history = History::open(None, 100);
+        history.seed(["one".to_string(), String::new(), "two".to_string()]);
+        assert_eq!(
+            history.entries(),
+            ["one", "two"],
+            "empty lines are not entries"
+        );
+        history.add("three");
+        assert_eq!(history.entries(), ["one", "two", "three"]);
+    }
+
+    /// A file being present changes nothing about where history comes from.
+    #[test]
+    fn seeding_happens_with_a_file_too() {
+        let dir = tempfile::tempdir().expect("tempdir");
+        let path = dir.path().join("hist");
+        std::fs::write(&path, "ignored\n").expect("write");
+        let mut history = History::open(Some(path), 100);
+        history.seed(["from the database".to_string()]);
+        assert_eq!(history.entries(), ["from the database"]);
+    }
+
+    #[test]
+    fn seeding_keeps_the_newest_when_there_are_more_than_the_limit() {
+        let mut history = History::open(None, 3);
+        history.seed((0..10).map(|i| format!("command {i}")));
+        assert_eq!(history.entries(), ["command 7", "command 8", "command 9"]);
     }
 
     /// The same line twice running is one entry, or the Up walk shows it twice and looks broken.
@@ -188,10 +250,10 @@ mod tests {
         );
     }
 
-    /// A multi-line command is one entry, and comes back with its newlines.
+    /// A multi-line command is one line in the file.
     ///
-    /// A raw newline in the file is an entry boundary, so it would split one command into three on
-    /// the next load — and the pieces would not parse.
+    /// A raw newline would be an entry boundary to whatever reads it, splitting one command into
+    /// three — and the pieces would not parse.
     #[test]
     fn a_multi_line_command_stays_one_entry() {
         let dir = tempfile::tempdir().expect("tempdir");
@@ -202,23 +264,24 @@ mod tests {
 
         let text = std::fs::read_to_string(&path).expect("file");
         assert_eq!(text.lines().count(), 1, "one entry is one line: {text:?}");
-
-        let reopened = History::open(Some(path), 100);
-        assert_eq!(reopened.entries(), [command], "and it round trips");
+        assert_eq!(text.trim_end(), "for i in a b\\ndo echo $i\\ndone");
+        assert_eq!(history.entries(), [command], "and in memory it is whole");
     }
 
     /// A backslash at the end of a command must not swallow the entry boundary.
     #[test]
-    fn a_trailing_backslash_survives() {
+    fn a_trailing_backslash_is_escaped() {
         let dir = tempfile::tempdir().expect("tempdir");
         let path = dir.path().join("hist");
         let mut history = History::open(Some(path.clone()), 100);
         history.add("echo ending in a backslash \\");
         history.add("echo after");
-        let reopened = History::open(Some(path), 100);
+
+        let text = std::fs::read_to_string(&path).expect("file");
         assert_eq!(
-            reopened.entries(),
-            ["echo ending in a backslash \\", "echo after"]
+            text.lines().collect::<Vec<_>>(),
+            ["echo ending in a backslash \\\\", "echo after"],
+            "two lines, the first ending in an escaped backslash: {text:?}"
         );
     }
 
@@ -240,20 +303,7 @@ mod tests {
         );
     }
 
-    /// The limit is applied when the file is read, keeping the newest.
-    #[test]
-    fn the_size_limit_keeps_the_newest() {
-        let dir = tempfile::tempdir().expect("tempdir");
-        let path = dir.path().join("hist");
-        let mut history = History::open(Some(path.clone()), 100);
-        for i in 0..10 {
-            history.add(&format!("command {i}"));
-        }
-        let trimmed = History::open(Some(path), 3);
-        assert_eq!(trimmed.entries(), ["command 7", "command 8", "command 9"]);
-    }
-
-    /// No file at all is a working history that simply is not saved — `HISTFILE=` asks for this.
+    /// No file at all is a working history that simply is not exported — the default.
     #[test]
     fn a_session_without_a_file_still_remembers() {
         let mut history = History::open(None, 10);

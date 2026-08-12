@@ -10,7 +10,7 @@ use crate::lua::api::hooks;
 use crate::startup::integration;
 use crate::startup::mode::Mode;
 use crate::startup::read::{Input, read_command};
-use crate::startup::recall::{remember_history, seed_history};
+use crate::startup::recall::{remember_history, seed_from_store};
 use crate::startup::{arrival, config, history, lua_init, mode, plugins, prompt};
 use crate::startup::{rc, timers, timing, tracking};
 use oslo_base::error::ShellError;
@@ -113,12 +113,7 @@ pub fn run_repl(login: bool) -> ! {
 
     let helper = OsloHelper::new(Arc::clone(&env_struct));
     let mut history = History::open(settings.file.clone(), settings.max_size);
-    // Seeded from the database when there is one, so a session started on a machine with no
-    // `$HISTFILE` still has its history back.
-    if let Some(db) = oslo_base::track::store() {
-        let entries = db.recent(settings.max_size.max(1));
-        seed_history(entries.iter().map(|e| (e.line.clone(), e.mode.clone())));
-    }
+    seed_from_store(&mut history, settings.max_size);
     publish_history(&history);
 
     let mut jobs = JobManager::new();

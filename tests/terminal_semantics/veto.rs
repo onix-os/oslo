@@ -21,8 +21,18 @@ end)
 "#;
 
 /// Run one public and one hidden line, and answer the shell so its files can be read.
+///
+/// **`$HISTFILE` is set on purpose.** There is no default history file any more, and a veto test run
+/// against a shell with one sink switched off is a weaker test — the point of this file is that
+/// *every* sink is checked, so every sink has to be turned on.
 fn after_both() -> PtyShell {
-    let mut shell = PtyShell::configured("xterm-256color", true, HIDING);
+    let mut shell = PtyShell::spawn_with_config_and_env(
+        "xterm-256color",
+        true,
+        None,
+        Some(HIDING),
+        &[("HISTFILE", ".oslo_history")],
+    );
     shell.wait_for_text("> ");
     shell.send(b"echo SHOWME\n");
     shell.wait_for_plain_text("SHOWME");

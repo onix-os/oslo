@@ -70,17 +70,17 @@ pub struct OsloHelper {
 impl OsloHelper {
     /// Build the helper for `env`.
     ///
-    /// Two side effects hang off whether `env` belongs to an interactive shell: the dropdown
-    /// takes the terminal over, and the frecency table is read from and appended to a file in
-    /// `$HOME`. `$-` is the signal rather than `isatty`, because `cargo test` inherits a terminal
-    /// on stdin and a test must not write to the user's home directory.
+    /// Two side effects hang off whether `env` belongs to an interactive shell: the dropdown takes
+    /// the terminal over, and the frecency table folds in what this profile has run. `$-` is the
+    /// signal rather than `isatty`, because `cargo test` inherits a terminal on stdin and a test
+    /// must not read the user's store.
     /// Generic so the coercion happens here rather than at every call site: a caller hands over
     /// whatever it already holds and this is the one place that forgets the concrete type.
     pub fn new<S: Shell + 'static>(env: Arc<Mutex<S>>) -> Self {
         let env: Arc<Mutex<dyn Shell>> = env;
         let interactive = env.lock().unwrap().interactive();
         let frecency = if interactive {
-            FrecencyStore::load(FrecencyStore::default_path())
+            FrecencyStore::from_history()
         } else {
             FrecencyStore::in_memory()
         };

@@ -17,6 +17,21 @@ pub(super) fn seed_history(entries: impl Iterator<Item = (String, String)>) {
     oslo_ui::recall::seed(entries.collect());
 }
 
+/// Fill **both** readers of the history from the profile database.
+///
+/// `recall` decides what the Up arrow and the ghost offer; the editor's own list is what the
+/// `history` builtin prints. They are filled from one query because they are two views of one
+/// record — the store. `$HISTFILE` is written for other programs and never read back, so a shell
+/// with no file has exactly the same history as one with a file; see [`super::history::store`].
+pub(super) fn seed_from_store(history: &mut super::history::store::History, max: usize) {
+    let Some(db) = oslo_base::track::store() else {
+        return;
+    };
+    let entries = db.recent(max.max(1));
+    seed_history(entries.iter().map(|e| (e.line.clone(), e.mode.clone())));
+    history.seed(entries.iter().map(|e| e.line.clone()));
+}
+
 /// Remember a line typed this session, so a later language switch still finds it.
 pub(super) fn remember_history(line: &str, mode: Mode) {
     oslo_ui::recall::remember(line, mode.name());

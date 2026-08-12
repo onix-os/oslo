@@ -97,12 +97,21 @@ thousand candidates and shows eight; a `stat` per candidate would be thousands o
 frame while an arrow key is held, and eight is nothing. The directory entry count is capped for the
 same reason — a spool directory with half a million files in it would be counted on every frame.
 
-Ranking is frecency: `count / (1 + ln(1 + age_in_hours))`, kept in `~/.oslo_frecency` as an
-append-only log of `count<TAB>timestamp<TAB>name` lines folded on load, and rewritten as one line
-per command by the next shell that loads it with 4096 lines or more in it. An append rather than a
-rewrite while the shell runs, so two shells open at once both keep their uses instead of the last
-one out overwriting the other. Only `command`, `builtin` and `subcommand` candidates are counted
-when accepted; every command word of an accepted line is counted too.
+Ranking is frecency: `count / (1 + ln(1 + age_in_hours))`, over **the commands you have run**. The
+counts come from the profile store's run table — one row per command line, carrying `runs` and
+`last_at` — folded to command names the first time a score is asked for, which is the same scan the
+history finder does when it opens. Accepting a completion bumps the name for the rest of the session;
+the run itself is written down when the command runs, so nothing is counted twice.
+
+Wrappers come off, so `sudo git status` ranks `git`, and every line of a command counts towards its
+name — `cargo build` and `cargo test` both rank `cargo`.
+
+**There is no frecency file.** `~/.oslo_frecency` used to hold an append-only log of
+`count<TAB>time<TAB>name`, and every reason for it had gone: the same counts were already in the
+profile store, it was the only store outside XDG, and it was the profile leak — directory ranking was
+per profile while command ranking was not, so an agent profile kept its `cd`s out of yours and let
+every command it completed into the table that ranks yours. It also counted the wrong thing:
+completions accepted rather than commands run, so a command typed in full taught the ranking nothing.
 
 ## What makes it different
 

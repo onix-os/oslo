@@ -24,8 +24,20 @@ const DEFAULT_HISTSIZE: usize = 10_000;
 /// What the editor's history is configured from.
 #[derive(Debug, PartialEq, Eq)]
 pub struct Settings {
-    /// The file history is loaded from and appended to, or `None` when history is not saved.
+    /// The file history is loaded from and appended to, or `None` when there is no such file.
+    ///
+    /// `None` is the default, and it does **not** mean this session keeps no record — see
+    /// [`Self::no_trace`].
     pub file: Option<PathBuf>,
+    /// Whether the user asked for this session to leave nothing behind at all.
+    ///
+    /// **Separate from `file` being `None`, and it has to be.** `HISTFILE=""` is the documented way
+    /// to run a shell that records nothing, and while the file had a default the two were the same
+    /// question: the only way to have no file was to ask for none. Now that there is no default
+    /// file, `file: None` is what an unconfigured shell looks like, and reading it as "leave no
+    /// trace" would have silently taken the tracking store — the finder, `cd` ranking, the
+    /// prediction model — away from everybody.
+    pub no_trace: bool,
     /// Maximum entries held in memory and written to the file.
     pub max_size: usize,
     /// `oslo.history.ignore_space`: a line starting with whitespace is not remembered.
@@ -36,8 +48,18 @@ pub struct Settings {
 
 /// Read `$HISTFILE` and `$HISTSIZE`, and `oslo.history` where the config set it.
 ///
-/// An explicitly *empty* `HISTFILE` disables the file, which is the documented way to run a session
-/// that leaves no trace; an unset one falls back to `~/.oslo_history`.
+/// An explicitly *empty* `HISTFILE` disables the file, and so does saying nothing at all.
+///
+/// **There is no default history file.** It used to fall back to `~/.oslo_history`, which meant a
+/// shell that had never been configured wrote a plain-text copy of everything typed into it, into
+/// `$HOME`, forever — a second store nothing reads. The history you search comes from the profile
+/// database; the file exists only for other programs, so it is worth having only when you say so:
+///
+/// ```lua
+/// oslo.history.file = "~/.oslo_history"
+/// ```
+///
+/// `HISTFILE=~/.oslo_history oslo` does the same for one session.
 ///
 /// **The environment wins.** `HISTSIZE=50 oslo` has to mean fifty for the same reason every other
 /// shell variable outranks a config file: it is the setting you can make for one invocation without
@@ -46,13 +68,15 @@ pub struct Settings {
 pub fn settings(env: &Environment) -> Settings {
     let configured = oslo_ui::settings::current().history.clone();
 
-    let file = match env.get_var("HISTFILE") {
-        Some("") => None,
-        Some(path) => Some(PathBuf::from(path)),
+    // An *empty* setting is the request to leave no trace; an absent one is simply nobody having
+    // asked for a file. The two used to be the same because the file had a default.
+    let (file, no_trace) = match env.get_var("HISTFILE") {
+        Some("") => (None, true),
+        Some(path) => (Some(PathBuf::from(path)), false),
         None => match configured.file.as_deref() {
-            Some("") => None,
-            Some(path) => Some(PathBuf::from(expand_tilde(env, path))),
-            None => home(env).map(|h| h.join(".oslo_history")),
+            Some("") => (None, true),
+            Some(path) => (Some(PathBuf::from(expand_tilde(env, path))), false),
+            None => (None, false),
         },
     };
     let max_size = match env.get_var("HISTSIZE") {
@@ -61,6 +85,7 @@ pub fn settings(env: &Environment) -> Settings {
     };
     Settings {
         file,
+        no_trace,
         max_size,
         ignore_space: configured.ignore_space,
         ignore_dups: configured.ignore_dups,

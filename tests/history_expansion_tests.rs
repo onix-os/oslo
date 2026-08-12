@@ -20,6 +20,9 @@ fn repl(dir: &std::path::Path, lines: &str) -> (String, String) {
         .arg("-i")
         .current_dir(dir)
         .env("HOME", dir)
+        // Asked for explicitly: there is no default history file any more, and this test is about
+        // what gets written into one.
+        .env("HISTFILE", dir.join(".oslo_history"))
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
