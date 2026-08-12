@@ -166,7 +166,11 @@ pub fn builtin_source(env: &mut Environment, args: &[String]) -> Result<i32> {
     let content = match fs::read_to_string(file_path) {
         Ok(c) => c,
         Err(e) => {
-            eprintln!("oslo: source: {}: {}", file_path, e);
+            eprintln!(
+                "oslo: source: {}: {}",
+                file_path,
+                oslo_base::error::reason(&e)
+            );
             return Ok(1);
         }
     };

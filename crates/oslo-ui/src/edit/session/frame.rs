@@ -26,7 +26,7 @@ pub(super) fn next_input(keys: &mut Keys, reported: &mut bool) -> Option<InputEv
     // prompt is rebuilt off this thread, and a wait with no deadline cannot notice it finishing —
     // so the fresh prompt sat in the cache until the next keystroke, and the prompt on screen went
     // on describing the command before last.
-    if !idle_hook && !crate::prompt::refreshing() {
+    if !idle_hook && !crate::pending::waiting() {
         return keys.read_event();
     }
 
@@ -34,12 +34,14 @@ pub(super) fn next_input(keys: &mut Keys, reported: &mut bool) -> Option<InputEv
     // runs while an answer is outstanding, which is a few tens of milliseconds after a command.
     const REFRESH_SLICE_MS: i32 = 15;
     let idle_ms = seconds.saturating_mul(1000).min(i32::MAX as u64) as i32;
-    let seen = crate::prompt::generation();
+    let seen = crate::pending::generation();
     let mut waited: i64 = 0;
     loop {
-        let refreshing = crate::prompt::refreshing();
+        let refreshing = crate::pending::waiting();
         let slice = match (refreshing, idle_hook) {
-            (true, _) => REFRESH_SLICE_MS,
+            // Never longer than the moment somebody asked for a turn at, so a provider's debounce
+            // expires when it said it would rather than up to a slice late.
+            (true, _) => crate::pending::slice_ms(REFRESH_SLICE_MS),
             (false, true) => idle_ms,
             // Nothing left to wait for but a key, and the idle hook is not installed.
             (false, false) => return keys.read_event(),
@@ -51,10 +53,13 @@ pub(super) fn next_input(keys: &mut Keys, reported: &mut bool) -> Option<InputEv
             }
             crate::term::EventPressed::Ended => return None,
             crate::term::EventPressed::Timeout => {
-                // The run finished and produced something different. Hand the loop a turn so it
-                // can redraw; it is not a key and nothing binds it.
-                if crate::prompt::generation() != seen {
-                    return Some(InputEvent::PromptRefreshed);
+                // Something landed and the frame is stale — a prompt rebuilt behind the line, a
+                // suggestion that had to be asked for. Hand the loop a turn so it can redraw; it is
+                // not a key and nothing binds it.
+                // A turn was asked for and its moment has come — a debounce expiring, which is a
+                // redraw rather than a key: the frame asks the providers again on the way past.
+                if crate::pending::generation() != seen || crate::pending::due() {
+                    return Some(InputEvent::Refreshed);
                 }
                 waited = waited.saturating_add(slice as i64);
                 if idle_hook && !*reported && waited >= idle_ms as i64 {

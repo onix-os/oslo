@@ -29,10 +29,12 @@ getrandom = "0.4"
 # still did not earn them. `explanations` answers why a prediction was made, which is a question a
 # debugging tool asks and a ghost suggestion does not.
 #
-# **A commit, not a branch**, so a push upstream cannot change what oslo builds without an edit
-# here. Named `vista` locally while the package is `vista-recall`, which is what keeps every
-# `use vista::…` in this crate reading the way it did when the crate had one name.
-vista = { package = "vista-recall", git = "https://github.com/bresilla/vista", rev = "8ec5fa733de21f9aa21bda280241d4d638e27860", optional = true, default-features = false, features = [
+# **A tag, not a branch**, so a push upstream cannot change what oslo builds without an edit here.
+# A tag rather than a raw commit because a release is the thing being depended on and `v0.1.2` says
+# which one; `Cargo.lock` still pins the exact commit, so a tag moved upstream cannot change a build
+# silently either. Named `vista` locally while the package is `vista-recall`, which is what keeps
+# every `use vista::…` in this crate reading the way it did when the crate had one name.
+vista = { package = "vista-recall", git = "https://github.com/bresilla/vista", tag = "v0.1.2", optional = true, default-features = false, features = [
     "snapshot",
     "recent-cache",
 ] }

@@ -121,6 +121,13 @@ fn lua_corpus_matches_its_recorded_expectations() {
             .current_dir(dir.path())
             .env("HOME", dir.path())
             .env_remove("ENV")
+            // **`HOME` alone does not isolate a case.** Anything resolving an XDG path prefers
+            // `$XDG_DATA_HOME`, which is inherited and points at the *developer's* real one — so a
+            // case that opened a database would write into their plugin directory rather than into
+            // the temporary home two lines up.
+            .env_remove("XDG_DATA_HOME")
+            .env_remove("XDG_CONFIG_HOME")
+            .env_remove("XDG_CACHE_HOME")
             .stdin(Stdio::null())
             .output()
             .expect("spawn oslo");

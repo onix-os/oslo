@@ -29,6 +29,9 @@
 pub const INTERPRETER_STACK: usize = 16 * 1024 * 1024;
 
 pub mod lua;
+/// Installing somebody else's Lua, and loading it on demand. `plugin` only.
+#[cfg(feature = "plugin")]
+pub mod plugin;
 pub mod startup;
 
 pub use lua::LuaEngine;

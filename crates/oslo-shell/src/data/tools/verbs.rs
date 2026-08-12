@@ -1,4 +1,4 @@
-//! The day-one verbs: `to`, `cols`, `get`, `sort-by`, `first`, `last`, `length`, `each`.
+//! The day-one verbs: `to`, `cols`, `get`, `sort-by`, `first`, `final`, `length`, `each`.
 //!
 //! ```text
 //! df | sort-by free | first 3
@@ -83,12 +83,17 @@ fn text(value: Option<&Val>) -> String {
     value.map(render_transport).unwrap_or_default()
 }
 
-/// The first or last `n` rows.
+/// The first or the closing `n` rows.
 pub fn first(rows: &[Record], n: usize) -> Vec<Record> {
     rows.iter().take(n).cloned().collect()
 }
 
-pub fn last(rows: &[Record], n: usize) -> Vec<Record> {
+/// The verb is `final`; the function cannot be, because `final` is a reserved word in Rust.
+///
+/// **It was `last`, which is a command util-linux ships.** Every name that can carry structure has
+/// to be one oslo invented, or `<a rows producer> | last` quietly stops meaning what a script said
+/// — the same defect `uniq` had, found in the same sweep.
+pub fn final_rows(rows: &[Record], n: usize) -> Vec<Record> {
     let skip = rows.len().saturating_sub(n);
     rows.iter().skip(skip).cloned().collect()
 }
@@ -226,9 +231,12 @@ mod tests {
 
     /// The ends of a table, and its size, all still rows.
     #[test]
-    fn first_last_and_length_keep_the_shape() {
+    fn first_final_and_length_keep_the_shape() {
         assert_eq!(first(&rows(), 1).len(), 1);
-        assert_eq!(last(&rows(), 1)[0].get("name"), Some(&Val::Str("a".into())));
+        assert_eq!(
+            final_rows(&rows(), 1)[0].get("name"),
+            Some(&Val::Str("a".into()))
+        );
         assert_eq!(length(&rows())[0].get("length"), Some(&Val::Int(2)));
         assert_eq!(first(&rows(), 99).len(), 2, "asking for more than there is");
     }

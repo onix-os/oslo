@@ -47,6 +47,12 @@ pub struct Settings {
     pub dirs: Vec<(String, String)>,
     /// `oslo.keys`: key name to action name, both as written.
     pub keys: Vec<(String, String)>,
+    /// `oslo.keys[…] = { desc = … }` — what a binding says it does, for anything that lists them.
+    ///
+    /// Beside `keys` rather than inside it: a description is optional and most bindings have none,
+    /// and widening the pair every existing reader destructures would be a change to all of them
+    /// for the sake of a field they do not use.
+    pub key_descriptions: Vec<(String, String)>,
     /// `oslo.scratch`: named sessions that outlive the terminal they were opened in.
     pub scratch: Scratch,
 }
@@ -218,6 +224,12 @@ pub enum Source {
     /// has been measured against `History` on a real history rather than assumed to be better.
     /// Ask for it by name until then.
     Prediction,
+    /// Whatever a config or a plugin registered with `oslo.suggest.provider`.
+    ///
+    /// **A source among the sources.** Where a plugin's answer sits relative to your own history is
+    /// one line of `oslo.suggest.sources`, and it is your line — the plugin does not get to decide
+    /// that it outranks what you have actually run.
+    Provider,
 }
 
 impl Source {
@@ -227,6 +239,7 @@ impl Source {
             "completion" | "completions" => Some(Source::Completion),
             "path" | "paths" | "file" => Some(Source::Path),
             "predict" | "prediction" => Some(Source::Prediction),
+            "provider" | "providers" | "plugin" => Some(Source::Provider),
             _ => None,
         }
     }

@@ -39,6 +39,10 @@ about what pressing Right will do.
    │             line starts with what you typed                               │
    │             ONLY in a build with the `vista` feature — `oslo`, not        │
    │             `oslo-minimal`. Elsewhere this row answers nothing.           │
+   ├───────────────────────────────────────────────────────────────────────────┤
+   │ provider    whatever oslo.suggest.provider registered, in registration    │
+   │             order; each answers a whole line, kept only if it continues   │
+   │             what you typed                                                │
    └───────────────────────────────────────────────────────────────────────────┘
                  │
                  │  the first source with an answer wins outright — no merging,
@@ -152,6 +156,7 @@ means different things in different projects, and a flat history only knows whic
 ```lua
 oslo.suggest.sources = { "history", "completion", "path" }   -- the default order
 oslo.suggest.sources = { "predict", "history", "path" }      -- ask the model first; `oslo` only
+oslo.suggest.sources = { "provider", "history" }              -- a plugin first, then your history
 oslo.suggest.sources = {}                                    -- no suggestions at all
 
 oslo.suggest.skip_history = { "rm", "shred", "trash" }       -- {} means every command
@@ -165,7 +170,8 @@ oslo.theme = { syntax = { autosuggestion = { fg = "244", italic = true } } }
 ```
 
 Source names: `history`; `completion` or `completions`; `path`, `paths` or `file`; `predict` or
-`prediction` — the last of which needs the `vista` feature to *answer*, though it always parses.
+`prediction` — which needs the `vista` feature to *answer*, though it always parses; and `provider`
+or `providers`.
 A name nothing answers to is reported when the config is read rather than silently turning a source
 off. Duplicates are dropped and the written order is kept.
 
@@ -176,7 +182,151 @@ says. To turn suggestions off for a while without losing what the config said:
 oslo.feature.set("suggest", false)   -- a mask; turning it back on restores oslo.suggest
 ```
 
+### Your own source
+
+```lua
+oslo.suggest.provider {
+  name = "tldr",
+  answer = function(ctx)          -- ctx = { line, cursor, cwd, language }
+    if ctx.line:match("^git com") then return "git commit --amend" end
+  end,
+}
+oslo.suggest.sources = { "history", "provider", "path" }
+```
+
+**It answers the whole line, not the tail.** That is what a provider naturally has — a page, a table
+of examples, a model all know *the command*, not the seven characters left to type. oslo computes
+the remainder.
+
+**Where it sits is your decision.** Registering puts a provider in front of nothing; it is asked when
+`oslo.suggest.sources` says `provider`, in the position that list gives it. VS Code's inline
+providers work the other way round — `yieldsToGroupIds` is declared by the *provider*, so the plugin
+decides whether it defers to you. That is the part deliberately not copied.
+
+Three rules a provider cannot escape:
+
+- **It must continue the line.** The ghost is drawn as trailing text and Right accepts it, so an
+  answer that is not a continuation would make that key insert something never suggested. Such an
+  answer is refused and reported in `messages` — never trimmed into something the provider did not
+  write.
+- **It must be quick.** This is the keystroke path. One that takes longer than 20 ms more than three
+  times is switched off for the session and says so, because a shell that stutters looks like oslo
+  being slow rather than like a plugin being slow.
+- **Raising is declining.** An error is recorded once and the next source is asked; it never costs
+  you the keystroke.
+
+`oslo.suggest.providers()` lists what is registered, in the order they are asked.
+
+### A provider that has to go and ask something
+
+An answer over a network cannot be given on the keystroke path, so a provider says `request` instead
+of `answer` and calls `reply` whenever the answer turns up:
+
+```lua
+oslo.suggest.provider {
+  name = "llm",
+  debounce_ms = 120,       -- wait for typing to stop; 120 is the default
+  timeout_ms = 2000,       -- give up after this; 2000 is the default
+  request = function(ctx, reply)
+    oslo.spawn { "my-llm", ctx.line, on_exit = function(out) reply(out) end }
+  end,
+}
+```
+
+`request` still runs on the keystroke path — what makes it asynchronous is what it *starts*, not how
+long it takes to start it. `oslo.spawn` is the intended shape.
+
+The three things that make this safe are worth knowing, because they are what an inline-completion
+feature usually gets wrong:
+
+- **The debounce is real.** A line is asked about only once typing has been still for
+  `debounce_ms`, so a word typed at speed is one question rather than eight. The editor is woken at
+  that moment rather than waiting for your next keystroke — otherwise the delay would expire only
+  when you pressed the very key it exists to avoid asking about.
+- **`reply` is bound to the line it was asked about.** An answer for `gi` that arrives after you have
+  typed `git ` does not match and is never drawn. This is not a check that could be forgotten: the
+  answer is stored under the question, and only an exact match is drawn.
+- **A decline is remembered, and so is a timeout.** Either way the line is not asked about again;
+  otherwise a provider that had stopped answering would be asked once per frame for ever.
+
+When the answer lands the line repaints on its own — the same mechanism an asynchronous prompt uses.
+
+### What a late answer may do to what is already there
+
+The decision this whole mechanism exists for. `predict` answers in microseconds and a model over a
+network answers in hundreds of milliseconds, so by the time the slow one speaks there is usually
+already a suggestion drawn. Neither answer to *what now* is right for everybody:
+
+```lua
+oslo.suggest.provider {
+  name = "llm",
+  on_late = "fill",       -- the default: draw only if nothing else did
+  on_late = "replace",    -- draw over what another source gave
+  settle_ms = 400,        -- but only if it came back within this; 400 is the default
+  request = …,
+}
+```
+
+**`fill` never changes what is on screen.** A provider set this way answers in a second pass that
+runs only when every source declined, so it can add a suggestion but never take one over — and its
+position in `oslo.suggest.sources` stops mattering, because "answer when nobody else did" is a
+different question from "answer before history".
+
+**`replace` answers in its own turn**, which is what puts it ahead of whatever is listed after it.
+That is the setting for when the slow provider is the one you actually trust. `settle_ms` is what
+makes it liveable: an answer that took longer than that is not allowed to rewrite a line you have
+had time to read — though it is still offered in the fill pass, where replacing nothing is not
+startling.
+
+There is no `drop`. For a provider that answers later, every answer is late, so a mode that refused
+late answers would be a slower way of writing `oslo.suggest.forget()`.
+
+### When to ask at all
+
+```lua
+oslo.suggest.provider {
+  name = "llm",
+  min_chars = 4,          -- a model asked about `g` is being asked nothing
+  max_line = 512,         -- a pasted 4 KB line is not a prompt
+  enabled = function(ctx) -- anything the two above cannot express
+    return not ctx.cwd:match("/private")
+  end,
+  request = …,
+}
+```
+
+`enabled` **is** the context rule. A `when = { command = …, cwd = … }` table was the other design,
+and a predicate is strictly more expressive than any set of fields would be, in the language the rest
+of the config is already written in. For a provider that would send your typing off the machine, it
+is the setting that matters most — and a predicate that raises is read as *no*, because a guard
+nobody can evaluate has not said yes.
+
+The cheap tests run first: `min_chars` and `max_line` are integer comparisons, and calling into Lua
+to discover that the line was two characters long would be the expensive way to answer a cheap
+question.
+
+### Worked examples
+
+Two, in `examples/plugins/`:
+
+- **`tldr`** — synchronous, answering from `oslo.db`. Offers what people actually do with a command,
+  in the dropdown *and* as a ghost.
+- **`slowpoke`** — asynchronous, the shape an LLM plugin has. Deliberately slow and deliberately
+  deterministic, so it exercises the debounce, the reply and the repaint while still being something
+  a test can assert on.
+
 ## Measurements
+
+The provider mechanism costs a shell that has none **nothing**. `bench/keystroke.rs`, min of three
+runs, against the same tree without it:
+
+| | paint | hint |
+|---|---|---|
+| without providers | 2.23 µs | 2.20 µs |
+| with the mechanism, none registered | 2.20 µs | 2.18 µs |
+
+`provider` is not in the default `sources`, so the arm is never reached; when it is, `any()` is a
+flag read. A *registered* provider costs whatever it does, bounded by the 20 ms budget above.
 
 `cargo bench --bench keystroke`, release, on this machine:
 
@@ -236,6 +386,9 @@ first time and 0.8 ms once the answer had been remembered — 86 µs on the slow
 | `crates/oslo-ui/src/recall/nearby.rs` | `from_store`, `place`, `remembered_answer`, `forget_answers_for` |
 | `crates/oslo-base/src/track/query.rs` | `Track::suggestion_here`, `Track::suggestion_in_workspace` |
 | `crates/oslo-base/src/track/row.rs` | `RunRow::worked`, `RunRow::standing` |
+| `crates/oslo-ui/src/suggest.rs` | the provider registry, the continuation invariant, the budget |
+| `crates/oslo-runtime/src/lua/api/suggest.rs` | `oslo.suggest.provider` — the Lua reader |
+| `crates/oslo-ui/src/pending.rs` | what the editor waits for when an answer is not ready yet |
 | `crates/oslo-ui/src/settings/mod.rs` | `Source`, `Suggest` |
 | `crates/oslo-ui/src/settings/from_lua.rs` | reading `oslo.suggest` |
 | `crates/oslo-ui/src/edit/session/accept.rs` | `Session::take_hint` |

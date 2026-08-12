@@ -192,16 +192,14 @@ pub fn open(
 /// keeping every visited profile's store open would be a file handle per Tab press.
 fn load_profile(name: &str) -> Vec<Command> {
     let limit = crate::settings::current().finder.limit;
-    let Some(path) = oslo_base::track::profile::store_path(
+    let Some(directory) = oslo_base::track::profile::profile_dir(
         std::env::var("XDG_DATA_HOME").ok().as_deref(),
         std::env::var("HOME").ok().as_deref(),
-        "kv",
+        name,
     ) else {
         return Vec::new();
     };
-    // `store_path` names the *current* profile, so the file name is swapped for the one asked for.
-    let path = path.with_file_name(format!("{name}.kv"));
-    oslo_base::track::Track::open(&path)
+    oslo_base::track::Track::open(&directory.join("hist.db"))
         .map(|track| track.commands(limit))
         .unwrap_or_default()
 }

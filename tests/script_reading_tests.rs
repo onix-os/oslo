@@ -124,7 +124,7 @@ fn allhist_records_a_dash_c_command_in_both_stores() {
     // **The bytes, not the file.** Tagdata pre-allocates 131072 bytes the moment it opens one, so
     // asserting the store *exists* passes whether or not anything was ever written to it — which
     // is exactly the kind of assertion that reports success for a feature that does nothing.
-    let store = dir.path().join("oslo").join("default.kv");
+    let store = dir.path().join("oslo/history/default/hist.db");
     let bytes = std::fs::read(&store).expect("the tracking store");
     assert!(
         bytes

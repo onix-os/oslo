@@ -18,6 +18,7 @@ pub mod marks;
 pub mod matching;
 pub mod nav;
 pub mod paint;
+pub mod pending;
 pub mod prompt;
 pub mod query;
 pub mod recall;
@@ -30,6 +31,7 @@ pub mod scanner;
 pub mod settings;
 pub mod shell;
 pub mod spec;
+pub mod suggest;
 pub mod syntax;
 pub mod term;
 pub mod theme;
@@ -70,17 +72,17 @@ pub struct OsloHelper {
 impl OsloHelper {
     /// Build the helper for `env`.
     ///
-    /// Two side effects hang off whether `env` belongs to an interactive shell: the dropdown
-    /// takes the terminal over, and the frecency table is read from and appended to a file in
-    /// `$HOME`. `$-` is the signal rather than `isatty`, because `cargo test` inherits a terminal
-    /// on stdin and a test must not write to the user's home directory.
+    /// Two side effects hang off whether `env` belongs to an interactive shell: the dropdown takes
+    /// the terminal over, and the frecency table folds in what this profile has run. `$-` is the
+    /// signal rather than `isatty`, because `cargo test` inherits a terminal on stdin and a test
+    /// must not read the user's store.
     /// Generic so the coercion happens here rather than at every call site: a caller hands over
     /// whatever it already holds and this is the one place that forgets the concrete type.
     pub fn new<S: Shell + 'static>(env: Arc<Mutex<S>>) -> Self {
         let env: Arc<Mutex<dyn Shell>> = env;
         let interactive = env.lock().unwrap().interactive();
         let frecency = if interactive {
-            FrecencyStore::load(FrecencyStore::default_path())
+            FrecencyStore::from_history()
         } else {
             FrecencyStore::in_memory()
         };
@@ -170,6 +172,35 @@ impl OsloHelper {
         names.iter().any(|name| name == command)
     }
 
+    /// Ask the registered providers, building the context they are told about.
+    ///
+    /// **The `any()` test comes first and costs an atomic load.** Every shell until somebody
+    /// installs a provider takes that branch on every keystroke, and it must not pay for a
+    /// mechanism it is not using — building the context alone would mean two lock acquisitions and
+    /// a `String` per key.
+    fn provider_hint(&self, line: &str, pos: usize) -> Option<String> {
+        Self::provider_ctx(line, pos).and_then(|ctx| suggest::ask(&ctx))
+    }
+
+    /// The gap-filling pass: providers that were told to answer only when nothing else did.
+    fn provider_fill(&self, line: &str, pos: usize) -> Option<String> {
+        Self::provider_ctx(line, pos).and_then(|ctx| suggest::ask_fill(&ctx))
+    }
+
+    fn provider_ctx(line: &str, pos: usize) -> Option<suggest::Ctx> {
+        if !suggest::any() {
+            return None;
+        }
+        Some(suggest::Ctx {
+            line: line.to_string(),
+            cursor: pos,
+            cwd: std::env::current_dir()
+                .map(|p| p.display().to_string())
+                .unwrap_or_default(),
+            language: prompt::language().unwrap_or_else(|| "sh".to_string()),
+        })
+    }
+
     /// The ghost suggestion for `line`, in `oslo.suggest.sources` order, as plain text.
     ///
     /// Only at the end of the line: a suggestion *continues* what you have typed, so offering one
@@ -211,12 +242,18 @@ impl OsloHelper {
                     .map(|guess| guess.line[line.len()..].to_string()),
                 #[cfg(not(feature = "vista"))]
                 settings::Source::Prediction => None,
+                // Whatever a config or a plugin registered. Asked in the place the config put it,
+                // so a plugin's answer beats history only if you said it should.
+                settings::Source::Provider => self.provider_hint(line, pos),
             };
             if found.is_some() {
                 return found;
             }
         }
-        None
+        // **Nothing answered, so the gap-fillers get their turn.** A provider set to `fill` has no
+        // position in the order — it answers when nobody else did, which is a different question
+        // from "answer before history" and cannot be expressed by placing it anywhere in the list.
+        self.provider_fill(line, pos)
     }
 
     /// Paint a ghost suggestion in the autosuggestion colour.

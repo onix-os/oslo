@@ -18,6 +18,7 @@ oslo.direnv.nix_develop()
 -- Idempotent, so a reload does not grow $PATH each time.
 oslo.direnv.path_add("./target/debug")
 oslo.direnv.path_add("./bin")
+oslo.direnv.path_add("./target/x86_64-unknown-linux-musl/release")
 
 -- Where the checkout is, for scripts that need to find their way back to the top.
 oslo.env.set("TOP_HEAD", oslo.sys.pwd())

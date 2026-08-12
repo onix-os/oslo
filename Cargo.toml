@@ -1,6 +1,6 @@
 [package]
 name = "oslo"
-version = "0.2.29"
+version = "0.3.0"
 edition = "2024"
 # Minimum supported Rust version, mirrored by the MSRV job in .github/workflows/tests.yml.
 rust-version = "1.89"
@@ -16,28 +16,11 @@ path = "src/lib.rs"
 # A default build produces one static musl binary without a C toolchain.
 default = []
 
-# `ssh` — an SSH client in the shell, behind a switch.
-#
-# **Off, and measured.** Adding it costs about 0.6 MB on the static musl binary (5.57 → 6.15) and
-# 83 crates. That is a quarter of what `russh` costs, and it is the only option that keeps the
-# no-C rule: `russh`'s default `aws-lc-rs` backend does not even *link* against musl — its C
-# objects want glibc's `__memcpy_chk` and `__isoc23_sscanf` — and its `ring` backend still runs a C
-# compiler, which is the thing `mlua` and `turso` were dropped for.
-#
-# Two things are unresolved and are why this is not on:
-#
-# * **The crypto is unaudited.** `maki` and the RustCrypto crates under it say so themselves. For a
-#   shell meant to be `/bin/sh` on a distribution that is a different class of risk from binary size.
-# * **`tokio` comes back.** `maki` is async and oslo's REPL is not, so using it means a runtime and
-#   `block_on` — the exact bridging that was deleted when `turso` went. Whether that lives at the
-#   edge or spreads is the design question this feature exists to answer.
-ssh = ["dep:maki", "dep:tokio"]
-
 # `vista` — the model behind the ghost prediction and the correction.
 #
-# **Off, for the same shape of reason `ssh` is.** What it buys is real and measured
+# **Off, and measured.** What it buys is real
 # (`docs/features/prediction-and-repair.md`), but it is a dependency oslo does not otherwise need
-# and 433 KB on a binary meant to be `/bin/sh`: 6,323,168 bytes without it against 6,766,848 with.
+# and 341 KB on a binary meant to be `/bin/sh`: 5,663,840 bytes without it against 6,013,312 with.
 # Without it the ghost comes from history, completions and `$PATH` — the sources that read what is
 # already on the machine — and the shell learns nothing, writes no model and reads none.
 #
@@ -50,9 +33,9 @@ vista = ["oslo-base/vista", "oslo-runtime/vista", "oslo-ui/vista"]
 # one key. See `PLAN.md` and `docs/features/tab.md`.
 #
 # **Off, because it is a second process and a pty for every session that uses it, and because a
-# shell meant to be `/bin/sh` should not carry a multiplexer nobody asked for.** Unlike `ssh` and
-# `vista` it adds no dependency at all — it is `nix`, which oslo already links — so what it costs is
-# code and the runtime directory, not crates.
+# shell meant to be `/bin/sh` should not carry a multiplexer nobody asked for.** Unlike `vista` it
+# adds no dependency at all — it is `nix`, which oslo already links — so what it costs is code and
+# the runtime directory, not crates.
 #
 # Without it the key is unbound and the settings are accepted and ignored, so one config works in
 # both builds with nothing to ask.
@@ -75,18 +58,22 @@ direnv = ["oslo-shell/direnv", "oslo-runtime/direnv"]
 # entry point asks for both.
 nix = ["oslo-shell/nix", "oslo-runtime/nix"]
 
-[dependencies]
-# A fork of `makiko`, the one pure-Rust SSH client — no `cc`, no `ring`, no `-sys` crate that is
-# really C. Forked rather than depended on because upstream was last touched in March 2025, and a
-# shell that ships this needs to be able to fix it. Optional, and reached only through `src/ssh.rs`.
-# **Pinned to a commit, not to a branch.** `branch = "master"` meant that a push to the fork changed
-# what oslo built, without a commit here saying so — a build that was green yesterday failing today
-# for a reason not in this repository's history. Moving it is now a deliberate edit to this line.
-maki = { git = "https://github.com/onix-os/maki", rev = "acfe78e19c411fef56f58f2b0bff9e48c511bb89", optional = true }
-# Only ever with `ssh`. `maki` pulls `tokio` for its `sync` primitives on its own; what oslo needs
-# on top is a runtime and a socket, which is what these two features are.
-tokio = { version = "1", features = ["rt-multi-thread", "net"], optional = true }
+# `plugin` — installing somebody else's Lua, and loading it on demand.
+#
+# **The line is drawn where the policy starts.** `oslo.db` and the `pre-cmd` veto are in every
+# build: they are capabilities, small and self-contained, and a config that will never install
+# anything can still want them. Putting them behind a switch would give oslo two dialects, where a
+# config has to ask whether `oslo.db` exists before using it.
+#
+# Installing is different in kind. It fetches somebody's code, decides whether to trust it, and
+# reserves builtin names on their behalf — none of which a `/bin/sh` on a distribution has any use
+# for, and all of which should be absent rather than merely unused.
+#
+# Without it there is no `oslo plugin`, no manifest, no index and no loading. Everything a plugin is
+# *written against* is still there, so the same Lua runs from `conf.d` in either binary.
+plugin = ["oslo-runtime/plugin"]
 
+[dependencies]
 # The Lua front end, in the same relationship to Lua that brush-parser has to the shell: it parses
 # and nothing else. Evaluation is oslo's own, in `src/lua/eval/`, so that both languages run on one
 # Rust core. `full_moon` is the parser behind StyLua and selene.
@@ -233,6 +220,28 @@ lto = "fat"
 codegen-units = 1
 strip = "symbols"
 
+# **Size, for oslo's own crates too — with the editor as the exception.**
+#
+# The rule below has applied to dependencies for a while; oslo's own crates were the last thing
+# still built for speed by default, and they are most of the binary. Applying the same setting to
+# them is worth 1.22 MB and, measured, costs nothing a person could feel:
+#
+# ```text
+#                                    static musl      paint      hint
+#   opt-level = 3 (before)             6.95 MB       2.21 us    2.21 us
+#   opt-level = "s", flat              5.57 MB       2.73 us    2.55 us
+#   opt-level = "s", oslo-ui at 3      5.73 MB       2.24 us    2.29 us
+# ```
+#
+# `bench/keystroke.rs`, min of six runs — a single run on this machine varies by a factor of two,
+# so anything less than that is noise dressed up as a measurement. The flat setting costs half a
+# microsecond per keystroke against a budget of about ten milliseconds, which would have been
+# acceptable; the exception makes it free, so there is no reason not to take it.
+#
+# `"z"` was measured too: 5.04 MB, another 0.53 below `"s"`. Not taken, because the speed of it was
+# never measured and the marginal byte is worth less than the certainty.
+opt-level = "s"
+
 # **The dependencies are compiled for size; oslo and its parser are not.**
 #
 # Compiling everything below this crate for size was measured once and deferred, because it cost
@@ -249,6 +258,13 @@ opt-level = "s"
 
 # The one dependency on the hot path, and the whole reason `"*"` above needed an exception.
 [profile.release.package.brush-parser]
+opt-level = 3
+
+# **The editor is oslo's own `brush-parser`**: the one crate on the path a keystroke takes, where
+# `"s"` was measurable. `paint` and `hint` run on every key and both come from here — 2.73 µs and
+# 2.55 µs built for size, 2.24 and 2.29 built for speed, against 2.21 before any of this. The other
+# 160 KB is the cheapest 160 KB in the binary.
+[profile.release.package.oslo-ui]
 opt-level = 3
 
 # **`"*"` does not reach oslo's own crates, and that is cargo's rule rather than luck.**

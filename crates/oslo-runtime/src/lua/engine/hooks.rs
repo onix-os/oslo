@@ -124,7 +124,7 @@ pub(super) fn fire_now(index: usize, args: Vec<Value>) {
     };
     for handler in crate::lua::api::hook_handlers(&registry, name) {
         if let Err(e) = interp.call(&handler, args.clone()) {
-            eprintln!("oslo: {name} hook: {e}");
+            oslo_base::messages::error(format!("{name} hook"), e.to_string());
         }
     }
 }
@@ -153,7 +153,7 @@ pub fn answer_hook_with(index: usize, args: Vec<Value>) -> Option<Value> {
             // the screen faster than it could be read, but silence here means a hook that has
             // stopped working with nothing to say why — and this one is on the typing path, so
             // "it went quiet" is exactly the symptom that needs explaining.
-            Err(e) => eprintln!("oslo: key hook: {e}"),
+            Err(e) => oslo_base::messages::error("key hook", e.to_string()),
         }
     }
     None
@@ -174,7 +174,7 @@ pub(super) fn ask_hook_on(
             }
             // Reported and skipped, as with any other hook: one broken handler must not stop the
             // others, and must not turn a missing command into a silent success.
-            Err(e) => eprintln!("oslo: {name} hook: {e}"),
+            Err(e) => oslo_base::messages::error(format!("{name} hook"), e.to_string()),
         }
     }
     None

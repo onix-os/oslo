@@ -52,7 +52,7 @@ The vocabulary is the whole of what can carry structure:
 | --- | --- | --- |
 | `df` `ps` `ls` | nothing | rows |
 | `lines` `parse` `from` | bytes | rows |
-| `where` `each` `cols` `get` `sort-by` `first` `last` `length` | rows | rows |
+| `where` `each` `cols` `get` `sort-by` `first` `final` `length` | rows | rows |
 | `to` | rows | bytes |
 
 `cols` rather than `select`, because `select` is a bash keyword and oslo's parser refuses it as one.
@@ -214,7 +214,7 @@ which nothing carries rows.
 | `crates/oslo-shell/src/data/plan.rs` | `Shape`, `Sink`, `Stage`, `plan`, `entered_structured_path` |
 | `crates/oslo-shell/src/data/tool.rs` | the declaration registry — `register`, `lookup`, `any_registered` |
 | `crates/oslo-shell/src/data/tools/mod.rs` | `register_all` (the whole vocabulary) and `run_tool` |
-| `crates/oslo-shell/src/data/tools/verbs.rs` | `cols`, `get`, `sort_by`, `first`, `last`, `length`, `to_format` |
+| `crates/oslo-shell/src/data/tools/verbs.rs` | `cols`, `get`, `sort_by`, `first`, `final_rows`, `length`, `to_format` |
 | `crates/oslo-shell/src/data/tools/where_.rs` | `filter` and `for_each` — the Lua binding of a row |
 | `crates/oslo-shell/src/data/tools/bridge.rs` | `lines`, `parse`, `from_json` |
 | `crates/oslo-shell/src/data/tools/df.rs`, `system.rs` | the `df`, `ps` and `ls` producers |

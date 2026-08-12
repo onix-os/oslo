@@ -1,5 +1,72 @@
 # Changelog
 
+## [0.3.0] - 2026-08-12
+
+### <!-- 0 -->⛰️  Features
+
+- When to ask, and two worked plugins
+- Candidates a plugin can add
+- Who wins when the slow answer lands
+- A provider that answers when it can
+- A ghost source a plugin can supply
+- Specs a config can declare
+- Oslo plugin test, a harness for authors
+- Messages, what this session said
+- Oslo config timing, what startup costs
+- Group-by, count, uniq and stats
+- Oslo.spawn, work off the prompt with a callback
+- Load_on, waking a plugin that has nothing to type
+- Oslo config files and which, for provenance
+- Oslo.state, and a description on a keybinding
+- Oslo plugin doctor, and a plugin's own checks
+- A builtin may describe itself and its completion
+- Oslo.after and oslo.every, fired between commands
+- Events a plugin names itself
+- A Lua tool may consume the rows that reached it
+- Requires, against one authoritative version
+- Manifest, index, trust gate and oslo plugin
+- Pre-cmd may decline to have a line recorded
+- Oslo.db, a database a config owns
+
+### <!-- 1 -->🐛 Bug Fixes
+
+- Say what a shell says, not what Rust says
+- Final, not last — util-linux ships that name
+- Distinct, not uniq — the name was coreutils'
+- Answer the options a bashrc sets
+- Help follows the history subcommand style
+
+### <!-- 2 -->🚜 Refactor
+
+- One channel for an answer that arrives late
+- A directory per profile, copied forward
+- The database is the history, the file an export
+
+### <!-- 3 -->📚 Documentation
+
+- What the providers cost, and what was not built
+- Tiers are a menu idea, not a ghost one
+- Plan tunable suggestion providers, after prior art
+- Plan pluggable ghost and dropdown suggestions
+- The six, in the README and the plan
+- Plan six more, after composition
+- Plan what a plugin still cannot do
+- The feature page and a worked example
+- Plan the plugin feature
+
+### <!-- 7 -->⚙️ Miscellaneous Tasks
+
+- Remove the ssh feature and its dependencies
+
+### <!-- 9 -->◀️ Revert
+
+- Drop the flat-layout migration
+
+### Build
+
+- Compile oslo for size, except the editor
+- Vista v0.1.2, tagged rather than pinned by hash
+
 ## [0.2.29] - 2026-08-11
 
 ### <!-- 0 -->⛰️  Features

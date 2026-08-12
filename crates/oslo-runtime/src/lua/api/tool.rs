@@ -62,7 +62,9 @@ pub fn install(oslo: &mut Table) {
         // "is there a tool called this" does not mean reaching up into the Lua API. See
         // `oslo_shell::data::custom`.
         TOOLS.with(|slot| slot.borrow_mut().insert(name.to_string(), rows.clone()));
-        let handler = std::rc::Rc::new(move |argv: &[String]| run_rows(&rows, argv));
+        let handler = std::rc::Rc::new(move |argv: &[String], input: Option<&[Record]>| {
+            run_rows(&rows, argv, input)
+        });
         oslo_shell::data::custom::register(&name, handler);
         oslo_shell::data::tool::register(&name, accepts, produces);
         Ok(vec![Value::Bool(true)])
@@ -101,20 +103,91 @@ fn shape_of(value: &Value, default: Shape) -> Result<Shape, LuaError> {
     }
 }
 
-/// Call a Lua tool's `rows` function with `argv`, and read back what it returned.
+/// Call a Lua tool's `rows` function with `argv` and whatever reached it, and read back what it
+/// returned.
 ///
 /// The body of the closure handed to [`oslo_shell::data::custom::register`]. The pipeline calls it
 /// without knowing it is Lua, which is the whole point of the split.
-fn run_rows(handler: &Value, argv: &[String]) -> Result<Vec<Record>, String> {
+///
+/// **`function(argv)` still works.** Lua ignores arguments it did not declare, so every tool written
+/// before rows could arrive keeps running unchanged; a verb declares `function(argv, input)` and
+/// gets them.
+fn run_rows(
+    handler: &Value,
+    argv: &[String],
+    input: Option<&[Record]>,
+) -> Result<Vec<Record>, String> {
     let mut list = Table::new();
     for (i, word) in argv.iter().enumerate() {
         list.set(Value::int(i as i64 + 1), Value::str(word));
     }
     let argv = Value::Table(std::rc::Rc::new(RefCell::new(list)));
+    // `nil` rather than an empty table when nothing reached this stage: "I was given nothing" and
+    // "I was given no rows" are different questions, and a verb that filters wants to tell them
+    // apart before deciding whether it has been misused.
+    let given = match input {
+        Some(rows) => rows_value(rows),
+        None => Value::Nil,
+    };
 
-    match crate::lua::engine::call_here(handler, vec![argv]) {
+    match crate::lua::engine::call_here(handler, vec![argv, given]) {
         Ok(values) => Ok(records_of(values.first().unwrap_or(&Value::Nil))),
         Err(e) => Err(e.to_string()),
+    }
+}
+
+/// Records as a Lua list of tables — the reverse of [`records_of`].
+///
+/// Column order is kept, because a record's order is not incidental: it decides what `cols` and the
+/// drawn table show, and a verb that hands its input back must not silently reorder it.
+fn rows_value(rows: &[Record]) -> Value {
+    let mut list = Table::new();
+    for (i, record) in rows.iter().enumerate() {
+        let mut row = Table::new();
+        for (name, value) in record.columns().iter().zip(record.values()) {
+            row.set(Value::str(name), lua_of(value));
+        }
+        list.set(
+            Value::int(i as i64 + 1),
+            Value::Table(std::rc::Rc::new(RefCell::new(row))),
+        );
+    }
+    Value::Table(std::rc::Rc::new(RefCell::new(list)))
+}
+
+/// One cell as Lua.
+///
+/// **The typed cells arrive as their number, not as their rendering.** A `Size` reaches Lua as bytes
+/// and a `Duration` as nanoseconds, so `where 'size > 1024'` compares numbers; handing over `4.2G`
+/// would make every comparison a string comparison and every filter wrong.
+fn lua_of(value: &Val) -> Value {
+    match value {
+        Val::Null => Value::Nil,
+        Val::Bool(b) => Value::Bool(*b),
+        Val::Int(i) => Value::int(*i),
+        Val::Float(f) => Value::float(*f),
+        Val::Str(s) => Value::str(s),
+        // Lua strings are byte strings, so bytes cross unchanged rather than being lost.
+        Val::Bytes(bytes) => Value::str(String::from_utf8_lossy(bytes)),
+        Val::Size(bytes) => Value::int(*bytes as i64),
+        Val::Duration(nanos) | Val::Time(nanos) => Value::int(*nanos),
+        Val::List(values) => {
+            let mut list = Table::new();
+            for (i, value) in values.iter().enumerate() {
+                list.set(Value::int(i as i64 + 1), lua_of(value));
+            }
+            Value::Table(std::rc::Rc::new(RefCell::new(list)))
+        }
+        Val::Record(record) => {
+            let mut row = Table::new();
+            for (name, value) in record.columns().iter().zip(record.values()) {
+                row.set(Value::str(name), lua_of(value));
+            }
+            Value::Table(std::rc::Rc::new(RefCell::new(row)))
+        }
+        // An error in one cell is text the rest of the row survives, and it must not be mistaken
+        // for a value: a filter comparing it sees a string that says what went wrong.
+        Val::Error(message) => Value::str(format!("error: {message}")),
     }
 }
 

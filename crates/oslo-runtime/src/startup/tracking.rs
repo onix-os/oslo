@@ -31,8 +31,13 @@ use std::time::{Duration, SystemTime};
 /// store rather than a quieter one. Read off [`history::Settings`] rather than off `$HISTFILE`
 /// again, so the tracker cannot come to a different conclusion from the history about what was
 /// asked for.
+///
+/// **`no_trace`, not `file.is_none()`.** This asked whether a history *file* had been settled on,
+/// which was the same question while one had a default. It is not any more: with no default file,
+/// reading an absent one as "leave no trace" would take the store away from every shell that had
+/// simply never been configured — and with it the finder, `cd` ranking and the model.
 fn keeps_a_record(settings: &history::Settings) -> bool {
-    settings.file.is_some() && settings.max_size > 0
+    !settings.no_trace && settings.max_size > 0
 }
 
 /// The two things the loop cannot re-derive after the fact: when the shell arrived where it is
@@ -488,19 +493,30 @@ mod tests {
     /// A session that was told to leave no trace leaves none of this either.
     #[test]
     fn a_session_that_keeps_no_history_opens_no_store() {
-        let kept = |file: Option<&str>, max_size| {
+        let kept = |file: Option<&str>, no_trace, max_size| {
             keeps_a_record(&history::Settings {
                 ignore_space: true,
                 ignore_dups: false,
                 file: file.map(std::path::PathBuf::from),
+                no_trace,
                 max_size,
             })
         };
-        assert!(kept(Some("/home/u/.oslo_history"), 10_000));
-        assert!(!kept(None, 10_000), "HISTFILE= disables the store with it");
+        assert!(kept(Some("/home/u/.oslo_history"), false, 10_000));
         assert!(
-            !kept(Some("/home/u/.oslo_history"), 0),
+            !kept(None, true, 10_000),
+            "HISTFILE= disables the store with it"
+        );
+        assert!(
+            !kept(Some("/home/u/.oslo_history"), false, 0),
             "and so does HISTSIZE=0"
+        );
+        // **The regression this pair exists to catch.** No history file is the default now, and a
+        // shell nobody has configured must still keep a store — the finder, `cd` ranking and the
+        // model all live in it.
+        assert!(
+            kept(None, false, 10_000),
+            "no history file is not a request to leave no trace"
         );
     }
 

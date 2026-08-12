@@ -82,6 +82,22 @@ const OPTIONS: &[ShoptOption] = &[
     fixed("nullglob", false, "an unmatched pattern expands to itself"),
     fixed("shift_verbose", false, "`shift` past the end is silent"),
     fixed("xpg_echo", false, "`echo` expands escapes only under `-e`"),
+    // **The ones a `.bashrc` sets without thinking about it.**
+    //
+    // Every name below is an option oslo has a real answer for, and the answer happens to be the
+    // one bash defaults to — so `shopt -s promptvars` is a request oslo already satisfies and
+    // returns 0 for. They are here because the alternative is what a login shell used to do: print
+    // `invalid shell option name` and a usage block, twice, on a line the user did not write and
+    // for a setting that was already true.
+    //
+    // A name oslo has no answer for is still refused. This is not a list of things to ignore; it is
+    // a list of questions oslo can answer.
+    fixed("checkwinsize", true, "the terminal is measured every frame, so a resize needs no signal"),
+    fixed("cmdhist", true, "a multi-line command is one history entry, with its newlines escaped"),
+    fixed("histappend", true, "the history file is only ever appended to, never rewritten"),
+    fixed("progcomp", true, "completion specs and providers are how oslo completes an argument"),
+    fixed("promptvars", true, "parameters expand in `$PS1`"),
+    fixed("checkjobs", false, "the shell keeps no table of running jobs to check"),
 ];
 
 /// Which options are on. Bit `n` is `OPTIONS[n]`; the `Fixed` ones are seeded by [`state_of`].

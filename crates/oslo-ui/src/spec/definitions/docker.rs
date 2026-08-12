@@ -4,120 +4,120 @@ use super::super::{CommandSpec, OptionSpec, SubcommandSpec};
 
 pub(crate) fn spec() -> CommandSpec {
     CommandSpec {
-        name: "docker",
-        description: "Manage Docker containers and images",
+        name: "docker".into(),
+        description: "Manage Docker containers and images".into(),
         subcommands: vec![
             SubcommandSpec {
-                name: "run",
-                description: "Run a command in a new container",
+                name: "run".into(),
+                description: "Run a command in a new container".into(),
                 subcommands: vec![],
                 options: vec![
                     OptionSpec {
-                        names: vec!["-d", "--detach"],
-                        description: "Run container in background",
+                        names: crate::spec::definitions::names(&["-d", "--detach"]),
+                        description: "Run container in background".into(),
                     },
                     OptionSpec {
-                        names: vec!["-it"],
-                        description: "Keep STDIN open and allocate a pseudo-TTY",
+                        names: crate::spec::definitions::names(&["-it"]),
+                        description: "Keep STDIN open and allocate a pseudo-TTY".into(),
                     },
                     OptionSpec {
-                        names: vec!["-p", "--publish"],
-                        description: "Publish container port(s) to host",
+                        names: crate::spec::definitions::names(&["-p", "--publish"]),
+                        description: "Publish container port(s) to host".into(),
                     },
                     OptionSpec {
-                        names: vec!["-v", "--volume"],
-                        description: "Bind mount a volume",
+                        names: crate::spec::definitions::names(&["-v", "--volume"]),
+                        description: "Bind mount a volume".into(),
                     },
                     OptionSpec {
-                        names: vec!["--rm"],
-                        description: "Automatically remove container when it exits",
+                        names: crate::spec::definitions::names(&["--rm"]),
+                        description: "Automatically remove container when it exits".into(),
                     },
                     OptionSpec {
-                        names: vec!["--name"],
-                        description: "Assign a name to the container",
+                        names: crate::spec::definitions::names(&["--name"]),
+                        description: "Assign a name to the container".into(),
                     },
                 ],
             },
             SubcommandSpec {
-                name: "ps",
-                description: "List containers",
+                name: "ps".into(),
+                description: "List containers".into(),
                 subcommands: vec![],
                 options: vec![
                     OptionSpec {
-                        names: vec!["-a", "--all"],
-                        description: "Show all containers (default shows just running)",
+                        names: crate::spec::definitions::names(&["-a", "--all"]),
+                        description: "Show all containers (default shows just running)".into(),
                     },
                     OptionSpec {
-                        names: vec!["-q", "--quiet"],
-                        description: "Only display container IDs",
+                        names: crate::spec::definitions::names(&["-q", "--quiet"]),
+                        description: "Only display container IDs".into(),
                     },
                 ],
             },
             SubcommandSpec {
-                name: "build",
-                description: "Build an image from a Dockerfile",
+                name: "build".into(),
+                description: "Build an image from a Dockerfile".into(),
                 subcommands: vec![],
                 options: vec![
                     OptionSpec {
-                        names: vec!["-t", "--tag"],
-                        description: "Name and optionally a tag in format 'name:tag'",
+                        names: crate::spec::definitions::names(&["-t", "--tag"]),
+                        description: "Name and optionally a tag in format 'name:tag'".into(),
                     },
                     OptionSpec {
-                        names: vec!["-f", "--file"],
-                        description: "Name of the Dockerfile",
+                        names: crate::spec::definitions::names(&["-f", "--file"]),
+                        description: "Name of the Dockerfile".into(),
                     },
                     OptionSpec {
-                        names: vec!["--no-cache"],
-                        description: "Do not use cache when building image",
+                        names: crate::spec::definitions::names(&["--no-cache"]),
+                        description: "Do not use cache when building image".into(),
                     },
                 ],
             },
             SubcommandSpec {
-                name: "images",
-                description: "List images",
+                name: "images".into(),
+                description: "List images".into(),
                 subcommands: vec![],
                 options: vec![
                     OptionSpec {
-                        names: vec!["-a", "--all"],
-                        description: "Show all images",
+                        names: crate::spec::definitions::names(&["-a", "--all"]),
+                        description: "Show all images".into(),
                     },
                     OptionSpec {
-                        names: vec!["-q", "--quiet"],
-                        description: "Only show image IDs",
+                        names: crate::spec::definitions::names(&["-q", "--quiet"]),
+                        description: "Only show image IDs".into(),
                     },
                 ],
             },
             SubcommandSpec {
-                name: "stop",
-                description: "Stop one or more running containers",
+                name: "stop".into(),
+                description: "Stop one or more running containers".into(),
                 subcommands: vec![],
                 options: vec![OptionSpec {
-                    names: vec!["-t", "--time"],
-                    description: "Seconds to wait before killing container",
+                    names: crate::spec::definitions::names(&["-t", "--time"]),
+                    description: "Seconds to wait before killing container".into(),
                 }],
             },
             SubcommandSpec {
-                name: "rm",
-                description: "Remove one or more containers",
+                name: "rm".into(),
+                description: "Remove one or more containers".into(),
                 subcommands: vec![],
                 options: vec![OptionSpec {
-                    names: vec!["-f", "--force"],
-                    description: "Force removal of running container",
+                    names: crate::spec::definitions::names(&["-f", "--force"]),
+                    description: "Force removal of running container".into(),
                 }],
             },
             SubcommandSpec {
-                name: "rmi",
-                description: "Remove one or more images",
+                name: "rmi".into(),
+                description: "Remove one or more images".into(),
                 subcommands: vec![],
                 options: vec![OptionSpec {
-                    names: vec!["-f", "--force"],
-                    description: "Force removal of image",
+                    names: crate::spec::definitions::names(&["-f", "--force"]),
+                    description: "Force removal of image".into(),
                 }],
             },
         ],
         options: vec![OptionSpec {
-            names: vec!["--version"],
-            description: "Show Docker version info",
+            names: crate::spec::definitions::names(&["--version"]),
+            description: "Show Docker version info".into(),
         }],
     }
 }

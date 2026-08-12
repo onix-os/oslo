@@ -5,6 +5,7 @@
 
 pub mod bridge;
 pub mod df;
+pub mod summarise;
 pub mod system;
 pub mod verbs;
 pub mod where_;
@@ -28,7 +29,11 @@ pub fn register_all() {
     crate::data::tool::register("parse", Shape::Bytes, Shape::Rows);
     crate::data::tool::register("from", Shape::Bytes, Shape::Rows);
     // The verbs. `cols` rather than `select`, which the parser refuses as a bash keyword.
-    for name in ["cols", "get", "sort-by", "first", "last", "length", "each"] {
+    for name in ["cols", "get", "sort-by", "first", "final", "length", "each"] {
+        crate::data::tool::register(name, Shape::Rows, Shape::Rows);
+    }
+    // The verbs that make a stream smaller. See `summarise` for why these four and not `join`.
+    for name in ["group-by", "count", "distinct", "stats"] {
         crate::data::tool::register(name, Shape::Rows, Shape::Rows);
     }
     // The way out. Rows in, bytes out — so `... | to json | jq .` works, and the structured world
@@ -47,7 +52,11 @@ pub fn run_tool(
 ) -> Option<(i32, Option<Vec<Record>>)> {
     // A tool the config registered. Looked up first so a config can add a name the shell does not
     // know; it cannot replace one it does, because a name already registered keeps its meaning.
-    if let Some(outcome) = crate::data::custom::rows_of(name, words) {
+    //
+    // **The rows that reached this stage are handed over.** They used to be dropped here, which is
+    // what made every Lua tool a source: `notes` was expressible and `redact` was not. The planner
+    // was already deciding the edge from `accepts`; this is the other half of that decision.
+    if let Some(outcome) = crate::data::custom::rows_of(name, words, input.as_deref()) {
         return match outcome {
             Ok(rows) => Some((0, Some(rows))),
             Err(e) => {
@@ -123,7 +132,7 @@ pub fn run_tool(
                 Some((2, None))
             }
         },
-        "first" | "last" => {
+        "first" | "final" => {
             let n = words
                 .get(1)
                 .and_then(|w| w.parse::<usize>().ok())
@@ -132,11 +141,36 @@ pub fn run_tool(
             let taken = if name == "first" {
                 verbs::first(&rows, n)
             } else {
-                verbs::last(&rows, n)
+                verbs::final_rows(&rows, n)
             };
             Some((0, Some(taken)))
         }
         "length" => Some((0, Some(verbs::length(&input.unwrap_or_default())))),
+        "group-by" => match words.get(1) {
+            Some(name) => Some((
+                0,
+                Some(summarise::group_by(&input.unwrap_or_default(), name)),
+            )),
+            None => {
+                eprintln!("oslo: group-by: a column name is required");
+                Some((2, None))
+            }
+        },
+        "count" => Some((0, Some(summarise::count(&input.unwrap_or_default())))),
+        "distinct" => Some((
+            0,
+            Some(summarise::distinct(
+                &input.unwrap_or_default(),
+                words.get(1).map(String::as_str),
+            )),
+        )),
+        "stats" => match words.get(1) {
+            Some(name) => Some((0, Some(summarise::stats(&input.unwrap_or_default(), name)))),
+            None => {
+                eprintln!("oslo: stats: a column name is required");
+                Some((2, None))
+            }
+        },
         "each" => {
             let Some(expression) = words.get(1) else {
                 eprintln!("oslo: each: an expression is required");

@@ -58,8 +58,18 @@ ps | where 'cpu > 10' | sort-by cpu | first 5 | to json | jq .
 Filters are **Lua**, not a dialect invented for the occasion, so the escape hatch is the same
 language as the filter: `ls | each 'print(name .. " is " .. size)'`.
 
-Verbs: `where` `each` `cols` `get` `sort-by` `first` `last` `length` `to` `from` `lines` `parse`.
-Producers: `df` `ps` `ls`, and anything you register yourself.
+Verbs: `where` `each` `cols` `get` `sort-by` `first` `final` `length` `to` `from` `lines` `parse`.
+Summaries: `group-by` `count` `distinct` `stats`. Producers: `df` `ps` `ls`, and anything you register
+yourself.
+
+```sh
+ps | group-by user | count            # how many processes each user has
+ls | distinct kind                    # one of each, keeping the first
+df | stats free                       # count, min, max, sum, mean over a column
+```
+
+Selection alone is a nicer `awk`; `ps | group-by user | count` is a query `ps | grep` cannot express.
+There is no `join`: it needs a *second* input stream, and a pipeline is a line.
 
 ### Your POSIX scripts cannot reach any of it
 
@@ -247,7 +257,7 @@ what pressing a key will do.
 ## What you were about to type
 
 **Behind `--features vista`, and off by default.** A default build suggests from history,
-completions and `$PATH` — everything below this line needs the flag, which costs 433 KB:
+completions and `$PATH` — everything below this line needs the flag, which costs 341 KB:
 
 ```sh
 cargo build --release --features vista
@@ -330,6 +340,36 @@ $ hosts | where 'ip:match("^10%.")' | cols host port
 
 A tool says what its rows *are*. The shell decides how they are drawn — and when the next stage
 wants rows, nothing is drawn at all.
+
+### Work that happens off the prompt
+
+```lua
+oslo.spawn{ "git", "status", "--porcelain",
+  on_exit = function(out, status) oslo.state.set("git.dirty", out ~= "") end }
+```
+
+**The callback arrives between commands**, not the instant the process exits — the same safe point
+timers fire at, where the shell holds nothing and can call Lua. That is the honest limitation: a
+prompt segment reading `oslo.state` shows the answer from a moment ago instead of blocking the draw
+to fetch a fresh one. One process, one callback; there is no scheduler and no promise. A missing
+command answers 127 and a `timeout` answers 124, which are the statuses a shell already uses for
+both.
+
+### Completion you declare rather than compute
+
+```lua
+oslo.completion.spec {
+  command = "notes",
+  subcommands = { { name = "new", desc = "start one" },
+                  { name = "list", desc = "every note",
+                    flags = { { "--since", desc = "only newer than" } } } },
+}
+```
+
+The same shape the specs for `git`, `cargo`, `docker` and `npm` are written in, and it runs through
+the same code at Tab time — nested subcommands, flags scoped to the subcommand you are in,
+descriptions in the dropdown. `oslo.completion.for_command` is still there for the cases that have to
+look at the machine; a spec answers the shape of a command, a function answers what is on it.
 
 ### Running commands from Lua
 
@@ -544,8 +584,8 @@ oslo.completion.for_command.nix = oslo.nix.complete
 ## One shell, several histories
 
 ```sh
-oslo                            # ~/.local/share/oslo/default.kv
-OSLO_PROFILE=claude oslo        # claude.kv instead — the default untouched
+oslo                            # ~/.local/share/oslo/history/default/
+OSLO_PROFILE=claude oslo        # history/claude/ instead — the default untouched
 ```
 
 A name is a **letter, then letters, digits, `_` or `-`** — anything else is refused rather than
@@ -564,12 +604,17 @@ table that decides what `cd` and Tab suggest. Give them a profile and that stops
 It is a name, not a lock: two shells can share one, and **Tab in the history finder moves to the
 next profile** — which is how you go and read what the agent ran without leaving your shell.
 
-There used to be two files, `history.db` and `track.kv`. There is one now. Nothing migrates the old
-pair — delete them.
+A profile is a **directory** — `~/.local/share/oslo/history/<name>/` holding `hist.db`, `hist.lock`
+and `hist.model`. So renaming one is `mv`, deleting one is `rm -r`, and copying one to another
+machine is `scp -r`; none of those were quite right when the three files sat flat beside each other.
+
+There used to be two files, `history.db` and `track.kv`. There is one now. Nothing migrates that
+older pair — delete them.
 
 ## Tools
 
-`oslo --help` lists them. `config`, `profile`, `history`, `direnv` and `hook`:
+`oslo --help` lists them — `config`, `profile`, `history`, `hook`, and whichever of `direnv`,
+`plugin` and `scratch` this build has:
 
 ```sh
 oslo history
@@ -581,7 +626,7 @@ oslo config
 
 - it contains no `/`
 - **no file of that name exists**
-- it is one of the five
+- it is one of those names
 
 The second is what makes this safe rather than merely unlikely to bite. oslo does not search
 `$PATH` for a script operand, so when no such file exists the alternative was never "run something
@@ -1010,7 +1055,7 @@ having the `vi` feature enabled — and a handler never has to remember a previo
 `set` on a feature that a `when` predicate owns is refused, because the write would appear to work
 and then be undone by the next `cd`.
 
-**History and the frecency store are deliberately not features.** They are what the command log is
+**History and the frecency ranking are deliberately not features.** They are what the command log is
 built from, and something reading it is entitled to assume it is complete rather than "complete
 except where a config had an opinion" — a gap nobody can see is worse than no data. `redact` and
 `--profile` are the controls that exist for this, and both leave a record that is honestly shaped.
@@ -1049,6 +1094,34 @@ status terminal                    # selected terminal features and their origin
 The predicates answer through the exit status, so they compose with `&&` and `||`. The portable
 spelling of the first line is `case $- in *i*) … esac`, which is correct and which nobody remembers.
 
+### `messages`
+
+```sh
+messages                 # everything this session said, oldest first
+messages -n 10           # the last ten
+messages plugin          # only what the plugin loader said
+messages --errors        # only what failed
+```
+
+What a session said after it has scrolled away — a plugin that could not load, a config file that
+raised, a hook that failed, a prompt segment that is quietly falling back. A config now loads
+`conf.d/*.lua`, plugins, prompt segments and timers, and any of them can fail in one line twenty
+commands ago.
+
+**In memory, and only this session.** It is not a log: nothing rotates, nothing needs permissioning,
+and a hook that echoed a token into a warning does not write it to disk. A repeated line is counted
+rather than kept twice, so a prompt segment failing on every draw cannot push the startup failure out
+of the buffer.
+
+It is a builtin rather than `oslo messages` because a tool is a new process, which has said nothing —
+the same reason `:messages` is a command inside neovim rather than a flag to it. Lua reaches the same
+buffer:
+
+```lua
+oslo.messages.warn("notes", "the database moved; the old one is still there")
+for _, said in ipairs(oslo.messages.all()) do print(said.source, said.text) end
+```
+
 `oslo.proc.capture`, `sh.df()`, `sh.ps()`, `sh.ls()`, `sh.stat()`, `oslo.path.*`, `oslo.json`, `oslo.re`,
 and a `did you mean` drawn from the command index oslo already keeps.
 
@@ -1070,15 +1143,15 @@ somebody building from source is asking for the shell rather than for the floor;
 release artifact is the default build.
 
 Each cost is what turning that one feature *off* takes back out of the full build, measured on the
-static musl binary — 6,081,344 bytes with none of them, 6,902,016 with all five:
+static musl binary — 5,266,368 bytes with none of them, 6,013,312 with all five:
 
 | feature | costs | brings |
 |---|---:|---|
-| `vista` | +433 KB | the model: `predict` as a suggestion source, `oslo.repair`, `oslo.predict.*`, and the correction drawn after a mistyped line |
-| `direnv` | +268 KB | `.env.lua` and `.envrc` read on arrival in a directory, the `direnv` builtin, `oslo.direnv` |
-| `nix` | +68 KB | `oslo.nix` — every `nix --json` answer as a Lua table, and flake-output completion |
-| `scratch` | +64 KB | named sessions that outlive their terminal, and the key that finds them |
-| `ssh` | **+0** | an SSH client — unfinished. Nothing reaches `src/ssh.rs` yet, so the linker discards `maki` and `tokio` whole and the binary is byte-for-byte the default one. It will cost about 0.6 MB the day something calls it |
+| `vista` | +341 KB | the model: `predict` as a suggestion source, `oslo.repair`, `oslo.predict.*`, and the correction drawn after a mistyped line |
+| `direnv` | +200 KB | `.env.lua` and `.envrc` read on arrival in a directory, the `direnv` builtin, `oslo.direnv` |
+| `nix` | +60 KB | `oslo.nix` — every `nix --json` answer as a Lua table, and flake-output completion |
+| `scratch` | +48 KB | named sessions that outlive their terminal, and the key that finds them |
+| `plugin` | +108 KB | `oslo plugin` — installing somebody else's Lua, and loading it on first use. `oslo.db` and the `pre-cmd` veto a plugin is written against are in **every** build |
 
 ```sh
 make build                  # static release, every feature on

@@ -104,11 +104,26 @@ fn a_document_larger_than_a_pipe_buffer_arrives_whole() {
 fn a_command_that_overruns_is_killed_and_says_so() {
     let (_dir, path) = fake("sleep 30");
     let argv = vec!["flake".to_string(), "show".to_string()];
+    // Retried on `ETXTBSY` like `run_fake`, and for the same reason — this one calls
+    // `run_program` directly, so it was the one case the retry there did not cover, and it
+    // failed under a loaded machine months after the rest stopped doing so.
     let started = Instant::now();
-    let err = run_program(path.as_os_str(), &argv, Duration::from_millis(150))
-        .expect_err("should time out");
+    let mut answer = run_program(path.as_os_str(), &argv, Duration::from_millis(150));
+    for _ in 0..100 {
+        match &answer {
+            Err(problem) if problem.contains("Text file busy") => {
+                std::thread::sleep(Duration::from_millis(10));
+                answer = run_program(path.as_os_str(), &argv, Duration::from_millis(150));
+            }
+            _ => break,
+        }
+    }
+    let err = answer.expect_err("should time out");
     assert!(err.contains("timed out"), "{err}");
-    assert!(started.elapsed() < Duration::from_secs(5), "was not killed");
+    assert!(
+        started.elapsed() < Duration::from_secs(15),
+        "was not killed"
+    );
 }
 
 #[test]

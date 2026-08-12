@@ -22,8 +22,18 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-/// What a registered tool does: turn its arguments into rows, or say why it could not.
-pub type Handler = Rc<dyn Fn(&[String]) -> Result<Vec<Record>, String>>;
+/// What a registered tool does: turn its arguments — and the rows that came before it, if it asked
+/// for any — into rows, or say why it could not.
+///
+/// **The input used to be missing, and that was the whole limitation.** `run_tool` had the previous
+/// stage's rows in hand and dropped them, so a Lua tool could only ever be a *source*: `notes` was
+/// possible and `redact` was not, because a verb is a function of what reached it. The planner
+/// already read `accepts` to decide the edge; only the handler could not see across it.
+///
+/// `None` means the tool declared `accepts = "nothing"`, which is still the common case and still
+/// gets no input rather than an empty list — "I was given nothing" and "I was given no rows" are
+/// different, and a verb that filters wants to tell them apart.
+pub type Handler = Rc<dyn Fn(&[String], Option<&[Record]>) -> Result<Vec<Record>, String>>;
 
 thread_local! {
     static TOOLS: RefCell<HashMap<String, Handler>> = RefCell::new(HashMap::new());
@@ -35,9 +45,13 @@ pub fn register(name: &str, handler: Handler) {
 }
 
 /// Run the tool called `name`, or `None` if nothing was registered under it.
-pub fn rows_of(name: &str, argv: &[String]) -> Option<Result<Vec<Record>, String>> {
+pub fn rows_of(
+    name: &str,
+    argv: &[String],
+    input: Option<&[Record]>,
+) -> Option<Result<Vec<Record>, String>> {
     let handler = TOOLS.with(|slot| slot.borrow().get(name).cloned())?;
-    Some(handler(argv))
+    Some(handler(argv, input))
 }
 
 /// Whether a tool of this name was registered, without running it.

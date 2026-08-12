@@ -104,14 +104,21 @@ pub fn load_config(lua: &LuaEngine, path: &Path) {
     // `load_file` still takes a `&str`; a path that is not UTF-8 is reported rather than
     // `unwrap`ped, which is what used to panic the shell before it printed its first prompt.
     let Some(text) = path.to_str() else {
-        eprintln!("oslo: {}: path is not valid UTF-8", path.display());
+        oslo_base::messages::error(path.display().to_string(), "path is not valid UTF-8");
         return;
     };
     if let Err(e) = lua.load_file(text) {
+        // Printed with the path marked up and remembered without the escape codes: a config that
+        // failed at startup is the thing most often still being asked about twenty commands later.
         eprintln!(
             "oslo: {}: {}",
             oslo_ui::marks::path(&path.display().to_string()),
             e
+        );
+        oslo_base::messages::say(
+            oslo_base::messages::Level::Error,
+            path.display().to_string(),
+            e.to_string(),
         );
     }
 }

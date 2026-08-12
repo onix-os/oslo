@@ -97,12 +97,21 @@ thousand candidates and shows eight; a `stat` per candidate would be thousands o
 frame while an arrow key is held, and eight is nothing. The directory entry count is capped for the
 same reason — a spool directory with half a million files in it would be counted on every frame.
 
-Ranking is frecency: `count / (1 + ln(1 + age_in_hours))`, kept in `~/.oslo_frecency` as an
-append-only log of `count<TAB>timestamp<TAB>name` lines folded on load, and rewritten as one line
-per command by the next shell that loads it with 4096 lines or more in it. An append rather than a
-rewrite while the shell runs, so two shells open at once both keep their uses instead of the last
-one out overwriting the other. Only `command`, `builtin` and `subcommand` candidates are counted
-when accepted; every command word of an accepted line is counted too.
+Ranking is frecency: `count / (1 + ln(1 + age_in_hours))`, over **the commands you have run**. The
+counts come from the profile store's run table — one row per command line, carrying `runs` and
+`last_at` — folded to command names the first time a score is asked for, which is the same scan the
+history finder does when it opens. Accepting a completion bumps the name for the rest of the session;
+the run itself is written down when the command runs, so nothing is counted twice.
+
+Wrappers come off, so `sudo git status` ranks `git`, and every line of a command counts towards its
+name — `cargo build` and `cargo test` both rank `cargo`.
+
+**There is no frecency file.** `~/.oslo_frecency` used to hold an append-only log of
+`count<TAB>time<TAB>name`, and every reason for it had gone: the same counts were already in the
+profile store, it was the only store outside XDG, and it was the profile leak — directory ranking was
+per profile while command ranking was not, so an agent profile kept its `cd`s out of yours and let
+every command it completed into the table that ranks yours. It also counted the wrong thing:
+completions accepted rather than commands run, so a command typed in full taught the ranking nothing.
 
 ## What makes it different
 
@@ -159,6 +168,78 @@ oslo.completion.for_command = {
 answer for the one kind it cares about. `for_command` *replaces* oslo's own candidates for that
 command rather than adding to them.
 
+### Adding candidates of your own
+
+```lua
+oslo.completion.provider {
+  name = "tldr",
+  kind = "example",        -- the badge, and the name `oslo.completion.sources` filters on
+  when = "git",            -- this command only; omit and it answers for every command
+  score_offset = 20,       -- a nudge in the ranking, not a position above it
+  max_items = 10,
+  answer = function(ctx)   -- ctx = { command, words, current, arg, cwd }
+    return { { display = "commit --amend", desc = "change the last commit" } }
+  end,
+}
+```
+
+**It adds; `for_command` replaces.** `oslo.completion.for_command.git` means *I own git* and oslo's
+own candidates for it are dropped — the right tool when you are rewriting a command's completions,
+and the wrong one for tldr, which wants three examples *beside* the subcommands oslo already knows.
+So a provider's offers are merged into the list before the kind filter and before the sort, and they
+compete in the same ranking rather than being stapled to one end.
+
+Which is why a provider has the two things `for_command` never had:
+
+- **a kind**, so `oslo.completion.sources` can name it and the badge column can show it. A
+  `for_command` candidate reports none at all, which is why setting `sources` silently removes every
+  config-supplied candidate. A provider that declares no `kind` is badged with its own name.
+- **a score offset**, because merging means competing. It is added to the frecency score in the
+  existing sort — blink.cmp's `score_offset` rather than a priority that overrules everything, so a
+  command you run constantly still beats a suggestion you have never taken.
+
+A provider takes the same guards the ghost's does — `min_chars` and an `enabled` predicate — and a
+list of plain strings is accepted where there is nothing to say about each one:
+`return { "one", "two" }`. `examples/plugins/tldr` is the worked example. Only offers that continue the word being typed are shown, `max_items`
+bounds what one provider can contribute so it cannot flood the menu, and a provider that raises loses
+its own candidates and nothing else. `oslo.completion.providers()` lists what is registered.
+
+### Declaring a spec instead of computing one
+
+```lua
+oslo.completion.spec {
+  command = "notes",
+  desc = "notes kept in the shell",
+  subcommands = {
+    { name = "new",  desc = "start one" },
+    { name = "list", desc = "every note",
+      flags = { { "--since", desc = "only newer than" } } },
+  },
+  flags = { { "-v", "--verbose", desc = "say more" } },
+}
+```
+
+The same shape the four built-in specs are written in, and it goes through the same code at Tab time:
+subcommand matching, the walk down a nested tree, flags scoped to the subcommand you are inside, and
+the description column. `subcommands` nests to any depth, so `docker compose up` is expressible.
+
+A flag's spellings are the array part of its table — `{ "-v", "--verbose", desc = … }` — so it reads
+the way the flag is written; `{ name = "--verbose" }` is accepted as well. An entry that is not a
+table, or that names nothing, is skipped rather than refusing the whole spec: a generated list where
+the third item came out wrong should still complete the other nine.
+
+**A declared spec wins over a built-in one of the same name.** The four compiled in are a starting
+point, not a claim to be right forever — `git` grows subcommands faster than this tree does.
+
+Declaring is not computing, and that is the trade: a spec is data, so it cannot look at the
+filesystem, run a command, or decide anything when Tab is pressed. `for_command` is still there for
+that, and the two compose — a spec answers the *shape* of the command, a function answers what is on
+the machine. There is no `takes = "duration"` on a flag, because nothing in oslo completes the
+argument *to* a flag yet and the field would be a promise the Tab key does not keep.
+
+Until this, a config's only route was `for_command`, and the reason was one word: `CommandSpec` held
+`&'static str`, which a spec built at runtime cannot be stored in at all.
+
 ## Measurements
 
 From `cargo bench --bench fuzzy` on this machine — one short pattern (`gco`, `smart`) scored
@@ -171,6 +252,21 @@ against 3,300 candidates, which is roughly what a `$PATH` holds, averaged over 5
 
 The 60 µs is 22 per cent of the pass, and it is entirely allocation: the scoring itself was never
 the cost. The candidate still has to be folded per call, because it is different every time.
+
+**What it cost to make specs own their strings.** `bench/spec_tab.py` presses Tab on `git comm` in a
+pty forty times and reports the fastest — the deepest walk of this data the shell does, since `git`
+carries the largest spec. Five runs each side, before and after:
+
+| | fastest Tab | binary |
+|---|---|---|
+| `&'static str` | 0.27 ms | 7,077,888 |
+| `String`, plus the `Rc` lookup | 0.27 ms | 7,109,968 |
+
+Nothing visible, which is what was expected and not what was assumed: the walk is a `HashMap` lookup
+and a handful of prefix tests against a tree of a few hundred entries, and it is drawn on a terminal
+either way. The 31 KB is the Lua reader and the second registry, not the string change. Individual
+runs land bimodally at either ~0.28 ms or ~0.50 ms on this machine, on both sides — which is why the
+number quoted is the minimum and not the median.
 
 ## What it cannot do
 
@@ -194,8 +290,12 @@ doing. `sort = "alpha"` also discards the fuzzy pass's own ordering, since the f
 name and nothing else.
 
 Nothing here parses a command's `--help`: the descriptions and the subcommand and flag candidates
-come from the built-in spec registry, so a command with no spec offers no arguments at all, only
-paths.
+come from the spec registry, so a command nobody has written a spec for offers no arguments at all,
+only paths.
+
+A declared spec lives for the session that declared it. There is no file it is read from and nothing
+writes one out, so a spec belongs in `config.lua` or in a plugin — which is where the code that knows
+the command's shape already is.
 
 ## Where it lives
 
@@ -209,6 +309,13 @@ paths.
 | `crates/oslo-ui/src/dropdown/layout.rs` | `compute_layout` — the order width is given up in |
 | `crates/oslo-ui/src/dropdown/render.rs` | `render_vertical_dropdown`, `DEFAULT_ROWS`, `CEILING_ROWS` |
 | `crates/oslo-ui/src/frecency_store.rs` | `FrecencyStore` — the log, the compaction |
+| `crates/oslo-ui/src/spec/mod.rs` | `CommandSpec`, `SubcommandSpec`, `OptionSpec`, `SpecRegistry` |
+| `crates/oslo-ui/src/spec/custom.rs` | the specs a config or a plugin declared |
+| `crates/oslo-ui/src/completion/provider.rs` | the candidate providers, their kinds and offsets |
+| `crates/oslo-ui/src/completion/paths.rs` | `path_candidates` — the one builder that reads the disk |
+| `crates/oslo-runtime/src/lua/api/complete.rs` | `oslo.completion.provider` — the Lua reader |
+| `crates/oslo-ui/src/spec/definitions/` | the four written by hand: `git`, `cargo`, `docker`, `npm` |
+| `crates/oslo-runtime/src/lua/api/spec.rs` | `oslo.completion.spec` — the Lua reader |
 | `crates/oslo-ui/src/spec/frecency.rs` | `FrecencyTracker::get_score` — the formula |
 | `crates/oslo-ui/src/settings/from_lua.rs` | how each `oslo.completion.*` key is read |
 | `crates/oslo-runtime/src/lua/columns.rs` | the `columns` and `for_command` hooks |

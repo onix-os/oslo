@@ -464,7 +464,7 @@ pub fn read_line(
             InputEvent::Focus(_) => continue,
             // A prompt rebuilt itself behind the editor. `repaint` is already true and the
             // generation check at the top of the loop picks the new text up.
-            InputEvent::PromptRefreshed => continue,
+            InputEvent::Refreshed => continue,
             InputEvent::Mouse(event) => {
                 if event.pressed
                     && event.button == crate::term::mouse::Button::Left

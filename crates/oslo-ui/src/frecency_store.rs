@@ -1,138 +1,133 @@
-//! Persistence and shared access for the frecency table.
+//! Shared access to the frecency table, seeded from the commands you have actually run.
 //!
-//! [`crate::spec::FrecencyTracker`] had no callers at all: `record_use` was never
-//! invoked, so `get_score` answered 0.0 for everything and the completion sort collapsed to
-//! alphabetical — typing `exit` offered `exitsnoop-bpfcc`. This wraps the tracker in the two
-//! things that were missing: interior mutability, because the completer only ever holds `&self`,
-//! and a file, because a ranking that resets every session never gets good.
+//! [`crate::spec::FrecencyTracker`] had no callers at all: `record_use` was never invoked, so
+//! `get_score` answered 0.0 for everything and the completion sort collapsed to alphabetical —
+//! typing `exit` offered `exitsnoop-bpfcc`. This wraps the tracker in interior mutability, because
+//! the completer only ever holds `&self`, and in a source of past counts, because a ranking that
+//! resets every session never gets good.
 //!
-//! The file is an append-only log of `count<TAB>timestamp<TAB>name` lines, folded on load. An
-//! append is atomic enough for the small records involved, so two shells running side by side
-//! both keep their uses instead of the last one out overwriting the other — which is exactly the
-//! failure the history file has.
+//! # There is no frecency file
+//!
+//! There used to be one: `$HOME/.oslo_frecency`, an append-only log of `count<TAB>time<TAB>name`.
+//! It was a bolt-on — written to give the dead tracker something to load, at a moment when giving
+//! it a file of its own was the smallest change that worked — and every reason for it had gone:
+//!
+//! - **The counts were already in the profile store.** `Tree::Run` holds one row per command line
+//!   with `runs` and `last_at` on it, which is the same `(count, last used)` pair the log kept.
+//! - **It was the profile leak.** Directory ranking is per profile and command ranking was not, so
+//!   `oslo --profile=claude` kept an agent's `cd`s out of yours and let every command it completed
+//!   into the table that ranks yours.
+//! - **It was the only store outside XDG**, sitting in `$HOME` beside nothing.
+//!
+//! # Runs, not completions
+//!
+//! The log counted *completions you accepted*; this counts *commands you ran*. `git` should rank
+//! high because you run it constantly, not because you press Tab at it constantly — and a command
+//! typed in full, which is most of them, used to teach the ranking nothing at all.
+//!
+//! Wrappers come off on the way in, so `sudo git status` ranks `git`.
+//!
+//! # Seeded on first use, not at startup
+//!
+//! Folding the run table is a scan, and a shell that pays for one before its first prompt is a
+//! shell that got slower to start so that Tab could be marginally better. The scan happens the
+//! first time a score is asked for — the same thing the history finder does when it opens.
 
 use super::spec::FrecencyTracker;
-use std::fs::{self, OpenOptions};
-use std::io::Write;
-use std::path::{Path, PathBuf};
 use std::sync::Mutex;
-use std::time::{SystemTime, UNIX_EPOCH};
-
-/// Rewrite the log once it has this many lines, so a long-lived shell does not grow it forever.
-const COMPACT_AT: usize = 4096;
 
 pub struct FrecencyStore {
     tracker: Mutex<FrecencyTracker>,
-    path: Option<PathBuf>,
+    /// Whether past runs should be folded in on first use. False for a store that must not read
+    /// anything — tests, and any shell with nobody typing at it.
+    seed: bool,
+    seeded: Mutex<bool>,
 }
 
 impl FrecencyStore {
-    /// Load the table from `path`, if it is readable.
-    ///
-    /// A missing or corrupt file is not an error: ranking is an optimisation, and refusing to
-    /// start a shell over it would be absurd.
-    pub fn load(path: Option<PathBuf>) -> Self {
-        let mut tracker = FrecencyTracker::new();
-        let mut lines = 0usize;
-        if let Some(ref p) = path
-            && let Ok(text) = fs::read_to_string(p)
-        {
-            for line in text.lines() {
-                lines += 1;
-                if let Some((count, last, name)) = parse_line(line) {
-                    tracker.merge(name, count, last);
-                }
-            }
+    /// A store that folds in what this profile has run, the first time it is asked anything.
+    pub fn from_history() -> Self {
+        Self {
+            tracker: Mutex::new(FrecencyTracker::new()),
+            seed: true,
+            seeded: Mutex::new(false),
         }
-
-        let store = Self {
-            tracker: Mutex::new(tracker),
-            path,
-        };
-        if lines >= COMPACT_AT {
-            store.compact();
-        }
-        store
     }
 
-    /// A store that never touches the disk. Used by tests and by non-interactive shells.
+    /// A store that reads nothing. Used by tests and by non-interactive shells.
     pub fn in_memory() -> Self {
         Self {
             tracker: Mutex::new(FrecencyTracker::new()),
-            path: None,
+            seed: false,
+            seeded: Mutex::new(true),
         }
     }
 
-    /// The default location, beside the history file.
-    pub fn default_path() -> Option<PathBuf> {
-        std::env::var_os("HOME").map(|h| PathBuf::from(h).join(".oslo_frecency"))
+    /// Fold in past runs: `(line, runs, last_at)` as the store holds them.
+    ///
+    /// Takes the counts rather than the database so that what is tested is the folding, and so that
+    /// this crate does not have to build a store to have an opinion about one.
+    pub fn seed_from(&self, commands: impl IntoIterator<Item = (String, i64, i64)>) {
+        let mut tracker = self.tracker.lock().unwrap();
+        for (line, runs, last_at) in commands {
+            // The command *name*, so `cargo build` and `cargo test` both rank `cargo` — which is
+            // what the dropdown offers. `head_of` has already dropped `sudo` and `VAR=x`.
+            let head = oslo_base::track::head_of(&line);
+            let Some(name) = head.split_whitespace().next() else {
+                continue;
+            };
+            if name.is_empty() || runs <= 0 {
+                continue;
+            }
+            tracker.merge(name, runs.max(0) as u64, last_at.max(0) as u64);
+        }
     }
 
-    /// Count one use of `name`, in memory and on disk.
+    /// Fold in past runs once, if this store was built to.
+    fn ensure_seeded(&self) {
+        if !self.seed {
+            return;
+        }
+        {
+            let mut seeded = self.seeded.lock().unwrap();
+            if *seeded {
+                return;
+            }
+            // Marked before the scan, not after: a scan that finds nothing must not be retried on
+            // every keystroke for the rest of the session.
+            *seeded = true;
+        }
+        let Some(track) = oslo_base::track::store() else {
+            return;
+        };
+        // A cap, because this folds to command *names* — a store with a hundred thousand runs has
+        // a few hundred of those, and the tail of distinct lines cannot change the ranking.
+        let commands = track.commands(20_000);
+        self.seed_from(
+            commands
+                .into_iter()
+                .map(|command| (command.line, command.runs, command.last_at)),
+        );
+    }
+
+    /// Count one use of `name`, for this session.
+    ///
+    /// **In memory only.** The run itself is written down by the tracker when the command runs, so
+    /// writing here as well would count it twice. This exists so that accepting a completion moves
+    /// the ranking *now* rather than at the next start.
     pub fn record(&self, name: &str) {
         if name.is_empty() {
             return;
         }
-        let now = now_secs();
+        self.ensure_seeded();
         self.tracker.lock().unwrap().record_use(name);
-        if let Some(ref p) = self.path {
-            append(p, name, now);
-        }
     }
 
     /// This command's rank, higher being better. Zero for anything never used.
     pub fn score(&self, name: &str) -> f64 {
+        self.ensure_seeded();
         self.tracker.lock().unwrap().get_score(name)
     }
-
-    /// Rewrite the log as one line per command.
-    fn compact(&self) {
-        let Some(ref p) = self.path else {
-            return;
-        };
-        let guard = self.tracker.lock().unwrap();
-        let mut out = String::new();
-        for (name, count, last) in guard.entries() {
-            if name.contains(['\t', '\n']) {
-                continue;
-            }
-            out.push_str(&format!("{}\t{}\t{}\n", count, last, name));
-        }
-        // Written through a sibling temp file so a crash mid-write cannot truncate the table.
-        let tmp = p.with_extension("tmp");
-        if fs::write(&tmp, out).is_ok() {
-            let _ = fs::rename(&tmp, p);
-        }
-    }
-}
-
-fn append(path: &Path, name: &str, now: u64) {
-    // A name with a tab or newline in it would corrupt the log; such a command name is not worth
-    // ranking.
-    if name.contains(['\t', '\n']) {
-        return;
-    }
-    if let Ok(mut f) = OpenOptions::new().create(true).append(true).open(path) {
-        let _ = writeln!(f, "1\t{}\t{}", now, name);
-    }
-}
-
-fn parse_line(line: &str) -> Option<(u64, u64, &str)> {
-    let mut parts = line.splitn(3, '\t');
-    let count = parts.next()?.parse().ok()?;
-    let last = parts.next()?.parse().ok()?;
-    let name = parts.next()?;
-    if name.is_empty() {
-        return None;
-    }
-    Some((count, last, name))
-}
-
-fn now_secs() -> u64 {
-    SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_secs())
-        .unwrap_or(0)
 }
 
 #[cfg(test)]
@@ -156,63 +151,83 @@ mod tests {
         assert!(store.score("git") > store.score("gcc"));
     }
 
+    fn now() -> i64 {
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|d| d.as_secs() as i64)
+            .unwrap_or(0)
+    }
+
+    /// **What replaced the file.** Past runs come from the profile store, so a fresh session ranks
+    /// what you actually use rather than starting flat.
     #[test]
-    fn uses_survive_a_restart() {
-        let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("frecency");
+    fn past_runs_rank_before_anything_is_typed() {
+        let store = FrecencyStore::in_memory();
+        store.seed_from([
+            ("cargo build".to_string(), 40, now()),
+            ("ls -la".to_string(), 2, now()),
+        ]);
+        assert!(store.score("cargo") > store.score("ls"));
+        assert_eq!(store.score("nothing-here"), 0.0);
+    }
 
-        let first = FrecencyStore::load(Some(path.clone()));
-        first.record("cargo");
-        first.record("cargo");
-        first.record("ls");
-        let expected = first.score("cargo");
-        drop(first);
+    /// The whole line folds to its command, so every `cargo …` counts towards `cargo`.
+    #[test]
+    fn every_line_of_a_command_counts_towards_its_name() {
+        let store = FrecencyStore::in_memory();
+        store.seed_from([
+            ("cargo build".to_string(), 3, now()),
+            ("cargo test".to_string(), 4, now()),
+            ("git status".to_string(), 5, now()),
+        ]);
+        assert!(store.score("cargo") > store.score("git"), "3 + 4 beats 5");
+    }
 
-        let second = FrecencyStore::load(Some(path));
-        assert!((second.score("cargo") - expected).abs() < 1e-6);
-        assert!(second.score("cargo") > second.score("ls"));
+    /// `sudo git status` is a use of `git`. Ranking `sudo` would put it above everything you own.
+    #[test]
+    fn a_wrapper_is_not_the_command() {
+        let store = FrecencyStore::in_memory();
+        store.seed_from([("sudo git status".to_string(), 9, now())]);
+        assert!(store.score("git") > 0.0);
+        assert_eq!(store.score("sudo"), 0.0);
+    }
+
+    /// Recency is half the score, so a seeded count must keep the time it happened rather than
+    /// being dated to startup.
+    #[test]
+    fn an_old_run_ranks_below_a_recent_one_with_the_same_count() {
+        let store = FrecencyStore::in_memory();
+        let long_ago = now() - 60 * 60 * 24 * 90;
+        store.seed_from([
+            ("ancient".to_string(), 10, long_ago),
+            ("current".to_string(), 10, now()),
+        ]);
+        assert!(store.score("current") > store.score("ancient"));
     }
 
     #[test]
-    fn two_shells_do_not_clobber_each_other() {
-        let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("frecency");
-
-        let a = FrecencyStore::load(Some(path.clone()));
-        let b = FrecencyStore::load(Some(path.clone()));
-        a.record("apples");
-        b.record("bananas");
-        drop((a, b));
-
-        let third = FrecencyStore::load(Some(path));
-        assert!(third.score("apples") > 0.0);
-        assert!(third.score("bananas") > 0.0);
+    fn a_row_with_nothing_usable_in_it_is_skipped() {
+        let store = FrecencyStore::in_memory();
+        store.seed_from([
+            ("".to_string(), 5, now()),
+            ("   ".to_string(), 5, now()),
+            ("zero".to_string(), 0, now()),
+        ]);
+        assert_eq!(store.score("zero"), 0.0);
     }
 
+    /// A store that reads nothing must not go looking, and one that has read must not read again.
     #[test]
-    fn a_corrupt_log_is_ignored_not_fatal() {
-        let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("frecency");
-        fs::write(&path, "garbage\n\n1\tnot-a-number\tx\n1\t100\tgood\n").unwrap();
+    fn seeding_happens_at_most_once() {
+        let store = FrecencyStore::in_memory();
+        assert!(*store.seeded.lock().unwrap());
+        store.score("anything");
 
-        let store = FrecencyStore::load(Some(path));
-        assert!(store.score("good") > 0.0);
-        assert_eq!(store.score("x"), 0.0);
-    }
-
-    #[test]
-    fn a_long_log_is_compacted_on_load() {
-        let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("frecency");
-        let mut text = String::new();
-        for i in 0..COMPACT_AT + 10 {
-            text.push_str(&format!("1\t100\tcmd{}\n", i % 5));
-        }
-        fs::write(&path, text).unwrap();
-
-        let store = FrecencyStore::load(Some(path.clone()));
-        assert!(store.score("cmd0") > 0.0);
-        let compacted = fs::read_to_string(&path).unwrap();
-        assert_eq!(compacted.lines().count(), 5);
+        let live = FrecencyStore::from_history();
+        assert!(!*live.seeded.lock().unwrap());
+        // No store is installed in a test process, so this folds nothing — and still only tries the
+        // once, which is the property that matters on the keystroke path.
+        live.score("anything");
+        assert!(*live.seeded.lock().unwrap());
     }
 }

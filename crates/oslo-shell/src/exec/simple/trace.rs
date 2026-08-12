@@ -16,7 +16,10 @@ use crate::env::Environment;
 /// `words` is the expanded argument vector. Either may be empty — `x=1` on its own is traced with
 /// no words, and a plain `echo hi` with no assignments.
 pub fn trace_command(env: &Environment, assignments: &[(String, String)], words: &[String]) {
-    if !env.xtrace() {
+    // **A vetoed command is not traced.** `set -x` prints every expanded argument, which is the one
+    // place a credential reaches the terminal from *inside* execution rather than from the loop that
+    // decided to hide the line.
+    if !env.xtrace() || oslo_base::quiet::active() {
         return;
     }
     let fields = assignments

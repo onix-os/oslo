@@ -24,10 +24,18 @@ pub mod error;
 /// Parts of the shell a config can turn off and on again while it runs.
 pub mod feature;
 pub mod hooks;
+/// What this session said, kept after it has scrolled off.
+pub mod messages;
 /// The depth guard every parse passes through, and the heredoc scan that feeds alias expansion.
 pub mod nesting;
 #[cfg(feature = "vista")]
 pub mod predict;
+/// Whether the command now running must leave no trace of itself.
+pub mod quiet;
+/// A database a config or a plugin owns, kept apart from oslo's own.
+pub mod store;
 pub mod track;
+/// The shell's version, as one number rather than one per crate.
+pub mod version;
 
 pub use error::{Result, ShellError};

@@ -7,8 +7,11 @@
 //! previous implementation recognised three forms and silently started a REPL for everything
 //! else, so `oslo --version` read the caller's stdin and exited 0.
 
+pub mod config;
 pub mod help;
 pub mod history;
+#[cfg(feature = "plugin")]
+pub mod plugin;
 #[cfg(feature = "scratch")]
 pub mod scratch;
 pub mod tools;

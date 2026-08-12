@@ -24,6 +24,7 @@ pub mod language;
 pub mod lua_init;
 pub mod mode;
 pub mod native;
+mod plugins;
 pub mod prompt;
 pub mod rc;
 mod read;
@@ -32,5 +33,6 @@ pub mod repl;
 #[cfg(feature = "direnv")]
 mod report;
 mod terminal;
+mod timers;
 pub mod timing;
 mod tracking;

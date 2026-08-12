@@ -264,7 +264,7 @@ pub fn report_failure(caller: &str, operand: &str, e: &io::Error) {
     if operand.is_empty() {
         eprintln!("oslo: {caller}: {NULL_DIRECTORY}");
     } else {
-        eprintln!("oslo: {caller}: {operand}: {e}");
+        eprintln!("oslo: {caller}: {operand}: {}", oslo_base::error::reason(e));
     }
 }
 

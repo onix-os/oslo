@@ -104,6 +104,9 @@ pub fn call_here(f: &Value, args: Vec<Value>) -> LuaResult<Vec<Value>> {
 mod borrow;
 /// The hook reach-backs, which every fire site outside this file uses.
 mod hooks;
+/// Running a plugin's entry file on this session's interpreter.
+#[cfg(feature = "plugin")]
+mod plugin;
 /// Hooks held until the shell can act on them. See that module for why.
 mod queue;
 pub(crate) use borrow::borrow_env;
@@ -111,6 +114,8 @@ pub use hooks::{
     answer_hook_here, answer_hook_with, ask_hook_here, fire_at_here, key_hook_here,
     key_hook_watched,
 };
+#[cfg(feature = "plugin")]
+pub(crate) use plugin::load_plugin_file;
 pub use queue::drain as run_deferred_hooks;
 
 /// Turn whatever a Lua builtin returned into an exit status.
@@ -317,7 +322,7 @@ impl LuaEngine {
     pub fn fire_hook(&self, name: &str, args: Vec<Value>) {
         for handler in crate::lua::api::hook_handlers(&self.registry, name) {
             if let Err(e) = self.interp.call(&handler, args.clone()) {
-                eprintln!("oslo: {name} hook: {e}");
+                oslo_base::messages::error(format!("{name} hook"), e.to_string());
             }
         }
     }
@@ -464,7 +469,7 @@ impl LuaEngine {
             Err(e) => {
                 // Reported rather than swallowed: a prompt function that raises leaves the shell
                 // silently drawing its default, which looks exactly like the config not loading.
-                eprintln!("oslo: {key}: {e}");
+                oslo_base::messages::error(key, e.to_string());
                 None
             }
         }
@@ -512,7 +517,9 @@ impl LuaEngine {
                 Ok(values) => values.first().cloned().unwrap_or(Value::Nil),
                 Err(e) => {
                     // Named, because with several segments "the prompt failed" does not say which.
-                    eprintln!("oslo: prompt: segment '{name}': {e}");
+                    // A segment fails on every draw, which is what `messages` counts rather than
+                    // keeps five hundred times.
+                    oslo_base::messages::error(format!("prompt segment '{name}'"), e.to_string());
                     continue;
                 }
             };

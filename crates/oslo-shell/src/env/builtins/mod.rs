@@ -32,6 +32,7 @@ mod io;
 mod jobs;
 mod r#let;
 mod mapfile;
+mod messages;
 mod nav;
 mod process;
 mod remove;
@@ -68,6 +69,7 @@ pub use io::{builtin_echo, builtin_printf, builtin_read, shell_quote};
 pub use jobs::{builtin_bg, builtin_disown, builtin_fg, builtin_jobs, builtin_wait};
 pub use r#let::builtin_let;
 pub use mapfile::builtin_mapfile;
+pub use messages::builtin_messages;
 pub use process::{
     builtin_kill, builtin_trap, builtin_umask, run_debug_trap, run_exit_trap, run_pending_traps,
 };
@@ -204,6 +206,9 @@ pub fn register_default_builtins(env: &mut Environment) {
     // computed this and dropped it, and `$PIPESTATUS` only answers one level down.
     env.register_custom_builtin("chain", builtin_chain);
     env.register_custom_builtin("status", builtin_status);
+    // `messages` — what this session said after it has scrolled off. A builtin rather than a tool
+    // because the buffer is this process's memory; see its module docs.
+    env.register_custom_builtin("messages", builtin_messages);
     env.register_custom_builtin("universal", builtin_universal);
     env.register_custom_builtin("suspend", builtin_suspend);
 
@@ -249,6 +254,7 @@ mod tests {
             "suspend",
             "rm",
             "chain",
+            "messages",
         ] {
             assert!(env.is_builtin(name), "{name} is not registered");
             assert!(

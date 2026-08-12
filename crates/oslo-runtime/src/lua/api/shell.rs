@@ -44,7 +44,10 @@ pub fn install(
 /// Who and where you are is `oslo.sys`; which process this is and how the last one ended is
 /// `oslo.proc`. `oslo.version` stays on `oslo` itself — it describes the whole thing.
 fn facts(oslo: &mut Table, system: &mut Table, process: &mut Table, env: &Arc<Mutex<Environment>>) {
-    oslo.set(Value::str("version"), Value::str(env!("CARGO_PKG_VERSION")));
+    oslo.set(
+        Value::str("version"),
+        Value::str(oslo_base::version::current()),
+    );
 
     // Read at call time, not at startup: a script that changes `$USER` or `hostname` mid-session
     // should see what it changed, and a value frozen at startup is a lie that is hard to spot.
@@ -155,7 +158,84 @@ fn hooks(registry: &Registry) -> Value {
             ok(handle(&registry, &key, id))
         });
     }
+    user_events(&mut on, registry);
     Value::table(on)
+}
+
+/// Where a *plugin* names the moment.
+///
+/// ```lua
+/// oslo.on.user("notes:saved", function(data, name) … end)   -- anyone who cares
+/// oslo.on.emit("notes:saved", { key = k })                  -- the plugin that did it
+/// ```
+///
+/// **The one thing two plugins can share.** Every hook above is a name oslo chose, so two plugins
+/// could previously compose only through the filesystem; this is the same mechanism neovim gets from
+/// its single `User` event, which is what its ecosystem coordinates through.
+///
+/// The storage is the built-in hooks' own, under a `user:` prefix — so a handler is removed by the
+/// same handle, fired in the order it was attached, and a raising one is reported while the rest
+/// still run. What is *not* shared is the watched bitset: that exists so an unused hot-path hook
+/// costs nothing, and nothing here is on a hot path.
+fn user_events(on: &mut Table, registry: &Registry) {
+    let for_attach = Rc::clone(registry);
+    put(on, "user", move |_, args| {
+        let name = event_name(args.first(), "oslo.on.user")?;
+        let Some(handler @ Value::Function(_)) = args.get(1) else {
+            return Err(LuaError::new(
+                "oslo.on.user: the second argument must be a function".to_string(),
+            ));
+        };
+        let key = format!("{HOOK_PREFIX}user:{name}");
+        let id = append(&for_attach, &key, handler.clone());
+        ok(handle(&for_attach, &key, id))
+    });
+
+    let for_emit = Rc::clone(registry);
+    put(on, "emit", move |_, args| {
+        let name = event_name(args.first(), "oslo.on.emit")?;
+        let payload = args.get(1).cloned().unwrap_or(Value::Nil);
+        let mut ran = 0;
+        for handler in handlers(&for_emit, &format!("user:{name}")) {
+            // The name as the second argument, so one handler can serve several events — the same
+            // thing neovim's `match` gives a `User` autocommand.
+            match crate::lua::engine::call_here(&handler, vec![payload.clone(), Value::str(&name)])
+            {
+                Ok(_) => ran += 1,
+                // Reported and stepped over, like every other hook: one plugin's broken handler
+                // must not stop another's from hearing the event.
+                Err(problem) => eprintln!("oslo: {name}: {problem}"),
+            }
+        }
+        // How many heard it, which is the only way an emitter can tell "nobody is listening" from
+        // "everybody failed".
+        ok(Value::int(ran))
+    });
+}
+
+/// An event name, or why it is not one.
+///
+/// **Refused rather than accepted loosely**, because the failure it prevents is silent: a typo in
+/// `oslo.on.user("notes:svaed", …)` subscribes to an event nothing will ever emit, and the plugin
+/// simply never reacts. A name with a space or a newline in it is a mistake that reads as one.
+fn event_name(value: Option<&Value>, called: &str) -> Result<String, LuaError> {
+    let Some(Value::Str(name)) = value else {
+        return Err(LuaError::new(format!(
+            "{called}: the first argument is the event's name"
+        )));
+    };
+    let name = name.to_string();
+    let shaped = !name.is_empty()
+        && name.len() <= 64
+        && name
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || ":._-/".contains(c));
+    if !shaped {
+        return Err(LuaError::new(format!(
+            "{called}: {name:?} is not an event name: letters, digits, and `: . _ - /`"
+        )));
+    }
+    Ok(name)
 }
 
 /// Add a handler to a hook's list, answering its position.
@@ -195,7 +275,15 @@ fn handle(registry: &Registry, key: &str, id: i64) -> Value {
 }
 
 /// Every handler currently attached to `name`, in the order they were added.
+///
+/// **Where a plugin waiting on a hook wakes up.** Every path that fires a hook comes through here to
+/// find its handlers, so this is the one place that can load a plugin *before* the firing it asked
+/// for — a plugin woken afterwards would hear the next one instead, which reads as "it works,
+/// sometimes". `load_for_hook` is a length check when nothing is waiting, which is every session
+/// that has no such plugin.
 pub(crate) fn handlers(registry: &Registry, name: &str) -> Vec<Value> {
+    #[cfg(feature = "plugin")]
+    crate::plugin::load_for_hook(name);
     let key = format!("{HOOK_PREFIX}{name}");
     let Some(V::Table(list)) = registry.borrow().get(&key).cloned() else {
         return Vec::new();

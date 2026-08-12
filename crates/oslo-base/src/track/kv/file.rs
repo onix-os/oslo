@@ -43,10 +43,13 @@ pub(super) fn open_lock(path: &Path) -> Option<File> {
     Some(lock)
 }
 
+/// `hist.db` locks on `hist.lock`, `notes.kv` on `notes.lock`.
+///
+/// The extension is replaced rather than appended. It used to append, giving `hist.db.lock` beside
+/// `hist.db` and `hist.model` — one of three files in a profile's directory wearing its own name
+/// differently, for no reason beyond how the string was built.
 fn lock_path(path: &Path) -> PathBuf {
-    let mut lock_path = path.as_os_str().to_os_string();
-    lock_path.push(".lock");
-    lock_path.into()
+    path.with_extension("lock")
 }
 
 /// Creates the database directory and restricts it to the current user.

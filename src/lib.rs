@@ -19,7 +19,7 @@
 pub use oslo_base::predict;
 /// The bottom of the stack: the syntax tree, the error type, the feature bits, the hook registry
 /// and the tracking store.
-pub use oslo_base::{ast, error, feature, hooks, nesting, track};
+pub use oslo_base::{ast, error, feature, hooks, messages, nesting, track, version};
 
 #[cfg(feature = "direnv")]
 pub use oslo_shell::direnv;
@@ -37,11 +37,6 @@ pub use oslo_ui as ui;
 
 /// The Lua API a config is written against, and the interpreter that owns it.
 pub use oslo_runtime::lua;
-
-/// SSH, behind the `ssh` feature — off by default. See the module docs for what it costs and what
-/// is still undecided.
-#[cfg(feature = "ssh")]
-pub mod ssh;
 
 /// Helper-level tests for the editor, driven against a real `Environment`.
 ///

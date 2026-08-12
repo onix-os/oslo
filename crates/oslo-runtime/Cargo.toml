@@ -17,6 +17,10 @@ scratch = ["oslo-shell/scratch"]
 direnv = ["oslo-shell/direnv"]
 # `nix` — see the note on `oslo-shell`.
 nix = ["oslo-shell/nix"]
+# `plugin` — the manifest, the index, and loading a plugin's Lua on first use. See the workspace
+# root. `dep:sha2` is the trust gate: a plugin is loaded only while its files hash to what was
+# allowed at install.
+plugin = ["dep:sha2"]
 
 
 [dependencies]
@@ -38,6 +42,10 @@ regex = { version = "1", default-features = false, features = [
 
 # `oslo.json`.
 serde_json = "1"
+
+# The `plugin` trust gate hashes a plugin's files. Optional, so a build without the feature does not
+# compile it at all.
+sha2 = { version = "0.10", optional = true }
 
 # Capturing an rc file's own output so it can be printed under the file that produced it.
 tempfile = "3.17"
