@@ -72,6 +72,66 @@ pub fn generation() -> u64 {
 /// was still coming was for a line that no longer exists.
 pub fn settle() {
     OUTSTANDING.store(0, Ordering::SeqCst);
+    WAKE_AT.with(|at| at.set(None));
+}
+
+thread_local! {
+    /// The soonest moment something wants the editor to have another turn.
+    ///
+    /// **What makes a debounce possible at all.** A provider that waits for typing to stop has
+    /// nothing to wait *with*: the editor blocks on a keystroke, so a delay measured from the last
+    /// key would be noticed only when the next one arrived — which is exactly the key the delay
+    /// exists to avoid asking about. This asks for a turn at a stated time.
+    ///
+    /// Thread-local because only the editor sets and reads it, unlike [`OUTSTANDING`], which a
+    /// worker thread decrements when its answer lands.
+    static WAKE_AT: std::cell::Cell<Option<std::time::Instant>> = const {
+        std::cell::Cell::new(None)
+    };
+}
+
+/// Ask for a turn in `after`, unless something already wants one sooner.
+pub fn wake_in(after: std::time::Duration) {
+    WAKE_AT.with(|at| {
+        let want = std::time::Instant::now() + after;
+        match at.get() {
+            Some(already) if already <= want => {}
+            _ => at.set(Some(want)),
+        }
+    });
+}
+
+/// Whether the editor should come up for air at all: an answer is coming, or a turn was asked for.
+pub fn waiting() -> bool {
+    outstanding() || WAKE_AT.with(|at| at.get().is_some())
+}
+
+/// Whether the moment asked for has arrived, clearing it if so.
+///
+/// Clearing here rather than leaving it to the caller: a turn that has been given is spent, and one
+/// that stayed set would make the editor spin at the poll interval for the rest of the session.
+pub fn due() -> bool {
+    WAKE_AT.with(|at| match at.get() {
+        Some(want) if std::time::Instant::now() >= want => {
+            at.set(None);
+            true
+        }
+        _ => false,
+    })
+}
+
+/// How long the editor may block for, given `slice` as the longest it would otherwise wait.
+///
+/// Never longer than the turn somebody asked for, and never zero — a zero timeout is a spin.
+pub fn slice_ms(slice: i32) -> i32 {
+    let Some(want) = WAKE_AT.with(|at| at.get()) else {
+        return slice;
+    };
+    let left = want
+        .saturating_duration_since(std::time::Instant::now())
+        .as_millis()
+        .min(i32::MAX as u128) as i32;
+    left.clamp(1, slice)
 }
 
 #[cfg(test)]

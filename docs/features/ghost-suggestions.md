@@ -217,6 +217,40 @@ Three rules a provider cannot escape:
 
 `oslo.suggest.providers()` lists what is registered, in the order they are asked.
 
+### A provider that has to go and ask something
+
+An answer over a network cannot be given on the keystroke path, so a provider says `request` instead
+of `answer` and calls `reply` whenever the answer turns up:
+
+```lua
+oslo.suggest.provider {
+  name = "llm",
+  debounce_ms = 120,       -- wait for typing to stop; 120 is the default
+  timeout_ms = 2000,       -- give up after this; 2000 is the default
+  request = function(ctx, reply)
+    oslo.spawn { "my-llm", ctx.line, on_exit = function(out) reply(out) end }
+  end,
+}
+```
+
+`request` still runs on the keystroke path — what makes it asynchronous is what it *starts*, not how
+long it takes to start it. `oslo.spawn` is the intended shape.
+
+The three things that make this safe are worth knowing, because they are what an inline-completion
+feature usually gets wrong:
+
+- **The debounce is real.** A line is asked about only once typing has been still for
+  `debounce_ms`, so a word typed at speed is one question rather than eight. The editor is woken at
+  that moment rather than waiting for your next keystroke — otherwise the delay would expire only
+  when you pressed the very key it exists to avoid asking about.
+- **`reply` is bound to the line it was asked about.** An answer for `gi` that arrives after you have
+  typed `git ` does not match and is never drawn. This is not a check that could be forgotten: the
+  answer is stored under the question, and only an exact match is drawn.
+- **A decline is remembered, and so is a timeout.** Either way the line is not asked about again;
+  otherwise a provider that had stopped answering would be asked once per frame for ever.
+
+When the answer lands the line repaints on its own — the same mechanism an asynchronous prompt uses.
+
 ## Measurements
 
 `cargo bench --bench keystroke`, release, on this machine:

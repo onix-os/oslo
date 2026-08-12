@@ -18,7 +18,6 @@ pub mod marks;
 pub mod matching;
 pub mod nav;
 pub mod paint;
-/// Answers that have not arrived yet, and the editor's willingness to wait for them.
 pub mod pending;
 pub mod prompt;
 pub mod query;
@@ -32,7 +31,6 @@ pub mod scanner;
 pub mod settings;
 pub mod shell;
 pub mod spec;
-/// Ghost suggestions a config or a plugin supplies.
 pub mod suggest;
 pub mod syntax;
 pub mod term;

@@ -5,13 +5,20 @@ use oslo_ui::suggest::{Ctx, ask, forget, names};
 /// again when the editor asks. A hand-built table would test none of those — and testing against one
 /// is how the first version of this file passed while the feature did not work at all.
 fn declare(source: &str) -> Result<(), String> {
+    on_engine(source).map(|_| ())
+}
+
+/// The same, handing the engine back so a test can run more Lua against it — which is how a reply
+/// that arrives *later* is delivered without a second interpreter.
+fn on_engine(source: &str) -> Result<crate::LuaEngine, String> {
     forget();
     let engine = crate::LuaEngine::new().map_err(|e| e.to_string())?;
     let env = std::sync::Arc::new(std::sync::Mutex::new(oslo_shell::env::Environment::new()));
     engine.setup_bindings(env).map_err(|e| e.to_string())?;
     engine
         .eval_as(source, "suggest test")
-        .map_err(|e| e.to_string())
+        .map_err(|e| e.to_string())?;
+    Ok(engine)
 }
 
 fn ctx(line: &str) -> Ctx {
@@ -106,5 +113,73 @@ fn the_names_come_back_in_the_order_they_are_asked() {
     )
     .expect("declares");
     assert_eq!(names(), vec!["first".to_string(), "second".to_string()]);
+    forget();
+}
+
+// ---------------------------------------------------------------- answering later
+
+/// **The shape an LLM provider has.** `request` starts something and returns; `reply` is called
+/// whenever the answer turns up, and carries the line it was asked about.
+#[test]
+fn a_request_answers_through_reply() {
+    let engine = on_engine(
+        r#"held = nil
+           oslo.suggest.provider {
+             name = "llm",
+             debounce_ms = 0,
+             request = function(ctx, reply) held = reply end,
+           }"#,
+    )
+    .expect("declares");
+
+    // The request went out and nothing is drawn yet: this is the whole point of `request`.
+    assert_eq!(ask(&ctx("git s")), None);
+
+    // The work finishes, somewhere else, later.
+    engine
+        .eval_as("held('git status')", "reply")
+        .expect("reply");
+    assert_eq!(ask(&ctx("git s")), Some("tatus".to_string()));
+    forget();
+}
+
+/// A reply of nothing is a decline, not an empty suggestion.
+#[test]
+fn a_reply_with_no_text_declines() {
+    let engine = on_engine(
+        r#"held = nil
+           oslo.suggest.provider {
+             name = "llm", debounce_ms = 0,
+             request = function(ctx, reply) held = reply end,
+           }"#,
+    )
+    .expect("declares");
+    ask(&ctx("git s"));
+    engine.eval_as("held()", "reply").expect("reply");
+    assert_eq!(ask(&ctx("git s")), None);
+    forget();
+}
+
+/// A `request` that raises must not leave the editor waiting for an answer that cannot come.
+#[test]
+fn a_request_that_raises_answers_nothing_rather_than_hanging() {
+    declare(
+        r#"oslo.suggest.provider {
+             name = "broken", debounce_ms = 0,
+             request = function() error("no") end,
+           }"#,
+    )
+    .expect("declares");
+    assert_eq!(ask(&ctx("git s")), None);
+    // Asked once and remembered as a decline, rather than retried on every frame.
+    assert_eq!(ask(&ctx("git s")), None);
+    forget();
+}
+
+#[test]
+fn a_provider_must_say_how_it_answers() {
+    let problem = declare(r#"oslo.suggest.provider { name = "neither" }"#).unwrap_err();
+    assert!(problem.contains("answer"), "{problem}");
+    assert!(problem.contains("request"), "{problem}");
     forget();
 }

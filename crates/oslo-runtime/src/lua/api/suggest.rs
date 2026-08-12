@@ -46,46 +46,76 @@ pub fn install(suggest: &mut Table) {
                 ));
             }
         };
-        let answer @ Value::Function(_) = declared.get(&Value::str("answer")) else {
-            return Err(oslo_lua::LuaError::new(
-                "oslo.suggest.provider: `answer` must be a function of one argument".to_string(),
-            ));
+        let named = name.clone();
+        let ask = match (
+            declared.get(&Value::str("answer")),
+            declared.get(&Value::str("request")),
+        ) {
+            (answer @ Value::Function(_), _) => {
+                oslo_ui::suggest::Ask::Now(Rc::new(move |ctx| {
+                    // `call_here` rather than a held interpreter: the session's is a thread-local,
+                    // and capturing an `Rc` to it inside a function stored *in* it would be a cycle
+                    // that never drops. It is the same call every other stored handler makes —
+                    // `register_tool`, `oslo.plugin.test`, the health checks.
+                    match crate::lua::engine::call_here(&answer, vec![context(ctx)]) {
+                        Ok(values) => match values.first() {
+                            Some(Value::Str(line)) => Some(line.to_string()),
+                            // Anything else is a decline. A number or a table would be a mistake,
+                            // but one made on the keystroke path — reporting it per key would fill
+                            // the screen faster than it could be read.
+                            _ => None,
+                        },
+                        Err(problem) => {
+                            complain(&named, &problem);
+                            None
+                        }
+                    }
+                }))
+            }
+            (_, request @ Value::Function(_)) => {
+                let debounce = millis(&declared, "debounce_ms", DEFAULT_DEBOUNCE_MS);
+                let timeout = millis(&declared, "timeout_ms", DEFAULT_TIMEOUT_MS);
+                let for_reply = name.clone();
+                oslo_ui::suggest::Ask::Later {
+                    request: Rc::new(move |ctx| {
+                        // **`reply` is bound to the line it was asked about**, not to whatever is on
+                        // screen when it is called. That is what makes a late answer harmless: it
+                        // arrives labelled with the question, and the label is what decides whether
+                        // it can be drawn.
+                        let line = ctx.line.clone();
+                        let who = for_reply.clone();
+                        let reply = super::util::native("reply", move |_, args| {
+                            let said = match args.first() {
+                                Some(Value::Str(text)) => Some(text.to_string()),
+                                _ => None,
+                            };
+                            oslo_ui::suggest::answered(&who, &line, said);
+                            Ok(vec![Value::Bool(true)])
+                        });
+                        if let Err(problem) =
+                            crate::lua::engine::call_here(&request, vec![context(ctx), reply])
+                        {
+                            complain(&named, &problem);
+                            // Answered with nothing rather than left outstanding: a `request` that
+                            // raised is never going to call `reply`, and the editor would poll for
+                            // it until the line changed.
+                            oslo_ui::suggest::answered(&named, &ctx.line, None);
+                        }
+                    }),
+                    debounce,
+                    timeout,
+                }
+            }
+            _ => {
+                return Err(oslo_lua::LuaError::new(
+                    "oslo.suggest.provider: one of `answer` (fast, answers now) or `request` \
+                     (slow, calls reply later) must be a function"
+                        .to_string(),
+                ));
+            }
         };
 
-        let named = name.clone();
-        oslo_ui::suggest::register(oslo_ui::suggest::Provider {
-            name,
-            answer: Rc::new(move |ctx| {
-                let mut table = Table::new();
-                table.set(Value::str("line"), Value::str(&ctx.line));
-                table.set(Value::str("cursor"), Value::int(ctx.cursor as i64));
-                table.set(Value::str("cwd"), Value::str(&ctx.cwd));
-                table.set(Value::str("language"), Value::str(&ctx.language));
-                // `call_here` rather than a held interpreter: the session's is a thread-local, and
-                // capturing an `Rc` to it inside a function stored *in* it would be a cycle that
-                // never drops. It is also the same call every other stored handler makes —
-                // `register_tool`, `oslo.plugin.test`, the health checks.
-                match crate::lua::engine::call_here(&answer, vec![Value::table(table)]) {
-                    Ok(values) => match values.first() {
-                        Some(Value::Str(line)) => Some(line.to_string()),
-                        // Anything else is a decline. A number or a table would be a mistake, but
-                        // one made on the keystroke path — reporting it per key would fill the
-                        // screen faster than it could be read.
-                        _ => None,
-                    },
-                    Err(problem) => {
-                        // Reported and declined. A provider that raises on every keystroke is why
-                        // this is a `messages` entry rather than a line on the screen.
-                        oslo_base::messages::say(
-                            oslo_base::messages::Level::Error,
-                            format!("suggest/{named}"),
-                            problem.to_string(),
-                        );
-                        None
-                    }
-                }
-            }),
-        });
+        oslo_ui::suggest::register(oslo_ui::suggest::Provider { name, ask });
         ok(Value::Bool(true))
     });
 
@@ -112,6 +142,42 @@ pub fn install(suggest: &mut Table) {
             }
         }
     });
+}
+
+/// How long typing must be still before a slow provider is asked.
+///
+/// Enough that a word typed at speed is one question rather than eight, short enough that an answer
+/// still feels like a response to what you just did.
+const DEFAULT_DEBOUNCE_MS: u64 = 120;
+
+/// How long an answer may take before it is given up on.
+const DEFAULT_TIMEOUT_MS: u64 = 2000;
+
+/// The table a provider is handed.
+fn context(ctx: &oslo_ui::suggest::Ctx) -> Value {
+    let mut table = Table::new();
+    table.set(Value::str("line"), Value::str(&ctx.line));
+    table.set(Value::str("cursor"), Value::int(ctx.cursor as i64));
+    table.set(Value::str("cwd"), Value::str(&ctx.cwd));
+    table.set(Value::str("language"), Value::str(&ctx.language));
+    Value::table(table)
+}
+
+fn millis(declared: &Table, key: &str, fallback: u64) -> std::time::Duration {
+    let asked = match declared.get(&Value::str(key)) {
+        Value::Number(n) => n.as_int().filter(|n| *n >= 0).map(|n| n as u64),
+        _ => None,
+    };
+    std::time::Duration::from_millis(asked.unwrap_or(fallback))
+}
+
+/// Report once per failure rather than per keystroke: a provider that raises does so on every key.
+fn complain(name: &str, problem: &oslo_lua::LuaError) {
+    oslo_base::messages::say(
+        oslo_base::messages::Level::Error,
+        format!("suggest/{name}"),
+        problem.to_string(),
+    );
 }
 
 #[cfg(test)]

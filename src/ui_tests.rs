@@ -383,7 +383,7 @@ fn subcommands_come_from_the_spec_for_this_command_not_the_first_one() {
 #[test]
 fn a_registered_provider_answers_the_ghost() {
     use crate::ui::settings::{self, Source};
-    use crate::ui::suggest::{self, Provider};
+    use crate::ui::suggest::{self, Ask, Provider};
 
     let mut with_provider = settings::current().as_ref().clone();
     with_provider.suggest.sources = vec![Source::Provider];
@@ -392,11 +392,11 @@ fn a_registered_provider_answers_the_ghost() {
     suggest::forget();
     suggest::register(Provider {
         name: "tldr".into(),
-        answer: std::rc::Rc::new(|ctx| {
+        ask: Ask::Now(std::rc::Rc::new(|ctx| {
             ctx.line
                 .starts_with("git com")
                 .then(|| "git commit --amend".to_string())
-        }),
+        })),
     });
 
     let h = helper(Environment::new());

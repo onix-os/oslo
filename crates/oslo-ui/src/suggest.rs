@@ -50,9 +50,29 @@ pub struct Ctx {
 /// because the invariant is checkable only against the whole thing. The remainder is computed here.
 pub type Answer = Rc<dyn Fn(&Ctx) -> Option<String>>;
 
+/// Start work for `Ctx` that will answer later by calling [`answered`] with the same line.
+///
+/// **It must return promptly.** This runs on the keystroke path exactly like a synchronous answer;
+/// what makes it asynchronous is what it *starts*, not how long it takes to start it. `oslo.spawn`
+/// is the intended shape: hand a process off and answer from its `on_exit`.
+pub type Request = Rc<dyn Fn(&Ctx)>;
+
+/// How a provider answers.
+pub enum Ask {
+    /// Now, on the keystroke path, within [`BUDGET`].
+    Now(Answer),
+    /// Later, by calling [`answered`]. The line is asked about only once typing has been still for
+    /// `debounce`, and an answer that has not arrived within `timeout` is given up on.
+    Later {
+        request: Request,
+        debounce: Duration,
+        timeout: Duration,
+    },
+}
+
 pub struct Provider {
     pub name: String,
-    pub answer: Answer,
+    pub ask: Ask,
 }
 
 /// How long one synchronous provider may take before it is a problem.
@@ -73,6 +93,20 @@ struct Registered {
     disabled: bool,
     /// Set once it has answered with something that was not a continuation, for the same reason.
     complained: bool,
+    /// What came back, and the line it was asked about.
+    ///
+    /// **Keyed by the line, which is what makes a stale answer impossible to draw.** A reply that
+    /// arrives for `gi` after `git ` has been typed simply does not match, so it is never shown —
+    /// rather than being dropped by a separate staleness check that could be forgotten.
+    ///
+    /// The inner `None` is a *remembered decline*: this line was asked about and the answer was
+    /// nothing. Kept, because forgetting it would mean asking again on the very next frame, and
+    /// again on the one after — a provider that declines would be asked for ever.
+    answered: Option<(String, Option<String>)>,
+    /// The line a request is out for, and when it went.
+    in_flight: Option<(String, Instant)>,
+    /// The line waiting for typing to go quiet, and the moment it stops waiting.
+    waiting_on: Option<(String, Instant)>,
 }
 
 thread_local! {
@@ -107,6 +141,9 @@ pub fn register(provider: Provider) {
             overruns: 0,
             disabled: false,
             complained: false,
+            answered: None,
+            in_flight: None,
+            waiting_on: None,
         };
         match providers
             .iter()
@@ -143,28 +180,167 @@ pub fn ask(ctx: &Ctx) -> Option<String> {
     if !any() {
         return None;
     }
-    // Cloned out of the cell before calling: an answer runs Lua, and Lua can reach back into the
-    // shell — the same hazard `completion::config_candidates` documents, and the same fix.
-    let ready: Vec<(usize, String, Answer)> = PROVIDERS.with(|slot| {
-        slot.borrow()
-            .iter()
-            .enumerate()
-            .filter(|(_, p)| !p.disabled)
-            .map(|(at, p)| (at, p.provider.name.clone(), Rc::clone(&p.provider.answer)))
-            .collect()
-    });
+    // Decided before anything is called, and cloned out of the cell: an answer runs Lua, and Lua can
+    // reach back into the shell — the same hazard `completion::config_candidates` documents, and the
+    // same fix. `Step` is what each provider wants to happen, computed while the borrow is held.
+    let steps = plan(ctx);
 
-    for (at, name, answer) in ready {
-        let started = Instant::now();
-        let said = answer(ctx);
-        note_time(at, &name, started.elapsed());
-        let Some(whole) = said else { continue };
-        match remainder(&ctx.line, &whole) {
-            Some(rest) => return Some(rest),
-            None => complain(at, &name, &ctx.line, &whole),
+    for (at, name, step) in steps {
+        match step {
+            Step::AnswerNow(answer) => {
+                let started = Instant::now();
+                let said = answer(ctx);
+                note_time(at, &name, started.elapsed());
+                let Some(whole) = said else { continue };
+                match remainder(&ctx.line, &whole) {
+                    Some(rest) => return Some(rest),
+                    None => complain(at, &name, &ctx.line, &whole),
+                }
+            }
+            // An answer already here for exactly this line.
+            Step::Draw(whole) => match remainder(&ctx.line, &whole) {
+                Some(rest) => return Some(rest),
+                None => complain(at, &name, &ctx.line, &whole),
+            },
+            Step::Send(request) => {
+                crate::pending::started();
+                request(ctx);
+            }
+            // Waiting for the debounce, or for a reply. Neither draws anything.
+            Step::Wait => {}
         }
     }
     None
+}
+
+/// What one provider wants to happen this frame.
+enum Step {
+    AnswerNow(Answer),
+    Draw(String),
+    Send(Request),
+    Wait,
+}
+
+/// Decide every provider's step, and record the bookkeeping, in one borrow.
+fn plan(ctx: &Ctx) -> Vec<(usize, String, Step)> {
+    let now = Instant::now();
+    PROVIDERS.with(|slot| {
+        let mut providers = slot.borrow_mut();
+        let mut steps = Vec::new();
+        for (at, entry) in providers.iter_mut().enumerate() {
+            if entry.disabled {
+                continue;
+            }
+            let name = entry.provider.name.clone();
+            let step = match &entry.provider.ask {
+                Ask::Now(answer) => Step::AnswerNow(Rc::clone(answer)),
+                Ask::Later {
+                    request,
+                    debounce,
+                    timeout,
+                } => later(entry, ctx, now, Rc::clone(request), *debounce, *timeout),
+            };
+            steps.push((at, name, step));
+        }
+        steps
+    })
+}
+
+/// The state machine for one asynchronous provider: give up, draw, send, or wait.
+fn later(
+    entry: &mut Registered,
+    ctx: &Ctx,
+    now: Instant,
+    request: Request,
+    debounce: Duration,
+    timeout: Duration,
+) -> Step {
+    // A reply that never came. Given up on so the editor stops waiting for it — an outstanding
+    // answer that is never finished leaves the input loop polling for the rest of the session.
+    if let Some((line, sent)) = entry.in_flight.clone()
+        && now.duration_since(sent) >= timeout
+    {
+        entry.in_flight = None;
+        // Remembered as a decline rather than simply forgotten, or the next frame would ask again
+        // and the one after that — a provider that has stopped answering would be hammered at the
+        // frame rate until the line changed.
+        entry.answered = Some((line, None));
+        crate::pending::finished();
+    }
+
+    // An answer for exactly this line. Not for a prefix of it and not for a longer line: those are
+    // answers to different questions, and drawing one would be the stale-suggestion bug.
+    if let Some((line, whole)) = &entry.answered
+        && line == &ctx.line
+    {
+        return match whole {
+            Some(whole) => Step::Draw(whole.clone()),
+            None => Step::Wait,
+        };
+    }
+
+    // Already asked about this line. Asking again would be a second request for the same answer.
+    if entry
+        .in_flight
+        .as_ref()
+        .is_some_and(|(line, _)| line == &ctx.line)
+    {
+        return Step::Wait;
+    }
+
+    // Start the wait, or start it again because the line changed — the old wait was for a question
+    // nobody is asking any more.
+    let restart = entry
+        .waiting_on
+        .as_ref()
+        .is_none_or(|(line, _)| line != &ctx.line);
+    if restart {
+        entry.waiting_on = Some((ctx.line.clone(), now + debounce));
+    }
+
+    // **Checked after being set, not on the next frame.** Setting the deadline and returning would
+    // mean a `debounce` of zero — which is what a provider asks for when it wants no delay at all —
+    // never firing until something else caused a redraw.
+    let Some((_, until)) = entry.waiting_on else {
+        return Step::Wait;
+    };
+    if now < until {
+        crate::pending::wake_in(until - now);
+        return Step::Wait;
+    }
+    entry.waiting_on = None;
+    entry.in_flight = Some((ctx.line.clone(), now));
+    Step::Send(request)
+}
+
+/// A provider answering the request it was given, from wherever its work finished.
+///
+/// `line` is the line it was *asked* about, not the one on screen now. The two are compared when the
+/// answer is drawn, which is what makes a late reply harmless rather than wrong.
+pub fn answered(name: &str, line: &str, whole: Option<String>) {
+    PROVIDERS.with(|slot| {
+        let mut providers = slot.borrow_mut();
+        let Some(entry) = providers
+            .iter_mut()
+            .find(|entry| entry.provider.name == name)
+        else {
+            return;
+        };
+        // Only if this is the reply to the outstanding request. A provider that replies twice, or
+        // replies to something it was never asked, does not get to unbalance the wait counter.
+        if entry
+            .in_flight
+            .as_ref()
+            .is_none_or(|(sent, _)| sent != line)
+        {
+            return;
+        }
+        entry.in_flight = None;
+        entry.answered = Some((line.to_string(), whole));
+        crate::pending::finished();
+        // The frame is stale: something can be drawn now that could not a moment ago.
+        crate::pending::landed();
+    });
 }
 
 /// The part of `whole` that comes after `line`, if `whole` really continues it.

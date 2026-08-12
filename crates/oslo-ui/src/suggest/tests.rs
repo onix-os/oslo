@@ -12,7 +12,7 @@ fn ctx(line: &str) -> Ctx {
 fn saying(name: &str, whole: Option<&'static str>) -> Provider {
     Provider {
         name: name.to_string(),
-        answer: Rc::new(move |_| whole.map(str::to_string)),
+        ask: Ask::Now(Rc::new(move |_| whole.map(str::to_string))),
     }
 }
 
@@ -59,10 +59,10 @@ fn the_first_provider_with_an_answer_wins_and_the_rest_are_not_asked() {
     let counter = Rc::clone(&asked);
     register(Provider {
         name: "second".to_string(),
-        answer: Rc::new(move |_| {
+        ask: Ask::Now(Rc::new(move |_| {
             counter.set(counter.get() + 1);
             Some("git stash".to_string())
-        }),
+        })),
     });
 
     assert_eq!(ask(&ctx("git st")), Some("atus".to_string()));
@@ -97,10 +97,10 @@ fn a_provider_that_overruns_its_budget_is_disabled() {
     forget();
     register(Provider {
         name: "slow".to_string(),
-        answer: Rc::new(|_| {
+        ask: Ask::Now(Rc::new(|_| {
             std::thread::sleep(BUDGET + Duration::from_millis(5));
             Some("git status".to_string())
-        }),
+        })),
     });
 
     // Forgiven a few times, because one slow answer is not a slow provider.
@@ -117,10 +117,10 @@ fn a_disabled_provider_does_not_take_the_others_with_it() {
     forget();
     register(Provider {
         name: "slow".to_string(),
-        answer: Rc::new(|_| {
+        ask: Ask::Now(Rc::new(|_| {
             std::thread::sleep(BUDGET + Duration::from_millis(5));
             None
-        }),
+        })),
     });
     register(saying("quick", Some("git status")));
 
@@ -137,10 +137,10 @@ fn what_a_provider_is_told_is_the_line_and_where_it_is() {
     let into = Rc::clone(&seen);
     register(Provider {
         name: "spy".to_string(),
-        answer: Rc::new(move |ctx| {
+        ask: Ask::Now(Rc::new(move |ctx| {
             *into.borrow_mut() = Some(ctx.clone());
             None
-        }),
+        })),
     });
     ask(&ctx("git st"));
 
@@ -149,5 +149,191 @@ fn what_a_provider_is_told_is_the_line_and_where_it_is() {
     assert_eq!(seen.line, "git st");
     assert_eq!(seen.cursor, 6);
     assert_eq!(seen.language, "sh");
+    forget();
+}
+
+// ---------------------------------------------------------------- answering later
+
+/// A provider that records what it was asked and answers only when told to.
+fn slow(name: &str, asked: Rc<RefCell<Vec<String>>>, debounce: Duration) -> Provider {
+    Provider {
+        name: name.to_string(),
+        ask: Ask::Later {
+            request: Rc::new(move |ctx| asked.borrow_mut().push(ctx.line.clone())),
+            debounce,
+            timeout: Duration::from_secs(5),
+        },
+    }
+}
+
+/// **Nothing is asked on the first keystroke.** The debounce is the whole point: ten keys in one
+/// word is one question, not ten.
+#[test]
+fn a_request_waits_for_typing_to_go_quiet() {
+    forget();
+    let asked = Rc::new(RefCell::new(Vec::new()));
+    register(slow("llm", Rc::clone(&asked), Duration::from_millis(30)));
+
+    assert_eq!(ask(&ctx("git s")), None, "nothing to draw yet");
+    assert!(asked.borrow().is_empty(), "and nothing asked yet");
+
+    std::thread::sleep(Duration::from_millis(35));
+    assert_eq!(ask(&ctx("git s")), None);
+    assert_eq!(
+        asked.borrow().clone(),
+        vec!["git s".to_string()],
+        "now asked"
+    );
+    forget();
+}
+
+/// Typing on restarts the wait, so what is finally asked is the line you stopped at.
+#[test]
+fn a_line_that_keeps_changing_is_never_asked_about() {
+    forget();
+    let asked = Rc::new(RefCell::new(Vec::new()));
+    register(slow("llm", Rc::clone(&asked), Duration::from_millis(30)));
+
+    for line in ["g", "gi", "git", "git ", "git s"] {
+        ask(&ctx(line));
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    assert!(
+        asked.borrow().is_empty(),
+        "still typing: {:?}",
+        asked.borrow()
+    );
+
+    std::thread::sleep(Duration::from_millis(35));
+    ask(&ctx("git s"));
+    assert_eq!(asked.borrow().clone(), vec!["git s".to_string()]);
+    forget();
+}
+
+#[test]
+fn an_answer_is_drawn_once_it_arrives() {
+    forget();
+    let asked = Rc::new(RefCell::new(Vec::new()));
+    register(slow("llm", Rc::clone(&asked), Duration::ZERO));
+
+    ask(&ctx("git s"));
+    assert_eq!(
+        asked.borrow().len(),
+        1,
+        "asked straight away with no debounce"
+    );
+
+    answered("llm", "git s", Some("git status".to_string()));
+    assert_eq!(ask(&ctx("git s")), Some("tatus".to_string()));
+    forget();
+}
+
+/// **The bug this design exists to prevent.** An answer to `gi` must never appear under `git `.
+#[test]
+fn an_answer_to_an_older_line_is_never_drawn() {
+    forget();
+    let asked = Rc::new(RefCell::new(Vec::new()));
+    register(slow("llm", Rc::clone(&asked), Duration::ZERO));
+
+    ask(&ctx("gi"));
+    // The line moves on, and only then does the answer to the old one arrive.
+    ask(&ctx("git "));
+    answered("llm", "gi", Some("git status".to_string()));
+
+    assert_eq!(
+        ask(&ctx("git ")),
+        None,
+        "the answer was to a different question"
+    );
+    forget();
+}
+
+/// A reply to something never asked, or a second reply, must not unbalance the editor's wait.
+#[test]
+fn a_reply_nobody_asked_for_is_ignored() {
+    forget();
+    let asked = Rc::new(RefCell::new(Vec::new()));
+    register(slow("llm", Rc::clone(&asked), Duration::ZERO));
+
+    answered("llm", "never asked", Some("git status".to_string()));
+    assert_eq!(ask(&ctx("never asked")), None, "not adopted as an answer");
+
+    ask(&ctx("git s"));
+    answered("llm", "git s", Some("git status".to_string()));
+    answered("llm", "git s", Some("git stash".to_string()));
+    assert_eq!(
+        ask(&ctx("git s")),
+        Some("tatus".to_string()),
+        "the second reply is not the answer"
+    );
+    forget();
+}
+
+/// A provider that declines answers nothing rather than leaving the line waiting for ever.
+#[test]
+fn a_reply_of_nothing_is_a_decline() {
+    forget();
+    let asked = Rc::new(RefCell::new(Vec::new()));
+    register(slow("llm", Rc::clone(&asked), Duration::ZERO));
+
+    ask(&ctx("git s"));
+    answered("llm", "git s", None);
+    assert_eq!(ask(&ctx("git s")), None);
+    // And it is not asked again for the same line: it has answered.
+    assert_eq!(asked.borrow().len(), 1);
+    forget();
+}
+
+/// One request per line, however many frames are drawn while it is out.
+#[test]
+fn a_line_is_asked_about_once_while_the_answer_is_coming() {
+    forget();
+    let asked = Rc::new(RefCell::new(Vec::new()));
+    register(slow("llm", Rc::clone(&asked), Duration::ZERO));
+
+    for _ in 0..5 {
+        ask(&ctx("git s"));
+    }
+    assert_eq!(asked.borrow().len(), 1);
+    forget();
+}
+
+/// An answer that never comes is given up on, and giving up is not a retry.
+///
+/// **Asserted on behaviour, not on `pending`'s counter.** That counter is process-wide and every
+/// other test here moves it, so reading it would be a race dressed up as an assertion; that it
+/// balances is `pending`'s own test.
+#[test]
+fn a_request_that_is_never_answered_times_out() {
+    forget();
+    let asked = Rc::new(RefCell::new(Vec::new()));
+    let counted = Rc::clone(&asked);
+    register(Provider {
+        name: "gone".to_string(),
+        ask: Ask::Later {
+            request: Rc::new(move |ctx| counted.borrow_mut().push(ctx.line.clone())),
+            debounce: Duration::ZERO,
+            timeout: Duration::from_millis(20),
+        },
+    });
+
+    ask(&ctx("git s"));
+    assert_eq!(asked.borrow().len(), 1);
+
+    std::thread::sleep(Duration::from_millis(25));
+    assert_eq!(
+        ask(&ctx("git s")),
+        None,
+        "nothing came, so nothing is drawn"
+    );
+    assert_eq!(
+        asked.borrow().len(),
+        1,
+        "and not asked again for the same line: a timeout is a decline, not a retry loop"
+    );
+
+    // A different line is a different question, and is asked.
+    ask(&ctx("git st"));
+    assert_eq!(asked.borrow().len(), 2);
     forget();
 }
