@@ -21,6 +21,7 @@ use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
 mod builtin;
+mod complete;
 mod convert;
 mod db;
 #[cfg(feature = "direnv")]
@@ -159,6 +160,8 @@ pub fn install(interp: &Rc<Interp>, registry: &Registry, env: Arc<Mutex<Environm
         // `oslo.completion.spec` — the declarative half. A function in the same table as the
         // settings, because that is where somebody looks for anything about completion.
         spec::install(&mut completion.borrow_mut());
+        // `oslo.completion.provider` — candidates computed at Tab time, merged with oslo's own.
+        complete::install(&mut completion.borrow_mut());
     }
     // `oslo.suggest.provider` — a ghost written in Lua. In the settings table for the same reason:
     // `oslo.suggest.sources` is next to it, and the two are read together.

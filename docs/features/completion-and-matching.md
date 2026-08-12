@@ -168,6 +168,41 @@ oslo.completion.for_command = {
 answer for the one kind it cares about. `for_command` *replaces* oslo's own candidates for that
 command rather than adding to them.
 
+### Adding candidates of your own
+
+```lua
+oslo.completion.provider {
+  name = "tldr",
+  kind = "example",        -- the badge, and the name `oslo.completion.sources` filters on
+  when = "git",            -- this command only; omit and it answers for every command
+  score_offset = 20,       -- a nudge in the ranking, not a position above it
+  max_items = 10,
+  answer = function(ctx)   -- ctx = { command, words, current, arg, cwd }
+    return { { display = "commit --amend", desc = "change the last commit" } }
+  end,
+}
+```
+
+**It adds; `for_command` replaces.** `oslo.completion.for_command.git` means *I own git* and oslo's
+own candidates for it are dropped — the right tool when you are rewriting a command's completions,
+and the wrong one for tldr, which wants three examples *beside* the subcommands oslo already knows.
+So a provider's offers are merged into the list before the kind filter and before the sort, and they
+compete in the same ranking rather than being stapled to one end.
+
+Which is why a provider has the two things `for_command` never had:
+
+- **a kind**, so `oslo.completion.sources` can name it and the badge column can show it. A
+  `for_command` candidate reports none at all, which is why setting `sources` silently removes every
+  config-supplied candidate. A provider that declares no `kind` is badged with its own name.
+- **a score offset**, because merging means competing. It is added to the frecency score in the
+  existing sort — blink.cmp's `score_offset` rather than a priority that overrules everything, so a
+  command you run constantly still beats a suggestion you have never taken.
+
+A list of plain strings is accepted where there is nothing to say about each one:
+`return { "one", "two" }`. Only offers that continue the word being typed are shown, `max_items`
+bounds what one provider can contribute so it cannot flood the menu, and a provider that raises loses
+its own candidates and nothing else. `oslo.completion.providers()` lists what is registered.
+
 ### Declaring a spec instead of computing one
 
 ```lua
@@ -275,6 +310,9 @@ the command's shape already is.
 | `crates/oslo-ui/src/frecency_store.rs` | `FrecencyStore` — the log, the compaction |
 | `crates/oslo-ui/src/spec/mod.rs` | `CommandSpec`, `SubcommandSpec`, `OptionSpec`, `SpecRegistry` |
 | `crates/oslo-ui/src/spec/custom.rs` | the specs a config or a plugin declared |
+| `crates/oslo-ui/src/completion/provider.rs` | the candidate providers, their kinds and offsets |
+| `crates/oslo-ui/src/completion/paths.rs` | `path_candidates` — the one builder that reads the disk |
+| `crates/oslo-runtime/src/lua/api/complete.rs` | `oslo.completion.provider` — the Lua reader |
 | `crates/oslo-ui/src/spec/definitions/` | the four written by hand: `git`, `cargo`, `docker`, `npm` |
 | `crates/oslo-runtime/src/lua/api/spec.rs` | `oslo.completion.spec` — the Lua reader |
 | `crates/oslo-ui/src/spec/frecency.rs` | `FrecencyTracker::get_score` — the formula |
