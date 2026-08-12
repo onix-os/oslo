@@ -59,7 +59,17 @@ Filters are **Lua**, not a dialect invented for the occasion, so the escape hatc
 language as the filter: `ls | each 'print(name .. " is " .. size)'`.
 
 Verbs: `where` `each` `cols` `get` `sort-by` `first` `last` `length` `to` `from` `lines` `parse`.
-Producers: `df` `ps` `ls`, and anything you register yourself.
+Summaries: `group-by` `count` `uniq` `stats`. Producers: `df` `ps` `ls`, and anything you register
+yourself.
+
+```sh
+ps | group-by user | count            # how many processes each user has
+ls | uniq kind                        # one of each, keeping the first
+df | stats free                       # count, min, max, sum, mean over a column
+```
+
+Selection alone is a nicer `awk`; `ps | group-by user | count` is a query `ps | grep` cannot express.
+There is no `join`: it needs a *second* input stream, and a pipeline is a line.
 
 ### Your POSIX scripts cannot reach any of it
 
@@ -330,6 +340,36 @@ $ hosts | where 'ip:match("^10%.")' | cols host port
 
 A tool says what its rows *are*. The shell decides how they are drawn — and when the next stage
 wants rows, nothing is drawn at all.
+
+### Work that happens off the prompt
+
+```lua
+oslo.spawn{ "git", "status", "--porcelain",
+  on_exit = function(out, status) oslo.state.set("git.dirty", out ~= "") end }
+```
+
+**The callback arrives between commands**, not the instant the process exits — the same safe point
+timers fire at, where the shell holds nothing and can call Lua. That is the honest limitation: a
+prompt segment reading `oslo.state` shows the answer from a moment ago instead of blocking the draw
+to fetch a fresh one. One process, one callback; there is no scheduler and no promise. A missing
+command answers 127 and a `timeout` answers 124, which are the statuses a shell already uses for
+both.
+
+### Completion you declare rather than compute
+
+```lua
+oslo.completion.spec {
+  command = "notes",
+  subcommands = { { name = "new", desc = "start one" },
+                  { name = "list", desc = "every note",
+                    flags = { { "--since", desc = "only newer than" } } } },
+}
+```
+
+The same shape the specs for `git`, `cargo`, `docker` and `npm` are written in, and it runs through
+the same code at Tab time — nested subcommands, flags scoped to the subcommand you are in,
+descriptions in the dropdown. `oslo.completion.for_command` is still there for the cases that have to
+look at the machine; a spec answers the shape of a command, a function answers what is on it.
 
 ### Running commands from Lua
 

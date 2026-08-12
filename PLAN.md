@@ -1,5 +1,19 @@
 # Six more, after composition
 
+> **Done**, on `feat/offprompt`. All six landed, one commit each, `make verify` green after every
+> one. Two things came out differently from the plan and are recorded where they happened:
+>
+> - **Item 4 is a builtin, `messages`, not `oslo messages`.** A tool is a new process, and the buffer
+>   is this process's memory — `oslo messages` would faithfully report that a shell which has just
+>   started has said nothing. Same reason `:messages` is a command inside neovim rather than a flag
+>   to it.
+> - **The ring counts consecutive repeats** rather than keeping them. A prompt segment that raises
+>   fails on every draw, so five hundred Returns would otherwise evict the startup failure the buffer
+>   exists to keep.
+>
+> Item 6 was measured, as it required: 0.27 ms fastest Tab on `git comm` before and after, +31 KB of
+> binary. The numbers and the method are in `docs/features/completion-and-matching.md`.
+
 The last plan closed the gaps that stopped a plugin *composing* — with the pipeline, with another
 plugin, with "later". These are the ones left over: work that happens off the prompt, a pipeline that
 can summarise rather than only select, three ways to find out what a session actually did, and the
