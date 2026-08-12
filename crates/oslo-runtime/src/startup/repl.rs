@@ -136,7 +136,7 @@ pub fn run_repl(login: bool) -> ! {
         None if misc.welcome => {
             println!(
                 "oslo {} - POSIX Compatible Shell with Lua & Fish-style Features",
-                env!("CARGO_PKG_VERSION")
+                oslo_base::version::current()
             );
             println!("Type 'exit' or Ctrl-D to exit.");
         }

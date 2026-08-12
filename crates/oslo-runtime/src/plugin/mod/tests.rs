@@ -10,6 +10,7 @@ fn installed(name: &str, builtins: &[&str]) -> index::Installed {
         builtins: builtins.iter().map(|n| (*n).to_string()).collect(),
         tools: Vec::new(),
         hash: "x".to_string(),
+        requires: None,
     }
 }
 

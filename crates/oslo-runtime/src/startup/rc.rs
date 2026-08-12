@@ -265,7 +265,7 @@ fn decode_escapes(env: &Environment, raw: &str) -> String {
                     .and_then(|p| p.file_name().map(|n| n.to_string_lossy().into_owned()))
                     .unwrap_or_default(),
             ),
-            Some('v') | Some('V') => out.push_str(env!("CARGO_PKG_VERSION")),
+            Some('v') | Some('V') => out.push_str(oslo_base::version::current()),
             // `\nnn` is an octal byte, which is how a prompt reaches a character it cannot type.
             Some(d @ '0'..='7') => {
                 let mut digits = String::from(d);

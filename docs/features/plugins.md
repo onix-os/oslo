@@ -40,6 +40,7 @@ return {
   version  = "0.1.0",
   entry    = "init.lua",
   builtins = { "note" },
+  -- requires = ">= 0.2.29",   -- optional: the oldest oslo it will run on
 }
 ```
 
@@ -109,6 +110,28 @@ flattens every manifest into one `index.json`, and a session reads that alone.
 `plugin.lua` is evaluated in a **fresh interpreter with no `oslo` global**. A manifest that tries to
 register a builtin, open a database or read a file finds nothing to do it with. That is what lets
 `oslo plugin install` show you what a plugin claims *before* you decide to trust it.
+
+### Saying which oslo it needs
+
+```lua
+requires = ">= 0.2.29"    -- or just "0.2.29"; they mean the same
+```
+
+A **minimum, and only a minimum**. A plugin knows what it needs — `oslo.db` arrived in a particular
+release, and calling it in an older shell is a nil index — but it cannot know what a *later* oslo
+will break, so an upper bound would be a guess that goes stale and locks working plugins out of new
+releases.
+
+Checked when it is installed *and* every time it is loaded, because the oslo a plugin was installed
+against is not necessarily the one running now: downgrading, or copying a home to an older machine,
+both leave a plugin recorded as fine and unable to work. Anything that is not a version — `^0.2`,
+`> 0.2`, a typo — is a manifest error when it is read, rather than a plugin that silently never
+loads.
+
+The version it is compared against is the one `oslo --version` prints and `oslo.version` reports.
+Those used to disagree — the binary said 0.2.29 while `oslo.version`, read from a different crate in
+the workspace, said 0.2.21 — which would have made a requirement meaningless: an author reads one
+number and the check compares another. There is one now.
 
 ## Trust
 

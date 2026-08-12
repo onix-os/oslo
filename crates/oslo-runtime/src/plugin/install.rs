@@ -69,6 +69,17 @@ pub struct Planned {
 /// before anybody has decided to trust it.
 pub fn plan(candidate: &Path, installed: &[Installed]) -> Result<Planned, String> {
     let manifest = manifest::read(candidate)?;
+    // **Refused here rather than installed and left to fail later.** A plugin that needs a newer
+    // oslo than this one is not going to start working because it was copied in.
+    if let Some(requirement) = &manifest.requires
+        && !manifest::satisfied(requirement, oslo_base::version::current())?
+    {
+        return Err(format!(
+            "{} needs oslo {requirement} and this is {}",
+            manifest.name,
+            oslo_base::version::current()
+        ));
+    }
     let hash = trust::hash_of(candidate)?;
     let conflicts = installed
         .iter()

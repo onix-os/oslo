@@ -266,6 +266,43 @@ fn a_plugin_that_registers_nothing_leaves_the_name_unclaimed() {
     assert!(session.contains("not found"), "{session}");
 }
 
+/// A plugin needing a newer oslo is refused at install, rather than installed and left to fail.
+#[test]
+fn a_plugin_that_needs_a_newer_oslo_is_refused() {
+    let home = Home::new();
+    let source = home.candidate(
+        "future",
+        r#"return { name = "future", builtins = { "fut" }, requires = ">= 99.0.0" }"#,
+        "-- nothing\n",
+    );
+    let refused = home.plugin(&["install", source.to_str().unwrap(), "--yes"]);
+    assert!(!refused.status.success());
+    assert!(
+        err(&refused).contains("needs oslo >= 99.0.0"),
+        "{}",
+        err(&refused)
+    );
+    assert!(out(&home.plugin(&["list"])).contains("no plugins installed"));
+}
+
+/// One this oslo satisfies installs and runs like any other.
+#[test]
+fn a_requirement_this_oslo_meets_is_no_obstacle() {
+    let home = Home::new();
+    let source = home.candidate(
+        "notes",
+        r#"return { name = "notes", builtins = { "note" }, requires = ">= 0.0.1" }"#,
+        r#"oslo.register_builtin("note", function() print("REQUIREMENT-MET") return 0 end)"#,
+    );
+    assert!(
+        home.plugin(&["install", source.to_str().unwrap(), "--yes"])
+            .status
+            .success()
+    );
+    let session = interactive(&home, "note\nexit\n");
+    assert!(session.contains("REQUIREMENT-MET"), "{session}");
+}
+
 #[test]
 fn a_git_source_without_a_revision_is_refused_before_anything_is_fetched() {
     let home = Home::new();

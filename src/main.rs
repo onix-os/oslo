@@ -74,6 +74,10 @@ fn report_structured_audit() {
 }
 
 fn main() {
+    // **The binary's version, for everything that reports one.** Every crate has a
+    // `CARGO_PKG_VERSION` of its own and they differ; this is the one a release is tagged with, and
+    // installing it here is what stops `oslo --version` and `oslo.version` disagreeing.
+    oslo::version::install(env!("CARGO_PKG_VERSION"));
     // Before any thread exists, as the safety note on the function requires.
     restore_default_sigpipe();
     report_structured_audit();

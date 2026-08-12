@@ -10,6 +10,7 @@ fn one() -> Installed {
         builtins: vec!["note".to_string()],
         tools: vec!["notes".to_string()],
         hash: "abc123".to_string(),
+        requires: None,
     }
 }
 

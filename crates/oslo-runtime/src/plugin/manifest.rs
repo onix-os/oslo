@@ -37,6 +37,27 @@ pub struct Manifest {
     pub builtins: Vec<String>,
     /// Row-producing tool names to reserve.
     pub tools: Vec<String>,
+    /// The oldest oslo this plugin will run on, as written: `">= 0.2.29"` or `"0.2.29"`.
+    ///
+    /// `None` when the plugin did not say, which means it runs anywhere.
+    pub requires: Option<String>,
+}
+
+/// Does this oslo satisfy `requirement`?
+///
+/// **Only a minimum, and deliberately.** A plugin knows what it needs — `oslo.db` arrived in some
+/// version and calling it in an older shell is a nil index — but it cannot know what a *later* oslo
+/// will break, so an upper bound would be a guess that goes stale and locks working plugins out of
+/// new releases. `>= X.Y.Z` and a bare `X.Y.Z` mean the same thing; anything else is refused when
+/// the manifest is read, rather than silently treated as "runs anywhere".
+pub fn satisfied(requirement: &str, version: &str) -> Result<bool, String> {
+    let wanted = requirement.trim();
+    let wanted = wanted.strip_prefix(">=").unwrap_or(wanted).trim();
+    let least = oslo_base::version::numbers(wanted)
+        .ok_or_else(|| format!("{requirement:?} is not a version, or a `>=` and a version"))?;
+    let have = oslo_base::version::numbers(version)
+        .ok_or_else(|| format!("{version:?} is not a version"))?;
+    Ok(have >= least)
 }
 
 impl Manifest {
@@ -106,12 +127,22 @@ pub fn read(directory: &Path) -> Result<Manifest, String> {
         ));
     }
 
+    // Checked here, when the manifest is read, so a requirement nobody can satisfy — a typo, a
+    // range this does not understand — is a manifest error at install rather than a plugin that
+    // quietly never loads.
+    let requires = string(&table, "requires");
+    if let Some(requirement) = &requires {
+        satisfied(requirement, oslo_base::version::current())
+            .map_err(|problem| format!("{}: `requires`: {problem}", path.display()))?;
+    }
+
     Ok(Manifest {
         name,
         version: string(&table, "version").unwrap_or_else(|| "0".to_string()),
         entry,
         builtins,
         tools,
+        requires,
     })
 }
 

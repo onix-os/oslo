@@ -44,7 +44,10 @@ pub fn install(
 /// Who and where you are is `oslo.sys`; which process this is and how the last one ended is
 /// `oslo.proc`. `oslo.version` stays on `oslo` itself — it describes the whole thing.
 fn facts(oslo: &mut Table, system: &mut Table, process: &mut Table, env: &Arc<Mutex<Environment>>) {
-    oslo.set(Value::str("version"), Value::str(env!("CARGO_PKG_VERSION")));
+    oslo.set(
+        Value::str("version"),
+        Value::str(oslo_base::version::current()),
+    );
 
     // Read at call time, not at startup: a script that changes `$USER` or `hostname` mid-session
     // should see what it changed, and a value frozen at startup is a lie that is hard to spot.

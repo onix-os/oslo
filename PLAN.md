@@ -87,9 +87,16 @@ return {
   entry    = "init.lua",
   builtins = { "secret" },        -- names to reserve; the file runs when one is called
   tools    = { "stale" },         -- same, for row-producing tools
-  requires = ">= 0.2.29",
+  requires = ">= 0.2.29",        -- optional: the oldest oslo it will run on
 }
 ```
+
+`requires` is a **minimum, in either spelling** — `">= 0.2.29"` and `"0.2.29"` mean the same thing.
+Only a minimum: a plugin knows what it needs, but cannot know what a later oslo will break, so an
+upper bound would be a guess that goes stale and locks working plugins out of new releases. It is
+checked at install *and* at load, because the oslo a plugin was installed against is not necessarily
+the one running now. Anything that is not a version — `^0.2`, `> 0.2`, a typo — is a manifest error
+when it is read, rather than a plugin that silently never loads.
 
 **The index is generated because reading manifests is not free.** A Lua manifest is the right thing
 to *write* in a Lua-first shell, but reading ten of them at startup means ten parses to learn ten

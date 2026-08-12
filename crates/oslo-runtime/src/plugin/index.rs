@@ -38,6 +38,11 @@ pub struct Installed {
     pub tools: Vec<String>,
     /// What the plugin's files hashed to when it was allowed.
     pub hash: String,
+    /// The oldest oslo it will run on, as the manifest wrote it.
+    ///
+    /// Carried here so the load-time check costs nothing: re-reading the manifest to learn it would
+    /// undo the whole reason the index exists.
+    pub requires: Option<String>,
 }
 
 impl Installed {
@@ -58,6 +63,7 @@ impl Installed {
             builtins: manifest.builtins.clone(),
             tools: manifest.tools.clone(),
             hash,
+            requires: manifest.requires.clone(),
         }
     }
 }
@@ -128,6 +134,7 @@ pub fn parse(text: &str) -> Result<Vec<Installed>, String> {
             builtins: list_of("builtins"),
             tools: list_of("tools"),
             hash,
+            requires: text_of("requires"),
         });
     }
     Ok(found)
@@ -148,6 +155,7 @@ pub fn write(entries: &[Installed]) -> Result<(), String> {
             "builtins": installed.builtins,
             "tools": installed.tools,
             "hash": installed.hash,
+            "requires": installed.requires,
         })).collect::<Vec<_>>(),
     });
     let text = serde_json::to_string_pretty(&document).map_err(|error| error.to_string())?;

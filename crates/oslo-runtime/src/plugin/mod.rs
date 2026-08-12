@@ -117,6 +117,17 @@ fn load(installed: &index::Installed) -> Result<(), String> {
     let directory = installed
         .directory()
         .ok_or_else(|| "nowhere to look for it".to_string())?;
+    // **Checked at load as well as at install**, because the shell it was installed against is not
+    // necessarily the shell running now: downgrading oslo, or copying a home to an older machine,
+    // both leave a plugin recorded as fine and unable to work.
+    if let Some(requirement) = &installed.requires
+        && !manifest::satisfied(requirement, oslo_base::version::current())?
+    {
+        return Err(format!(
+            "it needs oslo {requirement} and this is {}",
+            oslo_base::version::current()
+        ));
+    }
     if !trust::unchanged(&directory, &installed.hash)? {
         return Err(format!(
             "it has changed since you allowed it; run `oslo plugin allow {}` \

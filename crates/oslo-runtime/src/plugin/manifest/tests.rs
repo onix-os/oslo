@@ -107,6 +107,53 @@ fn a_name_the_shell_could_not_dispatch_is_refused() {
     }
 }
 
+/// `requires` is a *minimum*, in either of its two spellings.
+#[test]
+fn a_requirement_is_met_by_this_version_or_a_later_one() {
+    assert_eq!(satisfied(">= 0.2.29", "0.2.29"), Ok(true), "equal is met");
+    assert_eq!(satisfied("0.2.29", "0.2.29"), Ok(true), "a bare version");
+    assert_eq!(satisfied(">=0.2.29", "0.3.0"), Ok(true), "no space");
+    assert_eq!(satisfied(" >= 0.2.29 ", "1.0.0"), Ok(true), "untrimmed");
+    assert_eq!(satisfied(">= 0.3.0", "0.2.29"), Ok(false), "too old");
+    // Numeric, not string: 0.2.9 is older than 0.2.29 even though it sorts after it.
+    assert_eq!(satisfied(">= 0.2.29", "0.2.9"), Ok(false));
+}
+
+/// **A requirement nobody could satisfy is a manifest error**, not a plugin that never loads.
+#[test]
+fn a_requirement_that_is_not_a_version_is_refused_when_the_manifest_is_read() {
+    for bad in [">= banana", "^0.2.29", "> 0.2.29", "0.2.x", ""] {
+        assert!(satisfied(bad, "0.2.29").is_err(), "{bad:?} was accepted");
+        let (_root, directory) = plugin(
+            "notes",
+            &format!(r#"return {{ name = "notes", builtins = {{ "note" }}, requires = {bad:?} }}"#),
+        );
+        let refused = read(&directory).expect_err("should refuse");
+        assert!(refused.contains("`requires`"), "{refused}");
+    }
+}
+
+#[test]
+fn a_manifest_may_say_nothing_about_the_version() {
+    let (_root, directory) = plugin(
+        "notes",
+        r#"return { name = "notes", builtins = { "note" } }"#,
+    );
+    assert_eq!(read(&directory).expect("read").requires, None);
+}
+
+#[test]
+fn a_requirement_this_shell_meets_is_kept_as_written() {
+    let (_root, directory) = plugin(
+        "notes",
+        r#"return { name = "notes", builtins = { "note" }, requires = ">= 0.0.1" }"#,
+    );
+    assert_eq!(
+        read(&directory).expect("read").requires.as_deref(),
+        Some(">= 0.0.1")
+    );
+}
+
 #[test]
 fn a_manifest_that_is_not_a_table_or_will_not_parse_is_a_message() {
     let (_root, directory) = plugin("notes", "return 3");

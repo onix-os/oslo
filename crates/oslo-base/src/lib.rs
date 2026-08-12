@@ -33,5 +33,7 @@ pub mod quiet;
 /// A database a config or a plugin owns, kept apart from oslo's own.
 pub mod store;
 pub mod track;
+/// The shell's version, as one number rather than one per crate.
+pub mod version;
 
 pub use error::{Result, ShellError};
