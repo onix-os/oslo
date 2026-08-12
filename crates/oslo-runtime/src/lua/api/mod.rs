@@ -20,6 +20,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
+mod builtin;
 mod convert;
 mod db;
 #[cfg(feature = "direnv")]
@@ -156,6 +157,7 @@ pub fn install(interp: &Rc<Interp>, registry: &Registry, env: Arc<Mutex<Environm
     oslo.set(Value::str("feature"), feature::build(registry));
     oslo.set(Value::str("db"), db::build());
     timer::install(&mut oslo);
+    builtin::install(&mut oslo);
     oslo.set(Value::str("json"), json::build());
     oslo.set(Value::str("re"), re::build());
     oslo.set(Value::str("proc"), proc::build_proc());
@@ -523,33 +525,28 @@ fn shell(
     });
 
     // oslo.register_builtin(name, callback)
+    // oslo.register_builtin{ name = …, run = …, desc = …, complete = … }
     //
     // The callback is stored and run (PLAN R9.8). Until that round it was *dropped* and a stub
     // registered under the name instead, which is worse than doing nothing:
     // `oslo.register_builtin('ls', …)` made `ls /` print nothing and exit 0.
     let env_builtin = Arc::clone(env);
     let registry_builtin = Rc::clone(registry);
-    put(oslo, "register_builtin", move |_, args| {
-        let name = text(&args, 1, "oslo.register_builtin")?.trim().to_string();
-        if name.is_empty() {
-            return Err(LuaError::new(
-                "oslo.register_builtin: the builtin name must not be empty",
-            ));
-        }
-        let Some(callback @ Value::Function(_)) = args.get(1) else {
-            return Err(LuaError::new(
-                "oslo.register_builtin: the second argument must be a function",
-            ));
-        };
+    put(oslo, "register_builtin", move |interp, args| {
+        let declared = builtin::declaration(&args)?;
         // Stored first: if the shell registration fails there is no name in the registry
         // pointing at a callback that is not there.
-        registry_builtin
-            .borrow_mut()
-            .insert(format!("{BUILTIN_KEY_PREFIX}{name}"), callback.clone());
+        registry_builtin.borrow_mut().insert(
+            format!("{BUILTIN_KEY_PREFIX}{}", declared.name),
+            declared.run.clone(),
+        );
+        builtin::remember(interp, &declared);
 
         let mut guard = borrow_env(&env_builtin)?;
-        let key = name.clone();
-        guard.register_dynamic_builtin(&name, move |_env, args| Ok(call_lua_builtin(&key, args)));
+        let key = declared.name.clone();
+        guard.register_dynamic_builtin(&declared.name, move |_env, args| {
+            Ok(call_lua_builtin(&key, args))
+        });
         Ok(Vec::new())
     });
 
