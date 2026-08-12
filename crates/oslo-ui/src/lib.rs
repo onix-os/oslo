@@ -18,6 +18,8 @@ pub mod marks;
 pub mod matching;
 pub mod nav;
 pub mod paint;
+/// Answers that have not arrived yet, and the editor's willingness to wait for them.
+pub mod pending;
 pub mod prompt;
 pub mod query;
 pub mod recall;

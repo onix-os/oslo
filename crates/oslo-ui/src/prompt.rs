@@ -499,6 +499,11 @@ static PROMPT_GENERATION: std::sync::atomic::AtomicU64 = std::sync::atomic::Atom
 /// the working directory. Anything else — a keystroke, a redraw, a resize — leaves it alone.
 pub fn invalidate() {
     PROMPT_GENERATION.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    // And tell the editor the frame is stale. Two counters rather than one because they answer
+    // different questions: this one decides whether the *prompt* is rebuilt, and `pending`'s
+    // decides whether the editor redraws at all — a suggestion landing moves the second and must
+    // not move the first, or every provider answer would rebuild the prompt as well.
+    crate::pending::landed();
 }
 
 /// The current generation. Equal to a previous reading means nothing has changed since.
@@ -506,29 +511,24 @@ pub fn generation() -> u64 {
     PROMPT_GENERATION.load(std::sync::atomic::Ordering::Relaxed)
 }
 
-/// How many background prompt runs have been started and not yet finished.
-static REFRESHING: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
-
 /// Say that a prompt is being rebuilt somewhere off this thread.
 ///
 /// **What makes an asynchronous prompt visible at all.** The editor waits for a keystroke, and a
 /// blocking wait cannot notice a generation bump — so the answer a background run produced sat in
 /// the cache until the next key was pressed, which for the last prompt of a session is never. This
 /// tells the input wait to come up for air while an answer may still be coming.
+///
+/// The counter itself is [`crate::pending`], shared with everything else that can answer late.
 pub fn refresh_started() {
-    REFRESHING.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    crate::pending::started();
 }
 
 /// Say that one finished, however it ended.
 pub fn refresh_finished() {
-    let _ = REFRESHING.fetch_update(
-        std::sync::atomic::Ordering::SeqCst,
-        std::sync::atomic::Ordering::SeqCst,
-        |n| Some(n.saturating_sub(1)),
-    );
+    crate::pending::finished();
 }
 
-/// Whether an answer may still arrive for a prompt already on screen.
+/// Whether an answer may still arrive for anything already on screen.
 pub fn refreshing() -> bool {
-    REFRESHING.load(std::sync::atomic::Ordering::SeqCst) > 0
+    crate::pending::outstanding()
 }
