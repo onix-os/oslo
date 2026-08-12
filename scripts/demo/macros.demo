@@ -38,11 +38,9 @@ wait 1.6
 key Left
 wait 1.8
 
-# Tab is the other source: the aliases your configuration defines, as against the ones stored.
-key Tab
-wait 2.4
-key Tab
-wait 1.6
+# **No Tab here.** The other source is the aliases the *recording machine's* configuration defines,
+# so a demo that pressed it would publish whatever the person recording happens to have in their
+# dotfiles. The key is documented; it is not something a cast can show honestly.
 
 # Space turns one off for this session — it stays in the database, and the row says so.
 key Down
