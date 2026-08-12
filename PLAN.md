@@ -4,7 +4,9 @@
 list and remove them. Four kinds share it: an **alias**, an **abbreviation**, a **function** and a
 **script**.
 
-**Work on `feat/aliases`**, branched from `develop`.
+**Work on `feat/aliases`**, branched from `develop`. **Done** — all six steps below are built and
+`make verify` is green; what shipped is written up in
+[`docs/features/aliases.md`](docs/features/aliases.md).
 
 ## What exists today, and what does not
 
@@ -173,7 +175,8 @@ No editor integration exists, so all of this is new:
 `track::history::Command` and would have to be generalised first.
 
 **Flattened to one line each**, as asked: a function is many lines, and a list of many-line entries is
-not a list. A row is `kind  name  first line`; Enter opens the real thing in the editor.
+not a list. A row is `kind  name  first line`; Enter shows the real thing, and `--edit` opens it in
+the editor instead. Piped, or with `--plain`, there is no widget: a page of tab-separated text.
 
 ## Order
 
@@ -205,8 +208,14 @@ Each step ends with `make verify` green and is its own commit.
   start, and a flat read is 3.6 µs. A non-interactive shell never read `config.lua` either, so this
   takes nothing away.
 
-## Still open
+## Settled while building
 
-1. **Is a stored script on `$PATH`?** Typing `deploy` should probably run it — but resolved *after*
-   `$PATH`, so a real `deploy` on the system still wins. Same rule as functions, and worth saying out
-   loud because it is the opposite of what a dotfiles `bin/` directory does.
+1. **A stored script answers to its name** — resolved *after* `$PATH` and after `functions/*.sh`, so
+   a real `deploy` on the system still wins. Same rule as functions, and worth saying out loud
+   because it is the opposite of what a dotfiles `bin/` directory does. The first question asked is
+   whether `aliases.db` exists at all, so a shell with nothing stored pays a `stat(2)` on a line that
+   was going to fail anyway.
+2. **A name that is both a function and a script** is not resolved silently: the function answers,
+   and `oslo aliases show NAME` lists every kind that name has.
+3. **A redirection is applied around the call**, through the same guard a function call uses, so
+   `deploy > out` fails the command rather than running it on the shell's own streams.

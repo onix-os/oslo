@@ -138,6 +138,24 @@ abbr gc 'git commit -m "%"'  # `%` says where the cursor lands
 Better than an alias for a shell that promises not to change what scripts see: the real command
 lands in the buffer, in history and in the log, and you watch it happen.
 
+### Small named things, kept
+
+```sh
+oslo aliases add gs 'git status --short'
+oslo aliases add --abbrev gco 'git checkout'
+oslo aliases add --func mkcd            # opens $EDITOR
+oslo aliases add --script deploy        # opens $EDITOR — any language, with a shebang
+oslo aliases show                       # the list, narrowed as you type
+```
+
+A database rather than a file to edit and re-source. Aliases and abbreviations reach an interactive
+shell when it starts; a function or a script is found when you call it, **after `$PATH` has already
+failed**, so nothing on the system can be quietly redefined. A stored script runs from an anonymous
+in-memory file — no temporary file is ever written. `alias` in a script and `oslo.alias` in your
+config still work, and the database is applied last, so it wins; `show` marks what it shadows.
+
+[The alias manager](docs/features/aliases.md) has the whole of it.
+
 ### Keys that run your code
 
 ```lua
@@ -613,8 +631,8 @@ older pair — delete them.
 
 ## Tools
 
-`oslo --help` lists them — `config`, `profile`, `history`, `hook`, and whichever of `direnv`,
-`plugin` and `scratch` this build has:
+`oslo --help` lists them — `config`, `profile`, `history`, `aliases`, `hook`, and whichever of
+`direnv`, `plugin` and `scratch` this build has:
 
 ```sh
 oslo history
