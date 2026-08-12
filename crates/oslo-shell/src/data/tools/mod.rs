@@ -29,7 +29,7 @@ pub fn register_all() {
     crate::data::tool::register("parse", Shape::Bytes, Shape::Rows);
     crate::data::tool::register("from", Shape::Bytes, Shape::Rows);
     // The verbs. `cols` rather than `select`, which the parser refuses as a bash keyword.
-    for name in ["cols", "get", "sort-by", "first", "last", "length", "each"] {
+    for name in ["cols", "get", "sort-by", "first", "final", "length", "each"] {
         crate::data::tool::register(name, Shape::Rows, Shape::Rows);
     }
     // The verbs that make a stream smaller. See `summarise` for why these four and not `join`.
@@ -132,7 +132,7 @@ pub fn run_tool(
                 Some((2, None))
             }
         },
-        "first" | "last" => {
+        "first" | "final" => {
             let n = words
                 .get(1)
                 .and_then(|w| w.parse::<usize>().ok())
@@ -141,7 +141,7 @@ pub fn run_tool(
             let taken = if name == "first" {
                 verbs::first(&rows, n)
             } else {
-                verbs::last(&rows, n)
+                verbs::final_rows(&rows, n)
             };
             Some((0, Some(taken)))
         }

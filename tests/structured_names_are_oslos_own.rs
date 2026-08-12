@@ -23,8 +23,8 @@ use std::process::Command;
 /// Written out rather than read from the shell, so this test fails when somebody *adds* a name and
 /// has to come and think about it here.
 const STRUCTURED: &[&str] = &[
-    "df", "ps", "ls", "where", "lines", "parse", "from", "cols", "get", "sort-by", "first", "last",
-    "length", "each", "group-by", "count", "distinct", "stats", "to",
+    "df", "ps", "ls", "where", "lines", "parse", "from", "cols", "get", "sort-by", "first",
+    "final", "length", "each", "group-by", "count", "distinct", "stats", "to",
 ];
 
 /// Names that collide with a real command on purpose, and why that is safe.
@@ -40,12 +40,6 @@ const DELIBERATE: &[(&str, &str)] = &[
     (
         "ls",
         "a producer, and the one people notice: it is coreutils unless a rows consumer follows it",
-    ),
-    (
-        "last",
-        "util-linux's `last` shows logins. It collides only in `<rows producer> | last`, which is \
-         not an idiom anybody writes — but it is a collision, and it is recorded rather than \
-         discovered later",
     ),
 ];
 

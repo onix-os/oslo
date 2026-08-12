@@ -58,7 +58,7 @@ ps | where 'cpu > 10' | sort-by cpu | first 5 | to json | jq .
 Filters are **Lua**, not a dialect invented for the occasion, so the escape hatch is the same
 language as the filter: `ls | each 'print(name .. " is " .. size)'`.
 
-Verbs: `where` `each` `cols` `get` `sort-by` `first` `last` `length` `to` `from` `lines` `parse`.
+Verbs: `where` `each` `cols` `get` `sort-by` `first` `final` `length` `to` `from` `lines` `parse`.
 Summaries: `group-by` `count` `distinct` `stats`. Producers: `df` `ps` `ls`, and anything you register
 yourself.
 
