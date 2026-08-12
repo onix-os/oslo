@@ -22,9 +22,13 @@ use std::io::Write;
 /// Through a temporary file and a rename, so a shell reading it while `oslo macros add` runs sees
 /// the old file or the new one and never half of either.
 pub fn write(entries: &[Entry]) -> Result<(), String> {
-    let Some(path) = super::snapshot() else {
-        return Err("nowhere to write the snapshot".to_string());
-    };
+    let path = super::snapshot().ok_or_else(|| "nowhere to write the snapshot".to_string())?;
+    write_to(&path, entries)
+}
+
+/// The same file, written somewhere else — see [`super::elsewhere`], which is the same rows from a
+/// different source and has no business inventing a second format for them.
+pub fn write_to(path: &std::path::Path, entries: &[Entry]) -> Result<(), String> {
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent).map_err(|e| format!("{}: {e}", parent.display()))?;
     }
@@ -60,10 +64,14 @@ pub fn write(entries: &[Entry]) -> Result<(), String> {
 ///
 /// Never an error: see the note above about it being a cache.
 pub fn read() -> Vec<Entry> {
-    let Some(path) = super::snapshot() else {
-        return Vec::new();
-    };
-    let Ok(text) = std::fs::read_to_string(&path) else {
+    match super::snapshot() {
+        Some(path) => read_from(&path),
+        None => Vec::new(),
+    }
+}
+
+pub fn read_from(path: &std::path::Path) -> Vec<Entry> {
+    let Ok(text) = std::fs::read_to_string(path) else {
         return Vec::new();
     };
     text.lines().filter_map(one).collect()

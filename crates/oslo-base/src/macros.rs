@@ -38,6 +38,7 @@
 //! the rule `exec::simple::autoload` states — so it costs a database open only on a line that was
 //! going to fail anyway, and nothing at startup.
 
+pub mod live;
 pub mod snapshot;
 
 pub use crate::track::kv::Store;

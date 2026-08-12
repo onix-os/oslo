@@ -79,7 +79,7 @@ pub fn run_repl(login: bool) -> ! {
     }
     // **After the config, so the database wins.** The ordinary shell rule — the last definition of a
     // name is the one that counts — applied to sources rather than to lines. See `startup::stored`.
-    super::stored::install(&env_struct);
+    let mut macros_held = super::stored::install(&env_struct);
     plugins::start(&env_struct);
 
     let settings = history::settings(&env_struct.lock().unwrap());
@@ -188,6 +188,13 @@ pub fn run_repl(login: bool) -> ! {
         // syscall per prompt rather than a parse.
         universal_stamp = timing::phase("universal", || {
             oslo_shell::env::universal::refresh(&mut env_struct.lock().unwrap(), universal_stamp)
+        });
+
+        // And the same question about macros: another shell — or `oslo macros` in this one — may
+        // have added, removed or turned one off since the last prompt. Two `stat`s decide whether
+        // there is anything to do, which is the same bargain the line above makes.
+        macros_held = timing::phase("macros", || {
+            super::stored::refresh(&env_struct, macros_held)
         });
 
         timing::phase("size", || publish_terminal_size(&env_struct));

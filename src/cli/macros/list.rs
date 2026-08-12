@@ -168,13 +168,10 @@ fn picked(store: &macros::Store, entries: &[Entry], edit: bool) -> Option<i32> {
 /// Read from the snapshot's neighbour rather than by running Lua: this is a *label on a list*, and
 /// starting an interpreter to draw one would cost more than the list.
 fn configured_names() -> Vec<String> {
-    let Some(dir) = oslo::macros::directory() else {
-        return Vec::new();
-    };
-    let path = dir.join("configured.names");
-    std::fs::read_to_string(path)
-        .map(|text| text.lines().map(str::to_string).collect())
-        .unwrap_or_default()
+    macros::live::from_elsewhere()
+        .into_iter()
+        .map(|entry| entry.name)
+        .collect()
 }
 
 fn one_line(body: &str) -> String {
