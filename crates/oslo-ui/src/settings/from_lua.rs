@@ -239,8 +239,43 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
                         .keys
                         .push((key.to_string(), crate::editor::ACTION.to_string()));
                 }
+                // **The table form: a binding that can say what it does.**
+                //
+                //     oslo.keys["alt-n"] = { run = f, desc = "the next note" }
+                //
+                // Without this a binding is a key and a closure, and nothing can list what a
+                // session has bound — which is the gap neovim closed by putting `desc` on
+                // `vim.keymap.set`, and what every which-key display is built on.
+                (Value::Str(key), Value::Table(spec)) => {
+                    let spec = spec.borrow();
+                    let desc = match spec.get(&Value::str("desc")) {
+                        Value::Str(text) => Some(text.to_string()),
+                        _ => None,
+                    };
+                    match spec.get(&Value::str("run")) {
+                        run @ Value::Function(_) => {
+                            crate::editor::register(key, run);
+                            settings
+                                .keys
+                                .push((key.to_string(), crate::editor::ACTION.to_string()));
+                        }
+                        Value::Str(named) => {
+                            settings.keys.push((key.to_string(), named.to_string()));
+                        }
+                        _ => {
+                            problems.push(format!(
+                                "oslo.keys.{key}: `run` must be a function or an action name"
+                            ));
+                            continue;
+                        }
+                    }
+                    if let Some(desc) = desc {
+                        settings.key_descriptions.push((key.to_string(), desc));
+                    }
+                }
                 _ => problems.push(
-                    "oslo.keys: an entry is a key name mapped to an action name or to a function"
+                    "oslo.keys: an entry is a key name mapped to an action name, a function, \
+                     or a table with `run` and `desc`"
                         .to_string(),
                 ),
             }
@@ -248,6 +283,7 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
         // Table iteration has no order, and a binding that depends on which of two entries was
         // applied last is one that behaves differently between runs.
         settings.keys.sort();
+        settings.key_descriptions.sort();
     }
 
     if let Value::Table(table) = oslo.get(&Value::str("abbr")) {

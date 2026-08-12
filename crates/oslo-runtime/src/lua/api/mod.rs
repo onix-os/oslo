@@ -41,6 +41,7 @@ mod re;
 mod run;
 pub(crate) mod segment;
 mod shell;
+mod state;
 pub(crate) mod timer;
 pub(crate) mod tool;
 mod ui;
@@ -156,6 +157,7 @@ pub fn install(interp: &Rc<Interp>, registry: &Registry, env: Arc<Mutex<Environm
     // not configuration. It is a runtime mask over configuration, and the two must not look alike.
     oslo.set(Value::str("feature"), feature::build(registry));
     oslo.set(Value::str("db"), db::build());
+    oslo.set(Value::str("state"), state::build());
     timer::install(&mut oslo);
     builtin::install(&mut oslo);
     oslo.set(Value::str("json"), json::build());
