@@ -569,7 +569,8 @@ pair — delete them.
 
 ## Tools
 
-`oslo --help` lists them. `config`, `profile`, `history`, `direnv` and `hook`:
+`oslo --help` lists them — `config`, `profile`, `history`, `hook`, and whichever of `direnv`,
+`plugin` and `scratch` this build has:
 
 ```sh
 oslo history
@@ -581,7 +582,7 @@ oslo config
 
 - it contains no `/`
 - **no file of that name exists**
-- it is one of the five
+- it is one of those names
 
 The second is what makes this safe rather than merely unlikely to bite. oslo does not search
 `$PATH` for a script operand, so when no such file exists the alternative was never "run something
@@ -1048,6 +1049,34 @@ status terminal                    # selected terminal features and their origin
 
 The predicates answer through the exit status, so they compose with `&&` and `||`. The portable
 spelling of the first line is `case $- in *i*) … esac`, which is correct and which nobody remembers.
+
+### `messages`
+
+```sh
+messages                 # everything this session said, oldest first
+messages -n 10           # the last ten
+messages plugin          # only what the plugin loader said
+messages --errors        # only what failed
+```
+
+What a session said after it has scrolled away — a plugin that could not load, a config file that
+raised, a hook that failed, a prompt segment that is quietly falling back. A config now loads
+`conf.d/*.lua`, plugins, prompt segments and timers, and any of them can fail in one line twenty
+commands ago.
+
+**In memory, and only this session.** It is not a log: nothing rotates, nothing needs permissioning,
+and a hook that echoed a token into a warning does not write it to disk. A repeated line is counted
+rather than kept twice, so a prompt segment failing on every draw cannot push the startup failure out
+of the buffer.
+
+It is a builtin rather than `oslo messages` because a tool is a new process, which has said nothing —
+the same reason `:messages` is a command inside neovim rather than a flag to it. Lua reaches the same
+buffer:
+
+```lua
+oslo.messages.warn("notes", "the database moved; the old one is still there")
+for _, said in ipairs(oslo.messages.all()) do print(said.source, said.text) end
+```
 
 `oslo.proc.capture`, `sh.df()`, `sh.ps()`, `sh.ls()`, `sh.stat()`, `oslo.path.*`, `oslo.json`, `oslo.re`,
 and a `did you mean` drawn from the command index oslo already keeps.

@@ -67,14 +67,16 @@ pub fn start(taken: impl Fn(&str) -> bool) {
             .filter(|name| taken(name) || !claimed.insert((*name).clone()))
             .collect();
         if !conflicts.is_empty() {
-            eprintln!(
-                "oslo: plugin {}: {} is already taken",
-                installed.name,
-                conflicts
-                    .iter()
-                    .map(|name| name.as_str())
-                    .collect::<Vec<_>>()
-                    .join(", ")
+            oslo_base::messages::warn(
+                format!("plugin {}", installed.name),
+                format!(
+                    "{} is already taken",
+                    conflicts
+                        .iter()
+                        .map(|name| name.as_str())
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                ),
             );
             continue;
         }
@@ -119,7 +121,7 @@ pub fn ensure_loaded(line: &str) {
     });
     for installed in wanted {
         if let Err(problem) = load(&installed) {
-            eprintln!("oslo: plugin {}: {problem}", installed.name);
+            oslo_base::messages::error(format!("plugin {}", installed.name), problem);
         }
     }
 }
@@ -153,7 +155,7 @@ pub fn load_for_hook(hook: &str) {
     });
     for installed in wanted {
         if let Err(problem) = load(&installed) {
-            eprintln!("oslo: plugin {}: {problem}", installed.name);
+            oslo_base::messages::error(format!("plugin {}", installed.name), problem);
         }
     }
 }

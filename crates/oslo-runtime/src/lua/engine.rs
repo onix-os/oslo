@@ -322,7 +322,7 @@ impl LuaEngine {
     pub fn fire_hook(&self, name: &str, args: Vec<Value>) {
         for handler in crate::lua::api::hook_handlers(&self.registry, name) {
             if let Err(e) = self.interp.call(&handler, args.clone()) {
-                eprintln!("oslo: {name} hook: {e}");
+                oslo_base::messages::error(format!("{name} hook"), e.to_string());
             }
         }
     }
@@ -469,7 +469,7 @@ impl LuaEngine {
             Err(e) => {
                 // Reported rather than swallowed: a prompt function that raises leaves the shell
                 // silently drawing its default, which looks exactly like the config not loading.
-                eprintln!("oslo: {key}: {e}");
+                oslo_base::messages::error(key, e.to_string());
                 None
             }
         }
@@ -517,7 +517,9 @@ impl LuaEngine {
                 Ok(values) => values.first().cloned().unwrap_or(Value::Nil),
                 Err(e) => {
                     // Named, because with several segments "the prompt failed" does not say which.
-                    eprintln!("oslo: prompt: segment '{name}': {e}");
+                    // A segment fails on every draw, which is what `messages` counts rather than
+                    // keeps five hundred times.
+                    oslo_base::messages::error(format!("prompt segment '{name}'"), e.to_string());
                     continue;
                 }
             };

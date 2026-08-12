@@ -91,9 +91,9 @@ pub fn read() -> Vec<Installed> {
     match parse(&text) {
         Ok(found) => found,
         Err(message) => {
-            eprintln!(
-                "oslo: {}: {message}; run `oslo plugin list`",
-                path.display()
+            oslo_base::messages::error(
+                path.display().to_string(),
+                format!("{message}; run `oslo plugin list`"),
             );
             Vec::new()
         }

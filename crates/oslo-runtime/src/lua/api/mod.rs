@@ -30,6 +30,7 @@ pub(crate) mod external;
 pub mod feature;
 mod fs;
 mod json;
+mod messages;
 #[cfg(feature = "nix")]
 mod nix;
 mod path;
@@ -159,6 +160,7 @@ pub fn install(interp: &Rc<Interp>, registry: &Registry, env: Arc<Mutex<Environm
     oslo.set(Value::str("feature"), feature::build(registry));
     oslo.set(Value::str("db"), db::build());
     oslo.set(Value::str("state"), state::build());
+    oslo.set(Value::str("messages"), messages::build());
     timer::install(&mut oslo);
     spawn::install(&mut oslo);
     builtin::install(&mut oslo);
