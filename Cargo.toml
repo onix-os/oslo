@@ -16,26 +16,9 @@ path = "src/lib.rs"
 # A default build produces one static musl binary without a C toolchain.
 default = []
 
-# `ssh` — an SSH client in the shell, behind a switch.
-#
-# **Off, and measured.** Adding it costs about 0.6 MB on the static musl binary (5.57 → 6.15) and
-# 83 crates. That is a quarter of what `russh` costs, and it is the only option that keeps the
-# no-C rule: `russh`'s default `aws-lc-rs` backend does not even *link* against musl — its C
-# objects want glibc's `__memcpy_chk` and `__isoc23_sscanf` — and its `ring` backend still runs a C
-# compiler, which is the thing `mlua` and `turso` were dropped for.
-#
-# Two things are unresolved and are why this is not on:
-#
-# * **The crypto is unaudited.** `maki` and the RustCrypto crates under it say so themselves. For a
-#   shell meant to be `/bin/sh` on a distribution that is a different class of risk from binary size.
-# * **`tokio` comes back.** `maki` is async and oslo's REPL is not, so using it means a runtime and
-#   `block_on` — the exact bridging that was deleted when `turso` went. Whether that lives at the
-#   edge or spreads is the design question this feature exists to answer.
-ssh = ["dep:maki", "dep:tokio"]
-
 # `vista` — the model behind the ghost prediction and the correction.
 #
-# **Off, for the same shape of reason `ssh` is.** What it buys is real and measured
+# **Off, and measured.** What it buys is real
 # (`docs/features/prediction-and-repair.md`), but it is a dependency oslo does not otherwise need
 # and 433 KB on a binary meant to be `/bin/sh`: 6,323,168 bytes without it against 6,766,848 with.
 # Without it the ghost comes from history, completions and `$PATH` — the sources that read what is
@@ -50,9 +33,9 @@ vista = ["oslo-base/vista", "oslo-runtime/vista", "oslo-ui/vista"]
 # one key. See `PLAN.md` and `docs/features/tab.md`.
 #
 # **Off, because it is a second process and a pty for every session that uses it, and because a
-# shell meant to be `/bin/sh` should not carry a multiplexer nobody asked for.** Unlike `ssh` and
-# `vista` it adds no dependency at all — it is `nix`, which oslo already links — so what it costs is
-# code and the runtime directory, not crates.
+# shell meant to be `/bin/sh` should not carry a multiplexer nobody asked for.** Unlike `vista` it
+# adds no dependency at all — it is `nix`, which oslo already links — so what it costs is code and
+# the runtime directory, not crates.
 #
 # Without it the key is unbound and the settings are accepted and ignored, so one config works in
 # both builds with nothing to ask.
@@ -91,17 +74,6 @@ nix = ["oslo-shell/nix", "oslo-runtime/nix"]
 plugin = ["oslo-runtime/plugin"]
 
 [dependencies]
-# A fork of `makiko`, the one pure-Rust SSH client — no `cc`, no `ring`, no `-sys` crate that is
-# really C. Forked rather than depended on because upstream was last touched in March 2025, and a
-# shell that ships this needs to be able to fix it. Optional, and reached only through `src/ssh.rs`.
-# **Pinned to a commit, not to a branch.** `branch = "master"` meant that a push to the fork changed
-# what oslo built, without a commit here saying so — a build that was green yesterday failing today
-# for a reason not in this repository's history. Moving it is now a deliberate edit to this line.
-maki = { git = "https://github.com/onix-os/maki", rev = "acfe78e19c411fef56f58f2b0bff9e48c511bb89", optional = true }
-# Only ever with `ssh`. `maki` pulls `tokio` for its `sync` primitives on its own; what oslo needs
-# on top is a runtime and a socket, which is what these two features are.
-tokio = { version = "1", features = ["rt-multi-thread", "net"], optional = true }
-
 # The Lua front end, in the same relationship to Lua that brush-parser has to the shell: it parses
 # and nothing else. Evaluation is oslo's own, in `src/lua/eval/`, so that both languages run on one
 # Rust core. `full_moon` is the parser behind StyLua and selene.

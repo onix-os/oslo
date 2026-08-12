@@ -38,11 +38,6 @@ pub use oslo_ui as ui;
 /// The Lua API a config is written against, and the interpreter that owns it.
 pub use oslo_runtime::lua;
 
-/// SSH, behind the `ssh` feature — off by default. See the module docs for what it costs and what
-/// is still undecided.
-#[cfg(feature = "ssh")]
-pub mod ssh;
-
 /// Helper-level tests for the editor, driven against a real `Environment`.
 ///
 /// Here rather than in `oslo-ui` because that is the point of them: the crate under test knows the
