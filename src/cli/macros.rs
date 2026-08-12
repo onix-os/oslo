@@ -1,6 +1,6 @@
-//! `oslo aliases` — the small named things you keep, in one place.
+//! `oslo macros` — the small named things you keep, in one place.
 //!
-//! The rules live in [`oslo_base::aliases`]; this parses words, opens an editor and prints. Every
+//! The rules live in [`oslo_base::macros`]; this parses words, opens an editor and prints. Every
 //! mutation republishes the snapshot a starting shell reads, so the database and the file cannot
 //! drift apart by anything short of editing the file by hand.
 
@@ -8,7 +8,7 @@ pub mod help;
 mod list;
 
 use crate::cli::help::Paint;
-use oslo::aliases::{self, Entry, Kind};
+use oslo::macros::{self, Entry, Kind};
 
 pub fn run(args: &[String]) -> i32 {
     let Some(command) = args.first().map(String::as_str) else {
@@ -40,13 +40,13 @@ pub fn run(args: &[String]) -> i32 {
 }
 
 fn usage(message: &str) -> i32 {
-    eprintln!("oslo aliases: {message}\n");
+    eprintln!("oslo macros: {message}\n");
     eprint!("{}", help::text(Paint::plain()));
     2
 }
 
 fn fail(message: &str) -> i32 {
-    eprintln!("oslo aliases: {message}");
+    eprintln!("oslo macros: {message}");
     1
 }
 
@@ -89,7 +89,7 @@ fn parse(args: &[String]) -> Result<Asked, String> {
             "--plain" => asked.plain = true,
             "--replace" => asked.replace = true,
             // Only a *leading* dash is an option. A body is arbitrary text and often starts with
-            // one — `oslo aliases add ll '-la'` is a thing somebody will write.
+            // one — `oslo macros add ll '-la'` is a thing somebody will write.
             other if other.starts_with("--") && asked.words.is_empty() => {
                 return Err(format!("unknown option {other:?}"));
             }
@@ -107,14 +107,14 @@ fn add(args: &[String]) -> i32 {
     let Some(name) = asked.words.first().cloned() else {
         return usage("add needs a name");
     };
-    if !aliases::valid_name(&name) {
+    if !macros::valid_name(&name) {
         return fail(&format!(
             "{name:?} is not a name: it becomes a command word, so no spaces and nothing that \
              could be an operator"
         ));
     }
 
-    let store = match aliases::open() {
+    let store = match macros::open() {
         Ok(store) => store,
         Err(problem) => return fail(&problem),
     };
@@ -126,7 +126,7 @@ fn add(args: &[String]) -> i32 {
         asked.edit || inline.is_empty() || matches!(asked.kind, Kind::Func | Kind::Script);
     let body = if wants_editor {
         let starting = if inline.is_empty() {
-            aliases::get(&store, asked.kind, &name)
+            macros::get(&store, asked.kind, &name)
                 .map(|e| e.body)
                 .unwrap_or_else(|| starter(asked.kind, &name))
         } else {
@@ -152,7 +152,7 @@ fn add(args: &[String]) -> i32 {
         name: name.clone(),
         body,
     };
-    if let Err(problem) = aliases::put_and_publish(&store, &entry) {
+    if let Err(problem) = macros::put_and_publish(&store, &entry) {
         return fail(&problem);
     }
     println!("{} {name}", asked.kind.word());
@@ -181,17 +181,17 @@ fn remove(args: &[String]) -> i32 {
     let Some(name) = asked.words.first() else {
         return usage("remove needs a name");
     };
-    let store = match aliases::open() {
+    let store = match macros::open() {
         Ok(store) => store,
         Err(problem) => return fail(&problem),
     };
-    match aliases::remove_and_publish(&store, asked.kind, name) {
+    match macros::remove_and_publish(&store, asked.kind, name) {
         Ok(true) => {
             println!("removed {} {name}", asked.kind.word());
             0
         }
         Ok(false) => {
-            let others = aliases::kinds_of(&store, name);
+            let others = macros::kinds_of(&store, name);
             if others.is_empty() {
                 fail(&format!("no {} called {name}", asked.kind.word()))
             } else {
@@ -213,5 +213,5 @@ fn remove(args: &[String]) -> i32 {
 }
 
 #[cfg(test)]
-#[path = "aliases/tests.rs"]
+#[path = "macros/tests.rs"]
 mod tests;

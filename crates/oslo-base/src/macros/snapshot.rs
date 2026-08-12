@@ -11,7 +11,7 @@
 //! # It is a cache, and behaves like one
 //!
 //! Unreadable, half-written, from a future version with a fourth column — all the same answer: no
-//! aliases, and the next `oslo aliases` command writes a good one. A shell that refused to start
+//! aliases, and the next `oslo macros` command writes a good one. A shell that refused to start
 //! because a *cache* was malformed would be a worse shell than one that starts without your aliases.
 
 use super::{Entry, Kind};
@@ -19,7 +19,7 @@ use std::io::Write;
 
 /// Write the snapshot for `entries`, replacing whatever was there.
 ///
-/// Through a temporary file and a rename, so a shell reading it while `oslo aliases add` runs sees
+/// Through a temporary file and a rename, so a shell reading it while `oslo macros add` runs sees
 /// the old file or the new one and never half of either.
 pub fn write(entries: &[Entry]) -> Result<(), String> {
     let Some(path) = super::snapshot() else {

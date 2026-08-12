@@ -1,7 +1,7 @@
 //! `show`, `export` and `import` — reading the store out, and putting it back.
 
 use super::{Paint, fail, parse, usage};
-use oslo::aliases::{self, Entry, Kind};
+use oslo::macros::{self, Entry, Kind};
 
 /// The list, or one entry in full.
 pub(super) fn show(args: &[String]) -> i32 {
@@ -9,11 +9,11 @@ pub(super) fn show(args: &[String]) -> i32 {
         Ok(asked) => asked,
         Err(problem) => return usage(&problem),
     };
-    let store = match aliases::open() {
+    let store = match macros::open() {
         Ok(store) => store,
         Err(problem) => return fail(&problem),
     };
-    let entries = aliases::all(&store);
+    let entries = macros::all(&store);
 
     // A name asked for prints in full: `show gco` is somebody asking what it *is*, and flattening
     // the answer to one line would be answering a different question.
@@ -32,12 +32,12 @@ pub(super) fn show(args: &[String]) -> i32 {
     }
 
     if entries.is_empty() {
-        println!("nothing stored yet — `oslo aliases add NAME BODY`");
+        println!("nothing stored yet — `oslo macros add NAME BODY`");
         return 0;
     }
 
     let paint = Paint::detect();
-    let configured = configured_aliases();
+    let configured = configured_names();
 
     // **On a terminal it is the list, narrowed as you type** — the same widget the history finder
     // is, rather than a page of output to read. `--plain` is the way to ask for the page, and a
@@ -85,7 +85,7 @@ pub(super) fn show(args: &[String]) -> i32 {
 /// The list as a widget: pick one and see it, or edit it.
 ///
 /// `None` when there is no terminal to ask on, which is how a pipe gets the printed list instead.
-fn picked(store: &aliases::Store, entries: &[Entry], edit: bool) -> Option<i32> {
+fn picked(store: &macros::Store, entries: &[Entry], edit: bool) -> Option<i32> {
     // **Flattened to one row each.** A function is many lines and a list of many-line entries is
     // not a list; the whole thing is what opening one shows.
     let rows: Vec<String> = entries
@@ -110,7 +110,7 @@ fn picked(store: &aliases::Store, entries: &[Entry], edit: bool) -> Option<i32> 
         header: if edit {
             "edit which?".to_string()
         } else {
-            "aliases".to_string()
+            "macros".to_string()
         },
         items: rows.clone(),
         height: 15,
@@ -147,7 +147,7 @@ fn picked(store: &aliases::Store, entries: &[Entry], edit: bool) -> Option<i32> 
                 body,
                 ..entry.clone()
             };
-            match aliases::put_and_publish(store, &updated) {
+            match macros::put_and_publish(store, &updated) {
                 Ok(()) => {
                     println!("{} {}", updated.kind.word(), updated.name);
                     Some(0)
@@ -163,8 +163,8 @@ fn picked(store: &aliases::Store, entries: &[Entry], edit: bool) -> Option<i32> 
 ///
 /// Read from the snapshot's neighbour rather than by running Lua: this is a *label on a list*, and
 /// starting an interpreter to draw one would cost more than the list.
-fn configured_aliases() -> Vec<String> {
-    let Some(dir) = oslo::aliases::directory() else {
+fn configured_names() -> Vec<String> {
+    let Some(dir) = oslo::macros::directory() else {
         return Vec::new();
     };
     let path = dir.join("configured.names");
@@ -197,11 +197,11 @@ pub(super) fn export(args: &[String]) -> i32 {
         Ok(asked) => asked,
         Err(problem) => return usage(&problem),
     };
-    let store = match aliases::open() {
+    let store = match macros::open() {
         Ok(store) => store,
         Err(problem) => return fail(&problem),
     };
-    let text = write_text(&aliases::all(&store));
+    let text = write_text(&macros::all(&store));
     match asked.words.first() {
         Some(path) => match std::fs::write(path, &text) {
             Ok(()) => 0,
@@ -262,7 +262,7 @@ pub(super) fn read_text(text: &str) -> Result<Vec<Entry>, String> {
         let Some(kind) = Kind::named(kind) else {
             return Err(format!("line {}: {kind:?} is not a kind", number + 1));
         };
-        if !aliases::valid_name(name) {
+        if !macros::valid_name(name) {
             return Err(format!("line {}: {name:?} is not a name", number + 1));
         }
         entries.push(Entry {
@@ -307,25 +307,25 @@ pub(super) fn import(args: &[String]) -> i32 {
         Ok(entries) => entries,
         Err(problem) => return fail(&problem),
     };
-    let store = match aliases::open() {
+    let store = match macros::open() {
         Ok(store) => store,
         Err(problem) => return fail(&problem),
     };
     if asked.replace {
-        for entry in aliases::all(&store) {
-            aliases::remove(&store, entry.kind, &entry.name);
+        for entry in macros::all(&store) {
+            macros::remove(&store, entry.kind, &entry.name);
         }
     }
     let mut stored = 0;
     for entry in &entries {
-        if let Err(problem) = aliases::put(&store, entry) {
+        if let Err(problem) = macros::put(&store, entry) {
             return fail(&problem);
         }
         stored += 1;
     }
     // One snapshot for the batch rather than one per entry: the reason `put_and_publish` and `put`
     // are separate functions.
-    if let Err(problem) = aliases::publish(&store) {
+    if let Err(problem) = macros::publish(&store) {
         return fail(&problem);
     }
     println!("imported {stored}");

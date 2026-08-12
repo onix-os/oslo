@@ -44,7 +44,7 @@ fn a_shell_script_knows_its_own_name() {
 #[test]
 fn only_a_shell_gets_the_name_repair() {
     let shellish = |body: &str| {
-        aliases::shebang_interpreter(body)
+        macros::shebang_interpreter(body)
             .filter(|i| matches!(i.as_str(), "sh" | "bash" | "dash" | "ksh" | "zsh" | "oslo"))
     };
     assert_eq!(shellish("#!/bin/sh\n").as_deref(), Some("sh"));

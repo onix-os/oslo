@@ -31,8 +31,8 @@ pub struct Tool {
 /// undocumented, or listed and unreachable.
 pub const TOOLS: &[Tool] = &[
     Tool {
-        name: "aliases",
-        about: "aliases, abbreviations, functions and scripts you have stored",
+        name: "macros",
+        about: "the aliases, abbreviations, functions and scripts you keep",
     },
     Tool {
         name: "config",
@@ -125,8 +125,8 @@ pub fn run(tool: &'static Tool, args: &[String]) -> i32 {
     if tool.name == "history" {
         return crate::cli::history::run(args);
     }
-    if tool.name == "aliases" {
-        return crate::cli::aliases::run(args);
+    if tool.name == "macros" {
+        return crate::cli::macros::run(args);
     }
     if tool.name == "config" {
         return crate::cli::config::run(args);

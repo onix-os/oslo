@@ -1,15 +1,15 @@
-# The alias manager
+# Macros
 
 Four kinds of small named thing — an alias, an abbreviation, a function, a script — kept in one
 database and managed with one subcommand, so that saving one does not mean editing a file and
 re-sourcing it.
 
 ```sh
-oslo aliases add gs 'git status --short'          # an alias
-oslo aliases add --abbrev gco 'git checkout'      # expanded into your line as you type
-oslo aliases add --func mkcd                      # opens your editor
-oslo aliases add --script deploy                  # opens your editor, any language
-oslo aliases show                                 # the list, narrowed as you type
+oslo macros add gs 'git status --short'          # an alias
+oslo macros add --abbrev gco 'git checkout'      # expanded into your line as you type
+oslo macros add --func mkcd                      # opens your editor
+oslo macros add --script deploy                  # opens your editor, any language
+oslo macros show                                 # the list, narrowed as you type
 ```
 
 An alias in `config.lua` still works, and so does `alias` in a script. This is a second source, not
@@ -63,7 +63,7 @@ deploy alpha
    ▼
 exec::stored::try_call
    │
-   ├─ does aliases.db exist at all?      no ──────────► "command not found"
+   ├─ does macros.db exist at all?      no ──────────► "command not found"
    ├─ func deploy?                       yes ─────────► run it in THIS shell
    ▼  script deploy
 memory_file("deploy", body)          memfd_create(2), no MFD_CLOEXEC
@@ -114,10 +114,10 @@ database is not read at startup at all: every mutation republishes a **snapshot*
 beside the database — and a starting shell reads that.
 
 ```
-oslo aliases add gs …
+oslo macros add gs …
    │
-   ├─ put into aliases/aliases.db          the store, for the manager
-   └─ publish → aliases/aliases.snapshot   a flat file, for a starting shell
+   ├─ put into aliases/macros.db          the store, for the manager
+   └─ publish → aliases/macros.snapshot   a flat file, for a starting shell
 
 a new interactive shell
    │
@@ -131,14 +131,14 @@ else either, so a non-interactive shell has never had aliases to expand.
 
 ## Order: config first, database last
 
-Three things define an alias — `alias` in a script, `oslo.alias` in `config.lua`, `oslo aliases add`
+Three things define an alias — `alias` in a script, `oslo.alias` in `config.lua`, `oslo macros add`
 — and the ordinary shell rule is that the last definition wins. That rule is applied to the sources:
 the database is applied after the configuration, so **the database wins**.
 
 That is the deliberate half. The database is the one you can change without editing a file, so
-`oslo aliases add gco …` taking effect is what you asked for. The cost is that a stored entry can
+`oslo macros add gco …` taking effect is what you asked for. The cost is that a stored entry can
 shadow one you wrote in `config.lua`, so the names the config defined are written down at startup and
-`oslo aliases show` marks the row:
+`oslo macros show` marks the row:
 
 ```
 alias   gs                 git status --short  (shadows config.lua)
@@ -156,7 +156,7 @@ on the machine. The temporary file is named for the language it holds (`.sh`, `.
 whatever the shebang says), because syntax highlighting is most of the reason to want a real editor.
 Quitting without saving stores nothing and says `unchanged`.
 
-`oslo aliases show` on a terminal is the list narrowed as you type, one row per entry — a function is
+`oslo macros show` on a terminal is the list narrowed as you type, one row per entry — a function is
 many lines and a list of many-line entries is not a list, so a row is `kind  name  first line` and
 picking one shows the whole thing. `--edit` opens the one you pick. Piped or with `--plain` it is a
 page of tab-separated text instead, with no widget in the way.
@@ -176,12 +176,12 @@ func mkcd
 
 | | |
 |---|---|
-| `crates/oslo-base/src/aliases.rs` | the store, the four kinds, the snapshot |
+| `crates/oslo-base/src/macros.rs` | the store, the four kinds, the snapshot |
 | `crates/oslo-runtime/src/startup/stored.rs` | applying the snapshot to a starting shell |
 | `crates/oslo-shell/src/exec/stored.rs` | running a function or a script, and the memfd |
-| `src/cli/aliases.rs` | `add`, `remove`, `show`, `export`, `import` |
+| `src/cli/macros.rs` | `add`, `remove`, `show`, `export`, `import` |
 | `src/cli/editor.rs` | handing text to `$EDITOR` and taking it back |
-| `~/.local/share/oslo/aliases/` | `aliases.db`, `aliases.snapshot`, `configured.names` |
+| `~/.local/share/oslo/macros/` | `macros.db`, `macros.snapshot`, `configured.names` |
 
 One database for the user, not one per profile: a profile keeps *histories* apart because they are a
 record of what a particular shell did, and an alias is not a record of anything.

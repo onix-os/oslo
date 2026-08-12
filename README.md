@@ -141,11 +141,11 @@ lands in the buffer, in history and in the log, and you watch it happen.
 ### Small named things, kept
 
 ```sh
-oslo aliases add gs 'git status --short'
-oslo aliases add --abbrev gco 'git checkout'
-oslo aliases add --func mkcd            # opens $EDITOR
-oslo aliases add --script deploy        # opens $EDITOR — any language, with a shebang
-oslo aliases show                       # the list, narrowed as you type
+oslo macros add --alias gs 'git status --short'
+oslo macros add --abbrev gco 'git checkout'
+oslo macros add --func mkcd            # opens $EDITOR
+oslo macros add --script deploy        # opens $EDITOR — any language, with a shebang
+oslo macros show                       # the list, narrowed as you type
 ```
 
 A database rather than a file to edit and re-source. Aliases and abbreviations reach an interactive
@@ -154,7 +154,7 @@ failed**, so nothing on the system can be quietly redefined. A stored script run
 in-memory file — no temporary file is ever written. `alias` in a script and `oslo.alias` in your
 config still work, and the database is applied last, so it wins; `show` marks what it shadows.
 
-[The alias manager](docs/features/aliases.md) has the whole of it.
+[Macros](docs/features/macros.md) has the whole of it.
 
 ### Keys that run your code
 

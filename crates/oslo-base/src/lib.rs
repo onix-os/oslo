@@ -19,12 +19,12 @@
 //! it means deciding who constructs a shell environment, and that is a question about the shell,
 //! not about this crate. It is left where it is until the answer is worth the churn.
 
-pub mod aliases;
 pub mod ast;
 pub mod error;
 /// Parts of the shell a config can turn off and on again while it runs.
 pub mod feature;
 pub mod hooks;
+pub mod macros;
 /// What this session said, kept after it has scrolled off.
 pub mod messages;
 /// The depth guard every parse passes through, and the heredoc scan that feeds alias expansion.

@@ -2,7 +2,7 @@ use super::*;
 
 fn store() -> (tempfile::TempDir, Store) {
     let dir = tempfile::tempdir().expect("tempdir");
-    let store = Store::open(&dir.path().join("aliases.db")).expect("open");
+    let store = Store::open(&dir.path().join("macros.db")).expect("open");
     (dir, store)
 }
 

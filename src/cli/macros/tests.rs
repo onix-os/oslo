@@ -12,7 +12,7 @@ fn help_is_not_an_error() {
     }
 }
 
-/// Bare `oslo aliases` prints the overview and is a usage error, like `history` and `plugin`.
+/// Bare `oslo macros` prints the overview and is a usage error, like `history` and `plugin`.
 #[test]
 fn saying_nothing_is_a_usage_error() {
     assert_eq!(run(&[]), 2);
@@ -46,7 +46,7 @@ fn two_kinds_at_once_is_a_mistake_rather_than_the_last_one_winning() {
     assert!(problem.contains("one kind"), "{problem}");
 }
 
-/// **A body is arbitrary text and often starts with a dash.** `oslo aliases add ll '-la'` has to
+/// **A body is arbitrary text and often starts with a dash.** `oslo macros add ll '-la'` has to
 /// store `-la`, not report an unknown option.
 #[test]
 fn a_dash_after_the_name_is_a_body_not_an_option() {

@@ -1,8 +1,8 @@
 //! The small named things you accumulate: aliases, abbreviations, functions and scripts.
 //!
 //! ```text
-//! ~/.local/share/oslo/aliases/aliases.db         the four kinds, keyed `<kind>/<name>`
-//! ~/.local/share/oslo/aliases/aliases.snapshot   what a starting shell actually reads
+//! ~/.local/share/oslo/macros/macros.db         the four kinds, keyed `<kind>/<name>`
+//! ~/.local/share/oslo/macros/macros.snapshot   what a starting shell actually reads
 //! ```
 //!
 //! # One store, not one per profile
@@ -28,7 +28,7 @@
 //! every mutation and [`snapshot::read`] is what a starting shell reads.
 //!
 //! **The database stays the single source of truth.** The snapshot is a cache: delete it and the
-//! next `oslo aliases` command writes it again, and a shell that finds none simply has no aliases
+//! next `oslo macros` command writes it again, and a shell that finds none simply has no aliases
 //! until then rather than reading a database on the startup path.
 //!
 //! # Only two kinds are in the snapshot
@@ -146,7 +146,7 @@ pub fn valid_name(name: &str) -> bool {
         })
 }
 
-/// `$XDG_DATA_HOME/oslo/aliases`, or `~/.local/share/oslo/aliases`.
+/// `$XDG_DATA_HOME/oslo/macros`, or `~/.local/share/oslo/macros`.
 pub fn directory() -> Option<PathBuf> {
     let base = std::env::var_os("XDG_DATA_HOME")
         .map(PathBuf::from)
@@ -154,21 +154,21 @@ pub fn directory() -> Option<PathBuf> {
         .or_else(|| {
             std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".local/share"))
         })?;
-    Some(base.join("oslo/aliases"))
+    Some(base.join("oslo/macros"))
 }
 
 pub fn database() -> Option<PathBuf> {
-    Some(directory()?.join("aliases.db"))
+    Some(directory()?.join("macros.db"))
 }
 
 pub fn snapshot() -> Option<PathBuf> {
-    Some(directory()?.join("aliases.snapshot"))
+    Some(directory()?.join("macros.snapshot"))
 }
 
 /// Open the database, creating it if it is not there.
 pub fn open() -> Result<Store, String> {
     let path = database().ok_or_else(|| {
-        "no $XDG_DATA_HOME and no $HOME, so there is nowhere to keep aliases".to_string()
+        "no $XDG_DATA_HOME and no $HOME, so there is nowhere to keep macros".to_string()
     })?;
     Store::open(&path).ok_or_else(|| format!("{}: cannot be opened", path.display()))
 }
@@ -251,5 +251,5 @@ pub fn publish(store: &Store) -> Result<(), String> {
 }
 
 #[cfg(test)]
-#[path = "aliases/tests.rs"]
+#[path = "macros/tests.rs"]
 mod tests;

@@ -39,7 +39,7 @@
 //! honest; writing a file named after the script to make one variable prettier is not.
 
 use crate::env::Environment;
-use oslo_base::aliases::{self, Kind};
+use oslo_base::macros::{self, Kind};
 use std::os::fd::{AsRawFd, OwnedFd};
 
 /// Run the stored function or script `words[0]` names, with the redirections applied.
@@ -54,12 +54,12 @@ pub(super) fn try_call(
 ) -> Option<oslo_base::error::Result<i32>> {
     // Nothing is stored at all in the overwhelming case, and finding that out must not cost a
     // database open on every failed command. Whether the file exists is what a `stat(2)` answers.
-    if !aliases::database().is_some_and(|path| path.exists()) {
+    if !macros::database().is_some_and(|path| path.exists()) {
         return None;
     }
-    let store = aliases::open().ok()?;
-    let entry = aliases::get(&store, Kind::Func, name)
-        .or_else(|| aliases::get(&store, Kind::Script, name))?;
+    let store = macros::open().ok()?;
+    let entry = macros::get(&store, Kind::Func, name)
+        .or_else(|| macros::get(&store, Kind::Script, name))?;
     drop(store);
 
     // The same guard a function call uses, and for its reason: a redirection that cannot be set up
@@ -118,7 +118,7 @@ fn script(body: &str, name: &str, args: &[String]) -> i32 {
     let path = format!("/proc/self/fd/{}", fd.as_raw_fd());
 
     // A shell interpreter gets its `$0` back; see the module docs.
-    let shell = aliases::shebang_interpreter(body).filter(|interp| {
+    let shell = macros::shebang_interpreter(body).filter(|interp| {
         matches!(
             interp.as_str(),
             "sh" | "bash" | "dash" | "ksh" | "zsh" | "oslo"

@@ -1,4 +1,4 @@
-//! `oslo aliases` help rendering.
+//! `oslo macros` help rendering.
 //!
 //! The same shape as `history`'s and `plugin`'s, to the letter: one `Sub` per subcommand, an
 //! overview built from `row`, per-subcommand help behind `--help`, and notes wrapped to the
@@ -51,7 +51,7 @@ pub(super) const SUBCOMMANDS: &[Sub] = &[
             ("--script", "remove the script"),
         ],
         note: "Without a flag it removes the alias. A name may be more than one kind at once, so \
-               removing without saying which removes only the alias — `oslo aliases show NAME` \
+               removing without saying which removes only the alias — `oslo macros show NAME` \
                lists every kind that name has. Removing one that shadowed a `config.lua` alias \
                puts the configured one back on the next shell.",
     },
@@ -101,7 +101,7 @@ pub fn text(paint: Paint) -> String {
         text,
         "  {} {} {} {}",
         paint.key("oslo"),
-        paint.key("aliases"),
+        paint.key("macros"),
         paint.slot("<subcommand>"),
         paint.slot("[argument]...")
     );
@@ -112,7 +112,7 @@ pub fn text(paint: Paint) -> String {
     let _ = writeln!(
         text,
         "\n  {}",
-        paint.dim("`oslo aliases <subcommand> --help` for that subcommand's arguments.")
+        paint.dim("`oslo macros <subcommand> --help` for that subcommand's arguments.")
     );
     let _ = writeln!(
         text,
@@ -136,7 +136,7 @@ pub fn subcommand(name: &str, paint: Paint) -> Option<String> {
         text,
         "  {} {} {}",
         paint.key("oslo"),
-        paint.key("aliases"),
+        paint.key("macros"),
         paint.key(sub.name)
     );
     if !sub.args.is_empty() {
