@@ -37,6 +37,12 @@ answer as a Lua table. Independent of `direnv`: what the two share, `use flake` 
 `oslo.direnv.nix_develop()`, needs both. In `oslo-minimal` there is no `oslo.nix`, and a config asks
 for it the way it asks about anything optional — `if oslo.nix then … end`.
 
+**[Plugins](plugins.md) are half `oslo`-only.** `oslo.db` — a database a config owns — and the
+`pre-cmd` veto that lets a hook decline to have a line recorded are in **both** binaries: they are
+capabilities, and a config should not have to ask whether they exist. *Installing* is behind the
+`plugin` cargo feature at 88 KB, because fetching somebody's code and deciding whether to trust it
+is not something a `/bin/sh` does. In `oslo-minimal` the word `plugin` falls through to `$PATH`.
+
 Everything else on this page is in both binaries.
 
 Each document opens with a recording of the feature actually running. They are not screencasts
@@ -96,6 +102,7 @@ scripts/demo/embed.sh                            # put the players back in the d
 | [The filesystem navigator](nav.md) | `nav`: type to filter, arrows to move, Esc to take the shell there |
 | [rm, and the things that can bite](rm-and-safety.md) | Recoverable at the prompt, POSIX in a script |
 | [Scratches](scratch.md) | Named sessions that outlive the terminal they were opened in |
+| [Plugins](plugins.md) | Somebody else's Lua, installed once — with a database and a trust gate |
 
 ## Appearance and control
 

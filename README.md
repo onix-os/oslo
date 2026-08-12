@@ -1064,20 +1064,21 @@ nix build         # static musl binary
 
 ### Optional features
 
-All five are off *by default*, and off for the same reason: a shell that is going to be `/bin/sh`
+All six are off *by default*, and off for the same reason: a shell that is going to be `/bin/sh`
 should carry what every session needs and nothing else. `make build` turns them on, because
 somebody building from source is asking for the shell rather than for the floor; the published
 release artifact is the default build.
 
 Each cost is what turning that one feature *off* takes back out of the full build, measured on the
-static musl binary — 6,081,344 bytes with none of them, 6,902,016 with all five:
+static musl binary — 6,122,304 bytes with none of them, 7,033,088 with all six:
 
 | feature | costs | brings |
 |---|---:|---|
-| `vista` | +433 KB | the model: `predict` as a suggestion source, `oslo.repair`, `oslo.predict.*`, and the correction drawn after a mistyped line |
+| `vista` | +437 KB | the model: `predict` as a suggestion source, `oslo.repair`, `oslo.predict.*`, and the correction drawn after a mistyped line |
 | `direnv` | +268 KB | `.env.lua` and `.envrc` read on arrival in a directory, the `direnv` builtin, `oslo.direnv` |
-| `nix` | +68 KB | `oslo.nix` — every `nix --json` answer as a Lua table, and flake-output completion |
-| `scratch` | +64 KB | named sessions that outlive their terminal, and the key that finds them |
+| `nix` | +80 KB | `oslo.nix` — every `nix --json` answer as a Lua table, and flake-output completion |
+| `scratch` | +68 KB | named sessions that outlive their terminal, and the key that finds them |
+| `plugin` | +88 KB | `oslo plugin` — installing somebody else's Lua, and loading it on first use. `oslo.db` and the `pre-cmd` veto a plugin is written against are in **every** build |
 | `ssh` | **+0** | an SSH client — unfinished. Nothing reaches `src/ssh.rs` yet, so the linker discards `maki` and `tokio` whole and the binary is byte-for-byte the default one. It will cost about 0.6 MB the day something calls it |
 
 ```sh
@@ -1086,7 +1087,7 @@ make build TYPE=minimal     # static release, none of them
 ```
 
 **There are no others**, and in particular none that exist to serve the test suite —
-`--all-features` turns on exactly the five above. Test-only helpers that other crates' tests need
+`--all-features` turns on exactly the six above. Test-only helpers that other crates' tests need
 are ordinary `pub` items the linker drops from the binary, not features, because a build flag
 should never decide whether test scaffolding ships.
 
