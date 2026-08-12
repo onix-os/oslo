@@ -148,6 +148,9 @@ oslo macros add --script deploy        # opens $EDITOR — any language, with a 
 oslo macros show                       # the manager, on the whole screen
 ```
 
+**Alt+\\ opens it from the prompt**, beside Ctrl+\\ for the scratch finder — the same key with the
+other modifier, for the other list of things you keep. `oslo.macros.key` moves it.
+
 A database rather than a file to edit and re-source. Four kinds under one word: an alias, an
 abbreviation, a function and a script. `oslo macros show` is the history finder's screen pointed at
 them — type to filter, ← → for the tag, Tab between what you stored and what your config defines,
@@ -722,6 +725,8 @@ oslo.finder.enabled        = true     -- the full-screen history search
 oslo.finder.key            = "up"
 oslo.finder.limit          = 5000     -- distinct commands loaded when it opens
 oslo.finder.confirm_delete = true     -- Delete asks before forgetting a command
+
+oslo.macros.key            = "alt-\\" -- the macro manager, beside the scratch finder's ctrl-\
 
 oslo.history.ignore     = {}          -- $HISTIGNORE patterns, matched against the whole line
 oslo.history.ignore_space = true      -- a line starting with a space is not remembered

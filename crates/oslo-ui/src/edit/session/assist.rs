@@ -68,6 +68,14 @@ pub trait Assist {
         false
     }
 
+    /// Open the macro manager, and answer whether the screen was taken over.
+    ///
+    /// The same shape and the same reason as `open_scratch`: the editor knows a key was pressed,
+    /// not what a macro is or where they are kept.
+    fn open_macros(&mut self) -> bool {
+        false
+    }
+
     /// The previous history entry, given what is on the line now.
     fn history_prev(&mut self, _line: &str) -> Option<String> {
         None

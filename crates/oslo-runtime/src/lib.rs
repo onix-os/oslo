@@ -28,7 +28,9 @@
 /// against the stack oslo actually provides.
 pub const INTERPRETER_STACK: usize = 16 * 1024 * 1024;
 
+pub mod editor;
 pub mod lua;
+pub mod macros;
 /// Installing somebody else's Lua, and loading it on demand. `plugin` only.
 #[cfg(feature = "plugin")]
 pub mod plugin;

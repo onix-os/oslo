@@ -200,6 +200,17 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
         }
     }
 
+    if let Value::Table(table) = oslo.get(&Value::str("macros")) {
+        let table = table.borrow();
+        if let Value::Str(key) = table.get(&Value::str("key")) {
+            if crate::keys::is_key_name(&key) {
+                settings.macros.key = key.to_string();
+            } else {
+                problems.push(format!("oslo.macros.key: '{key}' is not a key name"));
+            }
+        }
+    }
+
     if let Value::Table(table) = oslo.get(&Value::str("finder")) {
         let table = table.borrow();
         if let Value::Bool(on) = table.get(&Value::str("enabled")) {

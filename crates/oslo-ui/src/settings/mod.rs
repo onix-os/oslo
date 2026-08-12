@@ -55,6 +55,27 @@ pub struct Settings {
     pub key_descriptions: Vec<(String, String)>,
     /// `oslo.scratch`: named sessions that outlive the terminal they were opened in.
     pub scratch: Scratch,
+    /// `oslo.macros`: the small named things you keep, and the key that opens them.
+    pub macros: Macros,
+}
+
+/// `oslo.macros` — the manager `oslo macros show` opens, on a key.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Macros {
+    /// The key that opens the manager at the prompt.
+    pub key: String,
+}
+
+impl Default for Macros {
+    fn default() -> Self {
+        Macros {
+            // `alt-\`, beside the scratch finder's `ctrl-\`: the same key with the other
+            // modifier, for the other list of things you keep. Alt sends `ESC` and the character
+            // in every terminal, so unlike a Ctrl+Enter this one arrives without the kitty
+            // keyboard protocol having to be negotiated first.
+            key: "alt-\\".to_string(),
+        }
+    }
 }
 
 /// `oslo.tab` — named sessions that keep running when the terminal goes away.

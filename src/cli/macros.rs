@@ -173,7 +173,7 @@ fn add(args: &[String]) -> i32 {
         } else {
             inline
         };
-        match super::editor::edit(&starting, kind.extension(&starting)) {
+        match oslo_runtime::editor::edit(&starting, kind.extension(&starting)) {
             Ok(Some(body)) => body,
             Ok(None) => {
                 println!("unchanged");

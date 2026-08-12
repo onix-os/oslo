@@ -65,12 +65,12 @@ pub fn edit(body: &str, extension: &str) -> Result<Option<String>, String> {
     let path = dir.path().join(format!("oslo-edit.{extension}"));
     {
         let mut file = std::fs::File::create(&path)
-            .map_err(|e| format!("{}: {}", path.display(), oslo::error::reason(&e)))?;
+            .map_err(|e| format!("{}: {}", path.display(), oslo_base::error::reason(&e)))?;
         // The temporary file holds what the row holds, and a row can hold a token. `tempdir` is
         // already `0700`, and this makes the file itself say so too.
         let _ = file.set_permissions(std::os::unix::fs::PermissionsExt::from_mode(0o600));
         file.write_all(body.as_bytes())
-            .map_err(|e| format!("{}: {}", path.display(), oslo::error::reason(&e)))?;
+            .map_err(|e| format!("{}: {}", path.display(), oslo_base::error::reason(&e)))?;
     }
 
     let editor = chosen();
@@ -79,7 +79,7 @@ pub fn edit(body: &str, extension: &str) -> Result<Option<String>, String> {
         .args(arguments)
         .arg(&path)
         .status()
-        .map_err(|e| format!("{program}: {}", oslo::error::reason(&e)))?;
+        .map_err(|e| format!("{program}: {}", oslo_base::error::reason(&e)))?;
     if !status.success() {
         // A non-zero editor is a person who quit rather than saved, as often as it is a failure.
         // Either way, taking the buffer anyway would store something they did not agree to.
@@ -90,7 +90,7 @@ pub fn edit(body: &str, extension: &str) -> Result<Option<String>, String> {
     }
 
     let after = std::fs::read_to_string(&path)
-        .map_err(|e| format!("{}: {}", path.display(), oslo::error::reason(&e)))?;
+        .map_err(|e| format!("{}: {}", path.display(), oslo_base::error::reason(&e)))?;
     Ok((after != body).then_some(after))
 }
 

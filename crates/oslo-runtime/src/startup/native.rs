@@ -204,6 +204,23 @@ impl Assist for ShellAssist<'_> {
         }
     }
 
+    /// Open the macro manager on the key that asked for it.
+    ///
+    /// The same screen `oslo macros show` opens, and the same code — see [`crate::macros::screen`].
+    /// A failure is printed where the key was pressed rather than returned, because there is nobody
+    /// above this to report it to: the prompt comes back either way.
+    fn open_macros(&mut self) -> bool {
+        match crate::macros::screen() {
+            Some(Ok(())) => true,
+            Some(Err(problem)) => {
+                eprintln!("\r\noslo: macros: {problem}");
+                true
+            }
+            // No terminal to draw on. Nothing happened, so nothing is repainted.
+            None => false,
+        }
+    }
+
     fn complete(
         &mut self,
         line: &str,
@@ -299,6 +316,12 @@ impl Assist for ShellAssist<'_> {
         #[cfg(feature = "scratch")]
         if settings.scratch.key == name {
             return Some(Bound::OpenScratch);
+        }
+
+        // Ranked with it, and for the same reason: `oslo.macros.key` is a statement the config
+        // made on purpose, and `oslo.keys` binding the same chord to something else still wins.
+        if settings.macros.key == name {
+            return Some(Bound::OpenMacros);
         }
 
         if settings.suggest.accept.as_deref() == Some(name.as_str()) {

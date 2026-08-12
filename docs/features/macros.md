@@ -175,6 +175,15 @@ name in a table; there is nothing to enumerate, so that source can never show ei
 look, the same striping, the same search bar, the same delete confirmation. A second full-screen list
 that behaved differently would be a second thing to learn.
 
+**Alt+\\ opens it from the prompt** — beside Ctrl+\\ for the [scratch finder](scratch.md), the same
+key with the other modifier for the other list of things you keep. `oslo.macros.key` moves it, and
+takes any key name a config can write.
+
+Alt rather than a Ctrl+Enter, which is the obvious choice and does not work: Ctrl+Enter sends the
+same `\r` as Enter unless the terminal speaks the kitty keyboard protocol, and even then oslo
+decodes it as Ctrl+M — historically the same key. Alt sends `ESC` and the character, everywhere,
+with nothing to negotiate.
+
 ```
    3d   alias   gs        git status --short                    #git #system
    3d   abbrev  gco       git checkout                          #git
@@ -270,8 +279,9 @@ oslo macros add --alias gs 'git status --short' --tag git --tag system
 | `crates/oslo-runtime/src/startup/stored.rs` | applying it to a shell, at startup and per prompt |
 | `crates/oslo-shell/src/exec/stored.rs` | running a function or a script, and the memfd |
 | `crates/oslo-ui/src/manager.rs` | the screen: rows, keys, and what it asks the caller to do |
+| `crates/oslo-runtime/src/macros.rs` | the screen over the real database, for the key and the CLI |
+| `crates/oslo-runtime/src/editor.rs` | handing text to `$EDITOR` and taking it back |
 | `src/cli/macros.rs` | `add`, `remove`, `show`, `off`, `on`, `export`, `import` |
-| `src/cli/editor.rs` | handing text to `$EDITOR` and taking it back |
 | `~/.local/share/oslo/macros/` | `macros.db`, `macros.snapshot`, `elsewhere.snapshot`, `session/` |
 
 ## What it cannot do

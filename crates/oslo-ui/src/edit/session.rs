@@ -48,6 +48,8 @@ pub enum Bound {
     /// Open the tab finder. Like completion, it wants the terminal to itself, so the session only
     /// says so and the outer loop does it.
     OpenScratch,
+    /// Open the macro manager, on the same terms.
+    OpenMacros,
     /// A Lua function, by the key's name.
     Lua(String),
 }
@@ -73,6 +75,8 @@ pub enum Step {
     OpenCompletion { backwards: bool },
     /// Open the tab finder through the outer loop, which owns the terminal the widget needs.
     OpenScratch,
+    /// Open the macro manager, likewise.
+    OpenMacros,
 }
 
 /// The line being edited, and where in history it came from.
@@ -118,6 +122,7 @@ impl Session {
             Bound::Interrupt => Step::Interrupted,
             Bound::Complete => Step::OpenCompletion { backwards: false },
             Bound::OpenScratch => Step::OpenScratch,
+            Bound::OpenMacros => Step::OpenMacros,
             Bound::SearchHistory => match assist.search_history(&self.buffer.text()) {
                 Some(line) => {
                     let end = line.chars().count();
@@ -519,6 +524,14 @@ pub fn read_line(
             // than the row repainted: what is on the screen now was written by something else.
             Step::OpenScratch => {
                 if assist.open_scratch() {
+                    crate::prompt::invalidate();
+                }
+                repaint = true;
+            }
+            // The manager owns the whole screen while it is open, so what is underneath when it
+            // closes was written by something else — the prompt is rebuilt rather than repainted.
+            Step::OpenMacros => {
+                if assist.open_macros() {
                     crate::prompt::invalidate();
                 }
                 repaint = true;
