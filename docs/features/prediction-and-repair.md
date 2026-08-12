@@ -19,7 +19,7 @@ hundred hand-written rules and this does with none).
 > make build TYPE=minimal     # the floor: no model, nothing to learn from
 > ```
 >
-> It costs 433 KB — 6,323,168 bytes without it against 6,766,848 with — on a binary meant to be
+> It costs 341 KB — 5,663,840 bytes without it against 6,013,312 with — on a binary meant to be
 > `/bin/sh`, which is the whole argument for a distribution shipping `oslo-minimal` as the system
 > shell. Without it the shell learns nothing, writes no model and reads none; a config that has to
 > work under both asks before using the names, `if oslo.repair then … end`.

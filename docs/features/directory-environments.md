@@ -19,7 +19,7 @@ shell it did not write, and **oslo is the shell**.
 > make build TYPE=minimal     # no directory environments at all
 > ```
 >
-> It costs **256 KB** — 6,081,344 bytes without it against 6,343,648 with — the largest of the four
+> It costs **200 KB** — 5,808,352 bytes without it against 6,013,312 with — the largest of the four
 > optional features, and the reason it is off is not the size. This is the one part of the shell
 > that **reads a file on arrival in a directory and can run what it finds there**. That is a
 > different kind of trust from anything else oslo does unprompted, and a `/bin/sh` on a

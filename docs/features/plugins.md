@@ -20,8 +20,8 @@ adds commands to the shell you type at — and nothing else in oslo had to chang
 >
 > Installing is different in kind — it fetches somebody's code, decides whether to trust it, and
 > reserves command names on their behalf. A `/bin/sh` on a distribution has no use for any of that.
-> It is behind the **`plugin`** cargo feature and costs **88 KB**: 6,942,976 bytes without it
-> against 7,033,088 with. In `oslo-minimal` the word `plugin` falls through to `$PATH`.
+> It is behind the **`plugin`** cargo feature and costs **108 KB**: 5,902,720 bytes without it
+> against 6,013,312 with. In `oslo-minimal` the word `plugin` falls through to `$PATH`.
 
 ## What a plugin is
 
@@ -226,7 +226,7 @@ an absent field as a veto would make every table-returning handler hide its line
 
 | | |
 |---|---|
-| the `plugin` feature | +88 KB on the static musl binary |
+| the `plugin` feature | +108 KB on the static musl binary |
 | an installed, unused plugin | one line in a JSON file; no Lua parsed, no Lua run |
 | a plugin in use | its own Lua, once per session |
 

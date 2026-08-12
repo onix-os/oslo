@@ -20,7 +20,7 @@ default = []
 #
 # **Off, and measured.** What it buys is real
 # (`docs/features/prediction-and-repair.md`), but it is a dependency oslo does not otherwise need
-# and 433 KB on a binary meant to be `/bin/sh`: 6,323,168 bytes without it against 6,766,848 with.
+# and 341 KB on a binary meant to be `/bin/sh`: 5,663,840 bytes without it against 6,013,312 with.
 # Without it the ghost comes from history, completions and `$PATH` — the sources that read what is
 # already on the machine — and the shell learns nothing, writes no model and reads none.
 #
@@ -220,6 +220,28 @@ lto = "fat"
 codegen-units = 1
 strip = "symbols"
 
+# **Size, for oslo's own crates too — with the editor as the exception.**
+#
+# The rule below has applied to dependencies for a while; oslo's own crates were the last thing
+# still built for speed by default, and they are most of the binary. Applying the same setting to
+# them is worth 1.22 MB and, measured, costs nothing a person could feel:
+#
+# ```text
+#                                    static musl      paint      hint
+#   opt-level = 3 (before)             6.95 MB       2.21 us    2.21 us
+#   opt-level = "s", flat              5.57 MB       2.73 us    2.55 us
+#   opt-level = "s", oslo-ui at 3      5.73 MB       2.24 us    2.29 us
+# ```
+#
+# `bench/keystroke.rs`, min of six runs — a single run on this machine varies by a factor of two,
+# so anything less than that is noise dressed up as a measurement. The flat setting costs half a
+# microsecond per keystroke against a budget of about ten milliseconds, which would have been
+# acceptable; the exception makes it free, so there is no reason not to take it.
+#
+# `"z"` was measured too: 5.04 MB, another 0.53 below `"s"`. Not taken, because the speed of it was
+# never measured and the marginal byte is worth less than the certainty.
+opt-level = "s"
+
 # **The dependencies are compiled for size; oslo and its parser are not.**
 #
 # Compiling everything below this crate for size was measured once and deferred, because it cost
@@ -236,6 +258,13 @@ opt-level = "s"
 
 # The one dependency on the hot path, and the whole reason `"*"` above needed an exception.
 [profile.release.package.brush-parser]
+opt-level = 3
+
+# **The editor is oslo's own `brush-parser`**: the one crate on the path a keystroke takes, where
+# `"s"` was measurable. `paint` and `hint` run on every key and both come from here — 2.73 µs and
+# 2.55 µs built for size, 2.24 and 2.29 built for speed, against 2.21 before any of this. The other
+# 160 KB is the cheapest 160 KB in the binary.
+[profile.release.package.oslo-ui]
 opt-level = 3
 
 # **`"*"` does not reach oslo's own crates, and that is cargo's rule rather than luck.**

@@ -257,7 +257,7 @@ what pressing a key will do.
 ## What you were about to type
 
 **Behind `--features vista`, and off by default.** A default build suggests from history,
-completions and `$PATH` — everything below this line needs the flag, which costs 433 KB:
+completions and `$PATH` — everything below this line needs the flag, which costs 341 KB:
 
 ```sh
 cargo build --release --features vista
@@ -1143,15 +1143,15 @@ somebody building from source is asking for the shell rather than for the floor;
 release artifact is the default build.
 
 Each cost is what turning that one feature *off* takes back out of the full build, measured on the
-static musl binary — 6,122,304 bytes with none of them, 7,033,088 with all five:
+static musl binary — 5,266,368 bytes with none of them, 6,013,312 with all five:
 
 | feature | costs | brings |
 |---|---:|---|
-| `vista` | +437 KB | the model: `predict` as a suggestion source, `oslo.repair`, `oslo.predict.*`, and the correction drawn after a mistyped line |
-| `direnv` | +268 KB | `.env.lua` and `.envrc` read on arrival in a directory, the `direnv` builtin, `oslo.direnv` |
-| `nix` | +80 KB | `oslo.nix` — every `nix --json` answer as a Lua table, and flake-output completion |
-| `scratch` | +68 KB | named sessions that outlive their terminal, and the key that finds them |
-| `plugin` | +88 KB | `oslo plugin` — installing somebody else's Lua, and loading it on first use. `oslo.db` and the `pre-cmd` veto a plugin is written against are in **every** build |
+| `vista` | +341 KB | the model: `predict` as a suggestion source, `oslo.repair`, `oslo.predict.*`, and the correction drawn after a mistyped line |
+| `direnv` | +200 KB | `.env.lua` and `.envrc` read on arrival in a directory, the `direnv` builtin, `oslo.direnv` |
+| `nix` | +60 KB | `oslo.nix` — every `nix --json` answer as a Lua table, and flake-output completion |
+| `scratch` | +48 KB | named sessions that outlive their terminal, and the key that finds them |
+| `plugin` | +108 KB | `oslo plugin` — installing somebody else's Lua, and loading it on first use. `oslo.db` and the `pre-cmd` veto a plugin is written against are in **every** build |
 
 ```sh
 make build                  # static release, every feature on
