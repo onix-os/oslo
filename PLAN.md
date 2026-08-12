@@ -1,324 +1,165 @@
-# Suggestions you can plug into, and tune
+# An alias manager, and things that are not aliases
 
-> **Done**, on `feat/providers`, one commit per step. `make verify` green after each, and
-> `cargo test` with no features green too. Three things came out differently from the plan and are
-> recorded where they happened:
->
-> - **Step 5 (tiers for the ghost) was dropped on inspection** — see the note in the order below. The
->   ghost takes the first source that answers, so grouping expresses nothing a flat list does not.
-> - **`on_late = "drop"` does not exist.** For a provider that answers later, *every* answer is late,
->   so the mode would have been a slower way of writing `oslo.suggest.forget()`. Two modes, `fill`
->   and `replace`, and `settle_ms` bounding the second.
-> - **The context rules are a predicate, not a table.** `enabled = function(ctx)` is strictly more
->   expressive than any `when = { command = …, cwd = … }` would be, and it is Lua — which is what the
->   rest of the config is written in.
->
-> **Not done: asynchronous *completion* providers.** The ghost's async path is complete; the
-> dropdown's is not. It is a bigger change than it looks — the menu owns the terminal while it is
-> open, and rows arriving must not move the selection under a cursor that is already somewhere.
-> Completion providers are synchronous, which is what the tldr case needs.
->
-> Measured, as required: `bench/keystroke.rs`, min of three runs, against `develop`.
->
-> | | paint | hint |
-> |---|---|---|
-> | `develop` | 2.23 µs | 2.20 µs |
-> | `feat/providers` | 2.20 µs | 2.18 µs |
->
-> Nothing, which is the answer a shell with no providers installed must get: `Source::Provider` is
-> not in the default `sources`, so the arm is never reached, and when it is, `any()` is a thread-local
-> flag read.
+`oslo aliases` — a database of the small named things you accumulate, and one place to add, edit,
+list and remove them. Four kinds share it: an **alias**, an **abbreviation**, a **function** and a
+**script**.
 
-Two things the shell offers as you type — the **ghost** past the cursor and the **dropdown** on Tab —
-are closed. A config can reorder the ghost's four built-in sources and replace the dropdown for one
-named command; it cannot add to either, and it cannot say *how* two answers should compete.
+**Work on `feat/aliases`**, branched from `develop`.
 
-This opens both, and the second half is the point: **who wins is the user's decision, not the
-plugin's.** If you want your LLM to beat the model, say so and it does.
+## What exists today, and what does not
 
-**Work on a new branch off `develop`.**
-
-## Why now
-
-Two plugins nobody can write today:
-
-- **tldr** — 3,000 pages of what people actually do with a command. `git <Tab>` should offer them.
-  Half is already possible (`oslo.completion.spec` takes tldr's shape); what is missing is *adding*
-  to a command oslo already knows, and answering generically rather than one name at a time.
-- **an LLM ghost** — regenerated as you type. Nothing about this fits: the sources are a Rust enum
-  and the call is synchronous on the keystroke path, where a 300 ms answer is not an answer.
-
-The slow one decides the design. **A provider that can be slow is the general case.**
-
-## What other systems do
-
-Six of them, and each is right about something different.
-
-| | inline / ghost | menu / dropdown | how two answers compete |
-|---|---|---|---|
-| **zsh-autosuggestions** | `ZSH_AUTOSUGGEST_STRATEGY` array — *"tried successively until a suggestion is found"* | — | first to answer wins |
-| **zsh compsys** | — | `completer` style: an ordered list, the next tried when the previous found nothing | ordered fallback, plus `tag-order` / `group-order` for presentation |
-| **VS Code / Monaco** | `InlineCompletionsProvider.groupId` + `yieldsToGroupIds` | `CompletionItemProvider` | a provider **declares** it yields to another group |
-| **nvim-cmp** | — | `group_index` — a higher group is ignored entirely if a lower one produced anything; `priority` within a group | fallback tiers |
-| **blink.cmp** | — | per provider: `enabled`, `async`, `timeout_ms`, `min_keyword_length`, `max_items`, `score_offset`, `fallbacks`, `transform_items` | a numeric **nudge**, plus explicit fallbacks |
-| **Emacs** | — | `completion-at-point-functions` — sequential, first that answers wins; `cape-capf-super` **merges** several so they appear together | two named modes: sequential *or* merged |
-
-Five lessons worth taking:
-
-1. **The two surfaces need different composition.** Emacs makes it explicit: a list is sequential by
-   default, and merging is a thing you ask for by name. The ghost can only draw one string, so it is
-   first-wins. A menu shows everything, so it is merged. oslo already behaves this way by accident;
-   this makes it deliberate.
-2. **Tiers beat a flat list.** nvim-cmp's `group_index`, zsh's `completer`, blink's `fallbacks` are
-   the same idea: *only ask the next tier if nothing better answered*. This is the shape of the LLM
-   question — put it in a tier and let the user choose the tier.
-3. **VS Code has the right control in the wrong hands.** `yieldsToGroupIds` is declared by the
-   *provider*. That is exactly the complaint: the plugin decides, you do not. Here a provider
-   declares a **default** and the config overrides it.
-4. **A nudge is finer than an order.** blink's `score_offset` composes with ranking instead of
-   replacing it — and oslo already sorts by frecency (`completion.rs:214`), so an offset drops
-   straight in.
-5. **zstyle is the deepest fine control anyone has shipped.** Its context is
-   `:completion:function:completer:command:argument:tag`, and any style can be set for any pattern —
-   so "for `git`, at argument 1, prefer these" is one line. That axis-per-colon idea is what
-   "more fine control" actually means; the syntax is not.
-
-## What oslo has
-
-**The ghost.** `OsloHelper::suggest` (`crates/oslo-ui/src/lib.rs:177`) walks `oslo.suggest.sources`
-and takes the first that answers, over a closed enum: `History | Completion | Path | Prediction`.
-Called from `Assist::hint_text` → `frame::draw`, synchronously, once per keystroke. Guarded by three
-rules worth keeping: end of line only, `sh` only, `feature::on(SUGGEST)`.
-
-**The dropdown.** `OsloHelper::candidates` merges the built-in builders, then
-`oslo.completion.sources` filters by **kind** (`completion.rs:203`), then it sorts by frecency and
-name (`completion.rs:214`). `for_command` (`completion.rs:116`) **replaces** everything for one named
-command and supplies **no kind**, so `sources` filters its candidates out entirely — a known hole.
-
-**The discovery that shapes the plan.** The editor already knows how to wait for an answer that has
-not arrived — built for asynchronous *prompts*. `frame::next_input` (`edit/session/frame.rs:22`):
-
-```rust
-if !idle_hook && !prompt::refreshing() { return keys.read_event(); }   // block: the default
-const REFRESH_SLICE_MS: i32 = 15;
-Timeout => if prompt::generation() != seen { return Some(InputEvent::PromptRefreshed); }
-```
-
-An outstanding count, a generation counter, a 15 ms slice used *only* while something is outstanding,
-and a synthetic event that makes the loop redraw. And `lua/api/external.rs` states the constraint in
-its own words — *"a prompt is on the critical path of every keystroke"* — answered with `timeout_ms`
-plus an `async` mode that uses the previous answer immediately.
-
-**So this is mostly generalisation.**
-
-## The design
-
-### 1. One channel for a late answer
-
-Lift `prompt::refreshing`/`generation` into `crates/oslo-ui/src/pending.rs`: an outstanding count and
-a generation, with the prompt as its first caller and the ghost and dropdown as the next two.
-`next_input` waits in slices while *anything* is outstanding. ~60 lines, and nothing below works
-without it.
-
-### 2. Tiers, not a flat list
-
-```lua
-oslo.suggest.sources = {
-  { "history", "predict" },   -- tier 1: instant, local, and only ever something you really ran
-  { "llm" },                  -- tier 2: asked only when tier 1 said nothing
-  { "path" },                 -- tier 3
-}
-```
-
-A tier is consulted only if every earlier tier answered nothing — nvim-cmp's `group_index`, zsh's
-`completer`. **The flat list stays valid** and means one tier per entry, so every config written
-today keeps working.
-
-Want the LLM to beat history? Put it in tier 1 and give it the offset, or put history in tier 2. It
-is one line either way, and it is *your* line — the plugin does not get a vote.
-
-### 3. What happens when the slow one is late — the user decides
-
-This is the real question. `predict` answers in ~4 µs, an LLM in ~300 ms. Something is already drawn
-when the slow answer lands.
-
-```lua
-oslo.suggest.provider {
-  name = "llm",
-  on_late = "replace",     -- "fill" (default) | "replace" | "drop"
-  settle_ms = 400,         -- after this, too late to swap under your eyes: treated as "drop"
-}
-```
-
-- **`fill`** — draw only if nothing is drawn. Nothing ever changes under the cursor. The safe default.
-- **`replace`** — swap it in. Text you are looking at changes half a second after you stopped typing.
-  It is a real thing to want, and if you say so, that is what happens.
-- **`drop`** — never draw after the fact; the answer is only used if it arrives before the frame.
-
-`settle_ms` is the guard that makes `replace` liveable: an answer that took four seconds is not
-allowed to rewrite a line you have moved on from.
-
-### 4. A nudge for the dropdown
-
-The menu merges rather than choosing, so tiers are the wrong tool. `score_offset` is the right one —
-added to the frecency score in the existing sort:
-
-```lua
-oslo.completion.provider { name = "tldr", kind = "example", score_offset = 20 }
-```
-
-`fallbacks = { "…" }` covers the other case blink identified: *if I return nothing, ask these*.
-
-### 5. Context rules — zstyle's lesson, in Lua
-
-One order for every situation is not fine control. The axes oslo actually has are the command, the
-argument position, the language, and where you are standing:
-
-```lua
-oslo.suggest.rules = {
-  { when = { command = "git" },        use = { { "llm" }, { "history" } } },
-  { when = { language = "lua" },       use = { { "history" } } },   -- no model, no LLM, in Lua
-  { when = { cwd = "~/work/*" },       use = { { "history" } } },   -- nothing leaves this tree
-}
-
-oslo.completion.rules = {
-  { when = { command = "git", arg = 1 }, offset = { tldr = 50 } },
-  { when = { kind = "file" },            offset = { tldr = -100 } },
-}
-```
-
-First matching rule wins, falling back to the global setting. `when` fields are all optional and
-ANDed; `command` and `cwd` take the shell's own glob. This is `zstyle ':completion:*:*:git:*' …`
-without the colons — the same power, in the language the rest of the config is written in.
-
-### 6. Guards, all borrowed
-
-Per provider, and every one of them earns its place from somebody else's experience:
-
-| | from | why |
+| | where it lives now | persisted |
 |---|---|---|
-| `min_chars` | blink `min_keyword_length` | do not ask a model about `g` |
-| `max_line` | `ZSH_AUTOSUGGEST_BUFFER_MAX_SIZE` | a pasted 4 KB line is not a prompt for suggestions |
-| `ignore = { "…" }` | `ZSH_AUTOSUGGEST_HISTORY_IGNORE` | glob patterns that silence the provider — and the privacy control |
-| `enabled = function(ctx)` | blink, nvim-cmp | anything the other fields cannot express |
-| `debounce_ms` | every LLM plugin | ten keystrokes in one word is one request, not ten |
-| `timeout_ms` | blink, `external.rs` | and a **sync budget**: a provider that overruns repeatedly is disabled for the session and says which it was |
-| `max_items` | blink | one provider cannot flood the menu |
+| `alias gco='git checkout'` | `Environment`, from `config.lua` or the `alias` builtin | **no** |
+| `abbr gco 'git checkout'` | `oslo_ui::abbr`, from `config.lua` or the `abbr` builtin | **no** |
+| a shell function | `~/.config/oslo/functions/NAME.sh`, autoloaded on first call | as a file |
+| a script | a file on `$PATH` | as a file |
 
-### 7. The continuation invariant, and trust
+Three of the four are configuration, one is a file, and **nothing survives except by editing a
+file**. There is also **no `$EDITOR` integration anywhere in oslo** — nothing shells out to an editor
+today, so that is new work rather than a call to something existing.
 
-**The ghost is drawn as trailing text and accepted with Right**, so an answer that is not a
-continuation of the line would make that key lie. Such an answer is **refused and reported once**
-through `messages`, never trimmed into something the plugin did not write. A provider that wants to
-*replace* the line is asking for the repair slot, which this plan leaves alone.
+Two pieces already exist and should be used rather than rebuilt: `oslo_base::store` (a private
+`0600` key-value database per name, which is what `oslo.db` is) and `ask::filter` (a list narrowed as
+you type, which is the picker `show` wants).
 
-**A ghost provider sees every keystroke** — including the ones you retyped because a password went
-into the wrong field. An LLM provider sends them off the machine. So:
+## The research that decides the shape: running a script that has no file
 
-- `oslo plugin doctor` **names every provider that can see typing**, because "what reads my
-  keystrokes" must have an answer that is not "read the source";
-- `oslo.feature` can kill them mid-session (`SUGGEST` already exists);
-- they are not asked at all when the line is secret, under the leading-space convention, or when
-  `no_trace` is set. The veto work established that every sink asks one flag; this is one more sink.
+A script needs a path for the kernel to `exec`. A database row is not a path. The obvious answer is
+to write a temp file, and it is the wrong one: it costs a write per run, leaves rubbish to clean up,
+and puts your script in a world-readable directory where somebody can read it or race it.
 
-## The API, whole
+**oslo is Linux-only, so it can do better.** `memfd_create(2)` makes an anonymous file that exists
+only in memory, and `/proc/self/fd/N` is a path the kernel will honour — shebang and all. Tested on
+this machine, not assumed:
 
-```lua
--- ghost: fast
-oslo.suggest.provider { name = "tldr", answer = function(ctx) return "…" end }
-
--- ghost: slow
-oslo.suggest.provider {
-  name = "llm", tier = 2, on_late = "fill", settle_ms = 400,
-  debounce_ms = 120, timeout_ms = 2000, min_chars = 3, max_line = 512,
-  ignore = { "* --password *" },
-  request = function(ctx, reply)
-    oslo.spawn { "llm", ctx.line, on_exit = function(out) reply(out) end }
-  end,
-}
-
--- dropdown
-oslo.completion.provider {
-  name = "tldr", kind = "example", score_offset = 20, max_items = 10,
-  answer = function(ctx)          -- ctx = { command, words, current, arg, cwd, language }
-    return { { display = "git commit --amend", description = "change the last commit" } }
-  end,
-}
+```text
+#!/bin/sh              from a memfd   → ran, exit 0
+#!/usr/bin/env python3 from a memfd   → ran, exit 0
+sealed with F_SEAL_WRITE              → ran, and cannot be modified after it is written
+readable by another user?             → no: `/memfd:name (deleted)`, reachable only through
+                                        this process's own /proc/PID/fd
 ```
 
-`ctx` for the ghost is `{ line, cursor, cwd, language, last_status }`. Returning `nil` declines and
-the next source is asked — exactly what the built-in sources do.
+**One wart, with a fix for the common case.** The kernel rewrites `argv` for a shebang, so a script
+sees `$0` as `/proc/self/fd/3` rather than its own name. For a *shell* interpreter that is repairable,
+because `sh -c` takes the name as its next argument:
+
+```text
+execv("/bin/sh", ["sh", "-c", ". /proc/self/fd/3 \"$@\"", "deploy", "alpha", "beta"])
+  →  $0 is: deploy ; args: alpha beta
+```
+
+Tested and correct. For any other interpreter the name goes in `$OSLO_SCRIPT` and `$0` stays the fd
+path — which is honest, and better than pretending by writing a file named after the script.
+
+## The four kinds
+
+```sh
+oslo aliases add gco 'git checkout'          # alias: the word is replaced before parsing
+oslo aliases add --abbrev gco 'git checkout' # abbreviation: expanded into the line as you type
+oslo aliases add --func mkcd                 # function: opens $EDITOR, sh or lua
+oslo aliases add --script deploy             # script: opens $EDITOR, any language, has a shebang
+oslo aliases show                            # the list, narrowed as you type
+oslo aliases remove gco
+```
+
+The distinction is not decoration. Each reaches the shell by a different route, and that is what
+decides where the work goes:
+
+| kind | how it takes effect | when it must be loaded |
+|---|---|---|
+| alias | word substitution before the parse | **before any line is parsed** |
+| abbreviation | expanded into the buffer as you type | interactive only, on the keystroke path |
+| function | a name the command search finds | on first call, like `functions/*.sh` |
+| script | executed from a memfd | on first call |
+
+## The problem this creates, and it is the important one
+
+**An alias has to be loaded before the first command, and oslo is `/bin/sh`.**
+
+`shopt` says `expand_aliases` is permanently on — *"oslo expands aliases in every shell, not only
+interactive ones"* — so a database of aliases means opening a database on **every** `sh -c` a build
+spawns. oslo starts in about 3.5 ms today, and a hundred short-lived shells per `make` is exactly the
+case the rest of the design has been protecting.
+
+Three ways out. Measure before choosing:
+
+1. **Interactive only.** Aliases from the database load when somebody is typing; a script sees none.
+   This is what bash does — a non-interactive shell does not expand aliases unless asked — and it
+   would mean `expand_aliases` stops being permanently on and starts answering honestly.
+2. **A snapshot.** The database is the source of truth; a flat file beside it is what a shell reads,
+   rewritten whenever `oslo aliases` changes something. One `read(2)` of a few hundred bytes.
+3. **Pay it.** If a store open is tens of microseconds, this is an argument about nothing.
+
+**Functions and scripts do not have this problem** — both are looked up after the `$PATH` search has
+already failed, so they cost a database open only on a line that was going to fail anyway.
+
+## Where it lives
+
+```text
+~/.local/share/oslo/aliases/<profile>/aliases.db
+```
+
+As asked — with one question worth answering first. **Should aliases be per profile?** History is,
+because an agent's commands must not pollute the ranking of yours. But aliases are *your tooling*: it
+is not obvious that a shell under `OSLO_PROFILE=claude` should have different ones, and a per-profile
+default means adding an alias in one shell and not finding it in the next.
+
+The alternative is one store for the user, with the profile as an optional scope. Both are one line;
+they are not the same decision.
+
+**And the trade nobody should discover later:** a database is not a dotfiles repository. Today an
+alias lives in `config.lua` — version-controlled, diffable, copied to a new machine with the rest of
+your configuration. In a database it is none of those. `export`/`import` is the answer, and it belongs
+in the first version rather than bolted on after somebody has fifty of them.
+
+## Editing
+
+No editor integration exists, so all of this is new:
+
+- `$VISUAL`, then `$EDITOR`, then `nvim`, then `vi`. Never a hardcoded editor.
+- The row goes to a temp file with the **right extension** — `.sh`, `.lua`, or whatever the shebang
+  implies — because syntax highlighting is most of why you wanted a real editor.
+- Read back, stored, temp file removed. Unchanged content stores nothing.
+- The terminal has to be handed over and taken back: oslo owns raw mode, and an editor that inherits
+  a raw terminal misbehaves. `scratch` already does this dance for a pty and is the thing to read.
+
+## Listing
+
+`ask::filter` — the list narrowed as you type — rather than the history finder, which is built around
+`track::history::Command` and would have to be generalised first.
+
+**Flattened to one line each**, as asked: a function is many lines, and a list of many-line entries is
+not a list. A row is `kind  name  first line`; Enter opens the real thing in the editor.
 
 ## Order
 
 Each step ends with `make verify` green and is its own commit.
 
-1. **`pending`** — lift the outstanding/generation pair out of `prompt.rs`; `next_input` waits on any
-   of them. No behaviour change; the prompt tests are the proof.
-2. **Ghost providers, sync.** Registry, the fifth source, the continuation invariant, the sync
-   budget. Measured against `bench/keystroke.rs` with none installed.
-3. **Ghost providers, async.** `request`/`reply`, debounce, staleness by generation, `timeout_ms`.
-4. **`on_late` and `settle_ms`.** The three policies, and the test that `fill` never changes drawn
-   text.
-5. ~~**Tiers** for `oslo.suggest.sources`.~~ **Dropped, on inspection.** The ghost takes the first
-   source that answers, so `{{a, b}, {c}}` — try `a` and `b`, and only if both declined try `c` — is
-   exactly what the flat `{a, b, c}` already means. Grouping is worth having where results *merge*,
-   which is why nvim-cmp has `group_index` for its menu; a surface that can draw only one string has
-   nothing to group. It belongs to the dropdown, and it is in step 6.
-6. **Completion providers**, sync then async: additive, kinds, `score_offset`, `fallbacks`,
-   `max_items`. Fixes the `for_command` no-kind hole on the way past.
-7. **Context rules** for both, and the guards table.
-8. **Two worked examples** in `examples/plugins/`: `tldr` (sync, `oslo.db`-backed) and `slowpoke`
-   (async, `oslo.spawn`-backed — an LLM stand-in that is slow and *deterministic*, so it can be a
-   test).
+1. **The store, and the measurement above.** How long does opening it take, and does an alias
+   database belong on the `/bin/sh` path at all? The answer decides step 3.
+2. **`oslo aliases add`/`remove`/`show`** for aliases and abbreviations only — no editor, no scripts.
+   The whole surface working end to end for the two simple kinds.
+3. **Loading into a shell**, by whichever route step 1's measurement chose.
+4. **`--func`**, with the editor round-trip and the extension-by-kind.
+5. **`--script`**, and `memfd_create` + `execveat` to run one, with the `sh -c` repair for `$0`.
+6. **`export`/`import`**, so the database is not a one-way door.
 
-Steps 1–6 are core and work in `oslo-minimal`; nothing here is behind a cargo feature, because the
-ghost and the dropdown are not.
+## What this should not do
 
-## Verification
+- **No new list widget.** `ask::filter` exists.
+- **No editor of its own.** `$VISUAL`/`$EDITOR`, with nvim only as a fallback.
+- **No temp file for running a script.** That is what `memfd` is for.
+- **No shadowing.** A stored function or script is found *after* `$PATH`, exactly as `functions/*.sh`
+  is, so nothing on disk can be quietly redefined — the rule `exec/simple/autoload.rs` already states,
+  and for the reason it states.
 
-- `bench/keystroke.rs` **before and after step 2**, min-of-N: a shell with no provider installed must
-  not pay for the mechanism. If it does, the lookup goes behind an "any providers at all" atomic.
-- **A stale answer is never drawn.** Type, request, type again, answer the first — the frame shows
-  the second line's suggestion or none, never the first's.
-- **`on_late = "fill"` never changes drawn text**, and `"replace"` does, and `settle_ms` stops it.
-- **A non-continuation is refused**, and reported once rather than per keystroke.
-- **A slow sync provider is disabled** rather than paid for on every key.
-- The async paths belong in the pty tests (`tests/terminal_semantics/`) — a ghost that repaints is
-  only observable in a real editor.
-- `oslo-minimal` builds, and its ghost still works with no providers registered.
+## Open, and worth answering before step 1
 
-## Things that will bite
-
-- **`edit/session.rs` is 595 lines, `completion.rs` 588, `settings/from_lua.rs` 544.** All three
-  cross 600 on the first step that touches them. Split by subject before adding.
-- **Reentrancy.** `config_candidates` documents it (`completion.rs:121`): the hook runs Lua, Lua can
-  complete another word, and the outstanding `RefCell` borrow panics. Every new registry needs the
-  same clone-before-call.
-- **Lua is not `Send`.** `answer` runs on the shell's thread; only the *work* an async provider
-  starts leaves it. That is why `request`/`reply` is shaped like `oslo.spawn` and `reply` is
-  delivered at a safe point, never from the worker.
-- **`InputEvent::PromptRefreshed` is named for the prompt** — renaming touches the editor tests.
-- **The dropdown owns the terminal.** Rows arriving while it is open must not move the selection: a
-  row inserted above the cursor means Enter runs something you did not choose.
-- **Settings are read two to four times per keystroke** (`bench/keystroke.rs`). Rules are matched on
-  that path and must be compiled once, not parsed per key.
-
-## What this does not do
-
-- **No repair slot for plugins.** The correction after the line stays the model's.
-- **No streaming.** One answer per request; a token-by-token ghost needs the drawing path to accept
-  partial answers.
-- **No sandbox.** The trust gate still decides whether you run somebody's code. What is new is that
-  the doctor will *say* which plugins can see your typing.
-- **No `tag-order`.** zsh can order *within* a menu by tag; oslo's equivalent would be grouping the
-  dropdown by kind, which is a presentation change and a separate piece of work.
-
-## Sources
-
-zsh-autosuggestions `ZSH_AUTOSUGGEST_STRATEGY` / `USE_ASYNC` / `BUFFER_MAX_SIZE` / `*_IGNORE`; zsh
-compsys `completer`, `tag-order`, `group-order` and the `:completion:…` context; VS Code / Monaco
-`InlineCompletionsProvider.groupId` and `yieldsToGroupIds`; nvim-cmp `group_index` and `priority`;
-blink.cmp per-provider `enabled` / `async` / `timeout_ms` / `min_keyword_length` / `max_items` /
-`score_offset` / `fallbacks` / `transform_items`; Emacs `completion-at-point-functions` and
-`cape-capf-super`.
+1. **Per profile, or per user?** The path says per profile; the argument above says perhaps not.
+2. **Do aliases load in a non-interactive shell?** Bash says no. oslo currently says yes for
+   config-defined ones. A database is what makes the question cost something.
+3. **Is a stored script on `$PATH`?** Typing `deploy` should probably run it — but resolved *after*
+   `$PATH`, so a real `deploy` on the system still wins. Same rule as functions, and worth saying out
+   loud because it is the opposite of what a dotfiles `bin/` directory does.
