@@ -251,6 +251,36 @@ feature usually gets wrong:
 
 When the answer lands the line repaints on its own — the same mechanism an asynchronous prompt uses.
 
+### What a late answer may do to what is already there
+
+The decision this whole mechanism exists for. `predict` answers in microseconds and a model over a
+network answers in hundreds of milliseconds, so by the time the slow one speaks there is usually
+already a suggestion drawn. Neither answer to *what now* is right for everybody:
+
+```lua
+oslo.suggest.provider {
+  name = "llm",
+  on_late = "fill",       -- the default: draw only if nothing else did
+  on_late = "replace",    -- draw over what another source gave
+  settle_ms = 400,        -- but only if it came back within this; 400 is the default
+  request = …,
+}
+```
+
+**`fill` never changes what is on screen.** A provider set this way answers in a second pass that
+runs only when every source declined, so it can add a suggestion but never take one over — and its
+position in `oslo.suggest.sources` stops mattering, because "answer when nobody else did" is a
+different question from "answer before history".
+
+**`replace` answers in its own turn**, which is what puts it ahead of whatever is listed after it.
+That is the setting for when the slow provider is the one you actually trust. `settle_ms` is what
+makes it liveable: an answer that took longer than that is not allowed to rewrite a line you have
+had time to read — though it is still offered in the fill pass, where replacing nothing is not
+startling.
+
+There is no `drop`. For a provider that answers later, every answer is late, so a mode that refused
+late answers would be a slower way of writing `oslo.suggest.forget()`.
+
 ## Measurements
 
 `cargo bench --bench keystroke`, release, on this machine:

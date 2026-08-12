@@ -156,12 +156,24 @@ fn what_a_provider_is_told_is_the_line_and_where_it_is() {
 
 /// A provider that records what it was asked and answers only when told to.
 fn slow(name: &str, asked: Rc<RefCell<Vec<String>>>, debounce: Duration) -> Provider {
+    slow_with(name, asked, debounce, Late::Replace, Duration::from_secs(5))
+}
+
+fn slow_with(
+    name: &str,
+    asked: Rc<RefCell<Vec<String>>>,
+    debounce: Duration,
+    on_late: Late,
+    settle: Duration,
+) -> Provider {
     Provider {
         name: name.to_string(),
         ask: Ask::Later {
             request: Rc::new(move |ctx| asked.borrow_mut().push(ctx.line.clone())),
             debounce,
             timeout: Duration::from_secs(5),
+            on_late,
+            settle,
         },
     }
 }
@@ -314,6 +326,8 @@ fn a_request_that_is_never_answered_times_out() {
             request: Rc::new(move |ctx| counted.borrow_mut().push(ctx.line.clone())),
             debounce: Duration::ZERO,
             timeout: Duration::from_millis(20),
+            on_late: Late::Replace,
+            settle: Duration::from_secs(5),
         },
     });
 
@@ -335,5 +349,116 @@ fn a_request_that_is_never_answered_times_out() {
     // A different line is a different question, and is asked.
     ask(&ctx("git st"));
     assert_eq!(asked.borrow().len(), 2);
+    forget();
+}
+
+// ---------------------------------------------------------------- what a late answer may do
+
+/// **`fill` never changes what is drawn.** It answers only in the second pass, which runs when every
+/// source declined — so a provider set this way can add a suggestion but never take one over.
+#[test]
+fn a_gap_filler_is_silent_in_its_own_turn() {
+    forget();
+    let asked = Rc::new(RefCell::new(Vec::new()));
+    register(slow_with(
+        "llm",
+        Rc::clone(&asked),
+        Duration::ZERO,
+        Late::Fill,
+        Duration::from_secs(5),
+    ));
+
+    ask(&ctx("git s"));
+    answered("llm", "git s", Some("git status".to_string()));
+
+    assert_eq!(ask(&ctx("git s")), None, "not in the provider's turn");
+    assert_eq!(
+        ask_fill(&ctx("git s")),
+        Some("tatus".to_string()),
+        "but it fills the gap when nothing else answered"
+    );
+    forget();
+}
+
+/// `replace` answers in its own turn, which is what puts it ahead of the sources listed after it.
+#[test]
+fn a_replacing_provider_answers_in_its_turn() {
+    forget();
+    let asked = Rc::new(RefCell::new(Vec::new()));
+    register(slow_with(
+        "llm",
+        Rc::clone(&asked),
+        Duration::ZERO,
+        Late::Replace,
+        Duration::from_secs(5),
+    ));
+
+    ask(&ctx("git s"));
+    answered("llm", "git s", Some("git status".to_string()));
+    assert_eq!(ask(&ctx("git s")), Some("tatus".to_string()));
+    forget();
+}
+
+/// **What makes `replace` liveable.** An answer that took longer than `settle` may not rewrite the
+/// line under you — but it is still worth having where there is nothing to rewrite.
+#[test]
+fn an_answer_that_took_too_long_may_still_fill_but_not_replace() {
+    forget();
+    let asked = Rc::new(RefCell::new(Vec::new()));
+    register(slow_with(
+        "llm",
+        Rc::clone(&asked),
+        Duration::ZERO,
+        Late::Replace,
+        Duration::from_millis(10),
+    ));
+
+    ask(&ctx("git s"));
+    std::thread::sleep(Duration::from_millis(15));
+    answered("llm", "git s", Some("git status".to_string()));
+
+    assert_eq!(ask(&ctx("git s")), None, "too late to take anything over");
+    assert_eq!(
+        ask_fill(&ctx("git s")),
+        Some("tatus".to_string()),
+        "and still offered where nothing else answered"
+    );
+    forget();
+}
+
+/// A gap-filler still sends its request at the ordinary moment; only the drawing is deferred.
+#[test]
+fn a_gap_filler_is_still_asked_on_time() {
+    forget();
+    let asked = Rc::new(RefCell::new(Vec::new()));
+    register(slow_with(
+        "llm",
+        Rc::clone(&asked),
+        Duration::ZERO,
+        Late::Fill,
+        Duration::from_secs(5),
+    ));
+
+    ask(&ctx("git s"));
+    assert_eq!(asked.borrow().clone(), vec!["git s".to_string()]);
+    forget();
+}
+
+/// The fill pass must not drive the state machine, or a provider would be asked twice per frame.
+#[test]
+fn the_fill_pass_asks_nothing_new() {
+    forget();
+    let asked = Rc::new(RefCell::new(Vec::new()));
+    register(slow_with(
+        "llm",
+        Rc::clone(&asked),
+        Duration::ZERO,
+        Late::Fill,
+        Duration::from_secs(5),
+    ));
+
+    ask(&ctx("git s"));
+    ask_fill(&ctx("git s"));
+    assert_eq!(asked.borrow().len(), 1, "one frame, one request");
     forget();
 }

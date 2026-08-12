@@ -179,18 +179,25 @@ impl OsloHelper {
     /// mechanism it is not using — building the context alone would mean two lock acquisitions and
     /// a `String` per key.
     fn provider_hint(&self, line: &str, pos: usize) -> Option<String> {
+        Self::provider_ctx(line, pos).and_then(|ctx| suggest::ask(&ctx))
+    }
+
+    /// The gap-filling pass: providers that were told to answer only when nothing else did.
+    fn provider_fill(&self, line: &str, pos: usize) -> Option<String> {
+        Self::provider_ctx(line, pos).and_then(|ctx| suggest::ask_fill(&ctx))
+    }
+
+    fn provider_ctx(line: &str, pos: usize) -> Option<suggest::Ctx> {
         if !suggest::any() {
             return None;
         }
-        let language = prompt::language().unwrap_or_else(|| "sh".to_string());
-        let cwd = std::env::current_dir()
-            .map(|p| p.display().to_string())
-            .unwrap_or_default();
-        suggest::ask(&suggest::Ctx {
+        Some(suggest::Ctx {
             line: line.to_string(),
             cursor: pos,
-            cwd,
-            language,
+            cwd: std::env::current_dir()
+                .map(|p| p.display().to_string())
+                .unwrap_or_default(),
+            language: prompt::language().unwrap_or_else(|| "sh".to_string()),
         })
     }
 
@@ -243,7 +250,10 @@ impl OsloHelper {
                 return found;
             }
         }
-        None
+        // **Nothing answered, so the gap-fillers get their turn.** A provider set to `fill` has no
+        // position in the order — it answers when nobody else did, which is a different question
+        // from "answer before history" and cannot be expressed by placing it anywhere in the list.
+        self.provider_fill(line, pos)
     }
 
     /// Paint a ghost suggestion in the autosuggestion colour.

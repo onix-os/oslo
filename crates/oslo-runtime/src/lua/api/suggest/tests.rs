@@ -1,4 +1,4 @@
-use oslo_ui::suggest::{Ctx, ask, forget, names};
+use oslo_ui::suggest::{Ctx, ask, ask_fill, forget, names};
 
 /// Run `source` on a real engine, so what is tested is the whole path: `api::install` putting
 /// `provider` into `oslo.suggest`, the declaration, and `engine::call_here` finding the interpreter
@@ -139,7 +139,9 @@ fn a_request_answers_through_reply() {
     engine
         .eval_as("held('git status')", "reply")
         .expect("reply");
-    assert_eq!(ask(&ctx("git s")), Some("tatus".to_string()));
+    // Through the fill pass, because `on_late` defaults to `fill`: a provider that answers late
+    // takes nothing over unless it was told to.
+    assert_eq!(ask_fill(&ctx("git s")), Some("tatus".to_string()));
     forget();
 }
 
@@ -156,7 +158,7 @@ fn a_reply_with_no_text_declines() {
     .expect("declares");
     ask(&ctx("git s"));
     engine.eval_as("held()", "reply").expect("reply");
-    assert_eq!(ask(&ctx("git s")), None);
+    assert_eq!(ask_fill(&ctx("git s")), None);
     forget();
 }
 
@@ -181,5 +183,37 @@ fn a_provider_must_say_how_it_answers() {
     let problem = declare(r#"oslo.suggest.provider { name = "neither" }"#).unwrap_err();
     assert!(problem.contains("answer"), "{problem}");
     assert!(problem.contains("request"), "{problem}");
+    forget();
+}
+
+/// `on_late = "replace"` is what puts a slow provider ahead of the sources listed after it.
+#[test]
+fn a_provider_told_to_replace_answers_in_its_turn() {
+    let engine = on_engine(
+        r#"held = nil
+           oslo.suggest.provider {
+             name = "llm", debounce_ms = 0, on_late = "replace",
+             request = function(ctx, reply) held = reply end,
+           }"#,
+    )
+    .expect("declares");
+    ask(&ctx("git s"));
+    engine
+        .eval_as("held('git status')", "reply")
+        .expect("reply");
+    assert_eq!(ask(&ctx("git s")), Some("tatus".to_string()));
+    forget();
+}
+
+#[test]
+fn a_mode_nobody_answers_to_is_refused_rather_than_guessed_at() {
+    let problem = declare(
+        r#"oslo.suggest.provider {
+             name = "llm", on_late = "clobber", request = function() end,
+           }"#,
+    )
+    .unwrap_err();
+    assert!(problem.contains("fill"), "{problem}");
+    assert!(problem.contains("replace"), "{problem}");
     forget();
 }

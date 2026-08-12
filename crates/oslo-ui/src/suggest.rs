@@ -57,6 +57,26 @@ pub type Answer = Rc<dyn Fn(&Ctx) -> Option<String>>;
 /// is the intended shape: hand a process off and answer from its `on_exit`.
 pub type Request = Rc<dyn Fn(&Ctx)>;
 
+/// What a late answer is allowed to do to what is already on screen.
+///
+/// **The decision this whole mechanism exists for.** `predict` answers in microseconds and a model
+/// over a network answers in hundreds of milliseconds, so by the time the slow one speaks there is
+/// usually already a suggestion drawn. Neither answer to "what now" is right for everybody, so it is
+/// a setting rather than a rule.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Late {
+    /// Draw it only if nothing else did. Nothing on screen ever changes on its own.
+    ///
+    /// The default, and the reason it is the default: text moving under the cursor half a second
+    /// after you stopped typing is startling, and startling is a bad default even when it is better.
+    Fill,
+    /// Draw it even over an answer another source already gave.
+    ///
+    /// What you ask for when the slow provider is the one you actually trust. Bounded by `settle`,
+    /// so an answer that took long enough for you to have moved on does not rewrite the line anyway.
+    Replace,
+}
+
 /// How a provider answers.
 pub enum Ask {
     /// Now, on the keystroke path, within [`BUDGET`].
@@ -67,6 +87,11 @@ pub enum Ask {
         request: Request,
         debounce: Duration,
         timeout: Duration,
+        on_late: Late,
+        /// How long an answer may take and still be allowed to replace what is drawn.
+        ///
+        /// Only [`Late::Replace`] reads it: filling a gap is never startling however long it took.
+        settle: Duration,
     },
 }
 
@@ -103,6 +128,8 @@ struct Registered {
     /// nothing. Kept, because forgetting it would mean asking again on the very next frame, and
     /// again on the one after — a provider that declines would be asked for ever.
     answered: Option<(String, Option<String>)>,
+    /// How long the answer took, for the `settle` bound.
+    took: Duration,
     /// The line a request is out for, and when it went.
     in_flight: Option<(String, Instant)>,
     /// The line waiting for typing to go quiet, and the moment it stops waiting.
@@ -142,6 +169,7 @@ pub fn register(provider: Provider) {
             disabled: false,
             complained: false,
             answered: None,
+            took: Duration::ZERO,
             in_flight: None,
             waiting_on: None,
         };
@@ -177,13 +205,33 @@ pub fn names() -> Vec<String> {
 /// The first one with a usable answer wins, which is how the built-in sources behave among
 /// themselves. `None` means every provider declined, and the next source is asked.
 pub fn ask(ctx: &Ctx) -> Option<String> {
+    ask_in(ctx, Phase::Turn)
+}
+
+/// The second pass, after every other source declined: the answers that were told to fill a gap
+/// rather than take one over.
+///
+/// **Asked outside the `sources` order on purpose.** A gap-filler has no position — it answers when
+/// nothing else did, which is a different question from "answer before history".
+pub fn ask_fill(ctx: &Ctx) -> Option<String> {
+    ask_in(ctx, Phase::Fill)
+}
+
+/// Which pass this is: the provider source's turn in the order, or the gap-filling pass after it.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Phase {
+    Turn,
+    Fill,
+}
+
+fn ask_in(ctx: &Ctx, phase: Phase) -> Option<String> {
     if !any() {
         return None;
     }
     // Decided before anything is called, and cloned out of the cell: an answer runs Lua, and Lua can
     // reach back into the shell — the same hazard `completion::config_candidates` documents, and the
     // same fix. `Step` is what each provider wants to happen, computed while the borrow is held.
-    let steps = plan(ctx);
+    let steps = plan(ctx, phase);
 
     for (at, name, step) in steps {
         match step {
@@ -222,7 +270,7 @@ enum Step {
 }
 
 /// Decide every provider's step, and record the bookkeeping, in one borrow.
-fn plan(ctx: &Ctx) -> Vec<(usize, String, Step)> {
+fn plan(ctx: &Ctx, phase: Phase) -> Vec<(usize, String, Step)> {
     let now = Instant::now();
     PROVIDERS.with(|slot| {
         let mut providers = slot.borrow_mut();
@@ -233,17 +281,53 @@ fn plan(ctx: &Ctx) -> Vec<(usize, String, Step)> {
             }
             let name = entry.provider.name.clone();
             let step = match &entry.provider.ask {
-                Ask::Now(answer) => Step::AnswerNow(Rc::clone(answer)),
+                // A synchronous answer is never late — it is given in the frame that asked — so it
+                // has nothing to fill and belongs to the provider source's turn.
+                Ask::Now(answer) => match phase {
+                    Phase::Turn => Step::AnswerNow(Rc::clone(answer)),
+                    Phase::Fill => Step::Wait,
+                },
                 Ask::Later {
                     request,
                     debounce,
                     timeout,
-                } => later(entry, ctx, now, Rc::clone(request), *debounce, *timeout),
+                    on_late,
+                    settle,
+                } => {
+                    let (request, on_late, settle) = (Rc::clone(request), *on_late, *settle);
+                    let (debounce, timeout) = (*debounce, *timeout);
+                    // **The state machine runs in the turn pass only**, whichever mode this is: a
+                    // gap-filler still has to send its request at the same moment, or it would ask
+                    // only on the lines where everything else stayed silent.
+                    let step = match phase {
+                        Phase::Turn => later(entry, ctx, now, request, debounce, timeout),
+                        Phase::Fill => ready(entry, ctx),
+                    };
+                    match (&step, phase, on_late) {
+                        // Drawn in the other pass, not this one.
+                        (Step::Draw(_), Phase::Turn, Late::Fill) => Step::Wait,
+                        // An answer that took longer than it was allowed to may not take over what
+                        // is already drawn. It is still there for the fill pass, where replacing
+                        // nothing is not startling.
+                        (Step::Draw(_), Phase::Turn, Late::Replace) if entry.took > settle => {
+                            Step::Wait
+                        }
+                        _ => step,
+                    }
+                }
             };
             steps.push((at, name, step));
         }
         steps
     })
+}
+
+/// An answer already here for exactly this line, without touching the request state machine.
+fn ready(entry: &Registered, ctx: &Ctx) -> Step {
+    match &entry.answered {
+        Some((line, Some(whole))) if line == &ctx.line => Step::Draw(whole.clone()),
+        _ => Step::Wait,
+    }
 }
 
 /// The state machine for one asynchronous provider: give up, draw, send, or wait.
@@ -335,6 +419,11 @@ pub fn answered(name: &str, line: &str, whole: Option<String>) {
         {
             return;
         }
+        entry.took = entry
+            .in_flight
+            .as_ref()
+            .map(|(_, sent)| sent.elapsed())
+            .unwrap_or_default();
         entry.in_flight = None;
         entry.answered = Some((line.to_string(), whole));
         crate::pending::finished();

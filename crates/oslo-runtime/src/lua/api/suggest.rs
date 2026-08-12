@@ -75,6 +75,21 @@ pub fn install(suggest: &mut Table) {
             (_, request @ Value::Function(_)) => {
                 let debounce = millis(&declared, "debounce_ms", DEFAULT_DEBOUNCE_MS);
                 let timeout = millis(&declared, "timeout_ms", DEFAULT_TIMEOUT_MS);
+                let settle = millis(&declared, "settle_ms", DEFAULT_SETTLE_MS);
+                let on_late = match declared.get(&Value::str("on_late")) {
+                    Value::Str(word) => match word.as_ref() {
+                        "fill" => oslo_ui::suggest::Late::Fill,
+                        "replace" => oslo_ui::suggest::Late::Replace,
+                        other => {
+                            return Err(oslo_lua::LuaError::new(format!(
+                                "oslo.suggest.provider: on_late = {other:?} is not one of \
+                                 \"fill\" (draw only if nothing else did) or \"replace\" \
+                                 (draw over what another source gave)"
+                            )));
+                        }
+                    },
+                    _ => oslo_ui::suggest::Late::Fill,
+                };
                 let for_reply = name.clone();
                 oslo_ui::suggest::Ask::Later {
                     request: Rc::new(move |ctx| {
@@ -104,6 +119,8 @@ pub fn install(suggest: &mut Table) {
                     }),
                     debounce,
                     timeout,
+                    on_late,
+                    settle,
                 }
             }
             _ => {
@@ -152,6 +169,13 @@ const DEFAULT_DEBOUNCE_MS: u64 = 120;
 
 /// How long an answer may take before it is given up on.
 const DEFAULT_TIMEOUT_MS: u64 = 2000;
+
+/// How long an answer may take and still be allowed to replace what is already drawn.
+///
+/// Only `on_late = "replace"` reads it. Chosen as about the longest a person still associates an
+/// answer with the key they last pressed; beyond that the line changing on its own reads as the
+/// shell doing something rather than as an answer to what you typed.
+const DEFAULT_SETTLE_MS: u64 = 400;
 
 /// The table a provider is handed.
 fn context(ctx: &oslo_ui::suggest::Ctx) -> Value {
