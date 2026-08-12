@@ -317,6 +317,17 @@ Two, in `examples/plugins/`:
 
 ## Measurements
 
+The provider mechanism costs a shell that has none **nothing**. `bench/keystroke.rs`, min of three
+runs, against the same tree without it:
+
+| | paint | hint |
+|---|---|---|
+| without providers | 2.23 µs | 2.20 µs |
+| with the mechanism, none registered | 2.20 µs | 2.18 µs |
+
+`provider` is not in the default `sources`, so the arm is never reached; when it is, `any()` is a
+flag read. A *registered* provider costs whatever it does, bounded by the 20 ms budget above.
+
 `cargo bench --bench keystroke`, release, on this machine:
 
 | path | cost |

@@ -1,5 +1,34 @@
 # Suggestions you can plug into, and tune
 
+> **Done**, on `feat/providers`, one commit per step. `make verify` green after each, and
+> `cargo test` with no features green too. Three things came out differently from the plan and are
+> recorded where they happened:
+>
+> - **Step 5 (tiers for the ghost) was dropped on inspection** — see the note in the order below. The
+>   ghost takes the first source that answers, so grouping expresses nothing a flat list does not.
+> - **`on_late = "drop"` does not exist.** For a provider that answers later, *every* answer is late,
+>   so the mode would have been a slower way of writing `oslo.suggest.forget()`. Two modes, `fill`
+>   and `replace`, and `settle_ms` bounding the second.
+> - **The context rules are a predicate, not a table.** `enabled = function(ctx)` is strictly more
+>   expressive than any `when = { command = …, cwd = … }` would be, and it is Lua — which is what the
+>   rest of the config is written in.
+>
+> **Not done: asynchronous *completion* providers.** The ghost's async path is complete; the
+> dropdown's is not. It is a bigger change than it looks — the menu owns the terminal while it is
+> open, and rows arriving must not move the selection under a cursor that is already somewhere.
+> Completion providers are synchronous, which is what the tldr case needs.
+>
+> Measured, as required: `bench/keystroke.rs`, min of three runs, against `develop`.
+>
+> | | paint | hint |
+> |---|---|---|
+> | `develop` | 2.23 µs | 2.20 µs |
+> | `feat/providers` | 2.20 µs | 2.18 µs |
+>
+> Nothing, which is the answer a shell with no providers installed must get: `Source::Provider` is
+> not in the default `sources`, so the arm is never reached, and when it is, `any()` is a thread-local
+> flag read.
+
 Two things the shell offers as you type — the **ghost** past the cursor and the **dropdown** on Tab —
 are closed. A config can reorder the ghost's four built-in sources and replace the dropdown for one
 named command; it cannot add to either, and it cannot say *how* two answers should compete.
