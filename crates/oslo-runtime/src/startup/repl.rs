@@ -77,6 +77,9 @@ pub fn run_repl(login: bool) -> ! {
         // set, since what is read is the whole `oslo` table each time.
         config::apply(&lua);
     }
+    // **After the config, so the database wins.** The ordinary shell rule — the last definition of a
+    // name is the one that counts — applied to sources rather than to lines. See `startup::stored`.
+    super::stored::install(&env_struct);
     plugins::start(&env_struct);
 
     let settings = history::settings(&env_struct.lock().unwrap());

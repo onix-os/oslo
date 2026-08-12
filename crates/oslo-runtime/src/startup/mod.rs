@@ -32,6 +32,7 @@ pub mod recall;
 pub mod repl;
 #[cfg(feature = "direnv")]
 mod report;
+mod stored;
 mod terminal;
 mod timers;
 pub mod timing;
