@@ -11,6 +11,7 @@ pub mod pipeline;
 pub mod procsub;
 pub mod redirect;
 pub mod simple;
+pub mod stored;
 pub mod substitution;
 
 pub use job::JobManager;

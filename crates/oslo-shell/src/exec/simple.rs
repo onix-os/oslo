@@ -364,7 +364,13 @@ fn run_program(
             None if escape.skips_function() => nothing_to_run(env, cmd_name, redirections),
             None => match autoload::try_call(env, cmd_name, words, redirections) {
                 Some(result) => result,
-                None => nothing_to_run(env, cmd_name, redirections),
+                // And then the database, on the same terms and for the same reason: after `$PATH`
+                // has already failed, so a stored row can add a name but never take one over. It
+                // is last because a file you can see beats a row you cannot.
+                None => match super::stored::try_call(env, cmd_name, words, redirections) {
+                    Some(result) => result,
+                    None => nothing_to_run(env, cmd_name, redirections),
+                },
             },
         },
     }
