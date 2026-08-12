@@ -27,6 +27,7 @@ mod trash;
 use crate::env::options::ShellOption;
 use crate::env::scope::Environment;
 use oslo_base::error::Result;
+use oslo_base::error::reason;
 use std::path::{Path, PathBuf};
 
 /// What the options add up to.
@@ -115,7 +116,7 @@ fn remove_operand(path: &Path, shown: &str, options: &Options, mode: &Mode) -> b
             return false;
         }
         Err(e) => {
-            eprintln!("oslo: rm: cannot remove '{shown}': {e}");
+            eprintln!("oslo: rm: cannot remove '{shown}': {}", reason(&e));
             return false;
         }
     };
@@ -166,7 +167,7 @@ fn remove_operand(path: &Path, shown: &str, options: &Options, mode: &Mode) -> b
             true
         }
         Err(e) => {
-            eprintln!("oslo: rm: cannot remove '{shown}': {e}");
+            eprintln!("oslo: rm: cannot remove '{shown}': {}", reason(&e));
             false
         }
     }

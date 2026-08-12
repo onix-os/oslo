@@ -63,15 +63,46 @@ pub enum ShellError {
     },
 }
 
+/// An `io::Error`'s reason, without the number Rust appends to it.
+///
+/// **`Display` for `io::Error` ends in ` (os error 30)`, and no shell prints that.** These strings
+/// reach the user as `oslo: /etc/thing: Read-only file system`, which is the shape every other shell
+/// uses and the shape that ends up in a package build log; the errno is an implementation detail of
+/// the language oslo happens to be written in.
+///
+/// Found by running 816 Ubuntu maintainer scripts under `dash` and under oslo and diffing: nothing
+/// *behaved* differently, and this was most of what the diff was full of.
+pub fn reason(e: &std::io::Error) -> String {
+    let said = e.to_string();
+    let Some(at) = said.rfind(" (os error ") else {
+        return said;
+    };
+    // **The number has to be a number.** Trimming on the phrase alone turned an error that merely
+    // mentioned it — `failed (os error reading the manual)` — into `failed`, which is a shell
+    // swallowing the half of a message that said what happened. Its own test caught that.
+    let inside = &said[at + " (os error ".len()..];
+    match inside.strip_suffix(')') {
+        Some(digits) if !digits.is_empty() && digits.bytes().all(|b| b.is_ascii_digit()) => {
+            said[..at].to_string()
+        }
+        _ => said,
+    }
+}
+
 impl std::fmt::Display for ShellError {
-    /// The wording is the derive's, character for character: these strings reach the user through
-    /// `oslo: {error}` and a shell's diagnostics are part of its interface.
+    /// The wording reaches the user through `oslo: {error}`, so it is part of the interface.
+    ///
+    /// **`ExecutionError` prints no category of its own.** Its message is already
+    /// `what: why` — `/etc/default/alsa: Read-only file system` — and bash writes exactly that.
+    /// "Execution error: " in front of it named the enum variant rather than telling anybody
+    /// anything. `Syntax error` and `Expansion error` keep theirs: those *are* what went wrong, and
+    /// two tests use the first as the signal that a script parsed.
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             ShellError::SyntaxError(m) => write!(f, "Syntax error: {m}"),
             ShellError::ExpansionError(m) => write!(f, "Expansion error: {m}"),
-            ShellError::ExecutionError(m) => write!(f, "Execution error: {m}"),
-            ShellError::Io(e) => write!(f, "IO error: {e}"),
+            ShellError::ExecutionError(m) => write!(f, "{m}"),
+            ShellError::Io(e) => write!(f, "{}", reason(e)),
             ShellError::Lua(e) => write!(f, "Lua error: {e}"),
             ShellError::Nix(e) => write!(f, "POSIX error: {e}"),
             ShellError::Exit(c) => write!(f, "Builtin exit requested with code: {c}"),
@@ -298,5 +329,43 @@ mod tests {
             ShellError::ExecutionError("x".into()).fatal_exit_status(),
             1
         );
+    }
+
+    /// **No shell prints an errno.** These strings end up in package build logs, and
+    /// `Permission denied (os error 13)` there says oslo is written in Rust rather than saying
+    /// what went wrong.
+    #[test]
+    fn an_io_reason_carries_no_errno() {
+        let denied = std::io::Error::from_raw_os_error(13);
+        assert!(denied.to_string().contains("os error"), "the leak is real");
+        assert_eq!(reason(&denied), "Permission denied");
+
+        let missing = std::io::Error::from_raw_os_error(2);
+        assert_eq!(reason(&missing), "No such file or directory");
+    }
+
+    /// An error that never had a code keeps every word of what it said.
+    #[test]
+    fn an_error_without_an_errno_is_left_alone() {
+        let made_up = std::io::Error::other("the tape ran out");
+        assert_eq!(reason(&made_up), "the tape ran out");
+        // And a message that merely mentions the words is not truncated.
+        let awkward = std::io::Error::other("failed (os error reading the manual)");
+        assert_eq!(reason(&awkward), "failed (os error reading the manual)");
+    }
+
+    /// **`ExecutionError` names no category.** Its message is already `what: why`, which is what
+    /// bash writes; the variant's name in front of it told nobody anything.
+    #[test]
+    fn an_execution_error_reads_the_way_bash_writes_one() {
+        let failed = ShellError::ExecutionError("/etc/thing: Read-only file system".to_string());
+        assert_eq!(failed.to_string(), "/etc/thing: Read-only file system");
+
+        // The two that *are* a category keep it — and a test elsewhere uses the first as its
+        // signal that a script parsed.
+        let syntax = ShellError::SyntaxError("unexpected end of input".to_string());
+        assert!(syntax.to_string().starts_with("Syntax error: "));
+        let expansion = ShellError::ExpansionError("NOPE: unbound variable".to_string());
+        assert!(expansion.to_string().starts_with("Expansion error: "));
     }
 }

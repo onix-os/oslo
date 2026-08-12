@@ -3,7 +3,7 @@ use crate::expand::{expand_word, expand_word_to_string};
 use nix::fcntl::{FcntlArg, FdFlag, fcntl};
 use nix::unistd::dup2;
 use oslo_base::ast::{RedirectKind, Redirection};
-use oslo_base::error::{Result, ShellError};
+use oslo_base::error::{Result, ShellError, reason};
 use std::fs::{File, OpenOptions};
 use std::io::{Seek, SeekFrom, Write};
 use std::os::fd::RawFd;
@@ -73,7 +73,7 @@ impl RedirectGuard {
             match redir.kind {
                 RedirectKind::Input => {
                     let file = File::open(&target_str).map_err(|e| {
-                        ShellError::ExecutionError(format!("{}: {}", target_str, e))
+                        ShellError::ExecutionError(format!("{}: {}", target_str, reason(&e)))
                     })?;
                     install(file, target_fd)?;
                 }
@@ -92,7 +92,7 @@ impl RedirectGuard {
                         .append(true)
                         .open(&target_str)
                         .map_err(|e| {
-                            ShellError::ExecutionError(format!("{}: {}", target_str, e))
+                            ShellError::ExecutionError(format!("{}: {}", target_str, reason(&e)))
                         })?;
                     install(file, target_fd)?;
                 }
@@ -104,7 +104,7 @@ impl RedirectGuard {
                         .truncate(false)
                         .open(&target_str)
                         .map_err(|e| {
-                            ShellError::ExecutionError(format!("{}: {}", target_str, e))
+                            ShellError::ExecutionError(format!("{}: {}", target_str, reason(&e)))
                         })?;
                     install(file, target_fd)?;
                 }
@@ -210,7 +210,7 @@ fn open_for_output(path: &str, refuse_existing: bool) -> Result<File> {
             .create(true)
             .truncate(true)
             .open(path)
-            .map_err(|e| ShellError::ExecutionError(format!("{}: {}", path, e)));
+            .map_err(|e| ShellError::ExecutionError(format!("{}: {}", path, reason(&e))));
     }
 
     match OpenOptions::new().write(true).create_new(true).open(path) {
@@ -228,9 +228,13 @@ fn open_for_output(path: &str, refuse_existing: bool) -> Result<File> {
             OpenOptions::new()
                 .write(true)
                 .open(path)
-                .map_err(|e| ShellError::ExecutionError(format!("{}: {}", path, e)))
+                .map_err(|e| ShellError::ExecutionError(format!("{}: {}", path, reason(&e))))
         }
-        Err(e) => Err(ShellError::ExecutionError(format!("{}: {}", path, e))),
+        Err(e) => Err(ShellError::ExecutionError(format!(
+            "{}: {}",
+            path,
+            reason(&e)
+        ))),
     }
 }
 
@@ -243,9 +247,9 @@ fn open_for_output(path: &str, refuse_existing: bool) -> Result<File> {
 fn heredoc_body(content: &str) -> Result<File> {
     let mut file = anonymous_file()?;
     file.write_all(content.as_bytes())
-        .map_err(|e| ShellError::ExecutionError(format!("heredoc: {}", e)))?;
+        .map_err(|e| ShellError::ExecutionError(format!("heredoc: {}", reason(&e))))?;
     file.seek(SeekFrom::Start(0))
-        .map_err(|e| ShellError::ExecutionError(format!("heredoc: {}", e)))?;
+        .map_err(|e| ShellError::ExecutionError(format!("heredoc: {}", reason(&e))))?;
     Ok(file)
 }
 
