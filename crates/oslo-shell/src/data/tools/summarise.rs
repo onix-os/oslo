@@ -1,8 +1,8 @@
-//! The verbs that make a stream *smaller*: `group-by`, `count`, `uniq`, `stats`.
+//! The verbs that make a stream *smaller*: `group-by`, `count`, `distinct`, `stats`.
 //!
 //! ```text
 //! ps | group-by user | count
-//! ls | uniq kind
+//! ls | distinct kind
 //! df | stats free
 //! ```
 //!
@@ -101,9 +101,14 @@ pub fn count(rows: &[Record]) -> Vec<Record> {
 
 /// Distinct rows, or rows distinct by one field.
 ///
-/// Keeps the **first** of each, so `sort-by name | uniq kind` gives the alphabetically first of each
-/// kind rather than an arbitrary one.
-pub fn uniq(rows: &[Record], field: Option<&str>) -> Vec<Record> {
+/// Keeps the **first** of each, so `sort-by name | distinct kind` gives the alphabetically first of
+/// each kind rather than an arbitrary one.
+///
+/// **Named `distinct` rather than `uniq`, and that is not a style choice.** Every name that can
+/// carry structure has to be one oslo invented, or a script written before oslo existed could reach
+/// the structured path by accident — and `uniq` is coreutils. `ls | uniq` is an ordinary thing to
+/// write, and with the name taken it printed `ls`'s columns instead of deduplicating its lines.
+pub fn distinct(rows: &[Record], field: Option<&str>) -> Vec<Record> {
     let mut seen: std::collections::HashSet<String> = std::collections::HashSet::new();
     rows.iter()
         .filter(|row| {
@@ -111,7 +116,7 @@ pub fn uniq(rows: &[Record], field: Option<&str>) -> Vec<Record> {
                 Some(field) => match key_of(row, field) {
                     Some(key) => key,
                     // Without the column there is nothing to be distinct by, so the row goes
-                    // through: dropping it would make `uniq` quietly a filter as well.
+                    // through: dropping it would make `distinct` quietly a filter as well.
                     None => return true,
                 },
                 None => row

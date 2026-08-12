@@ -64,15 +64,15 @@ fn count_after_group_by_keeps_each_groups_own_number() {
 }
 
 #[test]
-fn uniq_keeps_the_first_of_each() {
-    let by_user = uniq(&rows(), Some("user"));
+fn distinct_keeps_the_first_of_each() {
+    let by_user = distinct(&rows(), Some("user"));
     assert_eq!(by_user.len(), 2);
     assert_eq!(by_user[0].get("size"), Some(&Val::Size(100)), "the first");
 
     // With no field, a whole row must match to be a duplicate.
     let mut doubled = rows();
     doubled.push(rows()[0].clone());
-    assert_eq!(uniq(&doubled, None).len(), 3);
+    assert_eq!(distinct(&doubled, None).len(), 3);
 }
 
 #[test]
@@ -106,7 +106,7 @@ fn stats_counts_only_the_cells_that_are_numbers() {
 fn an_empty_stream_summarises_to_something_honest() {
     let none: Vec<Record> = Vec::new();
     assert!(group_by(&none, "user").is_empty());
-    assert!(uniq(&none, None).is_empty());
+    assert!(distinct(&none, None).is_empty());
     assert_eq!(count(&none)[0].get("count"), Some(&Val::Int(0)));
 
     let summary = &stats(&none, "size")[0];
@@ -119,7 +119,7 @@ fn an_empty_stream_summarises_to_something_honest() {
 fn one_row_is_its_own_summary() {
     let one = vec![Record::from_pairs([("n", Val::Int(7))])];
     assert_eq!(count(&one)[0].get("count"), Some(&Val::Int(1)));
-    assert_eq!(uniq(&one, None).len(), 1);
+    assert_eq!(distinct(&one, None).len(), 1);
     let summary = &stats(&one, "n")[0];
     assert_eq!(summary.get("min"), summary.get("max"));
     assert_eq!(summary.get("mean"), Some(&Val::Float(7.0)));

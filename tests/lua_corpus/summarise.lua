@@ -1,4 +1,4 @@
--- The verbs that make a stream smaller: `group-by`, `count`, `uniq`, `stats`.
+-- The verbs that make a stream smaller: `group-by`, `count`, `distinct`, `stats`.
 --
 -- Everything oslo had before was selection. These are what make `ps | group-by user | count` a
 -- query `ps | grep` cannot express.
@@ -23,7 +23,7 @@ print("== how many each ==")
 oslo.proc.exec("sample | group-by user | count | cols user count")
 
 print("== distinct by a column, keeping the first ==")
-oslo.proc.exec("sample | uniq kind | cols kind size")
+oslo.proc.exec("sample | distinct kind | cols kind size")
 
 print("== the shape of a numeric column ==")
 oslo.proc.exec("sample | stats size | cols count min max sum mean")

@@ -59,12 +59,12 @@ Filters are **Lua**, not a dialect invented for the occasion, so the escape hatc
 language as the filter: `ls | each 'print(name .. " is " .. size)'`.
 
 Verbs: `where` `each` `cols` `get` `sort-by` `first` `last` `length` `to` `from` `lines` `parse`.
-Summaries: `group-by` `count` `uniq` `stats`. Producers: `df` `ps` `ls`, and anything you register
+Summaries: `group-by` `count` `distinct` `stats`. Producers: `df` `ps` `ls`, and anything you register
 yourself.
 
 ```sh
 ps | group-by user | count            # how many processes each user has
-ls | uniq kind                        # one of each, keeping the first
+ls | distinct kind                    # one of each, keeping the first
 df | stats free                       # count, min, max, sum, mean over a column
 ```
 

@@ -33,7 +33,7 @@ pub fn register_all() {
         crate::data::tool::register(name, Shape::Rows, Shape::Rows);
     }
     // The verbs that make a stream smaller. See `summarise` for why these four and not `join`.
-    for name in ["group-by", "count", "uniq", "stats"] {
+    for name in ["group-by", "count", "distinct", "stats"] {
         crate::data::tool::register(name, Shape::Rows, Shape::Rows);
     }
     // The way out. Rows in, bytes out — so `... | to json | jq .` works, and the structured world
@@ -157,9 +157,9 @@ pub fn run_tool(
             }
         },
         "count" => Some((0, Some(summarise::count(&input.unwrap_or_default())))),
-        "uniq" => Some((
+        "distinct" => Some((
             0,
-            Some(summarise::uniq(
+            Some(summarise::distinct(
                 &input.unwrap_or_default(),
                 words.get(1).map(String::as_str),
             )),
