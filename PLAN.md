@@ -1,191 +1,233 @@
-# Six more, after composition
+# Suggestions you can plug into
 
-> **Done**, on `feat/offprompt`. All six landed, one commit each, `make verify` green after every
-> one. Two things came out differently from the plan and are recorded where they happened:
->
-> - **Item 4 is a builtin, `messages`, not `oslo messages`.** A tool is a new process, and the buffer
->   is this process's memory — `oslo messages` would faithfully report that a shell which has just
->   started has said nothing. Same reason `:messages` is a command inside neovim rather than a flag
->   to it.
-> - **The ring counts consecutive repeats** rather than keeping them. A prompt segment that raises
->   fails on every draw, so five hundred Returns would otherwise evict the startup failure the buffer
->   exists to keep.
->
-> Item 6 was measured, as it required: 0.27 ms fastest Tab on `git comm` before and after, +31 KB of
-> binary. The numbers and the method are in `docs/features/completion-and-matching.md`.
+Two things the shell offers as you type — the **ghost** past the cursor and the **dropdown** on Tab —
+are closed. A config can reorder the ghost's four built-in sources and can replace the dropdown for
+one named command; it cannot add to either. This opens both, in a shape that works for a plugin
+answering from a local database *and* for one answering from a language model over a network.
 
-The last plan closed the gaps that stopped a plugin *composing* — with the pipeline, with another
-plugin, with "later". These are the ones left over: work that happens off the prompt, a pipeline that
-can summarise rather than only select, three ways to find out what a session actually did, and the
-one extension point a shell has that an editor does not.
+**Work on a new branch off `develop`.**
 
-**Work on a new branch off `feat/compose`**, not `develop`: item 1 lands its callbacks at the safe
-point the timers introduced, and item 2's verbs are the reason a Lua verb was worth allowing.
+## Why this, and why now
 
-## 1. Nothing can run in the background and call you back
+Two plugins nobody can write today:
 
-`oslo.job` lists, foregrounds, backgrounds and signals — all of them things done to jobs that already
-exist. Lua cannot start work and be told when it is finished, so anything a config wants to *know*
-must be fetched on the spot, blocking whatever asked.
+- **tldr** — 3,000 pages of "here is what people actually do with this command". `git <Tab>` should
+  offer them with descriptions. Half of this is already possible: `oslo.completion.spec` (landed last
+  branch) takes exactly the shape tldr has. The half that is missing is *adding* to a command oslo
+  already knows, and answering for commands generically rather than one name at a time.
+- **an LLM ghost** — regenerating the suggestion as you type, the way an editor does. Nothing about
+  this fits today: the ghost's sources are a Rust enum, and the call is synchronous on the keystroke
+  path, where an answer that takes 300 ms is not an answer at all.
 
-**The cost is already being paid.** The `nix` prompt segment shells out on every draw — measured at
-6 ms — because there is no other way to have an answer ready.
+The second is the one that decides the design. **A provider that can be slow is the general case**;
+a fast one is the easy special case of it.
 
-The machinery exists and is walled in. `lua/api/external.rs` already spawns a thread, waits with a
-deadline, and delivers through a channel; it does that for *prompt commands only*, and nothing else
-can reach it.
+## What is there now
 
-```lua
-oslo.spawn{ "git", "status", "--porcelain",
-  on_exit = function(out, status) oslo.state.set("git.dirty", out ~= "") end }
-```
+### The ghost
 
-**Delivered where timers are.** `startup::timers::fire` already runs Lua at the two moments the shell
-holds nothing; a finished job's callback joins that queue rather than inventing a second one. The
-same honest limitation applies and must be documented: **a callback arrives between commands**, not
-the instant the process exits.
-
-What this is not: a general async runtime. One process, one callback, no promises and no scheduler.
-
-## 2. The pipeline can select but not summarise
-
-Every verb oslo has — `where cols get sort-by first last length each`, plus `to from lines parse` —
-is **selection**. There is no way to reduce a stream to a smaller one.
-
-That is what makes rows worth having over text. `ps | group-by user | count` is the query `ps | grep`
-cannot express, and without it the structured pipeline is a nicer `awk` rather than a different tool.
-
-Add four, in Rust:
-
-| | |
-|---|---|
-| `group-by FIELD` | rows in, one row per distinct value, each carrying its group |
-| `count` | how many rows, or how many per group |
-| `uniq [FIELD]` | distinct rows, or distinct by one field |
-| `stats FIELD` | min, max, sum, mean over a numeric column |
-
-**Rust rather than Lua, even though Lua verbs now work.** These are the ones every pipeline reaches
-for; they must be present in `oslo-minimal`, and they must be fast enough that nobody drops back to
-`sort | uniq -c`.
-
-**`join` is deliberately excluded.** It needs a *second* input stream, and oslo's pipeline is a line —
-there is no shape for "and also read this". Adding one is a pipeline change, not a verb.
-
-## 3. No way to find out why the shell got slow
-
-There is no startup profiling of any kind. A session now loads `conf.d/*.lua`, `config.lua`, every
-installed plugin, prompt segments and timers — five suspects and no instrument.
-
-`oslo config timing` runs the same load the shell does and reports what each file and each plugin
-cost. Neovim's `--startuptime` for the same reason: "my shell got slow" is otherwise answered by
-commenting lines out until it stops.
-
-The measurement must be of the *real* load, so this belongs beside `oslo config which`, which already
-reproduces it.
-
-## 4. No record of what a session did
-
-Nothing answers "what loaded, what fired, what failed". A plugin that could not load said so once,
-twenty commands ago, and the line is gone.
-
-`oslo messages` — the diagnostics this session produced, newest last, each with what produced it: a
-plugin, a config file, a hook. neovim keeps `:messages` for exactly this, and the plugin work made it
-matter more: a refused trust hash, a shadowed name and a plugin that registered nothing are all
-single lines that scroll.
-
-**A ring buffer in memory, not a log on disk.** What a *session* said is a session-lived fact, and a
-file would be one more thing to rotate, permission and eventually leak something into.
-
-## 5. A plugin author cannot test a plugin
-
-There is no harness. Every plugin written for this tree so far was tested by hand, in a pty, with a
-temporary home — which is not a thing to ask of anybody else.
-
-`oslo plugin test <directory>` loads the plugin into a session with a temporary home and database,
-runs the assertions it declares, and reports. A plugin declares them the way it declares health
-checks, which is a shape that already exists:
-
-```lua
-oslo.plugin.test("notes", function(t)
-  t.equal(note_count(), 0, "a new database is empty")
-end)
-```
-
-This is what turns "I wrote a plugin" into "I maintain a plugin", and it is the difference between a
-plugin ecosystem and a directory of one-offs.
-
-## 6. Completion cannot be declared, only computed
-
-The highest ceiling on this list, and the most work.
-
-oslo has a real completion spec system — `crates/oslo-ui/src/spec/definitions/` ships hand-written
-specs for `git`, `cargo`, `docker` and `npm`, with subcommands, flags and descriptions. **A config
-cannot add one**, and the reason is structural:
+`OsloHelper::suggest` (`crates/oslo-ui/src/lib.rs:177`) walks `oslo.suggest.sources` in order and
+takes the first source that answers:
 
 ```rust
-pub struct CommandSpec { pub names: Vec<&'static str>, pub description: &'static str, … }
+History | Completion | Path | Prediction     // settings::Source — a closed enum
 ```
 
-`&'static str`. A spec built at runtime from Lua cannot be stored in it at all.
+Reached from `Assist::hint_text` → `frame::draw` (`edit/session/frame.rs:88`), synchronously, once
+per frame — which is once per keystroke. Guarded by three rules worth keeping: end of line only,
+`sh` mode only, and `feature::on(SUGGEST)`.
 
-So a plugin's only route is `for_command`: a function that must re-implement subcommand matching,
-flag parsing and descriptions by hand, for every command it wants to complete. What it wants to write
-is what fish lets you write:
+### The dropdown
+
+`OsloHelper::candidates` gathers; `config_candidates` (`completion.rs:116`) asks
+`oslo.completion.for_command[name]` and **replaces** oslo's own candidates for that command
+(`completion.rs:187`). `spec::custom` holds config-declared specs. `DropdownMenu::select_interactive`
+then owns the terminal and its own key loop.
+
+Three limits, all real:
+
+- per command *by name* — there is no "answer for anything" hook;
+- **replaces**, so a plugin that completes `git` loses oslo's built-in git spec;
+- carries **no kind**, so `oslo.completion.sources` filters every config candidate out
+  (`completion.rs:135` says so).
+
+`on-completion-start` / `-select` / `-cancel` exist and are `answers: false` — observers.
+
+### The part that changes everything
+
+**The editor already knows how to wait for an answer that has not arrived.** `frame::next_input`
+(`edit/session/frame.rs:22`):
+
+```rust
+if !idle_hook && !crate::prompt::refreshing() { return keys.read_event(); }   // block, the default
+…
+const REFRESH_SLICE_MS: i32 = 15;
+match keys.read_event_within(slice) { …
+    Timeout => if crate::prompt::generation() != seen { return Some(InputEvent::PromptRefreshed); }
+```
+
+A counter (`prompt::generation`), an outstanding-work count (`prompt::refreshing`), a 15 ms poll
+slice used *only* while something is outstanding, and a synthetic non-key event that makes the loop
+redraw. That is precisely what an asynchronous ghost needs, working in the tree today for
+asynchronous prompts.
+
+`lua/api/external.rs` is the third precedent and states the constraint outright: *"a prompt is on the
+critical path of every keystroke"*, answered with `timeout_ms` and an `async` mode that uses the
+previous output immediately.
+
+**So this plan is mostly generalisation, not invention.**
+
+## The design
+
+### 1. One channel for "an answer may still be coming"
+
+`prompt::refreshing`/`generation` are prompt-specific. Lift the pair into
+`crates/oslo-ui/src/pending.rs` — an outstanding count and a generation, with the prompt as its first
+caller and the ghost and the dropdown as the next two. `next_input` waits in slices when *anything*
+is outstanding and answers `InputEvent::Refreshed` when *any* generation moves.
+
+About 60 lines. Everything below depends on it and nothing below is possible without it.
+
+### 2. Ghost providers
+
+A fifth source, so a plugin's suggestion takes its place in the priority order the user already
+controls:
 
 ```lua
-oslo.completion.spec{ command = "notes",
-  subcommands = { { name = "new", desc = "start one" }, { name = "list", desc = "every note" } },
-  flags = { { name = "--since", desc = "only newer than", takes = "duration" } } }
+oslo.suggest.sources = { "history", "provider", "predict", "path" }
 ```
 
-**The work is making `CommandSpec` own its strings**, then a Lua reader that builds one. The four
-built-in definitions change with it, mechanically. Measure first: the registry is consulted on every
-Tab, and `String` where `&'static str` was is an allocation at build time and a pointer chase at read
-time — expected to be nothing against a `HashMap` lookup and a fuzzy match, but expected is not
-measured.
+Two forms, because the two cases are genuinely different:
+
+```lua
+-- fast: answers now, on the keystroke path. A database lookup, a table, a regex.
+oslo.suggest.provider { name = "tldr", answer = function(ctx) return "…" end }
+
+-- slow: answers later. The prompt is not held; the line repaints when it lands.
+oslo.suggest.provider {
+  name = "llm", debounce_ms = 120, timeout_ms = 2000,
+  request = function(ctx, reply) oslo.spawn{ "llm", ctx.line, on_exit = function(out) reply(out) end } end,
+}
+```
+
+`ctx` is `{ line, cursor, cwd, mode, last_status }`. A provider returning `nil` declines and the next
+source is asked, exactly as the built-in sources behave.
+
+**The continuation invariant is not negotiable.** The ghost is drawn as trailing text and accepted
+with Right, so an answer that is not a continuation of what is typed would be a lie about what the
+key does. An answer that does not start with the line is **refused and reported once** through
+`messages` — not silently trimmed, which would produce a suggestion the plugin never wrote. A plugin
+that wants to *replace* the line is asking for the repair slot, which is a separate question left out
+of this plan.
+
+### 3. Completion providers
+
+Additive, any command or one, and carrying a kind:
+
+```lua
+oslo.completion.provider {
+  name = "tldr",
+  kind = "example",                  -- shown as the badge, and addable to oslo.completion.sources
+  answer = function(ctx)             -- ctx = { command, words, current, cwd }
+    return { { display = "git commit --amend", description = "change the last commit" } }
+  end,
+}
+```
+
+- **Adds** rather than replaces. `for_command` keeps its meaning — *I own this command* — and stays
+  the escape hatch for a plugin that wants oslo's own candidates gone.
+- **A kind, declared once**, so `oslo.completion.sources` can name it and the badge column can show
+  it. This also fixes the existing hole where `for_command` candidates carry none.
+- Async by the same two-form shape as the ghost. A dropdown that is already open gains rows when a
+  slow provider answers; `select_interactive` has its own key loop and already polls
+  (`finder/run.rs:92` does the same trick for the scanner animation).
+
+### 4. Staleness, debounce, deadline
+
+The three ways this feature is normally got wrong.
+
+- **Staleness.** Every request carries the generation it was made at. An answer whose generation has
+  moved is dropped, never drawn. Without this, typing `gi`, then `t`, then ` ` shows the answer to
+  `gi` under `git ` — the classic async-suggestion bug.
+- **Debounce.** `debounce_ms` per provider: no request is made until the line has been still that
+  long. A model asked on every keystroke is asked ten times for one word.
+- **Deadline.** `timeout_ms` per provider, and a **sync** provider gets a budget too: one that
+  overruns it repeatedly is disabled for the session and says so through `messages`. A shell that
+  feels broken because somebody's plugin is slow must be able to say which plugin.
+
+### 5. Trust, and the switch
+
+**A ghost provider sees every keystroke** — including the ones you did not run and the ones you
+retyped because you got a password wrong. An LLM provider ships them somewhere. That is a bigger
+privacy surface than anything a plugin can reach today, and it must be:
+
+- named in `oslo plugin doctor`, so "what can see my typing" has an answer;
+- covered by `oslo.feature` (`SUGGEST` already exists) so it can be turned off mid-session;
+- silent under the existing no-trace rules — a provider must not be asked at all when the line is
+  secret, when `HISTFILE=""` set `no_trace`, or when the leading-space convention is in force. The
+  veto work already established that every sink asks one flag; this is one more sink.
 
 ## Order
 
 Each step ends with `make verify` green and is its own commit.
 
-1. **`oslo.spawn`**, delivered at the timers' safe point.
-2. **`group-by`, `count`, `uniq`, `stats`.**
-3. **`oslo config timing`.**
-4. **`oslo messages`.**
-5. **`oslo plugin test`.**
-6. **Declarative completion specs**, last: the largest change, and the only one that touches code
-   every keystroke goes through.
+1. **`pending`** — lift the prompt's outstanding/generation pair into a shared module; `next_input`
+   waits on any of them. No behaviour change; the prompt tests are the proof.
+2. **Ghost providers, sync only.** The fifth source, the registry, the continuation invariant, the
+   sync budget. Measurable against `bench/keystroke.rs` with no provider installed.
+3. **Ghost providers, async.** `request`/`reply`, debounce, staleness by generation, deadline.
+4. **Completion providers, sync.** Additive, kinds, `sources` integration, and the badge.
+5. **Completion providers, async**, gaining rows into an open dropdown.
+6. **Two worked examples**, both in `examples/plugins/`: `tldr` (sync, `oslo.db`-backed, generated
+   specs plus example candidates) and `echoer` (async, `oslo.spawn`-backed, standing in for an LLM
+   with something that answers slowly and deterministically — so it can be a test).
 
-Steps 1, 2 and 6 are core and must work in `oslo-minimal`; 5 is behind `plugin`; 3 and 4 are tools.
+Steps 1–5 are core and must work in `oslo-minimal`; nothing here is behind a cargo feature, because
+the ghost and the dropdown are not.
 
 ## Verification
 
-- `make verify` after every step, and `cargo test` with no features.
-- **Step 1 needs a test that the callback does not arrive early**: a spawn whose process is still
-  running must not have called back, and one that finished must call back exactly once.
-- **Step 2 belongs in the corpus**, piped from a built-in producer and into a built-in consumer, with
-  the empty stream and the single-row stream as their own cases — an aggregation over nothing is
-  where these usually get it wrong.
-- **Step 6 is measured before and after**: completion latency on a spec-carrying command, min-of-N,
-  against `feat/compose`. If `String` costs anything visible, the change stops there.
-- The 600-line rule will bite `data/tools/mod.rs` again at step 2; split by subject, not by order.
+- `bench/keystroke.rs` **before and after step 2**, min-of-N: a shell with no provider installed must
+  not pay for the mechanism. If it does, the registry lookup moves behind a "any providers at all"
+  atomic.
+- **A test that a stale answer is never drawn.** Type, request, type again, answer the first request
+  — the frame must show the second line's suggestion or none, never the first's.
+- **A test that a non-continuation is refused**, and reported exactly once rather than per keystroke.
+- **A test that a slow sync provider is disabled** rather than being paid for on every key.
+- The pty tests are where the async paths belong: `tests/terminal_semantics/` already drives a real
+  editor, and an async ghost that repaints is only observable there.
+- `oslo-minimal` builds and its ghost still works with no providers registered.
+
+## Things that will bite
+
+- **`edit/session.rs` is 595 lines and `completion.rs` is 588** — both cross the 600-line limit on the
+  first step that touches them. Split by subject before adding, not after.
+- **Reentrancy.** `config_candidates` already documents it (`completion.rs:121`): the hook runs Lua,
+  Lua can complete another word, and the outstanding `RefCell` borrow panics. Every new registry has
+  the same hazard and needs the same clone-before-call.
+- **Lua is not `Send`.** A provider's `answer` runs on the shell's thread; only the *work* an async
+  provider starts may leave it, which is why `request`/`reply` is shaped like `oslo.spawn` rather
+  than like a promise. `reply` is delivered at a safe point, not from the worker thread.
+- **`InputEvent::PromptRefreshed` is named for the prompt.** Renaming it touches the editor tests.
+- **The dropdown owns the terminal.** Rows arriving while it is open must not move the selection —
+  a row inserted above where your cursor is means Enter runs something you did not choose.
 
 ## What this does not do
 
-- **No `join`, and no second input stream.** See item 2.
-- **No async runtime.** Item 1 is one process and one callback; there is no promise, no coroutine
-  scheduler, and no way for two callbacks to interleave.
-- **No log on disk.** Item 4 is a session's own memory.
-- **No sandbox.** Unchanged: the trust gate decides whether you run somebody's code.
+- **No repair slot for plugins.** The correction after the line stays the model's.
+- **No replacing the ghost's built-in sources** — a provider joins the order, it does not displace
+  `history`, whose whole value is that it only ever offers something you really ran.
+- **No sandbox.** Unchanged: the trust gate decides whether you run somebody's code. What is new is
+  that the doctor will *say* which plugins can see your typing.
+- **No streaming.** One answer per request. A token-by-token ghost is a different feature and would
+  need the drawing path to accept partial answers.
 
-## Open, and worth deciding rather than omitting
+## Open, and worth deciding before step 3
 
-**An external door into a running session.** Neovim's ecosystem exists because *any* program can
-drive it over RPC, and oslo has no equivalent — an editor that wants the shell's working directory,
-or to run something in its context, has nothing to talk to. The precedent is in-tree: the scratch
-daemon already has a socket and a wire protocol.
-
-It is left out of this plan on purpose, because it is larger than the other six together and because
-it may be the wrong shape for a shell: a shell's integration story has always been "it is a process,
-pipe to it", and an RPC surface is a second, permanent interface to keep compatible. Worth an
-explicit decision before anybody starts.
+**What an async ghost does about the model.** With `vista` installed, `predict` answers in ~4 µs and
+an LLM answers in ~300 ms. If both are in `sources`, the model's answer is drawn first and then
+replaced when the slow one lands — text under the cursor changing on its own, half a second after you
+stopped typing. The alternatives are: never replace an answer already drawn (the slow provider only
+ever fills a *gap*), or let it replace and accept the flicker. **I would take the first**, but it is
+a decision about how the shell feels rather than about what is correct, and it should be made
+deliberately rather than discovered.
