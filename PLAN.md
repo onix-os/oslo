@@ -133,8 +133,16 @@ registering a function the doctor calls.
   plugins all write now, and "why is my keybinding not working" has no answer.
 - **A description on a keybinding.** `oslo.keys["alt-n"] = { run = f, desc = … }`, so something can
   list what is bound.
-- **Lazy-load by hook.** A plugin that only matters in a git repository could declare
+- **Lazy-load by hook.** A plugin that only matters in a git repository declares
   `load_on = "post-change-dir"` instead of being loaded because its name appeared in a line.
+
+  Two things fell out of building it. The waking belongs in `api::shell::handlers` — the one
+  function every fire path calls to find a hook's handlers — rather than at wake points sprinkled
+  through the loop: it covers all 22 hooks at once, costs the loop nothing, and loads the plugin
+  *before* the firing it asked for, so its handler hears that one rather than the next. And a
+  waited-on hook has to be marked watched at startup, because a hook nothing is attached to is
+  gated by a bitset and never asked for its handlers at all — without that a plugin sleeps
+  through the very moment it named.
 
 ## Order
 
@@ -142,7 +150,9 @@ Each step ends with `make verify` green and is its own commit.
 
 1. **Rows into a Lua tool** — the widened handler and the `Record` → Lua conversion.
 2. **User events** — `emit` and `on.user`, with name validation.
-3. **Timers** — `after`, `every`, `stop`, drained from the read loop.
+3. **Timers** — `after`, `every`, `stop`, drained from the read loop. The bookkeeping is separate
+   from the firing (`settle` and `fire_due`) because the half worth testing needs no interpreter and
+   the half that fires needs one.
 4. **`register_builtin` in table form** — `desc` and `complete` beside `run`.
 5. **`oslo plugin doctor`**, including a plugin's own check.
 6. **The smaller four**, each its own commit.

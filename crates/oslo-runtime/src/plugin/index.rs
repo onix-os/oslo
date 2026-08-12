@@ -43,6 +43,8 @@ pub struct Installed {
     /// Carried here so the load-time check costs nothing: re-reading the manifest to learn it would
     /// undo the whole reason the index exists.
     pub requires: Option<String>,
+    /// A hook whose firing loads it, for a plugin with nothing to be typed.
+    pub load_on: Option<String>,
 }
 
 impl Installed {
@@ -64,6 +66,7 @@ impl Installed {
             tools: manifest.tools.clone(),
             hash,
             requires: manifest.requires.clone(),
+            load_on: manifest.load_on.clone(),
         }
     }
 }
@@ -135,6 +138,7 @@ pub fn parse(text: &str) -> Result<Vec<Installed>, String> {
             tools: list_of("tools"),
             hash,
             requires: text_of("requires"),
+            load_on: text_of("load_on"),
         });
     }
     Ok(found)
@@ -156,6 +160,7 @@ pub fn write(entries: &[Installed]) -> Result<(), String> {
             "tools": installed.tools,
             "hash": installed.hash,
             "requires": installed.requires,
+            "load_on": installed.load_on,
         })).collect::<Vec<_>>(),
     });
     let text = serde_json::to_string_pretty(&document).map_err(|error| error.to_string())?;

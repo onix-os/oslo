@@ -80,6 +80,16 @@ pub fn start(taken: impl Fn(&str) -> bool) {
         }
         pending.push(installed);
     }
+    // **A hook nothing is attached to is never even asked for its handlers.** `on-key` and the rest
+    // are gated by a bitset so that not using a hook costs nothing, and a plugin waiting on one has
+    // attached nothing yet — so without this it would sleep through the very moment it named.
+    for installed in &pending {
+        if let Some(hook) = &installed.load_on
+            && let Some((index, _)) = crate::lua::api::hooks::resolve(hook)
+        {
+            crate::lua::api::hooks::attached(index);
+        }
+    }
     PENDING.with(|slot| *slot.borrow_mut() = pending);
 }
 
@@ -118,6 +128,44 @@ pub fn ensure_loaded(line: &str) {
 /// line, asked for directly.
 pub fn load_one(installed: &index::Installed) -> Result<(), String> {
     load(installed)
+}
+
+/// Load every plugin waiting on a hook that is about to fire.
+///
+/// **For a plugin with nothing to be typed.** [`ensure_loaded`] loads what a line *names*, which is
+/// no use to a plugin whose whole job is a `post-change-dir` handler: nobody types the name of a
+/// plugin that only watches, so it would sit in the index forever. `load_on = "post-change-dir"` in
+/// its manifest is how it says which moment to wake up for.
+///
+/// Called from the loop at the same safe point everything else is, and *before* the hook fires — so
+/// the handler the plugin registers is attached in time to hear the very firing that loaded it.
+pub fn load_for_hook(hook: &str) {
+    if PENDING.with(|slot| slot.borrow().is_empty()) {
+        return;
+    }
+    let wanted: Vec<index::Installed> = PENDING.with(|slot| {
+        let mut pending = slot.borrow_mut();
+        let (wanted, keep) = pending
+            .drain(..)
+            .partition(|installed| installed.load_on.as_deref() == Some(hook));
+        *pending = keep;
+        wanted
+    });
+    for installed in wanted {
+        if let Err(problem) = load(&installed) {
+            eprintln!("oslo: plugin {}: {problem}", installed.name);
+        }
+    }
+}
+
+/// Every hook some installed plugin is waiting on, so the loop can ask cheaply.
+pub fn hooks_waited_on() -> Vec<String> {
+    PENDING.with(|slot| {
+        slot.borrow()
+            .iter()
+            .filter_map(|installed| installed.load_on.clone())
+            .collect()
+    })
 }
 
 /// Check the plugin still hashes to what was allowed, then run its entry file.

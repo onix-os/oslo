@@ -11,6 +11,7 @@ fn one() -> Installed {
         tools: vec!["notes".to_string()],
         hash: "abc123".to_string(),
         requires: None,
+        load_on: None,
     }
 }
 

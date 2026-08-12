@@ -194,16 +194,21 @@ fn install_one(source: &str, assume_yes: bool) -> i32 {
 
     // **What it will reserve, before it is trusted.** Nothing of the plugin has run at this point:
     // the manifest was read in an interpreter with no `oslo` in it, and the hash is over bytes.
+    let reserves: Vec<String> = planned.manifest.names().cloned().collect();
     println!(
-        "{} {} reserves: {}",
+        "{} {} {}",
         planned.manifest.name,
         planned.manifest.version,
-        planned
-            .manifest
-            .names()
-            .cloned()
-            .collect::<Vec<_>>()
-            .join(", ")
+        match (reserves.is_empty(), &planned.manifest.load_on) {
+            // A plugin with no commands is not a broken one: it watches. Saying "reserves:" with
+            // nothing after it reads as a plugin that failed to declare anything.
+            (true, Some(hook)) => format!("reserves nothing; loads on `{hook}`"),
+            (true, None) => "reserves nothing".to_string(),
+            (false, Some(hook)) => {
+                format!("reserves: {}; loads on `{hook}`", reserves.join(", "))
+            }
+            (false, None) => format!("reserves: {}", reserves.join(", ")),
+        }
     );
     if !assume_yes && !confirm("install and allow it to run?") {
         println!("not installed");

@@ -21,6 +21,7 @@ fn installed(name: &str, builtins: &[&str]) -> Installed {
         tools: Vec::new(),
         hash: "x".to_string(),
         requires: None,
+        load_on: None,
     }
 }
 

@@ -41,6 +41,13 @@ pub struct Manifest {
     ///
     /// `None` when the plugin did not say, which means it runs anywhere.
     pub requires: Option<String>,
+    /// A hook whose firing loads this plugin, whether or not anything named it.
+    ///
+    /// **For a plugin that has nothing to be typed.** A plugin whose whole job is a `post-change-dir`
+    /// handler would otherwise never load: loading happens when a line mentions one of its declared
+    /// names, and nobody types the name of a plugin that only watches. `load_on = "post-change-dir"`
+    /// is how it says so.
+    pub load_on: Option<String>,
 }
 
 /// Does this oslo satisfy `requirement`?
@@ -120,9 +127,9 @@ pub fn read(directory: &Path) -> Result<Manifest, String> {
 
     let builtins = names(&table, "builtins", &path)?;
     let tools = names(&table, "tools", &path)?;
-    if builtins.is_empty() && tools.is_empty() {
+    if builtins.is_empty() && tools.is_empty() && string(&table, "load_on").is_none() {
         return Err(format!(
-            "{}: declares no builtins and no tools, so nothing would ever load it",
+            "{}: declares no builtins, no tools and no `load_on`, so nothing would ever load it",
             path.display()
         ));
     }
@@ -136,6 +143,18 @@ pub fn read(directory: &Path) -> Result<Manifest, String> {
             .map_err(|problem| format!("{}: `requires`: {problem}", path.display()))?;
     }
 
+    // Checked here for the same reason `requires` is: a hook name nothing will ever fire is a
+    // plugin that silently never loads, and a typo is the likeliest way to write one.
+    let load_on = string(&table, "load_on");
+    if let Some(hook) = &load_on
+        && crate::lua::api::hooks::resolve(hook).is_none()
+    {
+        return Err(format!(
+            "{}: `load_on`: {hook:?} is not a hook; see `oslo hook`",
+            path.display()
+        ));
+    }
+
     Ok(Manifest {
         name,
         version: string(&table, "version").unwrap_or_else(|| "0".to_string()),
@@ -143,6 +162,7 @@ pub fn read(directory: &Path) -> Result<Manifest, String> {
         builtins,
         tools,
         requires,
+        load_on,
     })
 }
 
