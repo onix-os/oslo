@@ -2028,8 +2028,8 @@ checksum = "0b928f33d975fc6ad9f86c8f283853ad26bdd5b10b7f1542aa2fa15e2289105a"
 
 [[package]]
 name = "vista-recall"
-version = "0.1.0"
-source = "git+https://github.com/bresilla/vista?rev=8ec5fa733de21f9aa21bda280241d4d638e27860#8ec5fa733de21f9aa21bda280241d4d638e27860"
+version = "0.1.2"
+source = "git+https://github.com/bresilla/vista?tag=v0.1.2#db0670d43ea5484d77719310136e4fd341760800"
 
 [[package]]
 name = "walkdir"
