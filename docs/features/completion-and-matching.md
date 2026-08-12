@@ -198,8 +198,9 @@ Which is why a provider has the two things `for_command` never had:
   existing sort — blink.cmp's `score_offset` rather than a priority that overrules everything, so a
   command you run constantly still beats a suggestion you have never taken.
 
-A list of plain strings is accepted where there is nothing to say about each one:
-`return { "one", "two" }`. Only offers that continue the word being typed are shown, `max_items`
+A provider takes the same guards the ghost's does — `min_chars` and an `enabled` predicate — and a
+list of plain strings is accepted where there is nothing to say about each one:
+`return { "one", "two" }`. `examples/plugins/tldr` is the worked example. Only offers that continue the word being typed are shown, `max_items`
 bounds what one provider can contribute so it cannot flood the menu, and a provider that raises loses
 its own candidates and nothing else. `oslo.completion.providers()` lists what is registered.
 

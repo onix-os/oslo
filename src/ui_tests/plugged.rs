@@ -24,7 +24,7 @@ fn subcommands_come_from_the_spec_for_this_command_not_the_first_one() {
 #[test]
 fn a_registered_provider_answers_the_ghost() {
     use crate::ui::settings::{self, Source};
-    use crate::ui::suggest::{self, Ask, Provider};
+    use crate::ui::suggest::{self, Ask, Only, Provider};
 
     let mut with_provider = settings::current().as_ref().clone();
     with_provider.suggest.sources = vec![Source::Provider];
@@ -38,6 +38,7 @@ fn a_registered_provider_answers_the_ghost() {
                 .starts_with("git com")
                 .then(|| "git commit --amend".to_string())
         })),
+        only: Only::default(),
     });
 
     let h = helper(Environment::new());
@@ -245,6 +246,8 @@ fn a_completion_provider_adds_to_what_oslo_already_offers() {
         when: Some("git".into()),
         score_offset: 0.0,
         max_items: DEFAULT_MAX_ITEMS,
+        min_chars: 0,
+        enabled: None,
         answer: std::rc::Rc::new(|_| {
             vec![Offer {
                 display: "commit --amend".into(),

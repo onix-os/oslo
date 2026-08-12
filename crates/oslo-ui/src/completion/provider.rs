@@ -52,6 +52,9 @@ pub struct Offer {
     pub description: Option<String>,
 }
 
+/// A predicate over the context: whether this provider is worth asking here at all.
+pub type Enabled = Rc<dyn Fn(&Ctx) -> bool>;
+
 pub type Answer = Rc<dyn Fn(&Ctx) -> Vec<Offer>>;
 
 pub struct Provider {
@@ -65,6 +68,13 @@ pub struct Provider {
     pub score_offset: f64,
     /// At most this many offers are taken, so one provider cannot flood the menu.
     pub max_items: usize,
+    /// Do not ask until this much of the word has been typed.
+    pub min_chars: usize,
+    /// Anything the other fields cannot express — a predicate over the whole context.
+    ///
+    /// The same idea as the ghost's, and the same reason: a Lua function is more expressive than any
+    /// table of `when` fields, in the language the config is already written in.
+    pub enabled: Option<Enabled>,
     pub answer: Answer,
 }
 
@@ -119,6 +129,8 @@ pub fn offers(ctx: &Ctx) -> Vec<(CompletionCandidate, f64)> {
         slot.borrow()
             .iter()
             .filter(|p| p.when.as_ref().is_none_or(|only| only == &ctx.command))
+            .filter(|p| ctx.current.chars().count() >= p.min_chars)
+            .filter(|p| p.enabled.as_ref().is_none_or(|ask| ask(ctx)))
             .map(|p| {
                 (
                     p.name.clone(),

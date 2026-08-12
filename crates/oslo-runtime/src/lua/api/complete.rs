@@ -55,6 +55,10 @@ pub fn install(completion: &mut Table) {
                 .filter(|n| *n > 0.0)
                 .map(|n| n as usize)
                 .unwrap_or(oslo_ui::completion::provider::DEFAULT_MAX_ITEMS),
+            min_chars: number(&declared, "min_chars")
+                .map(|n| n as usize)
+                .unwrap_or(0),
+            enabled: predicate(&declared),
             name,
             answer: Rc::new(move |ctx| {
                 match crate::lua::engine::call_here(&answer, vec![context(ctx)]) {
@@ -130,6 +134,23 @@ fn string(table: &Table, key: &str) -> Option<String> {
         Value::Str(text) => Some(text.to_string()),
         _ => None,
     }
+}
+
+/// `enabled = function(ctx) … end` — the context rule, as a predicate.
+///
+/// **A function rather than a `when = { … }` table.** A predicate is strictly more expressive than
+/// any set of fields would be, and it is written in the language the rest of the config is. A
+/// predicate that raises is read as *no*: a guard nobody can evaluate has not said yes.
+fn predicate(declared: &Table) -> Option<oslo_ui::completion::provider::Enabled> {
+    let asked @ Value::Function(_) = declared.get(&Value::str("enabled")) else {
+        return None;
+    };
+    Some(Rc::new(move |ctx| {
+        match crate::lua::engine::call_here(&asked, vec![context(ctx)]) {
+            Ok(values) => values.first().is_some_and(Value::truthy),
+            Err(_) => false,
+        }
+    }))
 }
 
 fn number(table: &Table, key: &str) -> Option<f64> {

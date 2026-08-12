@@ -48,6 +48,9 @@ pub struct Ctx {
 ///
 /// The whole line rather than the remainder, because that is what a provider naturally has and
 /// because the invariant is checkable only against the whole thing. The remainder is computed here.
+/// A predicate over the context: whether this provider is worth asking here at all.
+pub type Enabled = Rc<dyn Fn(&Ctx) -> bool>;
+
 pub type Answer = Rc<dyn Fn(&Ctx) -> Option<String>>;
 
 /// Start work for `Ctx` that will answer later by calling [`answered`] with the same line.
@@ -98,6 +101,49 @@ pub enum Ask {
 pub struct Provider {
     pub name: String,
     pub ask: Ask,
+    /// Guards, checked before the provider is asked anything.
+    pub only: Only,
+}
+
+/// When a provider is worth asking at all.
+///
+/// **Cheap tests first, and the predicate last.** `min_chars` and `max_line` are two integer
+/// comparisons; `enabled` is a call into Lua, and calling it to find out that the line was two
+/// characters long would be the expensive way to answer a cheap question.
+pub struct Only {
+    /// Do not ask about a line shorter than this. A model asked about `g` is being asked nothing.
+    pub min_chars: usize,
+    /// Do not ask about a line longer than this.
+    ///
+    /// From `ZSH_AUTOSUGGEST_BUFFER_MAX_SIZE`, and for its reason: a 4 KB line is a paste, not a
+    /// prompt, and suggesting against it is expensive and pointless in the same breath.
+    pub max_line: usize,
+    /// Anything the two above cannot express — a predicate over the whole context.
+    ///
+    /// **This is the context rule.** A `when = { command = …, cwd = … }` table was the other design,
+    /// and a Lua function is strictly more expressive than any table of fields would be, in the
+    /// language the rest of the config is already written in. It is what says *not in this
+    /// directory*, which for a provider that sends your typing somewhere is the setting that
+    /// matters most.
+    pub enabled: Option<Enabled>,
+}
+
+impl Default for Only {
+    fn default() -> Self {
+        Only {
+            min_chars: 1,
+            max_line: 512,
+            enabled: None,
+        }
+    }
+}
+
+impl Only {
+    fn asks(&self, ctx: &Ctx) -> bool {
+        ctx.line.chars().count() >= self.min_chars
+            && ctx.line.len() <= self.max_line
+            && self.enabled.as_ref().is_none_or(|ask| ask(ctx))
+    }
 }
 
 /// How long one synchronous provider may take before it is a problem.
@@ -276,7 +322,7 @@ fn plan(ctx: &Ctx, phase: Phase) -> Vec<(usize, String, Step)> {
         let mut providers = slot.borrow_mut();
         let mut steps = Vec::new();
         for (at, entry) in providers.iter_mut().enumerate() {
-            if entry.disabled {
+            if entry.disabled || !entry.provider.only.asks(ctx) {
                 continue;
             }
             let name = entry.provider.name.clone();

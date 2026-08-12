@@ -132,7 +132,16 @@ pub fn install(suggest: &mut Table) {
             }
         };
 
-        oslo_ui::suggest::register(oslo_ui::suggest::Provider { name, ask });
+        let only = oslo_ui::suggest::Only {
+            min_chars: number(&declared, "min_chars")
+                .map(|n| n as usize)
+                .unwrap_or(1),
+            max_line: number(&declared, "max_line")
+                .map(|n| n as usize)
+                .unwrap_or(512),
+            enabled: predicate(&declared),
+        };
+        oslo_ui::suggest::register(oslo_ui::suggest::Provider { name, ask, only });
         ok(Value::Bool(true))
     });
 
@@ -185,6 +194,32 @@ fn context(ctx: &oslo_ui::suggest::Ctx) -> Value {
     table.set(Value::str("cwd"), Value::str(&ctx.cwd));
     table.set(Value::str("language"), Value::str(&ctx.language));
     Value::table(table)
+}
+
+/// `enabled = function(ctx) … end` — the context rule, as a predicate.
+///
+/// **A function rather than a `when = { … }` table.** A predicate is strictly more expressive than
+/// any set of fields, in the language the config is already written in — and it is what says *not in
+/// this directory*, which for a provider that sends your typing somewhere is the setting that
+/// matters most. A predicate that raises is read as *no*: a guard nobody can evaluate has not said
+/// yes, and failing closed is the only safe direction for a guard about privacy.
+fn predicate(declared: &Table) -> Option<oslo_ui::suggest::Enabled> {
+    let asked @ Value::Function(_) = declared.get(&Value::str("enabled")) else {
+        return None;
+    };
+    Some(Rc::new(move |ctx| {
+        match crate::lua::engine::call_here(&asked, vec![context(ctx)]) {
+            Ok(values) => values.first().is_some_and(Value::truthy),
+            Err(_) => false,
+        }
+    }))
+}
+
+fn number(declared: &Table, key: &str) -> Option<f64> {
+    match declared.get(&Value::str(key)) {
+        Value::Number(n) => Some(n.as_float()),
+        _ => None,
+    }
 }
 
 fn millis(declared: &Table, key: &str, fallback: u64) -> std::time::Duration {

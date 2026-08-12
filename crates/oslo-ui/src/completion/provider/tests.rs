@@ -21,6 +21,8 @@ fn offering(
         when: when.map(str::to_string),
         score_offset: 0.0,
         max_items: DEFAULT_MAX_ITEMS,
+        min_chars: 0,
+        enabled: None,
         answer: Rc::new(move |_| {
             offers
                 .iter()
@@ -93,6 +95,8 @@ fn max_items_bounds_what_one_provider_contributes() {
         when: None,
         score_offset: 0.0,
         max_items: 3,
+        min_chars: 0,
+        enabled: None,
         answer: Rc::new(|_| {
             (0..100)
                 .map(|n| Offer {

@@ -281,6 +281,40 @@ startling.
 There is no `drop`. For a provider that answers later, every answer is late, so a mode that refused
 late answers would be a slower way of writing `oslo.suggest.forget()`.
 
+### When to ask at all
+
+```lua
+oslo.suggest.provider {
+  name = "llm",
+  min_chars = 4,          -- a model asked about `g` is being asked nothing
+  max_line = 512,         -- a pasted 4 KB line is not a prompt
+  enabled = function(ctx) -- anything the two above cannot express
+    return not ctx.cwd:match("/private")
+  end,
+  request = …,
+}
+```
+
+`enabled` **is** the context rule. A `when = { command = …, cwd = … }` table was the other design,
+and a predicate is strictly more expressive than any set of fields would be, in the language the rest
+of the config is already written in. For a provider that would send your typing off the machine, it
+is the setting that matters most — and a predicate that raises is read as *no*, because a guard
+nobody can evaluate has not said yes.
+
+The cheap tests run first: `min_chars` and `max_line` are integer comparisons, and calling into Lua
+to discover that the line was two characters long would be the expensive way to answer a cheap
+question.
+
+### Worked examples
+
+Two, in `examples/plugins/`:
+
+- **`tldr`** — synchronous, answering from `oslo.db`. Offers what people actually do with a command,
+  in the dropdown *and* as a ghost.
+- **`slowpoke`** — asynchronous, the shape an LLM plugin has. Deliberately slow and deliberately
+  deterministic, so it exercises the debounce, the reply and the repaint while still being something
+  a test can assert on.
+
 ## Measurements
 
 `cargo bench --bench keystroke`, release, on this machine:

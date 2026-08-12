@@ -13,6 +13,7 @@ fn saying(name: &str, whole: Option<&'static str>) -> Provider {
     Provider {
         name: name.to_string(),
         ask: Ask::Now(Rc::new(move |_| whole.map(str::to_string))),
+        only: Only::default(),
     }
 }
 
@@ -59,6 +60,7 @@ fn the_first_provider_with_an_answer_wins_and_the_rest_are_not_asked() {
     let counter = Rc::clone(&asked);
     register(Provider {
         name: "second".to_string(),
+        only: Only::default(),
         ask: Ask::Now(Rc::new(move |_| {
             counter.set(counter.get() + 1);
             Some("git stash".to_string())
@@ -97,6 +99,7 @@ fn a_provider_that_overruns_its_budget_is_disabled() {
     forget();
     register(Provider {
         name: "slow".to_string(),
+        only: Only::default(),
         ask: Ask::Now(Rc::new(|_| {
             std::thread::sleep(BUDGET + Duration::from_millis(5));
             Some("git status".to_string())
@@ -117,6 +120,7 @@ fn a_disabled_provider_does_not_take_the_others_with_it() {
     forget();
     register(Provider {
         name: "slow".to_string(),
+        only: Only::default(),
         ask: Ask::Now(Rc::new(|_| {
             std::thread::sleep(BUDGET + Duration::from_millis(5));
             None
@@ -137,6 +141,7 @@ fn what_a_provider_is_told_is_the_line_and_where_it_is() {
     let into = Rc::clone(&seen);
     register(Provider {
         name: "spy".to_string(),
+        only: Only::default(),
         ask: Ask::Now(Rc::new(move |ctx| {
             *into.borrow_mut() = Some(ctx.clone());
             None
@@ -168,6 +173,7 @@ fn slow_with(
 ) -> Provider {
     Provider {
         name: name.to_string(),
+        only: Only::default(),
         ask: Ask::Later {
             request: Rc::new(move |ctx| asked.borrow_mut().push(ctx.line.clone())),
             debounce,
@@ -322,6 +328,7 @@ fn a_request_that_is_never_answered_times_out() {
     let counted = Rc::clone(&asked);
     register(Provider {
         name: "gone".to_string(),
+        only: Only::default(),
         ask: Ask::Later {
             request: Rc::new(move |ctx| counted.borrow_mut().push(ctx.line.clone())),
             debounce: Duration::ZERO,
@@ -460,5 +467,82 @@ fn the_fill_pass_asks_nothing_new() {
     ask(&ctx("git s"));
     ask_fill(&ctx("git s"));
     assert_eq!(asked.borrow().len(), 1, "one frame, one request");
+    forget();
+}
+
+// ---------------------------------------------------------------- when to ask at all
+
+fn guarded(name: &str, only: Only) -> (Provider, Rc<RefCell<Vec<String>>>) {
+    let asked = Rc::new(RefCell::new(Vec::new()));
+    let seen = Rc::clone(&asked);
+    (
+        Provider {
+            name: name.to_string(),
+            ask: Ask::Now(Rc::new(move |ctx| {
+                seen.borrow_mut().push(ctx.line.clone());
+                Some(format!("{} --done", ctx.line))
+            })),
+            only,
+        },
+        asked,
+    )
+}
+
+/// A model asked about `g` is being asked nothing.
+#[test]
+fn a_line_shorter_than_min_chars_is_not_worth_asking_about() {
+    forget();
+    let (provider, asked) = guarded(
+        "llm",
+        Only {
+            min_chars: 3,
+            ..Only::default()
+        },
+    );
+    register(provider);
+
+    assert_eq!(ask(&ctx("gi")), None);
+    assert!(asked.borrow().is_empty());
+    assert!(ask(&ctx("git")).is_some());
+    forget();
+}
+
+/// **A pasted line is not a prompt.** From `ZSH_AUTOSUGGEST_BUFFER_MAX_SIZE`, for its reason.
+#[test]
+fn a_pasted_line_is_too_long_to_suggest_against() {
+    forget();
+    let (provider, asked) = guarded(
+        "llm",
+        Only {
+            max_line: 16,
+            ..Only::default()
+        },
+    );
+    register(provider);
+
+    assert_eq!(ask(&ctx(&"x".repeat(64))), None);
+    assert!(asked.borrow().is_empty());
+    forget();
+}
+
+/// **The context rule.** A predicate over the whole context is what says *not in this directory* —
+/// which for a provider that sends your typing somewhere is the setting that matters most.
+#[test]
+fn a_predicate_decides_anything_the_others_cannot() {
+    forget();
+    let (provider, asked) = guarded(
+        "llm",
+        Only {
+            enabled: Some(Rc::new(|ctx| ctx.cwd != "/w/private")),
+            ..Only::default()
+        },
+    );
+    register(provider);
+
+    assert!(ask(&ctx("git s")).is_some());
+    let mut secret = ctx("git s");
+    secret.cwd = "/w/private".to_string();
+    assert_eq!(ask(&secret), None);
+    assert_eq!(asked.borrow().len(), 1, "and it was not even asked");
     forget();
 }
