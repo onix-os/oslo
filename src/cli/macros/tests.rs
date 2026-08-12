@@ -25,25 +25,51 @@ fn words(args: &[&str]) -> Vec<String> {
 #[test]
 fn a_flag_names_the_kind_and_the_rest_are_words() {
     let asked = parse(&words(&["--abbrev", "gs", "git status"])).expect("parses");
-    assert_eq!(asked.kind, Kind::Abbrev);
+    assert_eq!(asked.kind, Some(Kind::Abbrev));
     assert_eq!(asked.words, ["gs", "git status"]);
 
-    assert_eq!(parse(&words(&["--func", "x"])).unwrap().kind, Kind::Func);
-    assert_eq!(
-        parse(&words(&["--script", "x"])).unwrap().kind,
-        Kind::Script
-    );
-    assert_eq!(
-        parse(&words(&["x"])).unwrap().kind,
-        Kind::Alias,
-        "the default"
-    );
+    for (flag, kind) in [
+        ("--alias", Kind::Alias),
+        ("--func", Kind::Func),
+        ("--script", Kind::Script),
+    ] {
+        assert_eq!(parse(&words(&[flag, "x"])).unwrap().kind, Some(kind));
+    }
+}
+
+/// **There is no default kind.** `add gs 'git status'` meaning an alias because alias came first
+/// in an enum is exactly the trap this avoids.
+#[test]
+fn a_kind_has_to_be_said() {
+    assert_eq!(parse(&words(&["x"])).unwrap().kind, None);
+    let problem = parse(&words(&["x"])).unwrap().kind().unwrap_err();
+    assert!(problem.contains("--alias"), "{problem}");
+    assert_eq!(run(&words(&["add", "gs", "git status"])), 2);
 }
 
 #[test]
 fn two_kinds_at_once_is_a_mistake_rather_than_the_last_one_winning() {
     let problem = parse(&words(&["--func", "--script", "x"])).unwrap_err();
     assert!(problem.contains("one kind"), "{problem}");
+    // The same flag twice is not two kinds; it is somebody being emphatic.
+    assert!(parse(&words(&["--func", "--func", "x"])).is_ok());
+}
+
+#[test]
+fn tags_are_collected_and_checked() {
+    let asked = parse(&words(&["--alias", "gs", "--tag", "git", "-t", "system"])).expect("parses");
+    assert_eq!(asked.tags, ["git", "system"]);
+    assert_eq!(asked.words, ["gs"]);
+
+    assert!(parse(&words(&["--tag"])).is_err(), "a tag with no tag");
+    assert!(parse(&words(&["--tag", "two words"])).is_err());
+}
+
+/// A body on the command line is refused for the two kinds that cannot fit on one.
+#[test]
+fn a_function_may_not_be_written_inline() {
+    assert_eq!(run(&words(&["add", "--func", "f", "echo hi"])), 2);
+    assert_eq!(run(&words(&["add", "--script", "s", "echo hi"])), 2);
 }
 
 /// **A body is arbitrary text and often starts with a dash.** `oslo macros add ll '-la'` has to

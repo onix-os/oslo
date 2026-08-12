@@ -18,9 +18,10 @@ pub(super) struct Sub {
 pub(super) const SUBCOMMANDS: &[Sub] = &[
     Sub {
         name: "add",
-        args: "NAME [BODY]",
+        args: "--KIND NAME [BODY]",
         about: "store an alias, an abbreviation, a function or a script",
         flags: &[
+            ("--alias", "a word replaced before the line is parsed"),
             (
                 "--abbrev",
                 "an abbreviation: expanded into the line as you type it",
@@ -30,30 +31,33 @@ pub(super) const SUBCOMMANDS: &[Sub] = &[
                 "--script",
                 "a script: opens your editor, any language, with a shebang",
             ),
+            ("--tag TAG", "label it; repeat for more than one"),
             (
                 "--edit",
-                "open an alias in the editor instead of taking it as an argument",
+                "open the body in the editor instead of taking it as an argument",
             ),
         ],
-        note: "With no BODY and no flag, the editor opens. `--func` and `--script` always open it, \
-               because neither fits on a command line. An alias and an abbreviation differ in what \
-               they touch: an alias replaces the word before the line is parsed and a script never \
-               sees what you typed, while an abbreviation is expanded *into your line*, so what \
-               runs is what you can see and what the history records.",
+        note: "The kind is required: four kinds and a silent default is a trap. A BODY on the \
+               command line is for an alias and an abbreviation only — a function and a script \
+               always open the editor, because neither fits on a line and pretending otherwise \
+               invites a function written as one. An alias replaces the word before the line is \
+               parsed, so nothing you can see is what runs; an abbreviation is expanded *into your \
+               line*, so what runs is what you read and what the history records.",
     },
     Sub {
         name: "remove",
         args: "NAME",
         about: "forget one",
         flags: &[
-            ("--abbrev", "remove the abbreviation of that name"),
+            ("--alias", "remove the alias of that name"),
+            ("--abbrev", "remove the abbreviation"),
             ("--func", "remove the function"),
             ("--script", "remove the script"),
         ],
-        note: "Without a flag it removes the alias. A name may be more than one kind at once, so \
-               removing without saying which removes only the alias — `oslo macros show NAME` \
-               lists every kind that name has. Removing one that shadowed a `config.lua` alias \
-               puts the configured one back on the next shell.",
+        note: "The kind is only needed when the name is more than one thing at once — removing \
+               the only macro called `gs` is not a question. Removing one that shadowed an alias \
+               your configuration defines puts the configured one back, in every shell already \
+               running. To keep it and stop it applying, turn it off in `show` instead.",
     },
     Sub {
         name: "show",
@@ -67,10 +71,10 @@ pub(super) const SUBCOMMANDS: &[Sub] = &[
             ("--edit", "open the one you pick in your editor"),
         ],
         note: "A function or a script is many lines and a list of many-line entries is not a list, \
-               so each is flattened to `kind  name  first line`. With a NAME it prints that one in \
-               full instead. An entry that shadows an alias your configuration defines is marked, \
-               because finding that out from a list is fine and finding it out by wondering why \
-               your config stopped working is not.",
+               so each is flattened to one row: when it was made, its kind, its name, its first \
+               line and its tags. With a NAME it prints that one in full instead. Piped, or with \
+               --plain, there is no widget and no colour — a manager only a person can read would \
+               be one you cannot script.",
     },
     Sub {
         name: "export",
@@ -80,7 +84,8 @@ pub(super) const SUBCOMMANDS: &[Sub] = &[
         note: "A database is not a dotfiles repository: an alias in `config.lua` is \
                version-controlled, diffable and copied to a new machine with the rest of your \
                configuration, and one in here is none of those. This is the way back out. Without \
-               a FILE it writes to stdout.",
+               a FILE it writes to stdout. A header line carries the kind, the name, `off` if it \
+               is turned off and `#tag` for each tag; the body follows, indented by one tab.",
     },
     Sub {
         name: "import",

@@ -63,10 +63,14 @@ pub(super) fn show(args: &[String]) -> i32 {
             String::new()
         };
         if asked.plain {
+            // Every field, one row, tab-separated — the form something other than a person reads,
+            // so nothing is left out for looking tidy.
             println!(
-                "{}\t{}\t{}",
+                "{}\t{}\t{}\t{}\t{}",
                 entry.kind.word(),
                 entry.name,
+                if entry.active { "on" } else { "off" },
+                entry.tags.join(","),
                 one_line(&entry.body)
             );
         } else {
@@ -217,7 +221,16 @@ pub(super) fn export(args: &[String]) -> i32 {
 pub(super) fn write_text(entries: &[Entry]) -> String {
     let mut text = String::new();
     for entry in entries {
-        text.push_str(&format!("{} {}\n", entry.kind.word(), entry.name));
+        let mut header = format!("{} {}", entry.kind.word(), entry.name);
+        if !entry.active {
+            header.push_str(" off");
+        }
+        for tag in &entry.tags {
+            header.push_str(" #");
+            header.push_str(tag);
+        }
+        text.push_str(&header);
+        text.push('\n');
         for line in entry.body.lines() {
             text.push('\t');
             text.push_str(line);
@@ -265,11 +278,17 @@ pub(super) fn read_text(text: &str) -> Result<Vec<Entry>, String> {
         if !macros::valid_name(name) {
             return Err(format!("line {}: {name:?} is not a name", number + 1));
         }
-        entries.push(Entry {
-            kind,
-            name: name.to_string(),
-            body: String::new(),
-        });
+        // Anything after the name is a label: `#tag` for a tag, `off` for one that is turned off.
+        let mut entry = Entry::new(kind, name, "");
+        for word in words {
+            match word.strip_prefix('#') {
+                Some(tag) if macros::valid_tag(tag) => entry.tags.push(tag.to_string()),
+                Some(tag) => return Err(format!("line {}: {tag:?} is not a tag", number + 1)),
+                None if word == "off" => entry.active = false,
+                None => return Err(format!("line {}: {word:?} means nothing here", number + 1)),
+            }
+        }
+        entries.push(entry);
     }
     finish(&mut entries, &mut body, &mut ends_with_newline);
     Ok(entries)

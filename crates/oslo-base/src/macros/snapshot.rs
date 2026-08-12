@@ -29,7 +29,13 @@ pub fn write(entries: &[Entry]) -> Result<(), String> {
         std::fs::create_dir_all(parent).map_err(|e| format!("{}: {e}", parent.display()))?;
     }
     let mut text = String::new();
-    for entry in entries.iter().filter(|e| e.kind.wanted_at_startup()) {
+    // **Only what is on.** A macro turned off is still in the database — that is what makes it
+    // different from a removed one — but the snapshot is a list of what a shell should do, and a
+    // shell filtering it again would be reading a field it has no other use for.
+    let wanted = entries
+        .iter()
+        .filter(|e| e.kind.wanted_at_startup() && e.active);
+    for entry in wanted {
         text.push_str(entry.kind.word());
         text.push('\t');
         text.push_str(&entry.name);
@@ -73,11 +79,9 @@ fn one(line: &str) -> Option<Entry> {
     if !kind.wanted_at_startup() || !super::valid_name(name) {
         return None;
     }
-    Some(Entry {
-        kind,
-        name: name.to_string(),
-        body: unescape(body),
-    })
+    // **The fields a shell does not need are not in the file.** When it was created and what it is
+    // tagged belong to the manager, and a row that reached this file is on by definition.
+    Some(Entry::new(kind, name, &unescape(body)))
 }
 
 /// Forget the file. The database is untouched, so the next write brings it back.

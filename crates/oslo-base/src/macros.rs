@@ -112,6 +112,49 @@ pub struct Entry {
     pub kind: Kind,
     pub name: String,
     pub body: String,
+    /// Unix seconds, set the first time it is stored and never moved afterwards.
+    ///
+    /// The manager's first column. Editing a macro does not make it new, so this survives a rewrite
+    /// — see [`put`], which carries the old one forward rather than stamping a fresh one.
+    pub created: i64,
+    /// Any number of labels: `system`, `git`, `work`. The manager's Left and Right move through
+    /// them, which is where a history profile would be if a macro were a record of anything.
+    pub tags: Vec<String>,
+    /// `false` is off everywhere, until it is turned back on. Not a removal: what it was is still
+    /// here, which is the whole difference between turning something off and deleting it.
+    pub active: bool,
+}
+
+impl Entry {
+    /// A new one, on and untagged, created now.
+    pub fn new(kind: Kind, name: &str, body: &str) -> Entry {
+        Entry {
+            kind,
+            name: name.to_string(),
+            body: body.to_string(),
+            created: now(),
+            tags: Vec::new(),
+            active: true,
+        }
+    }
+
+    pub fn tagged(self, tags: &[String]) -> Entry {
+        Entry {
+            tags: tags.to_vec(),
+            ..self
+        }
+    }
+}
+
+/// Unix seconds, or 0 on a clock this cannot read.
+///
+/// Zero rather than a panic: a timestamp is a column in a list, and a manager that refused to store
+/// a macro because the clock was odd would be worse than one whose first column said `just now`.
+pub fn now() -> i64 {
+    std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|since| since.as_secs() as i64)
+        .unwrap_or(0)
 }
 
 /// The interpreter a script's shebang names, if it has one.
@@ -146,6 +189,19 @@ pub fn valid_name(name: &str) -> bool {
         })
 }
 
+/// Whether `tag` is one this may store.
+///
+/// Looser than a name — a tag is never a command word — but it is a field in a comma-separated
+/// header and a column in a list, so a comma, a space or a newline is not a tag.
+pub fn valid_tag(tag: &str) -> bool {
+    !tag.is_empty()
+        && tag.len() <= 64
+        && !tag.starts_with('-')
+        && tag
+            .chars()
+            .all(|c| !c.is_whitespace() && !matches!(c, ',' | '#'))
+}
+
 /// `$XDG_DATA_HOME/oslo/macros`, or `~/.local/share/oslo/macros`.
 pub fn directory() -> Option<PathBuf> {
     let base = std::env::var_os("XDG_DATA_HOME")
@@ -178,21 +234,109 @@ fn key(kind: Kind, name: &str) -> String {
 }
 
 /// Store one, replacing whatever had that name and kind.
+///
+/// **`created` is taken from what is already there**, if anything is: editing a macro changes the
+/// macro, not when you first made it, and a caller building an `Entry` to write should not have to
+/// remember to go and read the old timestamp first.
 pub fn put(store: &Store, entry: &Entry) -> Result<(), String> {
     if !valid_name(&entry.name) {
         return Err(format!("{:?} is not a name this can store", entry.name));
     }
-    crate::store::set(store, &key(entry.kind, &entry.name), entry.body.as_bytes())
+    let created = get(store, entry.kind, &entry.name)
+        .map(|old| old.created)
+        .unwrap_or(entry.created);
+    let record = Entry {
+        created,
+        ..entry.clone()
+    };
+    crate::store::set(
+        store,
+        &key(entry.kind, &entry.name),
+        encode(&record).as_bytes(),
+    )
 }
 
 /// Read one back.
 pub fn get(store: &Store, kind: Kind, name: &str) -> Option<Entry> {
-    let body = crate::store::get(store, &key(kind, name))?;
-    Some(Entry {
+    let stored = crate::store::get(store, &key(kind, name))?;
+    Some(decode(kind, name, &String::from_utf8_lossy(&stored)))
+}
+
+/// The header line a record starts with, and then the body exactly as it was written.
+///
+/// A body is arbitrary text — a script, several hundred lines of it — so it is stored **verbatim**
+/// and everything else goes in front of it. The alternative, a field-separated format the body also
+/// lives in, means escaping a script on the way in and unescaping it exactly right on the way out,
+/// forever, to hold three small values.
+///
+/// ```text
+/// 1 1754870400 on system,git
+/// git status --short
+/// ```
+///
+/// The leading `1` is the format. A record that starts with anything else is read as a bare body
+/// from before there were fields, which costs one comparison and means the store never has to be
+/// migrated.
+fn encode(entry: &Entry) -> String {
+    format!(
+        "1 {} {} {}\n{}",
+        entry.created,
+        if entry.active { "on" } else { "off" },
+        entry.tags.join(","),
+        entry.body
+    )
+}
+
+fn decode(kind: Kind, name: &str, stored: &str) -> Entry {
+    let (header, body) = match stored.split_once('\n') {
+        Some((header, body)) if header.starts_with("1 ") => (header, body),
+        // No header: a body and nothing else. On, untagged, and undated.
+        _ => {
+            return Entry {
+                kind,
+                name: name.to_string(),
+                body: stored.to_string(),
+                created: 0,
+                tags: Vec::new(),
+                active: true,
+            };
+        }
+    };
+    let mut fields = header.split(' ').skip(1);
+    let created = fields.next().and_then(|n| n.parse().ok()).unwrap_or(0);
+    let active = fields.next() != Some("off");
+    let tags = fields
+        .next()
+        .map(|tags| {
+            tags.split(',')
+                .filter(|tag| !tag.is_empty())
+                .map(str::to_string)
+                .collect()
+        })
+        .unwrap_or_default();
+    Entry {
         kind,
         name: name.to_string(),
-        body: String::from_utf8_lossy(&body).into_owned(),
-    })
+        body: body.to_string(),
+        created,
+        tags,
+        active,
+    }
+}
+
+/// Turn one on or off, and answer what it now is. `None` if there is no such macro.
+pub fn set_active(store: &Store, kind: Kind, name: &str, active: bool) -> Option<bool> {
+    let entry = get(store, kind, name)?;
+    put(store, &Entry { active, ..entry }).ok()?;
+    Some(active)
+}
+
+/// Every tag in use, sorted, each once.
+pub fn tags(entries: &[Entry]) -> Vec<String> {
+    let mut found: Vec<String> = entries.iter().flat_map(|e| e.tags.clone()).collect();
+    found.sort();
+    found.dedup();
+    found
 }
 
 /// Every kind that has something under `name`.

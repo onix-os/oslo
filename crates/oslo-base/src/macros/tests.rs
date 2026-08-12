@@ -7,11 +7,7 @@ fn store() -> (tempfile::TempDir, Store) {
 }
 
 fn entry(kind: Kind, name: &str, body: &str) -> Entry {
-    Entry {
-        kind,
-        name: name.to_string(),
-        body: body.to_string(),
-    }
+    Entry::new(kind, name, body)
 }
 
 #[test]
@@ -85,6 +81,71 @@ fn a_bad_name_is_refused_rather_than_stored() {
     let (_dir, store) = store();
     assert!(put(&store, &entry(Kind::Alias, "two words", "x")).is_err());
     assert!(all(&store).is_empty());
+}
+
+// ---------------------------------------------------------------- created, tags, active
+
+/// **A body is stored verbatim**, header or no header, because it is a script and not a field.
+#[test]
+fn the_header_carries_the_fields_and_the_body_carries_itself() {
+    let (_dir, store) = store();
+    let awkward = "#!/bin/sh\n# a body with\ttabs, a comma, and\nseveral lines\n";
+    let mine = Entry::new(Kind::Script, "deploy", awkward).tagged(&["work".into(), "ci".into()]);
+    put(&store, &mine).expect("put");
+
+    let back = get(&store, Kind::Script, "deploy").expect("stored");
+    assert_eq!(back.body, awkward, "byte for byte");
+    assert_eq!(back.tags, ["work", "ci"]);
+    assert!(back.active);
+    assert_eq!(back.created, mine.created);
+}
+
+/// A record from before there were fields is a bare body. Read as one rather than migrated.
+#[test]
+fn a_record_with_no_header_is_a_body_and_nothing_else() {
+    let plain = decode(Kind::Alias, "gs", "git status --short");
+    assert_eq!(plain.body, "git status --short");
+    assert!(plain.active, "on, because off has to be said");
+    assert_eq!(plain.created, 0);
+    assert!(plain.tags.is_empty());
+}
+
+/// **Editing a macro does not make it new.** The manager's first column would otherwise say a
+/// three-year-old alias was created the last time you fixed a typo in it.
+#[test]
+fn rewriting_one_keeps_the_day_it_was_made() {
+    let (_dir, store) = store();
+    let mut first = Entry::new(Kind::Alias, "gs", "git status");
+    first.created = 1_000_000;
+    put(&store, &first).expect("put");
+
+    put(&store, &Entry::new(Kind::Alias, "gs", "git status --short")).expect("put again");
+    let back = get(&store, Kind::Alias, "gs").expect("stored");
+    assert_eq!(back.created, 1_000_000, "the day it was made, not today");
+    assert_eq!(back.body, "git status --short");
+}
+
+/// Off is not gone: the body is still there, and the snapshot a shell reads is what changes.
+#[test]
+fn turning_one_off_keeps_it_and_takes_it_out_of_the_snapshot() {
+    let (_dir, store) = store();
+    put(&store, &entry(Kind::Alias, "gs", "git status")).expect("put");
+    assert_eq!(set_active(&store, Kind::Alias, "gs", false), Some(false));
+
+    let back = get(&store, Kind::Alias, "gs").expect("still stored");
+    assert!(!back.active);
+    assert_eq!(back.body, "git status", "off, not forgotten");
+    assert_eq!(set_active(&store, Kind::Alias, "nothing", false), None);
+}
+
+#[test]
+fn the_tags_in_use_are_listed_once_each_in_order() {
+    let entries = [
+        Entry::new(Kind::Alias, "a", "x").tagged(&["git".into(), "system".into()]),
+        Entry::new(Kind::Alias, "b", "x").tagged(&["git".into()]),
+        Entry::new(Kind::Alias, "c", "x"),
+    ];
+    assert_eq!(tags(&entries), ["git", "system"]);
 }
 
 // ---------------------------------------------------------------- what a shebang says

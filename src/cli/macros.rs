@@ -53,48 +53,72 @@ fn fail(message: &str) -> i32 {
 /// The kind a flag asked for, and the words that were not flags.
 #[derive(Debug)]
 struct Asked {
-    kind: Kind,
+    /// **`None` until a flag says.** Four kinds and a silent default is a trap: `add gs 'git status'`
+    /// would quietly make an alias when the fingers meant an abbreviation.
+    kind: Option<Kind>,
     edit: bool,
     plain: bool,
     replace: bool,
+    tags: Vec<String>,
     words: Vec<String>,
+}
+
+impl Asked {
+    /// The kind, or the error that says the four names.
+    fn kind(&self) -> Result<Kind, String> {
+        self.kind
+            .ok_or_else(|| "say which: --alias, --abbrev, --func or --script".to_string())
+    }
 }
 
 fn parse(args: &[String]) -> Result<Asked, String> {
     let mut asked = Asked {
-        kind: Kind::Alias,
+        kind: None,
         edit: false,
         plain: false,
         replace: false,
+        tags: Vec::new(),
         words: Vec::new(),
     };
-    let mut kind_given = false;
+    let mut waiting_for_tag = false;
     for arg in args {
+        if waiting_for_tag {
+            waiting_for_tag = false;
+            if !macros::valid_tag(arg) {
+                return Err(format!("{arg:?} is not a tag: one word, no spaces"));
+            }
+            asked.tags.push(arg.to_string());
+            continue;
+        }
         let kind = match arg.as_str() {
+            "--alias" => Some(Kind::Alias),
             "--abbrev" | "--abbr" => Some(Kind::Abbrev),
             "--func" | "--function" => Some(Kind::Func),
             "--script" => Some(Kind::Script),
             _ => None,
         };
         if let Some(kind) = kind {
-            if kind_given {
-                return Err("one kind at a time: --abbrev, --func or --script".to_string());
+            if asked.kind.is_some_and(|had| had != kind) {
+                return Err("one kind at a time: --alias, --abbrev, --func or --script".to_string());
             }
-            kind_given = true;
-            asked.kind = kind;
+            asked.kind = Some(kind);
             continue;
         }
         match arg.as_str() {
             "--edit" | "-e" => asked.edit = true,
             "--plain" => asked.plain = true,
             "--replace" => asked.replace = true,
+            "--tag" | "-t" => waiting_for_tag = true,
             // Only a *leading* dash is an option. A body is arbitrary text and often starts with
-            // one — `oslo macros add ll '-la'` is a thing somebody will write.
+            // one — `oslo macros add --alias ll '-la'` is a thing somebody will write.
             other if other.starts_with("--") && asked.words.is_empty() => {
                 return Err(format!("unknown option {other:?}"));
             }
             other => asked.words.push(other.to_string()),
         }
+    }
+    if waiting_for_tag {
+        return Err("--tag needs a tag".to_string());
     }
     Ok(asked)
 }
@@ -102,6 +126,10 @@ fn parse(args: &[String]) -> Result<Asked, String> {
 fn add(args: &[String]) -> i32 {
     let asked = match parse(args) {
         Ok(asked) => asked,
+        Err(problem) => return usage(&problem),
+    };
+    let kind = match asked.kind() {
+        Ok(kind) => kind,
         Err(problem) => return usage(&problem),
     };
     let Some(name) = asked.words.first().cloned() else {
@@ -119,20 +147,28 @@ fn add(args: &[String]) -> i32 {
         Err(problem) => return fail(&problem),
     };
 
-    // A body on the command line, or the editor. `--func` and `--script` always take the editor:
-    // neither fits on one line, and pretending otherwise invites a function written as one.
+    // **A function and a script are always written in the editor**, and an inline body for one is
+    // refused rather than accepted: taking it would store a one-line function because that is what
+    // fitted on the command line, which is how you end up with a function written as one line.
     let inline = asked.words[1..].join(" ");
-    let wants_editor =
-        asked.edit || inline.is_empty() || matches!(asked.kind, Kind::Func | Kind::Script);
-    let body = if wants_editor {
+    let editor_only = matches!(kind, Kind::Func | Kind::Script);
+    if editor_only && !inline.is_empty() {
+        return usage(&format!(
+            "a {} is written in the editor: `oslo macros add --{} {name}` and no body",
+            kind.word(),
+            kind.word()
+        ));
+    }
+
+    let body = if editor_only || asked.edit || inline.is_empty() {
         let starting = if inline.is_empty() {
-            macros::get(&store, asked.kind, &name)
+            macros::get(&store, kind, &name)
                 .map(|e| e.body)
-                .unwrap_or_else(|| starter(asked.kind, &name))
+                .unwrap_or_else(|| starter(kind, &name))
         } else {
             inline
         };
-        match super::editor::edit(&starting, asked.kind.extension(&starting)) {
+        match super::editor::edit(&starting, kind.extension(&starting)) {
             Ok(Some(body)) => body,
             Ok(None) => {
                 println!("unchanged");
@@ -147,15 +183,20 @@ fn add(args: &[String]) -> i32 {
     if body.trim().is_empty() {
         return fail("nothing to store: the body is empty");
     }
-    let entry = Entry {
-        kind: asked.kind,
-        name: name.clone(),
-        body,
+    // The tags asked for, or — when none were — whatever it already had, so editing a macro does
+    // not silently strip its labels.
+    let tags = if asked.tags.is_empty() {
+        macros::get(&store, kind, &name)
+            .map(|old| old.tags)
+            .unwrap_or_default()
+    } else {
+        asked.tags.clone()
     };
+    let entry = Entry::new(kind, &name, &body).tagged(&tags);
     if let Err(problem) = macros::put_and_publish(&store, &entry) {
         return fail(&problem);
     }
-    println!("{} {name}", asked.kind.word());
+    println!("{} {name}", kind.word());
     0
 }
 
@@ -185,20 +226,40 @@ fn remove(args: &[String]) -> i32 {
         Ok(store) => store,
         Err(problem) => return fail(&problem),
     };
-    match macros::remove_and_publish(&store, asked.kind, name) {
+    // **The kind is only asked for when the name is ambiguous.** `remove gs` is unambiguous
+    // whenever one kind has that name, and making somebody name the kind to delete the only thing
+    // called `gs` is a question with one possible answer.
+    let kind = match asked.kind.or_else(|| {
+        let only = macros::kinds_of(&store, name);
+        (only.len() == 1).then(|| only[0])
+    }) {
+        Some(kind) => kind,
+        None => match macros::kinds_of(&store, name).as_slice() {
+            [] => return fail(&format!("nothing called {name}")),
+            several => {
+                let words: Vec<String> =
+                    several.iter().map(|k| format!("--{}", k.word())).collect();
+                return usage(&format!(
+                    "{name} is more than one thing — say which: {}",
+                    words.join(", ")
+                ));
+            }
+        },
+    };
+    match macros::remove_and_publish(&store, kind, name) {
         Ok(true) => {
-            println!("removed {} {name}", asked.kind.word());
+            println!("removed {} {name}", kind.word());
             0
         }
         Ok(false) => {
             let others = macros::kinds_of(&store, name);
             if others.is_empty() {
-                fail(&format!("no {} called {name}", asked.kind.word()))
+                fail(&format!("no {} called {name}", kind.word()))
             } else {
                 let words: Vec<&str> = others.iter().map(|k| k.word()).collect();
                 fail(&format!(
                     "no {} called {name} — it is a {} ({})",
-                    asked.kind.word(),
+                    kind.word(),
                     words.join(" and a "),
                     words
                         .iter()
