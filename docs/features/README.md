@@ -83,7 +83,7 @@ scripts/demo/embed.sh                            # put the players back in the d
 | [Prediction and repair](prediction-and-repair.md) | A model of what you run: what comes next, and what you meant |
 | [Completion and matching](completion-and-matching.md) | The dropdown, and matching as a transform rather than a prefix test |
 | [Abbreviations](abbreviations.md) | `gco ` becomes `git checkout ` in the buffer, where you can see it |
-| [Macros](macros.md) | `oslo macros` — aliases, abbreviations, functions and scripts in one database |
+| [Macros](macros.md) | `oslo macros` — aliases, abbreviations, functions and scripts, in a database with a manager |
 
 ## Memory
 

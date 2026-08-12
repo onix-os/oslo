@@ -141,18 +141,25 @@ lands in the buffer, in history and in the log, and you watch it happen.
 ### Small named things, kept
 
 ```sh
-oslo macros add --alias gs 'git status --short'
+oslo macros add --alias gs 'git status --short' --tag git
 oslo macros add --abbrev gco 'git checkout'
 oslo macros add --func mkcd            # opens $EDITOR
 oslo macros add --script deploy        # opens $EDITOR — any language, with a shebang
-oslo macros show                       # the list, narrowed as you type
+oslo macros show                       # the manager, on the whole screen
 ```
 
-A database rather than a file to edit and re-source. Aliases and abbreviations reach an interactive
-shell when it starts; a function or a script is found when you call it, **after `$PATH` has already
-failed**, so nothing on the system can be quietly redefined. A stored script runs from an anonymous
-in-memory file — no temporary file is ever written. `alias` in a script and `oslo.alias` in your
-config still work, and the database is applied last, so it wins; `show` marks what it shadows.
+A database rather than a file to edit and re-source. Four kinds under one word: an alias, an
+abbreviation, a function and a script. `oslo macros show` is the history finder's screen pointed at
+them — type to filter, ← → for the tag, Tab between what you stored and what your config defines,
+Enter to edit in `$EDITOR`, Delete to forget, Space to turn one off for this session and three
+spaces to turn it off everywhere. A change is live in every running shell before its next prompt,
+for the price of a `stat`.
+
+Aliases and abbreviations reach an interactive shell when it starts; a function or a script is found
+when you call it, **after `$PATH` has already failed**, so nothing on the system can be quietly
+redefined. A stored script runs from an anonymous in-memory file — no temporary file is ever
+written. `alias` in a script and `oslo.alias` in your config still work, and the database is applied
+last, so it wins.
 
 [Macros](docs/features/macros.md) has the whole of it.
 
@@ -628,6 +635,10 @@ machine is `scp -r`; none of those were quite right when the three files sat fla
 
 There used to be two files, `history.db` and `track.kv`. There is one now. Nothing migrates that
 older pair — delete them.
+
+**`$OSLO_SESSION`** names the session itself, and is exported. A shell sets it once; everything the
+shell starts — a subshell, a tool, `oslo macros` — reports the session it is part of rather than
+inventing one of its own, which is what lets a child process say "this shell" and be believed.
 
 ## Tools
 
