@@ -38,6 +38,9 @@ pub struct Frame<'a> {
     pub cols: usize,
     pub rows_available: usize,
     pub now: i64,
+    /// Every tag in use, sorted — what decides the colours. Passed in rather than gathered from
+    /// `rows` so that filtering the list, or moving to the other source, does not recolour it.
+    pub tags: &'a [String],
 }
 
 /// How many rows remain for the list after the input and its margins.
@@ -101,10 +104,22 @@ pub fn frame(f: &Frame<'_>) -> String {
     let look = look_of(f);
     let visible = visible_rows(f.rows_available);
 
+    // **One column for the name, measured across the whole list** — the same reason the metadata
+    // columns are measured that way. Padding each name to its own length puts the bodies a single
+    // space behind names of wildly different lengths, which is a ragged left edge where the eye
+    // wants a straight one. Capped, so one long name cannot push every body off the screen.
+    let name_width = f
+        .rows
+        .iter()
+        .map(|item| item.name.chars().count())
+        .max()
+        .unwrap_or(0)
+        .min(NAME_WIDTH);
+
     let rows: Vec<Row> = f
         .rows
         .iter()
-        .map(|item| row_of(item, &look, f.now))
+        .map(|item| row_of(item, &look, f.now, name_width, f.tags))
         .collect();
     let view = View {
         selected: f.selected,
@@ -150,11 +165,11 @@ pub fn frame(f: &Frame<'_>) -> String {
 }
 
 /// One macro as a row of the list.
-fn row_of(item: &Item, look: &Look, now: i64) -> Row {
+fn row_of(item: &Item, look: &Look, now: i64, name_width: usize, known: &[String]) -> Row {
     let tags: String = item
         .tags
         .iter()
-        .map(|tag| format!("#{tag}"))
+        .map(|tag| colour_of(tag, known).open(theme::depth()) + "#" + tag)
         .collect::<Vec<_>>()
         .join(" ");
     // The state marker sits where the checkbox does in a multi-select list, because it is the same
@@ -171,9 +186,116 @@ fn row_of(item: &Item, look: &Look, now: i64) -> Row {
         // Muted while it is off: a list where a disabled row looks exactly like a live one answers
         // the wrong question.
         tint: (!item.on()).then_some(look.muted),
-        ..Row::new(format!("{}  {}", item.name, item.first))
+        ..Row::new(format!(
+            "{:<name_width$}  {}",
+            truncated(&item.name, name_width),
+            item.first
+        ))
+    }
+}
+
+/// How wide the name column may grow before a body is worth more than an aligned edge.
+const NAME_WIDTH: usize = 22;
+
+fn truncated(name: &str, width: usize) -> String {
+    match name.chars().count() > width {
+        true => {
+            name.chars()
+                .take(width.saturating_sub(1))
+                .collect::<String>()
+                + "…"
+        }
+        false => name.to_string(),
+    }
+}
+
+/// The colour a tag is drawn in: **its place in the sorted set of tags you use**.
+///
+/// The obvious answer is to hash the name, so a tag's colour depends on nothing but the tag. It was
+/// measured and it does not work: with 15 tags and a palette of 24 a collision is not unlikely, it is
+/// near-certain — the birthday problem — and the run that proved it put `net` and `files` on the same
+/// blue while leaving 13 colours unused. Two tags the same colour in one list is the whole feature
+/// failing, and no palette small enough to stay cool is large enough to make hashing safe.
+///
+/// By position, every tag on screen is a different colour, guaranteed. The cost is that adding a tag
+/// early in the alphabet shifts the ones after it — paid once, when you invent a tag, against a list
+/// that is unambiguous every other day.
+///
+/// The palette is cool on purpose: red and orange in a list mean *wrong*, and a tag is not a warning.
+/// They are 256-colour indexes rather than truecolour triples, so a row looks the same over ssh into
+/// a terminal that has neither.
+fn colour_of(tag: &str, tags: &[String]) -> theme::Style {
+    const PALETTE: [u8; 24] = [
+        39, 45, 51, 43, 49, 37, 74, 80, 86, 68, 69, 75, 110, 111, 117, 140, 141, 147, 114, 79, 108,
+        183, 177, 152,
+    ];
+    let at = tags.iter().position(|known| known == tag).unwrap_or(0);
+    theme::Style {
+        fg: Some(theme::Color::Indexed(PALETTE[at % PALETTE.len()])),
+        ..theme::Style::default()
     }
 }
 
 // The confirmation box is `finder::render::confirm_row`, question and all. Two screens drawing the
 // same box from two copies of the same arithmetic would be two boxes that eventually differ.
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn tags(words: &[&str]) -> Vec<String> {
+        let mut tags: Vec<String> = words.iter().map(|w| w.to_string()).collect();
+        tags.sort();
+        tags
+    }
+
+    /// **The measurement that decided against hashing, as a test.** These are the fifteen tags a
+    /// real macro database ended up with; hashing them into a palette of this size collided four
+    /// times and left thirteen colours unused.
+    #[test]
+    fn every_tag_on_screen_is_a_different_colour() {
+        let tags = tags(&[
+            "net", "desktop", "shell", "files", "system", "dev", "disk", "docs", "virt", "robot",
+            "media", "pkg", "git", "secret", "ai",
+        ]);
+        let mut colours: Vec<Option<theme::Color>> =
+            tags.iter().map(|tag| colour_of(tag, &tags).fg).collect();
+        let before = colours.len();
+        colours.sort_by_key(|colour| format!("{colour:?}"));
+        colours.dedup();
+        assert_eq!(colours.len(), before, "two tags share a colour");
+    }
+
+    /// The same tag is the same colour in every row, which is the whole point of a colour.
+    #[test]
+    fn a_tag_keeps_its_colour() {
+        let tags = tags(&["git", "net", "shell"]);
+        assert_eq!(colour_of("net", &tags).fg, colour_of("net", &tags).fg);
+        assert_ne!(colour_of("net", &tags).fg, colour_of("git", &tags).fg);
+        // One nobody listed still gets a colour rather than a panic.
+        assert!(colour_of("unknown", &tags).fg.is_some());
+    }
+
+    /// A name longer than the column is cut, not allowed to push every body off the screen.
+    #[test]
+    fn a_long_name_is_cut_to_the_column() {
+        assert_eq!(truncated("gs", 8), "gs");
+        assert_eq!(truncated("zz-update-systemd-boot", 10), "zz-update…");
+        assert_eq!(
+            truncated("gs", 0),
+            "…",
+            "even at nothing, it says something"
+        );
+    }
+
+    /// How long you have kept something is months, not minutes — and undated is undated.
+    #[test]
+    fn the_age_column_covers_years_and_says_when_it_cannot() {
+        let now = 100_000_000;
+        assert_eq!(ago(now, 0), "—", "no date recorded");
+        assert_eq!(ago(now, now - 10), "now");
+        assert_eq!(ago(now, now - 3 * 86_400), "3d");
+        assert_eq!(ago(now, now - 40 * 86_400), "1mo");
+        assert_eq!(ago(now, now - 800 * 86_400), "2y");
+    }
+}

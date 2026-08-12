@@ -37,6 +37,9 @@ pub fn open(items: Vec<Item>, seed: &str, backing: &mut dyn Backing) -> Option<O
     let opened = Instant::now();
     let mut stdout = io::stdout();
     let mut state = State::new(items, seed);
+    // Every tag in the whole set, not just the visible source: a tag has to keep its colour when
+    // Tab moves to the other list, or the same word is two colours on two screens.
+    let all_tags = state.all_tags();
     let mut keys = Keys::on(restore.fd());
     let mut last = String::new();
 
@@ -56,6 +59,7 @@ pub fn open(items: Vec<Item>, seed: &str, backing: &mut dyn Backing) -> Option<O
             cols,
             rows_available: rows,
             now: super::render::now(),
+            tags: &all_tags,
         });
         if painted != last {
             let _ = stdout.write_all(painted.as_bytes());
@@ -181,7 +185,22 @@ impl State {
         state
     }
 
-    /// Every tag in use in the current source, with "all" in front.
+    /// Every tag in the whole set, whichever source it came from.
+    ///
+    /// What the colours are handed out by — so a tag keeps its colour when Tab moves to the other
+    /// list, which the source-filtered [`State::tags`] could not promise.
+    fn all_tags(&self) -> Vec<String> {
+        let mut found: Vec<String> = self
+            .items
+            .iter()
+            .flat_map(|item| item.tags.clone())
+            .collect();
+        found.sort();
+        found.dedup();
+        found
+    }
+
+    /// Every tag in use in the current source, which is what ← and → move through.
     fn tags(&self) -> Vec<String> {
         let mut found: Vec<String> = self
             .items

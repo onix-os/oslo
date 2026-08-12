@@ -126,13 +126,7 @@ fn items_for(store: &macros::Store) -> Vec<oslo::ui::manager::Item> {
         .chain(elsewhere)
         .map(|(entry, from_database)| oslo::ui::manager::Item {
             kind: entry.kind.word().to_string(),
-            first: trimmed(
-                entry
-                    .body
-                    .lines()
-                    .find(|line| !line.trim().is_empty())
-                    .unwrap_or(""),
-            ),
+            first: summary(&entry),
             session_off: macros::live::session::is_off(&session, &entry.name),
             stored: from_database,
             name: entry.name,
@@ -141,6 +135,26 @@ fn items_for(store: &macros::Store) -> Vec<oslo::ui::manager::Item> {
             active: entry.active,
         })
         .collect()
+}
+
+/// What a row says about a macro, beside its name.
+///
+/// **An alias is its body; a function or a script is its language.** A row is one line and a script
+/// is two hundred, so the first line of one is `#!/usr/bin/env python3` — which says nothing you
+/// could not have guessed and takes the width that a name and a tag can use. What is worth knowing
+/// at a glance is what you are about to open, so the row says `python3` and Enter shows the rest.
+fn summary(entry: &Entry) -> String {
+    match entry.kind {
+        Kind::Func | Kind::Script => macros::shebang_interpreter(&entry.body)
+            .unwrap_or_else(|| entry.kind.extension(&entry.body).to_string()),
+        _ => trimmed(
+            entry
+                .body
+                .lines()
+                .find(|line| !line.trim().is_empty())
+                .unwrap_or(""),
+        ),
+    }
 }
 
 /// Open one in the editor and store what comes back. `Some` only when something went wrong enough
