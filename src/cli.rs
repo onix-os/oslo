@@ -10,6 +10,7 @@
 pub mod config;
 pub mod help;
 pub mod history;
+pub mod macros;
 #[cfg(feature = "plugin")]
 pub mod plugin;
 #[cfg(feature = "scratch")]

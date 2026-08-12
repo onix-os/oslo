@@ -36,4 +36,38 @@ if command -v git >/dev/null; then
         commit -qm "the demo tree" 2>/dev/null || true
 fi
 
+# A macro database of its own, under the work directory, so the manager demo shows a handful of
+# invented macros rather than whatever the person recording happens to keep. Record that demo with
+# `XDG_DATA_HOME="$WORK/data"` and the shell reads this store instead of the real one.
+#
+# Seeded through `oslo macros import`, which is the same door a person uses — so if the format
+# changes and this stops working, that is worth knowing.
+OSLO="${OSLO_BIN:-$PWD/target/x86_64-unknown-linux-musl/release/oslo}"
+if [ -x "$OSLO" ]; then
+    mkdir -p "$WORK/data"
+    XDG_DATA_HOME="$WORK/data" "$OSLO" macros import >/dev/null <<'EOF'
+alias gs #git
+	git status --short --branch
+alias gl #git
+	git log --oneline --graph -20
+abbrev gco #git
+	git checkout
+abbrev dc #docker
+	docker compose
+alias ports #net
+	ss -tulpn
+alias ips #net
+	ip -c -brief addr
+func mkcd #files
+	mkdir -p "$1" && cd "$1"
+script deploy #work
+	#!/usr/bin/env python3
+	import sys
+	print("deploying", sys.argv[1:])
+script backup #work
+	#!/bin/sh
+	rsync -a --delete "$1" /srv/backup/
+EOF
+fi
+
 echo "$WORK"

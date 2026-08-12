@@ -385,6 +385,28 @@ fn the_scratch_default_is_ctrl_backslash_and_no_daemon() {
     assert!(!settings.scratch.daemon);
 }
 
+/// **`alt-\`, beside the scratch finder's `ctrl-\`.** The same key with the other modifier, for
+/// the other list of things you keep — and Alt sends `ESC` and the character in every terminal, so
+/// unlike Ctrl+Enter it arrives without the kitty keyboard protocol having to be negotiated.
+#[test]
+fn the_macro_manager_opens_on_alt_backslash() {
+    let (settings, problems) = settings_from("oslo = {}");
+    assert!(problems.is_empty(), "{problems:?}");
+    assert_eq!(settings.macros.key, "alt-\\");
+    assert_ne!(
+        settings.macros.key, settings.scratch.key,
+        "two screens on one key would be one screen"
+    );
+
+    let (settings, problems) = settings_from(r#"oslo = { macros = { key = "f4" } }"#);
+    assert!(problems.is_empty(), "{problems:?}");
+    assert_eq!(settings.macros.key, "f4");
+
+    let (settings, problems) = settings_from(r#"oslo = { macros = { key = "nonsense" } }"#);
+    assert_eq!(problems.len(), 1, "reported where it was written");
+    assert_eq!(settings.macros.key, "alt-\\", "and the default is kept");
+}
+
 /// A key nothing can name is reported against the line that wrote it, and the default is kept —
 /// the alternative is a scratch with no way out.
 #[test]

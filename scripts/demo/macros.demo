@@ -1,0 +1,64 @@
+# macros: the small named things you keep — aliases, abbreviations, functions and scripts.
+#
+# Against the fixture's own macro database, so the list is the nine invented macros rather than
+# whatever the person recording happens to keep — see `env` below and `fixture.sh`, which seeds it.
+env XDG_DATA_HOME=/tmp/oslo-demo-work/data
+# `oslo macros …` is the binary on $PATH, which is whatever is installed rather than the one being
+# demonstrated. The build under test goes in front of it, so the recording shows this oslo.
+env PATH=$OSLO_DIR:$PATH
+cols 100
+rows 22
+speed 0.06
+
+run oslo macros add --alias ll 'eza -l --git --group-directories-first' --tag files
+wait 1.6
+
+# Alt+\ opens the manager, beside Ctrl+\ for scratches. Newest first, so the one just added is
+# under the cursor.
+key M-\
+wait 2.2
+
+# Typing narrows on every column, so a kind is a filter and so is a tag.
+type script
+wait 2.0
+key C-u
+wait 0.8
+type git
+wait 2.0
+key C-u
+wait 1.0
+
+# Left and Right move through the tags in use, where the history finder puts its scopes.
+key Right
+wait 1.6
+key Right
+wait 1.6
+key Right
+wait 1.6
+key Left
+wait 1.8
+
+# **No Tab here.** The other source is the aliases the *recording machine's* configuration defines,
+# so a demo that pressed it would publish whatever the person recording happens to have in their
+# dotfiles. The key is documented; it is not something a cast can show honestly.
+
+# Space turns one off for this session — it stays in the database, and the row says so.
+key Down
+wait 1.0
+key Space
+wait 2.0
+key Space
+wait 1.6
+
+key Escape
+wait 1.2
+
+# A stored script runs from an anonymous in-memory file, after $PATH has already failed.
+run deploy alpha beta
+wait 2.0
+
+# And every switch has a spelling for something that is not a person.
+run oslo macros off ll
+wait 1.6
+run oslo macros show --plain
+wait 2.6

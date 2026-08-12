@@ -138,6 +138,34 @@ abbr gc 'git commit -m "%"'  # `%` says where the cursor lands
 Better than an alias for a shell that promises not to change what scripts see: the real command
 lands in the buffer, in history and in the log, and you watch it happen.
 
+### Small named things, kept
+
+```sh
+oslo macros add --alias gs 'git status --short' --tag git
+oslo macros add --abbrev gco 'git checkout'
+oslo macros add --func mkcd            # opens $EDITOR
+oslo macros add --script deploy        # opens $EDITOR — any language, with a shebang
+oslo macros show                       # the manager, on the whole screen
+```
+
+**Alt+\\ opens it from the prompt**, beside Ctrl+\\ for the scratch finder — the same key with the
+other modifier, for the other list of things you keep. `oslo.macros.key` moves it.
+
+A database rather than a file to edit and re-source. Four kinds under one word: an alias, an
+abbreviation, a function and a script. `oslo macros show` is the history finder's screen pointed at
+them — type to filter, ← → for the tag, Tab between what you stored and what your config defines,
+Enter to edit in `$EDITOR`, Delete to forget, Space to turn one off for this session and three
+spaces to turn it off everywhere. A change is live in every running shell before its next prompt,
+for the price of a `stat`.
+
+Aliases and abbreviations reach an interactive shell when it starts; a function or a script is found
+when you call it, **after `$PATH` has already failed**, so nothing on the system can be quietly
+redefined. A stored script runs from an anonymous in-memory file — no temporary file is ever
+written. `alias` in a script and `oslo.alias` in your config still work, and the database is applied
+last, so it wins.
+
+[Macros](docs/features/macros.md) has the whole of it.
+
 ### Keys that run your code
 
 ```lua
@@ -611,10 +639,14 @@ machine is `scp -r`; none of those were quite right when the three files sat fla
 There used to be two files, `history.db` and `track.kv`. There is one now. Nothing migrates that
 older pair — delete them.
 
+**`$OSLO_SESSION`** names the session itself, and is exported. A shell sets it once; everything the
+shell starts — a subshell, a tool, `oslo macros` — reports the session it is part of rather than
+inventing one of its own, which is what lets a child process say "this shell" and be believed.
+
 ## Tools
 
-`oslo --help` lists them — `config`, `profile`, `history`, `hook`, and whichever of `direnv`,
-`plugin` and `scratch` this build has:
+`oslo --help` lists them — `config`, `profile`, `history`, `aliases`, `hook`, and whichever of
+`direnv`, `plugin` and `scratch` this build has:
 
 ```sh
 oslo history
@@ -693,6 +725,8 @@ oslo.finder.enabled        = true     -- the full-screen history search
 oslo.finder.key            = "up"
 oslo.finder.limit          = 5000     -- distinct commands loaded when it opens
 oslo.finder.confirm_delete = true     -- Delete asks before forgetting a command
+
+oslo.macros.key            = "alt-\\" -- the macro manager, beside the scratch finder's ctrl-\
 
 oslo.history.ignore     = {}          -- $HISTIGNORE patterns, matched against the whole line
 oslo.history.ignore_space = true      -- a line starting with a space is not remembered

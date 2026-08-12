@@ -14,6 +14,7 @@ pub mod frecency_store;
 pub mod highlight;
 mod hinting;
 pub mod keys;
+pub mod manager;
 pub mod marks;
 pub mod matching;
 pub mod nav;

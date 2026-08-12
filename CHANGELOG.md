@@ -1,5 +1,45 @@
 # Changelog
 
+## [0.3.1] - 2026-08-12
+
+### <!-- 0 -->⛰️  Features
+
+- Alt-\ opens the manager at the prompt
+- A script's language, bracketed and faint
+- Colour the tags, align the columns
+- Off for a session, off everywhere
+- The manager screen, on the finder's shape
+- A change reaches every running shell
+- Created, tags, active, and a required kind
+- Pick from the list, and open it
+- Run a stored function or script
+- Stored entries reach a starting shell
+- The oslo aliases subcommand
+- The store, and the snapshot a shell reads
+
+### <!-- 1 -->🐛 Bug Fixes
+
+- A path in KEY= is not a key
+- Open the screen even with nothing stored
+
+### <!-- 2 -->🚜 Refactor
+
+- Aliases become macros, four kinds
+
+### <!-- 3 -->📚 Documentation
+
+- Publish the macros demo
+- Keep the demo off the recorder's own aliases
+- A demo for the macro manager
+- Keep the finished macros plan in plans/
+- The macro manager
+- Plan the macros manager
+- The alias manager
+- Measure what an alias database would cost a script shell
+- Keep the finished providers plan in plans/
+- One store, and config loses to the database
+- Plan an alias manager, and how to run a script from a database
+
 ## [0.3.0] - 2026-08-12
 
 ### <!-- 0 -->⛰️  Features

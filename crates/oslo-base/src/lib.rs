@@ -24,6 +24,7 @@ pub mod error;
 /// Parts of the shell a config can turn off and on again while it runs.
 pub mod feature;
 pub mod hooks;
+pub mod macros;
 /// What this session said, kept after it has scrolled off.
 pub mod messages;
 /// The depth guard every parse passes through, and the heredoc scan that feeds alias expansion.
