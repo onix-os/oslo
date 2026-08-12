@@ -175,7 +175,7 @@ builtin and Tab's ranking all come from there.
 
 ```sh
 HISTFILE="" oslo                    # leave no trace at all: no file *and* no store; HISTSIZE=0 too
-OSLO_PROFILE=claude oslo            # ~/.local/share/oslo/claude.kv, yours untouched
+OSLO_PROFILE=claude oslo            # ~/.local/share/oslo/history/claude/, yours untouched
 OSLO_ALLHIST=1 oslo -c 'echo hi'    # log an -c line too; off unless set
 ```
 

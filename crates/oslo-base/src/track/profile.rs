@@ -84,16 +84,28 @@ pub fn valid(name: &str) -> bool {
         && name.len() <= 64
 }
 
-/// `<data>/oslo/<profile>.<extension>`.
+/// `<data>/oslo/history/<profile>/hist.<extension>`.
+///
+/// **A directory per profile, not a file per profile per kind.** A profile started as one `.kv` and
+/// had grown a `.model` and a `.lock` beside it, all three flat in `<data>/oslo/` next to `plugins/`
+/// and `direnv/` — so six profiles meant fifteen files in one directory and every new per-profile
+/// artifact multiplied by the number of profiles. A directory makes a profile a thing you can copy
+/// to another machine or delete outright, which `rm claude.*` only approximated.
 pub fn store_path(xdg_data: Option<&str>, home: Option<&str>, extension: &str) -> Option<PathBuf> {
-    let base = match xdg_data {
-        Some(dir) if !dir.trim().is_empty() => PathBuf::from(dir),
-        _ => PathBuf::from(home?).join(".local/share"),
-    };
-    Some(base.join("oslo").join(format!("{}.{extension}", current())))
+    Some(profile_dir(xdg_data, home, &current())?.join(format!("hist.{extension}")))
 }
 
-/// The directory profile stores live in.
+/// Where one named profile keeps everything: `<data>/oslo/history/<name>/`.
+pub fn profile_dir(xdg_data: Option<&str>, home: Option<&str>, name: &str) -> Option<PathBuf> {
+    Some(history_dir(xdg_data, home)?.join(name))
+}
+
+/// The directory every profile lives under.
+pub fn history_dir(xdg_data: Option<&str>, home: Option<&str>) -> Option<PathBuf> {
+    Some(store_dir(xdg_data, home)?.join("history"))
+}
+
+/// oslo's own directory under the data home. `plugins/`, `direnv/` and `history/` are inside it.
 pub fn store_dir(xdg_data: Option<&str>, home: Option<&str>) -> Option<PathBuf> {
     let base = match xdg_data {
         Some(dir) if !dir.trim().is_empty() => PathBuf::from(dir),
@@ -102,36 +114,46 @@ pub fn store_dir(xdg_data: Option<&str>, home: Option<&str>) -> Option<PathBuf> 
     Some(base.join("oslo"))
 }
 
+/// Where a profile's store used to live: `<data>/oslo/<profile>.<extension>`.
+///
+/// Only [`super::migrate`] reads this. Kept as its own function rather than spelled out there, so
+/// the two layouts are visibly one decision apart.
+pub fn legacy_path(
+    xdg_data: Option<&str>,
+    home: Option<&str>,
+    name: &str,
+    ext: &str,
+) -> Option<PathBuf> {
+    Some(store_dir(xdg_data, home)?.join(format!("{name}.{ext}")))
+}
+
 /// Every profile that has a tracking store, sorted, with the current one always present.
 ///
-/// Found by listing rather than recorded anywhere: a profile *is* a database file, so the
-/// directory is the only thing that could be authoritative. The current profile is included even
-/// with nothing written yet, or a brand-new shell would have nothing to switch away from.
+/// Found by listing rather than recorded anywhere: a profile *is* a directory with a store in it, so
+/// the filesystem is the only thing that could be authoritative. The current profile is included
+/// even with nothing written yet, or a brand-new shell would have nothing to switch away from.
 pub fn available() -> Vec<String> {
-    let mut found: Vec<String> = std::env::var("XDG_DATA_HOME")
-        .ok()
-        .or_else(|| std::env::var("HOME").ok())
-        .and_then(|_| {
-            store_dir(
-                std::env::var("XDG_DATA_HOME").ok().as_deref(),
-                std::env::var("HOME").ok().as_deref(),
-            )
-        })
-        .and_then(|dir| std::fs::read_dir(dir).ok())
-        .map(|entries| {
-            entries
-                .flatten()
-                .filter_map(|entry| {
-                    let path = entry.path();
-                    // The aggregate is the one that must exist for a profile to be worth showing:
-                    // an event log with no store has nothing the finder can rank.
-                    (path.extension()? == "kv")
-                        .then(|| path.file_stem()?.to_str().map(str::to_string))
-                        .flatten()
-                })
-                .collect()
-        })
-        .unwrap_or_default();
+    let mut found: Vec<String> = history_dir(
+        std::env::var("XDG_DATA_HOME").ok().as_deref(),
+        std::env::var("HOME").ok().as_deref(),
+    )
+    .and_then(|dir| std::fs::read_dir(dir).ok())
+    .map(|entries| {
+        entries
+            .flatten()
+            .filter_map(|entry| {
+                // The store is what must exist for a profile to be worth showing: a directory
+                // somebody made by hand, or one left behind, has nothing the finder can rank.
+                entry
+                    .path()
+                    .join("hist.db")
+                    .is_file()
+                    .then(|| entry.file_name().to_str().map(str::to_string))
+                    .flatten()
+            })
+            .collect()
+    })
+    .unwrap_or_default();
     let now = current();
     if !found.contains(&now) {
         found.push(now);
@@ -231,13 +253,21 @@ mod tests {
     fn the_path_is_the_profile_and_the_extension() {
         let _guard = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
         unsafe { std::env::set_var(ENV, "claude") };
+        // The directory carries the profile; the file says only what it is.
         assert_eq!(
-            store_path(Some("/x/data"), None, "kv"),
-            Some(PathBuf::from("/x/data/oslo/claude.kv"))
+            store_path(Some("/x/data"), None, "db"),
+            Some(PathBuf::from("/x/data/oslo/history/claude/hist.db"))
         );
         assert_eq!(
-            store_path(None, Some("/home/u"), "kv"),
-            Some(PathBuf::from("/home/u/.local/share/oslo/claude.kv"))
+            store_path(None, Some("/home/u"), "model"),
+            Some(PathBuf::from(
+                "/home/u/.local/share/oslo/history/claude/hist.model"
+            ))
+        );
+        // The old layout, which only the migration looks at.
+        assert_eq!(
+            legacy_path(Some("/x/data"), None, "claude", "kv"),
+            Some(PathBuf::from("/x/data/oslo/claude.kv"))
         );
         unsafe { std::env::remove_var(ENV) };
     }

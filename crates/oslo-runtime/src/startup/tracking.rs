@@ -67,6 +67,28 @@ impl Tracker {
         if !keeps_a_record(settings) {
             return tracker;
         }
+        // A home written by an older oslo keeps its stores flat in `<data>/oslo/`; bring them into
+        // the per-profile directories before anything opens one. Here — behind the gate that says
+        // this session keeps a record at all — rather than at the top of `main`, so a shell that has
+        // been told to leave no trace, and every `sh -c` that never opens a store, touch nothing.
+        let brought = oslo_base::track::migrate::from_flat_layout();
+        for profile in &brought.moved {
+            oslo_base::messages::say(
+                oslo_base::messages::Level::Note,
+                "history",
+                format!("copied {profile} into its own directory; the old files are still there"),
+            );
+        }
+        // Loud, because the alternative is a profile that quietly looks empty in the new layout.
+        for profile in &brought.failed {
+            oslo_base::messages::warn(
+                "history",
+                format!(
+                    "{profile}: the old store could not be read, so it was not brought forward; \
+                     `oslo history` on it will say why"
+                ),
+            );
+        }
         // The predictor's snapshot, read on a thread of its own — and behind the same gate, which
         // is why it is here rather than in the loop. A model is a distillation of the history, so
         // a session that keeps no history must not read one or write one either; `HISTFILE=""`

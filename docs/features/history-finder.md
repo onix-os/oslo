@@ -183,7 +183,7 @@ oslo.on.on_history_close(function(h)  end)  -- { chosen = "true" | "false" }
 A profile is chosen with the environment and nothing else:
 
 ```sh
-OSLO_PROFILE=claude oslo        # ~/.local/share/oslo/claude.kv
+OSLO_PROFILE=claude oslo        # ~/.local/share/oslo/history/claude/
 ```
 
 ## Measurements

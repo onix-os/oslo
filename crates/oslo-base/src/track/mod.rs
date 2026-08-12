@@ -34,6 +34,7 @@
 pub mod db;
 pub mod history;
 pub mod log;
+pub mod migrate;
 pub mod profile;
 pub mod session;
 pub mod sync;
@@ -92,20 +93,15 @@ pub fn store() -> Option<&'static Track> {
 
 /// Where the store is kept, given the environment.
 ///
-/// Beside the profile's event log, and for the same reason: this is state the user accumulates,
-/// not configuration they wrote. `None` when neither `$XDG_DATA_HOME` nor `$HOME` is knowable — a
-/// container's `nobody` — which must run without a store rather than fail.
+/// `<data>/oslo/history/<profile>/hist.db` — state the user accumulates, not configuration they
+/// wrote. `None` when neither `$XDG_DATA_HOME` nor `$HOME` is knowable — a container's `nobody` —
+/// which must run without a store rather than fail.
 ///
-/// # `.kv`, not `.db`
-///
-/// The two stores of one profile differ only by extension, and the extension says which engine
-/// wrote the file: `.db` is the event log, `.kv` the aggregate. Neither is ever handed to the
-/// other's reader, and the seam refuses a foreign file rather than letting an engine panic on one.
-///
-/// Nothing here adopts a store written under an older name. Files this did not write are the
-/// user's to keep or delete — see [`profile`].
+/// One store per profile, holding everything: the event log, the aggregate, the directories. It used
+/// to be `<profile>.kv` flat in `<data>/oslo/`; see [`profile::store_path`] for why it moved and
+/// [`migrate`] for what happens to the old one.
 pub fn default_path(xdg_data: Option<&str>, home: Option<&str>) -> Option<PathBuf> {
-    profile::store_path(xdg_data, home, "kv")
+    profile::store_path(xdg_data, home, "db")
 }
 
 #[cfg(test)]
@@ -118,9 +114,10 @@ mod tests {
     static SERIAL: Mutex<()> = Mutex::new(());
 
     #[test]
-    fn the_store_lives_beside_the_history_database() {
-        // Named after the profile now, not after what it holds — see `track::profile`.
-        let named = |dir: &str| PathBuf::from(format!("{dir}/oslo/{}.kv", profile::current()));
+    fn the_store_lives_in_the_profiles_own_directory() {
+        // A directory per profile, named after the profile — see `track::profile::store_path`.
+        let named =
+            |dir: &str| PathBuf::from(format!("{dir}/oslo/history/{}/hist.db", profile::current()));
         assert_eq!(
             default_path(Some("/x/data"), Some("/home/u")),
             Some(named("/x/data"))

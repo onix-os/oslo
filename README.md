@@ -584,8 +584,8 @@ oslo.completion.for_command.nix = oslo.nix.complete
 ## One shell, several histories
 
 ```sh
-oslo                            # ~/.local/share/oslo/default.kv
-OSLO_PROFILE=claude oslo        # claude.kv instead — the default untouched
+oslo                            # ~/.local/share/oslo/history/default/
+OSLO_PROFILE=claude oslo        # history/claude/ instead — the default untouched
 ```
 
 A name is a **letter, then letters, digits, `_` or `-`** — anything else is refused rather than
@@ -604,8 +604,17 @@ table that decides what `cd` and Tab suggest. Give them a profile and that stops
 It is a name, not a lock: two shells can share one, and **Tab in the history finder moves to the
 next profile** — which is how you go and read what the agent ran without leaving your shell.
 
-There used to be two files, `history.db` and `track.kv`. There is one now. Nothing migrates the old
-pair — delete them.
+A profile is a **directory** — `~/.local/share/oslo/history/<name>/` holding `hist.db`, `hist.lock`
+and `hist.model`. So renaming one is `mv`, deleting one is `rm -r`, and copying one to another
+machine is `scp -r`; none of those were quite right when the three files sat flat beside each other.
+
+A home written by an older oslo is brought forward the first time an interactive shell starts:
+each `<name>.kv` is **copied** into its directory, and the old files are left exactly where they are.
+Copied rather than moved because a shell already running is still using them — they are yours to
+delete once nothing is. A store that cannot be read is reported rather than skipped.
+
+There used to be two files, `history.db` and `track.kv`. There is one now. Nothing migrates that
+older pair — delete them.
 
 ## Tools
 

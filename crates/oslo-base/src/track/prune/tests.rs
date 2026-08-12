@@ -261,9 +261,11 @@ fn the_sweep_is_the_only_thing_holding_the_file_down() {
         })
         .collect();
     beside.sort();
+    // The lock replaces the extension rather than being appended to it, so a profile's directory
+    // holds `hist.db` and `hist.lock` rather than `hist.db.lock`.
     assert_eq!(
         beside,
-        vec!["track.kv".to_string(), "track.kv.lock".to_string()]
+        vec!["track.kv".to_string(), "track.lock".to_string()]
     );
 }
 
