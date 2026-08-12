@@ -5,6 +5,7 @@
 
 pub mod bridge;
 pub mod df;
+pub mod summarise;
 pub mod system;
 pub mod verbs;
 pub mod where_;
@@ -29,6 +30,10 @@ pub fn register_all() {
     crate::data::tool::register("from", Shape::Bytes, Shape::Rows);
     // The verbs. `cols` rather than `select`, which the parser refuses as a bash keyword.
     for name in ["cols", "get", "sort-by", "first", "last", "length", "each"] {
+        crate::data::tool::register(name, Shape::Rows, Shape::Rows);
+    }
+    // The verbs that make a stream smaller. See `summarise` for why these four and not `join`.
+    for name in ["group-by", "count", "uniq", "stats"] {
         crate::data::tool::register(name, Shape::Rows, Shape::Rows);
     }
     // The way out. Rows in, bytes out — so `... | to json | jq .` works, and the structured world
@@ -141,6 +146,31 @@ pub fn run_tool(
             Some((0, Some(taken)))
         }
         "length" => Some((0, Some(verbs::length(&input.unwrap_or_default())))),
+        "group-by" => match words.get(1) {
+            Some(name) => Some((
+                0,
+                Some(summarise::group_by(&input.unwrap_or_default(), name)),
+            )),
+            None => {
+                eprintln!("oslo: group-by: a column name is required");
+                Some((2, None))
+            }
+        },
+        "count" => Some((0, Some(summarise::count(&input.unwrap_or_default())))),
+        "uniq" => Some((
+            0,
+            Some(summarise::uniq(
+                &input.unwrap_or_default(),
+                words.get(1).map(String::as_str),
+            )),
+        )),
+        "stats" => match words.get(1) {
+            Some(name) => Some((0, Some(summarise::stats(&input.unwrap_or_default(), name)))),
+            None => {
+                eprintln!("oslo: stats: a column name is required");
+                Some((2, None))
+            }
+        },
         "each" => {
             let Some(expression) = words.get(1) else {
                 eprintln!("oslo: each: an expression is required");

@@ -37,7 +37,11 @@ end }
 print("cancelled: " .. tostring(job:cancel()))
 
 -- Give the shell somewhere to deliver. Each of these is a command boundary.
-for _ = 1, 40 do
+--
+-- **The bound is generous on purpose.** In practice both callbacks arrive within two or three
+-- iterations; a tighter bound passed when run by hand and failed under a loaded test machine, which
+-- is a flaky test rather than a demonstration. The loop stops as soon as both have arrived.
+for _ = 1, 500 do
   oslo.proc.exec("true")
   if #heard >= 2 then break end
 end
