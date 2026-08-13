@@ -124,3 +124,15 @@ _here() {
     assert_eq!(status, 0);
     assert_eq!(env.get_var("argc_dir"), Some("/somewhere"));
 }
+
+/// **At a prompt there is no script**, and every other builtin answers `--help` with what it is
+/// for. Reporting "cannot read the script" about the shell binary explains nothing to somebody who
+/// typed `argc` to find out what it does.
+#[test]
+fn asked_outside_a_script_it_says_what_it_is_for() {
+    let usage = self_help("/usr/bin/oslo");
+    assert!(usage.starts_with("usage: argc"), "{usage}");
+    assert!(usage.contains("argc \"$@\""), "how to call it");
+    assert!(usage.contains("--argc-eval"), "and the bash spelling");
+    assert!(usage.contains("/usr/bin/oslo"), "what $0 actually was");
+}

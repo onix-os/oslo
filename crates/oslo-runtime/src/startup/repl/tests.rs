@@ -1,4 +1,3 @@
-
 use super::*;
 use crate::startup::read::{HeredocTracker, is_complete};
 

@@ -45,9 +45,21 @@ pub fn builtin_argc(env: &mut Environment, args: &[String]) -> oslo_base::error:
     let name = env.shell_name.clone();
     let source = match source_of(env, &name) {
         Some(source) => source,
+        // **Nothing to parse means this was not called from a script**, which at a prompt is what
+        // `argc` on its own is: `$0` is the shell. Every other builtin answers `--help` with what it
+        // is for, and reporting "cannot read the script" about the shell binary explains nothing.
         None => {
-            eprintln!("oslo: argc: {name}: cannot read the script to parse it");
-            return Ok(1);
+            let asked = args
+                .iter()
+                .skip(1)
+                .any(|word| word == "--help" || word == "-h");
+            let usage = self_help(&name);
+            if asked {
+                println!("{usage}");
+                return Ok(0);
+            }
+            eprintln!("{usage}");
+            return Ok(2);
         }
     };
 
@@ -140,6 +152,22 @@ fn apply(env: &mut Environment, values: &[ArgcValue]) -> oslo_base::error::Resul
         },
         None => Ok(0),
     }
+}
+
+/// What `argc` is, for somebody who typed it at a prompt.
+///
+/// The name is included because `$0` is the only reason this is being printed: it says which script
+/// was looked for and did not exist, which is the useful half of the old error message.
+fn self_help(name: &str) -> String {
+    format!(
+        "usage: argc [ARG]...        — from inside a script, as `argc \"$@\"`\n\
+         \n\
+         Parses the script's own `# @option`, `# @flag`, `# @arg` and `# @cmd` comments and sets\n\
+         `$argc_*` from them, generating `--help` and reporting a bad argument.\n\
+         \n\
+         There is no script here: `$0` is {name}. In a bash script the same thing is spelled\n\
+         `eval \"$(oslo --argc-eval \"$0\" \"$@\")\"`."
+    )
 }
 
 /// `argc_tries`, from `tries`. The prefix is argc's, and scripts are written against it.
