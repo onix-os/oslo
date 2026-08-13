@@ -151,50 +151,71 @@ fn dispatch() {
         cli::Action::ArgcEval(ref words) => std::process::exit(cli::argc::eval(words)),
         // `oslo history …` — reached only when no file of that name exists, so this never takes
         // an invocation a script could have wanted. See `cli::tools::as_operand`.
+        //
+        // **A tool starts no session.** It is a child of the shell that ran it and belongs to that
+        // shell's session, which it inherits through `$OSLO_SESSION` — see `track::session`. This is
+        // why the id is stamped *here*, on the shell arms, rather than when an `Environment` is
+        // built: a tool builds one too.
         Action::Tool(ref name, ref args) => {
             let tool = cli::tools::from_name(name).expect("the parser only names tools it found");
             std::process::exit(cli::tools::run(tool, args));
         }
         // **`-c` is always shell.** Every `sh -c` idiom in the world depends on it, and no amount
         // of detection is worth being wrong about that one.
-        Action::Command(ref text) => run_program(&invocation, text),
-        // A script operand names a file whose language is worked out from the file itself.
-        Action::Script(ref path) => match fs::read_to_string(path) {
-            Ok(script) => match language::detect(Some(path), &script) {
-                Language::Lua => std::process::exit(startup::lua_init::run_lua_source(
-                    &script,
-                    path,
-                    &invocation.positional,
-                )),
-                // Streamed: a file is what polyglots and partial execution are about.
-                Language::Shell => run_program_reading(&invocation, &script, Reading::Streamed),
-            },
-            Err(_) => {
-                eprintln!("oslo: {}: No such file or directory", path);
-                std::process::exit(127);
-            }
-        },
-        Action::Stdin => {
-            if invocation.force_interactive || stdin_is_a_terminal() {
-                startup::repl::run_repl(invocation.login);
-            } else {
-                let mut script = String::new();
-                if let Err(e) = std::io::stdin().read_to_string(&mut script) {
-                    eprintln!("oslo: cannot read standard input: {}", e);
-                    std::process::exit(1);
-                }
-                match language::detect(None, &script) {
-                    Language::Lua => std::process::exit(startup::lua_init::run_lua_source(
-                        &script,
-                        "stdin",
-                        &invocation.positional,
-                    )),
-                    // A pipe is a stream, and bash and dash both run what they have read of one
-                    // before a later syntax error stops them.
-                    Language::Shell => run_program_reading(&invocation, &script, Reading::Streamed),
-                }
-            }
+        Action::Command(ref text) => {
+            oslo::track::session::begin();
+            run_program(&invocation, text)
         }
+        // A script operand names a file whose language is worked out from the file itself.
+        Action::Script(ref path) => {
+            oslo::track::session::begin();
+            run_script(&invocation, path)
+        }
+        Action::Stdin => {
+            oslo::track::session::begin();
+            run_stdin(&invocation)
+        }
+    }
+}
+
+/// A script operand: read it, work out its language, run it.
+fn run_script(invocation: &cli::Invocation, path: &str) -> ! {
+    match fs::read_to_string(path) {
+        Ok(script) => match language::detect(Some(path), &script) {
+            Language::Lua => std::process::exit(startup::lua_init::run_lua_source(
+                &script,
+                path,
+                &invocation.positional,
+            )),
+            // Streamed: a file is what polyglots and partial execution are about.
+            Language::Shell => run_program_reading(invocation, &script, Reading::Streamed),
+        },
+        Err(_) => {
+            eprintln!("oslo: {}: No such file or directory", path);
+            std::process::exit(127);
+        }
+    }
+}
+
+/// No operand: a prompt if there is somebody there, and the program on standard input if not.
+fn run_stdin(invocation: &cli::Invocation) -> ! {
+    if invocation.force_interactive || stdin_is_a_terminal() {
+        startup::repl::run_repl(invocation.login);
+    }
+    let mut script = String::new();
+    if let Err(e) = std::io::stdin().read_to_string(&mut script) {
+        eprintln!("oslo: cannot read standard input: {}", e);
+        std::process::exit(1);
+    }
+    match language::detect(None, &script) {
+        Language::Lua => std::process::exit(startup::lua_init::run_lua_source(
+            &script,
+            "stdin",
+            &invocation.positional,
+        )),
+        // A pipe is a stream, and bash and dash both run what they have read of one before a later
+        // syntax error stops them.
+        Language::Shell => run_program_reading(invocation, &script, Reading::Streamed),
     }
 }
 

@@ -10,6 +10,10 @@
 # The demo script is a line-per-action file:
 #
 #   env  NAME=value    an environment variable the demo shell starts with
+#
+# `$OSLO_DIR` is substituted in any of them: it is the directory of the binary being recorded, which
+# a demo needs when it puts that binary on `$PATH` — the shell under test has to be the one a
+# `#!/usr/bin/env oslo` script finds, not whichever oslo is installed.
 #   cols 120          terminal width  (default 120)
 #   rows 20           terminal height (default 20)
 #   speed 0.08        seconds between keystrokes while typing
@@ -92,6 +96,7 @@ while IFS= read -r line; do
     verb="${line%% *}"
     rest="${line#* }"
     [ "$verb" = "$line" ] && rest=""
+    rest="${rest//\$OSLO_DIR/$OSLO_DIR}"
     case "$verb" in
         ''|'#'*|cols|rows|speed|env) ;;
         run)   send_text "$rest"; sleep 0.4; tmux send-keys -t "$SESSION" Enter; sleep 1.2 ;;

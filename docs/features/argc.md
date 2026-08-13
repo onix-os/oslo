@@ -34,6 +34,10 @@ natively rather than a program you have to install beside one.
 
 **Behind the `argc` cargo feature**, which a release build has and `oslo-minimal` does not.
 
+<!-- demo:begin -->
+[![argc demo](https://asciinema.org/a/1262956.svg)](https://asciinema.org/a/1262956)
+<!-- demo:end -->
+
 ## Two doors, one parser
 
 ```text
@@ -42,6 +46,9 @@ oslo script   →  argc "$@"                              →  variables
 ```
 
 ### `oslo --argc-eval`, for a script that is not oslo's
+
+[![argc-eval demo](https://asciinema.org/a/1262957.svg)](https://asciinema.org/a/1262957)
+
 
 ```sh
 #!/usr/bin/env bash
@@ -135,6 +142,9 @@ switched on.
 
 ## What it cannot do
 
+- **Completion offers flags, options and subcommands — not an option's declared values.**
+  `deploy --<Tab>` reads the comments; `deploy --env <Tab>` does not yet offer `dev staging prod`,
+  though `--help` lists them. The declaration is understood, the dropdown row is not built.
 - **Nothing in `oslo-minimal`.** The word `argc` falls through to `$PATH`, so the real one still
   works if it is installed.
 - **`--argc-eval` needs a real path.** `$0` in a stored script is a name; the builtin is the answer

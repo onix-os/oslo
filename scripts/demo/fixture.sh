@@ -70,4 +70,32 @@ script backup #work
 EOF
 fi
 
+# Two scripts that declare their arguments in comments, for the `argc` demos: one oslo, one bash.
+# They live in `$WORK/bin`, which those demos put on `$PATH`, so the shell finds them by name and
+# completes them the way it would any other command.
+mkdir -p "$WORK/bin"
+cat > "$WORK/bin/deploy" <<'EOF'
+#!/usr/bin/env oslo
+# @describe        Send a build somewhere
+# @flag   -n --dry-run          say what would happen, do nothing
+# @option -t --tries <N>        how many times to try
+# @option -e --env[dev|staging|prod]   which environment
+# @arg    build!                the build to send
+argc "$@"
+
+echo "sending $argc_build to ${argc_env:-dev} ($argc_tries tries, dry=${argc_dry_run:-0})"
+EOF
+
+cat > "$WORK/bin/release" <<'EOF'
+#!/usr/bin/env bash
+# @describe        Cut a release
+# @flag   -f --force            even with a dirty tree
+# @option -m --message <TEXT>   the tag message
+# @arg    version!              the version to cut
+eval "$(oslo --argc-eval "$0" "$@")"
+
+echo "cutting $argc_version (force=${argc_force:-0}) — $argc_message"
+EOF
+chmod +x "$WORK/bin/deploy" "$WORK/bin/release"
+
 echo "$WORK"

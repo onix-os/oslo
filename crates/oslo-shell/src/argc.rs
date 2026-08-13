@@ -66,7 +66,11 @@ pub fn builtin_argc(env: &mut Environment, args: &[String]) -> oslo_base::error:
     // The words `argc` matches: the script's name, then the arguments as given. **`args[0]` is the
     // builtin's own name** — every builtin here is called with it, the way `argv[0]` works — so it
     // is dropped: what `argc` wants after the name is what the script was called with.
-    let mut words = vec![name.clone()];
+    //
+    // The *base* name, because this word is what the generated help calls the command. `$0` for a
+    // script found on `$PATH` is the path it was found at, and `USAGE: /usr/local/bin/deploy` names
+    // something nobody types. The path is still passed separately, which is what reads the file.
+    let mut words = vec![basename(&name)];
     words.extend(args.iter().skip(1).cloned());
 
     let runtime = Shell::new(env);
@@ -168,6 +172,11 @@ fn self_help(name: &str) -> String {
          There is no script here: `$0` is {name}. In a bash script the same thing is spelled\n\
          `eval \"$(oslo --argc-eval \"$0\" \"$@\")\"`."
     )
+}
+
+/// The last component of a path, which is what a command is called.
+fn basename(name: &str) -> String {
+    name.rsplit('/').next().unwrap_or(name).to_string()
 }
 
 /// `argc_tries`, from `tries`. The prefix is argc's, and scripts are written against it.

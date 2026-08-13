@@ -26,8 +26,8 @@ pub fn write(entries: &[Entry]) -> Result<(), String> {
     write_to(&path, entries)
 }
 
-/// The same file, written somewhere else — see [`super::elsewhere`], which is the same rows from a
-/// different source and has no business inventing a second format for them.
+/// The same file, written somewhere else — see [`super::live::elsewhere`], which is the same rows
+/// from a different source and has no business inventing a second format for them.
 pub fn write_to(path: &std::path::Path, entries: &[Entry]) -> Result<(), String> {
     if let Some(parent) = path.parent() {
         std::fs::create_dir_all(parent).map_err(|e| format!("{}: {e}", parent.display()))?;

@@ -94,45 +94,7 @@ fn a_missing_argument_is_an_error_that_ends_it() {
         Ok(status) => panic!("a missing argument carried on with status {status}"),
     }
 }
-
-/// The subcommand the arguments chose is called, in this shell.
-#[test]
-fn a_subcommand_runs_the_function_it_names() {
-    let script = "\
-# @cmd Say hello
-# @arg who!
-hello() {
-    printf 'hello %s' \"$argc_who\"
-}
-";
-    let (status, env) = run(script, &["hello", "world"]);
-    assert_eq!(status, 0);
-    assert_eq!(env.get_var("argc_who"), Some("world"));
-}
-
-/// **A default computed by a function runs in this shell, not in a bash somewhere.** That is the
-/// whole point of implementing `argc::Runtime` rather than using the one upstream ships.
-#[test]
-fn a_default_from_a_function_is_computed_here() {
-    let script = "\
-# @option --dir=`_here`
-_here() {
-    printf /somewhere
-}
-";
-    let (status, env) = run(script, &[]);
-    assert_eq!(status, 0);
-    assert_eq!(env.get_var("argc_dir"), Some("/somewhere"));
-}
-
-/// **At a prompt there is no script**, and every other builtin answers `--help` with what it is
-/// for. Reporting "cannot read the script" about the shell binary explains nothing to somebody who
-/// typed `argc` to find out what it does.
-#[test]
-fn asked_outside_a_script_it_says_what_it_is_for() {
-    let usage = self_help("/usr/bin/oslo");
-    assert!(usage.starts_with("usage: argc"), "{usage}");
-    assert!(usage.contains("argc \"$@\""), "how to call it");
-    assert!(usage.contains("--argc-eval"), "and the bash spelling");
-    assert!(usage.contains("/usr/bin/oslo"), "what $0 actually was");
-}
+// **The two that run a script's own functions are integration tests**, in `tests/argc_tests.rs`:
+// calling one means a command substitution, which forks, and forking from a test process with a
+// dozen live threads in it is how a suite hangs rather than fails. The real binary is one process
+// per test and has no such problem — and it exercises the whole path rather than this half of it.

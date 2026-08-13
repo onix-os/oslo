@@ -46,10 +46,16 @@ pub fn eval(words: &[String]) -> i32 {
     };
 
     // What `argc` matches against: the script's own name first, then the arguments as given. The
-    // caller passes `"$0" "$@"`, so `words` is already in that order.
+    // caller passes `"$0" "$@"`, so `words` is already in that order — except that the first word is
+    // replaced by its *base* name, because it is what the generated help calls the command and `$0`
+    // for a script found on `$PATH` is the path it was found at. `USAGE: /usr/local/bin/release`
+    // names something nobody types. The path is still passed separately and is what reads the file.
+    let mut words = words.to_vec();
+    words[0] = path.rsplit('/').next().unwrap_or(path).to_string();
+
     let mut env = oslo_shell::env::Environment::new();
     let runtime = Shell::new(&mut env);
-    match argc::eval(runtime, &source, words, Some(path), width()) {
+    match argc::eval(runtime, &source, &words, Some(path), width()) {
         Ok(values) => {
             print!("{}", argc::ArgcValue::to_bash(&values));
             0

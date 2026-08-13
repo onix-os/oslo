@@ -81,18 +81,24 @@ fn quoted(value: &str) -> String {
 mod tests {
     use super::*;
 
+    /// **Quoting only, no subshell.** What a helper function actually *does* is tested through the
+    /// real binary in `tests/argc_tests.rs`: command substitution forks, and forking from a test
+    /// process with a dozen other threads in it is how a suite hangs — which this one did, once.
     #[test]
-    fn a_value_survives_being_written_into_a_script() {
-        for awkward in ["plain", "with space", "it's", "$HOME", "a\nb", "*"] {
-            let script = format!("printf %s {}", quoted(awkward));
-            let mut env = Environment::new();
-            assert_eq!(
-                crate::exec::substitution::eval_command_substitution(&mut env, &script)
-                    .unwrap_or_default(),
-                awkward.trim_end_matches('\n'),
-                "{awkward:?} did not survive"
-            );
-        }
+    fn a_value_is_written_so_the_shell_reads_it_back_as_itself() {
+        assert_eq!(quoted("plain"), "'plain'");
+        assert_eq!(quoted("with space"), "'with space'");
+        assert_eq!(
+            quoted("$HOME"),
+            "'$HOME'",
+            "no expansion inside single quotes"
+        );
+        assert_eq!(
+            quoted("it's"),
+            "'it'\\''s'",
+            "the one character that ends it"
+        );
+        assert_eq!(quoted("*"), "'*'");
     }
 
     #[test]
@@ -102,20 +108,5 @@ mod tests {
         assert!(!is_a_name("1BAD"));
         assert!(!is_a_name("has-dash"));
         assert!(!is_a_name(""));
-    }
-
-    /// The function's output is the answer, and the shell that asked is unchanged by it.
-    #[test]
-    fn a_helper_answers_without_touching_the_caller() {
-        let mut env = Environment::new();
-        let source = "_choices() {\n  echo one\n  echo two\n}\n";
-        let out = capture(&mut env, source, "_choices", &[], &HashMap::new());
-        assert_eq!(out, "one\ntwo");
-
-        let source = "_leak() {\n  cd /tmp\n  echo here\n}\n";
-        let before = env.get_var("PWD").map(str::to_string);
-        let out = capture(&mut env, source, "_leak", &[], &HashMap::new());
-        assert_eq!(out, "here");
-        assert_eq!(env.get_var("PWD").map(str::to_string), before, "a subshell");
     }
 }

@@ -1,0 +1,33 @@
+# argc, for a script that is not oslo's: bash, with one `eval` line, and oslo as its parser.
+cols 100
+rows 24
+speed 0.05
+
+# **`$PATH` is set here rather than around the shell**, because a config rebuilds it at startup and
+# whatever the launcher exported is gone by the first prompt. `bin` holds the two scripts the
+# fixture wrote; `$OSLO_DIR` is the binary being recorded, which is the one a `#!/usr/bin/env oslo`
+# script has to find.
+run export PATH=/tmp/oslo-demo-work/bin:$OSLO_DIR:$PATH
+wait 0.8
+clear
+
+# The same idea in a bash script. bash cannot be handed a parse — only text to run — so the one
+# line at the bottom asks oslo for it and evaluates what comes back.
+run bat --style=numbers --paging=never $(which release)
+wait 4.5
+
+clear
+
+# That is what `oslo --argc-eval` prints: assignments, and nothing a shell cannot read.
+run oslo --argc-eval $(which release) --force -m 'ship it' 1.4.0
+wait 4.0
+
+clear
+
+# Run under bash, the argument parsing is oslo's and everything else is bash's.
+run bash $(which release) --force -m 'ship it' 1.4.0
+wait 2.5
+
+# The generated help, the same as it would be for an oslo script.
+run bash $(which release) --help
+wait 3.5

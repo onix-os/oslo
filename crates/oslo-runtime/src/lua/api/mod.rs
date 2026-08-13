@@ -117,6 +117,7 @@ pub fn install(interp: &Rc<Interp>, registry: &Registry, env: Arc<Mutex<Environm
         "theme",
         "abbr",
         "scratch",
+        "macros",
     ] {
         if matches!(oslo.get(&Value::str(name)), Value::Nil) {
             oslo.set(
