@@ -35,7 +35,7 @@ natively rather than a program you have to install beside one.
 **Behind the `argc` cargo feature**, which a release build has and `oslo-minimal` does not.
 
 <!-- demo:begin -->
-[![argc demo](https://asciinema.org/a/1262959.svg)](https://asciinema.org/a/1262959)
+[![argc demo](https://asciinema.org/a/1262961.svg)](https://asciinema.org/a/1262961)
 <!-- demo:end -->
 
 ## Two doors, one parser
@@ -47,7 +47,7 @@ oslo script   →  argc "$@"                              →  variables
 
 ### `oslo --argc-eval`, for a script that is not oslo's
 
-[![argc-eval demo](https://asciinema.org/a/1262957.svg)](https://asciinema.org/a/1262957)
+[![argc-eval demo](https://asciinema.org/a/1262962.svg)](https://asciinema.org/a/1262962)
 
 
 ```sh
