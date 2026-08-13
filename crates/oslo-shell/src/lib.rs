@@ -25,6 +25,9 @@
 //! of config-supplied tools moved to [`data::custom`], which the pipeline reads and the API writes;
 //! and "the interpreter parked on this thread" moved into `oslo-lua`, which owns the type.
 
+/// `argc` — a script's arguments, parsed from the comments that declare them.
+#[cfg(feature = "argc")]
+pub mod argc;
 pub mod data;
 #[cfg(feature = "direnv")]
 pub mod direnv;

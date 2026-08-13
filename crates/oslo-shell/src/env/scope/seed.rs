@@ -40,8 +40,11 @@ impl Environment {
         // **Which session this is, exported so a child can say so too.** `oslo macros` runs as a
         // child of the shell whose macros it manages, and "off for this session" is a statement
         // about the *parent*: without a name both processes agree on, the manager would write down
-        // a session nobody is running. `track::session::id` reads this first, so everything oslo
-        // starts — a subshell, a tool, a hook — reports the session it is actually part of.
+        // a session nobody is running.
+        //
+        // The id itself is decided in `main`, by `track::session::begin`, because *being a shell* is
+        // what starts a session and building an `Environment` is not — a tool builds one too, and a
+        // tool that stamped a new session over the inherited one would be talking about itself.
         let session = oslo_base::track::session::id();
         self.vars
             .insert("OSLO_SESSION".to_string(), (session.clone(), true));

@@ -9,7 +9,12 @@
 #
 # The demo script is a line-per-action file:
 #
+#   setup <command>   run it before the recorder attaches, so it is not in the film
 #   env  NAME=value    an environment variable the demo shell starts with
+#
+# `$OSLO_DIR` is substituted in any of them: it is the directory of the binary being recorded, which
+# a demo needs when it puts that binary on `$PATH` — the shell under test has to be the one a
+# `#!/usr/bin/env oslo` script finds, not whichever oslo is installed.
 #   cols 120          terminal width  (default 120)
 #   rows 20           terminal height (default 20)
 #   speed 0.08        seconds between keystrokes while typing
@@ -64,6 +69,24 @@ tmux -f /dev/null new-session -d -s "$SESSION" -x "$cols" -y "$rows" -c "$WORK" 
 tmux set -t "$SESSION" status off
 tmux set -t "$SESSION" escape-time 0
 sleep 3
+# **`setup` runs here, in the window between the shell starting and the recorder attaching.**
+# A demo that needs `$PATH` pointed somewhere has to say so *inside* the session — a config rebuilds
+# `$PATH` at startup, so what the launcher exported is gone by the first prompt — and a viewer has
+# no reason to watch it happen. Everything below this line is recorded; nothing above it is.
+while IFS= read -r line; do
+    case "${line%% *}" in
+        setup)
+            command="${line#setup }"
+            # The same substitution the `env` lines get, and for the same reason: the tmux server
+            # may predate this script and knows nothing of `$OSLO_DIR`.
+            # **With a leading space**, which every shell here reads as "do not remember this".
+            # Without it the setup line is the newest thing in the history, and the ghost offers it
+            # at the first empty prompt — putting the line back on camera by another route.
+            tmux send-keys -t "$SESSION" " ${command//\$OSLO_DIR/$OSLO_DIR}" Enter
+            sleep 0.6
+            ;;
+    esac
+done < "$DEMO"
 tmux send-keys -t "$SESSION" "clear" Enter
 sleep 1
 
@@ -92,8 +115,9 @@ while IFS= read -r line; do
     verb="${line%% *}"
     rest="${line#* }"
     [ "$verb" = "$line" ] && rest=""
+    rest="${rest//\$OSLO_DIR/$OSLO_DIR}"
     case "$verb" in
-        ''|'#'*|cols|rows|speed|env) ;;
+        ''|'#'*|cols|rows|speed|env|setup) ;;
         run)   send_text "$rest"; sleep 0.4; tmux send-keys -t "$SESSION" Enter; sleep 1.2 ;;
         type)  send_text "$rest" ;;
         key)   tmux send-keys -t "$SESSION" "$rest"; sleep 0.5 ;;

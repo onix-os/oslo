@@ -17,14 +17,18 @@ use common::{run, run_in};
 /// `$PWD` is excluded, and that is not a workaround. `run` gives each invocation its own temporary
 /// directory, so the two shells genuinely *are* somewhere different — a `set` that printed the same
 /// `PWD` for both would be the bug. bash lists it too. What this test is about is the *order* of
-/// the listing, so the one line that legitimately differs is dropped rather than the comparison
-/// being weakened.
+/// the listing, so the lines that legitimately differ are dropped rather than the comparison being
+/// weakened.
+///
+/// `$OSLO_SESSION` is excluded for the same reason and is the same kind of thing: two runs are two
+/// sessions, and a `set` that printed one id for both would mean a shell could not tell its own
+/// session from another's.
 #[test]
 fn set_listing_is_deterministic() {
     let script = "a=1; b=2; c=3; f() { echo one; }; g() { echo two; }; set";
     let without_pwd = |text: &str| -> String {
         text.lines()
-            .filter(|line| !line.starts_with("PWD="))
+            .filter(|line| !line.starts_with("PWD=") && !line.starts_with("OSLO_SESSION="))
             .map(|line| format!("{line}\n"))
             .collect()
     };

@@ -213,8 +213,21 @@ pub(super) fn is_elementwise(expansion_type: &ParamExpansion) -> bool {
 
 /// Apply an element-wise operator to every value, keeping the list's length.
 ///
-/// Each element goes through [`apply`] as a [`Target::Value`], so `${a[@]%.c}` and `${v%.c}` are
-/// the same code and cannot disagree about what `%` means.
+/// # The pattern is expanded once, not once per element
+///
+/// Each element used to go through [`apply`], which expands the operator's *pattern* — and the
+/// pattern does not depend on the element it is matched against. With `$@` holding five positionals
+/// and a pattern that is itself an expansion, that is five expansions per level; nest it twelve
+/// deep and it is 5¹². The fuzzer found it as a timeout, and the measurement is not subtle:
+///
+/// ```text
+/// set -- 1 2 3 4 5; : $(( ${@/${@/${@/…/x}/x}/x} ))   twelve levels
+///   bash   0.007 s
+///   oslo  >20     s      before this; 0.004 s after
+/// ```
+///
+/// So the words are expanded here, once, and the elements are mapped over what came out. Nothing
+/// about the result changes — this is the same pattern applied to the same values.
 pub(super) fn map_elements(
     env: &mut Environment,
     values: &[String],
@@ -224,10 +237,79 @@ pub(super) fn map_elements(
         is_elementwise(expansion_type),
         "map_elements is only defined for the operators is_elementwise admits"
     );
+    let prepared = Prepared::compile(env, expansion_type)?;
     values
         .iter()
-        .map(|value| apply(env, &Target::Value(value), expansion_type))
+        .map(|value| Ok(prepared.apply(value)))
         .collect()
+}
+
+/// An element-wise operator with its words already expanded.
+///
+/// Built once per list by [`map_elements`]; see the note there for what that is worth.
+enum Prepared {
+    RemovePrefix(ShellPattern, bool),
+    RemoveSuffix(ShellPattern, bool),
+    Replace(ShellPattern, String, ReplaceScope),
+    CaseConvert(Option<ShellPattern>, bool, bool),
+}
+
+impl Prepared {
+    fn compile(env: &mut Environment, expansion_type: &ParamExpansion) -> Result<Prepared> {
+        Ok(match expansion_type {
+            ParamExpansion::RemovePrefix { pattern, longest } => {
+                Prepared::RemovePrefix(compile_pattern(env, pattern)?, *longest)
+            }
+            ParamExpansion::RemoveSuffix { pattern, longest } => {
+                Prepared::RemoveSuffix(compile_pattern(env, pattern)?, *longest)
+            }
+            ParamExpansion::Replace {
+                pattern,
+                replacement,
+                scope,
+            } => Prepared::Replace(
+                compile_pattern(env, pattern)?,
+                expand_word_to_string(env, replacement)?,
+                *scope,
+            ),
+            ParamExpansion::CaseConvert {
+                pattern,
+                upper,
+                all,
+            } => Prepared::CaseConvert(
+                match pattern {
+                    Some(word) => Some(compile_pattern(env, word)?),
+                    None => None,
+                },
+                *upper,
+                *all,
+            ),
+            // Unreachable: `map_elements` asserts what it was given, and `is_elementwise` admits
+            // exactly the four above. Answering with the value unchanged is what a fifth operator
+            // arriving here should do — not a panic in the middle of somebody's expansion.
+            _ => Prepared::CaseConvert(None, false, false),
+        })
+    }
+
+    fn apply(&self, value: &str) -> String {
+        match self {
+            Prepared::RemovePrefix(pattern, longest) => {
+                pattern::remove_prefix(value, pattern, *longest)
+            }
+            Prepared::RemoveSuffix(pattern, longest) => {
+                pattern::remove_suffix(value, pattern, *longest)
+            }
+            Prepared::Replace(pattern, replacement, scope) => match scope {
+                ReplaceScope::First => pattern::replace(value, pattern, replacement, false),
+                ReplaceScope::All => pattern::replace(value, pattern, replacement, true),
+                ReplaceScope::Prefix => pattern::replace_prefix(value, pattern, replacement),
+                ReplaceScope::Suffix => pattern::replace_suffix(value, pattern, replacement),
+            },
+            Prepared::CaseConvert(selector, upper, all) => {
+                pattern::convert_case(value, selector.as_ref(), *upper, *all)
+            }
+        }
+    }
 }
 
 /// `${list:offset:length}` — the elements a slice selects.

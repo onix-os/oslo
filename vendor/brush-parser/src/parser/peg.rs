@@ -694,13 +694,22 @@ peg::parser! {
         // need to make sure that there was no space between the number and the
         // redirection operator; unfortunately we don't have the space anymore
         // but we can infer it by looking at the tokens' locations.
+        // The digits have to *fit in a file descriptor*, not merely be digits. A word of ninety-six
+        // threes in front of a `>` is not fd 333…; bash reads it as a command word and redirects
+        // the command, and this used to read it as an `IoFd` and panic on the overflow —
+        // `ParseIntError { kind: PosOverflow }`, found by the parse fuzzer. Failing the guard leaves
+        // the token a word, which is the same answer bash gives.
         rule io_number() -> ast::IoFd =
-            [Token::Word(w, num_loc) if w.chars().all(|c: char| c.is_ascii_digit())]
+            [Token::Word(w, num_loc) if
+                    w.chars().all(|c: char| c.is_ascii_digit()) &&
+                    w.parse::<ast::IoFd>().is_ok()]
             &([Token::Operator(o, redir_loc) if
                     o.starts_with(['<', '>']) &&
                     locations_are_contiguous(num_loc, redir_loc)]) {
 
-                w.parse().unwrap()
+                // Guarded above, so this cannot fail; `unwrap_or_default` rather than `unwrap`
+                // because a parser is the wrong place to be right by argument.
+                w.parse().unwrap_or_default()
             }
 
         //

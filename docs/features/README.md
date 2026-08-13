@@ -43,6 +43,11 @@ capabilities, and a config should not have to ask whether they exist. *Installin
 `plugin` cargo feature at 88 KB, because fetching somebody's code and deciding whether to trust it
 is not something a `/bin/sh` does. In `oslo-minimal` the word `plugin` falls through to `$PATH`.
 
+**[Arguments in comments](argc.md) is `oslo` only**, behind the `argc` cargo feature and the largest
+of them at 308 KB — it vendors a parser and brings five crates oslo does not otherwise link. In
+`oslo-minimal` there is no `argc` builtin and no `--argc-eval`, so the word `argc` falls through to
+`$PATH` and the real one still works.
+
 Everything else on this page is in both binaries.
 
 Each document opens with a recording of the feature actually running. They are not screencasts
@@ -84,6 +89,7 @@ scripts/demo/embed.sh                            # put the players back in the d
 | [Completion and matching](completion-and-matching.md) | The dropdown, and matching as a transform rather than a prefix test |
 | [Abbreviations](abbreviations.md) | `gco ` becomes `git checkout ` in the buffer, where you can see it |
 | [Macros](macros.md) | `oslo macros` — aliases, abbreviations, functions and scripts, in a database with a manager |
+| [Arguments in comments](argc.md) | A script declares its options in comments and the shell parses them |
 
 ## Memory
 

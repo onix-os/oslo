@@ -7,6 +7,8 @@
 //! previous implementation recognised three forms and silently started a REPL for everything
 //! else, so `oslo --version` read the caller's stdin and exited 0.
 
+#[cfg(feature = "argc")]
+pub mod argc;
 pub mod config;
 pub mod help;
 pub mod history;
@@ -35,6 +37,13 @@ pub enum Action {
     Tool(String, Vec<String>),
     /// `-s`, or no operand at all: read the program from standard input.
     Stdin,
+    /// `--argc-eval SCRIPT [ARG…]`: parse the script's argument declarations and print the shell
+    /// code that applies them. This is what `eval "$(oslo --argc-eval "$0" "$@")"` runs.
+    ///
+    /// **Not a shell invocation at all.** Nothing is executed and no shell starts; oslo is being
+    /// used here as the `argc` binary. See `src/cli/argc.rs`.
+    #[cfg(feature = "argc")]
+    ArgcEval(Vec<String>),
 }
 
 /// A fully-understood invocation.
@@ -232,6 +241,23 @@ pub fn parse(argv: &[String]) -> Result<Invocation, Exit> {
 
         if let Some(long) = arg.strip_prefix("--") {
             match long {
+                // **Everything after it belongs to the script**, exactly as it does after `-c`:
+                // the words are a script path and its arguments, and one of them looking like an
+                // option is not this shell's business.
+                #[cfg(feature = "argc")]
+                "argc-eval" => {
+                    return Ok(Invocation {
+                        action: Action::ArgcEval(argv[i + 1..].to_vec()),
+                        name,
+                        positional: Vec::new(),
+                        force_interactive: false,
+                        login: false,
+                        set_options: String::new(),
+                        unset_letters: String::new(),
+                        unset_long: Vec::new(),
+                        long_options: Vec::new(),
+                    });
+                }
                 "version" => {
                     return Err(Exit {
                         message: version_line(),

@@ -190,6 +190,14 @@ pub fn short(paint: Paint) -> String {
         format!("{} {}", paint.key("-o"), paint.slot("NAME")),
         "the same by name, for the ones with no letter (`+o` off)",
     ));
+    // **Only in a build that has it.** A flag listed here and refused by the parser would be worse
+    // than one that is simply absent, and `argc` is behind a cargo feature.
+    #[cfg(feature = "argc")]
+    s.push_str(&row(
+        "--argc-eval FILE",
+        format!("{} {}", paint.key("--argc-eval"), paint.slot("FILE")),
+        "parse a script's `# @option` comments, for a bash `eval`",
+    ));
     for (key, about) in LONG {
         let painted = match key.split_once('=') {
             Some((flag, slot)) => format!("{}={}", paint.key(flag), paint.slot(slot)),
@@ -286,6 +294,10 @@ const ENVIRONMENT: &[(&str, &str)] = &[
     (
         "OSLO_ALLHIST",
         "record `sh -c` commands in the history too (off unless set)",
+    ),
+    (
+        "OSLO_SESSION",
+        "this shell's session; exported, so a child can name the one it is in",
     ),
     ("XDG_CONFIG_HOME", "where config.lua lives (~/.config)"),
     (

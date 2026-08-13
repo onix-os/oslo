@@ -2,7 +2,7 @@
 //!
 //! # Two sources, and one of them is a file only a shell can write
 //!
-//! An alias reaches a shell from the database — [`super::snapshot`] — or from the configuration:
+//! An alias reaches a shell from the database — [`mod@super::snapshot`] — or from the configuration:
 //! `alias` in a bash file, `oslo.alias` in Lua. The second cannot be enumerated by anything except a
 //! shell that has run its config, so a shell writes it down as it starts, into `elsewhere.snapshot`
 //! beside the other. That file is what lets `oslo macros` show you a configured alias next to a

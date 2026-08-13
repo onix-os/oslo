@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.3.2] - 2026-08-13
+
+### <!-- 0 -->⛰️  Features
+
+- Name the command, and two demos
+- Say what the builtin is when there is no script
+- Complete a script from its own comments
+- Vendor argc, and parse a script's own arguments
+
+### <!-- 1 -->🐛 Bug Fixes
+
+- Flag completion, an oversized fd, and a pattern expanded per element
+- A declared choice outranks a filename
+
+### <!-- 3 -->📚 Documentation
+
+- Re-record argc off camera, on a bigger screen
+- Keep the finished argc plan in plans/
+
+### <!-- 4 -->⚡ Performance
+
+- Build the vendored parser for size
+
 ## [0.3.1] - 2026-08-12
 
 ### <!-- 0 -->⛰️  Features

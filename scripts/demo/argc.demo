@@ -1,0 +1,60 @@
+# argc: a script declares its arguments in comments, and the shell parses them.
+#
+# The fixture writes the two scripts this and `argc-eval.demo` use, into `$WORK/bin`.
+cols 150
+rows 36
+speed 0.05
+
+# **Off camera**: the two scripts the fixture wrote go on `$PATH`, and so does the binary being
+# recorded — a config rebuilds `$PATH` at startup, so the launcher's environment does not survive to
+# the first prompt. `setup` runs before the recorder attaches, so none of this is in the film.
+# **A store of its own**, so the ghost has learned nothing: the prediction model is per profile but
+# lives under `$XDG_DATA_HOME`, and after a few takes it had learned the setup line above and was
+# offering it at the first empty prompt — putting an off-camera command back on camera.
+env XDG_DATA_HOME=/tmp/oslo-demo-work/data
+setup export PATH=/tmp/oslo-demo-work/bin:$OSLO_DIR:$PATH
+
+# The whole script. Nine lines, five of them comments — and no `eval` at the end, because oslo has
+# the parser linked in.
+run bat --style=numbers --paging=never $(which deploy)
+wait 4.0
+
+clear
+
+# The help is generated from those comments.
+run deploy --help
+wait 4.0
+
+clear
+
+# **And so is the completion.** Nothing was installed, nothing was generated: the dropdown is
+# reading the same comments.
+type deploy --
+wait 1.0
+key Tab
+wait 3.5
+key Escape
+wait 0.5
+# **`C-c`, not `C-u`.** Escape closes the dropdown and leaves the words on the line; a kill-line
+# after it left `deploy --env` behind once, and the next command typed into the leftovers.
+key C-c
+wait 1.0
+
+
+# Including the values an option is allowed to take, above whatever happens to be in the directory.
+type deploy --env 
+wait 1.0
+key Tab
+wait 3.0
+key Escape
+wait 0.5
+key C-c
+wait 1.0
+
+# And then it just runs.
+run deploy --dry-run --tries 2 --env prod app-1.4
+wait 2.5
+
+# A mistake is the script's own, reported before its body ever runs.
+run deploy --nonsense
+wait 2.5

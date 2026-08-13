@@ -147,3 +147,27 @@ fn a_large_heredoc_does_not_deadlock() {
         "the whole heredoc body should reach the command's stdin"
     );
 }
+
+/// **A number too big to be a file descriptor is a command word.** Ninety-six threes in front of a
+/// `>` used to reach `w.parse::<IoFd>().unwrap()` in the parser and panic — `PosOverflow`, found by
+/// the parse fuzzer and now a seed in `fuzz/seeds/fuzz_parse/`. bash reads it as a word and runs it,
+/// which is what this now does.
+#[test]
+fn an_oversized_fd_is_a_word_rather_than_a_panic() {
+    let huge = "3".repeat(96);
+    let r = run(&format!("{huge}> out.txt"));
+    assert!(
+        r.stderr.contains("command not found"),
+        "stderr was {:?}",
+        r.stderr
+    );
+    assert!(
+        !r.stderr.contains("panicked"),
+        "the parser panicked: {:?}",
+        r.stderr
+    );
+
+    // And an fd that does fit is still a redirection.
+    let r = run("echo hi 2>/dev/null");
+    assert_eq!(r.out(), "hi");
+}

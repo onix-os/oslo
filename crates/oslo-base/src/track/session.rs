@@ -13,22 +13,43 @@ use std::sync::OnceLock;
 pub fn id() -> String {
     static ID: OnceLock<String> = OnceLock::new();
     ID.get_or_init(|| {
-        // **`$OSLO_SESSION` first.** A shell exports it, so everything the shell starts — a
-        // subshell, a tool, `oslo macros` — names the session it is part of rather than inventing
-        // one of its own. Without this a child process could not talk about the session it is in:
-        // it would compute an id nobody else has ever heard of.
+        // **`$OSLO_SESSION` first, for anything that is not itself a shell.** A tool oslo starts —
+        // `oslo macros`, a hook, a subshell running a helper — has to be able to name the session
+        // it is part of, and without this it would compute an id nobody has ever heard of and turn
+        // a macro off for a session nobody is running.
+        //
+        // A **shell** does not take the inherited one: it calls [`begin`] first, which stamps a new
+        // id over it. A nested shell is its own session — the terminal integration marks every
+        // command with it, and two shells sharing one id would be two shells the terminal cannot
+        // tell apart.
         if let Ok(named) = std::env::var("OSLO_SESSION")
             && !named.trim().is_empty()
         {
             return named;
         }
-        let started = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .map(|d| d.as_secs())
-            .unwrap_or(0);
-        format!("{}-{started}", std::process::id())
+        fresh()
     })
     .clone()
+}
+
+/// Start a new session, and export it.
+///
+/// Called by a process that *is* a shell, before anything reads [`id`]. Everything it starts
+/// inherits `$OSLO_SESSION` and so agrees with it about which session this is.
+pub fn begin() -> String {
+    let id = fresh();
+    // SAFETY: called once, from `main`, before any thread is started.
+    unsafe { std::env::set_var("OSLO_SESSION", &id) };
+    id
+}
+
+/// An id nothing else will have: this process, and when it started.
+fn fresh() -> String {
+    let started = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_secs())
+        .unwrap_or(0);
+    format!("{}-{started}", std::process::id())
 }
 
 /// This machine's short name — everything before the first dot.
@@ -60,12 +81,33 @@ mod tests {
     }
 
     /// It carries the pid *and* a start time, because pids are reused.
+    ///
+    /// Asked of [`fresh`] rather than of [`id`]: `id` answers with the *inherited* `$OSLO_SESSION`
+    /// when there is one, and a test run from an oslo shell has one — so asserting that `id` names
+    /// this process would be asserting that nothing started this test, which is false and was how
+    /// this test failed the moment a session could be inherited at all.
     #[test]
     fn the_session_id_is_more_than_a_pid() {
-        let id = id();
+        let id = fresh();
         let (pid, started) = id.split_once('-').expect("pid-started");
         assert_eq!(pid, std::process::id().to_string());
         assert!(started.parse::<u64>().expect("a timestamp") > 1_600_000_000);
+    }
+
+    /// **Two shells are two sessions; a tool is not a shell.** `id` takes the inherited
+    /// `$OSLO_SESSION` so that `oslo macros off --session` names the shell that started it, and
+    /// `begin` stamps a new one so a nested shell is its own — the terminal marks every command
+    /// with it, and two shells sharing an id would be two the terminal cannot tell apart.
+    #[test]
+    fn a_shell_starts_a_session_and_a_tool_joins_one() {
+        // `fresh` is what both are built from, and no two calls agree.
+        let one = fresh();
+        assert!(one.contains('-'), "pid and start time: {one}");
+        assert_eq!(one, fresh(), "same process, same second");
+
+        // What a tool would read, without touching the process environment every other test shares.
+        let inherited = "424242-1700000000";
+        assert_ne!(inherited, fresh(), "a tool's own id is not the shell's");
     }
 
     #[test]

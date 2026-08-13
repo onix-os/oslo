@@ -1,0 +1,34 @@
+# argc, for a script that is not oslo's: bash, with one `eval` line, and oslo as its parser.
+cols 150
+rows 36
+speed 0.05
+
+# **Off camera**: the two scripts the fixture wrote go on `$PATH`, and so does the binary being
+# recorded — a config rebuilds `$PATH` at startup, so the launcher's environment does not survive to
+# the first prompt. `setup` runs before the recorder attaches, so none of this is in the film.
+# **A store of its own**, so the ghost has learned nothing: the prediction model is per profile but
+# lives under `$XDG_DATA_HOME`, and after a few takes it had learned the setup line above and was
+# offering it at the first empty prompt — putting an off-camera command back on camera.
+env XDG_DATA_HOME=/tmp/oslo-demo-work/data
+setup export PATH=/tmp/oslo-demo-work/bin:$OSLO_DIR:$PATH
+
+# The same idea in a bash script. bash cannot be handed a parse — only text to run — so the one
+# line at the bottom asks oslo for it and evaluates what comes back.
+run bat --style=numbers --paging=never $(which release)
+wait 4.5
+
+clear
+
+# That is what `oslo --argc-eval` prints: assignments, and nothing a shell cannot read.
+run oslo --argc-eval $(which release) --force -m 'ship it' 1.4.0
+wait 4.0
+
+clear
+
+# Run under bash, the argument parsing is oslo's and everything else is bash's.
+run bash $(which release) --force -m 'ship it' 1.4.0
+wait 2.5
+
+# The generated help, the same as it would be for an oslo script.
+run bash $(which release) --help
+wait 3.5

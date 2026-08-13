@@ -1,6 +1,6 @@
 [package]
 name = "oslo"
-version = "0.3.1"
+version = "0.3.2"
 edition = "2024"
 # Minimum supported Rust version, mirrored by the MSRV job in .github/workflows/tests.yml.
 rust-version = "1.89"
@@ -73,6 +73,32 @@ nix = ["oslo-shell/nix", "oslo-runtime/nix"]
 # *written against* is still there, so the same Lua runs from `conf.d` in either binary.
 plugin = ["oslo-runtime/plugin"]
 
+# `argc` — the shell parses its own scripts' arguments, and other people's.
+#
+# `argc` is a CLI framework for bash: a script declares its options as comments and calls
+# `eval "$(argc --argc-eval "$0" "$@")"` to have them parsed. With this feature oslo *is* that
+# parser, in two forms — `oslo --argc-eval` for a bash script, and the `argc` builtin for a script
+# oslo runs itself, which applies the parse to the environment directly rather than through a
+# subprocess and an `eval`.
+#
+# **Off, and measured: 308 KB.** The real binary, built both ways at this profile:
+#
+# ```text
+#   every feature but this one   6,160,768 bytes
+#   with it                      6,476,160 bytes    +315,392
+# ```
+#
+# An isolated test binary had predicted 439 KB; the difference is what fat LTO shares with crates
+# oslo already links. Still larger than `direnv` and `plugin` together, and it brings five crates
+# oslo does not otherwise have — `nom` among them, a second parser-combinator library in a tree
+# whose argument is that it owns its parsers. It parses *comments*, which is where that line is
+# drawn. A `/bin/sh` has no business parsing argument declarations for other people's scripts, so a
+# distribution ships this off.
+#
+# Without it there is no `--argc-eval`, no `argc` builtin and no completion from a script's
+# comments; the word `argc` falls through to `$PATH`, so the real one still works.
+argc = ["oslo-shell/argc", "oslo-runtime/argc", "dep:argc"]
+
 [dependencies]
 # The Lua front end, in the same relationship to Lua that brush-parser has to the shell: it parses
 # and nothing else. Evaluation is oslo's own, in `src/lua/eval/`, so that both languages run on one
@@ -82,6 +108,13 @@ plugin = ["oslo-runtime/plugin"]
 # compiled 30k lines of C into the binary, so a static musl build needed a C toolchain, and Lua
 # values lived in a separate VM that the shell could only pass strings across. See PLAN-LUA.md.
 full_moon = { path = "vendor/full_moon", default-features = false, features = ["lua54"] }
+# `argc`, behind the feature of the same name. Only the parts a caller needs: the parse and the
+# match (`eval`), the bash renderer for `--argc-eval`, and the completion generator. `native-runtime`
+# is deliberately absent — oslo implements `argc::Runtime` over its own facilities, which is what
+# lets a script's own functions run in this shell rather than in a bash it has to go and find.
+argc = { path = "vendor/argc", default-features = false, features = [
+    "eval", "eval-bash", "compgen",
+], optional = true }
 # `resource` is what `ulimit` reads and sets limits through, and what `times` reads getrusage(2)
 # through. Without it both had to parse /proc by hand.
 # `poll` is declared here rather than arriving by accident. It used to come from rustyline's own
@@ -167,6 +200,7 @@ members = [
   "crates/oslo-runtime",
   "crates/oslo-shell",
   "crates/oslo-ui",
+  "vendor/argc",
   "vendor/brush-parser",
   "vendor/full_moon",
   "vendor/full_moon/derive",
@@ -266,6 +300,24 @@ opt-level = 3
 # 160 KB is the cheapest 160 KB in the binary.
 [profile.release.package.oslo-ui]
 opt-level = 3
+
+# **The one place where `"s"` was chosen after measuring both.** `argc` was built at `3` first, on
+# the argument that a parse runs once per invocation of a script that uses it and that is the shape
+# which pays for speed. The binary says what that argument costs:
+#
+# ```text
+#   without argc      6,164,864
+#   argc at "s"       6,508,928    +336 KB
+#   argc at 3         6,562,176    +388 KB
+#                                  ───────
+#   maximum optimisation costs         52 KB
+# ```
+#
+# Fifty-two kilobytes is more than every optional argc *feature* put together — `eval-bash` is 12 KB
+# and `compgen` is 400 bytes — to make a parse of a ten-line declaration faster than the
+# microseconds it already takes. Nobody can feel that; everybody carries the bytes.
+[profile.release.package.argc]
+opt-level = "s"
 
 # **`"*"` does not reach oslo's own crates, and that is cargo's rule rather than luck.**
 #
