@@ -74,15 +74,20 @@ pub(super) fn refresh(env: &Arc<Mutex<Environment>>, held: Held) -> Held {
 /// In that order, because a name in both lists must end up **set**: the other way round would add
 /// `gs` and then remove it again for having been in yesterday's set too.
 fn apply(env: &Arc<Mutex<Environment>>, wanted: &[Entry], had: &Applied, now: &Applied) {
-    let (aliases, abbrevs) = had.gone(now);
-    for name in &abbrevs {
+    let gone = had.gone(now);
+    for name in &gone.abbrevs {
         oslo_ui::abbr::remove(name);
     }
     let Ok(mut guard) = env.lock() else {
         return;
     };
-    for name in &aliases {
+    for name in &gone.aliases {
         guard.remove_alias(name);
+    }
+    // The recipe, not the value: see `Applied::gone`. A variable already read is a variable like
+    // any other by now, and unsetting it under a running command would be a different feature.
+    for name in &gone.vars {
+        guard.remove_lazy_var(name);
     }
     for entry in wanted {
         match entry.kind {
@@ -95,6 +100,23 @@ fn apply(env: &Arc<Mutex<Environment>>, wanted: &[Entry], had: &Applied, now: &A
                 // a flag rather than changing what these mean.
                 oslo_ui::abbr::Placement::Command,
             ),
+            // **A value now; a recipe when somebody asks.**
+            //
+            // A plain value costs nothing, so it is exported here like any other environment
+            // variable — which is also the only way a program that reads the environment *itself*
+            // can find it, since nothing about `gh` or `aws` expands `$NAME` first.
+            //
+            // A body that runs a command is different in kind: doing that for every stored variable
+            // at every prompt would decrypt everything you own to answer a question nobody asked.
+            // The shell is handed the line and runs it the first time the name is read — see
+            // `oslo_shell::expand::param::materialise`.
+            // **Neither overrules the environment this shell was started with**, which is the same
+            // rule the lazy path follows and the reason `FOO=x oslo …` still means something.
+            Kind::Var if guard.get_var(&entry.name).is_some() => {}
+            Kind::Var if oslo_base::macros::is_a_value(&entry.body) => {
+                guard.set_var(&entry.name, entry.body.trim(), true);
+            }
+            Kind::Var => guard.set_lazy_var(&entry.name, &entry.body),
             // A function or a script is found after `$PATH` fails, so neither is in the snapshot
             // and neither belongs here. See `oslo_shell::exec::stored`.
             Kind::Func | Kind::Script => {}

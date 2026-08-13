@@ -1,7 +1,7 @@
 # Macros
 
-Four kinds of small named thing — an alias, an abbreviation, a function, a script — kept in one
-database and managed with one subcommand, so that saving one does not mean editing a file and
+Five kinds of small named thing — an alias, an abbreviation, a function, a script, a variable — kept
+in one database and managed with one subcommand, so that saving one does not mean editing a file and
 re-sourcing it.
 
 ```sh
@@ -9,11 +9,12 @@ oslo macros add --alias  gs 'git status --short' --tag git
 oslo macros add --abbrev gco 'git checkout'      # expanded into your line as you type
 oslo macros add --func   mkcd                    # opens your editor
 oslo macros add --script deploy                  # opens your editor, any language
+oslo macros add --var    'GITHUB_TOKEN=$(oslo secret get gh-token)'
 oslo macros show                                 # the manager, on the whole screen
 ```
 
-The kind is required, because four kinds and a silent default is a trap. An inline body is for the
-two that fit on a line; a function and a script always open the editor.
+The kind is required, because five kinds and a silent default is a trap. An inline body is for the
+three that fit on a line; a function and a script always open the editor.
 
 An alias in `config.lua` still works, and so does `alias` in a script. This is a second source, not
 a replacement — see [Order](#order-config-first-database-last).
@@ -22,7 +23,7 @@ a replacement — see [Order](#order-config-first-database-last).
 [![macros demo](https://asciinema.org/a/1262943.svg)](https://asciinema.org/a/1262943)
 <!-- demo:end -->
 
-## The four kinds, and why there are four
+## The five kinds, and why there are five
 
 They are not variations on one idea; they differ in *when* they act and in *what sees them*.
 
@@ -32,6 +33,7 @@ They are not variations on one idea; they differ in *when* they act and in *what
 | `abbrev` | as you type the space after it | what is in your buffer, visibly | at shell start |
 | `func` | when you call the name | shell code, **in this shell** | after `$PATH` fails |
 | `script` | when you call the name | its own program, in a child | after `$PATH` fails |
+| `var` | when something reads the name | its body, once, in this shell | at shell start |
 
 The pair that looks redundant is `alias` and `abbrev`, and the difference is the whole reason
 [abbreviations](abbreviations.md) exist: an alias replaces the word before anything can see it, so
@@ -41,6 +43,34 @@ the line*, so what runs is what you can read and what the history keeps.
 The pair that looks like one thing is `func` and `script`. A function runs in the shell that called
 it — it can `cd`, set a variable, change the shell it was called from. A script cannot: it is its own
 program with its own shebang, and Python is as good an answer as `sh`.
+
+### A variable holds a recipe, not a value
+
+The fifth is the one that is not what it looks like. `oslo macros add --var EDITOR=nvim` stores a
+value and the shell exports it at startup, which is unremarkable. `--var
+'GITHUB_TOKEN=$(oslo secret get gh-token)'` stores a *line*, and the shell runs it the first time
+something reads `$GITHUB_TOKEN` — once, in that shell, and never in a shell that does not mention
+the name.
+
+That difference is the whole point of storing one. Written in `config.lua` as an `export`, the same
+line decrypts a secret at every shell start, on every machine, for ever, whether or not anything
+wanted it; here a session that never touches the token never runs the command at all. It is the same
+argument the [secrets](secrets.md) store makes about files, applied to time.
+
+The split is by cost, and it is measured by `is_a_value`: a body with no command in it — `nvim`,
+`/srv/data`, `$HOME/bin` — is exported at startup, because it is free and because a program that
+reads the environment *itself* (`gh`, `aws`, `docker`) has no `$NAME` for the shell to expand and
+would otherwise never see it. A body with `$(…)` in it waits.
+
+Two consequences worth knowing:
+
+* **The environment the shell was started with wins.** Neither kind overrules a name that is already
+  set, so `FOO=x oslo` still means what it says — and `oslo macros add --var` says so at the time if
+  the name is already taken.
+* **A recipe reaches a program that reads the environment only once the name has been read.** For
+  `gh` that means mentioning it — `echo "$GITHUB_TOKEN" >/dev/null` first, or writing the command as
+  `gh …` after anything that expands it. A `secret run NAME -- cmd` that puts one value in one
+  child's environment is the better answer and is not built yet.
 
 ## Running a script that has no file
 
@@ -278,7 +308,7 @@ oslo macros add --alias gs 'git status --short' --tag git --tag system
 
 | | |
 |---|---|
-| `crates/oslo-base/src/macros.rs` | the store, the four kinds, the record |
+| `crates/oslo-base/src/macros.rs` | the store, the five kinds, the record, `is_a_value` |
 | `crates/oslo-base/src/macros/live.rs` | the two sources, the rebuild, the session list |
 | `crates/oslo-runtime/src/startup/stored.rs` | applying it to a shell, at startup and per prompt |
 | `crates/oslo-shell/src/exec/stored.rs` | running a function or a script, and the memfd |

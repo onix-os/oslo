@@ -81,6 +81,9 @@ pub fn expand_param(
 ) -> Result<Vec<Field>> {
     let origin = origin_of(in_quotes);
 
+    // A stored variable is a line until somebody reads the name, and a value from then on.
+    materialise(env, name);
+
     // `$@` and `$*` are the only parameters that stand for a *list*, and only `$@` keeps its
     // members apart. Everything list-valued has to be answered here: falling through to the
     // scalar path below joins the positionals with a space first, which is how `"${@:2}"` came
@@ -100,6 +103,36 @@ pub fn expand_param(
 
     let text = expand_to_string(env, name, expansion_type)?;
     Ok(vec![vec![Run::new(text, origin)]])
+}
+
+/// Run the recipe behind a stored variable, the first time its name is read.
+///
+/// `oslo macros add --var GITHUB_TOKEN '$(oslo secret get gh-token)'` gives the shell that line and
+/// nothing else. Here it becomes `export GITHUB_TOKEN=$(oslo secret get gh-token)` and is run — by
+/// the shell's own parser and evaluator, because the alternative is deciding by hand whether the
+/// body needs quoting, and an assignment is exactly the context where a command substitution does
+/// *not* word-split. What the person wrote means what it would mean typed.
+///
+/// **Nothing runs until something asks.** A shell that never mentions the name never decrypts
+/// anything, and the second mention finds an ordinary exported variable, because
+/// [`Environment::take_lazy_var`] hands the recipe over once.
+///
+/// A failure is the command's own to report — it printed whatever it printed on its way to failing
+/// — and leaves the variable unset, which is what an empty `$(…)` would have left anyway.
+fn materialise(env: &mut Environment, name: &str) {
+    // Already a value, or never a recipe: the common case, and one hash lookup.
+    if env.get_var(name).is_some() || env.lazy_var_names().is_empty() {
+        return;
+    }
+    let Some(body) = env.take_lazy_var(name) else {
+        return;
+    };
+    // Parsed without alias substitution: the body is a value, and a stored alias called `git`
+    // rewriting somebody's `$(git rev-parse)` would be a surprise nobody could see coming.
+    let line = format!("export {name}={body}");
+    if let Ok(ast) = crate::syntax::parse_with_aliases(&line, false, &|_| None) {
+        let _ = crate::exec::eval_command_list(env, &ast);
+    }
 }
 
 /// The fields a `${x-word}` or `${x+word}` payload contributes, when the payload is what wins.

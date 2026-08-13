@@ -6,14 +6,17 @@ fn what_was_ours_and_is_no_longer_is_what_comes_off() {
     let had = Applied {
         aliases: vec!["gs".into(), "gco".into()],
         abbrevs: vec!["gc".into()],
+        vars: vec!["GITHUB_TOKEN".into()],
     };
     let now = Applied {
         aliases: vec!["gs".into()],
         abbrevs: vec!["gc".into(), "gp".into()],
+        vars: Vec::new(),
     };
-    let (aliases, abbrevs) = had.gone(&now);
-    assert_eq!(aliases, ["gco"], "removed from the database");
-    assert!(abbrevs.is_empty(), "a new one is not a removal");
+    let gone = had.gone(&now);
+    assert_eq!(gone.aliases, ["gco"], "removed from the database");
+    assert!(gone.abbrevs.is_empty(), "a new one is not a removal");
+    assert_eq!(gone.vars, ["GITHUB_TOKEN"], "a variable comes off too");
 }
 
 /// **An alias you typed is not ours to take away.** It was never in `Applied`, so it can never be
@@ -23,8 +26,9 @@ fn a_name_we_never_put_there_is_never_removed() {
     let ours = Applied {
         aliases: vec!["gs".into()],
         abbrevs: Vec::new(),
+        vars: Vec::new(),
     };
-    let (gone, _) = ours.gone(&Applied::default());
+    let gone = ours.gone(&Applied::default()).aliases;
     assert_eq!(gone, ["gs"]);
     assert!(
         !gone.contains(&"typed_at_the_prompt".to_string()),

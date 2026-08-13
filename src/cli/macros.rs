@@ -73,7 +73,7 @@ impl Asked {
     /// The kind, or the error that says the four names.
     fn kind(&self) -> Result<Kind, String> {
         self.kind
-            .ok_or_else(|| "say which: --alias, --abbrev, --func or --script".to_string())
+            .ok_or_else(|| "say which: --alias, --abbrev, --func, --script or --var".to_string())
     }
 }
 
@@ -102,11 +102,14 @@ fn parse(args: &[String]) -> Result<Asked, String> {
             "--abbrev" | "--abbr" => Some(Kind::Abbrev),
             "--func" | "--function" => Some(Kind::Func),
             "--script" => Some(Kind::Script),
+            "--var" | "--variable" | "--env" => Some(Kind::Var),
             _ => None,
         };
         if let Some(kind) = kind {
             if asked.kind.is_some_and(|had| had != kind) {
-                return Err("one kind at a time: --alias, --abbrev, --func or --script".to_string());
+                return Err(
+                    "one kind at a time: --alias, --abbrev, --func, --script or --var".to_string(),
+                );
             }
             asked.kind = Some(kind);
             continue;
@@ -143,6 +146,16 @@ fn add(args: &[String]) -> i32 {
     let Some(name) = asked.words.first().cloned() else {
         return usage("add needs a name");
     };
+    // **A variable may be written the way it would be typed.** `--var GITHUB_TOKEN=$(oslo secret
+    // get gh-token)` and `--var GITHUB_TOKEN '$(oslo secret get gh-token)'` store the same thing;
+    // the first is what somebody's fingers already know, and refusing it would be pedantry.
+    let (name, first_word_body) = match kind {
+        Kind::Var => match name.split_once('=') {
+            Some((name, body)) => (name.to_string(), Some(body.to_string())),
+            None => (name, None),
+        },
+        _ => (name, None),
+    };
     if !macros::valid_name(&name) {
         return fail(&format!(
             "{name:?} is not a name: it becomes a command word, so no spaces and nothing that \
@@ -158,7 +171,11 @@ fn add(args: &[String]) -> i32 {
     // **A function and a script are always written in the editor**, and an inline body for one is
     // refused rather than accepted: taking it would store a one-line function because that is what
     // fitted on the command line, which is how you end up with a function written as one line.
-    let inline = asked.words[1..].join(" ");
+    let inline = match &first_word_body {
+        Some(body) if asked.words.len() == 1 => body.clone(),
+        Some(body) => format!("{body} {}", asked.words[1..].join(" ")),
+        None => asked.words[1..].join(" "),
+    };
     let editor_only = matches!(kind, Kind::Func | Kind::Script);
     if editor_only && !inline.is_empty() {
         return usage(&format!(
@@ -190,6 +207,18 @@ fn add(args: &[String]) -> i32 {
 
     if body.trim().is_empty() {
         return fail("nothing to store: the body is empty");
+    }
+    // **A stored variable is what a name means when nothing else has said**, so one that is already
+    // in the environment would never be reached — and finding that out by wondering why nothing
+    // changed is a bad afternoon. The shell will not overrule the parent that started it; saying so
+    // here is the only warning there is a place for.
+    if kind == Kind::Var
+        && let Ok(already) = std::env::var(&name)
+    {
+        eprintln!(
+            "oslo macros: {name} is already set to {already:?} by something else, so this applies \
+             only where it is not"
+        );
     }
     // The tags asked for, or — when none were — whatever it already had, so editing a macro does
     // not silently strip its labels.

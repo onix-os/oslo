@@ -145,14 +145,23 @@ oslo macros add --alias gs 'git status --short' --tag git
 oslo macros add --abbrev gco 'git checkout'
 oslo macros add --func mkcd            # opens $EDITOR
 oslo macros add --script deploy        # opens $EDITOR — any language, with a shebang
+oslo macros add --var EDITOR=nvim
+oslo macros add --var 'GITHUB_TOKEN=$(oslo secret get gh-token)'
 oslo macros show                       # the manager, on the whole screen
 ```
+
+**A variable is the odd one: its body is a recipe, not a value.** `EDITOR=nvim` is exported when the
+shell starts, like anything else. `GITHUB_TOKEN=$(oslo secret get gh-token)` is *not* — the shell
+holds the line and runs it the first time something reads `$GITHUB_TOKEN`, once, in that shell. A
+session that never mentions the name never decrypts anything, which is what makes it safe to keep a
+dozen of them. Neither kind overrules the environment the shell was started with, so `FOO=x oslo`
+still means what it says.
 
 **Alt+\\ opens it from the prompt**, beside Ctrl+\\ for the scratch finder — the same key with the
 other modifier, for the other list of things you keep. `oslo.macros.key` moves it.
 
-A database rather than a file to edit and re-source. Four kinds under one word: an alias, an
-abbreviation, a function and a script. `oslo macros show` is the history finder's screen pointed at
+A database rather than a file to edit and re-source. Five kinds under one word: an alias, an
+abbreviation, a function, a script and a variable. `oslo macros show` is the history finder's screen pointed at
 them — type to filter, ← → for the tag, Tab between what you stored and what your config defines,
 Enter to edit in `$EDITOR`, Delete to forget, Space to turn one off for this session and three
 spaces to turn it off everywhere. A change is live in every running shell before its next prompt,
