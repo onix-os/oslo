@@ -297,9 +297,18 @@ fn publish(_args: &[String]) -> i32 {
         .iter()
         .filter(|entry| entry.kind == Kind::Script && entry.active)
         .count();
-    match macros::bin::directory() {
-        Some(dir) => println!("{scripts} scripts written to {}", dir.display()),
-        None => println!("{scripts} scripts"),
+    let aliases = macros::all(&store)
+        .iter()
+        .filter(|entry| entry.kind == Kind::Alias && entry.active)
+        .count();
+    if let Some(dir) = macros::bin::directory() {
+        println!("{scripts} scripts  → {}", dir.display());
+    }
+    if let Some(path) = macros::sourced::path() {
+        println!("{aliases} aliases  → {}", path.display());
+        println!();
+        println!("For a shell that is not oslo, source that file:");
+        println!("  [ -f {} ] && . {}", path.display(), path.display());
     }
     0
 }
