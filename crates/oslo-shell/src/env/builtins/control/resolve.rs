@@ -29,7 +29,7 @@ pub fn is_keyword(name: &str) -> bool {
 }
 
 /// One way a name resolves, in the order dispatch would try them.
-enum Kind {
+pub enum Kind {
     Alias(String),
     Keyword,
     Function(Command),
@@ -40,6 +40,36 @@ enum Kind {
 }
 
 impl Kind {
+    /// The file this resolves to, for a caller that wants a path and nothing else.
+    pub fn path(&self) -> Option<&std::path::Path> {
+        match self {
+            Kind::File(path) => Some(path),
+            _ => None,
+        }
+    }
+
+    /// What this is, in the words `which` and `whereis` use — where `type` says "cd is a shell
+    /// builtin", they say "cd: shell built-in command".
+    pub fn noun(&self) -> &'static str {
+        match self {
+            Kind::Alias(_) => "aliased to",
+            Kind::Keyword => "shell reserved word",
+            Kind::Function(_) => "shell function",
+            Kind::Builtin => "shell built-in command",
+            Kind::File(_) => "",
+            Kind::Stored(oslo_base::macros::Kind::Func) => "stored function",
+            Kind::Stored(_) => "stored script",
+        }
+    }
+
+    /// The alias body, which is the one kind whose *value* belongs on the line.
+    pub fn alias_body(&self) -> Option<&str> {
+        match self {
+            Kind::Alias(value) => Some(value),
+            _ => None,
+        }
+    }
+
     /// The word `type -t` prints.
     ///
     /// A stored macro answers with the word for how it *behaves*, because that is what the scripts
@@ -173,6 +203,21 @@ fn resolve(env: &Environment, name: &str, opts: &Options) -> Vec<Kind> {
         kinds.push(Kind::Stored(kind));
     }
     kinds
+}
+
+/// Every way `name` resolves, in dispatch order, for a builtin that reports it in other words.
+///
+/// `all` is `type -a`: the matches a nearer one shadows, which is most of what anyone runs
+/// `which -a` for.
+pub fn ways(env: &Environment, name: &str, all: bool) -> Vec<Kind> {
+    resolve(
+        env,
+        name,
+        &Options {
+            all,
+            ..Options::default()
+        },
+    )
 }
 
 /// `type [-afptP] name …`

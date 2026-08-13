@@ -10,6 +10,11 @@ mod unparse;
 pub use resolve::builtin_type;
 /// Whether a name is a reserved word; `command -v` has to agree with `type` about this.
 pub use resolve::is_keyword;
+/// How a name resolves, for the other builtins that report it rather than run it.
+///
+/// `type` and `which` answer the same question in different words, and a shell where they disagree
+/// has two dispatch tables and one of them is wrong. There is one, and it is [`resolve::ways`].
+pub use resolve::{Kind, ways};
 /// Render a function definition as shell source; also what `set` and `declare -f` need to print.
 pub use unparse::format_function;
 

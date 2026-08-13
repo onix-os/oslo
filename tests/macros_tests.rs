@@ -125,6 +125,79 @@ fn what_would_run_is_what_type_reports() {
     );
 }
 
+/// Type `line` at an interactive oslo and collect what it prints.
+fn at_a_prompt(dirs: (&std::path::Path, &std::path::Path), line: &str) -> String {
+    use std::io::Write;
+    let mut command = Command::new(oslo_bin());
+    command
+        .arg("-i")
+        .env("XDG_DATA_HOME", dirs.0)
+        // Not the machine's own config: a `oslo.alias` in it would answer some of these.
+        .env("XDG_CONFIG_HOME", dirs.0)
+        .env("OSLO_MACROS_BIN", dirs.1)
+        .stdin(std::process::Stdio::piped())
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null());
+    let mut child = command.spawn().expect("spawn oslo");
+    child
+        .stdin
+        .as_mut()
+        .expect("stdin")
+        .write_all(line.as_bytes())
+        .expect("write");
+    let out = child.wait_with_output().expect("wait");
+    String::from_utf8_lossy(&out.stdout).to_string()
+}
+
+/// **`which` and `whereis` are builtins so that they can answer this at all.** The programs by
+/// those names read `$PATH`, and a stored macro is a database row dispatch reaches after it.
+#[test]
+fn which_and_whereis_know_about_a_stored_macro() {
+    let data = tempfile::tempdir().expect("tempdir");
+    let bin = tempfile::tempdir().expect("tempdir");
+    let dirs = (data.path(), bin.path());
+    store(dirs, "script oslo-probe\n\t#!/bin/sh\n\techo hi\n");
+
+    let out = at_a_prompt(dirs, "which oslo-probe\n");
+    assert!(out.contains("oslo-probe: stored script"), "{out:?}");
+    // `whereis` shows the generated copy where `which` does not: it reports where files are, and
+    // that file is how everything which is not oslo runs the same script. The `export` is typed
+    // rather than inherited because a config of the machine's own may rebuild `$PATH` at startup.
+    let out = at_a_prompt(
+        dirs,
+        &format!(
+            "export PATH={}:$PATH\nwhereis oslo-probe\n",
+            bin.path().display()
+        ),
+    );
+    assert!(
+        out.contains(&format!(
+            "oslo-probe: stored script {}/oslo-probe",
+            bin.path().display()
+        )),
+        "{out:?}"
+    );
+    // A builtin is the case no program can answer.
+    let out = at_a_prompt(dirs, "which cd\n");
+    assert!(out.contains("cd: shell built-in command"), "{out:?}");
+}
+
+/// **A script gets the program**, because `which` is not POSIX and `$(which echo)` in somebody's
+/// configure script has to stay a path. `command -v` is the one that answers about this shell.
+#[test]
+fn a_script_is_answered_by_the_program() {
+    let data = tempfile::tempdir().expect("tempdir");
+    let bin = tempfile::tempdir().expect("tempdir");
+    let dirs = (data.path(), bin.path());
+
+    let out = oslo(dirs, &["-c", "which echo"], false);
+    // Nothing to assert if the machine has no `which` at all — then the builtin answers, which is
+    // the documented fallback.
+    if which::which("which").is_ok() {
+        assert!(out.trim().ends_with("/echo"), "not a path: {out:?}");
+    }
+}
+
 /// One turned off is not there, for `type` as for dispatch.
 #[test]
 fn one_turned_off_is_reported_by_neither() {

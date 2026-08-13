@@ -821,6 +821,39 @@ which is what bash and dash answer, and why giving it a meaning at a prompt brea
 
 Quoting is not escaping: `"rm"` and `'rm'` run the builtin, in oslo as in every other shell.
 
+### `which` and `whereis` — builtins, because the programs cannot see a shell
+
+```sh
+which ls        # /usr/bin/ls
+which ll        # ll: aliased to ls -alF
+which cd        # cd: shell built-in command
+which deploy    # deploy: stored script
+whereis ls      # ls: /usr/bin/ls /usr/share/man/man1/ls.1.gz
+whereis cd      # cd: shell built-in command
+```
+
+`/usr/bin/which` reads `$PATH`, and everything interesting about a name here is invisible to a
+program: an alias is in this shell's memory, a builtin has no file, a stored macro is a database row
+found after `$PATH`. So it answers "nothing" — not because nothing runs, but because it was asked by
+something that cannot see. zsh made `which` a builtin for this reason; this is the same answer in
+the same words.
+
+A path prints bare, so `$(which foo)` is still a path. Anything else prints `name: what it is`,
+which no script can mistake for one. `which --skip-alias` does the plain `$PATH` search the program
+does, `\which` runs the program itself, and `which`, `type` and `command -v` all read the same
+resolution order — a shell where those three disagree has more than one dispatch table.
+
+**Only at a prompt**, like the frecency jump in `cd`. In a script both hand straight over to the
+programs on `$PATH`, because `which` is not POSIX and somebody's configure script doing
+`ECHO=$(which echo)` has to keep getting a path rather than a sentence about a builtin. What a
+script has always had is `command -v`, which is POSIX, answers about *this* shell, and knows every
+alias, builtin and stored macro there is. Where the system has no such program — a small
+distribution may ship neither — the builtin answers after all.
+
+`whereis` answers the other question, where the *files* are, so it shows the copy of a stored script
+that `oslo macros` writes for everything that is not oslo. Manual pages come from `$MANPATH`;
+sources are not searched, because the directory list that would mean is different on every machine.
+
 ### Autoloaded functions
 
 `~/.config/oslo/functions/NAME.sh` defines `NAME`, and is not read until something calls it.
