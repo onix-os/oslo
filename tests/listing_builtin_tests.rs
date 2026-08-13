@@ -22,13 +22,15 @@ use common::{run, run_in};
 ///
 /// `$OSLO_SESSION` is excluded for the same reason and is the same kind of thing: two runs are two
 /// sessions, and a `set` that printed one id for both would mean a shell could not tell its own
-/// session from another's.
+/// session from another's. `$OSLO_NESTED_PID` is a third: it names *this* shell, so two runs must
+/// disagree about it or nothing below could tell a live shell above from a remembered one.
 #[test]
 fn set_listing_is_deterministic() {
     let script = "a=1; b=2; c=3; f() { echo one; }; g() { echo two; }; set";
+    let per_process = ["PWD=", "OSLO_SESSION=", "OSLO_NESTED_PID="];
     let without_pwd = |text: &str| -> String {
         text.lines()
-            .filter(|line| !line.starts_with("PWD=") && !line.starts_with("OSLO_SESSION="))
+            .filter(|line| !per_process.iter().any(|name| line.starts_with(name)))
             .map(|line| format!("{line}\n"))
             .collect()
     };

@@ -50,6 +50,16 @@ pub const VARIABLE: &str = "OSLO_NESTED";
 /// for every pane on the machine.
 const TERMINAL: &str = "OSLO_NESTED_TTY";
 
+/// The shell that published the count, by process id.
+///
+/// **The terminal alone is not enough, because an environment can outlive the thing it describes.**
+/// A `tmux` or `hexe` server keeps the variables it was started with for as long as it runs, and
+/// hands them to every pane it opens for the rest of the week — so a count can arrive from a shell
+/// that exited days ago. A pid can be checked: the shell you are supposedly inside has to be a
+/// process that is still running *and* still between this one and the terminal, or there is nothing
+/// to `exit` back into.
+const OWNER: &str = "OSLO_NESTED_PID";
+
 /// This shell's own depth, fixed for its lifetime.
 static DEPTH: OnceLock<usize> = OnceLock::new();
 
@@ -60,10 +70,11 @@ static DEPTH: OnceLock<usize> = OnceLock::new();
 /// opened that it was a level deeper than it is.
 pub fn begin() -> usize {
     let here = terminal();
-    let level = next(inherited(), here_too(here.as_deref()));
+    let level = next(inherited(), inside(here.as_deref()));
     // SAFETY: called once, from `main`, before any thread is started — as `session::begin` is.
     unsafe {
         std::env::set_var(VARIABLE, level.to_string());
+        std::env::set_var(OWNER, std::process::id().to_string());
         match &here {
             Some(tty) => std::env::set_var(TERMINAL, tty),
             // Removed rather than left behind: an inherited terminal that is not ours would make
@@ -81,7 +92,7 @@ pub fn begin() -> usize {
 pub fn depth() -> usize {
     *DEPTH.get_or_init(|| {
         inherited()
-            .filter(|_| here_too(terminal().as_deref()))
+            .filter(|_| inside(terminal().as_deref()))
             .unwrap_or(0)
     })
 }
@@ -124,14 +135,64 @@ fn terminal() -> Option<String> {
     })
 }
 
-/// Whether the shell that published the count was looking at the same screen this one is.
+/// Whether this shell really is inside the one that published the count.
 ///
-/// **Neither having a terminal counts as the same**, which is what keeps a chain of scripts
-/// counting: two shells in a CI runner are as nested as two shells in a terminal, and there is
-/// nobody there for the difference to matter to. One having one and the other not is a change of
-/// screen like any other.
-fn here_too(here: Option<&str>) -> bool {
-    std::env::var(TERMINAL).ok().as_deref() == here
+/// Two things have to hold, and each catches what the other cannot:
+///
+/// * **The same screen.** Neither having a terminal counts as the same, which is what keeps a chain
+///   of scripts counting: two shells in a CI runner are as nested as two in a terminal, and there is
+///   nobody there for the difference to matter to.
+/// * **A live ancestor.** The publisher has to still be running and still be between this process
+///   and the terminal. An environment outlives what it describes — a `tmux` server hands out the
+///   variables it started with for as long as it runs — and this is the half that a stale one
+///   cannot survive.
+fn inside(here: Option<&str>) -> bool {
+    if std::env::var(TERMINAL).ok().as_deref() != here {
+        return false;
+    }
+    match std::env::var(OWNER)
+        .ok()
+        .and_then(|pid| pid.trim().parse().ok())
+    {
+        Some(pid) => ancestor(pid),
+        // No owner named at all: an older oslo published the count, or something else did. The
+        // terminal has already agreed, and refusing here would make the count useless during an
+        // upgrade — the shell above is on this screen, which is what was asked.
+        None => true,
+    }
+}
+
+/// Whether `pid` is a process this one descends from.
+///
+/// Walked through `/proc`, one parent at a time, which is the only place the answer exists. Bounded
+/// because a corrupt chain must not become a loop; nothing real is sixty-four processes deep.
+fn ancestor(pid: u32) -> bool {
+    let mut current = std::process::id();
+    for _ in 0..64 {
+        let Some(parent) = parent_of(current) else {
+            return false;
+        };
+        if parent == pid {
+            return true;
+        }
+        if parent <= 1 {
+            return false;
+        }
+        current = parent;
+    }
+    false
+}
+
+/// The parent of `pid`, from `/proc/<pid>/stat`.
+///
+/// Read after the last `)`, because the second field is the executable's name and a name is allowed
+/// to contain both spaces and parentheses — splitting from the left is the classic way to read the
+/// wrong number out of this file.
+fn parent_of(pid: u32) -> Option<u32> {
+    let stat = std::fs::read_to_string(format!("/proc/{pid}/stat")).ok()?;
+    let after_name = stat.rsplit_once(')')?.1;
+    // state, then ppid.
+    after_name.split_whitespace().nth(1)?.parse().ok()
 }
 
 /// The level below `above`, or the top when this is a screen of its own.
@@ -178,5 +239,31 @@ mod tests {
     fn a_value_that_is_not_a_number_is_not_a_shell() {
         assert_eq!(next(None, true), 0);
         assert_eq!(next(Some(usize::MAX), true), usize::MAX, "no wrap to zero");
+    }
+
+    /// **The shell above has to still be there.** A `tmux` server hands out the environment it was
+    /// started with for as long as it runs, so a count can arrive from a shell that exited days
+    /// ago; a pid is the half of the check that cannot be stale.
+    #[test]
+    fn only_a_live_ancestor_counts() {
+        assert!(
+            ancestor(std::os::unix::process::parent_id()),
+            "the process that started this test is an ancestor of it"
+        );
+        assert!(
+            !ancestor(std::process::id()),
+            "a process is not inside itself"
+        );
+        // A pid that cannot be running: nothing is above the maximum, and a chain that ends at
+        // `init` ends rather than looping.
+        assert!(!ancestor(u32::MAX));
+    }
+
+    /// The name in `/proc/<pid>/stat` may contain spaces and parentheses, which is why the fields
+    /// are read from the right of it.
+    #[test]
+    fn the_parent_is_read_past_the_name() {
+        let mine = parent_of(std::process::id()).expect("this process has a parent");
+        assert_eq!(mine, std::os::unix::process::parent_id());
     }
 }

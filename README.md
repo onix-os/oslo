@@ -470,8 +470,10 @@ oslo, and so on. Every shell publishes it, `-c` and scripts included; only an in
 
 **One terminal, one stack.** A tmux pane, a hexe pod and an ssh login all inherit the count from the
 shell that opened them and none of them is inside it — each runs its shell on a pty of its own, and
-there is nothing there to `exit` back into. So the count travels with the terminal it was set on and
-one arriving from a different screen starts again at `0`.
+there is nothing there to `exit` back into. So a count only counts when two things hold: it was set
+on *this* terminal, and the shell that set it is **still a live ancestor** of this one. A server that
+has been running for a week hands out the environment it started with, so the second half is what a
+stale variable cannot survive. Anything else starts again at `0`.
 
 Asked only when there is a terminal to ask on — `command | oslo -i` is a shell with no person at
 the other end of stdin, and a question there would be answered by the script's first line.
