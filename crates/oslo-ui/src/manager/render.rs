@@ -79,7 +79,16 @@ pub fn ago(now: i64, then: i64) -> String {
 /// The look, with only the two things the preset cannot know set here.
 fn look_of(f: &Frame<'_>) -> Look {
     let mut look = Preset::History.look();
-    look.right = format!("{} @ {{badge}} || {{n}}/{{total}} ", f.source.label());
+    // **Said before the key is pressed**, not after it does nothing: an inherited row has no macro
+    // behind it to open or delete, so Enter and Delete are inert there and the status says which
+    // list you are in and what that means.
+    look.right = match f.source {
+        Source::Stored => format!("{} @ {{badge}} || {{n}}/{{total}} ", f.source.label()),
+        Source::Elsewhere => format!(
+            "{} not editable @ {{badge}} || {{n}}/{{total}} ",
+            f.source.label()
+        ),
+    };
     look.badge = match &f.kind {
         Some(kind) => format!("[{kind}]"),
         None => "[all]".to_string(),

@@ -200,8 +200,16 @@ That is the deliberate half. The database is the one you can change without edit
 can shadow one you wrote in `config.lua` — which is why a shell writes down what its config defined,
 and why the manager can show you both: **Tab** moves between `[stored]` and `[elsewhere]`.
 
-`[elsewhere]` is aliases and abbreviations only. A function is a file on disk and a Lua function is a
-name in a table; there is nothing to enumerate, so that source can never show either.
+`[elsewhere]` is aliases, abbreviations and **every variable this shell has** — which is what makes
+it worth opening: a stored `EDITOR` that never applies because a profile already exported one is
+invisible until the two lists are on the same screen. A function is a file on disk and a Lua function
+is a name in a table; there is nothing to enumerate, so that source can never show either.
+
+**Nothing there is editable.** An inherited row is a fact about this shell, not a record in the
+database: there is no body to open and nothing to delete, so Enter and Delete do nothing and the
+status line says `not editable` before either is pressed. Space still works, because turning one off
+is a decision this shell can carry out — the off list is applied to the merged set, so an alias your
+config defined can be turned off exactly like a stored one.
 
 ## The manager
 
@@ -232,16 +240,17 @@ with nothing to negotiate.
 | type | filter — every column; `#git` asks for a tag, in any order and with anything else |
 | ← → | **the kind**: all of them, then each one in use. Where the finder's scopes are |
 | Tab | **the source**: `[stored]` ↔ `[elsewhere]`. Where the finder's profile is |
-| Enter | **the editor**, for every kind, including an alias |
-| Delete | forget it, after the same question the finder asks |
+| Enter | **the editor**, for every kind, including an alias — `[stored]` only |
+| Delete | forget it, after the same question the finder asks — `[stored]` only |
 | Space | off **for this session** |
 | Space ×3 | off **everywhere**, until three more turn it back on |
 
 Enter is the one that differs from the finder, and it has to: the finder puts a line back on the
 prompt because a past command is something to run again, while a macro is something you keep — and
-what you want from it is to change it. Enter on an `[elsewhere]` row copies it into the database
-first, because a row that came from a file is not ours to write back to. That copy is also how you
-get a configured alias you can turn off.
+what you want from it is to change it. On an `[elsewhere]` row it does nothing at all: that row has
+no record behind it, and an Enter that quietly wrote a *new* macro shadowing the one you were looking
+at would not be the key it looks like. To keep a version of your own, add it — the name is on the
+screen in front of you.
 
 **Off is not gone.** A macro turned off keeps its body, its tags and the day it was made; what
 changes is that it stops applying. Turning off an alias that shadows a configured one uncovers the

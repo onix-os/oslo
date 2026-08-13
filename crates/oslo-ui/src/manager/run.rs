@@ -94,6 +94,13 @@ pub fn open(items: Vec<Item>, seed: &str, backing: &mut dyn Backing) -> Option<O
 
         match pressed {
             Key::Cancel | Key::Abort => return Some(Outcome::Cancelled),
+            // **Only a stored row can be edited or forgotten.** An inherited one is a fact about
+            // this shell — an alias your config defined, a variable your profile exported — and
+            // there is no row in the database to open in an editor or to delete. Opening one
+            // anyway would write a *new* macro that shadows it, which is a different thing from
+            // what Enter looks like it does; doing nothing is the honest answer, and the status
+            // line says so before the key is pressed.
+            Key::Accept | Key::Delete if state.selected().is_some_and(|item| !item.stored) => {}
             Key::Accept => {
                 let item = state.selected()?.clone();
                 return Some(Outcome::Edit {
@@ -376,6 +383,14 @@ impl State {
         let Some(item) = self.selected().cloned() else {
             return;
         };
+        // **Nothing to forget.** An inherited row has no record in the database; removing it would
+        // be removing something from a place it was never in, and the row would come back the next
+        // time the shell published what your config defines. The key loop refuses before the
+        // question is asked, and this refuses again — a guard that only lives in the key loop is
+        // one the next caller does not have.
+        if !item.stored {
+            return;
+        }
         backing.act(&item, Act::Forget);
         self.items.retain(|row| row.key() != item.key());
         let was = self.selected;

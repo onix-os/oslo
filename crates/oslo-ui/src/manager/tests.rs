@@ -139,6 +139,33 @@ fn tab_moves_between_the_database_and_the_config() {
     assert_eq!(state.kind(), None, "the old source’s kind does not follow");
 }
 
+/// **An inherited row is not editable and not deletable**, because there is no macro behind it —
+/// only an alias your config defined or a variable your profile exported. Enter used to open an
+/// editor and store a *new* macro shadowing it, which is not what the key looks like it does.
+#[test]
+fn an_inherited_row_cannot_be_edited_or_forgotten() {
+    let mut backing = Recorded::default();
+    let mut config = item("var", "EDITOR", &[]);
+    config.stored = false;
+    let mut state = state(vec![config]);
+    state.next_source();
+    assert_eq!(state.source, Source::Elsewhere);
+    assert_eq!(state.shown.len(), 1);
+
+    state.forget_selected(&mut backing);
+    assert!(
+        backing.0.is_empty(),
+        "something was removed from a database it was never in: {:?}",
+        backing.0
+    );
+    assert_eq!(state.shown.len(), 1, "and the row is still there");
+
+    // A stored one, for contrast, goes.
+    let mut stored = State::new(vec![item("alias", "gs", &[])], "");
+    stored.forget_selected(&mut backing);
+    assert_eq!(backing.0, [("alias/gs".to_string(), Act::Forget)]);
+}
+
 /// One space is the session, and it toggles.
 #[test]
 fn a_space_turns_it_off_for_the_session_and_a_second_puts_it_back() {
