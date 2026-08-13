@@ -8,11 +8,16 @@ use std::io::Write;
 use std::process::{Command, Stdio};
 
 /// Run `oslo secret …` against a store of its own, with `input` on standard input.
+///
+/// The key goes under `$XDG_STATE_HOME`, which is a different directory on purpose — both are
+/// pointed at the same temporary root here only so a test cleans up after itself.
 fn secret(store: &std::path::Path, args: &[&str], input: &[u8]) -> (String, String, i32) {
     let mut child = Command::new(oslo_bin())
         .arg("secret")
         .args(args)
         .env("XDG_DATA_HOME", store)
+        .env("XDG_STATE_HOME", store.join("state"))
+        .env_remove("OSLO_SECRET_IDENTITY")
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
@@ -76,7 +81,7 @@ fn the_identity_is_private_from_the_start() {
     let store = tempfile::tempdir().expect("tempdir");
     secret(store.path(), &["set", "token"], b"value");
 
-    let identity = store.path().join("oslo/secrets/identity");
+    let identity = store.path().join("state/oslo/identity");
     let mode = std::fs::metadata(&identity)
         .expect("an identity")
         .permissions()
@@ -85,6 +90,95 @@ fn the_identity_is_private_from_the_start() {
     assert_eq!(
         mode, 0o600,
         "the key is readable by somebody else: {mode:04o}"
+    );
+}
+
+/// **The key is not in the store, and that is the whole arrangement.** The store is encrypted so it
+/// can go in a dotfiles repository; a key inside it would be committed along with it, which turns
+/// the feature into the accident it exists to prevent.
+#[test]
+fn the_key_is_not_where_the_secrets_are() {
+    let store = tempfile::tempdir().expect("tempdir");
+    secret(store.path(), &["set", "token"], b"value");
+
+    let secrets = store.path().join("oslo/secrets");
+    assert!(secrets.join("token.age").exists(), "the store is here");
+    let stray: Vec<_> = std::fs::read_dir(&secrets)
+        .expect("a store")
+        .flatten()
+        .map(|e| e.file_name().to_string_lossy().into_owned())
+        .filter(|name| !name.ends_with(".age"))
+        .collect();
+    assert!(
+        stray.is_empty(),
+        "something other than ciphertext: {stray:?}"
+    );
+}
+
+/// `$OSLO_SECRET_IDENTITY` puts the key anywhere — a USB stick, an encrypted volume, `~/.ssh`.
+#[test]
+fn the_key_can_be_put_anywhere() {
+    let store = tempfile::tempdir().expect("tempdir");
+    let elsewhere = tempfile::tempdir().expect("tempdir");
+    let key = elsewhere.path().join("deep/inside/identity");
+
+    let run = |args: &[&str], input: &[u8]| {
+        let mut child = Command::new(oslo_bin())
+            .arg("secret")
+            .args(args)
+            .env("XDG_DATA_HOME", store.path())
+            .env("OSLO_SECRET_IDENTITY", &key)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .spawn()
+            .expect("spawn oslo");
+        child
+            .stdin
+            .as_mut()
+            .expect("stdin")
+            .write_all(input)
+            .expect("write");
+        let out = child.wait_with_output().expect("wait");
+        String::from_utf8_lossy(&out.stdout).to_string()
+    };
+
+    run(&["set", "token"], b"value");
+    assert!(
+        key.exists(),
+        "the key was not written where it was asked for"
+    );
+    assert_eq!(run(&["get", "token"], b""), "value");
+}
+
+/// **A key under a `.git` is one `git add -A` from being published**, and the person that happens
+/// to did not choose it — they moved a directory a year later. Saying so is the only defence a
+/// shell has.
+#[test]
+fn a_key_inside_a_repository_is_called_out() {
+    let store = tempfile::tempdir().expect("tempdir");
+    let repository = tempfile::tempdir().expect("tempdir");
+    // A repository, not merely a directory with the name — an empty `.git` is neither, and the
+    // check knows the difference.
+    std::fs::create_dir_all(repository.path().join(".git")).expect("a repository");
+    std::fs::write(
+        repository.path().join(".git/HEAD"),
+        "ref: refs/heads/main\n",
+    )
+    .expect("a HEAD");
+    let key = repository.path().join("state/identity");
+
+    let out = Command::new(oslo_bin())
+        .args(["secret", "list"])
+        .env("XDG_DATA_HOME", store.path())
+        .env("OSLO_SECRET_IDENTITY", &key)
+        .output()
+        .expect("spawn oslo");
+    let said = String::from_utf8_lossy(&out.stderr);
+    assert!(said.contains("inside the git repository"), "{said:?}");
+    assert!(
+        said.contains("OSLO_SECRET_IDENTITY"),
+        "a way out is named: {said:?}"
     );
 }
 

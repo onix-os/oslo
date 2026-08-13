@@ -11,14 +11,26 @@
 
 use oslo::secrets;
 
-const USAGE: &str = "usage: oslo secret set|get|list|rm [NAME]\n\
+const USAGE: &str = "usage: oslo secret set|get|list|rm|where [NAME]\n\
                      \n\
                      \x20 set NAME    read a value from standard input and keep it encrypted\n\
                      \x20 get NAME    write that value to standard output\n\
                      \x20 list        the names kept here\n\
-                     \x20 rm NAME     forget one";
+                     \x20 rm NAME     forget one\n\
+                     \x20 where       the store and the key, and which of them may be committed";
 
 pub fn run(args: &[String]) -> i32 {
+    // Said once, wherever the command is going: a key under a `.git` is one `git add -A` from being
+    // published, and the person it happens to did not choose it — they moved a directory.
+    if let Some(repository) = secrets::identity_in_a_repository() {
+        eprintln!(
+            "oslo secret: the key is inside the git repository at {}",
+            repository.display()
+        );
+        eprintln!(
+            "oslo secret: move it with $OSLO_SECRET_IDENTITY, or the next commit publishes it"
+        );
+    }
     match args.first().map(String::as_str) {
         Some("set") => match args.get(1) {
             Some(name) => set(name),
@@ -39,6 +51,23 @@ pub fn run(args: &[String]) -> i32 {
             for name in secrets::names() {
                 println!("{name}");
             }
+            0
+        }
+        // **Two directories with opposite rules, so say which is which.** The whole point of the
+        // store being encrypted is that it can be committed; the whole point of the key being
+        // elsewhere is that it cannot.
+        Some("where" | "paths") => {
+            let unknown = std::path::PathBuf::from("(nowhere: no $HOME)");
+            println!(
+                "store     {}   encrypted, safe to commit",
+                secrets::directory()
+                    .unwrap_or_else(|| unknown.clone())
+                    .display()
+            );
+            println!(
+                "key       {}   never commit this",
+                secrets::identity_path().unwrap_or(unknown).display()
+            );
             0
         }
         Some("-h" | "--help" | "help") => {
