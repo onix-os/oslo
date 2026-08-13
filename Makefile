@@ -99,7 +99,7 @@ r: run
 # of ours. Nor is it plain `cargo test`: that is the root package alone, and the moment code moved
 # into `crates/` its tests silently stopped running — a suite that quietly shrinks is worse than
 # one that fails. Excluding by name states which code is somebody else's; see `vendor/README.md`.
-OURS := --workspace --exclude brush-parser --exclude full_moon --exclude full_moon_derive
+OURS := --workspace --exclude argc --exclude brush-parser --exclude full_moon --exclude full_moon_derive
 
 # `--all-features`, like `check` and `clippy` beside it. Without it the tests behind a feature were
 # compiled by `check` and then never *run* — `vista`'s and `tab`'s both — so a suite that looked

@@ -73,6 +73,23 @@ nix = ["oslo-shell/nix", "oslo-runtime/nix"]
 # *written against* is still there, so the same Lua runs from `conf.d` in either binary.
 plugin = ["oslo-runtime/plugin"]
 
+# `argc` — the shell parses its own scripts' arguments, and other people's.
+#
+# `argc` is a CLI framework for bash: a script declares its options as comments and calls
+# `eval "$(argc --argc-eval "$0" "$@")"` to have them parsed. With this feature oslo *is* that
+# parser, in two forms — `oslo --argc-eval` for a bash script, and the `argc` builtin for a script
+# oslo runs itself, which applies the parse to the environment directly rather than through a
+# subprocess and an `eval`.
+#
+# **Off, and measured: 439 KB.** A minimal binary calling `argc::eval` at this profile went from
+# 292,376 to 731,600 bytes — larger than `direnv` and `plugin` together, and it brings six crates
+# oslo does not otherwise link, `nom` among them. A `/bin/sh` has no business parsing argument
+# declarations for other people's scripts, so a distribution ships this off.
+#
+# Without it there is no `--argc-eval`, no `argc` builtin and no completion from a script's
+# comments; the word `argc` falls through to `$PATH`, so the real one still works.
+argc = ["oslo-shell/argc", "oslo-runtime/argc", "dep:argc"]
+
 [dependencies]
 # The Lua front end, in the same relationship to Lua that brush-parser has to the shell: it parses
 # and nothing else. Evaluation is oslo's own, in `src/lua/eval/`, so that both languages run on one
@@ -82,6 +99,13 @@ plugin = ["oslo-runtime/plugin"]
 # compiled 30k lines of C into the binary, so a static musl build needed a C toolchain, and Lua
 # values lived in a separate VM that the shell could only pass strings across. See PLAN-LUA.md.
 full_moon = { path = "vendor/full_moon", default-features = false, features = ["lua54"] }
+# `argc`, behind the feature of the same name. Only the parts a caller needs: the parse and the
+# match (`eval`), the bash renderer for `--argc-eval`, and the completion generator. `native-runtime`
+# is deliberately absent — oslo implements `argc::Runtime` over its own facilities, which is what
+# lets a script's own functions run in this shell rather than in a bash it has to go and find.
+argc = { path = "vendor/argc", default-features = false, features = [
+    "eval", "eval-bash", "compgen",
+], optional = true }
 # `resource` is what `ulimit` reads and sets limits through, and what `times` reads getrusage(2)
 # through. Without it both had to parse /proc by hand.
 # `poll` is declared here rather than arriving by accident. It used to come from rustyline's own
@@ -167,6 +191,7 @@ members = [
   "crates/oslo-runtime",
   "crates/oslo-shell",
   "crates/oslo-ui",
+  "vendor/argc",
   "vendor/brush-parser",
   "vendor/full_moon",
   "vendor/full_moon/derive",
@@ -265,6 +290,13 @@ opt-level = 3
 # 2.55 µs built for size, 2.24 and 2.29 built for speed, against 2.21 before any of this. The other
 # 160 KB is the cheapest 160 KB in the binary.
 [profile.release.package.oslo-ui]
+opt-level = 3
+
+# **Vendored, so it is built the way oslo's own crates are.** `argc` parses a script's comments and
+# then matches every argument against them; it runs once per invocation of a script that uses it,
+# which is the shape that pays for speed. `"s"` would be saving bytes on a feature whose whole cost
+# is already paid the moment it is switched on.
+[profile.release.package.argc]
 opt-level = 3
 
 # **`"*"` does not reach oslo's own crates, and that is cargo's rule rather than luck.**

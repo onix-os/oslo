@@ -56,7 +56,7 @@ pub fn write_to(path: &std::path::Path, entries: &[Entry]) -> Result<(), String>
     file.write_all(text.as_bytes())
         .map_err(|e| format!("{}: {}", scratch.display(), crate::error::reason(&e)))?;
     drop(file);
-    std::fs::rename(&scratch, &path)
+    std::fs::rename(&scratch, path)
         .map_err(|e| format!("{}: {}", path.display(), crate::error::reason(&e)))
 }
 

@@ -172,6 +172,10 @@ pub fn register_default_builtins(env: &mut Environment) {
     env.register_custom_builtin("dirh", directories::ring::builtin_dirh);
     #[cfg(feature = "direnv")]
     env.register_custom_builtin("direnv", direnv::builtin_direnv);
+    // A script's own arguments, parsed from the comments that declare them. A builtin rather than
+    // the `eval "$(argc …)"` line bash needs, because the parser is linked in — see `crate::argc`.
+    #[cfg(feature = "argc")]
+    env.register_custom_builtin("argc", crate::argc::builtin_argc);
 
     // Job control. `wait` is registered above but belongs with these: all five read one table.
     env.register_custom_builtin("jobs", builtin_jobs);

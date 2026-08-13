@@ -1,0 +1,47 @@
+[package]
+name = "argc"
+version = "1.24.0"
+edition = "2021"
+authors = ["sigoden <sigoden@gmail.com>"]
+description = "A bash cli framework, also a bash-based command runner"
+license = "MIT OR Apache-2.0"
+homepage = "https://github.com/sigoden/argc"
+repository = "https://github.com/sigoden/argc"
+autotests = false
+categories = ["command-line-utilities", "development-tools"]
+keywords = ["cli", "bash", "runner", "arg", "parser"]
+
+[features]
+# **No `application` feature and no binary.** Upstream builds `argc` itself from this crate; here
+# oslo is the application, so `src/bin/` is not vendored and the feature that turned it on is gone
+# with it. What is left is the set a library caller picks from.
+default = []
+native-runtime = ["which"]
+eval = ["natord"]
+eval-bash = ["eval"]
+build = []
+mangen = ["roff"]
+completions = []
+compgen = ["dirs", "natord"]
+export = ["serde_json", "indexmap/serde"]
+wrap-help = ["textwrap"]
+
+# Four optional dependencies are gone with the binary: `num_cpus`, `threadpool` and `base64` were
+# `--argc-parallel`, and `path-absolutize` was the application's path handling. Nothing under
+# `src/` names any of them.
+[dependencies]
+anyhow = "1"
+convert_case = "0.11.0"
+indexmap = { version = "2.10.0" }
+nom = "8.0.0"
+either = "1.15.0"
+serde = { version = "1", features = ["derive"] }
+serde_json = { version = "1", features = ["preserve_order"], optional = true }
+which = { version = "8.0.0", optional = true }
+shell-words = "1.1.0"
+textwrap = { version = "0.16.2", optional = true }
+dirs = { version = "6.0.0", optional = true }
+natord = { version = "1.0.9", optional = true }
+roff = { version = "1.0.0", optional = true }
+unicode-width = "0.2.1"
+

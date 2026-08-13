@@ -146,6 +146,9 @@ fn dispatch() {
     };
 
     match invocation.action {
+        // Not a shell invocation: oslo is the `argc` binary for one command, prints and exits.
+        #[cfg(feature = "argc")]
+        cli::Action::ArgcEval(ref words) => std::process::exit(cli::argc::eval(words)),
         // `oslo history …` — reached only when no file of that name exists, so this never takes
         // an invocation a script could have wanted. See `cli::tools::as_operand`.
         Action::Tool(ref name, ref args) => {
