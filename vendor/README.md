@@ -9,15 +9,27 @@ Two parsers oslo does not write and does not want to depend on remotely. `full_m
 proc-macro in `full_moon/derive`: a `proc-macro = true` crate can only export macros, so it cannot
 live *inside* another crate, so nesting the directory is as close to one unit as cargo permits.
 
-Both are hard forks: the source is here, oslo builds it as a workspace member, and there is no
-upstream to sync with. That is what separates them from an ordinary dependency, and the reason
-`vista` briefly sat here and no longer does — see *Not here* below.
+`brush-parser` and `full_moon` are hard forks: the source is here, oslo builds it as a workspace
+member, and there is no upstream to sync with.
+
+**`argc` is not.** It is actively developed, and oslo tracks it: this is 1.24.0, and a later release
+is a rebase rather than a fork's divergence. What that costs is written down — the modifications are
+few and listed below, so a rebase is a readable diff rather than an archaeology exercise:
+
+| what | why |
+|---|---|
+| `src/bin/` removed, with the `application` feature and four dependencies only it used | oslo is the application |
+| `#![allow(…)]` at the top of `lib.rs` | oslo lints at `-D warnings`; what is unused is unused only because oslo builds a subset of the features |
+| `pub use anyhow;` | so a caller implementing `Runtime` can name `anyhow::Result` without depending on the crate for one type |
+
+Nothing else is touched, and nothing is restyled.
 
 **oslo is MIT. `full_moon` and `full_moon/derive` are MPL-2.0 and remain so.** See *Licences* below
 before copying anything out of this directory.
 
 | crate | upstream | licence | why it is here |
 |---|---|---|---|
+| `argc` | [sigoden/argc](https://github.com/sigoden/argc) | MIT OR Apache-2.0 | the `# @option` declaration language, behind the `argc` feature |
 | `brush-parser` | [reubeno/brush](https://github.com/reubeno/brush) | MIT | POSIX/bash tokenizer and parser |
 | `full_moon` | [Kampfkarren/full-moon](https://github.com/Kampfkarren/full-moon) | **MPL-2.0** | Lua parser |
 |`full_moon/derive` | as above | **MPL-2.0** | proc-macro `full_moon` needs; not published as a standalone path dep |

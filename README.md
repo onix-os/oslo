@@ -166,6 +166,23 @@ last, so it wins.
 
 [Macros](docs/features/macros.md) has the whole of it.
 
+### Arguments, declared in comments
+
+```sh
+#!/usr/bin/env oslo
+# @option -t --tries <N>   how many times
+# @arg    target!          where to
+argc "$@"
+echo "$argc_target, $argc_tries times"
+```
+
+[argc](https://github.com/sigoden/argc)'s declaration language, vendored and parsed by the shell
+itself: `--help` is generated, a bad flag is reported, and `deploy --<Tab>` completes from the same
+comments with no completion file to install. A bash script gets the same parser through
+`eval "$(oslo --argc-eval "$0" "$@")"` — oslo is a drop-in for the `argc` binary.
+
+Behind the `argc` feature. [The whole of it](docs/features/argc.md).
+
 ### Keys that run your code
 
 ```lua
@@ -1171,7 +1188,7 @@ nix build         # static musl binary
 
 ### Optional features
 
-All five are off *by default*, and off for the same reason: a shell that is going to be `/bin/sh`
+All six are off *by default*, and off for the same reason: a shell that is going to be `/bin/sh`
 should carry what every session needs and nothing else. `make build` turns them on, because
 somebody building from source is asking for the shell rather than for the floor; the published
 release artifact is the default build.
@@ -1186,6 +1203,7 @@ static musl binary — 5,266,368 bytes with none of them, 6,013,312 with all fiv
 | `nix` | +60 KB | `oslo.nix` — every `nix --json` answer as a Lua table, and flake-output completion |
 | `scratch` | +48 KB | named sessions that outlive their terminal, and the key that finds them |
 | `plugin` | +108 KB | `oslo plugin` — installing somebody else's Lua, and loading it on first use. `oslo.db` and the `pre-cmd` veto a plugin is written against are in **every** build |
+| `argc` | +308 KB | a script declares its options in comments and the shell parses them: the `argc` builtin, `oslo --argc-eval` for bash scripts, and completion from those comments. The largest of the six, and the only one that vendors a parser |
 
 ```sh
 make build                  # static release, every feature on

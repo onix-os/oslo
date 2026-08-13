@@ -27,6 +27,7 @@
 //! `oslo --argc-eval` exists too, for bash scripts; see `src/cli.rs`. Both are the same parse.
 
 mod call;
+pub mod complete;
 mod runtime;
 
 use crate::env::Environment;

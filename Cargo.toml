@@ -81,10 +81,19 @@ plugin = ["oslo-runtime/plugin"]
 # oslo runs itself, which applies the parse to the environment directly rather than through a
 # subprocess and an `eval`.
 #
-# **Off, and measured: 439 KB.** A minimal binary calling `argc::eval` at this profile went from
-# 292,376 to 731,600 bytes — larger than `direnv` and `plugin` together, and it brings six crates
-# oslo does not otherwise link, `nom` among them. A `/bin/sh` has no business parsing argument
-# declarations for other people's scripts, so a distribution ships this off.
+# **Off, and measured: 308 KB.** The real binary, built both ways at this profile:
+#
+# ```text
+#   every feature but this one   6,160,768 bytes
+#   with it                      6,476,160 bytes    +315,392
+# ```
+#
+# An isolated test binary had predicted 439 KB; the difference is what fat LTO shares with crates
+# oslo already links. Still larger than `direnv` and `plugin` together, and it brings five crates
+# oslo does not otherwise have — `nom` among them, a second parser-combinator library in a tree
+# whose argument is that it owns its parsers. It parses *comments*, which is where that line is
+# drawn. A `/bin/sh` has no business parsing argument declarations for other people's scripts, so a
+# distribution ships this off.
 #
 # Without it there is no `--argc-eval`, no `argc` builtin and no completion from a script's
 # comments; the word `argc` falls through to `$PATH`, so the real one still works.
