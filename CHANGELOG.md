@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.3.5] - 2026-08-13
+
+### <!-- 1 -->🐛 Bug Fixes
+
+- The shell above must still be there
+
 ## [0.3.4] - 2026-08-13
 
 ### <!-- 1 -->🐛 Bug Fixes
