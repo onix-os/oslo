@@ -311,7 +311,14 @@ the thing a profile could never be.
 oslo macros add --alias gs 'git status --short' --tag git --tag system
 ```
 
-← and → move through the tags in use, in the place the finder puts its scopes.
+**A tag is asked for by typing it**, `#git`, in the search bar with everything else — in any order,
+`#ai tool` or `tool #ai` or `#ai` alone, and scoped to the kind you are looking at. The tags are
+taken out of the query and the rest is fuzzy-matched.
+
+That is a deliberate swap. ← and → used to walk the tags, which spent the arrow keys — the most
+obvious pair on the keyboard — on the one filter that already has a spelling you can type. They walk
+the [kinds](#the-five-kinds-and-why-there-are-five) instead, which is the division a list of five
+kinds is actually navigated by and the one thing you cannot type.
 
 ## Where it lives
 

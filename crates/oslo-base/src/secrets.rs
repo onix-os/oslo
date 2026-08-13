@@ -173,9 +173,9 @@ pub fn set(name: &str, value: &[u8]) -> Result<(), String> {
 
     let encryptor = age::Encryptor::with_recipients([&identity.to_public() as _].into_iter())
         .map_err(|e| format!("{e}"))?;
-    let mut armoured = Vec::new();
+    let mut ciphertext = Vec::new();
     let mut writer = encryptor
-        .wrap_output(&mut armoured)
+        .wrap_output(&mut ciphertext)
         .map_err(|e| format!("{e}"))?;
     writer.write_all(value).map_err(|e| format!("{e}"))?;
     writer.finish().map_err(|e| format!("{e}"))?;
@@ -192,7 +192,7 @@ pub fn set(name: &str, value: &[u8]) -> Result<(), String> {
             .mode(0o600)
             .open(&scratch)
             .map_err(|e| format!("{}: {e}", scratch.display()))?;
-        file.write_all(&armoured)
+        file.write_all(&ciphertext)
             .map_err(|e| format!("{}: {e}", scratch.display()))?;
     }
     std::fs::rename(&scratch, &path).map_err(|e| format!("{}: {e}", path.display()))

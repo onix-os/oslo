@@ -1,5 +1,15 @@
 use super::*;
 
+/// Held for the whole of any test that touches the held line, the position or the last failure.
+///
+/// Those live in one slot for the process, and `cargo test` runs this file's tests on several
+/// threads at once — so two of them calling `forget_shared` interleaved is a failure that appears
+/// perhaps one run in ten and never on its own.
+fn shared() -> std::sync::MutexGuard<'static, ()> {
+    static LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    LOCK.lock().unwrap_or_else(|held| held.into_inner())
+}
+
 /// A recorded command, as the log would have it.
 fn entry(session: u32, seq: u32, line: &str) -> Entry {
     Entry {
@@ -279,6 +289,7 @@ fn only_a_line_that_worked_is_learned() {
 /// The held line is learned at the command boundary, not when it was logged.
 #[test]
 fn a_line_is_learned_when_its_status_arrives() {
+    let _held = shared();
     forget_shared();
     record(&entry(9, 1, "cargo build"), 1);
     assert!(!ready(), "learning before the status is what this prevents");
@@ -299,6 +310,7 @@ fn a_line_is_learned_when_its_status_arrives() {
 /// offering nothing.
 #[test]
 fn the_last_failure_is_remembered_until_something_works() {
+    let _held = shared();
     forget_shared();
     record(&entry(8, 1, "ehco alpha"), 1);
     settle(Some(127));

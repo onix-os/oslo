@@ -67,7 +67,26 @@ script deploy #work
 script backup #work
 	#!/bin/sh
 	rsync -a --delete "$1" /srv/backup/
+var EDITOR #shell
+	hx
+var PAGER #shell
+	bat
 EOF
+fi
+
+# A secret, and a variable whose body goes and fetches it — the pair the `secrets` demo is about.
+# Kept out of the import above because it is written through `oslo secret`, which is the door a
+# person uses, and because a store seeded any other way would not have an identity beside it.
+#
+# `$WORK-key` rather than `$WORK/data`: the key does not live where the ciphertext lives, which is
+# the whole arrangement — and outside the work tree, which is a git repository, or the shell would
+# rightly say the key is one commit from being published.
+if [ -x "$OSLO" ] && "$OSLO" secret --help >/dev/null 2>&1; then
+    mkdir -p "$WORK/data" "$WORK-key"
+    printf %s 'demo-not-a-real-github-token' |
+        XDG_DATA_HOME="$WORK/data" XDG_STATE_HOME="$WORK-key" "$OSLO" secret set gh-token
+    XDG_DATA_HOME="$WORK/data" XDG_STATE_HOME="$WORK-key" "$OSLO" macros add \
+        --var 'GITHUB_TOKEN=$(oslo secret get gh-token)' --tag work >/dev/null
 fi
 
 # Two scripts that declare their arguments in comments, for the `argc` demos: one oslo, one bash.

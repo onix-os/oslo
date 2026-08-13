@@ -86,10 +86,26 @@ pub fn run(args: &[String]) -> i32 {
 /// **A trailing newline is dropped**, because the value came from a line somebody typed or from a
 /// `printf` in a script, and a token with `\n` on the end fails authentication in a way that takes
 /// an hour to find.
+///
+/// **At a terminal it is asked for instead**, masked, by the shell's own `ui input`. Standard input
+/// there is the keyboard, so reading it to end of file means the value is typed in the clear, into
+/// the scrollback, and finished with a Ctrl-D nobody is told about.
 fn set(name: &str) -> i32 {
-    use std::io::Read;
+    use std::io::{IsTerminal, Read};
     let mut value = Vec::new();
-    if let Err(e) = std::io::stdin().read_to_end(&mut value) {
+    if std::io::stdin().is_terminal() {
+        let asked = oslo_ui::ask::input(&oslo_ui::ask::Input {
+            prompt: format!("{name}: "),
+            password: true,
+            required: true,
+            ..Default::default()
+        });
+        match asked {
+            oslo_ui::ask::Answer::Given(typed) => value = typed.into_bytes(),
+            oslo_ui::ask::Answer::Cancelled => return 1,
+            oslo_ui::ask::Answer::NoTerminal => return fail("nothing to read the value from"),
+        }
+    } else if let Err(e) = std::io::stdin().read_to_end(&mut value) {
         return fail(&format!("cannot read standard input: {e}"));
     }
     if value.last() == Some(&b'\n') {
