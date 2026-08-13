@@ -24,6 +24,7 @@ pub mod language;
 pub mod lua_init;
 pub mod mode;
 pub mod native;
+mod nested;
 mod plugins;
 pub mod prompt;
 pub mod rc;

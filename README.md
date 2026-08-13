@@ -446,6 +446,32 @@ without pretending that a command ran. OSC 7 publishes the working directory, OS
 OSC 8 carries Oslo-owned hyperlinks, and OSC 52 powers the `copy` builtin over SSH. OSC 52 can still
 be refused by the terminal's clipboard policy.
 
+### A shell inside a shell says so
+
+```text
+You are already in oslo. Start a nested shell? (one deep)
+
+  Nested shell   Stay here
+
+←→ choose • y/n answer • enter confirm
+```
+
+Typing `oslo` at an oslo prompt has always worked and never said anything, which is the problem: the
+new shell looks exactly like the old one, so the usual way to find out you are two deep is an `exit`
+later that does not close the terminal. Enter answers "stay here", because that is the answer you
+cannot regret.
+
+`$OSLO_NESTED` counts, for a prompt that wants to show it — `0` in a fresh terminal, `1` inside one
+oslo, and so on. Every shell publishes it, `-c` and scripts included; only an interactive one asks.
+
+```sh
+[ "${OSLO_NESTED:-0}" -gt 0 ] && printf '⧉%s ' "$OSLO_NESTED"
+```
+
+Asked only when there is a terminal to ask on — `command | oslo -i` is a shell with no person at
+the other end of stdin, and a question there would be answered by the script's first line.
+`oslo.misc.nested_ask = false` turns it off for somebody who nests on purpose; the count stays.
+
 ### Copying what a command printed
 
 ```sh
@@ -761,6 +787,7 @@ oslo.misc.welcome       = true        -- the startup banner
 oslo.misc.greeting      = nil         -- a line of your own instead of the banner
 oslo.misc.escape_delay  = 25          -- ms to wait for the rest of an escape sequence; raise on ssh
 oslo.misc.color_depth   = nil         -- truecolor / 256 / 16 / none, when detection is wrong
+oslo.misc.nested_ask    = true        -- ask before starting an oslo inside an oslo
 
 oslo.vi.enabled         = false       -- vi mode; true for vi, false for emacs only
 oslo.vi.cursor_insert   = "line"      -- block / line / underscore, each + " blink"

@@ -163,19 +163,29 @@ fn dispatch() {
         // **`-c` is always shell.** Every `sh -c` idiom in the world depends on it, and no amount
         // of detection is worth being wrong about that one.
         Action::Command(ref text) => {
-            oslo::track::session::begin();
+            begin_shell();
             run_program(&invocation, text)
         }
         // A script operand names a file whose language is worked out from the file itself.
         Action::Script(ref path) => {
-            oslo::track::session::begin();
+            begin_shell();
             run_script(&invocation, path)
         }
         Action::Stdin => {
-            oslo::track::session::begin();
+            begin_shell();
             run_stdin(&invocation)
         }
     }
+}
+
+/// What every invocation that *is* a shell says about itself before it runs anything.
+///
+/// Both are stamped here rather than when an `Environment` is built, because a tool builds one too
+/// and is not a shell: it belongs to the session that started it and stands at that session's
+/// depth. See `track::session` and `track::nested`.
+fn begin_shell() {
+    oslo::track::session::begin();
+    oslo::track::nested::begin();
 }
 
 /// A script operand: read it, work out its language, run it.

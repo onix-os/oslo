@@ -34,6 +34,7 @@
 pub mod db;
 pub mod history;
 pub mod log;
+pub mod nested;
 pub mod profile;
 pub mod session;
 pub mod sync;

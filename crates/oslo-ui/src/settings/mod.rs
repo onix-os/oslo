@@ -303,6 +303,12 @@ pub struct Misc {
     /// over ssh, under a CI runner. A config that knows what it is talking to should be able to
     /// say so.
     pub color_depth: Option<String>,
+    /// Whether an interactive oslo started inside another one asks before nesting.
+    ///
+    /// **On by default**, because a nested shell is invisible: it looks like the shell you were
+    /// already at, and the usual way to find out is an `exit` that does not close the terminal.
+    /// Off is for somebody who nests deliberately — `$OSLO_NESTED` still counts either way.
+    pub nested_ask: bool,
     /// Whether `--help` reports what is wrong with this installation.
     ///
     /// **On by default**, because the things it checks are ones you cannot see from inside a
@@ -323,6 +329,7 @@ impl Default for Misc {
             // that Esc feels immediate.
             escape_delay: 25,
             color_depth: None,
+            nested_ask: true,
             warnings: true,
         }
     }
