@@ -38,6 +38,7 @@
 //! the rule `exec::simple::autoload` states — so it costs a database open only on a line that was
 //! going to fail anyway, and nothing at startup.
 
+pub mod bin;
 pub mod live;
 pub mod snapshot;
 
@@ -390,9 +391,25 @@ pub fn remove_and_publish(store: &Store, kind: Kind, name: &str) -> Result<bool,
     Ok(gone)
 }
 
-/// Rewrite the snapshot from what the database now says.
+/// Rewrite everything derived from what the database now says.
+///
+/// Two files, one rule: the database is the only thing anybody edits, and every copy of it is
+/// rewritten by whatever changed it. [`mod@snapshot`] is what a starting shell reads; [`bin`] is what
+/// everything that is not oslo runs.
 pub fn publish(store: &Store) -> Result<(), String> {
-    snapshot::write(&all(store))
+    let entries = all(store);
+    snapshot::write(&entries)?;
+    // **A failure here is reported, not fatal.** The scripts on disk are a convenience for other
+    // programs; a `$HOME` that cannot be written to is a reason to say so and still have stored the
+    // macro, which is what the database already did.
+    if let Err(problem) = bin::publish(&entries) {
+        crate::messages::say(
+            crate::messages::Level::Warn,
+            "macros",
+            format!("the scripts could not be written out: {problem}"),
+        );
+    }
+    Ok(())
 }
 
 #[cfg(test)]

@@ -33,7 +33,34 @@ pub fn resolve_program(name: &str) -> Option<PathBuf> {
         let path = Path::new(name);
         return path.is_file().then(|| path.to_path_buf());
     }
-    which::which(name).ok()
+    // **oslo does not see its own copies.** `macros::bin` writes every stored script into a
+    // directory on `$PATH` so that bash, tmux and a `.desktop` file can run one; oslo has the
+    // database and needs no copy, so that directory is taken *out of the search* and the macro is
+    // answered from the database instead — after the rest of `$PATH`, which is where a stored macro
+    // belongs.
+    //
+    // **Out of the search, not out of the answer.** Rejecting the path `which` came back with was
+    // the first attempt and it is wrong in a way that matters: it ends the search, so a stored
+    // `date` with a copy early on `$PATH` beat `/usr/bin/date` — exactly the shadowing this whole
+    // design promises cannot happen. The directory is removed from `$PATH` and the rest is walked.
+    match without_our_copies() {
+        Some(path) => which::which_in(name, Some(path), std::env::current_dir().ok()?).ok(),
+        None => which::which(name).ok(),
+    }
+}
+
+/// `$PATH` without the directory oslo writes its own scripts into, or `None` when it is not there.
+fn without_our_copies() -> Option<std::ffi::OsString> {
+    let ours = oslo_base::macros::bin::directory()?;
+    let path = std::env::var_os("PATH")?;
+    let kept: Vec<PathBuf> = std::env::split_paths(&path)
+        .filter(|entry| entry != &ours)
+        .collect();
+    // Unchanged means the copies are not on `$PATH` at all, and the ordinary search is the cheaper
+    // answer — this runs on every command that is not a builtin.
+    (kept.len() != std::env::split_paths(&path).count())
+        .then(|| std::env::join_paths(kept).ok())
+        .flatten()
 }
 
 /// The status a shell reports when a command word could not be run at all.

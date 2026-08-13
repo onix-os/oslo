@@ -82,6 +82,26 @@ pub(super) fn try_call(
     }))
 }
 
+/// Run the stored macro `name` with `args`, whatever this shell was asked to do otherwise.
+///
+/// **The door for everything that is not oslo.** A stored script is reachable by name only from a
+/// shell that can read the database, so a `bash` script, a `tmux` command or a `.desktop` file that
+/// wants one has no way in — and scripts call each other constantly. `oslo macros run NAME …` is
+/// that way in, and it is why the database can be the only copy rather than the second one.
+///
+/// `None` when nothing is stored under the name, which is what lets the caller report it.
+pub fn run_named(env: &mut Environment, name: &str, args: &[String]) -> Option<i32> {
+    let store = macros::open().ok()?;
+    let entry = macros::get(&store, Kind::Func, name)
+        .or_else(|| macros::get(&store, Kind::Script, name))
+        .filter(|entry| entry.active)?;
+    drop(store);
+    Some(match entry.kind {
+        Kind::Func => function(env, &entry.body, name, args),
+        _ => script(&entry.body, name, args),
+    })
+}
+
 /// A stored function: the shell's own, run in this shell.
 ///
 /// **In-process, not exec'd.** A function is expected to be able to `cd`, set a variable and change

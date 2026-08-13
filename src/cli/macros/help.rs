@@ -121,6 +121,29 @@ pub(super) const SUBCOMMANDS: &[Sub] = &[
                different switches and one is not a way to override the other.",
     },
     Sub {
+        name: "run",
+        args: "NAME [ARG]...",
+        about: "run a stored macro from something that is not oslo",
+        flags: &[],
+        note: "Everything after NAME belongs to the macro, including words that look like options. \
+               oslo itself needs none of this — it finds a stored macro by name — but bash, tmux, a \
+               systemd unit and a `.desktop` file cannot read the database, and this is their way \
+               in. So is the copy `publish` writes; this is the one that needs no `$PATH` entry.",
+    },
+    Sub {
+        name: "publish",
+        args: "",
+        about: "write the derived copies again",
+        flags: &[],
+        note: "Every stored script is also written as a file in `~/.local/sbin` (or \
+               `$OSLO_MACROS_BIN`), so that everything which is not oslo can run it by name. Those \
+               files are rewritten by every change and are never edited — the database is the only \
+               copy anybody touches. **oslo does not read them**: that directory is left out of its \
+               own `$PATH` search, so a stored macro is answered from the database and somebody who \
+               only uses oslo can delete the directory and lose nothing. Ask for this when the \
+               directory was deleted, or when a database was filled before it existed.",
+    },
+    Sub {
         name: "export",
         args: "[FILE]",
         about: "write every entry out as text",

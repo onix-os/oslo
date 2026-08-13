@@ -33,6 +33,8 @@ pub fn run(args: &[String]) -> i32 {
         "add" => add(rest),
         "remove" | "rm" => remove(rest),
         "edit" => edit(rest),
+        "run" => run_macro(rest),
+        "publish" => publish(rest),
         "show" | "list" => list::show(rest),
         "off" => switch(rest, false),
         "on" => switch(rest, true),
@@ -276,6 +278,47 @@ fn remove(args: &[String]) -> i32 {
             }
         }
         Err(problem) => fail(&problem),
+    }
+}
+
+/// `publish` — write the derived copies again.
+///
+/// Every mutation does this already, so the only reason to ask is a directory that was deleted, a
+/// `$PATH` that moved, or a database that was filled before the copies existed at all.
+fn publish(_args: &[String]) -> i32 {
+    let store = match macros::open() {
+        Ok(store) => store,
+        Err(problem) => return fail(&problem),
+    };
+    if let Err(problem) = macros::publish(&store) {
+        return fail(&problem);
+    }
+    let scripts = macros::all(&store)
+        .iter()
+        .filter(|entry| entry.kind == Kind::Script && entry.active)
+        .count();
+    match macros::bin::directory() {
+        Some(dir) => println!("{scripts} scripts written to {}", dir.display()),
+        None => println!("{scripts} scripts"),
+    }
+    0
+}
+
+/// `run NAME [ARG]...` — run a stored macro from something that is not oslo.
+///
+/// **Everything after the name belongs to the macro**, including words that look like options:
+/// `oslo macros run deploy --dry-run` passes `--dry-run` to `deploy` and not to oslo. That is the
+/// same rule `-c` follows, and for the same reason.
+fn run_macro(args: &[String]) -> i32 {
+    let Some((name, rest)) = args.split_first() else {
+        return usage("run needs a name: `oslo macros run NAME [ARG]...`");
+    };
+    let mut env = oslo::env::Environment::new();
+    match oslo::exec::stored::run_named(&mut env, name, rest) {
+        Some(status) => status,
+        None => fail(&format!(
+            "nothing runnable called {name} — `oslo macros show {name}` says what it is"
+        )),
     }
 }
 
