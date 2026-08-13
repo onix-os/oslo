@@ -109,6 +109,49 @@ fn a_macro_turned_off_has_no_file() {
     unsafe { std::env::remove_var("OSLO_MACROS_BIN") };
 }
 
+/// **A directory belongs to the store that filled it**, and a second store may not empty it.
+///
+/// This is not a hypothetical. Pointing `$XDG_DATA_HOME` at a scratch store and running
+/// `oslo macros publish` deleted seventy-two scripts out of a real `~/.local/sbin`, because the
+/// store had moved and the script directory had not — it is `$OSLO_MACROS_BIN` or `~/.local/sbin`
+/// and nothing about it follows the store. The manifest now says whose the directory is.
+#[test]
+fn a_second_store_does_not_empty_the_first_ones_directory() {
+    let _guard = lock();
+    let bin = tempfile::tempdir().expect("tempdir");
+    let first = tempfile::tempdir().expect("tempdir");
+    let second = tempfile::tempdir().expect("tempdir");
+    unsafe { std::env::set_var("OSLO_MACROS_BIN", bin.path()) };
+
+    // The first store fills it.
+    unsafe { std::env::set_var("XDG_DATA_HOME", first.path()) };
+    publish(&[script("deploy", "#!/bin/sh\necho one\n")]).expect("publish");
+    assert!(bin.path().join("deploy").exists());
+
+    // The second store, with nothing in it, is refused rather than obeyed.
+    unsafe { std::env::set_var("XDG_DATA_HOME", second.path()) };
+    let refused = publish(&[]);
+    assert!(refused.is_err(), "a foreign store was allowed to publish");
+    let said = refused.unwrap_err();
+    assert!(
+        said.contains("OSLO_MACROS_BIN"),
+        "a way out is named: {said}"
+    );
+    assert!(
+        bin.path().join("deploy").exists(),
+        "the other store's script was deleted"
+    );
+
+    // And the store that owns it still may.
+    unsafe { std::env::set_var("XDG_DATA_HOME", first.path()) };
+    publish(&[script("deploy", "#!/bin/sh\necho two\n")]).expect("its own store may");
+
+    unsafe {
+        std::env::remove_var("OSLO_MACROS_BIN");
+        std::env::remove_var("XDG_DATA_HOME");
+    }
+}
+
 /// What the command resolver asks, to know it is looking at oslo's own output.
 ///
 /// **Written by oslo, not merely sitting where oslo writes.** A file somebody put in the directory
