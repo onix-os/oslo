@@ -135,7 +135,12 @@ fn terse_description(env: &Environment, name: &str, default_path: bool) -> Optio
     if is_keyword(name) || env.get_function(name).is_some() || env.is_builtin(name) {
         return Some(name.to_string());
     }
-    lookup_program(name, default_path).map(|p| p.display().to_string())
+    if let Some(path) = lookup_program(name, default_path) {
+        return Some(path.display().to_string());
+    }
+    // A stored macro is found after `$PATH` and has no path to print, so it answers with its own
+    // name — the same word a function answers with, and one this shell can run.
+    crate::exec::stored::kind_of(name).map(|_| name.to_string())
 }
 
 /// What `command -V name` prints: a sentence naming the kind of thing `name` is.
@@ -155,7 +160,18 @@ fn verbose_description(env: &Environment, name: &str, default_path: bool) -> Opt
     if env.is_builtin(name) {
         return Some(format!("{} is a shell builtin", name));
     }
-    lookup_program(name, default_path).map(|p| format!("{} is {}", name, p.display()))
+    if let Some(path) = lookup_program(name, default_path) {
+        return Some(format!("{} is {}", name, path.display()));
+    }
+    crate::exec::stored::kind_of(name).map(|kind| format!("{} is {}", name, stored_as(kind)))
+}
+
+/// How a stored macro is named to someone reading `-V` or `type`.
+fn stored_as(kind: oslo_base::macros::Kind) -> &'static str {
+    match kind {
+        oslo_base::macros::Kind::Func => "a stored function",
+        _ => "a stored script",
+    }
 }
 
 /// Resolve a bare command word, honouring `-p`'s substitute `PATH`.

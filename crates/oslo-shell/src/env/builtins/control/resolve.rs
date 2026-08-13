@@ -35,10 +35,16 @@ enum Kind {
     Function(Command),
     Builtin,
     File(PathBuf),
+    /// A row in the macro database — looked up only once `$PATH` has failed, as dispatch does.
+    Stored(oslo_base::macros::Kind),
 }
 
 impl Kind {
     /// The word `type -t` prints.
+    ///
+    /// A stored macro answers with the word for how it *behaves*, because that is what the scripts
+    /// reading `type -t` are testing: a stored function runs in this shell like any other function,
+    /// a stored script runs as a program like any other file.
     fn terse(&self) -> &'static str {
         match self {
             Kind::Alias(_) => "alias",
@@ -46,6 +52,8 @@ impl Kind {
             Kind::Function(_) => "function",
             Kind::Builtin => "builtin",
             Kind::File(_) => "file",
+            Kind::Stored(oslo_base::macros::Kind::Func) => "function",
+            Kind::Stored(_) => "file",
         }
     }
 
@@ -58,6 +66,8 @@ impl Kind {
             }
             Kind::Builtin => format!("{name} is a shell builtin"),
             Kind::File(path) => format!("{name} is {}", path.display()),
+            Kind::Stored(oslo_base::macros::Kind::Func) => format!("{name} is a stored function"),
+            Kind::Stored(_) => format!("{name} is a stored script"),
         }
     }
 }
@@ -112,14 +122,22 @@ fn parse_options(args: &[String]) -> std::result::Result<(Options, &[String]), i
 ///
 /// `which_all` rather than `which` because `type -a` has to show the shadowed ones too — that is
 /// most of the reason anyone runs it.
+///
+/// The copies `oslo macros` writes for other shells are left out, because dispatch leaves them out:
+/// oslo runs the database row, and reporting a path it would never execute is the disagreement this
+/// module exists to prevent.
 fn path_matches(name: &str, all: bool) -> Vec<PathBuf> {
-    if all {
+    let found: Vec<PathBuf> = if all {
         which::which_all(name)
             .map(|found| found.collect())
             .unwrap_or_default()
     } else {
         which::which(name).into_iter().collect()
-    }
+    };
+    found
+        .into_iter()
+        .filter(|path| !oslo_base::macros::bin::is_ours(path))
+        .collect()
 }
 
 fn resolve(env: &Environment, name: &str, opts: &Options) -> Vec<Kind> {
@@ -147,6 +165,12 @@ fn resolve(env: &Environment, name: &str, opts: &Options) -> Vec<Kind> {
     // Without `-a` a single earlier match settles it, and a `$PATH` walk would be wasted work.
     if opts.all || kinds.is_empty() {
         kinds.extend(path_matches(name, opts.all).into_iter().map(Kind::File));
+    }
+    // Last, because that is where dispatch looks: a database row never shadows a program.
+    if (opts.all || kinds.is_empty())
+        && let Some(kind) = crate::exec::stored::kind_of(name)
+    {
+        kinds.push(Kind::Stored(kind));
     }
     kinds
 }

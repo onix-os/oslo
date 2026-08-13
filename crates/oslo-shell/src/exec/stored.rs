@@ -52,6 +52,27 @@ pub(super) fn try_call(
     words: &[String],
     redirections: &[oslo_base::ast::Redirection],
 ) -> Option<oslo_base::error::Result<i32>> {
+    let entry = lookup(name)?;
+
+    // The same guard a function call uses, and for its reason: a redirection that cannot be set up
+    // fails the command rather than running it with the shell's own streams.
+    let mut guard = crate::exec::redirect::RedirectGuard::new();
+    if guard.apply(env, redirections).is_err() {
+        return Some(Ok(1));
+    }
+    let args: Vec<String> = words.iter().skip(1).cloned().collect();
+    Some(Ok(match entry.kind {
+        Kind::Func => function(env, &entry.body, name, &args),
+        _ => script(&entry.body, name, &args),
+    }))
+}
+
+/// What would run under `name` once the `$PATH` search has failed, or `None` when nothing would.
+///
+/// The whole rule, in the one place that can be asked without running anything: `type` and
+/// `command -v` exist to answer "what would run?", and a `type` that disagrees with dispatch is
+/// worse than no `type` at all.
+fn lookup(name: &str) -> Option<macros::Entry> {
     // Nothing is stored at all in the overwhelming case, and finding that out must not cost a
     // database open on every failed command. Whether the file exists is what a `stat(2)` answers.
     if !macros::database().is_some_and(|path| path.exists()) {
@@ -68,18 +89,12 @@ pub(super) fn try_call(
     if macros::live::session::is_off(&oslo_base::track::session::id(), name) {
         return None;
     }
+    Some(entry)
+}
 
-    // The same guard a function call uses, and for its reason: a redirection that cannot be set up
-    // fails the command rather than running it with the shell's own streams.
-    let mut guard = crate::exec::redirect::RedirectGuard::new();
-    if guard.apply(env, redirections).is_err() {
-        return Some(Ok(1));
-    }
-    let args: Vec<String> = words.iter().skip(1).cloned().collect();
-    Some(Ok(match entry.kind {
-        Kind::Func => function(env, &entry.body, name, &args),
-        _ => script(&entry.body, name, &args),
-    }))
+/// The kind of stored macro `name` would run as — what `type` and `command -v` report.
+pub fn kind_of(name: &str) -> Option<Kind> {
+    lookup(name).map(|entry| entry.kind)
 }
 
 /// Run the stored macro `name` with `args`, whatever this shell was asked to do otherwise.

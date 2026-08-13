@@ -82,6 +82,65 @@ fn a_stored_script_runs_when_nothing_else_answers() {
     );
 }
 
+/// **`type` and `command -v` answer for a stored macro**, because they exist to answer "what would
+/// run?" and it runs.
+///
+/// Both were wrong once, in opposite directions: `command -v` said nothing at all, while `type`
+/// printed the path of oslo's own copy — a file dispatch skips. Anything that probes with
+/// `command -v foo` before calling `foo` got the wrong answer for every stored script.
+#[test]
+fn what_would_run_is_what_type_reports() {
+    let data = tempfile::tempdir().expect("tempdir");
+    let bin = tempfile::tempdir().expect("tempdir");
+    let dirs = (data.path(), bin.path());
+    store(dirs, "script oslo-probe\n\t#!/bin/sh\n\techo hi\n");
+
+    // The word `command -v` prints is one this shell can run, as it is for a function.
+    assert_eq!(
+        oslo(dirs, &["-c", "command -v oslo-probe"], true).trim(),
+        "oslo-probe"
+    );
+    assert_eq!(
+        oslo(dirs, &["-c", "command -V oslo-probe"], true).trim(),
+        "oslo-probe is a stored script"
+    );
+    assert_eq!(
+        oslo(dirs, &["-c", "type oslo-probe"], true).trim(),
+        "oslo-probe is a stored script"
+    );
+    // `-t` is read by scripts, and it behaves as a file does.
+    assert_eq!(
+        oslo(dirs, &["-c", "type -t oslo-probe"], true).trim(),
+        "file"
+    );
+    // The probe every configure script writes.
+    assert_eq!(
+        oslo(
+            dirs,
+            &["-c", "command -v oslo-probe >/dev/null && echo yes"],
+            true
+        )
+        .trim(),
+        "yes"
+    );
+}
+
+/// One turned off is not there, for `type` as for dispatch.
+#[test]
+fn one_turned_off_is_reported_by_neither() {
+    let data = tempfile::tempdir().expect("tempdir");
+    let bin = tempfile::tempdir().expect("tempdir");
+    let dirs = (data.path(), bin.path());
+    store(dirs, "script oslo-probe\n\t#!/bin/sh\n\techo hi\n");
+    oslo(dirs, &["macros", "off", "oslo-probe"], false);
+
+    assert_eq!(
+        oslo(dirs, &["-c", "command -v oslo-probe"], false).trim(),
+        ""
+    );
+    assert_eq!(oslo(dirs, &["-c", "type -t oslo-probe"], false).trim(), "");
+}
+
 /// The copy is written for everything that is not oslo, and it is what bash finds.
 #[test]
 fn the_copy_is_what_another_shell_runs() {
