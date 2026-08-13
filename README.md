@@ -446,6 +446,98 @@ without pretending that a command ran. OSC 7 publishes the working directory, OS
 OSC 8 carries Oslo-owned hyperlinks, and OSC 52 powers the `copy` builtin over SSH. OSC 52 can still
 be refused by the terminal's clipboard policy.
 
+### A shell inside a shell says so
+
+```text
+You are already in oslo. Start a nested shell? (one deep)
+
+  Nested shell   Stay here
+
+←→ choose • y/n answer • enter confirm
+```
+
+Typing `oslo` at an oslo prompt has always worked and never said anything, which is the problem: the
+new shell looks exactly like the old one, so the usual way to find out you are two deep is an `exit`
+later that does not close the terminal. Enter answers "stay here", because that is the answer you
+cannot regret.
+
+`$OSLO_NESTED` counts, for a prompt that wants to show it — `0` in a fresh terminal, `1` inside one
+oslo, and so on. Every shell publishes it, `-c` and scripts included; only an interactive one asks.
+
+```sh
+[ "${OSLO_NESTED:-0}" -gt 0 ] && printf '⧉%s ' "$OSLO_NESTED"
+```
+
+**One terminal, one stack.** A tmux pane, a hexe pod and an ssh login all inherit the count from the
+shell that opened them and none of them is inside it — each runs its shell on a pty of its own, and
+there is nothing there to `exit` back into. So the count travels with the terminal it was set on and
+one arriving from a different screen starts again at `0`.
+
+Asked only when there is a terminal to ask on — `command | oslo -i` is a shell with no person at
+the other end of stdin, and a question there would be answered by the script's first line.
+`oslo.misc.nested_ask = false` turns it off for somebody who nests on purpose; the count stays.
+
+### Copying what a command printed
+
+```sh
+ls | copy                  # a pipe, arguments, or a file: copy hi / copy < notes.txt
+keep git log --oneline     # run it, watch it, and keep what it printed
+copy --last                # that, on the clipboard
+keep -e make build         # keep the errors too
+```
+
+`copy` reaches the clipboard through OSC 52, so it works over SSH and in a container with no
+`xsel` — and the terminal may refuse it, in which case nothing arrives and there is no reply for
+oslo to read.
+
+**`keep` is a prefix because output is gone once it is printed.** To have a copy the shell must
+stand between the command and the terminal, and standing there for *every* command means holding
+the largest thing you ever run in memory and turning `isatty` false for all of them. So it is one
+command at a time. You still watch it scroll: every chunk is written to the terminal before it is
+kept. What it costs is that a program which colours only for a terminal will not colour here — and
+what is left of an escape sequence is taken out before it is stored, because a clipboard full of
+`\x1b[32m` is not the output.
+
+Kept per session, so two terminals do not answer for each other, in a file rather than in memory —
+`keep` inside a pipeline runs in a forked child, and `copy --last` still finds it. A capture over
+1 MiB keeps its tail and says so, since the end of a build log is the part worth having.
+
+A key, if you want one — no new code, the existing handler rewrites the line:
+
+```lua
+oslo.keys["alt-enter"] = function(line) return "keep " .. line.text end
+```
+
+### Asking for something, from any shell
+
+```sh
+ui choose alpha beta gamma          # at an oslo prompt: the builtin
+oslo userin choose alpha beta       # from bash, a Makefile, a .desktop file: the same widgets
+```
+
+Thirteen of them — `input`, `write`, `confirm`, `choose`, `filter`, `table`, `file`, `style`,
+`format`, `join`, `pager`, `log`, `spin` — and `oslo userin --help` lists them with their options.
+
+**Two doors, one body.** `ui` is a builtin, and a builtin cannot be reached from bash: a script, an
+`sh -c`, a status bar reach a *program*. `oslo userin` is that program, running the same code, so
+the two can never disagree about what a widget does. It is why a shell that ships its own prompts
+can lend them to everything else on the machine, with nothing installed beside it.
+
+Three rules a script depends on:
+
+- **the answer is stdout, everything else is stderr**, so `$(oslo userin input)` captures the answer
+  and the widget still draws on the terminal;
+- **cancelling is status 1 with no output**, so `x=$(oslo userin input) || exit` is right — a widget
+  that returned `""` on Esc would make cancelled and empty the same thing;
+- **no terminal is status 2**, distinct from cancelled, so a script can tell "nobody was there to
+  ask" from "they said no".
+
+Items come from the operands or from stdin, so `ls | oslo userin filter` and
+`oslo userin filter a b c` are both the obvious thing.
+
+[Asking for something](docs/features/userin.md) has the whole of it, including the third door:
+`oslo.ui.choose{…}` from Lua, the same widgets again.
+
 The native editor enables bracketed paste while it owns the line. A pasted newline is inserted as
 text and does not execute until Enter is pressed. Pasted and typed control characters stay exact in
 the command buffer but redraw as inert notation such as `^[`, `^I`, `^M`, and `^?`; raw OSC and CSI
@@ -730,6 +822,8 @@ oslo.misc.welcome       = true        -- the startup banner
 oslo.misc.greeting      = nil         -- a line of your own instead of the banner
 oslo.misc.escape_delay  = 25          -- ms to wait for the rest of an escape sequence; raise on ssh
 oslo.misc.color_depth   = nil         -- truecolor / 256 / 16 / none, when detection is wrong
+oslo.misc.nested_ask    = true        -- ask before starting an oslo inside an oslo
+oslo.misc.warnings      = true        -- the hint and warning boxes under `--help`
 
 oslo.vi.enabled         = false       -- vi mode; true for vi, false for emacs only
 oslo.vi.cursor_insert   = "line"      -- block / line / underscore, each + " blink"
@@ -820,6 +914,42 @@ which is what bash and dash answer, and why giving it a meaning at a prompt brea
 `tests/corpus/command_word_backslash.sh` is the case that pins both halves against bash.
 
 Quoting is not escaping: `"rm"` and `'rm'` run the builtin, in oslo as in every other shell.
+
+### `which` and `whereis` — builtins, because the programs cannot see a shell
+
+```sh
+which ls        # /usr/bin/ls
+which ll        # ll: aliased to ls -alF
+which cd        # cd: shell built-in command
+which deploy    # deploy: stored script
+whereis ls      # ls: /usr/bin/ls /usr/share/man/man1/ls.1.gz
+whereis cd      # cd: shell built-in command
+whereis deploy  # deploy: stored script
+```
+
+`/usr/bin/which` reads `$PATH`, and everything interesting about a name here is invisible to a
+program: an alias is in this shell's memory, a builtin has no file, a stored macro is a database row
+found after `$PATH`. So it answers "nothing" — not because nothing runs, but because it was asked by
+something that cannot see. zsh made `which` a builtin for this reason; this is the same answer in
+the same words.
+
+A path prints bare, so `$(which foo)` is still a path. Anything else prints `name: what it is`,
+which no script can mistake for one. `which --skip-alias` does the plain `$PATH` search the program
+does, `\which` runs the program itself, and `which`, `type` and `command -v` all read the same
+resolution order — a shell where those three disagree has more than one dispatch table.
+
+**Only at a prompt**, like the frecency jump in `cd`. In a script both hand straight over to the
+programs on `$PATH`, because `which` is not POSIX and somebody's configure script doing
+`ECHO=$(which echo)` has to keep getting a path rather than a sentence about a builtin. What a
+script has always had is `command -v`, which is POSIX, answers about *this* shell, and knows every
+alias, builtin and stored macro there is. Where the system has no such program — a small
+distribution may ship neither — the builtin answers after all.
+
+`whereis` answers the other question — every place a name lives, plus its manual pages — and prints
+one entry per *thing*: the copy of a stored script that `oslo macros` writes for other shells is the
+same macro written down twice, not a second place, so it is left out here as it is everywhere else.
+Manual pages come from `$MANPATH`; sources are not searched, because the directory list that would
+mean is different on every machine.
 
 ### Autoloaded functions
 

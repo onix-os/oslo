@@ -25,11 +25,25 @@ use oslo_base::error::Result;
 use oslo_ui::marks;
 use std::io::{Read, Write};
 
+/// Past this much, a terminal is likely to drop the sequence rather than answer it.
+///
+/// xterm's own limit is a little under 75 KB and several terminals are stricter; there is no reply
+/// to read, so the only honest thing is to say what was attempted. Nothing is truncated — a
+/// terminal that does take it should get all of it.
+const A_LOT: usize = 64 * 1024;
+
 pub fn builtin_copy(_env: &mut Environment, args: &[String]) -> Result<i32> {
     let operands = &args[1..];
-    if operands.first().is_some_and(|a| a == "--help" || a == "-h") {
-        println!("Usage: copy [TEXT...]      with no arguments, copies standard input");
-        return Ok(0);
+    match operands.first().map(String::as_str) {
+        Some("--help" | "-h") => {
+            println!(
+                "Usage: copy [TEXT...]      with no arguments, copies standard input\n\
+                 \n  -l, --last     copy what the last `keep` command printed"
+            );
+            return Ok(0);
+        }
+        Some("--last" | "-l") => return copy_last(),
+        _ => {}
     }
 
     let text = if operands.is_empty() {
@@ -43,10 +57,34 @@ pub fn builtin_copy(_env: &mut Environment, args: &[String]) -> Result<i32> {
         // Joined with spaces, as `echo` does: `copy hello world` copies what it looks like.
         operands.join(" ")
     };
+    put(&text)
+}
 
+/// `copy --last`: what the last `keep` command printed, in this session.
+fn copy_last() -> Result<i32> {
+    match oslo_base::capture::last(&oslo_base::track::session::id()) {
+        Some(text) => put(&text),
+        None => {
+            // Named rather than implied: "nothing to copy" would read as a bug in `copy`, when the
+            // answer is that nothing asked for the output to be kept in the first place.
+            eprintln!("copy: nothing kept in this session — run a command with `keep` first");
+            Ok(1)
+        }
+    }
+}
+
+/// Send `text` to the terminal's clipboard.
+fn put(text: &str) -> Result<i32> {
     // A trailing newline is almost never wanted on a clipboard — pasting it into a shell would run
     // the line — and `ls | copy` produces one for every entry. Only the last is dropped.
-    let text = text.strip_suffix('\n').unwrap_or(&text);
+    let text = text.strip_suffix('\n').unwrap_or(text);
+
+    if text.len() > A_LOT {
+        eprintln!(
+            "copy: {} KB — most terminals refuse an OSC 52 payload this large, so it may not arrive",
+            text.len() / 1024
+        );
+    }
 
     let mut out = std::io::stdout();
     if out.write_all(marks::clipboard(text).as_bytes()).is_err() || out.flush().is_err() {

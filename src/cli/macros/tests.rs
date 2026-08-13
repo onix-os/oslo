@@ -89,3 +89,13 @@ fn the_switches_are_read() {
     assert!(parse(&words(&["--plain"])).unwrap().plain);
     assert!(parse(&words(&["--replace"])).unwrap().replace);
 }
+
+#[test]
+fn edit_needs_a_name_and_reports_one_it_does_not_have() {
+    assert_eq!(run(&words(&["edit"])), 2, "no name is a usage error");
+    assert_eq!(
+        run(&words(&["edit", "no-such-macro-anywhere"])),
+        1,
+        "a name nothing is stored under is an error, not a new macro"
+    );
+}

@@ -15,6 +15,17 @@
 //! Nothing here writes anything. Repointing `/bin/sh` is a decision about the whole machine, taken
 //! with the package manager and a way back — not something a `--help` should do because it noticed.
 //! Each line therefore says what is true, and the box says how to act on it.
+//!
+//! # A hint is not a warning
+//!
+//! Two kinds of finding, and they are drawn as two boxes because the difference matters.
+//!
+//! * **A hint** is a fact about this machine you may not have chosen: `/bin/sh` still points at
+//!   dash. Nothing is broken — oslo runs, your scripts run, they just do not run *in oslo*. It is
+//!   information, and drawing it in red taught the eye to ignore the colour for the day something
+//!   actually was wrong.
+//! * **A warning** is something that fails for somebody: a binary no other user can execute means
+//!   their `#!/bin/sh` dies with a permission error naming the script rather than the shell.
 
 use super::help::Paint;
 use std::path::{Path, PathBuf};
@@ -40,19 +51,41 @@ pub struct Facts {
     pub bad_mode: Option<u32>,
 }
 
-impl Facts {
-    /// One line per problem, in the order they are worth acting on.
-    pub fn lines(&self) -> Vec<String> {
-        let mut lines = Vec::new();
-        for (path, points_at) in &self.foreign_sh {
-            lines.push(format!("{path} is {points_at}, not oslo"));
+/// How much a finding is worth: something that fails, or something you may not have meant.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Level {
+    /// Nothing is broken. See the module note.
+    Hint,
+    /// Something fails for somebody.
+    Warning,
+}
+
+impl Level {
+    /// The word in the box's top edge, padded as it is drawn.
+    fn title(self) -> &'static str {
+        match self {
+            Level::Hint => " hint ",
+            Level::Warning => " warning ",
         }
+    }
+}
+
+impl Facts {
+    /// One line per finding, with how much it matters, worst first.
+    pub fn findings(&self) -> Vec<(Level, String)> {
+        let mut found = Vec::new();
         if let Some(mode) = self.bad_mode {
-            lines.push(format!(
-                "this binary is mode {mode:04o}; a system shell needs 0755"
+            found.push((
+                Level::Warning,
+                format!("this binary is mode {mode:04o}; a system shell needs 0755"),
             ));
         }
-        lines
+        for (path, points_at) in &self.foreign_sh {
+            // A hint: oslo runs perfectly well beside another `/bin/sh`. What you do not get is
+            // oslo for the things that start a script, which is a choice rather than a fault.
+            found.push((Level::Hint, format!("{path} is {points_at}, not oslo")));
+        }
+        found
     }
 }
 
@@ -163,13 +196,33 @@ const RED: (u8, u8, u8) = (224, 64, 64);
 /// footer — and it still grows past `width` rather than truncate, since a warning that has been
 /// cut off is worse than a ragged edge.
 pub fn box_of(facts: &Facts, paint: Paint, width: usize) -> String {
-    let lines = facts.lines();
-    if lines.is_empty() {
-        return String::new();
+    let findings = facts.findings();
+    let mut s = String::new();
+    // Worst first, and each level in its own box: one box titled for the more serious of two
+    // different things would be lying about the other one.
+    for level in [Level::Warning, Level::Hint] {
+        let lines: Vec<&str> = findings
+            .iter()
+            .filter(|(found, _)| *found == level)
+            .map(|(_, line)| line.as_str())
+            .collect();
+        if !lines.is_empty() {
+            s.push_str(&drawn(level, &lines, paint, width));
+        }
     }
-    let red = paint.rgb(RED);
+    s
+}
 
-    const TITLE: &str = " warning ";
+/// One box: a titled top edge, a row per line, a bottom edge, and a blank row after it.
+fn drawn(level: Level, lines: &[&str], paint: Paint, width: usize) -> String {
+    // A hint is dim rather than coloured. Red is what makes the eye stop, and spending it on
+    // something that is not wrong is how a warning stops being read at all.
+    let ink: Box<dyn Fn(&str) -> String> = match level {
+        Level::Warning => Box::new(paint.rgb(RED)),
+        Level::Hint => Box::new(move |text: &str| paint.dim(text)),
+    };
+    let title = level.title();
+
     // The interior, between the two corner characters — so a drawn row is `inner + 2` wide, and
     // matching a page of `width` means an interior of `width - 2`.
     //
@@ -180,18 +233,18 @@ pub fn box_of(facts: &Facts, paint: Paint, width: usize) -> String {
         .map(|l| l.chars().count())
         .max()
         .unwrap_or(0)
-        .max(TITLE.len())
+        .max(title.len())
         + 2)
     .max(width.saturating_sub(2));
 
     let mut s = String::new();
-    let rule = "─".repeat(inner - TITLE.len() - 1);
-    s.push_str(&red(&format!("╭─{TITLE}{rule}╮\n")));
-    for line in &lines {
+    let rule = "─".repeat(inner - title.len() - 1);
+    s.push_str(&ink(&format!("╭─{title}{rule}╮\n")));
+    for line in lines {
         let pad = " ".repeat(inner - 1 - line.chars().count());
-        s.push_str(&format!("{} {line}{pad}{}\n", red("│"), red("│")));
+        s.push_str(&format!("{} {line}{pad}{}\n", ink("│"), ink("│")));
     }
-    s.push_str(&red(&format!("╰{}╯\n", "─".repeat(inner))));
+    s.push_str(&ink(&format!("╰{}╯\n", "─".repeat(inner))));
     s.push('\n');
     s
 }

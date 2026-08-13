@@ -39,12 +39,27 @@ use std::io::BufRead;
 
 pub fn builtin_ui(env: &mut Environment, args: &[String]) -> Result<i32> {
     let _ = env;
-    let Some(sub) = args.get(1) else {
-        usage();
-        return Ok(2);
+    Ok(run("ui", args.get(1..).unwrap_or_default()))
+}
+
+/// `oslo userin …`, for every shell that is not oslo.
+///
+/// **A builtin cannot be reached from bash.** A script, a `sh -c`, a Makefile recipe — all of them
+/// reach a *program*, and the widgets are the part of oslo most worth having from outside: a shell
+/// that ships its own prompts should be able to lend them out. One body, two doors, so the two can
+/// never disagree about what a widget does.
+pub fn tool(args: &[String]) -> i32 {
+    run("oslo userin", args)
+}
+
+/// The widget and its options, whichever door they came through.
+fn run(called: &str, args: &[String]) -> i32 {
+    let Some(sub) = args.first() else {
+        usage(called, Where::Error);
+        return 2;
     };
-    let rest = &args[2..];
-    Ok(match sub.as_str() {
+    let rest = &args[1..];
+    match sub.as_str() {
         "input" => run_input(rest),
         "write" => run_write(rest),
         "confirm" => run_confirm(rest),
@@ -59,20 +74,29 @@ pub fn builtin_ui(env: &mut Environment, args: &[String]) -> Result<i32> {
         "spin" => run_spin(rest),
         "table" => run_table(rest),
         "help" | "--help" | "-h" => {
-            usage();
+            // **Asked for, so it is output.** A `--help` on stderr cannot be paged or grepped,
+            // which is the first thing anyone does with a list of thirteen widgets.
+            usage(called, Where::Output);
             0
         }
         other => {
-            eprintln!("oslo: ui: {other}: not a widget");
-            usage();
+            eprintln!("oslo: {called}: {other}: not a widget");
+            usage(called, Where::Error);
             2
         }
-    })
+    }
 }
 
-fn usage() {
-    eprintln!(
-        "usage: ui WIDGET [options] [arguments]\n\
+/// Where the usage goes: what was asked for is output, what went wrong is not.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Where {
+    Output,
+    Error,
+}
+
+fn usage(called: &str, out: Where) {
+    let text = format!(
+        "usage: {called} WIDGET [options] [arguments]\n\
          \n\
          ask for something\n\
          \x20 input   [--placeholder T] [--prompt T] [--value T] [--password] [--required]\n\
@@ -94,6 +118,10 @@ fn usage() {
          The answer goes to stdout. Cancelling is status 1; no terminal is status 2.\n\
          Items come from stdin when none are given."
     );
+    match out {
+        Where::Output => println!("{text}"),
+        Where::Error => eprintln!("{text}"),
+    }
 }
 
 /// Report an answer the way a script reads it: the value on stdout, the status as the status.

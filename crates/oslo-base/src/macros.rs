@@ -38,8 +38,10 @@
 //! the rule `exec::simple::autoload` states — so it costs a database open only on a line that was
 //! going to fail anyway, and nothing at startup.
 
+pub mod bin;
 pub mod live;
 pub mod snapshot;
+pub mod sourced;
 
 pub use crate::track::kv::Store;
 use std::path::PathBuf;
@@ -390,9 +392,29 @@ pub fn remove_and_publish(store: &Store, kind: Kind, name: &str) -> Result<bool,
     Ok(gone)
 }
 
-/// Rewrite the snapshot from what the database now says.
+/// Rewrite everything derived from what the database now says.
+///
+/// Two files, one rule: the database is the only thing anybody edits, and every copy of it is
+/// rewritten by whatever changed it. [`mod@snapshot`] is what a starting shell reads, [`bin`] is what
+/// everything that is not oslo *runs*, and [`sourced`] is what another shell *sources* to have the
+/// aliases — the half a `$PATH` directory cannot carry, because an alias is not a program.
 pub fn publish(store: &Store) -> Result<(), String> {
-    snapshot::write(&all(store))
+    let entries = all(store);
+    snapshot::write(&entries)?;
+    // **A failure here is reported, not fatal.** What is written out is a convenience for other
+    // programs; a `$HOME` that cannot be written to is a reason to say so and still have stored the
+    // macro, which is what the database already did.
+    for problem in [bin::publish(&entries), sourced::publish(&entries)]
+        .into_iter()
+        .filter_map(Result::err)
+    {
+        crate::messages::say(
+            crate::messages::Level::Warn,
+            "macros",
+            format!("the copies for other shells could not be written: {problem}"),
+        );
+    }
+    Ok(())
 }
 
 #[cfg(test)]

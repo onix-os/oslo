@@ -81,6 +81,9 @@ pub fn run_repl(login: bool) -> ! {
         // set, since what is read is the whole `oslo` table each time.
         config::apply(&lua);
     }
+    // **A shell inside a shell says so before it becomes one.** After the config, so a setting can
+    // turn the question off; before everything below, so answering "no" pays for none of it.
+    super::nested::ask_before_nesting();
     // **After the config, so the database wins.** The ordinary shell rule — the last definition of a
     // name is the one that counts — applied to sources rather than to lines. See `startup::stored`.
     let mut macros_held = super::stored::install(&env_struct);

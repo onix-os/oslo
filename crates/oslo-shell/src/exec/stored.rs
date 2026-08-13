@@ -52,6 +52,27 @@ pub(super) fn try_call(
     words: &[String],
     redirections: &[oslo_base::ast::Redirection],
 ) -> Option<oslo_base::error::Result<i32>> {
+    let entry = lookup(name)?;
+
+    // The same guard a function call uses, and for its reason: a redirection that cannot be set up
+    // fails the command rather than running it with the shell's own streams.
+    let mut guard = crate::exec::redirect::RedirectGuard::new();
+    if guard.apply(env, redirections).is_err() {
+        return Some(Ok(1));
+    }
+    let args: Vec<String> = words.iter().skip(1).cloned().collect();
+    Some(Ok(match entry.kind {
+        Kind::Func => function(env, &entry.body, name, &args),
+        _ => script(&entry.body, name, &args),
+    }))
+}
+
+/// What would run under `name` once the `$PATH` search has failed, or `None` when nothing would.
+///
+/// The whole rule, in the one place that can be asked without running anything: `type` and
+/// `command -v` exist to answer "what would run?", and a `type` that disagrees with dispatch is
+/// worse than no `type` at all.
+fn lookup(name: &str) -> Option<macros::Entry> {
     // Nothing is stored at all in the overwhelming case, and finding that out must not cost a
     // database open on every failed command. Whether the file exists is what a `stat(2)` answers.
     if !macros::database().is_some_and(|path| path.exists()) {
@@ -68,18 +89,32 @@ pub(super) fn try_call(
     if macros::live::session::is_off(&oslo_base::track::session::id(), name) {
         return None;
     }
+    Some(entry)
+}
 
-    // The same guard a function call uses, and for its reason: a redirection that cannot be set up
-    // fails the command rather than running it with the shell's own streams.
-    let mut guard = crate::exec::redirect::RedirectGuard::new();
-    if guard.apply(env, redirections).is_err() {
-        return Some(Ok(1));
-    }
-    let args: Vec<String> = words.iter().skip(1).cloned().collect();
-    Some(Ok(match entry.kind {
-        Kind::Func => function(env, &entry.body, name, &args),
-        _ => script(&entry.body, name, &args),
-    }))
+/// The kind of stored macro `name` would run as — what `type` and `command -v` report.
+pub fn kind_of(name: &str) -> Option<Kind> {
+    lookup(name).map(|entry| entry.kind)
+}
+
+/// Run the stored macro `name` with `args`, whatever this shell was asked to do otherwise.
+///
+/// **The door for everything that is not oslo.** A stored script is reachable by name only from a
+/// shell that can read the database, so a `bash` script, a `tmux` command or a `.desktop` file that
+/// wants one has no way in — and scripts call each other constantly. `oslo macros run NAME …` is
+/// that way in, and it is why the database can be the only copy rather than the second one.
+///
+/// `None` when nothing is stored under the name, which is what lets the caller report it.
+pub fn run_named(env: &mut Environment, name: &str, args: &[String]) -> Option<i32> {
+    let store = macros::open().ok()?;
+    let entry = macros::get(&store, Kind::Func, name)
+        .or_else(|| macros::get(&store, Kind::Script, name))
+        .filter(|entry| entry.active)?;
+    drop(store);
+    Some(match entry.kind {
+        Kind::Func => function(env, &entry.body, name, args),
+        _ => script(&entry.body, name, args),
+    })
 }
 
 /// A stored function: the shell's own, run in this shell.

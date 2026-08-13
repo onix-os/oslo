@@ -60,6 +60,17 @@ pub(super) const SUBCOMMANDS: &[Sub] = &[
                running. To keep it and stop it applying, turn it off in `show` instead.",
     },
     Sub {
+        name: "edit",
+        args: "NAME",
+        about: "open one in your editor",
+        flags: &[("--alias", "when the name is more than one kind at once")],
+        note: "The kind is only needed when the name is more than one thing. **A function or a \
+               script that also exists as a file on `$PATH` is shadowed by that file** — the shell \
+               finds a stored one only after the `$PATH` search has failed — so this says which \
+               file is running before it opens the editor. Editing the stored copy of something \
+               `$PATH` answers first changes nothing about what runs.",
+    },
+    Sub {
         name: "show",
         args: "[NAME]",
         about: "the manager: the list, narrowed as you type",
@@ -108,6 +119,29 @@ pub(super) const SUBCOMMANDS: &[Sub] = &[
         note: "The other half of `off`, and the same rules. `on --session` cancels a session \
                switch; it does not turn on something that is off everywhere, because those are two \
                different switches and one is not a way to override the other.",
+    },
+    Sub {
+        name: "run",
+        args: "NAME [ARG]...",
+        about: "run a stored macro from something that is not oslo",
+        flags: &[],
+        note: "Everything after NAME belongs to the macro, including words that look like options. \
+               oslo itself needs none of this — it finds a stored macro by name — but bash, tmux, a \
+               systemd unit and a `.desktop` file cannot read the database, and this is their way \
+               in. So is the copy `publish` writes; this is the one that needs no `$PATH` entry.",
+    },
+    Sub {
+        name: "publish",
+        args: "",
+        about: "write the derived copies again",
+        flags: &[],
+        note: "Every stored script is also written as a file in `~/.local/sbin` (or \
+               `$OSLO_MACROS_BIN`), so that everything which is not oslo can run it by name. Those \
+               files are rewritten by every change and are never edited — the database is the only \
+               copy anybody touches. **oslo does not read them**: that directory is left out of its \
+               own `$PATH` search, so a stored macro is answered from the database and somebody who \
+               only uses oslo can delete the directory and lose nothing. Ask for this when the \
+               directory was deleted, or when a database was filled before it existed.",
     },
     Sub {
         name: "export",

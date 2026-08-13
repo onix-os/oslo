@@ -29,16 +29,52 @@ pub fn is_keyword(name: &str) -> bool {
 }
 
 /// One way a name resolves, in the order dispatch would try them.
-enum Kind {
+pub enum Kind {
     Alias(String),
     Keyword,
     Function(Command),
     Builtin,
     File(PathBuf),
+    /// A row in the macro database — looked up only once `$PATH` has failed, as dispatch does.
+    Stored(oslo_base::macros::Kind),
 }
 
 impl Kind {
+    /// The file this resolves to, for a caller that wants a path and nothing else.
+    pub fn path(&self) -> Option<&std::path::Path> {
+        match self {
+            Kind::File(path) => Some(path),
+            _ => None,
+        }
+    }
+
+    /// What this is, in the words `which` and `whereis` use — where `type` says "cd is a shell
+    /// builtin", they say "cd: shell built-in command".
+    pub fn noun(&self) -> &'static str {
+        match self {
+            Kind::Alias(_) => "aliased to",
+            Kind::Keyword => "shell reserved word",
+            Kind::Function(_) => "shell function",
+            Kind::Builtin => "shell built-in command",
+            Kind::File(_) => "",
+            Kind::Stored(oslo_base::macros::Kind::Func) => "stored function",
+            Kind::Stored(_) => "stored script",
+        }
+    }
+
+    /// The alias body, which is the one kind whose *value* belongs on the line.
+    pub fn alias_body(&self) -> Option<&str> {
+        match self {
+            Kind::Alias(value) => Some(value),
+            _ => None,
+        }
+    }
+
     /// The word `type -t` prints.
+    ///
+    /// A stored macro answers with the word for how it *behaves*, because that is what the scripts
+    /// reading `type -t` are testing: a stored function runs in this shell like any other function,
+    /// a stored script runs as a program like any other file.
     fn terse(&self) -> &'static str {
         match self {
             Kind::Alias(_) => "alias",
@@ -46,6 +82,8 @@ impl Kind {
             Kind::Function(_) => "function",
             Kind::Builtin => "builtin",
             Kind::File(_) => "file",
+            Kind::Stored(oslo_base::macros::Kind::Func) => "function",
+            Kind::Stored(_) => "file",
         }
     }
 
@@ -58,6 +96,8 @@ impl Kind {
             }
             Kind::Builtin => format!("{name} is a shell builtin"),
             Kind::File(path) => format!("{name} is {}", path.display()),
+            Kind::Stored(oslo_base::macros::Kind::Func) => format!("{name} is a stored function"),
+            Kind::Stored(_) => format!("{name} is a stored script"),
         }
     }
 }
@@ -112,14 +152,22 @@ fn parse_options(args: &[String]) -> std::result::Result<(Options, &[String]), i
 ///
 /// `which_all` rather than `which` because `type -a` has to show the shadowed ones too — that is
 /// most of the reason anyone runs it.
+///
+/// The copies `oslo macros` writes for other shells are left out, because dispatch leaves them out:
+/// oslo runs the database row, and reporting a path it would never execute is the disagreement this
+/// module exists to prevent.
 fn path_matches(name: &str, all: bool) -> Vec<PathBuf> {
-    if all {
+    let found: Vec<PathBuf> = if all {
         which::which_all(name)
             .map(|found| found.collect())
             .unwrap_or_default()
     } else {
         which::which(name).into_iter().collect()
-    }
+    };
+    found
+        .into_iter()
+        .filter(|path| !oslo_base::macros::bin::is_ours(path))
+        .collect()
 }
 
 fn resolve(env: &Environment, name: &str, opts: &Options) -> Vec<Kind> {
@@ -148,7 +196,28 @@ fn resolve(env: &Environment, name: &str, opts: &Options) -> Vec<Kind> {
     if opts.all || kinds.is_empty() {
         kinds.extend(path_matches(name, opts.all).into_iter().map(Kind::File));
     }
+    // Last, because that is where dispatch looks: a database row never shadows a program.
+    if (opts.all || kinds.is_empty())
+        && let Some(kind) = crate::exec::stored::kind_of(name)
+    {
+        kinds.push(Kind::Stored(kind));
+    }
     kinds
+}
+
+/// Every way `name` resolves, in dispatch order, for a builtin that reports it in other words.
+///
+/// `all` is `type -a`: the matches a nearer one shadows, which is most of what anyone runs
+/// `which -a` for.
+pub fn ways(env: &Environment, name: &str, all: bool) -> Vec<Kind> {
+    resolve(
+        env,
+        name,
+        &Options {
+            all,
+            ..Options::default()
+        },
+    )
 }
 
 /// `type [-afptP] name …`

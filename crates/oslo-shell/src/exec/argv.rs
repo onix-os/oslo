@@ -160,6 +160,19 @@ pub fn spawn_reading(
     env: &mut Environment,
     argv: &[String],
 ) -> Result<(nix::unistd::Pid, OwnedFd)> {
+    spawn_reading_streams(env, argv, false)
+}
+
+/// [`spawn_reading`], with `merge_stderr` putting the command's stderr down the same pipe.
+///
+/// One pipe rather than two, because the caller that wants both wants them *interleaved* the way
+/// they appeared — `keep make build` is worth having only if the error is in its place among the
+/// lines that led to it, and two pipes drained separately cannot say which came first.
+pub fn spawn_reading_streams(
+    env: &mut Environment,
+    argv: &[String],
+    merge_stderr: bool,
+) -> Result<(nix::unistd::Pid, OwnedFd)> {
     if argv.is_empty() {
         return Err(ShellError::ExecutionError(
             "oslo.lines: the command list is empty".to_string(),
@@ -176,6 +189,9 @@ pub fn spawn_reading(
             crate::exec::job::reset_signals_for_child();
             let _ = close(reader.into_raw_fd());
             let _ = dup2(writer.as_raw_fd(), 1);
+            if merge_stderr {
+                let _ = dup2(writer.as_raw_fd(), 2);
+            }
             let _ = close(writer.into_raw_fd());
             env.enter_subshell();
             let status = status_of(crate::exec::simple::run_argv(env, argv));

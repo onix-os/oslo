@@ -115,6 +115,7 @@ scripts/demo/embed.sh                            # put the players back in the d
 
 | | |
 |---|---|
+| [Asking for something](userin.md) | Thirteen widgets — at an oslo prompt, from every other shell, and from Lua |
 | [The prompt](the-prompt.md) | Named segments with priorities, gathered once |
 | [Colours](theme.md) | Every role settable, with inheritance and background detection |
 | [The terminal knows what is happening](terminal-integration.md) | What oslo tells the terminal and the multiplexer |

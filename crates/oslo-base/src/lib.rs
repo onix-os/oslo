@@ -20,6 +20,8 @@
 //! not about this crate. It is left where it is until the answer is worth the churn.
 
 pub mod ast;
+/// The output of a command that was asked to keep it, for `copy --last`.
+pub mod capture;
 pub mod error;
 /// Parts of the shell a config can turn off and on again while it runs.
 pub mod feature;

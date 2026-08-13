@@ -526,7 +526,14 @@ oslo.prompt.left = function() return "READY> " end
 
 #[test]
 fn iterm_nested_shells_keep_distinct_stable_session_ids() {
-    let mut shell = PtyShell::spawn_with_options("xterm-256color", false, Some("iTerm.app"));
+    // An interactive oslo started inside one asks whether that is what you meant, and this test
+    // nests on purpose — so it says so in the config it starts with. See `startup::nested`.
+    let mut shell = PtyShell::spawn_with_config(
+        "xterm-256color",
+        false,
+        Some("iTerm.app"),
+        Some("oslo.misc.nested_ask = false\n"),
+    );
     shell.wait_for_marks(2);
     shell.send(format!("{} -i\n", common::oslo_bin().display()).as_bytes());
     let nested = shell.wait_for_marks(5);
@@ -545,6 +552,24 @@ fn iterm_nested_shells_keep_distinct_stable_session_ids() {
             .iter()
             .all(|mark| mark.aid() == Some(&outer))
     );
+}
+
+/// **A shell inside a shell asks first**, and the answer that costs nothing is the one Enter gives.
+///
+/// On a terminal, because that is the whole condition: `$OSLO_NESTED` says there is an oslo above
+/// this one, and there is a person here to ask. The test above turns this off to nest on purpose.
+#[test]
+fn a_nested_interactive_shell_asks_before_it_starts() {
+    let mut shell = PtyShell::spawn("xterm-256color");
+    shell.wait_for_marks(2);
+    shell.send(format!("{} -i\n", common::oslo_bin().display()).as_bytes());
+    shell.wait_for_text("Start a nested shell?");
+
+    // Enter takes the default, which is to stay where you are — so the nested shell never starts
+    // and the outer one is still the shell taking input.
+    shell.send(b"\r");
+    shell.send(b"echo STILL-OUTER=$OSLO_NESTED\n");
+    shell.wait_for_text("STILL-OUTER=0");
 }
 
 #[path = "terminal_semantics/terminal_input.rs"]

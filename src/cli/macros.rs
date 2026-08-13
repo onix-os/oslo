@@ -32,6 +32,9 @@ pub fn run(args: &[String]) -> i32 {
     match command {
         "add" => add(rest),
         "remove" | "rm" => remove(rest),
+        "edit" => edit(rest),
+        "run" => run_macro(rest),
+        "publish" => publish(rest),
         "show" | "list" => list::show(rest),
         "off" => switch(rest, false),
         "on" => switch(rest, true),
@@ -276,6 +279,135 @@ fn remove(args: &[String]) -> i32 {
         }
         Err(problem) => fail(&problem),
     }
+}
+
+/// `publish` — write the derived copies again.
+///
+/// Every mutation does this already, so the only reason to ask is a directory that was deleted, a
+/// `$PATH` that moved, or a database that was filled before the copies existed at all.
+fn publish(_args: &[String]) -> i32 {
+    let store = match macros::open() {
+        Ok(store) => store,
+        Err(problem) => return fail(&problem),
+    };
+    if let Err(problem) = macros::publish(&store) {
+        return fail(&problem);
+    }
+    let scripts = macros::all(&store)
+        .iter()
+        .filter(|entry| entry.kind == Kind::Script && entry.active)
+        .count();
+    let aliases = macros::all(&store)
+        .iter()
+        .filter(|entry| entry.kind == Kind::Alias && entry.active)
+        .count();
+    if let Some(dir) = macros::bin::directory() {
+        println!("{scripts} scripts  → {}", dir.display());
+    }
+    if let Some(path) = macros::sourced::path() {
+        println!("{aliases} aliases  → {}", path.display());
+        println!();
+        println!("For a shell that is not oslo, source that file:");
+        println!("  [ -f {} ] && . {}", path.display(), path.display());
+    }
+    0
+}
+
+/// `run NAME [ARG]...` — run a stored macro from something that is not oslo.
+///
+/// **Everything after the name belongs to the macro**, including words that look like options:
+/// `oslo macros run deploy --dry-run` passes `--dry-run` to `deploy` and not to oslo. That is the
+/// same rule `-c` follows, and for the same reason.
+fn run_macro(args: &[String]) -> i32 {
+    let Some((name, rest)) = args.split_first() else {
+        return usage("run needs a name: `oslo macros run NAME [ARG]...`");
+    };
+    let mut env = oslo::env::Environment::new();
+    match oslo::exec::stored::run_named(&mut env, name, rest) {
+        Some(status) => status,
+        None => fail(&format!(
+            "nothing runnable called {name} — `oslo macros show {name}` says what it is"
+        )),
+    }
+}
+
+/// `edit NAME` — open one in `$EDITOR` and store what comes back.
+///
+/// `add` already opens the editor for a name it knows, but only by way of adding one; asking to
+/// *edit* what you have should not be spelled as adding it again.
+fn edit(args: &[String]) -> i32 {
+    let asked = match parse(args) {
+        Ok(asked) => asked,
+        Err(problem) => return usage(&problem),
+    };
+    let Some(name) = asked.words.first() else {
+        return usage("edit needs a name");
+    };
+    let store = match macros::open() {
+        Ok(store) => store,
+        Err(problem) => return fail(&problem),
+    };
+    // The kind is only asked for when the name is more than one thing, exactly as `remove` does it.
+    let kind = match asked
+        .kind
+        .or_else(|| match macros::kinds_of(&store, name).as_slice() {
+            [only] => Some(*only),
+            _ => None,
+        }) {
+        Some(kind) => kind,
+        None => match macros::kinds_of(&store, name).as_slice() {
+            [] => return fail(&format!("nothing called {name}")),
+            several => {
+                let words: Vec<String> =
+                    several.iter().map(|k| format!("--{}", k.word())).collect();
+                return usage(&format!(
+                    "{name} is more than one thing — say which: {}",
+                    words.join(", ")
+                ));
+            }
+        },
+    };
+    let Some(entry) = macros::get(&store, kind, name) else {
+        return fail(&format!("no {} called {name}", kind.word()));
+    };
+
+    // **Said before the editor opens, not after it closes.** A function or a script is found only
+    // once `$PATH` has failed, so a file of the same name on `$PATH` is what actually runs — and
+    // editing the stored one would be editing something the shell never reaches. Whoever asked for
+    // this should know that while they still have the choice of editing the other file instead.
+    if let Some(path) = shadowing_file(kind, name) {
+        eprintln!("oslo macros: {name} runs from {path} — this is the stored copy, and `$PATH`");
+        eprintln!(
+            "oslo macros: wins over it. Edit that file, or take it off `$PATH`, if you meant"
+        );
+        eprintln!("oslo macros: the one that runs.");
+    }
+
+    match oslo_runtime::editor::edit(&entry.body, kind.extension(&entry.body)) {
+        Ok(None) => {
+            println!("unchanged");
+            0
+        }
+        Ok(Some(body)) => match macros::put_and_publish(&store, &Entry { body, ..entry }) {
+            Ok(()) => {
+                println!("{} {name}", kind.word());
+                0
+            }
+            Err(problem) => fail(&problem),
+        },
+        Err(problem) => fail(&problem),
+    }
+}
+
+/// The file on `$PATH` that would answer to `name` before a stored macro does.
+///
+/// Only for the kinds that are *found by name* when a command runs. An alias and an abbreviation
+/// are applied before the search happens, so nothing on `$PATH` can shadow one.
+fn shadowing_file(kind: Kind, name: &str) -> Option<String> {
+    if !matches!(kind, Kind::Func | Kind::Script) {
+        return None;
+    }
+    oslo::env::builtins::hash_lookup(name).map(|path| path.to_string_lossy().into_owned())
 }
 
 /// `off` and `on` — the screen's Space and Space ×3, for something that is not a person.

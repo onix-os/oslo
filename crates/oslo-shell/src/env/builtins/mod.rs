@@ -30,7 +30,9 @@ mod getopts;
 mod hash;
 mod io;
 mod jobs;
+mod keep;
 mod r#let;
+mod locate;
 mod mapfile;
 mod messages;
 mod nav;
@@ -46,6 +48,8 @@ mod suspend;
 pub use scratch::tool as scratch_tool;
 mod times;
 mod ui;
+/// `oslo userin …` — the same widgets as the `ui` builtin, for a shell that is not oslo.
+pub use ui::tool as userin_tool;
 mod ulimit;
 mod universal;
 mod variables;
@@ -68,6 +72,9 @@ pub use hash::builtin_hash;
 pub use io::{builtin_echo, builtin_printf, builtin_read, shell_quote};
 pub use jobs::{builtin_bg, builtin_disown, builtin_fg, builtin_jobs, builtin_wait};
 pub use r#let::builtin_let;
+/// `which` and `whereis`, which only a shell can answer: an alias, a builtin and a stored macro are
+/// all invisible to the programs by those names.
+pub use locate::{builtin_whereis, builtin_which};
 pub use mapfile::builtin_mapfile;
 pub use messages::builtin_messages;
 pub use process::{
@@ -140,6 +147,10 @@ pub fn register_default_builtins(env: &mut Environment) {
     env.register_custom_builtin("true", |_, _| Ok(0));
     env.register_custom_builtin("false", |_, _| Ok(1));
     env.register_custom_builtin("type", builtin_type);
+    // The programs by these names read `$PATH` and nothing else, so they are wrong about every
+    // alias, builtin and stored macro in this shell. `/usr/bin/which` still answers the old way.
+    env.register_custom_builtin("which", builtin_which);
+    env.register_custom_builtin("whereis", builtin_whereis);
     env.register_custom_builtin("eval", builtin_eval);
     env.register_custom_builtin(".", builtin_source);
     env.register_custom_builtin("source", builtin_source);
@@ -160,6 +171,9 @@ pub fn register_default_builtins(env: &mut Environment) {
 
     // `OSC 52` to the terminal, so it works over SSH where a clipboard helper cannot.
     env.register_custom_builtin("copy", copy::builtin_copy);
+    // The prefix that gives `copy --last` something to copy. Opt-in, one command at a time: a
+    // shell that kept every command's output would pay for all of them to answer about one.
+    env.register_custom_builtin("keep", keep::builtin_keep);
     env.register_custom_builtin("abbr", abbr::builtin_abbr);
     env.register_custom_builtin("ui", ui::builtin_ui);
     env.register_custom_builtin("nav", nav::builtin_nav);
