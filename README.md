@@ -468,6 +468,11 @@ oslo, and so on. Every shell publishes it, `-c` and scripts included; only an in
 [ "${OSLO_NESTED:-0}" -gt 0 ] && printf '⧉%s ' "$OSLO_NESTED"
 ```
 
+**One terminal, one stack.** A tmux pane, a hexe pod and an ssh login all inherit the count from the
+shell that opened them and none of them is inside it — each runs its shell on a pty of its own, and
+there is nothing there to `exit` back into. So the count travels with the terminal it was set on and
+one arriving from a different screen starts again at `0`.
+
 Asked only when there is a terminal to ask on — `command | oslo -i` is a shell with no person at
 the other end of stdin, and a question there would be answered by the script's first line.
 `oslo.misc.nested_ask = false` turns it off for somebody who nests on purpose; the count stays.
