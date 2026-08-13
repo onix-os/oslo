@@ -51,12 +51,21 @@ regex = { version = "1", default-features = false, features = [
 # `track::nested` tells a terminal it can name from a pipe it cannot.
 nix = { version = "0.29", features = ["hostname", "fs"] }
 
+# The age file format, for `secrets`. Default features only: that is x25519 and a passphrase, in
+# pure Rust. `ssh` would let it read `~/.ssh/id_*` and brings `rsa`, `aes`, `cbc`, `ctr` and
+# `bcrypt-pbkdf` for the sake of key types age's own documentation asks people not to use.
+age = { version = "0.12", optional = true, default-features = false }
+
 [features]
 default = []
 # `vista` — the model behind ghost prediction and repair. Off, and the switch is here rather than
 # in the shell because this is where the crate it needs is named: without the feature
 # `vista-recall` is not compiled, not fetched, and not in the binary.
 vista = ["dep:vista"]
+# `secrets` — values encrypted at rest with age, held in memory only while something is using them.
+# Named here because this is where the crate is: without the feature `age` is not compiled, not
+# fetched, and not in the binary.
+secrets = ["dep:age"]
 # Exposes the lock and the reset that serialise tests touching the process-wide feature bitset.
 # Enabled by `oslo`'s dev-dependencies, so it is absent from any build that is not a test.
 

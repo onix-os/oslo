@@ -75,6 +75,11 @@ pub const TOOLS: &[Tool] = &[
         name: "userin",
         about: "ask for something: choose, filter, input, confirm and the rest",
     },
+    #[cfg(feature = "secrets")]
+    Tool {
+        name: "secret",
+        about: "values kept encrypted, handed out when something asks",
+    },
 ];
 
 /// The tool a first *operand* names, if it safely names one.
@@ -160,6 +165,10 @@ pub fn run(tool: &'static Tool, args: &[String]) -> i32 {
     // print instead.
     if tool.name == "userin" {
         return oslo::env::builtins::userin_tool(args);
+    }
+    #[cfg(feature = "secrets")]
+    if tool.name == "secret" {
+        return crate::cli::secret::run(args);
     }
     let paint = crate::cli::help::Paint::detect();
     if args.iter().any(|a| a == "--help" || a == "-h") {

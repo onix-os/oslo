@@ -99,6 +99,30 @@ plugin = ["oslo-runtime/plugin"]
 # comments; the word `argc` falls through to `$PATH`, so the real one still works.
 argc = ["oslo-shell/argc", "oslo-runtime/argc", "dep:argc"]
 
+# `secrets` — values encrypted at rest with age, decrypted only when something asks for one.
+#
+# **Off, and measured before anything was designed on top of it.** The real binary at this profile,
+# built both ways, with only the x25519 path exercised:
+#
+# ```text
+#   nothing else on          5,467,072 bytes
+#   with it                  5,827,616 bytes    +352 KB
+#   every other feature on   6,549,888 → 6,902,240   +344 KB
+# ```
+#
+# That makes it the **largest single feature** — larger than `vista` (341 KB) and `argc` (308 KB) —
+# and the byte count is the smaller half of the cost. `age` brings **109 crates**, and what is in
+# them is the surprise: `i18n-embed`, `rust-embed` and the whole `fluent` stack, because the library
+# localises its error messages; `hpke`, `ml-kem` and `p256` for hybrid recipients; `nom`,
+# `cookie-factory`, `pin-project` and eight `futures-*` crates. Encrypting sixteen bytes to one key
+# does not need any of it, but the crate does not offer a way to say so — every one of those is an
+# unconditional dependency of `age` itself, not a feature that can be turned off.
+#
+# Kept behind a switch on those grounds alone: a `/bin/sh` on a distribution should not carry a
+# localisation framework to hold a token. Without it there is no `oslo secret`, and `age` is not
+# compiled, fetched or linked.
+secrets = ["oslo-base/secrets"]
+
 [dependencies]
 # The Lua front end, in the same relationship to Lua that brush-parser has to the shell: it parses
 # and nothing else. Evaluation is oslo's own, in `src/lua/eval/`, so that both languages run on one
