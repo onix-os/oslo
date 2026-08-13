@@ -301,12 +301,23 @@ opt-level = 3
 [profile.release.package.oslo-ui]
 opt-level = 3
 
-# **Vendored, so it is built the way oslo's own crates are.** `argc` parses a script's comments and
-# then matches every argument against them; it runs once per invocation of a script that uses it,
-# which is the shape that pays for speed. `"s"` would be saving bytes on a feature whose whole cost
-# is already paid the moment it is switched on.
+# **The one place where `"s"` was chosen after measuring both.** `argc` was built at `3` first, on
+# the argument that a parse runs once per invocation of a script that uses it and that is the shape
+# which pays for speed. The binary says what that argument costs:
+#
+# ```text
+#   without argc      6,164,864
+#   argc at "s"       6,508,928    +336 KB
+#   argc at 3         6,562,176    +388 KB
+#                                  ───────
+#   maximum optimisation costs         52 KB
+# ```
+#
+# Fifty-two kilobytes is more than every optional argc *feature* put together — `eval-bash` is 12 KB
+# and `compgen` is 400 bytes — to make a parse of a ten-line declaration faster than the
+# microseconds it already takes. Nobody can feel that; everybody carries the bytes.
 [profile.release.package.argc]
-opt-level = 3
+opt-level = "s"
 
 # **`"*"` does not reach oslo's own crates, and that is cargo's rule rather than luck.**
 #
