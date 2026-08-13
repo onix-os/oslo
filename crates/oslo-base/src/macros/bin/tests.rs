@@ -119,20 +119,22 @@ fn a_macro_turned_off_has_no_file() {
 fn a_second_store_does_not_empty_the_first_ones_directory() {
     let _guard = lock();
     let bin = tempfile::tempdir().expect("tempdir");
-    let first = tempfile::tempdir().expect("tempdir");
-    let second = tempfile::tempdir().expect("tempdir");
     unsafe { std::env::set_var("OSLO_MACROS_BIN", bin.path()) };
 
-    // The first store fills it.
-    unsafe { std::env::set_var("XDG_DATA_HOME", first.path()) };
-    publish(&[script("deploy", "#!/bin/sh\necho one\n")]).expect("publish");
-    assert!(bin.path().join("deploy").exists());
+    // A directory another store filled: its manifest says so, and its script is in it. Written by
+    // hand rather than by pointing `$XDG_DATA_HOME` somewhere — that is process-wide, and moving it
+    // under other tests is what `track::universal` warns about.
+    std::fs::write(bin.path().join("deploy"), "#!/bin/sh\necho theirs\n").expect("their script");
+    std::fs::write(
+        bin.path().join(".oslo"),
+        "store /somewhere/else/oslo/macros\ndeploy\n",
+    )
+    .expect("their manifest");
 
-    // The second store, with nothing in it, is refused rather than obeyed.
-    unsafe { std::env::set_var("XDG_DATA_HOME", second.path()) };
     let refused = publish(&[]);
     assert!(refused.is_err(), "a foreign store was allowed to publish");
     let said = refused.unwrap_err();
+    assert!(said.contains("/somewhere/else"), "it names whose: {said}");
     assert!(
         said.contains("OSLO_MACROS_BIN"),
         "a way out is named: {said}"
@@ -142,14 +144,13 @@ fn a_second_store_does_not_empty_the_first_ones_directory() {
         "the other store's script was deleted"
     );
 
-    // And the store that owns it still may.
-    unsafe { std::env::set_var("XDG_DATA_HOME", first.path()) };
-    publish(&[script("deploy", "#!/bin/sh\necho two\n")]).expect("its own store may");
+    // A directory with no owner at all is nobody's, and may be taken: that is every directory
+    // written before this line existed.
+    std::fs::write(bin.path().join(".oslo"), "deploy\n").expect("an old manifest");
+    publish(&[script("ours", "#!/bin/sh\n")]).expect("an unclaimed directory");
+    assert!(bin.path().join("ours").exists());
 
-    unsafe {
-        std::env::remove_var("OSLO_MACROS_BIN");
-        std::env::remove_var("XDG_DATA_HOME");
-    }
+    unsafe { std::env::remove_var("OSLO_MACROS_BIN") };
 }
 
 /// What the command resolver asks, to know it is looking at oslo's own output.

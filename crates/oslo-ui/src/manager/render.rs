@@ -33,7 +33,8 @@ pub struct Frame<'a> {
     pub elapsed_ms: u64,
     pub confirm: Option<bool>,
     pub source: Source,
-    pub tag: Option<String>,
+    /// The kind on screen, or `None` for all of them — what ← and → move through.
+    pub kind: Option<String>,
     pub total: usize,
     pub cols: usize,
     pub rows_available: usize,
@@ -79,16 +80,16 @@ pub fn ago(now: i64, then: i64) -> String {
 fn look_of(f: &Frame<'_>) -> Look {
     let mut look = Preset::History.look();
     look.right = format!("{} @ {{badge}} || {{n}}/{{total}} ", f.source.label());
-    look.badge = match &f.tag {
-        Some(tag) => format!("[#{tag}]"),
+    look.badge = match &f.kind {
+        Some(kind) => format!("[{kind}]"),
         None => "[all]".to_string(),
     };
     // **An empty list says which empty list it is.** The screen opens on an empty database on
     // purpose — the database is not the only source, and Tab is how you reach the other one — so the
     // one place a person is already looking says where the rest of it went.
     if f.rows.is_empty() && f.query.is_empty() {
-        look.placeholder = match (f.source, f.tag.is_some()) {
-            (_, true) => "nothing with this tag — ← → for another".to_string(),
+        look.placeholder = match (f.source, f.kind.is_some()) {
+            (_, true) => "nothing of this kind — ← → for another".to_string(),
             (Source::Stored, false) => {
                 "nothing stored — tab for what your config defines".to_string()
             }

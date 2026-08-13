@@ -162,7 +162,7 @@ other modifier, for the other list of things you keep. `oslo.macros.key` moves i
 
 A database rather than a file to edit and re-source. Five kinds under one word: an alias, an
 abbreviation, a function, a script and a variable. `oslo macros show` is the history finder's screen pointed at
-them — type to filter, ← → for the tag, Tab between what you stored and what your config defines,
+them — type to filter (`#tag` narrows to a tag), ← → for the kind, Tab between what you stored and what your shell inherited,
 Enter to edit in `$EDITOR`, Delete to forget, Space to turn one off for this session and three
 spaces to turn it off everywhere. A change is live in every running shell before its next prompt,
 for the price of a `stat`.

@@ -229,8 +229,8 @@ with nothing to negotiate.
 
 | key | |
 |---|---|
-| type | filter — every column, so `script` narrows by kind and `git` by tag |
-| ← → | **the tag**: all of them, then each one in use. Where the finder's scopes are |
+| type | filter — every column; `#git` asks for a tag, in any order and with anything else |
+| ← → | **the kind**: all of them, then each one in use. Where the finder's scopes are |
 | Tab | **the source**: `[stored]` ↔ `[elsewhere]`. Where the finder's profile is |
 | Enter | **the editor**, for every kind, including an alias |
 | Delete | forget it, after the same question the finder asks |

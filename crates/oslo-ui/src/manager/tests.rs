@@ -43,33 +43,83 @@ fn the_query_matches_every_column_on_the_row() {
     assert_eq!(state.shown[0].name, "gs", "and so is a tag");
 }
 
-/// Left and Right are the tag, the way they are the scope in the finder.
+/// **Left and Right are the kind**, which is the division a list of five kinds is navigated by —
+/// and the one that matters once the inherited side carries every variable this shell has.
 #[test]
-fn the_arrows_move_through_the_tags_in_use() {
+fn the_arrows_move_through_the_kinds_in_use() {
     let mut state = state(vec![
-        item("alias", "a", &["git"]),
-        item("alias", "b", &["system"]),
-        item("alias", "c", &[]),
+        item("alias", "a", &[]),
+        item("script", "b", &[]),
+        item("var", "c", &[]),
     ]);
-    assert_eq!(state.tag(), None, "all of them, to start");
+    assert_eq!(state.kind(), None, "all of them, to start");
     assert_eq!(state.shown.len(), 3);
 
-    state.next_tag();
-    assert_eq!(state.tag().as_deref(), Some("git"));
+    state.next_kind();
+    assert_eq!(state.kind().as_deref(), Some("alias"));
     assert_eq!(state.shown.len(), 1);
+    assert_eq!(state.shown[0].name, "a");
 
-    state.next_tag();
-    assert_eq!(state.tag().as_deref(), Some("system"));
+    state.next_kind();
+    assert_eq!(state.kind().as_deref(), Some("script"));
 
-    state.next_tag();
-    assert_eq!(state.tag(), None, "round the loop");
+    state.next_kind();
+    assert_eq!(state.kind().as_deref(), Some("var"));
 
-    state.previous_tag();
+    state.next_kind();
+    assert_eq!(state.kind(), None, "round the loop");
+
+    state.previous_kind();
     assert_eq!(
-        state.tag().as_deref(),
-        Some("system"),
+        state.kind().as_deref(),
+        Some("var"),
         "and back the other way"
     );
+}
+
+/// **A tag is asked for in the query**, in any order and with or without anything else — so there is
+/// no second key, and the arrows are free for the kind.
+#[test]
+fn a_hash_in_the_query_asks_for_a_tag() {
+    let mut state = state(vec![
+        item("alias", "gs", &["git"]),
+        item("alias", "gp", &["git"]),
+        item("alias", "ll", &["system"]),
+    ]);
+
+    state.query = "#git".to_string();
+    state.refilter();
+    assert_eq!(state.shown.len(), 2, "everything with the tag");
+
+    for query in ["#git gs", "gs #git"] {
+        state.query = query.to_string();
+        state.refilter();
+        assert_eq!(state.shown.len(), 1, "{query}");
+        assert_eq!(state.shown[0].name, "gs");
+    }
+
+    // The tag is not matched as text: `#git` finds the tag, not a body that says "git".
+    state.query = "#nothing".to_string();
+    state.refilter();
+    assert!(state.shown.is_empty());
+}
+
+/// And it is scoped by the kind, because the kind filter runs first.
+#[test]
+fn a_tag_is_asked_for_within_the_kind_on_screen() {
+    let mut state = state(vec![
+        item("alias", "gs", &["git"]),
+        item("script", "deploy", &["git"]),
+    ]);
+
+    state.query = "#git".to_string();
+    state.refilter();
+    assert_eq!(state.shown.len(), 2, "both kinds, in the everything view");
+
+    state.next_kind();
+    assert_eq!(state.kind().as_deref(), Some("alias"));
+    assert_eq!(state.shown.len(), 1, "only this kind's");
+    assert_eq!(state.shown[0].name, "gs");
 }
 
 /// Tab is the source, and an untagged list has nothing but "all" to move through.
@@ -86,7 +136,7 @@ fn tab_moves_between_the_database_and_the_config() {
     state.next_source();
     assert_eq!(state.source, Source::Elsewhere);
     assert_eq!(state.shown[0].name, "ll");
-    assert_eq!(state.tag(), None, "the old source's tag does not follow");
+    assert_eq!(state.kind(), None, "the old source’s kind does not follow");
 }
 
 /// One space is the session, and it toggles.

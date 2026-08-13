@@ -129,6 +129,16 @@ fn apply(env: &Arc<Mutex<Environment>>, wanted: &[Entry], had: &Applied, now: &A
 /// The manager's second source, and what makes a removal able to put the configured alias back.
 /// Everyone else reads it from the file rather than by running Lua, because this is the only
 /// process that has already run it.
+/// Whether a variable is one somebody would look for in a list of what this shell has.
+///
+/// **Nearly all of them are**, so this is a short list of the ones that are not: the four the shell
+/// rewrites as you move and type, which would be a different value every time the list is drawn and
+/// tell you nothing about your setup. Everything else stays — including `PATH` and the long ones,
+/// because a list that quietly hid what it judged uninteresting would be worth less than `env`.
+fn worth_listing(name: &str) -> bool {
+    !matches!(name, "_" | "PWD" | "OLDPWD" | "SHLVL")
+}
+
 fn publish_what_the_config_defined(env: &Arc<Mutex<Environment>>) -> Option<()> {
     let mut entries: Vec<Entry> = {
         let guard = env.lock().ok()?;
@@ -143,6 +153,18 @@ fn publish_what_the_config_defined(env: &Arc<Mutex<Environment>>) -> Option<()> 
             .into_iter()
             .map(|(name, abbr)| Entry::new(Kind::Abbrev, &name, &abbr.expansion)),
     );
+    // **And every variable this shell has**, which is the other half of "what is defined that you
+    // did not store". A stored `EDITOR` that never applies because a profile already exported one
+    // is invisible until the two lists are on the same screen; this is that screen.
+    if let Ok(guard) = env.lock() {
+        entries.extend(
+            guard
+                .exported_vars()
+                .into_iter()
+                .filter(|(name, _)| worth_listing(name))
+                .map(|(name, value)| Entry::new(Kind::Var, &name, &value)),
+        );
+    }
     entries.sort_by(|a, b| a.kind.cmp(&b.kind).then_with(|| a.name.cmp(&b.name)));
     // Best effort: this is a list the manager draws. A shell that failed to start because it could
     // not write one would be absurd.
