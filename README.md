@@ -530,6 +530,9 @@ Three rules a script depends on:
 Items come from the operands or from stdin, so `ls | oslo userin filter` and
 `oslo userin filter a b c` are both the obvious thing.
 
+[Asking for something](docs/features/userin.md) has the whole of it, including the third door:
+`oslo.ui.choose{…}` from Lua, the same widgets again.
+
 The native editor enables bracketed paste while it owns the line. A pasted newline is inserted as
 text and does not execute until Enter is pressed. Pasted and typed control characters stay exact in
 the command buffer but redraw as inert notation such as `^[`, `^I`, `^M`, and `^?`; raw OSC and CSI
@@ -815,6 +818,7 @@ oslo.misc.greeting      = nil         -- a line of your own instead of the banne
 oslo.misc.escape_delay  = 25          -- ms to wait for the rest of an escape sequence; raise on ssh
 oslo.misc.color_depth   = nil         -- truecolor / 256 / 16 / none, when detection is wrong
 oslo.misc.nested_ask    = true        -- ask before starting an oslo inside an oslo
+oslo.misc.warnings      = true        -- the hint and warning boxes under `--help`
 
 oslo.vi.enabled         = false       -- vi mode; true for vi, false for emacs only
 oslo.vi.cursor_insert   = "line"      -- block / line / underscore, each + " blink"
