@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.3.6] - 2026-08-13
+
+### <!-- 1 -->🐛 Bug Fixes
+
+- A -c wrapper is not a shell you are in
+
 ## [0.3.5] - 2026-08-13
 
 ### <!-- 1 -->🐛 Bug Fixes
