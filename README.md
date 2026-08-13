@@ -462,7 +462,9 @@ later that does not close the terminal. Enter answers "stay here", because that 
 cannot regret.
 
 `$OSLO_NESTED` counts, for a prompt that wants to show it — `0` in a fresh terminal, `1` inside one
-oslo, and so on. Every shell publishes it, `-c` and scripts included; only an interactive one asks.
+oslo, and so on. **Only shells you type at take a level.** `oslo -c …` and scripts are plumbing and
+pass the count through untouched: `ssh` runs `oslo -c waypipe … server` on the far side and the
+login shell comes out from under it, which is not something anybody can `exit` back into.
 
 ```sh
 [ "${OSLO_NESTED:-0}" -gt 0 ] && printf '⧉%s ' "$OSLO_NESTED"

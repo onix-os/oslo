@@ -29,8 +29,15 @@
 //! So the count travels with the terminal it was set on — `$OSLO_NESTED_TTY`, this host and the
 //! device this terminal *is* — and a count that arrives from a different one starts again at the top.
 //!
-//! Every shell publishes it, `-c` and scripts included — it counts the oslo shells above this
-//! process, and one started by a script is one of them. Only an interactive shell asks about it.
+//! # Only shells you type at
+//!
+//! `oslo -c …` and a script take no level and publish nothing. They are plumbing, and one of them
+//! is why `ssh` asked the question for a week: sshd on the far side runs `oslo -c waypipe … server`
+//! and the login shell comes out from under it — the same terminal, a live ancestor, and nothing
+//! anybody could `exit` back into. Both checks below were satisfied and both were beside the point.
+//!
+//! So what a `-c` shell hands its children is what it was handed, unchanged: the shell above *it*,
+//! or nothing at all.
 
 use std::sync::OnceLock;
 
@@ -68,18 +75,26 @@ static DEPTH: OnceLock<usize> = OnceLock::new();
 /// Beside [`super::session::begin`] and called from the same places, for the same reason: a tool
 /// oslo starts is not a shell and must not count as one, or `oslo macros` would tell every shell it
 /// opened that it was a level deeper than it is.
-pub fn begin() -> usize {
+pub fn begin(interactive: bool) -> usize {
     let here = terminal();
-    let level = next(inherited(), inside(here.as_deref()));
-    // SAFETY: called once, from `main`, before any thread is started — as `session::begin` is.
-    unsafe {
-        std::env::set_var(VARIABLE, level.to_string());
-        std::env::set_var(OWNER, std::process::id().to_string());
-        match &here {
-            Some(tty) => std::env::set_var(TERMINAL, tty),
-            // Removed rather than left behind: an inherited terminal that is not ours would make
-            // the next shell in this chain believe it shares a screen with something it cannot see.
-            None => std::env::remove_var(TERMINAL),
+    // The shell above, when there really is one: on this screen, still running, still an ancestor.
+    let above = inherited().filter(|_| inside(here.as_deref()));
+    let level = level(interactive, above);
+
+    // **Only a shell somebody types at writes any of this**, and it writes all three together. A
+    // `-c` shell changes nothing at all: what its children inherit is what it inherited, which is
+    // the shell above *it* — and if there was none, none.
+    if interactive {
+        // SAFETY: called once, from `main`, before any thread is started — as `session::begin` is.
+        unsafe {
+            std::env::set_var(VARIABLE, level.to_string());
+            std::env::set_var(OWNER, std::process::id().to_string());
+            match &here {
+                Some(tty) => std::env::set_var(TERMINAL, tty),
+                // Removed rather than left behind: an inherited terminal that is not ours would
+                // make the next shell believe it shares a screen with something it cannot see.
+                None => std::env::remove_var(TERMINAL),
+            }
         }
     }
     *DEPTH.get_or_init(|| level)
@@ -195,16 +210,23 @@ fn parent_of(pid: u32) -> Option<u32> {
     after_name.split_whitespace().nth(1)?.parse().ok()
 }
 
-/// The level below `above`, or the top when this is a screen of its own.
+/// Where this shell stands, given the shell above it (if any) and whether anybody types at this one.
 ///
-/// A value that is not a number is treated as no value at all: something other than oslo wrote it,
-/// and guessing what it meant would put a shell at a depth nobody can explain.
-fn next(above: Option<usize>, same_terminal: bool) -> usize {
-    match above {
-        Some(level) if same_terminal => level.saturating_add(1),
-        // A new terminal is a new stack: a tmux pane, a hexe pod and an ssh login all begin at the
-        // top however deep the shell that opened them was.
-        _ => 0,
+/// **A `-c` shell is not a level.** It is plumbing — `ssh host cmd`, a Makefile recipe, the wrapper
+/// that starts a Wayland proxy before the login shell — and nobody can `exit` back into one. This
+/// was the whole bug on `ssh`: sshd ran `oslo -c waypipe … server`, that oslo counted itself, and
+/// the login shell underneath it was told it was one deep. It is on the same terminal and genuinely
+/// an ancestor, so no amount of checking *that* could have caught it — what was wrong was calling it
+/// a shell you were inside.
+///
+/// So a `-c` shell passes the stack through untouched, and the next shell measures itself against
+/// the last shell somebody was actually typing at.
+fn level(interactive: bool, above: Option<usize>) -> usize {
+    match (interactive, above) {
+        (true, Some(above)) => above.saturating_add(1),
+        (false, Some(above)) => above,
+        // The top of a screen, whatever arrived in the environment.
+        (_, None) => 0,
     }
 }
 
@@ -216,29 +238,38 @@ mod tests {
     /// environment of every other test's thread.
     #[test]
     fn the_first_shell_is_the_zeroth() {
-        assert_eq!(next(None, true), 0, "a fresh terminal has nothing above it");
-        assert_eq!(next(Some(0), true), 1);
-        assert_eq!(next(Some(7), true), 8);
+        assert_eq!(level(true, None), 0, "a fresh screen has nothing above it");
+        assert_eq!(level(true, Some(0)), 1);
+        assert_eq!(level(true, Some(7)), 8);
     }
 
     /// **A new terminal is a new stack.** A tmux pane, a hexe pod and an ssh login all inherit the
     /// count from the shell that opened them and are not inside it — they are looking at a screen
     /// of their own, and asking them whether they meant to nest is asking about somebody else.
+    /// `None` here is what [`inside`] answers for all of them.
     #[test]
     fn another_screen_starts_again_at_the_top() {
-        assert_eq!(next(Some(0), false), 0);
-        assert_eq!(
-            next(Some(3), false),
-            0,
-            "however deep the one that opened it"
-        );
+        assert_eq!(level(true, None), 0);
+        assert_eq!(level(false, None), 0);
+    }
+
+    /// **A `-c` shell is not a level.** `ssh host` runs `oslo -c waypipe … server` on the far side
+    /// and the login shell comes out from under it: same terminal, live ancestor, and not one thing
+    /// you could `exit` back into. It passes the stack through instead of adding to it.
+    #[test]
+    fn plumbing_does_not_take_a_level() {
+        assert_eq!(level(false, Some(0)), 0, "the wrapper is not a shell above");
+        assert_eq!(level(false, Some(2)), 2);
+        // And a shell somebody types at, under that same wrapper, is one below what the wrapper
+        // passed on — not two.
+        assert_eq!(level(true, Some(level(false, Some(0)))), 1);
     }
 
     /// Somebody else's `OSLO_NESTED=deep` is not a depth, and this shell is not nested in it.
     #[test]
     fn a_value_that_is_not_a_number_is_not_a_shell() {
-        assert_eq!(next(None, true), 0);
-        assert_eq!(next(Some(usize::MAX), true), usize::MAX, "no wrap to zero");
+        assert_eq!(level(true, None), 0);
+        assert_eq!(level(true, Some(usize::MAX)), usize::MAX, "no wrap to zero");
     }
 
     /// **The shell above has to still be there.** A `tmux` server hands out the environment it was
