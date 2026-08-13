@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.3.3] - 2026-08-13
+
+### <!-- 0 -->⛰️  Features
+
+- The widgets, for shells that are not oslo
+- Ask before nesting, count with OSLO_NESTED
+- Keep a command's output, copy --last
+- Which and whereis know this shell
+- Aliases as a file another shell can source
+- The database is canonical, the files are derived
+- Edit, and a word about what $PATH answers first
+
+### <!-- 1 -->🐛 Bug Fixes
+
+- One terminal, one stack
+- A foreign /bin/sh is a hint, not a warning
+- One entry per thing, not per file
+- Type and command -v see stored macros
+
+### <!-- 3 -->📚 Documentation
+
+- The widgets, and the three doors
+
 ## [0.3.2] - 2026-08-13
 
 ### <!-- 0 -->⛰️  Features
