@@ -30,6 +30,7 @@ mod getopts;
 mod hash;
 mod io;
 mod jobs;
+mod keep;
 mod r#let;
 mod locate;
 mod mapfile;
@@ -168,6 +169,9 @@ pub fn register_default_builtins(env: &mut Environment) {
 
     // `OSC 52` to the terminal, so it works over SSH where a clipboard helper cannot.
     env.register_custom_builtin("copy", copy::builtin_copy);
+    // The prefix that gives `copy --last` something to copy. Opt-in, one command at a time: a
+    // shell that kept every command's output would pay for all of them to answer about one.
+    env.register_custom_builtin("keep", keep::builtin_keep);
     env.register_custom_builtin("abbr", abbr::builtin_abbr);
     env.register_custom_builtin("ui", ui::builtin_ui);
     env.register_custom_builtin("nav", nav::builtin_nav);

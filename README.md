@@ -446,6 +446,37 @@ without pretending that a command ran. OSC 7 publishes the working directory, OS
 OSC 8 carries Oslo-owned hyperlinks, and OSC 52 powers the `copy` builtin over SSH. OSC 52 can still
 be refused by the terminal's clipboard policy.
 
+### Copying what a command printed
+
+```sh
+ls | copy                  # a pipe, arguments, or a file: copy hi / copy < notes.txt
+keep git log --oneline     # run it, watch it, and keep what it printed
+copy --last                # that, on the clipboard
+keep -e make build         # keep the errors too
+```
+
+`copy` reaches the clipboard through OSC 52, so it works over SSH and in a container with no
+`xsel` — and the terminal may refuse it, in which case nothing arrives and there is no reply for
+oslo to read.
+
+**`keep` is a prefix because output is gone once it is printed.** To have a copy the shell must
+stand between the command and the terminal, and standing there for *every* command means holding
+the largest thing you ever run in memory and turning `isatty` false for all of them. So it is one
+command at a time. You still watch it scroll: every chunk is written to the terminal before it is
+kept. What it costs is that a program which colours only for a terminal will not colour here — and
+what is left of an escape sequence is taken out before it is stored, because a clipboard full of
+`\x1b[32m` is not the output.
+
+Kept per session, so two terminals do not answer for each other, in a file rather than in memory —
+`keep` inside a pipeline runs in a forked child, and `copy --last` still finds it. A capture over
+1 MiB keeps its tail and says so, since the end of a build log is the part worth having.
+
+A key, if you want one — no new code, the existing handler rewrites the line:
+
+```lua
+oslo.keys["alt-enter"] = function(line) return "keep " .. line.text end
+```
+
 The native editor enables bracketed paste while it owns the line. A pasted newline is inserted as
 text and does not execute until Enter is pressed. Pasted and typed control characters stay exact in
 the command buffer but redraw as inert notation such as `^[`, `^I`, `^M`, and `^?`; raw OSC and CSI
