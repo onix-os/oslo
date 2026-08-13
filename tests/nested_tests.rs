@@ -20,10 +20,14 @@ fn oslo(nested: Option<&str>, line: &str) -> String {
         .args(["-c", line])
         .env_remove("OSLO_NESTED")
         .env_remove("OSLO_NESTED_TTY")
+        .env_remove("OSLO_NESTED_PID")
         .stdin(std::process::Stdio::null())
         .stderr(std::process::Stdio::null());
     if let Some(value) = nested {
         command.env("OSLO_NESTED", value);
+        // This process is about to be the child's parent, which is what a shell publishing a count
+        // is: something the next shell is genuinely inside.
+        command.env("OSLO_NESTED_PID", std::process::id().to_string());
     }
     let out = command.output().expect("spawn oslo");
     String::from_utf8_lossy(&out.stdout).trim().to_string()
@@ -67,6 +71,26 @@ fn a_count_from_another_terminal_is_ignored() {
         .args(["-c", "echo $OSLO_NESTED"])
         .env("OSLO_NESTED", "3")
         .env("OSLO_NESTED_TTY", "somewhere-else")
+        .env("OSLO_NESTED_PID", std::process::id().to_string())
+        .stdin(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .output()
+        .expect("spawn oslo");
+    assert_eq!(String::from_utf8_lossy(&out.stdout).trim(), "0");
+}
+
+/// **A count whose shell is gone is nobody's.** A `tmux` or `hexe` server keeps the environment it
+/// was started with and hands it to every pane for as long as it runs, so a pane opened today can
+/// inherit a count from a shell that exited last week — the case where the terminal check cannot
+/// help, because the pane may well be on the same screen the count was set on.
+#[test]
+fn a_count_from_a_shell_that_is_gone_is_ignored() {
+    let out = Command::new(oslo_bin())
+        .args(["-c", "echo $OSLO_NESTED"])
+        .env("OSLO_NESTED", "2")
+        // Everything else agrees; only the shell that said so is not there.
+        .env_remove("OSLO_NESTED_TTY")
+        .env("OSLO_NESTED_PID", "4294967294")
         .stdin(std::process::Stdio::null())
         .stderr(std::process::Stdio::null())
         .output()
@@ -84,6 +108,7 @@ fn a_shell_with_no_terminal_just_runs() {
         .arg("-i")
         .env("OSLO_NESTED", "3")
         .env_remove("OSLO_NESTED_TTY")
+        .env("OSLO_NESTED_PID", std::process::id().to_string())
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::null())
