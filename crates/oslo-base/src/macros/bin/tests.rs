@@ -110,13 +110,22 @@ fn a_macro_turned_off_has_no_file() {
 }
 
 /// What the command resolver asks, to know it is looking at oslo's own output.
+///
+/// **Written by oslo, not merely sitting where oslo writes.** A file somebody put in the directory
+/// by hand is theirs: bash runs it, and a shell that answered "command not found" for its own
+/// directory would be the only thing on the system that could not see it.
 #[test]
-fn a_path_in_the_directory_is_recognised_as_ours() {
+fn ours_means_this_module_wrote_it() {
     let _guard = lock();
     let dir = tempfile::tempdir().expect("tempdir");
     unsafe { std::env::set_var("OSLO_MACROS_BIN", dir.path()) };
+    publish(&[script("git-rel", "#!/bin/sh\n")]).expect("publish");
 
     assert!(is_ours(&dir.path().join("git-rel")));
+    assert!(
+        !is_ours(&dir.path().join("hand-written")),
+        "a file oslo never wrote is not oslo's to hide"
+    );
     assert!(!is_ours(std::path::Path::new("/usr/bin/git-rel")));
     assert!(!is_ours(&dir.path().join("nested/git-rel")));
 

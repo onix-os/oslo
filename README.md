@@ -830,6 +830,7 @@ which cd        # cd: shell built-in command
 which deploy    # deploy: stored script
 whereis ls      # ls: /usr/bin/ls /usr/share/man/man1/ls.1.gz
 whereis cd      # cd: shell built-in command
+whereis deploy  # deploy: stored script
 ```
 
 `/usr/bin/which` reads `$PATH`, and everything interesting about a name here is invisible to a
@@ -850,9 +851,11 @@ script has always had is `command -v`, which is POSIX, answers about *this* shel
 alias, builtin and stored macro there is. Where the system has no such program — a small
 distribution may ship neither — the builtin answers after all.
 
-`whereis` answers the other question, where the *files* are, so it shows the copy of a stored script
-that `oslo macros` writes for everything that is not oslo. Manual pages come from `$MANPATH`;
-sources are not searched, because the directory list that would mean is different on every machine.
+`whereis` answers the other question — every place a name lives, plus its manual pages — and prints
+one entry per *thing*: the copy of a stored script that `oslo macros` writes for other shells is the
+same macro written down twice, not a second place, so it is left out here as it is everywhere else.
+Manual pages come from `$MANPATH`; sources are not searched, because the directory list that would
+mean is different on every machine.
 
 ### Autoloaded functions
 

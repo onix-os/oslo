@@ -54,13 +54,24 @@ pub fn directory() -> Option<PathBuf> {
 
 /// Whether `path` is a file this module wrote.
 ///
-/// Asked by the command resolver on a hit, so it is a string comparison against the parent and
-/// nothing more.
+/// **The manifest decides, not the directory.** Taking "in that directory" to mean "ours" is one
+/// string comparison and it is wrong about anything a person drops in there by hand: that file
+/// would run from bash and from a `.desktop` entry, and be *not found* in the shell whose directory
+/// it is. Nothing else on the system behaves that way, and there is a list of what oslo wrote
+/// sitting right beside the files.
+///
+/// Asked by the command resolver on a hit, so the cheap half comes first: a name that resolved
+/// anywhere else is answered by comparing two paths, and the manifest is read only for a hit inside
+/// oslo's own directory.
 pub fn is_ours(path: &Path) -> bool {
-    match (path.parent(), directory()) {
-        (Some(parent), Some(dir)) => parent == dir,
-        _ => false,
-    }
+    let (Some(parent), Some(dir), Some(name)) = (path.parent(), directory(), path.file_name())
+    else {
+        return false;
+    };
+    parent == dir
+        && read_manifest(&dir)
+            .iter()
+            .any(|written| std::ffi::OsStr::new(written) == name)
 }
 
 /// Write every stored script out, and take away the ones that are no longer stored.

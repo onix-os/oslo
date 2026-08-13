@@ -8,13 +8,14 @@
 //! ```text
 //! ls   → ls: /usr/bin/ls /usr/share/man/man1/ls.1.gz
 //! cd   → cd: shell built-in command
-//! me   → me: stored script /home/bresilla/.local/sbin/me
+//! me   → me: stored script
 //! ```
 //!
-//! **The copy is shown here on purpose**, where `which` and `type` leave it out. They report what
-//! runs, and oslo runs the database row; this reports where files are, and the file is genuinely
-//! there — it is how bash, a `.desktop` file and everything else that is not oslo reaches the same
-//! script. Saying so is the point of the command.
+//! **One entry per thing, not per file.** `oslo macros` writes a copy of every stored script into
+//! its own directory for the benefit of everything that is not oslo, and that copy is left out here
+//! exactly as it is in `which` and `type`: it is the same macro written down twice, and a line
+//! reading `me: stored script /home/…/sbin/me` says the name means two things when it means one.
+//! Where `me` is, is the database. The file is derived from it and rewritten whenever it changes.
 //!
 //! # What is not searched
 //!
@@ -23,7 +24,6 @@
 //! Inventing a list here would produce confident wrong answers, so `-s` is refused rather than
 //! answered badly.
 
-use super::binaries;
 use crate::env::builtins::control::{self, Kind};
 use crate::env::scope::Environment;
 use oslo_base::error::Result;
@@ -69,8 +69,7 @@ pub fn builtin_whereis(env: &mut Environment, args: &[String]) -> Result<i32> {
     for name in names {
         let mut parts = Vec::new();
         if opts.wants_binaries() {
-            parts.extend(shell_answer(env, name));
-            parts.extend(binaries(name).iter().map(|p| p.display().to_string()));
+            parts.extend(everything_under(env, name));
         }
         if opts.wants_manuals() {
             parts.extend(manuals(name).iter().map(|p| p.display().to_string()));
@@ -88,17 +87,20 @@ pub fn builtin_whereis(env: &mut Environment, args: &[String]) -> Result<i32> {
     Ok(0)
 }
 
-/// What the shell knows and the filesystem does not: builtin, alias, function, reserved word,
-/// stored macro. Empty for a name that is only a program.
-fn shell_answer(env: &Environment, name: &str) -> Vec<String> {
-    control::ways(env, name, false)
+/// Everything this name is: what the shell knows — builtin, alias, function, reserved word, stored
+/// macro — and every file on `$PATH` that answers to it.
+///
+/// One entry per *thing*, which is why `oslo macros`' own copies are not among the files. A stored
+/// script and the copy written for other shells are one macro, not a macro and a program, and
+/// printing both would say the name means two things when it means one. Where it is, is the
+/// database — the file is written from it and rewritten on every change.
+fn everything_under(env: &Environment, name: &str) -> Vec<String> {
+    control::ways(env, name, true)
         .iter()
-        .filter_map(|kind| match kind {
-            Kind::File(_) => None,
-            other => Some(match other.alias_body() {
-                Some(body) => format!("aliased to {body}"),
-                None => other.noun().to_string(),
-            }),
+        .map(|kind| match (kind, kind.alias_body()) {
+            (Kind::File(path), _) => path.display().to_string(),
+            (_, Some(body)) => format!("aliased to {body}"),
+            _ => kind.noun().to_string(),
         })
         .collect()
 }

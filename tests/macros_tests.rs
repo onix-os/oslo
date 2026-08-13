@@ -160,9 +160,10 @@ fn which_and_whereis_know_about_a_stored_macro() {
 
     let out = at_a_prompt(dirs, "which oslo-probe\n");
     assert!(out.contains("oslo-probe: stored script"), "{out:?}");
-    // `whereis` shows the generated copy where `which` does not: it reports where files are, and
-    // that file is how everything which is not oslo runs the same script. The `export` is typed
-    // rather than inherited because a config of the machine's own may rebuild `$PATH` at startup.
+    // **One entry per thing.** The copy `oslo macros` writes for other shells is the same macro
+    // written down twice, so it is not a second place this name lives — even with the directory
+    // right there on `$PATH`. The `export` is typed rather than inherited because a config of the
+    // machine's own may rebuild `$PATH` at startup.
     let out = at_a_prompt(
         dirs,
         &format!(
@@ -170,12 +171,10 @@ fn which_and_whereis_know_about_a_stored_macro() {
             bin.path().display()
         ),
     );
+    assert!(out.contains("oslo-probe: stored script"), "{out:?}");
     assert!(
-        out.contains(&format!(
-            "oslo-probe: stored script {}/oslo-probe",
-            bin.path().display()
-        )),
-        "{out:?}"
+        !out.contains(&format!("{}/oslo-probe", bin.path().display())),
+        "the generated copy was reported as a second place: {out:?}"
     );
     // A builtin is the case no program can answer.
     let out = at_a_prompt(dirs, "which cd\n");
@@ -212,6 +211,35 @@ fn one_turned_off_is_reported_by_neither() {
         ""
     );
     assert_eq!(oslo(dirs, &["-c", "type -t oslo-probe"], false).trim(), "");
+}
+
+/// **A file somebody put in that directory by hand is theirs**, and runs like a file anywhere else.
+///
+/// oslo passes over the copies it wrote, and for a while it did that by taking the whole directory
+/// out of `$PATH` — which made a hand-written script there run from bash, from tmux and from a
+/// `.desktop` entry, and be "command not found" in the one shell that owns the directory. The
+/// manifest says which files are oslo's; nothing else in there is.
+#[test]
+fn a_file_oslo_never_wrote_is_not_oslos_to_hide() {
+    let data = tempfile::tempdir().expect("tempdir");
+    let bin = tempfile::tempdir().expect("tempdir");
+    let dirs = (data.path(), bin.path());
+    store(dirs, "script oslo-probe\n\t#!/bin/sh\n\techo hi\n");
+
+    let by_hand = bin.path().join("oslo-hand-written");
+    std::fs::write(&by_hand, "#!/bin/sh\necho by-hand\n").expect("write");
+    let mut mode = std::fs::metadata(&by_hand).expect("stat").permissions();
+    std::os::unix::fs::PermissionsExt::set_mode(&mut mode, 0o755);
+    std::fs::set_permissions(&by_hand, mode).expect("chmod");
+
+    assert_eq!(
+        oslo(dirs, &["-c", "oslo-hand-written"], true).trim(),
+        "by-hand"
+    );
+    assert_eq!(
+        oslo(dirs, &["-c", "command -v oslo-hand-written"], true).trim(),
+        by_hand.display().to_string()
+    );
 }
 
 /// The copy is written for everything that is not oslo, and it is what bash finds.
