@@ -33,13 +33,6 @@ pub(crate) enum Target<'a> {
     Param(&'a str),
     /// One element of an indexed array, with its subscript already evaluated.
     Element { name: &'a str, index: i64 },
-    /// A value already in hand, with no slot in the environment behind it.
-    ///
-    /// This is what element-wise application needs: `${a[@]#pat}` runs the operator over values
-    /// the array path already read out, and there is no per-element name to look up. Nothing can
-    /// assign through it, which is why the `${a[@]:=v}` family is still refused rather than
-    /// routed here.
-    Value(&'a str),
 }
 
 impl Target<'_> {
@@ -51,7 +44,6 @@ impl Target<'_> {
                 .get_array(name)
                 .and_then(|array| array.get(*index))
                 .map(str::to_string),
-            Self::Value(value) => Some((*value).to_string()),
         }
     }
 
@@ -65,9 +57,6 @@ impl Target<'_> {
             Self::Element { name, index } => {
                 env.set_array_element(name, *index, text);
             }
-            // `operators::map_elements` accepts only the four rewriting operators, none of which
-            // assigns, so this arm is unreachable by construction.
-            Self::Value(_) => unreachable!("an element-wise operator never assigns"),
         }
     }
 
@@ -76,7 +65,6 @@ impl Target<'_> {
         match self {
             Self::Param(name) => (*name).to_string(),
             Self::Element { name, index } => format!("{name}[{index}]"),
-            Self::Value(value) => (*value).to_string(),
         }
     }
 }

@@ -113,3 +113,52 @@ fn a_syntax_error_is_reported_and_fails() {
     assert_ne!(r.status, 0, "a syntax error must not exit 0");
     assert!(!r.stderr.is_empty(), "expected a diagnostic on stderr");
 }
+
+/// **The pattern of an element-wise operator is expanded once, not once per element.**
+///
+/// `${@/pat/rep}` applies to every positional, and the pattern does not depend on which one — but
+/// it used to be expanded inside that loop, so a pattern that is itself an expansion cost one
+/// expansion per positional per level. Twelve levels over five positionals is 5¹²: measured at over
+/// twenty seconds here and seven milliseconds in bash. The fuzzer found it as a timeout.
+#[test]
+fn a_nested_elementwise_pattern_does_not_take_forever() {
+    let mut expr = "${@/a/b}".to_string();
+    for _ in 0..12 {
+        expr = format!("${{@/{expr}/x}}");
+    }
+    let start = std::time::Instant::now();
+    let r = run(&format!("set -- 1 2 3 4 5; : $(( {expr} ))"));
+    let took = start.elapsed();
+
+    // **The time is the assertion.** What the expression *evaluates to* is not interesting — five
+    // positionals joined by spaces are not arithmetic, and bash rejects it too — but it has to be
+    // rejected in milliseconds rather than never.
+    assert!(
+        took < std::time::Duration::from_secs(5),
+        "took {took:?} — the pattern is being expanded per element again"
+    );
+    assert!(!r.stderr.contains("panicked"), "stderr was {:?}", r.stderr);
+}
+
+/// A chain of variables whose values are expressions **branches**, and the depth cap alone does not
+/// bound it: thirty levels of doubling is a billion evaluations. bash hangs on this; oslo reports it.
+#[test]
+fn a_branching_chain_of_expressions_is_refused_rather_than_run() {
+    let mut script = String::from("a0=1\n");
+    for i in 1..=30 {
+        script.push_str(&format!("a{i}=\"a{} + a{}\"\n", i - 1, i - 1));
+    }
+    script.push_str(": $(( a30 ))\necho reached\n");
+
+    let start = std::time::Instant::now();
+    let r = run(&script);
+    assert!(
+        start.elapsed() < std::time::Duration::from_secs(5),
+        "it ran the whole tree"
+    );
+    assert!(
+        r.stderr.contains("too large to evaluate"),
+        "stderr was {:?}",
+        r.stderr
+    );
+}

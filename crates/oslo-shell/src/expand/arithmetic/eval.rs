@@ -18,11 +18,39 @@ use oslo_base::error::{Result, ShellError};
 /// rather than run into the stack. 32 is far past any real indirection and far short of the limit.
 const MAX_RESOLVE_DEPTH: usize = 32;
 
+/// How many pieces of text one evaluation may expand and evaluate, all told.
+///
+/// **[`MAX_RESOLVE_DEPTH`] bounds the height of the recursion and says nothing about its width.**
+/// A variable whose value is an expression naming two more variables branches, and thirty-two
+/// levels of branching by two is four billion evaluations:
+///
+/// ```text
+/// a='b+b'; b='c+c'; c='d+d'; …    thirty levels
+/// ```
+///
+/// Each is a legal assignment and each doubles the work, so the depth cap alone lets a shell hang
+/// on a page of ordinary-looking variables. Ten thousand evaluations is far past anything a person
+/// writes — the POSIX corpus never exceeds a few dozen — and short enough to be imperceptible.
+const MAX_EVALUATIONS: usize = 10_000;
+
+thread_local! {
+    /// Evaluations spent by the call to [`eval_arithmetic`] currently running.
+    ///
+    /// A counter rather than an argument threaded through `eval`, `resolve` and `read`: it is one
+    /// number for the whole evaluation and every one of those functions would otherwise have to
+    /// carry it to hand it to the next.
+    static SPENT: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
 /// Evaluate an arithmetic expression, applying any assignments it performs.
 ///
 /// The environment is taken mutably because `$((i++))` and `$((x = 9))` are expressions with
 /// side effects; a read-only environment made them structurally impossible to support.
 pub fn eval_arithmetic(env: &mut Environment, expr: &str) -> Result<i64> {
+    // The budget belongs to one *top-level* evaluation. Reset here rather than decremented from a
+    // running total, so a shell that has done a million expansions today starts this one with the
+    // whole allowance.
+    SPENT.with(|spent| spent.set(0));
     eval_text(env, expr, 0)
 }
 
@@ -31,6 +59,16 @@ pub fn eval_arithmetic(env: &mut Environment, expr: &str) -> Result<i64> {
 /// `depth` counts how many variable values deep this text was found; it is what stops a cycle of
 /// variables naming each other from recursing forever.
 fn eval_text(env: &mut Environment, expr: &str, depth: usize) -> Result<i64> {
+    let spent = SPENT.with(|spent| {
+        let now = spent.get() + 1;
+        spent.set(now);
+        now
+    });
+    if spent > MAX_EVALUATIONS {
+        return Err(ShellError::ExpansionError(
+            "arithmetic expression is too large to evaluate".to_string(),
+        ));
+    }
     // Expansion first, and over the whole string: POSIX runs parameter expansion, command
     // substitution and quote removal across the expression before any of it is arithmetic.
     let expanded = expand_expression(env, expr)?;

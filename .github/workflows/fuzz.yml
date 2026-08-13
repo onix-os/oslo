@@ -12,10 +12,15 @@ on:
         default: "600"
   pull_request:
     paths:
+      # **Where the code being fuzzed actually is.** These read `src/lexer/**`, `src/parser/**` and
+      # `src/expand/arithmetic/**` until the shell became six crates and every one of those paths
+      # stopped existing — so a pull request touching the parser stopped running the fuzz job, in
+      # silence, which is the failure mode a path filter has.
       - "fuzz/**"
-      - "src/lexer/**"
-      - "src/parser/**"
-      - "src/expand/arithmetic/**"
+      - "crates/oslo-shell/src/lexer/**"
+      - "crates/oslo-shell/src/syntax/**"
+      - "crates/oslo-shell/src/expand/**"
+      - "vendor/brush-parser/**"
       - ".github/workflows/fuzz.yml"
 
 permissions:
