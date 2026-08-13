@@ -106,21 +106,23 @@ argc = ["oslo-shell/argc", "oslo-runtime/argc", "dep:argc"]
 #
 # ```text
 #   nothing else on          5,467,072 bytes
-#   with it                  5,827,616 bytes    +352 KB
-#   every other feature on   6,549,888 → 6,902,240   +344 KB
+#   with it, as published    5,827,616 bytes    +352 KB, 109 crates
+#   with it, trimmed         5,618,656 bytes    +148 KB,  36 crates
 # ```
 #
-# That makes it the **largest single feature** — larger than `vista` (341 KB) and `argc` (308 KB) —
-# and the byte count is the smaller half of the cost. `age` brings **109 crates**, and what is in
-# them is the surprise: `i18n-embed`, `rust-embed` and the whole `fluent` stack, because the library
-# localises its error messages; `hpke`, `ml-kem` and `p256` for hybrid recipients; `nom`,
-# `cookie-factory`, `pin-project` and eight `futures-*` crates. Encrypting sixteen bytes to one key
-# does not need any of it, but the crate does not offer a way to say so — every one of those is an
-# unconditional dependency of `age` itself, not a feature that can be turned off.
+# The first number is what `age` costs as it comes, and most of it is not encryption: the error
+# messages are localised through Fluent, and the recipient types for hardware keys and post-quantum
+# bring `hpke`, `ml-kem`, `p256` and the elliptic-curve tower beneath them. None of that is optional
+# upstream, so the crate is vendored and cut down — see `vendor/README.md`, which lists every change.
+# What is left is the age format: x25519 and passphrase recipients, the header, the STREAM payload.
 #
-# Kept behind a switch on those grounds alone: a `/bin/sh` on a distribution should not carry a
-# localisation framework to hold a token. Without it there is no `oslo secret`, and `age` is not
-# compiled, fetched or linked.
+# It is built for size like every other dependency, by the `package."*"` rule below rather than by
+# an entry of its own — and that is where it should stay. Built at `3` instead it is 5,626,848: the
+# maximum optimisation is worth 8 KB here, on code that runs once when a secret is read.
+#
+# Still off by default, because 148 KB and 36 crates is not nothing on a binary meant to be
+# `/bin/sh`, and a shell that never holds a secret should not carry the code that could. Without it
+# there is no `oslo secret`, and `age` is not compiled, fetched or linked.
 secrets = ["oslo-base/secrets"]
 
 [dependencies]

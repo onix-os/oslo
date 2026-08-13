@@ -22,13 +22,37 @@ few and listed below, so a rebase is a readable diff rather than an archaeology 
 | `#![allow(…)]` at the top of `lib.rs` | oslo lints at `-D warnings`; what is unused is unused only because oslo builds a subset of the features |
 | `pub use anyhow;` | so a caller implementing `Runtime` can name `anyhow::Result` without depending on the crate for one type |
 
-Nothing else is touched, and nothing is restyled.
+**`age` and `age-core` are here to be made smaller, which is a third reason again.** The library is
+fine; what it carries is the problem for a binary meant to be `/bin/sh`. Untouched, `age` adds **109
+crates and 352 KB**, and most of that has nothing to do with encrypting a token: the error messages
+are localised through Fluent, which means `i18n-embed`, `rust-embed`, `intl-memoizer`, `unic-langid`,
+`walkdir` and a TOML parser, and the recipient types for hardware keys and post-quantum bring `hpke`,
+`ml-kem` and `p256` and the elliptic-curve tower under them. None of it is optional upstream: they
+are unconditional dependencies of the crate, not features that can be turned off.
+
+Trimmed, the same thing costs **36 crates and 148 KB**, and what is left is the age format — x25519
+and passphrase recipients, the header, the STREAM payload:
+
+| what | why |
+|---|---|
+| `src/ssh/`, `src/cli_common/`, `src/plugin.rs` removed with their features | already off; deleting them is what lets the dependencies go |
+| `src/native/tag.rs`, `src/native/tagpq/` removed | recipient types for hardware keys and post-quantum, which oslo has no way to use; `hpke`, `ml-kem`, `p256` go with them |
+| `hpke_seal`/`hpke_open` removed from `age-core::primitives` | nothing calls them once the two recipient types are gone |
+| `src/i18n.rs` rewritten as `macro_rules!` over the English catalogue | the whole Fluent stack, for twenty-four sentences oslo prints in English |
+| `i18n/en-US/age.ftl` kept, the other six translations deleted | it is the source the macro arms were transcribed from, and the thing to diff against on a rebase |
+| `cookie-factory` default features off | its default pulls `futures`, which pulled eight more crates for an async writer nothing here uses |
+| `benches/`, `tests/` removed | they exercise the features above |
+
+Everything else is untouched, and nothing is restyled. A rebase onto a later `age` is the same
+readable diff `argc` is: seven changes, each with a reason.
 
 **oslo is MIT. `full_moon` and `full_moon/derive` are MPL-2.0 and remain so.** See *Licences* below
 before copying anything out of this directory.
 
 | crate | upstream | licence | why it is here |
 |---|---|---|---|
+| `age` | [str4d/rage](https://github.com/str4d/rage) | MIT OR Apache-2.0 | the age file format, behind the `secrets` feature, with everything oslo cannot use taken out |
+| `age-core` | as above | MIT OR Apache-2.0 | the format primitives `age` is built on |
 | `argc` | [sigoden/argc](https://github.com/sigoden/argc) | MIT OR Apache-2.0 | the `# @option` declaration language, behind the `argc` feature |
 | `brush-parser` | [reubeno/brush](https://github.com/reubeno/brush) | MIT | POSIX/bash tokenizer and parser |
 | `full_moon` | [Kampfkarren/full-moon](https://github.com/Kampfkarren/full-moon) | **MPL-2.0** | Lua parser |

@@ -54,7 +54,7 @@ nix = { version = "0.29", features = ["hostname", "fs"] }
 # The age file format, for `secrets`. Default features only: that is x25519 and a passphrase, in
 # pure Rust. `ssh` would let it read `~/.ssh/id_*` and brings `rsa`, `aes`, `cbc`, `ctr` and
 # `bcrypt-pbkdf` for the sake of key types age's own documentation asks people not to use.
-age = { version = "0.12", optional = true, default-features = false }
+age = { path = "../../vendor/age", optional = true, default-features = false }
 
 [features]
 default = []
