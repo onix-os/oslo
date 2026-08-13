@@ -8,30 +8,22 @@ mod common;
 use common::oslo_bin;
 use std::process::Command;
 
-/// The controlling terminal, the way the shell reads it — `None` where there is none, which is the
-/// usual case under a test runner.
-fn terminal() -> Option<String> {
-    use std::os::unix::fs::MetadataExt;
-    let tty = std::fs::File::open("/dev/tty").ok()?;
-    Some(tty.metadata().ok()?.rdev().to_string())
-}
-
 /// Run `line` in an oslo, with `nested` as the inherited `$OSLO_NESTED` (or none).
 ///
-/// The terminal is published alongside it, because that is what the shell that set the count would
-/// have done — a count with no terminal beside it is one from another screen, and is ignored.
+/// **The child gets no terminal of any kind**, so what it makes of the count is the same whether
+/// this suite was started from a terminal or from CI. A shell with no terminal and a count with no
+/// terminal beside it are on the same screen — which is to say neither is on one, and there is
+/// nobody there for the difference to matter to.
 fn oslo(nested: Option<&str>, line: &str) -> String {
     let mut command = Command::new(oslo_bin());
     command
         .args(["-c", line])
         .env_remove("OSLO_NESTED")
         .env_remove("OSLO_NESTED_TTY")
-        .stdin(std::process::Stdio::null());
+        .stdin(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null());
     if let Some(value) = nested {
         command.env("OSLO_NESTED", value);
-        if let Some(tty) = terminal() {
-            command.env("OSLO_NESTED_TTY", tty);
-        }
     }
     let out = command.output().expect("spawn oslo");
     String::from_utf8_lossy(&out.stdout).trim().to_string()
@@ -67,8 +59,8 @@ fn a_value_that_is_not_a_number_is_not_a_shell() {
 
 /// **A count from another screen is somebody else's.** `tmux`, `hexe` and `ssh` all inherit the
 /// variable from the shell that started them and run their own shell on a pty of its own; treating
-/// that as nesting asked a fresh pane whether it meant to nest, and left `⧉1` in its prompt for
-/// ever. Here the terminal is deliberately not published beside the count.
+/// that as nesting asked every fresh pane whether it meant to nest, and left `⧉1` in its prompt for
+/// ever.
 #[test]
 fn a_count_from_another_terminal_is_ignored() {
     let out = Command::new(oslo_bin())
@@ -76,6 +68,7 @@ fn a_count_from_another_terminal_is_ignored() {
         .env("OSLO_NESTED", "3")
         .env("OSLO_NESTED_TTY", "somewhere-else")
         .stdin(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
         .output()
         .expect("spawn oslo");
     assert_eq!(String::from_utf8_lossy(&out.stdout).trim(), "0");
@@ -90,7 +83,7 @@ fn a_shell_with_no_terminal_just_runs() {
     let mut child = Command::new(oslo_bin())
         .arg("-i")
         .env("OSLO_NESTED", "3")
-        .envs(terminal().map(|tty| ("OSLO_NESTED_TTY", tty)))
+        .env_remove("OSLO_NESTED_TTY")
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::null())

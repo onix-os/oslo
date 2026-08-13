@@ -26,8 +26,8 @@
 //! them is: they are looking at a screen of their own, and the shell that opened them is not
 //! something they can `exit` back into.
 //!
-//! So the count travels with the terminal it was set on — `$OSLO_NESTED_TTY`, the controlling
-//! terminal's device number — and a count that arrives from a different one starts again at the top.
+//! So the count travels with the terminal it was set on — `$OSLO_NESTED_TTY`, this host and the
+//! device this terminal *is* — and a count that arrives from a different one starts again at the top.
 //!
 //! Every shell publishes it, `-c` and scripts included — it counts the oslo shells above this
 //! process, and one started by a script is one of them. Only an interactive shell asks about it.
@@ -45,8 +45,9 @@ pub const VARIABLE: &str = "OSLO_NESTED";
 /// they meant to nest, and they would have gone on showing `⧉1` in a prompt for ever.
 ///
 /// What they do not carry is the *screen*: every one of them runs its shell on a pty of its own. So
-/// the count travels with the controlling terminal it was set on, and a count from another one is
-/// somebody else's.
+/// the count travels with the terminal it was set on, and a count from another one is somebody
+/// else's. What names a terminal here is [`terminal`], and getting that wrong made this check pass
+/// for every pane on the machine.
 const TERMINAL: &str = "OSLO_NESTED_TTY";
 
 /// This shell's own depth, fixed for its lifetime.
@@ -90,15 +91,37 @@ fn inherited() -> Option<usize> {
     std::env::var(VARIABLE).ok()?.trim().parse().ok()
 }
 
-/// The controlling terminal, as the number the kernel knows it by.
+/// This terminal, named by the device it actually is: `tron:88:6` for `/dev/pts/6`.
 ///
-/// `/dev/tty` is whichever terminal *this process* is attached to, whatever its own descriptors
-/// have been redirected to, so this survives a pipeline and answers `None` only where there is
-/// genuinely no terminal — a service, a cron job, a CI runner.
+/// **Not `/dev/tty`.** That was the first attempt and it is wrong in the worst way — it names a
+/// terminal that exists on every machine and answers `5:0` from *all* of them, so every pane, every
+/// login and every new window matched every other one and the whole check passed for reasons that
+/// had nothing to do with the screen. Measured, after the reports came in:
+///
+/// ```text
+/// /dev/pts/6   stat /dev/tty            → 5:0     ← the same everywhere
+///              stat /proc/self/fd/0     → 88:6    ← this pty and no other
+/// ```
+///
+/// The host is in front of it because a device number is only unique on the machine that issued it:
+/// `/dev/pts/6` here and `/dev/pts/6` on the far end of an `ssh` are both `88:6`, and a variable
+/// that ever reaches the other machine must not make one look like the other.
+///
+/// `None` where there is no terminal at all — a service, a cron job, a CI runner.
 fn terminal() -> Option<String> {
     use std::os::unix::fs::MetadataExt;
-    let tty = std::fs::File::open("/dev/tty").ok()?;
-    Some(tty.metadata().ok()?.rdev().to_string())
+    // stdin, then stderr: the two the question itself needs, so a shell that has one to draw on
+    // always has a name for it. Anything else — a pipe, a file, `/dev/null` — is not a terminal
+    // and must not be mistaken for one that two unrelated shells happen to share.
+    [0, 2].into_iter().find_map(|fd| {
+        if !nix::unistd::isatty(fd).unwrap_or(false) {
+            return None;
+        }
+        let device = std::fs::metadata(format!("/proc/self/fd/{fd}"))
+            .ok()?
+            .rdev();
+        Some(format!("{}:{device}", super::session::host()))
+    })
 }
 
 /// Whether the shell that published the count was looking at the same screen this one is.
