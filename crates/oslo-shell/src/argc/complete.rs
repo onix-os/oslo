@@ -48,22 +48,34 @@ pub fn offers(ctx: &Ctx) -> Vec<Offer> {
     text.lines().filter_map(one).collect()
 }
 
-/// One line of what `compgen` printed: the value, then a tab, then its description.
+/// One line of what `compgen` printed.
+///
+/// **Three fields, not two**: the value, a display hint, then the description —
+///
+/// ```text
+/// --dry-run\t/color:cyan\tsay what would happen
+/// staging\t/color:default
+/// ```
+///
+/// The hint is for a completion *script* deciding how to paint a row, which oslo's dropdown does
+/// itself from its own theme. Splitting on the first tab alone put `/color:cyan` at the front of
+/// every description — visible in the menu, and the sort of detail that is only ever found by
+/// looking at the output rather than at the documentation.
 fn one(line: &str) -> Option<Offer> {
-    let (display, description) = match line.split_once('\t') {
-        Some((display, rest)) => (display, Some(rest.trim().to_string())),
-        None => (line, None),
-    };
-    let display = display.trim();
+    let mut fields = line.split('\t');
+    let display = fields.next()?.trim();
     if display.is_empty() {
         return None;
     }
+    let description = fields
+        .filter(|field| !field.starts_with('/'))
+        .map(str::trim)
+        .filter(|field| !field.is_empty())
+        .collect::<Vec<_>>()
+        .join(" ");
     Some(Offer {
         display: display.to_string(),
-        // `__argc_value` and its friends are instructions to a completion *script* — "now complete a
-        // file here". oslo's dropdown does that itself, so a row that is one of those is dropped
-        // rather than offered as a word to type.
-        description: description.filter(|text| !text.is_empty()),
+        description: (!description.is_empty()).then_some(description),
     })
 }
 
@@ -94,9 +106,19 @@ mod tests {
 
     #[test]
     fn a_line_becomes_an_offer_with_its_description() {
-        let offer = one("--tries\thow many times").expect("an offer");
+        // The real shape, three fields: value, display hint, description.
+        let offer = one("--tries\t/color:cyan\thow many times").expect("an offer");
         assert_eq!(offer.display, "--tries");
-        assert_eq!(offer.description.as_deref(), Some("how many times"));
+        assert_eq!(
+            offer.description.as_deref(),
+            Some("how many times"),
+            "the colour hint is the dropdown's business, not a description"
+        );
+
+        // A value has a hint and nothing else to say.
+        let value = one("staging\t/color:default").expect("an offer");
+        assert_eq!(value.display, "staging");
+        assert_eq!(value.description, None);
 
         let bare = one("--force").expect("an offer");
         assert_eq!(bare.display, "--force");

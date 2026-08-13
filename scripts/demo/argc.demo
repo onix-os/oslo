@@ -40,6 +40,16 @@ key C-c
 wait 1.0
 
 
+# Including the values an option is allowed to take, above whatever happens to be in the directory.
+type deploy --env 
+wait 1.0
+key Tab
+wait 3.0
+key Escape
+wait 0.5
+key C-c
+wait 1.0
+
 # And then it just runs.
 run deploy --dry-run --tries 2 --env prod app-1.4
 wait 2.5

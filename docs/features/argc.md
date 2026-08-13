@@ -35,7 +35,7 @@ natively rather than a program you have to install beside one.
 **Behind the `argc` cargo feature**, which a release build has and `oslo-minimal` does not.
 
 <!-- demo:begin -->
-[![argc demo](https://asciinema.org/a/1262956.svg)](https://asciinema.org/a/1262956)
+[![argc demo](https://asciinema.org/a/1262959.svg)](https://asciinema.org/a/1262959)
 <!-- demo:end -->
 
 ## Two doors, one parser
@@ -102,6 +102,11 @@ deploy --<Tab>                       # completed from those comments
 It costs nothing on a machine with no argc-shaped scripts: the command word is checked first, then
 the source is read, and the parser runs only once the source is seen to contain a `# @` at all.
 
+`deploy --env <Tab>` offers the values the option declares — `dev staging prod` — and they are
+**scored above a filename**: the provider carries a `score_offset` because a row it offers exists
+only because the script declared it, and losing to whatever happens to be in the current directory
+is how `--env <Tab>` came to complete `src/`. Found by recording it, not by reading it.
+
 The provider is named `argc` and badged `argc`, so `oslo.completion.sources` can filter it and a
 config that wants to replace it declares a provider of the same name.
 
@@ -142,9 +147,6 @@ switched on.
 
 ## What it cannot do
 
-- **Completion offers flags, options and subcommands — not an option's declared values.**
-  `deploy --<Tab>` reads the comments; `deploy --env <Tab>` does not yet offer `dev staging prod`,
-  though `--help` lists them. The declaration is understood, the dropdown row is not built.
 - **Nothing in `oslo-minimal`.** The word `argc` falls through to `$PATH`, so the real one still
   works if it is installed.
 - **`--argc-eval` needs a real path.** `$0` in a stored script is a name; the builtin is the answer
