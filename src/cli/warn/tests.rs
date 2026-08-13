@@ -5,7 +5,7 @@ use super::*;
 #[test]
 fn a_healthy_install_says_nothing() {
     let facts = Facts::default();
-    assert!(facts.lines().is_empty());
+    assert!(facts.findings().is_empty());
     assert_eq!(box_of(&facts, Paint::plain(), 0), "");
 }
 
@@ -17,14 +17,45 @@ fn each_problem_is_one_line_that_names_it() {
         foreign_sh: vec![("/bin/sh".into(), "dash".into())],
         bad_mode: Some(0o644),
     };
-    let lines = facts.lines();
-    assert_eq!(lines.len(), 2);
-    assert_eq!(lines[0], "/bin/sh is dash, not oslo");
-    assert!(lines[1].contains("0644"), "{}", lines[1]);
-    assert!(lines[1].contains("0755"), "the fix is named: {}", lines[1]);
+    let found = facts.findings();
+    assert_eq!(found.len(), 2);
+    // Worst first: the one that fails for somebody, then the one that is merely true.
+    assert_eq!(found[0].0, Level::Warning);
+    assert!(found[0].1.contains("0644"), "{}", found[0].1);
+    assert!(
+        found[0].1.contains("0755"),
+        "the fix is named: {}",
+        found[0].1
+    );
+    assert_eq!(
+        found[1],
+        (Level::Hint, "/bin/sh is dash, not oslo".to_string())
+    );
 }
 
-/// The box is a box: every row the same width, and the content inside it.
+/// **`/bin/sh` is a hint, not a warning.** Nothing is broken by it — oslo runs, and so do the
+/// scripts, they just do not run *in* oslo. Red is what makes the eye stop, and spending it here is
+/// how a warning stops being read for the day something really is wrong.
+#[test]
+fn a_foreign_sh_is_only_a_hint() {
+    let facts = Facts {
+        foreign_sh: vec![("/bin/sh".into(), "dash".into())],
+        ..Facts::default()
+    };
+    let drawn = box_of(&facts, Paint::plain(), 0);
+    assert!(drawn.contains("hint"), "{drawn}");
+    assert!(!drawn.contains("warning"), "{drawn}");
+
+    // Dim, not red — the colour says the same thing the word does.
+    let painted = box_of(&facts, Paint::at(oslo::ui::theme::Depth::True), 0);
+    assert!(
+        !painted.contains("224;64;64"),
+        "a hint in warning red: {painted:?}"
+    );
+}
+
+/// The box is a box: every row the same width, and the content inside it. Two kinds of finding are
+/// two boxes, because one box titled for the more serious would be lying about the other.
 #[test]
 fn the_box_lines_up() {
     let facts = Facts {
@@ -33,13 +64,16 @@ fn the_box_lines_up() {
     };
     let drawn = box_of(&facts, Paint::plain(), 0);
     let rows: Vec<&str> = drawn.lines().filter(|l| !l.is_empty()).collect();
-    assert_eq!(rows.len(), 4, "top, two problems, bottom: {drawn}");
+    assert_eq!(rows.len(), 6, "two boxes of three rows: {drawn}");
 
-    let width = rows[0].chars().count();
-    for row in &rows {
-        assert_eq!(row.chars().count(), width, "ragged row {row:?} in {drawn}");
+    for box_rows in rows.chunks(3) {
+        let width = box_rows[0].chars().count();
+        for row in box_rows {
+            assert_eq!(row.chars().count(), width, "ragged row {row:?} in {drawn}");
+        }
     }
-    assert!(rows[0].contains("warning"));
+    assert!(rows[0].contains("warning"), "the worse one first: {drawn}");
+    assert!(rows[3].contains("hint"), "{drawn}");
     assert!(drawn.contains("/bin/sh is dash"));
 }
 
