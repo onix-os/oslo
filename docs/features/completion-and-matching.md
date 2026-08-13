@@ -49,7 +49,7 @@ stem = "f-b"
  │ 2  Ignoring   the same, case-folded a character at a time                 │
  │ 3  Pieces     split on / - _ . ; every typed piece prefixes its own       │
  │                 f-b → foo-bar      /u/s/b → /usr/share/bin                │
- │ 4  Fuzzy      gap-capped subsequence, present only when fuzzy ≠ off       │
+ │ 4  Fuzzy      nucleo, present only when fuzzy ≠ off                       │
  └───────────────────────────────────────────────────────────────────────────┘
     ↓ each pass runs only when the one above it came back with nothing
     ↓ case_sensitive = true stops the walk after pass 1
@@ -58,27 +58,29 @@ stem = "f-b"
 Piece matching refuses to run unless a separator was actually typed, because without one it is a
 plain prefix test wearing another name and the pass above it has already failed.
 
-The fuzzy pass is a *gap-capped* subsequence rather than a plain one. Unbounded, `cat` matches
-`create_application_target` and every other name on the machine containing those letters in order.
+The fuzzy pass is [nucleo](https://github.com/helix-editor/nucleo)'s matcher — Helix's, and fzf's in
+shape — reached through `Fuzzed`, which is the only thing the six widgets that filter ever name.
 
-| preset | unmatched characters allowed between two typed letters | `gco` → `git checkout` |
-|---|---|---|
-| `off` | no subsequence pass at all | no |
-| `tight` | 1 | no |
-| `smart` (default) | 4 | yes |
-| `loose` | 8 | yes |
+| preset | what it means | `gco` → `git checkout` | `cbf` → `cargo build --features` |
+|---|---|---|---|
+| `off` | no subsequence pass at all | no | no |
+| `tight` | the letters must be together | no | no |
+| `smart` (default) | fuzzy; a capital asks for a capital | yes | yes |
+| `loose` | fuzzy; case ignored whatever you typed | yes | yes |
 
-The cap is measured between *consecutive* matched letters, never from the start of the string — a
-distance from the start is not a gap, or nothing could ever match on its second word.
+**It used to be a cap on the gap between two typed letters, and that was the thing that made it feel
+broken.** At `smart` the cap was four, so `cbf` — the query a fuzzy finder exists to answer — could
+not reach `cargo build --release --all-features` at all, and the search came back empty on exactly
+the abbreviation somebody had in their fingers. A cap is a crude stand-in for ranking: with a real
+score, a sprawling match simply scores badly and [`Quality`](#ranking) puts it in the last tier,
+where the eye never reaches it. `tight` is where "the letters must be together" still lives.
 
-Because every candidate a fuzzy pass returns matched equally, that pass alone would hand back
-`$PATH` order, so its results are scored. Two alignments are tried and the better kept: one that
-prefers word starts, one that takes the earliest letter every time. Neither is right alone. The
-boundary-seeking one finds `c`argo `r`un --`e`xample for `cre`, where a first-occurrence scan takes
-the `r` buried inside `cargo` and strands the `e`; the plain one saves `rdme` against `README.md`,
-where boundary-seeking jumps to the `m` after the dot and has no `e` left. The score rewards a
-letter landing at a word start (+12), a letter adjacent to the last one (+8), and subtracts the
-gap, how late the match started (capped at 20) and a quarter of what is left over (capped at 40).
+Space separates *atoms*, each matched independently and in any order, so `push git` finds
+`git push`. fzf's syntax comes with it: `'exact`, `^begins`, `ends$`, `!not`.
+
+One thing is oslo's own on top of nucleo: a small penalty for what is left over, capped, so that
+`cargo` beats `cargo-nextest-runner` for `cargo` instead of tying with it and falling back to
+whatever order the list was built in.
 
 ### Rows
 

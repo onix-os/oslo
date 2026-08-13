@@ -31,6 +31,22 @@ brush-parser = { path = "../../vendor/brush-parser" }
 
 # `has`-style lookups from the completion side.
 which = "7.0"
+# The matcher behind Helix and, in shape, behind fzf: an optimal alignment rather than the greedy
+# one this used to have, which is the difference between `cbf` reaching `cargo build --features`
+# and it reaching nothing at all.
+#
+# **Measured, both ways.** `fuzzy-matcher` — skim's algorithm as a library — is the alternative and
+# is two crates against nucleo's one; `nucleo` proper is the multi-threaded harness above this and
+# is not what a list of four hundred rows needs. The binary paid 72 KB for the swap:
+#
+# ```text
+#   the hand-written matcher   5,483,456
+#   nucleo-matcher             5,557,216    +72 KB
+# ```
+#
+# `matching.rs` is the only file that names it; the six widgets that filter — the finder, the
+# manager, completion, `nav`, `ui choose` and `ui table` — all ask `Fuzzed` and did not change.
+nucleo-matcher = "0.3.1"
 
 [dev-dependencies]
 tempfile = "3.17"
