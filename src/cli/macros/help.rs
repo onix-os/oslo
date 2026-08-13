@@ -60,6 +60,17 @@ pub(super) const SUBCOMMANDS: &[Sub] = &[
                running. To keep it and stop it applying, turn it off in `show` instead.",
     },
     Sub {
+        name: "edit",
+        args: "NAME",
+        about: "open one in your editor",
+        flags: &[("--alias", "when the name is more than one kind at once")],
+        note: "The kind is only needed when the name is more than one thing. **A function or a \
+               script that also exists as a file on `$PATH` is shadowed by that file** — the shell \
+               finds a stored one only after the `$PATH` search has failed — so this says which \
+               file is running before it opens the editor. Editing the stored copy of something \
+               `$PATH` answers first changes nothing about what runs.",
+    },
+    Sub {
         name: "show",
         args: "[NAME]",
         about: "the manager: the list, narrowed as you type",
