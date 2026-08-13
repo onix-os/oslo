@@ -69,6 +69,12 @@ pub const TOOLS: &[Tool] = &[
         name: "scratch",
         about: "list the named sessions, or go into one",
     },
+    // The widgets, for everything that is not an oslo prompt. Same body as the `ui` builtin: a
+    // bash script, a Makefile recipe or a `sh -c` reaches a program, and cannot reach a builtin.
+    Tool {
+        name: "userin",
+        about: "ask for something: choose, filter, input, confirm and the rest",
+    },
 ];
 
 /// The tool a first *operand* names, if it safely names one.
@@ -149,6 +155,11 @@ pub fn run(tool: &'static Tool, args: &[String]) -> i32 {
             return 0;
         }
         return oslo::env::builtins::scratch_tool(args);
+    }
+    // Its own `--help` too: the widget list is the help, and this tool has no page of its own to
+    // print instead.
+    if tool.name == "userin" {
+        return oslo::env::builtins::userin_tool(args);
     }
     let paint = crate::cli::help::Paint::detect();
     if args.iter().any(|a| a == "--help" || a == "-h") {

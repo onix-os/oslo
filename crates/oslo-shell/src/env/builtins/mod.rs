@@ -48,6 +48,8 @@ mod suspend;
 pub use scratch::tool as scratch_tool;
 mod times;
 mod ui;
+/// `oslo userin …` — the same widgets as the `ui` builtin, for a shell that is not oslo.
+pub use ui::tool as userin_tool;
 mod ulimit;
 mod universal;
 mod variables;

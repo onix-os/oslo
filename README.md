@@ -503,6 +503,33 @@ A key, if you want one — no new code, the existing handler rewrites the line:
 oslo.keys["alt-enter"] = function(line) return "keep " .. line.text end
 ```
 
+### Asking for something, from any shell
+
+```sh
+ui choose alpha beta gamma          # at an oslo prompt: the builtin
+oslo userin choose alpha beta       # from bash, a Makefile, a .desktop file: the same widgets
+```
+
+Thirteen of them — `input`, `write`, `confirm`, `choose`, `filter`, `table`, `file`, `style`,
+`format`, `join`, `pager`, `log`, `spin` — and `oslo userin --help` lists them with their options.
+
+**Two doors, one body.** `ui` is a builtin, and a builtin cannot be reached from bash: a script, an
+`sh -c`, a status bar reach a *program*. `oslo userin` is that program, running the same code, so
+the two can never disagree about what a widget does. It is why a shell that ships its own prompts
+can lend them to everything else on the machine, with nothing installed beside it.
+
+Three rules a script depends on:
+
+- **the answer is stdout, everything else is stderr**, so `$(oslo userin input)` captures the answer
+  and the widget still draws on the terminal;
+- **cancelling is status 1 with no output**, so `x=$(oslo userin input) || exit` is right — a widget
+  that returned `""` on Esc would make cancelled and empty the same thing;
+- **no terminal is status 2**, distinct from cancelled, so a script can tell "nobody was there to
+  ask" from "they said no".
+
+Items come from the operands or from stdin, so `ls | oslo userin filter` and
+`oslo userin filter a b c` are both the obvious thing.
+
 The native editor enables bracketed paste while it owns the line. A pasted newline is inserted as
 text and does not execute until Enter is pressed. Pasted and typed control characters stay exact in
 the command buffer but redraw as inert notation such as `^[`, `^I`, `^M`, and `^?`; raw OSC and CSI
