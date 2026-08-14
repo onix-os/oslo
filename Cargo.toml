@@ -99,49 +99,39 @@ plugin = ["oslo-runtime/plugin"]
 # comments; the word `argc` falls through to `$PATH`, so the real one still works.
 argc = ["oslo-shell/argc", "oslo-runtime/argc", "dep:argc"]
 
-# `secrets` — values encrypted at rest with age, decrypted only when something asks for one.
+# `secrets` — the filing: stores, names, `oslo secret run`, the lazy variable, `oslo.secret` and the
+# hooks. **No crypto of its own.** A store names an `encrypt`/`decrypt command` or a `crypto hook`,
+# and a build with only this feature is one a distribution can ship as `/bin/sh` while the machine's
+# own tool — `age`, `gpg`, `systemd-creds` — does the encryption.
 #
-# **Off, and measured before anything was designed on top of it.** The real binary at this profile,
-# built both ways, with only the x25519 path exercised:
-#
-# ```text
-#   nothing else on          5,467,072 bytes
-#   with it, as published    5,827,616 bytes    +352 KB, 109 crates
-#   with it, trimmed         5,618,656 bytes    +148 KB,  36 crates
-# ```
-#
-# The first number is what `age` costs as it comes, and most of it is not encryption: the error
-# messages are localised through Fluent, and the recipient types for hardware keys and post-quantum
-# bring `hpke`, `ml-kem`, `p256` and the elliptic-curve tower beneath them. None of that is optional
-# upstream, so the crate is vendored and cut down — see `vendor/README.md`, which lists every change.
-# What is left is the age format: x25519 and passphrase recipients, the header, the STREAM payload.
-#
-# It is built for size like every other dependency, by the `package."*"` rule below rather than by
-# an entry of its own — and that is where it should stay. Built at `3` instead it is 5,626,848: the
-# maximum optimisation is worth 8 KB here, on code that runs once when a secret is read.
-#
-# Still off by default, because 148 KB and 36 crates is not nothing on a binary meant to be
-# `/bin/sh`, and a shell that never holds a secret should not carry the code that could. Without it
-# there is no `oslo secret`, no `oslo.secret`, and `age` is not compiled, fetched or linked.
-#
-# **Re-measured after the stores went in**, on the binary as it is now — several stores, several key
-# sources, several recipients, `secrets.conf`, `oslo.secret` and `oslo secret run`:
+# **Split from the crypto, and measured both ways.** The real binary at this profile:
 #
 # ```text
-#   every other feature on   6,631,840 bytes
-#   with it                  6,894,016 bytes    +256 KB, still 36 crates
+#   every other feature on   6,631,840 bytes   78 packages
+#   + secrets                6,730,144 bytes   79 packages    +96 KB,  +1 package
+#   + crypt                  6,767,008 bytes   89 packages    +36 KB, +10 packages
 # ```
 #
-# So the layer above `age` is 108 KB and no new dependency: `base64` at the Lua boundary was already
-# in the tree as an unconditional dependency of vendored `age`, which is also why `seal` speaks
-# base64 rather than turning on age's `armor` — that was measured at 45 KB for a format nothing on
-# this side of the boundary would read.
-#
-# **No age plugin client, deliberately.** Hardware keys in the age world are reached by an external
-# `age-plugin-NAME` binary, and speaking that protocol would mean restoring the code the trim above
-# deleted. It is not here: a key oslo cannot compute itself comes from `key command` instead, which
-# runs whatever already holds it. See `docs/features/secrets.md`.
+# The one package `secrets` adds is `base64`, for the Lua boundary: a `Value::Str` is UTF-8 and a
+# sealed file is not, so ciphertext crosses as base64 — which is also why `seal` speaks base64
+# rather than an armoured format.
 secrets = ["oslo-base/secrets", "oslo-runtime/secrets"]
+
+# `crypt` — the built-in mechanism, so a fresh install encrypts without being told anything.
+#
+# XChaCha20-Poly1305 and one 32-byte key file. A 192-bit nonce is drawn at random on every write, so
+# there is no counter to keep — with a 96-bit nonce a random one repeats often enough to matter, and
+# the counter that avoids it is state that would have to survive a crash, a restore and a second
+# machine writing to the same store.
+#
+# **This was `age`, and `age` cost +160 KB and +32 packages** for the same job. What it bought was
+# public-key recipients, and with them `x25519-dalek`, `curve25519-dalek`, `bech32`, `scrypt`,
+# `secrecy` and the tower beneath: the whole feature was 256 KB and 33 packages against 132 and 11
+# now. Recipients went with it, and come back as `age` the *program* — which is what the
+# `encrypt`/`decrypt command` mechanism is for, and reaches a YubiKey or a TPM besides.
+#
+# Named for the job rather than for what implements it, because what sits behind it has changed
+# once already.
 crypt = ["secrets", "oslo-base/crypt"]
 
 [dependencies]

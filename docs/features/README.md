@@ -43,10 +43,11 @@ capabilities, and a config should not have to ask whether they exist. *Installin
 `plugin` cargo feature at 88 KB, because fetching somebody's code and deciding whether to trust it
 is not something a `/bin/sh` does. In `oslo-minimal` the word `plugin` falls through to `$PATH`.
 
-**[Secrets](secrets.md) are `oslo` only**, behind the `secrets` cargo feature at 148 KB and 36
-crates — the `age` format, vendored and cut down from the 352 KB it costs as it comes. A shell that
-never holds a secret should not carry the code that could, so in `oslo-minimal` there is no
-`oslo secret` and `age` is not compiled, fetched or linked.
+**[Secrets](secrets.md) are `oslo` only**, and are two cargo features rather than one. `secrets` is
+the filing — stores, names, `oslo secret run`, the lazy variable, `oslo.secret`, the hooks — at
+96 KB and one package, with no crypto of its own; `crypt` is the built-in mechanism at 36 KB and ten
+more. A distribution can ship the first alone and name the machine's own tool. In `oslo-minimal`
+there is neither.
 
 **[Arguments in comments](argc.md) is `oslo` only**, behind the `argc` cargo feature and the largest
 of them at 308 KB — it vendors a parser and brings five crates oslo does not otherwise link. In
@@ -115,7 +116,7 @@ scripts/demo/embed.sh                            # put the players back in the d
 | [rm, and the things that can bite](rm-and-safety.md) | Recoverable at the prompt, POSIX in a script |
 | [Scratches](scratch.md) | Named sessions that outlive the terminal they were opened in |
 | [Plugins](plugins.md) | Somebody else's Lua, installed once — with a database and a trust gate |
-| [Secrets](secrets.md) | Encrypted with age, decrypted when something asks — and the key kept elsewhere on purpose |
+| [Secrets](secrets.md) | Encrypted at rest, decrypted when something asks — with the crypto itself replaceable |
 
 ## Appearance and control
 
