@@ -175,6 +175,37 @@ last, so it wins.
 
 [Macros](docs/features/macros.md) has the whole of it.
 
+### Secrets, and where the key is not
+
+```sh
+oslo secret set stripe                          # asks for it, masked; or reads standard input
+oslo secret get stripe                          # to standard output, and nowhere else
+oslo secret run TOKEN=stripe -- curl …          # one value, one child, no shell in between
+oslo secret key add command -- pass show oslo/id
+oslo secret recipient add age1lggyhq…           # a colleague, or your other machine
+oslo secret rotate
+```
+
+Encrypted at rest with [age](https://github.com/str4d/rage) — one key type, no options to get
+wrong, and no C to link into a static binary. **The store and the key live in different trees on
+purpose**: `$XDG_DATA_HOME` for the ciphertext, which is the point of encrypting it — commit it,
+back it up, sync it — and `$XDG_STATE_HOME` for the key, which must never go with it. A key that
+ends up under a `.git` anyway is called out every time you use one.
+
+A store is a directory, a list of keys to decrypt with and a list of recipients to encrypt to, and
+there can be several — `--store work`, `$OSLO_SECRET_STORE`, or a `default` line. All of it is one
+flat file beside the key, because `$(oslo secret get …)` is a child process that never reads
+`config.lua`: configuration that only existed after Lua had run would apply in your shell and
+silently not in `cron`. A key can be a **program** — `pass`, `gpg`, anything that prints an
+identity — and native keys are tried first, so a store that opens with a file key never forks.
+
+From Lua there is `oslo.secret`: `get`, `set`, `open(store)`, `seal`/`unseal`, and
+`oslo.secret.mine()` — a plugin's own encrypted store, beside the database `oslo.db` gives it. A
+plugin declares the secrets of yours it will read and `oslo plugin install` prints that before you
+trust it, which is a disclosure rather than a sandbox, and the document says so in those words.
+
+[Secrets](docs/features/secrets.md) has the whole of it.
+
 ### Arguments, declared in comments
 
 ```sh
@@ -1331,13 +1362,13 @@ nix build         # static musl binary
 
 ### Optional features
 
-All six are off *by default*, and off for the same reason: a shell that is going to be `/bin/sh`
+All seven are off *by default*, and off for the same reason: a shell that is going to be `/bin/sh`
 should carry what every session needs and nothing else. `make build` turns them on, because
 somebody building from source is asking for the shell rather than for the floor; the published
 release artifact is the default build.
 
 Each cost is what turning that one feature *off* takes back out of the full build, measured on the
-static musl binary — 5,266,368 bytes with none of them, 6,013,312 with all five:
+static musl binary — 5,557,216 bytes with none of them, 6,853,056 with all seven:
 
 | feature | costs | brings |
 |---|---:|---|
@@ -1346,7 +1377,8 @@ static musl binary — 5,266,368 bytes with none of them, 6,013,312 with all fiv
 | `nix` | +60 KB | `oslo.nix` — every `nix --json` answer as a Lua table, and flake-output completion |
 | `scratch` | +48 KB | named sessions that outlive their terminal, and the key that finds them |
 | `plugin` | +108 KB | `oslo plugin` — installing somebody else's Lua, and loading it on first use. `oslo.db` and the `pre-cmd` veto a plugin is written against are in **every** build |
-| `argc` | +308 KB | a script declares its options in comments and the shell parses them: the `argc` builtin, `oslo --argc-eval` for bash scripts, and completion from those comments. The largest of the six, and the only one that vendors a parser |
+| `secrets` | +216 KB | values encrypted at rest with age: `oslo secret`, several stores with their own keys and recipients, and `oslo.secret` for a config or a plugin. Vendors `age`, cut down from the 352 KB it costs as it comes |
+| `argc` | +308 KB | a script declares its options in comments and the shell parses them: the `argc` builtin, `oslo --argc-eval` for bash scripts, and completion from those comments. The largest of the seven, and the only one that vendors a parser |
 
 ```sh
 make build                  # static release, every feature on
@@ -1354,7 +1386,7 @@ make build TYPE=minimal     # static release, none of them
 ```
 
 **There are no others**, and in particular none that exist to serve the test suite —
-`--all-features` turns on exactly the five above. Test-only helpers that other crates' tests need
+`--all-features` turns on exactly the seven above. Test-only helpers that other crates' tests need
 are ordinary `pub` items the linker drops from the binary, not features, because a build flag
 should never decide whether test scaffolding ships.
 

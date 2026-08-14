@@ -122,7 +122,25 @@ argc = ["oslo-shell/argc", "oslo-runtime/argc", "dep:argc"]
 #
 # Still off by default, because 148 KB and 36 crates is not nothing on a binary meant to be
 # `/bin/sh`, and a shell that never holds a secret should not carry the code that could. Without it
-# there is no `oslo secret`, and `age` is not compiled, fetched or linked.
+# there is no `oslo secret`, no `oslo.secret`, and `age` is not compiled, fetched or linked.
+#
+# **Re-measured after the stores went in**, on the binary as it is now — several stores, several key
+# sources, several recipients, `secrets.conf`, `oslo.secret` and `oslo secret run`:
+#
+# ```text
+#   every other feature on   6,631,840 bytes
+#   with it                  6,853,056 bytes    +216 KB, still 36 crates
+# ```
+#
+# So the layer above `age` is 68 KB and no new dependency: `base64` at the Lua boundary was already
+# in the tree as an unconditional dependency of vendored `age`, which is also why `seal` speaks
+# base64 rather than turning on age's `armor` — that was measured at 45 KB for a format nothing on
+# this side of the boundary would read.
+#
+# **No age plugin client, deliberately.** Hardware keys in the age world are reached by an external
+# `age-plugin-NAME` binary, and speaking that protocol would mean restoring the code the trim above
+# deleted. It is not here: a key oslo cannot compute itself comes from `key command` instead, which
+# runs whatever already holds it. See `docs/features/secrets.md`.
 secrets = ["oslo-base/secrets", "oslo-runtime/secrets"]
 
 [dependencies]
