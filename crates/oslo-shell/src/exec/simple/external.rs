@@ -9,6 +9,7 @@ use crate::env::Environment;
 use crate::exec::job;
 use crate::exec::redirect::RedirectGuard;
 use crate::exec::simple::report_redirect_failure;
+use nix::sys::signal::Signal;
 use nix::sys::wait::{WaitPidFlag, WaitStatus, waitpid};
 use nix::unistd::{ForkResult, Pid, fork};
 use oslo_base::ast::Redirection;
@@ -180,6 +181,16 @@ fn wait_for_child(child: Pid, cmd_name: &str, words: &[String]) -> i32 {
                 // killed by signal `n` from one that called `exit(128 + n)`, and a caller that
                 // captured this command's output is about to be asked which it was.
                 crate::exec::argv::note_signal(Some(sig as i32));
+                // **R7.2: the Ctrl-C the shell never saw.** The terminal sends SIGINT to the
+                // foreground *child*, and a shell waiting on one is not in that group — so the
+                // interrupt machinery hears nothing, and the only evidence that a key was pressed
+                // is this wait status. Without noting it, `while true; do sleep 1; done` runs
+                // forever under a keyboard full of `^C`, and `sleep 5; echo hi` still prints,
+                // because the next command boundary has nothing to poll. Both diverge from bash
+                // and from dash, which end the loop and swallow the rest of the line.
+                if matches!(sig, Signal::SIGINT | Signal::SIGQUIT) {
+                    job::note_interrupt();
+                }
                 return 128 + sig as i32;
             }
             Ok(WaitStatus::Stopped(_, sig)) => {
