@@ -41,6 +41,13 @@ pub struct Manifest {
     ///
     /// `None` when the plugin did not say, which means it runs anywhere.
     pub requires: Option<String>,
+    /// The user's secrets this plugin says it will read, by name.
+    ///
+    /// **A disclosure, not a sandbox.** It is shown at install, before trust is decided, and it is
+    /// what `oslo.secret` filters a plugin's handle to. Nothing stops a plugin shelling out to
+    /// `oslo secret get` instead — what the declaration buys is a plugin that can be caught
+    /// contradicting its own manifest.
+    pub secrets: Vec<String>,
     /// A hook whose firing loads this plugin, whether or not anything named it.
     ///
     /// **For a plugin that has nothing to be typed.** A plugin whose whole job is a `post-change-dir`
@@ -125,6 +132,16 @@ pub fn read(directory: &Path) -> Result<Manifest, String> {
         ));
     }
 
+    let secrets = strings(&table, "secrets", &path)?;
+    for name in &secrets {
+        if name.contains('/') || name.contains('*') || name.starts_with('.') || name.is_empty() {
+            return Err(format!(
+                "{}: `secrets` takes names, never a path or a pattern: {name:?}",
+                path.display()
+            ));
+        }
+    }
+
     let builtins = names(&table, "builtins", &path)?;
     let tools = names(&table, "tools", &path)?;
     if builtins.is_empty() && tools.is_empty() && string(&table, "load_on").is_none() {
@@ -162,6 +179,7 @@ pub fn read(directory: &Path) -> Result<Manifest, String> {
         builtins,
         tools,
         requires,
+        secrets,
         load_on,
     })
 }
@@ -172,6 +190,28 @@ fn string(table: &oslo_lua::value::Table, field: &str) -> Option<String> {
         Value::Str(text) => Some(text.to_string()),
         _ => None,
     }
+}
+
+/// A list of plain strings.
+fn strings(
+    table: &oslo_lua::value::Table,
+    field: &str,
+    path: &Path,
+) -> Result<Vec<String>, String> {
+    let Value::Table(list) = table.get(&Value::str(field)) else {
+        return Ok(Vec::new());
+    };
+    list.borrow()
+        .sequence()
+        .iter()
+        .map(|value| match value {
+            Value::Str(text) => Ok(text.to_string()),
+            _ => Err(format!(
+                "{}: every `{field}` entry must be a string",
+                path.display()
+            )),
+        })
+        .collect()
 }
 
 /// A list of command names, each of which must be one the shell could dispatch.

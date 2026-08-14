@@ -83,6 +83,20 @@ pub fn publish(entries: &[Entry]) -> Result<(), String> {
     let Some(dir) = directory() else {
         return Err("no $HOME, so there is nowhere to write the scripts".to_string());
     };
+    // **A directory belongs to the store that filled it.** Two stores, one directory, and the
+    // second one's publish deletes the first one's scripts — which is not a hypothetical: pointing
+    // `$XDG_DATA_HOME` at a scratch store and running `oslo macros publish` emptied a real
+    // `~/.local/sbin` of seventy-two files, because the store moved and this directory did not.
+    // The manifest says whose it is, so the answer is to look before writing.
+    if let Some(owner) = owner_of(&dir)
+        && Some(&owner) != super::directory().as_ref()
+    {
+        return Err(format!(
+            "{} holds scripts published from {} — set $OSLO_MACROS_BIN to write somewhere else",
+            dir.display(),
+            owner.display()
+        ));
+    }
     let wanted: Vec<&Entry> = entries
         .iter()
         .filter(|entry| entry.kind == Kind::Script && entry.active)
@@ -125,22 +139,43 @@ fn write_one(path: &Path, body: &str) -> Result<(), String> {
         .map_err(|e| format!("{}: {}", path.display(), crate::error::reason(&e)))
 }
 
+/// The names oslo wrote into `dir`, from its manifest.
+///
+/// The `store …` line is not one of them: it says *whose* the directory is, and is read by
+/// [`owner_of`].
 fn read_manifest(dir: &Path) -> Vec<String> {
     std::fs::read_to_string(dir.join(MANIFEST))
         .map(|text| {
             text.lines()
                 .map(str::trim)
-                .filter(|line| !line.is_empty())
+                .filter(|line| !line.is_empty() && !line.starts_with(OWNER))
                 .map(str::to_string)
                 .collect()
         })
         .unwrap_or_default()
 }
 
+/// The first line of a manifest, naming the store the files were published from.
+const OWNER: &str = "store ";
+
+/// Which store filled this directory, when it says.
+///
+/// `None` for a directory with no manifest, and for one written before this line existed — in both
+/// cases nobody has claimed it and the caller may take it.
+fn owner_of(dir: &Path) -> Option<PathBuf> {
+    let text = std::fs::read_to_string(dir.join(MANIFEST)).ok()?;
+    let line = text.lines().find(|line| line.starts_with(OWNER))?;
+    Some(PathBuf::from(line[OWNER.len()..].trim()))
+}
+
 fn write_manifest(dir: &Path, names: &[String]) -> Result<(), String> {
     let path = dir.join(MANIFEST);
-    let mut text = names.join("\n");
-    if !text.is_empty() {
+    let mut text = String::new();
+    if let Some(store) = super::directory() {
+        text.push_str(&format!("{OWNER}{}\n", store.display()));
+    }
+    text.push_str(&names.join("\n"));
+    if !names.is_empty() {
         text.push('\n');
     }
     std::fs::write(&path, text).map_err(|e| format!("{}: {e}", path.display()))

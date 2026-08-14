@@ -41,6 +41,7 @@ return {
   entry    = "init.lua",
   builtins = { "note" },
   -- requires = ">= 0.2.29",   -- optional: the oldest oslo it will run on
+  -- secrets  = { "gh-token" },-- optional: the secrets of yours it will read
 }
 ```
 
@@ -167,8 +168,36 @@ end)
 ```
 
 `open` takes a **name, never a path**. `oslo.db.open("../history")` is refused before anything is
-opened, so one plugin cannot read another's data — or oslo's own. One file per plugin, mode `0600`,
-which is also what makes uninstalling an `rm`.
+opened, so a plugin cannot reach out of the directory these live in — oslo's own history and
+tracking store included. One file per plugin, mode `0600`, which is also what makes uninstalling
+an `rm`.
+
+**It does not stop one plugin opening another's**, and it was described here as though it did.
+`oslo.db.open("notes")` from a plugin called `weather` is accepted: the only check is on the shape
+of the name. Every plugin runs on one interpreter with one `oslo` global and can read any file this
+user can through `oslo.fs`, so a name check could never have been the thing that separated them.
+What the databases buy is a file per plugin — findable, removable, and not a shared blob — and that
+is worth having on its own.
+
+## Secrets
+
+A plugin can keep values encrypted, and can ask to read yours. Both are in
+[secrets](secrets.md#what-a-plugin-may-reach); the short of it:
+
+```lua
+-- plugin.lua
+secrets = { "gh-token" }    -- names, never a wildcard; shown at install, before you decide
+
+-- init.lua
+local mine = oslo.secret.mine()      -- its own store, encrypted, no name to pass
+mine:set("cursor", "42")
+oslo.secret.get("gh-token")          -- yours, and only what it declared
+```
+
+**A disclosure, not a sandbox**, for the reason [Trust](#trust) gives: a plugin that wants your
+token can shell out to `oslo secret get` whatever its manifest says. The declaration makes a plugin
+*catchable* — it is a claim, printed before trust is decided, that its behaviour can be held against.
+And as above, a plugin's encrypted store is protected from the disk rather than from other plugins.
 
 ## Testing one
 

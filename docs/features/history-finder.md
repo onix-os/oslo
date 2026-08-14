@@ -89,15 +89,42 @@ Tab is a different axis: it moves to the next profile, which is a different stor
 different history entirely. The query and the scope survive the switch, because you are asking the
 same question of a different history.
 
+### Marking, with Ctrl-Space
+
+**Ctrl-Space marks the row under the cursor and steps to the next one.** Marking a scattered handful
+and pressing Delete once is the case it exists for, and stopping after each mark would have meant two
+keystrokes a row. "Next" is upward, because the list grows up from the search bar. Stepping back onto
+a marked row unmarks it.
+
+A mark is kept as the command it is — the line and the mode, the same pair `forget` takes — and never
+as a position. Every keystroke re-ranks and re-filters the list, so a mark held by index would move to
+whatever row happened to take that slot: you would mark `rm -rf build`, type three letters, and delete
+something else. Marks therefore survive typing, a scope change and a profile change, and you can mark,
+narrow the query, mark more, and delete the lot.
+
+The checkbox column appears only once something is marked. Two cells against every row of a list
+nobody is marking is noise on every line, and the single shift when the first mark lands is cheaper
+than carrying it always.
+
 ### Delete
 
-Delete forgets the highlighted command — every run of it, in every directory, and out of the event
-log as well as the aggregate. Unless `oslo.finder.confirm_delete` is off it asks first, with *no*
-selected, so a stray Enter answers the safe way. While the question is up it owns the keyboard:
-Left, Right and Tab flip the answer, Enter commits it, and Esc answers *no* rather than closing the
-finder, because changing your mind about a deletion is not the same as wanting to leave. The
-question takes exactly the three rows the search bar already owns, so the list does not shift while
-you decide and the row you are about to delete stays under your eye.
+Delete forgets **everything marked**, or the highlighted command when nothing is — the same rule
+`ui choose` uses for Enter, so neither way of working has to be announced. Forgetting is total: every
+run of that line, in every directory, out of the event log as well as the aggregate.
+
+Unless `oslo.finder.confirm_delete` is off it asks first, with *no* selected, so a stray Enter answers
+the safe way. The question counts what is about to go — `delete 4 from history?` — because one row is
+what the eye is already on and four is a claim worth checking.
+
+While the question is up it owns the keyboard: Left, Right and Tab flip the answer, Enter commits it,
+and Esc answers *no* rather than closing the finder, because changing your mind about a deletion is
+not the same as wanting to leave. **Delete again means yes** — the key that asked is the one already
+under the finger, and pressing it twice is how somebody who knows what they are doing gets past the
+guard without reaching for Enter. It answers regardless of which button is highlighted, because the
+second press *is* the answer.
+
+The question takes exactly the three rows the search bar already owns, so the list does not shift
+while you decide and the row you are about to delete stays under your eye.
 
 `Track::forget` deletes from the `Run` tree and its `RunByArgv` twin, and then from the `History`
 tree, writing a deletion event for each removed line. **The second half was a bug fix**: forget
@@ -117,7 +144,9 @@ change makes the old index meaningless, whereas a deletion leaves the rows aroun
 | PageUp / PageDown | move by one window |
 | Left / Right, Ctrl-B / Ctrl-F | widen / narrow the scope |
 | Tab | the next profile |
-| Delete, Ctrl-D | forget the highlighted command |
+| Ctrl-Space | mark this row and step to the next |
+| Delete, Ctrl-D | forget everything marked, or the highlighted row |
+| Delete again | while the question is up, answer *yes* |
 | Backspace | one character off the query |
 | Ctrl-U | clear the query |
 | Enter | put the line on the prompt, unrun |
@@ -211,13 +240,16 @@ the survivors and clones them. `bench/fuzzy.rs` calls `Fuzzed::score`, where the
   the shell must have a root for a row to be in this one.
 - `host` filters nothing today. See above.
 - The search box has no cursor: characters, Backspace and Ctrl-U, which is the price of the arrows
-  meaning scope. And there is no marking, so Delete and Enter act on one highlighted row.
+  meaning scope.
+- **Enter is never plural.** Marks are for Delete; Enter puts one line on the prompt, because a
+  prompt holds one line. Marking and pressing Enter takes the row under the cursor.
+- Marks do not survive leaving the finder. Esc drops them, as it drops everything else.
 - Nothing is remembered between openings: it always opens on `global`, in the current profile.
 - `oslo.finder.key` is validated as a key name but is only ever compared against `"up"`. Setting it
   to anything else does not bind that key — it turns off the Up behaviour, and the binding table
   above is how you bind another one.
 - Delete has no undo. The rows are gone from the store and the only way back is to run the command
-  again.
+  again — which is why the question counts them, and why *no* is what Enter answers.
 - The finder never runs anything. Enter puts the line on the prompt for you to edit or accept,
   which is the contract every other recall in the shell has.
 
@@ -226,6 +258,7 @@ the survivors and clones them. `bench/fuzzy.rs` calls `Fuzzed::score`, where the
 | Path | What is in it |
 | --- | --- |
 | `crates/oslo-ui/src/finder/mod.rs` | `Scope`, `Scope::next`, `Scope::previous`, `Scope::label` |
+| `crates/oslo-ui/src/finder/run.rs` | `State::toggle_mark`, `State::doomed`, `State::forget_doomed` |
 | `crates/oslo-ui/src/finder/run.rs` | `open`, `Outcome`, `State`, `State::in_scope`, `State::forget_selected`, `State::next_profile` |
 | `crates/oslo-ui/src/finder/rank.rs` | `rank`, `Ranked`, `ago`, `is_here` |
 | `crates/oslo-ui/src/finder/render.rs` | `frame`, `visible_rows`, `confirm_row` |

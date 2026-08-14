@@ -19,6 +19,10 @@ direnv = ["oslo-shell/direnv"]
 argc = ["oslo-shell/argc"]
 # `nix` — see the note on `oslo-shell`.
 nix = ["oslo-shell/nix"]
+# `secrets` — `oslo.secret`, the store from Lua. `dep:base64` is the Lua boundary for `seal` and
+# `unseal`, which carry a whole age file: binary, and 45 KB cheaper than turning on age's armour.
+secrets = ["oslo-base/secrets", "dep:base64"]
+
 # `plugin` — the manifest, the index, and loading a plugin's Lua on first use. See the workspace
 # root. `dep:sha2` is the trust gate: a plugin is loaded only while its files hash to what was
 # allowed at install.
@@ -41,6 +45,10 @@ regex = { version = "1", default-features = false, features = [
     "std", "unicode-case", "unicode-gencat", "unicode-perl",
     "perf-literal", "perf-inline",
 ] }
+
+# `oslo.secret`'s seal/unseal, which hand a binary age file across the Lua boundary. Already in the
+# tree as an unconditional dependency of vendored age, so this adds no crate.
+base64 = { version = "0.22", optional = true }
 
 # `oslo.json`.
 serde_json = "1"

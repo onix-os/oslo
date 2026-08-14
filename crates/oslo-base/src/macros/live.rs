@@ -85,6 +85,7 @@ pub fn want() -> Vec<Entry> {
 pub struct Applied {
     pub aliases: Vec<String>,
     pub abbrevs: Vec<String>,
+    pub vars: Vec<String>,
 }
 
 impl Applied {
@@ -99,21 +100,28 @@ impl Applied {
         Applied {
             aliases: names(Kind::Alias),
             abbrevs: names(Kind::Abbrev),
+            vars: names(Kind::Var),
         }
     }
 
     /// The names that were ours and are not wanted any more.
-    pub fn gone(&self, next: &Applied) -> (Vec<String>, Vec<String>) {
+    ///
+    /// **A variable that has already been read is not taken back.** By then it is an ordinary
+    /// exported variable and the recipe is gone; removing the value would be reaching into a shell
+    /// to unset something a command may be holding. What is dropped is the *recipe*, so the name
+    /// stops resolving to it in every shell that has not asked yet.
+    pub fn gone(&self, next: &Applied) -> Applied {
         let dropped = |had: &[String], now: &[String]| -> Vec<String> {
             had.iter()
                 .filter(|name| !now.contains(name))
                 .cloned()
                 .collect()
         };
-        (
-            dropped(&self.aliases, &next.aliases),
-            dropped(&self.abbrevs, &next.abbrevs),
-        )
+        Applied {
+            aliases: dropped(&self.aliases, &next.aliases),
+            abbrevs: dropped(&self.abbrevs, &next.abbrevs),
+            vars: dropped(&self.vars, &next.vars),
+        }
     }
 }
 

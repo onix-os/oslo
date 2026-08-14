@@ -1,7 +1,7 @@
 # Macros
 
-Four kinds of small named thing — an alias, an abbreviation, a function, a script — kept in one
-database and managed with one subcommand, so that saving one does not mean editing a file and
+Five kinds of small named thing — an alias, an abbreviation, a function, a script, a variable — kept
+in one database and managed with one subcommand, so that saving one does not mean editing a file and
 re-sourcing it.
 
 ```sh
@@ -9,11 +9,12 @@ oslo macros add --alias  gs 'git status --short' --tag git
 oslo macros add --abbrev gco 'git checkout'      # expanded into your line as you type
 oslo macros add --func   mkcd                    # opens your editor
 oslo macros add --script deploy                  # opens your editor, any language
+oslo macros add --var    'GITHUB_TOKEN=$(oslo secret get gh-token)'
 oslo macros show                                 # the manager, on the whole screen
 ```
 
-The kind is required, because four kinds and a silent default is a trap. An inline body is for the
-two that fit on a line; a function and a script always open the editor.
+The kind is required, because five kinds and a silent default is a trap. An inline body is for the
+three that fit on a line; a function and a script always open the editor.
 
 An alias in `config.lua` still works, and so does `alias` in a script. This is a second source, not
 a replacement — see [Order](#order-config-first-database-last).
@@ -22,7 +23,7 @@ a replacement — see [Order](#order-config-first-database-last).
 [![macros demo](https://asciinema.org/a/1262943.svg)](https://asciinema.org/a/1262943)
 <!-- demo:end -->
 
-## The four kinds, and why there are four
+## The five kinds, and why there are five
 
 They are not variations on one idea; they differ in *when* they act and in *what sees them*.
 
@@ -32,6 +33,7 @@ They are not variations on one idea; they differ in *when* they act and in *what
 | `abbrev` | as you type the space after it | what is in your buffer, visibly | at shell start |
 | `func` | when you call the name | shell code, **in this shell** | after `$PATH` fails |
 | `script` | when you call the name | its own program, in a child | after `$PATH` fails |
+| `var` | when something reads the name | its body, once, in this shell | at shell start |
 
 The pair that looks redundant is `alias` and `abbrev`, and the difference is the whole reason
 [abbreviations](abbreviations.md) exist: an alias replaces the word before anything can see it, so
@@ -41,6 +43,34 @@ the line*, so what runs is what you can read and what the history keeps.
 The pair that looks like one thing is `func` and `script`. A function runs in the shell that called
 it — it can `cd`, set a variable, change the shell it was called from. A script cannot: it is its own
 program with its own shebang, and Python is as good an answer as `sh`.
+
+### A variable holds a recipe, not a value
+
+The fifth is the one that is not what it looks like. `oslo macros add --var EDITOR=nvim` stores a
+value and the shell exports it at startup, which is unremarkable. `--var
+'GITHUB_TOKEN=$(oslo secret get gh-token)'` stores a *line*, and the shell runs it the first time
+something reads `$GITHUB_TOKEN` — once, in that shell, and never in a shell that does not mention
+the name.
+
+That difference is the whole point of storing one. Written in `config.lua` as an `export`, the same
+line decrypts a secret at every shell start, on every machine, for ever, whether or not anything
+wanted it; here a session that never touches the token never runs the command at all. It is the same
+argument the [secrets](secrets.md) store makes about files, applied to time.
+
+The split is by cost, and it is measured by `is_a_value`: a body with no command in it — `nvim`,
+`/srv/data`, `$HOME/bin` — is exported at startup, because it is free and because a program that
+reads the environment *itself* (`gh`, `aws`, `docker`) has no `$NAME` for the shell to expand and
+would otherwise never see it. A body with `$(…)` in it waits.
+
+Two consequences worth knowing:
+
+* **The environment the shell was started with wins.** Neither kind overrules a name that is already
+  set, so `FOO=x oslo` still means what it says — and `oslo macros add --var` says so at the time if
+  the name is already taken.
+* **A recipe reaches a program that reads the environment only once the name has been read.** For
+  `gh` that means mentioning it — `echo "$GITHUB_TOKEN" >/dev/null` first, or writing the command as
+  `gh …` after anything that expands it. A `secret run NAME -- cmd` that puts one value in one
+  child's environment is the better answer and is not built yet.
 
 ## Running a script that has no file
 
@@ -170,8 +200,16 @@ That is the deliberate half. The database is the one you can change without edit
 can shadow one you wrote in `config.lua` — which is why a shell writes down what its config defined,
 and why the manager can show you both: **Tab** moves between `[stored]` and `[elsewhere]`.
 
-`[elsewhere]` is aliases and abbreviations only. A function is a file on disk and a Lua function is a
-name in a table; there is nothing to enumerate, so that source can never show either.
+`[elsewhere]` is aliases, abbreviations and **every variable this shell has** — which is what makes
+it worth opening: a stored `EDITOR` that never applies because a profile already exported one is
+invisible until the two lists are on the same screen. A function is a file on disk and a Lua function
+is a name in a table; there is nothing to enumerate, so that source can never show either.
+
+**Nothing there is editable.** An inherited row is a fact about this shell, not a record in the
+database: there is no body to open and nothing to delete, so Enter and Delete do nothing and the
+status line says `not editable` before either is pressed. Space still works, because turning one off
+is a decision this shell can carry out — the off list is applied to the merged set, so an alias your
+config defined can be turned off exactly like a stored one.
 
 ## The manager
 
@@ -199,19 +237,20 @@ with nothing to negotiate.
 
 | key | |
 |---|---|
-| type | filter — every column, so `script` narrows by kind and `git` by tag |
-| ← → | **the tag**: all of them, then each one in use. Where the finder's scopes are |
+| type | filter — every column; `#git` asks for a tag, in any order and with anything else |
+| ← → | **the kind**: all of them, then each one in use. Where the finder's scopes are |
 | Tab | **the source**: `[stored]` ↔ `[elsewhere]`. Where the finder's profile is |
-| Enter | **the editor**, for every kind, including an alias |
-| Delete | forget it, after the same question the finder asks |
+| Enter | **the editor**, for every kind, including an alias — `[stored]` only |
+| Delete | forget it, after the same question the finder asks — `[stored]` only |
 | Space | off **for this session** |
 | Space ×3 | off **everywhere**, until three more turn it back on |
 
 Enter is the one that differs from the finder, and it has to: the finder puts a line back on the
 prompt because a past command is something to run again, while a macro is something you keep — and
-what you want from it is to change it. Enter on an `[elsewhere]` row copies it into the database
-first, because a row that came from a file is not ours to write back to. That copy is also how you
-get a configured alias you can turn off.
+what you want from it is to change it. On an `[elsewhere]` row it does nothing at all: that row has
+no record behind it, and an Enter that quietly wrote a *new* macro shadowing the one you were looking
+at would not be the key it looks like. To keep a version of your own, add it — the name is on the
+screen in front of you.
 
 **Off is not gone.** A macro turned off keeps its body, its tags and the day it was made; what
 changes is that it stops applying. Turning off an alias that shadows a configured one uncovers the
@@ -272,13 +311,20 @@ the thing a profile could never be.
 oslo macros add --alias gs 'git status --short' --tag git --tag system
 ```
 
-← and → move through the tags in use, in the place the finder puts its scopes.
+**A tag is asked for by typing it**, `#git`, in the search bar with everything else — in any order,
+`#ai tool` or `tool #ai` or `#ai` alone, and scoped to the kind you are looking at. The tags are
+taken out of the query and the rest is fuzzy-matched.
+
+That is a deliberate swap. ← and → used to walk the tags, which spent the arrow keys — the most
+obvious pair on the keyboard — on the one filter that already has a spelling you can type. They walk
+the [kinds](#the-five-kinds-and-why-there-are-five) instead, which is the division a list of five
+kinds is actually navigated by and the one thing you cannot type.
 
 ## Where it lives
 
 | | |
 |---|---|
-| `crates/oslo-base/src/macros.rs` | the store, the four kinds, the record |
+| `crates/oslo-base/src/macros.rs` | the store, the five kinds, the record, `is_a_value` |
 | `crates/oslo-base/src/macros/live.rs` | the two sources, the rebuild, the session list |
 | `crates/oslo-runtime/src/startup/stored.rs` | applying it to a shell, at startup and per prompt |
 | `crates/oslo-shell/src/exec/stored.rs` | running a function or a script, and the memfd |

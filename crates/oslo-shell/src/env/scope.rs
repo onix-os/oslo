@@ -78,6 +78,13 @@ pub struct Environment {
     /// What `$LINENO` was last set to by [`Self::note_line`], or 0 when something else touched it.
     published_line: u32,
     aliases: HashMap<String, String>,
+    /// Stored variables that have not been asked for yet: name to the *recipe* for its value.
+    ///
+    /// `oslo macros add --var GITHUB_TOKEN '$(oslo secret get gh-token)'` puts a line here, not a
+    /// token. The first expansion of `$GITHUB_TOKEN` runs it, exports the result, and takes the
+    /// entry out — so the cost of a variable that decrypts something is paid by the command that
+    /// needed it and by no other, and a shell that never mentions the name never runs it at all.
+    lazy: HashMap<String, String>,
     functions: HashMap<String, Arc<Command>>,
     /// Every builtin this shell has. The one list consulted by [`Self::is_builtin`], the
     /// dispatcher in `exec::simple` and `type`; see the `registry` submodule.
@@ -157,6 +164,7 @@ impl Environment {
             substitution_status: None,
             published_line: 0,
             aliases,
+            lazy: HashMap::new(),
             functions: HashMap::new(),
             builtins: BuiltinRegistry::default(),
             procsubs: Vec::new(),

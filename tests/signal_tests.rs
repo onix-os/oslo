@@ -189,3 +189,150 @@ fn a_running_loop_sees_a_trapped_sigint() {
         "the INT trap did not run; output was {out:?}"
     );
 }
+
+/// **Ctrl-C must end a loop whose body forks, not just kill the child.**
+///
+/// The terminal sends SIGINT to the foreground *child*, and a shell waiting on one is not in that
+/// group — so nothing in the interrupt machinery hears the key, and `while true; do sleep 1; done`
+/// ran forever under a keyboard full of `^C`. The evidence a key was pressed is the child's wait
+/// status and nothing else, which is where it is now noticed.
+///
+/// Driven through a real pty because that is the only place the signal comes from the terminal
+/// rather than from a `kill`: sending SIGINT by hand would go to the shell and pass whatever the
+/// bug was.
+mod interrupt {
+    use super::*;
+    use nix::pty::openpty;
+    use std::io::Write;
+    use std::os::fd::OwnedFd;
+    use std::os::unix::process::CommandExt;
+
+    fn owned(fd: OwnedFd) -> fs::File {
+        fs::File::from(fd)
+    }
+
+    /// Run `line` at an interactive prompt, press Ctrl-C, and answer what the shell did next.
+    fn interrupted(line: &str) -> String {
+        let pty = openpty(None, None).expect("open pty");
+        let master = owned(pty.master);
+        let slave = owned(pty.slave);
+        let home = tempfile::tempdir().expect("temporary home");
+        let mut command = Command::new(common::oslo_bin());
+        command
+            .arg("-i")
+            .env_clear()
+            .env("HOME", home.path())
+            .env("PATH", "/usr/bin:/bin")
+            .env("TERM", "dumb")
+            .current_dir(home.path())
+            .stdin(Stdio::from(slave.try_clone().expect("clone")))
+            .stdout(Stdio::from(slave.try_clone().expect("clone")))
+            .stderr(Stdio::from(slave.try_clone().expect("clone")));
+        // The shell needs the pty as its *controlling* terminal, or the key never becomes a signal
+        // — which is the whole mechanism under test.
+        //
+        // SAFETY: runs after fork and calls only async-signal-safe system interfaces.
+        unsafe {
+            command.pre_exec(|| {
+                if nix::libc::setsid() == -1 {
+                    return Err(std::io::Error::last_os_error());
+                }
+                if nix::libc::ioctl(0, nix::libc::TIOCSCTTY, 0) == -1 {
+                    return Err(std::io::Error::last_os_error());
+                }
+                Ok(())
+            });
+        }
+        let mut child = command.spawn().expect("spawn oslo on a pty");
+
+        // **Dropped here.** The parent holding a copy of the slave means the master never reaches
+        // end of file, so anything waiting for one waits for ever.
+        drop(slave);
+
+        let mut input = master.try_clone().expect("clone master");
+        // **A shared buffer, never joined.** A `sleep` orphaned by the killed shell keeps the slave
+        // open, so the reader can outlive the test — which is fine as long as nothing waits for it.
+        let seen: std::sync::Arc<std::sync::Mutex<Vec<u8>>> = Default::default();
+        let filling = std::sync::Arc::clone(&seen);
+        std::thread::spawn(move || {
+            let mut buffer = [0u8; 4096];
+            while let Ok(n) = std::io::Read::read(&mut (&master), &mut buffer) {
+                if n == 0 {
+                    break;
+                }
+                filling
+                    .lock()
+                    .expect("transcript")
+                    .extend_from_slice(&buffer[..n]);
+            }
+        });
+
+        sleep(Duration::from_millis(700));
+        input.write_all(line.as_bytes()).expect("write");
+        input.write_all(b"\n").expect("write");
+        sleep(Duration::from_millis(900));
+        input.write_all(b"\x03").expect("write");
+        sleep(Duration::from_millis(900));
+        // If the shell is stuck in the loop this is never read, and the marker never comes back.
+        input.write_all(b"echo RECOVERED\n").expect("write");
+        sleep(Duration::from_millis(900));
+
+        let _ = child.kill();
+        let _ = child.wait();
+        drop(input);
+
+        let transcript = seen.lock().expect("transcript").clone();
+        String::from_utf8_lossy(&transcript).into_owned()
+    }
+
+    /// Did `word` appear as a *command's output* rather than as part of the line being typed?
+    ///
+    /// **Counting occurrences cannot answer this.** The line editor repaints the whole row on every
+    /// keystroke, so a word being typed appears once per character — in the transcript below,
+    /// `RECOVERED` shows up fourteen times before it has been run once. What only output produces
+    /// is a screen segment that is *nothing but* the word.
+    fn printed(transcript: &str, word: &str) -> bool {
+        let mut plain = String::with_capacity(transcript.len());
+        let mut chars = transcript.chars();
+        while let Some(c) = chars.next() {
+            if c != '\u{1b}' {
+                plain.push(c);
+                continue;
+            }
+            // Skip the escape and everything up to the byte that ends it.
+            for c in chars.by_ref() {
+                if c.is_ascii_alphabetic() || c == '\u{7}' {
+                    break;
+                }
+            }
+        }
+        plain
+            .split(['\r', '\n'])
+            .any(|segment| segment.trim() == word)
+    }
+
+    /// A loop that forks each iteration ends, rather than eating the key and going round again.
+    #[test]
+    fn a_loop_whose_body_forks_ends_on_ctrl_c() {
+        let seen = interrupted("while true; do sleep 0.2; done");
+        assert!(
+            printed(&seen, "RECOVERED"),
+            "the shell never came back:\n{seen}"
+        );
+    }
+
+    /// **And the rest of the line does not run.** bash and dash both abandon it; oslo used to
+    /// carry on to the next command, which is the same missed interrupt wearing a different hat.
+    #[test]
+    fn what_follows_an_interrupted_command_is_abandoned() {
+        let seen = interrupted("sleep 5; echo NOTTHIS");
+        assert!(
+            !printed(&seen, "NOTTHIS"),
+            "the rest of the line ran after Ctrl-C:\n{seen}"
+        );
+        assert!(
+            printed(&seen, "RECOVERED"),
+            "the shell never came back:\n{seen}"
+        );
+    }
+}

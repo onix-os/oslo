@@ -35,6 +35,8 @@ pub mod nesting;
 pub mod predict;
 /// Whether the command now running must leave no trace of itself.
 pub mod quiet;
+#[cfg(feature = "secrets")]
+pub mod secrets;
 /// A database a config or a plugin owns, kept apart from oslo's own.
 pub mod store;
 pub mod track;

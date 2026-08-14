@@ -1,11 +1,15 @@
-# macros: the small named things you keep — aliases, abbreviations, functions and scripts.
+# macros: the small named things you keep — aliases, abbreviations, functions, scripts, variables.
 #
-# Against the fixture's own macro database, so the list is the nine invented macros rather than
-# whatever the person recording happens to keep — see `env` below and `fixture.sh`, which seeds it.
+# Against the fixture's own macro database, so the list is the invented macros rather than whatever
+# the person recording happens to keep — see `env` below and `fixture.sh`, which seeds it.
 env XDG_DATA_HOME=/tmp/oslo-demo-work/data
+env XDG_STATE_HOME=/tmp/oslo-demo-work-key
 # `oslo macros …` is the binary on $PATH, which is whatever is installed rather than the one being
 # demonstrated. The build under test goes in front of it, so the recording shows this oslo.
-env PATH=$OSLO_DIR:$PATH
+# **Off camera**, and not `env`: a config rebuilds `$PATH` at startup, so what the launcher exported
+# is gone by the first prompt — and `oslo macros …` is a *program*, which would then be whichever
+# oslo is installed rather than the one being demonstrated.
+setup export PATH=$OSLO_DIR:$PATH
 cols 100
 rows 22
 speed 0.06
@@ -13,33 +17,42 @@ speed 0.06
 run oslo macros add --alias ll 'eza -l --git --group-directories-first' --tag files
 wait 1.6
 
+# A variable is the fifth kind, and the only one whose body is a recipe rather than a value.
+run oslo macros add --var 'GIT_PAGER=delta --side-by-side'
+wait 1.8
+clear
+
 # Alt+\ opens the manager, beside Ctrl+\ for scratches. Newest first, so the one just added is
 # under the cursor.
 key M-\
 wait 2.2
 
-# Typing narrows on every column, so a kind is a filter and so is a tag.
-type script
-wait 2.0
+# Typing narrows on every column.
+type deploy
+wait 1.8
 key C-u
 wait 0.8
-type git
+
+# A tag is asked for with a `#`, in any order and beside anything else — so no key is spent on it.
+type #git
 wait 2.0
 key C-u
 wait 1.0
 
-# Left and Right move through the tags in use, where the history finder puts its scopes.
+# Left and Right move through the kinds, which is the division a list of five is navigated by.
 key Right
-wait 1.6
+wait 1.8
 key Right
-wait 1.6
+wait 1.8
 key Right
+wait 1.8
+key Left
 wait 1.6
 key Left
-wait 1.8
+wait 1.6
 
-# **No Tab here.** The other source is the aliases the *recording machine's* configuration defines,
-# so a demo that pressed it would publish whatever the person recording happens to have in their
+# **No Tab here.** The other source is what the *recording machine's* shell inherited — its config's
+# aliases and every variable in its environment — so a demo that pressed it would publish somebody's
 # dotfiles. The key is documented; it is not something a cast can show honestly.
 
 # Space turns one off for this session — it stays in the database, and the row says so.
@@ -61,4 +74,4 @@ wait 2.0
 run oslo macros off ll
 wait 1.6
 run oslo macros show --plain
-wait 2.6
+wait 2.8

@@ -49,7 +49,12 @@ pub fn text(entries: &[Entry]) -> String {
          # hand and deleting it costs nothing — `oslo macros publish` writes it again.\n\
          #\n\
          # Source it from ~/.bashrc or ~/.zshrc to have these aliases in a shell that is not oslo.\n\
-         # oslo does not read it: it reads the database.\n\n",
+         # oslo does not read it: it reads the database.\n\
+         #\n\
+         # A stored variable is here only when its body is a plain value. One whose body runs a\n\
+         # command — `$(oslo secret get …)` — is not: oslo runs that the first time the name is\n\
+         # read, and a file that is sourced has no such moment, so writing it here would run every\n\
+         # one of them at every shell start.\n\n",
     );
     for entry in entries.iter().filter(|entry| entry.active) {
         match entry.kind {
@@ -65,6 +70,14 @@ pub fn text(entries: &[Entry]) -> String {
                     entry.name,
                     entry.body.trim_end()
                 ));
+            }
+            // **A variable travels only when its body is a value.** In oslo the body is run the
+            // first time the name is read; a sourced file has no such moment, so a
+            // `$(oslo secret get …)` written here would decrypt at every bash start — for every
+            // secret, whether or not anything wanted one. Those are left out and said so in the
+            // header. What is left is a plain value, which means the same thing in both shells.
+            Kind::Var if super::is_a_value(&entry.body) => {
+                out.push_str(&format!("export {}={}\n", entry.name, entry.body.trim()));
             }
             _ => {}
         }

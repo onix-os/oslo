@@ -118,6 +118,10 @@ pub fn key(bytes: &[u8]) -> Key {
             [b'S'] => Key::Function(4),
             _ => Key::Ignored,
         },
+        // Ctrl-Space arrives as NUL, and there is nothing else it can be: no terminal sends a bare
+        // zero byte for anything a person typed. Without this it fell through to `text_key` and was
+        // inserted into the line as nothing at all.
+        [0x00] => Key::Ctrl(' '),
         [byte @ 0x01..=0x1a] => Key::Ctrl((byte + b'a' - 1) as char),
         // The control bytes above the alphabet. A terminal that has not been asked for the Kitty
         // protocol sends these bare, with nothing to say they were a chord, and without this they

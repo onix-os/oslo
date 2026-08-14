@@ -137,6 +137,31 @@ substitution in the same word reports the previous *command* rather than the sub
 what bash 5.3 changed to; and `trap` lists `INT` rather than `SIGINT`. Interactive shells are exempt
 from the fatal rules, as POSIX itself says and bash agrees — a typo at a prompt must not log you out.
 
+### Ctrl-C, and the shell that never saw it
+
+A key at the terminal is a signal to the **foreground process group**, and while a command runs that
+group is the command's, not the shell's — that is what makes Ctrl-C reach `sleep` instead of killing
+your session. The consequence is easy to miss: a shell waiting on a child is *not told* that a key
+was pressed. Its only evidence is the wait status it reaps afterwards.
+
+Reading that status is what makes three things work, and all three were checked against `bash` and
+`dash` on a real pty rather than reasoned about:
+
+```sh
+while true; do sleep 0.2; done   # ^C ends the loop, rather than killing one sleep of many
+sleep 5; echo hi                 # ^C abandons the rest of the line; `hi` is not printed
+echo $?                          # 130, which is 128 + SIGINT
+```
+
+**oslo used to do none of them.** The interrupt was polled at every command boundary and the poll had
+nothing to find, so a loop went round again with the key thrown away — `^C ^C ^C` and no way out
+short of closing the terminal. A single command hid it, because there the child dying *is* the end of
+the command; and `while true; do :; done` hid it too, because with no child the shell is the
+foreground group and gets the signal itself. It took a body that forks for both halves to fail
+together.
+
+A child killed by SIGQUIT is treated the same way, for the same reason.
+
 ## What makes it different
 
 **`sh` is a personality, not a path.** Invoked as `sh`, oslo enters POSIX mode; invoked as `oslo` it
@@ -226,6 +251,9 @@ carries, because it replaced the process image and nothing registered at exit co
   and it says the shell *is* interactive, which changes far more than one convenience.
 - **Job control in a script needs both `set -m` and a controlling terminal.** With no terminal to
   claim it stays off, which is not an error — `set -m` inside a pipeline is legal and can do nothing.
+- **A key is only noticed when the child dies of it.** A program that catches SIGINT and keeps
+  running keeps running, and the shell waits — which is what a shell is supposed to do, and is why
+  a second Ctrl-C reaches the program rather than the loop around it.
 - **A running `while read` can still hang.** The harness treats a wall-clock timeout as a first-class
   verdict for exactly that reason: a hang is always a defect, never an accepted difference.
 
@@ -239,6 +267,9 @@ carries, because it replaced the process image and nothing registered at exit co
 | `tests/posix_stays_on_the_byte_path.rs` | the zero-structured-edges assertion |
 | `tests/command_escape_tests.rs` | `\cmd` and `\\cmd`, run twice: prompt and script |
 | `crates/oslo-shell/src/exec/simple/posix.rs` | `exits_on_error`, `resolve_builtin_result`, `assignment_failure` |
+| `crates/oslo-shell/src/exec/simple/external.rs` | `wait_for_child` — where a key the shell never saw is read off the wait status |
+| `crates/oslo-shell/src/exec/pipeline/interrupt.rs` | turning that into an unwind, and back into 130 at the top |
+| `tests/signal_tests.rs` | the pty tests: a forking loop ends, and the rest of the line does not run |
 | `crates/oslo-shell/src/exec/simple/escape.rs` | `Escape`, `intent` — the backslash gate |
 | `crates/oslo-shell/src/expand/sugar.rs` | `=command` and `@name`, interactive-only |
 | `crates/oslo-shell/src/exec/simple/autocd.rs` | `enabled` — interactive *and* opted in |

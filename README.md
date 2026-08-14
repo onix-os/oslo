@@ -118,8 +118,9 @@ Or just use `$PS1`, with the full escape set — `\u \h \w \$ \t \A \d \j \! \[ 
   `/usr/share/bin`, `f-b` reaches `foo-bar` and `gco` reaches `git checkout`, each looser pass
   running only when the stricter one found nothing, so an exact match is never diluted
 - **A full-screen history finder** on Up, seeded with whatever you had typed. Left and Right narrow
-  and widen the scope — global, host, session, directory, workspace — and Delete forgets a command
-  for good, after asking
+  and widen the scope — global, host, session, directory, workspace; Ctrl-Space marks rows and
+  Delete forgets all of them for good, after asking — and asking again is answered by pressing
+  Delete a second time
 - **First-class vi mode** on fish's model: cursor shape says the mode, the prompt says it too
 - **Its own line editor** — buffer, layout, redraw, emacs and vi keymaps — so oslo owns the row it
   edits rather than renting it. No `readline`, no `rustyline`.
@@ -145,15 +146,24 @@ oslo macros add --alias gs 'git status --short' --tag git
 oslo macros add --abbrev gco 'git checkout'
 oslo macros add --func mkcd            # opens $EDITOR
 oslo macros add --script deploy        # opens $EDITOR — any language, with a shebang
+oslo macros add --var EDITOR=nvim
+oslo macros add --var 'GITHUB_TOKEN=$(oslo secret get gh-token)'
 oslo macros show                       # the manager, on the whole screen
 ```
+
+**A variable is the odd one: its body is a recipe, not a value.** `EDITOR=nvim` is exported when the
+shell starts, like anything else. `GITHUB_TOKEN=$(oslo secret get gh-token)` is *not* — the shell
+holds the line and runs it the first time something reads `$GITHUB_TOKEN`, once, in that shell. A
+session that never mentions the name never decrypts anything, which is what makes it safe to keep a
+dozen of them. Neither kind overrules the environment the shell was started with, so `FOO=x oslo`
+still means what it says.
 
 **Alt+\\ opens it from the prompt**, beside Ctrl+\\ for the scratch finder — the same key with the
 other modifier, for the other list of things you keep. `oslo.macros.key` moves it.
 
-A database rather than a file to edit and re-source. Four kinds under one word: an alias, an
-abbreviation, a function and a script. `oslo macros show` is the history finder's screen pointed at
-them — type to filter, ← → for the tag, Tab between what you stored and what your config defines,
+A database rather than a file to edit and re-source. Five kinds under one word: an alias, an
+abbreviation, a function, a script and a variable. `oslo macros show` is the history finder's screen pointed at
+them — type to filter (`#tag` narrows to a tag), ← → for the kind, Tab between what you stored and what your shell inherited,
 Enter to edit in `$EDITOR`, Delete to forget, Space to turn one off for this session and three
 spaces to turn it off everywhere. A change is live in every running shell before its next prompt,
 for the price of a `stat`.
@@ -165,6 +175,41 @@ written. `alias` in a script and `oslo.alias` in your config still work, and the
 last, so it wins.
 
 [Macros](docs/features/macros.md) has the whole of it.
+
+### Secrets, and where the key is not
+
+```sh
+oslo secret set stripe                          # asks for it, masked; or reads standard input
+oslo secret get stripe                          # to standard output, and nowhere else
+oslo secret run TOKEN=stripe -- curl …          # one value, one child, no shell in between
+oslo secret recipient add OSLO-PUB-1:…          # your other machine, or a colleague
+oslo secret --store team cipher decrypt -- age -d -i ~/.config/age/identity
+```
+
+**The store and the key live in different trees on purpose**: `$XDG_DATA_HOME` for the ciphertext,
+which is the point of encrypting it — commit it, back it up, sync it — and `$XDG_STATE_HOME` for the
+key, which must never go with it. A key that ends up under a `.git` anyway is called out every time
+you use one.
+
+A store is a directory, a list of keys, and **the mechanism that opens it** — and that mechanism is
+the replaceable part. Built in, it is a sealed box in 60 KB: a secret you keep, recipients you
+publish, so two machines can read one store with neither holding the other's key. Named in
+configuration, it is any program that filters bytes both ways — `age`, `gpg`, `systemd-creds` for a
+TPM, `age-plugin-yubikey` through `age`. In Lua, it is a hook. The filing around it — names, `run`,
+the lazy variable — never changes.
+
+All of it is one flat file beside the key, because `$(oslo secret get …)` is a child process that
+never reads `config.lua`: configuration that only existed after Lua had run would apply in your
+shell and silently not in `cron`. The file declares *which* mechanism a store uses, so a process
+with no Lua that meets `crypto hook` says so instead of quietly doing something else.
+
+From Lua there is `oslo.secret`: `get`, `set`, `open(store)`, `seal`/`unseal`, `define` for a store
+whose bytes live somewhere else entirely, and `oslo.secret.mine()` — a plugin's own encrypted store,
+beside the database `oslo.db` gives it. A plugin declares the secrets of yours it will read and
+`oslo plugin install` prints that before you trust it, which is a disclosure rather than a sandbox,
+and the document says so in those words.
+
+[Secrets](docs/features/secrets.md) has the whole of it.
 
 ### Arguments, declared in comments
 
@@ -1322,13 +1367,13 @@ nix build         # static musl binary
 
 ### Optional features
 
-All six are off *by default*, and off for the same reason: a shell that is going to be `/bin/sh`
+All eight are off *by default*, and off for the same reason: a shell that is going to be `/bin/sh`
 should carry what every session needs and nothing else. `make build` turns them on, because
 somebody building from source is asking for the shell rather than for the floor; the published
 release artifact is the default build.
 
 Each cost is what turning that one feature *off* takes back out of the full build, measured on the
-static musl binary — 5,266,368 bytes with none of them, 6,013,312 with all five:
+static musl binary — 5,557,216 bytes with none of them, 6,894,016 with all seven:
 
 | feature | costs | brings |
 |---|---:|---|
@@ -1337,7 +1382,9 @@ static musl binary — 5,266,368 bytes with none of them, 6,013,312 with all fiv
 | `nix` | +60 KB | `oslo.nix` — every `nix --json` answer as a Lua table, and flake-output completion |
 | `scratch` | +48 KB | named sessions that outlive their terminal, and the key that finds them |
 | `plugin` | +108 KB | `oslo plugin` — installing somebody else's Lua, and loading it on first use. `oslo.db` and the `pre-cmd` veto a plugin is written against are in **every** build |
-| `argc` | +308 KB | a script declares its options in comments and the shell parses them: the `argc` builtin, `oslo --argc-eval` for bash scripts, and completion from those comments. The largest of the six, and the only one that vendors a parser |
+| `secrets` | +104 KB | the filing: `oslo secret`, several stores, `secret run`, the lazy variable, `oslo.secret` for a config or a plugin, and the hooks that replace the crypto outright. **No crypto of its own** — a store names an `encrypt`/`decrypt command` or a `crypto hook` |
+| `crypt` | +60 KB | the built-in mechanism, so a fresh install encrypts without being told anything: a sealed box — a key you keep, recipients you publish |
+| `argc` | +308 KB | a script declares its options in comments and the shell parses them: the `argc` builtin, `oslo --argc-eval` for bash scripts, and completion from those comments. The largest of the eight, and the only one that vendors a parser |
 
 ```sh
 make build                  # static release, every feature on
@@ -1345,7 +1392,7 @@ make build TYPE=minimal     # static release, none of them
 ```
 
 **There are no others**, and in particular none that exist to serve the test suite —
-`--all-features` turns on exactly the five above. Test-only helpers that other crates' tests need
+`--all-features` turns on exactly the eight above. Test-only helpers that other crates' tests need
 are ordinary `pub` items the linker drops from the binary, not features, because a build flag
 should never decide whether test scaffolding ships.
 

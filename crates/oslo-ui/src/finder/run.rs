@@ -66,6 +66,17 @@ pub fn open(
     loop {
         let (cols, rows) = terminal_size();
         state.fit(rows);
+        // One bool per visible row, resolved here because the frame is drawn against a list that
+        // cannot change underneath it — the state keeps marks by name, not by position.
+        let marked: Vec<bool> = state
+            .matches
+            .iter()
+            .map(|row| {
+                state
+                    .marked
+                    .contains(&(row.command.line.clone(), row.command.mode.clone()))
+            })
+            .collect();
         let painted = frame(&Frame {
             matches: &state.matches,
             selected: state.selected,
@@ -73,6 +84,7 @@ pub fn open(
             query: &state.query,
             elapsed_ms: opened.elapsed().as_millis() as u64,
             confirm: state.confirm,
+            marked: &marked,
             profile: &state.profile,
             scope: state.scope,
             total: state.total(),
@@ -105,8 +117,16 @@ pub fn open(
                 Key::Accept => {
                     state.confirm = None;
                     if yes {
-                        state.forget_selected();
+                        state.forget_doomed();
                     }
+                }
+                // **Delete again means yes.** The key that asked the question is the one already
+                // under the finger, and pressing it twice is how somebody who knows what they are
+                // doing gets through the guard without reaching for Enter. It answers whichever
+                // button is highlighted, because the second press is the answer.
+                Key::Delete => {
+                    state.confirm = None;
+                    state.forget_doomed();
                 }
                 // Esc and Ctrl-C answer *no* rather than leaving the finder: you asked to delete
                 // something and changed your mind, which is not the same as wanting to close.
@@ -155,15 +175,18 @@ pub fn open(
             // Asked about first unless the config turned that off: the rows are gone from the
             // store afterwards and the only way back is to run the command again.
             Key::Delete => {
-                if state.matches.is_empty() {
-                    // Nothing to ask about.
+                if state.doomed().is_empty() {
+                    // Nothing marked and nothing under the cursor: nothing to ask about.
                 } else if crate::settings::current().finder.confirm_delete {
                     // *No* is selected first, so a stray Enter answers the safe way.
                     state.confirm = Some(false);
                 } else {
-                    state.forget_selected();
+                    state.forget_doomed();
                 }
             }
+            // Ctrl-Space marks a row, so a scattered handful can go in one Delete rather than one
+            // question each.
+            Key::Ctrl(' ') => state.toggle_mark(),
             Key::Char(c) => {
                 state.query.push(c);
                 state.refilter();
@@ -222,6 +245,12 @@ struct State {
     window: usize,
     /// `Some(true)` while Delete is waiting on an answer, with *yes* selected.
     confirm: Option<bool>,
+    /// Rows Ctrl-Space has marked, by the pair that identifies a command in the store.
+    ///
+    /// **Not indices.** Every keystroke re-ranks and re-filters the list, so a row's position is
+    /// meaningless a moment later — but `(line, mode)` is what `forget` takes and what a row *is*,
+    /// so a mark survives typing, a scope change and a profile change.
+    marked: std::collections::HashSet<(String, String)>,
     /// Which profile's history is on screen. Tab moves to the next one.
     profile: String,
     /// The git worktree the shell is standing in, resolved once when the finder opens.
@@ -253,6 +282,7 @@ impl State {
             offset: 0,
             window: 1,
             confirm: None,
+            marked: std::collections::HashSet::new(),
             profile: oslo_base::track::profile::current(),
             worktree: crate::prompt::git_root_of(std::path::Path::new(cwd))
                 .map(|root| root.to_string_lossy().into_owned()),
@@ -271,24 +301,66 @@ impl State {
         self.offset = 0;
     }
 
-    /// Forget the highlighted command, in the store and in the list on screen.
-    fn forget_selected(&mut self) {
-        let Some(row) = self.matches.get(self.selected) else {
-            return;
-        };
-        let (line, mode) = (row.command.line.clone(), row.command.mode.clone());
-        if let Some(track) = oslo_base::track::store() {
-            track.forget(&line, &mode);
+    /// What Delete would remove: everything marked, or the highlighted row when nothing is.
+    ///
+    /// The same rule `ui choose` uses for Enter, and for the same reason — marking first and then
+    /// pressing the key is one way to work, and pressing the key on a row is the other, and neither
+    /// should need the mode to be announced.
+    fn doomed(&self) -> Vec<(String, String)> {
+        if !self.marked.is_empty() {
+            let mut wanted: Vec<(String, String)> = self.marked.iter().cloned().collect();
+            wanted.sort();
+            return wanted;
         }
-        // Dropped from the in-memory copy too, so the row goes now rather than the next time the
+        self.matches
+            .get(self.selected)
+            .map(|row| vec![(row.command.line.clone(), row.command.mode.clone())])
+            .unwrap_or_default()
+    }
+
+    /// Forget everything Delete was aimed at, in the store and in the list on screen.
+    fn forget_doomed(&mut self) {
+        let doomed = self.doomed();
+        if doomed.is_empty() {
+            return;
+        }
+        if let Some(track) = oslo_base::track::store() {
+            for (line, mode) in &doomed {
+                track.forget(line, mode);
+            }
+        }
+        // Dropped from the in-memory copy too, so the rows go now rather than the next time the
         // finder is opened — the key has to look like it did something.
-        self.commands
-            .retain(|command| !(command.line == line && command.mode == mode));
+        self.commands.retain(|command| {
+            !doomed
+                .iter()
+                .any(|(line, mode)| command.line == *line && command.mode == *mode)
+        });
+        self.marked.clear();
         let was = self.selected;
         self.refilter();
         // Back to where the eye was. `refilter` homes the selection because a *query* change
         // makes the old index meaningless; a deletion does not — the rows around it are the same.
         self.selected = was.min(self.matches.len().saturating_sub(1));
+    }
+
+    /// Mark or unmark the row under the cursor, and step to the next one.
+    ///
+    /// **Moving is the point.** Marking a run of unwanted lines is the case this key exists for,
+    /// and stopping after each one would mean two keystrokes per row. Unmarking is the rarer half
+    /// and costs one step back.
+    ///
+    /// "Next" is [`up`](Self::up), because the list grows *upward* from the search bar: the row
+    /// after the one under the cursor is the one above it on screen.
+    fn toggle_mark(&mut self) {
+        let Some(row) = self.matches.get(self.selected) else {
+            return;
+        };
+        let it = (row.command.line.clone(), row.command.mode.clone());
+        if !self.marked.remove(&it) {
+            self.marked.insert(it);
+        }
+        self.up();
     }
 
     /// Whether `command` belongs to the scope being shown.
