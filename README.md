@@ -118,8 +118,9 @@ Or just use `$PS1`, with the full escape set — `\u \h \w \$ \t \A \d \j \! \[ 
   `/usr/share/bin`, `f-b` reaches `foo-bar` and `gco` reaches `git checkout`, each looser pass
   running only when the stricter one found nothing, so an exact match is never diluted
 - **A full-screen history finder** on Up, seeded with whatever you had typed. Left and Right narrow
-  and widen the scope — global, host, session, directory, workspace — and Delete forgets a command
-  for good, after asking
+  and widen the scope — global, host, session, directory, workspace; Ctrl-Space marks rows and
+  Delete forgets all of them for good, after asking — and asking again is answered by pressing
+  Delete a second time
 - **First-class vi mode** on fish's model: cursor shape says the mode, the prompt says it too
 - **Its own line editor** — buffer, layout, redraw, emacs and vi keymaps — so oslo owns the row it
   edits rather than renting it. No `readline`, no `rustyline`.

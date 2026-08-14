@@ -45,6 +45,7 @@ fn frame_of<'a>(matches: &'a [Ranked], query: &'a str, rows: usize) -> String {
         // The scanner's frame. Fixed, so a test never depends on when it ran.
         elapsed_ms: 0,
         // Not asking anything: these cover the ordinary search bar.
+        marked: &[],
         confirm: None,
         profile: "default",
     })
@@ -160,6 +161,7 @@ fn the_scope_is_shown_at_the_end_of_the_search_bar() {
         // The scanner's frame. Fixed, so a test never depends on when it ran.
         elapsed_ms: 0,
         // Not asking anything: these cover the ordinary search bar.
+        marked: &[],
         confirm: None,
         profile: "default",
     }));
@@ -186,6 +188,7 @@ fn the_scope_badge_uses_accent_on_zero() {
         // The scanner's frame. Fixed, so a test never depends on when it ran.
         elapsed_ms: 0,
         // Not asking anything: these cover the ordinary search bar.
+        marked: &[],
         confirm: None,
         profile: "default",
     };
@@ -290,6 +293,7 @@ fn exactly_one_row_carries_the_marker() {
         // The scanner's frame. Fixed, so a test never depends on when it ran.
         elapsed_ms: 0,
         // Not asking anything: these cover the ordinary search bar.
+        marked: &[],
         confirm: None,
         profile: "default",
     });
@@ -392,6 +396,7 @@ fn the_confirmation_is_a_box_in_the_bars_place() {
         offset: 0,
         query: "",
         elapsed_ms: 0,
+        marked: &[],
         confirm: Some(false),
         profile: "default",
         scope: Scope::Global,
@@ -435,6 +440,7 @@ fn the_box_squares_up() {
             offset: 0,
             query: "",
             elapsed_ms: 0,
+            marked: &[],
             confirm: Some(yes),
             profile: "default",
             scope: Scope::Global,
@@ -467,6 +473,7 @@ fn the_question_is_centred() {
             offset: 0,
             query: "",
             elapsed_ms: 0,
+            marked: &[],
             confirm: Some(false),
             profile: "default",
             scope: Scope::Global,
@@ -491,4 +498,86 @@ fn the_question_is_centred() {
         assert!(row.contains("[ yes ]"), "{row:?}");
         assert!(row.contains("[ no ]"), "{row:?}");
     }
+}
+
+/// **The marker column appears only once something is marked.** Two cells against every row of a
+/// list nobody is marking is noise on every line; the one shift when the first mark lands is the
+/// cheaper of the two.
+#[test]
+fn the_checkbox_column_is_absent_until_a_row_is_marked() {
+    let matches = vec![
+        ranked("cargo build", 3, 1_000, "/here", true),
+        ranked("cargo test", 2, 900, "/here", true),
+    ];
+    let draw = |marked: &[bool]| {
+        plain(&frame(&Frame {
+            matches: &matches,
+            selected: 0,
+            offset: 0,
+            query: "",
+            elapsed_ms: 0,
+            marked,
+            confirm: None,
+            scope: Scope::Global,
+            profile: "default",
+            total: matches.len(),
+            cols: 80,
+            rows: 12,
+            now: 1_000,
+        }))
+    };
+
+    let unmarked = draw(&[false, false]);
+    assert!(
+        !unmarked.contains('◉'),
+        "a marker with nothing marked:\n{unmarked}"
+    );
+    assert!(
+        !unmarked.contains('○'),
+        "a marker with nothing marked:\n{unmarked}"
+    );
+
+    // The age and count columns sit between the box and the text, so the row is matched by both
+    // ends rather than as one string.
+    let one = draw(&[true, false]);
+    let row = |mark: char, line: &str| {
+        one.lines()
+            .any(|row| row.contains(mark) && row.contains(line))
+    };
+    assert!(row('◉', "cargo build"), "the marked row:\n{one}");
+    // And the *other* row gets an empty box, so the two lines still start in the same column.
+    assert!(row('○', "cargo test"), "the unmarked row:\n{one}");
+}
+
+/// The question counts what it is about to remove: one row is what the eye is already on, and nine
+/// is a claim worth checking before saying yes.
+#[test]
+fn the_question_says_how_many_are_going() {
+    let matches = vec![
+        ranked("cargo build", 3, 1_000, "/here", true),
+        ranked("cargo test", 2, 900, "/here", true),
+        ranked("cargo run", 1, 800, "/here", true),
+    ];
+    let ask = |marked: &[bool]| {
+        plain(&frame(&Frame {
+            matches: &matches,
+            selected: 0,
+            offset: 0,
+            query: "",
+            elapsed_ms: 0,
+            marked,
+            confirm: Some(false),
+            scope: Scope::Global,
+            profile: "default",
+            total: matches.len(),
+            cols: 80,
+            rows: 12,
+            now: 1_000,
+        }))
+    };
+
+    assert!(ask(&[false, false, false]).contains("delete from history?"));
+    assert!(ask(&[true, false, false]).contains("delete from history?"));
+    assert!(ask(&[true, true, false]).contains("delete 2 from history?"));
+    assert!(ask(&[true, true, true]).contains("delete 3 from history?"));
 }

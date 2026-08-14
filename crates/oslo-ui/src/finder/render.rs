@@ -81,6 +81,11 @@ pub struct Frame<'a> {
     pub elapsed_ms: u64,
     /// Which profile's history is being shown.
     pub profile: &'a str,
+    /// Which rows Ctrl-Space has marked, as indices into `matches`.
+    ///
+    /// Indices here rather than the `(line, mode)` the state keeps, because a frame is drawn
+    /// against one list that cannot change underneath it — and the painter's job is rows.
+    pub marked: &'a [bool],
     /// When Delete is waiting to be confirmed, which button is selected.
     ///
     /// `Some(true)` is *yes*. The search bar becomes the question — the three rows it already
@@ -134,18 +139,33 @@ pub fn frame(f: &Frame<'_>) -> String {
     let depth = theme::depth();
     let look = look_of(f);
     let visible = f.visible_rows();
+    let any_marked = f.marked.iter().any(|m| *m);
 
     let rows: Vec<Row> = f
         .matches
         .iter()
-        .map(|row| Row {
-            // When and how often come first, then the command: the two numbers are short and
-            // fixed width, so leading with them gives the eye a ruler down the left of the screen.
-            meta: vec![
-                ago(f.now, row.command.last_at),
-                format!("{}×", row.command.runs),
-            ],
-            ..Row::new(row.command.line.clone())
+        .enumerate()
+        .map(|(at, row)| {
+            let marked = f.marked.get(at).copied().unwrap_or(false);
+            Row {
+                // When and how often come first, then the command: the two numbers are short and
+                // fixed width, so leading with them gives the eye a ruler down the left of the
+                // screen.
+                meta: vec![
+                    ago(f.now, row.command.last_at),
+                    format!("{}×", row.command.runs),
+                ],
+                // **The column appears only once something is marked.** A checkbox against every
+                // row of a list nobody is marking is two cells of noise on every line, and the one
+                // shift when the first mark lands is cheaper than carrying it always.
+                lead: match (any_marked, marked) {
+                    (false, _) => String::new(),
+                    (true, true) => "◉ ".to_string(),
+                    (true, false) => "○ ".to_string(),
+                },
+                marked,
+                ..Row::new(row.command.line.clone())
+            }
         })
         .collect();
     let view = View {
@@ -155,7 +175,7 @@ pub fn frame(f: &Frame<'_>) -> String {
         query: f.query,
         matched: f.matches.len(),
         total: f.total,
-        marked: 0,
+        marked: f.marked.iter().filter(|m| **m).count(),
         cols: f.cols,
         // While the question is up the bar is the question, so the look does not draw one.
         filtering: f.confirm.is_none(),
@@ -170,9 +190,14 @@ pub fn frame(f: &Frame<'_>) -> String {
         // about to delete stays under your eye.
         let pager = &theme::current().pager;
         body.extend(std::iter::repeat_n(String::new(), look.gap));
+        // The count is in the question because the answer is different: one row is what the eye is
+        // already on, and nine is a claim the person has to check before saying yes.
+        let asked = match f.marked.iter().filter(|m| **m).count() {
+            0 | 1 => "delete from history?".to_string(),
+            many => format!("delete {many} from history?"),
+        };
         body.extend(
-            (0..SURFACE_ROWS)
-                .map(|row| confirm_row(row, yes, "delete from history?", pager, f.cols, depth)),
+            (0..SURFACE_ROWS).map(|row| confirm_row(row, yes, &asked, pager, f.cols, depth)),
         );
     }
 

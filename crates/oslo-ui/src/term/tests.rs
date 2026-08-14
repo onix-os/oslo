@@ -360,6 +360,9 @@ fn control_chords_decode_by_letter() {
     assert_eq!(key(&[0x0f]), Key::Ctrl('o'));
     assert_eq!(key(&[0x01]), Key::Home, "C-a keeps its shared meaning");
     assert_eq!(key(&[0x09]), Key::ToggleScope, "Tab is not C-i here");
+    // Ctrl-Space arrives as NUL and used to fall through to the text path, where it became
+    // nothing at all — which is why the finder could not be given it as a key.
+    assert_eq!(key(&[0x00]), Key::Ctrl(' '), "C-Space");
 }
 
 /// **What follows the Enter is left where it was, not swallowed.**

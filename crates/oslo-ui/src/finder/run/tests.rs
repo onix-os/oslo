@@ -298,3 +298,81 @@ fn a_blank_seed_shows_everything() {
     assert_eq!(state.query, "");
     assert_eq!(state.matches.len(), 2);
 }
+
+/// Ctrl-Space marks the row under the cursor and steps down, so a run of unwanted lines is marked
+/// with one key per row rather than two.
+#[test]
+fn marking_moves_on_to_the_next_row() {
+    let commands = many(5);
+    let mut state = State::new(&commands, "/here", Fuzzy::Smart, "");
+    state.fit(10);
+
+    state.toggle_mark();
+    assert_eq!(state.marked.len(), 1);
+    assert_eq!(state.selected, 1, "the cursor did not move on");
+
+    state.toggle_mark();
+    assert_eq!(state.marked.len(), 2);
+
+    // And it is a toggle: stepping back onto a marked row clears it. Back is `down`, because the
+    // list runs upward from the search bar.
+    state.down();
+    state.toggle_mark();
+    assert_eq!(state.marked.len(), 1, "the second mark was not cleared");
+}
+
+/// **A mark is a command, not a position.** Every keystroke re-ranks the list, so a mark kept by
+/// index would move to whatever row happened to take that slot — which is the one bug that would
+/// make this feature dangerous rather than merely broken.
+#[test]
+fn a_mark_survives_the_list_being_refiltered() {
+    let commands = many(5);
+    let mut state = State::new(&commands, "/here", Fuzzy::Smart, "");
+    state.fit(10);
+
+    let wanted = state.matches[0].command.line.clone();
+    state.toggle_mark();
+
+    state.query.push_str("command-00");
+    state.refilter();
+    assert!(
+        state.marked.contains(&(wanted.clone(), "sh".to_string())),
+        "the mark was lost when the list changed"
+    );
+
+    // Still the same command, wherever it now sits.
+    let doomed = state.doomed();
+    assert_eq!(doomed, vec![(wanted, "sh".to_string())]);
+}
+
+/// Delete with nothing marked is about the row under the cursor — the behaviour that existed
+/// before marking did, and the one somebody who never presses Ctrl-Space still gets.
+#[test]
+fn delete_without_marks_is_the_highlighted_row() {
+    let commands = many(3);
+    let mut state = State::new(&commands, "/here", Fuzzy::Smart, "");
+    state.fit(10);
+    state.down();
+
+    let under_cursor = state.matches[state.selected].command.line.clone();
+    assert_eq!(state.doomed(), vec![(under_cursor, "sh".to_string())]);
+}
+
+/// With marks, Delete is about all of them — including when the cursor is somewhere else entirely.
+#[test]
+fn delete_with_marks_is_every_marked_row() {
+    let commands = many(5);
+    let mut state = State::new(&commands, "/here", Fuzzy::Smart, "");
+    state.fit(10);
+
+    state.toggle_mark();
+    state.toggle_mark();
+    let marked: std::collections::HashSet<_> = state.marked.iter().cloned().collect();
+    // Move away, so a `doomed` that quietly included the cursor's row would show up here.
+    state.down();
+    state.down();
+
+    let doomed: std::collections::HashSet<_> = state.doomed().into_iter().collect();
+    assert_eq!(doomed, marked);
+    assert_eq!(doomed.len(), 2);
+}
