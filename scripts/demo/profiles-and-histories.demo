@@ -4,7 +4,7 @@
 # first prompt — and `oslo profile …` is a *program*, which would otherwise be whichever oslo is
 # installed rather than the one being demonstrated. The stand-in for ssh inherits this too, so the
 # far end runs the same binary.
-setup export PATH=$OSLO_DIR:$PATH
+setup export PATH=$OSLO_DIR:/tmp/oslo-demo-work/bin:$PATH
 cols 120
 rows 20
 speed 0.055
@@ -15,8 +15,16 @@ run grep -c fn src/lib.rs
 wait 1.0
 
 # An agent's shell. The variable is inherited by everything it spawns.
+#
+# **oslo asks first.** A shell inside a shell looks exactly like the one you were in, so the only
+# sign is an `exit` later that does not close the terminal — and Enter alone answers "stay here".
+# This one is meant, so: y, then Enter.
 run OSLO_PROFILE=agent oslo
-wait 0.8
+wait 1.6
+key y
+wait 1.0
+key Enter
+wait 1.0
 run oslo history path
 wait 1.6
 run grep -c fn src/parser.rs
@@ -39,33 +47,38 @@ key C-u
 wait 0.4
 clear
 
-# **And the same profile on two machines.** Everything below is against two fixture homes under
-# /tmp, never this machine's own history — see `fixture.sh`. Stepping into the first one.
-run XDG_DATA_HOME=/tmp/oslo-demo-work/here XDG_STATE_HOME=/tmp/oslo-demo-work/here/state HOME=/tmp/oslo-demo-work/here oslo
+# **And the same profile on two machines.** There is no second computer in a recording, so two
+# fixture homes under /tmp stand in for them — never this machine's own history, see `fixture.sh`.
+# Both stand-ins are on screen before they are used: `here` is the near machine and `pretend-ssh` is
+# the far one, and neither is oslo. Everything between them is.
 wait 1.2
-run oslo profile
-wait 2.0
-run oslo history list --limit 5
-wait 2.4
-clear
-
-# The far end. There is no second computer in a recording, so this stands in for ssh — it runs the
-# command against the other home instead of over a network. Everything else is real.
+run cat /tmp/oslo-demo-work/bin/here
+wait 2.6
 run cat /tmp/oslo-demo-work/bin/pretend-ssh
 wait 3.0
+clear
+
+# What that machine holds, and the fingerprint that says which profile it is.
+run here oslo profile
+wait 2.6
+run here oslo history list -n 5
+wait 3.0
+clear
 
 # Two-way, and it says what moved in each direction.
-run OSLO_SSH=/tmp/oslo-demo-work/bin/pretend-ssh oslo profile sync laptop
-wait 3.4
-clear
+#
+# **The long waits are not for the reader.** A sync forks the far end twice and merges two stores;
+# typing the next line before that is done puts half of it into a shell that is still busy, and the
+# other half becomes a command of its own.
+run here OSLO_SSH=/tmp/oslo-demo-work/bin/pretend-ssh oslo profile sync laptop
+wait 5.0
 
 # Both machines now hold both histories — and `cargo build --release`, run on each, is *two* events
 # rather than one overwriting the other, because every event carries the host that ran it.
-run oslo history list --limit 8
-wait 3.2
+run here oslo history list -n 8
+wait 4.0
+clear
 
 # Running it again moves nothing, which is what makes it safe in a login file.
-run OSLO_SSH=/tmp/oslo-demo-work/bin/pretend-ssh oslo profile sync laptop
-wait 2.8
-run exit
-wait 1.0
+run here OSLO_SSH=/tmp/oslo-demo-work/bin/pretend-ssh oslo profile sync laptop
+wait 5.0

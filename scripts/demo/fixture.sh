@@ -100,18 +100,25 @@ if [ -x "$OSLO" ]; then
     done
     printf 'cargo build --release\ngit push origin main\nhx src/lib.rs\n' > "$WORK/here.txt"
     printf 'cargo build --release\nkubectl get pods -A\njournalctl -fu oslo\n' > "$WORK/there.txt"
+    # **`OSLO_PROFILE=default` on every one of these.** The recorder runs under a profile of its own
+    # so that nothing lands in a real history, and a fixture that inherited that name would seed one
+    # profile and then be asked to sync a different one.
     for machine in here there; do
-        XDG_DATA_HOME="$WORK/$machine" XDG_STATE_HOME="$WORK/$machine/state" HOME="$WORK/$machine" \
+        OSLO_PROFILE=default \
+            XDG_DATA_HOME="$WORK/$machine" XDG_STATE_HOME="$WORK/$machine/state" HOME="$WORK/$machine" \
             "$OSLO" history import "$WORK/$machine.txt" >/dev/null 2>&1
     done
     # The key that says the two are one profile, made on `here` and carried to `there` — the step a
     # person does once, done here so the recording can get to the part worth watching.
-    XDG_DATA_HOME="$WORK/here" XDG_STATE_HOME="$WORK/here/state" HOME="$WORK/here" \
-        "$OSLO" profile key init >/dev/null 2>&1
-    XDG_DATA_HOME="$WORK/here" XDG_STATE_HOME="$WORK/here/state" HOME="$WORK/here" \
-        "$OSLO" profile export 2>/dev/null |
-        XDG_DATA_HOME="$WORK/there" XDG_STATE_HOME="$WORK/there/state" HOME="$WORK/there" \
-            "$OSLO" profile import >/dev/null 2>&1
+    OSLO_PROFILE=default \
+        XDG_DATA_HOME="$WORK/here" XDG_STATE_HOME="$WORK/here/state" HOME="$WORK/here" \
+        "$OSLO" profile key init default >/dev/null 2>&1
+    OSLO_PROFILE=default \
+        XDG_DATA_HOME="$WORK/here" XDG_STATE_HOME="$WORK/here/state" HOME="$WORK/here" \
+        "$OSLO" profile export default 2>/dev/null |
+        OSLO_PROFILE=default \
+            XDG_DATA_HOME="$WORK/there" XDG_STATE_HOME="$WORK/there/state" HOME="$WORK/there" \
+            "$OSLO" profile import default >/dev/null 2>&1
 fi
 
 # A stand-in for `ssh`, so the sync act has a far end without a second computer.
@@ -121,11 +128,26 @@ fi
 # script on screen, because a recording that implied a real remote host would be lying about the
 # one thing being demonstrated.
 mkdir -p "$WORK/bin"
+
+# The near end, for the same reason.
+#
+# **A prefix rather than a nested shell.** `oslo` typed at an oslo prompt asks whether you meant to
+# nest — see `startup/nested.rs` — and a recording cannot answer a question that only appears at
+# some depths. This runs one command as if on the machine called `here`, and needs no shell.
+cat > "$WORK/bin/here" <<EOF
+#!/bin/sh
+# stands in for: being logged in on the machine called \`here\`
+exec env OSLO_PROFILE=default \\
+    XDG_DATA_HOME=$WORK/here XDG_STATE_HOME=$WORK/here/state HOME=$WORK/here "\$@"
+EOF
+chmod +x "$WORK/bin/here"
+
 cat > "$WORK/bin/pretend-ssh" <<EOF
 #!/bin/sh
 # stands in for: ssh USER@HOST oslo …
 shift
-exec env XDG_DATA_HOME=$WORK/there XDG_STATE_HOME=$WORK/there/state HOME=$WORK/there "\$@"
+exec env OSLO_PROFILE=default \\
+    XDG_DATA_HOME=$WORK/there XDG_STATE_HOME=$WORK/there/state HOME=$WORK/there "\$@"
 EOF
 chmod +x "$WORK/bin/pretend-ssh"
 
