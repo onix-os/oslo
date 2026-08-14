@@ -153,11 +153,6 @@ fn add(args: &[String]) -> i32 {
         ));
     }
 
-    let store = match macros::open() {
-        Ok(store) => store,
-        Err(problem) => return fail(&problem),
-    };
-
     // **A function and a script are always written in the editor**, and an inline body for one is
     // refused rather than accepted: taking it would store a one-line function because that is what
     // fitted on the command line, which is how you end up with a function written as one line.
@@ -167,6 +162,9 @@ fn add(args: &[String]) -> i32 {
         None => asked.words[1..].join(" "),
     };
     let editor_only = matches!(kind, Kind::Func | Kind::Script);
+    // **Decided before the database is opened**, because it is a decision about the words. Opening
+    // first made the answer depend on the store: a database that could not be opened turned a usage
+    // error into a failure to open, which is a different exit status for the same command line.
     if editor_only && !inline.is_empty() {
         return usage(&format!(
             "a {} is written in the editor: `oslo macros add --{} {name}` and no body",
@@ -174,6 +172,11 @@ fn add(args: &[String]) -> i32 {
             kind.word()
         ));
     }
+
+    let store = match macros::open() {
+        Ok(store) => store,
+        Err(problem) => return fail(&problem),
+    };
 
     let body = if editor_only || asked.edit || inline.is_empty() {
         let starting = if inline.is_empty() {
