@@ -155,6 +155,26 @@ pub const HOOKS: &[Hook] = &[
         aliases: &["key"],
         answers: true,
     },
+    Hook {
+        name: "on-secret-encrypt",
+        aliases: &[],
+        answers: true,
+    },
+    Hook {
+        name: "on-secret-decrypt",
+        aliases: &[],
+        answers: true,
+    },
+    Hook {
+        name: "pre-secret-access",
+        aliases: &[],
+        answers: false,
+    },
+    Hook {
+        name: "post-secret-access",
+        aliases: &[],
+        answers: false,
+    },
 ];
 
 /// The moments something on a hot path has to ask about, by index into [`HOOKS`].
@@ -257,6 +277,10 @@ mod tests {
             (at::PRE_RECORD, "pre-record"),
             (at::ON_EXIT, "on-exit"),
             (at::ON_KEY, "on-key"),
+            (at::SECRET_ENCRYPT, "on-secret-encrypt"),
+            (at::SECRET_DECRYPT, "on-secret-decrypt"),
+            (at::PRE_SECRET_ACCESS, "pre-secret-access"),
+            (at::POST_SECRET_ACCESS, "post-secret-access"),
         ] {
             assert_eq!(HOOKS[index].name, name, "at::* is out of step with HOOKS");
         }

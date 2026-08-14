@@ -24,6 +24,32 @@ impl Environment {
         self.aliases.remove(name);
     }
 
+    /// Hand the shell a variable it has not been asked for yet: the name, and the line that
+    /// produces the value. Run by `expand::param::materialise`, the first time the name is read.
+    pub fn set_lazy_var(&mut self, name: &str, body: &str) {
+        self.lazy.insert(name.to_string(), body.to_string());
+    }
+
+    pub fn remove_lazy_var(&mut self, name: &str) {
+        self.lazy.remove(name);
+    }
+
+    /// The recipe for `name`, **removed as it is handed over**.
+    ///
+    /// Taken rather than read, because running it is the next thing the caller does and a body that
+    /// mentions its own name would otherwise expand itself for ever. Gone means "already asked
+    /// for": the second read of `$GITHUB_TOKEN` finds an ordinary variable, which is the point.
+    pub fn take_lazy_var(&mut self, name: &str) -> Option<String> {
+        self.lazy.remove(name)
+    }
+
+    /// The names still waiting to be asked for, sorted — for anything that lists what a shell has.
+    pub fn lazy_var_names(&self) -> Vec<&str> {
+        let mut names: Vec<&str> = self.lazy.keys().map(String::as_str).collect();
+        names.sort_unstable();
+        names
+    }
+
     pub fn set_function(&mut self, name: &str, body: Command) {
         self.functions.insert(name.to_string(), Arc::new(body));
     }

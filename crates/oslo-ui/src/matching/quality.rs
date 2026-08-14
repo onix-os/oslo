@@ -92,7 +92,18 @@ mod tests {
         assert_eq!(q("git checkout origin", "gco"), Quality::Acronym);
         assert_eq!(q("cargo test", "test"), Quality::WordPrefix);
         assert_eq!(q("cargo", "argo"), Quality::Substring);
-        assert_eq!(q("codex --always-run", "car"), Quality::Scattered);
+        assert_eq!(q("git add --patch", "gp"), Quality::Scattered);
+    }
+
+    /// **A flag is a word, and its dashes are not.** `cbr` is the acronym of
+    /// `cargo build --release` the way anybody reading it would say so — and it was not, because
+    /// each `-` counted as the start of a word and the initials read `c b - - r`. In a shell nearly
+    /// every line has a flag in it, so the tier that exists for `gco` was reached by almost nothing.
+    #[test]
+    fn an_acronym_reads_through_the_dashes_of_a_flag() {
+        assert_eq!(q("cargo build --release", "cbr"), Quality::Acronym);
+        assert_eq!(q("git commit --amend", "gca"), Quality::Acronym);
+        assert_eq!(q("codex --always-run", "car"), Quality::Acronym);
     }
 
     /// Case never decides the kind: shells are typed in a hurry.

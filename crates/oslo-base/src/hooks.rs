@@ -57,6 +57,16 @@ pub mod at {
     pub const PRE_RECORD: usize = 19;
     pub const ON_EXIT: usize = 20;
     pub const ON_KEY: usize = 21;
+
+    /// Asked to *do* the crypto for a store the configuration marked as hook-backed. The answer is
+    /// the ciphertext; `nil` means "not mine" and the next handler is asked.
+    pub const SECRET_ENCRYPT: usize = 22;
+    /// The same, the other way: ciphertext in, the value out.
+    pub const SECRET_DECRYPT: usize = 23;
+    /// A secret is about to be read or written. Told the store, the name and which it is — never
+    /// the value.
+    pub const PRE_SECRET_ACCESS: usize = 24;
+    pub const POST_SECRET_ACCESS: usize = 25;
 }
 
 /// The four ways a hook is reached, supplied by whoever can actually run one.

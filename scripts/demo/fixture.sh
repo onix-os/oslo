@@ -67,8 +67,47 @@ script deploy #work
 script backup #work
 	#!/bin/sh
 	rsync -a --delete "$1" /srv/backup/
+var EDITOR #shell
+	hx
+var PAGER #shell
+	bat
 EOF
 fi
+
+# A secret, and a variable whose body goes and fetches it — the pair the `secrets` demo is about.
+# Kept out of the import above because it is written through `oslo secret`, which is the door a
+# person uses, and because a store seeded any other way would not have an identity beside it.
+#
+# `$WORK-key` rather than `$WORK/data`: the key does not live where the ciphertext lives, which is
+# the whole arrangement — and outside the work tree, which is a git repository, or the shell would
+# rightly say the key is one commit from being published.
+if [ -x "$OSLO" ] && "$OSLO" secret --help >/dev/null 2>&1; then
+    mkdir -p "$WORK/data" "$WORK-key"
+    printf %s 'demo-not-a-real-github-token' |
+        XDG_DATA_HOME="$WORK/data" XDG_STATE_HOME="$WORK-key" "$OSLO" secret set gh-token
+    XDG_DATA_HOME="$WORK/data" XDG_STATE_HOME="$WORK-key" "$OSLO" macros add \
+        --var 'GITHUB_TOKEN=$(oslo secret get gh-token)' --tag work >/dev/null
+fi
+
+# A stand-in for a program that does a store's crypto, for the `secrets` demo.
+#
+# **Not `age`, and named so nobody mistakes it for it.** The machine these are recorded on has
+# neither `age` nor a YubiKey, and a recording that pretended otherwise would be the one kind of
+# dishonesty a demo cannot recover from. What it does show is the contract, which is the whole of
+# what oslo relies on: bytes in on standard input, bytes out on standard output, and a prompt on
+# standard error the way a hardware key asks for a touch.
+mkdir -p "$WORK/bin"
+cat > "$WORK/bin/pretend-age" <<'EOF'
+#!/bin/sh
+# stands in for: age -R recipients.txt   /   age --decrypt --identity yubikey.txt
+echo "touch your key" >&2
+case "$1" in
+  -e) printf 'SEALED\n'; base64 ;;
+  -d) tail -n +2 | base64 -d ;;
+esac
+EOF
+chmod +x "$WORK/bin/pretend-age"
+
 
 # Two scripts that declare their arguments in comments, for the `argc` demos: one oslo, one bash.
 # They live in `$WORK/bin`, which those demos put on `$PATH`, so the shell finds them by name and

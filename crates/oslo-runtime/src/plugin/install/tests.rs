@@ -22,6 +22,7 @@ fn installed(name: &str, builtins: &[&str]) -> Installed {
         hash: "x".to_string(),
         requires: None,
         load_on: None,
+        secrets: Vec::new(),
     }
 }
 

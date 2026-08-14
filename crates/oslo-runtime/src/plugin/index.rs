@@ -45,6 +45,8 @@ pub struct Installed {
     pub requires: Option<String>,
     /// A hook whose firing loads it, for a plugin with nothing to be typed.
     pub load_on: Option<String>,
+    /// The user's secrets it declared, carried here so a load costs no manifest read.
+    pub secrets: Vec<String>,
 }
 
 impl Installed {
@@ -67,6 +69,7 @@ impl Installed {
             hash,
             requires: manifest.requires.clone(),
             load_on: manifest.load_on.clone(),
+            secrets: manifest.secrets.clone(),
         }
     }
 }
@@ -139,6 +142,7 @@ pub fn parse(text: &str) -> Result<Vec<Installed>, String> {
             hash,
             requires: text_of("requires"),
             load_on: text_of("load_on"),
+            secrets: list_of("secrets"),
         });
     }
     Ok(found)
@@ -161,6 +165,7 @@ pub fn write(entries: &[Installed]) -> Result<(), String> {
             "hash": installed.hash,
             "requires": installed.requires,
             "load_on": installed.load_on,
+            "secrets": installed.secrets,
         })).collect::<Vec<_>>(),
     });
     let text = serde_json::to_string_pretty(&document).map_err(|error| error.to_string())?;

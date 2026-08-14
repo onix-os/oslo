@@ -17,6 +17,8 @@ pub mod macros;
 pub mod plugin;
 #[cfg(feature = "scratch")]
 pub mod scratch;
+#[cfg(feature = "secrets")]
+pub mod secret;
 pub mod tools;
 pub mod warn;
 

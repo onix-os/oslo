@@ -54,7 +54,7 @@ pub fn open(items: Vec<Item>, seed: &str, backing: &mut dyn Backing) -> Option<O
             elapsed_ms: opened.elapsed().as_millis() as u64,
             confirm: state.confirm,
             source: state.source,
-            tag: state.tag(),
+            kind: state.kind(),
             total: state.total(),
             cols,
             rows_available: rows,
@@ -94,6 +94,13 @@ pub fn open(items: Vec<Item>, seed: &str, backing: &mut dyn Backing) -> Option<O
 
         match pressed {
             Key::Cancel | Key::Abort => return Some(Outcome::Cancelled),
+            // **Only a stored row can be edited or forgotten.** An inherited one is a fact about
+            // this shell — an alias your config defined, a variable your profile exported — and
+            // there is no row in the database to open in an editor or to delete. Opening one
+            // anyway would write a *new* macro that shadows it, which is a different thing from
+            // what Enter looks like it does; doing nothing is the honest answer, and the status
+            // line says so before the key is pressed.
+            Key::Accept | Key::Delete if state.selected().is_some_and(|item| !item.stored) => {}
             Key::Accept => {
                 let item = state.selected()?.clone();
                 return Some(Outcome::Edit {
@@ -105,8 +112,8 @@ pub fn open(items: Vec<Item>, seed: &str, backing: &mut dyn Backing) -> Option<O
             Key::Down => state.down(),
             Key::PageUp => state.page_up(),
             Key::PageDown => state.page_down(),
-            Key::Right => state.next_tag(),
-            Key::Left => state.previous_tag(),
+            Key::Right => state.next_kind(),
+            Key::Left => state.previous_kind(),
             Key::ToggleScope => state.next_source(),
             Key::Delete => {
                 if state.selected().is_some() {
@@ -150,15 +157,40 @@ struct Burst {
     was_off: bool,
 }
 
+/// A query split into the tags it asks for and the text that is matched on.
+///
+/// `#ai tool`, `tool #ai` and `#ai` all mean the same thing: everything tagged `ai`, narrowed by
+/// `tool` where a word is left over. **A tag is a set you are asking for, not a word you hope
+/// appears in a body**, which is why it is spelled differently — and doing it in the query is what
+/// leaves the arrows free for the kind, with no second key to learn.
+///
+/// A bare `#` is somebody mid-word and asks for nothing yet.
+fn split_tags(query: &str) -> (Vec<String>, String) {
+    let mut tags = Vec::new();
+    let mut text = Vec::new();
+    for word in query.split_whitespace() {
+        match word.strip_prefix('#') {
+            Some("") | None => text.push(word),
+            Some(tag) => tags.push(tag.to_string()),
+        }
+    }
+    (tags, text.join(" "))
+}
+
 /// The manager's state between keystrokes.
 struct State {
     /// Owned: Delete removes a row and a toggle changes one, and a slice cannot do either.
     items: Vec<Item>,
     query: String,
     source: Source,
-    /// Index into the tags in use, `0` being all of them.
-    tag_at: usize,
-    /// The rows on screen, after the source, the tag and the query have had their say.
+    /// Index into the kinds in use, `0` being all of them.
+    ///
+    /// **What ← and → move through**, because the kind is the division you are actually navigating:
+    /// five hundred inherited variables and forty aliases are one list until something separates
+    /// them, and the kind is what tells them apart. Tags are the finer cut and are asked for in the
+    /// query — `#ai` — which needs no key at all. See [`split_tags`].
+    kind_at: usize,
+    /// The rows on screen, after the source, the kind and the query have had their say.
     shown: Vec<Item>,
     selected: usize,
     offset: usize,
@@ -173,7 +205,7 @@ impl State {
             items,
             query: seed.trim().to_string(),
             source: Source::Stored,
-            tag_at: 0,
+            kind_at: 0,
             shown: Vec::new(),
             selected: 0,
             offset: 0,
@@ -200,34 +232,44 @@ impl State {
         found
     }
 
-    /// Every tag in use in the current source, which is what ← and → move through.
-    fn tags(&self) -> Vec<String> {
+    /// The tag being shown, or `None` for all of them.
+    /// The kinds in use in the current source, in the order they are cycled through.
+    ///
+    /// Drawn from what is actually there, so a list with no scripts in it does not offer to show
+    /// you the scripts. `0` is all of them.
+    fn kinds(&self) -> Vec<String> {
         let mut found: Vec<String> = self
             .items
             .iter()
             .filter(|item| self.source.holds(item))
-            .flat_map(|item| item.tags.clone())
+            .map(|item| item.kind.clone())
             .collect();
         found.sort();
         found.dedup();
         found
     }
 
-    /// The tag being shown, or `None` for all of them.
-    fn tag(&self) -> Option<String> {
-        self.tag_at
+    /// The kind being shown, or `None` for all of them.
+    fn kind(&self) -> Option<String> {
+        self.kind_at
             .checked_sub(1)
-            .and_then(|at| self.tags().get(at).cloned())
+            .and_then(|at| self.kinds().get(at).cloned())
     }
 
     fn refilter(&mut self) {
-        let tag = self.tag();
-        let fuzzed = Fuzzed::new(&self.query, Fuzzy::Smart);
+        let kind = self.kind();
+        // `#ai tool`, `tool #ai`, or just `#ai`: the tags are taken out of the query and the rest
+        // is what gets fuzzy-matched. A tag is a set you are asking for, not a word you are hoping
+        // appears somewhere in the body — and there is no key to learn, which is why the arrows are
+        // free for the kind.
+        let (tags, text) = split_tags(&self.query);
+        let fuzzed = Fuzzed::new(&text, Fuzzy::Smart);
         let mut found: Vec<(i32, Item)> = self
             .items
             .iter()
             .filter(|item| self.source.holds(item))
-            .filter(|item| tag.as_ref().is_none_or(|tag| item.tags.contains(tag)))
+            .filter(|item| kind.as_ref().is_none_or(|kind| &item.kind == kind))
+            .filter(|item| tags.iter().all(|tag| item.tags.contains(tag)))
             .filter_map(|item| {
                 // The best field wins, and the name is worth more than the rest: `gs` should find
                 // the macro called `gs` before one whose body happens to mention it.
@@ -270,20 +312,21 @@ impl State {
 
     fn next_source(&mut self) {
         self.source = self.source.other();
-        // The tag belonged to the old source's list of tags, and the new one has its own.
-        self.tag_at = 0;
+        // The kind belonged to the old source's list of kinds, and the new one has its own — the
+        // stored list has scripts in it and the inherited one has five hundred variables.
+        self.kind_at = 0;
         self.refilter();
     }
 
-    fn next_tag(&mut self) {
-        let count = self.tags().len() + 1;
-        self.tag_at = (self.tag_at + 1) % count;
+    fn next_kind(&mut self) {
+        let count = self.kinds().len() + 1;
+        self.kind_at = (self.kind_at + 1) % count;
         self.refilter();
     }
 
-    fn previous_tag(&mut self) {
-        let count = self.tags().len() + 1;
-        self.tag_at = (self.tag_at + count - 1) % count;
+    fn previous_kind(&mut self) {
+        let count = self.kinds().len() + 1;
+        self.kind_at = (self.kind_at + count - 1) % count;
         self.refilter();
     }
 
@@ -340,6 +383,14 @@ impl State {
         let Some(item) = self.selected().cloned() else {
             return;
         };
+        // **Nothing to forget.** An inherited row has no record in the database; removing it would
+        // be removing something from a place it was never in, and the row would come back the next
+        // time the shell published what your config defines. The key loop refuses before the
+        // question is asked, and this refuses again — a guard that only lives in the key loop is
+        // one the next caller does not have.
+        if !item.stored {
+            return;
+        }
         backing.act(&item, Act::Forget);
         self.items.retain(|row| row.key() != item.key());
         let was = self.selected;

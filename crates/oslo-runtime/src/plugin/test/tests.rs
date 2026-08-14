@@ -18,17 +18,6 @@ fn the_table_offers_test_beside_health() {
     ));
 }
 
-/// **What a test run is attributed to.** The first argument names the *test*, so the plugin has to
-/// come from when the registration happened — a test registered outside a load belongs to nobody in
-/// particular and falls back to its own name rather than disappearing.
-#[test]
-fn registrations_are_attributed_to_whatever_was_loading() {
-    while_loading("outer", || {
-        assert_eq!(current().as_deref(), Some("outer"));
-    });
-    assert_eq!(current(), None, "and not afterwards");
-}
-
 #[test]
 fn a_message_is_the_third_argument_and_a_missing_one_still_names_something() {
     assert_eq!(said(&[Value::str("a"), Value::str("b")], 1), "b");

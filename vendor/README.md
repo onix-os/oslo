@@ -22,8 +22,6 @@ few and listed below, so a rebase is a readable diff rather than an archaeology 
 | `#![allow(…)]` at the top of `lib.rs` | oslo lints at `-D warnings`; what is unused is unused only because oslo builds a subset of the features |
 | `pub use anyhow;` | so a caller implementing `Runtime` can name `anyhow::Result` without depending on the crate for one type |
 
-Nothing else is touched, and nothing is restyled.
-
 **oslo is MIT. `full_moon` and `full_moon/derive` are MPL-2.0 and remain so.** See *Licences* below
 before copying anything out of this directory.
 

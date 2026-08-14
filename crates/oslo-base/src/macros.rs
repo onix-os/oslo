@@ -57,15 +57,39 @@ pub enum Kind {
     Func,
     /// A whole program with a shebang, run from memory. See `oslo_shell::exec::stored`.
     Script,
+    /// An environment variable whose body is a *recipe* rather than a value.
+    ///
+    /// `GITHUB_TOKEN` with the body `$(oslo secret get gh-token)` is the case this exists for: the
+    /// shell holds the line, not the token, and runs it the first time something reads `$GITHUB_TOKEN`
+    /// — see `oslo_shell::expand::param`. A body with nothing to run in it is simply a value, and
+    /// costs the same nothing.
+    Var,
 }
 
 impl Kind {
+    /// Every kind there is, in the order a listing shows them.
+    ///
+    /// **One list, because two would drift.** Adding `Var` found two hand-written arrays of the
+    /// four kinds that existed before it — `all` and `kinds_of` — and a variable stored perfectly
+    /// well through one of them was invisible to both. Nothing that walks the kinds writes them out
+    /// again: it asks here, and the compiler is what notices the next one.
+    pub fn every() -> &'static [Kind] {
+        &[
+            Kind::Alias,
+            Kind::Abbrev,
+            Kind::Func,
+            Kind::Script,
+            Kind::Var,
+        ]
+    }
+
     pub fn word(self) -> &'static str {
         match self {
             Kind::Alias => "alias",
             Kind::Abbrev => "abbrev",
             Kind::Func => "func",
             Kind::Script => "script",
+            Kind::Var => "var",
         }
     }
 
@@ -75,13 +99,18 @@ impl Kind {
             "abbrev" | "abbr" => Some(Kind::Abbrev),
             "func" | "function" => Some(Kind::Func),
             "script" => Some(Kind::Script),
+            "var" | "variable" | "env" => Some(Kind::Var),
             _ => None,
         }
     }
 
     /// Whether a starting shell needs this before it can do anything.
+    ///
+    /// A variable is here for what it *is*, not for what it costs: the shell is told the recipe at
+    /// startup and runs it only when something reads the name, so a `$(…)` body is not a command
+    /// run on every prompt. See `oslo_shell::expand::param`.
     pub fn wanted_at_startup(self) -> bool {
-        matches!(self, Kind::Alias | Kind::Abbrev)
+        matches!(self, Kind::Alias | Kind::Abbrev | Kind::Var)
     }
 
     /// What a temporary file holding one of these should be called, so an editor colours it.
@@ -90,7 +119,7 @@ impl Kind {
     /// rather than from here.
     pub fn extension(self, body: &str) -> &'static str {
         match self {
-            Kind::Alias | Kind::Abbrev => "sh",
+            Kind::Alias | Kind::Abbrev | Kind::Var => "sh",
             Kind::Func => {
                 if body.trim_start().starts_with("--") || body.contains("local ") {
                     "lua"
@@ -107,6 +136,26 @@ impl Kind {
             },
         }
     }
+}
+
+/// Whether a variable's body is a value rather than something that has to be *run*.
+///
+/// One word with no command in it — `nvim`, `/srv/data`, `$HOME/bin`. The distinction is what
+/// decides when a stored variable is applied, and it is the same question in three places, so it is
+/// asked in one:
+///
+/// * a **value** costs nothing, so a shell exports it at startup like any other environment
+///   variable, and a program that reads the environment itself finds it there;
+/// * a **recipe** — `$(oslo secret get gh-token)` — is run the first time something reads the name,
+///   because running every one of them at every shell start is exactly what a shell holding secrets
+///   must not do;
+/// * and `macros.sh`, which bash sources, can carry the first and not the second.
+pub fn is_a_value(body: &str) -> bool {
+    let body = body.trim();
+    !body.is_empty()
+        && !body.contains("$(")
+        && !body.contains('`')
+        && !body.contains(char::is_whitespace)
 }
 
 /// One stored thing.
@@ -347,8 +396,9 @@ pub fn tags(entries: &[Entry]) -> Vec<String> {
 /// A name can be an alias *and* a script, which is a mistake rather than a feature — and the way to
 /// report it is to be able to see it.
 pub fn kinds_of(store: &Store, name: &str) -> Vec<Kind> {
-    [Kind::Alias, Kind::Abbrev, Kind::Func, Kind::Script]
-        .into_iter()
+    Kind::every()
+        .iter()
+        .copied()
         .filter(|kind| crate::store::has(store, &key(*kind, name)))
         .collect()
 }
@@ -361,7 +411,7 @@ pub fn remove(store: &Store, kind: Kind, name: &str) -> bool {
 /// Everything stored, sorted by kind then name.
 pub fn all(store: &Store) -> Vec<Entry> {
     let mut found = Vec::new();
-    for kind in [Kind::Alias, Kind::Abbrev, Kind::Func, Kind::Script] {
+    for kind in Kind::every().iter().copied() {
         let prefix = format!("{}/", kind.word());
         for full in crate::store::keys(store, &prefix) {
             let Some(name) = full.strip_prefix(&prefix) else {

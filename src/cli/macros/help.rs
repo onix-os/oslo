@@ -19,7 +19,7 @@ pub(super) const SUBCOMMANDS: &[Sub] = &[
     Sub {
         name: "add",
         args: "--KIND NAME [BODY]",
-        about: "store an alias, an abbreviation, a function or a script",
+        about: "store an alias, an abbreviation, a function, a script or a variable",
         flags: &[
             ("--alias", "a word replaced before the line is parsed"),
             (
@@ -31,18 +31,27 @@ pub(super) const SUBCOMMANDS: &[Sub] = &[
                 "--script",
                 "a script: opens your editor, any language, with a shebang",
             ),
+            (
+                "--var",
+                "an environment variable; the body runs the first time the name is read",
+            ),
             ("--tag TAG", "label it; repeat for more than one"),
             (
                 "--edit",
                 "open the body in the editor instead of taking it as an argument",
             ),
         ],
-        note: "The kind is required: four kinds and a silent default is a trap. A BODY on the \
-               command line is for an alias and an abbreviation only — a function and a script \
-               always open the editor, because neither fits on a line and pretending otherwise \
-               invites a function written as one. An alias replaces the word before the line is \
-               parsed, so nothing you can see is what runs; an abbreviation is expanded *into your \
-               line*, so what runs is what you read and what the history records.",
+        note: "The kind is required: five kinds and a silent default is a trap. A BODY on the \
+               command line is for an alias, an abbreviation and a variable — a function and a \
+               script always open the editor, because neither fits on a line and pretending \
+               otherwise invites a function written as one. An alias replaces the word before the \
+               line is parsed, so nothing you can see is what runs; an abbreviation is expanded \
+               *into your line*, so what runs is what you read and what the history records. A \
+               variable is the odd one: its body is a recipe, not a value, and it is run once, in \
+               the shell that first reads the name — which is what makes \
+               `--var GITHUB_TOKEN='$(oslo secret get gh-token)'` cost nothing until something \
+               needs the token. It may be written that way, as one word with an `=`, or as a name \
+               and a body.",
     },
     Sub {
         name: "remove",
@@ -53,6 +62,7 @@ pub(super) const SUBCOMMANDS: &[Sub] = &[
             ("--abbrev", "remove the abbreviation"),
             ("--func", "remove the function"),
             ("--script", "remove the script"),
+            ("--var", "remove the variable"),
         ],
         note: "The kind is only needed when the name is more than one thing at once — removing \
                the only macro called `gs` is not a question. Removing one that shadowed an alias \

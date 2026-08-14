@@ -109,6 +109,50 @@ fn a_macro_turned_off_has_no_file() {
     unsafe { std::env::remove_var("OSLO_MACROS_BIN") };
 }
 
+/// **A directory belongs to the store that filled it**, and a second store may not empty it.
+///
+/// This is not a hypothetical. Pointing `$XDG_DATA_HOME` at a scratch store and running
+/// `oslo macros publish` deleted seventy-two scripts out of a real `~/.local/sbin`, because the
+/// store had moved and the script directory had not — it is `$OSLO_MACROS_BIN` or `~/.local/sbin`
+/// and nothing about it follows the store. The manifest now says whose the directory is.
+#[test]
+fn a_second_store_does_not_empty_the_first_ones_directory() {
+    let _guard = lock();
+    let bin = tempfile::tempdir().expect("tempdir");
+    unsafe { std::env::set_var("OSLO_MACROS_BIN", bin.path()) };
+
+    // A directory another store filled: its manifest says so, and its script is in it. Written by
+    // hand rather than by pointing `$XDG_DATA_HOME` somewhere — that is process-wide, and moving it
+    // under other tests is what `track::universal` warns about.
+    std::fs::write(bin.path().join("deploy"), "#!/bin/sh\necho theirs\n").expect("their script");
+    std::fs::write(
+        bin.path().join(".oslo"),
+        "store /somewhere/else/oslo/macros\ndeploy\n",
+    )
+    .expect("their manifest");
+
+    let refused = publish(&[]);
+    assert!(refused.is_err(), "a foreign store was allowed to publish");
+    let said = refused.unwrap_err();
+    assert!(said.contains("/somewhere/else"), "it names whose: {said}");
+    assert!(
+        said.contains("OSLO_MACROS_BIN"),
+        "a way out is named: {said}"
+    );
+    assert!(
+        bin.path().join("deploy").exists(),
+        "the other store's script was deleted"
+    );
+
+    // A directory with no owner at all is nobody's, and may be taken: that is every directory
+    // written before this line existed.
+    std::fs::write(bin.path().join(".oslo"), "deploy\n").expect("an old manifest");
+    publish(&[script("ours", "#!/bin/sh\n")]).expect("an unclaimed directory");
+    assert!(bin.path().join("ours").exists());
+
+    unsafe { std::env::remove_var("OSLO_MACROS_BIN") };
+}
+
 /// What the command resolver asks, to know it is looking at oslo's own output.
 ///
 /// **Written by oslo, not merely sitting where oslo writes.** A file somebody put in the directory

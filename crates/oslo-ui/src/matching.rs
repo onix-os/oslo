@@ -8,6 +8,10 @@
 //! Kept apart from the candidate builders because it is the one piece of completion that can be
 //! reasoned about — and tested — without a filesystem, a `$PATH` or a terminal.
 
+use nucleo_matcher::pattern::{AtomKind, CaseMatching, Normalization, Pattern};
+use nucleo_matcher::{Config, Matcher, Utf32Str};
+use std::cell::RefCell;
+
 mod quality;
 pub use quality::Quality;
 
@@ -97,14 +101,33 @@ pub enum Fuzzy {
 }
 
 impl Fuzzy {
-    /// The most unmatched characters allowed between two typed letters.
-    pub fn max_gap(self) -> Option<usize> {
-        match self {
-            Fuzzy::Off => None,
-            Fuzzy::Tight => Some(1),
-            Fuzzy::Smart => Some(4),
-            Fuzzy::Loose => Some(8),
+    /// The pattern this preset scores with, or `None` when it matches nothing.
+    ///
+    /// **What the presets used to be was a cap on the gap between two typed letters**, and that cap
+    /// is what made the search feel broken: at `Smart` it was four, so `cbf` could not reach
+    /// `cargo build --features` — the very query a fuzzy finder exists to answer. A gap limit is a
+    /// crude stand-in for ranking, and now that the score is a real one it is not needed.
+    ///
+    /// What the presets mean now is *how loosely a word may be spelled*:
+    ///
+    /// * `Tight` — the letters must be together. `argo` finds `cargo`, `cgo` does not.
+    /// * `Smart` — fuzzy, and a capital in the query means a capital in the candidate.
+    /// * `Loose` — fuzzy, and case is ignored entirely.
+    ///
+    /// Space separates *atoms*, each of which must match somewhere and in any order — so
+    /// `push git` finds `git push`, which no single-subsequence matcher can do. fzf's own syntax
+    /// comes with it: `'exact`, `^begins`, `ends$`, `!not`.
+    fn pattern(self, typed: &str) -> Option<Pattern> {
+        if typed.is_empty() {
+            return None;
         }
+        let (case, kind) = match self {
+            Fuzzy::Off => return None,
+            Fuzzy::Tight => (CaseMatching::Smart, AtomKind::Substring),
+            Fuzzy::Smart => (CaseMatching::Smart, AtomKind::Fuzzy),
+            Fuzzy::Loose => (CaseMatching::Ignore, AtomKind::Fuzzy),
+        };
+        Some(Pattern::new(typed, case, Normalization::Smart, kind))
     }
 
     /// Read a setting. `true` means the default preset, `false` means off.
@@ -165,48 +188,66 @@ pub fn fuzzy_score(candidate: &str, typed: &str, fuzzy: Fuzzy) -> Option<i32> {
 ///
 /// The candidate still has to be folded per call, because it is different every time.
 pub struct Fuzzed<'a> {
+    /// The typed text, folded once — still needed by [`Quality`], which asks a different question
+    /// from the scorer and answers it about the raw characters.
     wanted: Vec<char>,
-    cap: Option<usize>,
     typed: &'a str,
+    /// The pattern nucleo scores with, or `None` for `Fuzzy::Off` and an empty query.
+    pattern: Option<Pattern>,
+    /// nucleo scores through a reusable buffer and so takes `&mut self`; the six callers hold a
+    /// `Fuzzed` by shared reference inside a loop, and a cell here is what keeps their code the
+    /// shape it already had. Single-threaded by construction: this is drawn on one terminal.
+    matcher: RefCell<Matcher>,
+    /// Reused across candidates for the same reason the pattern is: one allocation per keystroke
+    /// instead of one per candidate. `Utf32Str` needs somewhere to borrow from.
+    haystack: RefCell<Vec<char>>,
 }
 
 impl<'a> Fuzzed<'a> {
     pub fn new(typed: &'a str, fuzzy: Fuzzy) -> Fuzzed<'a> {
         Fuzzed {
             wanted: typed.chars().flat_map(char::to_lowercase).collect(),
-            cap: fuzzy.max_gap(),
             typed,
+            pattern: fuzzy.pattern(typed),
+            matcher: RefCell::new(Matcher::new(Config::DEFAULT)),
+            haystack: RefCell::new(Vec::new()),
         }
     }
 
     /// Whether this pattern can match anything at all — `Fuzzy::Off`, or nothing typed.
     pub fn is_idle(&self) -> bool {
-        self.cap.is_none() || self.typed.is_empty()
+        self.pattern.is_none() || self.typed.is_empty()
     }
 
     pub fn score(&self, candidate: &str) -> Option<i32> {
-        let cap = self.cap?;
+        // **Nothing typed matches everything**, and it is asked first: every widget draws its whole
+        // list before a key is pressed, and a `Fuzzed` built from an empty query that answered
+        // `None` would open each of them empty. `Fuzzy::Off` is the case that answers `None`.
         if self.typed.is_empty() {
             return Some(0);
         }
-        score_with(candidate, &self.wanted, cap)
+        let pattern = self.pattern.as_ref()?;
+        let mut haystack = self.haystack.borrow_mut();
+        let utf32 = Utf32Str::new(candidate, &mut haystack);
+        let score = pattern.score(utf32, &mut self.matcher.borrow_mut())? as i32;
+        // **Less left over wins a tie.** nucleo scores the match, not the leftovers, so `cargo` and
+        // `cargo-nextest-runner` both answer 140 for `cargo` and the list then falls back to
+        // whatever order it was built in. A small penalty, capped, so it settles ties without ever
+        // outweighing a genuinely better match.
+        Some(score - (utf32.len().saturating_sub(self.wanted.len())).min(40) as i32 / 4)
     }
 
-    /// What kind of match this is, and how good a one — from a single fold of the candidate.
+    /// What kind of match this is, and how good a one.
     ///
-    /// Both together because folding is the cost: the caller is a loop over every command in the
-    /// history, once per keystroke, and asking twice would double the only allocation in it.
+    /// Two answers to two questions: [`Quality`] is the coarse kind a person can see and the
+    /// finder sorts by, and the score is the tie-breaker within it. Only the score changed when the
+    /// matcher did — the kinds were never the part that was wrong.
     pub fn rank(&self, candidate: &str) -> Option<(Quality, i32)> {
-        let cap = self.cap?;
         if self.typed.is_empty() {
             return Some((Quality::Scattered, 0));
         }
+        let score = self.score(candidate)?;
         let have: Vec<char> = candidate.chars().flat_map(char::to_lowercase).collect();
-        if self.wanted.len() > have.len() {
-            return None;
-        }
-        let score =
-            align(&have, &self.wanted, cap, true).max(align(&have, &self.wanted, cap, false))?;
         Some((Quality::of(&have, &self.wanted), score))
     }
 }
@@ -225,87 +266,16 @@ fn starts_word(have: &[char], index: usize) -> bool {
 ///
 /// `gco` is `git checkout origin`. `gio` is not, because it would have to skip `checkout` — and a
 /// query that skips words is a scatter, which is what the last tier is for.
+///
+/// **A separator is not a word.** `cbr` on `cargo build --release` is the acronym anybody would
+/// expect, and it was not one: the `-` of `--release` starts a "word" by the rule above, so the
+/// initials read `c b - - r` and the third letter did not line up. In a shell almost every command
+/// has a flag in it, so the tier that exists for `gco` was reached by almost nothing.
 fn is_acronym(have: &[char], wanted: &[char]) -> bool {
     let mut initials = (0..have.len())
-        .filter(|&i| starts_word(have, i))
+        .filter(|&i| starts_word(have, i) && have[i].is_alphanumeric())
         .map(|i| have[i]);
     wanted.iter().all(|&want| initials.next() == Some(want))
-}
-
-fn score_with(candidate: &str, wanted: &[char], cap: usize) -> Option<i32> {
-    let have: Vec<char> = candidate.chars().flat_map(char::to_lowercase).collect();
-    if wanted.len() > have.len() {
-        return None;
-    }
-
-    // Two alignments, best-of. Neither is right on its own, and both are cheap.
-    //
-    // Preferring word starts is what makes an abbreviation work — `cre` finding `c`argo `r`un
-    // --`e`xample rather than the `r` buried in `cargo`. But applied as a rule it strands the rest
-    // of the query: `rdme` against `README.md` jumps to the `m` after the dot and then has no `e`
-    // left to find. Taking the earliest letter every time has the opposite failure. So try the
-    // boundary-seeking alignment, fall back to the plain one, and keep whichever scored.
-    let boundaries = align(&have, wanted, cap, true);
-    let plain = align(&have, wanted, cap, false);
-    boundaries.max(plain)
-}
-
-/// One alignment pass. `prefer_boundaries` chooses between the two failure modes above.
-fn align(have: &[char], wanted: &[char], cap: usize, prefer_boundaries: bool) -> Option<i32> {
-    let mut score = 0i32;
-    let mut at = 0usize;
-    let mut previous: Option<usize> = None;
-    let mut first: Option<usize> = None;
-
-    // The shared definition, so the score and the kind agree about where a word begins.
-    let starts_word = |index: usize| super::matching::starts_word(have, index);
-
-    for &want in wanted {
-        let earliest = have[at..].iter().position(|&have| have == want)? + at;
-        let reachable = |index: usize| match previous {
-            Some(last) => index - last - 1 <= cap,
-            None => true,
-        };
-        let found = if prefer_boundaries {
-            have[at..]
-                .iter()
-                .enumerate()
-                .find(|&(offset, &c)| {
-                    c == want && starts_word(at + offset) && reachable(at + offset)
-                })
-                .map_or(earliest, |(offset, _)| at + offset)
-        } else {
-            earliest
-        };
-
-        // A single gap wider than the preset allows refuses the whole candidate. Measured between
-        // consecutive matches only — the distance from the start of the string is not a gap, or no
-        // candidate could ever match on its second word.
-        if let Some(last) = previous {
-            let gap = found - last - 1;
-            if gap > cap {
-                return None;
-            }
-            score -= gap as i32;
-            if gap == 0 {
-                score += 8;
-            }
-        }
-        if starts_word(found) {
-            score += 12;
-        }
-        first.get_or_insert(found);
-        previous = Some(found);
-        at = found + 1;
-    }
-
-    // Where the match started, and how much candidate is left over. Both are tie-breaks rather than
-    // signals: among candidates that matched the same way, the one that starts sooner and has less
-    // left dangling is the better answer. Capped so a very long candidate cannot be pushed below a
-    // genuinely worse match on length alone.
-    score -= first.unwrap_or(0).min(20) as i32;
-    score -= (have.len() - wanted.len()).min(40) as i32 / 4;
-    Some(score)
 }
 
 /// Whether every piece of `typed` prefixes the corresponding piece of `candidate`.
@@ -361,20 +331,47 @@ mod tests {
         );
     }
 
-    /// The failure mode a gap cap exists to prevent.
+    /// **A scatter is ranked down, not refused** — which is the change of mind this matcher is.
     ///
-    /// Note how far apart these have to be to be refused: `cat` against `create_a_template` is
-    /// *not* a scatter, because `c`, `a` and `t` all sit inside `create`. That is the matcher
-    /// working — it is why the cap is measured between consecutive letters and not across the word.
+    /// The old rule was a cap on the gap between two typed letters, and at `Smart` it was four: a
+    /// query like `cbf` could not reach `cargo build --features` because the gaps are wider than
+    /// that, and a fuzzy finder that cannot answer `cbf` is one nobody would call fuzzy. A cap is a
+    /// crude stand-in for ranking; with a real score the sprawl simply scores badly, and
+    /// [`Quality`] puts it in the last tier where the eye never reaches it.
+    ///
+    /// `Tight` is where "the letters must be together" still lives.
     #[test]
-    fn a_wide_scatter_is_refused() {
+    fn a_wide_scatter_is_ranked_down_rather_than_refused() {
         let sprawl = "cxxxxxxxxxxaxxxxxxxxxxt";
+        assert!(fuzzy_score(sprawl, "cat", Fuzzy::Smart).is_some());
         assert!(
-            fuzzy_score(sprawl, "cat", Fuzzy::Loose).is_none(),
-            "gaps of ten beat loose's eight"
+            fuzzy_score("create_a_template", "cat", Fuzzy::Smart)
+                > fuzzy_score(sprawl, "cat", Fuzzy::Smart),
+            "tighter scores better"
         );
-        assert!(fuzzy_score(sprawl, "cat", Fuzzy::Smart).is_none());
-        assert!(fuzzy_score("create_a_template", "cat", Fuzzy::Smart).is_some());
+        assert!(
+            fuzzy_score(sprawl, "cat", Fuzzy::Tight).is_none(),
+            "tight is the preset that refuses a scatter"
+        );
+    }
+
+    /// The query the whole change was for: letters that land on word starts, however far apart.
+    #[test]
+    fn an_acronym_reaches_across_a_command_line() {
+        assert!(
+            fuzzy_score("cargo build --release --all-features", "cbf", Fuzzy::Smart).is_some(),
+            "the gap cap used to refuse this outright"
+        );
+        assert!(fuzzy_score("git commit --amend", "gca", Fuzzy::Smart).is_some());
+    }
+
+    /// Space separates atoms, and each may match anywhere — so the order you remember them in does
+    /// not have to be the order they were typed in.
+    #[test]
+    fn words_may_be_given_in_any_order() {
+        assert!(fuzzy_score("git push origin main", "push git", Fuzzy::Smart).is_some());
+        assert!(fuzzy_score("git push origin main", "git push", Fuzzy::Smart).is_some());
+        assert!(fuzzy_score("git pull origin main", "push git", Fuzzy::Smart).is_none());
     }
 
     /// The alignment a person means by an abbreviation, which greedy matching gets wrong.
@@ -412,10 +409,18 @@ mod tests {
         assert!(short > long, "{short} should beat {long}");
     }
 
+    /// **Smart case, which is what the word has meant everywhere else for a decade**: a query typed
+    /// in lower case ignores case, and a capital in the query asks for a capital. `Loose` is the
+    /// preset for somebody who wants case ignored whatever they typed.
     #[test]
-    fn case_is_ignored_on_both_sides() {
+    fn a_capital_in_the_query_is_a_request() {
         assert!(fuzzy_score("README.md", "rdme", Fuzzy::Smart).is_some());
-        assert!(fuzzy_score("readme.md", "RDME", Fuzzy::Smart).is_some());
+        assert!(fuzzy_score("README.md", "RDME", Fuzzy::Smart).is_some());
+        assert!(
+            fuzzy_score("readme.md", "RDME", Fuzzy::Smart).is_none(),
+            "capitals were asked for and there are none"
+        );
+        assert!(fuzzy_score("readme.md", "RDME", Fuzzy::Loose).is_some());
     }
 
     #[test]

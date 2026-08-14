@@ -17,6 +17,8 @@
 
 #[cfg(feature = "vista")]
 pub use oslo_base::predict;
+#[cfg(feature = "secrets")]
+pub use oslo_base::secrets;
 /// The bottom of the stack: the syntax tree, the error type, the feature bits, the hook registry
 /// and the tracking store.
 pub use oslo_base::{ast, error, feature, hooks, macros, messages, nesting, track, version};
