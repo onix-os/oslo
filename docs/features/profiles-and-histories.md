@@ -132,23 +132,14 @@ oslo profile export | ssh laptop oslo profile import   # once, to say these two 
 oslo profile sync laptop                           # from then on
 ```
 
-```text
-oslo profile fingerprint NAME          ssh laptop oslo profile fingerprint NAME
-           └──────────────── must be equal, or nothing moves ────────────┘
-
-ssh laptop oslo profile send NAME  ─────────────►  a snapshot of theirs
-           sync_files(mine, theirs)                merges *both* files
-ssh laptop oslo profile receive NAME  ◄─────────   the merged copy, merged again over there
-```
-
-**The far end is oslo, not `scp`.** A store is a live database, and copying the file under a shell
-that is writing to it is how you get half a transaction. `send` takes a proper snapshot with
-`backup_to`; `receive` *merges* rather than replaces, so a command typed on the other machine
-between the two steps survives instead of being overwritten. Running it twice moves nothing the
+The far end is oslo rather than `scp` — a store is a live database, and copying the file under a
+shell that is writing to it is how you get half a transaction. Running it twice moves nothing the
 second time, which is what makes it safe in a login file or a cron line.
 
-`$OSLO_SSH` replaces the `ssh` it runs — a wrapper, a jump host, an alternate config — and
-`$OSLO_SSH_REMOTE_BIN` names the far end's `oslo` when it is not on the default `$PATH`.
+**`oslo sync` is usually the one to reach for.** It carries the macros and the secrets as well, over
+the same ssh and behind the same key check, and `oslo profile sync` is a wrapper over it that does
+the history alone. [Syncing between machines](syncing.md) has the whole of it: the rule that decides
+which copy of a record wins, how a deletion travels, and why the secrets cross sealed.
 
 ### Why a key, and not just the name
 
@@ -272,7 +263,7 @@ machine, which is the argument for naming profiles after *roles* rather than per
 |---|---|
 | `crates/oslo-base/src/track/profile/key.rs` | the key, the fingerprint, and where neither of them goes |
 | `src/cli/profile.rs` | `list`, `show`, `key`, `export`, `import`, `fingerprint` |
-| `src/cli/profile/sync.rs` | `sync`, and the `send`/`receive` halves the far end runs |
+| `src/cli/profile/sync.rs` | `sync`, which parses the words and hands them to `oslo sync` |
 | `crates/oslo-base/src/track/profile.rs` | `ENV`, `current`, `valid`, `store_path`, `profile_dir`, `history_dir`, `available`, `after` |
 | `crates/oslo-base/src/track/mod.rs` | `default_path` — the `hist.db` of the current profile |
 | `crates/oslo-base/src/predict/mod.rs` | `default_path` — the `hist.model` of the same profile |

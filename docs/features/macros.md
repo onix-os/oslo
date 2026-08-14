@@ -320,11 +320,40 @@ obvious pair on the keyboard — on the one filter that already has a spelling y
 the [kinds](#the-five-kinds-and-why-there-are-five) instead, which is the division a list of five
 kinds is actually navigated by and the one thing you cannot type.
 
+## Between machines
+
+`oslo sync laptop` carries the macros as well as the history and the secrets, and all five kinds
+travel — a function and a script included, not only the two a starting shell reads. The merge is by
+name: for `alias/gs` one of the two copies wins outright, decided by the rule in
+[Syncing between machines](syncing.md).
+
+**Removing one is a tombstone rather than an erasure.** The record stays with its stamp buried, so
+that `oslo macros remove gs` on one machine removes it on the other and the machine that lost it does
+not hand it back on the next sync. That is a different switch from `off`, which is a setting *of* a
+macro that still exists.
+
+What arrives is **published**, not just stored: the flat snapshot a starting shell reads, the files
+in `~/.local/sbin` that let anything which is not oslo run a stored script by name, and the aliases
+another shell sources. Writing only the database left a synced script that worked at an oslo prompt
+and was missing from `$PATH` everywhere else.
+
+The record format carries three extra fields for this — a revision, a tombstone flag and a
+tie-breaker — after the ones a person might read:
+
+```text
+2 1754870400 on system,git 3 live 9f1c…
+git status --short
+```
+
+A record written before those existed is still read, and takes a fresh stamp: it has never been
+synced, so revision one is the truth about it.
+
 ## Where it lives
 
 | | |
 |---|---|
 | `crates/oslo-base/src/macros.rs` | the store, the five kinds, the record, `is_a_value` |
+| `crates/oslo-base/src/macros/sync.rs` | merging two machines' macros, name by name |
 | `crates/oslo-base/src/macros/live.rs` | the two sources, the rebuild, the session list |
 | `crates/oslo-runtime/src/startup/stored.rs` | applying it to a shell, at startup and per prompt |
 | `crates/oslo-shell/src/exec/stored.rs` | running a function or a script, and the memfd |

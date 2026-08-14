@@ -54,6 +54,10 @@ of them at 308 KB — it vendors a parser and brings five crates oslo does not o
 `oslo-minimal` there is no `argc` builtin and no `--argc-eval`, so the word `argc` falls through to
 `$PATH` and the real one still works.
 
+**[Syncing](syncing.md) is in both, and carries one part fewer in `oslo-minimal`.** History and
+macros travel from either binary; secrets are behind the feature above, so a build without them has
+no `secrets` part to name rather than one that is named and refused.
+
 Everything else on this page is in both binaries.
 
 Each document opens with a recording of the feature actually running. They are not screencasts
@@ -105,6 +109,7 @@ scripts/demo/embed.sh                            # put the players back in the d
 | [The history finder](history-finder.md) | Full-screen search with scopes that narrow and widen |
 | [Where you have been](where-you-have-been.md) | Directory tracking, `cd -N`, `cd root`, and ranking that puts match quality first |
 | [One shell, several histories](profiles-and-histories.md) | `$OSLO_PROFILE`, and keeping an agent's commands out of yours |
+| [Syncing between machines](syncing.md) | `oslo sync` — history, macros and secrets over ssh, deletions included |
 
 ## The environment
 

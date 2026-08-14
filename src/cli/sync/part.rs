@@ -96,7 +96,8 @@ fn one(remote: &str, part: Part, profile: &str, dry_run: bool) -> Result<(), Str
         .map_err(|e| format!("no temporary directory: {e}"))?;
     let theirs = held.path().join("theirs");
 
-    let snapshot = over_ssh(remote, &["sync", "send", part.word(), profile], None)?;
+    let answered = over_ssh(remote, &["sync", "send", part.word(), profile], None)?;
+    let snapshot = off_the_wire(remote, part, &answered)?;
     absorb(part, &theirs, &snapshot)?;
 
     let moved = merge_into(part, &theirs, profile, dry_run)?;
@@ -109,7 +110,7 @@ fn one(remote: &str, part: Part, profile: &str, dry_run: bool) -> Result<(), Str
     }
     // Merged again over there rather than dropped on top, so anything recorded on that machine
     // while this was running survives.
-    let merged = snapshot_of(part, &theirs)?;
+    let merged = on_the_wire(part, &snapshot_of(part, &theirs)?);
     // What it prints is deliberately nothing — see [`report::say_far`].
     over_ssh(
         remote,
@@ -117,6 +118,47 @@ fn one(remote: &str, part: Part, profile: &str, dry_run: bool) -> Result<(), Str
         Some(&merged),
     )?;
     Ok(())
+}
+
+/// What every answer from the far end begins with, so that a stale oslo cannot be mistaken for an
+/// empty one.
+///
+/// **Measured against the failure it exists for.** An oslo without `sync` does not fail loudly: the
+/// word is not one of its tools, so it looks for a *program* called `sync` — and `sync(1)` is a real
+/// one on most systems. It ran, printed nothing, and exited 0, which the near end read as *that
+/// machine has no history* and then died somewhere else entirely. A version that says its own name
+/// turns that into one sentence.
+const WIRE: &str = "OSLOSYNC1 ";
+
+/// A part's bytes, with the header that says what they are.
+fn on_the_wire(part: Part, payload: &[u8]) -> Vec<u8> {
+    let mut bytes = format!("{WIRE}{}\n", part.word()).into_bytes();
+    bytes.extend_from_slice(payload);
+    bytes
+}
+
+/// The other way, refusing anything that did not come from an oslo that speaks this.
+fn off_the_wire(remote: &str, part: Part, bytes: &[u8]) -> Result<Vec<u8>, String> {
+    let stale = || {
+        format!(
+            "{remote}: did not answer as an oslo that can sync.\n  \
+             Its oslo is most likely too old — `oslo sync` needs one on both machines."
+        )
+    };
+    let rest = bytes.strip_prefix(WIRE.as_bytes()).ok_or_else(stale)?;
+    let end = rest
+        .iter()
+        .position(|byte| *byte == b'\n')
+        .ok_or_else(stale)?;
+    // The part is echoed back, so a mixed-up answer is caught rather than merged into the wrong
+    // store — which for secrets would mean writing sealed files where history goes.
+    if &rest[..end] != part.word().as_bytes() {
+        return Err(format!(
+            "{remote}: was asked for {} and answered with something else",
+            part.word()
+        ));
+    }
+    Ok(rest[end + 1..].to_vec())
 }
 
 /// Merge the far end's copy into ours, and theirs into it, so both hold the union.
@@ -143,10 +185,13 @@ fn merge_into(
             let other = oslo::macros::Store::open(&theirs.join("macros.db"))
                 .ok_or_else(|| "the macros that arrived cannot be opened".to_string())?;
             let report = oslo::macros::sync::merge(&mine, &other, dry)?;
-            // The flat file a starting shell reads, or every arriving alias is invisible until the
-            // next `oslo macros` command happens to rewrite it.
+            // **Everything derived, not just the snapshot.** A macro that arrives has three copies
+            // to rewrite: the flat file a starting shell reads, the files in `~/.local/sbin` that
+            // let anything which is not oslo run a stored script by name, and the aliases another
+            // shell sources. Writing one of the three leaves a synced script that works at an oslo
+            // prompt and is missing from `$PATH` everywhere else.
             if !dry && !report.quiet() {
-                let _ = oslo::macros::snapshot::write(&oslo::macros::all(&mine));
+                oslo::macros::publish(&mine)?;
             }
             Ok(Moved::from_macros(&report))
         }
@@ -191,9 +236,23 @@ fn snapshot_of(part: Part, from: &std::path::Path) -> Result<Vec<u8>, String> {
 }
 
 /// The other way: bytes that arrived, laid out where a merge can read them.
+///
+/// **Nothing arriving is not the same as an empty file arriving.** A machine that has never made a
+/// macro sends no bytes at all — see [`mine`] — and writing those as a zero-length `macros.db`
+/// produces a file that is not a database and cannot be opened. Left absent, the merge opens a
+/// fresh empty store instead and everything here travels to them, which is the right answer.
 fn absorb(part: Part, into: &std::path::Path, bytes: &[u8]) -> Result<(), String> {
     std::fs::create_dir_all(into).map_err(|e| format!("{}: {e}", into.display()))?;
     match part {
+        // An empty body means that machine has none of these. A fresh empty database is what it
+        // means, and lets the ordinary merge run and send everything here over to them; the
+        // alternative, a zero-length file, is not a database and cannot be opened at all.
+        Part::History if bytes.is_empty() => oslo::track::Track::open(&into.join("hist.db"))
+            .map(|_| ())
+            .ok_or_else(|| "cannot make an empty history to merge against".to_string()),
+        Part::Macros if bytes.is_empty() => oslo::macros::Store::open(&into.join("macros.db"))
+            .map(|_| ())
+            .ok_or_else(|| "cannot make an empty macro store to merge against".to_string()),
         Part::History => write_at(&into.join("hist.db"), bytes),
         Part::Macros => write_at(&into.join("macros.db"), bytes),
         #[cfg(feature = "secrets")]
@@ -214,7 +273,9 @@ pub fn send(args: &[String]) -> i32 {
         .get(1)
         .cloned()
         .unwrap_or_else(oslo::track::profile::current);
-    match mine(part, &profile).and_then(|bytes| write_out(&bytes)) {
+    // Headed, so that the near end can tell "this machine has none of these" from "the thing that
+    // answered was not an oslo that speaks this".
+    match mine(part, &profile).and_then(|bytes| write_out(&on_the_wire(part, &bytes))) {
         Ok(()) => 0,
         Err(e) => super::fail(&e),
     }
@@ -310,9 +371,15 @@ pub fn receive(args: &[String]) -> i32 {
         return super::fail(&format!("cannot read standard input: {e}"));
     }
     if incoming.is_empty() {
-        // An empty snapshot is a machine with nothing of this kind, which is not a failure.
+        // Nothing at all on standard input is the near end deciding there was nothing to send,
+        // which is not a failure. A *headed* answer with an empty body is the same thing said out
+        // loud, and goes through the merge below.
         return 0;
     }
+    let incoming = match off_the_wire("the machine that called", part, &incoming) {
+        Ok(bytes) => bytes,
+        Err(e) => return super::fail(&e),
+    };
 
     let held = match tempfile::Builder::new().prefix("oslo-receive-").tempdir() {
         Ok(dir) => dir,

@@ -801,6 +801,31 @@ older pair — delete them.
 shell starts — a subshell, a tool, `oslo macros` — reports the session it is part of rather than
 inventing one of its own, which is what lets a child process say "this shell" and be believed.
 
+## Two machines, one command
+
+```sh
+oslo profile key init                                  # once
+oslo profile export | ssh laptop oslo profile import   # once, to say these two are yours
+oslo sync laptop                                       # from then on
+```
+
+History, macros and secrets, both ways, over ssh — `--only history` narrows it, `--dry-run` shows
+what would move. Both ends come out holding the union, running it twice moves nothing the second
+time, and **deleting works**: remove a command, an alias or a secret on one machine and the next sync
+removes it on the other, without the other machine handing it back.
+
+Three storages that share nothing but the rule that decides which copy of a record wins — a revision,
+a tombstone flag, and a tie-breaker stored with the record. No timestamps: two machines have no
+shared clock, and the one whose clock was wrong would win every conflict for as long as it stayed
+wrong.
+
+Secrets cross **sealed and are never opened**: both machines derive the same store key from the
+profile key they share, so the ciphertext is portable and the plaintext is in memory on neither side.
+The profile key is what says the two machines are yours, and every part refuses to move until both
+ends prove they hold it.
+
+[Syncing between machines](docs/features/syncing.md) has the whole of it.
+
 ## Tools
 
 `oslo --help` lists them — `config`, `profile`, `history`, `aliases`, `hook`, and whichever of

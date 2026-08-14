@@ -1,0 +1,54 @@
+# `oslo sync` — history, macros and secrets to another machine, in one command.
+#
+# **Off camera**: a config rebuilds `$PATH` at startup, so what the launcher exported is gone by the
+# first prompt — and everything below is a *program*, which would otherwise be whichever oslo is
+# installed rather than the one being demonstrated. `/tmp/oslo-demo-work/bin` is on the path too,
+# which is where the two stand-ins live.
+setup export PATH=$OSLO_DIR:/tmp/oslo-demo-work/bin:$PATH
+cols 120
+rows 22
+speed 0.055
+
+# There is no second computer in a recording, so two fixture homes under /tmp stand in for them —
+# never this machine's own data, see `fixture.sh`. Both stand-ins are on screen before they are
+# used: `here` is the near machine and `pretend-ssh` is the far one. Neither is oslo.
+run cat /tmp/oslo-demo-work/bin/here
+wait 2.6
+run cat /tmp/oslo-demo-work/bin/pretend-ssh
+wait 3.0
+clear
+
+# What the near machine has: three commands, two macros, one secret.
+run here oslo history list -n 3
+wait 2.4
+run here oslo macros show --plain
+wait 2.4
+run here oslo secret list
+wait 2.0
+clear
+
+# One command for all three. Both ends come out with the union.
+run here OSLO_SSH=/tmp/oslo-demo-work/bin/pretend-ssh oslo sync laptop
+wait 5.0
+clear
+
+# The other machine's things are here now — its command, its alias, and its secret, which crossed
+# sealed and opens because both machines derive the same store key from the profile key they share.
+run here oslo history list -n 6
+wait 3.0
+run here oslo macros show --plain
+wait 2.6
+run here oslo secret get registry
+wait 2.4
+clear
+
+# **Deleting works too, and that is the part that needs a design.** A removal is a tombstone rather
+# than an erasure, so it travels instead of being handed back by the other machine.
+run here oslo macros remove kp
+wait 1.6
+run here OSLO_SSH=/tmp/oslo-demo-work/bin/pretend-ssh oslo sync laptop --only macros
+wait 4.0
+
+# And running it again moves nothing, which is what makes it safe in a login file.
+run here OSLO_SSH=/tmp/oslo-demo-work/bin/pretend-ssh oslo sync laptop
+wait 5.0

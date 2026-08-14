@@ -9,6 +9,13 @@ WORK="${DEMO_WORK:-/tmp/oslo-demo-work}"
 rm -rf "$WORK"
 mkdir -p "$WORK"/{src,docs,build}
 
+# The two fixture machines, **beside `$WORK` rather than inside it**. `$WORK` is a git repository —
+# the prompt and nav demos need one — and a machine's state directory under it puts the profile key
+# inside a repository, which `oslo secret` correctly warns about on every call. The warning is right
+# and the layout was wrong.
+MACHINES="${WORK}-machines"
+rm -rf "$MACHINES"
+
 cat > "$WORK/README.md" <<'EOF'
 # demo
 A directory with enough in it to be worth looking at.
@@ -96,29 +103,48 @@ fi
 # /tmp, each with a history of its own, and the shell in the recording steps into `here`.
 if [ -x "$OSLO" ]; then
     for machine in here there; do
-        mkdir -p "$WORK/$machine/state"
+        mkdir -p "$MACHINES/$machine/state"
     done
-    printf 'cargo build --release\ngit push origin main\nhx src/lib.rs\n' > "$WORK/here.txt"
-    printf 'cargo build --release\nkubectl get pods -A\njournalctl -fu oslo\n' > "$WORK/there.txt"
+    printf 'cargo build --release\ngit push origin main\nhx src/lib.rs\n' > "$MACHINES/here.txt"
+    printf 'cargo build --release\nkubectl get pods -A\njournalctl -fu oslo\n' > "$MACHINES/there.txt"
     # **`OSLO_PROFILE=default` on every one of these.** The recorder runs under a profile of its own
     # so that nothing lands in a real history, and a fixture that inherited that name would seed one
     # profile and then be asked to sync a different one.
     for machine in here there; do
         OSLO_PROFILE=default \
-            XDG_DATA_HOME="$WORK/$machine" XDG_STATE_HOME="$WORK/$machine/state" HOME="$WORK/$machine" \
-            "$OSLO" history import "$WORK/$machine.txt" >/dev/null 2>&1
+            XDG_DATA_HOME="$MACHINES/$machine" XDG_STATE_HOME="$MACHINES/$machine/state" HOME="$MACHINES/$machine" \
+            "$OSLO" history import "$MACHINES/$machine.txt" >/dev/null 2>&1
     done
     # The key that says the two are one profile, made on `here` and carried to `there` — the step a
     # person does once, done here so the recording can get to the part worth watching.
     OSLO_PROFILE=default \
-        XDG_DATA_HOME="$WORK/here" XDG_STATE_HOME="$WORK/here/state" HOME="$WORK/here" \
+        XDG_DATA_HOME="$MACHINES/here" XDG_STATE_HOME="$MACHINES/here/state" HOME="$MACHINES/here" \
         "$OSLO" profile key init default >/dev/null 2>&1
     OSLO_PROFILE=default \
-        XDG_DATA_HOME="$WORK/here" XDG_STATE_HOME="$WORK/here/state" HOME="$WORK/here" \
+        XDG_DATA_HOME="$MACHINES/here" XDG_STATE_HOME="$MACHINES/here/state" HOME="$MACHINES/here" \
         "$OSLO" profile export default 2>/dev/null |
         OSLO_PROFILE=default \
-            XDG_DATA_HOME="$WORK/there" XDG_STATE_HOME="$WORK/there/state" HOME="$WORK/there" \
+            XDG_DATA_HOME="$MACHINES/there" XDG_STATE_HOME="$MACHINES/there/state" HOME="$MACHINES/there" \
             "$OSLO" profile import default >/dev/null 2>&1
+
+    # A macro and a secret on each, so the sync demo has all three parts to carry rather than one.
+    # Seeded through `macros import` because a function and a script would otherwise want an editor.
+    printf 'alias gs\n\tgit status --short\nscript deploy\n\t#!/bin/sh\n\techo shipping\n' \
+        > "$MACHINES/here-macros.txt"
+    printf 'alias kp\n\tkubectl get pods -A\n' > "$MACHINES/there-macros.txt"
+    for machine in here there; do
+        OSLO_PROFILE=default \
+            XDG_DATA_HOME="$MACHINES/$machine" XDG_STATE_HOME="$MACHINES/$machine/state" HOME="$MACHINES/$machine" \
+            "$OSLO" macros import "$MACHINES/$machine-macros.txt" >/dev/null 2>&1
+    done
+    printf 'sk-not-a-real-one' |
+        OSLO_PROFILE=default \
+            XDG_DATA_HOME="$MACHINES/here" XDG_STATE_HOME="$MACHINES/here/state" HOME="$MACHINES/here" \
+            "$OSLO" secret set deploy-token >/dev/null 2>&1
+    printf 'also-invented' |
+        OSLO_PROFILE=default \
+            XDG_DATA_HOME="$MACHINES/there" XDG_STATE_HOME="$MACHINES/there/state" HOME="$MACHINES/there" \
+            "$OSLO" secret set registry >/dev/null 2>&1
 fi
 
 # A stand-in for `ssh`, so the sync act has a far end without a second computer.
@@ -138,7 +164,7 @@ cat > "$WORK/bin/here" <<EOF
 #!/bin/sh
 # stands in for: being logged in on the machine called \`here\`
 exec env OSLO_PROFILE=default \\
-    XDG_DATA_HOME=$WORK/here XDG_STATE_HOME=$WORK/here/state HOME=$WORK/here "\$@"
+    XDG_DATA_HOME=$MACHINES/here XDG_STATE_HOME=$MACHINES/here/state HOME=$MACHINES/here "\$@"
 EOF
 chmod +x "$WORK/bin/here"
 
@@ -147,7 +173,7 @@ cat > "$WORK/bin/pretend-ssh" <<EOF
 # stands in for: ssh USER@HOST oslo …
 shift
 exec env OSLO_PROFILE=default \\
-    XDG_DATA_HOME=$WORK/there XDG_STATE_HOME=$WORK/there/state HOME=$WORK/there "\$@"
+    XDG_DATA_HOME=$MACHINES/there XDG_STATE_HOME=$MACHINES/there/state HOME=$MACHINES/there "\$@"
 EOF
 chmod +x "$WORK/bin/pretend-ssh"
 
