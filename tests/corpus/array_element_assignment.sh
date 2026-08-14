@@ -23,3 +23,12 @@ echo "${#h[1]}"
 u=(1 2 3)
 unset 'u[1]'
 echo "${!u[@]} | ${u[@]} | ${#u[@]}"
+# **Two different-looking keys are the same element.** The subscript is arithmetic, so an unset
+# name in it is 0 — `q[alpha]` and `q[beta]` both mean `q[0]`, and the second write wins. This is
+# the rule that makes a *fake* associative array dangerous rather than merely absent: a shell that
+# answered `declare -A` with an indexed array would collapse every key onto element 0 exactly like
+# this, and nothing on screen would look wrong.
+q=()
+q[alpha]=first
+q[beta]=second
+echo "${q[alpha]} | ${q[beta]} | ${q[0]} | ${#q[@]}"
