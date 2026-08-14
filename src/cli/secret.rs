@@ -14,6 +14,7 @@
 
 use oslo::secrets::{self, Store};
 
+mod cipher;
 mod key;
 mod recipient;
 mod run;
@@ -28,6 +29,7 @@ const USAGE: &str = "usage: oslo secret [--store NAME] COMMAND\n\
                      \x20 rotate        re-encrypt everything to the current recipients\n\
                      \x20 key           where this store's keys come from\n\
                      \x20 recipient     who this store encrypts to\n\
+                     \x20 cipher        hand this store's crypto to another program\n\
                      \x20 stores        every store this machine knows about\n\
                      \x20 where         the store and the key, and which of them may be committed";
 
@@ -106,6 +108,10 @@ pub fn run(args: &[String]) -> i32 {
             Ok(store) => recipient::run(&store, &args[1..]),
             Err(code) => code,
         },
+        Some("cipher") => match store() {
+            Ok(store) => cipher::run(&store, &args[1..]),
+            Err(code) => code,
+        },
         Some("stores") => stores(),
         // **Two directories with opposite rules, so say which is which.** The whole point of the
         // store being encrypted is that it can be committed; the whole point of the key being
@@ -117,19 +123,29 @@ pub fn run(args: &[String]) -> i32 {
                     "store     {}   encrypted, safe to commit",
                     store.directory.display()
                 );
-                println!(
-                    "key       {}   never commit this",
-                    secrets::identity_path()
-                        .unwrap_or(unknown.clone())
-                        .display()
-                );
+                if !store.cipher.is_external() {
+                    println!(
+                        "key       {}   never commit this",
+                        secrets::identity_path()
+                            .unwrap_or(unknown.clone())
+                            .display()
+                    );
+                }
                 println!(
                     "config    {}   names the keys, so never commit this either",
                     secrets::conf::path().unwrap_or(unknown).display()
                 );
                 println!();
-                key::show(&store);
-                recipient::show(&store);
+                // A store whose crypto is another program's has no keys or recipients of oslo's to
+                // show, and printing the defaults it is not using would be a lie about what opens
+                // these files.
+                match store.cipher.is_external() {
+                    true => cipher::show(&store),
+                    false => {
+                        key::show(&store);
+                        recipient::show(&store);
+                    }
+                }
                 0
             }
             Err(code) => code,

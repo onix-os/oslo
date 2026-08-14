@@ -28,6 +28,7 @@
 
 use std::path::PathBuf;
 
+use super::cipher::{self, Cipher};
 use super::key::KeySource;
 
 /// Where the file is: `$OSLO_SECRET_CONF`, else `$XDG_STATE_HOME/oslo/secrets.conf`.
@@ -47,6 +48,8 @@ pub struct Section {
     pub directory: Option<PathBuf>,
     pub recipients: Vec<String>,
     pub keys: Vec<KeySource>,
+    /// Set when another program does this store's crypto instead of oslo's own age.
+    pub cipher: Cipher,
 }
 
 /// The whole file: the lines as written, and what they mean.
@@ -115,6 +118,14 @@ pub fn parse(text: &str) -> Result<Conf, String> {
             ("key", Some(section)) => section
                 .keys
                 .push(KeySource::parse(rest).map_err(|e| format!("line {at}: {e}"))?),
+            ("encrypt", Some(section)) => {
+                section.cipher.encrypt =
+                    Some(cipher::parse(verb, rest).map_err(|e| format!("line {at}: {e}"))?);
+            }
+            ("decrypt", Some(section)) => {
+                section.cipher.decrypt =
+                    Some(cipher::parse(verb, rest).map_err(|e| format!("line {at}: {e}"))?);
+            }
             (other, _) => return Err(format!("line {at}: {other:?} is not a thing to say here")),
         }
     }

@@ -47,6 +47,7 @@
 //! and a shell that asks fifty times a day teaches you to keep the value somewhere else. Protecting
 //! it is the filesystem's job, the same as `~/.ssh/id_ed25519`.
 
+pub mod cipher;
 pub mod conf;
 pub mod key;
 pub mod recipient;
@@ -54,6 +55,7 @@ pub mod recipient;
 use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 
+pub use cipher::Cipher;
 pub use key::KeySource;
 pub use recipient::Recipient;
 
@@ -70,6 +72,8 @@ pub struct Store {
     pub directory: PathBuf,
     pub keys: Vec<KeySource>,
     pub recipients: Vec<Recipient>,
+    /// Set when another program does the crypto — a key in hardware, reached through `age` itself.
+    pub cipher: Cipher,
 }
 
 impl Store {
@@ -91,10 +95,11 @@ impl Store {
         if keys.is_empty() {
             keys.push(KeySource::File(identity_path().ok_or(NOWHERE_FOR_A_KEY)?));
         }
-        if name.starts_with(PLUGIN) && keys.iter().any(KeySource::is_external) {
-            return Err(format!(
-                "{name}: a plugin's store may not run a key command"
-            ));
+        let cipher = section.map(|s| s.cipher.clone()).unwrap_or_default();
+        if name.starts_with(PLUGIN)
+            && (keys.iter().any(KeySource::is_external) || cipher.is_external())
+        {
+            return Err(format!("{name}: a plugin's store may not run a command"));
         }
         Ok(Store {
             directory: match section.and_then(|s| s.directory.clone()) {
@@ -104,6 +109,7 @@ impl Store {
             name: name.to_string(),
             keys,
             recipients,
+            cipher,
         })
     }
 
@@ -185,7 +191,14 @@ impl Store {
     }
 
     /// Encrypt to every recipient, without storing it anywhere.
+    ///
+    /// **A store with an `encrypt command` never reaches oslo's own age**: who that program
+    /// encrypts to, and in what format, is its business. That is what makes a key oslo cannot
+    /// compute — one held in hardware — usable at all.
     pub fn seal(&self, value: &[u8]) -> Result<Vec<u8>, String> {
+        if let Some(argv) = &self.cipher.encrypt {
+            return cipher::through(argv, value);
+        }
         let recipients = self.encrypt_to()?;
         let boxed: Vec<Box<dyn age::Recipient + Send>> = recipients
             .into_iter()
@@ -209,6 +222,9 @@ impl Store {
     /// another key source names — no `$PATH` walk, no fork, and a cron job on a machine that cannot
     /// reach the other key degrades instead of hanging on it.
     pub fn unseal(&self, ciphertext: &[u8]) -> Result<Vec<u8>, String> {
+        if let Some(argv) = &self.cipher.decrypt {
+            return cipher::through(argv, ciphertext);
+        }
         let native = self.identities(false)?;
         if let Some(value) = attempt(ciphertext, &native)? {
             return Ok(value);

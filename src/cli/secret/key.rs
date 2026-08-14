@@ -82,7 +82,7 @@ fn source(args: &[String]) -> Result<KeySource, String> {
 
 fn add(store: &Store, source: &KeySource) -> i32 {
     if store.name.starts_with(secrets::PLUGIN) && source.is_external() {
-        return fail("a plugin's store may not run a key command");
+        return fail("a plugin's store may not run a command");
     }
     let mut conf = match secrets::conf::read() {
         Ok(conf) => conf,

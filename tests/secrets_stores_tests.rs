@@ -105,7 +105,10 @@ fn a_recipient_oslo_cannot_use_is_refused_at_the_time() {
     );
     assert_ne!(status, 0, "it was accepted");
     assert!(err.contains("plugin recipient"), "{err:?}");
-    assert!(err.contains("key command"), "a way out is named: {err:?}");
+    assert!(
+        err.contains("oslo secret cipher"),
+        "a way out is named: {err:?}"
+    );
 }
 
 /// **A key can be a program**, which is what reaches a password manager, a smartcard, or anything
@@ -177,7 +180,7 @@ fn a_plugin_store_may_not_run_a_key_command() {
         b"",
     );
     assert_ne!(status, 0, "it was accepted");
-    assert!(err.contains("may not run a key command"), "{err:?}");
+    assert!(err.contains("may not run a command"), "{err:?}");
 
     // And by hand, in the file the command would have written.
     let conf = home.path().join("state/oslo/secrets.conf");
@@ -185,7 +188,7 @@ fn a_plugin_store_may_not_run_a_key_command() {
     std::fs::write(&conf, "[plugin.notes]\nkey command /bin/cat\n").expect("write");
     let (_, err, status) = secret(home.path(), &["--store", "plugin.notes", "list"], b"");
     assert_ne!(status, 0, "the hand-written one was accepted");
-    assert!(err.contains("may not run a key command"), "{err:?}");
+    assert!(err.contains("may not run a command"), "{err:?}");
 }
 
 /// Which store an invocation means: the argument, then the environment, then the file, then `user`.
@@ -257,4 +260,126 @@ fn run_hands_the_value_to_one_child() {
         b"",
     );
     assert_ne!(status, 0);
+}
+
+/// **A key in hardware never leaves the hardware**, so there is no identity for `key command` to
+/// print — and the whole operation goes to a program that can reach it instead. Here that program
+/// stands in for `age` calling `age-plugin-yubikey`; what is under test is the plumbing, which is
+/// that oslo's own age is not involved at all and everything above it still works.
+#[test]
+fn a_store_can_hand_its_crypto_to_another_program() {
+    let home = tempfile::tempdir().expect("tempdir");
+    let filter = home.path().join("pretend-age");
+    std::fs::write(
+        &filter,
+        "#!/bin/sh\ncase \"$1\" in\n  -R) printf 'PRETEND-AGE\\n'; base64 ;;\n  -d) tail -n +2 | base64 -d ;;\nesac\n",
+    )
+    .expect("write");
+    std::fs::set_permissions(&filter, std::os::unix::fs::PermissionsExt::from_mode(0o755))
+        .expect("chmod");
+    let filter = filter.to_string_lossy().to_string();
+
+    for half in ["encrypt", "decrypt"] {
+        let flag = if half == "encrypt" { "-R" } else { "-d" };
+        let (_, err, status) = secret(
+            home.path(),
+            &["--store", "yubi", "cipher", half, "--", &filter, flag],
+            b"",
+        );
+        assert_eq!(status, 0, "{err}");
+    }
+
+    let (_, err, status) = secret(
+        home.path(),
+        &["--store", "yubi", "set", "deploy"],
+        b"held-in-hardware",
+    );
+    assert_eq!(status, 0, "{err}");
+
+    // The file is the other program's format, not age's — oslo did not write it.
+    let kept = std::fs::read_to_string(home.path().join("oslo/stores/yubi/deploy.age"))
+        .expect("the secret was written");
+    assert!(kept.starts_with("PRETEND-AGE"), "{kept:?}");
+    assert!(!kept.contains("held-in-hardware"), "in the clear: {kept:?}");
+
+    assert_eq!(
+        secret(home.path(), &["--store", "yubi", "get", "deploy"], b"").0,
+        "held-in-hardware"
+    );
+
+    // And everything above the store inherits it, `run` included.
+    let (out, err, status) = secret(
+        home.path(),
+        &[
+            "--store",
+            "yubi",
+            "run",
+            "TOKEN=deploy",
+            "--",
+            "sh",
+            "-c",
+            "echo \"$TOKEN\"",
+        ],
+        b"",
+    );
+    assert_eq!(status, 0, "{err}");
+    assert_eq!(out, "held-in-hardware\n");
+
+    // A program that fails is an error, never an empty value quietly written down.
+    secret(
+        home.path(),
+        &["--store", "broken", "cipher", "encrypt", "--", "/bin/false"],
+        b"",
+    );
+    let (_, err, status) = secret(home.path(), &["--store", "broken", "set", "x"], b"v");
+    assert_ne!(status, 0, "a failing encrypter was accepted");
+    assert!(err.contains("exited 1"), "{err:?}");
+}
+
+/// A plugin's store may not run a command, whichever half of the crypto it is.
+#[test]
+fn a_plugin_store_may_not_hand_off_its_crypto() {
+    let home = tempfile::tempdir().expect("tempdir");
+    let (_, err, status) = secret(
+        home.path(),
+        &[
+            "--store",
+            "plugin.notes",
+            "cipher",
+            "decrypt",
+            "--",
+            "/bin/cat",
+        ],
+        b"",
+    );
+    assert_ne!(status, 0, "it was accepted");
+    assert!(err.contains("may not run a command"), "{err:?}");
+}
+
+/// **The error that sends somebody to the answer.** A plugin identity is a stub naming the plugin
+/// to run, and "invalid Bech32" would send them looking for a typo.
+#[test]
+fn a_plugin_identity_says_what_to_do_instead() {
+    let home = tempfile::tempdir().expect("tempdir");
+    let giver = home.path().join("give");
+    std::fs::write(&giver, "#!/bin/sh\necho AGE-PLUGIN-YUBIKEY-1QQPZQZKC0Q9\n").expect("write");
+    std::fs::set_permissions(&giver, std::os::unix::fs::PermissionsExt::from_mode(0o755))
+        .expect("chmod");
+
+    secret(
+        home.path(),
+        &[
+            "--store",
+            "yk",
+            "key",
+            "add",
+            "command",
+            &giver.to_string_lossy(),
+        ],
+        b"",
+    );
+    let (_, err, status) = secret(home.path(), &["--store", "yk", "set", "thing"], b"v");
+    assert_ne!(status, 0);
+    assert!(err.contains("age plugin identity"), "{err:?}");
+    assert!(err.contains("oslo secret cipher"), "the way out: {err:?}");
 }

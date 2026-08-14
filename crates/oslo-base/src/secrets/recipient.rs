@@ -43,7 +43,7 @@ impl Recipient {
             if self.0.starts_with("age1") && self.0[4..].contains('1') {
                 format!(
                     "{}: an age plugin recipient. oslo does not speak the age plugin protocol; \
-                     see `key command` in the secrets documentation",
+                     hand this store's crypto to `age` itself with `oslo secret cipher`",
                     self.0
                 )
             } else {

@@ -101,6 +101,9 @@ oslo secret key add command -- pass show oslo/age-identity
 oslo secret key init                       # generate this store's key file, explicitly
 oslo secret key list
 
+oslo secret cipher encrypt -- age -R ~/.config/age/recipients.txt   # a key oslo cannot compute
+oslo secret cipher decrypt -- age -d -i ~/.config/age/yubikey.txt   # — see below
+
 oslo secret recipient add age1lggyhq…
 oslo secret recipient add --from RECIPIENTS.txt
 oslo secret recipient --export > RECIPIENTS.txt
@@ -152,17 +155,50 @@ What fences the command:
   the failure. Exported once by a cron job or a container and inherited by every child, it makes
   *this will not fork* something to assert rather than infer.
 
-### No age plugin client
+### A key in hardware: hand the crypto to `age` itself
 
-age reaches hardware keys — YubiKeys and the like — through an external `age-plugin-NAME` binary
-speaking a stanza protocol over pipes. **oslo does not speak it.** Supporting it would mean
-restoring the client code that the vendored `age` had removed, and this shell does not carry code
-for hardware it cannot itself talk to.
+A YubiKey's age key never leaves the YubiKey. That is the point of it, and it is why `key command`
+cannot reach one — there is no identity to print. age solves this with a plugin protocol, an
+external `age-plugin-yubikey` that does the crypto on the device, and **oslo does not speak that
+protocol**: supporting it would mean carrying the client code the vendored `age` had removed, and
+this shell does not carry code for hardware it cannot itself talk to.
 
-The consequence, stated plainly: a `age1yubikey1…` recipient is refused at the moment you add it,
-with the reason, rather than accepted and failing on the next write. If your key lives in a device,
-`key command` is the route — anything that can print an age identity will do — and if what you want
-is the real thing, use `age` itself and keep the file where oslo can read it.
+It does not have to. `age` speaks it, and a store can hand `age` the whole operation:
+
+```sh
+oslo secret --store yubi cipher encrypt -- age -R ~/.config/age/recipients.txt
+oslo secret --store yubi cipher decrypt -- age --decrypt --identity ~/.config/age/yubikey.txt
+```
+
+```
+[yubi]
+directory /home/you/src/dotfiles/secrets
+encrypt command age -R /home/you/.config/age/recipients.txt
+decrypt command age --decrypt --identity /home/you/.config/age/yubikey.txt
+```
+
+Plaintext goes in on standard input, ciphertext comes back out, and the reverse for reading. oslo's
+own `age` is not used for that store at all — the recipients, the plugin, the touch policy and the
+file format are the other program's business. What oslo keeps is everything around it: the store,
+the names, the file layout, `oslo secret run`, the [lazy variable](macros.md), the Lua API, and the
+rule about where keys are allowed to live. A `age1yubikey1…` recipient in `recipients.txt` works,
+because the program reading that file is the one that understands it.
+
+It is not only for hardware. `gpg`, a KMS wrapper, a company's own tool — anything that filters
+bytes both ways works, and none of it is code this shell has to carry.
+
+**What it costs, said plainly: the plaintext crosses a pipe to a program oslo did not compile.** An
+age plugin sees only a wrapped file key; this sees the secret. That is a real difference and the
+reason it is not the default — but the program is one you named in your own configuration file,
+which is the same trust `key command` already asks for. `$OSLO_SECRET_NO_EXEC` refuses both, and a
+`plugin.*` store may run neither.
+
+Two ways to get it wrong, both said out loud rather than left to be discovered:
+
+* Setting only one half is a store that can be written and not read, and `oslo secret where` says so
+  under the command it is missing.
+* A `key command` that prints an `AGE-PLUGIN-…` stub is not a key oslo can use, and the error says
+  that rather than *invalid Bech32* — which would send you looking for a typo.
 
 ## Several recipients, and a store you can commit
 
@@ -375,9 +411,10 @@ built for size rather than speed like every other dependency here; at `opt-level
 
 ## What it cannot do
 
-- **No age plugins, so no hardware keys directly.** See [above](#no-age-plugin-client): a
-  `age1yubikey1…` recipient is refused with its reason, and `key command` is the route to a key oslo
-  cannot compute itself.
+- **No age plugin protocol, so no hardware key that oslo talks to itself.** A `age1yubikey1…`
+  recipient is refused with its reason; the route is
+  [handing the crypto to `age`](#a-key-in-hardware-hand-the-crypto-to-age-itself), which does speak
+  it. The cost of that route is that the plaintext crosses a pipe.
 - **No passphrase recipients, and no `ssh` keys.** The format supports both; nothing here exposes
   them. A passphrase asked on every read is also the thing that teaches people to keep the value
   somewhere else.
@@ -407,6 +444,7 @@ built for size rather than speed like every other dependency here; at `opt-level
 | `crates/oslo-base/src/secrets.rs` | `Store`: paths, seal, unseal, rotate, and the user-store shorthands |
 | `crates/oslo-base/src/secrets/conf.rs` | `secrets.conf`: parsed, and edited line-wise |
 | `crates/oslo-base/src/secrets/key.rs` | `KeySource`: a file, or a program, and what fences the program |
+| `crates/oslo-base/src/secrets/cipher.rs` | handing encryption and decryption to another program |
 | `crates/oslo-base/src/secrets/recipient.rs` | who a store encrypts to, and what it makes of one it cannot use |
 | `crates/oslo-runtime/src/lua/api/secret.rs` | `oslo.secret`, and what a plugin's handle may reach |
 | `crates/oslo-runtime/src/plugin/loading.rs` | which plugin is loading, which is what attribution means here |

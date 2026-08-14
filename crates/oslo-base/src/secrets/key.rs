@@ -118,12 +118,22 @@ pub fn no_exec() -> bool {
 /// **Comment lines are skipped**, because `age-keygen` writes three of them above the key and
 /// telling somebody to strip them by hand would be a step nobody remembers.
 fn parse_identity(text: &str) -> Result<x25519::Identity, String> {
-    text.lines()
+    let line = text
+        .lines()
         .map(str::trim)
         .find(|line| !line.is_empty() && !line.starts_with('#'))
-        .ok_or_else(|| "no age identity in it".to_string())?
-        .parse::<x25519::Identity>()
-        .map_err(|e| e.to_string())
+        .ok_or_else(|| "no age identity in it".to_string())?;
+    // **The failure worth naming.** A key in hardware has no identity to print, so what a plugin
+    // hands out is a stub saying which plugin to run — and "invalid Bech32" would send somebody
+    // looking for a typo instead of at the answer, which is to let `age` itself do the crypto.
+    if line.starts_with("AGE-PLUGIN-") {
+        return Err(format!(
+            "{}: an age plugin identity. oslo does not speak the age plugin protocol; \
+             hand this store's crypto to `age` itself with `oslo secret cipher`",
+            line.split('-').take(3).collect::<Vec<_>>().join("-")
+        ));
+    }
+    line.parse::<x25519::Identity>().map_err(|e| e.to_string())
 }
 
 /// Make one where `path` says, mode `0600` from the moment it exists.
