@@ -20,6 +20,7 @@ pub mod profile;
 pub mod scratch;
 #[cfg(feature = "secrets")]
 pub mod secret;
+pub mod sync;
 pub mod tools;
 pub mod warn;
 

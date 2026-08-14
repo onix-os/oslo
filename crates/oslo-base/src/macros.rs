@@ -42,9 +42,23 @@ pub mod bin;
 pub mod live;
 pub mod snapshot;
 pub mod sourced;
+pub mod sync;
 
 pub use crate::track::kv::Store;
+use crate::track::stamp::Stamp;
 use std::path::PathBuf;
+
+/// What a record gets when the system has no randomness to give.
+///
+/// **Revision zero, which loses every comparison.** A stamp that cannot be rolled must not become
+/// one that wins ties by accident, so it takes the value the shared rule treats as "not a record" —
+/// see [`Stamp::is_real`]. Writing a macro still works; only its place in a sync is forfeit, and a
+/// machine with no `getrandom` has larger problems.
+const UNSTAMPED: Stamp = Stamp {
+    revision: 0,
+    deleted: false,
+    tie_breaker: [0; 16],
+};
 
 /// What a stored name is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
@@ -175,6 +189,13 @@ pub struct Entry {
     /// `false` is off everywhere, until it is turned back on. Not a removal: what it was is still
     /// here, which is the whole difference between turning something off and deleting it.
     pub active: bool,
+    /// Which revision of this macro it is, and whether it has been deleted.
+    ///
+    /// **Not the same switch as `active`**, and the difference matters when two machines sync.
+    /// `active` is a setting *of* a macro that still exists; a deleted one is a
+    /// [tombstone][crate::track::stamp] — the record stays so that the removal can travel, and
+    /// [`get`] answers `None` for it as if it were gone, which for every purpose but sync it is.
+    pub stamp: Stamp,
 }
 
 impl Entry {
@@ -187,6 +208,7 @@ impl Entry {
             created: now(),
             tags: Vec::new(),
             active: true,
+            stamp: Stamp::first().unwrap_or(UNSTAMPED),
         }
     }
 
@@ -290,15 +312,24 @@ fn key(kind: Kind, name: &str) -> String {
 /// **`created` is taken from what is already there**, if anything is: editing a macro changes the
 /// macro, not when you first made it, and a caller building an `Entry` to write should not have to
 /// remember to go and read the old timestamp first.
+/// **The stamp is advanced from whatever is already there**, tombstone included: writing a name
+/// somebody deleted brings it back, and the revision has to clear the tombstone's or the next sync
+/// would hand the deletion back and undo the write.
 pub fn put(store: &Store, entry: &Entry) -> Result<(), String> {
     if !valid_name(&entry.name) {
         return Err(format!("{:?} is not a name this can store", entry.name));
     }
-    let created = get(store, entry.kind, &entry.name)
+    let before = stored(store, entry.kind, &entry.name);
+    let created = before
+        .as_ref()
         .map(|old| old.created)
         .unwrap_or(entry.created);
+    let mut stamp = before.map(|old| old.stamp).unwrap_or(entry.stamp);
+    stamp.deleted = false;
+    stamp.advance();
     let record = Entry {
         created,
+        stamp,
         ..entry.clone()
     };
     crate::store::set(
@@ -308,8 +339,14 @@ pub fn put(store: &Store, entry: &Entry) -> Result<(), String> {
     )
 }
 
-/// Read one back.
+/// Read one back, or `None` when there is none — including when what is there is a tombstone.
 pub fn get(store: &Store, kind: Kind, name: &str) -> Option<Entry> {
+    stored(store, kind, name).filter(|entry| !entry.stamp.deleted)
+}
+
+/// The record as it really is, tombstones and all. For sync, which is the one thing that must see
+/// a deletion rather than be told there is nothing there.
+pub fn stored(store: &Store, kind: Kind, name: &str) -> Option<Entry> {
     let stored = crate::store::get(store, &key(kind, name))?;
     Some(decode(kind, name, &String::from_utf8_lossy(&stored)))
 }
@@ -322,26 +359,49 @@ pub fn get(store: &Store, kind: Kind, name: &str) -> Option<Entry> {
 /// forever, to hold three small values.
 ///
 /// ```text
-/// 1 1754870400 on system,git
+/// 2 1754870400 on system,git 3 live 9f1c…  (32 hex characters)
 /// git status --short
 /// ```
 ///
-/// The leading `1` is the format. A record that starts with anything else is read as a bare body
-/// from before there were fields, which costs one comparison and means the store never has to be
-/// migrated.
+/// The leading number is the format. Format `1` is the same line without the last three fields and
+/// is still read, taking a fresh stamp; a record that starts with neither is read as a bare body
+/// from before there were fields at all. Both cost one comparison, and mean a store written by an
+/// older oslo opens rather than explodes.
+///
+/// **The three sync fields go last** so that the ones a person might read are at the front.
 fn encode(entry: &Entry) -> String {
     format!(
-        "1 {} {} {}\n{}",
+        "2 {} {} {} {} {} {}\n{}",
         entry.created,
         if entry.active { "on" } else { "off" },
         entry.tags.join(","),
+        entry.stamp.revision,
+        if entry.stamp.deleted { "dead" } else { "live" },
+        hex(&entry.stamp.tie_breaker),
         entry.body
     )
 }
 
+fn hex(bytes: &[u8; 16]) -> String {
+    bytes.iter().map(|byte| format!("{byte:02x}")).collect()
+}
+
+fn unhex(text: &str) -> Option<[u8; 16]> {
+    if text.len() != 32 {
+        return None;
+    }
+    let mut bytes = [0; 16];
+    for (at, byte) in bytes.iter_mut().enumerate() {
+        *byte = u8::from_str_radix(text.get(at * 2..at * 2 + 2)?, 16).ok()?;
+    }
+    Some(bytes)
+}
+
 fn decode(kind: Kind, name: &str, stored: &str) -> Entry {
     let (header, body) = match stored.split_once('\n') {
-        Some((header, body)) if header.starts_with("1 ") => (header, body),
+        Some((header, body)) if header.starts_with("2 ") || header.starts_with("1 ") => {
+            (header, body)
+        }
         // No header: a body and nothing else. On, untagged, and undated.
         _ => {
             return Entry {
@@ -351,6 +411,7 @@ fn decode(kind: Kind, name: &str, stored: &str) -> Entry {
                 created: 0,
                 tags: Vec::new(),
                 active: true,
+                stamp: Stamp::first().unwrap_or(UNSTAMPED),
             };
         }
     };
@@ -366,6 +427,16 @@ fn decode(kind: Kind, name: &str, stored: &str) -> Entry {
                 .collect()
         })
         .unwrap_or_default();
+    // A record written before there were sync fields gets a fresh stamp, which is the right answer:
+    // it has never been synced, so revision one is the truth about it.
+    let stamp = match (fields.next(), fields.next(), fields.next()) {
+        (Some(revision), Some(state), Some(tie)) => Stamp {
+            revision: revision.parse().unwrap_or(1),
+            deleted: state == "dead",
+            tie_breaker: unhex(tie).unwrap_or([0; 16]),
+        },
+        _ => Stamp::first().unwrap_or(UNSTAMPED),
+    };
     Entry {
         kind,
         name: name.to_string(),
@@ -373,6 +444,7 @@ fn decode(kind: Kind, name: &str, stored: &str) -> Entry {
         created,
         tags,
         active,
+        stamp,
     }
 }
 
@@ -399,13 +471,25 @@ pub fn kinds_of(store: &Store, name: &str) -> Vec<Kind> {
     Kind::every()
         .iter()
         .copied()
-        .filter(|kind| crate::store::has(store, &key(*kind, name)))
+        .filter(|kind| get(store, *kind, name).is_some())
         .collect()
 }
 
 /// Remove one. Answers whether it was there.
+///
+/// **A tombstone, not an erasure.** The record stays with its stamp buried, because a row that
+/// simply vanished would be indistinguishable from one this machine never had — and the other end
+/// of a sync, seeing a macro we lack, would hand it straight back. See [`crate::track::stamp`].
 pub fn remove(store: &Store, kind: Kind, name: &str) -> bool {
-    crate::store::delete(store, &key(kind, name))
+    let Some(entry) = get(store, kind, name) else {
+        return false;
+    };
+    let mut stamp = entry.stamp;
+    stamp.bury();
+    // The body is kept: it costs a few bytes, and it is what lets a sync tell the far end *which*
+    // macro is gone rather than only that something was.
+    let buried = Entry { stamp, ..entry };
+    crate::store::set(store, &key(kind, name), encode(&buried).as_bytes()).is_ok()
 }
 
 /// Everything stored, sorted by kind then name.

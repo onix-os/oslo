@@ -261,10 +261,13 @@ fn a_store_can_hand_its_crypto_to_another_program() {
     );
     assert_eq!(status, 0, "{err}");
 
-    // The file is the other program's format, not age's — oslo did not write it.
+    // The body is the other program's format — oslo did not write it — behind oslo's own one-line
+    // header, which is what a sync reads and is deliberately outside the sealed part.
     let kept = std::fs::read_to_string(home.path().join("oslo/stores/yubi/deploy.sealed"))
         .expect("the secret was written");
-    assert!(kept.starts_with("PRETEND-AGE"), "{kept:?}");
+    let (header, body) = kept.split_once('\n').expect("a header and a body");
+    assert!(header.starts_with("OSLOSEC1 "), "{header:?}");
+    assert!(body.starts_with("PRETEND-AGE"), "{body:?}");
     assert!(!kept.contains("held-in-hardware"), "in the clear: {kept:?}");
 
     assert_eq!(

@@ -223,9 +223,15 @@ fn a_hook_can_drive_an_external_age_over_a_pipe() {
     assert!(out.contains("read:\theld-in-the-device"), "{out:?} {err}");
 
     // What the store holds is the other program's format, and the value is not in it.
+    //
+    // **Behind oslo's own one-line header**, which carries what a sync needs to know about the file
+    // — see `oslo::secrets::sync`. It is outside the sealed body on purpose: a machine that cannot
+    // open this store still has to be able to carry it.
     let kept = std::fs::read_to_string(home.path().join("oslo/stores/yubi/deploy.sealed"))
         .expect("the secret was written");
-    assert!(kept.starts_with("AGE-ISH"), "{kept:?}");
+    let (header, body) = kept.split_once('\n').expect("a header and a body");
+    assert!(header.starts_with("OSLOSEC1 "), "{header:?}");
+    assert!(body.starts_with("AGE-ISH"), "{body:?}");
     assert!(
         !kept.contains("held-in-the-device"),
         "in the clear: {kept:?}"

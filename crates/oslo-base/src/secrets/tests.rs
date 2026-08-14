@@ -34,16 +34,16 @@ fn an_empty_dot_git_is_not_a_repository() {
     let dir = tempfile::tempdir().expect("tempdir");
     let empty = dir.path().join("looks-like-one");
     std::fs::create_dir_all(&empty).expect("an empty .git");
-    assert!(!is_repository(&empty));
+    assert!(!super::place::is_repository(&empty));
 
     // A real one has `HEAD` in it…
     std::fs::write(empty.join("HEAD"), "ref: refs/heads/main\n").expect("write");
-    assert!(is_repository(&empty));
+    assert!(super::place::is_repository(&empty));
 
     // …and a worktree or submodule has a *file* saying where its directory is.
     let pointer = dir.path().join("worktree-dot-git");
     std::fs::write(&pointer, "gitdir: /elsewhere\n").expect("write");
-    assert!(is_repository(&pointer));
+    assert!(super::place::is_repository(&pointer));
 }
 
 /// **A malformed line is an error, not a skipped line.** The failure the loudness prevents is a

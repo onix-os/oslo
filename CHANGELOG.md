@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.5.0] - 2026-08-14
+
+### <!-- 0 -->⛰️  Features
+
+- Macros and secrets travel, deletes included
+
 ## [0.4.0] - 2026-08-14
 
 ### <!-- 0 -->⛰️  Features

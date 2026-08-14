@@ -223,6 +223,6 @@ fn syncing_twice_moves_nothing_the_second_time() {
 
     let (said, err, status) = syncing(&here, &there, &[]);
     assert_eq!(status, 0, "{err}");
-    assert!(said.contains("here     +0 ~0 -0"), "{said}");
-    assert!(said.contains("unchanged 2"), "{said}");
+    // A part with nothing to move says so in one line rather than three rows of zeroes.
+    assert!(said.contains("history   unchanged 2"), "{said}");
 }

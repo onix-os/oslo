@@ -46,6 +46,10 @@ pub const TOOLS: &[Tool] = &[
         name: "history",
         about: "search, export and prune the command history",
     },
+    Tool {
+        name: "sync",
+        about: "carry history, macros and secrets to another machine",
+    },
     #[cfg(feature = "direnv")]
     Tool {
         name: "direnv",
@@ -144,6 +148,9 @@ pub fn run(tool: &'static Tool, args: &[String]) -> i32 {
     }
     if tool.name == "profile" {
         return crate::cli::profile::run(args);
+    }
+    if tool.name == "sync" {
+        return crate::cli::sync::run(args);
     }
     #[cfg(feature = "plugin")]
     if tool.name == "plugin" {

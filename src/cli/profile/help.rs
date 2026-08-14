@@ -61,7 +61,7 @@ const SUBCOMMANDS: &[Sub] = &[
     Sub {
         name: "sync",
         args: "USER@HOST [NAME] [--dry-run]",
-        about: "two-way sync with the oslo over there",
+        about: "two-way history sync — `oslo sync` carries the rest",
         flags: &[
             ("--dry-run", "say what would change and change nothing"),
             ("$OSLO_SSH", "how to get there, if a bare `ssh` is not it"),
@@ -81,23 +81,6 @@ const SUBCOMMANDS: &[Sub] = &[
         flags: &[],
         note: "A hash of the key, never the key: this is the half that crosses the wire, and it \
                gives nothing away. Sixteen hex characters, short enough to read down a phone.",
-    },
-    Sub {
-        name: "send",
-        args: "[NAME]",
-        about: "a snapshot of this profile's store, on standard output",
-        flags: &[],
-        note: "The far end's half of a sync, run over ssh rather than typed. A consistent \
-               snapshot, not a file copy.",
-    },
-    Sub {
-        name: "receive",
-        args: "[NAME]",
-        about: "merge a snapshot arriving on standard input",
-        flags: &[],
-        note: "The other half, and it merges rather than replaces — between the moment the other \
-               end asked for a copy and the moment it hands one back, a shell here may have \
-               recorded something.",
     },
 ];
 

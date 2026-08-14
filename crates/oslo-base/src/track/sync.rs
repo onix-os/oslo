@@ -3,8 +3,8 @@ use super::kv::{Fields, Key, Span, Store, Tree, Walk, Writer};
 use super::log::Entry;
 use super::outcome::Outcome;
 use super::row::{DirRow, RunRow, key};
+use super::stamp::Stamp;
 use sha2::{Digest, Sha256};
-use std::cmp::Ordering;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fmt::{Display, Formatter};
 use std::path::Path;
@@ -142,10 +142,23 @@ impl HistoryEvent {
         }
     }
 
+    /// Which of two copies of the same event survives.
+    ///
+    /// The comparison itself is [`super::stamp`]'s, so that history cannot drift into a different
+    /// idea of "newer" than macros and secrets have.
     pub fn preferred<'a>(&'a self, other: &'a HistoryEvent) -> &'a HistoryEvent {
-        match self.stamp().cmp(&other.stamp()) {
-            Ordering::Less => other,
-            _ => self,
+        match other.mark().wins_over(&self.mark()) {
+            true => other,
+            false => self,
+        }
+    }
+
+    /// This event's revision, tombstone and tie-breaker, as the shared rule wants them.
+    fn mark(&self) -> Stamp {
+        Stamp {
+            revision: self.revision,
+            deleted: self.deleted,
+            tie_breaker: self.tie_breaker,
         }
     }
 

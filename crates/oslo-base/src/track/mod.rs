@@ -37,6 +37,10 @@ pub mod log;
 pub mod nested;
 pub mod profile;
 pub mod session;
+// The rule that decides which copy of a record wins, shared by everything that syncs. History,
+// macros and secrets keep their own storage and their own encodings; what they must not each invent
+// is a second idea of what "newer" means.
+pub mod stamp;
 pub mod sync;
 // The one module that knows which key-value engine is underneath. Read its note before touching
 // it: nothing else may `use tagdata`, so that moving engines again is a day of rewriting one
