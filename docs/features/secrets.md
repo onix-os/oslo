@@ -392,6 +392,46 @@ Everything crossing to Lua is **base64**, both hooks and both storage handlers: 
 and an age file is not. It is the same shape `oslo.secret.seal` speaks, so a handler can pass one
 straight to the other.
 
+### Calling `age` — and so a YubiKey — from a hook
+
+A handler is handed base64 and must answer base64, while `age` speaks raw bytes on a pipe. A Lua
+string cannot carry those, and putting the payload in argv would publish the plaintext to `ps`, so
+this is the one thing a hook cannot build for itself. `oslo.secret.through` is the pipe:
+
+```lua
+-- ~/.config/oslo/config.lua
+local recipients = os.getenv("HOME") .. "/.config/age/recipients.txt"   -- has age1yubikey1…
+local identity   = os.getenv("HOME") .. "/.config/age/yubikey.txt"      -- the AGE-PLUGIN-… stub
+
+oslo.on["on-secret-encrypt"](function(store, name, sealed)
+  if store ~= "yubi" then return nil end
+  return oslo.secret.through({ "age", "-R", recipients }, sealed)
+end)
+
+oslo.on["on-secret-decrypt"](function(store, name, sealed)
+  if store ~= "yubi" then return nil end
+  return oslo.secret.through({ "age", "--decrypt", "--identity", identity }, sealed)
+end)
+```
+
+```
+# secrets.conf
+[yubi]
+crypto hook
+```
+
+`age` finds `age-plugin-yubikey` on `$PATH` and talks to the device; oslo hands over bytes and gets
+bytes back. **Standard error is inherited**, so the plugin's *touch your key* prompt reaches your
+terminal — captured, it would not, and the shell would appear to hang for reasons nobody could see.
+The file that lands in the store is a real age file: `age -d -i yk.txt` opens it with oslo
+uninstalled.
+
+**A hook is the right route when you want logic** — different recipients per secret, a notification
+before the touch, a fallback, a cache. **When you only want `age` run, use
+[`cipher command`](#a-key-in-hardware-hand-the-crypto-to-age-itself) instead**: it is a subprocess
+rather than a hook, so it also works from `cron`, from `dash`, and behind
+`$(oslo secret get …)` in a macro variable — none of which run Lua.
+
 ### The rule that keeps it honest
 
 **The file declares which mechanism a store uses; Lua supplies the mechanism.**
@@ -448,6 +488,7 @@ while `oslo secret --store work` is untouched, because that process has no Lua.
 |---|---|
 | `on-secret-encrypt` | asked to seal, for a `crypto hook` store. Answers base64, or `nil` for "not mine" |
 | `on-secret-decrypt` | the same, the other way |
+| `oslo.secret.through(argv, base64)` | not a hook: the binary-safe pipe a handler calls to reach `age` or anything like it |
 | `pre-secret-access` | a secret is about to be read or written: store, name, `read`/`write` |
 | `post-secret-access` | it just was |
 

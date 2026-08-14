@@ -183,3 +183,58 @@ fn the_two_reserved_names_cannot_be_defined() {
     );
     assert!(out.contains("other:\ttrue"), "{out:?}");
 }
+
+/// **The shape a real `age` + `age-plugin-yubikey` takes.** A hook cannot build this out of
+/// `oslo.run`: it is handed base64, `age` speaks raw bytes on a pipe, and a Lua string cannot carry
+/// those — while putting the payload in argv would publish the plaintext to `ps`. So
+/// `oslo.secret.through` is the pipe, and this is the whole configuration somebody writes.
+#[test]
+fn a_hook_can_drive_an_external_age_over_a_pipe() {
+    let home = tempfile::tempdir().expect("tempdir");
+    let age = home.path().join("age");
+    std::fs::write(
+        &age,
+        "#!/bin/sh\necho 'touch the key' >&2\ncase \"$1\" in\n  -R) printf 'AGE-ISH\\n'; base64 ;;\n  --decrypt) tail -n +2 | base64 -d ;;\nesac\n",
+    )
+    .expect("write");
+    std::fs::set_permissions(&age, std::os::unix::fs::PermissionsExt::from_mode(0o755))
+        .expect("chmod");
+    let age = age.to_string_lossy().to_string();
+
+    let (out, err) = lua(
+        home.path(),
+        "[yubi]\ncrypto hook\n",
+        &format!(
+            r#"
+            oslo.on["on-secret-encrypt"](function(store, name, sealed)
+              if store ~= "yubi" then return nil end
+              return oslo.secret.through({{ "{age}", "-R", "recipients.txt" }}, sealed)
+            end)
+            oslo.on["on-secret-decrypt"](function(store, name, sealed)
+              if store ~= "yubi" then return nil end
+              return oslo.secret.through({{ "{age}", "--decrypt", "--identity", "yk.txt" }}, sealed)
+            end)
+            local v = oslo.secret.open("yubi")
+            v:set("deploy", "held-in-the-device")
+            print("read:", v:get("deploy"))
+            "#
+        ),
+    );
+    assert!(out.contains("read:\theld-in-the-device"), "{out:?} {err}");
+
+    // What the store holds is the other program's format, and the value is not in it.
+    let kept = std::fs::read_to_string(home.path().join("oslo/stores/yubi/deploy.age"))
+        .expect("the secret was written");
+    assert!(kept.starts_with("AGE-ISH"), "{kept:?}");
+    assert!(
+        !kept.contains("held-in-the-device"),
+        "in the clear: {kept:?}"
+    );
+
+    // **The prompt reached a terminal rather than a pipe.** A key in hardware asks for a touch on
+    // standard error, and a captured prompt is a shell that appears to hang for no visible reason.
+    assert!(
+        err.contains("touch the key"),
+        "the prompt was swallowed: {err:?}"
+    );
+}

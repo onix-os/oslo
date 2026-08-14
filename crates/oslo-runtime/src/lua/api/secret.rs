@@ -65,6 +65,47 @@ pub fn build() -> Value {
     // oslo.secret.define(name, handlers) -> where this store's bytes live
     put(&mut secret, "define", |_, args| defined::define(&args));
 
+    // oslo.secret.through({argv…}, base64) -> base64, or nil + message
+    //
+    // **The one thing a crypto hook cannot do for itself.** A handler is handed base64 and must
+    // answer base64, while `age` and everything like it speak raw bytes on a pipe — and a Lua string
+    // cannot hold those, so there is no way to build this out of `oslo.run`. Putting the payload in
+    // argv instead would publish the plaintext to `ps` on the encrypt side.
+    put(&mut secret, "through", |_, args| {
+        let Some(Value::Table(list)) = args.first() else {
+            return Ok(vec![
+                Value::Nil,
+                Value::str("oslo.secret.through: the first argument is a list of words"),
+            ]);
+        };
+        let argv: Vec<String> = list
+            .borrow()
+            .sequence()
+            .iter()
+            .filter_map(|word| match word {
+                Value::Str(text) => Some(text.to_string()),
+                _ => None,
+            })
+            .collect();
+        if argv.is_empty() {
+            return Ok(vec![
+                Value::Nil,
+                Value::str("oslo.secret.through: no program to run"),
+            ]);
+        }
+        let payload = text(&args, 2, "oslo.secret.through")?;
+        let Some(bytes) = unbase64(&payload) else {
+            return Ok(vec![
+                Value::Nil,
+                Value::str("oslo.secret.through: the payload is not base64"),
+            ]);
+        };
+        Ok(match secrets::cipher::through(&argv, &bytes) {
+            Ok(answered) => vec![Value::str(base64(&answered))],
+            Err(message) => vec![Value::Nil, Value::str(message)],
+        })
+    });
+
     // oslo.secret.mine() -> the calling plugin's own store
     #[cfg(feature = "plugin")]
     put(&mut secret, "mine", |_, _| {

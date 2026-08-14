@@ -96,7 +96,10 @@ pub fn through(argv: &[String], input: &[u8]) -> Result<Vec<u8>, String> {
         .args(rest)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
+        // **Inherited, not captured.** A key in hardware asks for a touch or a PIN, and it asks on
+        // standard error — captured, that prompt never reaches the person it is asking, and the
+        // shell appears to hang until they touch the device for reasons they cannot see.
+        .stderr(Stdio::inherit())
         .spawn()
         .map_err(|e| format!("{program}: {e}"))?;
 
@@ -105,13 +108,9 @@ pub fn through(argv: &[String], input: &[u8]) -> Result<Vec<u8>, String> {
     let writer = std::thread::spawn(move || stdin.write_all(&written));
 
     let mut output = Vec::new();
-    let mut said = String::new();
     if let Some(mut out) = child.stdout.take() {
         out.read_to_end(&mut output)
             .map_err(|e| format!("{program}: {e}"))?;
-    }
-    if let Some(mut err) = child.stderr.take() {
-        let _ = err.read_to_string(&mut said);
     }
     let status = child.wait().map_err(|e| format!("{program}: {e}"))?;
     // Joined after the wait: a program that exits without reading its input leaves the write
@@ -119,14 +118,9 @@ pub fn through(argv: &[String], input: &[u8]) -> Result<Vec<u8>, String> {
     let _ = writer.join();
 
     if !status.success() {
-        return Err(format!(
-            "{program}: exited {}{}",
-            status.code().unwrap_or(-1),
-            match said.trim().is_empty() {
-                true => String::new(),
-                false => format!(": {}", said.trim()),
-            }
-        ));
+        // Whatever it had to say went straight to the terminal on its way past, so this names the
+        // program and the status and does not pretend to know more.
+        return Err(format!("{program}: exited {}", status.code().unwrap_or(-1)));
     }
     if output.is_empty() {
         return Err(format!("{program}: gave nothing back"));
