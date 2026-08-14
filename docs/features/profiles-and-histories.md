@@ -136,7 +136,7 @@ The far end is oslo rather than `scp` — a store is a live database, and copyin
 shell that is writing to it is how you get half a transaction. Running it twice moves nothing the
 second time, which is what makes it safe in a login file or a cron line.
 
-**It carries the macros and the secrets too**, and `oslo sync` is the same command by another name —
+**It carries the macros and the secrets too**, and `oslo profile sync` is the same command by another name —
 the same flags, the same work. `NAME` decides only which *history* travels; macros and secrets are
 one per machine. [Syncing between machines](syncing.md) has the whole of it: the rule that decides
 which copy of a record wins, how a deletion travels, and why the secrets cross sealed.
@@ -263,7 +263,7 @@ machine, which is the argument for naming profiles after *roles* rather than per
 |---|---|
 | `crates/oslo-base/src/track/profile/key.rs` | the key, the fingerprint, and where neither of them goes |
 | `src/cli/profile.rs` | `list`, `show`, `key`, `export`, `import`, `fingerprint` |
-| `src/cli/profile/sync.rs` | `sync`, which parses the words and hands them to `oslo sync` |
+| `src/cli/profile/sync.rs` | `sync`, which parses the words and hands them to `oslo profile sync` |
 | `crates/oslo-base/src/track/profile.rs` | `ENV`, `current`, `valid`, `store_path`, `profile_dir`, `history_dir`, `available`, `after` |
 | `crates/oslo-base/src/track/mod.rs` | `default_path` — the `hist.db` of the current profile |
 | `crates/oslo-base/src/predict/mod.rs` | `default_path` — the `hist.model` of the same profile |

@@ -533,7 +533,7 @@ deleted.
 
 ## Between machines
 
-`oslo sync laptop` carries the store, and **nothing is decrypted to do it**. The store key is derived
+`oslo profile sync laptop` carries the store, and **nothing is decrypted to do it**. The store key is derived
 from the profile key, so two machines that share a profile derive the same one and each can open what
 the other wrote; the sealed bodies move exactly as they stand, and the plaintext is never in memory
 on either side.

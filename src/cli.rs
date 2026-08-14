@@ -20,6 +20,7 @@ pub mod profile;
 pub mod scratch;
 #[cfg(feature = "secrets")]
 pub mod secret;
+// The sync implementation. The command is `oslo profile sync`; this is not a tool of its own.
 pub mod sync;
 pub mod tools;
 pub mod warn;
