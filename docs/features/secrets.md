@@ -353,6 +353,86 @@ future sandbox all need. It also only holds while the plugin's file is loading: 
 a global outlives the load, and a call made from a hook is indistinguishable from one made at the
 prompt.
 
+## Pluggable: hooks do the crypto, Lua does the storage
+
+Everything above is oslo's own store — age, keys, recipients, and a flat file so it works in `cron`.
+That is deliberately the *only* thing `oslo secret` on the command line knows how to do.
+
+Lua is where the rest lives. Two independent axes, either or both replaceable:
+
+| axis | replaced by | declared in |
+|---|---|---|
+| **crypto** — what the bytes are | `on-secret-encrypt` / `on-secret-decrypt` | `crypto hook` in `secrets.conf` |
+| **storage** — where the bytes live | `oslo.secret.define` | Lua, at load |
+
+```lua
+-- crypto: whatever you like, for the stores you claim
+oslo.on["on-secret-encrypt"](function(store, name, sealed)
+  if store ~= "vault" then return nil end        -- nil is "not mine"
+  return my_own_encryption(sealed)
+end)
+oslo.on["on-secret-decrypt"](function(store, name, sealed)
+  if store ~= "vault" then return nil end
+  return my_own_decryption(sealed)
+end)
+
+-- storage: a database, a file elsewhere, a network call
+oslo.secret.define("vault", {
+  get    = function(name) return db:get(name) end,
+  set    = function(name, sealed) db:set(name, sealed) return true end,
+  list   = function() return db:keys() end,
+  forget = function(name) db:delete(name) return true end,   -- optional
+})
+
+local v = oslo.secret.open("vault")
+v:set("token", "…")
+```
+
+Everything crossing to Lua is **base64**, both hooks and both storage handlers: a Lua string is UTF-8
+and an age file is not. It is the same shape `oslo.secret.seal` speaks, so a handler can pass one
+straight to the other.
+
+### The rule that keeps it honest
+
+**The file declares which mechanism a store uses; Lua supplies the mechanism.**
+
+A hook only exists in a process that ran your config. `oslo secret get` never does. So a store whose
+crypto were *silently* a hook would work at your prompt and quietly do something else in the cron job
+reading the same store. Instead, `crypto hook` is written in `secrets.conf`, and a process with no
+Lua that meets it says so:
+
+```
+oslo secret: vault: its crypto is `crypto hook`, and nothing is attached to on-secret-decrypt
+here. A hook needs a shell that has read your config; `oslo secret` from a script, a Makefile
+or cron never does
+```
+
+That check runs *before* anything touches a file, so the reason you get is the real one rather than
+"no such file". Declaring `crypto hook` and an `encrypt command` in one store is refused outright —
+they have different reach, and quietly picking one is how a store becomes readable in one process
+and not another.
+
+### `nil` means "not mine"
+
+A handler that returns `nil` declines, and the next one is asked. So several plugins can each serve
+their own store off one hook, and a store nobody claims is a **refusal** rather than a fall back to
+age — falling back would encrypt to a key the store was never meant to use.
+
+### Watching, without seeing
+
+`pre-secret-access` and `post-secret-access` fire on every read and write, on the native path and the
+defined one. They are told the store, the name, and `"read"` or `"write"` — and **never the value**,
+because a hook that logs is the likeliest thing anybody writes on them and a log of secrets is worse
+than no log.
+
+### What may not be replaced
+
+`oslo.secret.define` refuses `user` and anything under `plugin.`. The first is what the command line
+means, and shadowing it would make `oslo.secret.get` and `oslo secret get` disagree about your own
+secrets; the second is reached only through `oslo.secret.mine()`. Everything else is open — and a
+config or plugin that defines `work` decides what `oslo.secret.open("work")` reads *in this shell*,
+while `oslo secret --store work` is untouched, because that process has no Lua.
+
 ## Configuration
 
 | | |
@@ -363,6 +443,13 @@ prompt.
 | `$OSLO_SECRET_CONF` | the configuration file, absolutely |
 | `$OSLO_SECRET_STORE` | which store this shell and its children mean |
 | `$OSLO_SECRET_NO_EXEC` | skip every key source that would run a program |
+
+| hook | |
+|---|---|
+| `on-secret-encrypt` | asked to seal, for a `crypto hook` store. Answers base64, or `nil` for "not mine" |
+| `on-secret-decrypt` | the same, the other way |
+| `pre-secret-access` | a secret is about to be read or written: store, name, `read`/`write` |
+| `post-secret-access` | it just was |
 
 There is no `config.lua` for any of this, and that is the point of the section above: a path read
 after Lua has run is a path a `cron` job never sees.
@@ -388,10 +475,10 @@ Re-measured on the binary as it now stands, with stores, keys, recipients, `secr
 
 ```text
   every other feature on   6,631,840 bytes
-  with it                  6,853,056 bytes    +216 KB, still 36 crates
+  with it                  6,894,016 bytes    +256 KB, still 36 crates
 ```
 
-So the whole layer above `age` is **68 KB and no new dependency**. `base64` was already in the tree
+So the whole layer above `age` is **108 KB and no new dependency**. `base64` was already in the tree
 as an unconditional dependency of vendored `age`.
 
 What a read costs, interleaved, min of five runs of three hundred, against the same binary doing a
@@ -422,6 +509,9 @@ built for size rather than speed like every other dependency here; at `opt-level
   global, and `oslo.fs` reads any file this user can. A plugin's store is encrypted against the
   *disk*, which is worth having; it is not isolated from other plugins, and saying otherwise would
   be a lie.
+- **A hook-backed store is unreachable outside a shell that ran your config** — no `cron`, no
+  `dash`, no `$(oslo secret get …)` in a macro variable. That is stated in the file rather than
+  discovered, but it is a real limit: for anything a script must read, use age or a command.
 - **The declaration is not enforcement.** `oslo.proc.exec("oslo", "secret", "get", …)` walks past
   it, and so does a handle acquired at load and used later.
 - **No rotation of the key itself.** `rotate` re-encrypts to the current recipients; there is
@@ -445,6 +535,9 @@ built for size rather than speed like every other dependency here; at `opt-level
 | `crates/oslo-base/src/secrets/conf.rs` | `secrets.conf`: parsed, and edited line-wise |
 | `crates/oslo-base/src/secrets/key.rs` | `KeySource`: a file, or a program, and what fences the program |
 | `crates/oslo-base/src/secrets/cipher.rs` | handing encryption and decryption to another program |
+| `crates/oslo-base/src/secrets/crypto.rs` | the three mechanisms, and why only one of them can be unreachable |
+| `crates/oslo-base/src/secrets/hooked.rs` | asking Lua to do the crypto, and telling it what was touched |
+| `crates/oslo-runtime/src/lua/api/secret/defined.rs` | `oslo.secret.define` — a store whose bytes are Lua's |
 | `crates/oslo-base/src/secrets/recipient.rs` | who a store encrypts to, and what it makes of one it cannot use |
 | `crates/oslo-runtime/src/lua/api/secret.rs` | `oslo.secret`, and what a plugin's handle may reach |
 | `crates/oslo-runtime/src/plugin/loading.rs` | which plugin is loading, which is what attribution means here |

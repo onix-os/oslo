@@ -41,6 +41,8 @@
 //! carry a whole age *file*, which is binary, so they speak base64 rather than putting a NUL and a
 //! header through anything that might treat it as text.
 
+mod defined;
+
 use super::util::{ok, put, text};
 use oslo_base::secrets::{self, Store};
 use oslo_lua::value::{Table, Value};
@@ -53,10 +55,15 @@ pub fn build() -> Value {
     put(&mut secret, "open", |_, args| {
         let name = text(&args, 1, "oslo.secret.open")?;
         match reachable(&name).and_then(|()| Store::named(&name)) {
+            // A store Lua defined keeps its own bytes; everything else is a directory of files.
+            Ok(store) if defined::holds(&name) => ok(defined::handle(store)),
             Ok(store) => ok(handle(store, allowed())),
             Err(message) => Ok(vec![Value::Nil, Value::str(message)]),
         }
     });
+
+    // oslo.secret.define(name, handlers) -> where this store's bytes live
+    put(&mut secret, "define", |_, args| defined::define(&args));
 
     // oslo.secret.mine() -> the calling plugin's own store
     #[cfg(feature = "plugin")]
@@ -88,6 +95,11 @@ pub fn build() -> Value {
             .collect();
         if !names.iter().any(|name| name == secrets::USER) {
             names.insert(0, secrets::USER.to_string());
+        }
+        for name in defined::names() {
+            if !names.contains(&name) {
+                names.push(name);
+            }
         }
         ok(list(&names))
     });
@@ -284,12 +296,12 @@ fn list(names: &[String]) -> Value {
 
 /// **Base64 rather than the bytes**, and rather than armour: an age file is binary, and `armor`
 /// costs 45 KB measured for a format nothing outside this boundary would read.
-fn base64(bytes: &[u8]) -> String {
+pub(crate) fn base64(bytes: &[u8]) -> String {
     use base64::Engine;
     base64::engine::general_purpose::STANDARD.encode(bytes)
 }
 
-fn unbase64(text: &str) -> Option<Vec<u8>> {
+pub(crate) fn unbase64(text: &str) -> Option<Vec<u8>> {
     use base64::Engine;
     base64::engine::general_purpose::STANDARD
         .decode(text.trim())

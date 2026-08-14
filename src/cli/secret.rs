@@ -76,6 +76,12 @@ pub fn run(args: &[String]) -> i32 {
         }),
         Some("list" | "ls") | None => match store() {
             Ok(store) => {
+                // A hook-backed store keeps its names wherever its storage is, which may not be a
+                // directory at all — so an empty listing here would be a wrong answer, not a short
+                // one.
+                if let Some(why) = store.unreachable_here() {
+                    return fail(&why);
+                }
                 for name in store.names() {
                     println!("{name}");
                 }
@@ -123,7 +129,7 @@ pub fn run(args: &[String]) -> i32 {
                     "store     {}   encrypted, safe to commit",
                     store.directory.display()
                 );
-                if !store.cipher.is_external() {
+                if !store.crypto.is_external() {
                     println!(
                         "key       {}   never commit this",
                         secrets::identity_path()
@@ -139,7 +145,7 @@ pub fn run(args: &[String]) -> i32 {
                 // A store whose crypto is another program's has no keys or recipients of oslo's to
                 // show, and printing the defaults it is not using would be a lie about what opens
                 // these files.
-                match store.cipher.is_external() {
+                match store.crypto.is_external() {
                     true => cipher::show(&store),
                     false => {
                         key::show(&store);

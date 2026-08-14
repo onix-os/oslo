@@ -50,6 +50,8 @@ pub struct Section {
     pub keys: Vec<KeySource>,
     /// Set when another program does this store's crypto instead of oslo's own age.
     pub cipher: Cipher,
+    /// `crypto hook`: Lua does this store's crypto, so only a process running Lua can open it.
+    pub hooked: bool,
 }
 
 /// The whole file: the lines as written, and what they mean.
@@ -118,6 +120,15 @@ pub fn parse(text: &str) -> Result<Conf, String> {
             ("key", Some(section)) => section
                 .keys
                 .push(KeySource::parse(rest).map_err(|e| format!("line {at}: {e}"))?),
+            ("crypto", Some(section)) => match rest {
+                "hook" => section.hooked = true,
+                "native" => section.hooked = false,
+                other => {
+                    return Err(format!(
+                        "line {at}: `crypto` is `hook` or `native`, not {other:?}"
+                    ));
+                }
+            },
             ("encrypt", Some(section)) => {
                 section.cipher.encrypt =
                     Some(cipher::parse(verb, rest).map_err(|e| format!("line {at}: {e}"))?);

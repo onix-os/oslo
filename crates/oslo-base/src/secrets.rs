@@ -49,6 +49,8 @@
 
 pub mod cipher;
 pub mod conf;
+pub mod crypto;
+pub mod hooked;
 pub mod key;
 pub mod recipient;
 
@@ -56,6 +58,7 @@ use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 
 pub use cipher::Cipher;
+pub use crypto::Crypto;
 pub use key::KeySource;
 pub use recipient::Recipient;
 
@@ -72,8 +75,8 @@ pub struct Store {
     pub directory: PathBuf,
     pub keys: Vec<KeySource>,
     pub recipients: Vec<Recipient>,
-    /// Set when another program does the crypto — a key in hardware, reached through `age` itself.
-    pub cipher: Cipher,
+    /// What seals and opens its files: oslo's own age, another program, or a Lua hook.
+    pub crypto: Crypto,
 }
 
 impl Store {
@@ -96,6 +99,8 @@ impl Store {
             keys.push(KeySource::File(identity_path().ok_or(NOWHERE_FOR_A_KEY)?));
         }
         let cipher = section.map(|s| s.cipher.clone()).unwrap_or_default();
+        let crypto = Crypto::of(section.is_some_and(|s| s.hooked), &cipher)
+            .map_err(|e| format!("{name}: {e}"))?;
         if name.starts_with(PLUGIN)
             && (keys.iter().any(KeySource::is_external) || cipher.is_external())
         {
@@ -109,7 +114,7 @@ impl Store {
             name: name.to_string(),
             keys,
             recipients,
-            cipher,
+            crypto,
         })
     }
 
@@ -127,6 +132,18 @@ impl Store {
         match conf::read()?.default {
             Some(name) => Store::named(&name),
             None => Store::named(USER),
+        }
+    }
+
+    /// Why this store cannot be used *in this process*, when that is the case.
+    ///
+    /// **Asked before anything touches a file**, or a hook-backed store in a script would report a
+    /// missing file — true, and not the reason. Only `crypto hook` can be unreachable: age and a
+    /// command both work wherever the binary does.
+    pub fn unreachable_here(&self) -> Option<String> {
+        match self.crypto {
+            Crypto::Hook => hooked::unreachable_here(&self.name),
+            _ => None,
         }
     }
 
@@ -149,8 +166,13 @@ impl Store {
 
     /// Keep `value` under `name`.
     pub fn set(&self, name: &str, value: &[u8]) -> Result<(), String> {
+        if let Some(why) = self.unreachable_here() {
+            return Err(why);
+        }
         let path = self.path(name)?;
-        let sealed = self.seal(value)?;
+        hooked::touched(true, &self.name, name, true);
+        let sealed = self.seal_named(name, value)?;
+        hooked::touched(false, &self.name, name, true);
         if let Some(parent) = path.parent() {
             std::fs::create_dir_all(parent).map_err(|e| format!("{}: {e}", parent.display()))?;
         }
@@ -163,9 +185,15 @@ impl Store {
 
     /// The value kept under `name`.
     pub fn get(&self, name: &str) -> Result<Vec<u8>, String> {
+        if let Some(why) = self.unreachable_here() {
+            return Err(why);
+        }
         let path = self.path(name)?;
         let ciphertext = std::fs::read(&path).map_err(|e| format!("{}: {e}", path.display()))?;
-        self.unseal(&ciphertext)
+        hooked::touched(true, &self.name, name, false);
+        let value = self.unseal_named(name, &ciphertext);
+        hooked::touched(false, &self.name, name, false);
+        value
     }
 
     /// Every name kept here, sorted.
@@ -196,8 +224,22 @@ impl Store {
     /// encrypts to, and in what format, is its business. That is what makes a key oslo cannot
     /// compute — one held in hardware — usable at all.
     pub fn seal(&self, value: &[u8]) -> Result<Vec<u8>, String> {
-        if let Some(argv) = &self.cipher.encrypt {
-            return cipher::through(argv, value);
+        self.seal_named("", value)
+    }
+
+    /// The same, telling whatever does the work which secret this is.
+    ///
+    /// The name is empty for an anonymous seal — `oslo.secret.seal`, which encrypts something the
+    /// caller keeps somewhere else of its own.
+    pub fn seal_named(&self, name: &str, value: &[u8]) -> Result<Vec<u8>, String> {
+        match &self.crypto {
+            Crypto::Hook => return hooked::encrypt(&self.name, name, value),
+            Crypto::Command(cipher) => {
+                if let Some(argv) = &cipher.encrypt {
+                    return cipher::through(argv, value);
+                }
+            }
+            Crypto::Native => {}
         }
         let recipients = self.encrypt_to()?;
         let boxed: Vec<Box<dyn age::Recipient + Send>> = recipients
@@ -222,8 +264,19 @@ impl Store {
     /// another key source names — no `$PATH` walk, no fork, and a cron job on a machine that cannot
     /// reach the other key degrades instead of hanging on it.
     pub fn unseal(&self, ciphertext: &[u8]) -> Result<Vec<u8>, String> {
-        if let Some(argv) = &self.cipher.decrypt {
-            return cipher::through(argv, ciphertext);
+        self.unseal_named("", ciphertext)
+    }
+
+    /// The same, telling whatever does the work which secret this is.
+    pub fn unseal_named(&self, name: &str, ciphertext: &[u8]) -> Result<Vec<u8>, String> {
+        match &self.crypto {
+            Crypto::Hook => return hooked::decrypt(&self.name, name, ciphertext),
+            Crypto::Command(cipher) => {
+                if let Some(argv) = &cipher.decrypt {
+                    return cipher::through(argv, ciphertext);
+                }
+            }
+            Crypto::Native => {}
         }
         let native = self.identities(false)?;
         if let Some(value) = attempt(ciphertext, &native)? {

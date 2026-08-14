@@ -129,10 +129,10 @@ argc = ["oslo-shell/argc", "oslo-runtime/argc", "dep:argc"]
 #
 # ```text
 #   every other feature on   6,631,840 bytes
-#   with it                  6,853,056 bytes    +216 KB, still 36 crates
+#   with it                  6,894,016 bytes    +256 KB, still 36 crates
 # ```
 #
-# So the layer above `age` is 68 KB and no new dependency: `base64` at the Lua boundary was already
+# So the layer above `age` is 108 KB and no new dependency: `base64` at the Lua boundary was already
 # in the tree as an unconditional dependency of vendored `age`, which is also why `seal` speaks
 # base64 rather than turning on age's `armor` — that was measured at 45 KB for a format nothing on
 # this side of the boundary would read.

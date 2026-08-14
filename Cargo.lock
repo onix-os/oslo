@@ -1107,6 +1107,7 @@ name = "oslo-base"
 version = "0.2.21"
 dependencies = [
  "age",
+ "base64",
  "getrandom 0.4.3",
  "nix",
  "oslo-lua",

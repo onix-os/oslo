@@ -1368,7 +1368,7 @@ somebody building from source is asking for the shell rather than for the floor;
 release artifact is the default build.
 
 Each cost is what turning that one feature *off* takes back out of the full build, measured on the
-static musl binary — 5,557,216 bytes with none of them, 6,853,056 with all seven:
+static musl binary — 5,557,216 bytes with none of them, 6,894,016 with all seven:
 
 | feature | costs | brings |
 |---|---:|---|
@@ -1377,7 +1377,7 @@ static musl binary — 5,557,216 bytes with none of them, 6,853,056 with all sev
 | `nix` | +60 KB | `oslo.nix` — every `nix --json` answer as a Lua table, and flake-output completion |
 | `scratch` | +48 KB | named sessions that outlive their terminal, and the key that finds them |
 | `plugin` | +108 KB | `oslo plugin` — installing somebody else's Lua, and loading it on first use. `oslo.db` and the `pre-cmd` veto a plugin is written against are in **every** build |
-| `secrets` | +216 KB | values encrypted at rest with age: `oslo secret`, several stores with their own keys and recipients, and `oslo.secret` for a config or a plugin. Vendors `age`, cut down from the 352 KB it costs as it comes |
+| `secrets` | +256 KB | values encrypted at rest with age: `oslo secret`, several stores with their own keys and recipients, `oslo.secret` for a config or a plugin, and hooks that replace the crypto outright. Vendors `age`, cut down from the 352 KB it costs as it comes |
 | `argc` | +308 KB | a script declares its options in comments and the shell parses them: the `argc` builtin, `oslo --argc-eval` for bash scripts, and completion from those comments. The largest of the seven, and the only one that vendors a parser |
 
 ```sh

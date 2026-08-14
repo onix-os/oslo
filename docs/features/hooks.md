@@ -129,6 +129,21 @@ Fields marked *(strings)* are strings even when they read as numbers: a notifyin
 | `pre-record` | the tracker, line finished | `{ text, cwd, mode, status, duration_ms, profile, segments }` | see below |
 | `on-exit` | both ways a REPL ends, before the EXIT trap | `{ status }` | — |
 | `on-key` | every keystroke, before any binding | `{ name, char, text, cursor, word, word_start }` | `false` swallows; string or `{ text = … }` replaces |
+| `on-secret-encrypt` | a store whose config says `crypto hook` | `(store, name, base64)` *(three arguments)* | base64 of the sealed bytes; **nil is "not mine"** |
+| `on-secret-decrypt` | the same, reading | `(store, name, base64)` | base64 of the value; nil declines |
+| `pre-secret-access` | any secret read or written | `{ store, name, how }`, `how` ∈ read, write | — |
+| `post-secret-access` | the same, afterwards | `{ store, name, how }` | — |
+
+The four secret hooks are the only ones that exist to *replace* a mechanism rather than to watch or
+veto one, and they carry two rules of their own. **`nil` means "not mine"** — the next handler is
+asked, so several plugins can each claim their own store, and a store nobody claims is a refusal
+rather than a fall back to age. And they are only reachable in a process that ran your config, which
+is why the store's configuration file has to say `crypto hook` out loud: `oslo secret get` under
+`cron` then fails naming the reason instead of quietly doing something else. See
+[secrets](secrets.md#pluggable-hooks-do-the-crypto-lua-does-the-storage).
+
+**The two watching ones are never given the value.** A hook that logs is the likeliest thing anybody
+writes on them, and a log of secrets is worse than no log.
 
 `pre-cmd`'s contract in full, because it is the one with three outcomes: **a string replaces the
 line that runs, `false` cancels it, and nil leaves it alone.** A cancelled line reports status 130,

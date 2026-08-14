@@ -11,7 +11,7 @@
 //! anything else where the private half never leaves the device. `age` speaks the age plugin
 //! protocol and calls `age-plugin-yubikey`; oslo hands it the bytes.
 
-use oslo::secrets::{self, Store, cipher, conf};
+use oslo::secrets::{self, Crypto, Store, cipher, conf};
 
 use super::fail;
 
@@ -40,12 +40,19 @@ pub fn run(store: &Store, args: &[String]) -> i32 {
 
 /// What does this store's crypto, if not oslo.
 pub fn show(store: &Store) {
-    for line in store.cipher.lines() {
+    for line in store.crypto.lines() {
         println!("{line}");
     }
+    if store.crypto == Crypto::Hook {
+        println!("  a hook, so only a shell that has read your config can open this store");
+        return;
+    }
+    let Crypto::Command(cipher) = &store.crypto else {
+        return;
+    };
     // **Said, rather than left to be noticed.** A store with one half handed over and the other not
     // is a store that writes files it cannot read, and the day that is discovered is the worst one.
-    match (&store.cipher.encrypt, &store.cipher.decrypt) {
+    match (&cipher.encrypt, &cipher.decrypt) {
         (Some(_), None) => {
             println!("  no `decrypt command`: this store can be written and not read")
         }
