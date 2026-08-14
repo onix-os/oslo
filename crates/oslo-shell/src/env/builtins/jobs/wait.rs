@@ -56,7 +56,14 @@ pub fn builtin_wait(env: &mut Environment, args: &[String]) -> Result<i32> {
     }
 
     if opts.next_only {
-        let targets = collect_targets(&opts.ids);
+        // **A target that has already finished is the first to finish.** Its status was collected
+        // by the opportunistic reaper and is being held for exactly this question; going to the
+        // kernel for a pid it has already forgotten answers `ECHILD`, which became 127 — while a
+        // plain `wait` on the same child answered correctly. The two must not disagree.
+        let (targets, finished) = collect_targets(&opts.ids);
+        if let Some(done) = finished {
+            return Ok(report(env, &opts, Some(done)));
+        }
         let outcome = wait_first_of(&targets);
         return Ok(report(env, &opts, outcome));
     }
@@ -211,16 +218,28 @@ fn settle(target: Target) -> Option<(Pid, i32)> {
     }
 }
 
-/// Every pid the `-n` form may return, with unresolvable operands already reported.
-fn collect_targets(ids: &[String]) -> Vec<Pid> {
-    ids.iter()
-        .filter_map(|id| match resolve(id) {
-            Ok(Target::Live(pids)) => Some(pids),
-            Ok(Target::Done(pid, _)) => Some(vec![pid]),
-            Err(_) => None,
-        })
-        .flatten()
-        .collect()
+/// Every pid the `-n` form may return, and the first operand that has already finished.
+///
+/// **Both halves, because `-n` means "the first to finish" and one of them already has.** Resolving
+/// consumes the remembered status — [`resolve_pid`] takes it out of the table — so a caller that
+/// discarded it would have destroyed the only remaining answer for that child.
+///
+/// The pids of later operands are still collected: a finished one is returned here and the rest are
+/// what the wait falls back to when there is none.
+fn collect_targets(ids: &[String]) -> (Vec<Pid>, Option<(Pid, i32)>) {
+    let mut pids = Vec::new();
+    let mut finished = None;
+    for id in ids {
+        match resolve(id) {
+            Ok(Target::Live(live)) => pids.extend(live),
+            Ok(Target::Done(pid, status)) => {
+                pids.push(pid);
+                finished.get_or_insert((pid, status));
+            }
+            Err(_) => {}
+        }
+    }
+    (pids, finished)
 }
 
 /// Wait for one specific child.
@@ -312,10 +331,15 @@ fn wait_first_of(targets: &[Pid]) -> Option<(Pid, i32)> {
                 let (Some(pid), Some(code)) = (status.pid(), exit_status(status)) else {
                     continue;
                 };
-                note_reaped(pid);
                 if targets.is_empty() || targets.contains(&pid) {
+                    note_reaped(pid);
                     return Some((pid, code));
                 }
+                // **Somebody else's child, and its status is not ours to throw away.** `waitpid(-1)`
+                // collects whichever ends first; the kernel will never offer this one again, so a
+                // later `wait $that` has nowhere but the table to find it. Dropping it here is what
+                // made that wait answer 127 and "not a child of this shell".
+                with_jobs(|jobs| jobs.keep_status(pid, code));
             }
             Err(Errno::EINTR) => continue,
             Err(_) => return None,

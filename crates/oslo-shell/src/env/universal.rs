@@ -255,10 +255,7 @@ pub fn apply(env: &mut crate::env::Environment) {
 /// the one that matters most — a shell sitting in its line editor has not reached the top of its
 /// loop since before you typed, so without the second check the command you just ran would see the
 /// value as it was one command ago.
-pub fn refresh(
-    env: &mut crate::env::Environment,
-    stamp: Option<std::time::SystemTime>,
-) -> Option<std::time::SystemTime> {
+pub fn refresh(env: &mut crate::env::Environment, stamp: Option<Stamp>) -> Option<Stamp> {
     let now = changed_at();
     if now != stamp {
         apply(env);
@@ -277,12 +274,38 @@ pub fn load() -> BTreeMap<String, Universal> {
     }
 }
 
-/// When the file last changed, for deciding whether a reload is needed.
+/// What the file looked like, for deciding whether a reload is needed.
 ///
+/// **Three fields rather than a modification time.** A timestamp alone answers "has this changed?"
+/// with a maybe: two writes that land in the same tick are one timestamp, and on a filesystem whose
+/// `mtime` granularity is coarse — an old ext3, some network mounts — that is a whole second of
+/// changes a reader cannot see. Linux gives nanoseconds on the filesystems oslo runs on, so this is
+/// mostly belt and braces, but the belt costs nothing: `stat` already returns all three.
+///
+/// * `mtime` catches an ordinary in-place write.
+/// * `len` catches a same-tick write that changed the length.
+/// * `inode` catches a replacement — a `rename` over the file leaves both of the others plausible.
+///
+/// **The residual hole, named rather than papered over:** a same-tick, same-length, in-place edit
+/// is still invisible. Closing it needs a generation counter *inside* the file, which cannot be
+/// read without reading the file — and reading it every prompt is the cost this exists to avoid.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Stamp {
+    mtime: Option<std::time::SystemTime>,
+    len: u64,
+    inode: u64,
+}
+
 /// One `stat` per prompt, which is what makes "see it everywhere" affordable: the file is only
 /// read when it has actually moved.
-pub fn changed_at() -> Option<std::time::SystemTime> {
-    std::fs::metadata(path()?).ok()?.modified().ok()
+pub fn changed_at() -> Option<Stamp> {
+    use std::os::unix::fs::MetadataExt;
+    let data = std::fs::metadata(path()?).ok()?;
+    Some(Stamp {
+        mtime: data.modified().ok(),
+        len: data.len(),
+        inode: data.ino(),
+    })
 }
 
 /// Apply `edit` to the file's contents under an exclusive lock.
