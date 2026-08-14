@@ -1,41 +1,29 @@
-//! `oslo profile sync user@host` — the history half of [`crate::cli::sync`], under the name of the
-//! thing it syncs.
+//! `oslo profile sync user@host` — another name for [`crate::cli::sync`], where somebody looking for
+//! it will find it.
 //!
-//! # Why this is a wrapper and not an implementation
+//! # It carries everything, and used not to
 //!
-//! A profile *is* the history, so syncing one is a real thing to want and this is where somebody
-//! will look for it. But there is nothing here that `oslo sync --only history` does not do, and two
-//! implementations of a merge are two chances to disagree about who wins — so this parses the words
-//! and hands over.
+//! This synced the history alone for a while, argued from the fact that macros and secrets are not
+//! part of a profile. That is true about the word and useless to the person typing it: the command
+//! moved a third of the machine, printed one line about history, and said nothing about the two
+//! parts it had left behind — so they were discovered missing on the other machine, later.
 //!
-//! `oslo sync` is the one to reach for: it carries macros and secrets as well, over the same ssh
-//! and behind the same profile-key check.
-
-use crate::cli::sync::part::{self, Part};
+//! A name is not worth that. Both spellings now carry all three, and `NAME` still decides only which
+//! *history* travels, because macros and secrets are one per machine either way.
+//!
+//! The merge itself is not here. Two implementations of it would be two chances to disagree about
+//! which copy of a record wins, so this parses the words and hands them to `oslo sync`.
 
 use super::help::MENU;
 
+/// **The same words and the same work as `oslo sync`**, down to `--only` and `--dry-run`.
+///
+/// Handed over rather than re-parsed: a second parser would be a second set of flags to keep in
+/// step, and the last time these two differed the difference was invisible until data failed to
+/// arrive on another machine.
 pub fn run(args: &[String]) -> i32 {
-    let mut remote = None;
-    let mut name = None;
-    let mut dry_run = false;
-    for argument in args {
-        match argument.as_str() {
-            "--dry-run" | "-n" => dry_run = true,
-            flag if flag.starts_with('-') => {
-                return MENU.wrong("sync", &format!("{flag:?}: no such option"));
-            }
-            word if remote.is_none() => remote = Some(word.to_string()),
-            word => name = Some(word.to_string()),
-        }
-    }
-    let Some(remote) = remote else {
+    if args.is_empty() {
         return MENU.wrong("sync", "needs a USER@HOST to sync with");
-    };
-    let name = name.unwrap_or_else(oslo::track::profile::current);
-
-    match part::named_profile(&remote, &[Part::History], &name, dry_run) {
-        Ok(()) => 0,
-        Err(e) => super::fail(&e),
     }
+    crate::cli::sync::here(args)
 }

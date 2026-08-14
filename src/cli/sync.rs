@@ -48,9 +48,10 @@ pub fn run(args: &[String]) -> i32 {
     }
 }
 
-/// `oslo sync USER@HOST [--only WHAT] [--dry-run]`.
-fn here(args: &[String]) -> i32 {
+/// `oslo sync USER@HOST [NAME] [--only WHAT] [--dry-run]`.
+pub(crate) fn here(args: &[String]) -> i32 {
     let mut remote = None;
+    let mut profile = None;
     let mut wanted: Vec<part::Part> = Vec::new();
     let mut dry_run = false;
     let mut waiting_for_only = false;
@@ -76,6 +77,9 @@ fn here(args: &[String]) -> i32 {
                 return MENU.wrong("sync", &format!("{flag:?}: no such option"));
             }
             word if remote.is_none() => remote = Some(word.to_string()),
+            // A second word is the profile, which is what `oslo profile sync HOST NAME` means and
+            // what this accepts so that the two spellings take the same words.
+            word if profile.is_none() => profile = Some(word.to_string()),
             word => return MENU.wrong("sync", &format!("{word:?}: one machine at a time")),
         }
     }
@@ -89,10 +93,11 @@ fn here(args: &[String]) -> i32 {
     if wanted.is_empty() {
         wanted = part::every();
     }
+    let profile = profile.unwrap_or_else(oslo::track::profile::current);
 
     // A sync that moved nothing is a sync that worked, so the status says nothing about how much
     // travelled — a login file running this must not see a failure because there was no news.
-    match part::all_of(&remote, &wanted, dry_run) {
+    match part::named_profile(&remote, &wanted, &profile, dry_run) {
         Ok(()) => 0,
         Err(e) => fail(&e),
     }

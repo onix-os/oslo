@@ -60,19 +60,21 @@ const SUBCOMMANDS: &[Sub] = &[
     },
     Sub {
         name: "sync",
-        args: "USER@HOST [NAME] [--dry-run]",
-        about: "two-way history sync — `oslo sync` carries the rest",
+        args: "USER@HOST [NAME] [--only WHAT] [--dry-run]",
+        about: "two-way sync: history, macros and secrets. `oslo sync` is the same",
         flags: &[
+            ("--only WHAT", "history, macros or secrets; repeat for two"),
             ("--dry-run", "say what would change and change nothing"),
             ("$OSLO_SSH", "how to get there, if a bare `ssh` is not it"),
             ("$OSLO_SSH_REMOTE_BIN", "what `oslo` is called over there"),
         ],
-        note: "Both ends end up with the union, and the far end is oslo rather than `scp` — a \
-               store is a live database, and copying the file under a shell that is writing to it \
-               is how you get half a transaction. It refuses unless both ends hold the same \
-               profile key, because `default` here and `default` on a box you have an account on \
-               are two histories that share a word. A command run on both machines is not a \
-               conflict: every event carries the host that ran it, so both survive.",
+        note: "The same command as `oslo sync`: history, macros and secrets all travel, and both \
+               ends end up with the union. NAME decides only which history — macros and secrets are \
+               one per machine. `--only history` narrows it, `--dry-run` shows what would move. It \
+               refuses unless both ends hold the same profile key, because `default` here and \
+               `default` on a box you have an account on are two histories that share a word. A \
+               command run on both machines is not a conflict: every event carries the host that \
+               ran it, so both survive.",
     },
     Sub {
         name: "fingerprint",

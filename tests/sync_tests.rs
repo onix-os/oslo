@@ -141,14 +141,14 @@ impl Machine {
     }
 }
 
-fn fake_ssh(at: &Path, machine: &Machine) -> String {
+fn fake_ssh(at: &Path, machine: &Path) -> String {
     let script = at.join("fake-ssh");
     std::fs::write(
         &script,
         format!(
             "#!/bin/sh\nshift\nexec env HOME={home} XDG_DATA_HOME={home} \
              XDG_STATE_HOME={home}/state \"$@\"\n",
-            home = machine.path().display()
+            home = machine.display()
         ),
     )
     .expect("write");
@@ -167,7 +167,7 @@ fn pair(here: &Machine, there: &Machine) {
 }
 
 fn syncing(here: &Machine, there: &Machine, extra: &[&str]) -> (String, String, i32) {
-    let ssh = fake_ssh(here.path(), there);
+    let ssh = fake_ssh(here.path(), there.path());
     let mut args = vec!["sync", "buildbox"];
     args.extend_from_slice(extra);
     here.run_with(
@@ -365,6 +365,62 @@ fn only_carries_the_part_it_names() {
             .iter()
             .any(|line| line.contains("cargo build"))
     );
+}
+
+/// **`oslo profile sync` carries everything too.**
+///
+/// It synced the history alone for a while, on the argument that macros and secrets are not part of
+/// a profile — so the command somebody actually types moved a third of the machine and said nothing
+/// about the rest. The two spellings take the same words and do the same work.
+#[test]
+fn profile_sync_is_the_same_command() {
+    let (here, there) = (Machine::new(), Machine::new());
+    pair(&here, &there);
+    here.remember(&["cargo build"]);
+    there.remember(&["kubectl get pods"]);
+    here.seed_macros(FIVE_KINDS);
+    here.keep_secret("deploy", b"deploy-value");
+
+    let ssh = fake_ssh(here.path(), there.path());
+    let (said, err, status) = here.run_with(
+        &["profile", "sync", "buildbox"],
+        &[
+            ("OSLO_SSH", ssh),
+            (
+                "OSLO_SSH_REMOTE_BIN",
+                oslo_bin().to_string_lossy().to_string(),
+            ),
+        ],
+        &[],
+    );
+    assert_eq!(status, 0, "{err}");
+    assert!(said.contains("macros"), "macros were not carried:\n{said}");
+    assert_eq!(there.macro_names(), here.macro_names());
+    assert_eq!(there.secret_names(), here.secret_names());
+
+    // And it takes the same flags, or "the same command" is a claim the help cannot keep.
+    let ssh = fake_ssh(here.path(), there.path());
+    let (said, err, status) = here.run_with(
+        &[
+            "profile",
+            "sync",
+            "buildbox",
+            "--only",
+            "history",
+            "--dry-run",
+        ],
+        &[
+            ("OSLO_SSH", ssh),
+            (
+                "OSLO_SSH_REMOTE_BIN",
+                oslo_bin().to_string_lossy().to_string(),
+            ),
+        ],
+        &[],
+    );
+    assert_eq!(status, 0, "{err}");
+    assert!(said.contains("dry run"), "{said}");
+    assert!(!said.contains("macros"), "--only was ignored:\n{said}");
 }
 
 /// A part nobody has is refused by name rather than silently ignored.
