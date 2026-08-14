@@ -11,6 +11,14 @@ use common::oslo_bin;
 use std::path::Path;
 use std::process::Command;
 
+/// Whether this build has a secret store to carry.
+///
+/// **CI runs `cargo test --all-targets` with default features, and `default = []`** — so the binary
+/// under test there has no `secret` tool at all, and a test that assumed one failed on four counts
+/// while passing locally under `--all-features`. A runtime `cfg!` rather than an attribute on every
+/// line: both branches then have to keep compiling, which is the point.
+const SECRETS: bool = cfg!(feature = "secrets");
+
 /// One machine: its own data, state and home.
 struct Machine {
     home: tempfile::TempDir,
@@ -101,11 +109,24 @@ impl Machine {
         found
     }
 
+    /// Every secret this machine holds, or nothing at all in a build that has none.
     fn secret_names(&self) -> Vec<String> {
+        if !SECRETS {
+            return Vec::new();
+        }
         let (out, _, _) = self.run(&["secret", "list"]);
         let mut found: Vec<String> = out.lines().map(str::to_string).collect();
         found.sort();
         found
+    }
+
+    /// Keep a secret, where the build has somewhere to keep one.
+    fn keep_secret(&self, name: &str, value: &[u8]) {
+        if !SECRETS {
+            return;
+        }
+        let (_, err, status) = self.feed(&["secret", "set", name], value);
+        assert_eq!(status, 0, "{err}");
     }
 
     fn lines(&self) -> Vec<String> {
@@ -179,24 +200,31 @@ fn one_command_carries_history_macros_and_secrets() {
     there.remember(&["kubectl get pods"]);
     here.seed_macros("alias gs\n\tgit status\n");
     there.seed_macros("alias ll\n\tls -la\n");
-    here.feed(&["secret", "set", "deploy"], b"deploy-value");
-    there.feed(&["secret", "set", "api"], b"api-value");
+    here.keep_secret("deploy", b"deploy-value");
+    there.keep_secret("api", b"api-value");
 
     let (said, err, status) = syncing(&here, &there, &[]);
     assert_eq!(status, 0, "{err}");
-    for part in ["history", "macros", "secrets"] {
+    for part in ["history", "macros"] {
         assert!(said.contains(part), "{part} was not reported:\n{said}");
     }
+    assert_eq!(
+        said.contains("secrets"),
+        SECRETS,
+        "the secrets part was reported by a build that has none, or missed by one that has:\n{said}"
+    );
 
     assert_eq!(here.lines(), there.lines());
     assert_eq!(here.macro_names(), there.macro_names());
     assert_eq!(here.secret_names(), there.secret_names());
 
-    // **Carried sealed and opened on the other side.** The value never crosses as plaintext; both
-    // machines derive the same store key from the profile key they share.
-    let (value, err, status) = there.run(&["secret", "get", "deploy"]);
-    assert_eq!(status, 0, "{err}");
-    assert_eq!(value, "deploy-value");
+    if SECRETS {
+        // **Carried sealed and opened on the other side.** The value never crosses as plaintext;
+        // both machines derive the same store key from the profile key they share.
+        let (value, err, status) = there.run(&["secret", "get", "deploy"]);
+        assert_eq!(status, 0, "{err}");
+        assert_eq!(value, "deploy-value");
+    }
 }
 
 /// **A machine that has none of something can still sync.** It sends no bytes at all, and a
@@ -211,12 +239,12 @@ fn a_machine_with_nothing_yet_is_not_an_empty_file() {
     here.remember(&["cargo build"]);
     there.remember(&["kubectl get pods"]);
     here.seed_macros(FIVE_KINDS);
-    here.feed(&["secret", "set", "deploy"], b"deploy-value");
+    here.keep_secret("deploy", b"deploy-value");
 
     let (_, err, status) = syncing(&here, &there, &[]);
     assert_eq!(status, 0, "{err}");
     assert_eq!(there.macro_names(), here.macro_names());
-    assert_eq!(there.secret_names(), vec!["deploy".to_string()]);
+    assert_eq!(there.secret_names(), here.secret_names());
 }
 
 /// Every kind travels, not only the two a starting shell reads.
@@ -281,9 +309,13 @@ fn a_deletion_travels_in_every_part() {
     here.remember(&["cargo build"]);
     there.remember(&["kubectl get pods"]);
     here.seed_macros("alias gs\n\tgit status\n");
-    here.feed(&["secret", "set", "deploy"], b"deploy-value");
+    here.keep_secret("deploy", b"deploy-value");
     syncing(&here, &there, &[]);
-    assert!(there.secret_names().iter().any(|name| name == "deploy"));
+    assert_eq!(
+        there.secret_names().iter().any(|name| name == "deploy"),
+        SECRETS,
+        "the secret did not travel"
+    );
 
     // Delete on `here`, including a history event that was run on `there`.
     let (listed, _, _) = here.run(&["history", "list"]);
@@ -353,18 +385,15 @@ fn syncing_again_moves_nothing() {
     here.remember(&["cargo build"]);
     there.remember(&["kubectl get pods"]);
     here.seed_macros("alias gs\n\tgit status\n");
-    here.feed(&["secret", "set", "deploy"], b"deploy-value");
+    here.keep_secret("deploy", b"deploy-value");
 
     syncing(&here, &there, &[]);
     let (said, err, status) = syncing(&here, &there, &[]);
     assert_eq!(status, 0, "{err}");
-    for part in [
-        "history   unchanged",
-        "macros    unchanged",
-        "secrets   unchanged",
-    ] {
+    for part in ["history   unchanged", "macros    unchanged"] {
         assert!(said.contains(part), "{part:?} missing from:\n{said}");
     }
+    assert_eq!(said.contains("secrets   unchanged"), SECRETS, "{said}");
 }
 
 /// A dry run says what would move and writes to neither machine.
