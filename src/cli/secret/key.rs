@@ -9,7 +9,8 @@
 //! ```
 //!
 //! A store with several is a store with several places to look, tried in the order they are
-//! written, and the ones that run a program are tried last however they are ordered.
+//! written, and the ones that run a program are tried last however they are ordered — so a store
+//! that opens with a key file never forks.
 
 use oslo::secrets::{self, KeySource, Store};
 
@@ -64,7 +65,7 @@ fn state_of(source: &KeySource) -> &'static str {
         KeySource::File(path) if path.exists() => "present",
         KeySource::File(_) => "not there yet",
         KeySource::Command(_) if secrets::key::no_exec() => "skipped: $OSLO_SECRET_NO_EXEC",
-        KeySource::Command(_) => "run when the native keys do not open a file",
+        KeySource::Command(_) => "run only when no key file opens it",
     }
 }
 

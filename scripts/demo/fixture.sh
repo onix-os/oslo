@@ -89,6 +89,17 @@ if [ -x "$OSLO" ] && "$OSLO" secret --help >/dev/null 2>&1; then
         --var 'GITHUB_TOKEN=$(oslo secret get gh-token)' --tag work >/dev/null
 fi
 
+# A second machine's published half, for the `recipient add` beat.
+#
+# Made with the binary under test in a home of its own, so it is a *real* recipient and the demo
+# exercises the same validation a person's would — an invented string would be refused on camera.
+if [ -x "$OSLO" ] && "$OSLO" secret --help >/dev/null 2>&1; then
+    XDG_DATA_HOME="$WORK/elsewhere" XDG_STATE_HOME="$WORK/elsewhere-key" \
+        "$OSLO" secret key init 2>/dev/null | tail -1 > "$WORK/build-server.pub"
+    printf '# the build server\n' | cat - "$WORK/build-server.pub" > "$WORK/tmp.pub" \
+        && mv "$WORK/tmp.pub" "$WORK/build-server.pub"
+fi
+
 # A stand-in for a program that does a store's crypto, for the `secrets` demo.
 #
 # **Not `age`, and named so nobody mistakes it for it.** The machine these are recorded on has
