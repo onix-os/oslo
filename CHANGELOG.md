@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.5.1] - 2026-08-14
+
+### <!-- 1 -->🐛 Bug Fixes
+
+- Empty stores, derived copies, and a stale far end
+
+### <!-- 3 -->📚 Documentation
+
+- The rule, the tombstones, and what crosses sealed
+
 ## [0.5.0] - 2026-08-14
 
 ### <!-- 0 -->⛰️  Features
