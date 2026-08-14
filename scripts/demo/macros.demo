@@ -6,7 +6,10 @@ env XDG_DATA_HOME=/tmp/oslo-demo-work/data
 env XDG_STATE_HOME=/tmp/oslo-demo-work-key
 # `oslo macros …` is the binary on $PATH, which is whatever is installed rather than the one being
 # demonstrated. The build under test goes in front of it, so the recording shows this oslo.
-env PATH=$OSLO_DIR:$PATH
+# **Off camera**, and not `env`: a config rebuilds `$PATH` at startup, so what the launcher exported
+# is gone by the first prompt — and `oslo macros …` is a *program*, which would then be whichever
+# oslo is installed rather than the one being demonstrated.
+setup export PATH=$OSLO_DIR:$PATH
 cols 100
 rows 22
 speed 0.06
