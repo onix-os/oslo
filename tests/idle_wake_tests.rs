@@ -46,6 +46,7 @@ impl Shell {
             .arg("-i")
             .env_clear()
             .env("HOME", home.path())
+            .env("XDG_DATA_HOME", home.path())
             .env("PATH", "/usr/bin:/bin")
             .env("TERM", "dumb")
             .current_dir(home.path())
@@ -93,6 +94,10 @@ impl Shell {
             _home: home,
             child,
         }
+    }
+
+    fn home(&self) -> &std::path::Path {
+        self._home.path()
     }
 
     fn text(&self) -> String {
@@ -150,6 +155,52 @@ fn an_idle_prompt_notices_a_job_finishing() {
     assert!(
         noticed,
         "an idle prompt never noticed the job finish:\n{}",
+        shell.text()
+    );
+}
+
+/// **A universal variable set elsewhere reaches an idle prompt, with nothing typed.**
+///
+/// The store is re-read before every prompt and again before every command, so typing anything at
+/// all would pick it up — which is why this watches the *prompt* instead. `PS1` is single-quoted so
+/// it expands each time it is drawn; if the value appears in a freshly drawn prompt without a
+/// keystroke, it arrived because the editor was woken by the `inotify` watch and repainted.
+#[test]
+fn an_idle_prompt_sees_a_universal_set_by_another_shell() {
+    let mut shell = Shell::start();
+    assert!(shell.until(|seen| !seen.trim().is_empty(), "the first prompt"));
+
+    shell.type_line("PS1='<$WOKEN># '");
+    assert!(
+        shell.until(|seen| seen.contains("<>#"), "the empty prompt"),
+        "the prompt never took the format:\n{}",
+        shell.text()
+    );
+    let before = shell.text().len();
+
+    // A *second* shell writes the variable, exactly as another terminal would.
+    let writer = Command::new(common::oslo_bin())
+        .arg("-c")
+        .arg("universal -x WOKEN=yes")
+        .env("HOME", shell.home())
+        .env("XDG_DATA_HOME", shell.home())
+        .env("PATH", "/usr/bin:/bin")
+        .output()
+        .expect("spawn the writing shell");
+    assert!(
+        writer.status.success(),
+        "the writer failed: {}",
+        String::from_utf8_lossy(&writer.stderr)
+    );
+
+    // Nothing is typed from here.
+    let arrived = shell.until(
+        |seen| seen[before.min(seen.len())..].contains("<yes>#"),
+        "the universal to reach the idle prompt",
+    );
+    assert!(
+        arrived,
+        "an idle prompt never saw the universal:\n{}",
         shell.text()
     );
 }

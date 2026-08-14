@@ -2,11 +2,6 @@
 
 pub fn initialize() {
     oslo_ui::term::watch_for_resize();
-    // **Only an interactive shell arms this**, and only after saying what servicing means. A script
-    // reaps at its command boundaries and has no editor to wake, so the signal would buy it nothing
-    // and cost it an interrupted `read` in every library call that makes one.
-    oslo_base::background::install(oslo_shell::exec::job::reap_background_jobs);
-    oslo_ui::term::watch_for_children();
     let mut background = oslo_ui::term::query::background_from_environment();
     let mut verified = oslo_ui::term::capability::Verified::default();
     let query_terminal = std::env::var("TERM").as_deref() != Ok("dumb");

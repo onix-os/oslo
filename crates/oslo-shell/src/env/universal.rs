@@ -34,6 +34,8 @@
 //! without the lock would make the last writer's copy — missing whatever it never read — the
 //! surviving one.
 
+pub mod watch;
+
 use std::collections::BTreeMap;
 use std::io::{Read, Seek, Write};
 use std::path::PathBuf;
@@ -209,6 +211,33 @@ pub fn forget_applied(name: &str) {
 /// Telling the two apart is what the record above is for. A name whose current value is still
 /// exactly what this shell last wrote is ours to change; a name the user has since assigned to is
 /// not, and is left alone in both directions — not updated, and not removed when the file drops it.
+/// The last stamp the *background* servicer acted on.
+///
+/// Its own, separate from the REPL's: the two ask the same question at different moments, and both
+/// answers are only ever "re-read or do not". Sharing one would mean the servicer's read could stop
+/// the loop's, and re-reading is idempotent anyway.
+static SERVICED: std::sync::Mutex<Option<Stamp>> = std::sync::Mutex::new(None);
+
+/// Re-read and apply, but only if the file has actually moved since this last looked.
+///
+/// **For the idle wake.** `inotify` says the directory changed, which is not the same as saying
+/// *this* file did — a lock file, a scratch file mid-rename and the store itself all live there, and
+/// every one of them is a wake. One `stat` decides.
+pub fn apply_if_changed(env: &mut crate::env::Environment) -> bool {
+    let now = changed_at();
+    let mut serviced = match SERVICED.lock() {
+        Ok(serviced) => serviced,
+        Err(poisoned) => poisoned.into_inner(),
+    };
+    if *serviced == now && serviced.is_some() {
+        return false;
+    }
+    *serviced = now;
+    drop(serviced);
+    apply(env);
+    true
+}
+
 pub fn apply(env: &mut crate::env::Environment) {
     let file = load();
     let mut ours: Vec<String> = Vec::new();

@@ -1330,7 +1330,14 @@ and positional parameters. Stored in `$XDG_DATA_HOME/oslo/universal`, one variab
 **never sourced**: a file every one of your shells writes to is not a file to execute.
 
 Running shells pick up a change before the next command, not the next login. That costs one `stat`
-per prompt, since the file is only read when it has actually moved.
+per prompt, since the file is only read when it has actually moved — and the identity is the
+modification time, the size *and* the inode, so a same-tick rewrite or a rename cannot hide one.
+
+**And at an idle prompt, with nothing typed.** An `inotify` watch on the store's directory is waited
+on beside the terminal, so a theme you set in one terminal reaches the prompt sitting in the next
+one. A change that arrives that way rebuilds the prompt too — a `$THEME` in `PS1` is expanded when
+the prompt is rendered, so without that it would be correct in the environment and unseen on screen.
+Where `inotify` is unavailable the idle refresh is what is lost, and nothing else.
 
 **A local assignment wins.** A universal `PAGER` must not stop `PAGER=cat cmd` meaning `cat`, so
 the file fills in names this shell has not set and loses to any it has — including for erasure,

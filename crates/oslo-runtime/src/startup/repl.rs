@@ -161,6 +161,33 @@ pub fn run_repl(login: bool) -> ! {
     let mut universal_stamp = oslo_shell::env::universal::changed_at();
     oslo_shell::env::universal::apply(&mut env_struct.lock().unwrap());
 
+    // **What an idle prompt does when the background moves.** Installed here rather than in
+    // `terminal::initialize` because it needs the environment a universal refresh writes into, and
+    // the REPL is what owns it. Runs on the shell thread with no editor borrow held — see
+    // `oslo_base::background`.
+    let serviced = Arc::clone(&env_struct);
+    oslo_base::background::install(move || {
+        oslo_shell::exec::job::reap_background_jobs();
+        let changed = match serviced.lock() {
+            Ok(mut env) => oslo_shell::env::universal::apply_if_changed(&mut env),
+            Err(_) => false,
+        };
+        // **A changed variable is invisible until the prompt is rebuilt.** `PS1` is expanded when
+        // the prompt is rendered, not on every repaint — so a theme another terminal just set would
+        // otherwise sit in the environment, correct and unseen, until the next command. This is the
+        // same door an asynchronous prompt already comes through.
+        if changed {
+            oslo_ui::prompt::invalidate();
+        }
+        changed
+    });
+    // Armed *after* the servicer, and only here: both checks want an interactive shell that has
+    // somewhere to deliver the news. A script reaps at its command boundaries and has no editor to
+    // wake, so the signal would buy it nothing and cost it an interrupted `read` in every library
+    // call that makes one.
+    oslo_ui::term::watch_for_children();
+    oslo_shell::env::universal::watch::start();
+
     // The directory whose `.env.lua` is loaded. Seeded from the arrival above, so the first prompt
     // does not run it a second time.
     let mut settled = here.clone();

@@ -49,7 +49,7 @@ regex = { version = "1", default-features = false, features = [
 
 # `ShellError::Nix`, the hostname a session is recorded under, and `isatty` — which is how
 # `track::nested` tells a terminal it can name from a pipe it cannot.
-nix = { version = "0.29", features = ["hostname", "fs"] }
+nix = { version = "0.29", features = ["hostname", "fs", "inotify"] }
 
 
 # The Lua boundary for a hook-backed store: a `Value::Str` is UTF-8 and an age file is not, so

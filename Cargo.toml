@@ -164,7 +164,7 @@ argc = { path = "vendor/argc", default-features = false, features = [
 # feature selection — oslo called `nix::poll` without ever asking for it, and removing rustyline is
 # what revealed the borrowed feature.
 nix = { version = "0.29", features = [
-    "process", "signal", "term", "fs", "user", "resource", "hostname", "poll",
+    "process", "signal", "term", "fs", "user", "resource", "hostname", "poll", "inotify",
 ] }
 # `[[ str =~ ere ]]` needs a real POSIX-ERE engine. Approximating it with globs would make every
 # validation idiom (`=~ ^[0-9]+$`) answer plausibly and wrongly.
