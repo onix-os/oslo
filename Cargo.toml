@@ -123,7 +123,7 @@ argc = ["oslo-shell/argc", "oslo-runtime/argc", "dep:argc"]
 # Still off by default, because 148 KB and 36 crates is not nothing on a binary meant to be
 # `/bin/sh`, and a shell that never holds a secret should not carry the code that could. Without it
 # there is no `oslo secret`, and `age` is not compiled, fetched or linked.
-secrets = ["oslo-base/secrets"]
+secrets = ["oslo-base/secrets", "oslo-runtime/secrets"]
 
 [dependencies]
 # The Lua front end, in the same relationship to Lua that brush-parser has to the shell: it parses

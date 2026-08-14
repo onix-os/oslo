@@ -12,6 +12,7 @@ fn one() -> Installed {
         hash: "abc123".to_string(),
         requires: None,
         load_on: None,
+        secrets: Vec::new(),
     }
 }
 

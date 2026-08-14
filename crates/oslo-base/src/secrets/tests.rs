@@ -45,3 +45,78 @@ fn an_empty_dot_git_is_not_a_repository() {
     std::fs::write(&pointer, "gitdir: /elsewhere\n").expect("write");
     assert!(is_repository(&pointer));
 }
+
+/// **A malformed line is an error, not a skipped line.** The failure the loudness prevents is a
+/// store quietly encrypting to one fewer recipient than its owner believes.
+#[test]
+fn a_conf_says_what_it_says_and_nothing_it_does_not() {
+    let parsed = conf::parse(
+        "# a comment\n\
+         default work\n\
+         \n\
+         [user]\n\
+         key file /k/one\n\
+         \n\
+         [work]\n\
+         directory /w\n\
+         recipient age1abc\n\
+         key command pass show oslo/id\n",
+    )
+    .expect("it parses");
+
+    assert_eq!(parsed.default.as_deref(), Some("work"));
+    assert_eq!(parsed.sections.len(), 2);
+    let work = parsed.section("work").expect("the work section");
+    assert_eq!(work.directory.as_deref(), Some(std::path::Path::new("/w")));
+    assert_eq!(work.recipients, ["age1abc"]);
+    assert_eq!(
+        work.keys,
+        [KeySource::Command(vec![
+            "pass".to_string(),
+            "show".to_string(),
+            "oslo/id".to_string()
+        ])]
+    );
+
+    for wrong in [
+        "recipient age1abc\n",        // before any section
+        "[work]\nkey wallet /w\n",    // not a kind of key
+        "[work]\nrecipients age1a\n", // not a word this file knows
+        "[work]\nkey file\n",         // nothing after it
+        "[..]\nkey file /k\n",        // not a store name
+        "[work]\ndefault other\n",    // `default` is not a store's business
+    ] {
+        assert!(conf::parse(wrong).is_err(), "{wrong:?} was accepted");
+    }
+}
+
+/// Editing splices lines, so what a person wrote around the change survives being edited by a
+/// command — the reason this is not simply re-rendered from the parsed model.
+#[test]
+fn editing_keeps_the_comments_and_the_order() {
+    let mut parsed = conf::parse("# mine\n\n[user]\nkey file /k/one\n").expect("it parses");
+    parsed.add("user", "key file /k/two");
+    parsed.add("work", "directory /w");
+    parsed.set_default("work");
+
+    assert_eq!(
+        parsed.text(),
+        "default work\n# mine\n\n[user]\nkey file /k/one\nkey file /k/two\n\n[work]\ndirectory /w\n"
+    );
+
+    assert_eq!(parsed.remove("user", |line| line == "key file /k/one"), 1);
+    assert_eq!(parsed.remove("user", |line| line == "key file /k/one"), 0);
+    assert!(parsed.text().contains("key file /k/two"));
+    assert!(parsed.text().contains("# mine"));
+}
+
+/// A store name is a directory name and a section header, so it may not be either out of place.
+#[test]
+fn a_store_name_cannot_reach_out_of_its_directory() {
+    for bad in ["", "..", "../elsewhere", "a/b", ".hidden", "a..b", "a b"] {
+        assert!(conf::valid_store_name(bad).is_err(), "{bad:?} was accepted");
+    }
+    for good in ["user", "work", "plugin.notes", "a-b_c.2"] {
+        assert!(conf::valid_store_name(good).is_ok(), "{good:?} was refused");
+    }
+}

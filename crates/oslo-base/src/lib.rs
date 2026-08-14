@@ -35,10 +35,9 @@ pub mod nesting;
 pub mod predict;
 /// Whether the command now running must leave no trace of itself.
 pub mod quiet;
-/// A database a config or a plugin owns, kept apart from oslo's own.
-/// Values kept encrypted, decrypted only when something asks for one.
 #[cfg(feature = "secrets")]
 pub mod secrets;
+/// A database a config or a plugin owns, kept apart from oslo's own.
 pub mod store;
 pub mod track;
 /// The shell's version, as one number rather than one per crate.

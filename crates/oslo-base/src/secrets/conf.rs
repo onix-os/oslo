@@ -1,0 +1,237 @@
+//! `secrets.conf` — which stores exist, where each keeps its files, what it encrypts to, and where
+//! its keys come from.
+//!
+//! # Why a file, and not Lua
+//!
+//! `oslo secret get` is dispatched as a tool: it never builds an `Environment`, never reads
+//! `config.lua`, never starts a Lua interpreter. That is not an oversight — `$(oslo secret get
+//! gh-token)` has to work from `dash`, from `cron`, from a `Makefile` and from a container, none of
+//! which have run an oslo config. Configuration that only existed after `config.lua` had run would
+//! apply in an interactive shell and silently not apply everywhere else, which for a *recipient
+//! list* means encrypting to the wrong key and finding out at restore time.
+//!
+//! So it is a flat file that the process doing the decrypting reads for itself. One
+//! `read_to_string` of a few hundred bytes, and nothing to keep in step.
+//!
+//! # Beside the key, not inside the store
+//!
+//! `$XDG_STATE_HOME/oslo/secrets.conf`, with the identity — not `$XDG_DATA_HOME` with the
+//! ciphertext. The store is meant to be committable; this file names this machine's key paths, and
+//! a recipient list published with a store is a disclosure of exactly which devices can read it.
+//! A `secrets.conf` restored from somebody else's backup silently changing who this machine
+//! encrypts to is recipient injection with nobody having to attack anything.
+//!
+//! # Edited in place
+//!
+//! `oslo secret key add` and its neighbours splice lines rather than re-render the file, so
+//! comments, blank lines and the order things were written in survive being edited by a command.
+
+use std::path::PathBuf;
+
+use super::key::KeySource;
+
+/// Where the file is: `$OSLO_SECRET_CONF`, else `$XDG_STATE_HOME/oslo/secrets.conf`.
+pub fn path() -> Option<PathBuf> {
+    if let Some(named) = std::env::var_os("OSLO_SECRET_CONF")
+        && !named.is_empty()
+    {
+        return Some(PathBuf::from(named));
+    }
+    Some(super::state_directory()?.join("secrets.conf"))
+}
+
+/// One store's declaration.
+#[derive(Debug, Default, Clone)]
+pub struct Section {
+    pub name: String,
+    pub directory: Option<PathBuf>,
+    pub recipients: Vec<String>,
+    pub keys: Vec<KeySource>,
+}
+
+/// The whole file: the lines as written, and what they mean.
+#[derive(Debug, Default, Clone)]
+pub struct Conf {
+    lines: Vec<String>,
+    pub default: Option<String>,
+    pub sections: Vec<Section>,
+}
+
+/// Read it, or an empty one when there is no file — which is every install that has never
+/// configured anything, and must cost one failed `open`.
+pub fn read() -> Result<Conf, String> {
+    let Some(path) = path() else {
+        return Ok(Conf::default());
+    };
+    match std::fs::read_to_string(&path) {
+        Ok(text) => parse(&text).map_err(|e| format!("{}: {e}", path.display())),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(Conf::default()),
+        Err(e) => Err(format!("{}: {e}", path.display())),
+    }
+}
+
+/// **A malformed line is an error, never a skipped line.** The failure this prevents is a typo in a
+/// `recipient` that leaves a store encrypted to one fewer key than its owner believes, which is
+/// discovered on the day the other key is the only one left.
+pub fn parse(text: &str) -> Result<Conf, String> {
+    let mut conf = Conf {
+        lines: text.lines().map(str::to_string).collect(),
+        ..Conf::default()
+    };
+    let mut here: Option<Section> = None;
+
+    for (number, raw) in text.lines().enumerate() {
+        let line = raw.trim();
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        let at = number + 1;
+
+        if let Some(name) = line.strip_prefix('[').and_then(|l| l.strip_suffix(']')) {
+            let name = name.trim();
+            valid_store_name(name).map_err(|e| format!("line {at}: {e}"))?;
+            if let Some(done) = here.replace(Section {
+                name: name.to_string(),
+                ..Section::default()
+            }) {
+                conf.sections.push(done);
+            }
+            continue;
+        }
+
+        let (verb, rest) = split_word(line);
+        match (verb, here.as_mut()) {
+            ("default", None) => conf.default = Some(rest.to_string()),
+            ("default", Some(_)) => {
+                return Err(format!(
+                    "line {at}: `default` belongs above the first [store]"
+                ));
+            }
+            (_, None) => {
+                return Err(format!("line {at}: {verb:?} before any [store]"));
+            }
+            ("directory", Some(section)) => section.directory = Some(PathBuf::from(rest)),
+            ("recipient", Some(section)) => section.recipients.push(rest.to_string()),
+            ("key", Some(section)) => section
+                .keys
+                .push(KeySource::parse(rest).map_err(|e| format!("line {at}: {e}"))?),
+            (other, _) => return Err(format!("line {at}: {other:?} is not a thing to say here")),
+        }
+    }
+    if let Some(done) = here {
+        conf.sections.push(done);
+    }
+    Ok(conf)
+}
+
+impl Conf {
+    /// What one store declares, if it declares anything.
+    pub fn section(&self, name: &str) -> Option<&Section> {
+        self.sections.iter().find(|s| s.name == name)
+    }
+
+    /// The file as it now stands.
+    pub fn text(&self) -> String {
+        let mut text = self.lines.join("\n");
+        if !text.is_empty() {
+            text.push('\n');
+        }
+        text
+    }
+
+    /// Put `line` at the end of `section`, adding the section if it is not there yet.
+    pub fn add(&mut self, section: &str, line: &str) {
+        match self.span(section) {
+            Some((_, end)) => self.lines.insert(end, line.to_string()),
+            None => {
+                if !self.lines.is_empty() && !self.lines[self.lines.len() - 1].trim().is_empty() {
+                    self.lines.push(String::new());
+                }
+                self.lines.push(format!("[{section}]"));
+                self.lines.push(line.to_string());
+            }
+        }
+    }
+
+    /// Take out every line in `section` that `wanted` says to, and answer how many went.
+    pub fn remove(&mut self, section: &str, wanted: impl Fn(&str) -> bool) -> usize {
+        let Some((start, end)) = self.span(section) else {
+            return 0;
+        };
+        let mut gone = 0;
+        for at in (start..end).rev() {
+            if wanted(self.lines[at].trim()) {
+                self.lines.remove(at);
+                gone += 1;
+            }
+        }
+        gone
+    }
+
+    /// The store a bare `oslo secret` means.
+    pub fn set_default(&mut self, name: &str) {
+        let line = format!("default {name}");
+        let first_section = self
+            .lines
+            .iter()
+            .position(|l| l.trim_start().starts_with('['))
+            .unwrap_or(self.lines.len());
+        match self.lines[..first_section]
+            .iter()
+            .position(|l| split_word(l.trim()).0 == "default")
+        {
+            Some(at) => self.lines[at] = line,
+            None => self.lines.insert(0, line),
+        }
+    }
+
+    /// Where `section`'s lines are: its header index, and one past its last line.
+    fn span(&self, section: &str) -> Option<(usize, usize)> {
+        let header = format!("[{section}]");
+        let start = self.lines.iter().position(|l| l.trim() == header)?;
+        let end = self.lines[start + 1..]
+            .iter()
+            .position(|l| l.trim_start().starts_with('['))
+            .map(|at| start + 1 + at)
+            .unwrap_or(self.lines.len());
+        Some((start + 1, end))
+    }
+
+    /// Write it back where [`path`] says, mode `0600` and atomically — it names key paths, and a
+    /// half-written one would be a store with half a recipient list.
+    pub fn write(&self) -> Result<(), String> {
+        let path = path().ok_or("no $XDG_STATE_HOME and no $HOME, so there is nowhere for it")?;
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent).map_err(|e| format!("{}: {e}", parent.display()))?;
+        }
+        let scratch = path.with_extension("conf.new");
+        super::write_private(&scratch, self.text().as_bytes())?;
+        std::fs::rename(&scratch, &path).map_err(|e| format!("{}: {e}", path.display()))
+    }
+}
+
+/// A store name is a directory name and a section header, so it may not be either of those things
+/// out of place. `plugin.` is a namespace rather than a rule: the command line reaches it, Lua
+/// does not.
+pub fn valid_store_name(name: &str) -> Result<(), String> {
+    if name.is_empty() {
+        return Err("a store needs a name".to_string());
+    }
+    if !name
+        .chars()
+        .all(|c| c.is_ascii_alphanumeric() || matches!(c, '-' | '_' | '.'))
+        || name.starts_with('.')
+        || name.contains("..")
+    {
+        return Err(format!("{name:?} is not a usable name for a store"));
+    }
+    Ok(())
+}
+
+/// The first word, and everything after it.
+pub fn split_word(line: &str) -> (&str, &str) {
+    match line.split_once(char::is_whitespace) {
+        Some((word, rest)) => (word, rest.trim()),
+        None => (line, ""),
+    }
+}

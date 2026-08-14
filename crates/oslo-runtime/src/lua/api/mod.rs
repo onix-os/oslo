@@ -34,6 +34,7 @@ mod json;
 mod messages;
 #[cfg(feature = "nix")]
 mod nix;
+mod optional;
 mod path;
 #[cfg(feature = "vista")]
 mod predict;
@@ -41,6 +42,8 @@ mod proc;
 pub(crate) mod prompt;
 mod re;
 mod run;
+#[cfg(feature = "secrets")]
+mod secret;
 pub(crate) mod segment;
 mod shell;
 pub(crate) mod spawn;
@@ -220,14 +223,7 @@ pub fn install(interp: &Rc<Interp>, registry: &Registry, env: Arc<Mutex<Environm
     extend(&mut oslo, "proc", process);
     oslo.set(Value::str("sys"), Value::table(system));
     oslo.set(Value::str("ui"), Value::table(ui));
-    #[cfg(feature = "direnv")]
-    oslo.set(Value::str("direnv"), direnv::build(&env));
-    #[cfg(feature = "nix")]
-    oslo.set(Value::str("nix"), nix::build(interp));
-    // `oslo.plugin.health` — the check a plugin writes about itself, which `oslo plugin doctor`
-    // loads it to ask. Only in a build that can install plugins at all.
-    #[cfg(feature = "plugin")]
-    oslo.set(Value::str("plugin"), crate::plugin::health::build());
+    optional::install(&mut oslo, interp, &env);
     let oslo = Value::table(oslo);
     publish(interp, &oslo);
     interp.set_global("oslo", oslo);

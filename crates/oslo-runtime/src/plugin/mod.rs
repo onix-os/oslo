@@ -32,6 +32,7 @@ pub mod doctor;
 pub mod health;
 pub mod index;
 pub mod install;
+pub mod loading;
 pub mod manifest;
 /// The assertions a plugin writes about itself, and the harness that runs them.
 pub mod test;
@@ -142,7 +143,7 @@ pub fn load_one(installed: &index::Installed) -> Result<(), String> {
 /// a plugin before being allowed to test it.
 pub fn load_from(directory: &std::path::Path) -> Result<manifest::Manifest, String> {
     let manifest = manifest::read(directory)?;
-    test::while_loading(&manifest.name, || {
+    loading::while_loading(&manifest.name, &manifest.secrets, || {
         crate::lua::engine::load_plugin_file(&directory.join(&manifest.entry))
     })?;
     Ok(manifest)
@@ -209,7 +210,11 @@ fn load(installed: &index::Installed) -> Result<(), String> {
             installed.name
         ));
     }
-    crate::lua::engine::load_plugin_file(&directory.join(&installed.entry))
+    // Attributed while it runs, so a handle `oslo.secret` hands out during the load knows which
+    // plugin asked for it.
+    loading::while_loading(&installed.name, &installed.secrets, || {
+        crate::lua::engine::load_plugin_file(&directory.join(&installed.entry))
+    })
 }
 
 #[cfg(test)]

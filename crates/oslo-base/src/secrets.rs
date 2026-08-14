@@ -16,11 +16,19 @@
 //! wrong shape here: it needs a daemon, a session bus and a desktop, none of which exist on a
 //! server, in a container, or in the initramfs where this shell is supposed to work.
 //!
+//! # A store is three things
+//!
+//! A [`Store`] is a directory, an ordered list of [`KeySource`]s to decrypt with, and a list of
+//! [`Recipient`]s to encrypt to. Every one of them is configurable in [`conf`]; an install that has
+//! configured nothing gets one store called `user`, one key file and one recipient, which is
+//! exactly what this module did when it had no configuration at all.
+//!
 //! # What is on disk, and why the key is not next to it
 //!
 //! ```text
 //! ~/.local/share/oslo/secrets/NAME.age      one secret, encrypted — safe to commit
 //! ~/.local/state/oslo/identity              the key, mode 0600 — never
+//! ~/.local/state/oslo/secrets.conf          which stores exist — beside the key, and why is in `conf`
 //! ```
 //!
 //! **Two directories, because they have opposite rules.** The point of encrypting a store is that
@@ -39,39 +47,315 @@
 //! and a shell that asks fifty times a day teaches you to keep the value somewhere else. Protecting
 //! it is the filesystem's job, the same as `~/.ssh/id_ed25519`.
 
-use age::secrecy::ExposeSecret;
-use age::x25519;
+pub mod conf;
+pub mod key;
+pub mod recipient;
+
 use std::io::{Read, Write};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+
+pub use key::KeySource;
+pub use recipient::Recipient;
+
+/// The store every install has, and the one `oslo secret` means when nothing says otherwise.
+pub const USER: &str = "user";
+
+/// A plugin's own store is named for it, under a prefix Lua cannot type.
+pub const PLUGIN: &str = "plugin.";
+
+/// A directory, what opens it, and who it is written for.
+#[derive(Debug, Clone)]
+pub struct Store {
+    pub name: String,
+    pub directory: PathBuf,
+    pub keys: Vec<KeySource>,
+    pub recipients: Vec<Recipient>,
+}
+
+impl Store {
+    /// The store called `name`, as `secrets.conf` has it, filled in with the defaults for whatever
+    /// it does not say.
+    pub fn named(name: &str) -> Result<Store, String> {
+        conf::valid_store_name(name)?;
+        let declared = conf::read()?;
+        let section = declared.section(name);
+        let recipients = match section {
+            Some(section) => section
+                .recipients
+                .iter()
+                .map(|text| Recipient::new(text))
+                .collect::<Result<Vec<_>, _>>()?,
+            None => Vec::new(),
+        };
+        let mut keys = section.map(|s| s.keys.clone()).unwrap_or_default();
+        if keys.is_empty() {
+            keys.push(KeySource::File(identity_path().ok_or(NOWHERE_FOR_A_KEY)?));
+        }
+        if name.starts_with(PLUGIN) && keys.iter().any(KeySource::is_external) {
+            return Err(format!(
+                "{name}: a plugin's store may not run a key command"
+            ));
+        }
+        Ok(Store {
+            directory: match section.and_then(|s| s.directory.clone()) {
+                Some(directory) => directory,
+                None => default_directory(name)?,
+            },
+            name: name.to_string(),
+            keys,
+            recipients,
+        })
+    }
+
+    /// The store this invocation means: what was asked for, else `$OSLO_SECRET_STORE`, else the
+    /// `default` line, else [`USER`].
+    pub fn selected(asked: Option<&str>) -> Result<Store, String> {
+        if let Some(name) = asked {
+            return Store::named(name);
+        }
+        if let Some(name) = std::env::var_os("OSLO_SECRET_STORE")
+            && !name.is_empty()
+        {
+            return Store::named(&name.to_string_lossy());
+        }
+        match conf::read()?.default {
+            Some(name) => Store::named(&name),
+            None => Store::named(USER),
+        }
+    }
+
+    /// Where one secret lives.
+    ///
+    /// A name is a filename, so it may not reach out of the directory it is written into: `..` and
+    /// `/` are refused rather than sanitised, because a secret quietly stored somewhere other than
+    /// where it was asked for is worse than an error.
+    pub fn path(&self, name: &str) -> Result<PathBuf, String> {
+        if name.is_empty()
+            || name.contains('/')
+            || name.contains('\0')
+            || name == ".."
+            || name.starts_with('.')
+        {
+            return Err(format!("{name:?} is not a usable name for a secret"));
+        }
+        Ok(self.directory.join(format!("{name}.age")))
+    }
+
+    /// Keep `value` under `name`.
+    pub fn set(&self, name: &str, value: &[u8]) -> Result<(), String> {
+        let path = self.path(name)?;
+        let sealed = self.seal(value)?;
+        if let Some(parent) = path.parent() {
+            std::fs::create_dir_all(parent).map_err(|e| format!("{}: {e}", parent.display()))?;
+        }
+        // The ciphertext is not a secret, but the file is still written privately: what it *is* is
+        // still information — a size, a modification time, the fact that this name exists at all.
+        let scratch = path.with_extension("age.new");
+        write_private(&scratch, &sealed)?;
+        std::fs::rename(&scratch, &path).map_err(|e| format!("{}: {e}", path.display()))
+    }
+
+    /// The value kept under `name`.
+    pub fn get(&self, name: &str) -> Result<Vec<u8>, String> {
+        let path = self.path(name)?;
+        let ciphertext = std::fs::read(&path).map_err(|e| format!("{}: {e}", path.display()))?;
+        self.unseal(&ciphertext)
+    }
+
+    /// Every name kept here, sorted.
+    pub fn names(&self) -> Vec<String> {
+        let Ok(entries) = std::fs::read_dir(&self.directory) else {
+            return Vec::new();
+        };
+        let mut names: Vec<String> = entries
+            .flatten()
+            .filter_map(|entry| {
+                let name = entry.file_name().to_string_lossy().into_owned();
+                name.strip_suffix(".age").map(str::to_string)
+            })
+            .collect();
+        names.sort();
+        names
+    }
+
+    /// Forget the secret kept under `name`.
+    pub fn forget(&self, name: &str) -> Result<(), String> {
+        let path = self.path(name)?;
+        std::fs::remove_file(&path).map_err(|e| format!("{}: {e}", path.display()))
+    }
+
+    /// Encrypt to every recipient, without storing it anywhere.
+    pub fn seal(&self, value: &[u8]) -> Result<Vec<u8>, String> {
+        let recipients = self.encrypt_to()?;
+        let boxed: Vec<Box<dyn age::Recipient + Send>> = recipients
+            .into_iter()
+            .map(|r| Box::new(r) as Box<dyn age::Recipient + Send>)
+            .collect();
+        let encryptor = age::Encryptor::with_recipients(boxed.iter().map(|r| r.as_ref() as _))
+            .map_err(|e| format!("{e}"))?;
+        let mut ciphertext = Vec::new();
+        let mut writer = encryptor
+            .wrap_output(&mut ciphertext)
+            .map_err(|e| format!("{e}"))?;
+        writer.write_all(value).map_err(|e| format!("{e}"))?;
+        writer.finish().map_err(|e| format!("{e}"))?;
+        Ok(ciphertext)
+    }
+
+    /// Decrypt with whichever key opens it.
+    ///
+    /// **Native sources first, and external ones only if none of them matched.** `age` stops at the
+    /// first identity that fits, so a store whose file key opens the file never runs the program
+    /// another key source names — no `$PATH` walk, no fork, and a cron job on a machine that cannot
+    /// reach the other key degrades instead of hanging on it.
+    pub fn unseal(&self, ciphertext: &[u8]) -> Result<Vec<u8>, String> {
+        let native = self.identities(false)?;
+        if let Some(value) = attempt(ciphertext, &native)? {
+            return Ok(value);
+        }
+        let external = self.identities(true)?;
+        if !external.is_empty()
+            && let Some(value) = attempt(ciphertext, &external)?
+        {
+            return Ok(value);
+        }
+        Err(self.why_it_did_not_open(native.len() + external.len()))
+    }
+
+    /// Re-encrypt everything here to the recipients as they now stand, and answer how many moved.
+    pub fn rotate(&self) -> Result<usize, String> {
+        let names = self.names();
+        let mut values = Vec::with_capacity(names.len());
+        for name in &names {
+            values.push((name.clone(), self.get(name)?));
+        }
+        for (name, value) in &values {
+            self.set(name, value)?;
+        }
+        Ok(values.len())
+    }
+
+    /// The identities this store can offer, of one kind.
+    pub fn identities(&self, external: bool) -> Result<Vec<age::x25519::Identity>, String> {
+        let mut found = Vec::new();
+        for source in self.keys.iter().filter(|s| s.is_external() == external) {
+            match source.identity() {
+                Ok(Some(identity)) => found.push(identity),
+                Ok(None) => {}
+                // A key source that cannot answer is not the end of the list: the next one may be
+                // the one that opens this file, and the failure is reported only if none does.
+                Err(_) if self.keys.len() > 1 => {}
+                Err(e) => return Err(e),
+            }
+        }
+        Ok(found)
+    }
+
+    /// The first key file this store would look in, which is where `key init` makes one.
+    pub fn key_file(&self) -> Option<PathBuf> {
+        self.keys.iter().find_map(|source| match source {
+            KeySource::File(path) => Some(path.clone()),
+            KeySource::Command(_) => None,
+        })
+    }
+
+    /// Who this store encrypts to, generating the default key if that is what it comes to.
+    pub fn encrypt_to(&self) -> Result<Vec<age::x25519::Recipient>, String> {
+        if !self.recipients.is_empty() {
+            return self.recipients.iter().map(Recipient::native).collect();
+        }
+        // Native first here too, but a store whose only key is a command still has a public half to
+        // encrypt to — it just costs running the command to learn it.
+        for external in [false, true] {
+            if let Some(identity) = self.identities(external)?.first() {
+                return Ok(vec![identity.to_public()]);
+            }
+        }
+        match self.key_file() {
+            Some(path) => Ok(vec![key::generate(&path)?.to_public()]),
+            None => Err(format!(
+                "{}: no recipient to encrypt to, and no key file to make one from",
+                self.name
+            )),
+        }
+    }
+
+    /// Why nothing opened it, in the terms of what this store was told to try.
+    fn why_it_did_not_open(&self, tried: usize) -> String {
+        let skipped = key::no_exec() && self.keys.iter().any(KeySource::is_external);
+        if skipped {
+            return format!(
+                "no key opened it. $OSLO_SECRET_NO_EXEC is set, so {} of {} key sources were not run",
+                self.keys.iter().filter(|s| s.is_external()).count(),
+                self.keys.len()
+            );
+        }
+        if tried == 0 {
+            return format!("{}: no key to open it with", self.name);
+        }
+        format!("no key opened it, of the {tried} this store has")
+    }
+}
+
+/// Try one set of identities against a file, telling "wrong key" apart from "broken file".
+fn attempt(
+    ciphertext: &[u8],
+    identities: &[age::x25519::Identity],
+) -> Result<Option<Vec<u8>>, String> {
+    if identities.is_empty() {
+        return Ok(None);
+    }
+    let decryptor = age::Decryptor::new(ciphertext).map_err(|e| format!("{e}"))?;
+    let mut reader = match decryptor.decrypt(identities.iter().map(|i| i as &dyn age::Identity)) {
+        Ok(reader) => reader,
+        Err(age::DecryptError::NoMatchingKeys) => return Ok(None),
+        Err(e) => return Err(format!("{e}")),
+    };
+    let mut value = Vec::new();
+    reader.read_to_end(&mut value).map_err(|e| format!("{e}"))?;
+    Ok(Some(value))
+}
+
+const NOWHERE_FOR_A_KEY: &str =
+    "no $XDG_STATE_HOME and no $HOME, so there is nowhere to keep a key";
+
+/// `$XDG_DATA_HOME/oslo`, or `~/.local/share/oslo`.
+fn data_directory() -> Option<PathBuf> {
+    base("XDG_DATA_HOME", ".local/share").map(|base| base.join("oslo"))
+}
+
+/// `$XDG_STATE_HOME/oslo`, or `~/.local/state/oslo`.
+fn state_directory() -> Option<PathBuf> {
+    base("XDG_STATE_HOME", ".local/state").map(|base| base.join("oslo"))
+}
+
+fn base(variable: &str, fallback: &str) -> Option<PathBuf> {
+    std::env::var_os(variable)
+        .map(PathBuf::from)
+        .filter(|path| !path.as_os_str().is_empty())
+        .or_else(|| std::env::var_os("HOME").map(|home| PathBuf::from(home).join(fallback)))
+}
+
+/// Where a store keeps its files when it does not say.
+///
+/// The `user` store keeps the directory it has always had. A named one gets its own under
+/// `stores/`, and a plugin's under `plugins/`, beside the `.kv` that `oslo.db` makes for it — so
+/// uninstalling a plugin stays an `rm -r` rather than a migration.
+fn default_directory(name: &str) -> Result<PathBuf, String> {
+    let oslo = data_directory()
+        .ok_or("no $XDG_DATA_HOME and no $HOME, so there is nowhere to keep secrets")?;
+    Ok(match name {
+        USER => oslo.join("secrets"),
+        _ => match name.strip_prefix(PLUGIN) {
+            Some(plugin) => oslo.join("plugins").join(format!("{plugin}.secrets")),
+            None => oslo.join("stores").join(name),
+        },
+    })
+}
 
 /// `$XDG_DATA_HOME/oslo/secrets`, or `~/.local/share/oslo/secrets`.
 pub fn directory() -> Option<PathBuf> {
-    let base = std::env::var_os("XDG_DATA_HOME")
-        .map(PathBuf::from)
-        .filter(|path| !path.as_os_str().is_empty())
-        .or_else(|| {
-            std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".local/share"))
-        })?;
-    Some(base.join("oslo/secrets"))
-}
-
-/// Where one secret lives.
-///
-/// A name is a filename, so it may not reach out of the directory it is written into: `..` and `/`
-/// are refused rather than sanitised, because a secret quietly stored somewhere other than where it
-/// was asked for is worse than an error.
-pub fn path(name: &str) -> Result<PathBuf, String> {
-    if name.is_empty()
-        || name.contains('/')
-        || name.contains('\0')
-        || name == ".."
-        || name.starts_with('.')
-    {
-        return Err(format!("{name:?} is not a usable name for a secret"));
-    }
-    Ok(directory()
-        .ok_or("no $XDG_DATA_HOME and no $HOME, so there is nowhere to keep secrets")?
-        .join(format!("{name}.age")))
+    default_directory(USER).ok()
 }
 
 /// Where the private key is: `$OSLO_SECRET_IDENTITY`, else `$XDG_STATE_HOME/oslo/identity`, else
@@ -85,13 +369,7 @@ pub fn identity_path() -> Option<PathBuf> {
     {
         return Some(PathBuf::from(named));
     }
-    let base = std::env::var_os("XDG_STATE_HOME")
-        .map(PathBuf::from)
-        .filter(|path| !path.as_os_str().is_empty())
-        .or_else(|| {
-            std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".local/state"))
-        })?;
-    Some(base.join("oslo/identity"))
+    Some(state_directory()?.join("identity"))
 }
 
 /// The repository the identity is inside, when it is inside one.
@@ -118,37 +396,15 @@ pub fn identity_in_a_repository() -> Option<PathBuf> {
 /// "not a git repository" — so a bare `exists()` warned that a key was about to be committed to a
 /// repository that does not exist. A real one is a directory with `HEAD` in it, or a *file* saying
 /// where the directory is, which is what a worktree and a submodule have.
-fn is_repository(dot_git: &std::path::Path) -> bool {
+fn is_repository(dot_git: &Path) -> bool {
     dot_git.is_file() || dot_git.join("HEAD").exists()
 }
 
-/// The key this machine encrypts to, read from disk or created on first use.
+/// Write bytes where only this user can read them, before anything is in them.
 ///
-/// Mode `0600` from the moment it exists: written to a temporary file that is already private and
-/// then renamed, so there is no instant where the key is readable by anybody else.
-fn identity() -> Result<x25519::Identity, String> {
-    let path = identity_path()
-        .ok_or("no $XDG_STATE_HOME and no $HOME, so there is nowhere to keep a key")?;
-    if let Ok(text) = std::fs::read_to_string(&path) {
-        return text
-            .trim()
-            .parse::<x25519::Identity>()
-            .map_err(|e| format!("{}: {e}", path.display()));
-    }
-
-    let directory = path
-        .parent()
-        .ok_or_else(|| format!("{}: has no directory to be in", path.display()))?;
-    std::fs::create_dir_all(directory).map_err(|e| format!("{}: {e}", directory.display()))?;
-    let fresh = x25519::Identity::generate();
-    let scratch = directory.join("identity.new");
-    write_private(&scratch, fresh.to_string().expose_secret())?;
-    std::fs::rename(&scratch, &path).map_err(|e| format!("{}: {e}", path.display()))?;
-    Ok(fresh)
-}
-
-/// Write `text` where only this user can read it, before anything is in it.
-fn write_private(path: &std::path::Path, text: &str) -> Result<(), String> {
+/// **Bytes, and nothing appended.** It writes age ciphertext as well as identities, and a newline
+/// added to the end of an age file is a file the format does not accept back.
+fn write_private(path: &Path, bytes: &[u8]) -> Result<(), String> {
     use std::os::unix::fs::OpenOptionsExt;
     let mut file = std::fs::OpenOptions::new()
         .write(true)
@@ -157,86 +413,35 @@ fn write_private(path: &std::path::Path, text: &str) -> Result<(), String> {
         .mode(0o600)
         .open(path)
         .map_err(|e| format!("{}: {e}", path.display()))?;
-    file.write_all(text.as_bytes())
-        .map_err(|e| format!("{}: {e}", path.display()))?;
-    file.write_all(b"\n")
+    file.write_all(bytes)
         .map_err(|e| format!("{}: {e}", path.display()))
 }
 
-/// Keep `value` under `name`, encrypted to this machine's key.
+/// Where one secret lives in the `user` store.
+pub fn path(name: &str) -> Result<PathBuf, String> {
+    Store::named(USER)?.path(name)
+}
+
+/// Keep `value` under `name` in the `user` store.
 pub fn set(name: &str, value: &[u8]) -> Result<(), String> {
-    let path = path(name)?;
-    let identity = identity()?;
-    if let Some(parent) = path.parent() {
-        std::fs::create_dir_all(parent).map_err(|e| format!("{}: {e}", parent.display()))?;
-    }
-
-    let encryptor = age::Encryptor::with_recipients([&identity.to_public() as _].into_iter())
-        .map_err(|e| format!("{e}"))?;
-    let mut ciphertext = Vec::new();
-    let mut writer = encryptor
-        .wrap_output(&mut ciphertext)
-        .map_err(|e| format!("{e}"))?;
-    writer.write_all(value).map_err(|e| format!("{e}"))?;
-    writer.finish().map_err(|e| format!("{e}"))?;
-
-    // The ciphertext is not a secret, but the file is still written privately: what it *is* is
-    // still information — a size, a modification time, the fact that this name exists at all.
-    let scratch = path.with_extension("age.new");
-    {
-        use std::os::unix::fs::OpenOptionsExt;
-        let mut file = std::fs::OpenOptions::new()
-            .write(true)
-            .create(true)
-            .truncate(true)
-            .mode(0o600)
-            .open(&scratch)
-            .map_err(|e| format!("{}: {e}", scratch.display()))?;
-        file.write_all(&ciphertext)
-            .map_err(|e| format!("{}: {e}", scratch.display()))?;
-    }
-    std::fs::rename(&scratch, &path).map_err(|e| format!("{}: {e}", path.display()))
+    Store::named(USER)?.set(name, value)
 }
 
-/// The value kept under `name`.
+/// The value kept under `name` in the `user` store.
 pub fn get(name: &str) -> Result<Vec<u8>, String> {
-    let path = path(name)?;
-    let ciphertext =
-        std::fs::read(&path).map_err(|e| format!("{name}: {e}", name = path.display(), e = e))?;
-    let identity = identity()?;
-
-    let decryptor = age::Decryptor::new(&ciphertext[..]).map_err(|e| format!("{e}"))?;
-    let mut reader = decryptor
-        .decrypt([&identity as &dyn age::Identity].into_iter())
-        .map_err(|e| format!("{e}"))?;
-    let mut value = Vec::new();
-    reader.read_to_end(&mut value).map_err(|e| format!("{e}"))?;
-    Ok(value)
+    Store::named(USER)?.get(name)
 }
 
-/// Every name kept here, sorted.
+/// Every name in the `user` store.
 pub fn names() -> Vec<String> {
-    let Some(directory) = directory() else {
-        return Vec::new();
-    };
-    let Ok(entries) = std::fs::read_dir(directory) else {
-        return Vec::new();
-    };
-    let mut names: Vec<String> = entries
-        .flatten()
-        .filter_map(|entry| {
-            let name = entry.file_name().to_string_lossy().into_owned();
-            name.strip_suffix(".age").map(str::to_string)
-        })
-        .collect();
-    names.sort();
-    names
+    Store::named(USER)
+        .map(|store| store.names())
+        .unwrap_or_default()
 }
 
-/// Forget the secret kept under `name`.
+/// Forget the secret kept under `name` in the `user` store.
 pub fn forget(name: &str) -> Result<(), String> {
-    let path = path(name)?;
-    std::fs::remove_file(&path).map_err(|e| format!("{}: {e}", path.display()))
+    Store::named(USER)?.forget(name)
 }
 
 #[cfg(test)]

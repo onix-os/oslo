@@ -213,6 +213,15 @@ fn install_one(source: &str, assume_yes: bool) -> i32 {
             (false, None) => format!("reserves: {}", reserves.join(", ")),
         }
     );
+    // **Said before the question, not after.** A plugin that will read your tokens says so in a
+    // manifest read with no `oslo` in it, which is the one moment the claim can be seen before its
+    // code has had a chance to do anything.
+    if !planned.manifest.secrets.is_empty() {
+        println!(
+            "  secrets: {}   it will be able to read these",
+            planned.manifest.secrets.join(", ")
+        );
+    }
     if !assume_yes && !confirm("install and allow it to run?") {
         println!("not installed");
         return 1;

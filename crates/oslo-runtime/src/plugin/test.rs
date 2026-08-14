@@ -68,33 +68,12 @@ pub fn install(plugin: &mut Table) {
         // said "notes: 3 passed" without saying which three is no use when one of them breaks.
         TESTS.with(|slot| {
             slot.borrow_mut()
-                .entry(current().unwrap_or_else(|| name.to_string()))
+                .entry(super::loading::current().map_or_else(|| name.to_string(), |it| it.plugin))
                 .or_default()
                 .push((name.to_string(), body.clone()))
         });
         Ok(vec![Value::Bool(true)])
     });
-}
-
-thread_local! {
-    /// Which plugin's file is being loaded, while it is being loaded.
-    static LOADING: RefCell<Option<String>> = const { RefCell::new(None) };
-}
-
-fn current() -> Option<String> {
-    LOADING.with(|slot| slot.borrow().clone())
-}
-
-/// Attribute everything registered while `body` runs to `plugin`.
-///
-/// **Because the first argument is a test's name, not the plugin's.** `oslo.plugin.health` takes the
-/// plugin name because a health report is printed under it; a test is one of many and wants its own
-/// title, so the plugin has to be known from *when* the registration happened instead.
-pub fn while_loading<T>(plugin: &str, body: impl FnOnce() -> T) -> T {
-    LOADING.with(|slot| *slot.borrow_mut() = Some(plugin.to_string()));
-    let outcome = body();
-    LOADING.with(|slot| *slot.borrow_mut() = None);
-    outcome
 }
 
 /// Run every test `plugin` registered.

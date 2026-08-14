@@ -1128,6 +1128,7 @@ dependencies = [
 name = "oslo-runtime"
 version = "0.2.21"
 dependencies = [
+ "base64",
  "nix",
  "oslo-base",
  "oslo-lua",
