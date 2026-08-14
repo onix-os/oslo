@@ -14,8 +14,14 @@
 //! It is a *profile*, not a lock. Nothing stops two shells sharing one, which is what makes
 //! `oslo --profile=claude` twice in a row accumulate rather than start over.
 //!
+//! A profile also carries a **key**, in [`key`]: the thing that says two machines mean the same
+//! history rather than two histories that share a word. Nothing needs it until `oslo profile sync`
+//! does.
+//!
 //! Either `--profile=NAME` or `$OSLO_PROFILE` names it — the flag for one invocation, the variable
 //! for a whole session, and the flag wins when both are given.
+
+pub mod key;
 
 use std::path::PathBuf;
 

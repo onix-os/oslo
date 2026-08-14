@@ -15,6 +15,7 @@ pub mod history;
 pub mod macros;
 #[cfg(feature = "plugin")]
 pub mod plugin;
+pub mod profile;
 #[cfg(feature = "scratch")]
 pub mod scratch;
 #[cfg(feature = "secrets")]
