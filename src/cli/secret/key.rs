@@ -2,7 +2,7 @@
 //!
 //! ```sh
 //! oslo secret key list
-//! oslo secret key init                              # make the default one, explicitly
+//! oslo secret key add profile                       # the default: derived from the profile's key
 //! oslo secret key add file ~/.ssh/oslo-identity
 //! oslo secret key add command -- pass show oslo/age-identity
 //! oslo secret key rm file ~/.ssh/oslo-identity
@@ -11,6 +11,10 @@
 //! A store with several is a store with several places to look, tried in the order they are
 //! written, and the ones that run a program are tried last however they are ordered — so a store
 //! that opens with a key file never forks.
+//!
+//! **The default is the profile's key**, derived per store name. That is what makes one
+//! `oslo profile export` carry a machine's history *and* its secrets: there is one secret on the
+//! machine rather than two, and one thing to copy.
 
 use oslo::secrets::{self, KeySource, Store};
 
@@ -18,6 +22,7 @@ use super::fail;
 
 const USAGE: &str = "usage: oslo secret key list|init|add|rm\n\
                      \n\
+                     \x20 add profile          derive it from this profile's key (the default)\n\
                      \x20 add file PATH        read the identity out of a file\n\
                      \x20 add command ARG…     run a program; its output is the identity\n\
                      \x20 rm  file PATH\n\
@@ -33,6 +38,7 @@ pub fn run(store: &Store, args: &[String]) -> i32 {
         }
         #[cfg(feature = "crypt")]
         Some("init") => init(store),
+        Some("profile") => add(store, &KeySource::Profile),
         Some("add") => match source(&args[1..]) {
             Ok(source) => add(store, &source),
             Err(e) => fail(&e),
@@ -62,6 +68,7 @@ pub fn show(store: &Store) {
 /// Whether it is there, said in the fewest words that are true.
 fn state_of(source: &KeySource) -> &'static str {
     match source {
+        KeySource::Profile => "derived from this profile's key",
         KeySource::File(path) if path.exists() => "present",
         KeySource::File(_) => "not there yet",
         KeySource::Command(_) if secrets::key::no_exec() => "skipped: $OSLO_SECRET_NO_EXEC",
@@ -69,7 +76,7 @@ fn state_of(source: &KeySource) -> &'static str {
     }
 }
 
-/// `file PATH` or `command ARG…`, with an optional `--` before the program.
+/// `profile`, `file PATH` or `command ARG…`, with an optional `--` before the program.
 fn source(args: &[String]) -> Result<KeySource, String> {
     let words: Vec<&str> = args
         .iter()
@@ -90,15 +97,15 @@ fn add(store: &Store, source: &KeySource) -> i32 {
         Ok(conf) => conf,
         Err(e) => return fail(&e),
     };
-    // **Only the `user` store keeps its implied key when the first explicit one arrives.** Its
-    // files are already encrypted to that identity and dropping it out of the list would make them
-    // unreadable. Any other store is being told what to use instead, which is the whole reason to
-    // write a key line for it.
-    if store.name == secrets::USER
-        && conf.section(&store.name).is_none_or(|s| s.keys.is_empty())
-        && let Some(path) = secrets::identity_path()
+    // **Only a store that already holds something keeps its implied key.** Every store's key is the
+    // profile's until it says otherwise, so a store with files in it is sealed to that and dropping
+    // it would make them unreadable — but a store with nothing in it is being *configured*, and
+    // prepending a key the person did not ask for would mean the one they named never gets used.
+    if conf.section(&store.name).is_none_or(|s| s.keys.is_empty())
+        && !matches!(source, KeySource::Profile)
+        && !store.names().is_empty()
     {
-        conf.add(&store.name, &KeySource::File(path).line());
+        conf.add(&store.name, &KeySource::Profile.line());
     }
     conf.add(&store.name, &source.line());
     match conf.write() {
@@ -130,7 +137,11 @@ fn remove(store: &Store, source: &KeySource) -> i32 {
 #[cfg(feature = "crypt")]
 fn init(store: &Store) -> i32 {
     let Some(path) = store.key_file() else {
-        return fail(&format!("{}: has no key file to make", store.name));
+        return fail(&format!(
+            "{}: its key is the profile's — `oslo profile key init` makes that one, and \
+             `oslo profile export` carries it to another machine",
+            store.name
+        ));
     };
     if path.exists() {
         eprintln!("oslo secret key: {} is already there", path.display());

@@ -26,6 +26,19 @@ pub fn run(store: &Store, args: &[String]) -> i32 {
             0
         }
         Some("--export") => {
+            if store.recipients.is_empty() {
+                return match mine(store) {
+                    Ok(Some(published)) => {
+                        println!("{published}");
+                        0
+                    }
+                    Ok(None) => fail(&format!(
+                        "{}: no key yet — write a secret, or `oslo profile key init`",
+                        store.name
+                    )),
+                    Err(e) => fail(&e),
+                };
+            }
             for recipient in &store.recipients {
                 println!("{recipient}");
             }
@@ -50,7 +63,16 @@ pub fn run(store: &Store, args: &[String]) -> i32 {
 /// The list, with what this binary makes of each.
 pub fn show(store: &Store) {
     if store.recipients.is_empty() {
-        println!("recipient (this store's own key)   implied, until one is added");
+        // **The implied one is printed, not merely named.** It is the half somebody else puts in
+        // their `recipient add`, and with the key derived from the profile there is nowhere else to
+        // read it from — `key init` used to be that place and no longer exists.
+        match mine(store) {
+            Ok(Some(published)) => println!("recipient {published}   implied, until one is added"),
+            Ok(None) => {
+                println!("recipient (none yet — write a secret, or `oslo profile key init`)")
+            }
+            Err(e) => println!("recipient (unreadable: {e})"),
+        }
         return;
     }
     for recipient in &store.recipients {
@@ -59,6 +81,21 @@ pub fn show(store: &Store) {
             Err(e) => println!("recipient {recipient}   UNUSABLE: {e}"),
         }
     }
+}
+
+/// This store's own published half, when it has a key to derive one from.
+///
+/// **Only when the key already exists.** Asking who can read a store must not be the thing that
+/// creates a key, so this looks and does not make.
+fn mine(store: &Store) -> Result<Option<String>, String> {
+    let profile = oslo::track::profile::current();
+    let Some(key) = oslo::track::profile::key::read(&profile)? else {
+        return Ok(None);
+    };
+    let derived = oslo::secrets::native::derive_store_key(&key, &store.name)?;
+    Ok(Some(oslo::secrets::native::write_public(
+        &oslo::secrets::native::public_of(&derived),
+    )))
 }
 
 /// The recipients named on the command line, or read out of the file `--from` names.
@@ -103,9 +140,9 @@ fn add(store: &Store, recipients: &[Recipient]) -> i32 {
     if store.recipients.is_empty() {
         match store.key_to_write_with() {
             Ok(key) => {
-                let mine =
+                let ours =
                     oslo::secrets::native::write_public(&oslo::secrets::native::public_of(&key));
-                declared.add(&store.name, &format!("recipient {mine}"));
+                declared.add(&store.name, &format!("recipient {ours}"));
             }
             Err(e) => return fail(&e),
         }

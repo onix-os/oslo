@@ -82,12 +82,12 @@ fn secret(home: &std::path::Path, args: &[&str], input: &[u8]) -> (String, Strin
 fn a_key_can_come_from_a_program_and_can_be_refused() {
     let home = tempfile::tempdir().expect("tempdir");
     secret(home.path(), &["set", "unrelated"], b"v");
-    let identity = home.path().join("state/oslo/key");
-
+    // A program that prints a key, which is the whole contract — there is no per-store key file to
+    // `cat` any more, because a store's key comes from the profile unless it is told otherwise.
     let giver = home.path().join("give-key");
     std::fs::write(
         &giver,
-        format!("#!/bin/sh\ncat {}\n", identity.to_string_lossy()),
+        "#!/bin/sh\necho OSLO-KEY-1:YSBkZW1vIGtleSwgdGhpcnR5LXR3byBieXRlcyBsb24=\n",
     )
     .expect("write");
     std::fs::set_permissions(&giver, std::os::unix::fs::PermissionsExt::from_mode(0o755))
@@ -403,11 +403,20 @@ fn a_second_recipient_reads_it_with_a_key_of_their_own() {
     let mine = tempfile::tempdir().expect("tempdir");
     let theirs = tempfile::tempdir().expect("tempdir");
 
-    // Their key, in a home of its own, and the half they would publish.
-    let (out, err, status) = secret(theirs.path(), &["key", "init"], b"");
+    // Their key is their *profile's*, and writing one secret is what makes it. The half they would
+    // publish comes off the store that key derives.
+    secret(
+        theirs.path(),
+        &["set", "anything"],
+        b"so the profile key exists",
+    );
+    let (out, err, status) = secret(theirs.path(), &["recipient"], b"");
     assert_eq!(status, 0, "{err}");
-    let published = out.lines().last().expect("a public half").to_string();
-    assert!(published.starts_with("OSLO-PUB-1:"), "{out:?}");
+    let published = out
+        .split_whitespace()
+        .find(|word| word.starts_with("OSLO-PUB-1:"))
+        .expect("a public half")
+        .to_string();
 
     secret(mine.path(), &["set", "token"], b"shared-value");
     let (_, err, status) = secret(mine.path(), &["recipient", "add", &published], b"");
@@ -448,8 +457,17 @@ fn a_second_recipient_reads_it_with_a_key_of_their_own() {
 #[cfg(feature = "crypt")]
 fn a_published_recipient_is_refused_as_a_key() {
     let home = tempfile::tempdir().expect("tempdir");
-    let (out, _, _) = secret(home.path(), &["key", "init"], b"");
-    let published = out.lines().last().expect("a public half").to_string();
+    secret(
+        home.path(),
+        &["set", "anything"],
+        b"so the profile key exists",
+    );
+    let (out, _, _) = secret(home.path(), &["recipient"], b"");
+    let published = out
+        .split_whitespace()
+        .find(|word| word.starts_with("OSLO-PUB-1:"))
+        .expect("a public half")
+        .to_string();
 
     let wrong = home.path().join("wrong-key");
     std::fs::write(&wrong, format!("{published}\n")).expect("write");

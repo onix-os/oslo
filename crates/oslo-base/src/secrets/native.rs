@@ -207,6 +207,20 @@ fn encode(bytes: &[u8]) -> String {
     base64::engine::general_purpose::STANDARD.encode(bytes)
 }
 
+/// The secret key a store derives from its profile's.
+///
+/// **Derived rather than stored**, so there is one secret on the machine instead of two: carrying
+/// the profile to another machine carries its stores with it, and there is no second file to keep
+/// in step or forget to copy. The store's name is in the salt, so two stores under one profile do
+/// not share a key and a file from one cannot be opened with the other's.
+pub fn derive_store_key(profile: &[u8; KEY], store: &str) -> Result<[u8; KEY], String> {
+    let mut key = [0u8; KEY];
+    hkdf::Hkdf::<sha2::Sha256>::new(Some(store.as_bytes()), profile)
+        .expand(b"oslo secret store v1", &mut key)
+        .map_err(|_| "the store key could not be derived".to_string())?;
+    Ok(key)
+}
+
 /// A new secret key, from the operating system's randomness and nowhere else.
 pub fn generate_secret() -> Result<[u8; KEY], String> {
     random::<KEY>()
