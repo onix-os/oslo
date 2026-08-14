@@ -85,11 +85,17 @@ build without them has no `secrets` to name — `--only secrets` answers *no suc
 lists what that build can actually do. A part that could be named and then refused would be worse
 than one that is simply absent.
 
-**Macros are not part of a profile, and that is why this command is not `oslo profile sync`.** A
-profile is a history — see [One shell, several histories](profiles-and-histories.md). Aliases are
-your tooling and are deliberately shared across every profile on a machine, so a command that synced
-them under the name `profile` would be describing them wrongly. `oslo profile sync` still exists and
-does the history alone; it is a wrapper over this and not a second implementation.
+**`oslo profile sync` is the same command**, down to `--only` and `--dry-run`: it parses the words
+and hands them here. Both spellings carry all three.
+
+That was not true at first, and the reason it changed is worth writing down. A profile is a history
+— see [One shell, several histories](profiles-and-histories.md) — and macros are deliberately shared
+across every profile on a machine, so syncing them under the name `profile` describes them wrongly.
+On that argument `oslo profile sync` carried the history alone. What it did in practice was move a
+third of the machine, print one line about history, and say nothing about the two parts it had left
+behind — so they were found missing on the far end, later. **The name was not worth that.** `NAME`
+still decides only which *history* travels, because macros and secrets are one per machine either
+way.
 
 ## Secrets cross sealed, and are never opened
 

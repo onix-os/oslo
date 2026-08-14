@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.3.12] - 2026-08-14
+
+### <!-- 1 -->🐛 Bug Fixes
+
+- Profile sync carries macros and secrets too
+
 ## [0.3.11] - 2026-08-14
 
 ### <!-- 0 -->⛰️  Features

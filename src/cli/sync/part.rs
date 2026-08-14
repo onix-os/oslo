@@ -66,6 +66,7 @@ pub fn named(word: &str) -> Option<Part> {
 ///
 /// **The fingerprints are checked once, for all of them.** The profile key is what says these two
 /// machines are the same person's, and a per-part check would ask the same question three times.
+#[allow(dead_code)]
 pub fn all_of(remote: &str, wanted: &[Part], dry_run: bool) -> Result<(), String> {
     named_profile(remote, wanted, &oslo::track::profile::current(), dry_run)
 }

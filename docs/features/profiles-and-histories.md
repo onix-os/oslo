@@ -136,9 +136,9 @@ The far end is oslo rather than `scp` — a store is a live database, and copyin
 shell that is writing to it is how you get half a transaction. Running it twice moves nothing the
 second time, which is what makes it safe in a login file or a cron line.
 
-**`oslo sync` is usually the one to reach for.** It carries the macros and the secrets as well, over
-the same ssh and behind the same key check, and `oslo profile sync` is a wrapper over it that does
-the history alone. [Syncing between machines](syncing.md) has the whole of it: the rule that decides
+**It carries the macros and the secrets too**, and `oslo sync` is the same command by another name —
+the same flags, the same work. `NAME` decides only which *history* travels; macros and secrets are
+one per machine. [Syncing between machines](syncing.md) has the whole of it: the rule that decides
 which copy of a record wins, how a deletion travels, and why the secrets cross sealed.
 
 ### Why a key, and not just the name
