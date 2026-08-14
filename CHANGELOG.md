@@ -1,44 +1,5 @@
 # Changelog
 
-## [0.5.1] - 2026-08-14
-
-### <!-- 1 -->🐛 Bug Fixes
-
-- Empty stores, derived copies, and a stale far end
-
-### <!-- 3 -->📚 Documentation
-
-- The rule, the tombstones, and what crosses sealed
-
-## [0.5.0] - 2026-08-14
-
-### <!-- 0 -->⛰️  Features
-
-- Macros and secrets travel, deletes included
-
-## [0.4.0] - 2026-08-14
-
-### <!-- 0 -->⛰️  Features
-
-- The profile key is the store key too
-- A key per profile, and two-way sync over ssh
-
-### <!-- 1 -->🐛 Bug Fixes
-
-- The nested-shell ask was eating the profile act
-
-### <!-- 2 -->🚜 Refactor
-
-- One help renderer for every submenu
-
-### <!-- 3 -->📚 Documentation
-
-- The key, the sync, and what secrets derive
-
-### <!-- 6 -->🧪 Testing
-
-- Pin the refused attributes and the key collision
-
 ## [0.3.10] - 2026-08-14
 
 ## [0.3.9] - 2026-08-14
