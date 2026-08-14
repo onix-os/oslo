@@ -166,8 +166,14 @@ pub fn run_repl(login: bool) -> ! {
     // the REPL is what owns it. Runs on the shell thread with no editor borrow held — see
     // `oslo_base::background`.
     let serviced = Arc::clone(&env_struct);
+    oslo_base::background::install_deadline(crate::lua::api::timer::next_due_in_ms);
+    // Before anything can finish on a thread, so the descriptor is in the set the first wait polls.
+    oslo_base::background::arm();
     oslo_base::background::install(move || {
         oslo_shell::exec::job::reap_background_jobs();
+        // A timer that came due, and anything `oslo.spawn` finished on a thread. The same safe
+        // point they already use at a command boundary — the shell holds nothing and Lua may run.
+        timers::fire();
         let changed = match serviced.lock() {
             Ok(mut env) => oslo_shell::env::universal::apply_if_changed(&mut env),
             Err(_) => false,

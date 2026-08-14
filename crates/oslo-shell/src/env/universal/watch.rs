@@ -48,9 +48,55 @@ pub fn start() {
         return;
     }
     use std::os::fd::{AsFd, AsRawFd};
-    oslo_base::background::wake_on(inotify.as_fd().as_raw_fd());
+    oslo_base::background::wake_on_with(inotify.as_fd().as_raw_fd(), ours);
     // **Kept for the life of the process.** The descriptor is registered by number; dropping the
     // `Inotify` would close it, and the kernel would hand that number to the next thing that asked
     // — after which the editor would wake on somebody else's traffic for ever.
     oslo_base::background::keep(inotify);
+}
+
+/// Empty the watch and answer whether any of it was about *this* file.
+///
+/// **The watch is on a directory and the store is one file in it.** The same directory holds the
+/// history database, the model and the macros, and the shell writes to all of them constantly — so
+/// most of what arrives here is the shell hearing itself. Reacting to those would refresh the
+/// environment and rebuild the prompt after every command, for nothing.
+///
+/// The events have to be read whatever the answer: an `inotify` descriptor that is not emptied
+/// stays readable, and the editor would wake on the same events for ever.
+fn ours(fd: i32) -> bool {
+    // The events are read as bytes rather than through `nix`, which offers no way to read from a
+    // descriptor it does not own. The layout is kernel ABI and has not changed since 2.6.13:
+    // `wd: i32, mask: u32, cookie: u32, len: u32, name: [u8; len]`, each event aligned to the
+    // struct. `len` counts the padding, so the name is NUL-terminated inside it.
+    const HEAD: usize = 16;
+    let mut interesting = false;
+    let mut buffer = [0u8; 4096];
+    loop {
+        // SAFETY: a borrowed descriptor and a live buffer.
+        let n = unsafe { nix::libc::read(fd, buffer.as_mut_ptr().cast(), buffer.len()) };
+        if n <= 0 {
+            return interesting;
+        }
+        let mut at = 0usize;
+        while at + HEAD <= n as usize {
+            let len = u32::from_ne_bytes([
+                buffer[at + 12],
+                buffer[at + 13],
+                buffer[at + 14],
+                buffer[at + 15],
+            ]) as usize;
+            let from = at + HEAD;
+            let to = (from + len).min(n as usize);
+            if from < to {
+                let name = &buffer[from..to];
+                let name = &name[..name.iter().position(|b| *b == 0).unwrap_or(name.len())];
+                // The store, and the scratch file a write renames over it.
+                if name.starts_with(b"universal") {
+                    interesting = true;
+                }
+            }
+            at = from + len;
+        }
+    }
 }

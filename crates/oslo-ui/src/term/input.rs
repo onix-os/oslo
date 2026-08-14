@@ -410,9 +410,21 @@ impl Keys {
                 revents: 0,
             });
         }
+        // The nearest timer's deadline, or no timeout when nothing is waiting on the clock.
+        let timeout = background::wait_ms();
         // SAFETY: every descriptor is borrowed and live for the duration of the call.
-        let polled = unsafe { nix::libc::poll(fds.as_mut_ptr(), fds.len() as _, -1) };
-        if polled <= 0 {
+        let polled = unsafe { nix::libc::poll(fds.as_mut_ptr(), fds.len() as _, timeout) };
+        if polled == 0 {
+            // A deadline came due with nothing else to say. Servicing is what fires the timer.
+            return match background::service() {
+                true => {
+                    self.buf.push(CHILD_MARK);
+                    Waited::Marked
+                }
+                false => Waited::Nothing,
+            };
+        }
+        if polled < 0 {
             // **Interrupted, and the flags have to be read here.** A signal that arrives during the
             // poll has already been and gone by the time the read below runs, so it will not
             // interrupt *that* — and the shell would go back to blocking with the news unread. This
@@ -430,8 +442,8 @@ impl Keys {
         let mut woken = false;
         for (at, waker) in wakers.iter().enumerate() {
             if fds[at + 1].revents & (nix::libc::POLLIN | nix::libc::POLLHUP) != 0 {
-                background::drain(*waker);
-                woken = true;
+                // Emptied whatever it held; `woken` only when what it held was interesting.
+                woken |= background::read_waker(*waker);
             }
         }
         if !woken {

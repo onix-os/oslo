@@ -13,6 +13,12 @@
 //! two moments the shell holds nothing and can safely call Lua, and they are already where deferred
 //! hooks drain.
 //!
+//! **And at an idle prompt.** A prompt sitting untouched is a third such moment: the shell holds
+//! nothing there either, and it is where a timer set for "in five minutes" would otherwise have
+//! waited for the next keystroke to be noticed — the one moment its author did not mean.
+//! [`next_due_in_ms`] is what the editor's wait is given instead of "for ever", so the wake happens
+//! when the timer says rather than when the terminal does.
+//!
 //! The alternative is a real event loop — neovim has one, and `vim.uv` timers fire whenever it turns.
 //! That means libuv or `tokio` in a shell that deliberately removed `tokio`, plus every Lua callback
 //! becoming a thing that can run in the middle of an expansion. The trade taken here is the honest
@@ -171,6 +177,26 @@ fn settle(now: Instant) -> Vec<(u64, Value)> {
 /// Whether anything is waiting, so the loop can skip the check entirely.
 pub fn any() -> bool {
     TIMERS.with(|timers| !timers.borrow().is_empty())
+}
+
+/// How long until the soonest timer is due, in milliseconds. `None` when nothing is waiting.
+///
+/// **For the editor's wait, so a timer fires while you sit there.** A timer used to come due only
+/// at a command boundary: set one for five seconds, touch nothing, and it fired when you next
+/// pressed Enter — which is the one moment its author did not mean. This is the deadline the idle
+/// wait is given instead of "for ever".
+///
+/// Zero for something already due, which is a poll that returns at once rather than a negative
+/// timeout, which `poll` reads as "no timeout at all".
+pub fn next_due_in_ms() -> Option<u64> {
+    let now = Instant::now();
+    TIMERS.with(|timers| {
+        timers
+            .borrow()
+            .iter()
+            .map(|timer| timer.due.saturating_duration_since(now).as_millis() as u64)
+            .min()
+    })
 }
 
 #[cfg(test)]

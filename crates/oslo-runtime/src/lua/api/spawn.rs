@@ -17,10 +17,14 @@
 //!
 //! # Where a callback runs
 //!
-//! **Between commands, at the same safe point timers use** — never the instant the process exits.
-//! The process finishes on its own thread; what it produced waits in a queue until the read loop
-//! holds nothing and can call Lua. So a callback is late by up to one command, and that is the whole
-//! promise: this is not an async runtime, it is one process and one callback.
+//! **At the same safe point timers use** — never the instant the process exits. The process
+//! finishes on its own thread; what it produced waits in a queue until the shell holds nothing and
+//! can call Lua. This is not an async runtime: it is one process and one callback.
+//!
+//! That safe point now includes **an idle prompt**, not only a command boundary. The worker queues
+//! its result and nudges [`oslo_base::background`]; the editor's wait returns and delivers it. Before
+//! that, a callback for something that finished while you were reading the screen waited for your
+//! next keystroke — which for the last command of a session is for ever.
 //!
 //! A Lua value cannot cross threads — it is `Rc` — so the callback never leaves this one. The worker
 //! sends bytes and a status; the handler is looked up here, by id.
@@ -114,6 +118,11 @@ fn start(args: &[Value]) -> LuaResult<Vec<Value>> {
         if let Ok(mut done) = done().lock() {
             done.push(Finished { id, out, status });
         }
+        // **After the result is queued, never before.** The wake is what makes an idle editor come
+        // and look; waking first would have it look at a queue this thread has not filled yet, find
+        // nothing, and go back to sleep until the next keystroke — which is the delay this exists
+        // to remove. Nothing of the result crosses the pipe: it says only *go and look*.
+        oslo_base::background::nudge();
     });
 
     ok(handle(id))

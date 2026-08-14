@@ -37,16 +37,28 @@ struct Shell {
 
 impl Shell {
     fn start() -> Shell {
+        Shell::with_config("")
+    }
+
+    /// The same, with a `config.lua` in place before the first prompt — which is how anything that
+    /// has to be registered *without typing* gets registered.
+    fn with_config(config: &str) -> Shell {
         let pty = openpty(None, None).expect("open pty");
         let master = owned(pty.master);
         let slave = owned(pty.slave);
         let home = tempfile::tempdir().expect("temporary home");
+        if !config.is_empty() {
+            let dir = home.path().join("config/oslo");
+            std::fs::create_dir_all(&dir).expect("config directory");
+            std::fs::write(dir.join("config.lua"), config).expect("config");
+        }
         let mut command = Command::new(common::oslo_bin());
         command
             .arg("-i")
             .env_clear()
             .env("HOME", home.path())
             .env("XDG_DATA_HOME", home.path())
+            .env("XDG_CONFIG_HOME", home.path().join("config"))
             .env("PATH", "/usr/bin:/bin")
             .env("TERM", "dumb")
             .current_dir(home.path())
@@ -201,6 +213,39 @@ fn an_idle_prompt_sees_a_universal_set_by_another_shell() {
     assert!(
         arrived,
         "an idle prompt never saw the universal:\n{}",
+        shell.text()
+    );
+}
+
+/// **A timer fires while you sit there, with nothing typed at all.**
+///
+/// A timer used to come due only at a command boundary: set one for a few seconds, touch nothing,
+/// and it fired when you next pressed Enter — the one moment its author did not mean. The idle wait
+/// is now given the nearest deadline instead of "for ever".
+///
+/// Registered from the config so that *no* keystroke is involved, which is the whole claim.
+#[test]
+fn a_timer_fires_at_an_idle_prompt() {
+    let shell = Shell::with_config("oslo.after(1200, function() print('TIM' .. 'ER-RANG') end)\n");
+    assert!(
+        shell.until(|seen| seen.contains("TIMER-RANG"), "the timer to fire"),
+        "a timer never fired at an idle prompt:\n{}",
+        shell.text()
+    );
+}
+
+/// **A background `oslo.spawn` delivers its callback while you sit there.**
+///
+/// The worker finishes on a thread and appends its result; a nudge down a self-pipe is what brings
+/// the idle editor to look. Without it the callback waited for the next command.
+#[test]
+fn a_spawn_callback_arrives_at_an_idle_prompt() {
+    let shell = Shell::with_config(
+        "oslo.spawn{'sleep', '1', on_exit = function() print('SPAWN' .. '-BACK') end}\n",
+    );
+    assert!(
+        shell.until(|seen| seen.contains("SPAWN-BACK"), "the callback"),
+        "a spawn callback never arrived at an idle prompt:\n{}",
         shell.text()
     );
 }

@@ -33,9 +33,21 @@ use std::sync::{Mutex, OnceLock, RwLock};
 /// What to run when something in the background may have changed.
 static SERVICE: OnceLock<Box<dyn Fn() -> bool + Send + Sync>> = OnceLock::new();
 
-/// Descriptors to wait on beside the terminal. Read-mostly: written once each at startup and read
-/// on every editor wait.
-static WAKERS: RwLock<Vec<i32>> = RwLock::new(Vec::new());
+/// Descriptors to wait on beside the terminal, each with the reader that decides whether the event
+/// was one anybody asked for. Read-mostly: written once each at startup, read on every editor wait.
+static WAKERS: RwLock<Vec<Waker>> = RwLock::new(Vec::new());
+
+/// One thing worth waking for.
+struct Waker {
+    fd: i32,
+    /// Empties the descriptor and answers whether what it held was interesting.
+    ///
+    /// **Because a watch is coarser than the thing being watched.** `inotify` watches a directory,
+    /// and the shell writes its history, its model and its macros into the same one — so most wakes
+    /// are the shell hearing itself. Servicing every one of them is cheap but not free, and it made
+    /// the incidental traffic look like the mechanism under test.
+    read: fn(i32) -> bool,
+}
 
 /// Install the servicer. The first call wins; a later one is ignored rather than panicking, because
 /// a second install is a startup-order mistake and not worth killing a shell over.
@@ -70,10 +82,18 @@ pub fn is_installed() -> bool {
 /// shell. A watch that closes would leave a descriptor number here that the kernel has since given
 /// to something else, and the editor would wake on somebody else's traffic for ever.
 pub fn wake_on(fd: i32) {
+    wake_on_with(fd, |fd| {
+        drain(fd);
+        true
+    });
+}
+
+/// The same, for a descriptor whose events have to be looked at before they mean anything.
+pub fn wake_on_with(fd: i32, read: fn(i32) -> bool) {
     if let Ok(mut wakers) = WAKERS.write()
-        && !wakers.contains(&fd)
+        && !wakers.iter().any(|waker| waker.fd == fd)
     {
-        wakers.push(fd);
+        wakers.push(Waker { fd, read });
     }
 }
 
@@ -81,8 +101,20 @@ pub fn wake_on(fd: i32) {
 pub fn wakers() -> Vec<i32> {
     WAKERS
         .read()
-        .map(|wakers| wakers.clone())
+        .map(|wakers| wakers.iter().map(|waker| waker.fd).collect())
         .unwrap_or_default()
+}
+
+/// Empty `fd` and answer whether what it held is worth servicing for.
+pub fn read_waker(fd: i32) -> bool {
+    let read = WAKERS
+        .read()
+        .ok()
+        .and_then(|wakers| wakers.iter().find(|waker| waker.fd == fd).map(|w| w.read));
+    match read {
+        Some(read) => read(fd),
+        None => false,
+    }
 }
 
 /// Drain a waker that has fired, so the next wait does not fire again on the same event.
@@ -102,6 +134,75 @@ pub fn drain(fd: i32) {
             return;
         }
     }
+}
+
+/// How long the idle wait may block, in milliseconds — `None` for "until something happens".
+///
+/// Installed by whoever owns the timers. The editor asks before every wait, so a timer set while
+/// sitting at a prompt shortens the *next* wait rather than the one already running; that costs at
+/// most one keystroke of lateness and avoids having to interrupt a wait to re-arm it.
+static DEADLINE: OnceLock<Box<dyn Fn() -> Option<u64> + Send + Sync>> = OnceLock::new();
+
+/// Say how the nearest deadline is found.
+pub fn install_deadline(deadline: impl Fn() -> Option<u64> + Send + Sync + 'static) {
+    let _ = DEADLINE.set(Box::new(deadline));
+}
+
+/// The timeout for one wait: milliseconds, or `-1` for no timeout at all.
+///
+/// Clamped to `i32`, which is `poll`'s argument. A deadline further away than twenty-four days is
+/// the same as no deadline for anybody's purposes, and saturating is better than wrapping into a
+/// negative — which `poll` reads as "wait for ever" and would make a timer never fire.
+pub fn wait_ms() -> i32 {
+    match DEADLINE.get().and_then(|deadline| deadline()) {
+        Some(ms) => i32::try_from(ms).unwrap_or(i32::MAX),
+        None => -1,
+    }
+}
+
+/// Wake the idle wait from another thread.
+///
+/// **For a worker that has no signal to send.** `oslo.spawn` finishes on a thread, appends its
+/// result, and calls this; the editor's wait returns and the result is delivered where Lua may be
+/// called. One byte, and it does not matter if the pipe is already full — a full pipe means a wake
+/// is already pending, which is the same message.
+pub fn nudge() {
+    let Some((_, write)) = pipe() else { return };
+    let byte = [0u8; 1];
+    // SAFETY: a borrowed descriptor and one live byte. `EAGAIN` on a full pipe is the success case.
+    unsafe {
+        nix::libc::write(write, byte.as_ptr().cast(), 1);
+    }
+}
+
+/// Make the self-pipe now, so it is in the waker set before the first wait.
+///
+/// **Not left to the first [`nudge`], and this was a real bug.** Creating it lazily meant the first
+/// worker to finish registered a descriptor the editor's *current* `poll` was not watching — so the
+/// wake went into a pipe nobody was listening to and the callback waited for a keystroke after all.
+/// Exactly the case the nudge exists to remove.
+pub fn arm() {
+    let _ = pipe();
+}
+
+/// The self-pipe, made once and registered as a waker the first time anybody wants it.
+fn pipe() -> Option<(i32, i32)> {
+    static PIPE: OnceLock<Option<(i32, i32)>> = OnceLock::new();
+    *PIPE.get_or_init(|| {
+        let mut ends = [0i32; 2];
+        // SAFETY: a live array of two descriptors, which is what `pipe2` fills.
+        let made = unsafe {
+            nix::libc::pipe2(
+                ends.as_mut_ptr(),
+                nix::libc::O_CLOEXEC | nix::libc::O_NONBLOCK,
+            )
+        };
+        if made != 0 {
+            return None;
+        }
+        wake_on(ends[0]);
+        Some((ends[0], ends[1]))
+    })
 }
 
 /// Somewhere for a watch to keep the thing it must not drop.
