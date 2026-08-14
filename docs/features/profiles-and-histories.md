@@ -121,6 +121,58 @@ marked `remote` with the origin host — and `put_dir` deliberately skips the by
 indexes for a remote row. **A directory that only exists on another machine can never become a `cd`
 target here**, while the command it ran still counts.
 
+### Syncing over ssh, in one command
+
+`oslo history sync` takes two *files*, which is the right primitive and the wrong ergonomics for two
+machines. `oslo profile sync` is the transport over it:
+
+```sh
+oslo profile key init                              # once, on the machine that has the history
+oslo profile export | ssh laptop oslo profile import   # once, to say these two are one profile
+oslo profile sync laptop                           # from then on
+```
+
+```text
+oslo profile fingerprint NAME          ssh laptop oslo profile fingerprint NAME
+           └──────────────── must be equal, or nothing moves ────────────┘
+
+ssh laptop oslo profile send NAME  ─────────────►  a snapshot of theirs
+           sync_files(mine, theirs)                merges *both* files
+ssh laptop oslo profile receive NAME  ◄─────────   the merged copy, merged again over there
+```
+
+**The far end is oslo, not `scp`.** A store is a live database, and copying the file under a shell
+that is writing to it is how you get half a transaction. `send` takes a proper snapshot with
+`backup_to`; `receive` *merges* rather than replaces, so a command typed on the other machine
+between the two steps survives instead of being overwritten. Running it twice moves nothing the
+second time, which is what makes it safe in a login file or a cron line.
+
+`$OSLO_SSH` replaces the `ssh` it runs — a wrapper, a jump host, an alternate config — and
+`$OSLO_SSH_REMOTE_BIN` names the far end's `oslo` when it is not on the default `$PATH`.
+
+### Why a key, and not just the name
+
+`default` here and `default` on a machine you have an account on are two histories that share a
+word. Syncing on the strength of the word would merge a stranger's commands into yours, so a profile
+carries a **key** and sync refuses unless both ends hold the same one:
+
+```
+default: this machine is 4a2705fd014bc22b and laptop is 91c3e0a7715fe2b8 — they are not the
+same profile.
+  If they should be: `oslo profile export default | ssh laptop oslo profile import default`
+```
+
+The key is at `$XDG_STATE_HOME/oslo/profiles/<name>.key`, mode `0600`, and never in the store —
+the store is the thing that travels, and a key inside it would travel with every copy. What crosses
+the wire is a **fingerprint**: sixteen hex characters of a hash, enough to compare by eye and
+useless to anybody who intercepts it.
+
+**It is not the security of the sync.** ssh is already doing that, and is doing it before any of
+this is consulted. What the key answers is *identity* — which history is this.
+
+That same key is what [secrets](secrets.md) derive their store key from, so the one export carries
+both: the history and the values.
+
 ## What makes it different
 
 In bash and zsh, separating one stream of history from another means pointing `$HISTFILE` somewhere
@@ -189,6 +241,13 @@ machine, which is the argument for naming profiles after *roles* rather than per
 
 ## What it cannot do
 
+- **Sync needs `oslo` on the other machine**, on a `$PATH` ssh can see. A bare `scp` of the store
+  would be the alternative and is not offered: copying a live database is how you get half of one.
+- **Nothing is scheduled.** `oslo profile sync` is a command; putting it in a login file or a timer
+  is yours to decide, and it is safe there because a second run moves nothing.
+- **The key is not rotated, and there is no revocation.** A machine that has it can read what it
+  already has; taking it off the list is `rm` on that machine, not something this can reach.
+
 - **Isolate anything but the store.** Not the environment, not aliases, not `$PATH`, not direnv's
   allow list, not universal variables, and not `$HISTFILE` unless you set it yourself.
 - **Delete from the profile you are looking at.** The history finder's Delete acts on
@@ -211,6 +270,9 @@ machine, which is the argument for naming profiles after *roles* rather than per
 
 | path | what |
 |---|---|
+| `crates/oslo-base/src/track/profile/key.rs` | the key, the fingerprint, and where neither of them goes |
+| `src/cli/profile.rs` | `list`, `show`, `key`, `export`, `import`, `fingerprint` |
+| `src/cli/profile/sync.rs` | `sync`, and the `send`/`receive` halves the far end runs |
 | `crates/oslo-base/src/track/profile.rs` | `ENV`, `current`, `valid`, `store_path`, `profile_dir`, `history_dir`, `available`, `after` |
 | `crates/oslo-base/src/track/mod.rs` | `default_path` — the `hist.db` of the current profile |
 | `crates/oslo-base/src/predict/mod.rs` | `default_path` — the `hist.model` of the same profile |
