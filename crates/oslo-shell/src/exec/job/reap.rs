@@ -4,7 +4,7 @@
 //! *remembers* about its jobs; this is what it owes the kernel — every child of this process stays
 //! a zombie until this process waits for it, whether or not any job still names it.
 
-use super::table::{LIVE_CHILDREN, with_jobs};
+use super::table::{LIVE_CHILDREN, Transition, with_jobs};
 use nix::sys::wait::{WaitPidFlag, WaitStatus, waitpid};
 use nix::unistd::Pid;
 use std::sync::atomic::{AtomicU8, Ordering};
@@ -89,7 +89,7 @@ pub fn reap_background_jobs() {
         return;
     }
     let flags = WaitPidFlag::WNOHANG | WaitPidFlag::WUNTRACED | WaitPidFlag::WCONTINUED;
-    with_jobs(|jobs| {
+    let pending = with_jobs(|jobs| {
         for pid in jobs.reapable_pids() {
             loop {
                 match waitpid(pid, Some(flags)) {
@@ -114,5 +114,48 @@ pub fn reap_background_jobs() {
             }
         }
         super::report::announce_changes(jobs);
+        jobs.take_transitions()
     });
+    // **Outside `with_jobs`, and that is the whole point.** A handler is entitled to ask the shell
+    // about its jobs — `oslo.job.list()` takes this same lock — so firing from inside would be a
+    // handler waiting for a lock its own caller holds.
+    announce(pending);
+}
+
+/// Tell the hooks what the reaper found, now that the table is not locked.
+fn announce(pending: Vec<Transition>) {
+    use oslo_base::hooks::{at, fire_at_here, watched};
+    if pending.is_empty() || !(watched(at::PROCESS_EXIT) || watched(at::JOB_STATE)) {
+        return;
+    }
+    for change in pending {
+        match change {
+            Transition::ProcessExit { pid, job, status } => fire_at_here(
+                at::PROCESS_EXIT,
+                &[
+                    ("pid", &pid.as_raw().to_string()),
+                    ("job", &job.map(|id| id.to_string()).unwrap_or_default()),
+                    ("status", &status.to_string()),
+                ],
+            ),
+            Transition::JobState {
+                id,
+                pgid,
+                text,
+                from,
+                to,
+                background,
+            } => fire_at_here(
+                at::JOB_STATE,
+                &[
+                    ("id", &id.to_string()),
+                    ("pid", &pgid.as_raw().to_string()),
+                    ("text", &text),
+                    ("from", from),
+                    ("to", to),
+                    ("background", if background { "1" } else { "" }),
+                ],
+            ),
+        }
+    }
 }

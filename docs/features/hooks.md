@@ -122,6 +122,8 @@ Fields marked *(strings)* are strings even when they read as numbers: a notifyin
 | `on-completion-cancel` | the menu declined | `{ word }` | — |
 | `on-completion-select` | a candidate taken | `{ value, word }` | — |
 | `on-job-finish` | the job reaper, ended jobs only | `{ id, pid, text, status }` *(strings)* | — |
+| `on-process-exit` | the job reaper, one per process | `{ pid, job, status }` *(strings)* | — |
+| `on-job-state` | the job reaper, on a transition | `{ id, pid, text, from, to, background }` *(strings)* | — |
 | `on-time-report` | a `time`-prefixed pipeline | `{ real_ms, user_ms, sys_ms }` *(strings)* | — |
 | `on-command-not-found` | the end of the command search | the command name, a bare string | a number is the status, and means handled |
 | `on-idle-timeout` | the editor's timed read | `{ seconds }` *(string)* | — |
@@ -158,6 +160,22 @@ not a refusal — a handler that built a list and matched nothing meant "no chan
 
 An error raised by a handler is printed to stderr and the next handler is asked. A broken plugin
 must not silence a job notice, turn a missing command into a success, or stop the other handlers.
+
+### The three job hooks, and which one to want
+
+`on-job-finish` is one per **job**; `on-process-exit` is one per **process**. A pipeline of three
+stages is three of the latter and one of the former, which is the difference a plugin watching one
+particular child needs. `on-job-state` is the transition — `from` and `to`, both of `running`,
+`stopped` and `ended` — because "it stopped" and "it was already stopped" are different things to a
+status line.
+
+**They fire after the job table's lock is released, not while it is held.** A handler is entitled to
+call `oslo.job.list()`, which takes that same lock; firing from inside the reaper would be a handler
+waiting for a lock its own caller holds. So the reaper records what happened, drops the lock, and
+then announces — which is also why the payload is a snapshot of strings rather than a live handle.
+
+All three fire at a command boundary, where the reaper runs. A job that ends while you sit at an
+idle prompt is announced when you next run something, not the instant it happens.
 
 ## What makes it different
 

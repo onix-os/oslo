@@ -175,6 +175,19 @@ pub const HOOKS: &[Hook] = &[
         aliases: &[],
         answers: false,
     },
+    // The two OS-lifecycle observers. Notification only: a handler watching a child end has
+    // nothing to answer, and letting one veto a process that has *already exited* would be a
+    // promise the kernel does not keep.
+    Hook {
+        name: "on-process-exit",
+        aliases: &[],
+        answers: false,
+    },
+    Hook {
+        name: "on-job-state",
+        aliases: &[],
+        answers: false,
+    },
 ];
 
 /// The moments something on a hot path has to ask about, by index into [`HOOKS`].
@@ -270,6 +283,8 @@ mod tests {
             (at::COMPLETION_CANCEL, "on-completion-cancel"),
             (at::COMPLETION_SELECT, "on-completion-select"),
             (at::JOB_FINISH, "on-job-finish"),
+            (at::PROCESS_EXIT, "on-process-exit"),
+            (at::JOB_STATE, "on-job-state"),
             (at::TIME_REPORT, "on-time-report"),
             (at::COMMAND_NOT_FOUND, "on-command-not-found"),
             (at::IDLE_TIMEOUT, "on-idle-timeout"),

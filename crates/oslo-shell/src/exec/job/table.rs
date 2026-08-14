@@ -78,6 +78,44 @@ pub struct JobTable {
     /// Nothing is remembered about them but the pid. They have no job, no status anybody can ask
     /// for, and no report: the only obligation left is the one the kernel imposes.
     orphans: Vec<Pid>,
+    /// What has happened to jobs and their processes since anybody last asked.
+    ///
+    /// **Recorded here and fired elsewhere, deliberately.** Everything that mutates this table does
+    /// so holding its mutex, and a Lua handler is entitled to ask the shell about its jobs — so
+    /// calling one from inside would be a handler waiting for a lock its own caller holds. The
+    /// transitions queue instead, and [`super::reap`] drains and fires them once the lock is gone.
+    transitions: Vec<Transition>,
+}
+
+/// Something that happened to a job or one of its processes, waiting to be announced.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Transition {
+    /// One process of a job ended.
+    ProcessExit {
+        pid: Pid,
+        job: Option<usize>,
+        status: i32,
+    },
+    /// A job moved between running, stopped and ended.
+    JobState {
+        id: usize,
+        pgid: Pid,
+        text: String,
+        from: &'static str,
+        to: &'static str,
+        background: bool,
+    },
+}
+
+impl JobState {
+    /// The word a hook is given for this state.
+    fn word(&self) -> &'static str {
+        match self {
+            JobState::Running => "running",
+            JobState::Stopped => "stopped",
+            JobState::Completed(_) => "ended",
+        }
+    }
 }
 
 /// How many statuses to remember for a `wait` that may never come.
@@ -273,6 +311,30 @@ impl JobTable {
         Some(self.statuses.remove(index).1)
     }
 
+    /// Take everything that has happened since the last drain, for a caller that no longer holds
+    /// the lock and can therefore afford to run Lua.
+    pub fn take_transitions(&mut self) -> Vec<Transition> {
+        std::mem::take(&mut self.transitions)
+    }
+
+    /// Note a job's move from one state to another, if it is a move at all.
+    fn note_state(&mut self, id: usize, from: &JobState, to: &JobState) {
+        if from.word() == to.word() {
+            return;
+        }
+        let (from, to) = (from.word(), to.word());
+        if let Some(job) = self.get(id) {
+            self.transitions.push(Transition::JobState {
+                id,
+                pgid: job.pgid,
+                text: job.command.clone(),
+                from,
+                to,
+                background: job.background,
+            });
+        }
+    }
+
     /// Record a status somebody else's `waitpid` collected, so a later `wait` still has an answer.
     ///
     /// **For a child reaped on the way to another one.** `wait -n` waits with `waitpid(-1)` and
@@ -345,15 +407,25 @@ impl JobTable {
             WaitStatus::Stopped(_, _) => {
                 if let Some(id) = job_id {
                     self.promote(id);
+                    let was = self.get(id).map(|job| job.state.clone());
                     if let Some(job) = self.get_mut(id) {
                         job.state = JobState::Stopped;
                         job.notified = false;
                     }
+                    if let Some(was) = was {
+                        self.note_state(id, &was, &JobState::Stopped);
+                    }
                 }
             }
             WaitStatus::Continued(_) => {
-                if let Some(job) = job_id.and_then(|id| self.get_mut(id)) {
-                    job.state = JobState::Running;
+                if let Some(id) = job_id {
+                    let was = self.get(id).map(|job| job.state.clone());
+                    if let Some(job) = self.get_mut(id) {
+                        job.state = JobState::Running;
+                    }
+                    if let Some(was) = was {
+                        self.note_state(id, &was, &JobState::Running);
+                    }
                 }
             }
             _ => {}
@@ -398,6 +470,11 @@ impl JobTable {
             return;
         }
         self.remember_status(pid, code);
+        self.transitions.push(Transition::ProcessExit {
+            pid,
+            job: job_id,
+            status: code,
+        });
         let Some(job) = job_id.and_then(|id| self.get_mut(id)) else {
             return;
         };
@@ -405,8 +482,12 @@ impl JobTable {
         job.ended.push(pid);
         if job.pids.is_empty() {
             // A pipeline's status is its last stage's, and the last stage is the last pid left.
+            let was = job.state.clone();
             job.state = JobState::Completed(code);
             job.notified = false;
+            if let Some(id) = job_id {
+                self.note_state(id, &was, &JobState::Completed(code));
+            }
         }
     }
 }

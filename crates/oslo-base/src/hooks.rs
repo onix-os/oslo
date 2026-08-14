@@ -67,6 +67,18 @@ pub mod at {
     /// the value.
     pub const PRE_SECRET_ACCESS: usize = 24;
     pub const POST_SECRET_ACCESS: usize = 25;
+
+    /// One process of a job ended. Told the pid, the job it belonged to and how it went.
+    ///
+    /// **One per process, where [`JOB_FINISH`] is one per job.** A pipeline of three is three of
+    /// these and one of those, which is the difference a plugin watching a particular child needs
+    /// and could not previously get.
+    pub const PROCESS_EXIT: usize = 26;
+    /// A job changed state: running, stopped, or ended.
+    ///
+    /// The transition rather than the destination — `from` and `to` — because "it stopped" and "it
+    /// was already stopped" are different things to a status line.
+    pub const JOB_STATE: usize = 27;
 }
 
 /// The four ways a hook is reached, supplied by whoever can actually run one.
