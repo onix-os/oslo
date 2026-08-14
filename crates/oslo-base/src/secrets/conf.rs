@@ -47,7 +47,9 @@ pub struct Section {
     pub name: String,
     pub directory: Option<PathBuf>,
     pub keys: Vec<KeySource>,
-    /// Set when another program does this store's crypto instead of oslo's own age.
+    /// Who this store's files are written for, as written.
+    pub recipients: Vec<String>,
+    /// Set when another program does this store's crypto instead of oslo's own.
     pub cipher: Cipher,
     /// `crypto hook`: Lua does this store's crypto, so only a process running Lua can open it.
     pub hooked: bool,
@@ -115,16 +117,18 @@ pub fn parse(text: &str) -> Result<Conf, String> {
                 return Err(format!("line {at}: {verb:?} before any [store]"));
             }
             ("directory", Some(section)) => section.directory = Some(PathBuf::from(rest)),
-            // **Refused rather than parsed and ignored.** Without the built-in mechanism a `key`
-            // line says nothing — the key belongs to whatever program the store names — and a line
-            // that quietly did nothing is how somebody comes to believe a store is protected by
-            // something it is not.
-            ("key", Some(_)) if !cfg!(feature = "crypt") => {
+            // **Refused rather than parsed and ignored.** Without the built-in mechanism these say
+            // nothing — the key and the recipients belong to whatever program the store names — and
+            // a line that quietly did nothing is how somebody comes to believe a colleague can read
+            // a store they cannot.
+            ("key" | "recipient", Some(_)) if !cfg!(feature = "crypt") => {
                 return Err(format!(
-                    "line {at}: this oslo has no built-in crypto, so `key` means nothing here — \
-                     the key is the business of the `encrypt`/`decrypt command` this store names"
+                    "line {at}: this oslo has no built-in crypto, so `{verb}` means nothing here — \
+                     the key and the recipients are the business of the `encrypt`/`decrypt command` \
+                     this store names"
                 ));
             }
+            ("recipient", Some(section)) => section.recipients.push(rest.to_string()),
             ("key", Some(section)) => section
                 .keys
                 .push(KeySource::parse(rest).map_err(|e| format!("line {at}: {e}"))?),

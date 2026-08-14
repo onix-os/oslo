@@ -182,7 +182,7 @@ last, so it wins.
 oslo secret set stripe                          # asks for it, masked; or reads standard input
 oslo secret get stripe                          # to standard output, and nowhere else
 oslo secret run TOKEN=stripe -- curl …          # one value, one child, no shell in between
-oslo secret key add command -- pass show oslo/key
+oslo secret recipient add OSLO-PUB-1:…          # your other machine, or a colleague
 oslo secret --store team cipher decrypt -- age -d -i ~/.config/age/identity
 ```
 
@@ -192,10 +192,11 @@ key, which must never go with it. A key that ends up under a `.git` anyway is ca
 you use one.
 
 A store is a directory, a list of keys, and **the mechanism that opens it** — and that mechanism is
-the replaceable part. Built in, it is XChaCha20-Poly1305 and one key file, in 36 KB. Named in
-configuration, it is any program that filters bytes both ways: `age` for public-key recipients and
-hardware keys, `gpg`, `systemd-creds` for a TPM. In Lua, it is a hook. The filing around it — names,
-`run`, the lazy variable, the manager — never changes.
+the replaceable part. Built in, it is a sealed box in 60 KB: a secret you keep, recipients you
+publish, so two machines can read one store with neither holding the other's key. Named in
+configuration, it is any program that filters bytes both ways — `age`, `gpg`, `systemd-creds` for a
+TPM, `age-plugin-yubikey` through `age`. In Lua, it is a hook. The filing around it — names, `run`,
+the lazy variable — never changes.
 
 All of it is one flat file beside the key, because `$(oslo secret get …)` is a child process that
 never reads `config.lua`: configuration that only existed after Lua had run would apply in your
@@ -1381,8 +1382,8 @@ static musl binary — 5,557,216 bytes with none of them, 6,894,016 with all sev
 | `nix` | +60 KB | `oslo.nix` — every `nix --json` answer as a Lua table, and flake-output completion |
 | `scratch` | +48 KB | named sessions that outlive their terminal, and the key that finds them |
 | `plugin` | +108 KB | `oslo plugin` — installing somebody else's Lua, and loading it on first use. `oslo.db` and the `pre-cmd` veto a plugin is written against are in **every** build |
-| `secrets` | +96 KB | the filing: `oslo secret`, several stores, `secret run`, the lazy variable, `oslo.secret` for a config or a plugin, and the hooks that replace the crypto outright. **No crypto of its own** — a store names an `encrypt`/`decrypt command` or a `crypto hook` |
-| `crypt` | +36 KB | the built-in mechanism, so a fresh install encrypts without being told anything: XChaCha20-Poly1305 and one key file |
+| `secrets` | +104 KB | the filing: `oslo secret`, several stores, `secret run`, the lazy variable, `oslo.secret` for a config or a plugin, and the hooks that replace the crypto outright. **No crypto of its own** — a store names an `encrypt`/`decrypt command` or a `crypto hook` |
+| `crypt` | +60 KB | the built-in mechanism, so a fresh install encrypts without being told anything: a sealed box — a key you keep, recipients you publish |
 | `argc` | +308 KB | a script declares its options in comments and the shell parses them: the `argc` builtin, `oslo --argc-eval` for bash scripts, and completion from those comments. The largest of the eight, and the only one that vendors a parser |
 
 ```sh

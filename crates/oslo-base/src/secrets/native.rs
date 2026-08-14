@@ -1,116 +1,221 @@
-//! The built-in mechanism: one key, one AEAD, and nothing to configure.
+//! The built-in mechanism: a key you keep, recipients you publish.
 //!
-//! # What it is
+//! # The shape, and why it is this shape
 //!
-//! XChaCha20-Poly1305 with a 32-byte key kept in a file. That is the whole of it. The same AEAD
-//! `age` uses for its payload, without any of the key exchange around it — because the key exchange
-//! is what buys *public-key recipients*, and a shell that wants those should use `age` itself
-//! through an `encrypt command`.
+//! A **sealed box**, which is the construction age uses and NaCl calls `crypto_box_seal`. One
+//! random *file key* encrypts the value; that file key is then wrapped once per recipient, each
+//! wrap using a fresh ephemeral X25519 keypair against that recipient's public half.
 //!
 //! ```text
-//! OSLO1 │ 24-byte nonce │ ciphertext ‖ 16-byte tag
-//!   5   │      24       │ …
+//! OSLO2 │ n │ n × [ ephemeral public (32) │ wrapped file key (48) ] │ nonce (24) │ ciphertext ‖ tag
 //! ```
 //!
-//! **X**ChaCha rather than plain ChaCha for one reason: a 192-bit nonce can be drawn at random for
-//! every write without anybody counting. With a 96-bit nonce, a random one repeats often enough to
-//! matter and the counter that avoids it is state that has to survive a crash, a restore and a
-//! second machine writing to the same store.
+//! That indirection buys the thing a single symmetric key cannot have: **a store can be readable by
+//! several keys without any of them being shared.** Your laptop keeps one secret, the server keeps
+//! another, and the store lists two recipients — nobody hands anybody a private key, and taking a
+//! machine off the list is one `recipient rm` and a `rotate`.
 //!
-//! # What it deliberately does not do
+//! # What is deliberately not here
 //!
-//! No recipients, no public half, no passphrase, no key derivation. A store is opened by the key
-//! or it is not opened. Sharing one with a colleague or a second machine means either copying the
-//! key over a channel you trust, or — better — handing that store's crypto to `age`, which has
-//! recipients precisely because that is a hard problem worth somebody else's code.
+//! Not the age *format*. `age -d` will not open these files and is not meant to: what was worth
+//! having was the key model, and carrying the format meant bech32, scrypt, a localised error
+//! catalogue and thirty-two packages. A store that wants real age files says so —
+//! `encrypt command age -R …` — and this module is not involved at all.
+//!
+//! No passphrase, and no key derivation from one: the secret is a file at mode `0600`, like
+//! `~/.ssh/id_ed25519`.
 
 use base64::Engine;
 use chacha20poly1305::aead::{Aead, KeyInit};
 use chacha20poly1305::{Key, XChaCha20Poly1305, XNonce};
+use x25519_dalek::{PublicKey, StaticSecret};
 
 /// What every file this writes begins with.
-const MAGIC: &[u8] = b"OSLO1";
+const MAGIC: &[u8] = b"OSLO2";
 
-/// The nonce XChaCha takes, in bytes.
+/// The nonce XChaCha takes.
 const NONCE: usize = 24;
 
-/// What a key file holds, so one is recognisable on sight and not mistaken for a secret.
-const PREFIX: &str = "OSLO-KEY-1:";
+/// An X25519 public or secret key.
+const KEY: usize = 32;
 
-/// Encrypt with `key`.
-pub fn seal(key: &[u8; 32], value: &[u8]) -> Result<Vec<u8>, String> {
-    let cipher = XChaCha20Poly1305::new(&Key::from(*key));
+/// A wrapped file key: 32 bytes of key and the AEAD's 16-byte tag.
+const WRAPPED: usize = KEY + 16;
+
+/// One recipient's share: the ephemeral public half, and the file key wrapped to it.
+const STANZA: usize = KEY + WRAPPED;
+
+/// What a secret key file holds, so one is recognisable on sight.
+const SECRET: &str = "OSLO-KEY-1:";
+
+/// What a recipient is written as. A different prefix from the secret, because the whole point is
+/// that one of them is safe to publish and the other is not.
+const PUBLIC: &str = "OSLO-PUB-1:";
+
+/// Domain separation for the wrapping key, so this construction's output can never be confused with
+/// another use of the same X25519 secret.
+const INFO: &[u8] = b"oslo secret v2 wrap";
+
+/// Encrypt to every recipient.
+///
+/// **Every recipient, or none.** One that cannot be used fails the whole write rather than being
+/// skipped: a file quietly encrypted to fewer keys than its owner listed is the failure here that
+/// stays invisible until the day one of the others is the only key left.
+pub fn seal(recipients: &[[u8; KEY]], value: &[u8]) -> Result<Vec<u8>, String> {
+    if recipients.is_empty() {
+        return Err("no recipient to encrypt to".to_string());
+    }
+    if recipients.len() > u8::MAX as usize {
+        return Err(format!("{} recipients is more than 255", recipients.len()));
+    }
+
+    let file_key: [u8; KEY] = random()?;
+    let mut out = Vec::with_capacity(MAGIC.len() + 1 + recipients.len() * STANZA + NONCE);
+    out.extend_from_slice(MAGIC);
+    out.push(recipients.len() as u8);
+
+    for recipient in recipients {
+        let ephemeral = StaticSecret::from(random::<KEY>()?);
+        let public = PublicKey::from(&ephemeral);
+        let shared = ephemeral.diffie_hellman(&PublicKey::from(*recipient));
+        let wrapping = derive(shared.as_bytes(), public.as_bytes(), recipient)?;
+
+        // A zero nonce is safe *here* and nowhere else: the wrapping key comes from a fresh
+        // ephemeral secret, so it encrypts exactly one message and can never repeat.
+        let wrapped = XChaCha20Poly1305::new(&Key::from(wrapping))
+            .encrypt(&XNonce::from([0u8; NONCE]), file_key.as_slice())
+            .map_err(|_| "the file key could not be wrapped".to_string())?;
+        out.extend_from_slice(public.as_bytes());
+        out.extend_from_slice(&wrapped);
+    }
+
     let nonce = XNonce::from(random::<NONCE>()?);
-    let sealed = cipher
+    let sealed = XChaCha20Poly1305::new(&Key::from(file_key))
         .encrypt(&nonce, value)
         .map_err(|_| "the value could not be encrypted".to_string())?;
-
-    let mut file = Vec::with_capacity(MAGIC.len() + NONCE + sealed.len());
-    file.extend_from_slice(MAGIC);
-    file.extend_from_slice(&nonce);
-    file.extend_from_slice(&sealed);
-    Ok(file)
+    out.extend_from_slice(&nonce);
+    out.extend_from_slice(&sealed);
+    Ok(out)
 }
 
-/// Decrypt with `key`, or say which way it did not work.
-///
-/// **A wrong key and a damaged file are told apart**, because they are different problems: one is
-/// "you are holding the wrong thing" and the other is "this file is not what it was".
-pub fn unseal(key: &[u8; 32], file: &[u8]) -> Result<Vec<u8>, String> {
-    let Some(rest) = file.strip_prefix(MAGIC) else {
-        return Err("not a file this oslo wrote: no OSLO1 header".to_string());
-    };
-    if rest.len() < NONCE {
-        return Err("not a file this oslo wrote: it stops inside the nonce".to_string());
+/// Decrypt with `secret`, if its public half is one of the recipients.
+pub fn unseal(secret: &[u8; KEY], file: &[u8]) -> Result<Vec<u8>, String> {
+    let rest = file
+        .strip_prefix(MAGIC)
+        .ok_or("not a file this oslo wrote: no OSLO2 header")?;
+    let (count, rest) = rest.split_first().ok_or("it stops before the recipients")?;
+
+    let wrapped = STANZA * *count as usize;
+    if rest.len() < wrapped + NONCE {
+        return Err("it stops inside the recipients".to_string());
     }
-    let (nonce, sealed) = rest.split_at(NONCE);
+    let (stanzas, body) = rest.split_at(wrapped);
+    let (nonce, sealed) = body.split_at(NONCE);
 
-    let cipher = XChaCha20Poly1305::new(&Key::from(*key));
-    cipher
-        .decrypt(
-            &XNonce::try_from(nonce).map_err(|_| "a nonce of the wrong size")?,
-            sealed,
-        )
-        .map_err(|_| "the key did not open it, or the file has been changed".to_string())
+    let secret = StaticSecret::from(*secret);
+    let mine = PublicKey::from(&secret);
+    for stanza in stanzas.chunks_exact(STANZA) {
+        let (ephemeral, wrapped) = stanza.split_at(KEY);
+        let ephemeral: [u8; KEY] = ephemeral.try_into().expect("a chunk of exactly 32");
+        let shared = secret.diffie_hellman(&PublicKey::from(ephemeral));
+        let wrapping = derive(shared.as_bytes(), &ephemeral, mine.as_bytes())?;
+
+        // Somebody else's stanza: the tag fails, which is the answer rather than an error.
+        let Ok(file_key) = XChaCha20Poly1305::new(&Key::from(wrapping))
+            .decrypt(&XNonce::from([0u8; NONCE]), wrapped)
+        else {
+            continue;
+        };
+        let file_key: [u8; KEY] = file_key
+            .try_into()
+            .map_err(|_| "a wrapped file key of the wrong size".to_string())?;
+        return XChaCha20Poly1305::new(&Key::from(file_key))
+            .decrypt(
+                &XNonce::try_from(nonce).map_err(|_| "a nonce of the wrong size")?,
+                sealed,
+            )
+            .map_err(|_| "the file has been changed since it was written".to_string());
+    }
+    Err("no key of yours is a recipient of this file".to_string())
 }
 
-/// A key, as it is written in a file.
-pub fn write_key(key: &[u8; 32]) -> String {
-    format!(
-        "{PREFIX}{}\n",
-        base64::engine::general_purpose::STANDARD.encode(key)
-    )
-}
-
-/// The first key in what a file or a program gave us.
+/// The wrapping key for one ephemeral-to-recipient pair.
 ///
+/// **Hashed, never used raw.** An X25519 shared secret is a curve point rather than a uniform key,
+/// and the salt binds it to the two public halves it came from, so a wrap cannot be replayed
+/// against a different pair.
+fn derive(
+    shared: &[u8; KEY],
+    ephemeral: &[u8; KEY],
+    recipient: &[u8; KEY],
+) -> Result<[u8; KEY], String> {
+    let mut salt = [0u8; KEY * 2];
+    salt[..KEY].copy_from_slice(ephemeral);
+    salt[KEY..].copy_from_slice(recipient);
+
+    let mut key = [0u8; KEY];
+    hkdf::Hkdf::<sha2::Sha256>::new(Some(&salt), shared)
+        .expand(INFO, &mut key)
+        .map_err(|_| "the wrapping key could not be derived".to_string())?;
+    Ok(key)
+}
+
+/// A secret key, as it is written in a file.
+pub fn write_secret(secret: &[u8; KEY]) -> String {
+    format!("{SECRET}{}\n", encode(secret))
+}
+
+/// A recipient, as it is written in `secrets.conf` or handed to somebody.
+pub fn write_public(public: &[u8; KEY]) -> String {
+    format!("{PUBLIC}{}", encode(public))
+}
+
+/// The public half of a secret key.
+pub fn public_of(secret: &[u8; KEY]) -> [u8; KEY] {
+    PublicKey::from(&StaticSecret::from(*secret)).to_bytes()
+}
+
+/// The first secret key in what a file or a program gave us.
+pub fn read_secret(text: &str) -> Result<[u8; KEY], String> {
+    read(text, SECRET, "a key")
+}
+
+/// One recipient, as written.
+pub fn read_public(text: &str) -> Result<[u8; KEY], String> {
+    read(text, PUBLIC, "a recipient")
+}
+
 /// Comment lines are skipped, the way a key file people edit needs.
-pub fn read_key(text: &str) -> Result<[u8; 32], String> {
+fn read(text: &str, prefix: &str, what: &str) -> Result<[u8; KEY], String> {
     let line = text
         .lines()
         .map(str::trim)
         .find(|line| !line.is_empty() && !line.starts_with('#'))
-        .ok_or("no key in it")?;
+        .ok_or_else(|| format!("no {what} in it"))?;
     let body = line
-        .strip_prefix(PREFIX)
-        .ok_or_else(|| format!("a key begins with {PREFIX}, and this does not"))?;
+        .strip_prefix(prefix)
+        .ok_or_else(|| format!("{what} begins with {prefix}, and this does not"))?;
     let bytes = base64::engine::general_purpose::STANDARD
         .decode(body.trim())
-        .map_err(|_| "the key is not base64".to_string())?;
+        .map_err(|_| format!("{what} is not base64"))?;
     bytes
         .try_into()
-        .map_err(|_| "a key is 32 bytes, and this is not".to_string())
+        .map_err(|_| format!("{what} is 32 bytes, and this is not"))
 }
 
-/// A new key, from the operating system's randomness and nowhere else.
-pub fn generate_key() -> Result<[u8; 32], String> {
-    random::<32>()
+fn encode(bytes: &[u8]) -> String {
+    base64::engine::general_purpose::STANDARD.encode(bytes)
+}
+
+/// A new secret key, from the operating system's randomness and nowhere else.
+pub fn generate_secret() -> Result<[u8; KEY], String> {
+    random::<KEY>()
 }
 
 /// `N` bytes from the operating system.
 ///
-/// **`getrandom`, not a seeded generator.** A nonce or a key drawn from anything this process could
-/// have predicted is the one mistake in this file that would not show up in a test.
+/// **`getrandom`, not a seeded generator.** A nonce, a file key or an ephemeral secret drawn from
+/// anything this process could have predicted is the one mistake in this file that no test catches.
 fn random<const N: usize>() -> Result<[u8; N], String> {
     let mut bytes = [0u8; N];
     getrandom::fill(&mut bytes).map_err(|e| format!("no randomness from the system: {e}"))?;
@@ -118,69 +223,5 @@ fn random<const N: usize>() -> Result<[u8; N], String> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn what_goes_in_comes_back_out() {
-        let key = generate_key().expect("a key");
-        for value in [b"".as_slice(), b"short", &[0u8; 100_000]] {
-            let sealed = seal(&key, value).expect("seal");
-            assert_ne!(&sealed[5..], value, "the value is in the file in the clear");
-            assert_eq!(unseal(&key, &sealed).expect("unseal"), value);
-        }
-    }
-
-    /// **Two writes of one value differ**, which is what the random nonce is for: equal files would
-    /// tell anybody holding the store that a secret had not changed between two backups.
-    #[test]
-    fn the_same_value_seals_differently_every_time() {
-        let key = generate_key().expect("a key");
-        let once = seal(&key, b"the same value").expect("seal");
-        let twice = seal(&key, b"the same value").expect("seal");
-        assert_ne!(once, twice);
-        assert_eq!(
-            unseal(&key, &once).expect("a"),
-            unseal(&key, &twice).expect("b")
-        );
-    }
-
-    /// A wrong key does not open it, and neither does a file somebody has edited.
-    #[test]
-    fn it_refuses_the_wrong_key_and_a_changed_file() {
-        let key = generate_key().expect("a key");
-        let sealed = seal(&key, b"value").expect("seal");
-        assert!(
-            unseal(&generate_key().expect("another"), &sealed).is_err(),
-            "wrong key opened it"
-        );
-
-        let mut bent = sealed.clone();
-        let last = bent.len() - 1;
-        bent[last] ^= 1;
-        assert!(unseal(&key, &bent).is_err(), "a changed file opened");
-
-        assert!(unseal(&key, b"nonsense").unwrap_err().contains("OSLO1"));
-    }
-
-    #[test]
-    fn a_key_survives_being_written_down() {
-        let key = generate_key().expect("a key");
-        let text = write_key(&key);
-        assert!(text.starts_with(PREFIX));
-        assert_eq!(read_key(&text).expect("read"), key);
-        assert_eq!(
-            read_key(&format!("# a comment\n{text}")).expect("read"),
-            key
-        );
-        for bad in [
-            "",
-            "# only a comment",
-            "not-a-key",
-            "OSLO-KEY-1:!!!",
-            "OSLO-KEY-1:c2hvcnQ=",
-        ] {
-            assert!(read_key(bad).is_err(), "{bad:?} was accepted");
-        }
-    }
-}
+#[path = "native/tests.rs"]
+mod tests;

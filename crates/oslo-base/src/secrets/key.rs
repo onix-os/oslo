@@ -66,7 +66,7 @@ impl KeySource {
     pub fn key(&self) -> Result<Option<[u8; 32]>, String> {
         match self {
             KeySource::File(path) => match std::fs::read_to_string(path) {
-                Ok(text) => super::native::read_key(&text)
+                Ok(text) => super::native::read_secret(&text)
                     .map(Some)
                     .map_err(|e| format!("{}: {e}", path.display())),
                 Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
@@ -104,7 +104,7 @@ impl KeySource {
         }
         let text = String::from_utf8(output.stdout)
             .map_err(|_| format!("{program}: what it printed is not a key"))?;
-        super::native::read_key(&text).map_err(|e| format!("{program}: {e}"))
+        super::native::read_secret(&text).map_err(|e| format!("{program}: {e}"))
     }
 }
 
@@ -120,9 +120,9 @@ pub fn generate(path: &std::path::Path) -> Result<[u8; 32], String> {
         .parent()
         .ok_or_else(|| format!("{}: has no directory to be in", path.display()))?;
     std::fs::create_dir_all(directory).map_err(|e| format!("{}: {e}", directory.display()))?;
-    let fresh = super::native::generate_key()?;
+    let fresh = super::native::generate_secret()?;
     let scratch = directory.join("key.new");
-    super::write_private(&scratch, super::native::write_key(&fresh).as_bytes())?;
+    super::write_private(&scratch, super::native::write_secret(&fresh).as_bytes())?;
     std::fs::rename(&scratch, path).map_err(|e| format!("{}: {e}", path.display()))?;
     Ok(fresh)
 }

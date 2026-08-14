@@ -17,6 +17,8 @@ use oslo::secrets::{self, Store};
 mod cipher;
 #[cfg(feature = "crypt")]
 mod key;
+#[cfg(feature = "crypt")]
+mod recipient;
 mod run;
 
 const USAGE: &str = "usage: oslo secret [--store NAME] COMMAND\n\
@@ -33,7 +35,8 @@ const USAGE: &str = "usage: oslo secret [--store NAME] COMMAND\n\
 
 /// The subcommands only a build with oslo's own crypto has.
 #[cfg(feature = "crypt")]
-const KEYS_AND_RECIPIENTS: &str = "\x20 key           where this store's key comes from\n";
+const KEYS_AND_RECIPIENTS: &str = "\x20 key           where this store's key comes from\n\
+                                   \x20 recipient     who its files are written for\n";
 #[cfg(not(feature = "crypt"))]
 const KEYS_AND_RECIPIENTS: &str = "";
 
@@ -112,6 +115,11 @@ pub fn run(args: &[String]) -> i32 {
             Ok(store) => key::run(&store, &args[1..]),
             Err(code) => code,
         },
+        #[cfg(feature = "crypt")]
+        Some("recipient" | "recipients") => match store() {
+            Ok(store) => recipient::run(&store, &args[1..]),
+            Err(code) => code,
+        },
         Some("cipher") => match store() {
             Ok(store) => cipher::run(&store, &args[1..]),
             Err(code) => code,
@@ -146,7 +154,10 @@ pub fn run(args: &[String]) -> i32 {
                 #[cfg(feature = "crypt")]
                 match store.crypto.is_external() {
                     true => cipher::show(&store),
-                    false => key::show(&store),
+                    false => {
+                        key::show(&store);
+                        recipient::show(&store);
+                    }
                 }
                 #[cfg(not(feature = "crypt"))]
                 cipher::show(&store);

@@ -136,8 +136,14 @@ fn init(store: &Store) -> i32 {
         return 1;
     }
     match secrets::key::generate(&path) {
-        Ok(_) => {
+        // The public half is printed because it is the half that is *useful*: it goes in somebody
+        // else's `recipient add`, and there is nowhere else to read it from.
+        Ok(secret) => {
             println!("{}", path.display());
+            println!(
+                "{}",
+                secrets::native::write_public(&secrets::native::public_of(&secret))
+            );
             0
         }
         Err(e) => fail(&e),

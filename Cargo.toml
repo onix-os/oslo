@@ -119,19 +119,27 @@ secrets = ["oslo-base/secrets", "oslo-runtime/secrets"]
 
 # `crypt` — the built-in mechanism, so a fresh install encrypts without being told anything.
 #
-# XChaCha20-Poly1305 and one 32-byte key file. A 192-bit nonce is drawn at random on every write, so
-# there is no counter to keep — with a 96-bit nonce a random one repeats often enough to matter, and
-# the counter that avoids it is state that would have to survive a crash, a restore and a second
-# machine writing to the same store.
+# A **sealed box**: one random file key encrypts the value, and that file key is wrapped once per
+# recipient against their public half with a fresh ephemeral X25519 keypair. That indirection is the
+# whole point — a store readable by several keys, none of them shared, which one symmetric key
+# cannot do however cheap it is.
 #
-# **This was `age`, and `age` cost +160 KB and +32 packages** for the same job. What it bought was
-# public-key recipients, and with them `x25519-dalek`, `curve25519-dalek`, `bech32`, `scrypt`,
-# `secrecy` and the tower beneath: the whole feature was 256 KB and 33 packages against 132 and 11
-# now. Recipients went with it, and come back as `age` the *program* — which is what the
-# `encrypt`/`decrypt command` mechanism is for, and reaches a YubiKey or a TPM besides.
+# ```text
+#   every other feature on   6,640,032 bytes   78 packages
+#   + secrets                6,746,528 bytes   79 packages    +104 KB,  +1 package
+#   + crypt                  6,807,968 bytes   96 packages    + 60 KB, +17 packages
+# ```
+#
+# **This was `age`, at +160 KB and +32 packages.** What age added on top of the same key model was
+# its *file format*: bech32, scrypt, a localised error catalogue, recipient types for hardware and
+# post-quantum. Keeping the model and dropping the format is 60 KB. Real age files are still one
+# line away — `encrypt command age -R …` — which is also the door to `gpg`, a TPM and a YubiKey.
+#
+# An earlier version was one symmetric key at 36 KB: 24 KB cheaper, and unable to let two machines
+# read one store without copying a private key between them.
 #
 # Named for the job rather than for what implements it, because what sits behind it has changed
-# once already.
+# twice already.
 crypt = ["secrets", "oslo-base/crypt"]
 
 [dependencies]

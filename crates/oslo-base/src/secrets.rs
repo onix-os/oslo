@@ -54,6 +54,7 @@ pub mod hooked;
 pub mod key;
 #[cfg(feature = "crypt")]
 pub mod native;
+pub mod recipient;
 
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -61,6 +62,7 @@ use std::path::{Path, PathBuf};
 pub use cipher::Cipher;
 pub use crypto::Crypto;
 pub use key::KeySource;
+pub use recipient::Recipient;
 
 /// What one secret's file is called, after its name.
 ///
@@ -80,6 +82,8 @@ pub struct Store {
     pub name: String,
     pub directory: PathBuf,
     pub keys: Vec<KeySource>,
+    /// Who its files are written for. Empty means "just me": the public half of the first key.
+    pub recipients: Vec<Recipient>,
     /// What seals and opens its files: oslo's own age, another program, or a Lua hook.
     pub crypto: Crypto,
 }
@@ -95,6 +99,14 @@ impl Store {
         if keys.is_empty() {
             keys.push(KeySource::File(identity_path().ok_or(NOWHERE_FOR_A_KEY)?));
         }
+        let recipients = match section {
+            Some(section) => section
+                .recipients
+                .iter()
+                .map(|text| Recipient::new(text))
+                .collect::<Result<Vec<_>, _>>()?,
+            None => Vec::new(),
+        };
         let cipher = section.map(|s| s.cipher.clone()).unwrap_or_default();
         let crypto = Crypto::of(section.is_some_and(|s| s.hooked), &cipher)
             .map_err(|e| format!("{name}: {e}"))?;
@@ -110,6 +122,7 @@ impl Store {
             },
             name: name.to_string(),
             keys,
+            recipients,
             crypto,
         })
     }
@@ -243,7 +256,7 @@ impl Store {
     /// oslo's own, in this process.
     #[cfg(feature = "crypt")]
     fn seal_natively(&self, value: &[u8]) -> Result<Vec<u8>, String> {
-        native::seal(&self.key_to_write_with()?, value)
+        native::seal(&self.encrypt_to()?, value)
     }
 
     /// This build carries no crypto of its own, so a store has to name one.
@@ -336,6 +349,19 @@ impl Store {
             KeySource::File(path) => Some(path.clone()),
             KeySource::Command(_) => None,
         })
+    }
+
+    /// Who this store writes for.
+    ///
+    /// **A store with no `recipient` line is written for its own key**, which is what makes a fresh
+    /// install work without being told anything — and adding the first recipient is the moment that
+    /// stops being implied, which is why the command writes the implied one down first.
+    #[cfg(feature = "crypt")]
+    pub fn encrypt_to(&self) -> Result<Vec<[u8; 32]>, String> {
+        if !self.recipients.is_empty() {
+            return self.recipients.iter().map(Recipient::public).collect();
+        }
+        Ok(vec![native::public_of(&self.key_to_write_with()?)])
     }
 
     /// The key this store writes with, made now if this is the first time.

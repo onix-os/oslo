@@ -17,7 +17,7 @@ oslo secret rm stripe
 | | | |
 |---|---:|---|
 | **`secrets`** | +96 KB, 1 package | the *filing*: stores, names, `run`, the lazy variable, `oslo.secret`, the hooks. **No crypto of its own** |
-| **`crypt`** | +36 KB, 10 packages | the *built-in mechanism*, so a fresh install encrypts without being told anything |
+| **`crypt`** | +60 KB, 17 packages | the *built-in mechanism*, so a fresh install encrypts without being told anything |
 
 A distribution shipping `/bin/sh` can take the filing alone and name the machine's own tool —
 `age`, `gpg`, `systemd-creds` — in one line of configuration. Someone who wants it self-contained
@@ -59,45 +59,69 @@ The mechanism is the one that decides **where a store can be used**, so it is wo
 
 ## The built-in mechanism
 
-**XChaCha20-Poly1305 with one 32-byte key.** That is the whole of it.
+**A sealed box: a key you keep, recipients you publish.** One random *file key* encrypts the value,
+and that file key is wrapped once per recipient against their public half, each wrap using a fresh
+ephemeral X25519 keypair.
 
 ```
-OSLO1 │ 24-byte nonce │ ciphertext ‖ 16-byte tag
-  5   │      24       │ …
+OSLO2 │ n │ n × [ ephemeral public (32) │ wrapped file key (48) ] │ nonce (24) │ ciphertext ‖ tag
 ```
 
-The key is a file you could read out loud over a phone:
+The two halves look different on purpose, because one of them is safe to publish and the other is
+not:
 
 ```
-OSLO-KEY-1:hqFoSGbhpF797BbBSjB+95yipkKjh2g2kEaXOFPlIYk=
+OSLO-KEY-1:hqFoSGbhpF797BbBSjB+95yipkKjh2g2kEaXOFPlIYk=    the file, mode 0600
+OSLO-PUB-1:zyzEW4hwVZdjajit/OwLB+o2647dl8YfoWY+mdCS+QM=    what you hand out
 ```
 
-**X**ChaCha rather than plain ChaCha for one reason: a 192-bit nonce can be drawn at random on every
-write without anybody counting. With a 96-bit nonce a random one repeats often enough to matter, and
-the counter that avoids it is state that has to survive a crash, a restore, and a second machine
-writing to the same store. The nonce and the key come from `getrandom` — the operating system, never
-a seeded generator.
+Pasting one where the other belongs is refused rather than quietly accepted — a published half read
+as a key would make the store openable by everybody who has it.
 
-Two consequences of it being an AEAD rather than a cipher: a file that has been edited is refused
-rather than decrypted into rubbish, and the same value written twice produces two different files,
-so nobody holding your backups can tell which secrets changed between them.
+That indirection is what a single symmetric key cannot have: **a store can be readable by several
+keys without any of them being shared.**
+
+```sh
+oslo secret key init                      # on the other machine: prints its OSLO-PUB-1 half
+oslo secret recipient add OSLO-PUB-1:…    # here
+oslo secret rotate                        # so what already exists reaches them too
+```
+
+Your laptop keeps one secret, the server keeps another, and the store lists two recipients. Nobody
+hands anybody a private key, and taking a machine off the list is one `recipient rm` and a `rotate`.
+**Adding a recipient does not re-encrypt anything** — they can read what is written after today, and
+`rotate` is the separate, deliberate step, because *who could read this before I changed it* has a
+permanent answer.
+
+`X`ChaCha for the payload, so the 192-bit nonce can be drawn at random on every write with nobody
+counting. The wrapping key comes from HKDF-SHA256 over the shared curve point, salted with both
+public halves: an X25519 output is a curve point rather than a uniform key, and the salt binds a
+wrap to the pair it came from. Everything random — nonces, file keys, ephemeral secrets — comes from
+`getrandom`, never a seeded generator.
+
+Two consequences of it being an AEAD: a file that has been edited is refused rather than decrypted
+into rubbish — including an edit to the recipient list — and the same value written twice produces
+two different files, so nobody holding your backups can tell which secrets changed between them.
 
 ### What it deliberately is not
 
-**No recipients, no public half, no passphrase, no key derivation.** A store is opened by its key or
-it is not opened. That is a real limitation and it is the reason the mechanism is replaceable:
-sharing a store with a colleague or a second machine means either copying the key over a channel you
-trust, or handing that store's crypto to `age`, which has public-key recipients precisely because
-that is a hard problem worth somebody else's code:
+**Not the age format.** `age -d` will not open these files. What was worth having was the key model,
+and carrying the format meant bech32, scrypt, a localised error catalogue and thirty-two packages —
+against seventeen for the model alone.
+
+No passphrase, and no key derivation from one: the secret is a file at mode `0600`, like
+`~/.ssh/id_ed25519`.
+
+**And none of it is compulsory.** The mechanism is one of three, and the other two do not involve
+any of this:
 
 ```sh
 oslo secret --store team cipher encrypt -- age -R ~/.config/age/recipients.txt
 oslo secret --store team cipher decrypt -- age -d -i ~/.config/age/identity
 ```
 
-The same door reaches a YubiKey, a TPM or anything else oslo will never carry: `age` with
-`age-plugin-yubikey`, `systemd-creds --with-key=tpm2`, `gpg`. See
-[below](#calling-age--and-so-a-yubikey--from-a-hook) for the version with logic in it.
+That is the door to real age files, to `gpg`, to `systemd-creds --with-key=tpm2`, and to a YubiKey
+through `age-plugin-yubikey`. A store that names one never reaches the code above.
 
 ## Configuration is a file, not Lua
 
@@ -117,6 +141,8 @@ default work
 directory /home/you/src/dotfiles/secrets     # a store meant to be committed
 key file /home/you/.ssh/oslo-work
 key command pass show oslo/key
+recipient OSLO-PUB-1:jmtSV18HQJ/Ph1RXFGFTX8vbjNYpveSlwm1n9AwJySY=   # you
+recipient OSLO-PUB-1:zyzEW4hwVZdjajit/OwLB+o2647dl8YfoWY+mdCS+QM=   # the build server
 
 [team]
 directory /home/you/src/team/secrets
@@ -138,11 +164,17 @@ Nothing needs to be edited by hand:
 ```sh
 oslo secret key add file ~/.ssh/oslo-work
 oslo secret key add command -- pass show oslo/key
-oslo secret key init                       # make this store's key now, rather than on first use
+oslo secret key init                       # make this store's key, and print the half to publish
 oslo secret key list
-oslo secret cipher encrypt -- age -R ~/.config/age/recipients.txt
+
+oslo secret recipient add OSLO-PUB-1:…     # a colleague, or your other machine
+oslo secret recipient add --from RECIPIENTS
+oslo secret recipient --export > RECIPIENTS
+oslo secret recipient rm OSLO-PUB-1:…
+oslo secret rotate                         # re-encrypt everything to the list as it now stands
+
+oslo secret cipher encrypt -- age -R ~/.config/age/recipients.txt   # or hand it all to age
 oslo secret cipher decrypt -- age -d -i ~/.config/age/identity
-oslo secret rotate                         # re-encrypt everything as the store is now configured
 ```
 
 The commands splice lines rather than re-render the file, so comments and ordering survive.
@@ -431,33 +463,40 @@ after Lua has run is a path a `cron` job never sees.
 What each half costs, measured on the real binary at the release profile:
 
 ```text
-  every other feature on   6,631,840 bytes   78 packages
-  + secrets (the filing)   6,730,144 bytes   79 packages    +96 KB,  +1 package
-  + crypt (the mechanism)  6,767,008 bytes   89 packages    +36 KB, +10 packages
+  every other feature on   6,640,032 bytes   78 packages
+  + secrets (the filing)   6,746,528 bytes   79 packages    +104 KB,  +1 package
+  + crypt (the mechanism)  6,807,968 bytes   96 packages    + 60 KB, +17 packages
 ```
 
-**This used to be `age`, and `age` cost +160 KB and +32 packages** for the same job — because what
-it brought was public-key recipients, and with them `x25519-dalek`, `curve25519-dalek`, `bech32`,
-`scrypt`, `secrecy` and the tower beneath them. The whole feature went from 256 KB and 33 packages
-to 132 KB and 11. Recipients left with it; `age` as a *program* is how they come back.
+**This used to be `age`, at +160 KB and +32 packages.** What age brought was the file format on top
+of the same key model — bech32, scrypt, a localised error catalogue, the recipient types for
+hardware and post-quantum. Dropping the format and keeping the model costs 60 KB: `x25519-dalek`
+and the curve beneath it, `chacha20poly1305`, and `hkdf` against the `sha2` already here.
+
+An earlier version of `crypt` was one symmetric key at 36 KB and 10 packages. It was 24 KB cheaper
+and could not let two machines read one store without copying a private key between them, which is
+most of what a secrets store is for.
 
 What a read costs, interleaved, min of five runs of three hundred, against the same binary doing a
 `secret list` — same process, same directory, no key opened and nothing decrypted:
 
 | | |
 |---|---|
-| `oslo secret list` | 496 µs |
-| `oslo secret get` | **598 µs** |
+| `oslo secret list` | 598 µs |
+| `oslo secret get` | **807 µs** |
 
-So reading the key and opening the payload is about **102 µs**, and the rest is starting a process.
+So reading the key, the X25519 exchange, the HKDF and opening the payload come to about **209 µs**,
+and the rest is starting a process. The exchange is what the symmetric version did not pay; it is
+also what lets somebody else read the file.
 Delegating to a program instead costs a spawn: `systemd-creds` measured **45,254 µs** on this
 machine, which is the price of the flexibility and the reason the built-in mechanism is not simply
 deleted.
 
 ## What it cannot do
 
-- **No recipients.** One key opens a store. Sharing means copying the key, or handing that store's
-  crypto to `age` — which is a `cipher command` away and produces real age files.
+- **Recipients are oslo's own, not age's.** A colleague who already has an age identity cannot be
+  added; they publish an `OSLO-PUB-1` half or the store hands its crypto to `age`. There is no
+  interoperability with the age ecosystem by design.
 - **No passphrase, and no key derivation.** The key is protected by the filesystem, mode `0600`,
   like `~/.ssh/id_ed25519`. A passphrase asked on every read is what teaches people to keep the
   value somewhere else instead.
@@ -468,8 +507,11 @@ deleted.
   global, and `oslo.fs` reads any file this user can. A plugin's store is encrypted against the
   *disk*; it is not isolated from other plugins.
 - **The declaration is not enforcement.** `oslo.proc.exec("oslo", "secret", "get", …)` walks past it.
-- **No key rotation.** `rotate` re-encrypts with the key as it now stands; nothing retires a key and
-  rewrites every store to a new one. Deleting a key makes everything sealed with it unreadable.
+- **No key rotation, and no revocation of what is already out.** `rotate` re-encrypts to the list as
+  it now stands, so removing a recipient stops them reading anything written *afterwards* — it
+  cannot reach a copy of the store they already have. Deleting a key makes everything sealed only to
+  it unreadable.
+- **At most 255 recipients**, which is one byte in the header and more than anybody has.
 - **A value is not hidden from the process that asked for it.** If you export it, every child gets
   it. `run` is the narrower door, and it is still an environment.
 - **No `git`-aware anything.** The repository check is one warning about where the *key* is.
@@ -479,7 +521,8 @@ deleted.
 | | |
 |---|---|
 | `crates/oslo-base/src/secrets.rs` | `Store`: paths, seal, unseal, rotate, and the user-store shorthands |
-| `crates/oslo-base/src/secrets/native.rs` | the built-in mechanism: XChaCha20-Poly1305, the key file, the format |
+| `crates/oslo-base/src/secrets/native.rs` | the sealed box: the wrap, the key file, the format |
+| `crates/oslo-base/src/secrets/recipient.rs` | who a store is written for, and what a build makes of one |
 | `crates/oslo-base/src/secrets/conf.rs` | `secrets.conf`: parsed, and edited line-wise |
 | `crates/oslo-base/src/secrets/key.rs` | `KeySource`: a file, or a program, and what fences the program |
 | `crates/oslo-base/src/secrets/crypto.rs` | the three mechanisms, and why only one can be unreachable |

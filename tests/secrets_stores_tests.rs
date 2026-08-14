@@ -393,3 +393,79 @@ fn something_that_is_not_a_key_is_named_as_such() {
     assert_ne!(status, 0);
     assert!(err.contains("OSLO-KEY-1"), "{err:?}");
 }
+
+/// **The whole reason the built-in mechanism is not one symmetric key.** A colleague publishes a
+/// recipient, you add it and rotate, and now two keys open the store — with neither of you ever
+/// having handed the other a private key.
+#[test]
+#[cfg(feature = "crypt")]
+fn a_second_recipient_reads_it_with_a_key_of_their_own() {
+    let mine = tempfile::tempdir().expect("tempdir");
+    let theirs = tempfile::tempdir().expect("tempdir");
+
+    // Their key, in a home of its own, and the half they would publish.
+    let (out, err, status) = secret(theirs.path(), &["key", "init"], b"");
+    assert_eq!(status, 0, "{err}");
+    let published = out.lines().last().expect("a public half").to_string();
+    assert!(published.starts_with("OSLO-PUB-1:"), "{out:?}");
+
+    secret(mine.path(), &["set", "token"], b"shared-value");
+    let (_, err, status) = secret(mine.path(), &["recipient", "add", &published], b"");
+    assert_eq!(status, 0, "{err}");
+    // Adding does not reach what is already written; rotate is the deliberate second step.
+    let (_, err, status) = secret(mine.path(), &["rotate"], b"");
+    assert_eq!(status, 0, "{err}");
+
+    assert_eq!(
+        secret(mine.path(), &["get", "token"], b"").0,
+        "shared-value"
+    );
+
+    // The store travels; the key does not.
+    let theirs_store = theirs.path().join("oslo/secrets");
+    std::fs::create_dir_all(&theirs_store).expect("mkdir");
+    std::fs::copy(
+        mine.path().join("oslo/secrets/token.sealed"),
+        theirs_store.join("token.sealed"),
+    )
+    .expect("copy the store");
+    assert_eq!(
+        secret(theirs.path(), &["get", "token"], b"").0,
+        "shared-value",
+        "the second recipient could not open it"
+    );
+
+    // And the list is what it says: mine first, because adding the first one writes down the
+    // recipient that was until then implied.
+    let (listed, _, _) = secret(mine.path(), &["recipient"], b"");
+    assert_eq!(listed.lines().count(), 2, "{listed}");
+    assert!(listed.contains(&published), "{listed}");
+}
+
+/// **A recipient is not a key.** Pasting the published half where the secret belongs must be
+/// refused, or a store would be readable by anybody holding the half meant to be published.
+#[test]
+#[cfg(feature = "crypt")]
+fn a_published_recipient_is_refused_as_a_key() {
+    let home = tempfile::tempdir().expect("tempdir");
+    let (out, _, _) = secret(home.path(), &["key", "init"], b"");
+    let published = out.lines().last().expect("a public half").to_string();
+
+    let wrong = home.path().join("wrong-key");
+    std::fs::write(&wrong, format!("{published}\n")).expect("write");
+    secret(
+        home.path(),
+        &[
+            "--store",
+            "w",
+            "key",
+            "add",
+            "file",
+            &wrong.to_string_lossy(),
+        ],
+        b"",
+    );
+    let (_, err, status) = secret(home.path(), &["--store", "w", "set", "x"], b"v");
+    assert_ne!(status, 0, "a recipient was accepted as a key");
+    assert!(err.contains("OSLO-KEY-1"), "{err:?}");
+}
