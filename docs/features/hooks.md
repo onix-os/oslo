@@ -174,8 +174,15 @@ call `oslo.job.list()`, which takes that same lock; firing from inside the reape
 waiting for a lock its own caller holds. So the reaper records what happened, drops the lock, and
 then announces — which is also why the payload is a snapshot of strings rather than a live handle.
 
-All three fire at a command boundary, where the reaper runs. A job that ends while you sit at an
-idle prompt is announced when you next run something, not the instant it happens.
+**They fire at an idle prompt too, not only at a command boundary.** `SIGCHLD` is installed without
+`SA_RESTART`, so a child ending makes the editor's blocked `read` fail with `EINTR`; the reader
+services the background and repaints before going back to waiting. That is the same route `SIGWINCH`
+has always taken for a resize, rather than a second mechanism — the editor has a blocking read, not
+an event loop, and the interrupt is already load-bearing.
+
+Only an interactive shell arms it. A script reaps at its command boundaries and has no editor to
+wake, so the signal would buy it nothing and cost it an interrupted `read` in every library call
+that makes one.
 
 ## What makes it different
 

@@ -1,3 +1,4 @@
+use super::child::{CHILD_MARK, take_child};
 use super::paste::{self, Paste};
 use super::resize::{RESIZE_MARK, take_resize};
 use std::collections::VecDeque;
@@ -256,6 +257,10 @@ impl Keys {
                         InputEvent::Key(key)
                     });
                 }
+                Parsed::Serviced(used) => {
+                    self.buf.drain(..used);
+                    return Some(InputEvent::Refreshed);
+                }
                 Parsed::Focus(used, focused) => {
                     self.buf.drain(..used);
                     return Some(InputEvent::Focus(focused));
@@ -339,6 +344,10 @@ impl Keys {
                         self.buf.push(RESIZE_MARK);
                         return true;
                     }
+                    if take_child() {
+                        self.buf.push(CHILD_MARK);
+                        return true;
+                    }
                 }
                 io::ErrorKind::WouldBlock => {
                     let mut ready = nix::libc::pollfd {
@@ -381,6 +390,8 @@ pub(crate) enum Parsed {
     Focus(usize, bool),
     Mouse(usize, super::mouse::Event),
     Discard(usize),
+    /// Background work was done rather than a key produced. The loop gets a turn to repaint.
+    Serviced(usize),
     Partial,
 }
 
@@ -388,6 +399,13 @@ pub(crate) fn parse(buf: &[u8]) -> Parsed {
     let Some(&first) = buf.first() else {
         return Parsed::Partial;
     };
+    // A child ended while the editor was waiting. Serviced here rather than handed onward as a key:
+    // it is not one, no binding may claim it, and what the loop needs afterwards is a repaint —
+    // which is exactly what `Refreshed` already means.
+    if first == CHILD_MARK {
+        oslo_base::background::service();
+        return Parsed::Serviced(1);
+    }
     if first != 0x1b {
         let len = utf8_len(first);
         if buf.len() < len {

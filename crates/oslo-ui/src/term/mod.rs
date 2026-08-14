@@ -189,6 +189,7 @@ impl Drop for Restore {
 }
 
 pub mod capability;
+mod child;
 mod input;
 pub mod keyboard;
 pub mod metadata;
@@ -200,6 +201,7 @@ pub mod query;
 mod resize;
 pub mod semantic;
 pub mod vscode;
+pub use child::watch_for_children;
 pub use input::{EventPressed, InputEvent, Key, Keys, PasteError, Pressed, key};
 pub use resize::watch_for_resize;
 

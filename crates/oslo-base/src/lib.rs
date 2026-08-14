@@ -21,6 +21,7 @@
 
 pub mod ast;
 /// The output of a command that was asked to keep it, for `copy --last`.
+pub mod background;
 pub mod capture;
 pub mod error;
 /// Parts of the shell a config can turn off and on again while it runs.
