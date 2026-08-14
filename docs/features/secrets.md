@@ -12,6 +12,12 @@ oslo secret where                      # the two directories, and which of them 
 oslo secret rm stripe
 ```
 
+**The command line is oslo's own store, and only that.** It is age, a key file and a flat
+configuration file, so that `$(oslo secret get …)` works from `cron`, from `dash` and from a
+`Makefile` — processes that never run Lua. Everything else is
+[pluggable from Lua](#pluggable-hooks-do-the-crypto-lua-does-the-storage): hooks replace the crypto,
+`oslo.secret.define` replaces the storage, and the two are independent.
+
 **`oslo` only**, behind the `secrets` cargo feature. Without it there is no `oslo secret`, no
 `oslo.secret`, and `age` is not compiled, fetched or linked — see [Measurements](#measurements) for
 what it costs, which is the reason it is off in `oslo-minimal`.
@@ -40,10 +46,19 @@ A system keyring is the obvious alternative and is the wrong shape. It wants a d
 and a desktop — none of which exist on a server, in a container, or in an initramfs, which is
 exactly where a shell has to keep working.
 
-## A store is three things
+## A store is four things
 
-A **directory**, an ordered list of **keys** to decrypt with, and a list of **recipients** to
-encrypt to. All three are configurable, and there can be more than one store.
+A **directory**, an ordered list of **keys** to decrypt with, a list of **recipients** to encrypt
+to, and the **mechanism** that seals and opens its files. Every one of them is configurable, and
+there can be more than one store.
+
+The mechanism is the one that decides where a store can be *used*, so it has its own table:
+
+| | does the crypto | reachable from |
+|---|---|---|
+| default | oslo's own age, with this store's keys and recipients | anywhere the binary runs |
+| `encrypt`/`decrypt command` | another program, down a pipe | anywhere: a subprocess, not a shell |
+| `crypto hook` | a Lua handler | only a shell that has read your config |
 
 ```
 $XDG_DATA_HOME/oslo/secrets/NAME.age     the `user` store — mode 0600, encrypted

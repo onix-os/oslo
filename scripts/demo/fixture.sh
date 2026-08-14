@@ -89,6 +89,30 @@ if [ -x "$OSLO" ] && "$OSLO" secret --help >/dev/null 2>&1; then
         --var 'GITHUB_TOKEN=$(oslo secret get gh-token)' --tag work >/dev/null
 fi
 
+# A stand-in for `age` driving a hardware key, for the `secrets` demo.
+#
+# **Not `age`, and named so nobody mistakes it for it.** The machine these are recorded on has
+# neither `age` nor a YubiKey, and a recording that pretended otherwise would be the one kind of
+# dishonesty a demo cannot recover from. What it does show is the contract, which is the whole of
+# what oslo relies on: bytes in on standard input, bytes out on standard output, and a prompt on
+# standard error the way a plugin asks for a touch.
+mkdir -p "$WORK/bin"
+cat > "$WORK/bin/pretend-age" <<'EOF'
+#!/bin/sh
+# stands in for: age -R recipients.txt   /   age --decrypt --identity yubikey.txt
+echo "touch your key" >&2
+case "$1" in
+  -e) printf 'SEALED\n'; base64 ;;
+  -d) tail -n +2 | base64 -d ;;
+esac
+EOF
+chmod +x "$WORK/bin/pretend-age"
+
+# A colleague's public half, for the `recipient add --from` beat. A real age recipient, so the
+# demo exercises the same validation a person's would.
+printf '# a colleague, or your other machine\nage1lggyhqrw2nlhcxprm67z43rta597azn8gknawjehu9d9dl0jq3yqqvfafg\n' \
+    > "$WORK/colleague.txt"
+
 # Two scripts that declare their arguments in comments, for the `argc` demos: one oslo, one bash.
 # They live in `$WORK/bin`, which those demos put on `$PATH`, so the shell finds them by name and
 # completes them the way it would any other command.
