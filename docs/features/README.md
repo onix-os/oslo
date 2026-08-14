@@ -109,7 +109,7 @@ scripts/demo/embed.sh                            # put the players back in the d
 | [The history finder](history-finder.md) | Full-screen search with scopes that narrow and widen |
 | [Where you have been](where-you-have-been.md) | Directory tracking, `cd -N`, `cd root`, and ranking that puts match quality first |
 | [One shell, several histories](profiles-and-histories.md) | `$OSLO_PROFILE`, and keeping an agent's commands out of yours |
-| [Syncing between machines](syncing.md) | `oslo sync` — history, macros and secrets over ssh, deletions included |
+| [Syncing between machines](syncing.md) | `oslo profile sync` — history, macros and secrets over ssh, deletions included |
 
 ## The environment
 

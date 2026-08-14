@@ -61,16 +61,16 @@ const SUBCOMMANDS: &[Sub] = &[
     Sub {
         name: "sync",
         args: "USER@HOST [NAME] [--only WHAT] [--dry-run]",
-        about: "two-way sync: history, macros and secrets. `oslo sync` is the same",
+        about: "two-way: history, macros and secrets, to another machine",
         flags: &[
             ("--only WHAT", "history, macros or secrets; repeat for two"),
             ("--dry-run", "say what would change and change nothing"),
             ("$OSLO_SSH", "how to get there, if a bare `ssh` is not it"),
             ("$OSLO_SSH_REMOTE_BIN", "what `oslo` is called over there"),
         ],
-        note: "The same command as `oslo sync`: history, macros and secrets all travel, and both \
-               ends end up with the union. NAME decides only which history — macros and secrets are \
-               one per machine. `--only history` narrows it, `--dry-run` shows what would move. It \
+        note: "History, macros and secrets all travel, and both ends end up with the union. NAME \
+               decides only which history — macros and secrets are one per machine. \
+               `--only history` narrows it, `--dry-run` shows what would move. It \
                refuses unless both ends hold the same profile key, because `default` here and \
                `default` on a box you have an account on are two histories that share a word. A \
                command run on both machines is not a conflict: every event carries the host that \
@@ -83,6 +83,24 @@ const SUBCOMMANDS: &[Sub] = &[
         flags: &[],
         note: "A hash of the key, never the key: this is the half that crosses the wire, and it \
                gives nothing away. Sixteen hex characters, short enough to read down a phone.",
+    },
+    Sub {
+        name: "send",
+        args: "WHAT [NAME]",
+        about: "this machine's copy of one part, on standard output",
+        flags: &[],
+        note: "The far end's half of a sync, run over ssh rather than typed. A consistent snapshot \
+               rather than a file copy: these are live databases, and copying one under a shell \
+               that is writing to it is how you get half a transaction.",
+    },
+    Sub {
+        name: "receive",
+        args: "WHAT [NAME]",
+        about: "merge a copy arriving on standard input",
+        flags: &[],
+        note: "The other half, and it merges rather than replaces — between the moment this machine \
+               handed over its copy and the moment the merged one comes back, something here may \
+               have changed.",
     },
 ];
 

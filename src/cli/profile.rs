@@ -44,9 +44,11 @@ pub fn run(args: &[String]) -> i32 {
         Some("key") => key(&args[1..]),
         Some("export") => export(&named(1)),
         Some("import") => import(&named(1)),
-        // The history half of `oslo sync`, under the name of the thing it syncs. The far end's
-        // halves live there too — one protocol, so there is one thing to get right.
         Some("sync") => sync::run(&args[1..]),
+        // The two halves the far end of a sync runs, over ssh rather than typed. In the help
+        // because a command that exists and is undocumented is worse than one that does not.
+        Some("send") => crate::cli::sync::part::send(&args[1..]),
+        Some("receive") => crate::cli::sync::part::receive(&args[1..]),
         Some(other) => MENU.unknown(other),
     }
 }

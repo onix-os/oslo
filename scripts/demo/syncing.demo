@@ -1,4 +1,4 @@
-# `oslo sync` — history, macros and secrets to another machine, in one command.
+# `oslo profile sync` — history, macros and secrets to another machine, in one command.
 #
 # **Off camera**: a config rebuilds `$PATH` at startup, so what the launcher exported is gone by the
 # first prompt — and everything below is a *program*, which would otherwise be whichever oslo is
@@ -28,7 +28,7 @@ wait 2.0
 clear
 
 # One command for all three. Both ends come out with the union.
-run here OSLO_SSH=/tmp/oslo-demo-work/bin/pretend-ssh oslo sync laptop
+run here OSLO_SSH=/tmp/oslo-demo-work/bin/pretend-ssh oslo profile sync laptop
 wait 5.0
 clear
 
@@ -46,9 +46,9 @@ clear
 # than an erasure, so it travels instead of being handed back by the other machine.
 run here oslo macros remove kp
 wait 1.6
-run here OSLO_SSH=/tmp/oslo-demo-work/bin/pretend-ssh oslo sync laptop --only macros
+run here OSLO_SSH=/tmp/oslo-demo-work/bin/pretend-ssh oslo profile sync laptop --only macros
 wait 4.0
 
 # And running it again moves nothing, which is what makes it safe in a login file.
-run here OSLO_SSH=/tmp/oslo-demo-work/bin/pretend-ssh oslo sync laptop
+run here OSLO_SSH=/tmp/oslo-demo-work/bin/pretend-ssh oslo profile sync laptop
 wait 5.0

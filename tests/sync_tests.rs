@@ -168,7 +168,7 @@ fn pair(here: &Machine, there: &Machine) {
 
 fn syncing(here: &Machine, there: &Machine, extra: &[&str]) -> (String, String, i32) {
     let ssh = fake_ssh(here.path(), there.path());
-    let mut args = vec!["sync", "buildbox"];
+    let mut args = vec!["profile", "sync", "buildbox"];
     args.extend_from_slice(extra);
     here.run_with(
         &args,
@@ -499,7 +499,7 @@ fn a_far_end_that_does_not_speak_sync_is_named_as_the_problem() {
         .expect("chmod");
 
     let (_, err, status) = here.run_with(
-        &["sync", "buildbox"],
+        &["profile", "sync", "buildbox"],
         &[
             ("OSLO_SSH", quiet.to_string_lossy().to_string()),
             (

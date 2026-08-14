@@ -806,7 +806,7 @@ inventing one of its own, which is what lets a child process say "this shell" an
 ```sh
 oslo profile key init                                  # once
 oslo profile export | ssh laptop oslo profile import   # once, to say these two are yours
-oslo sync laptop                                       # from then on
+oslo profile sync laptop                                       # from then on
 ```
 
 History, macros and secrets, both ways, over ssh — `--only history` narrows it, `--dry-run` shows

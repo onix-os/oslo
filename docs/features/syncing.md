@@ -7,7 +7,7 @@ moves nothing the second time.
 ```sh
 oslo profile key init                                  # once, on the machine that has the data
 oslo profile export | ssh laptop oslo profile import   # once, to say these two are yours
-oslo sync laptop                                       # from then on
+oslo profile sync laptop                                       # from then on
 ```
 
 ```text
@@ -57,7 +57,7 @@ stays, `deleted` is set, and the revision is bumped.
 oslo history delete EVENT_ID --yes    # tombstone
 oslo macros remove gs                 # tombstone
 oslo secret rm deploy                 # tombstone, and the sealed body is dropped
-oslo sync laptop                      # the removal travels
+oslo profile sync laptop                      # the removal travels
 ```
 
 It does not matter whose machine the thing came from. Ownership is not a concept here: every copy is
@@ -85,17 +85,23 @@ build without them has no `secrets` to name — `--only secrets` answers *no suc
 lists what that build can actually do. A part that could be named and then refused would be worse
 than one that is simply absent.
 
-**`oslo profile sync` is the same command**, down to `--only` and `--dry-run`: it parses the words
-and hands them here. Both spellings carry all three.
-
-That was not true at first, and the reason it changed is worth writing down. A profile is a history
-— see [One shell, several histories](profiles-and-histories.md) — and macros are deliberately shared
-across every profile on a machine, so syncing them under the name `profile` describes them wrongly.
-On that argument `oslo profile sync` carried the history alone. What it did in practice was move a
-third of the machine, print one line about history, and say nothing about the two parts it had left
-behind — so they were found missing on the far end, later. **The name was not worth that.** `NAME`
-still decides only which *history* travels, because macros and secrets are one per machine either
+`NAME` decides only which *history* travels, because macros and secrets are one per machine either
 way.
+
+### There was briefly an `oslo sync`, and the reason it is gone
+
+A profile is a history — see [One shell, several histories](profiles-and-histories.md) — and macros
+are deliberately shared across every profile on a machine, so syncing them under the name `profile`
+describes them wrongly. On that argument this started as a separate `oslo sync` tool, with
+`oslo profile sync` carrying the history alone.
+
+Both halves of that were mistakes. The history-only command moved a third of the machine, printed
+one line about history, and said nothing about the two parts it had left behind — so they were found
+missing on the far end, later. And once `oslo profile sync` was fixed to carry everything, the two
+were one job under two names, which is one name more than the job has.
+
+**`oslo profile sync` is the only spelling.** The word `profile` describes the *pairing* — the key
+that says two machines are yours — which is the thing this command genuinely turns on.
 
 ## Secrets cross sealed, and are never opened
 
@@ -132,9 +138,9 @@ rather than sanitised.
 oslo profile fingerprint NAME       ssh laptop oslo profile fingerprint NAME
           └──────────── must be equal, or nothing moves ─────────┘
 
-ssh laptop oslo sync send WHAT   ─────────────►  a snapshot of theirs
+ssh laptop oslo profile send WHAT   ─────────────►  a snapshot of theirs
           merge, both directions                 both copies gain
-ssh laptop oslo sync receive WHAT  ◄───────────  the merged copy, merged again over there
+ssh laptop oslo profile receive WHAT  ◄───────────  the merged copy, merged again over there
 ```
 
 Every store here is a live database or a directory a shell may be writing to this instant, and
@@ -156,8 +162,8 @@ called `sync`, and `sync(1)` exists on most systems. It ran, printed nothing, ex
 end read that as *that machine has no history*.
 
 ```
-oslo sync: laptop: did not answer as an oslo that can sync.
-  Its oslo is most likely too old — `oslo sync` needs one on both machines.
+oslo profile sync: laptop: did not answer as an oslo that can sync.
+  Its oslo is most likely too old — `oslo profile sync` needs one on both machines.
 ```
 
 ## Why a key, and not just the hostname
@@ -193,7 +199,7 @@ record.
 
 - **Sync with a machine whose oslo predates this.** Both ends need one that has `sync`. It says so
   in a sentence rather than failing obscurely, which it did until the wire header was added.
-- **Run itself.** `oslo sync` is a command; putting it in a login file or a timer is yours to decide,
+- **Run itself.** `oslo profile sync` is a command; putting it in a login file or a timer is yours to decide,
   and it is safe there because a second run moves nothing.
 - **Rotate or revoke the key.** A machine that has it can read what it already has; taking it off
   the list is `rm` on that machine, not something this can reach.
@@ -215,7 +221,8 @@ record.
 | `crates/oslo-base/src/macros/sync.rs` | merging two macro stores, name by name |
 | `crates/oslo-base/src/secrets/sync.rs` | the file header, and merging two stores without a key |
 | `crates/oslo-base/src/track/sync/admin.rs` | `sync_files`, the history merge |
-| `src/cli/sync.rs` | the command, `--only` and `--dry-run` |
+| `src/cli/profile/sync.rs` | the `sync` subcommand, which hands its words to the parser below |
+| `src/cli/sync.rs` | the parser, `--only` and `--dry-run` — not a command of its own |
 | `src/cli/sync/part.rs` | the three parts, the wire header, `send` and `receive` |
 | `src/cli/sync/part/bundle.rs` | the sealed-file bundle, and the names it refuses |
 | `src/cli/sync/ssh.rs` | the transport, and the fingerprint check that comes first |

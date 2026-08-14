@@ -97,7 +97,7 @@ fn one(remote: &str, part: Part, profile: &str, dry_run: bool) -> Result<(), Str
         .map_err(|e| format!("no temporary directory: {e}"))?;
     let theirs = held.path().join("theirs");
 
-    let answered = over_ssh(remote, &["sync", "send", part.word(), profile], None)?;
+    let answered = over_ssh(remote, &["profile", "send", part.word(), profile], None)?;
     let snapshot = off_the_wire(remote, part, &answered)?;
     absorb(part, &theirs, &snapshot)?;
 
@@ -115,7 +115,7 @@ fn one(remote: &str, part: Part, profile: &str, dry_run: bool) -> Result<(), Str
     // What it prints is deliberately nothing — see [`report::say_far`].
     over_ssh(
         remote,
-        &["sync", "receive", part.word(), profile],
+        &["profile", "receive", part.word(), profile],
         Some(&merged),
     )?;
     Ok(())
@@ -268,7 +268,7 @@ fn write_at(path: &std::path::Path, bytes: &[u8]) -> Result<(), String> {
 /// `oslo sync send WHAT PROFILE` — this machine's copy, on standard output.
 pub fn send(args: &[String]) -> i32 {
     let Some(part) = args.first().and_then(|word| named(word)) else {
-        return super::fail("send needs one of: history, macros, secrets");
+        return crate::cli::sync::fail("send needs one of: history, macros, secrets");
     };
     let profile = args
         .get(1)
@@ -278,7 +278,7 @@ pub fn send(args: &[String]) -> i32 {
     // answered was not an oslo that speaks this".
     match mine(part, &profile).and_then(|bytes| write_out(&on_the_wire(part, &bytes))) {
         Ok(()) => 0,
-        Err(e) => super::fail(&e),
+        Err(e) => crate::cli::sync::fail(&e),
     }
 }
 
@@ -360,7 +360,7 @@ fn write_out(bytes: &[u8]) -> Result<(), String> {
 pub fn receive(args: &[String]) -> i32 {
     use std::io::Read;
     let Some(part) = args.first().and_then(|word| named(word)) else {
-        return super::fail("receive needs one of: history, macros, secrets");
+        return crate::cli::sync::fail("receive needs one of: history, macros, secrets");
     };
     let profile = args
         .get(1)
@@ -369,7 +369,7 @@ pub fn receive(args: &[String]) -> i32 {
 
     let mut incoming = Vec::new();
     if let Err(e) = std::io::stdin().read_to_end(&mut incoming) {
-        return super::fail(&format!("cannot read standard input: {e}"));
+        return crate::cli::sync::fail(&format!("cannot read standard input: {e}"));
     }
     if incoming.is_empty() {
         // Nothing at all on standard input is the near end deciding there was nothing to send,
@@ -379,22 +379,22 @@ pub fn receive(args: &[String]) -> i32 {
     }
     let incoming = match off_the_wire("the machine that called", part, &incoming) {
         Ok(bytes) => bytes,
-        Err(e) => return super::fail(&e),
+        Err(e) => return crate::cli::sync::fail(&e),
     };
 
     let held = match tempfile::Builder::new().prefix("oslo-receive-").tempdir() {
         Ok(dir) => dir,
-        Err(e) => return super::fail(&format!("no temporary directory: {e}")),
+        Err(e) => return crate::cli::sync::fail(&format!("no temporary directory: {e}")),
     };
     let theirs = held.path().join("theirs");
     if let Err(e) = absorb(part, &theirs, &incoming) {
-        return super::fail(&e);
+        return crate::cli::sync::fail(&e);
     }
     match merge_into(part, &theirs, &profile, false) {
         Ok(moved) => {
             report::say_far(part, &moved);
             0
         }
-        Err(e) => super::fail(&e),
+        Err(e) => crate::cli::sync::fail(&e),
     }
 }

@@ -1,14 +1,11 @@
-//! `oslo sync user@host` — one command, everything this machine keeps.
+//! What `oslo profile sync` does: everything this machine keeps, carried to another.
 //!
-//! # Why this is not `oslo profile sync`
+//! # There is no `oslo sync`
 //!
-//! A profile is a *history*: which commands this shell remembers. Macros are deliberately not part
-//! of one — `oslo_base::macros` says why, and it is right — and a secret store is not either. So a
-//! command that synced all three under the name `profile` would be lying about what a profile is.
-//!
-//! What the profile still provides is the **pairing**: its key is what says two machines are the
-//! same person's, and every part refuses to move until both ends prove they hold it. One key, one
-//! decision, everything else follows.
+//! There was, briefly, on the argument that macros and secrets are not part of a profile — which is
+//! true about the *word* and bought nothing. What it produced was two commands doing one job under
+//! two names, which is one more name than the job has. **`oslo profile sync` is the only spelling**;
+//! this module is where the work lives, not a command of its own.
 //!
 //! # What travels, and what each part is
 //!
@@ -21,34 +18,20 @@
 //! Three storages that share nothing but [`oslo::track::stamp`] — the rule that decides which copy
 //! of a record wins. That is the only thing they must agree about, and it is written once.
 //!
+//! The profile provides the **pairing**: its key is what says two machines are the same person's,
+//! and every part refuses to move until both ends prove they hold it.
+//!
 //! # Deleting works in every one of them
 //!
 //! A removal is a tombstone in all three, so deleting a command, an alias or a secret on this
 //! machine removes it on the other, and the machine that lost it does not hand it back.
 
-use crate::cli::help::Paint;
-use help::MENU;
+use crate::cli::profile::help::MENU;
 
-pub(crate) mod help;
 pub(crate) mod part;
 mod ssh;
 
-pub fn run(args: &[String]) -> i32 {
-    if let Some(page) = MENU.asked(args, Paint::detect()) {
-        print!("{page}");
-        return 0;
-    }
-    match args.first().map(String::as_str) {
-        None => MENU.missing("needs a USER@HOST to sync with"),
-        // The far end's halves. Plumbing rather than something to type, and in the help because a
-        // command that exists and is undocumented is worse than one that does not.
-        Some("send") => part::send(&args[1..]),
-        Some("receive") => part::receive(&args[1..]),
-        Some(_) => here(args),
-    }
-}
-
-/// `oslo sync USER@HOST [NAME] [--only WHAT] [--dry-run]`.
+/// `oslo profile sync USER@HOST [NAME] [--only WHAT] [--dry-run]`.
 pub(crate) fn here(args: &[String]) -> i32 {
     let mut remote = None;
     let mut profile = None;
@@ -104,6 +87,6 @@ pub(crate) fn here(args: &[String]) -> i32 {
 }
 
 pub(crate) fn fail(message: &str) -> i32 {
-    eprintln!("oslo sync: {message}");
+    eprintln!("oslo profile sync: {message}");
     1
 }

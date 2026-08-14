@@ -322,7 +322,7 @@ kinds is actually navigated by and the one thing you cannot type.
 
 ## Between machines
 
-`oslo sync laptop` carries the macros as well as the history and the secrets, and all five kinds
+`oslo profile sync laptop` carries the macros as well as the history and the secrets, and all five kinds
 travel — a function and a script included, not only the two a starting shell reads. The merge is by
 name: for `alias/gs` one of the two copies wins outright, decided by the rule in
 [Syncing between machines](syncing.md).
