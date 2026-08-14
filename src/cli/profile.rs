@@ -44,11 +44,9 @@ pub fn run(args: &[String]) -> i32 {
         Some("key") => key(&args[1..]),
         Some("export") => export(&named(1)),
         Some("import") => import(&named(1)),
+        // The history half of `oslo sync`, under the name of the thing it syncs. The far end's
+        // halves live there too — one protocol, so there is one thing to get right.
         Some("sync") => sync::run(&args[1..]),
-        // The two halves the far end of a sync runs. Plumbing rather than something to type: they
-        // are in the help because a command that exists and is undocumented is worse.
-        Some("send") => sync::send(&named(1)),
-        Some("receive") => sync::receive(&named(1)),
         Some(other) => MENU.unknown(other),
     }
 }

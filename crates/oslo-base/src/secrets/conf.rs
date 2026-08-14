@@ -38,7 +38,7 @@ pub fn path() -> Option<PathBuf> {
     {
         return Some(PathBuf::from(named));
     }
-    Some(super::state_directory()?.join("secrets.conf"))
+    Some(super::place::state_directory()?.join("secrets.conf"))
 }
 
 /// One store's declaration.
