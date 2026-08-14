@@ -4,7 +4,7 @@ use super::*;
 
 #[test]
 fn the_overview_describes_every_subcommand() {
-    let plain = text(Paint::plain());
+    let plain = MENU.overview(Paint::plain());
     assert!(!plain.contains('\x1b'), "plain is plain");
     for sub in SUBCOMMANDS {
         assert!(plain.contains(sub.name), "{} is missing", sub.name);
@@ -20,7 +20,9 @@ fn the_overview_describes_every_subcommand() {
 #[test]
 fn each_subcommand_documents_its_own_arguments() {
     for sub in SUBCOMMANDS {
-        let help = subcommand(sub.name, Paint::plain()).expect("every listed name answers");
+        let help = MENU
+            .subcommand(sub.name, Paint::plain())
+            .expect("every listed name answers");
         assert!(help.contains(sub.name), "{}", sub.name);
         assert!(help.contains(sub.about), "{}", sub.name);
         for (flag, about) in sub.flags {
@@ -40,23 +42,23 @@ fn the_surprises_are_written_down() {
         ("list", "will not load"),
     ];
     for (name, phrase) in checks {
-        let help = subcommand(name, Paint::plain()).expect("listed");
+        let help = MENU.subcommand(name, Paint::plain()).expect("listed");
         assert!(help.contains(phrase), "{name} does not mention {phrase:?}");
     }
 }
 
 #[test]
 fn a_name_nobody_listed_has_no_help() {
-    assert!(subcommand("nonesuch", Paint::plain()).is_none());
+    assert!(MENU.subcommand("nonesuch", Paint::plain()).is_none());
 }
 
 /// The overview and the tool table must agree about what exists.
 #[test]
 fn the_headings_match_the_house_style() {
-    let plain = text(Paint::plain());
+    let plain = MENU.overview(Paint::plain());
     assert!(plain.starts_with("USAGE\n"), "{plain}");
     assert!(plain.contains("\nSUBCOMMANDS\n"), "{plain}");
-    let install = subcommand("install", Paint::plain()).expect("listed");
+    let install = MENU.subcommand("install", Paint::plain()).expect("listed");
     assert!(install.starts_with("USAGE\n"), "{install}");
     assert!(install.contains("\nARGUMENTS\n"), "{install}");
 }

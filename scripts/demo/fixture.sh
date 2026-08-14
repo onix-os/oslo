@@ -89,6 +89,46 @@ if [ -x "$OSLO" ] && "$OSLO" secret --help >/dev/null 2>&1; then
         --var 'GITHUB_TOKEN=$(oslo secret get gh-token)' --tag work >/dev/null
 fi
 
+# Two whole machines, for the `profile sync` act.
+#
+# **Both ends are fixtures.** The demo must never sync the recording machine's own history — it
+# would merge invented commands into a real store — so `here` and `there` are two XDG homes under
+# /tmp, each with a history of its own, and the shell in the recording steps into `here`.
+if [ -x "$OSLO" ]; then
+    for machine in here there; do
+        mkdir -p "$WORK/$machine/state"
+    done
+    printf 'cargo build --release\ngit push origin main\nhx src/lib.rs\n' > "$WORK/here.txt"
+    printf 'cargo build --release\nkubectl get pods -A\njournalctl -fu oslo\n' > "$WORK/there.txt"
+    for machine in here there; do
+        XDG_DATA_HOME="$WORK/$machine" XDG_STATE_HOME="$WORK/$machine/state" HOME="$WORK/$machine" \
+            "$OSLO" history import "$WORK/$machine.txt" >/dev/null 2>&1
+    done
+    # The key that says the two are one profile, made on `here` and carried to `there` — the step a
+    # person does once, done here so the recording can get to the part worth watching.
+    XDG_DATA_HOME="$WORK/here" XDG_STATE_HOME="$WORK/here/state" HOME="$WORK/here" \
+        "$OSLO" profile key init >/dev/null 2>&1
+    XDG_DATA_HOME="$WORK/here" XDG_STATE_HOME="$WORK/here/state" HOME="$WORK/here" \
+        "$OSLO" profile export 2>/dev/null |
+        XDG_DATA_HOME="$WORK/there" XDG_STATE_HOME="$WORK/there/state" HOME="$WORK/there" \
+            "$OSLO" profile import >/dev/null 2>&1
+fi
+
+# A stand-in for `ssh`, so the sync act has a far end without a second computer.
+#
+# **Named so nobody mistakes it for ssh.** It ignores the destination and runs the command against
+# the `there` machine — which is exactly what ssh would do, minus the network. The demo shows the
+# script on screen, because a recording that implied a real remote host would be lying about the
+# one thing being demonstrated.
+mkdir -p "$WORK/bin"
+cat > "$WORK/bin/pretend-ssh" <<EOF
+#!/bin/sh
+# stands in for: ssh USER@HOST oslo …
+shift
+exec env XDG_DATA_HOME=$WORK/there XDG_STATE_HOME=$WORK/there/state HOME=$WORK/there "\$@"
+EOF
+chmod +x "$WORK/bin/pretend-ssh"
+
 # A second machine's published half, for the `recipient add` beat.
 #
 # Made with the binary under test in a home of its own, so it is a *real* recipient and the demo

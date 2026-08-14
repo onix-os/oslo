@@ -41,8 +41,7 @@ use std::path::PathBuf;
 use std::process::{Command, Stdio};
 
 use super::fail;
-
-const USAGE: &str = "usage: oslo profile sync USER@HOST [NAME] [--dry-run]";
+use super::help::MENU;
 
 pub fn run(args: &[String]) -> i32 {
     let mut remote = None;
@@ -52,17 +51,14 @@ pub fn run(args: &[String]) -> i32 {
         match argument.as_str() {
             "--dry-run" | "-n" => dry_run = true,
             flag if flag.starts_with('-') => {
-                eprintln!("oslo profile sync: {flag:?}: no such option");
-                eprintln!("{USAGE}");
-                return 2;
+                return MENU.wrong("sync", &format!("{flag:?}: no such option"));
             }
             word if remote.is_none() => remote = Some(word.to_string()),
             word => name = Some(word.to_string()),
         }
     }
     let Some(remote) = remote else {
-        eprintln!("{USAGE}");
-        return 2;
+        return MENU.wrong("sync", "needs a USER@HOST to sync with");
     };
     let name = name.unwrap_or_else(oslo::track::profile::current);
 

@@ -18,23 +18,18 @@
 //!
 //! The key is in `$XDG_STATE_HOME`, never in the store — the store is the thing that travels.
 
+use crate::cli::help::Paint;
+use help::MENU;
 use oslo::track::profile;
 
+pub(crate) mod help;
 mod sync;
 
-const USAGE: &str = "usage: oslo profile [COMMAND]\n\
-                     \n\
-                     \x20 (no command)      every profile, marking the one in use\n\
-                     \x20 show [NAME]       where its files are, and its fingerprint\n\
-                     \x20 key init [NAME]   give it a key, so it can be synced\n\
-                     \x20 key path [NAME]\n\
-                     \x20 export [NAME]     the key, to carry to another machine\n\
-                     \x20 import [NAME]     read one from standard input\n\
-                     \x20 sync USER@HOST    two-way sync with the oslo over there\n\
-                     \x20 fingerprint [NAME]   what the two ends compare\n\
-                     \x20 send / receive    the far end's half of a sync, over ssh";
-
 pub fn run(args: &[String]) -> i32 {
+    if let Some(page) = MENU.asked(args, Paint::detect()) {
+        print!("{page}");
+        return 0;
+    }
     let named = |at: usize| -> String {
         args.get(at)
             .filter(|word| !word.starts_with('-'))
@@ -54,15 +49,7 @@ pub fn run(args: &[String]) -> i32 {
         // are in the help because a command that exists and is undocumented is worse.
         Some("send") => sync::send(&named(1)),
         Some("receive") => sync::receive(&named(1)),
-        Some("-h" | "--help" | "help") => {
-            println!("{USAGE}");
-            0
-        }
-        Some(other) => {
-            eprintln!("oslo profile: {other}: no such subcommand");
-            eprintln!("{USAGE}");
-            2
-        }
+        Some(other) => MENU.unknown(other),
     }
 }
 
@@ -123,6 +110,10 @@ fn fingerprint(name: &str) -> i32 {
 }
 
 fn key(args: &[String]) -> i32 {
+    if let Some(page) = help::KEY.asked(args, Paint::detect()) {
+        print!("{page}");
+        return 0;
+    }
     let named = |at: usize| -> String {
         args.get(at)
             .filter(|word| !word.starts_with('-'))
@@ -144,10 +135,8 @@ fn key(args: &[String]) -> i32 {
             }
             None => fail("no $XDG_STATE_HOME and no $HOME, so there is nowhere for one"),
         },
-        _ => {
-            eprintln!("usage: oslo profile key init|path [NAME]");
-            2
-        }
+        None => help::KEY.missing("key needs `init` or `path`"),
+        Some(other) => help::KEY.unknown(other),
     }
 }
 

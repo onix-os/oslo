@@ -12,35 +12,23 @@
 //! and its recipients are in [`oslo::secrets`]; `key` and `recipient` below are the commands that
 //! write that configuration, and `where` is the one that shows it.
 
+use crate::cli::help::Paint;
+use help::MENU;
 use oslo::secrets::{self, Store};
 
 mod cipher;
+pub(crate) mod help;
 #[cfg(feature = "crypt")]
 mod key;
 #[cfg(feature = "crypt")]
 mod recipient;
 mod run;
 
-const USAGE: &str = "usage: oslo secret [--store NAME] COMMAND\n\
-                     \n\
-                     \x20 set NAME      read a value from standard input and keep it encrypted\n\
-                     \x20 get NAME      write that value to standard output\n\
-                     \x20 run VAR=NAME -- CMD…   run CMD with VAR set to it, and nothing else\n\
-                     \x20 list          the names kept here\n\
-                     \x20 rm NAME       forget one\n\
-                     \x20 rotate        re-encrypt everything, as the store is now configured\n\
-                     \x20 cipher        hand this store's crypto to another program\n\
-                     \x20 stores        every store this machine knows about\n\
-                     \x20 where         the store and the key, and which of them may be committed";
-
-/// The subcommands only a build with oslo's own crypto has.
-#[cfg(feature = "crypt")]
-const KEYS_AND_RECIPIENTS: &str = "\x20 key           where this store's key comes from\n\
-                                   \x20 recipient     who its files are written for\n";
-#[cfg(not(feature = "crypt"))]
-const KEYS_AND_RECIPIENTS: &str = "";
-
 pub fn run(args: &[String]) -> i32 {
+    if let Some(page) = MENU.asked(args, Paint::detect()) {
+        print!("{page}");
+        return 0;
+    }
     // Said once, wherever the command is going: a key under a `.git` is one `git add -A` from being
     // published, and the person it happens to did not choose it — they moved a directory.
     if let Some(repository) = secrets::identity_in_a_repository() {
@@ -165,15 +153,7 @@ pub fn run(args: &[String]) -> i32 {
             }
             Err(code) => code,
         },
-        Some("-h" | "--help" | "help") => {
-            println!("{USAGE}");
-            print!("{KEYS_AND_RECIPIENTS}");
-            0
-        }
-        Some(other) => {
-            eprintln!("oslo secret: {other}: no such subcommand");
-            usage()
-        }
+        Some(other) => MENU.unknown(other),
     }
 }
 
@@ -202,7 +182,10 @@ fn store_argument(args: &[String]) -> Result<(Option<String>, Vec<String>), Stri
 fn with_name(args: &[String], then: impl FnOnce(&str) -> i32) -> i32 {
     match args.get(1) {
         Some(name) => then(name),
-        None => usage(),
+        None => match args.first() {
+            Some(command) => MENU.wrong(command, "needs the name of a secret"),
+            None => MENU.missing("needs a subcommand"),
+        },
     }
 }
 
@@ -283,9 +266,4 @@ fn stores() -> i32 {
 pub fn fail(message: &str) -> i32 {
     eprintln!("oslo secret: {message}");
     1
-}
-
-fn usage() -> i32 {
-    eprintln!("{USAGE}");
-    2
 }

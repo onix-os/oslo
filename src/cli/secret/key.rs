@@ -19,18 +19,14 @@
 use oslo::secrets::{self, KeySource, Store};
 
 use super::fail;
-
-const USAGE: &str = "usage: oslo secret key list|init|add|rm\n\
-                     \n\
-                     \x20 add profile          derive it from this profile's key (the default)\n\
-                     \x20 add file PATH        read the identity out of a file\n\
-                     \x20 add command ARG…     run a program; its output is the identity\n\
-                     \x20 rm  file PATH\n\
-                     \x20 rm  command ARG…\n\
-                     \x20 init                 generate the default key file\n\
-                     \x20 list";
+use super::help::KEY as MENU;
+use crate::cli::help::Paint;
 
 pub fn run(store: &Store, args: &[String]) -> i32 {
+    if let Some(page) = MENU.asked(args, Paint::detect()) {
+        print!("{page}");
+        return 0;
+    }
     match args.first().map(String::as_str) {
         Some("list" | "ls") | None => {
             show(store);
@@ -47,11 +43,7 @@ pub fn run(store: &Store, args: &[String]) -> i32 {
             Ok(source) => remove(store, &source),
             Err(e) => fail(&e),
         },
-        Some(other) => {
-            eprintln!("oslo secret key: {other}: no such subcommand");
-            eprintln!("{USAGE}");
-            2
-        }
+        Some(other) => MENU.unknown(other),
     }
 }
 

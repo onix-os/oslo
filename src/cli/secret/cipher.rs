@@ -14,15 +14,14 @@
 use oslo::secrets::{self, Crypto, Store, cipher, conf};
 
 use super::fail;
-
-const USAGE: &str = "usage: oslo secret [--store NAME] cipher encrypt|decrypt|list|rm -- CMD…\n\
-                     \n\
-                     \x20 encrypt -- CMD…   plaintext in, ciphertext out\n\
-                     \x20 decrypt -- CMD…   ciphertext in, plaintext out\n\
-                     \x20 list\n\
-                     \x20 rm                back to oslo's own age";
+use super::help::CIPHER as MENU;
+use crate::cli::help::Paint;
 
 pub fn run(store: &Store, args: &[String]) -> i32 {
+    if let Some(page) = MENU.asked(args, Paint::detect()) {
+        print!("{page}");
+        return 0;
+    }
     match args.first().map(String::as_str) {
         None | Some("list" | "ls") => {
             show(store);
@@ -30,11 +29,7 @@ pub fn run(store: &Store, args: &[String]) -> i32 {
         }
         Some(half @ ("encrypt" | "decrypt")) => set(store, half, &args[1..]),
         Some("rm" | "remove") => remove(store),
-        Some(other) => {
-            eprintln!("oslo secret cipher: {other}: no such subcommand");
-            eprintln!("{USAGE}");
-            2
-        }
+        Some(other) => MENU.unknown(other),
     }
 }
 
@@ -73,8 +68,7 @@ fn set(store: &Store, half: &str, args: &[String]) -> i32 {
         .filter(|arg| *arg != "--")
         .collect();
     if argv.is_empty() {
-        eprintln!("{USAGE}");
-        return 2;
+        return MENU.wrong(half, "needs the program to run, after a `--`");
     }
     let line = format!("{half} command {}", argv.join(" "));
     if let Err(e) = cipher::parse(half, &format!("command {}", argv.join(" "))) {

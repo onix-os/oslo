@@ -16,10 +16,14 @@
 use oslo::secrets::{Recipient, Store, conf};
 
 use super::fail;
-
-const USAGE: &str = "usage: oslo secret recipient [--export] | add [--from FILE] | rm RECIPIENT";
+use super::help::RECIPIENT as MENU;
+use crate::cli::help::Paint;
 
 pub fn run(store: &Store, args: &[String]) -> i32 {
+    if let Some(page) = MENU.asked(args, Paint::detect()) {
+        print!("{page}");
+        return 0;
+    }
     match args.first().map(String::as_str) {
         None | Some("list" | "ls") => {
             show(store);
@@ -52,11 +56,7 @@ pub fn run(store: &Store, args: &[String]) -> i32 {
             Ok(recipients) => remove(store, &recipients),
             Err(e) => fail(&e),
         },
-        Some(other) => {
-            eprintln!("oslo secret recipient: {other}: no such subcommand");
-            eprintln!("{USAGE}");
-            2
-        }
+        Some(other) => MENU.unknown(other),
     }
 }
 

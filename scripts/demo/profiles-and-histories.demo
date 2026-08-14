@@ -1,4 +1,10 @@
 # Profiles: one shell, several histories. $OSLO_PROFILE names the database file.
+#
+# **Off camera**: a config rebuilds `$PATH` at startup, so what the launcher exported is gone by the
+# first prompt — and `oslo profile …` is a *program*, which would otherwise be whichever oslo is
+# installed rather than the one being demonstrated. The stand-in for ssh inherits this too, so the
+# far end runs the same binary.
+setup export PATH=$OSLO_DIR:$PATH
 cols 120
 rows 20
 speed 0.055
@@ -31,3 +37,35 @@ wait 1.0
 # The prompt comes back with the line as it was; clear it so the shell is left empty.
 key C-u
 wait 0.4
+clear
+
+# **And the same profile on two machines.** Everything below is against two fixture homes under
+# /tmp, never this machine's own history — see `fixture.sh`. Stepping into the first one.
+run XDG_DATA_HOME=/tmp/oslo-demo-work/here XDG_STATE_HOME=/tmp/oslo-demo-work/here/state HOME=/tmp/oslo-demo-work/here oslo
+wait 1.2
+run oslo profile
+wait 2.0
+run oslo history list --limit 5
+wait 2.4
+clear
+
+# The far end. There is no second computer in a recording, so this stands in for ssh — it runs the
+# command against the other home instead of over a network. Everything else is real.
+run cat /tmp/oslo-demo-work/bin/pretend-ssh
+wait 3.0
+
+# Two-way, and it says what moved in each direction.
+run OSLO_SSH=/tmp/oslo-demo-work/bin/pretend-ssh oslo profile sync laptop
+wait 3.4
+clear
+
+# Both machines now hold both histories — and `cargo build --release`, run on each, is *two* events
+# rather than one overwriting the other, because every event carries the host that ran it.
+run oslo history list --limit 8
+wait 3.2
+
+# Running it again moves nothing, which is what makes it safe in a login file.
+run OSLO_SSH=/tmp/oslo-demo-work/bin/pretend-ssh oslo profile sync laptop
+wait 2.8
+run exit
+wait 1.0

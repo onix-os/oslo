@@ -1,19 +1,22 @@
-//! `oslo macros` help rendering.
+//! What `oslo macros --help` says.
 //!
-//! The same shape as `history`'s and `plugin`'s, to the letter: one `Sub` per subcommand, an
-//! overview built from `row`, per-subcommand help behind `--help`, and notes wrapped to the
-//! terminal. Three subcommand helps that read differently are three things to learn instead of one.
+//! The rows only; how they are drawn is [`crate::cli::help::menu`]'s, so this page and every other
+//! tool's are one page with different words in it.
 
-use crate::cli::help::{Paint, row};
-use std::fmt::Write as _;
+use crate::cli::help::Paint;
+use crate::cli::help::menu::{CALL, Menu, SUBCOMMANDS as HEADING, Sub};
 
-pub(super) struct Sub {
-    pub name: &'static str,
-    pub args: &'static str,
-    pub about: &'static str,
-    pub flags: &'static [(&'static str, &'static str)],
-    pub note: &'static str,
-}
+pub(crate) const MENU: Menu = Menu {
+    path: &["macros"],
+    call: CALL,
+    heading: HEADING,
+    subs: SUBCOMMANDS,
+    notes: &[
+        "Aliases and abbreviations reach a shell when it starts; a function or a script",
+        "is found when you call it, after $PATH has already failed.",
+    ],
+    nested: &[],
+};
 
 pub(super) const SUBCOMMANDS: &[Sub] = &[
     Sub {
@@ -177,92 +180,7 @@ pub(super) const SUBCOMMANDS: &[Sub] = &[
 
 /// The overview.
 pub fn text(paint: Paint) -> String {
-    let mut text = String::new();
-    let _ = writeln!(text, "{}", paint.head("USAGE"));
-    let _ = writeln!(
-        text,
-        "  {} {} {} {}",
-        paint.key("oslo"),
-        paint.key("macros"),
-        paint.slot("<subcommand>"),
-        paint.slot("[argument]...")
-    );
-    let _ = writeln!(text, "\n{}", paint.head("SUBCOMMANDS"));
-    for sub in SUBCOMMANDS {
-        text.push_str(&row(sub.name, paint.key(sub.name), sub.about));
-    }
-    let _ = writeln!(
-        text,
-        "\n  {}",
-        paint.dim("`oslo macros <subcommand> --help` for that subcommand's arguments.")
-    );
-    let _ = writeln!(
-        text,
-        "  {}",
-        paint.dim("Aliases and abbreviations reach a shell when it starts; a function or a script")
-    );
-    let _ = writeln!(
-        text,
-        "  {}",
-        paint.dim("is found when you call it, after $PATH has already failed.")
-    );
-    text
-}
-
-/// Help for one subcommand.
-pub fn subcommand(name: &str, paint: Paint) -> Option<String> {
-    let sub = SUBCOMMANDS.iter().find(|sub| sub.name == name)?;
-    let mut text = String::new();
-    let _ = writeln!(text, "{}", paint.head("USAGE"));
-    let _ = write!(
-        text,
-        "  {} {} {}",
-        paint.key("oslo"),
-        paint.key("macros"),
-        paint.key(sub.name)
-    );
-    if !sub.args.is_empty() {
-        let _ = write!(text, " {}", paint.slot(sub.args));
-    }
-    let _ = writeln!(text, "\n\n  {}", sub.about);
-
-    if !sub.flags.is_empty() {
-        let _ = writeln!(text, "\n{}", paint.head("ARGUMENTS"));
-        for (flag, about) in sub.flags {
-            text.push_str(&row(flag, paint.key(flag), about));
-        }
-    }
-    if !sub.note.is_empty() {
-        text.push('\n');
-        for line in wrapped(sub.note) {
-            let _ = writeln!(text, "  {}", paint.dim(&line));
-        }
-    }
-    Some(text)
-}
-
-/// Wraps a note to the terminal width.
-fn wrapped(note: &str) -> Vec<String> {
-    const INDENT: usize = 2;
-    let width = oslo::ui::dropdown::width::terminal_cols()
-        .saturating_sub(INDENT + 2)
-        .clamp(32, 96);
-    let mut lines = Vec::new();
-    let mut line = String::new();
-    for word in note.split_whitespace() {
-        let would_be = line.chars().count() + usize::from(!line.is_empty()) + word.chars().count();
-        if would_be > width && !line.is_empty() {
-            lines.push(std::mem::take(&mut line));
-        }
-        if !line.is_empty() {
-            line.push(' ');
-        }
-        line.push_str(word);
-    }
-    if !line.is_empty() {
-        lines.push(line);
-    }
-    lines
+    MENU.overview(paint)
 }
 
 #[cfg(test)]
@@ -273,7 +191,7 @@ mod tests {
     fn every_subcommand_has_help_and_a_reason() {
         for sub in SUBCOMMANDS {
             assert!(
-                subcommand(sub.name, Paint::plain()).is_some(),
+                MENU.subcommand(sub.name, Paint::plain()).is_some(),
                 "{} has no help",
                 sub.name
             );
@@ -284,13 +202,13 @@ mod tests {
 
     #[test]
     fn a_name_nobody_listed_has_no_help() {
-        assert!(subcommand("nonsense", Paint::plain()).is_none());
+        assert!(MENU.subcommand("nonsense", Paint::plain()).is_none());
     }
 
     /// The overview names every subcommand, or one is reachable and undocumented.
     #[test]
     fn the_overview_lists_them_all() {
-        let overview = text(Paint::plain());
+        let overview = MENU.overview(Paint::plain());
         for sub in SUBCOMMANDS {
             assert!(overview.contains(sub.name), "{} is missing", sub.name);
         }
