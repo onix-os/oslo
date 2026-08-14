@@ -26,6 +26,13 @@ use std::path::PathBuf;
 /// Where one key comes from.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum KeySource {
+    /// The profile's own key, with this store's key derived from it.
+    ///
+    /// **The default, and the reason a fresh install needs to be told nothing.** A profile already
+    /// has a key — it is what lets two machines agree they share a history — so a store derives its
+    /// own from that rather than inventing a second secret to keep track of. Carrying the profile
+    /// to another machine therefore carries the secrets with it, which is the same one step.
+    Profile,
     File(PathBuf),
     Command(Vec<String>),
 }
@@ -35,19 +42,23 @@ impl KeySource {
     pub fn parse(rest: &str) -> Result<Self, String> {
         let (kind, rest) = super::conf::split_word(rest);
         match kind {
+            "profile" => Ok(KeySource::Profile),
             "file" if !rest.is_empty() => Ok(KeySource::File(PathBuf::from(rest))),
             "command" if !rest.is_empty() => {
                 let argv: Vec<String> = rest.split_whitespace().map(str::to_string).collect();
                 Ok(KeySource::Command(argv))
             }
             "file" | "command" => Err(format!("`key {kind}` needs something after it")),
-            other => Err(format!("a key is `file` or `command`, not {other:?}")),
+            other => Err(format!(
+                "a key is `profile`, `file` or `command`, not {other:?}"
+            )),
         }
     }
 
     /// How it is written in the file.
     pub fn line(&self) -> String {
         match self {
+            KeySource::Profile => "key profile".to_string(),
             KeySource::File(path) => format!("key file {}", path.display()),
             KeySource::Command(argv) => format!("key command {}", argv.join(" ")),
         }
@@ -65,6 +76,7 @@ impl KeySource {
     #[cfg(feature = "crypt")]
     pub fn key(&self) -> Result<Option<[u8; 32]>, String> {
         match self {
+            KeySource::Profile => Ok(None),
             KeySource::File(path) => match std::fs::read_to_string(path) {
                 Ok(text) => super::native::read_secret(&text)
                     .map(Some)

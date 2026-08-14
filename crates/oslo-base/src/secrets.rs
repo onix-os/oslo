@@ -97,7 +97,17 @@ impl Store {
         let section = declared.section(name);
         let mut keys = section.map(|s| s.keys.clone()).unwrap_or_default();
         if keys.is_empty() {
-            keys.push(KeySource::File(identity_path().ok_or(NOWHERE_FOR_A_KEY)?));
+            // **The profile, not a file of its own.** A store that says nothing takes its key from
+            // the profile it belongs to, so one exported profile carries the history *and* the
+            // secrets, and a machine has one secret on it rather than two.
+            //
+            // `$OSLO_SECRET_IDENTITY` still wins, because it is somebody saying *this file* — a
+            // USB stick, an encrypted volume — and a variable that quietly stopped meaning anything
+            // would be worse than one that never existed.
+            keys.push(match named_identity() {
+                Some(path) => KeySource::File(path),
+                None => KeySource::Profile,
+            });
         }
         let recipients = match section {
             Some(section) => section
@@ -331,6 +341,14 @@ impl Store {
     pub fn keys_of(&self, external: bool) -> Result<Vec<[u8; 32]>, String> {
         let mut found = Vec::new();
         for source in self.keys.iter().filter(|s| s.is_external() == external) {
+            // Only the store knows its own name, and the name is the salt — so this one is resolved
+            // here rather than by the key source.
+            if matches!(source, KeySource::Profile) {
+                if let Some(profile) = self.profile_key()? {
+                    found.push(native::derive_store_key(&profile, &self.name)?);
+                }
+                continue;
+            }
             match source.key() {
                 Ok(Some(key)) => found.push(key),
                 Ok(None) => {}
@@ -347,7 +365,7 @@ impl Store {
     pub fn key_file(&self) -> Option<PathBuf> {
         self.keys.iter().find_map(|source| match source {
             KeySource::File(path) => Some(path.clone()),
-            KeySource::Command(_) => None,
+            KeySource::Profile | KeySource::Command(_) => None,
         })
     }
 
@@ -364,6 +382,15 @@ impl Store {
         Ok(vec![native::public_of(&self.key_to_write_with()?)])
     }
 
+    /// This profile's key, if it has one.
+    ///
+    /// A plugin's store belongs to the same profile as everything else: the prefix names which
+    /// plugin, not which identity.
+    #[cfg(feature = "crypt")]
+    fn profile_key(&self) -> Result<Option<[u8; 32]>, String> {
+        crate::track::profile::key::read(&crate::track::profile::current())
+    }
+
     /// The key this store writes with, made now if this is the first time.
     ///
     /// The first that answers, file keys before program ones — so a store with a spare key on a USB
@@ -374,6 +401,20 @@ impl Store {
             if let Some(key) = self.keys_of(external)?.first() {
                 return Ok(*key);
             }
+        }
+        // Nothing answered, so this is the first write. A store that takes its key from the
+        // profile makes the *profile's* key rather than one of its own — which is what `oslo secret
+        // set` does on a machine that has never been told anything, and is the same key
+        // `oslo profile export` then carries.
+        if self
+            .keys
+            .iter()
+            .any(|source| matches!(source, KeySource::Profile))
+        {
+            let profile = crate::track::profile::current();
+            let made = crate::track::profile::key::generate(&profile)
+                .map_err(|e| format!("{}: {e}", self.name))?;
+            return native::derive_store_key(&made, &self.name);
         }
         match self.key_file() {
             Some(path) => key::generate(&path),
@@ -416,9 +457,6 @@ fn no_native(store: &str) -> String {
     )
 }
 
-const NOWHERE_FOR_A_KEY: &str =
-    "no $XDG_STATE_HOME and no $HOME, so there is nowhere to keep a key";
-
 /// `$XDG_DATA_HOME/oslo`, or `~/.local/share/oslo`.
 fn data_directory() -> Option<PathBuf> {
     base("XDG_DATA_HOME", ".local/share").map(|base| base.join("oslo"))
@@ -456,6 +494,13 @@ fn default_directory(name: &str) -> Result<PathBuf, String> {
 /// `$XDG_DATA_HOME/oslo/secrets`, or `~/.local/share/oslo/secrets`.
 pub fn directory() -> Option<PathBuf> {
     default_directory(USER).ok()
+}
+
+/// The key file `$OSLO_SECRET_IDENTITY` names, when it names one.
+fn named_identity() -> Option<PathBuf> {
+    std::env::var_os("OSLO_SECRET_IDENTITY")
+        .filter(|named| !named.is_empty())
+        .map(PathBuf::from)
 }
 
 /// Where the private key is: `$OSLO_SECRET_IDENTITY`, else `$XDG_STATE_HOME/oslo/identity`, else

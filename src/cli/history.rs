@@ -1,4 +1,4 @@
-mod help;
+pub mod help;
 
 use crate::cli::help::Paint;
 use oslo::track::{
@@ -12,35 +12,43 @@ use std::os::unix::fs::OpenOptionsExt;
 use std::path::PathBuf;
 use std::str::FromStr;
 
+/// The one complaint that is about the *choice* of subcommand rather than about its arguments, so
+/// that it can be said in the words every other tool says it in.
+const NO_SUCH: &str = "no such subcommand";
+
 pub fn run(args: &[String]) -> i32 {
     match execute(args) {
         Ok(()) => 0,
-        Err(error) => {
-            eprintln!("oslo history: {error}");
-            if error.starts_with("usage:") { 2 } else { 1 }
-        }
+        // **A mistake about the words gets the page for the subcommand it was made in**, then the
+        // complaint — which is the shape every other tool's mistakes have. Anything else is a
+        // failure at the work rather than at the asking, and a help page would be noise on top of
+        // it.
+        Err(error) => match error.strip_prefix("usage:") {
+            Some(complaint) => match (args.first(), complaint.trim()) {
+                (Some(word), NO_SUCH) => help::MENU.unknown(word),
+                (Some(command), complaint) => help::MENU.wrong(command, complaint),
+                (None, complaint) => help::MENU.missing(complaint),
+            },
+            None => {
+                eprintln!("oslo history: {error}");
+                1
+            }
+        },
     }
 }
 
 fn execute(args: &[String]) -> Result<(), String> {
+    // Asked and answered before any subcommand parses its own words, so that `--help` cannot be
+    // eaten by an argument parser that saw an option it did not know.
+    if let Some(page) = help::MENU.asked(args, Paint::detect()) {
+        print!("{page}");
+        return Ok(());
+    }
     let Some(command) = args.first().map(String::as_str) else {
         print_help();
         return Ok(());
     };
-    if matches!(command, "-h" | "--help" | "help") {
-        print_help();
-        return Ok(());
-    }
     let rest = &args[1..];
-    // Handle help before subcommand argument parsing.
-    if rest
-        .first()
-        .is_some_and(|a| matches!(a.as_str(), "-h" | "--help"))
-        && let Some(help) = help::subcommand(command, Paint::detect())
-    {
-        print!("{help}");
-        return Ok(());
-    }
     match command {
         "path" => path_command(rest),
         "status" => status_command(rest),
@@ -56,10 +64,7 @@ fn execute(args: &[String]) -> Result<(), String> {
         "export" => export_command(rest),
         "import" => import_command(rest),
         "backup" => backup_command(rest),
-        _ => Err(format!(
-            "usage: unknown subcommand {command:?}\n\n{}",
-            help::text(Paint::plain())
-        )),
+        _ => Err(format!("usage: {NO_SUCH}")),
     }
 }
 
@@ -198,7 +203,7 @@ fn parse_query(args: &[String], require_query: bool) -> Result<QueryOptions, Str
         at += 1;
     }
     if require_query && options.filter.query.is_none() {
-        return Err("usage: oslo history search QUERY [options]".to_string());
+        return Err("usage: needs something to search for".to_string());
     }
     if options.json && options.null {
         return Err("usage: --json and --null cannot be combined".to_string());
@@ -289,11 +294,10 @@ fn show_command(args: &[String]) -> Result<(), String> {
                 return Err(format!("usage: unknown show option {flag:?}"));
             }
             id if id_text.is_none() => id_text = Some(id),
-            _ => return Err("usage: oslo history show EVENT_ID [--json]".to_string()),
+            _ => return Err("usage: shows one event, so it takes one ID".to_string()),
         }
     }
-    let id_text =
-        id_text.ok_or_else(|| "usage: oslo history show EVENT_ID [--json]".to_string())?;
+    let id_text = id_text.ok_or_else(|| "usage: needs the event ID to show".to_string())?;
     let id = EventId::from_str(id_text).map_err(|error| format!("usage: {error}"))?;
     let event = open_current(true)?
         .event(id)
@@ -338,7 +342,7 @@ fn optional_path_and_json(args: &[String], command: &str) -> Result<(PathBuf, bo
         if argument == "--json" {
             json_output = true;
         } else if argument.starts_with('-') || path.is_some() {
-            return Err(format!("usage: oslo history {command} [FILE] [--json]"));
+            return Err(format!("usage: {command} takes one file at most"));
         } else {
             path = Some(PathBuf::from(argument));
         }
@@ -419,7 +423,7 @@ fn expect_empty(args: &[String], command: &str) -> Result<(), String> {
     if args.is_empty() {
         Ok(())
     } else {
-        Err(format!("usage: oslo history {command}"))
+        Err(format!("usage: {command} takes no arguments"))
     }
 }
 

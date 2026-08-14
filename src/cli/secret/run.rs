@@ -13,15 +13,16 @@
 use oslo::secrets::Store;
 
 use super::fail;
+use super::help::MENU;
 
 pub fn run(store: &Store, args: &[String]) -> i32 {
     let Some(at) = args.iter().position(|arg| arg == "--") else {
-        return fail("usage: oslo secret run VAR=NAME … -- CMD…");
+        return MENU.wrong("run", "needs a `--` before the command to run");
     };
     let (wanted, command) = args.split_at(at);
     let command = &command[1..];
     if wanted.is_empty() || command.is_empty() {
-        return fail("usage: oslo secret run VAR=NAME … -- CMD…");
+        return MENU.wrong("run", "needs both a VAR=NAME and a command");
     }
 
     let mut environment = Vec::with_capacity(wanted.len());

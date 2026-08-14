@@ -12,10 +12,13 @@ fn help_is_not_an_error() {
     }
 }
 
-/// Bare `oslo macros` prints the overview and is a usage error, like `history` and `plugin`.
+/// Bare `oslo macros` prints the overview, and printing the overview is not a failure.
+///
+/// **The same in every tool.** `history` exited 0 here and `macros`, `plugin` and `config` exited
+/// 2, which is one rule per command for the most ordinary thing a person can type.
 #[test]
-fn saying_nothing_is_a_usage_error() {
-    assert_eq!(run(&[]), 2);
+fn saying_nothing_is_the_help_page() {
+    assert_eq!(run(&[]), 0);
 }
 
 fn words(args: &[&str]) -> Vec<String> {

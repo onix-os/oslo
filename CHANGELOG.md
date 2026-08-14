@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.4.0] - 2026-08-14
+
+### <!-- 0 -->⛰️  Features
+
+- The profile key is the store key too
+- A key per profile, and two-way sync over ssh
+
+### <!-- 1 -->🐛 Bug Fixes
+
+- The nested-shell ask was eating the profile act
+
+### <!-- 2 -->🚜 Refactor
+
+- One help renderer for every submenu
+
+### <!-- 3 -->📚 Documentation
+
+- The key, the sync, and what secrets derive
+
+### <!-- 6 -->🧪 Testing
+
+- Pin the refused attributes and the key collision
+
 ## [0.3.10] - 2026-08-14
 
 ## [0.3.9] - 2026-08-14

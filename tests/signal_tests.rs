@@ -267,22 +267,46 @@ mod interrupt {
             }
         });
 
-        sleep(Duration::from_millis(700));
+        // **Waiting for evidence, not for a duration.** Fixed sleeps passed alone and failed under
+        // the full suite, where twenty test binaries share the machine and a shell takes longer to
+        // reach its first prompt than any number picked in advance.
+        let text = || String::from_utf8_lossy(&seen.lock().expect("transcript")).into_owned();
+        let until = |what: &dyn Fn(&str) -> bool, why: &str| {
+            let deadline = Instant::now() + Duration::from_secs(15);
+            while Instant::now() < deadline {
+                if what(&text()) {
+                    return;
+                }
+                sleep(Duration::from_millis(25));
+            }
+            panic!("timed out waiting for {why}:\n{}", text());
+        };
+
+        until(&|seen| !seen.trim().is_empty(), "the first prompt");
         input.write_all(line.as_bytes()).expect("write");
         input.write_all(b"\n").expect("write");
-        sleep(Duration::from_millis(900));
+
+        // The editor repaints the row as it is typed, so the tail of the line appearing means the
+        // shell read it. A short grace after that puts the Ctrl-C inside the loop rather than
+        // before it, which is the case that was broken.
+        let tail = line[line.len().saturating_sub(12)..].to_string();
+        until(&|seen| seen.contains(&tail), "the line to be read");
+        sleep(Duration::from_millis(400));
         input.write_all(b"\x03").expect("write");
-        sleep(Duration::from_millis(900));
+
+        sleep(Duration::from_millis(300));
         // If the shell is stuck in the loop this is never read, and the marker never comes back.
         input.write_all(b"echo RECOVERED\n").expect("write");
-        sleep(Duration::from_millis(900));
+        let recovered = Instant::now() + Duration::from_secs(15);
+        while Instant::now() < recovered && !printed(&text(), "RECOVERED") {
+            sleep(Duration::from_millis(25));
+        }
 
         let _ = child.kill();
         let _ = child.wait();
         drop(input);
 
-        let transcript = seen.lock().expect("transcript").clone();
-        String::from_utf8_lossy(&transcript).into_owned()
+        text()
     }
 
     /// Did `word` appear as a *command's output* rather than as part of the line being typed?

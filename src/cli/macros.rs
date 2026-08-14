@@ -11,24 +11,15 @@ use crate::cli::help::Paint;
 use oslo::macros::{self, Entry, Kind};
 
 pub fn run(args: &[String]) -> i32 {
+    if let Some(page) = help::MENU.asked(args, Paint::detect()) {
+        print!("{page}");
+        return 0;
+    }
     let Some(command) = args.first().map(String::as_str) else {
         print!("{}", help::text(Paint::detect()));
-        return 2;
+        return 0;
     };
-    if matches!(command, "-h" | "--help" | "help") {
-        print!("{}", help::text(Paint::detect()));
-        return 0;
-    }
     let rest = &args[1..];
-    // Handled before the subcommand parses its own arguments, the way `history` and `plugin` do it.
-    if rest
-        .first()
-        .is_some_and(|a| matches!(a.as_str(), "-h" | "--help"))
-        && let Some(text) = help::subcommand(command, Paint::detect())
-    {
-        print!("{text}");
-        return 0;
-    }
     match command {
         "add" => add(rest),
         "remove" | "rm" => remove(rest),
@@ -40,14 +31,13 @@ pub fn run(args: &[String]) -> i32 {
         "on" => switch(rest, true),
         "export" => list::export(rest),
         "import" => list::import(rest),
-        other => usage(&format!("unknown subcommand {other:?}")),
+        other => help::MENU.unknown(other),
     }
 }
 
+/// Something was wrong with the words, said the way every tool says it.
 fn usage(message: &str) -> i32 {
-    eprintln!("oslo macros: {message}\n");
-    eprint!("{}", help::text(Paint::plain()));
-    2
+    help::MENU.missing(message)
 }
 
 fn fail(message: &str) -> i32 {

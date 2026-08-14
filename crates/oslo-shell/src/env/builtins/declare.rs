@@ -13,8 +13,8 @@
 //!
 //! Attributes oslo cannot represent are **refused**, not ignored. `declare -i n` in bash makes
 //! every later assignment to `n` an arithmetic evaluation, and `declare -A` makes an
-//! *associative* array, which PLAN.md defers deliberately: a second value shape nothing else in
-//! the shell understands would buy far less than indexed arrays do. Accepting either and quietly
+//! *associative* array — a second value shape that the expander, `for`, `local`, `export` and the
+//! tracker would all have to learn, for far less than indexed arrays buy. Accepting either and quietly
 //! producing a plain scalar is the "plausible wrong answer with status 0" failure mode this shell
 //! is being audited for, so they exit 2 with a diagnostic instead.
 //!
@@ -62,9 +62,10 @@ pub fn builtin_declare(env: &mut Environment, args: &[String]) -> Result<i32> {
                 // what the author wrote. Both therefore report the name only, as `-F` does.
                 (false, 'f' | 'F') => attrs.functions = true,
                 (false, 'a') => attrs.indexed = true,
-                // The one attribute that is deferred rather than merely missing: PLAN.md's "Not
-                // doing" table keeps associative arrays out of this round on purpose, so say that
-                // rather than declaring an *indexed* array and letting `m[key]=v` write element 0.
+                // The one attribute that is deferred rather than merely missing. Saying so beats
+                // declaring an *indexed* array: the subscript is arithmetic, so every key would
+                // land on element 0 and the last write would win — see the collision pinned in
+                // `tests/corpus/array_element_assignment.sh`.
                 (false, 'A') => {
                     eprintln!("oslo: {}: -A: associative arrays are not supported", name);
                     return Ok(2);
@@ -326,8 +327,8 @@ mod tests {
     }
 
     /// An attribute with no representation in this shell is refused, not silently downgraded to
-    /// a plain scalar. `-A` is the deliberate one: PLAN.md defers associative arrays, so it must
-    /// say so rather than build an indexed array that would answer `${m[key]}` with element 0.
+    /// a plain scalar. `-A` is the deliberate one: it must say so rather than build an indexed
+    /// array that would answer `${m[key]}` with element 0.
     #[test]
     fn an_unrepresentable_attribute_is_refused() {
         let mut env = Environment::new();

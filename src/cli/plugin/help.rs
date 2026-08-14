@@ -1,24 +1,19 @@
-//! Plugin command help rendering.
+//! What `oslo plugin --help` says.
 //!
-//! The same shape as `history`'s, deliberately and to the letter: one `Sub` per subcommand, an
-//! overview built from `row`, per-subcommand help behind `--help`, and notes wrapped to the
-//! terminal. Two subcommand helps that read differently are two things to learn instead of one.
+//! The rows only; how they are drawn is [`crate::cli::help::menu`]'s, so this page and every other
+//! tool's are one page with different words in it.
 
-use crate::cli::help::{Paint, row};
-use std::fmt::Write as _;
+use crate::cli::help::Paint;
+use crate::cli::help::menu::{CALL, Menu, SUBCOMMANDS as HEADING, Sub};
 
-/// A plugin subcommand help entry.
-pub(super) struct Sub {
-    pub name: &'static str,
-    /// Argument syntax.
-    pub args: &'static str,
-    /// Overview description.
-    pub about: &'static str,
-    /// Supported flags.
-    pub flags: &'static [(&'static str, &'static str)],
-    /// Additional usage note.
-    pub note: &'static str,
-}
+pub(crate) const MENU: Menu = Menu {
+    path: &["plugin"],
+    call: CALL,
+    heading: HEADING,
+    subs: SUBCOMMANDS,
+    notes: &["A plugin's commands run in the interactive shell, never in a script."],
+    nested: &[],
+};
 
 pub(super) const SUBCOMMANDS: &[Sub] = &[
     Sub {
@@ -81,89 +76,9 @@ pub(super) const SUBCOMMANDS: &[Sub] = &[
     },
 ];
 
-/// Renders the plugin subcommand overview.
+/// The overview.
 pub fn text(paint: Paint) -> String {
-    let mut text = String::new();
-    let _ = writeln!(text, "{}", paint.head("USAGE"));
-    let _ = writeln!(
-        text,
-        "  {} {} {} {}",
-        paint.key("oslo"),
-        paint.key("plugin"),
-        paint.slot("<subcommand>"),
-        paint.slot("[argument]...")
-    );
-    let _ = writeln!(text, "\n{}", paint.head("SUBCOMMANDS"));
-    for sub in SUBCOMMANDS {
-        text.push_str(&row(sub.name, paint.key(sub.name), sub.about));
-    }
-    let _ = writeln!(
-        text,
-        "\n  {}",
-        paint.dim("`oslo plugin <subcommand> --help` for that subcommand's arguments.")
-    );
-    let _ = writeln!(
-        text,
-        "  {}",
-        paint.dim("A plugin's commands run in the interactive shell, never in a script.")
-    );
-    text
-}
-
-/// Renders help for one plugin subcommand.
-pub fn subcommand(name: &str, paint: Paint) -> Option<String> {
-    let sub = SUBCOMMANDS.iter().find(|sub| sub.name == name)?;
-    let mut text = String::new();
-    let _ = writeln!(text, "{}", paint.head("USAGE"));
-    let _ = write!(
-        text,
-        "  {} {} {}",
-        paint.key("oslo"),
-        paint.key("plugin"),
-        paint.key(sub.name)
-    );
-    if !sub.args.is_empty() {
-        let _ = write!(text, " {}", paint.slot(sub.args));
-    }
-    let _ = writeln!(text, "\n\n  {}", sub.about);
-
-    if !sub.flags.is_empty() {
-        let _ = writeln!(text, "\n{}", paint.head("ARGUMENTS"));
-        for (flag, about) in sub.flags {
-            text.push_str(&row(flag, paint.key(flag), about));
-        }
-    }
-    if !sub.note.is_empty() {
-        text.push('\n');
-        for line in wrapped(sub.note) {
-            let _ = writeln!(text, "  {}", paint.dim(&line));
-        }
-    }
-    Some(text)
-}
-
-/// Wraps a note to the terminal width.
-fn wrapped(note: &str) -> Vec<String> {
-    const INDENT: usize = 2;
-    let width = oslo::ui::dropdown::width::terminal_cols()
-        .saturating_sub(INDENT + 2)
-        .clamp(32, 96);
-    let mut lines = Vec::new();
-    let mut line = String::new();
-    for word in note.split_whitespace() {
-        let would_be = line.chars().count() + usize::from(!line.is_empty()) + word.chars().count();
-        if would_be > width && !line.is_empty() {
-            lines.push(std::mem::take(&mut line));
-        }
-        if !line.is_empty() {
-            line.push(' ');
-        }
-        line.push_str(word);
-    }
-    if !line.is_empty() {
-        lines.push(line);
-    }
-    lines
+    MENU.overview(paint)
 }
 
 #[cfg(test)]

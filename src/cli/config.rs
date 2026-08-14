@@ -13,31 +13,63 @@
 //! one that reproduces the load.
 
 use crate::cli::help::Paint;
+use crate::cli::help::menu::{CALL, Menu, SUBCOMMANDS as HEADING, Sub};
 use oslo_lua::Value;
 use std::path::PathBuf;
 
+pub(crate) const MENU: Menu = Menu {
+    path: &["config"],
+    call: CALL,
+    heading: HEADING,
+    subs: SUBCOMMANDS,
+    notes: &["oslo config which vi.enabled"],
+    nested: &[],
+};
+
+const SUBCOMMANDS: &[Sub] = &[
+    Sub {
+        name: "files",
+        args: "",
+        about: "every file a session reads, in order",
+        flags: &[],
+        note: "Read in that order, and the last to set something wins — which is the whole of why \
+               a keybinding you set stops working when a plugin arrives.",
+    },
+    Sub {
+        name: "timing",
+        args: "",
+        about: "what each configuration file costs at startup",
+        flags: &[],
+        note: "The files are loaded to measure them, in this process rather than in your session.",
+    },
+    Sub {
+        name: "which",
+        args: "SETTING",
+        about: "which file last set a setting, and to what",
+        flags: &[],
+        note: "Written as it is in `config.lua`, dots and all: `oslo config which vi.enabled`. The \
+               load is reproduced here rather than asked of the running shell, so the answer is \
+               what a *new* session would see.",
+    },
+];
+
 pub fn run(args: &[String]) -> i32 {
+    if let Some(page) = MENU.asked(args, Paint::detect()) {
+        print!("{page}");
+        return 0;
+    }
     match args.first().map(String::as_str) {
-        None | Some("-h") | Some("--help") | Some("help") => {
-            print!("{}", help(Paint::detect()));
-            i32::from(args.is_empty()) * 2
+        None => {
+            print!("{}", MENU.overview(Paint::detect()));
+            0
         }
         Some("files") => files(),
         Some("timing") => timing(),
         Some("which") => match args.get(1) {
             Some(key) => which(key),
-            None => {
-                eprintln!(
-                    "oslo config: which needs a setting, as in `oslo config which vi.enabled`"
-                );
-                2
-            }
+            None => MENU.missing("which needs a setting, as in `oslo config which vi.enabled`"),
         },
-        Some(other) => {
-            eprintln!("oslo config: unknown subcommand {other:?}\n");
-            eprint!("{}", help(Paint::plain()));
-            2
-        }
+        Some(other) => MENU.unknown(other),
     }
 }
 
@@ -214,39 +246,6 @@ fn read(_engine: &oslo_runtime::LuaEngine, key: &str) -> Option<String> {
 fn config_files() -> Vec<PathBuf> {
     let env = oslo::env::Environment::new();
     oslo_runtime::startup::lua_init::config_files(&env)
-}
-
-pub fn help(paint: Paint) -> String {
-    use crate::cli::help::row;
-    use std::fmt::Write as _;
-    let mut text = String::new();
-    let _ = writeln!(text, "{}", paint.head("USAGE"));
-    let _ = writeln!(
-        text,
-        "  {} {} {} {}",
-        paint.key("oslo"),
-        paint.key("config"),
-        paint.slot("<subcommand>"),
-        paint.slot("[argument]...")
-    );
-    let _ = writeln!(text, "\n{}", paint.head("SUBCOMMANDS"));
-    text.push_str(&row(
-        "files",
-        paint.key("files"),
-        "every file a session reads, in order",
-    ));
-    text.push_str(&row(
-        "timing",
-        paint.key("timing"),
-        "what each configuration file costs at startup",
-    ));
-    text.push_str(&row(
-        "which",
-        paint.key("which"),
-        "which file last set a setting, and to what",
-    ));
-    let _ = writeln!(text, "\n  {}", paint.dim("oslo config which vi.enabled"));
-    text
 }
 
 #[cfg(test)]
