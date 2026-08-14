@@ -12,24 +12,15 @@ use oslo_runtime::plugin::{doctor, index, install, manifest, trust};
 use std::path::{Path, PathBuf};
 
 pub fn run(args: &[String]) -> i32 {
+    if let Some(page) = help::MENU.asked(args, Paint::detect()) {
+        print!("{page}");
+        return 0;
+    }
     let Some(command) = args.first().map(String::as_str) else {
         print!("{}", help::text(Paint::detect()));
-        return 2;
+        return 0;
     };
-    if matches!(command, "-h" | "--help" | "help") {
-        print!("{}", help::text(Paint::detect()));
-        return 0;
-    }
-    // Handled before the subcommand parses its own arguments, the way `history` does it.
     let rest = &args[1..];
-    if rest
-        .first()
-        .is_some_and(|a| matches!(a.as_str(), "-h" | "--help"))
-        && let Some(help) = help::subcommand(command, Paint::detect())
-    {
-        print!("{help}");
-        return 0;
-    }
     match command {
         "list" => list(),
         "doctor" => doctor_command(rest.first().map(String::as_str)),
@@ -37,24 +28,18 @@ pub fn run(args: &[String]) -> i32 {
         "test" => test::run(rest.first().map(String::as_str)),
         "install" => match rest.first() {
             Some(source) => install_one(source, rest.iter().any(|a| a == "--yes")),
-            None => usage("install needs something to install"),
+            None => help::MENU.wrong("install", "needs something to install"),
         },
         "remove" => match rest.first() {
             Some(name) => remove_one(name),
-            None => usage("remove needs a plugin name"),
+            None => help::MENU.wrong("remove", "needs a plugin name"),
         },
         "allow" => match rest.first() {
             Some(name) => allow_one(name),
-            None => usage("allow needs a plugin name"),
+            None => help::MENU.wrong("allow", "needs a plugin name"),
         },
-        other => usage(&format!("unknown subcommand {other:?}")),
+        other => help::MENU.unknown(other),
     }
-}
-
-fn usage(message: &str) -> i32 {
-    eprintln!("oslo plugin: {message}\n");
-    eprint!("{}", help::text(Paint::plain()));
-    2
 }
 
 /// What is installed, and whether it still hashes to what was allowed.
@@ -154,7 +139,7 @@ fn with_lua<T>(work: impl FnOnce() -> T) -> T {
 fn install_one(source: &str, assume_yes: bool) -> i32 {
     let source = match install::Source::parse(source) {
         Ok(source) => source,
-        Err(problem) => return usage(&problem),
+        Err(problem) => return help::MENU.wrong("install", &problem),
     };
     let Some(root) = oslo_runtime::plugin::directory() else {
         eprintln!("oslo plugin: no $XDG_DATA_HOME and no $HOME, so there is nowhere to install to");

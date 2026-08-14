@@ -124,9 +124,7 @@ pub(super) fn sync_command(args: &[String]) -> Result<(), String> {
         [other] => (current_path()?, other.clone()),
         [left, right] => (left.clone(), right.clone()),
         _ => {
-            return Err(
-                "usage: oslo history sync OTHER|FILE1 FILE2 [--dry-run] [--json]".to_string(),
-            );
+            return Err("usage: takes one file, or two".to_string());
         }
     };
     let report = sync_files(&left, &right, dry_run)?;
@@ -175,7 +173,7 @@ pub(super) fn delete_command(args: &[String]) -> Result<(), String> {
         }
     }
     if ids.is_empty() {
-        return Err("usage: oslo history delete EVENT_ID... [--yes]".to_string());
+        return Err("usage: needs at least one event ID to delete".to_string());
     }
     if !yes && !confirm(&format!("delete {} history event(s)?", ids.len()))? {
         return Ok(());
@@ -186,7 +184,7 @@ pub(super) fn delete_command(args: &[String]) -> Result<(), String> {
 
 pub(super) fn clear_command(args: &[String]) -> Result<(), String> {
     if args != ["--yes"] {
-        return Err("usage: oslo history clear --yes".to_string());
+        return Err("usage: takes --yes and nothing else; there is no prompt to skip".to_string());
     }
     println!("deleted\t{}", open_current(false)?.clear_events()?);
     // The predictor's snapshot is a distillation of exactly what was just deleted. A shell that
@@ -207,7 +205,7 @@ pub(super) fn prune_command(args: &[String]) -> Result<(), String> {
     let dry_run = args.iter().any(|arg| arg == "--dry-run");
     let yes = args.iter().any(|arg| arg == "--yes");
     if args.iter().any(|arg| arg != "--dry-run" && arg != "--yes") {
-        return Err("usage: oslo history prune [--dry-run] [--yes]".to_string());
+        return Err("usage: takes only --dry-run and --yes".to_string());
     }
     if dry_run {
         let preview = open_current(true)?.sweep_preview();

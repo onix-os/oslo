@@ -1,22 +1,21 @@
-//! History command help rendering.
+//! What `oslo history --help` says.
+//!
+//! The rows only; every decision about how they are drawn is [`crate::cli::help::menu`]'s, which is
+//! what makes this page and `oslo secret --help` the same page with different words in it.
 
-use crate::cli::help::{Paint, row};
-use std::fmt::Write as _;
-
-/// A history subcommand help entry.
-struct Sub {
-    name: &'static str,
-    /// Argument syntax.
-    args: &'static str,
-    /// Overview description.
-    about: &'static str,
-    /// Supported flags.
-    flags: &'static [(&'static str, &'static str)],
-    /// Additional usage note.
-    note: &'static str,
-}
+use crate::cli::help::Paint;
+use crate::cli::help::menu::{CALL, Menu, SUBCOMMANDS as HEADING, Sub};
 
 const JSON: (&str, &str) = ("--json", "answer as JSON, valid even when empty");
+
+pub(crate) const MENU: Menu = Menu {
+    path: &["history"],
+    call: CALL,
+    heading: HEADING,
+    subs: SUBCOMMANDS,
+    notes: &[],
+    nested: &[],
+};
 
 const SUBCOMMANDS: &[Sub] = &[
     Sub {
@@ -159,84 +158,9 @@ const SUBCOMMANDS: &[Sub] = &[
     },
 ];
 
-/// Renders the history subcommand overview.
+/// The overview.
 pub fn text(paint: Paint) -> String {
-    let mut text = String::new();
-    let _ = writeln!(text, "{}", paint.head("USAGE"));
-    let _ = writeln!(
-        text,
-        "  {} {} {} {}",
-        paint.key("oslo"),
-        paint.key("history"),
-        paint.slot("<subcommand>"),
-        paint.slot("[argument]...")
-    );
-    let _ = writeln!(text, "\n{}", paint.head("SUBCOMMANDS"));
-    for sub in SUBCOMMANDS {
-        text.push_str(&row(sub.name, paint.key(sub.name), sub.about));
-    }
-    let _ = writeln!(
-        text,
-        "\n  {}",
-        paint.dim("`oslo history <subcommand> --help` for that subcommand's arguments.")
-    );
-    text
-}
-
-/// Renders help for one history subcommand.
-pub fn subcommand(name: &str, paint: Paint) -> Option<String> {
-    let sub = SUBCOMMANDS.iter().find(|sub| sub.name == name)?;
-    let mut text = String::new();
-    let _ = writeln!(text, "{}", paint.head("USAGE"));
-    let _ = write!(
-        text,
-        "  {} {} {}",
-        paint.key("oslo"),
-        paint.key("history"),
-        paint.key(sub.name)
-    );
-    if !sub.args.is_empty() {
-        let _ = write!(text, " {}", paint.slot(sub.args));
-    }
-    let _ = writeln!(text, "\n\n  {}", sub.about);
-
-    if !sub.flags.is_empty() {
-        let _ = writeln!(text, "\n{}", paint.head("ARGUMENTS"));
-        for (flag, about) in sub.flags {
-            text.push_str(&row(flag, paint.key(flag), about));
-        }
-    }
-    if !sub.note.is_empty() {
-        text.push('\n');
-        for line in wrapped(sub.note) {
-            let _ = writeln!(text, "  {}", paint.dim(&line));
-        }
-    }
-    Some(text)
-}
-
-/// Wraps a note to the terminal width.
-fn wrapped(note: &str) -> Vec<String> {
-    const INDENT: usize = 2;
-    let width = oslo::ui::dropdown::width::terminal_cols()
-        .saturating_sub(INDENT + 2)
-        .clamp(32, 96);
-    let mut lines = Vec::new();
-    let mut line = String::new();
-    for word in note.split_whitespace() {
-        let would_be = line.chars().count() + usize::from(!line.is_empty()) + word.chars().count();
-        if would_be > width && !line.is_empty() {
-            lines.push(std::mem::take(&mut line));
-        }
-        if !line.is_empty() {
-            line.push(' ');
-        }
-        line.push_str(word);
-    }
-    if !line.is_empty() {
-        lines.push(line);
-    }
-    lines
+    MENU.overview(paint)
 }
 
 #[cfg(test)]

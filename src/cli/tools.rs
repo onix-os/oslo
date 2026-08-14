@@ -142,6 +142,9 @@ pub fn run(tool: &'static Tool, args: &[String]) -> i32 {
     if tool.name == "config" {
         return crate::cli::config::run(args);
     }
+    if tool.name == "profile" {
+        return crate::cli::profile::run(args);
+    }
     #[cfg(feature = "plugin")]
     if tool.name == "plugin" {
         return crate::cli::plugin::run(args);

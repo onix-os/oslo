@@ -75,13 +75,16 @@ fn one_trailing_newline_is_dropped_and_no_more() {
 }
 
 /// The key is the one thing that must not be readable by anybody else, from the moment it exists.
+///
+/// It is the *profile's* key: a store derives its own from that rather than keeping a second one,
+/// so this is the file that matters on the whole machine.
 #[test]
 fn the_identity_is_private_from_the_start() {
     use std::os::unix::fs::PermissionsExt;
     let store = tempfile::tempdir().expect("tempdir");
     secret(store.path(), &["set", "token"], b"value");
 
-    let identity = store.path().join("state/oslo/key");
+    let identity = store.path().join("state/oslo/profiles/default.key");
     let mode = std::fs::metadata(&identity)
         .expect("an identity")
         .permissions()

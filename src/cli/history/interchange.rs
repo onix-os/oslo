@@ -19,7 +19,7 @@ pub(super) fn export_command(args: &[String]) -> Result<(), String> {
                 saw_destination = true;
             }
             _ => {
-                return Err("usage: oslo history export [FILE|-] [--format jsonl|text]".to_string());
+                return Err("usage: writes one file, so it takes one".to_string());
             }
         }
         at += 1;
@@ -60,10 +60,10 @@ pub(super) fn import_command(args: &[String]) -> Result<(), String> {
                 return Err(format!("usage: unknown import option {flag:?}"));
             }
             path if file.is_none() => file = Some(path),
-            _ => return Err("usage: oslo history import FILE [--dry-run]".to_string()),
+            _ => return Err("usage: reads one file, so it takes one".to_string()),
         }
     }
-    let file = file.ok_or_else(|| "usage: oslo history import FILE [--dry-run]".to_string())?;
+    let file = file.ok_or_else(|| "usage: needs the file to read".to_string())?;
     let input = std::fs::read_to_string(file).map_err(|error| format!("{file}: {error}"))?;
     let first = input.lines().find(|line| !line.trim().is_empty());
     if first.is_some_and(|line| line.trim_start().starts_with('{')) {
@@ -141,7 +141,7 @@ pub(super) fn import_command(args: &[String]) -> Result<(), String> {
 
 pub(super) fn backup_command(args: &[String]) -> Result<(), String> {
     let [destination] = args else {
-        return Err("usage: oslo history backup FILE".to_string());
+        return Err("usage: needs one file to write the copy to".to_string());
     };
     if destination.starts_with('-') {
         return Err(format!("usage: unknown backup option {destination:?}"));

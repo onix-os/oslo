@@ -24,6 +24,8 @@ use oslo::env::options::ALL;
 use oslo::ui::theme::{Color, Depth, Style};
 use std::fmt::Write as _;
 
+pub mod menu;
+
 /// How this run should be painted.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Paint {
@@ -103,9 +105,16 @@ impl Paint {
 const COLUMN: usize = 20;
 
 /// Formats an aligned help row.
+///
+/// **A key too wide for the column takes a line of its own** rather than being run into its
+/// description. `saturating_sub` gave it zero padding, which read as `$OSLO_SSH_REMOTE_BINwhat oslo
+/// is called` — one word made of two, in the one place a person goes to find out what the words are.
 pub(crate) fn row(key: &str, painted_key: String, about: &str) -> String {
-    let pad = COLUMN.saturating_sub(key.chars().count());
-    format!("  {}{}{}\n", painted_key, " ".repeat(pad), about)
+    let width = key.chars().count();
+    if width >= COLUMN {
+        return format!("  {painted_key}\n  {}{about}\n", " ".repeat(COLUMN));
+    }
+    format!("  {}{}{}\n", painted_key, " ".repeat(COLUMN - width), about)
 }
 
 /// The two invocation forms.

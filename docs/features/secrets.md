@@ -67,6 +67,15 @@ ephemeral X25519 keypair.
 OSLO2 │ n │ n × [ ephemeral public (32) │ wrapped file key (48) ] │ nonce (24) │ ciphertext ‖ tag
 ```
 
+**The secret half is the profile's, not a file of its own.** A store derives its key from the
+[profile key](profiles-and-histories.md#why-a-key-and-not-just-the-name) — HKDF over the profile's
+key, salted with the store's name — so a machine keeps one secret rather than two, and
+`oslo profile export` carries the history *and* the secrets in one step. Two stores under one
+profile still have different keys, so a file from one cannot be opened with the other's.
+
+`$OSLO_SECRET_IDENTITY` still wins when it is set, and `key file`/`key command` still override per
+store: naming a file is somebody saying *this one*, and that has to keep meaning what it says.
+
 The two halves look different on purpose, because one of them is safe to publish and the other is
 not:
 
@@ -162,9 +171,10 @@ something it is not.
 Nothing needs to be edited by hand:
 
 ```sh
-oslo secret key add file ~/.ssh/oslo-work
+oslo profile key init                      # the key a store derives its own from
+oslo secret recipient                      # the half to publish, derived and shown
+oslo secret key add file ~/.ssh/oslo-work  # or override it, per store
 oslo secret key add command -- pass show oslo/key
-oslo secret key init                       # make this store's key, and print the half to publish
 oslo secret key list
 
 oslo secret recipient add OSLO-PUB-1:…     # a colleague, or your other machine
@@ -442,7 +452,7 @@ secrets; the second is reached only through `oslo.secret.mine()`.
 |---|---|
 | `$XDG_DATA_HOME` | where stores live, under `oslo/`. Falls back to `~/.local/share` |
 | `$XDG_STATE_HOME` | where the key and `secrets.conf` live. Falls back to `~/.local/state` |
-| `$OSLO_SECRET_IDENTITY` | the `user` store's key file, absolutely — checked first, wins over both |
+| `$OSLO_SECRET_IDENTITY` | a key file for every store, absolutely — checked first, and beats the profile |
 | `$OSLO_SECRET_CONF` | the configuration file, absolutely |
 | `$OSLO_SECRET_STORE` | which store this shell and its children mean |
 | `$OSLO_SECRET_NO_EXEC` | skip every mechanism that would run a program |
@@ -524,7 +534,8 @@ deleted.
 | `crates/oslo-base/src/secrets/native.rs` | the sealed box: the wrap, the key file, the format |
 | `crates/oslo-base/src/secrets/recipient.rs` | who a store is written for, and what a build makes of one |
 | `crates/oslo-base/src/secrets/conf.rs` | `secrets.conf`: parsed, and edited line-wise |
-| `crates/oslo-base/src/secrets/key.rs` | `KeySource`: a file, or a program, and what fences the program |
+| `crates/oslo-base/src/secrets/key.rs` | `KeySource`: the profile, a file, or a program — and what fences the program |
+| `crates/oslo-base/src/track/profile/key.rs` | the profile key every store derives from |
 | `crates/oslo-base/src/secrets/crypto.rs` | the three mechanisms, and why only one can be unreachable |
 | `crates/oslo-base/src/secrets/cipher.rs` | handing encryption and decryption to another program |
 | `crates/oslo-base/src/secrets/hooked.rs` | asking Lua to do the crypto, and telling it what was touched |

@@ -89,6 +89,68 @@ if [ -x "$OSLO" ] && "$OSLO" secret --help >/dev/null 2>&1; then
         --var 'GITHUB_TOKEN=$(oslo secret get gh-token)' --tag work >/dev/null
 fi
 
+# Two whole machines, for the `profile sync` act.
+#
+# **Both ends are fixtures.** The demo must never sync the recording machine's own history — it
+# would merge invented commands into a real store — so `here` and `there` are two XDG homes under
+# /tmp, each with a history of its own, and the shell in the recording steps into `here`.
+if [ -x "$OSLO" ]; then
+    for machine in here there; do
+        mkdir -p "$WORK/$machine/state"
+    done
+    printf 'cargo build --release\ngit push origin main\nhx src/lib.rs\n' > "$WORK/here.txt"
+    printf 'cargo build --release\nkubectl get pods -A\njournalctl -fu oslo\n' > "$WORK/there.txt"
+    # **`OSLO_PROFILE=default` on every one of these.** The recorder runs under a profile of its own
+    # so that nothing lands in a real history, and a fixture that inherited that name would seed one
+    # profile and then be asked to sync a different one.
+    for machine in here there; do
+        OSLO_PROFILE=default \
+            XDG_DATA_HOME="$WORK/$machine" XDG_STATE_HOME="$WORK/$machine/state" HOME="$WORK/$machine" \
+            "$OSLO" history import "$WORK/$machine.txt" >/dev/null 2>&1
+    done
+    # The key that says the two are one profile, made on `here` and carried to `there` — the step a
+    # person does once, done here so the recording can get to the part worth watching.
+    OSLO_PROFILE=default \
+        XDG_DATA_HOME="$WORK/here" XDG_STATE_HOME="$WORK/here/state" HOME="$WORK/here" \
+        "$OSLO" profile key init default >/dev/null 2>&1
+    OSLO_PROFILE=default \
+        XDG_DATA_HOME="$WORK/here" XDG_STATE_HOME="$WORK/here/state" HOME="$WORK/here" \
+        "$OSLO" profile export default 2>/dev/null |
+        OSLO_PROFILE=default \
+            XDG_DATA_HOME="$WORK/there" XDG_STATE_HOME="$WORK/there/state" HOME="$WORK/there" \
+            "$OSLO" profile import default >/dev/null 2>&1
+fi
+
+# A stand-in for `ssh`, so the sync act has a far end without a second computer.
+#
+# **Named so nobody mistakes it for ssh.** It ignores the destination and runs the command against
+# the `there` machine — which is exactly what ssh would do, minus the network. The demo shows the
+# script on screen, because a recording that implied a real remote host would be lying about the
+# one thing being demonstrated.
+mkdir -p "$WORK/bin"
+
+# The near end, for the same reason.
+#
+# **A prefix rather than a nested shell.** `oslo` typed at an oslo prompt asks whether you meant to
+# nest — see `startup/nested.rs` — and a recording cannot answer a question that only appears at
+# some depths. This runs one command as if on the machine called `here`, and needs no shell.
+cat > "$WORK/bin/here" <<EOF
+#!/bin/sh
+# stands in for: being logged in on the machine called \`here\`
+exec env OSLO_PROFILE=default \\
+    XDG_DATA_HOME=$WORK/here XDG_STATE_HOME=$WORK/here/state HOME=$WORK/here "\$@"
+EOF
+chmod +x "$WORK/bin/here"
+
+cat > "$WORK/bin/pretend-ssh" <<EOF
+#!/bin/sh
+# stands in for: ssh USER@HOST oslo …
+shift
+exec env OSLO_PROFILE=default \\
+    XDG_DATA_HOME=$WORK/there XDG_STATE_HOME=$WORK/there/state HOME=$WORK/there "\$@"
+EOF
+chmod +x "$WORK/bin/pretend-ssh"
+
 # A second machine's published half, for the `recipient add` beat.
 #
 # Made with the binary under test in a home of its own, so it is a *real* recipient and the demo

@@ -2,7 +2,7 @@ use super::*;
 
 #[test]
 fn the_overview_describes_every_subcommand() {
-    let plain = text(Paint::plain());
+    let plain = MENU.overview(Paint::plain());
     assert!(!plain.contains('\x1b'), "plain is plain");
     for sub in SUBCOMMANDS {
         assert!(plain.contains(sub.name), "{} is missing", sub.name);
@@ -18,7 +18,9 @@ fn the_overview_describes_every_subcommand() {
 #[test]
 fn each_subcommand_documents_its_own_arguments() {
     for sub in SUBCOMMANDS {
-        let help = subcommand(sub.name, Paint::plain()).expect("every listed name answers");
+        let help = MENU
+            .subcommand(sub.name, Paint::plain())
+            .expect("every listed name answers");
         assert!(help.contains(sub.name), "{}", sub.name);
         assert!(help.contains(sub.about), "{}", sub.name);
         for (flag, about) in sub.flags {
@@ -42,7 +44,9 @@ fn the_surprises_are_written_down() {
         ("backup", "consistent snapshot"),
     ];
     for (name, expected) in checks {
-        let help = subcommand(name, Paint::plain()).expect("a known subcommand");
+        let help = MENU
+            .subcommand(name, Paint::plain())
+            .expect("a known subcommand");
         let said = help.split_whitespace().collect::<Vec<_>>().join(" ");
         assert!(
             said.to_lowercase().contains(&expected.to_lowercase()),
@@ -53,20 +57,24 @@ fn the_surprises_are_written_down() {
 
 #[test]
 fn an_unknown_subcommand_has_no_help() {
-    assert!(subcommand("nope", Paint::plain()).is_none());
-    assert!(subcommand("", Paint::plain()).is_none());
+    assert!(MENU.subcommand("nope", Paint::plain()).is_none());
+    assert!(MENU.subcommand("", Paint::plain()).is_none());
 }
 
 #[test]
 fn colour_follows_the_shared_painter() {
-    assert!(text(Paint::at(oslo::ui::theme::Depth::Ansi256)).contains("\x1b["));
     assert!(
-        subcommand("sync", Paint::at(oslo::ui::theme::Depth::Ansi256))
+        MENU.overview(Paint::at(oslo::ui::theme::Depth::Ansi256))
+            .contains("\x1b[")
+    );
+    assert!(
+        MENU.subcommand("sync", Paint::at(oslo::ui::theme::Depth::Ansi256))
             .expect("sync")
             .contains("\x1b[")
     );
     assert!(
-        !subcommand("sync", Paint::plain())
+        !MENU
+            .subcommand("sync", Paint::plain())
             .expect("sync")
             .contains('\x1b')
     );
