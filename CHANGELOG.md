@@ -1,5 +1,43 @@
 # Changelog
 
+## [0.3.9] - 2026-08-14
+
+### <!-- 0 -->⛰️  Features
+
+- A key you keep, recipients you publish
+- Ctrl-space marks rows, delete twice confirms
+- Split the filing from the crypto, drop age
+- Hooks can call age over a pipe
+- Hooks do the crypto, lua does the storage
+- A store can hand its crypto to a program
+- Stores, keys and recipients as an api
+- Arrows walk the kinds, #tag filters
+- A fifth kind — variables that hold a recipe
+- Age behind a switch, and what it costs
+
+### <!-- 1 -->🐛 Bug Fixes
+
+- A fake token that no scanner mistakes for a real one
+- Ctrl-c ends a loop whose body forks
+- Record against the binary under test
+- An inherited row is not yours to edit
+- A script directory belongs to one store
+- The key lives away from the store
+
+### <!-- 3 -->📚 Documentation
+
+- Re-record the demo for the key model
+- What ctrl-c does, and why it is not obvious
+- The split, and the cipher that replaced age
+- The pluggable half, and a demo for it
+- Stores, keys, recipients and the lua api
+- The page, and a masked prompt at a tty
+
+### <!-- 4 -->⚡ Performance
+
+- Nucleo, and acronyms that read through flags
+- Vendor age, cut what it cannot use
+
 ## [0.3.8] - 2026-08-14
 
 ## [0.3.7] - 2026-08-14
