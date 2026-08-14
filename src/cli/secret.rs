@@ -15,8 +15,8 @@
 use oslo::secrets::{self, Store};
 
 mod cipher;
+#[cfg(feature = "crypt")]
 mod key;
-mod recipient;
 mod run;
 
 const USAGE: &str = "usage: oslo secret [--store NAME] COMMAND\n\
@@ -26,12 +26,16 @@ const USAGE: &str = "usage: oslo secret [--store NAME] COMMAND\n\
                      \x20 run VAR=NAME -- CMD…   run CMD with VAR set to it, and nothing else\n\
                      \x20 list          the names kept here\n\
                      \x20 rm NAME       forget one\n\
-                     \x20 rotate        re-encrypt everything to the current recipients\n\
-                     \x20 key           where this store's keys come from\n\
-                     \x20 recipient     who this store encrypts to\n\
+                     \x20 rotate        re-encrypt everything, as the store is now configured\n\
                      \x20 cipher        hand this store's crypto to another program\n\
                      \x20 stores        every store this machine knows about\n\
                      \x20 where         the store and the key, and which of them may be committed";
+
+/// The subcommands only a build with oslo's own crypto has.
+#[cfg(feature = "crypt")]
+const KEYS_AND_RECIPIENTS: &str = "\x20 key           where this store's key comes from\n";
+#[cfg(not(feature = "crypt"))]
+const KEYS_AND_RECIPIENTS: &str = "";
 
 pub fn run(args: &[String]) -> i32 {
     // Said once, wherever the command is going: a key under a `.git` is one `git add -A` from being
@@ -94,24 +98,18 @@ pub fn run(args: &[String]) -> i32 {
             Err(code) => code,
         },
         Some("rotate") => match store() {
-            Ok(store) => match store
-                .encrypt_to()
-                .and_then(|to| Ok((store.rotate()?, to.len())))
-            {
-                Ok((moved, to)) => {
-                    println!("{moved} re-encrypted to {to} recipients");
+            Ok(store) => match store.rotate() {
+                Ok(moved) => {
+                    println!("{moved} re-encrypted");
                     0
                 }
                 Err(e) => fail(&e),
             },
             Err(code) => code,
         },
+        #[cfg(feature = "crypt")]
         Some("key") => match store() {
             Ok(store) => key::run(&store, &args[1..]),
-            Err(code) => code,
-        },
-        Some("recipient" | "recipients") => match store() {
-            Ok(store) => recipient::run(&store, &args[1..]),
             Err(code) => code,
         },
         Some("cipher") => match store() {
@@ -145,19 +143,20 @@ pub fn run(args: &[String]) -> i32 {
                 // A store whose crypto is another program's has no keys or recipients of oslo's to
                 // show, and printing the defaults it is not using would be a lie about what opens
                 // these files.
+                #[cfg(feature = "crypt")]
                 match store.crypto.is_external() {
                     true => cipher::show(&store),
-                    false => {
-                        key::show(&store);
-                        recipient::show(&store);
-                    }
+                    false => key::show(&store),
                 }
+                #[cfg(not(feature = "crypt"))]
+                cipher::show(&store);
                 0
             }
             Err(code) => code,
         },
         Some("-h" | "--help" | "help") => {
             println!("{USAGE}");
+            print!("{KEYS_AND_RECIPIENTS}");
             0
         }
         Some(other) => {

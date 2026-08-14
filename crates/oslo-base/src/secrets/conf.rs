@@ -46,7 +46,6 @@ pub fn path() -> Option<PathBuf> {
 pub struct Section {
     pub name: String,
     pub directory: Option<PathBuf>,
-    pub recipients: Vec<String>,
     pub keys: Vec<KeySource>,
     /// Set when another program does this store's crypto instead of oslo's own age.
     pub cipher: Cipher,
@@ -116,7 +115,16 @@ pub fn parse(text: &str) -> Result<Conf, String> {
                 return Err(format!("line {at}: {verb:?} before any [store]"));
             }
             ("directory", Some(section)) => section.directory = Some(PathBuf::from(rest)),
-            ("recipient", Some(section)) => section.recipients.push(rest.to_string()),
+            // **Refused rather than parsed and ignored.** Without the built-in mechanism a `key`
+            // line says nothing — the key belongs to whatever program the store names — and a line
+            // that quietly did nothing is how somebody comes to believe a store is protected by
+            // something it is not.
+            ("key", Some(_)) if !cfg!(feature = "crypt") => {
+                return Err(format!(
+                    "line {at}: this oslo has no built-in crypto, so `key` means nothing here — \
+                     the key is the business of the `encrypt`/`decrypt command` this store names"
+                ));
+            }
             ("key", Some(section)) => section
                 .keys
                 .push(KeySource::parse(rest).map_err(|e| format!("line {at}: {e}"))?),

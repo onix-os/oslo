@@ -142,6 +142,7 @@ argc = ["oslo-shell/argc", "oslo-runtime/argc", "dep:argc"]
 # deleted. It is not here: a key oslo cannot compute itself comes from `key command` instead, which
 # runs whatever already holds it. See `docs/features/secrets.md`.
 secrets = ["oslo-base/secrets", "oslo-runtime/secrets"]
+crypt = ["secrets", "oslo-base/crypt"]
 
 [dependencies]
 # The Lua front end, in the same relationship to Lua that brush-parser has to the shell: it parses

@@ -8,7 +8,7 @@
 //! one command, and never write it down. Anything outside the shell has to put the value somewhere
 //! the shell can read it, which means a file, which means a plaintext file.
 //!
-//! # age, and not a keyring
+//! # A key and an AEAD, not a keyring
 //!
 //! [age](https://github.com/str4d/rage) is a file encryption format with one key type, no options
 //! to get wrong, and a Rust implementation with no C in it — which is the only kind that can go in
@@ -18,16 +18,16 @@
 //!
 //! # A store is three things
 //!
-//! A [`Store`] is a directory, an ordered list of [`KeySource`]s to decrypt with, and a list of
-//! [`Recipient`]s to encrypt to. Every one of them is configurable in [`conf`]; an install that has
-//! configured nothing gets one store called `user`, one key file and one recipient, which is
-//! exactly what this module did when it had no configuration at all.
+//! A [`Store`] is a directory, an ordered list of [`KeySource`]s, and the [`Crypto`] that seals and
+//! opens its files — oslo's own, another program, or a Lua hook. Every one of them is configurable
+//! in [`conf`]; an install that has configured nothing gets one store called `user` and one key
+//! file, and never has to be told anything.
 //!
 //! # What is on disk, and why the key is not next to it
 //!
 //! ```text
-//! ~/.local/share/oslo/secrets/NAME.age      one secret, encrypted — safe to commit
-//! ~/.local/state/oslo/identity              the key, mode 0600 — never
+//! ~/.local/share/oslo/secrets/NAME.sealed   one secret, encrypted — safe to commit
+//! ~/.local/state/oslo/key                   the key, mode 0600 — never
 //! ~/.local/state/oslo/secrets.conf          which stores exist — beside the key, and why is in `conf`
 //! ```
 //!
@@ -52,15 +52,21 @@ pub mod conf;
 pub mod crypto;
 pub mod hooked;
 pub mod key;
-pub mod recipient;
+#[cfg(feature = "crypt")]
+pub mod native;
 
-use std::io::{Read, Write};
+use std::io::Write;
 use std::path::{Path, PathBuf};
 
 pub use cipher::Cipher;
 pub use crypto::Crypto;
 pub use key::KeySource;
-pub use recipient::Recipient;
+
+/// What one secret's file is called, after its name.
+///
+/// Not `.age`: these have not been age files since oslo grew a mechanism of its own, and a suffix
+/// that named a format it is not would send somebody to the wrong tool to open one.
+pub const KEPT: &str = ".sealed";
 
 /// The store every install has, and the one `oslo secret` means when nothing says otherwise.
 pub const USER: &str = "user";
@@ -74,7 +80,6 @@ pub struct Store {
     pub name: String,
     pub directory: PathBuf,
     pub keys: Vec<KeySource>,
-    pub recipients: Vec<Recipient>,
     /// What seals and opens its files: oslo's own age, another program, or a Lua hook.
     pub crypto: Crypto,
 }
@@ -86,14 +91,6 @@ impl Store {
         conf::valid_store_name(name)?;
         let declared = conf::read()?;
         let section = declared.section(name);
-        let recipients = match section {
-            Some(section) => section
-                .recipients
-                .iter()
-                .map(|text| Recipient::new(text))
-                .collect::<Result<Vec<_>, _>>()?,
-            None => Vec::new(),
-        };
         let mut keys = section.map(|s| s.keys.clone()).unwrap_or_default();
         if keys.is_empty() {
             keys.push(KeySource::File(identity_path().ok_or(NOWHERE_FOR_A_KEY)?));
@@ -113,7 +110,6 @@ impl Store {
             },
             name: name.to_string(),
             keys,
-            recipients,
             crypto,
         })
     }
@@ -161,7 +157,7 @@ impl Store {
         {
             return Err(format!("{name:?} is not a usable name for a secret"));
         }
-        Ok(self.directory.join(format!("{name}.age")))
+        Ok(self.directory.join(format!("{name}{KEPT}")))
     }
 
     /// Keep `value` under `name`.
@@ -178,7 +174,7 @@ impl Store {
         }
         // The ciphertext is not a secret, but the file is still written privately: what it *is* is
         // still information — a size, a modification time, the fact that this name exists at all.
-        let scratch = path.with_extension("age.new");
+        let scratch = path.with_extension("new");
         write_private(&scratch, &sealed)?;
         std::fs::rename(&scratch, &path).map_err(|e| format!("{}: {e}", path.display()))
     }
@@ -205,7 +201,7 @@ impl Store {
             .flatten()
             .filter_map(|entry| {
                 let name = entry.file_name().to_string_lossy().into_owned();
-                name.strip_suffix(".age").map(str::to_string)
+                name.strip_suffix(KEPT).map(str::to_string)
             })
             .collect();
         names.sort();
@@ -241,20 +237,19 @@ impl Store {
             }
             Crypto::Native => {}
         }
-        let recipients = self.encrypt_to()?;
-        let boxed: Vec<Box<dyn age::Recipient + Send>> = recipients
-            .into_iter()
-            .map(|r| Box::new(r) as Box<dyn age::Recipient + Send>)
-            .collect();
-        let encryptor = age::Encryptor::with_recipients(boxed.iter().map(|r| r.as_ref() as _))
-            .map_err(|e| format!("{e}"))?;
-        let mut ciphertext = Vec::new();
-        let mut writer = encryptor
-            .wrap_output(&mut ciphertext)
-            .map_err(|e| format!("{e}"))?;
-        writer.write_all(value).map_err(|e| format!("{e}"))?;
-        writer.finish().map_err(|e| format!("{e}"))?;
-        Ok(ciphertext)
+        self.seal_natively(value)
+    }
+
+    /// oslo's own, in this process.
+    #[cfg(feature = "crypt")]
+    fn seal_natively(&self, value: &[u8]) -> Result<Vec<u8>, String> {
+        native::seal(&self.key_to_write_with()?, value)
+    }
+
+    /// This build carries no crypto of its own, so a store has to name one.
+    #[cfg(not(feature = "crypt"))]
+    fn seal_natively(&self, _value: &[u8]) -> Result<Vec<u8>, String> {
+        Err(no_native(&self.name))
     }
 
     /// Decrypt with whichever key opens it.
@@ -278,17 +273,31 @@ impl Store {
             }
             Crypto::Native => {}
         }
-        let native = self.identities(false)?;
-        if let Some(value) = attempt(ciphertext, &native)? {
-            return Ok(value);
+        self.unseal_natively(ciphertext)
+    }
+
+    /// oslo's own, in this process.
+    ///
+    /// **File keys before program keys**, so a store that opens with a file never runs the program
+    /// another key source names: no `$PATH` walk, no fork, and a cron job on a machine that cannot
+    /// reach the other key degrades instead of hanging on it.
+    #[cfg(feature = "crypt")]
+    fn unseal_natively(&self, ciphertext: &[u8]) -> Result<Vec<u8>, String> {
+        let mut tried = 0;
+        for external in [false, true] {
+            for key in self.keys_of(external)? {
+                tried += 1;
+                if let Ok(value) = native::unseal(&key, ciphertext) {
+                    return Ok(value);
+                }
+            }
         }
-        let external = self.identities(true)?;
-        if !external.is_empty()
-            && let Some(value) = attempt(ciphertext, &external)?
-        {
-            return Ok(value);
-        }
-        Err(self.why_it_did_not_open(native.len() + external.len()))
+        Err(self.why_it_did_not_open(tried))
+    }
+
+    #[cfg(not(feature = "crypt"))]
+    fn unseal_natively(&self, _ciphertext: &[u8]) -> Result<Vec<u8>, String> {
+        Err(no_native(&self.name))
     }
 
     /// Re-encrypt everything here to the recipients as they now stand, and answer how many moved.
@@ -304,12 +313,13 @@ impl Store {
         Ok(values.len())
     }
 
-    /// The identities this store can offer, of one kind.
-    pub fn identities(&self, external: bool) -> Result<Vec<age::x25519::Identity>, String> {
+    /// The keys this store can offer, of one kind.
+    #[cfg(feature = "crypt")]
+    pub fn keys_of(&self, external: bool) -> Result<Vec<[u8; 32]>, String> {
         let mut found = Vec::new();
         for source in self.keys.iter().filter(|s| s.is_external() == external) {
-            match source.identity() {
-                Ok(Some(identity)) => found.push(identity),
+            match source.key() {
+                Ok(Some(key)) => found.push(key),
                 Ok(None) => {}
                 // A key source that cannot answer is not the end of the list: the next one may be
                 // the one that opens this file, and the failure is reported only if none does.
@@ -328,28 +338,28 @@ impl Store {
         })
     }
 
-    /// Who this store encrypts to, generating the default key if that is what it comes to.
-    pub fn encrypt_to(&self) -> Result<Vec<age::x25519::Recipient>, String> {
-        if !self.recipients.is_empty() {
-            return self.recipients.iter().map(Recipient::native).collect();
-        }
-        // Native first here too, but a store whose only key is a command still has a public half to
-        // encrypt to — it just costs running the command to learn it.
+    /// The key this store writes with, made now if this is the first time.
+    ///
+    /// The first that answers, file keys before program ones — so a store with a spare key on a USB
+    /// stick still writes with the one it always used.
+    #[cfg(feature = "crypt")]
+    pub fn key_to_write_with(&self) -> Result<[u8; 32], String> {
         for external in [false, true] {
-            if let Some(identity) = self.identities(external)?.first() {
-                return Ok(vec![identity.to_public()]);
+            if let Some(key) = self.keys_of(external)?.first() {
+                return Ok(*key);
             }
         }
         match self.key_file() {
-            Some(path) => Ok(vec![key::generate(&path)?.to_public()]),
+            Some(path) => key::generate(&path),
             None => Err(format!(
-                "{}: no recipient to encrypt to, and no key file to make one from",
+                "{}: no key, and no key file to make one in",
                 self.name
             )),
         }
     }
 
     /// Why nothing opened it, in the terms of what this store was told to try.
+    #[cfg(feature = "crypt")]
     fn why_it_did_not_open(&self, tried: usize) -> String {
         let skipped = key::no_exec() && self.keys.iter().any(KeySource::is_external);
         if skipped {
@@ -366,23 +376,18 @@ impl Store {
     }
 }
 
-/// Try one set of identities against a file, telling "wrong key" apart from "broken file".
-fn attempt(
-    ciphertext: &[u8],
-    identities: &[age::x25519::Identity],
-) -> Result<Option<Vec<u8>>, String> {
-    if identities.is_empty() {
-        return Ok(None);
-    }
-    let decryptor = age::Decryptor::new(ciphertext).map_err(|e| format!("{e}"))?;
-    let mut reader = match decryptor.decrypt(identities.iter().map(|i| i as &dyn age::Identity)) {
-        Ok(reader) => reader,
-        Err(age::DecryptError::NoMatchingKeys) => return Ok(None),
-        Err(e) => return Err(format!("{e}")),
-    };
-    let mut value = Vec::new();
-    reader.read_to_end(&mut value).map_err(|e| format!("{e}"))?;
-    Ok(Some(value))
+/// What a build with no crypto of its own says when a store did not name one.
+///
+/// **Named rather than implied.** A build without `age` has the whole of the filing — the store, the
+/// names, `run`, the lazy variable, the Lua API — and none of the encryption, so the one thing it
+/// cannot do has to say which one thing that is.
+#[cfg(not(feature = "crypt"))]
+fn no_native(store: &str) -> String {
+    format!(
+        "{store}: this oslo has no built-in crypto. Give the store an `encrypt command` and a \
+         `decrypt command` — `age`, `gpg`, `systemd-creds`, whatever this machine already has — \
+         or `crypto hook` to do it in Lua"
+    )
 }
 
 const NOWHERE_FOR_A_KEY: &str =
@@ -438,7 +443,7 @@ pub fn identity_path() -> Option<PathBuf> {
     {
         return Some(PathBuf::from(named));
     }
-    Some(state_directory()?.join("identity"))
+    Some(state_directory()?.join("key"))
 }
 
 /// The repository the identity is inside, when it is inside one.

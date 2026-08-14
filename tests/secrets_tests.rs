@@ -52,7 +52,7 @@ fn a_secret_survives_the_round_trip_without_being_written_down() {
 
     // **The file is the reason this exists.** A store that held the value in the clear would be a
     // `.env` with extra steps.
-    let file = store.path().join("oslo/secrets/token.age");
+    let file = store.path().join("oslo/secrets/token.sealed");
     let kept = std::fs::read(&file).expect("the secret was written");
     assert!(
         !String::from_utf8_lossy(&kept).contains(value),
@@ -81,7 +81,7 @@ fn the_identity_is_private_from_the_start() {
     let store = tempfile::tempdir().expect("tempdir");
     secret(store.path(), &["set", "token"], b"value");
 
-    let identity = store.path().join("state/oslo/identity");
+    let identity = store.path().join("state/oslo/key");
     let mode = std::fs::metadata(&identity)
         .expect("an identity")
         .permissions()
@@ -102,12 +102,12 @@ fn the_key_is_not_where_the_secrets_are() {
     secret(store.path(), &["set", "token"], b"value");
 
     let secrets = store.path().join("oslo/secrets");
-    assert!(secrets.join("token.age").exists(), "the store is here");
+    assert!(secrets.join("token.sealed").exists(), "the store is here");
     let stray: Vec<_> = std::fs::read_dir(&secrets)
         .expect("a store")
         .flatten()
         .map(|e| e.file_name().to_string_lossy().into_owned())
-        .filter(|name| !name.ends_with(".age"))
+        .filter(|name| !name.ends_with(".sealed"))
         .collect();
     assert!(
         stray.is_empty(),

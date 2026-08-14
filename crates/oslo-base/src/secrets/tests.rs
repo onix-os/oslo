@@ -21,7 +21,7 @@ fn a_name_is_a_file_in_the_store() {
     let Ok(path) = path("deploy-token") else {
         return; // No $HOME in this environment; nothing to assert about where it would go.
     };
-    assert!(path.ends_with("deploy-token.age"), "{}", path.display());
+    assert!(path.ends_with("deploy-token.sealed"), "{}", path.display());
     assert!(path.to_string_lossy().contains("oslo/secrets"));
 }
 
@@ -59,7 +59,6 @@ fn a_conf_says_what_it_says_and_nothing_it_does_not() {
          \n\
          [work]\n\
          directory /w\n\
-         recipient age1abc\n\
          key command pass show oslo/id\n",
     )
     .expect("it parses");
@@ -68,7 +67,6 @@ fn a_conf_says_what_it_says_and_nothing_it_does_not() {
     assert_eq!(parsed.sections.len(), 2);
     let work = parsed.section("work").expect("the work section");
     assert_eq!(work.directory.as_deref(), Some(std::path::Path::new("/w")));
-    assert_eq!(work.recipients, ["age1abc"]);
     assert_eq!(
         work.keys,
         [KeySource::Command(vec![

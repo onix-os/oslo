@@ -3,7 +3,7 @@
 //! # Two kinds, in a deliberate order
 //!
 //! A [`KeySource::File`] is read; a [`KeySource::Command`] is *run*, and its standard output is the
-//! identity. The second exists because the alternative is compiling every way a person might hold a
+//! key. The second exists because the alternative is compiling every way a person might hold a
 //! key into a shell that is meant to be `/bin/sh` — a password manager, a smartcard wrapper,
 //! whatever they already use. It costs nothing when it is not configured.
 //!
@@ -21,8 +21,6 @@
 //!   in the failure. Exported once by a cron job or a container, inherited by every child, it makes
 //!   "this will not fork" something to assert rather than infer.
 
-use age::secrecy::ExposeSecret;
-use age::x25519;
 use std::path::PathBuf;
 
 /// Where one key comes from.
@@ -60,14 +58,15 @@ impl KeySource {
         matches!(self, KeySource::Command(_))
     }
 
-    /// The identity, or why not.
+    /// The key, or why not.
     ///
     /// A file that is not there is `Ok(None)` rather than an error: several key sources are a list
     /// of places to look, and a laptop that has one of them is not misconfigured.
-    pub fn identity(&self) -> Result<Option<x25519::Identity>, String> {
+    #[cfg(feature = "crypt")]
+    pub fn key(&self) -> Result<Option<[u8; 32]>, String> {
         match self {
             KeySource::File(path) => match std::fs::read_to_string(path) {
-                Ok(text) => parse_identity(&text)
+                Ok(text) => super::native::read_key(&text)
                     .map(Some)
                     .map_err(|e| format!("{}: {e}", path.display())),
                 Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
@@ -77,7 +76,8 @@ impl KeySource {
         }
     }
 
-    fn run(argv: &[String]) -> Result<x25519::Identity, String> {
+    #[cfg(feature = "crypt")]
+    fn run(argv: &[String]) -> Result<[u8; 32], String> {
         if no_exec() {
             return Err(format!(
                 "$OSLO_SECRET_NO_EXEC is set, so `{}` was not run",
@@ -103,8 +103,8 @@ impl KeySource {
             ));
         }
         let text = String::from_utf8(output.stdout)
-            .map_err(|_| format!("{program}: what it printed is not an age identity"))?;
-        parse_identity(&text).map_err(|e| format!("{program}: {e}"))
+            .map_err(|_| format!("{program}: what it printed is not a key"))?;
+        super::native::read_key(&text).map_err(|e| format!("{program}: {e}"))
     }
 }
 
@@ -113,40 +113,16 @@ pub fn no_exec() -> bool {
     std::env::var_os("OSLO_SECRET_NO_EXEC").is_some_and(|value| !value.is_empty())
 }
 
-/// The first `AGE-SECRET-KEY-1…` in what a file or a program gave us.
-///
-/// **Comment lines are skipped**, because `age-keygen` writes three of them above the key and
-/// telling somebody to strip them by hand would be a step nobody remembers.
-fn parse_identity(text: &str) -> Result<x25519::Identity, String> {
-    let line = text
-        .lines()
-        .map(str::trim)
-        .find(|line| !line.is_empty() && !line.starts_with('#'))
-        .ok_or_else(|| "no age identity in it".to_string())?;
-    // **The failure worth naming.** A key in hardware has no identity to print, so what a plugin
-    // hands out is a stub saying which plugin to run — and "invalid Bech32" would send somebody
-    // looking for a typo instead of at the answer, which is to let `age` itself do the crypto.
-    if line.starts_with("AGE-PLUGIN-") {
-        return Err(format!(
-            "{}: an age plugin identity. oslo does not speak the age plugin protocol; \
-             hand this store's crypto to `age` itself with `oslo secret cipher`",
-            line.split('-').take(3).collect::<Vec<_>>().join("-")
-        ));
-    }
-    line.parse::<x25519::Identity>().map_err(|e| e.to_string())
-}
-
 /// Make one where `path` says, mode `0600` from the moment it exists.
-pub fn generate(path: &std::path::Path) -> Result<x25519::Identity, String> {
+#[cfg(feature = "crypt")]
+pub fn generate(path: &std::path::Path) -> Result<[u8; 32], String> {
     let directory = path
         .parent()
         .ok_or_else(|| format!("{}: has no directory to be in", path.display()))?;
     std::fs::create_dir_all(directory).map_err(|e| format!("{}: {e}", directory.display()))?;
-    let fresh = x25519::Identity::generate();
-    let scratch = directory.join("identity.new");
-    let mut text = fresh.to_string().expose_secret().to_string();
-    text.push('\n');
-    super::write_private(&scratch, text.as_bytes())?;
+    let fresh = super::native::generate_key()?;
+    let scratch = directory.join("key.new");
+    super::write_private(&scratch, super::native::write_key(&fresh).as_bytes())?;
     std::fs::rename(&scratch, path).map_err(|e| format!("{}: {e}", path.display()))?;
     Ok(fresh)
 }

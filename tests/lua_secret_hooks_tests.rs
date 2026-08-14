@@ -223,7 +223,7 @@ fn a_hook_can_drive_an_external_age_over_a_pipe() {
     assert!(out.contains("read:\theld-in-the-device"), "{out:?} {err}");
 
     // What the store holds is the other program's format, and the value is not in it.
-    let kept = std::fs::read_to_string(home.path().join("oslo/stores/yubi/deploy.age"))
+    let kept = std::fs::read_to_string(home.path().join("oslo/stores/yubi/deploy.sealed"))
         .expect("the secret was written");
     assert!(kept.starts_with("AGE-ISH"), "{kept:?}");
     assert!(

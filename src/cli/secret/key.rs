@@ -30,6 +30,7 @@ pub fn run(store: &Store, args: &[String]) -> i32 {
             show(store);
             0
         }
+        #[cfg(feature = "crypt")]
         Some("init") => init(store),
         Some("add") => match source(&args[1..]) {
             Ok(source) => add(store, &source),
@@ -122,6 +123,10 @@ fn remove(store: &Store, source: &KeySource) -> i32 {
 }
 
 /// Make this store's key file now, rather than on the first `set`.
+///
+/// Only a build with oslo's own age has a key of its own to make; otherwise the key belongs to
+/// whatever program the store names.
+#[cfg(feature = "crypt")]
 fn init(store: &Store) -> i32 {
     let Some(path) = store.key_file() else {
         return fail(&format!("{}: has no key file to make", store.name));
@@ -131,9 +136,8 @@ fn init(store: &Store) -> i32 {
         return 1;
     }
     match secrets::key::generate(&path) {
-        Ok(identity) => {
+        Ok(_) => {
             println!("{}", path.display());
-            println!("{}", identity.to_public());
             0
         }
         Err(e) => fail(&e),

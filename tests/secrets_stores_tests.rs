@@ -7,8 +7,46 @@ use common::oslo_bin;
 use std::io::Write;
 use std::process::{Command, Stdio};
 
+/// Give a build with no crypto of its own something to encrypt with.
+///
+/// **Not encryption, and it does not pretend to be**: it is a reversible filter, so what is under
+/// test is the plumbing — that the store, the names, `run` and the file layout work when the crypto
+/// belongs to somebody else. A build with `crypt` needs none of this and gets none of it.
+#[cfg(not(feature = "crypt"))]
+fn a_mechanism(home: &std::path::Path) {
+    let conf = home.join("state/oslo/secrets.conf");
+    if conf.exists() {
+        return;
+    }
+    let filter = home.join("filter");
+    std::fs::write(
+        &filter,
+        "#!/bin/sh\ncase \"$1\" in\n  -e) base64 ;;\n  -d) base64 -d ;;\nesac\n",
+    )
+    .expect("write");
+    std::fs::set_permissions(&filter, std::os::unix::fs::PermissionsExt::from_mode(0o755))
+        .expect("chmod");
+    std::fs::create_dir_all(conf.parent().expect("a parent")).expect("mkdir");
+    let filter = filter.to_string_lossy();
+    // Every store the suite names, because `secrets.conf` has no section that stands for all of
+    // them — which is itself worth knowing, and is why this is a list rather than one entry.
+    let mut text = String::new();
+    for store in [
+        "user", "work", "friend", "byhand", "broken", "yubi", "cmd", "yk",
+    ] {
+        text.push_str(&format!(
+            "[{store}]\nencrypt command {filter} -e\ndecrypt command {filter} -d\n\n"
+        ));
+    }
+    std::fs::write(&conf, text).expect("write");
+}
+
+#[cfg(feature = "crypt")]
+fn a_mechanism(_home: &std::path::Path) {}
+
 /// Run `oslo secret …` against a store of its own, with `input` on standard input.
 fn secret(home: &std::path::Path, args: &[&str], input: &[u8]) -> (String, String, i32) {
+    a_mechanism(home);
     let mut child = Command::new(oslo_bin())
         .arg("secret")
         .args(args)
@@ -36,89 +74,15 @@ fn secret(home: &std::path::Path, args: &[&str], input: &[u8]) -> (String, Strin
     )
 }
 
-/// **The thing a second recipient is for.** A colleague's key is added, everything is rotated to
-/// it, and then *their key alone* opens the file — which is the property that makes an encrypted
-/// store worth committing rather than a private one worth hiding.
-#[test]
-fn a_second_recipient_can_read_what_was_rotated_to_them() {
-    let home = tempfile::tempdir().expect("tempdir");
-    secret(home.path(), &["set", "token"], b"shared-value");
-
-    // Their key, made in a store of its own so it is a different identity.
-    let their_key = home.path().join("friend-key");
-    let (made, err, status) = secret(
-        home.path(),
-        &[
-            "--store",
-            "friend",
-            "key",
-            "add",
-            "file",
-            &their_key.to_string_lossy(),
-        ],
-        b"",
-    );
-    assert_eq!(status, 0, "{err}{made}");
-    let (out, err, status) = secret(home.path(), &["--store", "friend", "key", "init"], b"");
-    assert_eq!(status, 0, "{err}");
-    let public = out.lines().last().expect("a public half").to_string();
-    assert!(public.starts_with("age1"), "{out:?}");
-
-    let (_, err, status) = secret(home.path(), &["recipient", "add", &public], b"");
-    assert_eq!(status, 0, "{err}");
-    let (out, err, status) = secret(home.path(), &["rotate"], b"");
-    assert_eq!(status, 0, "{err}");
-    assert!(out.contains("2 recipients"), "{out:?}");
-
-    // Mine still opens it…
-    assert_eq!(
-        secret(home.path(), &["get", "token"], b"").0,
-        "shared-value"
-    );
-
-    // …and so does theirs, with nothing of mine in the environment.
-    let out = Command::new(oslo_bin())
-        .args(["secret", "get", "token"])
-        .env("XDG_DATA_HOME", home.path())
-        .env("XDG_STATE_HOME", home.path().join("state"))
-        .env("OSLO_SECRET_IDENTITY", &their_key)
-        .output()
-        .expect("spawn oslo");
-    assert_eq!(
-        String::from_utf8_lossy(&out.stdout),
-        "shared-value",
-        "{}",
-        String::from_utf8_lossy(&out.stderr)
-    );
-}
-
-/// A recipient this binary cannot use is refused when it is written, not when the next `set` fails.
-#[test]
-fn a_recipient_oslo_cannot_use_is_refused_at_the_time() {
-    let home = tempfile::tempdir().expect("tempdir");
-    secret(home.path(), &["set", "token"], b"v");
-
-    let (_, err, status) = secret(
-        home.path(),
-        &["recipient", "add", "age1yubikey1qdefinitelynotmine"],
-        b"",
-    );
-    assert_ne!(status, 0, "it was accepted");
-    assert!(err.contains("plugin recipient"), "{err:?}");
-    assert!(
-        err.contains("oslo secret cipher"),
-        "a way out is named: {err:?}"
-    );
-}
-
 /// **A key can be a program**, which is what reaches a password manager, a smartcard, or anything
 /// else oslo will never compile in — and `$OSLO_SECRET_NO_EXEC` is the switch that says this
 /// invocation will not fork, for a cron job or a container to export once.
 #[test]
+#[cfg(feature = "crypt")]
 fn a_key_can_come_from_a_program_and_can_be_refused() {
     let home = tempfile::tempdir().expect("tempdir");
     secret(home.path(), &["set", "unrelated"], b"v");
-    let identity = home.path().join("state/oslo/identity");
+    let identity = home.path().join("state/oslo/key");
 
     let giver = home.path().join("give-key");
     std::fs::write(
@@ -165,6 +129,7 @@ fn a_key_can_come_from_a_program_and_can_be_refused() {
 
 /// **A plugin's store never forks**, whichever door the command comes through.
 #[test]
+#[cfg(feature = "crypt")]
 fn a_plugin_store_may_not_run_a_key_command() {
     let home = tempfile::tempdir().expect("tempdir");
     let (_, err, status) = secret(
@@ -297,7 +262,7 @@ fn a_store_can_hand_its_crypto_to_another_program() {
     assert_eq!(status, 0, "{err}");
 
     // The file is the other program's format, not age's — oslo did not write it.
-    let kept = std::fs::read_to_string(home.path().join("oslo/stores/yubi/deploy.age"))
+    let kept = std::fs::read_to_string(home.path().join("oslo/stores/yubi/deploy.sealed"))
         .expect("the secret was written");
     assert!(kept.starts_with("PRETEND-AGE"), "{kept:?}");
     assert!(!kept.contains("held-in-hardware"), "in the clear: {kept:?}");
@@ -356,30 +321,75 @@ fn a_plugin_store_may_not_hand_off_its_crypto() {
     assert!(err.contains("may not run a command"), "{err:?}");
 }
 
-/// **The error that sends somebody to the answer.** A plugin identity is a stub naming the plugin
-/// to run, and "invalid Bech32" would send them looking for a typo.
+/// **Two stores with two keys do not open each other's files.** The built-in mechanism is one key
+/// and one AEAD, so this is the whole of what "a store is private" means here.
 #[test]
-fn a_plugin_identity_says_what_to_do_instead() {
+#[cfg(feature = "crypt")]
+fn a_key_opens_its_own_store_and_no_other() {
     let home = tempfile::tempdir().expect("tempdir");
-    let giver = home.path().join("give");
-    std::fs::write(&giver, "#!/bin/sh\necho AGE-PLUGIN-YUBIKEY-1QQPZQZKC0Q9\n").expect("write");
-    std::fs::set_permissions(&giver, std::os::unix::fs::PermissionsExt::from_mode(0o755))
-        .expect("chmod");
+    secret(home.path(), &["set", "mine"], b"in-the-user-store");
 
+    // A store with a key of its own.
+    let elsewhere = home.path().join("other-key");
+    let (_, err, status) = secret(
+        home.path(),
+        &[
+            "--store",
+            "work",
+            "key",
+            "add",
+            "file",
+            &elsewhere.to_string_lossy(),
+        ],
+        b"",
+    );
+    assert_eq!(status, 0, "{err}");
+    secret(
+        home.path(),
+        &["--store", "work", "set", "theirs"],
+        b"in-the-work-store",
+    );
+    assert!(elsewhere.exists(), "the key was not made on first use");
+
+    // Each opens its own…
+    assert_eq!(
+        secret(home.path(), &["get", "mine"], b"").0,
+        "in-the-user-store"
+    );
+    assert_eq!(
+        secret(home.path(), &["--store", "work", "get", "theirs"], b"").0,
+        "in-the-work-store"
+    );
+
+    // …and the user store's key does not open the other's file, even pointed straight at it.
+    let theirs = home.path().join("oslo/stores/work/theirs.sealed");
+    let mine = home.path().join("oslo/secrets/theirs.sealed");
+    std::fs::copy(&theirs, &mine).expect("copy");
+    let (_, err, status) = secret(home.path(), &["get", "theirs"], b"");
+    assert_ne!(status, 0, "the wrong key opened it");
+    assert!(err.contains("no key opened it"), "{err:?}");
+}
+
+/// A key file that is not a key says so, rather than failing later as "wrong key".
+#[test]
+#[cfg(feature = "crypt")]
+fn something_that_is_not_a_key_is_named_as_such() {
+    let home = tempfile::tempdir().expect("tempdir");
+    let wrong = home.path().join("not-a-key");
+    std::fs::write(&wrong, "hello\n").expect("write");
     secret(
         home.path(),
         &[
             "--store",
-            "yk",
+            "w",
             "key",
             "add",
-            "command",
-            &giver.to_string_lossy(),
+            "file",
+            &wrong.to_string_lossy(),
         ],
         b"",
     );
-    let (_, err, status) = secret(home.path(), &["--store", "yk", "set", "thing"], b"v");
+    let (_, err, status) = secret(home.path(), &["--store", "w", "set", "x"], b"v");
     assert_ne!(status, 0);
-    assert!(err.contains("age plugin identity"), "{err:?}");
-    assert!(err.contains("oslo secret cipher"), "the way out: {err:?}");
+    assert!(err.contains("OSLO-KEY-1"), "{err:?}");
 }
