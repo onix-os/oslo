@@ -245,7 +245,8 @@ oslo secret get stripe
    ├─ read secrets.conf                which store, which keys, which mechanism
    ├─ path("stripe")                   a name is a filename: no `/`, no `..`, no leading `.`
    │                                   — refused, not sanitised
-   ├─ read secrets/stripe.sealed
+   ├─ read secrets/stripe.sealed      one header line, then the sealed body
+   ├─ a buried stamp? ─► no such secret        a tombstone reads as gone
    ├─ file keys, in the order written
    │     └─ none opened it? ─► program keys    only then is anything run
    ▼
@@ -525,12 +526,48 @@ deleted.
 - **A value is not hidden from the process that asked for it.** If you export it, every child gets
   it. `run` is the narrower door, and it is still an environment.
 - **No `git`-aware anything.** The repository check is one warning about where the *key* is.
+- **The sync header is not authenticated.** It cannot be — reading it would then need the key, and a
+  machine that has no key for a store still has to be able to carry it. Somebody who can write to
+  your store can therefore roll a revision back or flip a tombstone. They cannot read anything, and
+  write access already meant they could delete the file.
+
+## Between machines
+
+`oslo sync laptop` carries the store, and **nothing is decrypted to do it**. The store key is derived
+from the profile key, so two machines that share a profile derive the same one and each can open what
+the other wrote; the sealed bodies move exactly as they stand, and the plaintext is never in memory
+on either side.
+
+Each file therefore carries a one-line header **outside** the ciphertext:
+
+```text
+OSLOSEC1 3 live 9f1c…        (32 hex characters)
+<the sealed bytes, exactly as the crypto produced them>
+```
+
+A revision, a tombstone flag and a tie-breaker — and nothing about what the secret is. It has to be
+outside, because **syncing must not need the key**: a store whose crypto is a YubiKey works only on
+the machine the key is plugged into, and the other machine still has to be able to carry its files.
+
+**What that costs, said plainly:** the header is not authenticated, because authenticating it would
+mean holding the key to read it. Somebody who can *write* to your store could roll a revision back or
+flip a tombstone. They cannot read anything, and somebody with write access could already delete the
+file outright.
+
+`oslo secret rm` is a tombstone: the sealed body is dropped and the name stays with its stamp buried,
+so the removal travels rather than being undone by the other machine on the next sync. A file written
+before there were headers still opens, and counts as never having been synced.
+
+[Syncing between machines](syncing.md) has the rest, including the bundle format and why it is not
+tar.
 
 ## Where it lives
 
 | | |
 |---|---|
-| `crates/oslo-base/src/secrets.rs` | `Store`: paths, seal, unseal, rotate, and the user-store shorthands |
+| `crates/oslo-base/src/secrets.rs` | `Store`: seal, unseal, rotate, and what a tombstone is |
+| `crates/oslo-base/src/secrets/place.rs` | where the store is, where the key is, and why those differ |
+| `crates/oslo-base/src/secrets/sync.rs` | the file header, and merging two stores without a key |
 | `crates/oslo-base/src/secrets/native.rs` | the sealed box: the wrap, the key file, the format |
 | `crates/oslo-base/src/secrets/recipient.rs` | who a store is written for, and what a build makes of one |
 | `crates/oslo-base/src/secrets/conf.rs` | `secrets.conf`: parsed, and edited line-wise |
