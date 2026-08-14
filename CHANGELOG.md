@@ -1,5 +1,37 @@
 # Changelog
 
+## [0.3.11] - 2026-08-14
+
+### <!-- 0 -->⛰️  Features
+
+- Macros and secrets travel, deletes included
+- The profile key is the store key too
+- A key per profile, and two-way sync over ssh
+
+### <!-- 1 -->🐛 Bug Fixes
+
+- Refuse an inline body before opening the store
+- Empty stores, derived copies, and a stale far end
+- The nested-shell ask was eating the profile act
+
+### <!-- 2 -->🚜 Refactor
+
+- One help renderer for every submenu
+
+### <!-- 3 -->📚 Documentation
+
+- The rule, the tombstones, and what crosses sealed
+- The key, the sync, and what secrets derive
+
+### <!-- 6 -->🧪 Testing
+
+- The secret parts only where the build has them
+- Pin the refused attributes and the key collision
+
+### <!-- 7 -->⚙️ Miscellaneous Tasks
+
+- Back to 0.3.10, the 0.4 and 0.5 tags are gone
+
 ## [0.3.10] - 2026-08-14
 
 ## [0.3.9] - 2026-08-14
