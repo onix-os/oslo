@@ -202,3 +202,45 @@ fn a_quoted_mark_is_not_completed_as_a_mark() {
 
     oslo_base::dirs::set_named_dirs(std::collections::HashMap::new());
 }
+
+/// **The highlighter has no opinion about a word containing a `$VAR`.**
+///
+/// The lexer splits `$PWD/tmp` into a variable span and a word span, and the existence check was
+/// asked of the spans one at a time — so it answered whether `/tmp` exists *from the filesystem
+/// root*. On any machine that has `/tmp`, `ls $PWD/tmp` lit up as a path that is there while
+/// `ls $PWD/one` stayed plain: both of them exactly backwards. The highlighter cannot resolve a
+/// variable, so it says nothing rather than something wrong.
+#[test]
+fn a_path_after_a_variable_is_not_judged() {
+    let root = tree();
+    let base = root.path().display();
+    let no = |_: &str| false;
+    let ctx = Context {
+        path: "",
+        is_builtin: &no,
+        is_function: &no,
+        check_paths: true,
+    };
+
+    let judged = |line: &str| {
+        classify(&lex(line), &ctx)
+            .into_iter()
+            .any(|(_, kind)| kind == TokenType::ValidPath)
+    };
+
+    // The control: with no variable in it, a real path is still recognised.
+    assert!(
+        judged(&format!("ls {base}/three")),
+        "an ordinary existing path must still be marked"
+    );
+    // `/three` exists at the root of this fixture but not at the root of the filesystem; either
+    // way, a word carrying a variable gets no verdict at all.
+    assert!(
+        !judged("ls $NOPE/three"),
+        "a word containing a variable must not be judged by its literal remainder"
+    );
+    assert!(
+        !judged("ls $PWD/tmp"),
+        "and that holds whichever way the literal remainder happens to resolve"
+    );
+}

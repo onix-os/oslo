@@ -150,11 +150,55 @@ fn glob_word_answers(spans: &[Span], ctx: &Context<'_>, checked: &mut usize) -> 
     answers
 }
 
+/// Which `Word` spans are part of a word that also contains a `$VAR`.
+///
+/// The lexer splits `$PWD/tmp` into a `Variable` span and a `Word` span, and the existence check is
+/// asked of the spans one at a time — so it was asked whether `/tmp` exists, from the filesystem
+/// root. `ls $PWD/tmp` came back underlined as a path that is not there while `ls $PWD/one` rendered
+/// plain, both of them exactly backwards.
+///
+/// The highlighter cannot resolve a variable: it has no environment, and the value can be anything.
+/// So it says nothing rather than something wrong — the same rule `glob_word_answers` follows for a
+/// quoted piece, which it also refuses to have an opinion about.
+fn touches_a_variable(spans: &[Span]) -> Vec<bool> {
+    let joined = |role: Role| {
+        matches!(
+            role,
+            Role::Word
+                | Role::Glob
+                | Role::Number
+                | Role::SingleQuote
+                | Role::DoubleQuote
+                | Role::Variable
+                | Role::Escape
+        )
+    };
+    let mut flagged = vec![false; spans.len()];
+    let mut at = 0;
+    while at < spans.len() {
+        if !joined(spans[at].role) {
+            at += 1;
+            continue;
+        }
+        let start = at;
+        while at < spans.len() && joined(spans[at].role) {
+            at += 1;
+        }
+        if spans[start..at].iter().any(|s| s.role == Role::Variable) {
+            for flag in flagged.iter_mut().take(at).skip(start) {
+                *flag = true;
+            }
+        }
+    }
+    flagged
+}
+
 /// Resolve every span into its final token type.
 pub fn classify(spans: &[Span], ctx: &Context<'_>) -> Vec<(String, TokenType)> {
     let mut out = Vec::with_capacity(spans.len());
     let mut checked = 0usize;
     let globbed = glob_word_answers(spans, ctx, &mut checked);
+    let expanded = touches_a_variable(spans);
 
     for (at, span) in spans.iter().enumerate() {
         let token = match span.role {
@@ -173,7 +217,7 @@ pub fn classify(spans: &[Span], ctx: &Context<'_>) -> Vec<(String, TokenType)> {
                     // Counted whether or not the file turned out to exist: the cap is on the
                     // syscalls, not on the hits.
                     checked += 1;
-                    if names_an_existing_file(&span.text) {
+                    if !expanded[at] && names_an_existing_file(&span.text) {
                         TokenType::ValidPath
                     } else {
                         TokenType::Param
