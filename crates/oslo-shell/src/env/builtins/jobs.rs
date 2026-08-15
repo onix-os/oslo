@@ -48,9 +48,17 @@ pub fn builtin_jobs(_env: &mut Environment, args: &[String]) -> Result<i32> {
     }
 
     let (lines, finished) = with_jobs(|jobs| {
-        let selected = match select(jobs, &operands, "jobs") {
-            Ok(ids) => ids,
-            Err(status) => return (Err(status), Vec::new()),
+        // **Every job, not the current one.** `jobs` with no operand is a *listing*, where the
+        // other three builtins that share `select` — `fg`, `bg`, `disown` — act on one job and
+        // default to the one you mean. Sharing the default made `jobs` report the newest and hide
+        // the rest, so `kill $(jobs -p)` killed one of them and `jobs` after three `&`s looked
+        // like the first two had never started.
+        let selected = match operands.is_empty() {
+            true => jobs.jobs().iter().map(|job| job.id).collect(),
+            false => match select(jobs, &operands, "jobs") {
+                Ok(ids) => ids,
+                Err(status) => return (Err(status), Vec::new()),
+            },
         };
         let mut lines = Vec::new();
         let mut finished = Vec::new();
@@ -361,6 +369,42 @@ mod tests {
         // No operands means the current job — what a bare `fg`/`bg`/`disown` acts on.
         assert_eq!(select(&jobs, &[], "fg"), Ok(vec![2]));
         assert_eq!(select(&JobTable::default(), &[], "fg"), Ok(vec![]));
+    }
+
+    /// **A bare `jobs` lists every job**, where the three builtins that act on *one* default to the
+    /// current one.
+    ///
+    /// Sharing `select`'s default made `jobs` report only the newest: three `&`s in a row looked
+    /// like the first two had never started, and `kill $(jobs -p)` — the idiom the `-p` flag is for
+    /// — killed exactly one of them.
+    #[test]
+    fn a_bare_jobs_lists_every_job() {
+        let mut jobs = JobTable::default();
+        for (pid, text) in [(31, "a"), (32, "b"), (33, "c")] {
+            jobs.add_background(Pid::from_raw(pid), vec![Pid::from_raw(pid)], text.into());
+        }
+        let listed = listing(&mut jobs, &[]);
+        assert_eq!(listed.len(), 3, "{listed:?}");
+        assert!(listed[0].contains(" a"), "{listed:?}");
+        assert!(listed[2].contains(" c"), "{listed:?}");
+
+        // Named operands still narrow it, as they always did.
+        assert_eq!(listing(&mut jobs, &args(&["%2"])).len(), 1);
+    }
+
+    /// The lines `jobs` would print for these operands.
+    fn listing(jobs: &mut JobTable, operands: &[String]) -> Vec<String> {
+        let selected: Vec<usize> = match operands.is_empty() {
+            true => jobs.jobs().iter().map(|job| job.id).collect(),
+            false => select(jobs, operands, "jobs").expect("operands resolve"),
+        };
+        selected
+            .into_iter()
+            .filter_map(|id| {
+                let marker = jobs.marker(id);
+                jobs.get(id).map(|job| long_form(job, marker, false))
+            })
+            .collect()
     }
 
     #[test]
