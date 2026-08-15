@@ -69,7 +69,30 @@ fn err(o: &Output) -> String {
     String::from_utf8_lossy(&o.stderr).into_owned()
 }
 
+/// Run the oracle, having first checked that it *is* one.
+///
+/// **On a machine where oslo has been installed as `bash`, `bash` is oslo** — a supported thing to
+/// do, and it turns every comparison below into oslo against oslo, which passes and proves nothing.
+/// The real one says `GNU bash`; oslo says `oslo version …`. Checked once, before the first
+/// comparison, because a test that cannot tell whether it is testing anything is worse than one
+/// that does not run. See `differential_tests::oracle_version`, where the same substitution had the
+/// suite demanding that real gaps be deleted.
 fn bash(args: &[&str]) -> String {
+    static CHECKED: std::sync::Once = std::sync::Once::new();
+    CHECKED.call_once(|| {
+        let banner = Command::new("bash")
+            .arg("--version")
+            .output()
+            .expect("bash must be on PATH: it is this file's oracle");
+        let banner = String::from_utf8_lossy(&banner.stdout).into_owned();
+        assert!(
+            banner.contains("GNU bash"),
+            "the oracle on $PATH is not bash — it said {:?}.\n\
+             oslo installed as `bash` is the usual cause. Put a real bash ahead of it: \
+             PATH=/tmp/realbash:$PATH cargo test",
+            banner.lines().next().unwrap_or("").trim()
+        );
+    });
     let o = Command::new("bash")
         .args(args)
         .stdin(Stdio::null())
