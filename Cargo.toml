@@ -188,7 +188,10 @@ regex = { version = "1", default-features = false, features = [
 # JSON is a core capability rather than a library a user can install: a C module cannot load into
 # a static binary, which rules out lua-cjson and every Lua JSON parser that wraps it. `serde_json`
 # is pure Rust, so it works where those cannot. See PLAN-LUA.md.
-serde_json = "1"
+# `preserve_order` keeps a document's own column order: without it `serde_json::Map` is a
+# `BTreeMap`, so `from json` handed the record its fields alphabetised and `to text` printed them in
+# an order matching neither the document nor its own header.
+serde_json = { version = "1", features = ["preserve_order"] }
 which = "7.0"
 unicode-segmentation = "1.12"
 unicode-width = "0.2"

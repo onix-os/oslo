@@ -47,7 +47,10 @@ regex = { version = "1", default-features = false, features = [
 
 # The structured pipeline's JSON, and a core capability rather than a library a user can install:
 # a C module cannot load into a static binary.
-serde_json = "1"
+# `preserve_order` keeps a document's own column order: without it `serde_json::Map` is a
+# `BTreeMap`, so `from json` handed the record its fields alphabetised and `to text` printed them in
+# an order matching neither the document nor its own header.
+serde_json = { version = "1", features = ["preserve_order"] }
 
 # Command resolution for `command -v` and the direnv stdlib's `has`.
 which = "7.0"

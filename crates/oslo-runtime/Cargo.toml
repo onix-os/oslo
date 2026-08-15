@@ -51,7 +51,10 @@ regex = { version = "1", default-features = false, features = [
 base64 = { version = "0.22", optional = true }
 
 # `oslo.json`.
-serde_json = "1"
+# `preserve_order` keeps a document's own column order: without it `serde_json::Map` is a
+# `BTreeMap`, so `from json` handed the record its fields alphabetised and `to text` printed them in
+# an order matching neither the document nor its own header.
+serde_json = { version = "1", features = ["preserve_order"] }
 
 # The `plugin` trust gate hashes a plugin's files. Optional, so a build without the feature does not
 # compile it at all.
