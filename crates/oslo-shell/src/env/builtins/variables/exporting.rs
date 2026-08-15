@@ -208,6 +208,7 @@ mod tests {
     use super::{builtin_export, builtin_unset};
     use crate::env::builtins::builtin_readonly;
     use crate::env::scope::Environment;
+    use oslo_base::error::ShellError;
 
     /// The bug this whole rewrite is named for: `-p` used to be taken as a variable name.
     #[test]
@@ -247,10 +248,16 @@ mod tests {
         env.push_scope();
         assert!(env.set_local_var("RO_KEEP", "kept"));
         builtin_readonly(&mut env, &words(&["readonly", "RO_KEEP"])).unwrap();
-        assert_eq!(
-            builtin_unset(&mut env, &words(&["unset", "RO_KEEP"])).unwrap(),
-            1
-        );
+        // **A utility error, not a status.** `unset` is a POSIX special builtin, so this has to
+        // end a non-interactive shell in POSIX mode; `posix::resolve_builtin_result` is what
+        // decides that, and folds it back to this same 1 for a shell that is not in POSIX mode.
+        // Asserting the status here would have been asserting it below the layer that chooses.
+        match builtin_unset(&mut env, &words(&["unset", "RO_KEEP"])) {
+            Err(ShellError::UtilityError { status, fatal, .. }) => {
+                assert_eq!((status, fatal), (1, 1));
+            }
+            other => panic!("expected a utility error, got {other:?}"),
+        }
         assert_eq!(env.get_var("RO_KEEP"), Some("kept"));
         env.pop_scope();
     }
