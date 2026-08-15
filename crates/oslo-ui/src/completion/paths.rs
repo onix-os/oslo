@@ -225,6 +225,29 @@ pub(crate) fn executable(path: &std::path::Path) -> bool {
 impl OsloHelper {
     pub(super) fn path_candidates(&self, word: &Word<'_>, out: &mut Vec<CompletionCandidate>) {
         let stem = word.stem.as_str();
+        // **`~name` before the first slash is a user, not a filename.** With no `/` yet the word was
+        // handed to the ordinary prefix walk and matched against the working directory, so `~ro`
+        // offered nothing at all — while the highlighter coloured `~root` as a real path and the
+        // expander resolved it. The three only had to agree.
+        if let Some(typed) = stem.strip_prefix('~')
+            && !stem.contains('/')
+            && word.quote == crate::words::Quote::None
+        {
+            for name in oslo_base::tilde::user_names() {
+                if !name.starts_with(typed) {
+                    continue;
+                }
+                // Written back as `~name/`, not as the home directory it stands for — the same rule
+                // `directories_named` follows, so accepting a completion never replaces the tilde
+                // with the path behind it.
+                out.push(CompletionCandidate::new(
+                    format!("~{name}/"),
+                    format!("~{name}/"),
+                    Some("user".to_string()),
+                ));
+            }
+            return;
+        }
         // Split on the *unquoted* value: `"My Dir/fi` has to look inside `My Dir`.
         let (dir_part, prefix) = match stem.rfind('/') {
             Some(i) => (&stem[..=i], &stem[i + 1..]),

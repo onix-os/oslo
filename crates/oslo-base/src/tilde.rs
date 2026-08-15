@@ -67,6 +67,33 @@ fn current_directory() -> Option<String> {
 }
 
 /// The home directory recorded for `name`, or `None` if there is no such user.
+/// The user names `~name` could stand for, for a completion to offer.
+///
+/// **Read from `/etc/passwd` rather than enumerated through `getpwent`.** `nix` exposes no safe
+/// iterator, and `getpwent` is not thread-safe — this runs on the keystroke path beside a writer
+/// thread. What it misses is a directory service (LDAP, SSSD) that answers `getpwnam` without
+/// having a line in the file; those names still *expand*, because expansion goes through
+/// `User::from_name`. They simply are not offered before they are typed, which is the same bargain
+/// bash's own `~` completion makes.
+///
+/// Nothing is cached: this is reached only when a word begins with `~` and has no `/` in it yet,
+/// which is a keystroke or two per session.
+pub fn user_names() -> Vec<String> {
+    let Ok(passwd) = std::fs::read_to_string("/etc/passwd") else {
+        return Vec::new();
+    };
+    let mut names: Vec<String> = passwd
+        .lines()
+        .filter(|line| !line.starts_with('#'))
+        .filter_map(|line| line.split(':').next())
+        .filter(|name| !name.is_empty())
+        .map(str::to_string)
+        .collect();
+    names.sort();
+    names.dedup();
+    names
+}
+
 fn passwd_home(name: &str) -> Option<String> {
     let user = nix::unistd::User::from_name(name).ok().flatten()?;
     Some(user.dir.to_string_lossy().into_owned())

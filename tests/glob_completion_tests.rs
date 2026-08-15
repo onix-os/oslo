@@ -244,3 +244,31 @@ fn a_path_after_a_variable_is_not_judged() {
         "and that holds whichever way the literal remainder happens to resolve"
     );
 }
+
+/// **`~name` completes to a user, because that is what it means.**
+///
+/// With no `/` in it yet the word went to the ordinary prefix walk and was matched against the
+/// working directory, so `~ro` offered nothing — while the highlighter coloured `~root` as a real
+/// path and the expander resolved it. Three views of one word, and only two of them agreed.
+///
+/// `root` is the one name every Linux `/etc/passwd` has.
+#[test]
+fn a_user_name_completes_after_a_tilde() {
+    let offered = offers("ls ~roo");
+    assert!(
+        offered.iter().any(|name| name == "~root/"),
+        "expected `~root/` among {offered:?}"
+    );
+
+    // Written back as the tilde, never as the directory it stands for.
+    assert!(
+        !offered.iter().any(|name| name.starts_with('/')),
+        "a completion must not replace the tilde with its home: {offered:?}"
+    );
+
+    // And a word that has a slash is a path again, not a user.
+    assert!(
+        !offers("ls ~root/").iter().any(|name| name == "~root/"),
+        "past the slash it is an ordinary path walk"
+    );
+}
