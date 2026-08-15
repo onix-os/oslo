@@ -153,6 +153,12 @@ pub fn builtin_bg(_env: &mut Environment, args: &[String]) -> Result<i32> {
 }
 
 /// `disown [-ahr] [jobspec …]` — stop tracking a job, so the shell forgets it exists.
+///
+/// **`-h` is a narrower thing here than in bash, and deliberately.** There it marks a job to be
+/// spared the SIGHUP an exiting shell sends its jobs; oslo never sends one — `shopt huponexit` is
+/// fixed off and says so — so there is nothing to be spared. What is left is the other half of the
+/// same flag: the job stays in the table and `jobs` keeps listing it, where a bare `disown` drops
+/// it. The shell simply stops reporting on it.
 pub fn builtin_disown(_env: &mut Environment, args: &[String]) -> Result<i32> {
     let mut all = false;
     let mut running_only = false;
@@ -191,9 +197,8 @@ pub fn builtin_disown(_env: &mut Environment, args: &[String]) -> Result<i32> {
 
     with_jobs(|jobs| {
         for id in targets {
-            // `-h` keeps the job listed and only exempts it from the shell's exit-time SIGHUP;
-            // without it the job leaves the table altogether. Marking it as already notified is
-            // what that exemption amounts to here — the shell stops reporting on it.
+            // Marked as already notified rather than removed: the entry stays findable by `jobs`
+            // and by `wait`, and the shell says nothing more about it.
             match keep_listed {
                 true => {
                     if let Some(job) = jobs.get_mut(id) {
