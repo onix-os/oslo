@@ -130,12 +130,22 @@ fn announce(pending: Vec<Transition>) {
     }
     for change in pending {
         match change {
-            Transition::ProcessExit { pid, job, status } => fire_at_here(
+            Transition::ProcessExit {
+                pid,
+                job,
+                status,
+                stage,
+                signal,
+            } => fire_at_here(
                 at::PROCESS_EXIT,
                 &[
                     ("pid", &pid.as_raw().to_string()),
                     ("job", &job.map(|id| id.to_string()).unwrap_or_default()),
                     ("status", &status.to_string()),
+                    // Empty rather than absent when there is nothing to say: a handler reading
+                    // `e.stage` gets a string either way and never has to test for nil.
+                    ("stage", &stage.map(|n| n.to_string()).unwrap_or_default()),
+                    ("signal", &signal.map(|n| n.to_string()).unwrap_or_default()),
                 ],
             ),
             Transition::JobState {

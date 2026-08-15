@@ -98,3 +98,53 @@ fn nothing_is_reported_when_nothing_is_attached() {
     assert!(out.contains("done"), "{out:?} {err}");
     assert!(!out.contains("status="), "something was announced: {out:?}");
 }
+
+/// **A signal is not an exit status**, even though the shell reports both as one number.
+///
+/// `128 + n` is what `$?` says, and it is also what a program may exit with of its own accord —
+/// `exit 137` is indistinguishable from being killed. The field says which happened.
+///
+/// **Killed from outside rather than by itself**, because a backgrounded list runs in a subshell:
+/// a child that signals *itself* is still a subshell calling `exit(128 + n)` on the way out, and
+/// this shell's own child exited perfectly normally. `kill %1` signals the group, so the process
+/// this shell forked is the one the kernel kills.
+#[test]
+fn on_process_exit_names_the_signal_that_killed_it() {
+    let (out, err) = lua(r#"
+        oslo.on["on-process-exit"](function(e)
+          print("gone status=" .. tostring(e.status) .. " signal=" .. tostring(e.signal))
+        end)
+        oslo.proc.exec("sleep 5 &")
+        oslo.proc.exec("kill -TERM %1")
+        oslo.proc.exec("sleep 0.4")
+        oslo.proc.exec("true")
+        "#);
+    assert!(
+        out.contains("status=143 signal=15"),
+        "the signal was not reported: {out:?} {err}"
+    );
+}
+
+/// The stage number reaches a handler, and for a backgrounded list it is stage one.
+///
+/// **`cmd | cmd &` is one process to this shell, not two.** A backgrounded and-or list runs in a
+/// subshell, so the pipeline's stages are that subshell's children and the job holds the single
+/// process the shell forked. A job with several stages is one the shell forked itself — a
+/// foreground pipeline that was stopped and resumed — and reaching that from here would mean
+/// typing Ctrl-Z at a terminal. The stage numbering itself is pinned in the job table's own tests,
+/// and the payload is pinned here.
+#[test]
+fn on_process_exit_says_which_stage_it_was() {
+    let (out, err) = lua(r#"
+        oslo.on["on-process-exit"](function(e)
+          print("stage " .. tostring(e.stage) .. " status " .. tostring(e.status))
+        end)
+        oslo.proc.exec([[sh -c "exit 4" | sh -c "exit 5" &]])
+        oslo.proc.exec("sleep 0.5")
+        oslo.proc.exec("true")
+        "#);
+    assert!(
+        out.contains("stage 1 status 5"),
+        "no stage reached the handler: {out:?} {err}"
+    );
+}

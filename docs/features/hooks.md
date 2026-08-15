@@ -121,8 +121,8 @@ Fields marked *(strings)* are strings even when they read as numbers: a notifyin
 | `on-completion-start` | Tab, only with candidates | `{ word, line, count }` *(strings)* | — |
 | `on-completion-cancel` | the menu declined | `{ word }` | — |
 | `on-completion-select` | a candidate taken | `{ value, word }` | — |
-| `on-job-finish` | the job reaper, ended jobs only | `{ id, pid, text, status }` *(strings)* | — |
-| `on-process-exit` | the job reaper, one per process | `{ pid, job, status }` *(strings)* | — |
+| `on-job-finish` | the job reaper, ended jobs only | `{ id, pid, text, status, pipestatus }` *(strings)* | — |
+| `on-process-exit` | the job reaper, one per process | `{ pid, job, status, stage, signal }` *(strings)* | — |
 | `on-job-state` | the job reaper, on a transition | `{ id, pid, text, from, to, background }` *(strings)* | — |
 | `on-focus-change` | a focus report from the terminal | `{ focused }` — `"1"` / `""` | — |
 | `on-variable-change` | an assignment, `export`, `unset`, `universal`, or the store re-read | `{ name, action, scope, source, exported }` *(strings)* | — |
@@ -170,6 +170,17 @@ stages is three of the latter and one of the former, which is the difference a p
 particular child needs. `on-job-state` is the transition — `from` and `to`, both of `running`,
 `stopped` and `ended` — because "it stopped" and "it was already stopped" are different things to a
 status line.
+
+`stage` counts from one, in the order the pipeline was written, and does not move as the other
+stages end. `signal` is the signal that killed the process, empty when none did — `status` cannot
+answer that, because `128 + n` is also a status a program may exit with of its own accord.
+`pipestatus` is every stage's status in the same order, space-separated, with `?` for a stage that
+left none behind; `status` on its own is the last stage's, which is exactly what a pipeline's
+failure usually is not.
+
+**A backgrounded list is one process, not several.** `a | b &` runs the whole pipeline in a
+subshell, so this shell has one child and the job has one stage. A job with several is one the
+shell forked itself — a foreground pipeline that was stopped and resumed.
 
 **They fire after the job table's lock is released, not while it is held.** A handler is entitled to
 call `oslo.job.list()`, which takes that same lock; firing from inside the reaper would be a handler

@@ -99,6 +99,7 @@ pub(super) fn announce_changes(jobs: &mut JobTable) {
                     ("pid", &job.pgid.as_raw().to_string()),
                     ("text", &job.command),
                     ("status", &status.to_string()),
+                    ("pipestatus", &pipestatus(job)),
                 ],
             );
             retire.push(id);
@@ -107,6 +108,22 @@ pub(super) fn announce_changes(jobs: &mut JobTable) {
     for id in retire {
         jobs.remove(id);
     }
+}
+
+/// Every stage's status, in pipeline order, space-separated — the shape `$PIPESTATUS` has.
+///
+/// **`status` alone is the last stage's**, which for `grep x file | head` says nothing about
+/// whether `grep` found anything. A stage that left no status behind — disowned, or reaped by
+/// somebody who did not record it — is written as `?` rather than as a plausible number.
+fn pipestatus(job: &Job) -> String {
+    job.stages
+        .iter()
+        .map(|pid| match job.outcomes.iter().find(|(p, _)| p == pid) {
+            Some((_, code)) => code.to_string(),
+            None => "?".to_string(),
+        })
+        .collect::<Vec<_>>()
+        .join(" ")
 }
 
 /// Whether an `on-report` handler drew this job's notice instead.
@@ -141,12 +158,28 @@ mod tests {
             id: 1,
             pgid: Pid::from_raw(5),
             pids: vec![Pid::from_raw(5)],
+            stages: vec![Pid::from_raw(5)],
+            outcomes: Vec::new(),
             ended: Vec::new(),
             command: command.to_string(),
             state: JobState::Running,
             notified: false,
             background: false,
         }
+    }
+
+    /// **Every stage's status, in the order the pipeline was written.**
+    ///
+    /// `status` is the last stage's, which is exactly the thing a pipeline's failure usually is
+    /// not: `grep x file | head` succeeds whether or not `grep` found anything.
+    #[test]
+    fn pipestatus_is_every_stage_in_order() {
+        let mut job = running("a | b | c");
+        job.stages = (11..14).map(Pid::from_raw).collect();
+        // Reported out of order, and the middle one never reported at all.
+        job.outcomes = vec![(Pid::from_raw(13), 6), (Pid::from_raw(11), 4)];
+
+        assert_eq!(pipestatus(&job), "4 ? 6");
     }
 
     /// The line `jobs` prints, and the notice a finished job produces.

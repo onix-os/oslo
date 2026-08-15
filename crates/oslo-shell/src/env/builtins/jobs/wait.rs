@@ -339,7 +339,11 @@ fn wait_first_of(targets: &[Pid]) -> Option<(Pid, i32)> {
                 // collects whichever ends first; the kernel will never offer this one again, so a
                 // later `wait $that` has nowhere but the table to find it. Dropping it here is what
                 // made that wait answer 127 and "not a child of this shell".
-                with_jobs(|jobs| jobs.keep_status(pid, code));
+                let signal = match status {
+                    WaitStatus::Signaled(_, sig, _) => Some(sig as i32),
+                    _ => None,
+                };
+                with_jobs(|jobs| jobs.keep_status(pid, code, signal));
             }
             Err(Errno::EINTR) => continue,
             Err(_) => return None,
