@@ -267,7 +267,11 @@ fn capture(
     use std::io::Read;
     use std::os::fd::{AsRawFd, FromRawFd};
 
-    let (reader, writer) = nix::unistd::pipe()
+    // **`O_CLOEXEC`, so the pair does not leak into every stage of the prefix.** Without it each
+    // forked command inherits a read end of the very pipe it is writing to as stdout — a descriptor
+    // nothing there will ever use, and one more holder of a pipe whose lifetime decides when the
+    // read below sees EOF.
+    let (reader, writer) = nix::unistd::pipe2(nix::fcntl::OFlag::O_CLOEXEC)
         .map_err(|e| oslo_base::error::ShellError::ExecutionError(format!("pipe: {e}")))?;
 
     // stdout is put back whatever happens below, including on the error path: leaving the shell
@@ -277,15 +281,29 @@ fn capture(
     let _ = nix::unistd::dup2(writer.as_raw_fd(), std::io::stdout().as_raw_fd());
     drop(writer);
 
+    // **Drained while the prefix runs, not after it.** A pipe holds 64 KiB; reading only once
+    // `fallback` returned meant the prefix blocked in `write` the moment it produced more than that,
+    // and `fallback` cannot return until the prefix exits. `cat big.json | from json | …` hung for
+    // ever, at exactly one byte over the pipe's capacity — the documented headline example of this
+    // very module, for any input a real command produces.
+    let draining = std::thread::spawn(move || {
+        let mut output = String::new();
+        let mut reader = std::fs::File::from(reader);
+        let _ = reader.read_to_string(&mut output);
+        output
+    });
+
     let status = fallback(env, prefix);
 
+    // **Before the join, and that order is the whole of it.** The reader sees EOF only once every
+    // write end is gone: the prefix's children close theirs by exiting, which `fallback` has waited
+    // for, and this puts back the shell's own — the last one.
+    //
     // SAFETY: `saved` is a descriptor this function created with `dup` and has not closed.
     let saved = unsafe { std::os::fd::OwnedFd::from_raw_fd(saved) };
     let _ = nix::unistd::dup2(saved.as_raw_fd(), std::io::stdout().as_raw_fd());
 
-    let mut output = String::new();
-    let mut reader = std::fs::File::from(reader);
-    let _ = reader.read_to_string(&mut output);
+    let output = draining.join().unwrap_or_default();
     Ok((status?, output))
 }
 
