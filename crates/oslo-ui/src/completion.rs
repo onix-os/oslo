@@ -123,13 +123,23 @@ impl OsloHelper {
                 Some(braced) => self.variable_candidates(braced, Braced::Yes, word.quote, &mut out),
                 None => self.variable_candidates(prefix, Braced::No, word.quote, &mut out),
             }
-        } else if word.stem.starts_with('@') && !word.stem.contains('/') && !word.command_position {
+        } else if word.stem.starts_with('@')
+            && word.quote == Quote::None
+            && !word.stem.contains('/')
+            && !word.command_position
+        {
             // A name still being typed. `@work/` has already been retargeted at the directory it
             // stands for, so only the bare name reaches here.
             //
             // **Not at the start of a line**, where `@name` does not expand either: that position is
             // reserved, and offering completions for it would promise something the shell will not
             // then do.
+            //
+            // **And not inside quotes**, for the same reason and a worse symptom. A quoted `@name`
+            // is a literal to the expander, so completing it promises an expansion that will not
+            // happen — and `named_dir_candidates` writes back as if the word were unquoted, so
+            // `ls "@pr<Tab>` came back as `ls @proj/` with the opening quote deleted. Every sibling
+            // builder in `sugar.rs` declines a quoted word; this branch was the one that did not.
             self.named_dir_candidates(word.stem.as_str(), &mut out);
             if out.is_empty() {
                 self.path_candidates(&word, &mut out);

@@ -166,3 +166,39 @@ fn a_glob_that_reaches_nothing_offers_nothing() {
     assert!(offers(&format!("ls {base}/nosuch/*")).is_empty());
     assert!(offers(&format!("ls {base}/one/zz*")).is_empty());
 }
+
+/// **A quoted `@name` is a literal, and completion must not pretend otherwise.**
+///
+/// The expander only substitutes an unquoted `@name`, so offering a mark inside quotes promises an
+/// expansion that will never happen. The symptom was worse than a wrong candidate: the mark builder
+/// writes back as though the word were bare, so `ls "@pr` + Tab returned `ls @proj/` — the opening
+/// quote deleted, and with a closing quote present the line fell to a continuation prompt.
+#[test]
+fn a_quoted_mark_is_not_completed_as_a_mark() {
+    let root = tree();
+    oslo_base::dirs::set_named_dirs(
+        [(
+            "marked".to_string(),
+            root.path().join("three").display().to_string(),
+        )]
+        .into_iter()
+        .collect(),
+    );
+
+    assert!(
+        offers("ls @mark")
+            .iter()
+            .any(|name| name.contains("marked")),
+        "an unquoted mark still completes: {:?}",
+        offers("ls @mark")
+    );
+    assert!(
+        !offers("ls \"@mark")
+            .iter()
+            .any(|name| name.contains("marked")),
+        "a quoted mark must not be offered: {:?}",
+        offers("ls \"@mark")
+    );
+
+    oslo_base::dirs::set_named_dirs(std::collections::HashMap::new());
+}
