@@ -29,7 +29,7 @@
 //!   and approximating it would be worse than refusing.
 
 mod commands;
-mod extended_test;
+pub mod extended_test;
 mod redirects;
 mod words;
 

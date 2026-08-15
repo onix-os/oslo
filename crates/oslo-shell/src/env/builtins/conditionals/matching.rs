@@ -36,6 +36,35 @@ pub(super) const REGEX_OP: &str = "=~";
 /// same source-quoting test.
 pub(super) const REGEX_LITERAL_OP: &str = "=~lit";
 
+/// The markers the adapter leaves around a quoted run. See there for why they exist.
+use crate::syntax::brush_adapter::extended_test::{QUOTED_CLOSE, QUOTED_OPEN};
+
+/// Turn a marked operand into a regex: what was quoted is escaped, what was not is left as it is.
+fn with_quoted_runs_escaped(source: &str) -> String {
+    if !source.contains(QUOTED_OPEN) {
+        return source.to_string();
+    }
+    let mut out = String::with_capacity(source.len());
+    let mut rest = source;
+    while let Some(at) = rest.find(QUOTED_OPEN) {
+        out.push_str(&rest[..at]);
+        let after = &rest[at + QUOTED_OPEN.len_utf8()..];
+        match after.find(QUOTED_CLOSE) {
+            Some(end) => {
+                out.push_str(&regex::escape(&after[..end]));
+                rest = &after[end + QUOTED_CLOSE.len_utf8()..];
+            }
+            // An opener with no closer cannot come from the adapter; leave the text alone rather
+            // than eating the rest of the pattern.
+            None => {
+                rest = after;
+            }
+        }
+    }
+    out.push_str(rest);
+    out
+}
+
 /// Whether `op` is one of the two regex spellings.
 ///
 /// Used to route *before* [`super::operators::eval_binary`], which cannot do this job: matching
@@ -57,7 +86,7 @@ pub(super) fn eval_regex_match(
     let source = if op == REGEX_LITERAL_OP {
         regex::escape(operand)
     } else {
-        operand.to_string()
+        with_quoted_runs_escaped(operand)
     };
 
     let re = compile(&source)?;
