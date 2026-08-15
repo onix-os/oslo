@@ -182,9 +182,80 @@ pub fn ps2(env: &mut Environment) -> String {
 /// parameter expansion and command substitution. Doing it the other way round is not a
 /// refinement but a bug — `parse_single_word` reads a backslash as *quoting*, so `PS1='\w'`
 /// would expand to the letter `w`.
+///
+/// # What an escape produces is not shell source
+///
+/// **This was a command injection, and an easy one to meet.** `\w` is the working directory, and
+/// the second pass ran command substitution over the result — so a directory named
+/// `$(touch /tmp/pwned)` executed that on every prompt, and `cd`-ing into a cloned repository or an
+/// unpacked archive was enough to do it. bash does not: with `promptvars` on, which is its default,
+/// it expands the string *you wrote* and prints what `\w` produced literally. Measured against
+/// bash 5 rather than assumed.
+///
+/// So every escape whose value comes from outside the prompt string — the directory, the user, the
+/// host, the tty — is decoded to an opaque placeholder, and the real text is put back after the
+/// expansion has run and can no longer act on it. The escapes that produce a fixed character the
+/// author chose (`\n`, `\$`, an octal byte) are left alone: they carry nothing from outside and
+/// `PS1='\$USER'` goes on meaning what it always did.
 pub fn expand_prompt(env: &mut Environment, raw: &str) -> String {
-    let decoded = decode_escapes(env, raw);
-    expand_prompt_free_text(env, &decoded).unwrap_or(decoded)
+    let (decoded, values) = decode_escapes(env, raw);
+    let expanded = match expand_prompt_free_text(env, &decoded) {
+        Some(text) => text,
+        None => decoded,
+    };
+    restore(&expanded, &values)
+}
+
+/// The two bytes that bracket a placeholder, and cannot be typed into a prompt by accident.
+const HOLD_OPEN: char = '\u{1}';
+const HOLD_CLOSE: char = '\u{2}';
+
+/// Stand `value` aside, leaving a marker the expander cannot act on.
+fn protect(out: &mut String, values: &mut Vec<String>, value: &str) {
+    out.push(HOLD_OPEN);
+    out.push_str(&values.len().to_string());
+    out.push(HOLD_CLOSE);
+    values.push(value.to_string());
+}
+
+/// Put the stood-aside values back where their markers are.
+///
+/// A marker that does not parse is left exactly as it is: the text may have come from the user's
+/// own prompt, and eating something because it looked like ours would be the same class of mistake
+/// this whole arrangement exists to avoid.
+fn restore(text: &str, values: &[String]) -> String {
+    if values.is_empty() {
+        return text.to_string();
+    }
+    let mut out = String::with_capacity(text.len());
+    let mut rest = text;
+    while let Some(at) = rest.find(HOLD_OPEN) {
+        out.push_str(&rest[..at]);
+        let after = &rest[at + HOLD_OPEN.len_utf8()..];
+        match after.find(HOLD_CLOSE) {
+            Some(end) => {
+                match after[..end]
+                    .parse::<usize>()
+                    .ok()
+                    .and_then(|i| values.get(i))
+                {
+                    Some(value) => out.push_str(value),
+                    None => {
+                        out.push(HOLD_OPEN);
+                        out.push_str(&after[..end]);
+                        out.push(HOLD_CLOSE);
+                    }
+                }
+                rest = &after[end + HOLD_CLOSE.len_utf8()..];
+            }
+            None => {
+                out.push(HOLD_OPEN);
+                rest = after;
+            }
+        }
+    }
+    out.push_str(rest);
+    out
 }
 
 /// Run one string through the shell's own expander, or `None` if it will not expand.
@@ -203,8 +274,11 @@ fn expand_prompt_free_text(env: &mut Environment, text: &str) -> Option<String> 
 /// prompt can say that a plain expansion cannot. An escape that is not in the table keeps its
 /// backslash, so a prompt written for bash degrades to something readable rather than to
 /// silence.
-fn decode_escapes(env: &Environment, raw: &str) -> String {
+fn decode_escapes(env: &Environment, raw: &str) -> (String, Vec<String>) {
     let mut out = String::with_capacity(raw.len());
+    // What the escapes below produced, stood aside so the expansion that follows cannot act on it.
+    // See [`expand_prompt`] — this is a command injection when it is not done.
+    let mut values: Vec<String> = Vec::new();
     let mut chars = raw.chars();
     while let Some(ch) = chars.next() {
         if ch != '\\' {
@@ -218,28 +292,36 @@ fn decode_escapes(env: &Environment, raw: &str) -> String {
             Some('e') => out.push('\u{1b}'),
             Some('n') => out.push('\n'),
             Some('r') => out.push('\r'),
-            Some('s') => out.push_str("oslo"),
+            Some('s') => protect(&mut out, &mut values, "oslo"),
             Some('$') => out.push(if nix::unistd::geteuid().is_root() {
                 '#'
             } else {
                 '$'
             }),
-            Some('u') => out.push_str(&user_name(env)),
-            Some('h') => out.push_str(host_name().split('.').next().unwrap_or_default()),
-            Some('H') => out.push_str(&host_name()),
-            Some('w') => out.push_str(&tilde_pwd(env)),
+            Some('u') => protect(&mut out, &mut values, &user_name(env)),
+            Some('h') => protect(
+                &mut out,
+                &mut values,
+                host_name().split('.').next().unwrap_or_default(),
+            ),
+            Some('H') => protect(&mut out, &mut values, &host_name()),
+            Some('w') => protect(&mut out, &mut values, &tilde_pwd(env)),
             Some('W') => {
                 let pwd = tilde_pwd(env);
                 let base = pwd.rsplit('/').next().unwrap_or(&pwd);
-                out.push_str(if base.is_empty() { &pwd } else { base });
+                protect(
+                    &mut out,
+                    &mut values,
+                    if base.is_empty() { &pwd } else { base },
+                );
             }
             // The clock escapes. Local time, not UTC: a prompt showing the wrong hour is worse
             // than one showing none, and `localtime_r` is where the system keeps the answer.
-            Some('t') => out.push_str(&clock("%H:%M:%S")),
-            Some('T') => out.push_str(&clock("%I:%M:%S")),
-            Some('@') => out.push_str(&clock("%I:%M %p")),
-            Some('A') => out.push_str(&clock("%H:%M")),
-            Some('d') => out.push_str(&clock("%a %b %e")),
+            Some('t') => protect(&mut out, &mut values, &clock("%H:%M:%S")),
+            Some('T') => protect(&mut out, &mut values, &clock("%I:%M:%S")),
+            Some('@') => protect(&mut out, &mut values, &clock("%I:%M %p")),
+            Some('A') => protect(&mut out, &mut values, &clock("%H:%M")),
+            Some('d') => protect(&mut out, &mut values, &clock("%a %b %e")),
             // `\D{...}` takes a strftime format of its own.
             Some('D') => {
                 let mut format = String::new();
@@ -252,20 +334,30 @@ fn decode_escapes(env: &Environment, raw: &str) -> String {
                         format.push(c);
                     }
                 }
-                out.push_str(&clock(if format.is_empty() { "%X" } else { &format }));
+                let shown = clock(if format.is_empty() { "%X" } else { &format });
+                protect(&mut out, &mut values, &shown);
             }
             // Which line of history this will be. bash counts from one.
-            Some('!') | Some('#') => out.push_str(&(oslo_ui::recall::len() + 1).to_string()),
+            Some('!') | Some('#') => protect(
+                &mut out,
+                &mut values,
+                &(oslo_ui::recall::len() + 1).to_string(),
+            ),
             // Jobs the shell is tracking.
-            Some('j') => out.push_str(&crate::startup::history::job_count().to_string()),
+            Some('j') => protect(
+                &mut out,
+                &mut values,
+                &crate::startup::history::job_count().to_string(),
+            ),
             // The terminal's basename, as bash reports it.
-            Some('l') => out.push_str(
-                &nix::unistd::ttyname(std::io::stdin())
+            Some('l') => {
+                let tty = nix::unistd::ttyname(std::io::stdin())
                     .ok()
                     .and_then(|p| p.file_name().map(|n| n.to_string_lossy().into_owned()))
-                    .unwrap_or_default(),
-            ),
-            Some('v') | Some('V') => out.push_str(oslo_base::version::current()),
+                    .unwrap_or_default();
+                protect(&mut out, &mut values, &tty);
+            }
+            Some('v') | Some('V') => protect(&mut out, &mut values, oslo_base::version::current()),
             // `\nnn` is an octal byte, which is how a prompt reaches a character it cannot type.
             Some(d @ '0'..='7') => {
                 let mut digits = String::from(d);
@@ -294,7 +386,7 @@ fn decode_escapes(env: &Environment, raw: &str) -> String {
             }
         }
     }
-    out
+    (out, values)
 }
 
 /// The current local time, formatted.
@@ -416,12 +508,37 @@ mod tests {
         assert!(out.starts_with('/') || out.starts_with('~'), "{out:?}");
     }
 
+    /// **What an escape produced is printed, not run.**
+    ///
+    /// `\w` is the working directory and the prompt used to go through command substitution
+    /// *after* it was substituted in, so a directory named `$(touch /tmp/pwned)` ran that on every
+    /// prompt — entering a cloned repository was enough. `\u` is the same door with a settable
+    /// value, which is why the test uses it: `$USER` is a variable, `current_dir` is the process.
+    ///
+    /// bash 5 with `promptvars` on — its default — prints the name literally, and so does this.
+    #[test]
+    fn an_escape_that_looks_like_a_substitution_is_not_run() {
+        let mut env = env_with(&[("USER", "$(echo pwned)")]);
+        assert_eq!(expand_prompt(&mut env, "\\u"), "$(echo pwned)");
+        assert_eq!(expand_prompt(&mut env, "[\\u]"), "[$(echo pwned)]");
+
+        // Backticks are the other spelling, and were the other half of the same hole.
+        let mut env = env_with(&[("USER", "`echo pwned`")]);
+        assert_eq!(expand_prompt(&mut env, "\\u"), "`echo pwned`");
+
+        // A variable *in the prompt the author wrote* still expands: that is `promptvars`, and it
+        // is the behaviour this must not take away while closing the hole.
+        let mut env = env_with(&[("USER", "ada"), ("WHO", "somebody")]);
+        assert_eq!(expand_prompt(&mut env, "$WHO"), "somebody");
+        assert_eq!(expand_prompt(&mut env, "\\u"), "ada");
+    }
+
     #[test]
     fn unknown_escapes_keep_their_backslash() {
         let env = env_with(&[]);
-        assert_eq!(decode_escapes(&env, "\\q"), "\\q");
-        assert_eq!(decode_escapes(&env, "a\\\\b"), "a\\b");
-        assert_eq!(decode_escapes(&env, "\\[x\\]"), "x");
+        assert_eq!(decode_escapes(&env, "\\q").0, "\\q");
+        assert_eq!(decode_escapes(&env, "a\\\\b").0, "a\\b");
+        assert_eq!(decode_escapes(&env, "\\[x\\]").0, "x");
     }
 
     #[test]
