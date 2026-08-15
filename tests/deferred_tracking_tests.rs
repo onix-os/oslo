@@ -17,6 +17,19 @@ use std::process::{Command, Stdio};
 
 /// Run an interactive shell against a private data directory and answer where its store ended up.
 fn interactive_session(lines: &str) -> (tempfile::TempDir, std::path::PathBuf) {
+    let (home, store, status) = session_ending_however(lines);
+    assert!(status.code().is_some(), "the shell was killed, not exited");
+    (home, store)
+}
+
+/// The same, for the sessions that do not end by `exit` — the ones this file exists to pin.
+fn session_ending_however(
+    lines: &str,
+) -> (
+    tempfile::TempDir,
+    std::path::PathBuf,
+    std::process::ExitStatus,
+) {
     let home = tempfile::tempdir().expect("tempdir");
     let data = home.path().join("data");
     std::fs::create_dir_all(home.path().join("config/oslo")).expect("config dir");
@@ -41,12 +54,74 @@ fn interactive_session(lines: &str) -> (tempfile::TempDir, std::path::PathBuf) {
         .expect("stdin")
         .write_all(lines.as_bytes())
         .expect("feed the shell");
-    let status = child.wait().expect("oslo exits");
-    assert!(status.code().is_some(), "the shell was killed, not exited");
+    let status = child.wait().expect("oslo is reaped");
 
     let store =
         oslo_base::track::default_path(data.to_str(), home.path().to_str()).expect("a store path");
-    (home, store)
+    (home, store, status)
+}
+
+/// Every line the shell accepted, in the order it accepted them.
+fn lines_recorded(store: &std::path::Path) -> Vec<String> {
+    let track = oslo_base::track::Track::open(store).expect("the store opens");
+    let (seen, _) = track.observations(50);
+    seen.into_iter().map(|row| row.line).collect()
+}
+
+/// **A killed shell keeps the line.** The log row is appended before the command runs, on the prompt
+/// thread, and that is the entire reason it is not deferred with everything else: a command that has
+/// to be killed is exactly the one you want to find in your history afterwards.
+///
+/// `docs/features/what-gets-written-down.md` promises this. Deferring the append quietly took it
+/// away, and nothing here noticed — so it is asserted now.
+#[test]
+fn a_killed_shell_still_recorded_the_line_it_was_running() {
+    let (_home, store, status) = session_ending_however("echo alpha\nkill -9 $$\n");
+    assert!(status.code().is_none(), "the shell was meant to be killed");
+
+    let lines = lines_recorded(&store);
+    assert!(
+        lines.iter().any(|line| line == "echo alpha"),
+        "a killed shell lost the line it had already accepted: {lines:?}"
+    );
+}
+
+/// **`exec` is an ordinary way out, and has to wait like one.** It never returns to the loop, so it
+/// never reaches `settle_stores`; without its own barrier the writer queue is replaced along with
+/// the process image and the session loses its tail. `exec $SHELL` after editing a config is the
+/// commonest way anyone restarts a shell.
+///
+/// **Asserted on the status, not the line.** The lines are appended on the prompt thread and would
+/// survive an `exec` with no barrier at all; the boundary and the outcome behind them are what the
+/// queue is still holding, so a row left at `None` is the shape a missing barrier leaves.
+///
+/// **This does not prove the barrier.** Measured with it removed, an idle machine drains the queue
+/// before `execve` every time — at three commands and at three hundred. The barrier earns its place
+/// where the queue is genuinely behind: a large store, a filesystem whose commits block, a loaded
+/// box. What this test does catch is the deferred half going missing for any reason that is *not* a
+/// race. The barrier's own semantics are pinned in `track::writer`'s tests, which can be made to
+/// fail on purpose.
+#[test]
+fn a_session_that_ends_by_exec_still_wrote_everything() {
+    let (_home, store, _) = session_ending_however("echo one\necho two\nexec /bin/true\n");
+
+    let track = oslo_base::track::Track::open(&store).expect("the store opens");
+    let (seen, _) = track.observations(50);
+    let settled: Vec<(String, Option<i32>)> = seen
+        .into_iter()
+        .filter(|row| row.line.starts_with("echo "))
+        .map(|row| (row.line, row.status))
+        .collect();
+
+    assert_eq!(
+        settled.len(),
+        2,
+        "a line went missing entirely: {settled:?}"
+    );
+    assert!(
+        settled.iter().all(|(_, status)| status.is_some()),
+        "the writer queue was replaced along with the process image: {settled:?}"
+    );
 }
 
 /// Every accepted command has its outcome written by the time the process is gone.

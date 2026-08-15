@@ -125,6 +125,13 @@ pub fn builtin_exec(_env: &mut Environment, args: &[String]) -> Result<i32> {
     let mut c_args = vec![exec_cstring(argv0.as_bytes())];
     c_args.extend(inv.operands[1..].iter().map(|a| exec_cstring(a.as_bytes())));
 
+    // **The last chance anything has to be written down.** `exec` is an ordinary way out of an
+    // interactive shell — `exec $SHELL` after editing a config is how most people restart one — but
+    // it is the only one that does not return to the loop, so it never reaches the barrier in
+    // `settle_stores`. Without this, whatever the writer thread still holds is replaced along with
+    // the process image, and the session loses its tail. See `oslo_base::track::writer`.
+    oslo_base::track::writer::settle();
+
     // The program replacing this one must not inherit the shell's signal policy: the REPL ignores
     // SIGTSTP and friends so job-control keystrokes cannot stop the shell, and an ignored
     // disposition survives `exec`.

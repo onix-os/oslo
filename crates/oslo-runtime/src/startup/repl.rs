@@ -513,7 +513,7 @@ pub fn run_repl(login: bool) -> ! {
                         mode: mode.name(),
                         result: &res,
                         elapsed,
-                        logged_as: logged_as.as_ref(),
+                        logged_as,
                     });
                 }
 

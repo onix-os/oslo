@@ -18,7 +18,6 @@
 //! without the first one's answer suddenly meaning more than it did.
 
 use super::{History, Mode, remember, remember_history};
-use oslo_base::track::writer::Ticket;
 use oslo_lua::Value;
 
 /// Write the line down, unless it is hidden. Answers the log row, for joining what it *did* to it.
@@ -31,20 +30,25 @@ use oslo_lua::Value;
 /// `entered` is the line as *typed*, not the replacement a handler may have returned: history is
 /// what you wrote rather than what ran.
 ///
-/// # Why this answers a [`Ticket`] and not an id
+/// # Why the append stays on this thread when everything after it does not
 ///
-/// The two things the editor needs from a typed line — that it is in the recall list, and that a
-/// language switch will not lose it — are done here and now, because the very next keystroke can
-/// ask for them. The *store* needs none of that urgency: nothing drawn before the next prompt reads
-/// the row back. So the append joins the queue, and what comes back is where its id will be. See
-/// [`oslo_base::track::writer`].
+/// Because this is the row that says the command was typed at all, and it is the only one written
+/// *before* the command runs. A shell killed mid-command — the case
+/// `docs/features/what-gets-written-down.md` promises about — has this row and nothing else, which
+/// is exactly the guarantee worth having.
+///
+/// Deferring it bought 0.63 ms of prompt-thread CPU and no measurable latency at all: Enter to
+/// prompt-ready measured 0.40 ms either way over 150 samples. It cost the guarantee, and it lost
+/// the tail of every session ending in `exec`. Everything *after* the command — the boundary, the
+/// outcome, a rewrite of this row, the trim — is a record of something already finished, and does
+/// go to [`oslo_base::track::writer`].
 pub(super) fn write_down(
     history: &mut History,
     entered: &str,
     mode: Mode,
     hidden: bool,
     max_size: usize,
-) -> Option<Ticket> {
+) -> Option<u64> {
     remember(history, entered, hidden);
     if hidden {
         return None;
@@ -52,30 +56,24 @@ pub(super) fn write_down(
     // Kept alongside the editor's own copy so a later language switch, which refills that copy from
     // scratch, still finds this line.
     remember_history(entered, mode);
-    // Asked here rather than in the job: a shell with no store logs nothing, and the loop has to
-    // know that now, because it decides whether there is an outcome to record at all.
-    oslo_base::track::store()?;
-
-    let ticket = Ticket::pending();
-    let filling = ticket.clone();
-    let entered = entered.to_string();
-    let mode = match mode {
-        Mode::Lua => oslo_base::track::log::MODE_LUA,
-        Mode::Shell => oslo_base::track::log::MODE_SHELL,
-    };
+    let db = oslo_base::track::store()?;
+    let id = db.append(
+        entered,
+        match mode {
+            Mode::Lua => oslo_base::track::log::MODE_LUA,
+            Mode::Shell => oslo_base::track::log::MODE_SHELL,
+        },
+    );
+    // `$HISTSIZE` bounds the log as well as the editor's copy, or the file grows without limit while
+    // the shell politely forgets. Amortised, because the trim is a full scan and this used to be one
+    // per line typed. **Queued**, unlike the append: nothing waits on the bound being enforced this
+    // instant, and the scan is long enough to be felt — see `PLAN.md`.
     oslo_base::track::writer::defer(move || {
-        let Some(db) = oslo_base::track::store() else {
-            return;
-        };
-        if let Some(id) = db.append(&entered, mode) {
-            filling.fill(id);
+        if let Some(db) = oslo_base::track::store() {
+            db.trim_soon(max_size.max(1));
         }
-        // `$HISTSIZE` bounds the log as well as the editor's copy, or the file grows without limit
-        // while the shell politely forgets. Amortised, because the trim is a full scan and this
-        // used to be one per line typed.
-        db.trim_soon(max_size.max(1));
     });
-    Some(ticket)
+    id
 }
 
 /// What the loop should do with the line.

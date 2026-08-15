@@ -17,9 +17,8 @@ pub(in crate::startup) struct Finished<'a> {
     pub mode: &'a str,
     pub result: &'a Result<i32, ShellError>,
     pub elapsed: Duration,
-    /// The log row it went in under, if it was logged at all — which the append has very likely
-    /// not answered yet. See [`track::writer::Ticket`].
-    pub logged_as: Option<&'a track::writer::Ticket>,
+    /// The log row it went in under, if it was logged at all.
+    pub logged_as: Option<u64>,
 }
 
 impl Tracker {
@@ -43,17 +42,8 @@ impl Tracker {
         let rows = done
             .logged_as
             .filter(|_| !lines.is_empty())
-            .map(|row| (row.clone(), outcome_rows(done.result, done.elapsed)));
+            .map(|id| (id, outcome_rows(done.result, done.elapsed)));
         let rides_along = rows.is_some() && matches!(decided, Recording::AsTyped);
-
-        // The predictor's half of the same pairing, and it has to travel with them. `record` runs
-        // inside the append, on the writer thread; `settle` takes what that held. Left on this
-        // thread the two would invert the first time the queue was even slightly behind, and the
-        // model would learn a line's status against the line before it.
-        if rows.is_some() {
-            let status = outcome_status(done.result);
-            track::writer::defer(move || settle_prediction(status));
-        }
 
         for (first, line) in lines.iter().enumerate().map(|(i, l)| (i == 0, l)) {
             let run = ran(line, done.mode, done.result, done.elapsed);
@@ -63,7 +53,7 @@ impl Tracker {
                 let carried = rows
                     .as_ref()
                     .filter(|_| rides_along)
-                    .map(|(row, rows)| (row.clone(), rows.clone()));
+                    .map(|(id, rows)| (*id, rows.clone()));
                 self.boundary(done.before, done.after, run, carried);
             } else {
                 self.also_ran(done.before, run);
@@ -75,20 +65,12 @@ impl Tracker {
 
         // Behind the boundary in the same queue, so they still see the directory it resolved and
         // still land after the log row they rewrite.
-        if let Some(row) = done.logged_as.cloned() {
+        if let Some(id) = done.logged_as {
             let (decided, text) = (decided.clone(), done.text.to_string());
-            track::writer::defer(move || {
-                if let Some(id) = row.id() {
-                    settle_log_row(id, &decided, &text);
-                }
-            });
+            track::writer::defer(move || settle_log_row(id, &decided, &text));
         }
-        if let Some((row, rows)) = rows.filter(|_| !rides_along) {
-            track::writer::defer(move || {
-                if let Some(id) = row.id() {
-                    record_outcome(id, &rows);
-                }
-            });
+        if let Some((id, rows)) = rows.filter(|_| !rides_along) {
+            track::writer::defer(move || record_outcome(id, &rows));
         }
     }
 }

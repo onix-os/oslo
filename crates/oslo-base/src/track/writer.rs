@@ -1,14 +1,15 @@
 //! The store's writes, off the thread the prompt is drawn on.
 //!
-//! Every commit is a pair of `fsync`s, and an `fsync` is the one thing in a shell's loop that waits
-//! on a disk rather than on a CPU. Measured on this machine it is the difference between bash's
-//! 0.3 ms of post-command work and oslo's 25 ms — time spent entirely after the command has
-//! finished and before the next prompt appears, which is to say time the person is looking at.
+//! What makes these writes movable is what they *are*. They are records of something that has
+//! already happened: which directory a command ran in, what it exited with, how long it took.
+//! Nothing the next prompt draws is computed from them, so the only thing that was ever waiting on
+//! them landing was the person about to type the next command.
 //!
-//! What makes it movable is what the writes *are*. They are records of something that has already
-//! happened: which directory a command ran in, what it exited with, how long it took. Nothing the
-//! next prompt draws is computed from them, so the only thing that was ever waiting on them landing
-//! was the person about to type the next command.
+//! **What it is worth, honestly.** Measured on this machine it moves about 0.2 ms of CPU per
+//! command off the prompt thread, and changes Enter-to-prompt-ready by nothing at all — that path
+//! is 0.4 ms either way. `fsync` on this filesystem costs 0.000 ms, so the commits were never
+//! waiting on a disk here. It pays where the commit really blocks: an encrypted or network home, a
+//! filesystem that honours barriers, a machine under load. It is not a latency fix for this one.
 //!
 //! # One thread, and a queue in order
 //!
@@ -21,51 +22,18 @@
 //! # What it costs
 //!
 //! A shell that dies between a command and the next prompt — `kill -9`, a power cut — loses that
-//! command's tracking record where before it would have had it. It does not lose the command *line*:
-//! the history log is appended before the command runs and is still written on the prompt thread,
-//! because the id it answers is what everything after it joins to.
+//! command's tracking record where before it would have had it. It does **not** lose the command
+//! *line*: the log is appended before the command runs and is written on the prompt thread, which
+//! is the whole reason that one write stays there. See `repl::precmd::write_down`, which records
+//! what deferring it cost when that was tried.
 //!
-//! Every ordinary way out waits: [`settle`] is called on the way out of the loop, so a shell that
-//! exits normally has written everything it accepted.
+//! Every ordinary way out waits, and "ordinary" has to include the way that never comes back:
+//! [`settle`] is called from `settle_stores` on the way out of the loop, and from the `exec`
+//! builtin immediately before it replaces the process image. `exec $SHELL` is how most people
+//! restart a shell, and skipping the barrier there lost the tail of the session.
 
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::OnceLock;
 use std::sync::mpsc::{Sender, channel};
-use std::sync::{Arc, OnceLock};
-
-/// Where a log row's id will be, for the work queued behind the append that answers it.
-///
-/// The append is deferred like every other write, so the id does not exist yet when the loop asks
-/// for it — and it cannot simply be handed out in advance, because `next_id` is read *inside* the
-/// transaction and that is what stops two shells sharing a store from claiming the same row.
-///
-/// So the loop is given the place the answer will go rather than the answer. The append job fills
-/// it; the jobs queued behind it read it. Nothing synchronises them beyond the queue itself, which
-/// is enough: every one of them runs on the one writer thread, in the order they were handed over.
-#[derive(Clone, Default)]
-pub struct Ticket(Arc<AtomicU64>);
-
-impl Ticket {
-    /// A row that has not been written yet.
-    pub fn pending() -> Ticket {
-        Ticket::default()
-    }
-
-    /// Say which row the append settled on.
-    pub fn fill(&self, id: u64) {
-        self.0.store(id, Ordering::Relaxed);
-    }
-
-    /// The row's id, or `None` if the append has not run or wrote nothing.
-    ///
-    /// Ids begin at one, so zero is unambiguous as "no row". `Relaxed` is honest rather than lax:
-    /// this is only ever read from the same thread that filled it.
-    pub fn id(&self) -> Option<u64> {
-        match self.0.load(Ordering::Relaxed) {
-            0 => None,
-            id => Some(id),
-        }
-    }
-}
 
 /// One write, already holding everything it needs.
 ///

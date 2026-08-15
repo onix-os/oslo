@@ -187,15 +187,12 @@ impl Tracker {
     /// worktrees needs this `Tracker` and the locals the loop is holding; committing needs neither,
     /// and committing is the part that waits on a disk. See [`track::writer`].
     ///
-    /// The outcome arrives as a [`track::writer::Ticket`] rather than an id because the append that
-    /// answers it is itself in the queue, ahead of this — so the id is read where it is known to
-    /// exist, inside the job, rather than promised here where it is not.
     pub(super) fn boundary(
         &mut self,
         before: &str,
         after: &str,
         run: Option<Run<'_>>,
-        settled: Option<(track::writer::Ticket, Vec<track::Outcome>)>,
+        settled: Option<(u64, Vec<track::Outcome>)>,
     ) {
         if track::store().is_none() {
             return;
@@ -208,11 +205,7 @@ impl Tracker {
             let Some(track) = track::store() else {
                 return;
             };
-            // A line with no log row has nothing for the outcome to join to, so the step is still
-            // written and the outcome is not — the same shape as a line that was never logged.
-            let settled = settled
-                .as_ref()
-                .and_then(|(row, rows)| Some((row.id()?, rows.as_slice())));
+            let settled = settled.as_ref().map(|(id, rows)| (*id, rows.as_slice()));
             commit(
                 track,
                 &prepared,
@@ -496,26 +489,20 @@ fn segment_table() -> crate::lua::eval::value::Value {
 /// The links come from `exec::pipeline::segments`, which the read loop armed for this line. A line
 /// that was not a chain records one row for itself and no links, which is the common case and
 /// costs one small write.
-/// Tell the predictor what the line it is holding did.
-///
-/// The predictor took this line when the log wrote it, because a command's status does not exist
-/// until it has finished. That is what lets it learn that a failure was followed by a retyping,
-/// which is the whole of what repair is built on.
-///
-/// **On the writer thread, and it has to be.** The half that hands the line over runs inside the
-/// append, which is queued; this is the half that takes it back. Two threads would invert them the
-/// first time the queue was behind, and the model would learn one line's status against another's.
-pub(super) fn settle_prediction(status: Option<i32>) {
-    let _ = status;
-    #[cfg(feature = "vista")]
-    oslo_base::predict::settle(status);
-}
-
 pub(super) fn outcome_rows(
     result: &Result<i32, ShellError>,
     elapsed: Duration,
 ) -> Vec<track::Outcome> {
     let status = outcome_status(result);
+    // The predictor held this line when the log wrote it, because a command's status does not
+    // exist until here. This is what lets it learn that a failure was followed by a retyping,
+    // which is the whole of what repair is built on.
+    //
+    // **On this thread, because its other half is.** `predict::record` runs inside `append`, which
+    // is on the prompt thread; the two are a strict pair through one held slot. Queue one of them
+    // and the model learns a line's status against the line before it.
+    #[cfg(feature = "vista")]
+    oslo_base::predict::settle(status);
     // `0` for now: the directory is what the boundary resolves, and the boundary is what writes
     // these. The store fills segment zero in whichever way the rows reach it.
     let mut rows = vec![track::Outcome::line(0, status, millis(elapsed))];
