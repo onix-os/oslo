@@ -410,6 +410,13 @@ fn gsub(interp: &Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
     };
 
     let bytes = s.as_bytes();
+    // **`^` anchors the whole call, not each attempt.** The matcher applies the anchor at the
+    // position it is asked to start from, which is right for `find` — `("aaa"):find("^a", 2)` is
+    // 2 in Lua too — and wrong here, because `gsub` walks forward. Every position then looked like
+    // the beginning of the subject, so `("aaa"):gsub("^a", "X")` answered `XXX` where Lua answers
+    // `Xaa`, and `("abcabc"):gsub("^abc", "-")` replaced both halves. `lstrlib.c` breaks out of its
+    // loop after one attempt when the pattern is anchored; so does this.
+    let anchored = p.as_bytes().first() == Some(&b'^');
     let mut out: Vec<u8> = Vec::with_capacity(bytes.len());
     let mut from = 0usize;
     let mut count = 0i64;
@@ -431,6 +438,9 @@ fn gsub(interp: &Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
             from = m.start + 1;
         } else {
             from = m.end;
+        }
+        if anchored {
+            break;
         }
     }
     if from <= bytes.len() {

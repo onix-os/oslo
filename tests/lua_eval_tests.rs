@@ -379,6 +379,18 @@ fn patterns_drive_find_match_and_gsub() {
     returns("string.gsub('hello', 'l', 'L', 1)", "heLlo\t1");
     returns("select('#', ('a,b,c'):gsub(',', ';'))", "2");
 
+    // **`^` anchors the call, not every attempt.** The matcher applies the anchor wherever it is
+    // asked to start, which is right for `find` and wrong for a `gsub` that walks forward: every
+    // position looked like the beginning of the subject, so this answered `XXX` and replaced both
+    // halves of `abcabc`. Lua 5.4 stops after one attempt when the pattern is anchored.
+    returns("string.gsub('aaa', '^a', 'X')", "Xaa\t1");
+    returns("string.gsub('abcabc', '^abc', '-')", "-abc\t1");
+    returns("string.gsub('hello world', '^hello', 'HI')", "HI world\t1");
+    // A pattern that does not match at the start replaces nothing at all.
+    returns("string.gsub('xabc', '^abc', '-')", "xabc\t0");
+    // `find` keeps anchoring at the position it was given, which is Lua's behaviour too.
+    returns("string.find('aaa', '^a', 2)", "2\t2");
+
     let counted = r"
         local words = {}
         for w in ('the quick fox'):gmatch('%a+') do words[#words + 1] = w end
