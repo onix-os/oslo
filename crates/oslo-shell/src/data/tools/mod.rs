@@ -67,7 +67,15 @@ pub fn run_tool(
     }
     match name {
         "ps" => Some((0, Some(system::ps()))),
-        "ls" => Some((0, Some(system::ls(&words[1..])))),
+        // Status 2, which is what the ordinary `ls` answers a path it cannot read — the structured
+        // one is the same command wearing a different coat, and the two must not disagree.
+        "ls" => match system::ls(&words[1..]) {
+            Ok(rows) => Some((0, Some(rows))),
+            Err(e) => {
+                eprintln!("oslo: {e}");
+                Some((2, None))
+            }
+        },
         "lines" => Some((0, Some(bridge::lines(bytes.unwrap_or_default())))),
         "parse" => {
             let Some(pattern) = words.get(1) else {

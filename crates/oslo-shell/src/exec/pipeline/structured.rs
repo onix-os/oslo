@@ -246,7 +246,11 @@ pub(super) fn run(
         }
     }
 
-    let status = statuses.last().copied().unwrap_or(0);
+    // **`pipeline_status`, not `last()`.** `set -o pipefail` is a property of the pipeline, not of
+    // the path it happens to run on: taking the last status meant appending one structured verb to
+    // an ordinary byte pipeline silently disarmed pipefail for the whole thing, and `set -e` with
+    // it. The byte path's own helper answers this question, so both ask it the same way.
+    let status = super::pipeline_status(env, &statuses);
     // The stages did not fork, so there are no child statuses to collect — but `PIPESTATUS` must
     // still describe the pipeline the user wrote, or `${PIPESTATUS[0]}` starts lying the moment a
     // pipeline happens to be structured.
@@ -287,10 +291,15 @@ fn capture(
     // ever, at exactly one byte over the pipe's capacity — the documented headline example of this
     // very module, for any input a real command produces.
     let draining = std::thread::spawn(move || {
-        let mut output = String::new();
+        // **`read_to_end` and then lossy, not `read_to_string`.** A prefix is an arbitrary program
+        // and its output is arbitrary bytes; `read_to_string` answers `InvalidData` on the first
+        // one that is not UTF-8 and leaves the buffer *empty*, so a single stray byte anywhere in a
+        // two-megabyte log threw the whole of it away and `… | lines | length` said `0` with no
+        // error and status 0. The head-position path four lines up already reads it this way.
+        let mut buffer = Vec::new();
         let mut reader = std::fs::File::from(reader);
-        let _ = reader.read_to_string(&mut output);
-        output
+        let _ = reader.read_to_end(&mut buffer);
+        String::from_utf8_lossy(&buffer).into_owned()
     });
 
     let status = fallback(env, prefix);
