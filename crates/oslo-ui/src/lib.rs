@@ -278,9 +278,29 @@ impl OsloHelper {
         }
         let env = self.env.lock().unwrap();
         let path = env.var("PATH").unwrap_or_default().to_string();
-        let known =
+        let has =
             |name: &str| env.is_builtin(name) || env.alias(name).is_some() || env.is_function(name);
-        repair::of(line, &path, &known)
+        let begins = |stem: &str| {
+            env.builtin_names().iter().any(|n| n.starts_with(stem))
+                || env.aliases().keys().any(|n| n.starts_with(stem))
+                || env.functions().keys().any(|n| n.starts_with(stem))
+        };
+        let all = || {
+            env.builtin_names()
+                .into_iter()
+                .chain(env.aliases().keys().cloned())
+                .chain(env.functions().keys().cloned())
+                .collect()
+        };
+        repair::of(
+            line,
+            &path,
+            &repair::Known {
+                has: &has,
+                begins: &begins,
+                all: &all,
+            },
+        )
     }
 
     /// Draw the correction that goes after a mistyped line, marking only what changed.

@@ -220,7 +220,7 @@ pub fn nearest(path: &str, name: &str) -> Option<String> {
 ///
 /// Characters rather than bytes: a swap inside a multi-byte character is not a typo anybody made,
 /// and slicing one would panic.
-fn transpositions(name: &str) -> impl Iterator<Item = String> + '_ {
+pub(crate) fn transpositions(name: &str) -> impl Iterator<Item = String> + '_ {
     let chars: Vec<char> = name.chars().collect();
     let chars2 = chars.clone();
     (0..chars.len().saturating_sub(1))
