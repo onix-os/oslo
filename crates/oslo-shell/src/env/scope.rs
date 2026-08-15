@@ -186,6 +186,7 @@ impl Environment {
         env_struct.seed_process_vars();
         env_struct.seed_field_separator();
         env_struct.seed_working_directory();
+        env_struct.seed_option_index();
         env_struct.seed_compatibility_vars();
         env_struct
     }

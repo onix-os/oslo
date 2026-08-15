@@ -272,7 +272,7 @@ impl Spec {
                 .unwrap_or_default()
                 .into_bytes(),
             'd' | 'i' => match parse_int(arg) {
-                Ok(n) => n.to_string().into_bytes(),
+                Ok(n) => self.signed(n.to_string()).into_bytes(),
                 Err(()) => {
                     eprintln!("oslo: printf: {}: invalid number", arg);
                     status = Err(Bad::Argument(1));
@@ -290,10 +290,23 @@ impl Spec {
             'o' | 'x' | 'X' => match parse_int(arg) {
                 Ok(n) => {
                     let n = n as u64;
+                    // `#` is C's alternate form: a leading `0` on octal, `0x`/`0X` on hex. It is
+                    // how a script prints a number something else will read back as one, and it
+                    // was parsed and then dropped — `printf '%#x' 255` gave `ff`.
+                    let alt = self.flags.contains('#');
                     match self.conversion {
-                        'o' => format!("{:o}", n),
-                        'x' => format!("{:x}", n),
-                        _ => format!("{:X}", n),
+                        'o' => match alt && n != 0 {
+                            true => format!("0{n:o}"),
+                            false => format!("{n:o}"),
+                        },
+                        'x' => match alt && n != 0 {
+                            true => format!("0x{n:x}"),
+                            false => format!("{n:x}"),
+                        },
+                        _ => match alt && n != 0 {
+                            true => format!("0X{n:X}"),
+                            false => format!("{n:X}"),
+                        },
                     }
                     .into_bytes()
                 }
@@ -312,12 +325,13 @@ impl Spec {
                     0.0
                 });
                 let p = self.precision().unwrap_or(6);
-                match self.conversion {
+                let rendered = match self.conversion {
                     'e' => c_exponent(&format!("{:.*e}", p, value), 'e'),
                     'E' => c_exponent(&format!("{:.*E}", p, value), 'E'),
+                    'g' | 'G' => self.general(value, p),
                     _ => format!("{:.*}", p, value),
-                }
-                .into_bytes()
+                };
+                self.signed(rendered).into_bytes()
             }
             other => {
                 eprintln!("oslo: printf: `%{}': invalid format character", other);
@@ -327,6 +341,60 @@ impl Spec {
 
         out.extend_from_slice(&self.pad(body));
         status
+    }
+
+    /// Put back the sign the flags asked for.
+    ///
+    /// `+` prints one on a non-negative number and ` ` prints a space in its place, which is how a
+    /// column of numbers is kept in line. Both were parsed and then ignored, so `printf '%+d' 5`
+    /// gave `5`. `+` wins when both are given, as in C.
+    fn signed(&self, rendered: String) -> String {
+        if rendered.starts_with('-') {
+            return rendered;
+        }
+        match (self.flags.contains('+'), self.flags.contains(' ')) {
+            (true, _) => format!("+{rendered}"),
+            (false, true) => format!(" {rendered}"),
+            (false, false) => rendered,
+        }
+    }
+
+    /// `%g`: whichever of `%e` and `%f` is the shorter honest answer, C's rule.
+    ///
+    /// It used to fall through to `%f`, so `printf '%g' 1e20` printed twenty-one digits and a
+    /// fraction where C prints `1e+20` — the one conversion whose whole purpose is not to do that.
+    ///
+    /// The rule, from C99 7.19.6.1: with precision `p` (0 read as 1) and `x` the exponent `%e`
+    /// would use, `%f` with precision `p - 1 - x` when `p > x >= -4`, and `%e` with precision
+    /// `p - 1` otherwise. Trailing zeros come off unless `#` asked for them.
+    fn general(&self, value: f64, precision: usize) -> String {
+        let p = precision.max(1);
+        let exponent = match value == 0.0 {
+            true => 0,
+            false => value.abs().log10().floor() as i32,
+        };
+        let wide = (p as i32) > exponent && exponent >= -4;
+        let mut rendered = match wide {
+            true => format!("{:.*}", (p as i32 - 1 - exponent).max(0) as usize, value),
+            // Formatted in the case it will be printed in: `c_exponent` finds the marker in the
+            // text, so asking it for `E` while writing `e` leaves the exponent unnormalised.
+            false => match self.conversion == 'G' {
+                true => c_exponent(&format!("{:.*E}", p - 1, value), 'E'),
+                false => c_exponent(&format!("{:.*e}", p - 1, value), 'e'),
+            },
+        };
+        if self.flags.contains('#') || !rendered.contains('.') {
+            return rendered;
+        }
+        // Only the fraction's zeros, and only up to the exponent — `1.500000e+20` loses three
+        // zeros and keeps its `e+20`.
+        let (mantissa, tail) = match rendered.find(['e', 'E']) {
+            Some(at) => (rendered[..at].to_string(), rendered[at..].to_string()),
+            None => (rendered.clone(), String::new()),
+        };
+        let trimmed = mantissa.trim_end_matches('0').trim_end_matches('.');
+        rendered = format!("{trimmed}{tail}");
+        rendered
     }
 
     /// Apply width, with `-` for left and `0` for zero-fill.
@@ -465,7 +533,50 @@ fn parse_int(arg: &str) -> std::result::Result<i64, ()> {
 
 #[cfg(test)]
 mod tests {
-    use super::parse_int;
+    use super::{parse_int, render};
+
+    /// One pass of the formatter, as a string.
+    fn printf(format: &str, args: &[&str]) -> String {
+        let args: Vec<String> = args.iter().map(|a| a.to_string()).collect();
+        let mut out = Vec::new();
+        let mut next = 0;
+        render(format, &args, &mut next, &mut out).expect("format");
+        String::from_utf8(out).expect("utf8")
+    }
+
+    /// **The flags were parsed and then dropped.** `+`, a space and `#` all reached the `Spec` and
+    /// none of them reached the output, so `printf '%+d' 5` gave `5` and `printf '%#x' 255` gave
+    /// `ff`. Every expectation here is bash's, run side by side.
+    #[test]
+    fn the_sign_and_alternate_form_flags_are_honoured() {
+        assert_eq!(printf("%+d|%+d", &["5", "-5"]), "+5|-5");
+        assert_eq!(printf("[% d][% d]", &["5", "-5"]), "[ 5][-5]");
+        // `+` wins when both are given, as in C.
+        assert_eq!(printf("%+ d", &["5"]), "+5");
+        assert_eq!(printf("%#o|%#x|%#X", &["8", "255", "255"]), "010|0xff|0XFF");
+        // Zero takes no prefix: `0x0` is not what C prints.
+        assert_eq!(printf("%#o|%#x", &["0", "0"]), "0|0");
+        // And a float carries the sign too.
+        assert_eq!(printf("%+.1f", &["1.5"]), "+1.5");
+    }
+
+    /// **`%g` is the conversion whose whole purpose is not to print twenty-one digits**, and it
+    /// used to fall through to `%f` and do exactly that.
+    ///
+    /// C's rule: `%f` when the exponent fits inside the precision, `%e` otherwise, with the
+    /// trailing zeros taken off unless `#` asked for them.
+    #[test]
+    fn g_chooses_between_fixed_and_exponent_as_c_does() {
+        assert_eq!(printf("%g", &["1.5"]), "1.5");
+        assert_eq!(printf("%g", &["100000"]), "100000");
+        assert_eq!(printf("%g", &["0.0001"]), "0.0001");
+        // Past six significant figures, and past 1e-4, it turns into an exponent.
+        assert_eq!(printf("%g", &["1e20"]), "1e+20");
+        assert_eq!(printf("%g", &["0.00001"]), "1e-05");
+        assert_eq!(printf("%G", &["1e20"]), "1E+20");
+        // `#` keeps the zeros the rule would otherwise strip.
+        assert_eq!(printf("%#g", &["1.5"]), "1.50000");
+    }
 
     #[test]
     fn integers_are_read_in_every_base_a_shell_accepts() {

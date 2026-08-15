@@ -172,6 +172,22 @@ impl Environment {
         }
     }
 
+    /// `OPTIND`, which POSIX says a shell starts at 1.
+    ///
+    /// **`shift $((OPTIND-1))` is the line every option-parsing script ends with**, and it runs
+    /// whether or not `getopts` matched anything. Unset, `$OPTIND` expands to nothing, the
+    /// arithmetic reads it as 0 and the line becomes `shift -1` — "numeric argument required",
+    /// status 1, and the positional parameters left where they were. bash and dash both start it
+    /// at 1.
+    ///
+    /// Not exported, as in bash: it describes this shell's scan, and a child inheriting a
+    /// half-finished cursor would be told something untrue.
+    pub(super) fn seed_option_index(&mut self) {
+        self.vars
+            .entry("OPTIND".to_string())
+            .or_insert_with(|| ("1".to_string(), false));
+    }
+
     pub(super) fn seed_compatibility_vars(&mut self) {
         let (major, minor, patch) = Self::BASH_COMPAT;
         if !self.vars.contains_key("BASH_VERSION") {
@@ -219,6 +235,32 @@ mod pwd_tests {
                 .ok()
                 .and_then(|p| std::fs::canonicalize(p).ok()),
             "PWD must name the directory the process is actually in"
+        );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Environment;
+
+    /// **`OPTIND` starts at 1**, which is what `shift $((OPTIND-1))` depends on.
+    ///
+    /// That line ends every option-parsing script and runs whether or not `getopts` matched
+    /// anything. Unset, the arithmetic read the empty expansion as 0 and the line became
+    /// `shift -1`: "numeric argument required", status 1, positional parameters untouched.
+    #[test]
+    fn the_option_index_starts_at_one() {
+        let env = Environment::new();
+        assert_eq!(env.get_var("OPTIND"), Some("1"));
+    }
+
+    /// And it describes *this* shell, so it is not handed to children.
+    #[test]
+    fn the_option_index_is_not_exported() {
+        let env = Environment::new();
+        assert!(
+            !env.get_exported_vars().contains_key("OPTIND"),
+            "a child would be told a cursor that is not its own"
         );
     }
 }
