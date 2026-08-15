@@ -49,10 +49,18 @@ pub enum Role {
 }
 
 /// The reserved words a shell line can start a command with.
-const KEYWORDS: [&str; 17] = [
+pub(crate) const KEYWORDS: [&str; 17] = [
     "if", "then", "else", "elif", "fi", "for", "while", "until", "do", "done", "case", "esac",
     "in", "function", "select", "time", "coproc",
 ];
+
+/// Whether `word` is one of the shell's own reserved words.
+///
+/// Shared with the ghost, which must not offer to *complete* one: a closing keyword lands in
+/// command position, so `fi` was being extended into a name that only looks like a command.
+pub(crate) fn is_keyword(word: &str) -> bool {
+    KEYWORDS.contains(&word)
+}
 
 /// Split `line` into spans.
 pub fn lex(line: &str) -> Vec<Span> {

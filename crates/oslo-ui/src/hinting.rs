@@ -51,9 +51,16 @@ impl OsloHelper {
 
         // If what has been typed already names a command, it is not a prefix of the answer — it
         // *is* the answer. This is the `exit` case: bash shows nothing, and so should we.
+        //
+        // **A reserved word is finished for the same reason, and more urgently.** `current_word`
+        // starts a fresh command after `;`, so the *closing* keyword of a compound lands in command
+        // position: `if true; then echo a; fi` was being extended into `final`, and accepting it
+        // left an unterminated `if` and a continuation prompt. Nothing can complete `fi` — the
+        // shell's grammar is not a namespace to draw candidates from.
         if is_shell_name(stem)
             || CommandIndex::contains(&path, stem)
             || oslo_base::vocab::contains(stem)
+            || crate::highlight::lex::is_keyword(stem)
         {
             return None;
         }

@@ -11,7 +11,7 @@
 //! built to avoid — so `error` goes through that index, and `valid_path` is capped (see
 //! [`Context::check_paths`]).
 
-mod lex;
+pub(crate) mod lex;
 
 /// Shared with the correction so the two agree about which word is the command. The correction is
 /// its only other caller and is behind `vista`, so a default build — the one that ships — has none.
