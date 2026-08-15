@@ -312,35 +312,9 @@ fn run_all(cases: &[Case]) -> Vec<(String, Verdict)> {
 /// mystery divergences. The minor version matters too: it decides which cases carry a
 /// `# needs-bash:` line this runner cannot honour.
 ///
-/// # Why it checks that the oracle is not oslo
-///
-/// **On a machine where oslo has been installed as `bash`, it is.** That is a supported thing to
-/// do — `~/.local/share/shell/bash` pointing at `/usr/bin/oslo` is how you try it as your daily
-/// shell — and with it on `$PATH` this suite compared oslo against oslo and reported *408 matching,
-/// 0 divergent*. A perfect score, meaning nothing.
-///
-/// It was worse than meaningless. `$BASH_VERSINFO` is part of oslo's bash compatibility, so the
-/// version check passed; and every case listed as a known divergence "matched", so the run failed
-/// **demanding that three real gaps be deleted from `expected_fail.rs`** — `coproc` and `select`
-/// among them, which oslo refuses by name and does not implement. Following the instruction would
-/// have marked two unimplemented constructs as done and left nothing watching them.
-///
-/// `bash --version` is what tells the two apart: the real one says `GNU bash`, and oslo says
-/// `oslo version …`. Checked before anything is compared, because a suite that cannot tell whether
-/// it is testing anything is worse than one that does not run.
+/// The oracle is also checked to *be* bash — see `common::assert_oracle_is_bash`.
 fn oracle_version() -> (u32, u32) {
-    let banner = Command::new("bash")
-        .arg("--version")
-        .output()
-        .expect("bash must be on PATH: it is this suite's oracle");
-    let banner = String::from_utf8_lossy(&banner.stdout).into_owned();
-    assert!(
-        banner.contains("GNU bash"),
-        "the oracle on $PATH is not bash — it said {:?}.\n\
-         oslo installed as `bash` is the usual cause, and comparing oslo against oslo proves \
-         nothing. Put a real bash ahead of it: PATH=/tmp/realbash:$PATH cargo test",
-        banner.lines().next().unwrap_or("").trim()
-    );
+    common::assert_oracle_is_bash();
     let out = Command::new("bash")
         .args(["-c", "echo ${BASH_VERSINFO[0]}.${BASH_VERSINFO[1]}"])
         .output()
