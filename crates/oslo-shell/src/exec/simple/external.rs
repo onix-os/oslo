@@ -186,9 +186,22 @@ fn wait_for_child(child: Pid, cmd_name: &str, words: &[String]) -> i32 {
                 // interrupt machinery hears nothing, and the only evidence that a key was pressed
                 // is this wait status. Without noting it, `while true; do sleep 1; done` runs
                 // forever under a keyboard full of `^C`, and `sleep 5; echo hi` still prints,
-                // because the next command boundary has nothing to poll. Both diverge from bash
-                // and from dash, which end the loop and swallow the rest of the line.
-                if matches!(sig, Signal::SIGINT | Signal::SIGQUIT) {
+                // because the next command boundary has nothing to poll.
+                //
+                // **Interactive only, and that is the whole of the difference.** A script shares
+                // its process group with the terminal, so a real Ctrl-C reaches the *shell* too
+                // and its own handler sees it — there is nothing to infer. Inferring anyway meant
+                // a child that merely died by SIGINT of its own accord, `kill -INT $$` or a
+                // program re-raising it after cleanup, silently abandoned the rest of the script:
+                //
+                // ```text
+                // echo before                    bash, dash: before / after=130 / rc=0
+                // sh -c 'kill -INT $$'           oslo, before this: before / rc=130
+                // echo "after=$?"
+                // ```
+                if matches!(sig, Signal::SIGINT | Signal::SIGQUIT)
+                    && crate::exec::pipeline::is_interactive()
+                {
                     job::note_interrupt();
                 }
                 return 128 + sig as i32;

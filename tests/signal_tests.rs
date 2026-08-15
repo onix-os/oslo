@@ -200,6 +200,29 @@ fn a_running_loop_sees_a_trapped_sigint() {
 /// Driven through a real pty because that is the only place the signal comes from the terminal
 /// rather than from a `kill`: sending SIGINT by hand would go to the shell and pass whatever the
 /// bug was.
+/// **A child that dies by SIGINT does not end a script.**
+///
+/// The shell infers a keyboard interrupt from a child's wait status, because an interactive shell
+/// is not in the foreground process group and never sees the signal itself. A *script* is in that
+/// group — a real Ctrl-C reaches it directly — so there is nothing to infer, and inferring anyway
+/// meant a child that raised SIGINT on itself silently abandoned the rest of the file. bash and
+/// dash both carry on; measured against both.
+#[test]
+fn a_child_dying_by_sigint_does_not_abandon_a_script() {
+    let r = run("echo before\n/bin/sh -c 'kill -INT $$'\necho \"after=$?\"\n");
+    assert_eq!(
+        r.lines(),
+        vec!["before", "after=130"],
+        "stderr: {}",
+        r.stderr
+    );
+    assert_eq!(r.status, 0, "the script did not run to the end");
+
+    // SIGQUIT travels the same path.
+    let r = run("echo before\n/bin/sh -c 'kill -QUIT $$'\necho after\n");
+    assert_eq!(r.lines(), vec!["before", "after"], "stderr: {}", r.stderr);
+}
+
 mod interrupt {
     use super::*;
     use nix::pty::openpty;
