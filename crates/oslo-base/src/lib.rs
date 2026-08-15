@@ -23,9 +23,13 @@ pub mod ast;
 /// The output of a command that was asked to keep it, for `copy --last`.
 pub mod background;
 pub mod capture;
+/// The `@name` directory table, shared by expansion and completion.
+pub mod dirs;
 pub mod error;
 /// Parts of the shell a config can turn off and on again while it runs.
 pub mod feature;
+/// Shell pattern matching — `*`, `?`, `[…]` — shared by expansion, `case`, and the prompt.
+pub mod glob;
 pub mod hooks;
 pub mod macros;
 /// What this session said, kept after it has scrolled off.
@@ -40,8 +44,12 @@ pub mod quiet;
 pub mod secrets;
 /// A database a config or a plugin owns, kept apart from oslo's own.
 pub mod store;
-pub mod track;
 /// The shell's version, as one number rather than one per crate.
+/// Tilde expansion — `~`, `~user`, `~+`, `~-` — shared by the shell and the prompt.
+pub mod tilde;
+pub mod track;
 pub mod version;
+/// Names the shell can run that `$PATH` has never heard of, for the prompt to draw.
+pub mod vocab;
 
 pub use error::{Result, ShellError};
