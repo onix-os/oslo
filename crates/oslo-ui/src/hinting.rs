@@ -275,6 +275,18 @@ impl OsloHelper {
 /// **All four forms**, through the same expander the shell uses. Knowing only `~` and `~/…` left
 /// `~root/bi` and `~+/sr` with no ghost at all, though the shell expands both exactly as bash does.
 fn expand_tilde(dir: &str) -> String {
+    // `@name` as well as `~`, because the ghost was the only one of the four that did not know it.
+    // Tab completes `ls @proj/zeb`, the highlighter colours it and the expander resolves it — but
+    // the hint stayed blank, and `cd @proj/` is the case marks exist for.
+    // `highlight::names_an_existing_file` has the same two branches, for the same reason.
+    if let Some(rest) = dir.strip_prefix('@') {
+        return match oslo_base::dirs::expand_at(rest) {
+            Some(path) => path,
+            // A name that stands for nothing keeps its own text, so the caller reads it as a
+            // literal directory rather than as the filesystem root.
+            None => dir.to_string(),
+        };
+    }
     oslo_base::tilde::expand_prefix(dir, &oslo_base::tilde::from_process)
 }
 
