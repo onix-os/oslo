@@ -64,40 +64,53 @@ impl Action {
 /// these names directly. This exists so a typo in `oslo.finder.key` is reported next to the line
 /// that wrote it rather than leaving the finder quietly unreachable.
 pub fn is_key_name(name: &str) -> bool {
+    canonical(name).is_some()
+}
+
+/// The one spelling of `name` that a binding is stored and looked up under, or `None` when nothing
+/// can produce it.
+///
+/// **A binding is found by comparing strings**, against the name the editor gives the key that was
+/// pressed. So every spelling a config is allowed to write has to collapse to that one name before
+/// it is stored, or the binding is accepted and then never matches anything: `oslo.keys["Ctrl-R"]`
+/// and `oslo.keys["backtab"]` were each read without complaint and each bound nothing at all.
+///
+/// `meta-` is the other name for `alt-`, and collapses to it.
+///
+/// **What is not here is as deliberate as what is.** `shift-<letter>` is out because a terminal
+/// sends the capital rather than a modifier, and `enter`, `esc`, `backspace` and `delete` are out
+/// because the editor answers to those keys itself and never offers them to a binding — the `key`
+/// hook is the surface that sees them, and it exists for that reason. All six were accepted before,
+/// stored, and bound nothing for the rest of the session; a refusal is reported, which is the whole
+/// point of checking a name at all.
+pub fn canonical(name: &str) -> Option<String> {
     let name = name.trim().to_ascii_lowercase();
-    if matches!(
-        name.as_str(),
-        "tab"
-            | "shift-tab"
-            | "backtab"
-            | "s-tab"
-            | "enter"
-            | "return"
-            | "esc"
-            | "escape"
-            | "up"
-            | "down"
-            | "left"
-            | "right"
-            | "home"
-            | "end"
-            | "pageup"
-            | "pagedown"
-            | "backspace"
-            | "delete"
-            | "space"
-    ) {
-        return true;
+    let same = |name: String| Some(name);
+    match name.as_str() {
+        "tab" => return same(name),
+        "shift-tab" | "backtab" | "s-tab" => return Some("shift-tab".to_string()),
+        "up" | "down" | "left" | "right" | "home" | "end" | "pageup" | "pagedown" | "space" => {
+            return same(name);
+        }
+        _ => {}
     }
     if let Some(rest) = name.strip_prefix("f")
         && rest.parse::<u8>().is_ok_and(|n| (1..=12).contains(&n))
     {
-        return true;
+        return Some(name);
     }
-    ["ctrl-", "alt-", "meta-", "shift-"].iter().any(|prefix| {
-        name.strip_prefix(prefix)
-            .is_some_and(|c| c.chars().count() == 1)
-    })
+    if let Some(c) = name.strip_prefix("meta-")
+        && c.chars().count() == 1
+    {
+        return Some(format!("alt-{c}"));
+    }
+    ["ctrl-", "alt-"]
+        .iter()
+        .any(|prefix| {
+            name.strip_prefix(prefix)
+                .is_some_and(|c| c.chars().count() == 1)
+        })
+        .then_some(name)
 }
 
 #[cfg(test)]
@@ -113,8 +126,6 @@ mod tests {
             "backtab",
             "s-tab",
             "tab",
-            "enter",
-            "esc",
             "ctrl-r",
             "alt-f",
             "f2",
@@ -127,7 +138,7 @@ mod tests {
         }
         // Case does not matter, because a config is written by a person.
         assert!(is_key_name("Ctrl-R"));
-        assert!(is_key_name("  enter  "));
+        assert!(is_key_name("  tab  "));
     }
 
     /// A name oslo cannot place is refused, so a typo in `oslo.finder.key` is reported next to
@@ -137,6 +148,42 @@ mod tests {
         for name in ["", "ctrl-", "ctrl-shift-r", "f13", "wiggle", "alt-"] {
             assert!(!is_key_name(name), "{name:?} should not be a key name");
         }
+        // A terminal sends the capital for shift and a letter, so there is no key a `shift-r`
+        // binding could ever match. It was accepted, stored, and silently bound nothing.
+        assert!(!is_key_name("shift-r"));
+        assert!(!is_key_name("shift-1"));
+        assert!(is_key_name("shift-tab"), "the one shift chord that arrives");
+
+        // **The editor answers to these itself and never offers them to a binding.** The `key` hook
+        // is the surface that sees them. Accepting the names here meant a config could write
+        // `oslo.keys["enter"]` and be told nothing while it did nothing.
+        for name in ["enter", "return", "esc", "escape", "backspace", "delete"] {
+            assert!(
+                !is_key_name(name),
+                "{name:?} cannot be bound, so it is not a name"
+            );
+        }
+        // Space can be, and is listed as bindable in the line-editor page.
+        assert!(is_key_name("space"));
+    }
+
+    /// **Every spelling collapses to the one the editor produces.** A binding is found by comparing
+    /// strings against that name, so a name stored as written matched nothing at all: `Ctrl-R` and
+    /// `backtab` were each accepted and each bound nothing for the whole session.
+    #[test]
+    fn a_name_is_stored_in_one_spelling() {
+        assert_eq!(canonical("Ctrl-R").as_deref(), Some("ctrl-r"));
+        assert_eq!(canonical("  SPACE ").as_deref(), Some("space"));
+        for spelling in ["backtab", "s-tab", "Shift-Tab"] {
+            assert_eq!(
+                canonical(spelling).as_deref(),
+                Some("shift-tab"),
+                "{spelling}"
+            );
+        }
+        // `meta-` is the other name for `alt-`, and one key arrives for both.
+        assert_eq!(canonical("meta-n").as_deref(), Some("alt-n"));
+        assert_eq!(canonical("alt-n").as_deref(), Some("alt-n"));
     }
 
     /// The action vocabulary a config binds a key to. Every spelling here is one somebody has in

@@ -68,12 +68,32 @@ fn the_completion_order_is_read_and_a_typo_is_named() {
 #[test]
 fn the_suggestion_keys_are_read_under_their_own_names() {
     let (settings, problems) =
-        settings_from("oslo = { suggest = { accept = 'right', accept_word = 'alt-right' } }");
+        settings_from("oslo = { suggest = { accept = 'right', accept_word = 'alt-f' } }");
     assert!(problems.is_empty(), "{problems:?}");
     assert_eq!(settings.suggest.accept.as_deref(), Some("right"));
-    assert_eq!(settings.suggest.accept_word.as_deref(), Some("alt-right"));
+    assert_eq!(settings.suggest.accept_word.as_deref(), Some("alt-f"));
     // Naming them does not disturb the sources.
     assert_eq!(settings.suggest.sources, Suggest::default().sources);
+}
+
+/// **These are checked like every other key a config names.** They are compared against the
+/// editor's own name for the key that was pressed, so a spelling nothing can produce — `alt-right`,
+/// where the only Alt key oslo decodes is `Alt(char)` — was accepted and then matched nothing for
+/// the rest of the session. Now it is reported.
+#[test]
+fn a_suggestion_key_that_cannot_fire_is_reported() {
+    let (settings, problems) = settings_from("oslo = { suggest = { accept_word = 'alt-right' } }");
+    assert_eq!(problems.len(), 1, "{problems:?}");
+    assert!(problems[0].contains("alt-right"), "{problems:?}");
+    assert_eq!(
+        settings.suggest.accept_word, None,
+        "a name that cannot fire is not kept"
+    );
+
+    // And the spelling is normalised, so `Ctrl-F` finds the key that reports itself as `ctrl-f`.
+    let (settings, problems) = settings_from("oslo = { suggest = { accept = 'Ctrl-F' } }");
+    assert!(problems.is_empty(), "{problems:?}");
+    assert_eq!(settings.suggest.accept.as_deref(), Some("ctrl-f"));
 }
 
 #[test]

@@ -126,11 +126,21 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
             }
             settings.suggest.sources = sources;
         }
-        if let Value::Str(key) = table.get(&Value::str("accept")) {
-            settings.suggest.accept = Some(key.to_string());
-        }
-        if let Value::Str(key) = table.get(&Value::str("accept_word")) {
-            settings.suggest.accept_word = Some(key.to_string());
+        // Canonical, and checked, like every other key a config names: these are compared against
+        // the editor's own name for the key that was pressed, so `"Ctrl-F"` or `"return"` was
+        // accepted and then matched nothing for the rest of the session.
+        for (field, slot) in [
+            ("accept", &mut settings.suggest.accept),
+            ("accept_word", &mut settings.suggest.accept_word),
+        ] {
+            if let Value::Str(key) = table.get(&Value::str(field)) {
+                match crate::keys::canonical(&key) {
+                    Some(name) => *slot = Some(name),
+                    None => {
+                        problems.push(format!("oslo.suggest.{field}: '{key}' is not a key name"))
+                    }
+                }
+            }
         }
         if let Value::Table(list) = table.get(&Value::str("skip_history")) {
             settings.suggest.skip_history = list
@@ -184,8 +194,8 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
         if let Value::Str(key) = table.get(&Value::str("key")) {
             // Checked where it is written rather than where it is used, so a typo is reported
             // against the line that made it instead of leaving a tab nobody can get out of.
-            if crate::keys::is_key_name(&key) {
-                settings.scratch.key = key.to_string();
+            if let Some(name) = crate::keys::canonical(&key) {
+                settings.scratch.key = name;
             } else {
                 problems.push(format!("oslo.scratch.key: '{key}' is not a key name"));
             }
@@ -206,8 +216,8 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
     if let Value::Table(table) = oslo.get(&Value::str("macros")) {
         let table = table.borrow();
         if let Value::Str(key) = table.get(&Value::str("key")) {
-            if crate::keys::is_key_name(&key) {
-                settings.macros.key = key.to_string();
+            if let Some(name) = crate::keys::canonical(&key) {
+                settings.macros.key = name;
             } else {
                 problems.push(format!("oslo.macros.key: '{key}' is not a key name"));
             }
@@ -222,8 +232,8 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
         if let Value::Str(key) = table.get(&Value::str("key")) {
             // Checked here rather than at bind time, so a typo is reported next to the line that
             // wrote it instead of silently leaving the finder unreachable.
-            if crate::keys::is_key_name(&key) {
-                settings.finder.key = key.to_string();
+            if let Some(name) = crate::keys::canonical(&key) {
+                settings.finder.key = name;
             } else {
                 problems.push(format!("oslo.finder.key: '{key}' is not a key name"));
             }
@@ -240,18 +250,39 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
 
     if let Value::Table(table) = oslo.get(&Value::str("keys")) {
         for (key, action) in table.borrow().pairs() {
+            // Checked here, like every other key in this file: `oslo.keys` was the one table that
+            // took a name without looking at it, so a misspelled key or action was stored, bound to
+            // nothing and never mentioned again — the failure mode `keys.rs` opens by promising not
+            // to have.
+            //
+            // The canonical spelling is what gets stored, because a binding is found by comparing
+            // it against the editor's own name for the key — see [`crate::keys::canonical`].
+            let canon = match &key {
+                Value::Str(name) => match crate::keys::canonical(name) {
+                    Some(canon) => canon,
+                    None => {
+                        problems.push(format!("oslo.keys: '{name}' is not a key name"));
+                        continue;
+                    }
+                },
+                _ => String::new(),
+            };
             match (&key, &action) {
                 (Value::Str(key), Value::Str(action)) => {
-                    settings.keys.push((key.to_string(), action.to_string()));
+                    if crate::keys::action(action).is_none() {
+                        problems.push(format!("oslo.keys.{key}: '{action}' is not an action"));
+                        continue;
+                    }
+                    settings.keys.push((canon, action.to_string()));
                 }
                 // A function is a binding the config wrote itself. Kept aside rather than named,
                 // because a `Value` cannot live in `Settings` — the settings are plain data,
                 // readable without an interpreter, and a Lua function is neither.
-                (Value::Str(key), Value::Function(_)) => {
-                    crate::editor::register(key, action.clone());
+                (Value::Str(_), Value::Function(_)) => {
+                    crate::editor::register(&canon, action.clone());
                     settings
                         .keys
-                        .push((key.to_string(), crate::editor::ACTION.to_string()));
+                        .push((canon, crate::editor::ACTION.to_string()));
                 }
                 // **The table form: a binding that can say what it does.**
                 //
@@ -268,13 +299,18 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
                     };
                     match spec.get(&Value::str("run")) {
                         run @ Value::Function(_) => {
-                            crate::editor::register(key, run);
+                            crate::editor::register(&canon, run);
                             settings
                                 .keys
-                                .push((key.to_string(), crate::editor::ACTION.to_string()));
+                                .push((canon.clone(), crate::editor::ACTION.to_string()));
                         }
                         Value::Str(named) => {
-                            settings.keys.push((key.to_string(), named.to_string()));
+                            if crate::keys::action(&named).is_none() {
+                                problems
+                                    .push(format!("oslo.keys.{key}: '{named}' is not an action"));
+                                continue;
+                            }
+                            settings.keys.push((canon.clone(), named.to_string()));
                         }
                         _ => {
                             problems.push(format!(
@@ -284,7 +320,7 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
                         }
                     }
                     if let Some(desc) = desc {
-                        settings.key_descriptions.push((key.to_string(), desc));
+                        settings.key_descriptions.push((canon, desc));
                     }
                 }
                 _ => problems.push(
