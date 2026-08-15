@@ -155,6 +155,8 @@ pub fn builtin_unset(env: &mut Environment, args: &[String]) -> Result<i32> {
     }
 
     let mut status = 0;
+    // Whether any name was refused for being read-only. See the note where it is read.
+    let mut refused = false;
     for name in &args[opts.operands..] {
         // `unset 'a[1]'` drops one element and leaves the rest of the array where it was.
         if let Some(result) = crate::env::builtins::arrays::unset_element(env, name) {
@@ -183,12 +185,20 @@ pub fn builtin_unset(env: &mut Environment, args: &[String]) -> Result<i32> {
         if env.is_readonly(name) {
             eprintln!("oslo: unset: {}: cannot unset: readonly variable", name);
             status = 1;
+            refused = true;
             continue;
         }
         env.unset_var(name);
         announce(name, Change::Erased, Scope::Shell, Source::Local);
     }
 
+    // **After the whole line, not at the name that failed.** `unset` is a special builtin, so a
+    // read-only name ends a non-interactive shell in POSIX mode — but bash still unsets the other
+    // names first: `bash -c 'readonly r=1; x=2; unset r x; echo "[$x]"'` prints `[]`. Raising here
+    // keeps both, and outside POSIX `resolve_builtin_result` folds it back to the same status 1.
+    if refused {
+        return Err(ShellError::utility_error("unset: readonly variable", 1));
+    }
     Ok(status)
 }
 

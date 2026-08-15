@@ -43,7 +43,9 @@ enum Builtin {
 ///
 /// Two consequences POSIX attaches to the name: a special builtin is found *before* shell
 /// functions during command search, and its failure is fatal to a non-interactive shell.
-/// [`crate::exec::simple`] owns the first; the second is not implemented yet.
+/// [`crate::exec::simple`] owns the first; `exec::simple::posix::resolve_builtin_result` owns the
+/// second, and a builtin opts into it by answering `ShellError::utility_error` rather than a
+/// status. `.`, `unset`, `eval` and `export` do.
 const SPECIAL_BUILTINS: &[&str] = &[
     ":", ".", "break", "continue", "eval", "exec", "exit", "export", "readonly", "return", "set",
     "shift", "times", "trap", "unset",

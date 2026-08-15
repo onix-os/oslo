@@ -82,6 +82,29 @@ pub fn run_in(dir: &std::path::Path, script: &str) -> Run {
     }
 }
 
+/// The same, with `--posix` — where POSIX and bash's default disagree.
+///
+/// A separate runner rather than a flag on [`run_in`], because almost nothing wants it: the
+/// interesting cases are the handful where the two modes are *supposed* to differ, and a test that
+/// took the mode as a parameter would invite passing the wrong one by accident.
+pub fn run_posix(script: &str) -> Run {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let output: Output = Command::new(oslo_bin())
+        .arg("--posix")
+        .arg("-c")
+        .arg(script)
+        .current_dir(dir.path())
+        .stdin(Stdio::null())
+        .output()
+        .expect("spawn oslo");
+
+    Run {
+        stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
+        stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
+        status: output.status.code().unwrap_or(-1),
+    }
+}
+
 /// Run in a fresh temporary directory.
 pub fn run(script: &str) -> Run {
     let dir = tempfile::tempdir().expect("tempdir");

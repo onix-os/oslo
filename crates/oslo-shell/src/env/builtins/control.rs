@@ -150,11 +150,17 @@ pub fn builtin_eval(env: &mut Environment, args: &[String]) -> Result<i32> {
             env.get_alias(n).map(str::to_string)
         }) {
             Ok(ast) => eval_command_list(env, &ast),
-            // A syntax error in evaluated text is the *builtin's* failure, not the script's: bash
-            // reports it, gives `eval` status 2, and carries on with the next command.
+            // A syntax error in evaluated text is the *builtin's* failure, not the script's:
+            // bash reports it, gives `eval` status 2, and carries on with the next command.
+            //
+            // **Under `--posix` it is fatal instead**, because `eval` is a special builtin and
+            // POSIX 2.8.1 ends a non-interactive shell on a utility error in one. Raised rather
+            // than decided here: `posix::resolve_builtin_result` folds it back to this same status
+            // for a shell that is not in POSIX mode, so the ordinary case is unchanged. Measured —
+            // `bash --posix -c 'eval "if"; echo ALIVE'` prints nothing and exits 2.
             Err(e) => {
                 eprintln!("oslo: eval: {}", e);
-                Ok(2)
+                Err(oslo_base::error::ShellError::utility_error("eval", 2))
             }
         };
     env.exit_nested_script();
@@ -176,7 +182,10 @@ pub fn builtin_source(env: &mut Environment, args: &[String]) -> Result<i32> {
                 file_path,
                 oslo_base::error::reason(&e)
             );
-            return Ok(1);
+            // `.` is a special builtin, so a file it cannot read ends a non-interactive shell in
+            // POSIX mode — `bash --posix -c '. /nonexistent; echo ALIVE'` prints nothing. Outside
+            // POSIX this folds back to status 1 and the script carries on, as it always did.
+            return Err(oslo_base::error::ShellError::utility_error("source", 1));
         }
     };
 
