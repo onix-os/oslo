@@ -146,10 +146,10 @@ impl Environment {
 
         let pid = std::process::id();
 
-        let mut aliases = HashMap::new();
-        aliases.insert("ll".to_string(), "ls -la".to_string());
-        aliases.insert("la".to_string(), "ls -A".to_string());
-        aliases.insert("l".to_string(), "ls -CF".to_string());
+        // **No aliases here.** See [`Environment::seed_interactive_aliases`]: the three
+        // conveniences oslo ships belong to a person at a prompt, and this constructor is also
+        // every script, every `sh -c` and every subshell.
+        let aliases = HashMap::new();
 
         let mut env_struct = Self {
             vars,

@@ -144,9 +144,14 @@ fn alias_listing_round_trips() {
     assert_eq!(r.out(), "same", "stderr: {}", r.stderr);
 }
 
+/// `alias` with no operands prints the table, in the form that can be read back.
+///
+/// It used to assert on `ll`, which the shell seeded into *every* environment — including every
+/// script, where it shadowed a function of the same name. The conveniences now belong to an
+/// interactive session, so this defines its own and checks the listing rather than the seeding.
 #[test]
-fn alias_with_no_operands_prints_the_seeded_table() {
-    let r = run("alias");
+fn alias_with_no_operands_prints_the_table() {
+    let r = run("alias ll='ls -la'; alias");
     assert!(
         r.stdout.contains("alias ll='ls -la'"),
         "stdout: {}",

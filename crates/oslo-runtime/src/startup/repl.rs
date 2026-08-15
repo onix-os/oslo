@@ -50,6 +50,9 @@ pub fn run_repl(login: bool) -> ! {
     // A REPL is interactive and reads its program from the terminal: `$-` says so with `i` and
     // `s`, which is how a sourced script tells an interactive shell from a batch one.
     interactive_env.set_option(ShellOption::Interactive, true);
+    // `ll`, `la`, `l` — a person's conveniences, and only a person's. They used to be seeded into
+    // every `Environment`, so a script that defined `l()` silently got `ls -CF`.
+    interactive_env.seed_interactive_aliases();
     interactive_env.set_option(ShellOption::StdinInput, true);
     history::register(&mut interactive_env);
 

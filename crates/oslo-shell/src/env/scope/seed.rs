@@ -1,4 +1,5 @@
-//! The variables the shell describes *itself* with.
+//! What a fresh shell starts with: the variables it describes *itself* with, and the three aliases
+//! a person at a prompt is given.
 //!
 //! Every one is set only if the name is not already taken, so a caller who exported their own
 //! `$UID` or `$OSTYPE` keeps it. They are here rather than in `scope.rs` because they answer one
@@ -8,6 +9,24 @@ use super::Environment;
 use super::environ::environ_set;
 
 impl Environment {
+    /// The three conveniences oslo ships — `ll`, `la`, `l` — for an interactive session only.
+    ///
+    /// **They used to be seeded in [`Environment::new`], which is every shell there is.** A script
+    /// that defined `l() { … }` got `ls -CF` instead of its own function, because an alias is
+    /// resolved before a function and the shell had quietly put one there. bash and dash both run
+    /// the function; oslo now does too. It is also what the README promises about every extension
+    /// oslo adds: unreachable from shell written before oslo existed.
+    ///
+    /// Called by the REPL when it builds the session's environment. A subshell forked from that
+    /// session inherits the table by copy, so `(ll)` still works where you typed it.
+    pub fn seed_interactive_aliases(&mut self) {
+        for (name, expansion) in [("ll", "ls -la"), ("la", "ls -A"), ("l", "ls -CF")] {
+            self.aliases
+                .entry(name.to_string())
+                .or_insert_with(|| expansion.to_string());
+        }
+    }
+
     /// Set the variables that describe the process the shell is running as.
     ///
     /// Unset, these fail *quietly* and wrongly: `[ "$UID" = 0 ]` is the root check in most install
