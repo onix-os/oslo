@@ -74,6 +74,10 @@ pub fn isolate_for_tests() -> (std::sync::MutexGuard<'static, ()>, tempfile::Tem
     let dir = tempfile::tempdir().expect("tempdir");
     *ROOT.lock().expect("root") = Some(dir.path().to_path_buf());
     with_applied(|applied| applied.clear());
+    // The servicer's memory is about the *old* store, and a fresh one makes it a lie.
+    if let Ok(mut serviced) = SERVICED.lock() {
+        *serviced = None;
+    }
     (guard, dir)
 }
 
@@ -131,12 +135,20 @@ pub fn forget_applied(name: &str) {
     with_applied(|applied| applied.remove(name));
 }
 
-/// The last stamp the *background* servicer acted on.
+/// The last stamp the *background* servicer acted on, and whether it has ever looked.
 ///
 /// Its own, separate from the REPL's: the two ask the same question at different moments, and both
 /// answers are only ever "re-read or do not". Sharing one would mean the servicer's read could stop
 /// the loop's, and re-reading is idempotent anyway.
-static SERVICED: std::sync::Mutex<Option<Stamp>> = std::sync::Mutex::new(None);
+///
+/// **Two layers of `Option`, and the outer one is load-bearing.** The inner is the stamp, which is
+/// `None` when there is no store file — the ordinary state of a machine that has never set a
+/// universal variable. The outer says whether this has been asked before. Collapsing them made
+/// "no file" indistinguishable from "never looked", so every call reported a change, and every
+/// idle wake told the prompt to rebuild itself. With an external prompt that spawns, the rebuild
+/// spawned a child, the child's exit woke the editor, and the shell rendered its prompt three
+/// hundred times a second for as long as it sat there.
+static SERVICED: std::sync::Mutex<Option<Option<Stamp>>> = std::sync::Mutex::new(None);
 
 /// Re-read and apply, but only if the file has actually moved since this last looked.
 ///
@@ -149,10 +161,10 @@ pub fn apply_if_changed(env: &mut crate::env::Environment) -> bool {
         Ok(serviced) => serviced,
         Err(poisoned) => poisoned.into_inner(),
     };
-    if *serviced == now && serviced.is_some() {
+    if *serviced == Some(now) {
         return false;
     }
-    *serviced = now;
+    *serviced = Some(now);
     drop(serviced);
     apply(env);
     true
@@ -371,6 +383,33 @@ mod tests {
     /// An isolated store, held for the duration of the test.
     fn isolated() -> (std::sync::MutexGuard<'static, ()>, tempfile::TempDir) {
         super::isolate_for_tests()
+    }
+
+    /// **A store that does not exist has not changed.**
+    ///
+    /// The servicer asks this on every idle wake. Confusing "no file" with "never looked" made the
+    /// answer *yes* every time, which told the prompt to rebuild itself on every wake — and a
+    /// prompt that spawns anything then woke the editor by exiting, three hundred times a second.
+    #[test]
+    fn a_store_that_is_not_there_does_not_keep_reporting_a_change() {
+        let _store = isolated();
+        let mut env = crate::env::Environment::new();
+
+        assert!(
+            apply_if_changed(&mut env),
+            "the first look is a change: nothing had been applied yet"
+        );
+        for _ in 0..5 {
+            assert!(
+                !apply_if_changed(&mut env),
+                "an absent store reported a change twice"
+            );
+        }
+
+        // And a store that appears is noticed, once.
+        set("APPEARED", "yes", false).expect("write");
+        assert!(apply_if_changed(&mut env), "a new store went unnoticed");
+        assert!(!apply_if_changed(&mut env), "and then it settled");
     }
 
     /// **Every write replaces the file**, which is what makes one field of the stamp trustworthy on
