@@ -295,7 +295,11 @@ fn push(spans: &mut Vec<Span>, text: &str, role: Role) {
 }
 
 /// `NAME=` at the start of a word, which is a variable assignment rather than a command.
-fn is_assignment(word: &str) -> bool {
+///
+/// `pub(crate)` because the correction needs the same answer: the command word of `FOO=1 lsvlk` is
+/// `lsvlk`, and repair was reading `FOO=1` and giving up — so the highlighter called the line a
+/// command-not-found while the correction had nothing to say about it. Two rules would drift.
+pub(crate) fn is_assignment(word: &str) -> bool {
     let Some(eq) = word.find('=') else {
         return false;
     };

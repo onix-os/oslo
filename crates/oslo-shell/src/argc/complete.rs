@@ -42,12 +42,26 @@ pub fn offers(ctx: &Ctx) -> Vec<Offer> {
     // `__argc_value=BUILD`, an instruction to a completion script rather than a word anybody types.
     // A person pressing Tab on a command wants to see what it takes, and what it takes includes its
     // flags. So the same question is asked again with a `-`, which is how argc is told to list them.
-    if ctx.current.is_empty() {
+    //
+    // **Not after an option that takes a value.** `deploy --env <Tab>` has exactly one set of legal
+    // answers — the ones `--env` declares — and every flag on the script is illegal there. Injected
+    // anyway, and sorted ahead of the values because `-` precedes letters, they filled all eight
+    // rows of the default dropdown and the declared `dev staging prod` were never visible.
+    if ctx.current.is_empty() && !answers_an_option(&ctx.words, &offers) {
         let mut dashed = words.clone();
         *dashed.last_mut().expect("current was pushed") = "-".to_string();
         offers.extend(ask(runtime, &ctx.command, &source, &dashed));
     }
     offers
+}
+
+/// Whether what came back is the value list of the option just typed.
+///
+/// The two facts together: the previous word is an option, and asking about the empty word after it
+/// produced real words rather than the `__argc_value` marker a positional answers with. A boolean
+/// flag answers with the marker, so `deploy --dry-run <Tab>` still lists the flags.
+fn answers_an_option(words: &[String], offers: &[Offer]) -> bool {
+    !offers.is_empty() && words.last().is_some_and(|last| last.starts_with('-'))
 }
 
 /// One `compgen` call, with the rows a person could not type filtered out.
@@ -204,6 +218,35 @@ mod tests {
         let dashed = ask(runtime, &ctx.command, &source, &words);
         let shown: Vec<&str> = dashed.iter().map(|o| o.display.as_str()).collect();
         assert!(shown.contains(&"--dry-run"), "{shown:?}");
+    }
+
+    /// **After an option that takes a value, only its values.** Every flag on the script is an
+    /// illegal answer there, and `-` sorting before letters put all eight of them in the eight rows
+    /// the dropdown shows by default — so `dev staging prod` were generated and never seen.
+    #[test]
+    fn an_option_that_takes_a_value_is_not_answered_with_flags() {
+        let source = "\
+# @flag   -n --dry-run          say what would happen
+# @option -e --env[dev|staging|prod]  where to deploy
+# @arg build!
+";
+        let mut env = crate::env::Environment::new();
+        let runtime = super::super::Shell::new(&mut env);
+        let words = vec!["deploy".to_string(), "--env".to_string(), String::new()];
+        let values = ask(runtime, "deploy", source, &words);
+        let shown: Vec<&str> = values.iter().map(|o| o.display.as_str()).collect();
+        assert!(shown.contains(&"dev"), "the declared values: {shown:?}");
+
+        // Which is exactly when the second, flag-listing question must not be asked.
+        assert!(
+            answers_an_option(&words[..2], &values),
+            "the values of `--env` are the whole answer: {shown:?}"
+        );
+        // A boolean flag declares no values, so the flags are still listed after it.
+        let after_flag = vec!["deploy".to_string(), "--dry-run".to_string()];
+        assert!(!answers_an_option(&after_flag, &[]));
+        // And a bare command is not an option at all.
+        assert!(!answers_an_option(&["deploy".to_string()], &values));
     }
 
     /// The whole path, on a script that declares its arguments.

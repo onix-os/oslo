@@ -51,7 +51,10 @@ impl OsloHelper {
 
         // If what has been typed already names a command, it is not a prefix of the answer — it
         // *is* the answer. This is the `exit` case: bash shows nothing, and so should we.
-        if is_shell_name(stem) || CommandIndex::contains(&path, stem) {
+        if is_shell_name(stem)
+            || CommandIndex::contains(&path, stem)
+            || oslo_base::vocab::contains(stem)
+        {
             return None;
         }
 
@@ -85,6 +88,12 @@ impl OsloHelper {
         }
         drop(env);
 
+        // The structured verbs and registered tools. They run, so the ghost should reach them —
+        // and nothing else here can, since `$PATH` has never heard of any of them.
+        for (name, _) in oslo_base::vocab::all() {
+            consider(&name, Origin::Shell);
+        }
+
         // A binary search rather than a walk: `$PATH` holds a few thousand names here and only the
         // ones sharing the typed prefix can win.
         let sorted = CommandIndex::sorted(&path);
@@ -104,9 +113,13 @@ impl OsloHelper {
     /// for a word that is not in command position: a bare name at the start of a line is a command
     /// to look up, not a file in the current directory, and suggesting `./notes.txt` when someone
     /// typed `no` would be nonsense.
+    ///
+    /// **Unless it has a `/` in it**, which is how a command *is* named as a path. `./bui` and
+    /// `/usr/bin/gre` are commands nothing on `$PATH` can answer for, so refusing them here left
+    /// them with no ghost from any source at all.
     pub fn path_hint(&self, line: &str, pos: usize) -> Option<String> {
         let word = current_word(line, pos);
-        if word.command_position || word.stem.is_empty() {
+        if word.stem.is_empty() || (word.command_position && !word.stem.contains('/')) {
             return None;
         }
 
@@ -123,6 +136,15 @@ impl OsloHelper {
             return None;
         }
 
+        // **The same rule Tab follows.** `cd` refuses a file, and the ghost had no notion of that —
+        // so `cd a` was offered `azzz/` by Tab and suggested `aa` by the ghost, which `cd` then
+        // refused. It looked right only while the directory happened to sort first.
+        let only_dirs = word
+            .prior_words
+            .first()
+            .map(|w| crate::words::unquote(w))
+            .is_some_and(|c| crate::completion::takes_only_directories(&c));
+
         let expanded = expand_tilde(dir);
         let base = if expanded.is_empty() { "." } else { &expanded };
         let mut best: Option<String> = None;
@@ -136,11 +158,17 @@ impl OsloHelper {
             if name.starts_with('.') && !stem.starts_with('.') {
                 continue;
             }
-            let suffix = if entry.file_type().is_ok_and(|t| t.is_dir()) {
-                "/"
-            } else {
-                ""
-            };
+            let is_dir = entry.file_type().is_ok_and(|t| t.is_dir());
+            if only_dirs && !is_dir {
+                continue;
+            }
+            // A command named as a path can only be one that runs, so a plain data file is not a
+            // suggestion for it — the rule bash follows, and the reason `{dir}/not` in command
+            // position stays silent while `./bui` reaches an executable `build.sh`.
+            if word.command_position && !is_dir && !crate::completion::runnable_path(&entry) {
+                continue;
+            }
+            let suffix = if is_dir { "/" } else { "" };
             let candidate = format!("{name}{suffix}");
             // Shortest wins: it is the least presumptuous completion, and the one the user is
             // most likely already heading for.
@@ -156,14 +184,11 @@ impl OsloHelper {
 }
 
 /// A leading `~`, so a path typed with one can still be suggested.
+///
+/// **All four forms**, through the same expander the shell uses. Knowing only `~` and `~/…` left
+/// `~root/bi` and `~+/sr` with no ghost at all, though the shell expands both exactly as bash does.
 fn expand_tilde(dir: &str) -> String {
-    match dir.strip_prefix('~') {
-        Some(rest) if rest.is_empty() || rest.starts_with('/') => match std::env::var("HOME") {
-            Ok(home) if !home.is_empty() => format!("{home}{rest}"),
-            _ => dir.to_string(),
-        },
-        _ => dir.to_string(),
-    }
+    oslo_base::tilde::expand_prefix(dir, &oslo_base::tilde::from_process)
 }
 
 /// One candidate hint, with everything the ordering looks at.

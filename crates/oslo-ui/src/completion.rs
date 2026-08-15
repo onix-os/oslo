@@ -1,15 +1,20 @@
 //! Builds completion candidates for Tab.
 
 mod paths;
+pub(crate) use paths::glob_matches_anything;
+pub(crate) use paths::runnable as runnable_path;
+pub(crate) use paths::takes_only_directories;
 pub mod provider;
 mod segment;
+mod spec;
+mod sugar;
 
 use segment::{after_break, brace_segment};
 
 use super::OsloHelper;
 use super::command_index::CommandIndex;
 use super::dropdown::CompletionCandidate;
-use super::matching::{Fuzzed, Fuzzy, Match, matchers, matches_ignoring_case};
+use super::matching::{Fuzzed, Match, matchers, matches_ignoring_case};
 use super::settings;
 use super::words::{Quote, Word, current_word, quote_replacement, unquote};
 
@@ -42,20 +47,11 @@ thread_local! {
     static MATCHER: std::cell::Cell<Option<Match>> = const { std::cell::Cell::new(None) };
 }
 
-/// Put the best fuzzy matches first.
-///
-/// A prefix pass needs no such thing: everything it returns matched the same way, so the ordinary
-/// frecency order is the right one. A fuzzy pass is different — `gco` matching `git checkout` and
-/// `gcc --output` are not equally good answers, and the difference is exactly what
-/// [`fuzzy_score`] measures. Stable, so candidates that score the same keep the order the source
-/// gave them, which is frecency.
-fn rank_by_fuzz(out: &mut [CompletionCandidate], typed: &str, fuzzy: Fuzzy) {
-    // Folded once, outside the sort. `sort_by_key` calls this O(n log n) times, and the previous
-    // version rebuilt the typed pattern into a `Vec<char>` on every one of them.
-    let pattern = Fuzzed::new(typed, fuzzy);
-    out.sort_by_key(|candidate| {
-        std::cmp::Reverse(pattern.score(&candidate.display).unwrap_or(i32::MIN))
-    });
+/// Whether the variable being completed was written `${NAME` rather than `$NAME`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Braced {
+    Yes,
+    No,
 }
 
 /// A hook a config installs to complete one command itself.
@@ -110,11 +106,40 @@ fn config_candidates(
 impl OsloHelper {
     /// Return context-quoted candidates and their replacement byte offset.
     pub fn candidates(&self, line: &str, pos: usize) -> (usize, Vec<CompletionCandidate>) {
-        let word = brace_segment(after_break(current_word(line, pos)));
+        // oslo's own shorthands first: both look like ordinary words and neither completes like
+        // one, so the retarget has to happen before anything reads `stem`.
+        let sugared = sugar::at_segment(sugar::equals_segment(sugar::escaped_segment(
+            current_word(line, pos),
+        )));
+        let word = brace_segment(after_break(sugared));
         let mut out = Vec::new();
+        // Set when a fuzzy pass answered, and read by the final sort — see there.
+        let mut fuzzed: Option<Fuzzed> = None;
 
         if let Some(prefix) = word.stem.strip_prefix('$') {
-            self.variable_candidates(prefix, word.quote, &mut out);
+            // `${NAME` is the same question with a brace on it, and the answer has to carry the
+            // closing one — `${HO` completed to `$HOME` would leave an expansion that never ends.
+            match prefix.strip_prefix('{') {
+                Some(braced) => self.variable_candidates(braced, Braced::Yes, word.quote, &mut out),
+                None => self.variable_candidates(prefix, Braced::No, word.quote, &mut out),
+            }
+        } else if word.stem.starts_with('@') && !word.stem.contains('/') && !word.command_position {
+            // A name still being typed. `@work/` has already been retargeted at the directory it
+            // stands for, so only the bare name reaches here.
+            //
+            // **Not at the start of a line**, where `@name` does not expand either: that position is
+            // reserved, and offering completions for it would promise something the shell will not
+            // then do.
+            self.named_dir_candidates(word.stem.as_str(), &mut out);
+            if out.is_empty() {
+                self.path_candidates(&word, &mut out);
+            }
+        } else if word.command_position && word.stem.contains('/') {
+            // **A command with a `/` in it is a path, not a name.** Nothing on `$PATH` is reached by
+            // one, so the name builders below can never answer — and until this branch existed
+            // `./bui<Tab>`, `/usr/bin/gre<Tab>` and `~/bin/my<Tab>` did nothing at all, while the
+            // highlighter happily coloured the same word as a real command once it was typed out.
+            self.path_candidates(&word, &mut out);
         } else if word.command_position {
             // **Only in shell.** A command name is a shell answer: a builtin, an alias, a function,
             // something on `$PATH`. At a Lua prompt none of them can run, and offering them is the
@@ -131,9 +156,11 @@ impl OsloHelper {
                     if !out.is_empty() {
                         // A fuzzy pass has no useful order of its own — every candidate that
                         // matched at all matched, so without this the list arrives in whatever
-                        // order `$PATH` happened to be walked in.
+                        // order `$PATH` happened to be walked in. The pattern is carried to the
+                        // final sort rather than applied here: sorting twice means the second
+                        // sort wins, and it did.
                         if let Match::Fuzzy(fuzzy) = matcher {
-                            rank_by_fuzz(&mut out, word.stem.as_str(), fuzzy);
+                            fuzzed = Some(Fuzzed::new(word.stem.as_str(), fuzzy));
                         }
                         break;
                     }
@@ -181,10 +208,23 @@ impl OsloHelper {
         // `oslo.completion.sort`. Frecency first, name second — without the first key this is
         // alphabetical, which is how `exit` came to suggest `exitsnoop-bpfcc`. A config that
         // prefers a predictable order can ask for `alpha` and get name only.
+        //
+        // **How well it matched outranks both**, when a fuzzy pass is what found these. Every
+        // candidate in a fuzzy set matched, so frecency cannot separate them — unrun commands all
+        // score zero and the list came back in plain alphabetical order, which is how `cnr` offered
+        // `airscan-discover` above `cargo-nextest-runner` and why `gco` never reached
+        // `git checkout` first. Frecency still orders candidates that matched equally well.
         let by_name = crate::settings::current().completion.sort == crate::settings::Sort::Alpha;
         out.sort_by(|a, b| {
             if by_name {
                 return a.display.cmp(&b.display);
+            }
+            if let Some(pattern) = &fuzzed {
+                let fa = pattern.score(&a.display).unwrap_or(i32::MIN);
+                let fb = pattern.score(&b.display).unwrap_or(i32::MIN);
+                if fa != fb {
+                    return fb.cmp(&fa);
+                }
             }
             let sa =
                 self.frecency.score(&a.display) + boosts.get(&a.display).copied().unwrap_or(0.0);
@@ -204,11 +244,20 @@ impl OsloHelper {
         crate::settings::current().completion.case_sensitive
     }
 
-    fn variable_candidates(&self, prefix: &str, quote: Quote, out: &mut Vec<CompletionCandidate>) {
+    fn variable_candidates(
+        &self,
+        prefix: &str,
+        braced: Braced,
+        quote: Quote,
+        out: &mut Vec<CompletionCandidate>,
+    ) {
         let env = self.env.lock().unwrap();
         for name in env.vars().keys() {
             if matches_prefix(name, prefix, self.case_sensitive()) {
-                let value = format!("${}", name);
+                let value = match braced {
+                    Braced::Yes => format!("${{{name}}}"),
+                    Braced::No => format!("${name}"),
+                };
                 out.push(CompletionCandidate {
                     display: value.clone(),
                     // `$` survives quoting only outside double quotes; inside them it would be
@@ -262,6 +311,13 @@ impl OsloHelper {
             candidate.detail = detail;
             out.push(candidate);
         }
+        // The structured verbs and the tools a config registered. Not on `$PATH` and not builtins,
+        // so nothing else here can offer them — `whe<Tab>` found nothing at all.
+        for (name, kind) in oslo_base::vocab::all() {
+            if matches_prefix(&name, stem, self.case_sensitive()) {
+                out.push(self.command_candidate(word, name, kind));
+            }
+        }
         // The index is shared, not rebuilt: this used to `read_dir` all of `$PATH` per keystroke.
         for name in CommandIndex::executables(&path).iter() {
             if matches_prefix(name, stem, self.case_sensitive()) {
@@ -283,37 +339,6 @@ impl OsloHelper {
             path: None,
             detail: None,
         }
-    }
-
-    /// The command a name really stands for, following aliases.
-    ///
-    /// Transitive, because aliases chain — `alias g=git`, `alias gc='git commit'` — and bounded,
-    /// because they can also loop: `alias a=b` with `alias b=a` is legal to write and must not
-    /// hang the shell on Tab.
-    ///
-    /// Only the *first word* of an expansion matters here: `alias gc='git commit'` completes as
-    /// `git`, which is right for offering `git`'s options even if it means the subcommand path is
-    /// not followed. Getting the head right is most of the value; the rest can come later.
-    fn resolve_head(&self, name: &str) -> String {
-        let Ok(env) = self.env.lock() else {
-            return name.to_string();
-        };
-        let mut current = name.to_string();
-        for _ in 0..16 {
-            let Some(expansion) = env.alias(&current) else {
-                break;
-            };
-            let Some(first) = expansion.split_whitespace().next() else {
-                break;
-            };
-            if first == current {
-                // `alias ls='ls --color'` — the classic self-reference. It expands to itself, so
-                // the answer is already right and following it again would not terminate.
-                break;
-            }
-            current = first.to_string();
-        }
-        current
     }
 
     /// Command candidates found one particular way. See [`Match`].
@@ -371,80 +396,13 @@ impl OsloHelper {
         }
         boosts
     }
-
-    fn spec_candidates(&self, word: &Word<'_>, out: &mut Vec<CompletionCandidate>) {
-        // `prior_words` holds this command's words only, so `ls | git comm<TAB>` looks up `git`
-        // and not `ls`.
-        let Some((primary, rest)) = word.prior_words.split_first() else {
-            return;
-        };
-        // Through the alias table first. Everyone aliases `git`, and `g comm<TAB>` offering
-        // nothing is a gap the shell has no excuse for: the alias table is already loaded and this
-        // function is already holding the environment.
-        let head = self.resolve_head(&unquote(primary));
-        let Some(spec) = self.spec_registry.find_spec(&head) else {
-            return;
-        };
-
-        // Walk down the subcommand tree following what has already been typed, so
-        // `git commit --a<TAB>` offers `--amend` and not git's own top-level options.
-        let mut subcommands = &spec.subcommands;
-        let mut options = &spec.options;
-        for token in rest {
-            let token = unquote(token);
-            // Flags on the way down do not change which subcommand we are inside.
-            if token.starts_with('-') {
-                continue;
-            }
-            match subcommands.iter().find(|s| s.name == token) {
-                Some(found) => {
-                    subcommands = &found.subcommands;
-                    options = &found.options;
-                }
-                // An argument we do not recognise: stop rather than guess at a deeper level.
-                None => break,
-            }
-        }
-
-        if word.stem.starts_with('-') {
-            for opt in options {
-                for name in &opt.names {
-                    if name.starts_with(word.stem.as_str()) {
-                        out.push(self.spec_candidate(word, name, &opt.description, "flag"));
-                    }
-                }
-            }
-        } else {
-            for sub in subcommands {
-                if sub.name.starts_with(word.stem.as_str()) {
-                    out.push(self.spec_candidate(word, &sub.name, &sub.description, "subcommand"));
-                }
-            }
-        }
-    }
-
-    fn spec_candidate(
-        &self,
-        word: &Word<'_>,
-        name: &str,
-        description: &str,
-        kind: &str,
-    ) -> CompletionCandidate {
-        CompletionCandidate {
-            display: name.to_string(),
-            replacement: quote_replacement(name, word.quote),
-            description: Some(description.to_string()),
-            kind: Some(kind.to_string()),
-            path: None,
-            detail: None,
-        }
-    }
 }
 
 #[cfg(test)]
 mod case_tests {
     use super::matches_prefix;
     use super::{Match, matchers};
+    use crate::matching::Fuzzy;
 
     /// Each way of matching, and the case each one exists for.
     #[test]
@@ -485,7 +443,7 @@ mod case_tests {
     /// Exactness first. A list mixing an exact hit with looser ones is worse than either alone.
     #[test]
     fn the_chain_tries_exactness_first() {
-        let chain = matchers(super::Fuzzy::Off);
+        let chain = matchers(Fuzzy::Off);
         assert_eq!(chain[0], Match::Exact);
         assert_eq!(chain[1], Match::Ignoring);
         assert_eq!(chain[2], Match::Pieces);
@@ -498,10 +456,10 @@ mod case_tests {
     /// list by one you merely scattered the letters of.
     #[test]
     fn fuzzy_is_the_last_resort_and_only_when_asked_for() {
-        assert_eq!(matchers(super::Fuzzy::Off).len(), 3, "off adds no pass");
-        let chain = matchers(super::Fuzzy::Smart);
+        assert_eq!(matchers(Fuzzy::Off).len(), 3, "off adds no pass");
+        let chain = matchers(Fuzzy::Smart);
         assert_eq!(chain.len(), 4);
-        assert_eq!(*chain.last().unwrap(), Match::Fuzzy(super::Fuzzy::Smart));
+        assert_eq!(*chain.last().unwrap(), Match::Fuzzy(Fuzzy::Smart));
     }
 
     /// The setting was read from the config and then ignored, so turning it on changed nothing.

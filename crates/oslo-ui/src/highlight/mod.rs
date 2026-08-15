@@ -13,6 +13,10 @@
 
 mod lex;
 
+/// Shared with the correction so the two agree about which word is the command. The correction is
+/// its only other caller and is behind `vista`, so a default build — the one that ships — has none.
+#[cfg(feature = "vista")]
+pub(crate) use lex::is_assignment;
 pub use lex::{Role, Span, lex};
 
 use super::command_index::CommandIndex;
@@ -99,18 +103,72 @@ pub struct Context<'a> {
 /// and a line with forty words is one where the colour is not what you are looking at.
 const MAX_PATH_CHECKS: usize = 8;
 
+/// Whether each span belongs to a word that globs, and whether that word matches anything.
+///
+/// **A globbed word arrives here in pieces.** `tw*` is a `Word("tw")` and a `Glob("*")`, and
+/// path-checking the first piece asks whether a file called `tw` exists — a question nobody asked,
+/// whose answer was then painted onto the line. The word is put back together and resolved once, so
+/// `rm *.txt` can say whether it is about to hit anything.
+///
+/// `None` for every span that is not part of one, which is almost all of them.
+fn glob_word_answers(spans: &[Span], ctx: &Context<'_>, checked: &mut usize) -> Vec<Option<bool>> {
+    let mut answers = vec![None; spans.len()];
+    if !ctx.check_paths || !spans.iter().any(|s| s.role == Role::Glob) {
+        return answers;
+    }
+    let piece = |role: Role| {
+        matches!(
+            role,
+            Role::Word | Role::Glob | Role::Number | Role::SingleQuote | Role::DoubleQuote
+        )
+    };
+    let mut at = 0;
+    while at < spans.len() {
+        if !piece(spans[at].role) {
+            at += 1;
+            continue;
+        }
+        let start = at;
+        while at < spans.len() && piece(spans[at].role) {
+            at += 1;
+        }
+        // A quoted piece anywhere means the shell will not expand this word, so it is not a glob.
+        let group = &spans[start..at];
+        let quoted = group
+            .iter()
+            .any(|s| matches!(s.role, Role::SingleQuote | Role::DoubleQuote));
+        if quoted || !group.iter().any(|s| s.role == Role::Glob) || *checked >= MAX_PATH_CHECKS {
+            continue;
+        }
+        *checked += 1;
+        let word: String = group.iter().map(|s| s.text.as_str()).collect();
+        let hit = crate::completion::glob_matches_anything(&word);
+        for answer in answers.iter_mut().take(at).skip(start) {
+            *answer = Some(hit);
+        }
+    }
+    answers
+}
+
 /// Resolve every span into its final token type.
 pub fn classify(spans: &[Span], ctx: &Context<'_>) -> Vec<(String, TokenType)> {
     let mut out = Vec::with_capacity(spans.len());
     let mut checked = 0usize;
+    let globbed = glob_word_answers(spans, ctx, &mut checked);
 
-    for span in spans {
+    for (at, span) in spans.iter().enumerate() {
         let token = match span.role {
             Role::CommandWord => command_token(&span.text, ctx),
             Role::Keyword => TokenType::Keyword,
             Role::Word => {
                 if span.text.starts_with('-') && span.text.len() > 1 {
                     TokenType::Option
+                } else if let Some(matched) = globbed[at] {
+                    // Part of a word that globs; the whole word was resolved once, above.
+                    match matched {
+                        true => TokenType::ValidPath,
+                        false => TokenType::Param,
+                    }
                 } else if ctx.check_paths && checked < MAX_PATH_CHECKS {
                     // Counted whether or not the file turned out to exist: the cap is on the
                     // syscalls, not on the hits.
@@ -170,6 +228,20 @@ fn command_token(name: &str, ctx: &Context<'_>) -> TokenType {
     if (ctx.is_function)(name) {
         return TokenType::Function;
     }
+    // A structured verb or a registered tool. `$PATH` has never heard of `where`, so
+    // `ls | where 'size > 1024'` read as a line with two mistakes in it and ran perfectly.
+    if oslo_base::vocab::contains(name) {
+        return TokenType::Builtin;
+    }
+    // `=grep` is the shorthand for where grep lives, so it runs whenever grep does. Looked up as
+    // written it resolves to nothing and the line reads as an error while running perfectly.
+    if let Some(rest) = name.strip_prefix('=') {
+        return if !rest.is_empty() && !rest.contains('/') && which::which(rest).is_ok() {
+            TokenType::Command
+        } else {
+            TokenType::Error
+        };
+    }
     if name.contains('/') {
         // A path, not a lookup: `./configure`, `/usr/bin/env`.
         return if which::which(name).is_ok() {
@@ -190,14 +262,20 @@ fn names_an_existing_file(word: &str) -> bool {
     if word.is_empty() || word.starts_with('-') {
         return false;
     }
-    // `~` is not expanded by the lexer, so it is expanded here — a path a user typed with a tilde
-    // is exactly the kind that does exist and would otherwise never light up.
-    let expanded = match word.strip_prefix('~') {
-        Some(rest) if rest.is_empty() || rest.starts_with('/') => match std::env::var("HOME") {
-            Ok(home) if !home.is_empty() => format!("{home}{rest}"),
-            _ => return false,
+    // `~` and `@name` are not expanded by the lexer, so they are expanded here — a path typed with
+    // either is exactly the kind that does exist and would otherwise never light up.
+    //
+    // All four tilde forms, through the shell's own expander: knowing only `~` and `~/…` left
+    // `~root` and `~+/src` reading as paths that are not there, though the shell resolves both.
+    let expanded = match word.starts_with('~') {
+        true => oslo_base::tilde::expand_prefix(word, &oslo_base::tilde::from_process),
+        false => match word.strip_prefix('@') {
+            Some(rest) => match oslo_base::dirs::expand_at(rest) {
+                Some(path) => path,
+                None => return false,
+            },
+            None => word.to_string(),
         },
-        _ => word.to_string(),
     };
     std::fs::symlink_metadata(&expanded).is_ok()
 }

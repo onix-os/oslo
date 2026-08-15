@@ -108,20 +108,39 @@ fn unquoted_break(text: &str) -> Option<usize> {
 }
 
 /// The offset of a `{` that is still open at the end of `text`, ignoring quoted ones.
+///
+/// **`${` opens a parameter expansion, not a list**, and the two cannot share a stack. Counted as a
+/// list, `echo ${HO` was retargeted at `HO` with the `$` folded into its stem, and taking the one
+/// candidate spliced the line into `echo ${$HOME` — text the user never typed, on the ordinary way
+/// of writing `${HOME}`.
+///
+/// Its `}` has to be skipped with it rather than the `{` alone: popping the shared stack there
+/// would close somebody else's list, and `rm /d/{a,${X}b` would lose the brace it is really inside.
 fn unclosed_brace(text: &str) -> Option<usize> {
-    let mut open: Vec<usize> = Vec::new();
+    /// A `{` still waiting for its `}`, and whether a list or an expansion opened it.
+    struct Open {
+        at: usize,
+        list: bool,
+    }
+    let mut open: Vec<Open> = Vec::new();
     let mut quote = None;
+    let bytes = text.as_bytes();
     for (i, c) in text.char_indices() {
         match (quote, c) {
             (Some(q), _) if c == q => quote = None,
             (Some(_), _) => {}
             (None, '\'' | '"') => quote = Some(c),
-            (None, '{') => open.push(i),
+            (None, '{') => open.push(Open {
+                at: i,
+                list: i == 0 || bytes[i - 1] != b'$',
+            }),
             (None, '}') => {
                 open.pop();
             }
             _ => {}
         }
     }
-    open.pop()
+    // The innermost one, and only if a list opened it: inside an unclosed `${…}` the word being
+    // typed is a variable name, which the `$` branch of the completer answers for.
+    open.pop().filter(|last| last.list).map(|last| last.at)
 }
