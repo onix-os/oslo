@@ -263,6 +263,33 @@ the score, so the most-visited candidate wins however badly it matched. Here *ma
 primary key* and frecency only orders equal matches, so `cd rust` cannot land in `prust`. Each of
 the four is a named passing test.
 
+### Two shorthands, at the prompt only
+
+```sh
+nvim =script     # becomes `nvim /usr/bin/script` — where that command lives
+cd @work         # becomes `cd ~/data/code/tools` — a directory a config named
+ls @work/src     # the tail is kept
+```
+
+`=name` is zsh's, including the part that makes it safe: **a name that resolves to nothing is left
+exactly as it was**, so `echo =nosuch` still prints `=nosuch` and the worst case of the feature is
+that nothing happens. `@name` reads a table a config registers:
+
+```lua
+oslo.dirs = { work = "~/data/code/tools", dl = "~/Downloads" }
+```
+
+A distinct sigil rather than zsh's `~name`, deliberately: `~work` already means "the home directory
+of the user called `work`", so a real account could silently shadow your shortcut.
+
+**Interactive only.** A script written for `/bin/sh` sees neither — `echo =foo` prints `=foo` there,
+as it does in every other `sh`.
+
+Both are known to the rest of the prompt, not just to expansion: Tab after `=` completes *commands*
+and after `@` completes the registered names, `=grep` is coloured as the command it resolves to
+rather than as one that does not exist, and a misspelled `=lsvlk` is corrected the same way a
+misspelled first word is.
+
 ### Navigate the filesystem
 
 ```sh
@@ -439,7 +466,9 @@ oslo.spawn{ "git", "status", "--porcelain",
 ```
 
 **The callback arrives between commands**, not the instant the process exits — the same safe point
-timers fire at, where the shell holds nothing and can call Lua. That is the honest limitation: a
+timers fire at, where the shell holds nothing and can call Lua. Those timers are `oslo.after(ms, f)`
+and `oslo.every(ms, f)`, and what they promise is written down in
+[docs/features/timers.md](docs/features/timers.md). That is the honest limitation: a
 prompt segment reading `oslo.state` shows the answer from a moment ago instead of blocking the draw
 to fetch a fresh one. One process, one callback; there is no scheduler and no promise. A missing
 command answers 127 and a `timeout` answers 124, which are the statuses a shell already uses for
@@ -1448,8 +1477,7 @@ what to check afterwards and how to undo all of it — see
 
 ## Known gaps
 
-`coproc`, `select`, associative arrays, a structured tool reading the shell's own stdin, and
-process substitution on a system with no `/dev/fd`. Each one is listed with its cause and what to
+`coproc`, `select`, associative arrays, and process substitution on a system with no `/dev/fd`. Each one is listed with its cause and what to
 write instead in [docs/known-gaps.md](docs/known-gaps.md), and each one *says so* rather than
 quietly doing something else — a syntax error naming the construct, or a builtin refusing the
 option.

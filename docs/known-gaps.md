@@ -73,22 +73,6 @@ local m = {}
 m.k, m.j = "v", "w"
 ```
 
-## A structured tool reading the shell's own stdin
-
-```console
-$ printf 'a\nb\n' | oslo -c 'lines | length'
-0
-```
-
-`lines`, `parse` and `from` turn bytes into rows, and they read the bytes from *the pipe they are
-on*. The shell's own standard input is not that pipe, so a structured tool at the head of a
-pipeline finds nothing there and answers for an empty input. Put the bytes on the pipe:
-
-```console
-$ printf 'a\nb\n' | oslo -c 'cat | lines | length'
-2
-```
-
 ## Process substitution without `/dev/fd`
 
 `cat <(echo hi)` works, and works by handing the reader a `/dev/fd/N` path. On a system without
@@ -103,6 +87,7 @@ temporary file is the portable spelling, and it is what POSIX offers.
 | Was | Now |
 |---|---|
 | `for ((;;))` with touching separators | every spelling runs, empty sections and all |
+| A structured tool at the head of a pipeline | `printf 'a\nb\n' \| oslo -c 'lines \| length'` answers 2, not 0 |
 | Process substitution generally | works wherever `/dev/fd` exists, which is every ordinary Linux system |
 
 The first was closed by this audit and is worth a word, because the shape of it recurs. The

@@ -30,6 +30,18 @@ fn simple_command_name(simple: &SimpleCommand) -> Option<String> {
 
 /// How each stage of this pipeline will be asked to write its output.
 ///
+/// The shell's standard input, to the end.
+///
+/// Lossy rather than refusing: a tool that turns bytes into rows is being handed something the
+/// user piped in, and answering "not UTF-8" for one stray byte in a log file would be worse than
+/// carrying on. `Val::Bytes` exists for the cell that genuinely holds binary; this is the channel.
+fn read_standard_input() -> String {
+    use std::io::Read;
+    let mut buffer = Vec::new();
+    let _ = std::io::stdin().lock().read_to_end(&mut buffer);
+    String::from_utf8_lossy(&buffer).into_owned()
+}
+
 /// Every stage that is not a simple command naming a registered tool is reported as plain bytes,
 /// which is what keeps compound commands, functions and externals on the path they always took.
 fn plan_pipeline(pipeline: &Pipeline) -> Vec<Sink> {
@@ -140,7 +152,34 @@ pub(super) fn run(
     });
     let mut bytes: Option<String> = None;
     let start = match first_tool {
-        Some(0) | None => 0,
+        Some(0) | None => {
+            // **A bytes-taking tool at the head of the pipeline reads the shell's own input.**
+            //
+            // There is no stage before it, so `bytes` stayed `None` and `lines` was handed the
+            // empty string:
+            //
+            // ```text
+            // printf 'a\nb\nc\n' | oslo -c 'lines | length'      answered 0
+            // printf 'a\nb\nc\n' | oslo -c 'cat | lines | length'  answers 3
+            // ```
+            //
+            // Zero rows for three lines of input, silently — a wrong answer where a refusal would
+            // have been survivable, which is the one failure `docs/known-gaps.md` opens by saying
+            // oslo does not have. It does now what `cat` would do in its place: read standard
+            // input to the end. At a terminal that waits for Ctrl-D, exactly as `wc -l` does.
+            if let Some(Command::Simple(first)) = pipeline.commands.first()
+                && let Some(name) = simple_command_name(first)
+                && crate::data::tool::lookup(&name).is_some_and(|tool| {
+                    matches!(
+                        tool.accepts,
+                        crate::data::Shape::Bytes | crate::data::Shape::Any
+                    )
+                })
+            {
+                bytes = Some(read_standard_input());
+            }
+            0
+        }
         Some(at) => {
             let prefix = Pipeline {
                 commands: pipeline.commands[..at].to_vec(),

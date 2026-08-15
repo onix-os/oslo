@@ -115,3 +115,68 @@ fn no_corpus_script_ever_enters_the_structured_path() {
          stopped requiring a declaration on both ends.\n{offenders:#?}"
     );
 }
+
+/// **A bytes-taking tool at the head of a pipeline reads the shell's own input.**
+///
+/// There is no stage before it, so it used to be handed the empty string and answer for an empty
+/// input: `printf 'a\nb\nc\n' | oslo -c 'lines | length'` said **0**. Not a refusal — a wrong
+/// answer, silently, which is the one failure `docs/known-gaps.md` opens by saying oslo does not
+/// have. `cat | lines | length` said 3, which is what made it look like a rule about pipelines.
+#[test]
+fn a_bytes_tool_at_the_head_reads_standard_input() {
+    for (line, expected) in [
+        ("lines | length", "3"),
+        // Unchanged where there *is* an upstream stage.
+        ("cat | lines | length", "3"),
+    ] {
+        let out = piped("a\nb\nc\n", line);
+        assert_eq!(out.trim(), expected, "`{line}` answered wrongly");
+    }
+}
+
+/// A tool that takes nothing still takes nothing — `ls` must not consume the shell's input.
+///
+/// Five files in the directory and three lines on standard input, so the two answers cannot be
+/// confused for one another.
+#[test]
+fn a_tool_that_reads_nothing_leaves_standard_input_alone() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    for n in 0..5 {
+        std::fs::write(dir.path().join(format!("f{n}")), b"x").expect("write");
+    }
+    let out = piped_in(dir.path(), "a\nb\nc\n", "ls | length");
+    assert_eq!(
+        out.trim(),
+        "5",
+        "`ls` answered for the piped lines rather than for the directory"
+    );
+}
+
+/// Run `line` with `input` on standard input, in a fresh directory.
+fn piped(input: &str, line: &str) -> String {
+    let dir = tempfile::tempdir().expect("tempdir");
+    piped_in(dir.path(), input, line)
+}
+
+/// The same, somewhere the caller controls.
+fn piped_in(dir: &Path, input: &str, line: &str) -> String {
+    use std::io::Write;
+    use std::process::Stdio;
+    let mut child = Command::new(oslo_binary())
+        .arg("-c")
+        .arg(line)
+        .current_dir(dir)
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("spawn oslo");
+    child
+        .stdin
+        .as_mut()
+        .expect("stdin")
+        .write_all(input.as_bytes())
+        .expect("write");
+    let out = child.wait_with_output().expect("wait");
+    String::from_utf8_lossy(&out.stdout).into_owned()
+}
