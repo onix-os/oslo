@@ -182,10 +182,27 @@ pub fn nearest(path: &str, name: &str) -> Option<String> {
     if name.len() < 2 {
         return None;
     }
-    let budget = if name.len() <= 4 { 1 } else { 2 };
     let names = CommandIndex::executables(path);
+    // **Two letters the wrong way round, asked first.** It is the commonest typo there is —
+    // `gerp`, `gti`, `tset`, `buidl` — and Levenshtein charges *two* for it, which the budget
+    // below only affords to a name of five characters or more. Every short command anybody
+    // mistypes was therefore beyond repair: `gerp foo` got no correction at all.
+    //
+    // Asked first rather than folded into the distance because it also settles the ties. `gti` is
+    // one substitution from `gtf` and one swap from `git`, and by any distance those are equal —
+    // so the shell answered with whichever the scan reached first, which was the wrong one about
+    // as often as not. A swap is what a person actually did; it wins.
+    if let Some(swapped) = transpositions(name).find(|word| names.contains(word)) {
+        return Some(swapped);
+    }
+    let budget = if name.len() <= 4 { 1 } else { 2 };
+    // **`sorted`, not the set.** The set has no order, so two candidates at the same distance were
+    // separated by the hash — the same shell, asked the same question twice, could answer
+    // differently. See the tie note above; this is the half of it that has to be decided even
+    // when neither candidate is a swap.
+    let ordered = CommandIndex::sorted(path);
     let mut best: Option<(usize, &String)> = None;
-    for candidate in names.iter() {
+    for candidate in ordered.iter() {
         // A candidate wildly different in length cannot be within budget, and skipping it here
         // avoids the quadratic work for most of the three thousand entries.
         if candidate.len().abs_diff(name.len()) > budget {
@@ -197,6 +214,21 @@ pub fn nearest(path: &str, name: &str) -> Option<String> {
         }
     }
     best.map(|(_, name)| name.clone())
+}
+
+/// Every way of swapping one adjacent pair of characters in `name`.
+///
+/// Characters rather than bytes: a swap inside a multi-byte character is not a typo anybody made,
+/// and slicing one would panic.
+fn transpositions(name: &str) -> impl Iterator<Item = String> + '_ {
+    let chars: Vec<char> = name.chars().collect();
+    (0..chars.len().saturating_sub(1)).filter_map(move |at| {
+        (chars[at] != chars[at + 1]).then(|| {
+            let mut swapped = chars.clone();
+            swapped.swap(at, at + 1);
+            swapped.into_iter().collect()
+        })
+    })
 }
 
 /// Levenshtein distance, abandoning once it cannot come in under `budget`.
@@ -293,6 +325,50 @@ mod tests {
         assert_eq!(nearest(path, "zzzzzz"), None);
         // A short name gets one edit of leeway, not two: `ls` must not suggest `cd`.
         assert_eq!(nearest(path, "xy"), None);
+    }
+
+    /// **Two letters the wrong way round is one mistake, not two.**
+    ///
+    /// `gerp` is four characters, so it gets one edit of leeway, and Levenshtein charges two for a
+    /// swap — which left the commonest typo of all with no correction at all. The swap is asked
+    /// about before the distance is measured.
+    #[test]
+    fn a_transposition_is_repaired() {
+        let _guard = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
+        let dir = tempfile::tempdir().unwrap();
+        for name in ["grep", "git", "gtf"] {
+            make_exe(dir.path(), name);
+        }
+        invalidate();
+        let path = dir.path().to_str().unwrap();
+
+        assert_eq!(nearest(path, "gerp").as_deref(), Some("grep"));
+        // **And it beats a substitution at the same distance.** `gti` is one letter from `gtf` and
+        // one swap from `git`; the swap is what the typist did. Before this the answer was
+        // whichever the hash reached first.
+        assert_eq!(nearest(path, "gti").as_deref(), Some("git"));
+    }
+
+    /// The same question, asked twice, answers the same way.
+    ///
+    /// The candidates used to be walked in the set's order, which is the hash's, so two names at
+    /// equal distance were separated by nothing at all.
+    #[test]
+    fn an_equal_distance_tie_is_settled_the_same_way_every_time() {
+        let _guard = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
+        let dir = tempfile::tempdir().unwrap();
+        // All one substitution from `bxxxx`, and no swap of it is any of them.
+        for name in ["baxxx", "bxaxx", "bxxax", "bxxxa"] {
+            make_exe(dir.path(), name);
+        }
+        invalidate();
+        let path = dir.path().to_str().unwrap();
+
+        let first = nearest(path, "bxxxx");
+        assert!(first.is_some());
+        for _ in 0..20 {
+            assert_eq!(nearest(path, "bxxxx"), first);
+        }
     }
 
     /// A symlinked command counts. Most of coreutils is symlinks — `ls` and `cat` both point at
