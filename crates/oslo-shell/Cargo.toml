@@ -8,7 +8,7 @@ description = "oslo's shell: syntax adaptation, expansion, execution, builtins, 
 
 [features]
 default = []
-# `tab` — named sessions that keep running when the terminal they were in goes away. Off by
+# `scratch` — named sessions that keep running when the terminal they were in goes away. Off by
 # default; a build without it has no keeper, no client and no runtime directory, and the key that
 # opens the finder does nothing.
 scratch = []

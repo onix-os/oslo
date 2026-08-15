@@ -12,7 +12,7 @@
 //!
 //! The cost is an allocation per string at *build* time and a pointer chase at *read* time. Both
 //! were measured on a Tab against `git comm`, which is the deepest walk of this data the shell does:
-//! see `docs/features/completion-specs.md`.
+//! see `docs/features/completion-and-matching.md`.
 
 pub mod custom;
 pub mod definitions;

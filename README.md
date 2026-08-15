@@ -1448,10 +1448,11 @@ what to check afterwards and how to undo all of it — see
 
 ## Known gaps
 
-`for ((;;))` with touching separators, process substitution without `/dev/fd`, `coproc`, `select`,
-associative arrays, and a structured tool reading the shell's own stdin. Each one is listed with its
-cause and its workaround in [docs/known-gaps.md](docs/known-gaps.md), most of them pinned by a test
-that fails if the gap ever closes.
+`coproc`, `select`, associative arrays, a structured tool reading the shell's own stdin, and
+process substitution on a system with no `/dev/fd`. Each one is listed with its cause and what to
+write instead in [docs/known-gaps.md](docs/known-gaps.md), and each one *says so* rather than
+quietly doing something else — a syntax error naming the construct, or a builtin refusing the
+option.
 
 ## Licence
 

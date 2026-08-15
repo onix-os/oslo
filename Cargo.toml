@@ -29,8 +29,8 @@ default = []
 # before using them: `if oslo.repair then … end`.
 vista = ["oslo-base/vista", "oslo-runtime/vista", "oslo-ui/vista"]
 
-# `tab` — named sessions that keep running when the terminal they were in goes away, reached with
-# one key. See `PLAN.md` and `docs/features/tab.md`.
+# `scratch` — named sessions that keep running when the terminal they were in goes away, reached
+# with one key. See `PLAN.md` and `docs/features/scratch.md`.
 #
 # **Off, because it is a second process and a pty for every session that uses it, and because a
 # shell meant to be `/bin/sh` should not carry a multiplexer nobody asked for.** Unlike `vista` it
