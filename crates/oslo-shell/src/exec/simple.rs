@@ -10,7 +10,7 @@
 
 mod assign;
 mod autocd;
-mod autoload;
+pub(crate) mod autoload;
 mod declare;
 /// `\command` and `\\command`, which decide how much of the shell a name skips past.
 mod escape;
@@ -64,7 +64,7 @@ fn eval_simple_command_inner(env: &mut Environment, simple: &SimpleCommand) -> R
     let mut backslashes = 0;
     if let Some(first) = rest.next() {
         (escape, backslashes) = escape::intent(first, env.interactive());
-        words.extend(expand_word(env, first)?);
+        words.extend(crate::expand::expand_command_word(env, first)?);
     }
 
     if words.is_empty() {
@@ -440,7 +440,11 @@ fn nothing_to_run(
     // Nobody handled it, so say what a person needs next: the name that was probably meant. Only
     // when the shell is interactive — a script's stderr is read by machines, and bash says exactly
     // "command not found" there.
-    let hint = if env.interactive() {
+    //
+    // **Not for a word starting with `@`.** That position is reserved and `@name` does not expand
+    // there, so there is no command it could have been meant to be: `@proj` was answered with
+    // "did you mean gprof?", which is a guess about a word the shell has decided not to read.
+    let hint = if env.interactive() && !cmd_name.starts_with('@') {
         let path = env.get_var("PATH").unwrap_or_default().to_string();
         oslo_ui::command_index::nearest(&path, cmd_name)
     } else {

@@ -35,6 +35,16 @@ fn path_for(env: &Environment, name: &str) -> Option<PathBuf> {
     if name.is_empty() || name.contains('/') || name.starts_with('.') {
         return None;
     }
+    let file = directory(env)?.join(format!("{name}.sh"));
+    file.is_file().then_some(file)
+}
+
+/// The directory autoloaded functions are read from, whether or not it exists.
+///
+/// Split out because the prompt needs the *set* of names, not one of them: an autoloaded function
+/// is a command that runs, and until the interface could enumerate them every one of them was
+/// painted as a command that does not exist. See [`crate::names`].
+pub(crate) fn directory(env: &Environment) -> Option<PathBuf> {
     let base = env
         .get_var("XDG_CONFIG_HOME")
         .map(str::to_string)
@@ -49,8 +59,7 @@ fn path_for(env: &Environment, name: &str) -> Option<PathBuf> {
                 .filter(|h| !h.is_empty())?;
             Some(PathBuf::from(home).join(".config"))
         })?;
-    let file = base.join("oslo/functions").join(format!("{name}.sh"));
-    file.is_file().then_some(file)
+    Some(base.join("oslo/functions"))
 }
 
 /// Read the file defining `name` and answer whether it is now defined.
