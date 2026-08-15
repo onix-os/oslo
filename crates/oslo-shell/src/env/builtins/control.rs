@@ -193,6 +193,9 @@ pub fn builtin_source(env: &mut Environment, args: &[String]) -> Result<i32> {
     // counter is entered only after the file is known to be readable, so a missing file still
     // costs nothing, and exited on every path out so a `return` cannot leave it drifting.
     env.enter_nested_script()?;
+    // `$FUNCNAME`'s outermost entry, as bash spells it: a function called from a sourced file
+    // reads `f source`. `eval` gets none, and bash gives it none either.
+    env.enter_script_frame("source");
     let result =
         match crate::syntax::parse_with_aliases(&content, !env.get_aliases().is_empty(), &|n| {
             env.get_alias(n).map(str::to_string)
@@ -205,6 +208,7 @@ pub fn builtin_source(env: &mut Environment, args: &[String]) -> Result<i32> {
                 Ok(2)
             }
         };
+    env.exit_script_frame();
     env.exit_nested_script();
 
     // `return` ends a sourced script early and supplies its status.

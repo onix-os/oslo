@@ -124,6 +124,14 @@ pub struct Environment {
     /// The name of every shell function on that chain, outermost first. Pushed and popped with
     /// the counter above; read by `caller`.
     call_stack: Vec<String>,
+    /// How the code now running was reached: `main` for a script file, `source` for a sourced one.
+    ///
+    /// **Kept apart from [`Self::call_stack`] on purpose.** bash puts these in `$FUNCNAME` — a
+    /// function called from a script file sees `f main` — but they are not function frames, and
+    /// `caller` decides "am I inside a function at all" by asking whether that stack is empty. A
+    /// sentinel pushed there would make `caller` answer yes at the top level of every script, and
+    /// the `while caller $i` idiom depends on it answering no.
+    script_frames: Vec<String>,
     /// How deep the current `source`/`eval` chain is.
     script_depth: DepthGuard,
     /// The `set -e`/`set -o pipefail` options. Read through the accessors in the `options`
@@ -177,6 +185,7 @@ impl Environment {
             loop_depth: 0,
             function_depth: DepthGuard::new(MAX_FUNCTION_DEPTH),
             call_stack: Vec::new(),
+            script_frames: Vec::new(),
             script_depth: DepthGuard::new(MAX_SCRIPT_DEPTH),
             options: ShellOptions::default(),
         };
@@ -252,12 +261,61 @@ impl Environment {
     pub fn enter_function_named(&mut self, name: &str) -> Result<()> {
         self.function_depth.enter()?;
         self.call_stack.push(name.to_string());
+        self.publish_call_stack();
         Ok(())
     }
 
     pub fn exit_function(&mut self) {
         self.function_depth.exit();
         self.call_stack.pop();
+        self.publish_call_stack();
+    }
+
+    /// Publish `$FUNCNAME`, which is the call stack a script can read.
+    ///
+    /// **It was empty, and said nothing about being empty.** `f() { echo "$FUNCNAME"; }` printed a
+    /// blank line where bash prints `f` — so a log line or an error handler built on it lost the
+    /// one piece of information it existed to carry, silently, in every script that used one.
+    ///
+    /// An array, as in bash: `${FUNCNAME[0]}` is the function running now and `${FUNCNAME[1]}` is
+    /// whoever called it, so the order is the reverse of [`Self::call_stack`], which reads
+    /// outermost first. A bare `$FUNCNAME` is element 0, which the array machinery already does.
+    ///
+    /// Rebuilt on entry and exit rather than synthesised when read, because `get_array` hands back
+    /// a reference into the table and cannot make one up. The depth is capped at
+    /// [`MAX_FUNCTION_DEPTH`], so the copy is bounded and small — the same way `PIPESTATUS` is
+    /// published by whoever computes it.
+    ///
+    /// Unset outside every function, which is also bash: `${FUNCNAME+set}` is how a script asks
+    /// whether it is inside one at all.
+    fn publish_call_stack(&mut self) {
+        if self.call_stack.is_empty() {
+            self.arrays.remove("FUNCNAME");
+            return;
+        }
+        let frames: Vec<String> = self
+            .call_stack
+            .iter()
+            .rev()
+            .chain(self.script_frames.iter().rev())
+            .cloned()
+            .collect();
+        self.set_array("FUNCNAME", ShellArray::from_values(frames));
+    }
+
+    /// Note how the code about to run was reached, for `$FUNCNAME`'s outermost entries.
+    ///
+    /// `main` for a script file and `source` for a sourced one, which is what bash calls them.
+    /// Nothing is pushed for `-c` or for standard input, and bash pushes nothing there either.
+    pub fn enter_script_frame(&mut self, kind: &str) {
+        self.script_frames.push(kind.to_string());
+        self.publish_call_stack();
+    }
+
+    /// Leave the frame [`Self::enter_script_frame`] pushed.
+    pub fn exit_script_frame(&mut self) {
+        self.script_frames.pop();
+        self.publish_call_stack();
     }
 
     /// The shell functions currently executing, innermost last.
