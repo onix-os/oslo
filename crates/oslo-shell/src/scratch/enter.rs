@@ -27,7 +27,7 @@
 
 use super::{backend, client, detach, dir, keeper, name as naming};
 use oslo_ui::ask::{Answer, Choice, Pick, pick_or_create};
-use std::io;
+use std::io::{self, IsTerminal};
 
 /// What the key did, so a caller can tell "nothing happened" from "you are somewhere else now".
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -83,6 +83,17 @@ pub fn names() -> io::Result<Vec<String>> {
 /// The finder still opens if the key is pressed inside, so this is a way *in* rather than a second
 /// way of choosing: what happens after you arrive is the same either way.
 pub fn open_named(key: &str, replay: u64, name: &str) -> io::Result<Went> {
+    // **Before the session is made, not after the attach fails.** A scratch is a terminal you go
+    // into, and `ensure` forks the keeper and execs the shell inside it — so a `scratch work` from
+    // a script or a pipeline used to build the whole session, discover at the attach that there is
+    // no terminal, report the failure and exit 1, and leave the shell it had just started running
+    // with nobody attached and nobody able to attach. One per invocation, until the machine was
+    // rebooted or somebody went looking for them.
+    if !io::stdin().is_terminal() || !io::stdout().is_terminal() {
+        return Err(io::Error::other(
+            "a scratch is a terminal to go into, and there is none here",
+        ));
+    }
     if !naming::valid(name) {
         return Err(io::Error::other(format!(
             "{name:?} is not a usable scratch name"
