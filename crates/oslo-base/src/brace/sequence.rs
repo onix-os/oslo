@@ -118,7 +118,7 @@ fn single_ascii(s: &str) -> Option<u8> {
 
 #[cfg(test)]
 mod tests {
-    use crate::expand::brace::expand_braces_text as expand;
+    use crate::brace::expand_braces_text as expand;
 
     #[test]
     fn numeric_ranges_count_both_ways() {

@@ -141,6 +141,14 @@ const MAX_GLOB_ENTRIES: usize = 2_000;
 ///
 /// Bounded by [`MAX_GLOB_ENTRIES`]: this runs on the repaint path, once per globbing word.
 pub(crate) fn glob_matches_anything(stem: &str) -> bool {
+    // **A brace list is asked of each branch.** `three/{fo*,x}` reached here whole, and the literal
+    // string matched nothing — so a word that globs onto real files was marked as matching none,
+    // which is worse than saying nothing. Braces expand before globs in the shell, and they do here
+    // too. One alternative that hits is enough: the word as a whole reaches something.
+    let branches = oslo_base::brace::expand_braces_text(stem);
+    if branches.len() > 1 {
+        return branches.iter().any(|one| glob_matches_anything(one));
+    }
     let (dir_part, last) = match stem.rfind('/') {
         Some(i) => (&stem[..=i], &stem[i + 1..]),
         None => ("", stem),

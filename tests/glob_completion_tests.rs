@@ -272,3 +272,41 @@ fn a_user_name_completes_after_a_tilde() {
         "past the slash it is an ordinary path walk"
     );
 }
+
+/// **The highlighter answers a brace list by what it expands to.**
+///
+/// `{`, `}` and `,` are not glob metacharacters, so `three/{four,five}` reached the existence check
+/// as one literal word — no file has ever been called that, and a word naming two real paths was
+/// painted exactly like one naming none. `three/{fo*,x}` was worse: it was marked as *positively*
+/// matching nothing, while Tab has understood braces since it was written.
+#[test]
+fn a_brace_list_is_coloured_by_what_it_expands_to() {
+    let root = tree();
+    let base = root.path().display();
+    let no = |_: &str| false;
+    let ctx = Context {
+        path: "",
+        is_builtin: &no,
+        is_function: &no,
+        check_paths: true,
+    };
+    let live = |line: &str| {
+        classify(&lex(line), &ctx)
+            .into_iter()
+            .any(|(_, kind)| kind == TokenType::ValidPath)
+    };
+
+    assert!(
+        live(&format!("ls {base}/three/{{four,five}}")),
+        "both branches exist, so the word reaches something"
+    );
+    assert!(
+        !live(&format!("ls {base}/three/{{four,nope}}")),
+        "a branch that names nothing must not be dressed as a path"
+    );
+    // A glob inside a brace: the two expansions have to be tried separately.
+    assert!(
+        live(&format!("ls {base}/three/{{fo*,zzz}}")),
+        "`fo*` reaches `four`, so the word does"
+    );
+}

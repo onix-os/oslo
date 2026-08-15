@@ -89,7 +89,7 @@ pub fn expand_braces_text(word: &str) -> Vec<String> {
 /// Two places in oslo hold a list of words as one string and lex it themselves rather than going
 /// through the parser: an alias body (`alias mk='mkdir -p {a,b}'`) and a `declare -a` array
 /// literal. Brace expansion happens per word and before the lexer, so neither can get it from
-/// [`crate::expand::expand_word`] — this is the same pass applied at the same boundary, one word
+/// `oslo_shell::expand::expand_word` — this is the same pass applied at the same boundary, one word
 /// at a time.
 ///
 /// The separators between the words are copied through untouched rather than normalised, so a

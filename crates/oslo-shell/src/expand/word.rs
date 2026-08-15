@@ -309,7 +309,7 @@ pub fn expand_word_to_pattern(env: &mut Environment, word: &Word) -> Result<Vec<
 ///
 /// Brace expansion is not here, and deliberately so. It is the one expansion that yields whole
 /// *words* rather than fields, and matching bash means running it on the word's source text
-/// before the word is lexed at all — so it lives in [`crate::expand::brace`] and is applied by
+/// before the word is lexed at all — so it lives in `oslo_base::brace` and is applied by
 /// the parser, once per word, at the positions where bash applies it. By the time a [`Word`]
 /// reaches this function its groups are already gone.
 pub fn expand_word(env: &mut Environment, word: &Word) -> Result<Vec<String>> {

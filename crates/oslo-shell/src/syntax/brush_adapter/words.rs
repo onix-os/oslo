@@ -68,7 +68,7 @@ pub(super) fn convert_braced_word(w: &ast::Word) -> Result<Vec<oslo_ast::Word>> 
 pub(super) fn convert_braced_words_from_str(word_str: &str) -> Result<Vec<oslo_ast::Word>> {
     let trimmed = word_str.trim();
     let mut words = Vec::new();
-    for text in crate::expand::brace::expand_braces_text(trimmed) {
+    for text in oslo_base::brace::expand_braces_text(trimmed) {
         words.extend(convert_words_from_str(&text)?);
     }
     Ok(words)
