@@ -5,9 +5,14 @@
 //! sitting at a prompt means "when you next press Enter". A job that ended ten minutes ago was
 //! announced when you ran the next thing.
 //!
-//! `SIGCHLD` is now installed without `SA_RESTART`, so the blocked `read` fails with `EINTR` and
-//! the reader services the background before going back to waiting. The same route `SIGWINCH`
-//! already takes for a resize.
+//! The editor's wait now watches a set of descriptors beside the terminal, and everything that
+//! wants its attention arrives on one of them: a pipe the `SIGCHLD` handler writes a byte to, an
+//! `inotify` watch on the universal store, the queue a finished `oslo.spawn` appends to. A timer
+//! is the same wait with a deadline instead of none.
+//!
+//! Every test here types nothing after the setup. That is the whole point — the shell has to
+//! notice while nobody is touching it — so anything that arrives only at a command boundary fails
+//! them, which is what they are for.
 //!
 //! **A real pty, because that is the only place the editor exists.** A pipe is not interactive, the
 //! line editor never runs, and the thing under test is precisely what the editor does while idle.
@@ -280,6 +285,34 @@ fn a_universal_from_another_shell_announces_itself_as_remote() {
         shell.text().matches("CHANGED MOOD").count(),
         1,
         "an unchanged universal was announced again:\n{}",
+        shell.text()
+    );
+}
+
+/// **A prompt-visible change made while you sit there reaches the screen.**
+///
+/// The timer is the vehicle, but the claim is about the *prompt*: a handler that changes what one
+/// shows used to leave the value correct in the config and invisible on the terminal until the
+/// next command. Nothing is typed here, so the new prompt can only be a redraw the shell decided
+/// to do on its own — which is why `oslo.ui.redraw()` was written and then not shipped: with this
+/// passing, it would have been an API that asked for something already happening.
+#[test]
+fn a_prompt_that_changes_while_idle_is_drawn_again() {
+    let shell = Shell::with_config(
+        r#"local mood = "before"
+           oslo.prompt.left = function() return mood .. "> " end
+           oslo.after(1200, function() mood = "after" end)"#,
+    );
+    assert!(
+        shell.until(|seen| seen.contains("before>"), "the first prompt"),
+        "the config's prompt never appeared:\n{}",
+        shell.text()
+    );
+
+    // Nothing is typed from here: a changed prompt can only be one the shell chose to redraw.
+    assert!(
+        shell.until(|seen| seen.contains("after>"), "the redraw"),
+        "the prompt was never drawn again:\n{}",
         shell.text()
     );
 }
