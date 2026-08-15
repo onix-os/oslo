@@ -44,7 +44,7 @@ oslo.register_tool{
   name     = "mounts",
   accepts  = "nothing",   -- nothing | bytes | rows | any   (default: nothing)
   produces = "rows",      -- the same four                  (default: rows)
-  rows     = function(argv) return { { a = 1 }, { a = 2 } } end,
+  rows     = function(argv, input) return { { a = 1 }, { a = 2 } } end,
 }
 ```
 
@@ -57,11 +57,18 @@ planner ever reads, and `data::custom::register` holds the closure, which is wha
 there so that the pipeline can ask "is there a tool called this" without reaching up into the Lua
 API — the API sits above the shell, and the shell asking it a question would invert that.
 
-**The handler is given its argv and nothing else.** `argv[1]` is the tool's own name and the rest
-are its words. Rows produced by the previous stage are *not* passed to it, and neither are bytes —
-`accepts` is read by the planner to decide the edge, and then the input is dropped on the floor. A
-Lua tool is therefore always a producer; the consuming verbs are `where`, `cols`, `sort-by` and the
-rest, in Rust.
+**The handler is given its argv and its input.** `argv[1]` is the tool's own name and the rest are
+its words. The second argument is what the stage before it produced: a list of rows for a tool that
+declared `accepts = "rows"`, and `nil` for one that declared `nothing` or that has no neighbour. So
+a Lua tool can consume as well as produce —
+
+```lua
+oslo.register_tool{ name = "count", accepts = "rows",
+  rows = function(argv, input) return { { rows = #input } } end }
+```
+
+`accepts` is still what the planner reads to decide the edge; what changed is that the input is then
+handed over rather than dropped.
 
 The returned value is read as a list of tables. Each table becomes one row, columns in the order the
 table has them; a string, number, boolean or nil becomes the matching `Val`, a nested table becomes
@@ -190,9 +197,10 @@ gitroot() { git rev-parse --show-toplevel; }
 
 ## What it cannot do
 
-- **A tool is not a command on its own.** `mounts` alone is *command not found*: a single stage has
-  no edge, so the plan carries no rows and the byte path takes the word. It needs a neighbour that
-  accepts rows.
+Two entries left this list rather than being fixed in it, and both are worth knowing if you read an
+older copy: a tool **is** a command on its own now (`mounts` alone prints its rows, where it used to
+be *command not found*), and a tool **does** receive its input.
+
 - **A byte consumer breaks it too.** `mounts | grep ext4` is *command not found*, because that edge
   is bytes and the whole plan is thrown away. There is no byte prefix in reverse: everything before
   the first tool may be ordinary commands, nothing after the last one may be.
@@ -204,9 +212,6 @@ gitroot() { git rev-parse --show-toplevel; }
 - **A redirection removes both stages.** `mounts | where rw > /tmp/x` reports *mounts: command not
   found* and *where: command not found*, the built-in verb included. A redirection means bytes were
   asked for somewhere specific, and the tools have no byte form to fall back to.
-- **A tool never sees its input.** Declaring `accepts = "rows"` gets the planner to hand the stage a
-  rows edge, and the handler is still called with argv alone. A tool declaring `accepts = "rows"`
-  that returns `{ got = #argv }` answers 1 however many rows the stage before it produced.
 - **Nothing inside a tool or a registered builtin may reach the shell.** They run while the shell
   holds its own state, so `oslo.proc.capture`, `oslo.run` and even setting a shell variable fail
   with *shell state is busy*. `io.popen` is refused separately, because it would run its argument in
