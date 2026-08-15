@@ -482,6 +482,36 @@ mod special_builtins {
         }
     }
 
+    /// **A here-document is expanded before the command's prefix assignments exist.**
+    ///
+    /// `x=1 cat <<EOF` with `$x` in the body prints an empty line in bash and in dash: the
+    /// assignment belongs to the command's environment, and the document is not part of it. oslo
+    /// expanded the body down in the redirection code, which runs after the prefix scope is
+    /// pushed, so the document could see a variable the shell never had.
+    #[test]
+    fn a_heredoc_does_not_see_the_commands_prefix_assignments() {
+        let r = run("x=1 cat <<EOF\n[$x]\nEOF\n");
+        assert_eq!(r.out(), "[]", "stderr: {}", r.stderr);
+
+        // The same for a here-string, which travels the same path.
+        let r = run("x=1 cat <<< \"[$x]\"");
+        assert_eq!(r.out(), "[]", "stderr: {}", r.stderr);
+    }
+
+    /// And everything either side of that still holds: an ordinary body expands, a quoted
+    /// delimiter does not, and the assignment still reaches the command it was written for.
+    #[test]
+    fn the_ordinary_heredoc_cases_are_unchanged() {
+        let r = run("x=9; cat <<EOF\n[$x]\nEOF\n");
+        assert_eq!(r.out(), "[9]", "stderr: {}", r.stderr);
+
+        let r = run("x=9; cat <<\"EOF\"\n[$x]\nEOF\n");
+        assert_eq!(r.out(), "[$x]", "stderr: {}", r.stderr);
+
+        let r = run("x=1 env");
+        assert!(r.out().lines().any(|l| l == "x=1"), "stdout: {}", r.stdout);
+    }
+
     /// `unset` still clears the names it can, and complains about the one it cannot.
     ///
     /// bash does both: `readonly r=1; x=2; unset r x` leaves `x` unset and reports `r`. Raising at the

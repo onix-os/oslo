@@ -133,13 +133,54 @@ fn eval_simple_command_inner(env: &mut Environment, simple: &SimpleCommand) -> R
         return run_command_word(env, &cmd_name, &words, &simple.redirections, escape);
     }
 
+    // **A here-document is expanded without the prefix assignments in scope**, which is what bash
+    // and dash both do:
+    //
+    // ```text
+    // x=1 cat <<EOF     bash, dash: []
+    // [$x]              oslo, before this: [1]
+    // EOF
+    // ```
+    //
+    // The body used to be expanded down in `redirect::apply`, which runs after the scope below is
+    // pushed — so the document saw a variable that belongs to the command's environment and not to
+    // the shell's. Expanded here instead, and carried down as a literal: the parser already uses
+    // that shape for a quoted delimiter, so nothing expands it a second time.
+    let redirections = heredocs_expanded(env, &simple.redirections)?;
+
     env.push_scope();
     for (name, value) in &prefix_assignments {
         env.set_local_exported_var(name, value);
     }
-    let result = run_command_word(env, &cmd_name, &words, &simple.redirections, escape);
+    let result = run_command_word(env, &cmd_name, &words, &redirections, escape);
     env.pop_scope();
     result
+}
+
+/// The redirections with every here-document body already expanded.
+///
+/// Only the bodies: a redirection *target* is expanded by `redirect::apply` at the moment it is
+/// opened, and bash expands that one with the assignments in scope — `x=/tmp/f x=1 cat > $x` is
+/// not a case anybody writes, but the two halves genuinely differ and following bash on each is
+/// cheaper than explaining a rule of our own.
+fn heredocs_expanded(
+    env: &mut Environment,
+    redirections: &[Redirection],
+) -> Result<Vec<Redirection>> {
+    let mut out = Vec::with_capacity(redirections.len());
+    for redir in redirections {
+        let mut redir = redir.clone();
+        if matches!(
+            redir.kind,
+            RedirectKind::Heredoc | RedirectKind::HeredocStrip
+        ) && let Some(word) = &redir.heredoc_content
+        {
+            let text = expand_word_to_string(env, word)?;
+            redir.heredoc_content = Some(Word::from_literal(&text));
+        }
+        out.push(redir);
+    }
+    Ok(out)
 }
 
 /// Run a command that has no command word: `x=1`, or `x=1 $empty`.
