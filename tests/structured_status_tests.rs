@@ -102,3 +102,41 @@ fn a_directory_that_cannot_be_read_is_not_an_empty_one() {
     let listed = common::run_in(dir.path(), "ls . | length");
     assert_eq!(listed.out(), "2", "stderr: {}", listed.stderr);
 }
+
+/// **A redirection does not un-structure the pipeline.**
+///
+/// The planner treated a redirection on a stage as blocking the edge *into* it, so the whole
+/// pipeline fell to the byte path — where `lines` and `length` are not commands at all.
+/// `… | lines | length >/dev/null` answered `lines: command not found` and exited 127, which made
+/// the structured verbs unusable in exactly the scripts that would test them: every natural way to
+/// write "run this and check `$?`" ends in a redirection.
+///
+/// A redirection governs what a stage *writes*. Rows may reach it, and `structured::run` applies
+/// the redirection around its own output.
+#[test]
+fn a_redirection_does_not_drop_the_pipeline_to_bytes() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    std::fs::write(dir.path().join("t.txt"), b"a\nb\n").expect("fixture");
+
+    let quiet = common::run_in(
+        dir.path(),
+        "cat t.txt | lines | length >/dev/null\necho rc=$?",
+    );
+    assert!(
+        quiet.out().contains("rc=0"),
+        "the verbs were looked up as external commands: {:?} {}",
+        quiet.out(),
+        quiet.stderr
+    );
+
+    // And the redirection is honoured rather than merely tolerated.
+    let written = common::run_in(dir.path(), "cat t.txt | lines | length > out.txt");
+    assert!(written.stderr.is_empty(), "stderr: {}", written.stderr);
+    let landed = std::fs::read_to_string(dir.path().join("out.txt")).expect("the file was written");
+    assert_eq!(landed.trim(), "2", "the count never reached the file");
+
+    // A redirection on a *producer* still forces text: its bytes went to the file, so the stage
+    // after it has nothing to read, and pretending otherwise would be the opposite mistake.
+    let upstream = common::run_in(dir.path(), "cat t.txt >/dev/null | lines | length");
+    assert_eq!(upstream.out().trim(), "0", "stderr: {}", upstream.stderr);
+}

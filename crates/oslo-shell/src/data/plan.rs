@@ -132,12 +132,23 @@ pub fn plan(stages: &[Stage], last_is_terminal: bool) -> Vec<Sink> {
     for i in (0..last).rev() {
         let producer = &stages[i];
         let consumer = &stages[i + 1];
-        let rows = producer.produces.gives_rows()
-            && consumer.accepts.takes_rows()
-            && producer.in_process
+        // **A redirection governs what a stage writes, not what it reads.**
+        //
+        // Blocking the edge *into* a redirected consumer dropped the whole pipeline onto the byte
+        // path, where the structured verbs are not commands at all: `… | lines | length >/dev/null`
+        // answered `lines: command not found`, so every natural way to write "run this and check
+        // `$?`" was unusable. Rows may reach it — but only when it is the last stage, because that
+        // is the one whose redirection `structured::run` can apply around its own output. A
+        // redirected stage in the middle still forces text, since nothing would apply its
+        // redirection at all. The producer's own redirection always forces text: its bytes went to
+        // the file, so the consumer has nothing to read.
+        let consumer_takes_rows = consumer.accepts.takes_rows()
             && consumer.in_process
+            && (!consumer.redirected || i + 1 == last);
+        let rows = producer.produces.gives_rows()
+            && producer.in_process
             && !producer.redirected
-            && !consumer.redirected;
+            && consumer_takes_rows;
         sinks[i] = if rows {
             STRUCTURED_EDGES.fetch_add(1, Ordering::Relaxed);
             Sink::Rows
@@ -225,14 +236,40 @@ mod tests {
         );
     }
 
-    /// A redirection means the user asked for bytes at that point, and that outranks the planner.
+    /// A redirection means the user asked for bytes *out of* that stage — its own output — and that
+    /// outranks the planner. What reaches it is a separate question.
+    ///
+    /// Blocking the edge into it dropped the whole pipeline to the byte path, where the structured
+    /// verbs are not commands: `… | lines | length >/dev/null` answered `lines: command not found`.
+    /// So rows still arrive, the stage still writes text, and `structured::run` applies the
+    /// redirection around that text.
     #[test]
-    fn a_redirection_forces_bytes() {
+    fn a_redirection_forces_bytes_out_but_not_in() {
         let _guard = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
         let mut consumer = tool(Shape::Rows, Shape::Rows);
         consumer.redirected = true;
         let stages = [tool(Shape::Nothing, Shape::Rows), consumer];
-        assert_eq!(plan(&stages, true), vec![Sink::Text, Sink::Text]);
+        assert_eq!(plan(&stages, true), vec![Sink::Rows, Sink::Text]);
+    }
+
+    /// But only for the *last* stage, which is the one whose redirection anything applies.
+    ///
+    /// A redirected stage in the middle sends its bytes to a file, so the stage after it has
+    /// nothing to read — and nothing would apply its redirection anyway. Both of its edges are text.
+    #[test]
+    fn a_redirection_in_the_middle_still_forces_bytes() {
+        let _guard = SERIAL.lock().unwrap_or_else(|e| e.into_inner());
+        let mut middle = tool(Shape::Rows, Shape::Rows);
+        middle.redirected = true;
+        let stages = [
+            tool(Shape::Nothing, Shape::Rows),
+            middle,
+            tool(Shape::Rows, Shape::Rows),
+        ];
+        assert_eq!(
+            plan(&stages, true),
+            vec![Sink::Text, Sink::Text, Sink::Print]
+        );
     }
 
     /// Redirected output at the end is text, not a drawn table: a file gets the transport form.

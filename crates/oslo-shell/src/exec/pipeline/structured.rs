@@ -179,6 +179,20 @@ pub(super) fn run(
     let mut rows: Option<Vec<crate::data::Record>> = None;
     let mut statuses = Vec::with_capacity(pipeline.commands.len());
 
+    // **The last stage's redirection, applied around everything this writes.**
+    //
+    // The structured stages do not fork, so nothing has pointed this process's stdout at the file
+    // the user named — and `run` writes with `println!`. The planner will only route rows *into* a
+    // redirected stage when it is the last one, precisely so this is the only redirection that has
+    // to be honoured here. The guard restores the descriptor when it drops, however this returns.
+    let mut redirected = crate::exec::redirect::RedirectGuard::new();
+    if let Some(Command::Simple(last)) = pipeline.commands.last()
+        && !last.redirections.is_empty()
+    {
+        let redirections = last.redirections.clone();
+        redirected.apply(env, &redirections)?;
+    }
+
     // **The byte prefix.** `kubectl get pods -o json | from json | where ...` is an external
     // followed by structured stages: the external cannot hand over rows, so its *output* is what
     // the first structured stage is given. Everything up to the first tool runs exactly as it
