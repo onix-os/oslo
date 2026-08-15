@@ -188,6 +188,11 @@ pub const HOOKS: &[Hook] = &[
         aliases: &[],
         answers: false,
     },
+    Hook {
+        name: "on-focus-change",
+        aliases: &[],
+        answers: false,
+    },
 ];
 
 /// The moments something on a hot path has to ask about, by index into [`HOOKS`].
@@ -285,6 +290,7 @@ mod tests {
             (at::JOB_FINISH, "on-job-finish"),
             (at::PROCESS_EXIT, "on-process-exit"),
             (at::JOB_STATE, "on-job-state"),
+            (at::FOCUS_CHANGE, "on-focus-change"),
             (at::TIME_REPORT, "on-time-report"),
             (at::COMMAND_NOT_FOUND, "on-command-not-found"),
             (at::IDLE_TIMEOUT, "on-idle-timeout"),

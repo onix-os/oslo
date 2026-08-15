@@ -79,6 +79,11 @@ pub mod at {
     /// The transition rather than the destination — `from` and `to` — because "it stopped" and "it
     /// was already stopped" are different things to a status line.
     pub const JOB_STATE: usize = 27;
+    /// The terminal gained or lost focus, where the terminal reports it at all.
+    ///
+    /// An observer and nothing more: the report arrives as input, and a handler that could veto it
+    /// would be vetoing something that has already happened somewhere oslo does not control.
+    pub const FOCUS_CHANGE: usize = 28;
 }
 
 /// The four ways a hook is reached, supplied by whoever can actually run one.

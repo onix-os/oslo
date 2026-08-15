@@ -416,7 +416,17 @@ pub fn read_line(
                 at_row = 0;
                 continue;
             }
-            InputEvent::Focus(_) => continue,
+            // Decoded, and until now dropped. A status line that dims when you look away, or a
+            // plugin that pauses polling while the window is in the background, needs exactly this
+            // and had no way to hear it. An observer: the focus has already changed somewhere oslo
+            // does not control, so there is nothing for a handler to refuse.
+            InputEvent::Focus(focused) => {
+                oslo_base::hooks::fire_at_here(
+                    oslo_base::hooks::at::FOCUS_CHANGE,
+                    &[("focused", if focused { "1" } else { "" })],
+                );
+                continue;
+            }
             // A prompt rebuilt itself behind the editor. `repaint` is already true and the
             // generation check at the top of the loop picks the new text up.
             InputEvent::Refreshed => continue,

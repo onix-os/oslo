@@ -95,6 +95,7 @@ fn constant_names() -> HashMap<usize, &'static str> {
         (at::POST_SECRET_ACCESS, "POST_SECRET_ACCESS"),
         (at::PROCESS_EXIT, "PROCESS_EXIT"),
         (at::JOB_STATE, "JOB_STATE"),
+        (at::FOCUS_CHANGE, "FOCUS_CHANGE"),
     ])
 }
 
