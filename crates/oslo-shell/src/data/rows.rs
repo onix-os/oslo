@@ -1,6 +1,6 @@
 //! Per-command output parsers: `sh.df()` and friends, answering rows instead of text.
 //!
-//! The shape these follow is written up in `docs/built-in-tools.md`. The short version: a tool
+//! The shape these follow is written up in `docs/features/structured-pipelines.md`. The short version: a tool
 //! answers in text when a pipe asks and in a table when Lua asks, and the fields carry **values,
 //! not renderings** — `free` is a byte count, `free_human` is `"4.2G"`. A config that wants to
 //! compare needs the number; one that wants to draw wants the string; making each config derive

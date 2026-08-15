@@ -434,7 +434,7 @@ mod tests {
     /// Lua promises no order here, but a shell needs one: a record's columns are drawn and
     /// serialised in iteration order, and a hash map's order changes between runs — so a table
     /// built identically twice would print its columns shuffled. This is the prerequisite the
-    /// structured pipeline rests on; see `docs/research/dual-channel-pipe.md`.
+    /// structured pipeline rests on; see `docs/features/structured-pipelines.md`.
     #[test]
     fn the_hash_part_iterates_in_insertion_order() {
         let names = [

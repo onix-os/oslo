@@ -1,7 +1,7 @@
 //! The commands that understand structure.
 //!
 //! Each one declares what it takes and what it gives; the planner reads those declarations and
-//! nothing else. See `docs/research/dual-channel-pipe.md`.
+//! nothing else. See `docs/features/structured-pipelines.md`.
 
 pub mod bridge;
 pub mod df;

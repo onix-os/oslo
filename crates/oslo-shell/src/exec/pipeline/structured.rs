@@ -7,7 +7,7 @@
 //!
 //! Kept apart from the pipeline itself so the byte path stays exactly as long and exactly as
 //! readable as it was, and so the seam between the two is one function rather than a condition
-//! threaded through the old code. See `docs/research/dual-channel-pipe.md`.
+//! threaded through the old code. See `docs/features/structured-pipelines.md`.
 
 use super::Pipeline;
 use crate::data::{Sink, Stage};

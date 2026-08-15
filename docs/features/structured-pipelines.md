@@ -204,8 +204,6 @@ which nothing carries rows.
   edge, so no edge can carry rows. Structure is offered only where it costs nothing.
 * The README's `ps | where 'cpu > 10'` cannot work: `ps` rows carry no CPU column, so the filter
   reports `attempt to compare number with nil` and keeps nothing.
-* Six files point at `docs/research/dual-channel-pipe.md` for the design, and four more at
-  `docs/built-in-tools.md`. Neither file exists in the repository.
 
 ## Where it lives
 

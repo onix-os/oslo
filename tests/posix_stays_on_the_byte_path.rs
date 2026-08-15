@@ -3,7 +3,7 @@
 //! oslo's structured pipeline is designed so a script written before oslo existed cannot reach it:
 //! structure flows only between two stages that *both* declare they understand it, and every name
 //! that can carry a declaration is either invented by oslo or a builtin deliberately declared as
-//! bytes. See `docs/research/dual-channel-pipe.md`.
+//! bytes. See `docs/features/structured-pipelines.md`.
 //!
 //! That argument is worth only as much as its enforcement. This runs every script in the
 //! differential corpus — the same corpus checked against bash byte for byte — with the shell

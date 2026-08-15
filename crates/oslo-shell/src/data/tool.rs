@@ -38,11 +38,16 @@ pub fn any_registered() -> bool {
 static REGISTERED: AtomicBool = AtomicBool::new(false);
 
 /// Declare a tool.
+///
+/// The name is also recorded in [`oslo_base::vocab`], which is what the prompt reads: `$PATH` has
+/// never heard of `where`, so without it every structured verb was painted as a command that does
+/// not exist and offered by nothing on Tab.
 pub fn register(name: &str, accepts: Shape, produces: Shape) {
     if let Ok(mut t) = registry().lock() {
         t.insert(name.to_string(), Tool { accepts, produces });
         REGISTERED.store(true, Ordering::Relaxed);
     }
+    oslo_base::vocab::add(name, "verb");
 }
 
 /// What a name declares, or `None` if it declares nothing — which is the answer for every external
@@ -57,6 +62,7 @@ pub fn clear() {
         t.clear();
         REGISTERED.store(false, Ordering::Relaxed);
     }
+    oslo_base::vocab::clear();
 }
 
 #[cfg(test)]

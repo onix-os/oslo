@@ -7,7 +7,7 @@
 //! for a tagged scalar, so a size would have to be smuggled in as `{__kind="size"}`, which makes
 //! every consumer defensive about a shape the producer never intended.
 //!
-//! See `docs/research/dual-channel-pipe.md` for the design this belongs to. Two things there are
+//! See `docs/features/structured-pipelines.md` for the design this belongs to. Two things there are
 //! load-bearing here:
 //!
 //! * **[`Val::Error`] is a value, not a failure.** `ps` meets a process that exits mid-scan; `df`
