@@ -209,10 +209,17 @@ pub(crate) fn takes_only_directories(command: &str) -> bool {
 
 /// Whether a directory entry has an execute bit anybody could use.
 pub(crate) fn runnable(entry: &fs::DirEntry) -> bool {
+    executable(&entry.path())
+}
+
+/// The same question of a path rather than an entry.
+///
+/// For a caller that has already decided which candidate it wants and does not want to have paid a
+/// `statx` for the ones it discarded — see the ghost's `path_hint`, which was asking this of every
+/// prefix match in the directory before it knew which one could win.
+pub(crate) fn executable(path: &std::path::Path) -> bool {
     use std::os::unix::fs::PermissionsExt;
-    entry
-        .metadata()
-        .is_ok_and(|m| m.permissions().mode() & 0o111 != 0)
+    fs::metadata(path).is_ok_and(|m| m.permissions().mode() & 0o111 != 0)
 }
 
 impl OsloHelper {

@@ -1,8 +1,8 @@
 //! Builds completion candidates for Tab.
 
 mod paths;
+pub(crate) use paths::executable;
 pub(crate) use paths::glob_matches_anything;
-pub(crate) use paths::runnable as runnable_path;
 pub(crate) use paths::takes_only_directories;
 pub mod provider;
 mod segment;

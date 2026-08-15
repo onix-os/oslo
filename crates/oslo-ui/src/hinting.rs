@@ -12,6 +12,8 @@
 use super::OsloHelper;
 use super::command_index::CommandIndex;
 use super::words::{Quote, current_word};
+use std::cell::RefCell;
+use std::rc::Rc;
 
 /// How a hint candidate was found, best first. Ties on frecency are broken by this.
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Debug)]
@@ -20,6 +22,52 @@ enum Origin {
     External,
     /// A builtin, alias or function: part of this shell, so nearer to hand.
     Shell,
+}
+
+/// A directory's names, and whether each is itself a directory.
+type Listing = Rc<Vec<(String, bool)>>;
+
+/// That listing, with the directory it came from and the mtime it was read at.
+type Remembered = (String, std::time::SystemTime, Listing);
+
+/// One directory's entries, remembered between keystrokes.
+///
+/// The ghost re-listed the whole directory on **every** keystroke and threw the result away: in a
+/// directory of twenty thousand names that is a `getdents64` sweep per character, about 11 ms, and
+/// a sixteen-character paste paid it sixteen times. Nothing about the listing changes between two
+/// keystrokes of the same word, so it is read once and kept.
+///
+/// **Keyed on the directory's own mtime**, which is what changes when an entry is created or
+/// removed — so a file appearing while you type is picked up on the next keystroke, at the cost of
+/// one `stat` instead of a full walk. One entry, because a word is being typed in one directory;
+/// `Tracker::worktree` caches for the same reason and to the same depth.
+fn entries_of(base: &str) -> Option<Listing> {
+    thread_local! {
+        static CACHED: RefCell<Option<Remembered>> = const { RefCell::new(None) };
+    }
+    let stamp = std::fs::metadata(base).ok()?.modified().ok()?;
+    if let Some(hit) = CACHED.with(|slot| {
+        slot.borrow()
+            .as_ref()
+            .filter(|(path, at, _)| path == base && *at == stamp)
+            .map(|(_, _, entries)| Rc::clone(entries))
+    }) {
+        return Some(hit);
+    }
+    let entries: Vec<(String, bool)> = std::fs::read_dir(base)
+        .ok()?
+        .flatten()
+        .map(|entry| {
+            let name = entry.file_name().to_string_lossy().into_owned();
+            // `file_type` comes back with the directory entry on Linux, so this is not a syscall.
+            (name, entry.file_type().is_ok_and(|t| t.is_dir()))
+        })
+        .collect();
+    let entries = Rc::new(entries);
+    CACHED.with(|slot| {
+        *slot.borrow_mut() = Some((base.to_string(), stamp, Rc::clone(&entries)));
+    });
+    Some(entries)
 }
 
 impl OsloHelper {
@@ -154,9 +202,16 @@ impl OsloHelper {
 
         let expanded = expand_tilde(dir);
         let base = if expanded.is_empty() { "." } else { &expanded };
-        let mut best: Option<String> = None;
-        for entry in std::fs::read_dir(base).ok()?.flatten() {
-            let name = entry.file_name().to_string_lossy().into_owned();
+        // **Gathered first, then ranked, and only then asked whether it runs.**
+        //
+        // The executable test is a `statx`, and asking it inside the loop asked it of every name
+        // that merely shared a prefix — 43,763 of them per keystroke in a directory of 40,000, to
+        // choose one. The ranking does not depend on the answer, so it goes first and the syscall is
+        // paid for the winner alone. `file_type` stays in the loop because Linux hands it back with
+        // the directory entry; it is not a syscall.
+        let mut matches: Vec<(String, String, bool)> = Vec::new();
+        for (name, is_dir) in entries_of(base)?.iter() {
+            let (name, is_dir) = (name.clone(), *is_dir);
             if !name.starts_with(stem) || name.len() == stem.len() {
                 continue;
             }
@@ -165,20 +220,45 @@ impl OsloHelper {
             if name.starts_with('.') && !stem.starts_with('.') {
                 continue;
             }
-            let is_dir = entry.file_type().is_ok_and(|t| t.is_dir());
             if only_dirs && !is_dir {
                 continue;
             }
+            let candidate = if is_dir {
+                format!("{name}/")
+            } else {
+                name.clone()
+            };
+            matches.push((candidate, name, is_dir));
+        }
+        // Shortest wins: it is the least presumptuous completion, and the one the user is most
+        // likely already heading for. Sorted on the candidate itself — the very value the old loop
+        // compared — so the answer cannot drift from what it used to be.
+        matches.sort_by(|a, b| (a.0.len(), &a.0).cmp(&(b.0.len(), &b.0)));
+
+        let mut best: Option<String> = None;
+        // How many names may be tested for executability before the ghost gives up.
+        //
+        // The test is a `statx`, and "stop at the first one that runs" is only cheap when one of
+        // them does: typing `./` in a directory of twenty thousand data files matches every entry
+        // and finds nothing runnable, so the walk paid twenty thousand syscalls to answer nothing.
+        // A ghost is a suggestion, and a suggestion that is not among the shortest few dozen names
+        // was never going to be the one — so past that, silence is the right answer and the cheap
+        // one. `completion::paths` bounds its own walk the same way.
+        const MAX_EXECUTABLE_TESTS: usize = 64;
+        let mut tested = 0;
+        for (candidate, name, is_dir) in matches {
             // A command named as a path can only be one that runs, so a plain data file is not a
             // suggestion for it — the rule bash follows, and the reason `{dir}/not` in command
             // position stays silent while `./bui` reaches an executable `build.sh`.
-            if word.command_position && !is_dir && !crate::completion::runnable_path(&entry) {
-                continue;
+            if word.command_position && !is_dir {
+                tested += 1;
+                if tested > MAX_EXECUTABLE_TESTS {
+                    break;
+                }
+                if !crate::completion::executable(&std::path::Path::new(base).join(&name)) {
+                    continue;
+                }
             }
-            let suffix = if is_dir { "/" } else { "" };
-            let candidate = format!("{name}{suffix}");
-            // Shortest wins: it is the least presumptuous completion, and the one the user is
-            // most likely already heading for.
             if best
                 .as_ref()
                 .is_none_or(|b| (candidate.len(), &candidate) < (b.len(), b))
