@@ -14,9 +14,12 @@ fn every_menu() -> Vec<(&'static str, &'static Menu)> {
         ("history", &crate::cli::history::help::MENU),
         ("macros", &crate::cli::macros::help::MENU),
         ("config", &crate::cli::config::MENU),
+        ("hook", &crate::cli::hook::MENU),
         ("profile", &crate::cli::profile::help::MENU),
         ("profile key", &crate::cli::profile::help::KEY),
     ];
+    #[cfg(feature = "direnv")]
+    all.push(("direnv", &crate::cli::direnv::MENU));
     #[cfg(feature = "scratch")]
     all.push(("scratch", &crate::cli::scratch::MENU));
     #[cfg(feature = "plugin")]

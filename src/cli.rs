@@ -10,8 +10,11 @@
 #[cfg(feature = "argc")]
 pub mod argc;
 pub mod config;
+#[cfg(feature = "direnv")]
+pub mod direnv;
 pub mod help;
 pub mod history;
+pub mod hook;
 pub mod macros;
 #[cfg(feature = "plugin")]
 pub mod plugin;
