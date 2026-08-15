@@ -85,7 +85,9 @@ pub fn ps() -> Vec<Record> {
 
 /// A directory listing.
 pub fn ls(args: &[String]) -> Vec<Record> {
-    let path = args.first().map(String::as_str).unwrap_or(".");
+    // The same rule the Lua front end uses, from the same place: a leading `-` is a flag, not a
+    // directory. Taking it as one made `ls -la | where …` answer an empty listing without a word.
+    let path = crate::data::rows::ls_where(args);
     as_sizes(rows_of(&crate::data::rows::ls_rows(path)), &["size"])
 }
 
