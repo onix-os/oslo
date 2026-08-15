@@ -178,6 +178,13 @@ pub fn run_repl(login: bool) -> ! {
             Ok(mut env) => oslo_shell::env::universal::apply_if_changed(&mut env),
             Err(_) => false,
         };
+        // **The lock is gone by here, so anything the apply announced can run.** A hook fired while
+        // the shell's state is held is queued rather than called — it could look but not touch —
+        // and the queue is drained when the borrow that held it ends. This servicer takes the lock
+        // directly rather than through that borrow, so without this the `on-variable-change` for a
+        // value another terminal just set waited for the next command, which is the whole thing an
+        // idle wake exists to avoid.
+        crate::lua::engine::run_deferred_hooks();
         // **A changed variable is invisible until the prompt is rebuilt.** `PS1` is expanded when
         // the prompt is rendered, not on every repaint — so a theme another terminal just set would
         // otherwise sit in the environment, correct and unseen, until the next command. This is the

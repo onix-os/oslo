@@ -84,6 +84,12 @@ pub mod at {
     /// An observer and nothing more: the report arrives as input, and a handler that could veto it
     /// would be vetoing something that has already happened somewhere oslo does not control.
     pub const FOCUS_CHANGE: usize = 28;
+    /// A variable was set or erased, in this shell or in another one.
+    ///
+    /// **`source` is the field that earns this hook.** A universal variable can change because you
+    /// typed something here or because a shell in another window did, and a status line that
+    /// redraws on the second but not the first — or the other way about — needs to be told which.
+    pub const VARIABLE_CHANGE: usize = 29;
 }
 
 /// The four ways a hook is reached, supplied by whoever can actually run one.

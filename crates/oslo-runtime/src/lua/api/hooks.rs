@@ -193,6 +193,14 @@ pub const HOOKS: &[Hook] = &[
         aliases: &[],
         answers: false,
     },
+    // Observation only, and for a reason worth stating: a handler that could refuse an assignment
+    // would make `x=1` a thing a config can silently undo, and every script in the system is
+    // written on the understanding that it cannot.
+    Hook {
+        name: "on-variable-change",
+        aliases: &[],
+        answers: false,
+    },
 ];
 
 /// The moments something on a hot path has to ask about, by index into [`HOOKS`].
@@ -291,6 +299,7 @@ mod tests {
             (at::PROCESS_EXIT, "on-process-exit"),
             (at::JOB_STATE, "on-job-state"),
             (at::FOCUS_CHANGE, "on-focus-change"),
+            (at::VARIABLE_CHANGE, "on-variable-change"),
             (at::TIME_REPORT, "on-time-report"),
             (at::COMMAND_NOT_FOUND, "on-command-not-found"),
             (at::IDLE_TIMEOUT, "on-idle-timeout"),

@@ -217,6 +217,73 @@ fn an_idle_prompt_sees_a_universal_set_by_another_shell() {
     );
 }
 
+/// **And a handler is told, with `source` saying it came from somewhere else.**
+///
+/// The field is the whole reason `on-variable-change` exists — a status line usually wants to act
+/// on another terminal's change and not on its own — and this is the only place it can be proved,
+/// because a script never re-reads the store.
+#[test]
+fn a_universal_from_another_shell_announces_itself_as_remote() {
+    let shell = Shell::with_config(
+        r#"oslo.on["on-variable-change"](function(e)
+             print("CHANGED " .. e.name .. " " .. e.action .. " " .. e.scope .. " " .. e.source)
+           end)"#,
+    );
+    assert!(shell.until(|seen| !seen.trim().is_empty(), "the first prompt"));
+
+    let writer = Command::new(common::oslo_bin())
+        .arg("-c")
+        .arg("universal MOOD=calm")
+        .env("HOME", shell.home())
+        .env("XDG_DATA_HOME", shell.home())
+        .env("PATH", "/usr/bin:/bin")
+        .output()
+        .expect("spawn the writing shell");
+    assert!(
+        writer.status.success(),
+        "the writer failed: {}",
+        String::from_utf8_lossy(&writer.stderr)
+    );
+
+    // Nothing is typed from here either.
+    assert!(
+        shell.until(
+            |seen| seen.contains("CHANGED MOOD set universal remote"),
+            "the announcement",
+        ),
+        "no handler was told about the remote change:\n{}",
+        shell.text()
+    );
+
+    // **And a second change to a *different* name does not re-announce this one.** The whole store
+    // is re-read and re-applied every time any part of it moves, so a hook that announced what it
+    // read rather than what changed would tell a handler that `MOOD` changed every time anything
+    // did — which is the difference between an event and a heartbeat.
+    let writer = Command::new(common::oslo_bin())
+        .arg("-c")
+        .arg("universal OTHER=1")
+        .env("HOME", shell.home())
+        .env("XDG_DATA_HOME", shell.home())
+        .env("PATH", "/usr/bin:/bin")
+        .output()
+        .expect("spawn the writing shell");
+    assert!(writer.status.success());
+    assert!(
+        shell.until(
+            |seen| seen.contains("CHANGED OTHER"),
+            "the second announcement"
+        ),
+        "the second change never arrived:\n{}",
+        shell.text()
+    );
+    assert_eq!(
+        shell.text().matches("CHANGED MOOD").count(),
+        1,
+        "an unchanged universal was announced again:\n{}",
+        shell.text()
+    );
+}
+
 /// **A timer fires while you sit there, with nothing typed at all.**
 ///
 /// A timer used to come due only at a command boundary: set one for a few seconds, touch nothing,

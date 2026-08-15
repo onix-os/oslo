@@ -125,6 +125,7 @@ Fields marked *(strings)* are strings even when they read as numbers: a notifyin
 | `on-process-exit` | the job reaper, one per process | `{ pid, job, status }` *(strings)* | — |
 | `on-job-state` | the job reaper, on a transition | `{ id, pid, text, from, to, background }` *(strings)* | — |
 | `on-focus-change` | a focus report from the terminal | `{ focused }` — `"1"` / `""` | — |
+| `on-variable-change` | an assignment, `export`, `unset`, `universal`, or the store re-read | `{ name, action, scope, source, exported }` *(strings)* | — |
 | `on-time-report` | a `time`-prefixed pipeline | `{ real_ms, user_ms, sys_ms }` *(strings)* | — |
 | `on-command-not-found` | the end of the command search | the command name, a bare string | a number is the status, and means handled |
 | `on-idle-timeout` | the editor's timed read | `{ seconds }` *(string)* | — |
@@ -175,15 +176,44 @@ call `oslo.job.list()`, which takes that same lock; firing from inside the reape
 waiting for a lock its own caller holds. So the reaper records what happened, drops the lock, and
 then announces — which is also why the payload is a snapshot of strings rather than a live handle.
 
-**They fire at an idle prompt too, not only at a command boundary.** `SIGCHLD` is installed without
-`SA_RESTART`, so a child ending makes the editor's blocked `read` fail with `EINTR`; the reader
-services the background and repaints before going back to waiting. That is the same route `SIGWINCH`
-has always taken for a resize, rather than a second mechanism — the editor has a blocking read, not
-an event loop, and the interrupt is already load-bearing.
+**They fire at an idle prompt too, not only at a command boundary.** The `SIGCHLD` handler writes
+one byte down a pipe the editor's wait already watches beside the terminal; the wait returns, the
+reader services the background and repaints before going back to waiting.
+
+The obvious route — installing without `SA_RESTART` and letting the blocked `read` fail with
+`EINTR`, which is what `SIGWINCH` does for a resize — was tried and measured. That flag is not
+scoped to the editor: it makes every slow syscall in the process interruptible by every child exit,
+and a shell forks constantly. A loop whose body forks went from passing 12 runs out of 12 to 9.
 
 Only an interactive shell arms it. A script reaps at its command boundaries and has no editor to
 wake, so the signal would buy it nothing and cost it an interrupted `read` in every library call
 that makes one.
+
+### Watching variables
+
+`on-variable-change` fires for the four places you change one: an assignment, `export`, `unset`, and
+`universal` — plus the moment the universal store is re-read because *another* shell changed it.
+
+```lua
+oslo.on.on_variable_change(function(e)
+  if e.name == "THEME" and e.source == "remote" then
+    reload_theme(os.getenv("THEME"))
+  end
+end)
+```
+
+`source` is the field that earns the hook. A universal variable changes because you typed something
+here or because a shell in another window did, and a status line usually wants to act on one and not
+the other. `scope` is `shell` or `universal`, `action` is `set` or `erase`, and `exported` says
+whether a child would see it.
+
+Not fired for the shell's own bookkeeping. `PWD`, `?`, `_` and the rest go through the same
+internals, and a handler buried in those would be told everything and able to use none of it. The
+value is left out too: read it with `os.getenv` if you want it, which also means the hook costs
+nothing to fire for a large variable nobody looks at.
+
+**Nothing is attached, nothing is spent.** Every `x=1` in every script reaches the announcer, so it
+asks one atomic whether the hook has ever been attached to and returns if not.
 
 ## What makes it different
 

@@ -2,6 +2,7 @@
 
 use super::options;
 use super::quoting::single_quoted;
+use crate::env::announce::{Change, Scope, Source, announce};
 use crate::env::scope::{Environment, is_valid_identifier};
 use oslo_base::error::{Result, ShellError};
 
@@ -64,6 +65,14 @@ pub fn builtin_export(env: &mut Environment, args: &[String]) -> Result<i32> {
         if opts.has('n') && !unexport(env, name) {
             status = 1;
         }
+        announce(
+            name,
+            Change::Set {
+                exported: env.is_exported(name),
+            },
+            Scope::Shell,
+            Source::Local,
+        );
     }
 
     if bad_name {
@@ -177,6 +186,7 @@ pub fn builtin_unset(env: &mut Environment, args: &[String]) -> Result<i32> {
             continue;
         }
         env.unset_var(name);
+        announce(name, Change::Erased, Scope::Shell, Source::Local);
     }
 
     Ok(status)

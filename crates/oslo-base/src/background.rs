@@ -11,7 +11,7 @@
 //!
 //! * **A signal**, for a child ending. The handler writes one byte down the self-pipe below rather
 //!   than letting `EINTR` do the waking, which is the route `SIGWINCH` takes — see
-//!   [`nudge_from_signal`] and the measurement in `oslo_ui::term::child`.
+//!   [`crate::background::nudge_from_signal`] and the measurement in `oslo_ui::term::child`.
 //! * **A descriptor**, for anything a signal cannot carry: an `inotify` watch on the universal
 //!   store, a worker finishing a spawn. Registered here and waited on beside the terminal.
 //!

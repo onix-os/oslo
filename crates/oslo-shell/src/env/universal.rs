@@ -177,6 +177,8 @@ fn render(vars: &BTreeMap<String, Universal>) -> String {
 
 /// What this shell has applied from the file: name to the value it wrote.
 ///
+use crate::env::announce::{Change, Scope, Source, announce};
+
 /// Process state rather than a parameter, because there are **two** writers. The loop applies what
 /// it reads; the `universal` builtin applies what you just typed. If the builtin did not record its
 /// own write, the next reload would see a name it had never applied, conclude the user had assigned
@@ -267,12 +269,27 @@ pub fn apply(env: &mut crate::env::Environment) {
 
     for name in ours {
         let var = &file[&name];
+        // **Only when the value actually moved.** This runs before every prompt and every command,
+        // so announcing what it read rather than what changed would fire the hook continuously at
+        // an idle prompt — the store says the same thing each time.
+        let arrived = env.get_var(&name) != Some(var.value.as_str());
         env.set_var(&name, &var.value, var.exported);
         note_applied(&name, &var.value);
+        if arrived {
+            announce(
+                &name,
+                Change::Set {
+                    exported: var.exported,
+                },
+                Scope::Universal,
+                Source::Remote,
+            );
+        }
     }
     for (name, last) in gone {
         if env.get_var(&name).is_some_and(|current| current == last) {
             env.unset_var(&name);
+            announce(&name, Change::Erased, Scope::Universal, Source::Remote);
         }
     }
 }

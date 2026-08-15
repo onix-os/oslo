@@ -18,6 +18,7 @@
 
 use super::variables::quoting::single_quoted;
 use crate::env::Environment;
+use crate::env::announce::{Change, Scope, Source, announce};
 use crate::env::scope::is_valid_identifier;
 use crate::env::universal;
 use oslo_base::error::Result;
@@ -53,6 +54,7 @@ pub fn builtin_universal(env: &mut Environment, args: &[String]) -> Result<i32> 
                     // and nowhere else — the most confusing of the possible outcomes.
                     env.unset_var(name);
                     universal::forget_applied(name);
+                    announce(name, Change::Erased, Scope::Universal, Source::Local);
                 }
                 Ok(false) => {
                     eprintln!("universal: {name}: not a universal variable");
@@ -109,6 +111,12 @@ pub fn builtin_universal(env: &mut Environment, args: &[String]) -> Result<i32> 
         // than something the user typed, and may take it away again.
         env.set_var(name, value, exported);
         universal::note_applied(name, value);
+        announce(
+            name,
+            Change::Set { exported },
+            Scope::Universal,
+            Source::Local,
+        );
     }
     Ok(status)
 }

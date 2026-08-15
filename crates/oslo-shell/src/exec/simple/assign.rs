@@ -11,6 +11,7 @@
 //! * a subscript is arithmetic, evaluated when the assignment runs.
 
 use crate::env::Environment;
+use crate::env::announce::{Change, Scope, Source};
 use crate::env::scope::ShellArray;
 use crate::expand::arithmetic::eval_arithmetic;
 use crate::expand::{expand_word, expand_word_to_string};
@@ -41,8 +42,28 @@ impl Outcome {
     }
 }
 
-/// Apply one assignment to the shell's own variables.
+/// Apply one assignment to the shell's own variables, and say so.
+///
+/// **The announcement is here rather than in `set_var`**, which the shell also uses to maintain
+/// `PWD`, `_` and everything else it keeps up to date on your behalf. This is the assignment the
+/// user wrote, which is the one a config asked to hear about.
 pub(super) fn apply_assignment(env: &mut Environment, assign: &Assignment) -> Result<Outcome> {
+    let outcome = assigned(env, assign)?;
+    if outcome.assigned {
+        let name = assign.target.name();
+        crate::env::announce::announce(
+            name,
+            Change::Set {
+                exported: env.is_exported(name),
+            },
+            Scope::Shell,
+            Source::Local,
+        );
+    }
+    Ok(outcome)
+}
+
+fn assigned(env: &mut Environment, assign: &Assignment) -> Result<Outcome> {
     match (&assign.target, &assign.value) {
         (AssignmentTarget::Name(name), AssignmentValue::Scalar(word)) => {
             let value = expand_word_to_string(env, word)?;

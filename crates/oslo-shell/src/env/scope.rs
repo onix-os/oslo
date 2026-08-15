@@ -504,6 +504,14 @@ impl Environment {
             .collect()
     }
 
+    /// Whether `name` would be handed to a child process.
+    ///
+    /// One lookup rather than building the whole exported map, which is what a caller that only
+    /// wants to answer this about a single name was otherwise reduced to.
+    pub fn is_exported(&self, name: &str) -> bool {
+        self.vars.get(name).is_some_and(|(_, exported)| *exported)
+    }
+
     pub fn get_exported_vars(&self) -> HashMap<String, String> {
         self.vars
             .iter()

@@ -1,3 +1,4 @@
+pub mod announce;
 pub mod builtins;
 pub mod dynamic;
 pub mod nesting;
