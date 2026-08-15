@@ -311,6 +311,28 @@ pub fn expand_word_to_pattern(env: &mut Environment, word: &Word) -> Result<Vec<
 /// the parser, once per word, at the positions where bash applies it. By the time a [`Word`]
 /// reaches this function its groups are already gone.
 pub fn expand_word(env: &mut Environment, word: &Word) -> Result<Vec<String>> {
+    expand_word_at(env, word, Place::Argument)
+}
+
+/// Where in a command a word sits, which only the shorthands care about.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum Place {
+    /// The command name.
+    Command,
+    /// Everything after it.
+    Argument,
+}
+
+/// The command word, which the shorthands leave alone.
+///
+/// **The start of a line is reserved.** A leading symbol is being kept for something else, so
+/// `@proj` typed on its own must not quietly become a path — it did, and then failed with
+/// `Is a directory`, which is the position spoken for by an error message nobody chose.
+pub fn expand_command_word(env: &mut Environment, word: &Word) -> Result<Vec<String>> {
+    expand_word_at(env, word, Place::Command)
+}
+
+fn expand_word_at(env: &mut Environment, word: &Word, place: Place) -> Result<Vec<String>> {
     let mut out = Vec::new();
     // `set -f` switches pathname expansion off wholesale, so the field's own text is the answer.
     // Read once per word rather than per field: an expansion cannot change the option mid-word.
@@ -318,6 +340,14 @@ pub fn expand_word(env: &mut Environment, word: &Word) -> Result<Vec<String>> {
     let fields = expand_word_fields(env, word)?;
     let ifs = ifs_of(env);
     for field in fields {
+        // **`@name` is substituted here, where a tilde is, and for the same reason.** It names a
+        // directory, so the glob that follows it is the user's own and has to run: `@proj/*.rs` was
+        // reaching the command with a literal `*` while `~/*.rs` and `$M/*.rs` both expanded. Done
+        // before the split and the glob, and only when the word is an argument.
+        let field = match place {
+            Place::Argument if env.interactive() => crate::expand::sugar::marked_directory(field),
+            _ => field,
+        };
         for split in split_field(ifs, field) {
             if glob {
                 out.extend(expand_glob(&split));
@@ -329,8 +359,15 @@ pub fn expand_word(env: &mut Environment, word: &Word) -> Result<Vec<String>> {
     // `=command` and `@name`, last and only at a prompt. Last because they answer with a path, and
     // a path that has just been produced must not then be globbed or split again; interactive-only
     // because `echo =foo` in a script has to print `=foo` the way every other `/bin/sh` does.
+    //
     if env.interactive() {
         for field in &mut out {
+            // **`@name` never expands the command word**, whose leading position is reserved — see
+            // [`expand_command_word`]. `=name` still does: `=grep foo` naming where grep lives and
+            // then running it is the whole of what that shorthand is for.
+            if place == Place::Command && field.starts_with('@') {
+                continue;
+            }
             if let Some(expanded) = crate::expand::sugar::expand_field(env, field) {
                 *field = expanded;
             }

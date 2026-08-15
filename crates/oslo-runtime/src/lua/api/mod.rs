@@ -31,6 +31,7 @@ pub(crate) mod external;
 pub mod feature;
 mod fs;
 mod json;
+pub(crate) mod mark;
 mod messages;
 #[cfg(feature = "nix")]
 mod nix;
@@ -81,6 +82,8 @@ pub fn install(interp: &Rc<Interp>, registry: &Registry, env: Arc<Mutex<Environm
     oslo.set(Value::str("path"), paths);
     prompt::install(&mut oslo, &mut ui, registry);
     tool::install(&mut oslo);
+    // `@` from Lua: the same file the builtin writes, so `@name` has one place to look.
+    mark::install(&mut oslo);
     // `oslo.predict.*`, `oslo.repair` and `oslo.last_failed` exist only in a build that has the
     // model. A config guards on them the way it guards on any other optional surface:
     //   if oslo.repair then … end

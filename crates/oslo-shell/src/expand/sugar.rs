@@ -13,64 +13,37 @@
 //! still prints `=nosuch`, and the only words this changes are ones where the change is what you
 //! meant.
 //!
-//! # `@name`
+//! # `@name` lives elsewhere
 //!
-//! `cd @work` becomes `cd /home/u/data/code/tools`, from a table a config registers. A distinct
-//! sigil rather than zsh's `~name`, and deliberately: `~work` already means "the home directory of
-//! the user called `work`", so overloading it means a real user account can silently shadow your
-//! shortcut — or the reverse, which is worse.
+//! `cd @work` becomes `cd /home/u/data/code/tools`, from the marks file and the table a config
+//! registers. A distinct sigil rather than zsh's `~name`, and deliberately: `~work` already means
+//! "the home directory of the user called `work`", so overloading it means a real user account can
+//! silently shadow your shortcut — or the reverse, which is worse.
+//!
+//! **It is substituted where a tilde is** — `expand::word::marked_directory`, before splitting and
+//! globbing — because it names a *directory* and everything after it is the user's own path.
+//! Applied here, at the end, `@proj/*.rs` reached the command with a literal `*` while `~/*.rs`
+//! expanded, and `echo "@proj"` expanded through the quotes because a finished string no longer
+//! remembers it had any.
+//!
+//! `=command` stays here, and the difference is the point: it answers with a *command's* path,
+//! which must not then be globbed or split again.
 
 use crate::env::Environment;
-use std::collections::HashMap;
-use std::sync::RwLock;
+use crate::expand::word::{Field, Origin, Run};
 
-/// The directories `@name` can reach, from `oslo.dirs`.
-static NAMED: RwLock<Option<HashMap<String, String>>> = RwLock::new(None);
+pub use oslo_base::dirs::{named_dir, named_dirs, set_named_dirs};
 
-/// Register the `@name` table. Replaces whatever was there.
+/// Apply `=command` to one already-expanded field.
 ///
-/// A leading `~` is resolved here rather than at use: a config writes `~/data/code`, and the
-/// expansion path should not have to know about tildes to answer what `@work` means.
-pub fn set_named_dirs(dirs: HashMap<String, String>) {
-    let home = std::env::var("HOME").unwrap_or_default();
-    let resolved = dirs
-        .into_iter()
-        .map(|(name, path)| {
-            let path = match path.strip_prefix('~') {
-                Some(rest) if !home.is_empty() && (rest.is_empty() || rest.starts_with('/')) => {
-                    format!("{home}{rest}")
-                }
-                _ => path,
-            };
-            (name, path)
-        })
-        .collect();
-    if let Ok(mut slot) = NAMED.write() {
-        *slot = Some(resolved);
-    }
-}
-
-/// The path `@name` stands for, if one was registered.
-pub fn named_dir(name: &str) -> Option<String> {
-    NAMED.read().ok()?.as_ref()?.get(name).cloned()
-}
-
-/// Apply the interactive shorthands to one already-expanded field.
-///
-/// `None` when the field is not one of these — which is every field of almost every command.
-/// Answering with the field copied back meant a `String` per argument per interactive command, to
-/// say that nothing had happened.
+/// `None` when the field is not one — which is every field of almost every command. Answering with
+/// the field copied back meant a `String` per argument per interactive command, to say that nothing
+/// had happened.
 pub fn expand_field(env: &Environment, field: &str) -> Option<String> {
     if !env.interactive() {
         return None;
     }
-    if let Some(rest) = field.strip_prefix('=') {
-        return equals(rest);
-    }
-    if let Some(rest) = field.strip_prefix('@') {
-        return at_name(rest);
-    }
-    None
+    equals(field.strip_prefix('=')?)
 }
 
 /// `=name` — where that command lives, or `None` if it is not a command.
@@ -87,21 +60,39 @@ fn equals(name: &str) -> Option<String> {
         .map(|p| p.to_string_lossy().into_owned())
 }
 
-/// `@name` and `@name/tail` — the registered directory, with anything after the first `/` kept.
-fn at_name(rest: &str) -> Option<String> {
-    let (name, tail) = match rest.find('/') {
-        Some(i) => (&rest[..i], &rest[i..]),
-        None => (rest, ""),
+/// Replace a leading `@name` with the directory it stands for, as a quoted run.
+///
+/// `Origin::Quoted` for the substituted half, exactly as [`WordPart::Tilde`] does it: a home
+/// directory that happens to contain a `*` is still just a directory, and the same is true of a
+/// marked one. Everything after it keeps the origin it had, so the user's own glob still globs.
+///
+/// Only the *first* run, and only when it is text the script itself wrote: `echo "@proj"` is a
+/// literal, and a `@proj` that arrived out of a variable is data rather than a shorthand.
+pub(crate) fn marked_directory(field: Field) -> Field {
+    let Some(first) = field.first() else {
+        return field;
     };
-    if name.is_empty() {
-        return None;
+    if first.origin != Origin::Literal || !first.text.starts_with('@') {
+        return field;
     }
-    Some(format!("{}{tail}", named_dir(name)?))
+    let rest = &first.text[1..];
+    let cut = rest.find('/').unwrap_or(rest.len());
+    let Some(path) = oslo_base::dirs::named_dir(&rest[..cut]) else {
+        return field;
+    };
+    let tail = &rest[cut..];
+    let mut out = vec![Run::new(path, Origin::Quoted)];
+    if !tail.is_empty() {
+        out.push(Run::new(tail, first.origin));
+    }
+    out.extend(field.into_iter().skip(1));
+    out
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::collections::HashMap;
 
     fn interactive() -> Environment {
         let mut env = Environment::new();
@@ -143,19 +134,19 @@ mod tests {
         assert_eq!(field(&env, "FOO=bar"), "FOO=bar");
     }
 
+    /// **`@name` is no longer this function's business.** It is substituted where a tilde is —
+    /// before splitting and globbing — so that `@proj/*.rs` globs and `echo "@proj"` does not
+    /// expand. Handled here it did neither. See `expand::word::marked_directory`.
     #[test]
-    fn at_name_expands_a_registered_directory_and_keeps_the_tail() {
+    fn at_name_is_not_handled_here_any_more() {
         let env = interactive();
         set_named_dirs(HashMap::from([(
             "work".to_string(),
             "/home/u/work".to_string(),
         )]));
 
-        assert_eq!(field(&env, "@work"), "/home/u/work");
-        assert_eq!(field(&env, "@work/src/main.rs"), "/home/u/work/src/main.rs");
-        // An unregistered name is left alone, as an unresolved `=` is.
-        assert_eq!(field(&env, "@nowhere"), "@nowhere");
-        assert_eq!(field(&env, "@"), "@");
+        assert_eq!(field(&env, "@work"), "@work");
+        assert_eq!(field(&env, "@work/src/main.rs"), "@work/src/main.rs");
 
         set_named_dirs(HashMap::new());
     }

@@ -20,5 +20,6 @@ pub mod tilde;
 pub mod word;
 
 pub use word::{
-    Field, Origin, Run, expand_word, expand_word_fields, expand_word_part, expand_word_to_string,
+    Field, Origin, Run, expand_command_word, expand_word, expand_word_fields, expand_word_part,
+    expand_word_to_string,
 };

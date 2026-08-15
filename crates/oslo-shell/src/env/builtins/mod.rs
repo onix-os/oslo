@@ -34,6 +34,7 @@ mod keep;
 mod r#let;
 mod locate;
 mod mapfile;
+mod mark;
 mod messages;
 mod nav;
 mod process;
@@ -177,6 +178,12 @@ pub fn register_default_builtins(env: &mut Environment) {
     env.register_custom_builtin("abbr", abbr::builtin_abbr);
     env.register_custom_builtin("ui", ui::builtin_ui);
     env.register_custom_builtin("nav", nav::builtin_nav);
+    // `mark` — remember this directory as `@name`, and forget it by typing `mark` again. The other
+    // half of the `@name` expansion: without it every name had to be declared in a config first.
+    //
+    // **A word, not the `@` sigil.** A leading symbol is reserved: `@` at the start of a line is
+    // being kept for something else, so nothing here may claim that position.
+    env.register_custom_builtin("mark", mark::builtin_mark);
     // The finder the key opens, for a prompt counting tabs and for a name already known.
     #[cfg(feature = "scratch")]
     env.register_custom_builtin("scratch", scratch::builtin_scratch);
