@@ -162,3 +162,52 @@ fn a_mark_behaves_like_a_tilde() {
         Some(here.join("a.rs").to_str().unwrap())
     );
 }
+
+/// **The same test written two ways gives the same answer.**
+///
+/// `@name` was substituted at one call site — `expand_word_at`, arguments only — so `[ -d @proj ]`
+/// was true while `[[ -d @proj ]]` was false, and `case @proj in /*)` did not match where
+/// `case ~ in /*)` did. Two causes, one symptom: the other entry points never called the
+/// substitution at all, and `[[ ]]` wraps each operand in a synthetic double quote that made the
+/// word look like one the user had quoted deliberately.
+#[test]
+fn a_mark_expands_wherever_a_tilde_does() {
+    let (_root, here, data) = somewhere("proj");
+    interactive(&here, &data, "mark proj");
+
+    let ask = |script: &str| {
+        let (out, _) = interactive(here.parent().expect("parent"), &data, script);
+        out.trim().to_string()
+    };
+
+    assert_eq!(ask("[ -d @proj ] && echo yes || echo no"), "yes");
+    assert_eq!(
+        ask("[[ -d @proj ]] && echo yes || echo no"),
+        "yes",
+        "`[[ ]]` must agree with `[ ]` about the same word"
+    );
+    assert_eq!(
+        ask("case @proj in /*) echo yes;; *) echo no;; esac"),
+        "yes",
+        "`case` expands a tilde, so it expands a mark"
+    );
+}
+
+/// And nowhere a tilde does not. A quoted `@name` is a literal, and a name standing for nothing
+/// keeps its own text rather than becoming the filesystem root.
+#[test]
+fn a_quoted_or_unknown_mark_is_left_alone() {
+    let (_root, here, data) = somewhere("proj");
+    interactive(&here, &data, "mark proj");
+    let ask = |script: &str| {
+        let (out, _) = interactive(here.parent().expect("parent"), &data, script);
+        out.trim().to_string()
+    };
+
+    assert_eq!(
+        ask(r#"[[ -d "@proj" ]] && echo yes || echo no"#),
+        "no",
+        "a quoted mark is a literal, and widening the fix must not change that"
+    );
+    assert_eq!(ask("[[ -d @nosuchmark ]] && echo yes || echo no"), "no");
+}

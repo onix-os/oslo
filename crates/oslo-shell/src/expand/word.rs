@@ -277,6 +277,7 @@ fn check_nounset(env: &Environment, name: &str, expansion_type: &ParamExpansion)
 /// so the branch silently stops firing depending on where you run the script.
 pub fn expand_word_to_string(env: &mut Environment, word: &Word) -> Result<String> {
     let fields = expand_word_fields(env, word)?;
+    let fields = crate::expand::sugar::marked_fields(env, fields);
     if fields.len() == 1 {
         return Ok(field_text(&fields[0]));
     }
@@ -299,7 +300,8 @@ pub fn expand_word_to_string(env: &mut Environment, word: &Word) -> Result<Strin
 /// Several fields can only arise from `$@`; they are concatenated, which is the same text a
 /// context insisting on one string would have got.
 pub fn expand_word_to_pattern(env: &mut Environment, word: &Word) -> Result<Vec<Run>> {
-    Ok(expand_word_fields(env, word)?.concat())
+    let fields = expand_word_fields(env, word)?;
+    Ok(crate::expand::sugar::marked_fields(env, fields).concat())
 }
 
 /// Full expansion of one word: parameters, substitutions, field splitting, then pathname

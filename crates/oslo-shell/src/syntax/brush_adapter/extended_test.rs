@@ -100,6 +100,20 @@ fn operand(word: &ast::Word) -> Result<oslo_ast::Word> {
     if let Some(expanding) = relex_inside_quotes(word.as_ref(), &inner) {
         return Ok(expanding);
     }
+    // **A bare `@name` is left unwrapped**, because the quotes would be indistinguishable from
+    // quotes the user typed and `@name` is deliberately literal inside those. `[ -d @proj ]` was
+    // true and `[[ -d @proj ]]` false — the same test written two ways disagreeing — and the
+    // shell's own error message gave it away by echoing back `[[ -d "@proj" ]]`.
+    //
+    // Safe to leave bare: the substitution hands back the resolved path as an already-quoted run,
+    // so it cannot split or glob however many spaces are in it, and a name that resolves to
+    // nothing keeps its own text. One literal part only, so nothing here can expand to a field
+    // this was wrapping to protect.
+    if let [oslo_ast::WordPart::Literal(text)] = inner.parts.as_slice()
+        && text.starts_with('@')
+    {
+        return Ok(inner);
+    }
     Ok(oslo_ast::Word {
         parts: vec![oslo_ast::WordPart::DoubleQuoted(inner.parts)],
     })

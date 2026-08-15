@@ -89,6 +89,21 @@ pub(crate) fn marked_directory(field: Field) -> Field {
     out
 }
 
+/// `@name` substituted in every field, for the entry points that do not go through
+/// `expand_word_at`.
+///
+/// **The same substitution, at every door.** It was applied in one place — arguments only — so
+/// `[ -d @proj ]` was true while `[[ -d @proj ]]` was false, and `case @proj in /tmp*)` did not
+/// match where `case ~ in /tmp*)` did: the same word written two ways, giving opposite answers.
+/// This module's own contract says a mark is substituted where a tilde is, and a tilde is a
+/// `WordPart` that every one of those paths already resolves.
+pub(crate) fn marked_fields(env: &Environment, fields: Vec<Field>) -> Vec<Field> {
+    if !env.interactive() {
+        return fields;
+    }
+    fields.into_iter().map(marked_directory).collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
