@@ -285,11 +285,16 @@ impl OsloHelper {
                 || env.aliases().keys().any(|n| n.starts_with(stem))
                 || env.functions().keys().any(|n| n.starts_with(stem))
         };
+        // **Vocab belongs here too.** `spelling` asks vocab two of its three questions — is this a
+        // name, does a name begin with this — but the candidate list it corrects *towards* was
+        // builtins, aliases and functions only. So a typo of an autoloadable function or a
+        // structured verb had nothing to be corrected to, while a typo of a builtin did.
         let all = || {
             env.builtin_names()
                 .into_iter()
                 .chain(env.aliases().keys().cloned())
                 .chain(env.functions().keys().cloned())
+                .chain(oslo_base::vocab::all().into_iter().map(|(name, _)| name))
                 .collect()
         };
         repair::of(

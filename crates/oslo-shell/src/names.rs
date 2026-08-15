@@ -58,9 +58,14 @@ fn autoloaded_into(env: &Environment, out: &mut Vec<(String, &'static str)>) {
         return;
     };
     for entry in entries.flatten() {
+        // A directory named `x.sh` is not a function, and neither is anything `path_for` would
+        // refuse. Asked of the same predicate the loader uses, so the two cannot drift again.
+        if !entry.file_type().is_ok_and(|kind| kind.is_file()) {
+            continue;
+        }
         let name = entry.file_name().to_string_lossy().into_owned();
         if let Some(stem) = name.strip_suffix(".sh")
-            && !stem.is_empty()
+            && crate::exec::simple::autoload::loadable(stem)
         {
             out.push((stem.to_string(), "function"));
         }

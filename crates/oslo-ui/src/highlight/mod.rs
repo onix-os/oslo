@@ -228,10 +228,19 @@ fn command_token(name: &str, ctx: &Context<'_>) -> TokenType {
     if (ctx.is_function)(name) {
         return TokenType::Function;
     }
-    // A structured verb or a registered tool. `$PATH` has never heard of `where`, so
-    // `ls | where 'size > 1024'` read as a line with two mistakes in it and ran perfectly.
-    if oslo_base::vocab::contains(name) {
-        return TokenType::Builtin;
+    // A structured verb, a registered tool, an autoloadable function, a stored macro. `$PATH` has
+    // never heard of `where`, so `ls | where 'size > 1024'` read as a line with two mistakes in it
+    // and ran perfectly.
+    //
+    // **The kind decides the colour, not merely the fact of being known.** Everything here used to
+    // come back `Builtin`, so an autoloadable function was painted as a builtin until the first
+    // time it ran and then changed colour underneath the user — the shell disagreeing with itself
+    // about what a name is, in the one place that shows.
+    if let Some(kind) = oslo_base::vocab::kind_of(name) {
+        return match kind {
+            "function" | "macro" | "script" => TokenType::Function,
+            _ => TokenType::Builtin,
+        };
     }
     // `=grep` is the shorthand for where grep lives, so it runs whenever grep does. Looked up as
     // written it resolves to nothing and the line reads as an error while running perfectly.
