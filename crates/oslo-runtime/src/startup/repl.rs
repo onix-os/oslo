@@ -413,8 +413,13 @@ pub fn run_repl(login: bool) -> ! {
 
                 // `history -c` cannot reach the editor from inside a builtin, so it leaves a
                 // request behind and the loop carries it out.
-                if history::take_clear_request() {
+                let cleared_history = history::take_clear_request();
+                if cleared_history {
                     history.clear();
+                    // Anything still queued is from *earlier* lines, and landing after the clear
+                    // would put them straight back. The barrier is cheap here: `history -c` is a
+                    // deliberate act, not something typed a hundred times a minute.
+                    oslo_base::track::writer::settle();
                     // Every copy, or the ones left behind go on answering. The database, because
                     // clearing only the editor's would put every line back on the next start; and
                     // oslo's own recall set, which is what the ghost suggestion, the Up/Down walk
@@ -503,7 +508,14 @@ pub fn run_repl(login: bool) -> ! {
                 // Beside the hook rather than through it: a command that failed is exactly the one
                 // the `fails` column exists to count. Every argument here is a local this loop
                 // already had and used to drop.
-                if secret {
+                // **A line that cleared the history is not written into it.**
+                //
+                // The clear runs here, in the loop, because a builtin cannot reach the editor — but
+                // the tracking below runs afterwards, so `history -c` wrote its own boundary into
+                // the store it had just emptied. `history` showed nothing while Ctrl-R went on
+                // offering `history -c` for ever, the two views of one store disagreeing. Handled
+                // like a secret line, which is the same shape: run it, write nothing down.
+                if secret || cleared_history {
                     tracker.forget_boundary();
                 } else {
                     tracker.write_down(&tracking::Finished {
