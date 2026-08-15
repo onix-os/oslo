@@ -4,7 +4,7 @@ mod paths;
 pub mod provider;
 mod segment;
 
-use segment::{after_equals, brace_segment};
+use segment::{after_break, brace_segment};
 
 use super::OsloHelper;
 use super::command_index::CommandIndex;
@@ -110,7 +110,7 @@ fn config_candidates(
 impl OsloHelper {
     /// Return context-quoted candidates and their replacement byte offset.
     pub fn candidates(&self, line: &str, pos: usize) -> (usize, Vec<CompletionCandidate>) {
-        let word = brace_segment(after_equals(current_word(line, pos)));
+        let word = brace_segment(after_break(current_word(line, pos)));
         let mut out = Vec::new();
 
         if let Some(prefix) = word.stem.strip_prefix('$') {

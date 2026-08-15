@@ -42,21 +42,25 @@ pub(super) fn brace_segment(word: Word<'_>) -> Word<'_> {
 /// ls =some               nothing
 /// ```
 ///
-/// The last `=` rather than the first, so `--opt=a=b` completes `b` — the same rule bash applies,
-/// and the only one that leaves an `=` inside a value alone.
+/// **`:` too, and for the same reason.** It is the other break character people meet every day —
+/// `FOO=/usr/bin:/us` is somebody editing a `$PATH`, and `scp host:/pa` is somebody naming a remote
+/// file. Both completed against nothing before this.
+///
+/// The last one rather than the first, so `--opt=a=b` completes `b` and `/a:/b:/c` completes `/c` —
+/// the same rule bash applies, and the only one that leaves an earlier break inside a value alone.
 ///
 /// **Not in a quoted word.** `ls "a=b` is somebody completing a filename that has an `=` in it,
 /// where the quote is exactly the way to say "this is one word"; splitting there would take the
 /// tool away from the person who reached for it.
 ///
-/// `command_position` is cleared because what follows an `=` never names a command: the first word
-/// of `FOO=bar ls` is an assignment, and offering the commands starting with `bar` for it would be
-/// answering a question nobody asked.
-pub(super) fn after_equals(word: Word<'_>) -> Word<'_> {
+/// `command_position` is cleared because what follows a break never names a command: the first
+/// word of `FOO=bar ls` is an assignment, and offering the commands starting with `bar` for it
+/// would be answering a question nobody asked.
+pub(super) fn after_break(word: Word<'_>) -> Word<'_> {
     if word.quote != Quote::None {
         return word;
     }
-    let Some(at) = unquoted_equals(word.text) else {
+    let Some(at) = unquoted_break(word.text) else {
         return word;
     };
     let after = &word.text[at + 1..];
@@ -69,8 +73,15 @@ pub(super) fn after_equals(word: Word<'_>) -> Word<'_> {
     }
 }
 
-/// The offset of the last `=` in `text` that is not inside quotes and not escaped.
-fn unquoted_equals(text: &str) -> Option<usize> {
+/// Where a word is broken for completion, as `COMP_WORDBREAKS` does it in bash.
+///
+/// Only these two. The rest of bash's set — `"'><;|&(` — are characters the lexer has already
+/// split on by the time a word reaches here, so listing them would be describing work that is
+/// done.
+const BREAKS: [char; 2] = ['=', ':'];
+
+/// The offset of the last break character in `text` that is not inside quotes and not escaped.
+fn unquoted_break(text: &str) -> Option<usize> {
     let mut quote = None;
     let mut escaped = false;
     let mut last = None;
@@ -84,7 +95,7 @@ fn unquoted_equals(text: &str) -> Option<usize> {
             (Some(q), _) if c == q => quote = None,
             (Some(_), _) => {}
             (None, '\'' | '"') => quote = Some(c),
-            (None, '=') => last = Some(i),
+            (None, c) if BREAKS.contains(&c) => last = Some(i),
             _ => {}
         }
     }
