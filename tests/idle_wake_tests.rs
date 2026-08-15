@@ -123,8 +123,15 @@ impl Shell {
 
     /// Wait for evidence rather than for a duration: under the full suite a shell takes longer to
     /// reach its first prompt than any number picked in advance.
+    ///
+    /// **Sixty seconds, and that is not a number picked out of the air either.** These tests were
+    /// seen failing about twice in ten on a machine running a large parallel audit beside them —
+    /// with an empty transcript, which is a shell that had not printed its first prompt yet rather
+    /// than one that printed the wrong thing. A debug build of a shell that loads a Lua config is
+    /// slow to start when a hundred other processes want the same cores, and waiting is free: a
+    /// passing test returns the moment its evidence appears and never reaches the deadline.
     fn until(&self, what: impl Fn(&str) -> bool, _why: &str) -> bool {
-        let deadline = Instant::now() + Duration::from_secs(15);
+        let deadline = Instant::now() + Duration::from_secs(60);
         while Instant::now() < deadline {
             if what(&self.text()) {
                 return true;
@@ -132,6 +139,19 @@ impl Shell {
             sleep(Duration::from_millis(25));
         }
         false
+    }
+
+    /// What the shell is doing, for a failure message.
+    ///
+    /// **An empty transcript has two very different causes** — a shell still starting, and a shell
+    /// that died before it said anything — and a test that cannot tell them apart sends the reader
+    /// looking in the wrong place. Asked only when something has already failed.
+    fn state(&mut self) -> String {
+        match self.child.try_wait() {
+            Ok(Some(status)) => format!("the shell exited: {status}"),
+            Ok(None) => "the shell is still running".to_string(),
+            Err(e) => format!("the shell cannot be waited for: {e}"),
+        }
     }
 
     fn type_line(&mut self, line: &str) {
@@ -298,21 +318,23 @@ fn a_universal_from_another_shell_announces_itself_as_remote() {
 /// passing, it would have been an API that asked for something already happening.
 #[test]
 fn a_prompt_that_changes_while_idle_is_drawn_again() {
-    let shell = Shell::with_config(
+    let mut shell = Shell::with_config(
         r#"local mood = "before"
            oslo.prompt.left = function() return mood .. "> " end
            oslo.after(1200, function() mood = "after" end)"#,
     );
     assert!(
         shell.until(|seen| seen.contains("before>"), "the first prompt"),
-        "the config's prompt never appeared:\n{}",
+        "the config's prompt never appeared ({}):\n{}",
+        shell.state(),
         shell.text()
     );
 
     // Nothing is typed from here: a changed prompt can only be one the shell chose to redraw.
     assert!(
         shell.until(|seen| seen.contains("after>"), "the redraw"),
-        "the prompt was never drawn again:\n{}",
+        "the prompt was never drawn again ({}):\n{}",
+        shell.state(),
         shell.text()
     );
 }
