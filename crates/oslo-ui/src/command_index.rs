@@ -222,13 +222,14 @@ pub fn nearest(path: &str, name: &str) -> Option<String> {
 /// and slicing one would panic.
 fn transpositions(name: &str) -> impl Iterator<Item = String> + '_ {
     let chars: Vec<char> = name.chars().collect();
-    (0..chars.len().saturating_sub(1)).filter_map(move |at| {
-        (chars[at] != chars[at + 1]).then(|| {
-            let mut swapped = chars.clone();
+    let chars2 = chars.clone();
+    (0..chars.len().saturating_sub(1))
+        .filter(move |at| chars[*at] != chars[at + 1])
+        .map(move |at| {
+            let mut swapped = chars2.clone();
             swapped.swap(at, at + 1);
             swapped.into_iter().collect()
         })
-    })
 }
 
 /// Levenshtein distance, abandoning once it cannot come in under `budget`.
