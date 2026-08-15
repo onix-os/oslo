@@ -331,3 +331,50 @@ fn shell_grammar_is_never_respelled() {
         Some("lsblk")
     );
 }
+
+/// **A name that runs is never swapped for another name that runs.**
+///
+/// `spelling` asked this before it started; nothing else did. The model's branch takes whole lines
+/// with no such guard, so `tar /etc/hostname` — with `tac /etc/hostname` in the history — was
+/// offered as `[tac] /etc/hostname`, and accepting it ran a different program on the same file.
+/// The two are one edit apart and both exist, which is what a distance check cannot separate.
+#[test]
+fn a_proposal_never_replaces_a_command_that_already_runs() {
+    let (_dir, path) = path();
+    let known = nothing_is_known();
+
+    assert!(
+        !keeps_a_command_that_runs("git status", "gti status", &path, &known),
+        "`git` runs, so nothing may propose a different command in its place"
+    );
+    assert!(
+        keeps_a_command_that_runs("git psuh", "git push", &path, &known),
+        "repairing an argument is the whole point; only the command word is protected"
+    );
+    assert!(
+        keeps_a_command_that_runs("gti status", "git status", &path, &known),
+        "`gti` does not run, so respelling it is exactly what should happen"
+    );
+}
+
+/// The words the shell would not have read as a command name are none of this guard's business —
+/// the same list `spelling` declines on, so the two cannot disagree about what a name is.
+#[test]
+fn the_guard_has_no_opinion_about_paths_assignments_or_marks() {
+    let (_dir, path) = path();
+    let known = nothing_is_known();
+
+    for typed in ["./build now", "@proj/run", "$EDITOR file"] {
+        assert!(
+            keeps_a_command_that_runs(typed, "anything else", &path, &known),
+            "{typed:?} is not a name this may hold an opinion about"
+        );
+    }
+
+    // An assignment *prefix* is the exception, because `command_word` reads past it: the command in
+    // `FOO=1 git status` really is `git`, and it deserves the same protection as a bare `git`.
+    assert!(
+        !keeps_a_command_that_runs("FOO=1 git status", "FOO=1 gti status", &path, &known),
+        "an environment prefix does not stop `git` from being the command"
+    );
+}

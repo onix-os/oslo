@@ -46,9 +46,39 @@ pub fn of(line: &str, path: &str, known: &Known<'_>) -> Option<String> {
     if typed.trim().is_empty() {
         return None;
     }
-    spelling(typed, path, known)
+    let proposal = spelling(typed, path, known)
         .or_else(|| equals_word(typed, path, known))
-        .or_else(|| learned(typed))
+        .or_else(|| learned(typed))?;
+    keeps_a_command_that_runs(typed, &proposal, path, known).then_some(proposal)
+}
+
+/// Refuse a proposal that would swap out a command name which already runs.
+///
+/// **The last word before the line is accepted, and it applies to every source.** `spelling` asks
+/// this before it starts, but it was the only one that did: `learned` takes whole lines from the
+/// model with no such guard, so with `tac /etc/hostname` in the history, typing `tar /etc/hostname`
+/// offered `[tac] /etc/hostname` — and Right, Enter ran a different program on the same file. The
+/// two names are one edit apart and both exist, which is exactly the case a distance check cannot
+/// separate and this one can.
+///
+/// **Only the command word.** A proposal that keeps the command and repairs an argument is the
+/// thing repair is for — `git psuh` to `git push` has to survive — so a valid command word is not
+/// on its own a reason to say nothing. It is only a reason not to replace *it*.
+fn keeps_a_command_that_runs(typed: &str, proposal: &str, path: &str, known: &Known<'_>) -> bool {
+    let Some((_, was)) = command_word(typed) else {
+        return true;
+    };
+    // A word the shell would not have read as a name anyway — a path, an assignment, `@name` — is
+    // not something this can have an opinion about. `spelling` declines these for the same reason.
+    if was.contains('/') || was.contains('=') || was.starts_with(['$', '@']) {
+        return true;
+    }
+    let runs =
+        (known.has)(was) || CommandIndex::contains(path, was) || oslo_base::vocab::contains(was);
+    if !runs {
+        return true;
+    }
+    command_word(proposal).is_none_or(|(_, now)| now == was)
 }
 
 /// The nearest name to `word` across `$PATH` and the shell's own names.
