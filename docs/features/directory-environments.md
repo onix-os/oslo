@@ -160,7 +160,7 @@ of saying yes.
 `use flake` and `oslo.direnv.nix_develop()` are one implementation, reading
 `nix print-dev-env --json`. The JSON is a faithful dump of the builder, so a name that would wreck
 the shell you are standing in has to be dropped here rather than relied on to be absent: `IGNORED`
-in `devshell.rs` is that list — `HOME`, `PWD`, `OLDPWD`, `SHELL`, `SHLVL`, `TERM`, `TZ`, the
+in `nix_shell.rs` is that list — `HOME`, `PWD`, `OLDPWD`, `SHELL`, `SHLVL`, `TERM`, `TZ`, the
 `TMP*`/`TEMP*` family, `NIX_*` build variables and a few more — plus exported bash functions, whose
 encoding oslo cannot run. The `$PATH` the dev shell reports is also merged with your own rather
 than replacing it; without that, a `cd` into a flake silently loses half the commands you had.
@@ -326,7 +326,7 @@ work: **a load in a terminal is rounded up to a multiple of the tail's 80 ms pol
 stopping the tail joins a thread asleep in one of those slices. That interval is `EVERY` in
 `environments/live.rs`. Everything that is not a load costs tenths of a millisecond.
 
-Recorded in `devshell.rs` rather than measured here: `nix print-dev-env` costs about half a second
+Recorded in `nix_shell.rs` rather than measured here: `nix print-dev-env` costs about half a second
 on a warm store and several on a cold one. Hence the cache at `.direnv/dev-env.json`, keyed on the
 arguments and on `flake.nix`, `flake.lock`, `shell.nix` and `default.nix` as they stand, and written
 `0600` — it is a verbatim dump of a dev shell.
@@ -363,7 +363,7 @@ arguments and on `flake.nix`, `flake.lock`, `shell.nix` and `default.nix` as the
 | `crates/oslo-shell/src/direnv/diff.rs` | `Diff::between`, `reverse`, `changes`, `Change` |
 | `crates/oslo-shell/src/direnv/carry.rs` | `OSLO_DIRENV`: `encode`, `decode` |
 | `crates/oslo-shell/src/direnv/find.rs` | `applicable`, `here`, `governed_by`, `shadowed` |
-| `crates/oslo-shell/src/direnv/devshell.rs` | `print-dev-env --json`, `IGNORED`, the cache |
+| `crates/oslo-shell/src/nix_shell.rs` | `print-dev-env --json`, `IGNORED`, the cache |
 | `crates/oslo-shell/src/direnv/stdlib/` | the thirty functions, one table in `mod.rs` |
 | `crates/oslo-shell/src/env/builtins/direnv.rs` | the `direnv` builtin |
 | `crates/oslo-runtime/src/startup/environments/` | running the file, `capturing`, `live`, the block |

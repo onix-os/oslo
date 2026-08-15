@@ -267,17 +267,13 @@ the four is a named passing test.
 
 ```sh
 nvim =script     # becomes `nvim /usr/bin/script` — where that command lives
-cd @work         # becomes `cd ~/data/code/tools` — a directory a config named
+cd @work         # becomes `cd ~/data/code/tools` — a directory you marked
 ls @work/src     # the tail is kept
 ```
 
 `=name` is zsh's, including the part that makes it safe: **a name that resolves to nothing is left
 exactly as it was**, so `echo =nosuch` still prints `=nosuch` and the worst case of the feature is
-that nothing happens. `@name` reads a table a config registers:
-
-```lua
-oslo.dirs = { work = "~/data/code/tools", dl = "~/Downloads" }
-```
+that nothing happens.
 
 A distinct sigil rather than zsh's `~name`, deliberately: `~work` already means "the home directory
 of the user called `work`", so a real account could silently shadow your shortcut.
@@ -286,9 +282,73 @@ of the user called `work`", so a real account could silently shadow your shortcu
 as it does in every other `sh`.
 
 Both are known to the rest of the prompt, not just to expansion: Tab after `=` completes *commands*
-and after `@` completes the registered names, `=grep` is coloured as the command it resolves to
-rather than as one that does not exist, and a misspelled `=lsvlk` is corrected the same way a
-misspelled first word is.
+and after `@` completes the names you have, `@work/sr` + Tab reads the marked directory and offers
+what is in it, `=grep` is coloured as the command it resolves to rather than as one that does not
+exist, and a misspelled `=lsvlk` is corrected the same way a misspelled first word is.
+
+### Marking a directory: `mark`
+
+```console
+~/data/code/tools/rush $ mark
+marked @rush
+~/data/code/tools/rush $ cd /tmp && ls @rush/crates
+~/data/code/tools/rush $ mark          # again, in the same directory
+unmarked @rush
+```
+
+**A toggle, because the question is about one directory and has two answers.** Two verbs would be
+two names to remember for something you do without thinking, and a mark is made and unmade from
+inside the directory it is about — so the shell already knows which one you mean. The *path* decides,
+not the name: a bare `mark` undoes one you made earlier as `mark othername`.
+
+The name is the directory's own last component, which is what you will reach for a week later.
+`mark NAME` chooses another, and a name that already means somewhere else is refused rather than
+moved silently — walking into a second `src` must not steal the first one's name.
+
+```sh
+mark proj        # this directory, under a name of your own
+mark -l          # every name, marked and declared alike
+mark -d proj     # forget one from anywhere
+```
+
+**A word rather than the `@` sigil, and `@name` does not lead a line either.** The start of a line is
+reserved: `@proj` typed on its own is a word the shell declines to read, not a path it produces and
+then fails to execute. `@name` expands as an *argument*, which is where you use it.
+
+Marks live in `$XDG_DATA_HOME/oslo/marks`, one `name<TAB>path` per line — a plain file, because a
+mark is three words you chose and it is worth being able to read and edit with anything. It is
+written atomically and re-read on every lookup, so a mark made in another terminal is there in this
+one without a reload.
+
+From Lua, writing to the same file:
+
+```lua
+oslo.mark()                      -- this directory, under its own last component
+oslo.mark("proj")                -- under a name you choose
+oslo.mark("dl", "~/Downloads")   -- somewhere else
+oslo.unmark("proj")
+for name, path in pairs(oslo.marks()) do print(name, path) end
+```
+
+Which is what lets a project mark itself, in the file it already has:
+
+```lua
+-- ~/work/app/.env.lua
+oslo.mark("app")
+```
+
+**"This directory" there means the file's own, not the one you are standing in.** A `.env.lua`
+governs everything below it, so walking straight into `~/work/app/src/deep` runs it with the shell
+three levels down — and a bare `oslo.mark()` that took the shell's word for it would mark `deep` and
+call it `app`.
+
+`oslo.dirs` is still there and still separate: it is *declared*, replaced on every start, and wins a
+name collision. A mark is something you made in passing and must not quietly take over a name a
+config decided.
+
+```lua
+oslo.dirs = { work = "~/data/code/tools", dl = "~/Downloads" }
+```
 
 ### Navigate the filesystem
 

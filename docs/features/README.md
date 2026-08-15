@@ -80,6 +80,7 @@ scripts/demo/embed.sh                            # put the players back in the d
 | [The Lua interpreter](lua-interpreter.md) | Lua in pure Rust — what lets a static musl binary speak it with no C toolchain |
 | [Your own tools](your-own-tools.md) | `register_tool`, builtins and autoloaded functions from Lua |
 | [Hooks](hooks.md) | The points a config can attach to, and what a return value means |
+| [Timers](timers.md) | `oslo.after` and `oslo.every` — the only things that mean "later" |
 | [Drawing](drawing.md) | The shell's own output widgets, and taking them over |
 
 ## The pipeline
