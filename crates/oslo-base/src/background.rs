@@ -9,10 +9,14 @@
 //!
 //! # Two ways in, because there are two kinds of event
 //!
-//! * **A signal**, for a child ending. `SIGCHLD` without `SA_RESTART` makes the blocked `read` fail
-//!   with `EINTR` — the route `SIGWINCH` has always taken for a resize.
+//! * **A signal**, for a child ending. The handler writes one byte down the self-pipe below rather
+//!   than letting `EINTR` do the waking, which is the route `SIGWINCH` takes — see
+//!   [`nudge_from_signal`] and the measurement in `oslo_ui::term::child`.
 //! * **A descriptor**, for anything a signal cannot carry: an `inotify` watch on the universal
 //!   store, a worker finishing a spawn. Registered here and waited on beside the terminal.
+//!
+//! So both ends up being the same thing — a descriptor the idle wait already polls — and the wait
+//! has exactly one way to be woken instead of two that have to agree.
 //!
 //! Neither carries data. Both mean *something changed, go and look* — [`crate::background::service`] is what looks,
 //! and it runs on the shell thread with the locks free.
@@ -182,7 +186,37 @@ pub fn nudge() {
 /// wake went into a pipe nobody was listening to and the callback waited for a keystroke after all.
 /// Exactly the case the nudge exists to remove.
 pub fn arm() {
-    let _ = pipe();
+    if let Some((_, write)) = pipe() {
+        NUDGE_FD.store(write, std::sync::atomic::Ordering::Relaxed);
+    }
+}
+
+/// The write end, as one word a signal handler may read.
+///
+/// **Because [`nudge`] is not safe to call from a handler and this is.** `nudge` reaches a
+/// `OnceLock`, which on its first call takes a lock — and a handler that blocks on a lock its own
+/// interrupted thread holds is a hang with no way out. One relaxed load and one `write(2)`, both
+/// async-signal-safe, is the whole of what a handler may do.
+static NUDGE_FD: std::sync::atomic::AtomicI32 = std::sync::atomic::AtomicI32::new(-1);
+
+/// Wake the idle wait from a signal handler.
+///
+/// # Safety
+///
+/// Async-signal-safe: a relaxed atomic load and one `write` of a single byte, with the result
+/// discarded. `EAGAIN` on a full pipe is the success case — a full pipe means a wake is already
+/// pending, which is the same message.
+pub fn nudge_from_signal() {
+    let fd = NUDGE_FD.load(std::sync::atomic::Ordering::Relaxed);
+    if fd < 0 {
+        return;
+    }
+    let byte = [0u8; 1];
+    // SAFETY: `fd` is the pipe's write end, open for the life of the process, and the buffer is one
+    // live byte on this frame.
+    unsafe {
+        nix::libc::write(fd, byte.as_ptr().cast(), 1);
+    }
 }
 
 /// The self-pipe, made once and registered as a waker the first time anybody wants it.

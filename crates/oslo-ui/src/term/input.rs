@@ -1,9 +1,10 @@
-use super::child::{CHILD_MARK, take_child};
+mod idle;
+
+use super::child::CHILD_MARK;
 use super::paste::{self, Paste};
-use super::resize::{RESIZE_MARK, take_resize};
-use oslo_base::background;
+use super::resize::RESIZE_MARK;
+use idle::waiting;
 use std::collections::VecDeque;
-use std::io;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Key {
@@ -326,160 +327,6 @@ impl Keys {
             None => EventPressed::Ended,
         }
     }
-
-    fn fill(&mut self) -> bool {
-        let mut byte = [0u8; 1];
-        loop {
-            // **Only when something is registered.** With no wakers this is the blocking read it
-            // has always been, byte for byte — a script, a `sh -c` and a shell with nothing being
-            // watched all take exactly the path they used to. The poll is the opt-in half.
-            if !background::wakers().is_empty() {
-                match self.wait_for_terminal_or_background() {
-                    Waited::Marked => return true,
-                    // Serviced and there was nothing to say. Wait again rather than fall through:
-                    // the terminal has no data, and a read here would block with the wakers unwatched.
-                    Waited::Nothing => continue,
-                    Waited::Terminal => {}
-                }
-            }
-            // SAFETY: the destination is one live byte and `fd` is owned by the caller.
-            let n = unsafe { nix::libc::read(self.fd, byte.as_mut_ptr().cast(), 1) };
-            if n > 0 {
-                self.buf.push(byte[0]);
-                return true;
-            }
-            if n == 0 {
-                return false;
-            }
-            match io::Error::last_os_error().kind() {
-                io::ErrorKind::Interrupted => {
-                    if take_resize() {
-                        self.buf.push(RESIZE_MARK);
-                        return true;
-                    }
-                    if take_child() {
-                        self.buf.push(CHILD_MARK);
-                        return true;
-                    }
-                }
-                io::ErrorKind::WouldBlock => {
-                    let mut ready = nix::libc::pollfd {
-                        fd: self.fd,
-                        events: nix::libc::POLLIN,
-                        revents: 0,
-                    };
-                    // SAFETY: one valid descriptor is polled without a timeout.
-                    let polled = unsafe { nix::libc::poll(&mut ready, 1, -1) };
-                    if polled < 0 {
-                        if io::Error::last_os_error().kind() != io::ErrorKind::Interrupted {
-                            return false;
-                        }
-                        if take_resize() {
-                            self.buf.push(RESIZE_MARK);
-                            return true;
-                        }
-                    }
-                }
-                _ => return false,
-            }
-        }
-    }
-
-    /// Wait until the terminal has something, or the background does.
-    ///
-    /// Answers `true` when it serviced the background and pushed a marker — the caller returns and
-    /// the loop gets its turn to repaint. `false` means "the terminal is ready, go and read it",
-    /// which is also what every error answers: a broken poll must fall through to the read rather
-    /// than spin, and the read reports the real failure.
-    ///
-    /// **`poll` on a blocking descriptor is fine.** It reports when a read *would not* block; it
-    /// does not require `O_NONBLOCK`, which is why the terminal does not have to change mode for
-    /// any of this.
-    fn wait_for_terminal_or_background(&mut self) -> Waited {
-        let wakers = background::wakers();
-        let mut fds = Vec::with_capacity(wakers.len() + 1);
-        fds.push(nix::libc::pollfd {
-            fd: self.fd,
-            events: nix::libc::POLLIN,
-            revents: 0,
-        });
-        for waker in &wakers {
-            fds.push(nix::libc::pollfd {
-                fd: *waker,
-                events: nix::libc::POLLIN,
-                revents: 0,
-            });
-        }
-        // The nearest timer's deadline, or no timeout when nothing is waiting on the clock.
-        let timeout = background::wait_ms();
-        // SAFETY: every descriptor is borrowed and live for the duration of the call.
-        let polled = unsafe { nix::libc::poll(fds.as_mut_ptr(), fds.len() as _, timeout) };
-        if polled == 0 {
-            // A deadline came due with nothing else to say. Servicing is what fires the timer.
-            return match background::service() {
-                true => {
-                    self.buf.push(CHILD_MARK);
-                    Waited::Marked
-                }
-                false => Waited::Nothing,
-            };
-        }
-        if polled < 0 {
-            // **Interrupted, and the flags have to be read here.** A signal that arrives during the
-            // poll has already been and gone by the time the read below runs, so it will not
-            // interrupt *that* — and the shell would go back to blocking with the news unread. This
-            // was the regression: the job wake stopped working the moment a waker existed.
-            if take_resize() {
-                self.buf.push(RESIZE_MARK);
-                return Waited::Marked;
-            }
-            if take_child() {
-                self.buf.push(CHILD_MARK);
-                return Waited::Marked;
-            }
-            return Waited::Terminal;
-        }
-        let mut woken = false;
-        for (at, waker) in wakers.iter().enumerate() {
-            if fds[at + 1].revents & (nix::libc::POLLIN | nix::libc::POLLHUP) != 0 {
-                // Emptied whatever it held; `woken` only when what it held was interesting.
-                woken |= background::read_waker(*waker);
-            }
-        }
-        if !woken {
-            return Waited::Terminal;
-        }
-        // **A repaint only when something actually changed.** A watch is on a *directory*, and the
-        // shell writes its own history and state into the same one — so most wakes are the shell
-        // hearing itself. Marking every one of them would repaint the prompt on every command.
-        match background::service() {
-            true => {
-                self.buf.push(CHILD_MARK);
-                Waited::Marked
-            }
-            false => Waited::Nothing,
-        }
-    }
-}
-
-/// What one wait produced.
-enum Waited {
-    /// Something was pushed into the buffer; the caller returns and the loop takes its turn.
-    Marked,
-    /// The terminal has data. Go and read it.
-    Terminal,
-    /// The background was serviced and had nothing to report. Wait again.
-    Nothing,
-}
-
-fn waiting(fd: i32, ms: i32) -> bool {
-    let mut fds = nix::libc::pollfd {
-        fd,
-        events: nix::libc::POLLIN,
-        revents: 0,
-    };
-    // SAFETY: one valid poll descriptor is supplied for the duration of this call.
-    unsafe { nix::libc::poll(&mut fds, 1, ms) > 0 }
 }
 
 #[derive(Debug, PartialEq, Eq)]
