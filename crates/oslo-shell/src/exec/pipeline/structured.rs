@@ -35,11 +35,48 @@ fn simple_command_name(simple: &SimpleCommand) -> Option<String> {
 /// Lossy rather than refusing: a tool that turns bytes into rows is being handed something the
 /// user piped in, and answering "not UTF-8" for one stray byte in a log file would be worse than
 /// carrying on. `Val::Bytes` exists for the cell that genuinely holds binary; this is the channel.
-fn read_standard_input() -> String {
+fn read_standard_input() -> Option<String> {
+    use nix::poll::{PollFd, PollFlags, PollTimeout, poll};
     use std::io::Read;
+    use std::os::fd::AsFd;
+
+    let stdin = std::io::stdin();
+    let mut handle = stdin.lock();
     let mut buffer = Vec::new();
-    let _ = std::io::stdin().lock().read_to_end(&mut buffer);
-    String::from_utf8_lossy(&buffer).into_owned()
+    let mut chunk = [0u8; 8192];
+    loop {
+        // **Waited for in slices, so Ctrl-C is heard.**
+        //
+        // `wc -l` reading a terminal is a child in the foreground process group, so SIGINT kills
+        // it. This read happens in the shell's *own* process, where the handler only sets a flag —
+        // so a blocking `read_to_end` could not be broken out of at all, and every line typed after
+        // it was swallowed by the read rather than run. The flag is polled between slices, which is
+        // the same thing `eval_command_list` does at every command boundary.
+        match poll(
+            &mut [PollFd::new(handle.as_fd(), PollFlags::POLLIN)],
+            PollTimeout::from(100u16),
+        ) {
+            Ok(0) => {
+                if crate::exec::job::interrupt_pending() {
+                    return None;
+                }
+                continue;
+            }
+            Ok(_) => {}
+            // `EINTR` is the signal arriving while parked; ask the flag and carry on either way.
+            Err(_) => {
+                if crate::exec::job::interrupt_pending() {
+                    return None;
+                }
+                continue;
+            }
+        }
+        match handle.read(&mut chunk) {
+            Ok(0) | Err(_) => break,
+            Ok(read) => buffer.extend_from_slice(&chunk[..read]),
+        }
+    }
+    Some(String::from_utf8_lossy(&buffer).into_owned())
 }
 
 /// Every stage that is not a simple command naming a registered tool is reported as plain bytes,
@@ -176,7 +213,12 @@ pub(super) fn run(
                     )
                 })
             {
-                bytes = Some(read_standard_input());
+                match read_standard_input() {
+                    Some(text) => bytes = Some(text),
+                    // Interrupted: 130 is what a shell reports for a line Ctrl-C ended, and
+                    // returning it here leaves the queued keystrokes to be read as commands.
+                    None => return Ok(130),
+                }
             }
             0
         }
