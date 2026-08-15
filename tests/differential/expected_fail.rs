@@ -64,7 +64,6 @@ pub const EXPECTED_FAIL: &[(&str, &str, &str)] = &[
     // files. Deleted; the patch and its upstream PR text are worth re-sending to reubeno/brush
     // rather than hosting here. Spaced `for (( ; ; ))` and the ordinary `for ((i=0;i<3;i++))`
     // both work, and the unspaced form is a loud syntax error, not a wrong answer.
-    ("arith_for_unspaced_sections.sh", "R8.3", "`for ((;;))` with no space between the section separators is a syntax error; `for (( ; ; ))` works"),
     ("syntax_unsupported_coproc.sh", "R8.5", "coproc is refused by name and deliberately not implemented — it needs job control; bash runs the body and exits 0"),
     ("syntax_unsupported_select.sh", "R8.6", "select is refused by name and deliberately not implemented — it needs a prompt, PS3 and REPLY; bash runs the loop and reads EOF"),
 

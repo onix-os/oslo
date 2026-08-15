@@ -102,5 +102,13 @@ temporary file is the portable spelling, and it is what POSIX offers.
 
 | Was | Now |
 |---|---|
-| `for ((;;))` with touching separators | `for ((i=0;i<2;i++)); do …; done` runs, spaced or not |
+| `for ((;;))` with touching separators | every spelling runs, empty sections and all |
 | Process substitution generally | works wherever `/dev/fd` exists, which is every ordinary Linux system |
+
+The first was closed by this audit and is worth a word, because the shape of it recurs. The
+tokenizer takes the longest match, so `for ((;;))` carries **one** `;;` operator — the token that
+ends a `case` item — where the grammar reads two separators. `for (( ; ; ))` parsed, which made it
+look like a rule about spaces. The fix is two lines in the grammar: an arithmetic section now
+*stops* at `;;`, and the condition rule accepts one as an empty condition. Nothing in the tokenizer
+changed, because `;;` ends a `case` item far more often than it separates loop sections — and the
+corpus case carries a `case` at the bottom to prove that still holds.
