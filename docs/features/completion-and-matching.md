@@ -48,7 +48,7 @@ stem = "f-b"
  │ 1  Exact      candidate.starts_with(stem)                                 │
  │ 2  Ignoring   the same, case-folded a character at a time                 │
  │ 3  Pieces     split on / - _ . ; every typed piece prefixes its own       │
- │                 f-b → foo-bar      /u/s/b → /usr/share/bin                │
+ │                 f-b → foo-bar      d-c → docker-compose                   │
  │ 4  Fuzzy      nucleo, present only when fuzzy ≠ off                       │
  └───────────────────────────────────────────────────────────────────────────┘
     ↓ each pass runs only when the one above it came back with nothing
@@ -122,8 +122,9 @@ answer, and it is the bug this replaced: `exit` offered `exitsnoop-bpfcc`, a com
 never run, ahead of the one they were plainly typing. Alphabetical is still available on request as
 `sort = "alpha"` rather than being the only order there is.
 
-`/u/s/b` reaching `/usr/share/bin` is the third pass of the built-in chain and needs no
-configuration; what configuration exists only turns passes *off*.
+`d-c` reaching `docker-compose` is the third pass of the built-in chain and needs no
+configuration; what configuration exists only turns passes *off*. It runs over **command names**,
+not paths — `/u/s/b` does not reach `/usr/share/bin`, for the reason given further down.
 
 **Fuzzy matching is in the dropdown and never in the inline ghost suggestion.** The ghost is drawn
 as text appended after the cursor, so it can only ever be a strict continuation of what you typed —

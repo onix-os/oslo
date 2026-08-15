@@ -52,7 +52,7 @@ program wanted `4509715660`. It works with programs that know nothing about oslo
 ```sh
 kubectl get pods -o json | from json | where 'status.phase == "Running"' | cols name
 cat /etc/passwd | parse '{user}:{x}:{uid}:{rest}' | where 'uid > 1000' | get user
-ps | where 'cpu > 10' | sort-by cpu | first 5 | to json | jq .
+ps | where 'not is_kernel' | sort-by name | first 5 | to json | jq .
 ```
 
 Filters are **Lua**, not a dialect invented for the occasion, so the escape hatch is the same
@@ -63,12 +63,13 @@ Summaries: `group-by` `count` `distinct` `stats`. Producers: `df` `ps` `ls`, and
 yourself.
 
 ```sh
-ps | group-by user | count            # how many processes each user has
-ls | distinct kind                    # one of each, keeping the first
+ps | group-by is_kernel | count       # how many are the kernel's, how many yours
+ls | distinct is_dir                  # one of each, keeping the first
 df | stats free                       # count, min, max, sum, mean over a column
 ```
 
-Selection alone is a nicer `awk`; `ps | group-by user | count` is a query `ps | grep` cannot express.
+Selection alone is a nicer `awk`; `ps | group-by is_kernel | count` is a query `ps | grep`
+cannot express.
 There is no `join`: it needs a *second* input stream, and a pipeline is a line.
 
 ### Your POSIX scripts cannot reach any of it
@@ -114,9 +115,10 @@ Or just use `$PS1`, with the full escape set — `\u \h \w \$ \t \A \d \j \! \[ 
   the directory you are standing in. Right takes the one on screen, Tab opens the dropdown when
   there is a choice to make
 - **A completion dropdown** with columns, per-kind info and frecency ranking
-- **Matching that is a transform, not a prefix test** — in the dropdown, `/u/s/b` reaches
-  `/usr/share/bin`, `f-b` reaches `foo-bar` and `gco` reaches `git checkout`, each looser pass
-  running only when the stricter one found nothing, so an exact match is never diluted
+- **Matching that is a transform, not a prefix test** — in the dropdown, `d-c` reaches
+  `docker-compose`, `f-b` reaches `foo-bar` and `gco` reaches `git checkout`, each looser pass
+  running only when the stricter one found nothing, so an exact match is never diluted. Command
+  names only: a filename is matched by a plain prefix test
 - **A full-screen history finder** on Up, seeded with whatever you had typed. Left and Right narrow
   and widen the scope — global, host, session, directory, workspace; Ctrl-Space marks rows and
   Delete forgets all of them for good, after asking — and asking again is answered by pressing
@@ -917,8 +919,8 @@ ends prove they hold it.
 
 ## Tools
 
-`oslo --help` lists them — `config`, `profile`, `history`, `aliases`, `hook`, and whichever of
-`direnv`, `plugin` and `scratch` this build has:
+`oslo --help` lists them — `macros`, `config`, `profile`, `history`, `hook`, `userin`, `secret`,
+and whichever of `direnv`, `plugin` and `scratch` this build has:
 
 ```sh
 oslo history
@@ -1162,8 +1164,9 @@ no way to say "redraw the accepted line differently". oslo owns its own editor, 
 
 ### The hooks
 
-Twenty moments, named `pre-`, `post-` or `on-`. Kebab-case cannot be a Lua field, so every one is
-also spelled with underscores — `oslo.on.pre_cmd` and `oslo.on["pre-cmd"]` are the same hook.
+Thirty moments, named `pre-`, `post-` or `on-`; `oslo hook list` prints the current set.
+Kebab-case cannot be a Lua field, so every one is also spelled with underscores —
+`oslo.on.pre_cmd` and `oslo.on["pre-cmd"]` are the same hook.
 
 ```lua
 oslo.on.pre_cmd(function(c)  end)   -- { text, cwd, mode }   may answer
