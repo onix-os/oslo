@@ -19,12 +19,15 @@ pub(super) fn brace_segment(word: Word<'_>) -> Word<'_> {
     };
     let after = &word.text[open + 1..];
     let item = after.rfind(',').map_or(0, |c| c + 1);
-    let head = &word.text[..open];
+    let head = unquote(&word.text[..open]);
     let start = word.start + open + 1 + item;
     Word {
         start,
         text: &after[item..],
-        stem: format!("{}{}", unquote(head), unquote(&after[item..])),
+        stem: format!("{}{}", head, unquote(&after[item..])),
+        // The `/dir/` is in the stem so the directory can be read, and on the line already — so a
+        // completion must not write it again. See [`Word::carried`].
+        carried: head.len(),
         ..word
     }
 }
@@ -69,6 +72,8 @@ pub(super) fn after_break(word: Word<'_>) -> Word<'_> {
         text: after,
         stem: unquote(after),
         command_position: false,
+        // The stem is only what follows the break, so all of it is being replaced.
+        carried: 0,
         ..word
     }
 }

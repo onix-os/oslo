@@ -61,7 +61,14 @@ impl OsloHelper {
             };
             // The replacement is the whole word, not just the tail: quoting a fragment would
             // leave the directory part unquoted and the two halves would not agree.
-            let value = format!("{}{}", dir_part, display);
+            //
+            // **Minus whatever is already on the line.** A word retargeted at a piece of itself —
+            // the item inside `{a,b}` — keeps the directory in its stem so the right directory is
+            // read, while `start` points past it. Writing the whole path there gave
+            // `rm /dir/{alpha,/dir/beta`: a different, longer path than the one typed, on the
+            // command whose documented example is `rm`. See [`Word::carried`].
+            let head = dir_part.get(word.carried..).unwrap_or("");
+            let value = format!("{head}{display}");
             out.push(CompletionCandidate {
                 display,
                 replacement: quote_replacement(&value, word.quote),
