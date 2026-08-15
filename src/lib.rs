@@ -27,7 +27,7 @@ pub use oslo_base::{ast, error, feature, hooks, macros, messages, nesting, track
 pub use oslo_shell::direnv;
 /// The shell: syntax adaptation, expansion, execution, the builtins, the structured pipeline and
 /// directory environments.
-pub use oslo_shell::{data, env, exec, expand, lexer, syntax};
+pub use oslo_shell::{data, env, exec, expand, lexer, names, syntax};
 
 /// The old name for [`syntax`], because a great deal of the tree still says it. There is one shell
 /// parser and it is brush's; `syntax` is the conversion into oslo's own tree.

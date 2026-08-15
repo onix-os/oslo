@@ -495,8 +495,14 @@ static PROMPT_GENERATION: std::sync::atomic::AtomicU64 = std::sync::atomic::Atom
 
 /// Say that a prompt built now would differ from one built a moment ago.
 ///
-/// Called from the three places a prompt's inputs actually change: the vi mode, the language, and
-/// the working directory. Anything else — a keystroke, a redraw, a resize — leaves it alone.
+/// Called from the places a prompt's inputs actually change: the vi mode, the language, the working
+/// directory, a resize, and a timer or spawn callback that ran while the prompt sat idle. A
+/// keystroke and a plain redraw leave it alone.
+///
+/// **A resize belongs here**, and the note that used to say otherwise was describing a resize that
+/// never arrived: `term::input::parse` was discarding the marker as an undecodable byte. A prompt
+/// that measures the terminal is wrong at the new width, and redrawing the old string would only
+/// re-place a stale one.
 pub fn invalidate() {
     PROMPT_GENERATION.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     // And tell the editor the frame is stale. Two counters rather than one because they answer
