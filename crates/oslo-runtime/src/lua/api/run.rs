@@ -151,7 +151,7 @@ fn sugar(env: &Arc<Mutex<Environment>>) -> Value {
             let command = name.to_string();
             let env_call = Arc::clone(&env_index);
             // A command oslo can answer in rows does so. `sh.df()` gives a table with named
-            // fields rather than text nobody can parse safely — see `docs/built-in-tools.md`.
+            // fields rather than text nobody can parse safely — see `docs/features/structured-pipelines.md`.
             // Everything else falls through to running the external program, so a script keeps
             // working on a machine where oslo is not the shell.
             if oslo_shell::data::rows::answers_in_rows(&command) {

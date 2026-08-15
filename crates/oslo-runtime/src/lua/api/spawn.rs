@@ -232,10 +232,13 @@ pub fn deliver() {
 ///
 /// The shape every caller wants: a session with nothing spawned — every session, nearly always —
 /// costs one uncontended `try_lock` rather than a drain.
-pub fn deliver_if_any() {
+/// Answers whether a callback ran, so the caller can decide whether a drawn prompt is still true.
+pub fn deliver_if_any() -> bool {
     if any_done() {
         deliver();
+        return true;
     }
+    false
 }
 
 /// Whether anything has finished, so the loop can skip the lock.

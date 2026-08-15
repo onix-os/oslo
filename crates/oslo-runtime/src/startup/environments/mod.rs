@@ -173,6 +173,14 @@ fn capturing<T>(f: impl FnOnce() -> T) -> (T, String) {
 /// Run an `.env.lua`, which may set more than variables.
 fn source_lua(lua: &LuaEngine, rc: &Rc) -> Result<(), String> {
     let source = std::fs::read_to_string(&rc.path).map_err(|e| e.to_string())?;
+    // **`oslo.mark()` inside one of these means the file's directory, not the shell's.** A
+    // `.env.lua` governs everything below it, so walking straight into `app/src/deep` runs
+    // `app/.env.lua` with the shell three levels down — and a mark that took the shell's word for
+    // it would name `deep` after the project. Dropped on the way out, raise or no raise.
+    let _loading = rc
+        .path
+        .parent()
+        .map(crate::lua::api::mark::Loading::directory);
     lua.eval_as(&source, &rc.path.to_string_lossy())
         .map_err(|e| e.to_string())
 }

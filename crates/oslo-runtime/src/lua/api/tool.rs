@@ -16,7 +16,7 @@
 //! **Facts, not rendering.** A tool says what its rows *are*; the shell decides how they are drawn,
 //! and when the next stage wants rows it is never drawn at all — so the tool does not pay for a
 //! rendering nobody reads. One source of facts and one renderer is the only arrangement in which
-//! the two faces cannot disagree, which is the argument `docs/built-in-tools.md` makes.
+//! the two faces cannot disagree, which is the argument `docs/features/structured-pipelines.md` makes.
 //!
 //! Deliberately the last part of the pipeline work to be built: the Lua surface should be a face on
 //! a shape that has already been proven in Rust, not a guess that then constrains it.
@@ -225,9 +225,34 @@ fn val_of(value: &Value) -> Val {
             None => Val::Float(n.as_float()),
         },
         Value::Str(s) => Val::Str(s.to_string()),
-        Value::Table(_) => Val::Record(records_of(value).into_iter().next().unwrap_or_default()),
+        Value::Table(table) => table_of(&table.borrow()),
         _ => Val::Null,
     }
+}
+
+/// A nested table as a list or a record, the way [`lua_of`] would have written it.
+///
+/// **The two directions have to agree.** `lua_of` gives `Val::List` and `Val::Record` an arm each,
+/// while this side read every table as *a list of rows* and kept the first — so `{ x = 1 }` has
+/// length zero, the walk never ran, and the cell came back as `{}`. A tool that did nothing but
+/// pass a nested row through destroyed it.
+fn table_of(table: &Table) -> Val {
+    // A sequence is a list; anything else is a record of its string-keyed fields. Lua has one type
+    // for both, so its length is the only thing that tells them apart.
+    if table.length() >= 1 {
+        return Val::List(
+            (1..=table.length())
+                .map(|i| val_of(&table.get(&Value::int(i))))
+                .collect(),
+        );
+    }
+    let mut record = Record::new();
+    for (key, value) in table.pairs() {
+        if let Value::Str(name) = key {
+            record.set(&name, val_of(&value));
+        }
+    }
+    Val::Record(record)
 }
 
 #[cfg(test)]
@@ -266,5 +291,39 @@ mod tests {
         assert_eq!(records.len(), 1);
         assert_eq!(records[0].columns(), ["host", "ip"]);
         assert_eq!(records[0].get("ip"), Some(&Val::Str("10.0.0.1".into())));
+    }
+
+    /// **A nested table keeps its shape in both directions.** Every table was read as a list of
+    /// rows and only its first kept, so a map cell — length zero, so the walk never ran — arrived
+    /// as `{}`: `nest | to json` printed `"inner": {}` for `inner = { x = 1 }`.
+    #[test]
+    fn a_nested_table_keeps_its_shape() {
+        let mut inner = Table::new();
+        inner.set(Value::str("x"), Value::int(1));
+        let record = val_of(&Value::Table(std::rc::Rc::new(RefCell::new(inner))));
+        let Val::Record(record) = record else {
+            panic!("a map is a record, got {record:?}");
+        };
+        assert_eq!(record.get("x"), Some(&Val::Int(1)));
+
+        // And a sequence is a list, all of it — not just its first element.
+        let mut list = Table::new();
+        for (i, value) in [10, 20].into_iter().enumerate() {
+            list.set(Value::int(i as i64 + 1), Value::int(value));
+        }
+        let list = val_of(&Value::Table(std::rc::Rc::new(RefCell::new(list))));
+        assert_eq!(list, Val::List(vec![Val::Int(10), Val::Int(20)]));
+    }
+
+    /// The two directions agree: what `lua_of` writes, `val_of` reads back unchanged.
+    #[test]
+    fn a_nested_value_survives_the_round_trip() {
+        let mut record = Record::new();
+        record.set("x", Val::Int(1));
+        let nested = Val::Record(record);
+        assert_eq!(val_of(&lua_of(&nested)), nested);
+
+        let list = Val::List(vec![Val::Str("a".into()), Val::Int(2)]);
+        assert_eq!(val_of(&lua_of(&list)), list);
     }
 }

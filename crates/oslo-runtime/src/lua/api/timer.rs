@@ -126,8 +126,12 @@ fn handle(id: u64) -> Value {
 /// **The list is taken before anything runs.** A handler may set another timer — a poll that
 /// reschedules itself is the ordinary case — and appending to a list being iterated is how that
 /// becomes either a panic or an accidental infinite loop.
-pub fn fire_due() {
-    for (id, handler) in settle(Instant::now()) {
+/// Answers whether anything actually ran, which the caller needs to decide whether the prompt is
+/// still true — a handler that changed what `oslo.prompt.left` reads leaves a drawn prompt stale.
+pub fn fire_due() -> bool {
+    let due = settle(Instant::now());
+    let ran = !due.is_empty();
+    for (id, handler) in due {
         if let Err(problem) = crate::lua::engine::call_here(&handler, Vec::new()) {
             eprintln!("oslo: timer: {problem}");
             // A repeating timer that raises is stopped rather than left to raise on every command
@@ -135,6 +139,7 @@ pub fn fire_due() {
             TIMERS.with(|timers| timers.borrow_mut().retain(|timer| timer.id != id));
         }
     }
+    ran
 }
 
 /// Take what is due at `now`, leaving the list as it should be afterwards.

@@ -24,6 +24,15 @@ pub(super) fn key_name(key: Key) -> Option<String> {
         Key::PageUp => "pageup".to_string(),
         Key::PageDown => "pagedown".to_string(),
         Key::Function(number @ 1..=12) => format!("f{number}"),
+        // **Space, and only space, out of `Key::Char`.** The line-editor page lists it among the
+        // names a config may bind, and it had none here — so `oslo.keys["space"]` was read without
+        // complaint and never fired. Every other character is still ruled out, which is what keeps
+        // this off the path of simply typing.
+        //
+        // Enter, Esc, Backspace and Delete are deliberately *not* here; `is_key_name` refuses them
+        // now rather than accepting names nothing can produce. See `hook_key_name` below, which is
+        // the superset and exists for exactly that reason.
+        Key::Char(' ') => "space".to_string(),
         // The chords `term` folded into shared names. A config that bound `ctrl-a` means the
         // chord, so the name has to come back out even though the key arrived as `Home`.
         Key::Clear => "ctrl-u".to_string(),
