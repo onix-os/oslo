@@ -95,10 +95,19 @@ fn apply(env: &Arc<Mutex<Environment>>, wanted: &[Entry], had: &Applied, now: &A
             Kind::Abbrev => oslo_ui::abbr::add(
                 &entry.name,
                 &entry.body,
-                // The placement a stored abbreviation gets. `oslo macros` has no `--anywhere` yet,
-                // and command position is what an abbreviation is for; widening it later is adding
-                // a flag rather than changing what these mean.
-                oslo_ui::abbr::Placement::Command,
+                // **Whatever it already has, if it has one.**
+                //
+                // `want()` merges the macro database with `from_elsewhere` — and `from_elsewhere`
+                // is the snapshot *this shell* wrote a few lines ago, describing what its own
+                // config defined. So a config's `{ "| less", anywhere = true }` came straight back
+                // here and was re-added as `Command`, and the flag was gone before the first
+                // prompt. The config reader was right all along; this was the thief.
+                //
+                // A row that is genuinely only in the database has nothing in the table yet and
+                // gets the default: `oslo macros` has no `--anywhere`, and command position is
+                // what an abbreviation is for.
+                oslo_ui::abbr::placement_of(&entry.name)
+                    .unwrap_or(oslo_ui::abbr::Placement::Command),
             ),
             // **A value now; a recipe when somebody asks.**
             //
