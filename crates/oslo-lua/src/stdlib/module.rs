@@ -39,6 +39,37 @@ fn user_path(home: Option<&str>, xdg: Option<&str>) -> Option<String> {
 const DEFAULT_PATH: &str = "/usr/local/share/lua/5.4/?.lua;/usr/local/share/lua/5.4/?/init.lua;\
      /usr/share/lua/5.4/?.lua;/usr/share/lua/5.4/?/init.lua";
 
+/// `package.searchpath(name, path [, sep [, rep]])` — the first file that exists, or nil and the
+/// list of names that did not.
+///
+/// Real, not a stub: it is the one part of the module system a script can use on its own — asking
+/// where a file *would* come from without loading it — and it is nine lines of string work.
+fn searchpath(_: &Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
+    let name = super::arg_str(&args, 1, "searchpath")?;
+    let path = super::arg_str(&args, 2, "searchpath")?;
+    let sep = match args.get(2) {
+        Some(Value::Str(s)) => s.to_string(),
+        _ => ".".to_string(),
+    };
+    let rep = match args.get(3) {
+        Some(Value::Str(s)) => s.to_string(),
+        _ => "/".to_string(),
+    };
+    let wanted = match sep.is_empty() {
+        true => name.clone(),
+        false => name.replace(&sep, &rep),
+    };
+    let mut tried = String::new();
+    for template in path.split(';').filter(|t| !t.is_empty()) {
+        let candidate = template.replace('?', &wanted);
+        if std::path::Path::new(&candidate).is_file() {
+            return Ok(vec![Value::str(candidate)]);
+        }
+        tried.push_str(&format!("\n\tno file '{candidate}'"));
+    }
+    Ok(vec![Value::Nil, Value::str(tried)])
+}
+
 pub fn install(interp: &Interp) {
     let package = module(vec![
         ("loaded", Value::table(Table::new())),
@@ -47,6 +78,15 @@ pub fn install(interp: &Interp) {
         ("preload", Value::table(Table::new())),
         ("path", Value::str(search_path())),
         ("cpath", Value::str("")),
+        // The five characters that describe how paths are written, in the order Lua fixes: the
+        // directory separator, the path separator, the substitution mark, the executable mark and
+        // the ignore mark. A constant, and a script that reads it is asking about the platform.
+        ("config", Value::str("/\n;\n?\n!\n-\n")),
+        // Present and refusing rather than absent: oslo's `require` is not built out of a
+        // searcher list, so replacing one would silently do nothing — which is worse than saying
+        // so. See the rule at the top of `stdlib`.
+        ("searchers", Value::table(Table::new())),
+        ("searchpath", native("package.searchpath", searchpath)),
     ]);
     interp.set_global("package", package);
 

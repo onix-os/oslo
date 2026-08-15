@@ -31,12 +31,34 @@ pub fn install(interp: &Interp) {
         ("type", native("math.type", subtype)),
         ("random", native("math.random", random)),
         ("randomseed", native("math.randomseed", randomseed)),
+        ("deg", float1("math.deg", f64::to_degrees)),
+        ("rad", float1("math.rad", f64::to_radians)),
+        ("ult", native("math.ult", ult)),
         ("pi", Value::float(std::f64::consts::PI)),
         ("huge", Value::float(f64::INFINITY)),
         ("maxinteger", Value::int(i64::MAX)),
         ("mininteger", Value::int(i64::MIN)),
     ]);
     interp.set_global("math", library);
+}
+
+/// `math.ult(a, b)` — a < b, with both read as unsigned.
+///
+/// The one comparison Lua cannot express with `<`, which is why it has a function of its own:
+/// `-1` is the largest unsigned value there is, and `math.ult(-1, 1)` is false.
+fn ult(_: &Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
+    let whole = |at: usize| -> LuaResult<u64> {
+        arg(&args, at)
+            .as_number()
+            .and_then(|n| n.as_int())
+            .map(|i| i as u64)
+            .ok_or_else(|| {
+                LuaError::new(format!(
+                    "bad argument #{at} to 'ult' (number has no integer representation)"
+                ))
+            })
+    };
+    Ok(vec![Value::Bool(whole(1)? < whole(2)?)])
 }
 
 /// The argument of a one-argument numeric function.

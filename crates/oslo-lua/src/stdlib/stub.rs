@@ -11,12 +11,13 @@
 //! The first sends the reader looking for a typo. The second says what happened, and is a concrete
 //! request for the next thing to build.
 
-use super::super::value::Value;
+use super::super::value::{Table, Value};
 use super::super::{Interp, LuaError, LuaResult};
 use super::{module, native};
+use std::rc::Rc;
 
 /// A function that exists only to say it does not.
-fn missing(name: &'static str) -> Value {
+pub(super) fn missing(name: &'static str) -> Value {
     native(
         name,
         move |_: &Interp, _: Vec<Value>| -> LuaResult<Vec<Value>> {
@@ -82,7 +83,15 @@ pub fn install(interp: &Interp) {
     // these functions are the ones a script uses when it needs to know better.
     interp.set_global(
         "utf8",
-        refusing("utf8", &["char", "codepoint", "len", "offset", "codes"]),
+        with(
+            refusing("utf8", &["char", "codepoint", "len", "offset", "codes"]),
+            // A constant, not a function: the pattern that matches one UTF-8 character. It costs
+            // nothing to give and a script that only wanted this had no reason to be refused.
+            &[(
+                "charpattern",
+                Value::str("[\0-\u{7F}\u{C2}-\u{FD}][\u{80}-\u{BF}]*"),
+            )],
+        ),
     );
 
     io(interp);
@@ -115,8 +124,138 @@ fn io(interp: &Interp) {
         ("lines", missing("io.lines")),
         ("input", missing("io.input")),
         ("output", missing("io.output")),
+        ("tmpfile", missing("io.tmpfile")),
+        ("type", native("io.type", handle_type)),
+        ("flush", native("io.flush", flush)),
+        // **The three standard streams, as things you can write to.** `io.stderr:write(msg)` is
+        // how a Lua program complains, and it was `attempt to index a nil value` — the exact
+        // failure the rule at the top of this file exists to prevent. They are plain tables rather
+        // than file handles, which is enough for `write`, `flush` and `close`; anything that needs
+        // a real handle says so by name.
+        ("stdout", stream(Stream::Out)),
+        ("stderr", stream(Stream::Err)),
+        ("stdin", stream(Stream::In)),
     ]);
     interp.set_global("io", library);
+}
+
+/// Which stream a handle stands for.
+#[derive(Clone, Copy, PartialEq)]
+enum Stream {
+    Out,
+    Err,
+    In,
+}
+
+impl Stream {
+    fn name(self) -> &'static str {
+        match self {
+            Stream::Out => "io.stdout",
+            Stream::Err => "io.stderr",
+            Stream::In => "io.stdin",
+        }
+    }
+}
+
+/// One standard stream as a table with the methods a script actually calls on one.
+///
+/// `f:write(...)` passes the table as the first argument, so every method here drops it. `write`
+/// answers the handle, as Lua's does, so `io.stderr:write(a):write(b)` chains.
+fn stream(which: Stream) -> Value {
+    let handle = Table::new();
+    let handle = Rc::new(std::cell::RefCell::new(handle));
+    let name = which.name();
+    handle
+        .borrow_mut()
+        .set(Value::str("oslo_stream"), Value::str(name));
+    let me = handle.clone();
+    handle.borrow_mut().set(
+        Value::str("write"),
+        native(name, move |interp: &Interp, args: Vec<Value>| {
+            use std::io::Write;
+            if which == Stream::In {
+                return Err(LuaError::new("io.stdin: cannot write to standard input"));
+            }
+            let mut text = String::new();
+            // The first argument is the handle itself, from the `:` call.
+            for value in args.iter().skip(1) {
+                text.push_str(&super::super::ops::tostring(interp, value)?);
+            }
+            let written = match which {
+                Stream::Err => std::io::stderr().lock().write_all(text.as_bytes()),
+                _ => std::io::stdout().lock().write_all(text.as_bytes()),
+            };
+            written.map_err(|e| LuaError::new(format!("{name}: {e}")))?;
+            Ok(vec![Value::Table(me.clone())])
+        }),
+    );
+    let flushing = which;
+    handle.borrow_mut().set(
+        Value::str("flush"),
+        native(name, move |_: &Interp, _: Vec<Value>| {
+            use std::io::Write;
+            let _ = match flushing {
+                Stream::Err => std::io::stderr().flush(),
+                _ => std::io::stdout().flush(),
+            };
+            Ok(Vec::new())
+        }),
+    );
+    // Closing a standard stream is a no-op here rather than an error: a script that tidies up
+    // after itself should not fail for being tidy.
+    handle.borrow_mut().set(
+        Value::str("close"),
+        native(name, |_: &Interp, _: Vec<Value>| Ok(Vec::new())),
+    );
+    handle.borrow_mut().set(
+        Value::str("read"),
+        missing(match which {
+            Stream::In => "io.stdin:read",
+            Stream::Out => "io.stdout:read",
+            Stream::Err => "io.stderr:read",
+        }),
+    );
+    handle.borrow_mut().set(
+        Value::str("lines"),
+        missing(match which {
+            Stream::In => "io.stdin:lines",
+            Stream::Out => "io.stdout:lines",
+            Stream::Err => "io.stderr:lines",
+        }),
+    );
+    Value::Table(handle)
+}
+
+/// `io.type(x)` — `"file"` for one of the three streams above, nil for anything else.
+///
+/// Never `"closed file"`: none of them can be closed. A script uses this to tell a handle from a
+/// string before calling a method on it, which is exactly what it answers.
+fn handle_type(_: &Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
+    let Some(Value::Table(t)) = args.first() else {
+        return Ok(vec![Value::Nil]);
+    };
+    let tagged = matches!(t.borrow().get(&Value::str("oslo_stream")), Value::Str(_));
+    Ok(vec![match tagged {
+        true => Value::str("file"),
+        false => Value::Nil,
+    }])
+}
+
+/// `io.flush` — push standard output out now.
+fn flush(_: &Interp, _: Vec<Value>) -> LuaResult<Vec<Value>> {
+    use std::io::Write;
+    let _ = std::io::stdout().flush();
+    Ok(Vec::new())
+}
+
+/// A namespace with extra members added to it.
+fn with(namespace: Value, extra: &[(&str, Value)]) -> Value {
+    if let Value::Table(t) = &namespace {
+        for (name, value) in extra {
+            t.borrow_mut().set(Value::str(name), value.clone());
+        }
+    }
+    namespace
 }
 
 /// `io.write` — the arguments, concatenated, with no separator and no newline.

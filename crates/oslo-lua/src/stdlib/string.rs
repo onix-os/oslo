@@ -17,6 +17,15 @@ pub fn install(interp: &Interp) {
         ("lower", native("string.lower", lower)),
         ("rep", native("string.rep", rep)),
         ("reverse", native("string.reverse", reverse)),
+        // Binary packing and bytecode dumping: present and refusing, because both would need
+        // machinery this evaluator does not have — a byte-level format description, and a compiler
+        // that emits something to dump. Left `nil`, a script that probes for them with
+        // `if string.pack then` would be right, but one that simply calls one gets
+        // `attempt to call a nil value` and no idea why.
+        ("pack", super::stub::missing("string.pack")),
+        ("packsize", super::stub::missing("string.packsize")),
+        ("unpack", super::stub::missing("string.unpack")),
+        ("dump", super::stub::missing("string.dump")),
         ("byte", native("string.byte", byte)),
         ("char", native("string.char", char)),
         ("format", native("string.format", format)),

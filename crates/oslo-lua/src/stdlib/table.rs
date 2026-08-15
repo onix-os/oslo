@@ -13,12 +13,40 @@ pub fn install(interp: &Interp) {
         ("sort", native("table.sort", sort)),
         ("unpack", unpack_fn.clone()),
         ("pack", native("table.pack", pack)),
+        ("move", native("table.move", move_range)),
     ]);
     interp.set_global("table", library);
     // `unpack` was a global in 5.1 and moved into `table` in 5.2. Both names point at the one
     // function: the cost is an alias, and the alternative is that every pre-5.2 script fails on
     // its first use.
     interp.set_global("unpack", unpack_fn);
+}
+
+/// `table.move(a1, f, e, t [, a2])` — copy `a1[f..e]` to `a2[t..]`, answering `a2`.
+///
+/// **Overlap is the whole difficulty**, and it is why this cannot be a loop in Lua: moving a range
+/// down over itself must read a slot before it is written, and moving it up must read from the far
+/// end first. Copying the range out before writing any of it makes both directions the same code,
+/// at the cost of one vector — which is what the standard library does too when the tables differ.
+fn move_range(_: &Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
+    let from = arg_table(&args, 1, "move")?;
+    let first = arg_int(&args, 2, "move")?;
+    let last = arg_int(&args, 3, "move")?;
+    let target = arg_int(&args, 4, "move")?;
+    let into = match args.get(4) {
+        Some(Value::Table(t)) => t.clone(),
+        _ => from.clone(),
+    };
+    if last >= first {
+        let taken: Vec<Value> = (first..=last)
+            .map(|i| from.borrow().get(&Value::int(i)))
+            .collect();
+        for (offset, value) in taken.into_iter().enumerate() {
+            into.borrow_mut()
+                .set(Value::int(target + offset as i64), value);
+        }
+    }
+    Ok(vec![Value::Table(into)])
 }
 
 fn insert(_: &Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {

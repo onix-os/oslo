@@ -23,6 +23,8 @@ pub fn install(interp: &Interp) {
     interp.set_global("rawset", native("rawset", rawset));
     interp.set_global("rawequal", native("rawequal", rawequal));
     interp.set_global("rawlen", native("rawlen", rawlen));
+    interp.set_global("collectgarbage", native("collectgarbage", collectgarbage));
+    interp.set_global("warn", native("warn", warn));
     interp.set_global("setmetatable", native("setmetatable", setmetatable));
     interp.set_global("getmetatable", native("getmetatable", getmetatable));
 }
@@ -145,6 +147,59 @@ fn next(_: &Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
         Some((k, v)) => vec![k.clone(), v.clone()],
         None => vec![Value::Nil],
     })
+}
+
+/// `collectgarbage(opt)` — answers, rather than refusing, for the options that have an answer.
+///
+/// **There is no collector to drive.** Values are reference-counted and freed when the last
+/// reference goes, so `"collect"` and `"step"` have nothing to do and say so by answering 0 — the
+/// same thing a real collector says when it finds nothing. `"count"` is a number a script prints
+/// or compares, and 0 is honest: the heap this evaluator manages is not measured.
+///
+/// Refusing outright would have been the wrong shape: `collectgarbage()` is something a long
+/// script calls in a loop for tidiness, and failing there stops a program that was working.
+fn collectgarbage(_: &Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
+    let option = match args.first() {
+        Some(Value::Str(s)) => s.to_string(),
+        _ => "collect".to_string(),
+    };
+    Ok(match option.as_str() {
+        // Lua answers the heap size in kilobytes, and a second value in bytes-mod-1024.
+        "count" => vec![Value::float(0.0), Value::int(0)],
+        // `isrunning` is a boolean; there is no collector, so it is not running.
+        "isrunning" => vec![Value::Bool(false)],
+        _ => vec![Value::int(0)],
+    })
+}
+
+/// `warn(...)` — 5.4's warning channel, on standard error.
+///
+/// The control messages are `"@on"` and `"@off"`, and everything else is a warning to emit. Off
+/// until switched on, as in Lua: a library that warns must not print for a program that never
+/// asked to hear it.
+fn warn(interp: &Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
+    use std::io::Write;
+    let mut text = String::new();
+    for value in &args {
+        text.push_str(&super::super::ops::tostring(interp, value)?);
+    }
+    match text.as_str() {
+        "@on" => WARNING.with(|on| on.set(true)),
+        "@off" => WARNING.with(|on| on.set(false)),
+        // Any other `@` message is a control word this implementation does not know, and Lua says
+        // an unknown one is ignored rather than printed.
+        _ if text.starts_with('@') => {}
+        _ if WARNING.with(|on| on.get()) => {
+            let _ = writeln!(std::io::stderr(), "Lua warning: {text}");
+        }
+        _ => {}
+    }
+    Ok(Vec::new())
+}
+
+thread_local! {
+    /// Whether `warn` prints. Off until `warn("@on")`, which is Lua's default.
+    static WARNING: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
 fn error(_: &Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
