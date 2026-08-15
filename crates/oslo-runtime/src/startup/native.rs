@@ -103,6 +103,15 @@ fn open_finder(seed: &str) -> Option<oslo_ui::finder::Outcome> {
         return None;
     }
     let track = oslo_base::track::store()?;
+    // **The one read that has to be current.** The command you just ran is written on the writer
+    // thread, so for a moment after the prompt returns the store does not have it yet — and asking
+    // for your history and not finding the thing you just typed is the kind of wrong that makes a
+    // shell feel broken. Worse: with nothing else in the store the finder declines to open at all.
+    //
+    // Waited for here and nowhere else. This is a key somebody deliberately pressed, so a fraction
+    // of a millisecond is invisible; the ghost and the `cd` ranking read the same store on every
+    // keystroke and must not, which is the whole point of the writes being off this thread.
+    oslo_base::track::writer::settle();
     // Only this language's commands. The editor's history holds both, and offering a Lua line at a
     // shell prompt produces something that cannot run — the same crossing the ghost suggestion and
     // the arrow keys are already filtered for.

@@ -176,7 +176,7 @@ pub fn run_repl(login: bool) -> ! {
         oslo_shell::exec::job::reap_background_jobs();
         // A timer that came due, and anything `oslo.spawn` finished on a thread. The same safe
         // point they already use at a command boundary — the shell holds nothing and Lua may run.
-        timers::fire();
+        let fired = timers::fire();
         let changed = match serviced.lock() {
             Ok(mut env) => oslo_shell::env::universal::apply_if_changed(&mut env),
             Err(_) => false,
@@ -192,10 +192,15 @@ pub fn run_repl(login: bool) -> ! {
         // the prompt is rendered, not on every repaint — so a theme another terminal just set would
         // otherwise sit in the environment, correct and unseen, until the next command. This is the
         // same door an asynchronous prompt already comes through.
-        if changed {
+        //
+        // **A handler that ran is the same kind of news.** `oslo.after(1200, function() mood =
+        // "after" end)` changes what the prompt function returns, and without this the prompt was
+        // rebuilt only when a *universal variable* had also changed — so the new prompt appeared
+        // whenever something else happened to invalidate, and not otherwise.
+        if changed || fired {
             oslo_ui::prompt::invalidate();
         }
-        changed
+        changed || fired
     });
     // Armed *after* the servicer, and only here: both checks want an interactive shell that has
     // somewhere to deliver the news. A script reaps at its command boundaries and has no editor to
@@ -210,6 +215,18 @@ pub fn run_repl(login: bool) -> ! {
 
     loop {
         timers::fire();
+        // **The names that run only after `$PATH` has failed** — stored macro funcs and scripts,
+        // autoloaded functions. The prompt paints them, completes them and declines to "correct"
+        // them, and until it could enumerate them every one was drawn as a command that does not
+        // exist while running perfectly.
+        //
+        // Once per prompt rather than per keystroke, and here rather than after a command so the
+        // *first* prompt knows them too: the set cannot change while a line is being typed, and
+        // reading it opens a database. A macro this shell just added is picked up by the prompt
+        // that follows the command that added it.
+        if let Ok(env) = env_struct.lock() {
+            oslo_shell::names::refresh(&env);
+        }
         // **Where the shell notices it has moved, by any route at all.**
         //
         // The directory environment used to be reconciled in one place only: after a command line
@@ -489,34 +506,15 @@ pub fn run_repl(login: bool) -> ! {
                 if secret {
                     tracker.forget_boundary();
                 } else {
-                    // A `pre-record` rule may keep one link of a chain instead of the whole line,
-                    // or refuse it. Asked once, before anything is written down, and the answer
-                    // decides both what the aggregate learns and what the log ends up saying.
-                    let decided =
-                        tracking::ask_what_to_record(&text, &before, mode.name(), &res, elapsed);
-                    let lines = tracking::lines_to_record(&decided, &text);
-                    for (first, line) in lines.iter().enumerate().map(|(i, l)| (i == 0, l)) {
-                        let run = tracking::ran(line, mode.name(), &res, elapsed);
-                        // Only the first arrival records the *movement* and the dwell; a second
-                        // one would credit this directory twice for the same command.
-                        if first {
-                            tracker.boundary(&before, &after, run);
-                        } else {
-                            tracker.also_ran(&before, run);
-                        }
-                    }
-                    if lines.is_empty() {
-                        tracker.forget_boundary();
-                    }
-                    // What the line did, joined to the log row it went in under. **After the
-                    // boundary**, because that is what resolves the directory this then reads back
-                    // — one lookup between them rather than two.
-                    if let Some(id) = logged_as {
-                        tracking::settle_log_row(id, &decided, &text);
-                        if !lines.is_empty() {
-                            tracking::record_outcome(id, &res, elapsed);
-                        }
-                    }
+                    tracker.write_down(&tracking::Finished {
+                        text: &text,
+                        before: &before,
+                        after: &after,
+                        mode: mode.name(),
+                        result: &res,
+                        elapsed,
+                        logged_as: logged_as.as_ref(),
+                    });
                 }
 
                 match res {

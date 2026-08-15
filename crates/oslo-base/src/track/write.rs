@@ -42,6 +42,7 @@
 
 use super::db::{Run, Step, Track, Visit, capped, lookup_dir, now, put_dir, read_dir, resolve_dir};
 use super::kv::{Tree, Writer};
+use super::outcome::{Outcome, settled, write_outcomes};
 use super::redact;
 use super::row::{DirRow, RunRow, key};
 
@@ -98,6 +99,53 @@ impl Track {
             .write(|writer| write_step(writer, step, cached, here_excluded, moved_to))
         else {
             return false;
+        };
+        match next {
+            Some((id, path)) => self.remember_current(id, &path),
+            None => self.forget_current(),
+        }
+        true
+    }
+
+    /// Write down one turn of the loop *and* what its line did, in a single transaction.
+    ///
+    /// The two were always one write pretending to be two: the outcome's only unknown is the
+    /// directory, and the directory is exactly what the boundary has just resolved — so the second
+    /// transaction existed to read back what the first already had in hand. Merging them takes a
+    /// typed command from three commits to two, and a commit costs a pair of `fsync`s on the thread
+    /// the next prompt is waiting on.
+    ///
+    /// A step this refuses to record is still a line with an outcome, so the halves fall back
+    /// separately rather than the outcome being lost with the step.
+    pub fn record_settled(&self, step: &Step<'_>, history_id: u64, rows: &[Outcome]) -> bool {
+        if rows.is_empty() {
+            return self.record(step);
+        }
+        if !self.writable {
+            return false;
+        }
+        let here_excluded = redact::is_excluded(step.ran_in.path);
+        let moved_to = step
+            .moved_to
+            .filter(|to| to.path != step.ran_in.path)
+            .filter(|to| !redact::is_excluded(to.path));
+        // Nowhere worth remembering, but the line still ran and still reported. It ran somewhere
+        // excluded, so segment zero names no directory at all — which is the point of excluding it.
+        if here_excluded && moved_to.is_none() {
+            return self.record_outcome(history_id, rows);
+        }
+
+        let cached = self.cached_id(step.ran_in.path);
+        let Some(next) = self.store.write(|writer| {
+            let next = write_step(writer, step, cached, here_excluded, moved_to)?;
+            let here = next.as_ref().map_or(0, |(id, _)| *id);
+            write_outcomes(writer, history_id, &settled(rows, here))?;
+            Some(next)
+        }) else {
+            // The shared transaction is all-or-nothing, and a boundary that would not write is no
+            // reason to throw the outcome away with it — that is what the second write bought when
+            // there was one. It is bought back here, on the path nothing takes twice a second.
+            return self.record_outcome_here(history_id, rows);
         };
         match next {
             Some((id, path)) => self.remember_current(id, &path),

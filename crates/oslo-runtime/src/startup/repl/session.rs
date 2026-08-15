@@ -69,6 +69,11 @@ pub(super) fn fire_exit(lua: &LuaEngine, status: i32) {
 /// consistent at every commit, and the tracker's own bound is the daily sweep in `track::prune`
 /// rather than anything the way out of the loop can do. See `history_db`'s note and that module's.
 pub(super) fn settle_stores(settings: &history::Settings) {
+    // **Before the trim**, and before anything else here reads the store: the last command's
+    // boundary and outcome are on the writer thread, and a trim that ran ahead of them would bound
+    // a history that is still one command short of itself. Every ordinary way out of the loop comes
+    // through here, which is what makes the deferral safe — see `track::writer`.
+    oslo_base::track::writer::settle();
     if let Some(db) = oslo_base::track::store() {
         db.trim(settings.max_size.max(1));
     }

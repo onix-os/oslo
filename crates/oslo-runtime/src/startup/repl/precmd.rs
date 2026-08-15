@@ -18,9 +18,10 @@
 //! without the first one's answer suddenly meaning more than it did.
 
 use super::{History, Mode, remember, remember_history};
+use oslo_base::track::writer::Ticket;
 use oslo_lua::Value;
 
-/// Write the line down, unless it is hidden. Answers the log id, for joining what it *did* to it.
+/// Write the line down, unless it is hidden. Answers the log row, for joining what it *did* to it.
 ///
 /// **Called after `pre-cmd`, and that ordering is the whole of the veto.** These used to run before
 /// the hook fired, which was harmless while the only way to hide a line was the leading space — that
@@ -29,13 +30,21 @@ use oslo_lua::Value;
 ///
 /// `entered` is the line as *typed*, not the replacement a handler may have returned: history is
 /// what you wrote rather than what ran.
+///
+/// # Why this answers a [`Ticket`] and not an id
+///
+/// The two things the editor needs from a typed line — that it is in the recall list, and that a
+/// language switch will not lose it — are done here and now, because the very next keystroke can
+/// ask for them. The *store* needs none of that urgency: nothing drawn before the next prompt reads
+/// the row back. So the append joins the queue, and what comes back is where its id will be. See
+/// [`oslo_base::track::writer`].
 pub(super) fn write_down(
     history: &mut History,
     entered: &str,
     mode: Mode,
     hidden: bool,
     max_size: usize,
-) -> Option<u64> {
+) -> Option<Ticket> {
     remember(history, entered, hidden);
     if hidden {
         return None;
@@ -43,19 +52,30 @@ pub(super) fn write_down(
     // Kept alongside the editor's own copy so a later language switch, which refills that copy from
     // scratch, still finds this line.
     remember_history(entered, mode);
-    let db = oslo_base::track::store()?;
-    let id = db.append(
-        entered,
-        match mode {
-            Mode::Lua => oslo_base::track::log::MODE_LUA,
-            Mode::Shell => oslo_base::track::log::MODE_SHELL,
-        },
-    );
-    // `$HISTSIZE` bounds the log as well as the editor's copy, or the file grows without limit while
-    // the shell politely forgets. Amortised, because the trim is a full scan and this used to be one
-    // per line typed.
-    db.trim_soon(max_size.max(1));
-    id
+    // Asked here rather than in the job: a shell with no store logs nothing, and the loop has to
+    // know that now, because it decides whether there is an outcome to record at all.
+    oslo_base::track::store()?;
+
+    let ticket = Ticket::pending();
+    let filling = ticket.clone();
+    let entered = entered.to_string();
+    let mode = match mode {
+        Mode::Lua => oslo_base::track::log::MODE_LUA,
+        Mode::Shell => oslo_base::track::log::MODE_SHELL,
+    };
+    oslo_base::track::writer::defer(move || {
+        let Some(db) = oslo_base::track::store() else {
+            return;
+        };
+        if let Some(id) = db.append(&entered, mode) {
+            filling.fill(id);
+        }
+        // `$HISTSIZE` bounds the log as well as the editor's copy, or the file grows without limit
+        // while the shell politely forgets. Amortised, because the trim is a full scan and this
+        // used to be one per line typed.
+        db.trim_soon(max_size.max(1));
+    });
+    Some(ticket)
 }
 
 /// What the loop should do with the line.
