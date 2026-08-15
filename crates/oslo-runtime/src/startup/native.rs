@@ -252,7 +252,13 @@ impl Assist for ShellAssist<'_> {
             // acceptance" belongs so that every caller agrees.
             candidates.into_iter().next()?
         } else {
-            let indent = self.prompt_cols + dropdown::visible_len(&line[..start]);
+            // **The column the word is on, not how far along the line it is.** Those are the same
+            // number only until the line wraps: past that, the absolute offset is wider than the
+            // terminal and the menu was clamped to the same place whatever was typed — a word at
+            // column 10 of the second row got a dropdown at column 31. The wrap is what the
+            // terminal does to the offset, so it is what the indent has to do too.
+            let cells = self.prompt_cols + dropdown::visible_len(&line[..start]);
+            let indent = cells % dropdown::terminal_cols().max(1);
             let Some(chosen) = dropdown::DropdownMenu::select_interactive(
                 candidates,
                 indent,

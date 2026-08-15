@@ -135,7 +135,7 @@ and only once a command has taken `oslo.notify.after` seconds or more.
 | `oslo.ui.choose{items, header, multi, height}` / `.filter{…}` | a string, a list when `multi`, or nil | yes |
 | `oslo.ui.write{header, placeholder, default}` | multi-line text or nil | yes |
 | `oslo.ui.file{start, directories, both, hidden, height}` | a path or nil | yes |
-| `oslo.ui.table{rows, headers, separator, height, no_filter}` | the chosen row or nil | yes |
+| `oslo.ui.table{rows, headers, separator, height, no_filter}` | the chosen row or nil — this is the **picker**; `oslo.ui.grid` is the formatter | yes |
 | `oslo.ui.pager{text, title, wrap}` | true when it was shown | yes |
 | `oslo.ui.spin{title, command, quiet}` | the command's exit status | yes |
 | `oslo.ui.log(msg)` or `{message, level, time, fields}` | nothing; writes to stderr | no |
@@ -145,6 +145,32 @@ and only once a command has taken `oslo.notify.after` seconds or more.
 The raw-mode ones are the same code the `ui` builtin runs, so a prompt is identical whether shell or
 Lua asked for it. All of them write the question to stderr and only the answer to stdout, which is
 what makes `name=$(ui input)` capture the name and nothing else.
+
+### Laying text out, with no terminal required
+
+The ones above *ask* something. These only *shape* text, so none of them needs a tty and all of them
+work in a script or a pipeline.
+
+| call | answers |
+|---|---|
+| `oslo.ui.grid(rows, [{headers, align, gap, width}])` | a list of lines, columns aligned |
+| `oslo.ui.columns(items, [{width, gap}])` | a list of lines, laid out down-then-across as `ls` does |
+| `oslo.ui.rule([char], [width])` | one line of `char`, terminal width by default |
+| `oslo.ui.print(lines)` | nothing; writes a list of lines, or a single string, to stdout |
+| `oslo.ui.width_of(s)` | the columns `s` occupies on screen, not its bytes |
+| `oslo.ui.strip(s)` | `s` with its escape sequences removed |
+| `oslo.ui.truncate(s, n)` / `.pad(s, n)` / `.fit(s, n)` | `s` cut, padded, or cut-and-padded to `n` columns |
+
+```lua
+oslo.ui.print(oslo.ui.grid(
+  { { "alpha", "1" }, { "beta", "22" } },
+  { headers = { "name", "n" }, align = { "left", "right" } }))
+```
+
+**`grid` is the one that formats a table; `table` is the one that asks you to pick a row.** They are
+two different functions and the names do not say so, which is worth stating plainly because the trap
+is silent: `oslo.ui.table` needs a terminal and answers `nil` without one, so a script that reached
+for it to lay out a report got nothing at all and no error.
 
 ## What makes it different
 

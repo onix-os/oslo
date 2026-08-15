@@ -55,8 +55,14 @@ fn a_line_that_exactly_fills_the_row_does_not_claim_the_next_one() {
     let p = place(&row("$ ", &text, 8, 10));
     assert_eq!(p.rows, 1, "10 cells in a 10-wide terminal is still one row");
     // The cursor itself is at column 10, which the terminal shows as the pending-wrap position.
-    assert_eq!(p.cursor_row, 1);
-    assert_eq!(p.cursor_col, 0);
+    //
+    // **This is what the paragraph above always meant**, and the assertion used to say row 1,
+    // column 0 — the row *after* the block, which `rows` had just said does not exist. `session`
+    // hands that number back as the next frame's `from_row`, so the redraw moved up one row too
+    // many and its `ESC[J` erased the line above: the previous command's output vanished on the
+    // next keystroke, at every width the line happened to be an exact multiple of.
+    assert_eq!(p.cursor_row, 0);
+    assert_eq!(p.cursor_col, 10);
 }
 
 /// A wide character is two cells, so the cursor is two columns further on — the thing that goes
@@ -89,7 +95,9 @@ fn emoji_clusters_have_terminal_width_without_splitting() {
 fn a_wide_cluster_wraps_before_the_final_single_cell() {
     let p = place(&row("", "a日", 2, 2));
     assert_eq!(p.rows, 2);
-    assert_eq!((p.cursor_row, p.cursor_col), (2, 0));
+    // The last row is filled exactly, so the cursor is in its pending-wrap position — row 1 of a
+    // two-row block, not the row after it. See `a_line_that_exactly_fills_the_row_…`.
+    assert_eq!((p.cursor_row, p.cursor_col), (1, 2));
     assert_eq!(cursor_for_cell("", "a日", 2, 0, 1), 1);
     assert_eq!(cursor_for_cell("", "a日", 2, 1, 1), 2);
 }

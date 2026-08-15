@@ -81,7 +81,10 @@ impl Session {
                 }
                 None => changed(false),
             },
-            Bound::AcceptHint => changed(self.take_hint(true, assist)),
+            // A correction falls to the same key under the same rule as Right — the two are drawn
+            // in the same place and never at once. Without the second half, a config that named its
+            // own accept key got half of what the key is documented to accept.
+            Bound::AcceptHint => changed(self.take_hint(true, assist) || self.take_repair(assist)),
             Bound::AcceptHintWord => changed(self.take_hint(false, assist)),
             Bound::Lua(name) => {
                 match assist.lua_key(&name, &self.buffer.text(), self.buffer.cursor()) {

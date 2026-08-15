@@ -309,7 +309,7 @@ impl Keys {
     }
 
     pub fn read_within(&mut self, ms: i32) -> Pressed {
-        if !waiting(self.fd, ms) && self.buf.is_empty() {
+        if !waiting(self.fd, ms) && !self.took_resize() && self.buf.is_empty() {
             return Pressed::Timeout;
         }
         match self.read() {
@@ -319,13 +319,37 @@ impl Keys {
     }
 
     pub fn read_event_within(&mut self, ms: i32) -> EventPressed {
-        if !waiting(self.fd, ms) && self.buf.is_empty() && self.unread.is_empty() {
+        if !waiting(self.fd, ms)
+            && !self.took_resize()
+            && self.buf.is_empty()
+            && self.unread.is_empty()
+        {
             return EventPressed::Timeout;
         }
         match self.read_event() {
             Some(event) => EventPressed::Event(event),
             None => EventPressed::Ended,
         }
+    }
+
+    /// Take a resize that arrived during the *timed* wait, and queue it as a marker.
+    ///
+    /// **The two waits have to agree, and this is the half that did not.** `waiting` polls, and a
+    /// `SIGWINCH` interrupts the poll — but its `EINTR` is indistinguishable from a timeout in a
+    /// `bool`, so it answered "nothing happened" and the resize sat in its flag until the next
+    /// keystroke. The blocking wait has taken the flag since the marker was fixed; this one had not,
+    /// so whether a resize redrew the line depended on which wait the editor happened to be sitting
+    /// in — an idle hook armed, or a prompt being rebuilt off the thread, and it was the timed one.
+    /// That is what made losing the prompt on resize feel random.
+    ///
+    /// Taken *here* rather than inside `waiting`, which has nowhere to put it: a flag consumed by
+    /// something that cannot report it is worse than one left set.
+    fn took_resize(&mut self) -> bool {
+        if !super::resize::take_resize() {
+            return false;
+        }
+        self.buf.push(RESIZE_MARK);
+        true
     }
 }
 
@@ -351,6 +375,15 @@ pub(crate) fn parse(buf: &[u8]) -> Parsed {
     if first == CHILD_MARK {
         oslo_base::background::service();
         return Parsed::Serviced(1);
+    }
+    // **The window changed size.** Taken here, beside the other marker, because the path below
+    // cannot: `RESIZE_MARK` is `0xFF`, which is not a legal UTF-8 leading byte, so it failed
+    // `from_utf8` and was thrown away as an undecodable character — and the `[RESIZE_MARK, ..]`
+    // arm in [`key`] was never reached from here at all. A resize therefore set the flag, woke the
+    // read, pushed the marker and vanished, leaving the line laid out for the old width until the
+    // next command.
+    if first == RESIZE_MARK {
+        return Parsed::Took(1, Key::Resized);
     }
     if first != 0x1b {
         let len = utf8_len(first);
@@ -441,5 +474,28 @@ fn utf8_len(first: u8) -> usize {
         0xe0..=0xef => 3,
         0xf0..=0xf7 => 4,
         _ => 1,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// **A resize marker is taken, not thrown away.** `RESIZE_MARK` is `0xFF`, which is not a legal
+    /// UTF-8 leading byte — so before this it fell into the character path below, failed
+    /// `from_utf8` and was discarded as an undecodable byte. The `[RESIZE_MARK, ..]` arm in [`key`]
+    /// was unreachable from here, and a resize set its flag, woke the read, pushed its marker and
+    /// vanished: the line stayed laid out for the old width until the next command.
+    #[test]
+    fn a_resize_marker_is_taken_rather_than_discarded() {
+        assert_eq!(parse(&[RESIZE_MARK]), Parsed::Took(1, Key::Resized));
+        // With a keystroke queued behind it, the marker takes exactly its own byte.
+        assert_eq!(parse(&[RESIZE_MARK, b'x']), Parsed::Took(1, Key::Resized));
+    }
+
+    /// The other marker keeps its own path: it is serviced here rather than handed on as a key.
+    #[test]
+    fn a_child_marker_is_serviced() {
+        assert_eq!(parse(&[CHILD_MARK]), Parsed::Serviced(1));
     }
 }

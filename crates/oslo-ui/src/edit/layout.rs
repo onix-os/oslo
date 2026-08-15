@@ -109,11 +109,23 @@ pub fn place(row: &Row) -> Placed {
     // therefore occupies cells, even though the cursor never goes there.
     let rows = physical_rows(used, cols);
 
+    // **The cursor is counted the way the rows are, and that is the whole of this.** A line filled
+    // to exactly the width occupies *one* row — the terminal leaves the cursor in the last column
+    // with a wrap pending rather than moving down — and `physical_rows` says so. Dividing gave the
+    // cursor row *after* it: with 40 cells in 40 columns, `rows` was 1 and `cursor_row` was 1, a row
+    // outside the block. `session` feeds that back as the next frame's `from_row`, so the redraw
+    // moved up one row too many and its `ESC[J` erased the line above — the previous command's
+    // output, gone on the next keystroke, at every width the line happened to be a multiple of.
+    let (cursor_row, cursor_col) = match cursor_cells {
+        0 => (0, 0),
+        n => (physical_rows(n, cols) - 1, (n - 1) % cols + 1),
+    };
+
     Placed {
         text: out,
         rows,
-        cursor_row: cursor_cells / cols,
-        cursor_col: cursor_cells % cols,
+        cursor_row,
+        cursor_col,
     }
 }
 
