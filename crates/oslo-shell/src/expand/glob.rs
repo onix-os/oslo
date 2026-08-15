@@ -18,13 +18,24 @@
 //! path has: the `/` that splits a pattern into components, and the leading dot a component may
 //! not match blindly.
 
-mod compile;
-
 use crate::expand::word::{Run, field_text};
-use compile::{Item, compile_items, matches_items};
+use oslo_base::glob::{Item, compile_items, matches_items};
 use std::fs;
 
-pub use compile::ShellPattern;
+pub use oslo_base::glob::ShellPattern;
+
+/// Compile a pattern from expanded runs, honouring the quoting each run carries.
+///
+/// The shell-side half of [`ShellPattern`]: it is what makes `case $x in "$p")` a string comparison
+/// and `case $x in $p)` a pattern match. The matcher itself is in `oslo-base`, because the prompt
+/// needs it too and cannot see this crate.
+pub fn pattern_from_runs(runs: &[Run]) -> ShellPattern {
+    let chars: Vec<(char, bool)> = runs
+        .iter()
+        .flat_map(|run| run.text.chars().map(move |ch| (ch, run.globs())))
+        .collect();
+    ShellPattern::from_chars(&chars)
+}
 
 /// One `/`-separated piece of a pattern.
 enum Component {

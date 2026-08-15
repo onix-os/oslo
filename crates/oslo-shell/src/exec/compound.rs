@@ -10,7 +10,6 @@
 use crate::env::Environment;
 use crate::env::builtins::run_exit_trap;
 use crate::exec::pipeline::{eval_command_list, status_of, suspend_errexit, wait_for_status};
-use crate::expand::glob::ShellPattern;
 use crate::expand::word::expand_word_to_pattern;
 use crate::expand::{expand_word, expand_word_to_string};
 use nix::unistd::{ForkResult, fork};
@@ -143,7 +142,7 @@ fn eval_conditional_loop(
 fn any_pattern_matches(env: &mut Environment, patterns: &[Word], subject: &str) -> Result<bool> {
     for pat_word in patterns {
         let runs = expand_word_to_pattern(env, pat_word)?;
-        if ShellPattern::from_runs(&runs).matches(subject) {
+        if crate::expand::glob::pattern_from_runs(&runs).matches(subject) {
             return Ok(true);
         }
     }

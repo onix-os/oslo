@@ -182,7 +182,9 @@ pub(super) fn apply(
 /// flattening the operand to a string first turned every `*` a variable happened to contain into
 /// a metacharacter.
 fn compile_pattern(env: &mut Environment, word: &Word) -> Result<ShellPattern> {
-    Ok(ShellPattern::from_runs(&expand_word_to_pattern(env, word)?))
+    Ok(crate::expand::glob::pattern_from_runs(
+        &expand_word_to_pattern(env, word)?,
+    ))
 }
 
 /// Whether the parameter counts as "set" for the `${x-d}` family.

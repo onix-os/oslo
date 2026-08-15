@@ -7,53 +7,11 @@ use crate::env::Environment;
 /// Every failure path returns the text unchanged, which is what POSIX asks for and also the only
 /// safe answer: `~nosuchuser` as a literal is a path that will fail loudly, while a guessed home
 /// directory is a path that will succeed on the wrong files.
+/// The rule itself is [`oslo_base::tilde`], because the prompt needs the same answer and cannot see
+/// this crate — completion, the ghost and the highlighter each knew only `~` and `~/…`, so a form
+/// this function expands perfectly read at the prompt as a mistake.
 pub fn expand_tilde(env: &Environment, user: &str) -> String {
-    match user {
-        "" => home_directory(env),
-        // `~+` and `~-` are the shell's own notion of where it is, not a user's: they read the
-        // variables `cd` maintains, so they follow symlinks exactly the way `cd` left them.
-        "+" => env
-            .get_var("PWD")
-            .map(str::to_string)
-            .or_else(current_directory)
-            .unwrap_or_else(|| "~+".to_string()),
-        // With no previous directory there is nothing to name, and bash leaves `~-` literal.
-        "-" => env
-            .get_var("OLDPWD")
-            .map(str::to_string)
-            .unwrap_or_else(|| "~-".to_string()),
-        name => passwd_home(name).unwrap_or_else(|| format!("~{name}")),
-    }
-}
-
-/// `$HOME`, falling back to the password database.
-///
-/// The fallback matters for `env -u HOME sh`: a login without `HOME` still has a home directory,
-/// and expanding `~` to `/` there would point every script at the filesystem root.
-fn home_directory(env: &Environment) -> String {
-    if let Some(home) = env.get_var("HOME") {
-        return home.to_string();
-    }
-    passwd_home_of_uid().unwrap_or_else(|| "/".to_string())
-}
-
-fn current_directory() -> Option<String> {
-    std::env::current_dir()
-        .ok()
-        .map(|p| p.to_string_lossy().into_owned())
-}
-
-/// The home directory recorded for `name`, or `None` if there is no such user.
-fn passwd_home(name: &str) -> Option<String> {
-    let user = nix::unistd::User::from_name(name).ok().flatten()?;
-    Some(user.dir.to_string_lossy().into_owned())
-}
-
-fn passwd_home_of_uid() -> Option<String> {
-    let user = nix::unistd::User::from_uid(nix::unistd::getuid())
-        .ok()
-        .flatten()?;
-    Some(user.dir.to_string_lossy().into_owned())
+    oslo_base::tilde::expand(user, &|name: &str| env.get_var(name).map(str::to_string))
 }
 
 #[cfg(test)]
