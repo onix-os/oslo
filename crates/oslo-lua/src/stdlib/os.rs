@@ -33,10 +33,59 @@ pub fn install(interp: &Interp) {
     interp.set_global("os", library);
 }
 
-fn time(_: &Interp, _: Vec<Value>) -> LuaResult<Vec<Value>> {
-    // The table form — `os.time{year=…, month=…}` — needs a calendar, which is a dependency this
-    // shell does not carry. `os.time()` is what scripts actually call.
-    Ok(vec![Value::int(now())])
+fn time(_: &Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
+    // **The table form used to answer `now`**, which is a plausible number and the wrong one:
+    // `os.time{year = 2000, month = 1, day = 1}` reported today, and nothing said so. The reason
+    // given was that a calendar is a dependency this shell does not carry — but [`civil`], twenty
+    // lines below, *is* that calendar, read the other way round. This is its inverse.
+    //
+    // UTC, like everything else here: `os.date` says so in as many words, and a `os.time` that
+    // read its fields as local time while `os.date` wrote them as UTC would not round-trip.
+    let Some(Value::Table(table)) = args.first() else {
+        return Ok(vec![Value::int(now())]);
+    };
+    let table = table.borrow();
+    let field = |name: &str| -> Option<i64> {
+        table
+            .get(&Value::str(name))
+            .as_number()
+            .map(|n| n.as_float() as i64)
+    };
+    let (Some(year), Some(month), Some(day)) = (field("year"), field("month"), field("day")) else {
+        return Err(LuaError::new(
+            "time: field 'day' missing in date table".to_string(),
+        ));
+    };
+    // Lua's defaults, and the hour really is 12 rather than 0 — a table with no time in it means
+    // midday, so that a date survives a timezone shift in either direction.
+    let hour = field("hour").unwrap_or(12);
+    let minute = field("min").unwrap_or(0);
+    let second = field("sec").unwrap_or(0);
+    let days = days_from_civil(year, month, day);
+    Ok(vec![Value::int(
+        days * 86_400 + hour * 3_600 + minute * 60 + second,
+    )])
+}
+
+/// Days since the Unix epoch for a civil date, Howard Hinnant's algorithm.
+///
+/// The exact inverse of the arithmetic in [`civil`], which is why they agree at every boundary:
+/// the year is shifted to start in March so that the leap day falls at its end and no month needs
+/// a special case. Out-of-range fields normalise the way Lua's do — month 13 is the January
+/// after, day 0 is the last of the month before — because the arithmetic simply carries.
+fn days_from_civil(year: i64, month: i64, day: i64) -> i64 {
+    // Carry a month outside 1..=12 into the year before doing anything else.
+    let (year, month) = (
+        year + (month - 1).div_euclid(12),
+        (month - 1).rem_euclid(12) + 1,
+    );
+    let y = year - i64::from(month <= 2);
+    let era = y.div_euclid(400);
+    let yoe = y - era * 400;
+    let mp = (month + 9) % 12;
+    let doy = (153 * mp + 2) / 5 + day - 1;
+    let doe = yoe * 365 + yoe / 4 - yoe / 100 + doy;
+    era * 146_097 + doe - 719_468
 }
 
 fn now() -> i64 {
@@ -223,7 +272,7 @@ fn setlocale(_: &Interp, _: Vec<Value>) -> LuaResult<Vec<Value>> {
 
 #[cfg(test)]
 mod tests {
-    use super::{civil, render};
+    use super::{civil, days_from_civil, render};
 
     #[test]
     fn the_epoch_and_a_leap_day_come_out_right() {
@@ -239,5 +288,55 @@ mod tests {
     fn unknown_directives_survive_rather_than_vanishing() {
         assert_eq!(render("100%%", 0), "100%");
         assert_eq!(render("%A", 0), "%A");
+    }
+
+    /// **The two calendars are inverses**, which is the only claim `os.time{…}` has to make.
+    ///
+    /// `civil` reads a timestamp into fields and `days_from_civil` reads fields back into a
+    /// timestamp, so walking a few decades a day at a time and asking each to undo the other
+    /// catches an off-by-one at any month, leap year or century boundary it crosses. Before this,
+    /// the table form returned the current time whatever it was given.
+    #[test]
+    fn the_calendar_round_trips_at_every_boundary() {
+        // 1969 through 2039, one step a day, plus the epoch itself and a leap day.
+        let mut stamp = -31_536_000i64;
+        while stamp < 2_200_000_000 {
+            let (y, mo, d, ..) = civil(stamp);
+            assert_eq!(
+                days_from_civil(y, mo as i64, d as i64) * 86_400,
+                stamp,
+                "{y}-{mo}-{d} did not survive the round trip"
+            );
+            stamp += 86_400;
+        }
+    }
+
+    /// The values a person can check by hand.
+    #[test]
+    fn the_known_dates_are_the_known_numbers() {
+        assert_eq!(days_from_civil(1970, 1, 1), 0);
+        assert_eq!(days_from_civil(2000, 1, 1) * 86_400, 946_684_800);
+        // The leap day exists, and the day after it is the first of March.
+        assert_eq!(days_from_civil(2024, 2, 29) * 86_400, 1_709_164_800);
+        assert_eq!(
+            days_from_civil(2024, 3, 1),
+            days_from_civil(2024, 2, 29) + 1
+        );
+        // 1900 is not a leap year and 2000 is — the century rule, both halves.
+        assert_eq!(
+            days_from_civil(1900, 3, 1),
+            days_from_civil(1900, 2, 28) + 1
+        );
+        assert_eq!(
+            days_from_civil(2000, 3, 1),
+            days_from_civil(2000, 2, 29) + 1
+        );
+    }
+
+    /// A month outside 1..=12 carries into the year, as Lua's own normalisation does.
+    #[test]
+    fn an_out_of_range_month_carries() {
+        assert_eq!(days_from_civil(2000, 13, 1), days_from_civil(2001, 1, 1));
+        assert_eq!(days_from_civil(2000, 0, 1), days_from_civil(1999, 12, 1));
     }
 }

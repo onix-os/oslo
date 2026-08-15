@@ -48,6 +48,15 @@ pub struct LuaError {
     pub line: Option<usize>,
     /// Innermost frame last, for the traceback.
     pub frames: Vec<String>,
+    /// Set when the error value is the message and nothing else — no `chunk:line:` in front.
+    ///
+    /// **Two callers, and both are the language's own rule.** `error(message, 0)` says level 0,
+    /// which is Lua's spelling of "do not add position information", and `assert(false, message)`
+    /// raises the message as the error *object* rather than through `error`, so it never had any.
+    /// Both used to arrive at a handler wearing a file and a line they had asked not to wear —
+    /// which matters, because the idiom for reading one is `message:match(":(%d+):")` and a
+    /// message that answers it when it should not is worse than one that never does.
+    pub bare: bool,
     /// Set when this is `oslo.proc.exit(n)` rather than a failure.
     ///
     /// An exit travels as an error because unwinding is the only way out of a call that is
@@ -64,7 +73,16 @@ impl LuaError {
             chunk: None,
             line: None,
             frames: Vec::new(),
+            bare: false,
             exit: None,
+        }
+    }
+
+    /// The message alone, with no position ever attached. See the `bare` field.
+    pub fn without_position(message: impl Into<String>) -> Self {
+        LuaError {
+            bare: true,
+            ..LuaError::new(message)
         }
     }
 
@@ -81,6 +99,9 @@ impl LuaError {
     /// Innermost wins: the line where the error actually happened is more useful than the line of
     /// the call that led there, and the outer frames are in `frames` anyway.
     pub fn at(mut self, line: usize) -> Self {
+        if self.bare {
+            return self;
+        }
         self.line.get_or_insert(line);
         self
     }

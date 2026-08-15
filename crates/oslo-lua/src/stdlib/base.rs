@@ -151,14 +151,33 @@ fn error(_: &Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
     // Real Lua propagates the error *value*, so `error({code = 2})` is catchable as a table. This
     // evaluator carries a message only; a non-string is rendered rather than preserved, which is
     // the one place `pcall` is lossy. Recorded in PLAN.md.
-    Err(LuaError::new(arg(&args, 1).to_display()))
+    let message = arg(&args, 1).to_display();
+    // **Level 0 means "no position", and it was ignored.** `error(msg, 0)` is how a library says
+    // the message is the whole error — a usage string, a value a handler will match on — and it
+    // arrived wearing a `file:line:` it had asked not to wear.
+    //
+    // Levels above 1 name a *caller's* line rather than this one. That needs a line per frame,
+    // which this evaluator does not keep, so 2 and beyond are treated as 1: the position is real
+    // and one frame too deep, which is better than none and better than a wrong one invented here.
+    let level = match args.get(1) {
+        Some(Value::Number(n)) => n.as_float() as i64,
+        _ => 1,
+    };
+    match level {
+        0 => Err(LuaError::without_position(message)),
+        _ => Err(LuaError::new(message)),
+    }
 }
 
 fn assert(_: &Interp, args: Vec<Value>) -> LuaResult<Vec<Value>> {
     if arg(&args, 1).truthy() {
         return Ok(args);
     }
-    Err(LuaError::new(match args.get(1) {
+    // **Bare, because `assert` is not `error`.** It raises its message as the error *object*
+    // rather than calling `error`, so Lua never puts a position in front of it:
+    // `pcall(function() assert(false, "x") end)` answers exactly `x`. Adding one broke the usual
+    // shape of a checked argument's complaint.
+    Err(LuaError::without_position(match args.get(1) {
         Some(message) => message.to_display(),
         None => "assertion failed!".to_string(),
     }))
