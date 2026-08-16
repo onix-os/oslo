@@ -37,11 +37,19 @@ jobs:
       #
       # Native on both runners: `musl-gcc` targets the host architecture, and the arm64 job runs
       # on an arm64 runner, so neither leg cross-compiles.
-      - name: Install the musl C toolchain
+      # `mold` is here for `--icf=safe`, which folds functions that compiled to identical machine
+      # code into one copy: 51,264 bytes of the shipped binary. `safe` rather than `all` because it
+      # only folds functions whose address is never taken, which it proves from the relocations —
+      # `all` folds regardless and is 10 KB better, and 10 KB is not worth a class of bug where two
+      # distinct function pointers quietly become equal.
+      #
+      # Native on both runners, like `musl-tools`: mold links for the architecture it runs on.
+      - name: Install the musl C toolchain and mold
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends musl-tools
+          sudo apt-get install -y --no-install-recommends musl-tools mold
           musl-gcc --version | head -1
+          mold --version | head -1
       # Deliberately does NOT set a linker for the target. Pointing it at `musl-gcc` looks correct
       # and silently produces a *dynamically* linked musl binary — one that records an INTERP
       # pointing at whatever musl the build host had, and segfaults on any machine that does not
@@ -65,9 +73,18 @@ jobs:
       # It lives here rather than in `.cargo/config.toml` because setting `RUSTFLAGS` in the
       # environment makes cargo *ignore* that file's `rustflags` entirely — the flag would silently
       # not be applied to the one build that matters.
+      #
+      # `-fuse-ld=mold` swaps the linker the driver invokes; it does **not** point the target at a
+      # linker, which is the mistake the note above warns about. Checked rather than assumed — the
+      # result is still `static-pie linked, statically linked` and still runs, which is the property
+      # that matters and the one a wrong linker silently takes away.
       - name: Build
         env:
-          RUSTFLAGS: "-C target-feature=+crt-static -C link-arg=-Wl,-z,pack-relative-relocs"
+          RUSTFLAGS: >-
+            -C target-feature=+crt-static
+            -C link-arg=-Wl,-z,pack-relative-relocs
+            -C link-arg=-fuse-ld=mold
+            -C link-arg=-Wl,--icf=safe
         run: |
           cc_var="CC_$(echo '${{ matrix.target }}' | tr - _)"
           export "$cc_var=musl-gcc"
