@@ -350,28 +350,18 @@ fn expand_word_at(env: &mut Environment, word: &Word, place: Place) -> Result<Ve
             Place::Argument if env.interactive() => crate::expand::sugar::marked_directory(field),
             _ => field,
         };
+        // **`=command` is substituted here too, and for the third of the same reasons.** It has to
+        // see the field's *origin* — `echo "=ls"` is a literal and must stay one — and the origin
+        // is gone by the time the field is a `String`. What it answers with is marked quoted, so
+        // the path is still not split or globbed afterwards.
+        let field = crate::expand::sugar::equals_field(env, field).map_err(|name| {
+            ShellError::ExpansionError(format!("={name}: {name} is not a command"))
+        })?;
         for split in split_field(ifs, field) {
             if glob {
                 out.extend(expand_glob(&split));
             } else {
                 out.push(field_text(&split));
-            }
-        }
-    }
-    // `=command` and `@name`, last and only at a prompt. Last because they answer with a path, and
-    // a path that has just been produced must not then be globbed or split again; interactive-only
-    // because `echo =foo` in a script has to print `=foo` the way every other `/bin/sh` does.
-    //
-    if env.interactive() {
-        for field in &mut out {
-            // **`@name` never expands the command word**, whose leading position is reserved — see
-            // [`expand_command_word`]. `=name` still does: `=grep foo` naming where grep lives and
-            // then running it is the whole of what that shorthand is for.
-            if place == Place::Command && field.starts_with('@') {
-                continue;
-            }
-            if let Some(expanded) = crate::expand::sugar::expand_field(env, field) {
-                *field = expanded;
             }
         }
     }

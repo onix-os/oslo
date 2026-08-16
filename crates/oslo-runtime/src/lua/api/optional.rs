@@ -7,13 +7,6 @@
 
 use oslo_base::value::Table;
 use oslo_luavm::Host;
-// Every use of it is behind a feature, so a default build has none.
-#[cfg(any(
-    feature = "direnv",
-    feature = "nix",
-    feature = "secrets",
-    feature = "plugin"
-))]
 use oslo_shell::env::Environment;
 use std::sync::{Arc, Mutex};
 
