@@ -360,6 +360,45 @@ opt-level = "s"
 #
 # Worth writing down, because it is the obvious thing to get wrong once the shell is five crates:
 # `profile.package."*"` matches *dependencies*, not workspace members, so `oslo-shell` and the rest
-# keep this profile's `opt-level = 3` and are not quietly compiled for size along with everything
-# else. Checked rather than assumed — setting `oslo-ui` to `"z"` moves the binary 5.96 MB → 5.77 MB,
-# so a per-member override does take effect when one is written; there simply is not one.
+# take this profile's own `opt-level` rather than being quietly compiled for size along with
+# everything else. Checked rather than assumed — setting `oslo-ui` to `"z"` moves the binary
+# 5.96 MB → 5.77 MB, so a per-member override does take effect when one is written.
+
+# **The two members that are cold enough for `"z"`, measured both ways.**
+#
+# `oslo-runtime` is startup, configuration and the `oslo.*` bindings; `oslo-base` is the value type,
+# globbing and the history store. Neither is on the path a *keystroke* takes — that is `oslo-ui` and
+# `brush-parser`, which is why those two are the exceptions at `3` above.
+#
+# ```text
+#                              size          shell loop   glob    json
+#   both at "s"                7,161,120     0.07 s       0.11 s  0.121 s
+#   oslo-runtime at "z"        7,099,856     0.07 s       0.11 s  0.122 s
+#   + oslo-base at "z"         7,034,176     0.07 s       0.11 s  0.121 s
+#                              ─────────
+#                               −126,944
+# ```
+#
+# 124 KB for nothing measurable, over seven runs of each taking the best. The benchmarks are 30,000
+# iterations of a shell `for` with a `case` in it, 300 globs of `crates/*/src/*.rs`, and 20,000
+# `oslo.json` round trips.
+[profile.release.package.oslo-runtime]
+opt-level = "z"
+
+[profile.release.package.oslo-base]
+opt-level = "z"
+
+# **Two things that were tried and are deliberately not here.**
+#
+# *This profile's own `opt-level` at `"z"`.* It is the biggest single lever — 7,161,120 → 6,768,672,
+# 383 KB — and it was recorded above as untaken because the speed had never been measured. It has
+# now: the shell loop goes 0.07 s → 0.09 s and `oslo.json` 0.121 s → 0.139 s, both about 20%. That
+# is `oslo-shell`, the parser and executor that run on every command, and 5% of the binary is not
+# worth a fifth of it.
+#
+# *A per-package entry for `oslo` itself.* Overriding the **root** package's profile takes it out of
+# the fat-LTO merge, and the binary grows 7,161,120 → 8,686,760. A 1.5 MB regression from a setting
+# that reads like a size optimisation is worth one line to warn about.
+#
+# *`"z"` on the cold dependencies* — `regex` and its three companions, `serde_json`, the crypto
+# pair. 3,280 bytes across all of them, because fat LTO has already done that work.
