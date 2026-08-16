@@ -195,14 +195,32 @@ pub fn nearest(path: &str, name: &str) -> Option<String> {
     if let Some(swapped) = transpositions(name).find(|word| names.contains(word)) {
         return Some(swapped);
     }
-    let budget = if name.len() <= 4 { 1 } else { 2 };
     // **`sorted`, not the set.** The set has no order, so two candidates at the same distance were
     // separated by the hash — the same shell, asked the same question twice, could answer
     // differently. See the tie note above; this is the half of it that has to be decided even
     // when neither candidate is a swap.
-    let ordered = CommandIndex::sorted(path);
-    let mut best: Option<(usize, &String)> = None;
-    for candidate in ordered.iter() {
+    nearest_of(CommandIndex::sorted(path).iter().map(String::as_str), name)
+}
+
+/// The nearest of `candidates` to `name`, by the same rule [`nearest`] applies to `$PATH`.
+///
+/// **Separate from `nearest` because `$PATH` is not the only list of names a shorthand can miss.**
+/// `@work` mistyped as `@wrok` is the same mistake as `gerp` for `grep`, made against the marks a
+/// config registered instead of against the executables — and answering it with a second, subtly
+/// different rule is how two features that look alike start behaving differently.
+///
+/// `candidates` should be in a stable order, for the tie reason above.
+pub fn nearest_of<'a>(candidates: impl Iterator<Item = &'a str>, name: &str) -> Option<String> {
+    if name.len() < 2 {
+        return None;
+    }
+    let ordered: Vec<&str> = candidates.collect();
+    if let Some(swapped) = transpositions(name).find(|word| ordered.contains(&word.as_str())) {
+        return Some(swapped);
+    }
+    let budget = if name.len() <= 4 { 1 } else { 2 };
+    let mut best: Option<(usize, &str)> = None;
+    for candidate in ordered {
         // A candidate wildly different in length cannot be within budget, and skipping it here
         // avoids the quadratic work for most of the three thousand entries.
         if candidate.len().abs_diff(name.len()) > budget {
@@ -213,7 +231,7 @@ pub fn nearest(path: &str, name: &str) -> Option<String> {
             best = Some((distance, candidate));
         }
     }
-    best.map(|(_, name)| name.clone())
+    best.map(|(_, name)| name.to_string())
 }
 
 /// Every way of swapping one adjacent pair of characters in `name`.

@@ -273,9 +273,22 @@ cd @work         # becomes `cd ~/data/code/tools` — a directory you marked
 ls @work/src     # the tail is kept
 ```
 
-`=name` is zsh's, including the part that makes it safe: **a name that resolves to nothing is left
-exactly as it was**, so `echo =nosuch` still prints `=nosuch` and the worst case of the feature is
-that nothing happens.
+`=name` is zsh's, with one departure: **a name that resolves to nothing is told to you, and the
+command does not run.** zsh leaves the word as it was, on the argument that the worst case is then
+"nothing happens". It is not — `ldd =olso`, one transposed pair, hands `ldd` a word beginning with
+`=` and comes back with `ldd: ./=olso: No such file or directory`, which names a file nobody wrote.
+So the shorthand answers instead, with the name it thinks you meant:
+
+```
+$ ldd =olso
+oslo: =olso: olso is not a command — did you mean =oslo?
+```
+
+`@name` does the same where it can, but only when the name is *near* a mark you registered: `@`,
+`@{u}` and `@~1` are git revisions people type all day, and refusing every unknown `@word` would
+break `git log @`.
+
+Quoting takes both back: `echo "=ls"` and `echo "@work"` are literals.
 
 A distinct sigil rather than zsh's `~name`, deliberately: `~work` already means "the home directory
 of the user called `work`", so a real account could silently shadow your shortcut.

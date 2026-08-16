@@ -128,17 +128,23 @@ fn equals(name: &str) -> Equals {
 ///
 /// Only the *first* run, and only when it is text the script itself wrote: `echo "@proj"` is a
 /// literal, and a `@proj` that arrived out of a variable is data rather than a shorthand.
-pub(crate) fn marked_directory(field: Field) -> Field {
+pub(crate) fn marked_directory(field: Field) -> std::result::Result<Field, String> {
     let Some(first) = field.first() else {
-        return field;
+        return Ok(field);
     };
     if first.origin != Origin::Literal || !first.text.starts_with('@') {
-        return field;
+        return Ok(field);
     }
     let rest = &first.text[1..];
     let cut = rest.find('/').unwrap_or(rest.len());
     let Some(path) = oslo_base::dirs::named_dir(&rest[..cut]) else {
-        return field;
+        return match nearest_mark(&rest[..cut]) {
+            Some(near) => Err(format!(
+                "@{name}: no mark called {name} — did you mean @{near}?",
+                name = &rest[..cut]
+            )),
+            None => Ok(field),
+        };
     };
     let tail = &rest[cut..];
     let mut out = vec![Run::new(path, Origin::Quoted)];
@@ -146,7 +152,18 @@ pub(crate) fn marked_directory(field: Field) -> Field {
         out.push(Run::new(tail, first.origin));
     }
     out.extend(field.into_iter().skip(1));
-    out
+    Ok(out)
+}
+
+/// The nearest registered mark to `name`, or `None` when nothing is close.
+///
+/// **`None` is the common answer and the important one.** `@` on its own, `@{u}` and `@~1` are git
+/// revisions people type constantly, and none of them is a mistyped mark — so unless a name is
+/// *near* one the user actually registered, the word is left exactly as it was. That is what keeps
+/// this from breaking `git log @` the way a blanket refusal would.
+fn nearest_mark(name: &str) -> Option<String> {
+    let marks = oslo_base::dirs::named_dirs();
+    oslo_ui::command_index::nearest_of(marks.iter().map(|(name, _)| name.as_str()), name)
 }
 
 /// `@name` substituted in every field, for the entry points that do not go through
@@ -157,9 +174,12 @@ pub(crate) fn marked_directory(field: Field) -> Field {
 /// match where `case ~ in /tmp*)` did: the same word written two ways, giving opposite answers.
 /// This module's own contract says a mark is substituted where a tilde is, and a tilde is a
 /// `WordPart` that every one of those paths already resolves.
-pub(crate) fn marked_fields(env: &Environment, fields: Vec<Field>) -> Vec<Field> {
+pub(crate) fn marked_fields(
+    env: &Environment,
+    fields: Vec<Field>,
+) -> std::result::Result<Vec<Field>, String> {
     if !env.interactive() {
-        return fields;
+        return Ok(fields);
     }
     fields.into_iter().map(marked_directory).collect()
 }
@@ -185,10 +205,11 @@ mod tests {
         typed(env, text, Origin::Quoted)
     }
 
+    /// The rewritten text, or `<refused: …>` carrying the message the shell would print.
     fn typed(env: &Environment, text: &str, origin: Origin) -> String {
         match equals_field(env, vec![Run::new(text, origin)]) {
             Ok(runs) => runs.into_iter().map(|r| r.text).collect(),
-            Err(name) => format!("<unknown {name}>"),
+            Err(message) => format!("<refused: {message}>"),
         }
     }
 
@@ -228,9 +249,11 @@ mod tests {
     #[test]
     fn a_name_that_is_not_a_command_is_reported_rather_than_passed_on() {
         let env = interactive();
-        assert_eq!(
-            field(&env, "=definitely-not-a-command"),
-            "<unknown definitely-not-a-command>"
+        let refused = field(&env, "=definitely-not-a-command");
+        assert!(refused.starts_with("<refused:"), "{refused}");
+        assert!(
+            refused.contains("definitely-not-a-command is not a command"),
+            "{refused}"
         );
         // And still nothing at all in a script, which is what makes reporting safe here.
         assert_eq!(
@@ -269,5 +292,40 @@ mod tests {
         assert_eq!(field(&env, "@work/src/main.rs"), "@work/src/main.rs");
 
         set_named_dirs(HashMap::new());
+    }
+
+    /// What `marked_directory` does with a name that is not a mark.
+    fn mark(text: &str) -> String {
+        match marked_directory(vec![Run::new(text, Origin::Literal)]) {
+            Ok(runs) => runs.into_iter().map(|r| r.text).collect(),
+            Err(message) => format!("<refused: {message}>"),
+        }
+    }
+
+    /// **A mistyped mark is named; a word that merely starts with `@` is not.**
+    ///
+    /// The same failure `=name` had — `cd @wrok` answered `cd: @wrok: No such file or directory`,
+    /// blaming a directory nobody wrote. It cannot be fixed the same way, though: `@` on its own,
+    /// `@{u}` and `@~1` are git revisions people type all day, and refusing every unknown `@word`
+    /// would break `git log @`. So this speaks *only* when the name is near a mark that actually
+    /// exists, and stays silent otherwise.
+    #[test]
+    fn a_mistyped_mark_is_named_but_a_git_revision_is_not() {
+        set_named_dirs(HashMap::from([(
+            "work".to_string(),
+            "/home/u/work".to_string(),
+        )]));
+
+        let refused = mark("@wrok");
+        assert!(refused.contains("did you mean @work?"), "{refused}");
+
+        // Everything git types, untouched — none of it is near `work`.
+        for revision in ["@", "@{u}", "@~1", "@HEAD"] {
+            assert_eq!(mark(revision), revision, "{revision} was not left alone");
+        }
+
+        set_named_dirs(HashMap::new());
+        // And with no marks registered at all, nothing is ever near anything.
+        assert_eq!(mark("@wrok"), "@wrok");
     }
 }

@@ -277,7 +277,8 @@ fn check_nounset(env: &Environment, name: &str, expansion_type: &ParamExpansion)
 /// so the branch silently stops firing depending on where you run the script.
 pub fn expand_word_to_string(env: &mut Environment, word: &Word) -> Result<String> {
     let fields = expand_word_fields(env, word)?;
-    let fields = crate::expand::sugar::marked_fields(env, fields);
+    let fields =
+        crate::expand::sugar::marked_fields(env, fields).map_err(ShellError::ExpansionError)?;
     if fields.len() == 1 {
         return Ok(field_text(&fields[0]));
     }
@@ -301,7 +302,9 @@ pub fn expand_word_to_string(env: &mut Environment, word: &Word) -> Result<Strin
 /// context insisting on one string would have got.
 pub fn expand_word_to_pattern(env: &mut Environment, word: &Word) -> Result<Vec<Run>> {
     let fields = expand_word_fields(env, word)?;
-    Ok(crate::expand::sugar::marked_fields(env, fields).concat())
+    Ok(crate::expand::sugar::marked_fields(env, fields)
+        .map_err(ShellError::ExpansionError)?
+        .concat())
 }
 
 /// Full expansion of one word: parameters, substitutions, field splitting, then pathname
@@ -347,7 +350,9 @@ fn expand_word_at(env: &mut Environment, word: &Word, place: Place) -> Result<Ve
         // reaching the command with a literal `*` while `~/*.rs` and `$M/*.rs` both expanded. Done
         // before the split and the glob, and only when the word is an argument.
         let field = match place {
-            Place::Argument if env.interactive() => crate::expand::sugar::marked_directory(field),
+            Place::Argument if env.interactive() => {
+                crate::expand::sugar::marked_directory(field).map_err(ShellError::ExpansionError)?
+            }
             _ => field,
         };
         // **`=command` is substituted here too, and for the third of the same reasons.** It has to
