@@ -1,0 +1,12 @@
+local function try(name, f)
+  local ok, err = pcall(f)
+  print(string.format("%-22s %s", name, ok and "yes" or ("no  -- " .. tostring(err):sub(1,40))))
+end
+try("coroutines", function() local c = coroutine.create(function() coroutine.yield(1) end); coroutine.resume(c) end)
+try("string.format", function() assert(string.format("%5.2f", 1/3) == " 0.33") end)
+try("string.gsub/patterns", function() assert(("a-b"):gsub("%-", "+") == "a+b") end)
+try("string.char(255) len", function() assert(#string.char(255) == 1, "got " .. #string.char(255)) end)
+try("metatables __index", function() local t = setmetatable({}, {__index = function() return 7 end}); assert(t.x == 7) end)
+try("goto/labels", function() return load("do goto skip; ::skip:: end")() end)
+try("deep recursion 5k", function() local function d(n) if n == 0 then return 0 end return d(n-1) end; return d(5000) end)
+try("integer division //", function() assert(7 // 2 == 3) end)

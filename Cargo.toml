@@ -262,6 +262,7 @@ members = [
   "crates/oslo-ui",
   "vendor/argc",
   "vendor/brush-parser",
+  "vendor/luna",
   "vendor/full_moon",
   "vendor/full_moon/derive",
 ]

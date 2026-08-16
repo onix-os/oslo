@@ -1,34 +1,39 @@
-//! A measurable spike: the reference Lua 5.4 VM, in the same process as the shell.
+//! The Lua VM, behind the same front door as the evaluator it replaces.
 //!
-//! `oslo-lua` is a tree walker over `full_moon`'s AST, and `docs/features/lua-interpreter.md`
-//! records what that costs — no coroutines, no tracing GC, no byte strings, 200 nested calls — and
-//! what it buys: one Rust core behind two front ends, and no C anywhere near a static musl build.
+//! `luna` is a stackless bytecode VM with a tracing collector, in pure Rust. Against the tree walker
+//! in `oslo-lua` that is coroutines, `goto`, real string patterns, byte-exact strings, collected
+//! cycles and unbounded recursion — measured at 15–30× the speed — with no C anywhere, so a static
+//! musl build still needs nothing installed.
 //!
-//! This crate exists to put a number on the other side of that trade rather than an opinion. It is
-//! deliberately *not* wired into the shell's `oslo.*` API — that surface is 130 callables across
-//! 11.5k lines, and porting it is the actual cost of the switch, not something to fake in a spike.
-//! What it does is run the same benchmark scripts the documented measurements use, through the real
-//! VM, inside a real oslo binary, so the two engines can be compared on identical work.
+//! # The one thing that shapes everything above this
+//!
+//! luna's values carry a garbage-collector lifetime: `Value<'gc>` exists only inside
+//! `lua.enter(|ctx| …)`, and holding one across calls means stashing it in the VM's registry. That
+//! is the opposite of `oslo_lua::Value`, which is an `Rc` anyone can keep. So the boundary is real
+//! and it lives here: oslo's own value type stays the interchange currency for the ~40 files that
+//! have nothing to do with Lua — the structured pipeline, settings, hooks — and is converted at the
+//! edge, once, rather than infecting them with a lifetime.
 
-use mlua::Lua;
+use luna::{Closure, Executor, Lua};
 
-/// Run `source` and answer the exit status, printing any error the way the shell would.
+/// Run `source` and answer the exit status, reporting an error the way the shell would.
 pub fn run(source: &str, chunk_name: &str) -> i32 {
-    let lua = Lua::new();
-    match lua.load(source).set_name(chunk_name).exec() {
+    let mut lua = Lua::full();
+    let executor = match lua.try_enter(|ctx| {
+        let closure = Closure::load(ctx, Some(chunk_name), source.as_bytes())?;
+        Ok(ctx.stash(Executor::start(ctx, closure.into(), ())))
+    }) {
+        Ok(executor) => executor,
+        Err(error) => {
+            eprintln!("oslo: lua: {error}");
+            return 1;
+        }
+    };
+    match lua.execute::<()>(&executor) {
         Ok(()) => 0,
         Err(error) => {
             eprintln!("oslo: lua: {error}");
             1
         }
     }
-}
-
-/// What this build speaks, for a caller that wants to say so.
-pub fn version() -> &'static str {
-    mlua::Lua::new()
-        .load("return _VERSION")
-        .eval::<String>()
-        .map(|_| "Lua 5.4 (mlua, vendored)")
-        .unwrap_or("Lua 5.4 (mlua)")
 }

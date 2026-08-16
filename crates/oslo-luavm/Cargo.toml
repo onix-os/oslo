@@ -5,10 +5,9 @@ edition = "2024"
 rust-version = "1.90"
 license = "MIT"
 publish = false
-description = "A spike: the reference Lua VM behind the same front door as oslo's own evaluator."
+description = "The Lua VM oslo runs on: luna, vendored."
 
 [dependencies]
-# The reference interpreter, vendored and compiled from C. `vendored` is the whole question this
-# crate exists to answer: it is what makes the binary self-contained and what makes a musl build
-# need a C compiler.
-mlua = { version = "0.12", features = ["lua54", "vendored"] }
+# `vendor/luna` — a stackless Lua VM in pure Rust with a real garbage collector. No C, so a static
+# musl build needs no C toolchain, which is the property `oslo-lua` was written to keep.
+luna = { path = "../../vendor/luna" }
