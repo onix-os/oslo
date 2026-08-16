@@ -61,7 +61,7 @@ pub mod hooks;
 pub(crate) use shell::handlers as hook_handlers;
 pub(crate) mod util;
 
-use util::{native, put, text};
+use util::{put, text};
 
 /// Build the `oslo` table and install it as a global.
 pub fn install(host: &dyn Host, registry: &Registry, env: Arc<Mutex<Environment>>) {
@@ -226,9 +226,9 @@ pub fn install(host: &dyn Host, registry: &Registry, env: Arc<Mutex<Environment>
     oslo.set_str("ui", Value::table(ui));
     optional::install(&mut oslo, host, &env);
     let oslo = Value::table(oslo);
-    publish(host, &oslo);
     host.set_global("oslo", oslo);
     // After the global exists, because these are written in Lua and reach the table through it.
+    publish(host);
     #[cfg(feature = "nix")]
     nix::add_helpers(host);
     // Last, so it replaces the standard names rather than being replaced by them.
@@ -249,32 +249,37 @@ pub fn install(host: &dyn Host, registry: &Registry, env: Arc<Mutex<Environment>
 ///
 /// Registered in `package.preload` rather than on disk, so the lookup never touches the filesystem
 /// and a user's own `oslo/ui.lua` cannot shadow the built-in by accident — `preload` wins.
-fn publish(host: &dyn Host, oslo: &Value) {
-    let Value::Table(table) = oslo else { return };
+///
+/// # It is written in Lua, and it has to be
+///
+/// **`require "oslo"` must answer with the table the global *is*, not a copy of it.** Registering a
+/// native that hands back a shell-side value looks equivalent and is not: every value crossing the
+/// boundary is converted, so each call produced a fresh table. `require "oslo"` and `oslo` were
+/// then two different objects, and
+///
+/// ```lua
+/// local oslo = require "oslo"
+/// oslo.completion.max_rows = 42     -- written into a copy nothing reads
+/// ```
+///
+/// was silently discarded — the worst shape a configuration bug can take, because the file looks
+/// right and the setting simply never happens. Indexing the global from inside Lua reaches the VM's
+/// own table, so the closure captures the real thing and identity holds:
+/// `require "oslo" == oslo`.
+fn publish(host: &dyn Host) {
     // Only the tables. A function on `oslo` is not a module, and registering one would make
     // `require "oslo.glob"` answer with something that is not what `require` promises.
-    let entries: Vec<(String, Value)> = table
-        .borrow()
-        .pairs()
-        .into_iter()
-        .filter_map(|(name, value)| match (&name, &value) {
-            (Value::Str(name), Value::Table(_)) => Some((name.to_string(), value.clone())),
-            _ => None,
-        })
-        .collect();
-    for (name, value) in entries {
-        let module = value.clone();
-        host.set_field(
-            &["package", "preload", &format!("oslo.{name}")],
-            native("preload", move |_, _| Ok(vec![module.clone()])),
-        );
+    let source = r#"
+        package.preload["oslo"] = function() return oslo end
+        for name, value in pairs(oslo) do
+            if type(value) == "table" then
+                package.preload["oslo." .. name] = function() return value end
+            end
+        end
+    "#;
+    if let Err(e) = host.eval(source, "=oslo.publish") {
+        oslo_base::messages::error("oslo modules", e.to_string());
     }
-    // `require "oslo"` answers with the whole thing, so a script can take the lot in one line.
-    let whole = oslo.clone();
-    host.set_field(
-        &["package", "preload", "oslo"],
-        native("preload", move |_, _| Ok(vec![whole.clone()])),
-    );
 }
 
 /// Fold everything in `additions` into the table already on `oslo` under `name`.

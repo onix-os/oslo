@@ -990,6 +990,21 @@ That directory is fish's, and it is there for the same reason: a plugin or a dot
 somewhere to add a line without editing a file it does not own, and the file you wrote by hand
 keeps the final say.
 
+**A config that has outgrown one file stays one config.** oslo runs a real Lua VM, so the way to
+split it is the language's own — `require`, against a search path that is this directory:
+
+```lua
+-- ~/.config/oslo/config.lua
+local oslo = require "oslo"      -- the table the global names, not a copy
+require "prompt"                 -- ~/.config/oslo/prompt.lua
+require "keys"                   -- ~/.config/oslo/keys.lua
+```
+
+`package.path` is oslo's own — this directory, then `~/.config/oslo/lua/` for libraries, then the
+system ones. Stock Lua's `./?.lua` is deliberately **not** on it: in a shell "the working
+directory" is wherever you opened the terminal, so searching it means `cd` into somewhere
+untrusted and `require` loads a stranger's file.
+
 ### The settings
 
 Shown with their defaults, so the options are visible without reading the source. Every line here

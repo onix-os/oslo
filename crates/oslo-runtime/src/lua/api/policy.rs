@@ -26,6 +26,14 @@ use oslo_luavm::Host;
 /// `utils.lua` instead of yours. oslo's path is its own config directory and the system ones, and
 /// the working directory is not on it.
 ///
+/// **The config directory itself is on the path, not only `lua/` under it.** A configuration that
+/// has grown a second file — a prompt, a set of key bindings — should join it with
+/// `require "prompt"`, and that only works if the directory the file is *in* is searched. Without
+/// it the only way to reach a sibling was
+/// `dofile(oslo.env.get("HOME") .. "/.config/oslo/prompt.lua")`: an absolute path, spelled out, in
+/// a language that has had a module system for twenty years. `lua/` is still searched after it, for
+/// a library kept apart from the configuration that uses it.
+///
 /// `cpath` is set to the empty string rather than left unset. A static binary cannot `dlopen`
 /// anything, so advertising a C path would turn an honest "module not found" into a confusing
 /// loader error — but a `cpath` that is *absent* breaks `package.cpath == ""`, which is the way a
@@ -37,6 +45,8 @@ fn search_path() -> String {
         .or_else(|| std::env::var("HOME").ok().map(|h| format!("{h}/.config")));
     let mut parts = Vec::new();
     if let Some(config) = config {
+        parts.push(format!("{config}/oslo/?.lua"));
+        parts.push(format!("{config}/oslo/?/init.lua"));
         parts.push(format!("{config}/oslo/lua/?.lua"));
         parts.push(format!("{config}/oslo/lua/?/init.lua"));
     }
