@@ -6,9 +6,10 @@ follows from: oslo ships as a single statically linked musl binary, and speaking
 C toolchain. `mlua` — a binding to the reference interpreter — would compile some thirty thousand
 lines of C into the binary and need a musl cross-compiler to link it.
 
-It is a dependency **pinned to a commit** rather than vendored or tracked on a branch. luna has no
-tagged releases yet, and a branch would make a build depend on the day it ran; the hash moves when
-somebody moves it, and `cargo update` cannot move it at all. See `crates/oslo-luavm/Cargo.toml`.
+It is a dependency **pinned to a tag** — `v0.5.0` — rather than vendored or tracked on a branch. A
+branch would make a build depend on the day it ran; a tag moves only when somebody moves it, and
+`cargo update` cannot move it at all. `Cargo.lock` records the commit behind the tag either way, so
+what the tag buys is a name a human can read in a diff. See `crates/oslo-luavm/Cargo.toml`.
 
 **This replaced a tree walker.** Until recently the evaluator was oslo's own, walking a `full_moon`
 AST. That crate and its parser are gone: 19,630 lines deleted, in exchange for coroutines, `goto`,
@@ -136,7 +137,7 @@ The standard library is complete enough that oslo's own tests no longer notice i
 `pairs` iterates in insertion order, recursion is bounded by a catchable error, and floats print as
 Lua 5.4 prints them.
 
-Two things remain, both about the *shape* of an error rather than what it says:
+Three things remain, and one of them is oslo's own:
 
 * **A runtime error is `userdata`, where Lua 5.4 raises a string.** `tostring(err)` reaches the
   message, so nothing is lost — but `err:find("…")`, the idiom for inspecting one, cannot index a
@@ -146,9 +147,16 @@ Two things remain, both about the *shape* of an error rather than what it says:
   progress and reports `loop or previous error loading module`; here the recursion runs to the call
   depth limit and reports a stack overflow instead. It stops, catchably — it just says the wrong
   thing about why.
+* **`os.setlocale` is absent**, the last of the standard names. Nothing in a shell reaches for it.
 
-Neither is reachable from ordinary shell use. Both are written up with reproductions in luna's
-`plans/oslo_requirement.md`.
+Neither of the first two is reachable from ordinary shell use.
+
+**The third is `_ENV`, and it belongs here rather than to the VM.** A name assigned a table and then
+a string stays in `_G` instead of moving to the shell, because the globals metatable's `__newindex`
+does not fire for a name `_G` already has — see [`globals`](#what-makes-it-different). Expressing
+the rule exactly needs an always-empty `_ENV` proxy with the real names in a backing table, which
+`Closure::load_with_env` makes possible; it costs a metamethod on every global access, which is why
+it has not been done for one test.
 
 **Three names oslo refuses on purpose**, and those are not gaps — see
 `crates/oslo-runtime/src/lua/api/policy.rs`. `os.execute` and `io.popen` would run their argument
