@@ -1,10 +1,10 @@
-use ottavino_gc_arena::Collect;
 use std::pin::Pin;
 
 use luna::{
     BoxSequence, Callback, CallbackReturn, Closure, Context, Error, Execution, Executor,
     ExternError, Function, IntoValue, Lua, Sequence, SequencePoll, Stack, String, Thread, Value,
 };
+use ottavino_gc_arena::Collect;
 
 #[test]
 fn callback() -> Result<(), ExternError> {

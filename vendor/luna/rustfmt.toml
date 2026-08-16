@@ -1,4 +1,4 @@
-# **Vendored code is not restyled.** `vendor/README.md` states the rule; this is what enforces it
-# for a crate whose import order rustfmt disagrees with. Reformatting it would turn every future
-# rebase against upstream into a diff about house style rather than about the interpreter.
+# **Vendored code is not restyled.** `vendor/README.md` states the rule; this enforces it for a
+# crate whose import order rustfmt disagrees with. Reformatting would turn every rebase against
+# upstream into a diff about house style rather than about the interpreter.
 disable_all_formatting = true

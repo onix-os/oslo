@@ -14,7 +14,7 @@ do
     end)
 
     -- PRLua wraps the index and inserts at math.mininteger;
-    -- piccolo throws an error instead
+    -- luna throws an error instead
     if _VERSION == "luna" then
         assert(not res, "insert at maxinteger + 1 wrapped instead of erroring")
     else
@@ -30,7 +30,7 @@ do
         return t
     end)
     -- PRLua wraps the end index and silently doesn't shift interior elements
-    -- piccolo throws an error instead
+    -- luna throws an error instead
     if _VERSION == "luna" then
         assert(not res, "insert with length maxinteger wrapped instead of erroring")
     else

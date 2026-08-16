@@ -25,8 +25,8 @@ use crate::{
 /// instance.
 ///
 /// As a convenience, it also contains the [`ottavino_gc_arena::Mutation`] reference provided by `gc-arena`
-/// when mutating a [`ottavino_gc_arena::Arena`]. This allows code that uses ottavino to accept a single `ctx:
-/// Context<'gc>` parameter, rather than having to accept both the ottavino `ctx` *and* the usual
+/// when mutating a [`ottavino_gc_arena::Arena`]. This allows code that uses luna to accept a single `ctx:
+/// Context<'gc>` parameter, rather than having to accept both the luna `ctx` *and* the usual
 /// `mc: &Mutation<'gc>` parameter.
 ///
 /// To access the contained [`Mutation`] context, there is a `Deref` impl on `Context` that derefs
@@ -127,7 +127,7 @@ impl<'gc> ops::Deref for Context<'gc> {
 
 /// A Lua execution environment.
 ///
-/// This is the top-level `ottavino` type. In order to load and call any Lua code, the first step is
+/// This is the top-level `luna` type. In order to load and call any Lua code, the first step is
 /// to create a `Lua` instance.
 pub struct Lua {
     arena: Arena<Rootable![State<'_>]>,

@@ -1,8 +1,3 @@
-//! `luna` — a stackless Lua VM in pure Rust, with a tracing garbage collector.
-//!
-//! Vendored from <https://github.com/onix-os/luna>, a fork of `ottavino`, itself a fork of
-//! `piccolo`. See `vendor/README.md`.
-
 pub mod any;
 pub mod async_callback;
 pub mod callback;

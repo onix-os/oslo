@@ -1,5 +1,5 @@
-use ottavino_gc_arena::{lock::Lock, Collect, Gc, Rootable};
 use luna::{Callback, CallbackReturn, Closure, Executor, Lua, UserData, Value};
+use ottavino_gc_arena::{lock::Lock, Collect, Gc, Rootable};
 
 #[derive(Collect)]
 #[collect(no_drop)]
