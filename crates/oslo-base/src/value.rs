@@ -21,6 +21,10 @@
 //! limit recorded in PLAN.md rather than an oversight. A shell script's tables are small and
 //! short-lived, and the alternative is writing a garbage collector.
 
+pub mod error;
+
+pub use error::{LuaError, LuaResult};
+
 use std::any::Any;
 use std::cell::RefCell;
 use std::collections::HashMap;
