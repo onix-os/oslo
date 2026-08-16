@@ -43,6 +43,17 @@ pub trait Host {
     /// Set a global.
     fn set_global(&self, name: &str, value: Own);
 
+    /// Set a nested field, walking from the globals: `["package", "preload", "oslo.ui"]`.
+    ///
+    /// **Because a table read out of the VM is a copy.** The tree walker's tables were the
+    /// interpreter's own `Rc`, so fetching `package.preload` and inserting into it was visible to
+    /// the next `require`. A VM table cannot leave the collector, so what [`global`](Self::global)
+    /// answers is a snapshot and writing to it changes nothing. Anything that means to reach back
+    /// into a live table goes through here, where the write happens inside the arena.
+    ///
+    /// Answers whether the path existed and the write landed.
+    fn set_field(&self, path: &[&str], value: Own) -> bool;
+
     /// What the running source is called, for the position on an error.
     fn chunk(&self) -> String;
 
@@ -50,6 +61,25 @@ pub trait Host {
     ///
     /// Refused while a native is running — see the module note on stacklessness.
     fn call(&self, function: &Own, args: Vec<Own>) -> LuaResult<Vec<Own>>;
+}
+
+/// Walk `path` from the globals and set the last name, inside the arena.
+pub(crate) fn set_field_in<'gc>(ctx: Context<'gc>, path: &[&str], value: &Own) -> bool {
+    let Some((last, walked)) = path.split_last() else {
+        return false;
+    };
+    let mut table = ctx.globals();
+    for name in walked {
+        let key = Value::String(LunaStr::from_slice(&ctx, name.as_bytes()));
+        match table.get_value(ctx, key) {
+            Value::Table(next) => table = next,
+            // A path that is not there is not an error: `package.preload` is absent in a VM built
+            // without the library, and the caller's answer to that is to do nothing.
+            _ => return false,
+        }
+    }
+    let key = Value::String(LunaStr::from_slice(&ctx, last.as_bytes()));
+    table.set(ctx, key, into_lua(ctx, value)).is_ok()
 }
 
 /// The host a native sees while the VM is running it.
@@ -76,6 +106,10 @@ impl<'gc> Host for CallbackHost<'gc> {
             .ctx
             .globals()
             .set(self.ctx, key, into_lua(self.ctx, &value));
+    }
+
+    fn set_field(&self, path: &[&str], value: Own) -> bool {
+        set_field_in(self.ctx, path, &value)
     }
 
     fn chunk(&self) -> String {

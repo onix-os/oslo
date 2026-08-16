@@ -91,7 +91,7 @@ fn drawn_by_config(
             ("text", string(text)),
             ("duration_ms", int(elapsed.as_millis() as i64)),
             ("status", int(i64::from(status))),
-            ("ok", crate::lua::eval::value::Value::Bool(status == 0)),
+            ("ok", oslo_base::value::Value::Bool(status == 0)),
         ],
     )
 }

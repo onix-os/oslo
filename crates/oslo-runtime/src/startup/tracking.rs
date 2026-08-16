@@ -372,7 +372,7 @@ pub(super) fn ask_what_to_record(
     result: &Result<i32, ShellError>,
     elapsed: Duration,
 ) -> Recording {
-    use crate::lua::eval::value::Value;
+    use oslo_base::value::Value;
     let status = match result {
         Ok(status) => *status,
         Err(err) => err.failure_status(),
@@ -458,8 +458,8 @@ pub(super) fn settle_log_row(history_id: u64, decided: &Recording, typed: &str) 
 }
 
 /// The links of the line that just ran, as the table a handler walks.
-fn segment_table() -> crate::lua::eval::value::Value {
-    use crate::lua::eval::value::{Table, Value};
+fn segment_table() -> oslo_base::value::Value {
+    use oslo_base::value::{Table, Value};
     let mut list = Table::new();
     for (i, link) in oslo_shell::exec::pipeline::segments::taken()
         .iter()

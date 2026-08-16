@@ -179,3 +179,22 @@ fn a_native_sees_the_scripts_globals() {
         "got {returned:?}"
     );
 }
+
+/// An unfinished line asks for more; a wrong one does not.
+#[test]
+fn an_incomplete_chunk_is_told_from_a_broken_one() {
+    for unfinished in ["if true then", "local x = {", "function f()", "for i = 1, 2 do"] {
+        assert!(
+            !super::is_complete(unfinished),
+            "`{unfinished}` should have asked for another line"
+        );
+    }
+    for finished in ["x = 1", "if true then end", "print('hi')"] {
+        assert!(super::is_complete(finished), "`{finished}` is a whole chunk");
+    }
+    // A real mistake must run and report, not hang waiting for input that cannot fix it.
+    assert!(
+        super::is_complete("x = = 2"),
+        "a broken line was mistaken for an unfinished one"
+    );
+}

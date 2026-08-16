@@ -24,7 +24,7 @@ thread_local! {
     /// Thread-local because a Lua value is not `Send` and only the read loop's thread ever touches
     /// a prompt. `Some(None)` is meaningful and different from `None`: it says there was no prompt
     /// function before, so unloading must *remove* the directory's rather than leave it behind.
-    static PREVIOUS_PROMPT: RefCell<Option<Option<crate::lua::eval::Value>>> =
+    static PREVIOUS_PROMPT: RefCell<Option<Option<oslo_base::value::Value>>> =
         const { RefCell::new(None) };
 }
 
@@ -61,7 +61,7 @@ pub(super) fn arrive(env: &Mutex<Environment>, lua: &LuaEngine, dir: &Path) {
     // time and put back at unload time, which is the same record-and-restore shape the variables
     // use — it lives here rather than in `direnv` because a Lua value is not something a module
     // about directories should be holding.
-    let mut base_prompt: Option<Option<crate::lua::eval::Value>> = None;
+    let mut base_prompt: Option<Option<oslo_base::value::Value>> = None;
     let events = direnv::with(|state| {
         state.arrive(
             env,

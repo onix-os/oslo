@@ -24,14 +24,15 @@
 use super::util::native;
 use crate::lua::engine::borrow_env;
 use oslo_base::value::{Table, Value};
-use oslo_lua::{Interp, LuaError, LuaResult};
+use oslo_base::value::{LuaError, LuaResult};
+use oslo_luavm::Host;
 use oslo_shell::env::Environment;
 use oslo_shell::exec::argv::{Capture, Outcome};
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
 /// Install `oslo.run`, `oslo.pipe` and the `sh` global.
-pub fn install(interp: &Rc<Interp>, oslo: &mut Table, env: &Arc<Mutex<Environment>>) {
+pub fn install(host: &dyn Host, oslo: &mut Table, env: &Arc<Mutex<Environment>>) {
     let env_run = Arc::clone(env);
     oslo.set(
         Value::str("run"),
@@ -93,7 +94,7 @@ pub fn install(interp: &Rc<Interp>, oslo: &mut Table, env: &Arc<Mutex<Environmen
         }),
     );
 
-    interp.set_global("sh", sugar(env));
+    host.set_global("sh", sugar(env));
 }
 
 /// The iterator `oslo.lines` returns: one line per call, nil at the end.

@@ -107,7 +107,7 @@ fn writing(it: &mut Table) {
     // oslo.fs.remove(path, recursive)
     put(it, "remove", |_, args| {
         let path = text(&args, 1, "oslo.fs.remove")?;
-        let recursive = args.get(1).is_some_and(oslo_lua::Value::truthy);
+        let recursive = args.get(1).is_some_and(Value::truthy);
         let meta = match fs::symlink_metadata(&path) {
             Ok(meta) => meta,
             Err(e) => return failed(&path, e),

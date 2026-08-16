@@ -415,7 +415,7 @@ impl HeredocTracker {
 /// asking it directly.
 pub(super) fn is_complete(source: &str, mode: Mode) -> bool {
     match mode {
-        Mode::Lua => crate::lua::eval::is_complete(source),
+        Mode::Lua => oslo_luavm::is_complete(source),
         Mode::Shell => !matches!(oslo_ui::syntax::classify(source), InputStatus::Incomplete),
     }
 }

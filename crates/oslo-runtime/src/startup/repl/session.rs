@@ -53,7 +53,7 @@ pub(super) fn fire_exit(lua: &LuaEngine, status: i32) {
         hooks::at::ON_EXIT,
         vec![LuaEngine::hook_fields(&[(
             "status",
-            crate::lua::eval::value::Value::int(status as i64),
+            oslo_base::value::Value::int(status as i64),
         )])],
     );
 }

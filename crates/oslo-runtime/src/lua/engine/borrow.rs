@@ -1,8 +1,8 @@
 //! Taking the shell's state for one `oslo.*` call, and giving it back.
 
 use super::queue;
-use oslo_lua as eval;
-use oslo_base::value::LuaResult;
+
+use oslo_base::value::{LuaError, LuaResult};
 use oslo_shell::env::Environment;
 use std::sync::{Mutex, MutexGuard};
 
@@ -24,7 +24,7 @@ pub(crate) fn borrow_env(env: &Mutex<Environment>) -> LuaResult<EnvBorrow<'_>> {
         // reported a builtin registration nobody had written — which reads as noise and gets
         // skipped over. Hooks that answer run inline by necessity and are the common way to arrive
         // here now.
-        eval::LuaError::new(
+        LuaError::new(
             "oslo: shell state is busy; an oslo.* call that reaches the shell cannot run from \
              here. This is a builtin registered with oslo.register_builtin, or a hook that \
              answers — pre-cmd, pre-change-dir, on-command-not-found — which must run while the \

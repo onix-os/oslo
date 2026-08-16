@@ -172,6 +172,11 @@ impl Host for Engine {
         });
     }
 
+    fn set_field(&self, path: &[&str], value: Own) -> bool {
+        let mut lua = self.lua.borrow_mut();
+        lua.enter(|ctx| host::set_field_in(ctx, path, &value))
+    }
+
     fn chunk(&self) -> String {
         self.chunk.borrow().clone()
     }
@@ -179,6 +184,32 @@ impl Host for Engine {
     fn call(&self, function: &Own, args: Vec<Own>) -> LuaResult<Vec<Own>> {
         self.call_function(function, args)
     }
+}
+
+/// Whether `source` is a whole chunk, or was cut off part way through one.
+///
+/// This is what decides between running the line and asking for another: `if true then` is not an
+/// error, it is a beginning. The VM distinguishes the two itself — a chunk that ends mid-construct
+/// fails with *end of token stream*, and anything else is a real mistake that more input cannot
+/// repair, because `x = = 2` never becomes valid however much follows it.
+///
+/// A bare VM rather than the session's, so an unfinished line cannot run a metamethod or see a
+/// half-built global. It costs an arena per keystroke that ends a line, which is nothing against a
+/// terminal round trip.
+pub fn is_complete(source: &str) -> bool {
+    use luna::compiler::{ParseError, ParseErrorKind};
+
+    let mut lua = Lua::core();
+    lua.enter(|ctx| match Closure::load(ctx, None, source.as_bytes()) {
+        Ok(_) => true,
+        // The variant rather than the message: a rendered string is a thing that changes when
+        // someone improves the wording, and this decides whether the shell hangs waiting.
+        Err(luna::CompilerError::Parsing(ParseError {
+            kind: ParseErrorKind::EndOfStream { .. },
+            ..
+        })) => false,
+        Err(_) => true,
+    })
 }
 
 /// The session's engine, reachable from anywhere on its thread.

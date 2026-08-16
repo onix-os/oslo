@@ -20,7 +20,8 @@
 
 use super::util::put;
 use oslo_base::value::{Table, Value};
-use oslo_lua::{Interp, LuaError, LuaResult};
+use oslo_base::value::{LuaError, LuaResult};
+use oslo_luavm::Host;
 use std::cell::RefCell;
 use std::collections::HashMap;
 
@@ -109,7 +110,7 @@ fn named(name: &str) -> LuaResult<String> {
 /// where `lua::columns` already looks, so a declared completion is the same thing a config could
 /// have written by hand — one mechanism, reachable two ways, instead of two mechanisms that have to
 /// agree.
-pub(super) fn remember(interp: &Interp, declared: &Declared) {
+pub(super) fn remember(host: &dyn Host, declared: &Declared) {
     DECLARED.with(|slot| {
         slot.borrow_mut()
             .insert(declared.name.clone(), declared.desc.clone())
@@ -117,19 +118,12 @@ pub(super) fn remember(interp: &Interp, declared: &Declared) {
     let Some(complete) = &declared.complete else {
         return;
     };
-    let Value::Table(oslo) = interp.global("oslo") else {
-        return;
-    };
-    let completion = oslo.borrow().get(&Value::str("completion"));
-    let Value::Table(completion) = completion else {
-        return;
-    };
-    let for_command = completion.borrow().get(&Value::str("for_command"));
-    if let Value::Table(for_command) = for_command {
-        for_command
-            .borrow_mut()
-            .set(Value::str(&declared.name), complete.clone());
-    }
+    // Through the host rather than by fetching the table: what `global` answers is a copy of the
+    // VM's table, so inserting into it would land nowhere.
+    host.set_field(
+        &["oslo", "completion", "for_command", &declared.name],
+        complete.clone(),
+    );
 }
 
 /// Add `oslo.builtins()` — what a config has declared, and what each said it is for.

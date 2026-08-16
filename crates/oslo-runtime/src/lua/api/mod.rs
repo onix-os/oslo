@@ -14,7 +14,8 @@
 
 use crate::lua::engine::{BUILTIN_KEY_PREFIX, PROMPT_KEY, Registry, borrow_env, call_lua_builtin};
 use oslo_base::value::{Table, Value};
-use oslo_lua::{Interp, LuaError};
+use oslo_base::value::LuaError;
+use oslo_luavm::Host;
 use oslo_shell::env::Environment;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -62,7 +63,7 @@ pub(crate) mod util;
 use util::{native, put, text};
 
 /// Build the `oslo` table and install it as a global.
-pub fn install(interp: &Rc<Interp>, registry: &Registry, env: Arc<Mutex<Environment>>) {
+pub fn install(host: &dyn Host, registry: &Registry, env: Arc<Mutex<Environment>>) {
     let mut oslo = Table::new();
     // **Four namespaces, declared before anything fills them.** `oslo` had grown a flat surface of
     // twenty-two names where `nix_develop` sat between `login` and `path_add`, which tells a reader
@@ -73,7 +74,7 @@ pub fn install(interp: &Rc<Interp>, registry: &Registry, env: Arc<Mutex<Environm
     let mut process = Table::new();
     let mut system = Table::new();
     let mut ui = Table::new();
-    run::install(interp, &mut oslo, &env);
+    run::install(host, &mut oslo, &env);
     oslo.set(Value::str("fs"), fs::build());
     let mut paths = path::build();
     if let Value::Table(table) = &mut paths {
@@ -226,10 +227,10 @@ pub fn install(interp: &Rc<Interp>, registry: &Registry, env: Arc<Mutex<Environm
     extend(&mut oslo, "proc", process);
     oslo.set(Value::str("sys"), Value::table(system));
     oslo.set(Value::str("ui"), Value::table(ui));
-    optional::install(&mut oslo, interp, &env);
+    optional::install(&mut oslo, host, &env);
     let oslo = Value::table(oslo);
-    publish(interp, &oslo);
-    interp.set_global("oslo", oslo);
+    publish(host, &oslo);
+    host.set_global("oslo", oslo);
 }
 
 /// Make every `oslo.X` table `require`-able as `oslo.X`.
@@ -246,14 +247,8 @@ pub fn install(interp: &Rc<Interp>, registry: &Registry, env: Arc<Mutex<Environm
 ///
 /// Registered in `package.preload` rather than on disk, so the lookup never touches the filesystem
 /// and a user's own `oslo/ui.lua` cannot shadow the built-in by accident — `preload` wins.
-fn publish(interp: &Rc<Interp>, oslo: &Value) {
+fn publish(host: &dyn Host, oslo: &Value) {
     let Value::Table(table) = oslo else { return };
-    let Value::Table(package) = interp.global("package") else {
-        return;
-    };
-    let Value::Table(preload) = package.borrow().get(&Value::str("preload")) else {
-        return;
-    };
     // Only the tables. A function on `oslo` is not a module, and registering one would make
     // `require "oslo.glob"` answer with something that is not what `require` promises.
     let entries: Vec<(String, Value)> = table
@@ -267,15 +262,15 @@ fn publish(interp: &Rc<Interp>, oslo: &Value) {
         .collect();
     for (name, value) in entries {
         let module = value.clone();
-        preload.borrow_mut().set(
-            Value::str(format!("oslo.{name}")),
+        host.set_field(
+            &["package", "preload", &format!("oslo.{name}")],
             native("preload", move |_, _| Ok(vec![module.clone()])),
         );
     }
     // `require "oslo"` answers with the whole thing, so a script can take the lot in one line.
     let whole = oslo.clone();
-    preload.borrow_mut().set(
-        Value::str("oslo"),
+    host.set_field(
+        &["package", "preload", "oslo"],
         native("preload", move |_, _| Ok(vec![whole.clone()])),
     );
 }
@@ -561,7 +556,7 @@ fn shell(
     // `oslo.register_builtin('ls', …)` made `ls /` print nothing and exit 0.
     let env_builtin = Arc::clone(env);
     let registry_builtin = Rc::clone(registry);
-    put(oslo, "register_builtin", move |interp, args| {
+    put(oslo, "register_builtin", move |host, args| {
         let declared = builtin::declaration(&args)?;
         // Stored first: if the shell registration fails there is no name in the registry
         // pointing at a callback that is not there.
@@ -569,7 +564,7 @@ fn shell(
             format!("{BUILTIN_KEY_PREFIX}{}", declared.name),
             declared.run.clone(),
         );
-        builtin::remember(interp, &declared);
+        builtin::remember(host, &declared);
 
         let mut guard = borrow_env(&env_builtin)?;
         let key = declared.name.clone();
