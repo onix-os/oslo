@@ -34,7 +34,7 @@ use std::time::Duration;
 const HELPERS: &str = include_str!("nix.lua");
 
 /// Build the `oslo.nix` table.
-pub fn build(host: &dyn oslo_luavm::Host) -> Value {
+pub fn build() -> Value {
     let mut nix = Table::new();
 
     // oslo.nix.run{"flake", "metadata", timeout = 30, cache = true} -> table, or nil + message
@@ -60,32 +60,23 @@ pub fn build(host: &dyn oslo_luavm::Host) -> Value {
         ok(Value::Bool(json::available()))
     });
 
-    let table = Value::table(nix);
-    add_helpers(host, &table);
-    table
+    Value::table(nix)
 }
 
-/// Run `nix.lua`, which fills the table in with the named helpers.
+/// Run `nix.lua`, which fills `oslo.nix` in with the named helpers.
 ///
-/// The chunk is `return function(nix) … end` rather than a script that reaches for a global,
-/// because at this point in startup there is no `oslo` global yet — the table being filled is still
-/// on its way onto it. Handing it in as an argument also means the helpers cannot be confused about
-/// which table they are extending.
+/// **Called after `oslo` is a global, and the call happens in Lua.** The chunk works by *adding* to
+/// the table it is handed, and a table handed across the boundary is a copy — the additions would
+/// land on a value thrown away the moment the call returned. Indexing `oslo.nix` from inside the
+/// chunk reaches the VM's own table, which is the one every later lookup reads.
 ///
 /// **A failure is reported and startup continues.** These are conveniences over `oslo.nix.run`; a
 /// shell that will not start because one of them has a typo is a much worse outcome than a shell
 /// missing `oslo.nix.inputs`.
-fn add_helpers(host: &dyn oslo_luavm::Host, table: &Value) {
+pub(super) fn add_helpers(host: &dyn oslo_luavm::Host) {
     let chunk = "oslo.nix";
-    // Install time, so the host is the engine itself and calling back into Lua is allowed. A
-    // native could not do this: see `oslo_luavm::host`.
-    let installed = host
-        .eval(HELPERS, chunk)
-        .and_then(|returned| match returned.first() {
-            Some(install) => host.call(install, vec![table.clone()]),
-            None => Ok(Vec::new()),
-        });
-    if let Err(e) = installed {
+    let source = format!("local install = (function() {HELPERS} end)()\ninstall(oslo.nix)");
+    if let Err(e) = host.eval(&source, chunk) {
         eprintln!("oslo: {chunk}: {e}");
     }
 }

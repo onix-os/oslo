@@ -231,6 +231,9 @@ pub fn install(host: &dyn Host, registry: &Registry, env: Arc<Mutex<Environment>
     let oslo = Value::table(oslo);
     publish(host, &oslo);
     host.set_global("oslo", oslo);
+    // After the global exists, because these are written in Lua and reach the table through it.
+    #[cfg(feature = "nix")]
+    nix::add_helpers(host);
 }
 
 /// Make every `oslo.X` table `require`-able as `oslo.X`.

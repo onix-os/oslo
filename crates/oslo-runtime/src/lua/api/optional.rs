@@ -25,7 +25,7 @@ pub fn install(oslo: &mut Table, host: &dyn Host, env: &Arc<Mutex<Environment>>)
     #[cfg(feature = "direnv")]
     oslo.set(Value::str("direnv"), super::direnv::build(env));
     #[cfg(feature = "nix")]
-    oslo.set(Value::str("nix"), super::nix::build(host));
+    oslo.set(Value::str("nix"), super::nix::build());
     #[cfg(feature = "secrets")]
     oslo.set(Value::str("secret"), super::secret::build());
     #[cfg(feature = "plugin")]
