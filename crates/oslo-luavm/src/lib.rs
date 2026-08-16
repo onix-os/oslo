@@ -18,8 +18,10 @@
 //! it mutably, and a native cannot re-enter — see [`host`].
 
 pub mod convert;
+pub mod globals;
 pub mod host;
 
+pub use globals::Globals;
 pub use host::{Host, Native, NativeFn};
 
 use luna::{Closure, Executor, Lua, Value, Variadic};
@@ -51,6 +53,8 @@ pub struct Engine {
     lua: RefCell<Lua>,
     /// What the running source is called, for the position on an error.
     chunk: RefCell<String>,
+    /// What the next chunk sees as `...`.
+    varargs: RefCell<Vec<Own>>,
 }
 
 impl Default for Engine {
@@ -64,6 +68,7 @@ impl Engine {
         Engine {
             lua: RefCell::new(Lua::full()),
             chunk: RefCell::new("?".to_string()),
+            varargs: RefCell::new(Vec::new()),
         }
     }
 
@@ -72,14 +77,27 @@ impl Engine {
         *self.chunk.borrow_mut() = name.to_string();
     }
 
+    /// Send globals Lua does not have to the shell's variables. See [`globals`].
+    pub fn set_globals_host(&self, host: std::rc::Rc<dyn Globals>) {
+        let mut lua = self.lua.borrow_mut();
+        lua.enter(|ctx| globals::attach(ctx, host));
+    }
+
+    /// What a chunk sees as `...`.
+    pub fn set_varargs(&self, args: Vec<Own>) {
+        *self.varargs.borrow_mut() = args;
+    }
+
     /// Compile and run `source`, answering what it returned.
     pub fn eval(&self, source: &str, chunk: &str) -> LuaResult<Vec<Own>> {
         self.set_chunk(chunk);
+        let varargs = self.varargs.borrow().clone();
         let mut lua = self.lua.borrow_mut();
         let executor = lua
             .try_enter(|ctx| {
                 let closure = Closure::load(ctx, Some(chunk), source.as_bytes())?;
-                Ok(ctx.stash(Executor::start(ctx, closure.into(), ())))
+                let given: Vec<Value> = varargs.iter().map(|v| convert::into_lua(ctx, v)).collect();
+                Ok(ctx.stash(Executor::start(ctx, closure.into(), Variadic(given))))
             })
             .map_err(|e| self.failure(e))?;
         Self::finish(&mut lua, &executor).map_err(|e| self.failure(e))

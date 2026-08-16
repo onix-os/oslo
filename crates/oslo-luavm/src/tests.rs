@@ -183,18 +183,103 @@ fn a_native_sees_the_scripts_globals() {
 /// An unfinished line asks for more; a wrong one does not.
 #[test]
 fn an_incomplete_chunk_is_told_from_a_broken_one() {
-    for unfinished in ["if true then", "local x = {", "function f()", "for i = 1, 2 do"] {
+    for unfinished in [
+        "if true then",
+        "local x = {",
+        "function f()",
+        "for i = 1, 2 do",
+    ] {
         assert!(
             !super::is_complete(unfinished),
             "`{unfinished}` should have asked for another line"
         );
     }
     for finished in ["x = 1", "if true then end", "print('hi')"] {
-        assert!(super::is_complete(finished), "`{finished}` is a whole chunk");
+        assert!(
+            super::is_complete(finished),
+            "`{finished}` is a whole chunk"
+        );
     }
     // A real mistake must run and report, not hang waiting for input that cannot fix it.
     assert!(
         super::is_complete("x = = 2"),
         "a broken line was mistaken for an unfinished one"
+    );
+}
+
+/// **One namespace, two spellings.**
+///
+/// A shell variable is readable as a Lua global, a Lua string is readable as a shell variable, and
+/// the standard library survives a shell variable that shadows it — which is the rule the read
+/// order exists for.
+#[test]
+fn the_shell_and_lua_share_one_namespace() {
+    use std::collections::HashMap;
+
+    struct Vars(RefCell<HashMap<String, String>>);
+    impl super::Globals for Vars {
+        fn get(&self, name: &str) -> Option<String> {
+            self.0.borrow().get(name).cloned()
+        }
+        fn set(&self, name: &str, value: &str) {
+            self.0
+                .borrow_mut()
+                .insert(name.to_string(), value.to_string());
+        }
+        fn unset(&self, name: &str) {
+            self.0.borrow_mut().remove(name);
+        }
+    }
+
+    let vars = Rc::new(Vars(RefCell::new(HashMap::from([
+        ("one".to_string(), "two".to_string()),
+        // A shell variable that shadows the standard library. `print` must keep working.
+        ("print".to_string(), "/usr/bin/lpr".to_string()),
+    ]))));
+    let engine = Engine::new();
+    engine.set_globals_host(vars.clone());
+
+    // The shell's variable, read as a Lua global.
+    let seen = engine.eval("return one", "=test").expect("runs");
+    assert_eq!(
+        seen.first().map(|v| v.to_display()),
+        Some("two".to_string()),
+        "a shell variable was not readable as a global: {seen:?}"
+    );
+
+    // `_G` first: the standard library wins over a shell variable of the same name.
+    engine
+        .eval(
+            "if type(print) ~= 'function' then error('print was shadowed') end",
+            "=test",
+        )
+        .expect("the standard library survived a shell variable of the same name");
+
+    // A Lua string crosses the other way.
+    engine.eval("name = 'world'", "=test").expect("runs");
+    assert_eq!(
+        vars.0.borrow().get("name").map(String::as_str),
+        Some("world"),
+        "a Lua string did not reach the shell"
+    );
+
+    // A table does not — a shell variable cannot hold one, and `table: 0x…` would lose it.
+    engine.eval("handlers = {}", "=test").expect("runs");
+    assert!(
+        !vars.0.borrow().contains_key("handlers"),
+        "a table was flattened into a shell variable"
+    );
+    engine
+        .eval(
+            "if type(handlers) ~= 'table' then error('the table did not stay in _G') end",
+            "=test",
+        )
+        .expect("the table stayed a table");
+
+    // `nil` unsets in both homes.
+    engine.eval("name = nil", "=test").expect("runs");
+    assert!(
+        !vars.0.borrow().contains_key("name"),
+        "assigning nil left the shell variable behind"
     );
 }
