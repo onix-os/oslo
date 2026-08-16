@@ -2,7 +2,6 @@
 name = "oslo"
 version = "0.3.13"
 edition = "2024"
-# Minimum supported Rust version, mirrored by the MSRV job in .github/workflows/tests.yml.
 rust-version = "1.90"
 description = "oslo"
 license = "MIT"
@@ -13,232 +12,53 @@ publish = false
 path = "src/lib.rs"
 
 [features]
-# A default build produces one static musl binary without a C toolchain.
 default = []
 
-# `vista` — the model behind the ghost prediction and the correction.
-#
-# **Off, and measured.** What it buys is real
-# (`docs/features/prediction-and-repair.md`), but it is a dependency oslo does not otherwise need
-# and 341 KB on a binary meant to be `/bin/sh`: 5,663,840 bytes without it against 6,013,312 with.
-# Without it the ghost comes from history, completions and `$PATH` — the sources that read what is
-# already on the machine — and the shell learns nothing, writes no model and reads none.
-#
-# With it, the model becomes a fourth suggestion source and brings `oslo.repair`, `oslo.predict.*`
-# and the correction drawn after a mistyped line. A config that wants to work in both builds asks
-# before using them: `if oslo.repair then … end`.
 vista = ["oslo-base/vista", "oslo-runtime/vista", "oslo-ui/vista"]
 
-
-# `scratch` — named sessions that keep running when the terminal they were in goes away, reached
-# with one key. See `PLAN.md` and `docs/features/scratch.md`.
-#
-# **Off, because it is a second process and a pty for every session that uses it, and because a
-# shell meant to be `/bin/sh` should not carry a multiplexer nobody asked for.** Unlike `vista` it
-# adds no dependency at all — it is `nix`, which oslo already links — so what it costs is code and
-# the runtime directory, not crates.
-#
-# Without it the key is unbound and the settings are accepted and ignored, so one config works in
-# both builds with nothing to ask.
 scratch = ["oslo-shell/scratch", "oslo-runtime/scratch"]
 
-# `direnv` — directory environments.
-#
-# **Off, and the largest of the four.** It reads a file on every arrival in a directory and can run
-# what it finds there, which is a different kind of trust from anything else the shell does on its
-# own. A build without it has no `direnv` builtin, no `oslo.direnv` API, no `.env.lua` or `.envrc`
-# reading, and no dev shell import — `cd` is `cd`.
 direnv = ["oslo-shell/direnv", "oslo-runtime/direnv"]
 
-# `nix` — a Nix dev shell, imported without entering one.
-#
-# **Independent of `direnv`, on purpose.** Today the only way in is a directory file asking for it,
-# but nothing about reading `nix print-dev-env` needs a directory file — and the things worth adding
-# next (flake-output completion, a prompt segment naming the shell you are in) need one even less.
-# Where the two meet — `use flake` in an `.envrc`, `oslo.direnv.nix_develop` in a `.env.lua` — the
-# entry point asks for both.
 nix = ["oslo-shell/nix", "oslo-runtime/nix"]
 
-# `plugin` — installing somebody else's Lua, and loading it on demand.
-#
-# **The line is drawn where the policy starts.** `oslo.db` and the `pre-cmd` veto are in every
-# build: they are capabilities, small and self-contained, and a config that will never install
-# anything can still want them. Putting them behind a switch would give oslo two dialects, where a
-# config has to ask whether `oslo.db` exists before using it.
-#
-# Installing is different in kind. It fetches somebody's code, decides whether to trust it, and
-# reserves builtin names on their behalf — none of which a `/bin/sh` on a distribution has any use
-# for, and all of which should be absent rather than merely unused.
-#
-# Without it there is no `oslo plugin`, no manifest, no index and no loading. Everything a plugin is
-# *written against* is still there, so the same Lua runs from `conf.d` in either binary.
 plugin = ["oslo-runtime/plugin"]
 
-# `argc` — the shell parses its own scripts' arguments, and other people's.
-#
-# `argc` is a CLI framework for bash: a script declares its options as comments and calls
-# `eval "$(argc --argc-eval "$0" "$@")"` to have them parsed. With this feature oslo *is* that
-# parser, in two forms — `oslo --argc-eval` for a bash script, and the `argc` builtin for a script
-# oslo runs itself, which applies the parse to the environment directly rather than through a
-# subprocess and an `eval`.
-#
-# **Off, and measured: 308 KB.** The real binary, built both ways at this profile:
-#
-# ```text
-#   every feature but this one   6,160,768 bytes
-#   with it                      6,476,160 bytes    +315,392
-# ```
-#
-# An isolated test binary had predicted 439 KB; the difference is what fat LTO shares with crates
-# oslo already links. Still larger than `direnv` and `plugin` together, and it brings five crates
-# oslo does not otherwise have — `nom` among them, a second parser-combinator library in a tree
-# whose argument is that it owns its parsers. It parses *comments*, which is where that line is
-# drawn. A `/bin/sh` has no business parsing argument declarations for other people's scripts, so a
-# distribution ships this off.
-#
-# Without it there is no `--argc-eval`, no `argc` builtin and no completion from a script's
-# comments; the word `argc` falls through to `$PATH`, so the real one still works.
 argc = ["oslo-shell/argc", "oslo-runtime/argc", "dep:argc"]
 
-# `secrets` — the filing: stores, names, `oslo secret run`, the lazy variable, `oslo.secret` and the
-# hooks. **No crypto of its own.** A store names an `encrypt`/`decrypt command` or a `crypto hook`,
-# and a build with only this feature is one a distribution can ship as `/bin/sh` while the machine's
-# own tool — `age`, `gpg`, `systemd-creds` — does the encryption.
-#
-# **Split from the crypto, and measured both ways.** The real binary at this profile:
-#
-# ```text
-#   every other feature on   6,631,840 bytes   78 packages
-#   + secrets                6,730,144 bytes   79 packages    +96 KB,  +1 package
-#   + crypt                  6,767,008 bytes   89 packages    +36 KB, +10 packages
-# ```
-#
-# The one package `secrets` adds is `base64`, for the Lua boundary: a `Value::Str` is UTF-8 and a
-# sealed file is not, so ciphertext crosses as base64 — which is also why `seal` speaks base64
-# rather than an armoured format.
 secrets = ["oslo-base/secrets", "oslo-runtime/secrets"]
 
-# `crypt` — the built-in mechanism, so a fresh install encrypts without being told anything.
-#
-# A **sealed box**: one random file key encrypts the value, and that file key is wrapped once per
-# recipient against their public half with a fresh ephemeral X25519 keypair. That indirection is the
-# whole point — a store readable by several keys, none of them shared, which one symmetric key
-# cannot do however cheap it is.
-#
-# ```text
-#   every other feature on   6,640,032 bytes   78 packages
-#   + secrets                6,746,528 bytes   79 packages    +104 KB,  +1 package
-#   + crypt                  6,807,968 bytes   96 packages    + 60 KB, +17 packages
-# ```
-#
-# **This was `age`, at +160 KB and +32 packages.** What age added on top of the same key model was
-# its *file format*: bech32, scrypt, a localised error catalogue, recipient types for hardware and
-# post-quantum. Keeping the model and dropping the format is 60 KB. Real age files are still one
-# line away — `encrypt command age -R …` — which is also the door to `gpg`, a TPM and a YubiKey.
-#
-# An earlier version was one symmetric key at 36 KB: 24 KB cheaper, and unable to let two machines
-# read one store without copying a private key between them.
-#
-# Named for the job rather than for what implements it, because what sits behind it has changed
-# twice already.
 crypt = ["secrets", "oslo-base/crypt"]
 
 [dependencies]
-# `argc`, behind the feature of the same name. Only the parts a caller needs: the parse and the
-# match (`eval`), the bash renderer for `--argc-eval`, and the completion generator. `native-runtime`
-# is deliberately absent — oslo implements `argc::Runtime` over its own facilities, which is what
-# lets a script's own functions run in this shell rather than in a bash it has to go and find.
 argc = { path = "vendor/argc", default-features = false, features = [
     "eval", "eval-bash", "compgen",
 ], optional = true }
-# `resource` is what `ulimit` reads and sets limits through, and what `times` reads getrusage(2)
-# through. Without it both had to parse /proc by hand.
-# `poll` is declared here rather than arriving by accident. It used to come from rustyline's own
-# feature selection — oslo called `nix::poll` without ever asking for it, and removing rustyline is
-# what revealed the borrowed feature.
 nix = { version = "0.29", features = [
     "process", "signal", "term", "fs", "user", "resource", "hostname", "poll", "inotify",
 ] }
-# `[[ str =~ ere ]]` needs a real POSIX-ERE engine. Approximating it with globs would make every
-# validation idiom (`=~ ^[0-9]+$`) answer plausibly and wrongly.
-# **Trimmed on purpose, and measured.** The default feature set costs ~370KB and is *slower* for
-# what a shell actually does. Two things are dropped:
-#
-# * `perf-dfa` — the lazy DFA. It pays for itself scanning a long haystack and charges per search,
-#   which is the wrong trade for matching one short line at a time: line-by-line scanning measured
-#   972ms with it and 320ms without. Dropping it costs a pattern with no literal to prefilter on a
-#   long haystack — 6ms became 68ms — which is the rarer shape and still milliseconds.
-# * `unicode-age`, `-bool`, `-script`, `-segment` — the tables behind `\p{Age:…}`, `\p{Script:…}`
-#   and `\b{…}`. Nothing in a shell's regex reaches for them. `unicode-case` stays for `(?i)` and
-#   `-perl` for `\d \w \s`.
-# * `unicode-gencat` — the tables behind `\p{L}`, `\p{Nd}` and the rest of the general categories.
-#   Kept at first, on the same reasoning that keeps `-case` and `-perl`; dropped after measuring it
-#   at **57,344 bytes** of the shipped binary, which is more than `secrets` and `crypt` together.
-#   A shell's regex is a filter over paths, process names and log lines, and `\w` covers that;
-#   `\p{Lu}` is a thing a text editor needs. It fails loudly rather than quietly — the pattern is
-#   refused at compile time with `invalid pattern: regex parse error` pointing at the `\p{…}` —
-#   which is the property that makes dropping a capability safe rather than a trap.
-#
-# `perf-literal` is kept, and it is the one that matters: without it a long scan goes from 4ms to
-# 192ms. It brings `aho-corasick` and `memchr`, and earns them.
 regex = { version = "1", default-features = false, features = [
     "std", "unicode-case", "unicode-perl",
     "perf-literal", "perf-inline",
 ] }
-# JSON is a core capability rather than a library a user can install: a C module cannot load into
-# a static binary, which rules out lua-cjson and every Lua JSON parser that wraps it. `serde_json`
-# is pure Rust, so it works where those cannot. See PLAN-LUA.md.
-# `preserve_order` keeps a document's own column order: without it `serde_json::Map` is a
-# `BTreeMap`, so `from json` handed the record its fields alphabetised and `to text` printed them in
-# an order matching neither the document nor its own header.
 serde_json = { version = "1", features = ["preserve_order"] }
 which = "7.0"
 unicode-segmentation = "1.12"
 unicode-width = "0.2"
 
-# Used for *parsing only* — its AST is converted straight into oslo's own in
-# `src/parser/brush_adapter/`, and nothing else from brush executes anything. Every builtin here is
-# oslo's own.
-#
-# Pinned to a fork branch rather than the crates.io release while
-# https://github.com/reubeno/brush/pull/1253 is open. That PR fixes a tokenizer bug the published
-# 0.4.0 has: a comment inside `$( … )` is only recognised when an *even* number of blanks precedes
-# its `#`, so `$( #'` fails to parse. It rejects real scripts — two files in modernish's test suite
-# hit it. The branch is upstream `main` plus that one commit; revert this to a plain version
-# requirement once it lands in a release.
-#
-# The one thing this still costs is `for ((;;))` with no space between the section separators:
-# brush's tokenizer takes the longest match and fuses them into the single `;;` that ends a `case`
-# item, so the arithmetic-for rule never sees the two `;` it asks for. That is a loud syntax error
-# rather than a wrong answer — see tests/differential/expected_fail.rs.
 brush-parser = { path = "vendor/brush-parser" }
 oslo-base = { path = "crates/oslo-base" }
 oslo-luavm = { path = "crates/oslo-luavm" }
 oslo-runtime = { path = "crates/oslo-runtime" }
 oslo-shell = { path = "crates/oslo-shell" }
 oslo-ui = { path = "crates/oslo-ui" }
-# The allow list for directory environments is keyed by a hash of the rc file's path *and* its
-# contents, which is what makes editing an allowed file revoke it. Pure Rust, so it does not cost
-# the static musl build a C toolchain.
-# **0.10, deliberately.** `tagdata` pulls `sha3 0.10`, which is built on `digest 0.10`; asking for
-# `sha2 0.11` meant a second copy of the whole framework — `digest`, `block-buffer` and
-# `crypto-common` each linked twice — for no benefit. SHA-256 is SHA-256, so the version here
-# changes no hash and therefore invalidates no `.envrc` that has already been allowed.
 sha2 = "0.10"
-# A regular dependency rather than a dev one since the directory environment arrived: an `.envrc`'s
-# own output is captured to a scratch file so it can be printed under the file that produced it.
-# A pipe would be the obvious choice and is the wrong one — nothing drains it while the rc file
-# runs, so a chatty `.envrc` would block forever on its own output once the pipe filled.
 tempfile = "3.17"
-# The same crate as above, with the switch that exposes the lock serialising tests which touch the
-# process-wide feature bitset. Cargo unifies the two when it builds a test and does not when it
-# builds the shell, so a release binary carries neither the lock nor the reset.
+
 [dev-dependencies]
 oslo-base = { path = "crates/oslo-base" }
 oslo-ui = { path = "crates/oslo-ui" }
 
-# The crates oslo is built from, and the ones it vendors. `fuzz/` declares its own empty
-# [workspace] to stay out.
 [workspace]
 members = [
   "crates/oslo-base",
@@ -250,12 +70,8 @@ members = [
   "vendor/brush-parser",
 ]
 
-
-
 [[bench]]
 name = "fuzzy"
-# `bench/`, not cargo's default `benches/`. The path has to be stated because of that, and stating
-# it is the whole cost — cargo finds nothing to auto-discover and takes this instead.
 path = "bench/fuzzy.rs"
 harness = false
 
@@ -270,161 +86,27 @@ path = "bench/predict.rs"
 harness = false
 required-features = ["vista"]
 
-# Measured, not assumed — the before/after is in PERF_AND_CODE.md.
-#
-# **No `panic = "abort"`, and it is the most expensive "no" in this file: 806,912 bytes, 11.8%.**
-# Measured on the shipped musl build, 6,841,128 → 6,034,216. Written down because a number that
-# large will be proposed again, and the answer should not have to be rediscovered.
-#
-# What it buys back is **ten** `catch_unwind` sites, not the one this comment used to name. Every
-# one of them has a live recovery path, and under `abort` every one becomes a dead branch and a
-# dead shell:
-#
-# * `track/kv/mod.rs` — five of them, wrapping the *third-party* storage engine. "database open
-#   panicked" and "read transaction panicked" are real strings this code can produce, because a
-#   database truncated by a full disk or a kill during a write is a file the engine can panic on.
-#   Under `abort`, a corrupt `~/.local/share/oslo` history file stops the shell from starting, and
-#   there is no way out of it from inside the shell.
-# * `track/writer.rs` — the history writer thread's per-job guard: *one bad record costs one
-#   record*. Under `abort` one bad record costs the session.
-# * `track/kv/file.rs` — an unopenable database answers `None` and the shell runs without history.
-# * `startup::environments` — restores stdout and stderr before re-raising, so a panic inside a
-#   `.env.lua` is reported to the terminal rather than into a temp file nobody reads.
-#
-# The trade is 800 KB against a shell that dies on a data file it could have degraded past. A
-# `/bin/sh` that will not start because its own history is corrupt is a worse product than a larger
-# one. `-Z build-std` with `panic_immediate_abort` would be the way to have both, and it is nightly
-# — `rust-toolchain.toml` pins stable.
 [profile.release]
-# **Fat, since the shell became six crates.**
-#
-# `codegen-units = 1` used to mean the whole shell was one optimisation unit, because the whole
-# shell was one crate. Splitting it made five, and thin LTO optimises across units far less
-# thoroughly than being inside one — the static musl binary grew 5.77 MB → 6.09 MB with no code
-# added. Fat LTO does the cross-module work properly and gets it back:
-#
-# ```text
-#                thin      fat
-#   one crate    5.77 MB   5.49 MB
-#   six crates   6.09 MB   5.68 MB
-# ```
-#
-# So the split costs 0.19 MB rather than 0.32, and what ships is *smaller* than what shipped before
-# it — 5.68 against 5.77. The price is link time: a release relink went 33.8 s → 46.0 s. That is
-# paid by `make build` and by CI, not by `make dev`, which is the inner loop and does not use this
-# profile at all.
 lto = "fat"
 codegen-units = 1
 strip = "symbols"
-
-# **Size, for oslo's own crates too — with the editor as the exception.**
-#
-# The rule below has applied to dependencies for a while; oslo's own crates were the last thing
-# still built for speed by default, and they are most of the binary. Applying the same setting to
-# them is worth 1.22 MB and, measured, costs nothing a person could feel:
-#
-# ```text
-#                                    static musl      paint      hint
-#   opt-level = 3 (before)             6.95 MB       2.21 us    2.21 us
-#   opt-level = "s", flat              5.57 MB       2.73 us    2.55 us
-#   opt-level = "s", oslo-ui at 3      5.73 MB       2.24 us    2.29 us
-# ```
-#
-# `bench/keystroke.rs`, min of six runs — a single run on this machine varies by a factor of two,
-# so anything less than that is noise dressed up as a measurement. The flat setting costs half a
-# microsecond per keystroke against a budget of about ten milliseconds, which would have been
-# acceptable; the exception makes it free, so there is no reason not to take it.
-#
-# `"z"` was measured too: 5.04 MB, another 0.53 below `"s"`. Not taken, because the speed of it was
-# never measured and the marginal byte is worth less than the certainty.
 opt-level = "s"
 
-# **The dependencies are compiled for size; oslo and its parser are not.**
-#
-# Compiling everything below this crate for size was measured once and deferred, because it cost
-# 14% on the parser loop and 3% on the arithmetic loop. The reason was known even then: thin LTO
-# inlines `brush-parser` into oslo's hot path, so shrinking it shrinks the loop that runs on every
-# line typed. Nothing else oslo depends on is on that path.
-#
-# So the exception is named rather than the rule abandoned. `"*"` takes the size setting; the
-# parser is put back to `3` beside it, and cargo applies the more specific entry. That is the
-# refinement the earlier note said was untested — it is tested now, and the numbers are in the
-# commit that made this change.
 [profile.release.package."*"]
 opt-level = "s"
 
-# The one dependency on the hot path, and the whole reason `"*"` above needed an exception.
 [profile.release.package.brush-parser]
 opt-level = 3
 
-# **The editor is oslo's own `brush-parser`**: the one crate on the path a keystroke takes, where
-# `"s"` was measurable. `paint` and `hint` run on every key and both come from here — 2.73 µs and
-# 2.55 µs built for size, 2.24 and 2.29 built for speed, against 2.21 before any of this. The other
-# 160 KB is the cheapest 160 KB in the binary.
 [profile.release.package.oslo-ui]
 opt-level = 3
 
-# **The one place where `"s"` was chosen after measuring both.** `argc` was built at `3` first, on
-# the argument that a parse runs once per invocation of a script that uses it and that is the shape
-# which pays for speed. The binary says what that argument costs:
-#
-# ```text
-#   without argc      6,164,864
-#   argc at "s"       6,508,928    +336 KB
-#   argc at 3         6,562,176    +388 KB
-#                                  ───────
-#   maximum optimisation costs         52 KB
-# ```
-#
-# Fifty-two kilobytes is more than every optional argc *feature* put together — `eval-bash` is 12 KB
-# and `compgen` is 400 bytes — to make a parse of a ten-line declaration faster than the
-# microseconds it already takes. Nobody can feel that; everybody carries the bytes.
 [profile.release.package.argc]
 opt-level = "s"
 
-# **`"*"` does not reach oslo's own crates, and that is cargo's rule rather than luck.**
-#
-# Worth writing down, because it is the obvious thing to get wrong once the shell is five crates:
-# `profile.package."*"` matches *dependencies*, not workspace members, so `oslo-shell` and the rest
-# take this profile's own `opt-level` rather than being quietly compiled for size along with
-# everything else. Checked rather than assumed — setting `oslo-ui` to `"z"` moves the binary
-# 5.96 MB → 5.77 MB, so a per-member override does take effect when one is written.
-
-# **The two members that are cold enough for `"z"`, measured both ways.**
-#
-# `oslo-runtime` is startup, configuration and the `oslo.*` bindings; `oslo-base` is the value type,
-# globbing and the history store. Neither is on the path a *keystroke* takes — that is `oslo-ui` and
-# `brush-parser`, which is why those two are the exceptions at `3` above.
-#
-# ```text
-#                              size          shell loop   glob    json
-#   both at "s"                7,161,120     0.07 s       0.11 s  0.121 s
-#   oslo-runtime at "z"        7,099,856     0.07 s       0.11 s  0.122 s
-#   + oslo-base at "z"         7,034,176     0.07 s       0.11 s  0.121 s
-#                              ─────────
-#                               −126,944
-# ```
-#
-# 124 KB for nothing measurable, over seven runs of each taking the best. The benchmarks are 30,000
-# iterations of a shell `for` with a `case` in it, 300 globs of `crates/*/src/*.rs`, and 20,000
-# `oslo.json` round trips.
 [profile.release.package.oslo-runtime]
 opt-level = "z"
 
 [profile.release.package.oslo-base]
 opt-level = "z"
 
-# **Two things that were tried and are deliberately not here.**
-#
-# *This profile's own `opt-level` at `"z"`.* It is the biggest single lever — 7,161,120 → 6,768,672,
-# 383 KB — and it was recorded above as untaken because the speed had never been measured. It has
-# now: the shell loop goes 0.07 s → 0.09 s and `oslo.json` 0.121 s → 0.139 s, both about 20%. That
-# is `oslo-shell`, the parser and executor that run on every command, and 5% of the binary is not
-# worth a fifth of it.
-#
-# *A per-package entry for `oslo` itself.* Overriding the **root** package's profile takes it out of
-# the fat-LTO merge, and the binary grows 7,161,120 → 8,686,760. A 1.5 MB regression from a setting
-# that reads like a size optimisation is worth one line to warn about.
-#
-# *`"z"` on the cold dependencies* — `regex` and its three companions, `serde_json`, the crypto
-# pair. 3,280 bytes across all of them, because fat LTO has already done that work.
