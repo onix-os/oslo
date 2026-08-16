@@ -158,7 +158,8 @@ pub fn raise<'gc>(ctx: Context<'gc>, error: &LuaError) -> luna::Error<'gc> {
 /// what makes `to json` and `to text` print a row's columns the way the document had them.
 /// luna's hash part has no order to give back — it is `ahash`, seeded per process, so two runs
 /// disagree. A row that goes into Lua and comes back out therefore loses its column order. That
-/// is a real gap for the structured pipeline and is recorded in `PLAN-LUA-VM.md`; the array part
+/// is a real gap for the structured pipeline and is recorded in luna's `plans/oslo_requirement.md`;
+/// the array part
 /// (`1..n`) is unaffected, because it is a vector.
 pub fn from_lua<'gc>(ctx: Context<'gc>, value: Value<'gc>) -> Own {
     from_lua_within(ctx, value, &mut std::collections::HashMap::new())

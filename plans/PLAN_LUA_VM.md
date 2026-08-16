@@ -1,5 +1,17 @@
 # Should the Lua be a real VM? Measured.
 
+> **Done, but not with the engine measured here.** This is the spike that decided the question, kept
+> for the reasoning and the method. Two things in it are now history:
+>
+> * **Every number below is `mlua`'s**, the reference C interpreter. The engine actually adopted is
+>   [`luna`](https://github.com/onix-os/luna), a stackless Rust VM — chosen after this was written,
+>   because `mlua` needs a C toolchain for a musl build and pure Rust was the point. luna's own
+>   measurements, and the capability table that matters, are in
+>   `docs/features/lua-interpreter.md`. **The capability comparison below does not describe luna**:
+>   luna's standard library is considerably smaller, which this spike did not anticipate.
+> * **The port is finished.** "What this branch is not" describes a spike whose API was unbound;
+>   `oslo-lua` and `vendor/full_moon` are now deleted and the shell runs on the VM.
+
 `oslo-lua` is a tree walker over `full_moon`'s AST. `docs/features/lua-interpreter.md` records why —
 one Rust core behind two front ends, and no C anywhere near a static musl build — and it records
 what that costs. The question is whether the trade still holds.
