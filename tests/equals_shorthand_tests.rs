@@ -67,6 +67,56 @@ fn a_script_still_prints_the_word_untouched() {
     }
 }
 
+/// **The refusal names the command you meant.**
+///
+/// `olso is not a command` is true and useless — you typed it *because* you believe it is one, so
+/// being told otherwise leaves you re-reading your own line for the difference. Two letters the
+/// wrong way round is the commonest typo there is, and the shell already has the index that catches
+/// it. Its own binary is the fixture, because a name from `$PATH` would make this depend on what
+/// the machine happens to have installed.
+#[test]
+fn the_refusal_suggests_the_command_that_was_meant() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let bin = dir.path().join("bin");
+    std::fs::create_dir_all(&bin).expect("mkdir");
+    let tool = bin.join("zqwidget");
+    std::fs::write(&tool, "#!/bin/sh\n").expect("write");
+    {
+        use std::os::unix::fs::PermissionsExt;
+        let mut p = std::fs::metadata(&tool).expect("stat").permissions();
+        p.set_mode(0o755);
+        std::fs::set_permissions(&tool, p).expect("chmod");
+    }
+
+    let mut command = Command::new(oslo_bin());
+    let out = command
+        .arg("-i")
+        .arg("-c")
+        // `zqwdiget` is `zqwidget` with one pair swapped.
+        .arg("echo =zqwdiget")
+        .env("PATH", &bin)
+        .current_dir(dir.path())
+        .stdin(Stdio::null())
+        .output()
+        .expect("spawn oslo");
+    let err = String::from_utf8_lossy(&out.stderr);
+    assert!(
+        err.contains("did you mean =zqwidget?"),
+        "the near miss was not offered: {err:?}"
+    );
+}
+
+/// A name nothing is near gets no guess, rather than a bad one.
+#[test]
+fn a_name_with_no_near_miss_is_simply_refused() {
+    let (_, err) = run("echo =zzqqxxnothinglikethis", true);
+    assert!(err.contains("is not a command"), "{err:?}");
+    assert!(
+        !err.contains("did you mean"),
+        "invented a suggestion: {err:?}"
+    );
+}
+
 /// **Quoting makes it a literal**, which is what stops the error being a trap.
 ///
 /// `echo "=ls"` expanded through its quotes before this — the same bug `@name` had and had fixed.

@@ -75,8 +75,23 @@ pub(crate) fn equals_field(env: &Environment, field: Field) -> std::result::Resu
     };
     match equals(name) {
         Equals::Found(path) => Ok(vec![Run::new(path, Origin::Quoted)]),
-        Equals::Unknown(name) => Err(name),
+        Equals::Unknown(name) => Err(refusal(env, &name)),
         Equals::NotSugar => Ok(field),
+    }
+}
+
+/// What to say about a name that is not a command — and what it probably was.
+///
+/// **The near-miss is the whole message.** `olso is not a command` is true and useless: the reason
+/// you typed it is that you believe it is one, so being told otherwise leaves you reading your own
+/// line for the difference. Two letters the wrong way round is the commonest typo there is, and
+/// [`command_index::nearest`] is already built to catch exactly that — the same suggestion the
+/// repair offers after a mistyped line, said here at the moment the shorthand fails instead.
+fn refusal(env: &Environment, name: &str) -> String {
+    let path = env.get_var("PATH").unwrap_or_default();
+    match oslo_ui::command_index::nearest(path, name) {
+        Some(near) => format!("={name}: {name} is not a command — did you mean ={near}?"),
+        None => format!("={name}: {name} is not a command"),
     }
 }
 

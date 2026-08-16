@@ -354,9 +354,8 @@ fn expand_word_at(env: &mut Environment, word: &Word, place: Place) -> Result<Ve
         // see the field's *origin* — `echo "=ls"` is a literal and must stay one — and the origin
         // is gone by the time the field is a `String`. What it answers with is marked quoted, so
         // the path is still not split or globbed afterwards.
-        let field = crate::expand::sugar::equals_field(env, field).map_err(|name| {
-            ShellError::ExpansionError(format!("={name}: {name} is not a command"))
-        })?;
+        let field =
+            crate::expand::sugar::equals_field(env, field).map_err(ShellError::ExpansionError)?;
         for split in split_field(ifs, field) {
             if glob {
                 out.extend(expand_glob(&split));
