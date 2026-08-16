@@ -4,7 +4,29 @@
 //! behaviour that a reimplementation gets subtly wrong: integer versus float subtypes, what `#`
 //! reports, when a metamethod fires, and which errors are catchable.
 
+mod common;
+
 use oslo_luavm::Engine;
+
+/// Run a chunk through the real binary, which is the only place oslo's own surface exists.
+///
+/// **Most cases here do not need this.** They are language semantics — subtypes, `#`, metamethods —
+/// and a bare [`Engine`] answers them in microseconds. What needs a process is anything about the
+/// names oslo *replaces*: `os.execute`, `io.popen` and `os.tmpname` are refused by
+/// `lua::api::policy`, which is installed when the shell builds its `oslo` table and nowhere else.
+fn in_the_shell(source: &str) -> String {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let script = dir.path().join("case.lua");
+    std::fs::write(&script, source).expect("write");
+    let out = std::process::Command::new(common::oslo_bin())
+        .arg(&script)
+        .env("HOME", dir.path())
+        .env_remove("ENV")
+        .stdin(std::process::Stdio::null())
+        .output()
+        .expect("spawn oslo");
+    String::from_utf8_lossy(&out.stdout).trim_end().to_string()
+}
 
 /// Run a chunk and collect what it returned, rendered as Lua would print it.
 fn eval_to_string(source: &str) -> Result<String, String> {
@@ -299,10 +321,14 @@ fn recursion_is_bounded_by_a_catchable_error_on_the_stack_oslo_reserves() {
             ";
             assert_eq!(eval_to_string(deep).unwrap(), "150");
 
+            // `tostring(err)` rather than `err`: the VM raises this one as userdata where Lua 5.4
+            // raises a string, so the message is reachable but `err:find(…)` is not. What is being
+            // pinned here is that the recursion *stops*, catchably, and says why — a runaway
+            // function in a config must not take the shell down with it.
             let runaway = r"
                 local function f() return 1 + f() end
                 local ok, err = pcall(f)
-                return ok, err
+                return ok, tostring(err)
             ";
             let out = eval_to_string(runaway).unwrap();
             assert!(out.starts_with("false\t"), "got {out}");
@@ -314,17 +340,31 @@ fn recursion_is_bounded_by_a_catchable_error_on_the_stack_oslo_reserves() {
         .expect("the evaluator must not overflow the stack oslo reserves");
 }
 
+/// **A name oslo refuses is a function that explains itself, never a `nil`.**
+///
+/// The rule used to be about a tree walker's gaps — `coroutine.create` was a stub that raised
+/// rather than a missing field, so the first use said what was wrong instead of `attempt to call a
+/// nil value`. The VM implements coroutines, so the gaps are gone; what survives the rule is the
+/// handful of names oslo replaces *on purpose*, and they are held to it exactly the same way.
 #[test]
-fn unimplemented_surface_is_present_and_says_so() {
-    // Not `attempt to index a nil value` — the whole point of the stub tables.
-    let source = "local ok, err = pcall(coroutine.create, function() end) return ok, err";
-    let out = eval_to_string(source).unwrap();
-    assert!(out.starts_with("false\t"), "got {out}");
-    assert!(
-        out.contains("coroutine.create is not implemented"),
-        "got {out}"
-    );
-    assert_eq!(eval_to_string("return type(coroutine)").unwrap(), "table");
+fn a_refused_name_is_present_and_says_so() {
+    for (call, expected) in [
+        ("os.execute('ls')", "oslo.run"),
+        ("io.popen('ls')", "oslo.run"),
+        ("os.tmpname()", "oslo.fs.mktemp"),
+    ] {
+        let name = call.split('(').next().unwrap();
+        assert_eq!(
+            in_the_shell(&format!("print(type({name}))")),
+            "function",
+            "{name} is not there at all, so the first use is a nil error"
+        );
+        let out = in_the_shell(&format!(
+            "local ok, err = pcall(function() return {call} end) print(ok, err)"
+        ));
+        assert!(out.starts_with("false\t"), "for {call}: {out}");
+        assert!(out.contains(expected), "for {call}: {out}");
+    }
 }
 
 #[test]
@@ -480,29 +520,31 @@ fn os_date_formats_the_directives_a_script_uses() {
     // The day of the year has to count the leap day that came before it.
     returns("os.date('%j', 1709164800)", "060");
     returns("os.date('%Y%%', 0)", "1970%");
-    // An unknown directive survives rather than vanishing.
-    returns("os.date('%A', 0)", "%A");
+    // The name directives, which the evaluator this replaced passed through untranslated.
+    returns("os.date('%A', 0)", "Thursday");
+    returns("os.date('%b', 0)", "Jan");
 }
 
 #[test]
 fn the_two_shell_out_routes_refuse_and_say_what_to_use() {
     // Real Lua runs both through `/bin/sh` — someone else's shell, from inside this one, and
-    // nothing at all on a system where oslo is the only shell installed.
+    // nothing at all on a system where oslo is the only shell installed. The VM implements both
+    // correctly; oslo replaces them, so this has to run where that replacement happened.
     for call in ["os.execute('ls')", "io.popen('ls')"] {
-        let source = format!("local ok, err = pcall(function() return {call} end) return err");
-        let message = eval_to_string(&source).unwrap();
+        let message = in_the_shell(&format!(
+            "local ok, err = pcall(function() return {call} end) print(err)"
+        ));
         assert!(message.contains("/bin/sh"), "for {call}: {message}");
         assert!(message.contains("oslo.run"), "for {call}: {message}");
     }
     // With no argument `os.execute()` asks whether a shell is available, and one is.
-    returns("os.execute()", "true");
+    assert_eq!(in_the_shell("print(os.execute())"), "true");
 }
 
 #[test]
 fn os_tmpname_points_at_the_call_that_is_not_a_race() {
     let message =
-        eval_to_string("local ok, err = pcall(function() return os.tmpname() end) return err")
-            .unwrap();
+        in_the_shell("local ok, err = pcall(function() return os.tmpname() end) print(err)");
     assert!(message.contains("oslo.fs.mktemp"), "{message}");
 }
 

@@ -1,10 +1,14 @@
 # The Lua interpreter
 
 oslo speaks Lua 5.4 through [`luna`](https://github.com/onix-os/luna), a stackless bytecode VM with
-a tracing garbage collector, written in pure Rust and vendored in `vendor/luna`. Pure Rust is the
-requirement everything else follows from: oslo ships as a single statically linked musl binary, and
-speaking Lua had to cost no C toolchain. `mlua` — a binding to the reference interpreter — would
-compile some thirty thousand lines of C into the binary and need a musl cross-compiler to link it.
+a tracing garbage collector, written in pure Rust. Pure Rust is the requirement everything else
+follows from: oslo ships as a single statically linked musl binary, and speaking Lua had to cost no
+C toolchain. `mlua` — a binding to the reference interpreter — would compile some thirty thousand
+lines of C into the binary and need a musl cross-compiler to link it.
+
+It is a dependency **pinned to a commit** rather than vendored or tracked on a branch. luna has no
+tagged releases yet, and a branch would make a build depend on the day it ran; the hash moves when
+somebody moves it, and `cargo update` cannot move it at all. See `crates/oslo-luavm/Cargo.toml`.
 
 **This replaced a tree walker.** Until recently the evaluator was oslo's own, walking a `full_moon`
 AST. That crate and its parser are gone: 19,630 lines deleted, in exchange for coroutines, `goto`,
@@ -44,9 +48,9 @@ to seventy files.
 ### The crate graph
 
 ```text
-  vendor/luna ──► oslo-luavm ──► oslo-shell ──► oslo-runtime
-                       ▲              ▲              │
-                  oslo-base ──────────┴──────────────┘
+  luna (pinned) ──► oslo-luavm ──► oslo-shell ──► oslo-runtime
+                          ▲              ▲              │
+                     oslo-base ──────────┴──────────────┘
 ```
 
 ### Crossing the boundary
@@ -86,8 +90,28 @@ all on a system where oslo is the only shell installed.
 
 ## Configuration
 
-The interpreter has no settings of its own. A single-file `~/.config/oslo/config.lua` is the
-supported shape today; the module search path is part of the `package` support still to land.
+The interpreter has no settings of its own. What it exposes is the module search path, set by
+`lua::api::policy` from the environment at startup:
+
+```lua
+-- ~/.config/oslo/lua/?.lua, then ?/init.lua, then the system 5.4 directories.
+-- Rooted at $XDG_CONFIG_HOME when that is set, otherwise $HOME/.config.
+print(package.path)
+
+-- So a library of your own lives beside the config that requires it:
+--   ~/.config/oslo/lua/mine.lua
+local mine = require("mine")
+
+-- Both are ordinary Lua values, so a config can extend the path, or register a
+-- module that has no file at all. `preload` wins over the filesystem, so a
+-- host-provided module shadows a file of the same name rather than racing it.
+package.path = "/opt/team/lua/?.lua;" .. package.path
+package.preload["team.colours"] = function() return { accent = "#89b4fa" } end
+```
+
+`package.cpath` is the empty string, not unset: a static binary cannot `dlopen` anything, and
+advertising a C path would turn an honest "module not found" into a confusing loader error — but a
+`cpath` that is absent breaks `package.cpath == ""`, which is how a script asks.
 
 ## Measurements
 
@@ -102,37 +126,36 @@ document recorded, measured the same way.
 | 200,000 calls of a one-line Lua function | 0.093 s | **0.02 s** |
 | 100 processes, each running an empty chunk | 0.61 s | **0.36 s** |
 
-The benchmarks live in `bench/lua/`. The `_noos` variants exist because they cannot time themselves
-with `os.clock()` yet — see below.
+The benchmarks live in `bench/lua/`. The `_noos` variants time themselves from outside rather than
+with `os.clock()`, which is how these figures include process start.
 
 ## What it cannot do yet
 
-These are gaps in luna rather than in the binding, and each is written up with a minimal
-reproduction in luna's own `plans/oslo_requirement.md`. **The shell itself is unaffected by all of
-them** — commands, pipes, job control, globbing, completion, history and oslo's own structured
-tools are Rust and never touch the VM.
+The standard library is complete enough that oslo's own tests no longer notice its edges: `os`,
+`io`, `package`/`require`, `utf8`, `debug`, `coroutine`, `string.pack` and `_G` are all there,
+`pairs` iterates in insertion order, recursion is bounded by a catchable error, and floats print as
+Lua 5.4 prints them.
 
-* **`os`, `io`, `package`/`require`/`dofile`, `_G`, `xpcall`, `utf8`, `debug` are absent.** In
-  practice: no clock in a Lua prompt, no splitting a config across files, and no `io.open` — though
-  `oslo.fs.read` / `write` / `exists` cover what a shell script does with a file. A prompt function
-  that reaches for a missing name fails *gracefully*: the error is reported and the built-in prompt
-  is drawn.
-* **`pairs` does not iterate in insertion order.** luna's hash part is `ahash`, seeded per process,
-  so a row built **in Lua** prints its columns in a different order every run. oslo's own tools
-  build their rows in Rust and are unaffected — `ls | to json` is stable.
-* **A native cannot always call back into Lua.** Stepping a nested executor works, and a
-  Lua-registered tool typed at the prompt runs correctly. But `oslo.proc.exec("<a tool written in
-  Lua>")` *called from Lua* panics when that tool's body closes over a local, because reading an
-  upvalue of a still-running thread hits a borrow conflict inside the VM.
-* **Recursion is unbounded**, so a runaway recursive function in a config hangs rather than raising
-  a catchable error.
-* **`error(msg)` does not prepend `chunk:line:`**, so the `msg:match(":(%d+): ")` idiom finds
-  nothing. `error(msg, 0)` and `assert` are already correct.
-* **Floats render as integers.** `tostring(3.0)` is `3` and `10/2` prints `5`, where Lua 5.4 gives
-  `3.0` and `5.0` — the subtype is tracked correctly, only the formatting is wrong.
-* **Unimplemented names are `nil` rather than present and erroring.** oslo's rule is that a name it
-  does not implement should raise `… is not implemented in oslo's Lua` with a file and a line, so
-  the reader gets a sentence instead of `attempt to index a nil value`.
+Two things remain, both about the *shape* of an error rather than what it says:
+
+* **A runtime error is `userdata`, where Lua 5.4 raises a string.** `tostring(err)` reaches the
+  message, so nothing is lost — but `err:find("…")`, the idiom for inspecting one, cannot index a
+  userdata. `error("…")` and `require`'s "module not found" are already strings; it is the errors
+  the VM itself raises that are not.
+* **`require` does not detect a module that requires itself.** Reference Lua marks a module as in
+  progress and reports `loop or previous error loading module`; here the recursion runs to the call
+  depth limit and reports a stack overflow instead. It stops, catchably — it just says the wrong
+  thing about why.
+
+Neither is reachable from ordinary shell use. Both are written up with reproductions in luna's
+`plans/oslo_requirement.md`.
+
+**Three names oslo refuses on purpose**, and those are not gaps — see
+`crates/oslo-runtime/src/lua/api/policy.rs`. `os.execute` and `io.popen` would run their argument
+through `/bin/sh`, another shell started from inside this one; `os.tmpname` names a file without
+creating it, leaving a window for somebody else to take the name. Each refusal names its
+replacement, and `package.path` is set there too, without stock Lua's `./?.lua` — in a shell,
+searching the working directory is a script hijack.
 
 ## Where it lives
 
@@ -147,5 +170,5 @@ tools are Rust and never touch the VM.
 | `crates/oslo-runtime/src/lua/engine.rs` | `LuaEngine`, `ShellGlobals`, `call_lua_builtin`, `status_from_lua` |
 | `crates/oslo-runtime/src/lua/api/` | the `oslo.*` namespace; `api/util.rs` registers every callable; `api/run.rs` builds `sh` |
 | `crates/oslo-shell/src/data/tools/where_.rs` | `where` and `each`, compiling one expression and running it per row |
-| `vendor/luna/` | the VM; `plans/oslo_requirement.md` is what oslo still needs from it |
+| `crates/oslo-runtime/src/lua/api/policy.rs` | the names oslo replaces, and where `require` looks |
 | `tests/lua_eval_tests.rs`, `tests/lua_corpus/` | the language tests and the hand-written corpus |

@@ -38,6 +38,7 @@ mod messages;
 mod nix;
 mod optional;
 mod path;
+mod policy;
 #[cfg(feature = "vista")]
 mod predict;
 mod proc;
@@ -234,6 +235,8 @@ pub fn install(host: &dyn Host, registry: &Registry, env: Arc<Mutex<Environment>
     // After the global exists, because these are written in Lua and reach the table through it.
     #[cfg(feature = "nix")]
     nix::add_helpers(host);
+    // Last, so it replaces the standard names rather than being replaced by them.
+    policy::apply(host);
 }
 
 /// Make every `oslo.X` table `require`-able as `oslo.X`.

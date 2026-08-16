@@ -5,11 +5,16 @@ edition = "2024"
 rust-version = "1.90"
 license = "MIT"
 publish = false
-description = "The Lua VM oslo runs on: luna, vendored."
+description = "The Lua VM oslo runs on: luna."
 
 [dependencies]
-# `vendor/luna` — a stackless Lua VM in pure Rust with a real garbage collector. No C, so a static
-# musl build needs no C toolchain, which is the property `oslo-lua` was written to keep.
-luna = { path = "../../vendor/luna" }
+# A stackless Lua VM in pure Rust with a tracing garbage collector. No C, so a static musl build
+# needs no C toolchain — the property the evaluator this replaced was written to keep.
+#
+# **Pinned to a commit, not a tag or a branch.** luna has no tagged releases yet, and a branch would
+# make the build depend on when it was run: the same oslo revision would compile against whatever
+# had landed that morning. The hash moves when somebody moves it, deliberately, and `cargo update`
+# cannot move it at all.
+luna = { git = "https://github.com/onix-os/luna", rev = "48b6836822c3eafabdc64bdedfb3091b85f254f5" }
 # The value type the shell speaks. The whole point of this crate is converting between the two.
 oslo-base = { path = "../oslo-base" }

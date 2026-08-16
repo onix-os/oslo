@@ -75,7 +75,7 @@ pub(crate) fn attach<'gc>(ctx: Context<'gc>, host: Rc<dyn Globals>) {
 
     let _ = meta.set(ctx, "__index", Value::Function(index.into()));
     let _ = meta.set(ctx, "__newindex", Value::Function(newindex.into()));
-    ctx.globals().set_metatable(&ctx, Some(meta));
+    ctx.globals().set_metatable(ctx, Some(meta));
 }
 
 /// The key `__index` was asked for: `(table, key)`.

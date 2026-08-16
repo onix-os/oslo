@@ -67,8 +67,11 @@ pub trait Host {
     /// Run a chunk and answer what it returned.
     ///
     /// Used at *install* time, where a binding whose shape needs a Lua-side wrapper compiles one
-    /// and keeps it. Refused mid-call, for the same reason [`call`](Self::call) is.
+    /// and keeps it.
     fn eval(&self, source: &str, chunk: &str) -> LuaResult<Vec<Own>>;
+
+    /// Compile a chunk without running it, answering it as a callable value.
+    fn load(&self, source: &str, chunk: &str) -> LuaResult<Own>;
 }
 
 /// Walk `path` from the globals and set the last name, inside the arena.
@@ -142,6 +145,23 @@ impl<'gc> Host for CallbackHost<'gc> {
             .map_err(|e| LuaError::new(e.to_string()))?;
         run_nested(ctx, luna::Executor::start(ctx, closure.into(), ()))
     }
+
+    fn load(&self, source: &str, chunk: &str) -> LuaResult<Own> {
+        let ctx = self.ctx;
+        let closure = luna::Closure::load(ctx, Some(chunk), source.as_bytes())
+            .map_err(|e| LuaError::new(e.to_string()))?;
+        Ok(from_lua(ctx, luna::Value::Function(closure.into())))
+    }
+}
+
+/// Compile a chunk through the callback that is currently running, if one is.
+pub fn reentrant_load(source: &str, chunk: &str) -> Option<LuaResult<Own>> {
+    with_running(|host| host.load(source, chunk))
+}
+
+/// Run a chunk through the callback that is currently running, if one is.
+pub fn reentrant_eval(source: &str, chunk: &str) -> Option<LuaResult<Vec<Own>>> {
+    with_running(|host| host.eval(source, chunk))
 }
 
 thread_local! {
@@ -181,15 +201,22 @@ pub(crate) fn while_running<R>(host: &dyn Host, f: impl FnOnce() -> R) -> R {
     f()
 }
 
-/// Call a Lua function through the callback that is currently running, if one is.
+/// Ask the callback that is currently running, if one is.
 ///
-/// `None` when the VM is idle, which is the case the engine handles itself.
-pub fn reentrant(function: &Own, args: Vec<Own>) -> Option<LuaResult<Vec<Own>>> {
+/// `None` when the VM is idle, which is the case [`Engine`](crate::Engine) handles itself. **Every**
+/// entry point that borrows the arena needs this fallback, not just the obvious one: a native that
+/// starts a shell command can reach code that reads a global, compiles a `where` expression, or
+/// runs a chunk, and each of those would otherwise meet the borrow the callback is holding.
+pub fn with_running<R>(f: impl FnOnce(&dyn Host) -> R) -> Option<R> {
     let host = RUNNING.with(|slot| slot.get())?;
     // SAFETY: the slot holds a pointer only while `while_running` is on the stack below us, and
     // that function does not return until the borrow it made is finished with.
-    let host = unsafe { host.as_ref() };
-    Some(host.call(function, args))
+    Some(f(unsafe { host.as_ref() }))
+}
+
+/// Call a Lua function through the callback that is currently running, if one is.
+pub fn reentrant(function: &Own, args: Vec<Own>) -> Option<LuaResult<Vec<Own>>> {
+    with_running(|host| host.call(function, args))
 }
 
 /// Drive `executor` to the end from inside a running callback.

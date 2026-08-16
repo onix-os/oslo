@@ -48,6 +48,35 @@ fn taken_exit() -> Option<i32> {
     PENDING_EXIT.with(|slot| slot.borrow_mut().take())
 }
 
+/// What every entry point answers when the VM is busy and no callback is in progress.
+///
+/// Reachable only if something outside a callback held the arena — which nothing does — so it
+/// exists to be an error rather than a panic if that ever stops being true.
+fn busy() -> LuaError {
+    LuaError::new("the Lua engine is busy and no call is in progress")
+}
+
+/// Say "syntax error" for a chunk that would not compile, which is what Lua calls it.
+///
+/// The VM reports its own two stages — `parse error` and `compile error` — and both mean the same
+/// thing to somebody who has just mistyped a line: the source is not Lua. That is the word the
+/// language uses, the word the shell's own diagnostics use for the other language it speaks, and
+/// the word somebody searches for. The VM's wording is kept after it, because it is the half that
+/// says *where*.
+fn syntax_wording(message: &str) -> String {
+    for stage in ["parse error: ", "compile error: "] {
+        let Some(at) = message.find(stage) else {
+            continue;
+        };
+        // The VM raises a failed compile through its runtime channel, so the rendered message
+        // arrives as `runtime error: parse error: …`. A chunk that never ran did not fail at run
+        // time, and saying both is worse than saying the right one.
+        let before = message[..at].trim_end_matches("runtime error: ");
+        return format!("{before}syntax error: {}", &message[at + stage.len()..]);
+    }
+    message.to_string()
+}
+
 /// A Lua interpreter, and the shell's whole view of one.
 pub struct Engine {
     lua: RefCell<Lua>,
@@ -89,10 +118,15 @@ impl Engine {
     }
 
     /// Compile and run `source`, answering what it returned.
+    ///
+    /// Re-entrant, like [`call_function`](Self::call_function): a chunk compiled while the VM is
+    /// already running goes out through the callback in progress.
     pub fn eval(&self, source: &str, chunk: &str) -> LuaResult<Vec<Own>> {
         self.set_chunk(chunk);
         let varargs = self.varargs.borrow().clone();
-        let mut lua = self.lua.borrow_mut();
+        let Ok(mut lua) = self.lua.try_borrow_mut() else {
+            return host::reentrant_eval(source, chunk).unwrap_or_else(|| Err(busy()));
+        };
         let executor = lua
             .try_enter(|ctx| {
                 let closure = Closure::load(ctx, Some(chunk), source.as_bytes())?;
@@ -108,8 +142,12 @@ impl Engine {
     /// **So an expression can be compiled once and run per row.** `where free < 1e9` over a few
     /// hundred rows must not recompile the same six characters each time; the caller keeps what
     /// this returns and hands it to [`call_function`](Self::call_function) in the loop.
+    /// Re-entrant, for the same reason [`eval`](Self::eval) is: `where` and `each` compile their
+    /// expression through here, and a structured pipeline can be started from inside a native.
     pub fn load(&self, source: &str, chunk: &str) -> LuaResult<Own> {
-        let mut lua = self.lua.borrow_mut();
+        let Ok(mut lua) = self.lua.try_borrow_mut() else {
+            return host::reentrant_load(source, chunk).unwrap_or_else(|| Err(busy()));
+        };
         lua.try_enter(|ctx| {
             let closure = Closure::load(ctx, Some(chunk), source.as_bytes())?;
             Ok(convert::from_lua(
@@ -127,11 +165,7 @@ impl Engine {
     /// the call goes out through the callback that is running instead. See [`host::reentrant`].
     pub fn call_function(&self, function: &Own, args: Vec<Own>) -> LuaResult<Vec<Own>> {
         let Ok(mut lua) = self.lua.try_borrow_mut() else {
-            return host::reentrant(function, args).unwrap_or_else(|| {
-                Err(LuaError::new(
-                    "the Lua engine is busy and no call is in progress",
-                ))
-            });
+            return host::reentrant(function, args).unwrap_or_else(|| Err(busy()));
         };
         let executor = lua
             .try_enter(|ctx| {
@@ -179,13 +213,16 @@ impl Engine {
         }
         // The VM has already put `chunk:line:` in front where it knows one, so the message is
         // taken whole rather than positioned again.
-        LuaError::without_position(error.to_string()).in_chunk(self.chunk.borrow().clone())
+        LuaError::without_position(syntax_wording(&error.to_string()))
+            .in_chunk(self.chunk.borrow().clone())
     }
 }
 
 impl Host for Engine {
     fn global(&self, name: &str) -> Own {
-        let mut lua = self.lua.borrow_mut();
+        let Ok(mut lua) = self.lua.try_borrow_mut() else {
+            return host::with_running(|host| host.global(name)).unwrap_or(Own::Nil);
+        };
         lua.enter(|ctx| {
             let key = Value::String(luna::String::from_slice(&ctx, name.as_bytes()));
             convert::from_lua(ctx, ctx.globals().get_value(ctx, key))
@@ -193,7 +230,10 @@ impl Host for Engine {
     }
 
     fn set_global(&self, name: &str, value: Own) {
-        let mut lua = self.lua.borrow_mut();
+        let Ok(mut lua) = self.lua.try_borrow_mut() else {
+            host::with_running(|host| host.set_global(name, value));
+            return;
+        };
         lua.enter(|ctx| {
             let key = Value::String(luna::String::from_slice(&ctx, name.as_bytes()));
             let _ = ctx.globals().set(ctx, key, convert::into_lua(ctx, &value));
@@ -201,7 +241,9 @@ impl Host for Engine {
     }
 
     fn set_field(&self, path: &[&str], value: Own) -> bool {
-        let mut lua = self.lua.borrow_mut();
+        let Ok(mut lua) = self.lua.try_borrow_mut() else {
+            return host::with_running(|host| host.set_field(path, value)).unwrap_or(false);
+        };
         lua.enter(|ctx| host::set_field_in(ctx, path, &value))
     }
 
@@ -215,6 +257,10 @@ impl Host for Engine {
 
     fn eval(&self, source: &str, chunk: &str) -> LuaResult<Vec<Own>> {
         Engine::eval(self, source, chunk)
+    }
+
+    fn load(&self, source: &str, chunk: &str) -> LuaResult<Own> {
+        Engine::load(self, source, chunk)
     }
 }
 

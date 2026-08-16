@@ -241,7 +241,6 @@ members = [
   "crates/oslo-ui",
   "vendor/argc",
   "vendor/brush-parser",
-  "vendor/luna",
 ]
 
 

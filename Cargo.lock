@@ -498,6 +498,7 @@ checksum = "32a66949e030da00e8c7d4434b251670a91556f4144941d37452769c25d58a53"
 [[package]]
 name = "luna"
 version = "0.4.0"
+source = "git+https://github.com/onix-os/luna?rev=48b6836822c3eafabdc64bdedfb3091b85f254f5#48b6836822c3eafabdc64bdedfb3091b85f254f5"
 dependencies = [
  "ahash",
  "allocator-api2",

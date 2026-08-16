@@ -80,7 +80,7 @@ fn into_lua_seen<'gc>(ctx: Context<'gc>, value: &Own, seen: &mut Crossed<'gc>) -
             if let Some(meta) = meta
                 && let Value::Table(meta) = into_lua_seen(ctx, &Own::Table(meta), seen)
             {
-                out.set_metatable(&ctx, Some(meta));
+                out.set_metatable(ctx, Some(meta));
             }
             Value::Table(out)
         }
@@ -191,7 +191,7 @@ fn from_lua_within<'gc>(ctx: Context<'gc>, value: Value<'gc>, seen: &mut Brought
             // back at this table finds it rather than starting again.
             let out = Rc::new(RefCell::new(oslo_base::value::Table::new()));
             seen.insert(t, Own::Table(Rc::clone(&out)));
-            for (key, value) in t.iter() {
+            for (key, value) in t.iter(ctx) {
                 let key = from_lua_within(ctx, key, seen);
                 let value = from_lua_within(ctx, value, seen);
                 out.borrow_mut().set(key, value);
