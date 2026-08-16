@@ -1,5 +1,145 @@
 # Changelog
 
+## [0.4.0] - 2026-08-16
+
+### <!-- 0 -->⛰️  Features
+
+- One config, joined by require
+- Run on a pinned luna, and re-impose the names oslo refuses
+- The shell runs on the vm, and the tree walker is gone
+- The shell's variables as lua's global namespace
+- Nested writes, compiled chunks and line completeness
+- The ui and the shell run on the vm
+- The engine boundary natives and hooks cross
+- The boundary between the shell's values and the vm's
+- Vendor luna, a pure-rust stackless lua vm
+- Names that $PATH never heard of
+- Autoload a function from its own file
+- Mark a directory, reach it by @name
+- Primitives the prompt also needs
+- $FUNCNAME is the call stack, as in bash
+- Oslo hook and oslo direnv actually exist
+- Stage, signal and pipestatus in the payloads
+- On-variable-change, with local and remote
+- On-focus-change for terminal focus
+- Timers and spawn callbacks fire at a waiting prompt
+- Universals arrive without a keystroke
+- An idle prompt notices a job finishing
+- On-process-exit and on-job-state
+
+### <!-- 1 -->🐛 Bug Fixes
+
+- A mistyped mark is named too
+- A refused =name offers the one you meant
+- A mistyped =name is told, and quotes keep it literal
+- A value that crosses the boundary keeps its identity
+- The lua helpers reach the table the vm actually holds
+- A redirection keeps the rows flowing
+- A brace list is what it expands to
+- A terminal read answers Ctrl-C
+- ~name completes to a user
+- @name expands wherever a tilde does
+- Chrome gives way to the labels
+- No verdict on a path behind a $VAR
+- A record keeps the document's column order
+- -c does not write itself back
+- The config is not overruled by its echo
+- @name gets a path hint like ~ does
+- A resize gives the line back its paint
+- What runs is what the shell admits runs
+- The erase never starts at row zero
+- The edges answer like the middle
+- A quoted @name stays a literal
+- A reserved word is already finished
+- Never replace a command that runs
+- No way out of a shell loses history
+- Finish the half-wired api corners
+- A pipeline larger than a pipe
+- A resize no longer eats the prompt
+- A correction that reads assignments
+- Globs, braces and marks complete
+- Every key name has a canonical form
+- Unstage a peer's hook my commit swept up
+- A head-of-pipeline tool reads stdin
+- For ((;;)) parses, fused separator and all
+- A regex built from a variable is a regex
+- Every standard name exists, twenty did not
+- Os.time reads its table, error level 0 is bare
+- Ls flags are flags, not a directory
+- A child's SIGINT is not a script's
+- A heredoc predates the command's assignments
+- The sign and alternate flags, and a real %g
+- A special builtin's error ends the shell
+- Refuse before making a session nobody can enter
+- Gsub honours the ^ anchor
+- A bare jobs lists every job
+- The shipped aliases are a prompt's, not a script's
+- A brace item is not the whole path
+- An absent universal store is not a change
+- An escape's value is printed, not run
+- : breaks a word too, as in bash
+- = ends a word, as it does in bash
+- A transposition is one mistake, not two
+- Replace the store instead of editing it
+- The idle wait now survives its own wake
+- A disowned child is still ours to bury
+
+### <!-- 2 -->🚜 Refactor
+
+- The shell's values stop coming from the lua crate
+- The shared value type leaves the lua crate
+- Glob and tilde come from oslo-base
+- The call chain gets its own module
+
+### <!-- 3 -->📚 Documentation
+
+- Record what panic=abort would cost
+- The interpreter page describes the vm that is there
+- The prose is checked against the binary
+- The features index catches up
+- Point the design references at the page that exists
+- A tool runs alone and sees its input
+- The two pages the README promised
+- Say what -h actually does
+
+### <!-- 4 -->⚡ Performance
+
+- A literal key looks itself up in one place
+- Fold identical functions with mold
+- Drop regex's general-category tables
+- Pack relative relocations in the shipped binary
+- The two cold members compile for size
+- The worktree is found once a frame
+- The directory is read once, not per key
+- History writes leave the prompt thread
+
+### <!-- 6 -->🧪 Testing
+
+- The library's answers leave the language's file
+- One guard, both suites
+- Refuse an oracle that is not bash
+- Split the stdlib answers into their own file
+- Wait longer, and say what the shell was doing
+- Assert the error, not the folded status
+- A prompt that changes while idle is redrawn
+
+### <!-- 7 -->⚙️ Miscellaneous Tasks
+
+- Strip the manifest comments
+- Pin the v0.5.0 release
+- Pin the size-optimised vm
+- Luna's gsub anchor fix
+- Trim rand's default features in luna
+- Re-vendor luna under its own name
+
+### Build
+
+- Pin the toolchain, raise the msrv to 1.90
+
+### Spike
+
+- Measure the reference VM against the tree walker
+
 ## [0.3.13] - 2026-08-14
 
 ### <!-- 2 -->🚜 Refactor
