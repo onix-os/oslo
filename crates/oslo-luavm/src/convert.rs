@@ -25,8 +25,21 @@ use oslo_base::value::{Function, LuaError, Number, Value as Own};
 use std::cell::RefCell;
 use std::rc::Rc;
 
+/// What has already crossed, so that a thing that was one thing stays one thing.
+///
+/// **Identity is a property values have, and copying loses it.** `oslo.from_json` and
+/// `oslo.json.decode` are the same `Rc` on the shell's side; converting each occurrence separately
+/// makes two callbacks, and `oslo.from_json == oslo.json.decode` — which oslo documents and tests —
+/// answers false. The same map is what makes a cyclic table terminate: `t.self = t` would otherwise
+/// recurse until the stack ran out.
+type Crossed<'gc> = std::collections::HashMap<usize, Value<'gc>>;
+
 /// The shell's value, as something the VM can hold.
 pub fn into_lua<'gc>(ctx: Context<'gc>, value: &Own) -> Value<'gc> {
+    into_lua_seen(ctx, value, &mut Crossed::new())
+}
+
+fn into_lua_seen<'gc>(ctx: Context<'gc>, value: &Own, seen: &mut Crossed<'gc>) -> Value<'gc> {
     match value {
         Own::Nil => Value::Nil,
         Own::Bool(b) => Value::Boolean(*b),
@@ -38,12 +51,24 @@ pub fn into_lua<'gc>(ctx: Context<'gc>, value: &Own) -> Value<'gc> {
         // are `Rc<str>` owned by a value that outlives nothing in particular.
         Own::Str(s) => Value::String(LunaStr::from_slice(&ctx, s.as_bytes())),
         Own::Table(table) => {
+            let id = Rc::as_ptr(table) as *const () as usize;
+            if let Some(already) = seen.get(&id) {
+                return *already;
+            }
+            // Recorded *before* the entries are walked, so a table that contains itself finds the
+            // one being built rather than starting another.
             let out = Table::new(&ctx);
-            for (key, value) in table.borrow().pairs() {
+            seen.insert(id, Value::Table(out));
+            let entries = table.borrow().pairs();
+            for (key, value) in entries {
                 // A `set` only fails on a nil or NaN key. `pairs` yields neither: a nil key
                 // cannot be stored, and a NaN one never compares equal to itself so it could
                 // not have been either.
-                let _ = out.set(ctx, into_lua(ctx, &key), into_lua(ctx, &value));
+                let _ = out.set(
+                    ctx,
+                    into_lua_seen(ctx, &key, seen),
+                    into_lua_seen(ctx, &value, seen),
+                );
             }
             // **The metatable crosses too, or three headline surfaces are silently dead.** `sh` is
             // an *empty* table whose whole API is a `__index` that manufactures a command wrapper;
@@ -51,14 +76,23 @@ pub fn into_lua<'gc>(ctx: Context<'gc>, value: &Own) -> Value<'gc> {
             // files a prompt handler or defines a style. Copying only the entries delivers `{}` to
             // the VM, and `sh.ls(…)` becomes "attempt to call a nil value" while
             // `oslo.prompt.left = f` succeeds at doing nothing.
-            if let Some(meta) = &table.borrow().metatable
-                && let Value::Table(meta) = into_lua(ctx, &Own::Table(Rc::clone(meta)))
+            let meta = table.borrow().metatable.clone();
+            if let Some(meta) = meta
+                && let Value::Table(meta) = into_lua_seen(ctx, &Own::Table(meta), seen)
             {
                 out.set_metatable(&ctx, Some(meta));
             }
             Value::Table(out)
         }
-        Own::Function(f) => function_into_lua(ctx, f),
+        Own::Function(f) => {
+            let id = Rc::as_ptr(f) as *const () as usize;
+            if let Some(already) = seen.get(&id) {
+                return *already;
+            }
+            let out = function_into_lua(ctx, f);
+            seen.insert(id, out);
+            out
+        }
     }
 }
 
@@ -127,17 +161,18 @@ pub fn raise<'gc>(ctx: Context<'gc>, error: &LuaError) -> luna::Error<'gc> {
 /// is a real gap for the structured pipeline and is recorded in `PLAN-LUA-VM.md`; the array part
 /// (`1..n`) is unaffected, because it is a vector.
 pub fn from_lua<'gc>(ctx: Context<'gc>, value: Value<'gc>) -> Own {
-    from_lua_within(ctx, value, 0)
+    from_lua_within(ctx, value, &mut std::collections::HashMap::new())
 }
 
-/// How deep a table may nest before the conversion gives up.
+/// Tables already brought back, so a cycle stays a cycle rather than becoming infinite.
 ///
-/// A depth cap rather than a visited-set, because the shell's values are trees by construction —
-/// what this guards against is a *cyclic* table reaching the conversion at all, and a script can
-/// make one in a line.
-const MAX_DEPTH: usize = 64;
+/// **A visited set rather than a depth cap.** `t.self = t` is legal Lua and a script can write one
+/// in a line; a cap would answer a 64-deep tree with `nil` at the bottom, which is a *different*
+/// value that no longer contains itself — and oslo's JSON encoder, whose job is to refuse a cyclic
+/// table by name, would see nothing to refuse and encode the truncation instead.
+type Brought<'gc> = std::collections::HashMap<Table<'gc>, Own>;
 
-fn from_lua_within<'gc>(ctx: Context<'gc>, value: Value<'gc>, depth: usize) -> Own {
+fn from_lua_within<'gc>(ctx: Context<'gc>, value: Value<'gc>, seen: &mut Brought<'gc>) -> Own {
     match value {
         Value::Nil => Own::Nil,
         Value::Boolean(b) => Own::Bool(b),
@@ -147,23 +182,27 @@ fn from_lua_within<'gc>(ctx: Context<'gc>, value: Value<'gc>, depth: usize) -> O
         // Rooted in the VM's registry, so the collector keeps it while the shell holds it. This is
         // how a hook, a completer or a prompt handler survives past the call that installed it.
         Value::Function(f) => Own::Function(Rc::new(Function::Held(Rc::new(ctx.stash(f))))),
-        Value::Table(t) if depth < MAX_DEPTH => {
-            let mut out = oslo_base::value::Table::new();
+        Value::Table(t) => {
+            if let Some(already) = seen.get(&t) {
+                return already.clone();
+            }
+            // The `Rc` is made and recorded before the entries are walked, so an entry that points
+            // back at this table finds it rather than starting again.
+            let out = Rc::new(RefCell::new(oslo_base::value::Table::new()));
+            seen.insert(t, Own::Table(Rc::clone(&out)));
             for (key, value) in t.iter() {
-                out.set(
-                    from_lua_within(ctx, key, depth + 1),
-                    from_lua_within(ctx, value, depth + 1),
-                );
+                let key = from_lua_within(ctx, key, seen);
+                let value = from_lua_within(ctx, value, seen);
+                out.borrow_mut().set(key, value);
             }
             if let Some(meta) = t.metatable()
-                && let Own::Table(meta) = from_lua_within(ctx, Value::Table(meta), depth + 1)
+                && let Own::Table(meta) = from_lua_within(ctx, Value::Table(meta), seen)
             {
-                out.metatable = Some(meta);
+                out.borrow_mut().metatable = Some(meta);
             }
-            Own::Table(Rc::new(RefCell::new(out)))
+            Own::Table(out)
         }
-        // Deeper than the cap, or a thread, or userdata: nothing the shell's value type has a
-        // home for.
+        // A thread, or userdata: nothing the shell's value type has a home for.
         _ => Own::Nil,
     }
 }
