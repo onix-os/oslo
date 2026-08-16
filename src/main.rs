@@ -194,6 +194,13 @@ fn begin_shell(interactive: bool) {
 fn run_script(invocation: &cli::Invocation, path: &str) -> ! {
     match fs::read_to_string(path) {
         Ok(script) => match language::detect(Some(path), &script) {
+            // The spike's front door: same binary, same script, the other engine. Off unless
+            // both the feature is compiled in and `OSLO_LUA_VM` is set, so the ordinary path is
+            // byte-for-byte what it was. See the `lua-vm` feature in Cargo.toml.
+            #[cfg(feature = "lua-vm")]
+            Language::Lua if std::env::var_os("OSLO_LUA_VM").is_some() => {
+                std::process::exit(oslo_luavm::run(&script, path))
+            }
             Language::Lua => std::process::exit(startup::lua_init::run_lua_source(
                 &script,
                 path,

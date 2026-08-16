@@ -29,6 +29,18 @@ default = []
 # before using them: `if oslo.repair then … end`.
 vista = ["oslo-base/vista", "oslo-runtime/vista", "oslo-ui/vista"]
 
+# `lua-vm` — the reference Lua interpreter instead of oslo's own tree walker.
+#
+# **A spike, not a switch.** It routes `oslo script.lua` at the VM when `OSLO_LUA_VM=1` is set, so
+# the two engines can be timed on identical scripts inside identical binaries. The shell's own
+# `oslo.*` API is *not* bound to it — that surface is 130 callables over 11.5k lines, and porting it
+# is the real cost of the change rather than something a measurement should paper over.
+#
+# What it answers: what the VM costs in bytes, what it buys in speed, and whether a static musl
+# build still works once thirty thousand lines of C are in the tree.
+lua-vm = ["dep:oslo-luavm"]
+
+
 # `scratch` — named sessions that keep running when the terminal they were in goes away, reached
 # with one key. See `PLAN.md` and `docs/features/scratch.md`.
 #
@@ -214,6 +226,7 @@ unicode-width = "0.2"
 brush-parser = { path = "vendor/brush-parser" }
 oslo-base = { path = "crates/oslo-base" }
 oslo-lua = { path = "crates/oslo-lua" }
+oslo-luavm = { path = "crates/oslo-luavm", optional = true }
 oslo-runtime = { path = "crates/oslo-runtime" }
 oslo-shell = { path = "crates/oslo-shell" }
 oslo-ui = { path = "crates/oslo-ui" }
@@ -243,6 +256,7 @@ oslo-ui = { path = "crates/oslo-ui" }
 members = [
   "crates/oslo-base",
   "crates/oslo-lua",
+  "crates/oslo-luavm",
   "crates/oslo-runtime",
   "crates/oslo-shell",
   "crates/oslo-ui",
