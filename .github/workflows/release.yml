@@ -52,9 +52,22 @@ jobs:
       # none of them — the floor a distribution wants for `/bin/sh`, without the prediction model.
       # They are staged into `dist/` as they are built because both land on the same path under
       # `target/`, and the second build would otherwise overwrite the first.
+      # `pack-relative-relocs` is 282 KB of the shipped binary, for a linker flag and no code.
+      #
+      # A PIE carries one 24-byte `R_X86_64_RELATIVE` entry for every absolute address it has to fix
+      # up at startup, and a shell this size has tens of thousands of them. `DT_RELR` stores the
+      # same information as a bitmap — measured on the real musl build, 7,181,024 → 6,898,472.
+      #
+      # Safe *because* the binary is static-pie: the code that reads `.relr.dyn` is musl's own
+      # startup, linked in rather than found on the machine, so there is no loader version to be
+      # older than the format. Checked by running the result, not assumed.
+      #
+      # It lives here rather than in `.cargo/config.toml` because setting `RUSTFLAGS` in the
+      # environment makes cargo *ignore* that file's `rustflags` entirely — the flag would silently
+      # not be applied to the one build that matters.
       - name: Build
         env:
-          RUSTFLAGS: "-C target-feature=+crt-static"
+          RUSTFLAGS: "-C target-feature=+crt-static -C link-arg=-Wl,-z,pack-relative-relocs"
         run: |
           cc_var="CC_$(echo '${{ matrix.target }}' | tr - _)"
           export "$cc_var=musl-gcc"
