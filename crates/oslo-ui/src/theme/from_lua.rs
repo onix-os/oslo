@@ -275,14 +275,13 @@ fn read_ui(table: &oslo_base::value::Table, ui: &mut super::Ui, problems: &mut V
 #[cfg(test)]
 mod tests {
     use super::*;
-    use oslo_lua as eval;
+    use oslo_luavm::{Engine, Host};
 
     /// Build `oslo.theme` by running a chunk, which is how a real config produces one.
     fn theme_from(source: &str) -> (Theme, Vec<String>) {
-        let interp = eval::Interp::new("theme test");
-        let ast = eval::parse(source).expect("the test chunk must parse");
-        interp.run_ast(&ast).expect("the test chunk must run");
-        read_lua_theme(&interp.global("theme"))
+        let engine = Engine::new();
+        engine.eval(source, "theme test").expect("the test chunk must run");
+        read_lua_theme(&engine.global("theme"))
     }
 
     /// Naming one colour must not blank the other forty.

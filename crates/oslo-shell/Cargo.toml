@@ -29,7 +29,8 @@ oslo-base = { path = "../oslo-base" }
 argc = { path = "../../vendor/argc", default-features = false, features = [
     "eval", "eval-bash", "compgen",
 ], optional = true }
-oslo-lua = { path = "../oslo-lua" }
+# `where` and `each` evaluate a Lua expression once per row.
+oslo-luavm = { path = "../oslo-luavm" }
 # The widgets the `ui` builtin drives, and the settings a builtin reads.
 oslo-ui = { path = "../oslo-ui" }
 

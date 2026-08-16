@@ -85,6 +85,23 @@ impl Engine {
         Self::finish(&mut lua, &executor).map_err(|e| self.failure(e))
     }
 
+    /// Compile `source` without running it, answering the chunk as a callable value.
+    ///
+    /// **So an expression can be compiled once and run per row.** `where free < 1e9` over a few
+    /// hundred rows must not recompile the same six characters each time; the caller keeps what
+    /// this returns and hands it to [`call_function`](Self::call_function) in the loop.
+    pub fn load(&self, source: &str, chunk: &str) -> LuaResult<Own> {
+        let mut lua = self.lua.borrow_mut();
+        lua.try_enter(|ctx| {
+            let closure = Closure::load(ctx, Some(chunk), source.as_bytes())?;
+            Ok(convert::from_lua(
+                ctx,
+                Value::Function(luna::Function::Closure(closure)),
+            ))
+        })
+        .map_err(|e| self.failure(e))
+    }
+
     /// Call a Lua function the shell is holding.
     pub fn call_function(&self, function: &Own, args: Vec<Own>) -> LuaResult<Vec<Own>> {
         let mut lua = self.lua.borrow_mut();
@@ -161,6 +178,33 @@ impl Host for Engine {
 
     fn call(&self, function: &Own, args: Vec<Own>) -> LuaResult<Vec<Own>> {
         self.call_function(function, args)
+    }
+}
+
+/// The session's engine, reachable from anywhere on its thread.
+///
+/// **Because the things that call Lua are not the thing that owns Lua.** A completer, a timer, a
+/// hook and the `where` filter each need to call a function a config registered, and none of them
+/// is handed the engine — threading one through every call site would put a Lua parameter on code
+/// that has nothing else to do with Lua. It is a thread-local rather than a global because the
+/// engine is `Rc` and single-threaded by construction.
+pub mod current {
+    use super::Engine;
+    use std::cell::RefCell;
+    use std::rc::Rc;
+
+    thread_local! {
+        static CURRENT: RefCell<Option<Rc<Engine>>> = const { RefCell::new(None) };
+    }
+
+    /// Make `engine` the one this thread reaches, or clear it.
+    pub fn publish(engine: Option<Rc<Engine>>) {
+        CURRENT.with(|slot| *slot.borrow_mut() = engine);
+    }
+
+    /// The session's engine, if one has been published.
+    pub fn handle() -> Option<Rc<Engine>> {
+        CURRENT.with(|slot| slot.borrow().clone())
     }
 }
 

@@ -1,13 +1,12 @@
 //! What a config's `oslo` table turns into.
 
 use super::*;
-use oslo_lua as eval;
+use oslo_luavm::{Engine, Host};
 
 fn settings_from(source: &str) -> (Settings, Vec<String>) {
-    let interp = eval::Interp::new("settings test");
-    let ast = eval::parse(source).expect("the test chunk must parse");
-    interp.run_ast(&ast).expect("the test chunk must run");
-    read_lua_settings(&interp.global("oslo"))
+    let engine = Engine::new();
+    engine.eval(source, "settings test").expect("the test chunk must run");
+    read_lua_settings(&engine.global("oslo"))
 }
 
 #[test]

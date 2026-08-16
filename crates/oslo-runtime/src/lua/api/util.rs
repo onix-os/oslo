@@ -1,26 +1,30 @@
 //! Shared plumbing for the `oslo.*` namespaces: registering functions, reading arguments, and the
 //! one failure shape they all use.
 
-use oslo_base::value::{Function, Table, Value};
-use oslo_lua::{Interp, LuaError, LuaResult};
+use oslo_base::value::{Function, LuaError, LuaResult, Table, Value};
+use oslo_luavm::{Host, Native};
 use std::rc::Rc;
 
 /// Wrap a Rust function as a Lua value.
+///
+/// The result is an ordinary shell value carrying an opaque payload, which is what lets a namespace
+/// be *built* — here and in forty other files — with no VM in scope. It becomes a callback the
+/// instant it crosses into the engine, and not before.
 pub fn native(
     name: &'static str,
-    f: impl Fn(&Interp, Vec<Value>) -> LuaResult<Vec<Value>> + 'static,
+    f: impl Fn(&dyn Host, Vec<Value>) -> LuaResult<Vec<Value>> + 'static,
 ) -> Value {
-    Value::Function(Rc::new(Function::Native {
+    Value::Function(Rc::new(Function::Held(Rc::new(Native {
         name,
         call: Box::new(f),
-    }))
+    }))))
 }
 
 /// Register a function in a table under `name`.
 pub fn put(
     table: &mut Table,
     name: &'static str,
-    f: impl Fn(&Interp, Vec<Value>) -> LuaResult<Vec<Value>> + 'static,
+    f: impl Fn(&dyn Host, Vec<Value>) -> LuaResult<Vec<Value>> + 'static,
 ) {
     table.set(Value::str(name), native(name, f));
 }

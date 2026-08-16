@@ -16,6 +16,7 @@
 
 use crate::data::{Record, Val};
 use oslo_base::value::{Number, Table, Value};
+use oslo_luavm::{Engine, Host};
 
 /// Evaluate `expression` against each row, keeping the ones it is true for.
 ///
@@ -28,59 +29,52 @@ use oslo_base::value::{Number, Table, Value};
 /// worse: a filter that quietly passes everything through when it breaks is how a pipeline ending
 /// in `rm` removes the wrong thing.
 pub fn filter(rows: &[Record], expression: &str) -> (Vec<Record>, Option<String>) {
+    // The prompt's engine when there is one, so a filter sees the same globals and functions a
+    // config defined. In a script or a `-c` command there is none, and a filter must still work —
+    // so one is made for the occasion. Made once for the whole filter, not once per row.
+    let engine = session_engine();
     let source = format!("return ({expression})");
-    let ast = match oslo_lua::parse(&source) {
-        Ok(ast) => ast,
+    let compiled = match engine.load(&source, "where") {
+        Ok(compiled) => compiled,
         Err(e) => return (Vec::new(), Some(format!("where: {e}"))),
     };
 
-    // The prompt's interpreter when there is one, so a filter sees the same globals and functions
-    // a config defined. In a script or a `-c` command there is none, and a filter must still work
-    // — so one is made for the occasion. Made once for the whole filter, not once per row.
-    let owned;
-    let interp: &oslo_lua::Interp = match oslo_lua::current::handle() {
-        Some(handle) => {
-            owned = handle;
-            &owned
+    let mut kept = Vec::new();
+    let mut failure = None;
+    for row in rows {
+        // The columns are visible as themselves for the length of one evaluation, so
+        // `free < 1e9` reads the way it looks.
+        let names: Vec<String> = row.columns().to_vec();
+        for (name, value) in names.iter().zip(row.values()) {
+            engine.set_global(name, to_lua(value));
         }
-        None => {
-            owned = std::rc::Rc::new(oslo_lua::Interp::new("where"));
-            &owned
-        }
-    };
-    {
-        let mut kept = Vec::new();
-        let mut failure = None;
-        for row in rows {
-            // The columns are visible as themselves for the length of one evaluation, so
-            // `free < 1e9` reads the way it looks.
-            let names: Vec<String> = row.columns().to_vec();
-            for (name, value) in names.iter().zip(row.values()) {
-                interp.set_global(name, to_lua(value));
-            }
-            interp.set_global("row", to_lua(&Val::Record(row.clone())));
+        engine.set_global("row", to_lua(&Val::Record(row.clone())));
 
-            match interp.run_ast(&ast) {
-                Ok(values) => {
-                    if values.first().is_some_and(|v| v.truthy()) {
-                        kept.push(row.clone());
-                    }
-                }
-                Err(e) => {
-                    if failure.is_none() {
-                        failure = Some(format!("where: {e}"));
-                    }
+        match engine.call_function(&compiled, Vec::new()) {
+            Ok(values) => {
+                if values.first().is_some_and(|v| v.truthy()) {
+                    kept.push(row.clone());
                 }
             }
-
-            // Cleared again, or a column called `x` would still be a global at the next prompt.
-            for name in &names {
-                interp.set_global(name, Value::Nil);
+            Err(e) => {
+                if failure.is_none() {
+                    failure = Some(format!("where: {e}"));
+                }
             }
-            interp.set_global("row", Value::Nil);
         }
-        (kept, failure)
+
+        // Cleared again, or a column called `x` would still be a global at the next prompt.
+        for name in &names {
+            engine.set_global(name, Value::Nil);
+        }
+        engine.set_global("row", Value::Nil);
     }
+    (kept, failure)
+}
+
+/// The session's engine, or a fresh one when the filter is running outside a session.
+fn session_engine() -> std::rc::Rc<Engine> {
+    oslo_luavm::current::handle().unwrap_or_else(|| std::rc::Rc::new(Engine::new()))
 }
 
 /// A pipeline value as Lua sees it.
@@ -124,40 +118,29 @@ fn to_lua(value: &Val) -> Value {
 pub fn for_each(rows: &[Record], expression: &str) -> Option<String> {
     // Wrapped in a `do ... end` so a statement is as welcome as an expression: `each 'print(name)'`
     // is a call, and `each 'x = x + n'` is an assignment, and neither should need different syntax.
+    let engine = session_engine();
     let source = format!("do {expression} end");
-    let ast = match oslo_lua::parse(&source) {
-        Ok(ast) => ast,
+    let compiled = match engine.load(&source, "each") {
+        Ok(compiled) => compiled,
         Err(e) => return Some(format!("each: {e}")),
-    };
-
-    let owned;
-    let interp: &oslo_lua::Interp = match oslo_lua::current::handle() {
-        Some(handle) => {
-            owned = handle;
-            &owned
-        }
-        None => {
-            owned = std::rc::Rc::new(oslo_lua::Interp::new("each"));
-            &owned
-        }
     };
 
     let mut failure = None;
     for row in rows {
         let names: Vec<String> = row.columns().to_vec();
         for (name, value) in names.iter().zip(row.values()) {
-            interp.set_global(name, to_lua(value));
+            engine.set_global(name, to_lua(value));
         }
-        interp.set_global("row", to_lua(&Val::Record(row.clone())));
-        if let Err(e) = interp.run_ast(&ast)
+        engine.set_global("row", to_lua(&Val::Record(row.clone())));
+        if let Err(e) = engine.call_function(&compiled, Vec::new())
             && failure.is_none()
         {
             failure = Some(format!("each: {e}"));
         }
         for name in &names {
-            interp.set_global(name, Value::Nil);
+            engine.set_global(name, Value::Nil);
         }
-        interp.set_global("row", Value::Nil);
+        engine.set_global("row", Value::Nil);
     }
     failure
 }

@@ -31,7 +31,7 @@ plugin = ["dep:sha2"]
 
 [dependencies]
 oslo-base = { path = "../oslo-base" }
-oslo-lua = { path = "../oslo-lua" }
+oslo-luavm = { path = "../oslo-luavm" }
 oslo-shell = { path = "../oslo-shell" }
 oslo-ui = { path = "../oslo-ui" }
 
