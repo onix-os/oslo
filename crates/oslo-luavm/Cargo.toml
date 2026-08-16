@@ -11,3 +11,5 @@ description = "The Lua VM oslo runs on: luna, vendored."
 # `vendor/luna` — a stackless Lua VM in pure Rust with a real garbage collector. No C, so a static
 # musl build needs no C toolchain, which is the property `oslo-lua` was written to keep.
 luna = { path = "../../vendor/luna" }
+# The value type the shell speaks. The whole point of this crate is converting between the two.
+oslo-base = { path = "../oslo-base" }

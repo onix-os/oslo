@@ -1034,6 +1034,7 @@ name = "oslo-luavm"
 version = "0.1.0"
 dependencies = [
  "luna",
+ "oslo-base",
 ]
 
 [[package]]
