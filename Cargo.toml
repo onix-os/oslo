@@ -169,13 +169,20 @@ nix = { version = "0.29", features = [
 #   972ms with it and 320ms without. Dropping it costs a pattern with no literal to prefilter on a
 #   long haystack — 6ms became 68ms — which is the rarer shape and still milliseconds.
 # * `unicode-age`, `-bool`, `-script`, `-segment` — the tables behind `\p{Age:…}`, `\p{Script:…}`
-#   and `\b{…}`. Nothing in a shell's regex reaches for them. `unicode-case` stays for `(?i)`,
-#   `-gencat` for `\p{L}`, and `-perl` for `\d \w \s`.
+#   and `\b{…}`. Nothing in a shell's regex reaches for them. `unicode-case` stays for `(?i)` and
+#   `-perl` for `\d \w \s`.
+# * `unicode-gencat` — the tables behind `\p{L}`, `\p{Nd}` and the rest of the general categories.
+#   Kept at first, on the same reasoning that keeps `-case` and `-perl`; dropped after measuring it
+#   at **57,344 bytes** of the shipped binary, which is more than `secrets` and `crypt` together.
+#   A shell's regex is a filter over paths, process names and log lines, and `\w` covers that;
+#   `\p{Lu}` is a thing a text editor needs. It fails loudly rather than quietly — the pattern is
+#   refused at compile time with `invalid pattern: regex parse error` pointing at the `\p{…}` —
+#   which is the property that makes dropping a capability safe rather than a trap.
 #
 # `perf-literal` is kept, and it is the one that matters: without it a long scan goes from 4ms to
 # 192ms. It brings `aho-corasick` and `memchr`, and earns them.
 regex = { version = "1", default-features = false, features = [
-    "std", "unicode-case", "unicode-gencat", "unicode-perl",
+    "std", "unicode-case", "unicode-perl",
     "perf-literal", "perf-inline",
 ] }
 # JSON is a core capability rather than a library a user can install: a C module cannot load into

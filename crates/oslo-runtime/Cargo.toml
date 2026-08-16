@@ -42,7 +42,7 @@ nix = { version = "0.29", features = [
 
 # `oslo.re`, and history's own matching.
 regex = { version = "1", default-features = false, features = [
-    "std", "unicode-case", "unicode-gencat", "unicode-perl",
+    "std", "unicode-case", "unicode-perl",
     "perf-literal", "perf-inline",
 ] }
 

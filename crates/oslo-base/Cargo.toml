@@ -42,7 +42,7 @@ sha2 = "0.10"
 # `track`'s query matching. Trimmed to the same feature set the shell uses, and for the same
 # measured reasons — see the note in the root manifest.
 regex = { version = "1", default-features = false, features = [
-    "std", "unicode-case", "unicode-gencat", "unicode-perl",
+    "std", "unicode-case", "unicode-perl",
     "perf-literal", "perf-inline",
 ] }
 
