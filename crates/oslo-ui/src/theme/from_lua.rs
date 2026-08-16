@@ -280,7 +280,9 @@ mod tests {
     /// Build `oslo.theme` by running a chunk, which is how a real config produces one.
     fn theme_from(source: &str) -> (Theme, Vec<String>) {
         let engine = Engine::new();
-        engine.eval(source, "theme test").expect("the test chunk must run");
+        engine
+            .eval(source, "theme test")
+            .expect("the test chunk must run");
         read_lua_theme(&engine.global("theme"))
     }
 

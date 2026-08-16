@@ -4,7 +4,7 @@
 //! numeric tower. These are about what the library functions return, and they were the file's
 //! largest single group.
 
-use oslo::lua::eval;
+use oslo_luavm::Engine;
 
 /// Run a chunk and collect what it returned, rendered as Lua would print it.
 ///
@@ -12,7 +12,8 @@ use oslo::lua::eval;
 /// into `common`: they are four lines, and `common` is the *process*-level harness — putting an
 /// in-process evaluator beside it would invite a test to reach for the wrong one.
 fn eval_to_string(source: &str) -> Result<String, String> {
-    eval::run(source, "test")
+    Engine::new()
+        .eval(source, "test")
         .map(|values| {
             values
                 .iter()

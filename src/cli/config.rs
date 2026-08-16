@@ -14,7 +14,8 @@
 
 use crate::cli::help::Paint;
 use crate::cli::help::menu::{CALL, Menu, SUBCOMMANDS as HEADING, Sub};
-use oslo_lua::Value;
+use oslo_base::value::Value;
+use oslo_luavm::Host;
 use std::path::PathBuf;
 
 pub(crate) const MENU: Menu = Menu {

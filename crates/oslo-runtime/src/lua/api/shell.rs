@@ -12,8 +12,8 @@
 
 use super::util::{list, native, ok, put, record, text};
 use crate::lua::engine::{Registry, borrow_env};
-use oslo_base::value::{Table, Value};
 use oslo_base::value::{LuaError, Value as V};
+use oslo_base::value::{Table, Value};
 use oslo_shell::env::Environment;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};

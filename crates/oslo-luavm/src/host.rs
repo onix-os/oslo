@@ -18,6 +18,8 @@
 use crate::convert::{from_lua, into_lua};
 use luna::{Context, String as LunaStr, Value};
 use oslo_base::value::{LuaError, LuaResult, Value as Own};
+use std::cell::Cell;
+use std::ptr::NonNull;
 
 /// The Rust side of a builtin: arguments in, values out, or a Lua error.
 ///
@@ -61,6 +63,12 @@ pub trait Host {
     ///
     /// Refused while a native is running — see the module note on stacklessness.
     fn call(&self, function: &Own, args: Vec<Own>) -> LuaResult<Vec<Own>>;
+
+    /// Run a chunk and answer what it returned.
+    ///
+    /// Used at *install* time, where a binding whose shape needs a Lua-side wrapper compiles one
+    /// and keeps it. Refused mid-call, for the same reason [`call`](Self::call) is.
+    fn eval(&self, source: &str, chunk: &str) -> LuaResult<Vec<Own>>;
 }
 
 /// Walk `path` from the globals and set the last name, inside the arena.
@@ -117,10 +125,102 @@ impl<'gc> Host for CallbackHost<'gc> {
         "?".to_string()
     }
 
-    fn call(&self, _function: &Own, _args: Vec<Own>) -> LuaResult<Vec<Own>> {
-        Err(LuaError::new(
-            "cannot call a Lua function from inside a native call: the VM is stackless, so this \
-             binding must be written as a sequence",
+    fn call(&self, function: &Own, args: Vec<Own>) -> LuaResult<Vec<Own>> {
+        let ctx = self.ctx;
+        let luna::Value::Function(f) = into_lua(ctx, function) else {
+            return Err(LuaError::new(
+                "attempt to call a value that is not a function",
+            ));
+        };
+        let given: Vec<luna::Value> = args.iter().map(|v| into_lua(ctx, v)).collect();
+        run_nested(ctx, luna::Executor::start(ctx, f, luna::Variadic(given)))
+    }
+
+    fn eval(&self, source: &str, chunk: &str) -> LuaResult<Vec<Own>> {
+        let ctx = self.ctx;
+        let closure = luna::Closure::load(ctx, Some(chunk), source.as_bytes())
+            .map_err(|e| LuaError::new(e.to_string()))?;
+        run_nested(ctx, luna::Executor::start(ctx, closure.into(), ()))
+    }
+}
+
+thread_local! {
+    /// The host of the callback currently running, if one is.
+    ///
+    /// **So that code far from the VM can still reach it.** A tool a config registered is invoked
+    /// by the shell's dispatcher, four Rust frames below the native that started it, and that
+    /// dispatcher has no engine to be handed — it calls `call_here`. When the VM is already running
+    /// the engine cannot be borrowed, and this is the only route back in.
+    static RUNNING: Cell<Option<NonNull<dyn Host>>> = const { Cell::new(None) };
+}
+
+/// Run `f` with `host` reachable through [`reentrant`], and restore what was there before.
+///
+/// The pointer is valid for exactly the body of `f`, which is the callback: it is taken from a
+/// borrow that outlives the call, restored on the way out, and restored on an unwind too, because
+/// the previous value is put back by a guard. Single-threaded by construction — the slot is
+/// thread-local and the engine is `Rc`.
+pub(crate) fn while_running<R>(host: &dyn Host, f: impl FnOnce() -> R) -> R {
+    /// Puts back whatever was in the slot, however the body leaves.
+    struct Restore(Option<NonNull<dyn Host>>);
+    impl Drop for Restore {
+        fn drop(&mut self) {
+            RUNNING.with(|slot| slot.set(self.0));
+        }
+    }
+
+    // SAFETY: the lifetime is erased only to cross a thread-local. `_guard` puts the previous
+    // value back before `host` goes out of scope, on the ordinary path and on an unwind alike, so
+    // nothing can observe the pointer after the borrow it came from has ended.
+    let erased = unsafe {
+        std::mem::transmute::<NonNull<dyn Host + '_>, NonNull<dyn Host + 'static>>(NonNull::from(
+            host,
         ))
+    };
+    let _guard = Restore(RUNNING.with(|slot| slot.replace(Some(erased))));
+    f()
+}
+
+/// Call a Lua function through the callback that is currently running, if one is.
+///
+/// `None` when the VM is idle, which is the case the engine handles itself.
+pub fn reentrant(function: &Own, args: Vec<Own>) -> Option<LuaResult<Vec<Own>>> {
+    let host = RUNNING.with(|slot| slot.get())?;
+    // SAFETY: the slot holds a pointer only while `while_running` is on the stack below us, and
+    // that function does not return until the borrow it made is finished with.
+    let host = unsafe { host.as_ref() };
+    Some(host.call(function, args))
+}
+
+/// Drive `executor` to the end from inside a running callback.
+///
+/// **This is what makes the shell's re-entrancy work on a stackless VM.** A script calls
+/// `oslo.proc.exec("greet")`; that native runs the shell; the shell dispatches a tool a config
+/// registered; the tool's body is a Lua function. Three of those four frames are Rust, so there is
+/// no way to express the round trip as a continuation — the call has to happen *here*, part way
+/// down a native.
+///
+/// It works because stepping needs only a [`Context`], which a callback already holds — the
+/// `&mut Lua` that [`Engine`](crate::Engine) borrows is needed for the collector, not for running
+/// code. So a nested call runs on its own executor in the same arena, and nothing is collected
+/// until the outermost call returns. That is the cost: a deeply nested chain holds its garbage.
+fn run_nested<'gc>(ctx: Context<'gc>, executor: luna::Executor<'gc>) -> LuaResult<Vec<Own>> {
+    // Enough that an ordinary handler finishes in one step, and small enough that a runaway loop
+    // is still interruptible by the fuel accounting rather than by the stack.
+    const FUEL_PER_STEP: i32 = 4096;
+    loop {
+        let mut fuel = luna::Fuel::with(FUEL_PER_STEP);
+        match executor.step(ctx, &mut fuel) {
+            Ok(true) => break,
+            Ok(false) => continue,
+            Err(e) => return Err(LuaError::new(e.to_string())),
+        }
+    }
+    match executor.take_result::<luna::Variadic<Vec<luna::Value>>>(ctx) {
+        Ok(Ok(luna::Variadic(values))) => {
+            Ok(values.into_iter().map(|v| from_lua(ctx, v)).collect())
+        }
+        Ok(Err(error)) => Err(LuaError::without_position(error.to_string())),
+        Err(e) => Err(LuaError::new(e.to_string())),
     }
 }

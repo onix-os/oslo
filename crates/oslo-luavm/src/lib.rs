@@ -121,8 +121,18 @@ impl Engine {
     }
 
     /// Call a Lua function the shell is holding.
+    ///
+    /// **Re-entrant.** When the VM is already running — a native that started a shell command, and
+    /// the command reached a tool a config wrote in Lua — the arena cannot be borrowed again, so
+    /// the call goes out through the callback that is running instead. See [`host::reentrant`].
     pub fn call_function(&self, function: &Own, args: Vec<Own>) -> LuaResult<Vec<Own>> {
-        let mut lua = self.lua.borrow_mut();
+        let Ok(mut lua) = self.lua.try_borrow_mut() else {
+            return host::reentrant(function, args).unwrap_or_else(|| {
+                Err(LuaError::new(
+                    "the Lua engine is busy and no call is in progress",
+                ))
+            });
+        };
         let executor = lua
             .try_enter(|ctx| {
                 let Value::Function(f) = convert::into_lua(ctx, function) else {
@@ -201,6 +211,10 @@ impl Host for Engine {
 
     fn call(&self, function: &Own, args: Vec<Own>) -> LuaResult<Vec<Own>> {
         self.call_function(function, args)
+    }
+
+    fn eval(&self, source: &str, chunk: &str) -> LuaResult<Vec<Own>> {
+        Engine::eval(self, source, chunk)
     }
 }
 

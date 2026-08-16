@@ -94,6 +94,8 @@ fn nix_develop(it: &mut Table, env: &Arc<Mutex<Environment>>) {
             devshell::apply_with(&mut guard, &forwarded, want)
                 .map_err(|e| LuaError::new(format!("oslo.direnv.nix_develop: {e}")))?
         };
-        Ok(vec![Value::Number(oslo_lua::Number::Int(count as i64))])
+        Ok(vec![Value::Number(oslo_base::value::Number::Int(
+            count as i64,
+        ))])
     });
 }

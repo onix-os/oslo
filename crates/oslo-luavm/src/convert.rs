@@ -45,6 +45,17 @@ pub fn into_lua<'gc>(ctx: Context<'gc>, value: &Own) -> Value<'gc> {
                 // not have been either.
                 let _ = out.set(ctx, into_lua(ctx, &key), into_lua(ctx, &value));
             }
+            // **The metatable crosses too, or three headline surfaces are silently dead.** `sh` is
+            // an *empty* table whose whole API is a `__index` that manufactures a command wrapper;
+            // `oslo.prompt` and `oslo.theme.styles` are empty tables whose `__newindex` is what
+            // files a prompt handler or defines a style. Copying only the entries delivers `{}` to
+            // the VM, and `sh.ls(…)` becomes "attempt to call a nil value" while
+            // `oslo.prompt.left = f` succeeds at doing nothing.
+            if let Some(meta) = &table.borrow().metatable
+                && let Value::Table(meta) = into_lua(ctx, &Own::Table(Rc::clone(meta)))
+            {
+                out.set_metatable(&ctx, Some(meta));
+            }
             Value::Table(out)
         }
         Own::Function(f) => function_into_lua(ctx, f),
@@ -75,7 +86,9 @@ fn wrap<'gc>(ctx: Context<'gc>, native: Rc<Native>) -> Callback<'gc> {
     Callback::from_fn(&ctx, move |ctx, _exec, mut stack| {
         let args: Vec<Own> = stack.drain(..).map(|v| from_lua(ctx, v)).collect();
         let host = CallbackHost::new(ctx);
-        match (native.call)(&host, args) {
+        // Published for the duration of the call, so shell code several Rust frames down can call
+        // back into Lua — a registered tool, a registered builtin, a hook fired mid-command.
+        match crate::host::while_running(&host, || (native.call)(&host, args)) {
             Ok(values) => {
                 // `Variadic`, or a `Vec` would arrive as one table: returning two values and
                 // returning a list of two are different things, and every multi-return binding
@@ -141,6 +154,11 @@ fn from_lua_within<'gc>(ctx: Context<'gc>, value: Value<'gc>, depth: usize) -> O
                     from_lua_within(ctx, key, depth + 1),
                     from_lua_within(ctx, value, depth + 1),
                 );
+            }
+            if let Some(meta) = t.metatable()
+                && let Own::Table(meta) = from_lua_within(ctx, Value::Table(meta), depth + 1)
+            {
+                out.metatable = Some(meta);
             }
             Own::Table(Rc::new(RefCell::new(out)))
         }

@@ -23,8 +23,8 @@
 
 use super::util::native;
 use crate::lua::engine::borrow_env;
-use oslo_base::value::{Table, Value};
 use oslo_base::value::{LuaError, LuaResult};
+use oslo_base::value::{Table, Value};
 use oslo_luavm::Host;
 use oslo_shell::env::Environment;
 use oslo_shell::exec::argv::{Capture, Outcome};

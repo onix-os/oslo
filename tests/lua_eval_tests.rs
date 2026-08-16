@@ -4,11 +4,12 @@
 //! behaviour that a reimplementation gets subtly wrong: integer versus float subtypes, what `#`
 //! reports, when a metamethod fires, and which errors are catchable.
 
-use oslo::lua::eval;
+use oslo_luavm::Engine;
 
 /// Run a chunk and collect what it returned, rendered as Lua would print it.
 fn eval_to_string(source: &str) -> Result<String, String> {
-    eval::run(source, "test")
+    Engine::new()
+        .eval(source, "test")
         .map(|values| {
             values
                 .iter()
@@ -515,13 +516,13 @@ fn os_getenv_reads_the_real_environment() {
 
 #[test]
 fn incomplete_input_is_distinguishable_from_a_syntax_error() {
-    assert!(eval::is_complete("return 1"));
-    assert!(!eval::is_complete("if true then"));
-    assert!(!eval::is_complete("function f("));
-    assert!(!eval::is_complete("local t = {"));
+    assert!(oslo_luavm::is_complete("return 1"));
+    assert!(!oslo_luavm::is_complete("if true then"));
+    assert!(!oslo_luavm::is_complete("function f("));
+    assert!(!oslo_luavm::is_complete("local t = {"));
     // A genuine mistake is complete-but-wrong: the prompt must report it, not wait for more.
-    assert!(eval::is_complete("return 1 +/ 2"));
-    assert!(eval::is_complete("x = = 2"));
+    assert!(oslo_luavm::is_complete("return 1 +/ 2"));
+    assert!(oslo_luavm::is_complete("x = = 2"));
 }
 
 #[test]

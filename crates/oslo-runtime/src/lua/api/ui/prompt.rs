@@ -130,10 +130,10 @@ fn chrome_of(t: &Table) -> Result<Chrome, oslo_base::value::LuaError> {
             .ok_or_else(|| oslo_base::value::LuaError::new(format!("{name}: not a border")))?;
     }
     if let Some(colour) = maybe(t, "border_fg") {
-        chrome.border_style = theme::Style::fg(
-            theme::Color::parse(&colour)
-                .ok_or_else(|| oslo_base::value::LuaError::new(format!("{colour}: not a colour")))?,
-        );
+        chrome.border_style =
+            theme::Style::fg(theme::Color::parse(&colour).ok_or_else(|| {
+                oslo_base::value::LuaError::new(format!("{colour}: not a colour"))
+            })?);
     }
     for (field, slot) in [("fit", 0), ("border_fit", 0)] {
         let _ = slot;

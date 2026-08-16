@@ -5,7 +5,9 @@ use oslo_luavm::{Engine, Host};
 
 fn settings_from(source: &str) -> (Settings, Vec<String>) {
     let engine = Engine::new();
-    engine.eval(source, "settings test").expect("the test chunk must run");
+    engine
+        .eval(source, "settings test")
+        .expect("the test chunk must run");
     read_lua_settings(&engine.global("oslo"))
 }
 

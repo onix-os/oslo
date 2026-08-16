@@ -220,7 +220,7 @@ fn test(name: &str, fields: &[String]) -> i32 {
             vec![oslo_runtime::LuaEngine::hook_fields(
                 &pairs
                     .iter()
-                    .map(|(k, v)| (*k, oslo_lua::Value::str(v)))
+                    .map(|(k, v)| (*k, oslo_base::value::Value::str(v)))
                     .collect::<Vec<_>>(),
             )],
         ),
@@ -246,11 +246,11 @@ fn test(name: &str, fields: &[String]) -> i32 {
 ///
 /// Only the shapes a hook answers with: a replacement line, a refusal, a status. Anything else is
 /// debugged, which is honest about it being unusual rather than pretending to render it.
-fn plainly(value: &oslo_lua::Value) -> String {
+fn plainly(value: &oslo_base::value::Value) -> String {
     match value {
-        oslo_lua::Value::Str(text) => text.to_string(),
-        oslo_lua::Value::Bool(yes) => yes.to_string(),
-        oslo_lua::Value::Nil => "nil".to_string(),
+        oslo_base::value::Value::Str(text) => text.to_string(),
+        oslo_base::value::Value::Bool(yes) => yes.to_string(),
+        oslo_base::value::Value::Nil => "nil".to_string(),
         other => format!("{other:?}"),
     }
 }

@@ -144,14 +144,6 @@ secrets = ["oslo-base/secrets", "oslo-runtime/secrets"]
 crypt = ["secrets", "oslo-base/crypt"]
 
 [dependencies]
-# The Lua front end, in the same relationship to Lua that brush-parser has to the shell: it parses
-# and nothing else. Evaluation is oslo's own, in `src/lua/eval/`, so that both languages run on one
-# Rust core. `full_moon` is the parser behind StyLua and selene.
-#
-# This replaced `mlua`, which is a *binding* to the reference Lua written in C: it vendored and
-# compiled 30k lines of C into the binary, so a static musl build needed a C toolchain, and Lua
-# values lived in a separate VM that the shell could only pass strings across. See PLAN-LUA.md.
-full_moon = { path = "vendor/full_moon", default-features = false, features = ["lua54"] }
 # `argc`, behind the feature of the same name. Only the parts a caller needs: the parse and the
 # match (`eval`), the bash renderer for `--argc-eval`, and the completion generator. `native-runtime`
 # is deliberately absent — oslo implements `argc::Runtime` over its own facilities, which is what
@@ -214,7 +206,6 @@ unicode-width = "0.2"
 # rather than a wrong answer — see tests/differential/expected_fail.rs.
 brush-parser = { path = "vendor/brush-parser" }
 oslo-base = { path = "crates/oslo-base" }
-oslo-lua = { path = "crates/oslo-lua" }
 oslo-luavm = { path = "crates/oslo-luavm" }
 oslo-runtime = { path = "crates/oslo-runtime" }
 oslo-shell = { path = "crates/oslo-shell" }
@@ -244,7 +235,6 @@ oslo-ui = { path = "crates/oslo-ui" }
 [workspace]
 members = [
   "crates/oslo-base",
-  "crates/oslo-lua",
   "crates/oslo-luavm",
   "crates/oslo-runtime",
   "crates/oslo-shell",
@@ -252,8 +242,6 @@ members = [
   "vendor/argc",
   "vendor/brush-parser",
   "vendor/luna",
-  "vendor/full_moon",
-  "vendor/full_moon/derive",
 ]
 
 

@@ -13,14 +13,14 @@
 //! # A table, evaluated in an interpreter of its own
 //!
 //! It is Lua because oslo is, and writing a manifest in JSON in a Lua-first shell would be a small
-//! daily insult. It is evaluated in a **fresh [`Interp`] with no `oslo` global**, so a manifest that
+//! daily insult. It is evaluated in a **fresh [`Engine`] with no `oslo` global**, so a manifest that
 //! tries to do something — register a builtin, open a database, read a file — finds nothing to do it
 //! with. Reading what a plugin *claims* must not be the moment its code first runs.
 //!
 //! That is also why `install` can read one before you have decided to trust it.
 
 use oslo_base::value::Value;
-use oslo_lua::{Interp, parse};
+use oslo_luavm::Engine;
 use std::path::Path;
 
 /// The file a plugin directory must contain.
@@ -86,11 +86,10 @@ pub fn read(directory: &Path) -> Result<Manifest, String> {
     let path = directory.join(FILE);
     let source =
         std::fs::read_to_string(&path).map_err(|error| format!("{}: {error}", path.display()))?;
-    let ast = parse(&source).map_err(|error| format!("{}: {error}", path.display()))?;
-
-    let interp = Interp::new(path.to_string_lossy().into_owned());
-    let returned = interp
-        .run_ast(&ast)
+    // A fresh engine, so a manifest is read somewhere it can reach nothing — see the module note.
+    let engine = Engine::new();
+    let returned = engine
+        .eval(&source, &path.to_string_lossy())
         .map_err(|error| format!("{}: {error}", path.display()))?;
     let Some(Value::Table(table)) = returned.first() else {
         return Err(format!("{}: must return a table", path.display()));

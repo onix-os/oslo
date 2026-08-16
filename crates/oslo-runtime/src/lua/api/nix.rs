@@ -25,8 +25,8 @@
 //! to talk to nix. What is here is the argument reading and the conversion to Lua.
 
 use super::util::{failed, ok, put};
-use oslo_base::value::{Table, Value};
 use oslo_base::value::{LuaError, LuaResult};
+use oslo_base::value::{Table, Value};
 use oslo_shell::nix_shell::{cache, json};
 use std::time::Duration;
 
@@ -34,7 +34,7 @@ use std::time::Duration;
 const HELPERS: &str = include_str!("nix.lua");
 
 /// Build the `oslo.nix` table.
-pub fn build(interp: &oslo_lua::Interp) -> Value {
+pub fn build(host: &dyn oslo_luavm::Host) -> Value {
     let mut nix = Table::new();
 
     // oslo.nix.run{"flake", "metadata", timeout = 30, cache = true} -> table, or nil + message
@@ -61,7 +61,7 @@ pub fn build(interp: &oslo_lua::Interp) -> Value {
     });
 
     let table = Value::table(nix);
-    add_helpers(interp, &table);
+    add_helpers(host, &table);
     table
 }
 
@@ -75,17 +75,15 @@ pub fn build(interp: &oslo_lua::Interp) -> Value {
 /// **A failure is reported and startup continues.** These are conveniences over `oslo.nix.run`; a
 /// shell that will not start because one of them has a typo is a much worse outcome than a shell
 /// missing `oslo.nix.inputs`.
-fn add_helpers(interp: &oslo_lua::Interp, table: &Value) {
+fn add_helpers(host: &dyn oslo_luavm::Host, table: &Value) {
     let chunk = "oslo.nix";
-    let installed = oslo_lua::parse(HELPERS)
-        .map_err(|e| e.in_chunk(chunk))
-        .and_then(|ast| {
-            interp.set_chunk(chunk);
-            let returned = interp.run_ast(&ast)?;
-            match returned.first() {
-                Some(install) => interp.call(install, vec![table.clone()]),
-                None => Ok(Vec::new()),
-            }
+    // Install time, so the host is the engine itself and calling back into Lua is allowed. A
+    // native could not do this: see `oslo_luavm::host`.
+    let installed = host
+        .eval(HELPERS, chunk)
+        .and_then(|returned| match returned.first() {
+            Some(install) => host.call(install, vec![table.clone()]),
+            None => Ok(Vec::new()),
         });
     if let Err(e) = installed {
         eprintln!("oslo: {chunk}: {e}");

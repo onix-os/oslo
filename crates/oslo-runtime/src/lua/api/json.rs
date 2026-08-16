@@ -10,8 +10,8 @@
 //! that round-trips through Lua keeps its shape.
 
 use super::util::{failed, ok, put, text};
-use oslo_base::value::{Number, Table, Value};
 use oslo_base::value::{LuaError, LuaResult};
+use oslo_base::value::{Number, Table, Value};
 use serde_json::Value as Json;
 
 /// Key an encoder looks at to decide between an array and an object.

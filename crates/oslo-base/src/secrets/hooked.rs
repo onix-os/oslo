@@ -47,11 +47,7 @@ fn told(store: &str, name: &str, payload: &[u8]) -> Vec<crate::value::Value> {
 }
 
 /// What comes back, if anything claimed the store.
-fn taken(
-    answer: Option<crate::value::Value>,
-    store: &str,
-    verb: &str,
-) -> Result<Vec<u8>, String> {
+fn taken(answer: Option<crate::value::Value>, store: &str, verb: &str) -> Result<Vec<u8>, String> {
     use crate::value::Value;
     match answer {
         Some(Value::Str(text)) => decode(&text)

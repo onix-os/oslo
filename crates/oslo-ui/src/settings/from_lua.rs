@@ -574,7 +574,12 @@ fn flag(table: &oslo_base::value::Table, name: &str, slot: &mut bool) {
 /// you reach for first, and `fuzzy = "loose"` is what you reach for once you want to tune it. A
 /// name nothing answers to is reported rather than ignored — a typo that silently leaves fuzzy
 /// matching off looks exactly like the feature not working.
-fn fuzzy(table: &oslo_base::value::Table, path: &str, slot: &mut Fuzzy, problems: &mut Vec<String>) {
+fn fuzzy(
+    table: &oslo_base::value::Table,
+    path: &str,
+    slot: &mut Fuzzy,
+    problems: &mut Vec<String>,
+) {
     match table.get(&Value::str("fuzzy")) {
         Value::Nil => {}
         Value::Str(name) => match Fuzzy::parse(name.as_ref()) {

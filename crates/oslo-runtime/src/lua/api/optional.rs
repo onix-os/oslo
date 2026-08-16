@@ -5,8 +5,8 @@
 //! file, and a config asks the same question the way `docs/features/runtime-features.md` says —
 //! `if oslo.nix then … end`.
 
-use oslo_luavm::Host;
 use oslo_base::value::Table;
+use oslo_luavm::Host;
 // Every use of it is behind a feature, so a default build has none.
 #[cfg(any(
     feature = "direnv",

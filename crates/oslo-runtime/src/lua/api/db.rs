@@ -32,8 +32,9 @@
 use super::util::{ok, put, text};
 use oslo_base::store;
 use oslo_base::track::kv::Store;
+use oslo_base::value::{LuaError, LuaResult};
 use oslo_base::value::{Table, Value};
-use oslo_lua::{Interp, LuaError, LuaResult};
+use oslo_luavm::Host;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -45,10 +46,39 @@ thread_local! {
     /// file, and the second would fail or block depending on how far the engine got. A config that
     /// calls `oslo.db.open("notes")` in two places means one database either way.
     static OPEN: RefCell<HashMap<String, Rc<Store>>> = RefCell::new(HashMap::new());
+
+    /// `db:write`, compiled once at install time.
+    ///
+    /// **In Lua, because it calls the caller's function.** Every change in one transaction means
+    /// running a callback between opening the batch and applying it — and a Rust native cannot do
+    /// that on a stackless VM, which unwinds Lua's stack into its own heap rather than Rust's. The
+    /// two ends are natives (`__begin`, `__commit`) and the middle is three lines of Lua, where
+    /// calling a function is free.
+    ///
+    /// An error in the callback propagates and `__commit` never runs, so nothing is written —
+    /// which is the guarantee `db:write` exists to give.
+    static WRITE: RefCell<Option<Value>> = const { RefCell::new(None) };
 }
 
+/// The Lua half of `db:write`. See [`WRITE`].
+const WRITE_SHIM: &str = "return function(self, work)
+    if type(work) ~= 'function' then
+        error('db:write: expected a function of one argument', 2)
+    end
+    local w = self:__begin()
+    work(w)
+    return w:__commit()
+end";
+
 /// Build the `oslo.db` table.
-pub fn build() -> Value {
+pub fn build(host: &dyn Host) -> Value {
+    // Compiled here rather than per open: one function serves every handle.
+    if let Ok(values) = host.eval(WRITE_SHIM, "=oslo.db")
+        && let Some(write @ Value::Function(_)) = values.into_iter().next()
+    {
+        WRITE.with(|slot| *slot.borrow_mut() = Some(write));
+    }
+
     let mut db = Table::new();
 
     // oslo.db.open(name) -> handle, or nil + message
@@ -135,10 +165,15 @@ fn handle(name: &str, store: Rc<Store>) -> Value {
         ))
     });
 
+    // `write` is a Lua function, not a native one: it has to *call* the caller's callback, and a
+    // native cannot re-enter a stackless VM. See [`WRITE`].
     let it = Rc::clone(&store);
-    put(&mut table, "write", move |interp, args| {
-        batch(interp, &it, &args)
+    put(&mut table, "__begin", move |_, _| {
+        ok(staging_table(&Rc::new(RefCell::new(Vec::new())), &it))
     });
+    if let Some(write) = WRITE.with(|slot| slot.borrow().clone()) {
+        table.set(Value::str("write"), write);
+    }
 
     let it = Rc::clone(&store);
     put(&mut table, "path", move |_, _| {
@@ -154,26 +189,8 @@ fn handle(name: &str, store: Rc<Store>) -> Value {
     Value::table(table)
 }
 
-/// `db:write(function(w) … end)` — every change in one transaction.
-///
-/// **The whole callback is one transaction, and an error in it commits nothing.** That is the only
-/// reason this exists rather than leaving callers to call `set` repeatedly: a plugin writing an
-/// index and the row it points at needs both or neither, and `set` twice is two transactions with a
-/// window between them.
-fn batch(interp: &Interp, store: &Rc<Store>, args: &[Value]) -> LuaResult<Vec<Value>> {
-    let Some(work @ Value::Function(_)) = args.get(1) else {
-        return Err(LuaError::new(
-            "db:write: expected a function of one argument".to_string(),
-        ));
-    };
-
-    // Collected first, applied second. The Lua callback cannot run *inside* the engine's write
-    // transaction: it can call anything, including another `db:write` on this same store, and the
-    // engine has one writer. So the callback records what it wants and this applies the record.
-    let staged: Rc<RefCell<Vec<Change>>> = Rc::new(RefCell::new(Vec::new()));
-    let writer = staging_table(&staged);
-    interp.call(work, vec![writer])?;
-
+/// Apply everything staged on `writer`, as one transaction.
+fn commit(store: &Rc<Store>, staged: &Rc<RefCell<Vec<Change>>>) -> LuaResult<Vec<Value>> {
     let changes = staged.borrow();
     let applied = store.write(|writer| {
         for change in changes.iter() {
@@ -211,8 +228,14 @@ enum Change {
 }
 
 /// The `w` a `db:write` callback is handed: the same two verbs, recording rather than writing.
-fn staging_table(staged: &Rc<RefCell<Vec<Change>>>) -> Value {
+fn staging_table(staged: &Rc<RefCell<Vec<Change>>>, store: &Rc<Store>) -> Value {
     let mut table = Table::new();
+
+    // The other half of `write`: the shim calls this once the callback has returned, so everything
+    // the callback staged lands in one transaction or, if it raised, in none.
+    let into = Rc::clone(staged);
+    let it = Rc::clone(store);
+    put(&mut table, "__commit", move |_, _| commit(&it, &into));
 
     let into = Rc::clone(staged);
     put(&mut table, "set", move |_, args| {

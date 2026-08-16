@@ -13,8 +13,8 @@
 //! calls the shell's own globber, so the two interfaces cannot drift apart.
 
 use crate::lua::engine::{BUILTIN_KEY_PREFIX, PROMPT_KEY, Registry, borrow_env, call_lua_builtin};
-use oslo_base::value::{Table, Value};
 use oslo_base::value::LuaError;
+use oslo_base::value::{Table, Value};
 use oslo_luavm::Host;
 use oslo_shell::env::Environment;
 use std::cell::RefCell;
@@ -179,7 +179,7 @@ pub fn install(host: &dyn Host, registry: &Registry, env: Arc<Mutex<Environment>
     // `oslo.feature` — a namespace of functions rather than a settings table, because a feature is
     // not configuration. It is a runtime mask over configuration, and the two must not look alike.
     oslo.set(Value::str("feature"), feature::build(registry));
-    oslo.set(Value::str("db"), db::build());
+    oslo.set(Value::str("db"), db::build(host));
     oslo.set(Value::str("state"), state::build());
     oslo.set(Value::str("messages"), messages::build());
     timer::install(&mut oslo);

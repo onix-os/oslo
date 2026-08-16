@@ -4,7 +4,7 @@
 //!
 //! | crate | what it is |
 //! |---|---|
-//! | [`oslo_lua`] | a Lua 5.4 evaluator in pure Rust, with no dependency but its parser |
+//! | [`oslo_luavm`] | a Lua 5.4 VM in pure Rust — stackless, with a tracing collector |
 //! | [`oslo_base`] | the syntax tree, the error type, feature bits, the hook registry, the store |
 //! | [`oslo_ui`] | the line editor, completion, the dropdown, widgets, theming, the finder |
 //! | [`oslo_shell`] | syntax adaptation, expansion, execution, the builtins, directory environments |
