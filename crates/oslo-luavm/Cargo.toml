@@ -15,6 +15,6 @@ description = "The Lua VM oslo runs on: luna."
 # make the build depend on when it was run: the same oslo revision would compile against whatever
 # had landed that morning. The hash moves when somebody moves it, deliberately, and `cargo update`
 # cannot move it at all.
-luna = { git = "https://github.com/onix-os/luna", rev = "48b6836822c3eafabdc64bdedfb3091b85f254f5" }
+luna = { git = "https://github.com/onix-os/luna", rev = "a2e2d3181dc875e5ff83a46fb42fc68c8e0a93a1" }
 # The value type the shell speaks. The whole point of this crate is converting between the two.
 oslo-base = { path = "../oslo-base" }
