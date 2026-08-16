@@ -53,6 +53,8 @@ pub mod store;
 /// Tilde expansion — `~`, `~user`, `~+`, `~-` — shared by the shell and the prompt.
 pub mod tilde;
 pub mod track;
+/// The dynamic value the shell and its Lua share — tables, numbers, strings.
+pub mod value;
 pub mod version;
 /// Names the shell can run that `$PATH` has never heard of, for the prompt to draw.
 pub mod vocab;
