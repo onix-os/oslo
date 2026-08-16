@@ -272,10 +272,29 @@ required-features = ["vista"]
 
 # Measured, not assumed — the before/after is in PERF_AND_CODE.md.
 #
-# No `panic = "abort"`, deliberately, though it is the obvious fourth setting: `catch_unwind` in
-# `startup::environments` restores stdout and stderr before re-raising, and under `abort` that
-# restore never runs — a panic inside a `.env.lua` would kill the shell with its own message
-# written into a temp file nobody ever reads. A silent death is worse than a slightly larger binary.
+# **No `panic = "abort"`, and it is the most expensive "no" in this file: 806,912 bytes, 11.8%.**
+# Measured on the shipped musl build, 6,841,128 → 6,034,216. Written down because a number that
+# large will be proposed again, and the answer should not have to be rediscovered.
+#
+# What it buys back is **ten** `catch_unwind` sites, not the one this comment used to name. Every
+# one of them has a live recovery path, and under `abort` every one becomes a dead branch and a
+# dead shell:
+#
+# * `track/kv/mod.rs` — five of them, wrapping the *third-party* storage engine. "database open
+#   panicked" and "read transaction panicked" are real strings this code can produce, because a
+#   database truncated by a full disk or a kill during a write is a file the engine can panic on.
+#   Under `abort`, a corrupt `~/.local/share/oslo` history file stops the shell from starting, and
+#   there is no way out of it from inside the shell.
+# * `track/writer.rs` — the history writer thread's per-job guard: *one bad record costs one
+#   record*. Under `abort` one bad record costs the session.
+# * `track/kv/file.rs` — an unopenable database answers `None` and the shell runs without history.
+# * `startup::environments` — restores stdout and stderr before re-raising, so a panic inside a
+#   `.env.lua` is reported to the terminal rather than into a temp file nobody reads.
+#
+# The trade is 800 KB against a shell that dies on a data file it could have degraded past. A
+# `/bin/sh` that will not start because its own history is corrupt is a worse product than a larger
+# one. `-Z build-std` with `panic_immediate_abort` would be the way to have both, and it is nightly
+# — `rust-toolchain.toml` pins stable.
 [profile.release]
 # **Fat, since the shell became six crates.**
 #
