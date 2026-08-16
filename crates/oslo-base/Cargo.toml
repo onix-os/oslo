@@ -2,7 +2,7 @@
 name = "oslo-base"
 version = "0.2.21"
 edition = "2024"
-rust-version = "1.89"
+rust-version = "1.90"
 license = "MIT"
 description = "The bottom of oslo: the syntax tree, the error type, feature bits, the hook registry, and the tracking store."
 

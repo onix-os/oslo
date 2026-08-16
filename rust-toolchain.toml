@@ -1,0 +1,11 @@
+# The toolchain this repository builds with, pinned so a machine's `rustup default` cannot decide
+# it. The default here was silently switched to an old nightly, and `make verify` then failed with
+# "rustc 1.88.0-nightly is not supported" — a confusing way to learn that nothing was wrong with the
+# code.
+#
+# **The same version the CI jobs pin** (`.github/workflows/*.yml`), so a green run locally means the
+# same compiler agreed. The MSRV is separate and lower: `rust-version` in Cargo.toml says 1.90, and
+# the `msrv` job checks it by overriding this file with `RUSTUP_TOOLCHAIN`.
+[toolchain]
+channel = "1.94.0"
+components = ["rustfmt", "clippy"]

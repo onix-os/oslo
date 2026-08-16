@@ -3,7 +3,7 @@ name = "oslo"
 version = "0.3.13"
 edition = "2024"
 # Minimum supported Rust version, mirrored by the MSRV job in .github/workflows/tests.yml.
-rust-version = "1.89"
+rust-version = "1.90"
 description = "oslo"
 license = "MIT"
 readme = "README.md"

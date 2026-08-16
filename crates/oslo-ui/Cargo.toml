@@ -2,7 +2,7 @@
 name = "oslo-ui"
 version = "0.2.21"
 edition = "2024"
-rust-version = "1.89"
+rust-version = "1.90"
 license = "MIT"
 description = "oslo's interface layer: the line editor, completion, the dropdown, widgets, theming and the finder."
 

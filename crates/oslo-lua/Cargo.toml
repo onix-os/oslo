@@ -2,7 +2,7 @@
 name = "oslo-lua"
 version = "0.2.21"
 edition = "2024"
-rust-version = "1.88"
+rust-version = "1.90"
 license = "MIT"
 description = "A Lua 5.4 evaluator in pure Rust, with no dependencies beyond its parser."
 repository = "https://github.com/bresilla/oslo"

@@ -76,6 +76,8 @@ jobs:
       fail-fast: false
       matrix:
         target: [fuzz_parse, fuzz_lexer, fuzz_arith]
+    env:
+      RUSTUP_TOOLCHAIN: nightly
     steps:
       - uses: actions/checkout@v4
 
@@ -83,6 +85,10 @@ jobs:
       # needs `-Zsanitizer`, which is nightly-only, and the point of a nightly job is to run
       # against the current sanitizer rather than a fossil of one. This job gates nothing on the
       # default branch, so a toolchain that breaks costs a red cron and not a blocked merge.
+      #
+      # `RUSTUP_TOOLCHAIN` below is what keeps it nightly: `rust-toolchain.toml` pins a stable
+      # version for everything else and takes precedence over the toolchain this action installs,
+      # which would leave cargo-fuzz asking a stable compiler for `-Zsanitizer`.
       - uses: dtolnay/rust-toolchain@nightly
 
       - uses: actions/cache@v4
