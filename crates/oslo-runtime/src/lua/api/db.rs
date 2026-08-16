@@ -172,7 +172,7 @@ fn handle(name: &str, store: Rc<Store>) -> Value {
         ok(staging_table(&Rc::new(RefCell::new(Vec::new())), &it))
     });
     if let Some(write) = WRITE.with(|slot| slot.borrow().clone()) {
-        table.set(Value::str("write"), write);
+        table.set_str("write", write);
     }
 
     let it = Rc::clone(&store);
@@ -185,7 +185,7 @@ fn handle(name: &str, store: Rc<Store>) -> Value {
         ok(Value::int(it.size() as i64))
     });
 
-    table.set(Value::str("name"), Value::str(name));
+    table.set_str("name", Value::str(name));
     Value::table(table)
 }
 

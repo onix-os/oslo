@@ -45,18 +45,18 @@ pub(super) fn declaration(args: &[Value]) -> LuaResult<Declared> {
     // apart by the first argument's type, so neither can be mistaken for the other.
     if let Some(Value::Table(spec)) = args.first() {
         let spec = spec.borrow();
-        let Value::Str(name) = spec.get(&Value::str("name")) else {
+        let Value::Str(name) = spec.get_str("name") else {
             return Err(LuaError::new(
                 "oslo.register_builtin: `name` must be a string",
             ));
         };
-        let run = spec.get(&Value::str("run"));
+        let run = spec.get_str("run");
         if !matches!(run, Value::Function(_)) {
             return Err(LuaError::new(
                 "oslo.register_builtin: `run` must be a function",
             ));
         }
-        let complete = match spec.get(&Value::str("complete")) {
+        let complete = match spec.get_str("complete") {
             Value::Nil => None,
             it @ Value::Function(_) => Some(it),
             _ => {
@@ -68,7 +68,7 @@ pub(super) fn declaration(args: &[Value]) -> LuaResult<Declared> {
         return Ok(Declared {
             name: named(&name)?,
             run,
-            desc: match spec.get(&Value::str("desc")) {
+            desc: match spec.get_str("desc") {
                 Value::Str(text) => Some(text.to_string()),
                 _ => None,
             },
@@ -142,7 +142,7 @@ pub(super) fn install(oslo: &mut Table) {
         let mut out = Table::new();
         for (at, (name, desc)) in listed.into_iter().enumerate() {
             let mut row = Table::new();
-            row.set(Value::str("name"), Value::str(&name));
+            row.set_str("name", Value::str(&name));
             row.set(
                 Value::str("desc"),
                 desc.map(|d| Value::str(&d)).unwrap_or(Value::Nil),

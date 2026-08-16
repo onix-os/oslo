@@ -85,15 +85,15 @@ fn walk(list: &CommandList) -> Vec<(&Command, &'static str)> {
 /// One command: what it runs, and how it got here.
 fn describe(command: &Command, link: &str) -> Value {
     let mut t = Table::new();
-    t.set(Value::str("link"), Value::str(link));
+    t.set_str("link", Value::str(link));
     match command {
         Command::Simple(simple) => {
-            t.set(Value::str("kind"), Value::str("simple"));
+            t.set_str("kind", Value::str("simple"));
             let mut argv = Table::new();
             for (at, word) in simple.words.iter().enumerate() {
                 argv.set(Value::int(at as i64 + 1), Value::str(flatten(word)));
             }
-            t.set(Value::str("argv"), Value::table(argv));
+            t.set_str("argv", Value::table(argv));
             t.set(
                 Value::str("redirects"),
                 Value::int(simple.redirections.len() as i64),
@@ -101,10 +101,10 @@ fn describe(command: &Command, link: &str) -> Value {
         }
         // A `for` loop or an `if` is one command to the line and has no argv of its own. Named
         // rather than skipped, so a count of `c.commands` matches what the line actually runs.
-        Command::Compound { .. } => t.set(Value::str("kind"), Value::str("compound")),
+        Command::Compound { .. } => t.set_str("kind", Value::str("compound")),
         Command::FunctionDef { name, .. } => {
-            t.set(Value::str("kind"), Value::str("function"));
-            t.set(Value::str("name"), Value::str(name));
+            t.set_str("kind", Value::str("function"));
+            t.set_str("name", Value::str(name));
         }
     }
     Value::table(t)

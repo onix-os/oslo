@@ -12,10 +12,10 @@ fn parsed(text: &str) -> Vec<(Vec<String>, String)> {
                 panic!("command {at} is not a table");
             };
             let command = command.borrow();
-            let Value::Str(link) = command.get(&Value::str("link")) else {
+            let Value::Str(link) = command.get_str("link") else {
                 panic!("command {at} has no link");
             };
-            let argv = match command.get(&Value::str("argv")) {
+            let argv = match command.get_str("argv") {
                 Value::Table(argv) => {
                     let argv = argv.borrow();
                     (1..=argv.length())
@@ -106,7 +106,7 @@ fn a_compound_command_is_named_rather_than_dropped() {
     let Value::Table(first) = list.borrow().get(&Value::int(1)) else {
         panic!("no first command");
     };
-    let Value::Str(kind) = first.borrow().get(&Value::str("kind")) else {
+    let Value::Str(kind) = first.borrow().get_str("kind") else {
         panic!("no kind");
     };
     assert_eq!(kind.to_string(), "compound");

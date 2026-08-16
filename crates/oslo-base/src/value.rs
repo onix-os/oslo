@@ -181,6 +181,27 @@ impl Table {
         Self::default()
     }
 
+    /// Raw read under a literal name — `t.get_str("size")`.
+    ///
+    /// **Not inlined, and that is the whole point.** `Value::str` allocates an `Rc<str>` and copies
+    /// the name into it, and the lookup then clones a key and drops two values. Written out at each
+    /// of the two hundred-odd call sites that pass a literal, that is two hundred copies of the
+    /// same dozen instructions, each with its own unwind landing pads. Behind `#[inline(never)]`
+    /// there is one — measured at 28,208 bytes of the shipped binary.
+    ///
+    /// It also reads better, which is why the call sites were worth changing rather than leaving to
+    /// a smarter allocator: `t.get_str("size")` says what `t.get_str("size")` meant.
+    #[inline(never)]
+    pub fn get_str(&self, key: &str) -> Value {
+        self.get(&Value::str(key))
+    }
+
+    /// Raw write under a literal name. The counterpart of [`get_str`](Self::get_str).
+    #[inline(never)]
+    pub fn set_str(&mut self, key: &str, value: Value) {
+        self.set(Value::str(key), value);
+    }
+
     /// Raw read, ignoring any `__index` metamethod.
     pub fn get(&self, key: &Value) -> Value {
         if let Value::Number(n) = key
@@ -479,7 +500,7 @@ mod tests {
         for name in ["a", "b", "c"] {
             t.set(Value::str(name), Value::int(1));
         }
-        t.set(Value::str("a"), Value::int(99));
+        t.set_str("a", Value::int(99));
         assert_eq!(string_keys(&t), ["a", "b", "c"]);
     }
 
@@ -490,9 +511,9 @@ mod tests {
         for name in ["a", "b", "c"] {
             t.set(Value::str(name), Value::Bool(true));
         }
-        t.set(Value::str("b"), Value::Nil);
+        t.set_str("b", Value::Nil);
         assert_eq!(string_keys(&t), ["a", "c"]);
-        t.set(Value::str("b"), Value::Bool(true));
+        t.set_str("b", Value::Bool(true));
         assert_eq!(string_keys(&t), ["a", "c", "b"]);
     }
 }

@@ -115,7 +115,7 @@ fn chrome_of(t: &Table) -> Result<Chrome, oslo_base::value::LuaError> {
     let mut chrome = Chrome::default();
     // Absent leaves the default on, so `legend = false` is the only spelling that turns it off and
     // `legend = nil` cannot mean "off" by accident.
-    if let Value::Bool(shown) = t.get(&Value::str("legend")) {
+    if let Value::Bool(shown) = t.get_str("legend") {
         chrome.legend = shown;
     }
     chrome.fullscreen = flag(t, "fullscreen") || flag(t, "alt");
@@ -375,7 +375,7 @@ pub fn install(ui: &mut Table) {
                     }
                 }
                 time = maybe(&t, "time");
-                if let Value::Table(pairs) = t.get(&Value::str("fields")) {
+                if let Value::Table(pairs) = t.get_str("fields") {
                     fields.extend(named_values(&pairs.borrow()));
                     // Table iteration has no order, and a log line whose fields moved between runs
                     // is one nobody can diff.
@@ -428,7 +428,7 @@ pub fn install(ui: &mut Table) {
                         }
                     }
                 }
-                if let Value::Table(pairs) = t.get(&Value::str("fields")) {
+                if let Value::Table(pairs) = t.get_str("fields") {
                     values.extend(named_values(&pairs.borrow()));
                     // Sorted for the same reason `log`'s fields are: table iteration has no order,
                     // and `template` applies replacements in sequence — so overlapping keys would
@@ -493,7 +493,7 @@ pub fn install(ui: &mut Table) {
                 for (key, value) in spec.borrow().pairs() {
                     merged.set(key, value);
                 }
-                merged.set(Value::str("text"), args[0].clone());
+                merged.set_str("text", args[0].clone());
                 vec![Value::table(merged)]
             }
             _ => args,
@@ -523,7 +523,7 @@ pub fn install(ui: &mut Table) {
                 settings.style.bold = flag(&t, "bold");
                 settings.padding_x = size(&t, "padding_x", 0);
                 settings.padding_y = size(&t, "padding_y", 0);
-                settings.width = match t.get(&Value::str("width")) {
+                settings.width = match t.get_str("width") {
                     Value::Number(n) => n.as_int().map(|i| i.max(0) as usize),
                     _ => None,
                 };

@@ -114,7 +114,7 @@ fn overflow_of(options: Option<&Value>) -> Result<Option<Overflow>, LuaError> {
     let Some(Value::Table(table)) = options else {
         return Ok(None);
     };
-    let named = table.borrow().get(&Value::str("overflow"));
+    let named = table.borrow().get_str("overflow");
     match named {
         Value::Nil => Ok(None),
         Value::Str(name) => Overflow::named(name.as_ref()).map(Some).ok_or_else(|| {

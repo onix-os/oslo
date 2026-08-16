@@ -95,18 +95,18 @@ pub(super) fn read(answered: Option<Value>, text: String) -> Option<Answer> {
         }),
         Some(Value::Table(table)) => {
             let table = table.borrow();
-            if table.get(&Value::str("cancel")).truthy() {
+            if table.get_str("cancel").truthy() {
                 return None;
             }
             Some(Answer {
-                text: match table.get(&Value::str("text")) {
+                text: match table.get_str("text") {
                     Value::Str(replacement) => replacement.to_string(),
                     _ => text,
                 },
                 // **Absent means yes.** Only an explicit `record = false` suppresses; `record = nil`
                 // is a handler that did not mention recording, and reading that as a veto would
                 // make every table-returning handler hide the line by accident.
-                record: !matches!(table.get(&Value::str("record")), Value::Bool(false)),
+                record: !matches!(table.get_str("record"), Value::Bool(false)),
             })
         }
         _ => Some(Answer { text, record: true }),

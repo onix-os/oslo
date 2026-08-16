@@ -187,7 +187,7 @@ mod tests {
             panic!("a hook payload is a table");
         };
         let table = table.borrow();
-        assert!(matches!(table.get(&Value::str("from")), Value::Str(s) if &*s == "/a"));
-        assert!(matches!(table.get(&Value::str("to")), Value::Str(s) if &*s == "/b"));
+        assert!(matches!(table.get_str("from"), Value::Str(s) if &*s == "/a"));
+        assert!(matches!(table.get_str("to"), Value::Str(s) if &*s == "/b"));
     }
 }

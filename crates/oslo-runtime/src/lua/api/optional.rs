@@ -14,7 +14,6 @@ use oslo_luavm::Host;
     feature = "secrets",
     feature = "plugin"
 ))]
-use oslo_base::value::Value;
 use oslo_shell::env::Environment;
 use std::sync::{Arc, Mutex};
 
@@ -23,11 +22,11 @@ use std::sync::{Arc, Mutex};
 #[allow(unused_variables)]
 pub fn install(oslo: &mut Table, host: &dyn Host, env: &Arc<Mutex<Environment>>) {
     #[cfg(feature = "direnv")]
-    oslo.set(Value::str("direnv"), super::direnv::build(env));
+    oslo.set_str("direnv", super::direnv::build(env));
     #[cfg(feature = "nix")]
-    oslo.set(Value::str("nix"), super::nix::build());
+    oslo.set_str("nix", super::nix::build());
     #[cfg(feature = "secrets")]
-    oslo.set(Value::str("secret"), super::secret::build());
+    oslo.set_str("secret", super::secret::build());
     #[cfg(feature = "plugin")]
-    oslo.set(Value::str("plugin"), crate::plugin::health::build());
+    oslo.set_str("plugin", crate::plugin::health::build());
 }

@@ -9,7 +9,7 @@ fn declare(source: &str) -> Result<(), String> {
     let mut completion = Table::new();
     install(&mut completion);
     let mut oslo = Table::new();
-    oslo.set(Value::str("completion"), Value::table(completion));
+    oslo.set_str("completion", Value::table(completion));
     interp.set_global("oslo", Value::table(oslo));
     let ast = oslo_lua::parse(source).map_err(|e| e.to_string())?;
     interp.run_ast(&ast).map(|_| ()).map_err(|e| e.to_string())

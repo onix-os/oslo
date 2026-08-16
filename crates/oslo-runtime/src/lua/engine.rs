@@ -373,9 +373,9 @@ impl LuaEngine {
     /// inside the handler answers the same thing only until the command is a `cd`.
     pub fn command_started(text: &str, cwd: &str, mode: &str) -> Value {
         let mut t = oslo_base::value::Table::new();
-        t.set(Value::str("text"), Value::str(text));
-        t.set(Value::str("cwd"), Value::str(cwd));
-        t.set(Value::str("mode"), Value::str(mode));
+        t.set_str("text", Value::str(text));
+        t.set_str("cwd", Value::str(cwd));
+        t.set_str("mode", Value::str(mode));
         // **Parsed only when somebody is listening.** The line is parsed again a moment later by
         // the shell either way, so this is one extra parse per command — worth nothing to a config
         // that asks for it and worth avoiding entirely for the far more common one that does not.
@@ -384,7 +384,7 @@ impl LuaEngine {
             && oslo_base::hooks::watched(oslo_base::hooks::at::PRE_CMD)
             && let Some(commands) = crate::lua::parsed::commands_of(text)
         {
-            t.set(Value::str("commands"), commands);
+            t.set_str("commands", commands);
         }
         Value::table(t)
     }
@@ -402,11 +402,11 @@ impl LuaEngine {
         duration: std::time::Duration,
     ) -> Value {
         let mut t = oslo_base::value::Table::new();
-        t.set(Value::str("text"), Value::str(text));
-        t.set(Value::str("cwd"), Value::str(cwd));
-        t.set(Value::str("mode"), Value::str(mode));
-        t.set(Value::str("status"), Value::int(status as i64));
-        t.set(Value::str("ok"), Value::Bool(status == 0));
+        t.set_str("text", Value::str(text));
+        t.set_str("cwd", Value::str(cwd));
+        t.set_str("mode", Value::str(mode));
+        t.set_str("status", Value::int(status as i64));
+        t.set_str("ok", Value::Bool(status == 0));
         t.set(
             Value::str("duration_ms"),
             Value::int(duration.as_millis() as i64),
@@ -476,7 +476,7 @@ impl LuaEngine {
     pub fn read_theme(&self) -> (oslo_ui::theme::Theme, Vec<String>) {
         let oslo = self.interp.global("oslo");
         let theme = match &oslo {
-            Value::Table(table) => table.borrow().get(&Value::str("theme")),
+            Value::Table(table) => table.borrow().get_str("theme"),
             _ => Value::Nil,
         };
         oslo_ui::theme::read_lua_theme(&theme)

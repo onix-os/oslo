@@ -72,7 +72,7 @@ fn nix_develop(it: &mut Table, env: &Arc<Mutex<Environment>>) {
             // `nix_develop{ hook = true, functions = true }`, and optionally the installable.
             Some(Value::Table(options)) => {
                 let options = options.borrow();
-                let named = match options.get(&Value::str("flake")) {
+                let named = match options.get_str("flake") {
                     Value::Str(name) => vec![name.to_string()],
                     _ => Vec::new(),
                 };

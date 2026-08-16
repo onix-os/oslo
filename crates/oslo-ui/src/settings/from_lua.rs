@@ -20,7 +20,7 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
     };
     let oslo = oslo.borrow();
 
-    if let Value::Table(table) = oslo.get(&Value::str("dirs")) {
+    if let Value::Table(table) = oslo.get_str("dirs") {
         for (key, value) in table.borrow().pairs() {
             match (&key, &value) {
                 (Value::Str(name), Value::Str(path)) => {
@@ -33,20 +33,20 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
         settings.dirs.sort();
     }
 
-    if let Value::Table(table) = oslo.get(&Value::str("notify")) {
+    if let Value::Table(table) = oslo.get_str("notify") {
         let table = table.borrow();
         if let Some(n) = number(&table, "after") {
             settings.notify.after = n.max(0) as u64;
         }
-        if let Value::Str(title) = table.get(&Value::str("title")) {
+        if let Value::Str(title) = table.get_str("title") {
             settings.notify_text.title = Some(title.to_string());
         }
-        if let Value::Str(command) = table.get(&Value::str("command")) {
+        if let Value::Str(command) = table.get_str("command") {
             settings.notify_text.command = Some(command.to_string());
         }
     }
 
-    if let Value::Table(table) = oslo.get(&Value::str("vi")) {
+    if let Value::Table(table) = oslo.get_str("vi") {
         let table = table.borrow();
         flag(&table, "enabled", &mut settings.vi.enabled);
         let c = &mut settings.vi.cursors;
@@ -55,7 +55,7 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
         cursor(&table, "cursor_replace", &mut c.replace, &mut problems);
     }
 
-    if let Value::Table(table) = oslo.get(&Value::str("completion")) {
+    if let Value::Table(table) = oslo.get_str("completion") {
         let table = table.borrow();
         if let Some(n) = number(&table, "max_rows") {
             // One row is still a dropdown; zero would be a dropdown that never appears, which is
@@ -73,7 +73,7 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
             "case_sensitive",
             &mut settings.completion.case_sensitive,
         );
-        if let Value::Table(list) = table.get(&Value::str("sources")) {
+        if let Value::Table(list) = table.get_str("sources") {
             let mut kinds = Vec::new();
             for value in list.borrow().sequence() {
                 if let Value::Str(name) = value {
@@ -89,7 +89,7 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
             }
             settings.completion.sources = Some(kinds);
         }
-        if let Value::Str(name) = table.get(&Value::str("sort")) {
+        if let Value::Str(name) = table.get_str("sort") {
             match name.as_ref() {
                 "frecency" | "frequency" => settings.completion.sort = Sort::Frecency,
                 "alpha" | "alphabetical" | "name" => settings.completion.sort = Sort::Alpha,
@@ -106,9 +106,9 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
         );
     }
 
-    if let Value::Table(table) = oslo.get(&Value::str("suggest")) {
+    if let Value::Table(table) = oslo.get_str("suggest") {
         let table = table.borrow();
-        if let Value::Table(list) = table.get(&Value::str("sources")) {
+        if let Value::Table(list) = table.get_str("sources") {
             let mut sources = Vec::new();
             for value in list.borrow().sequence() {
                 let Value::Str(name) = value else { continue };
@@ -142,7 +142,7 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
                 }
             }
         }
-        if let Value::Table(list) = table.get(&Value::str("skip_history")) {
+        if let Value::Table(list) = table.get_str("skip_history") {
             settings.suggest.skip_history = list
                 .borrow()
                 .sequence()
@@ -155,18 +155,18 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
         }
     }
 
-    if let Value::Table(table) = oslo.get(&Value::str("misc")) {
+    if let Value::Table(table) = oslo.get_str("misc") {
         let table = table.borrow();
-        if let Value::Bool(on) = table.get(&Value::str("welcome")) {
+        if let Value::Bool(on) = table.get_str("welcome") {
             settings.misc.welcome = on;
         }
-        if let Value::Bool(on) = table.get(&Value::str("warnings")) {
+        if let Value::Bool(on) = table.get_str("warnings") {
             settings.misc.warnings = on;
         }
-        if let Value::Bool(on) = table.get(&Value::str("nested_ask")) {
+        if let Value::Bool(on) = table.get_str("nested_ask") {
             settings.misc.nested_ask = on;
         }
-        if let Value::Str(greeting) = table.get(&Value::str("greeting")) {
+        if let Value::Str(greeting) = table.get_str("greeting") {
             settings.misc.greeting = Some(greeting.to_string());
         }
         if let Some(seconds) = number(&table, "idle_timeout") {
@@ -178,7 +178,7 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
             // to Esc at all.
             settings.misc.escape_delay = ms.clamp(1, 2000) as u64;
         }
-        if let Value::Str(depth) = table.get(&Value::str("color_depth")) {
+        if let Value::Str(depth) = table.get_str("color_depth") {
             match crate::theme::Depth::named(&depth) {
                 Some(_) => settings.misc.color_depth = Some(depth.to_string()),
                 None => problems.push(format!(
@@ -189,9 +189,9 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
         }
     }
 
-    if let Value::Table(table) = oslo.get(&Value::str("scratch")) {
+    if let Value::Table(table) = oslo.get_str("scratch") {
         let table = table.borrow();
-        if let Value::Str(key) = table.get(&Value::str("key")) {
+        if let Value::Str(key) = table.get_str("key") {
             // Checked where it is written rather than where it is used, so a typo is reported
             // against the line that made it instead of leaving a tab nobody can get out of.
             if let Some(name) = crate::keys::canonical(&key) {
@@ -200,10 +200,10 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
                 problems.push(format!("oslo.scratch.key: '{key}' is not a key name"));
             }
         }
-        if let Value::Bool(on) = table.get(&Value::str("daemon")) {
+        if let Value::Bool(on) = table.get_str("daemon") {
             settings.scratch.daemon = on;
         }
-        if let Value::Str(dir) = table.get(&Value::str("dir")) {
+        if let Value::Str(dir) = table.get_str("dir") {
             settings.scratch.dir = dir.to_string();
         }
         if let Some(n) = number(&table, "log_bytes")
@@ -213,9 +213,9 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
         }
     }
 
-    if let Value::Table(table) = oslo.get(&Value::str("macros")) {
+    if let Value::Table(table) = oslo.get_str("macros") {
         let table = table.borrow();
-        if let Value::Str(key) = table.get(&Value::str("key")) {
+        if let Value::Str(key) = table.get_str("key") {
             if let Some(name) = crate::keys::canonical(&key) {
                 settings.macros.key = name;
             } else {
@@ -224,12 +224,12 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
         }
     }
 
-    if let Value::Table(table) = oslo.get(&Value::str("finder")) {
+    if let Value::Table(table) = oslo.get_str("finder") {
         let table = table.borrow();
-        if let Value::Bool(on) = table.get(&Value::str("enabled")) {
+        if let Value::Bool(on) = table.get_str("enabled") {
             settings.finder.enabled = on;
         }
-        if let Value::Str(key) = table.get(&Value::str("key")) {
+        if let Value::Str(key) = table.get_str("key") {
             // Checked here rather than at bind time, so a typo is reported next to the line that
             // wrote it instead of silently leaving the finder unreachable.
             if let Some(name) = crate::keys::canonical(&key) {
@@ -248,7 +248,7 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
         );
     }
 
-    if let Value::Table(table) = oslo.get(&Value::str("keys")) {
+    if let Value::Table(table) = oslo.get_str("keys") {
         for (key, action) in table.borrow().pairs() {
             // Checked here, like every other key in this file: `oslo.keys` was the one table that
             // took a name without looking at it, so a misspelled key or action was stored, bound to
@@ -293,11 +293,11 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
                 // `vim.keymap.set`, and what every which-key display is built on.
                 (Value::Str(key), Value::Table(spec)) => {
                     let spec = spec.borrow();
-                    let desc = match spec.get(&Value::str("desc")) {
+                    let desc = match spec.get_str("desc") {
                         Value::Str(text) => Some(text.to_string()),
                         _ => None,
                     };
-                    match spec.get(&Value::str("run")) {
+                    match spec.get_str("run") {
                         run @ Value::Function(_) => {
                             crate::editor::register(&canon, run);
                             settings
@@ -336,7 +336,7 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
         settings.key_descriptions.sort();
     }
 
-    if let Value::Table(table) = oslo.get(&Value::str("abbr")) {
+    if let Value::Table(table) = oslo.get_str("abbr") {
         // Sorted by name, for the reason `oslo.keys` is: Lua table iteration has no order, and two
         // runs of the same config must install the same thing in the same sequence.
         let mut defined: Vec<(String, String, bool)> = Vec::new();
@@ -354,7 +354,7 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
                 // The long form, for the one in ten that needs to fire outside command position.
                 Value::Table(spec) => {
                     let spec = spec.borrow();
-                    let expansion = match spec.get(&Value::str("expansion")) {
+                    let expansion = match spec.get_str("expansion") {
                         Value::Str(text) => text.to_string(),
                         // `{ "git checkout", anywhere = true }` — the expansion as the first
                         // element, which is how the same table reads when written by hand.
@@ -369,7 +369,7 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
                             }
                         },
                     };
-                    let anywhere = matches!(spec.get(&Value::str("anywhere")), Value::Bool(true));
+                    let anywhere = matches!(spec.get_str("anywhere"), Value::Bool(true));
                     defined.push((name.to_string(), expansion, anywhere));
                 }
                 _ => problems.push(format!(
@@ -383,15 +383,15 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
 
     // `oslo.builtin.rm`. Nested one deeper than the rest because `builtin` is a namespace per
     // builtin, not a group of settings — the next one to want a knob adds a sibling table.
-    if let Value::Table(table) = oslo.get(&Value::str("builtin"))
-        && let Value::Table(rm) = table.borrow().get(&Value::str("rm"))
+    if let Value::Table(table) = oslo.get_str("builtin")
+        && let Value::Table(rm) = table.borrow().get_str("rm")
     {
         let rm = rm.borrow();
         flag(&rm, "to_tmp", &mut settings.builtin.rm.to_tmp);
         if let Some(mb) = number(&rm, "max_to_tmp") {
             settings.builtin.rm.max_to_tmp = mb.max(0) as u64;
         }
-        match rm.get(&Value::str("trash")) {
+        match rm.get_str("trash") {
             Value::Str(dir) if !dir.trim().is_empty() => {
                 settings.builtin.rm.trash = dir.to_string();
             }
@@ -402,8 +402,8 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
         }
     }
 
-    if let Value::Table(table) = oslo.get(&Value::str("builtin"))
-        && let Value::Table(nav) = table.borrow().get(&Value::str("nav"))
+    if let Value::Table(table) = oslo.get_str("builtin")
+        && let Value::Table(nav) = table.borrow().get_str("nav")
     {
         let nav = nav.borrow();
         let settings = &mut settings.builtin.nav;
@@ -427,22 +427,22 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
         if let Some(n) = number(&nav, "padding_y") {
             settings.padding_y = n.max(0) as usize;
         }
-        if let Value::Table(walk) = nav.get(&Value::str("type_nav")) {
+        if let Value::Table(walk) = nav.get_str("type_nav") {
             let walk = walk.borrow();
             flag(&walk, "enabled", &mut settings.type_nav.enabled);
             if let Some(ms) = number(&walk, "settle_ms") {
                 settings.type_nav.settle = std::time::Duration::from_millis(ms.max(0) as u64);
             }
         }
-        if let Value::Table(icons) = nav.get(&Value::str("icons")) {
+        if let Value::Table(icons) = nav.get_str("icons") {
             let icons = icons.borrow();
-            if let Value::Str(mark) = icons.get(&Value::str("dir")) {
+            if let Value::Str(mark) = icons.get_str("dir") {
                 settings.icons.directory = mark.to_string();
             }
-            if let Value::Str(mark) = icons.get(&Value::str("file")) {
+            if let Value::Str(mark) = icons.get_str("file") {
                 settings.icons.file = mark.to_string();
             }
-            if let Value::Table(by_extension) = icons.get(&Value::str("ext")) {
+            if let Value::Table(by_extension) = icons.get_str("ext") {
                 for (key, value) in by_extension.borrow().pairs() {
                     match (&key, &value) {
                         // Lowercased once here rather than at every row: an extension is matched
@@ -460,7 +460,7 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
                 }
             }
         }
-        if let Value::Str(name) = nav.get(&Value::str("position")) {
+        if let Value::Str(name) = nav.get_str("position") {
             settings.position = match name.as_ref() {
                 "top" | "start" => crate::ask::chrome::Place::Start,
                 "center" | "centre" | "middle" => crate::ask::chrome::Place::Center,
@@ -473,7 +473,7 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
                 }
             };
         }
-        if let Value::Str(name) = nav.get(&Value::str("border")) {
+        if let Value::Str(name) = nav.get_str("border") {
             match crate::ask::Border::parse(&name) {
                 Some(border) => settings.border = border,
                 None => problems.push(format!(
@@ -481,7 +481,7 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
                 )),
             }
         }
-        if let Value::Str(name) = nav.get(&Value::str("border_fit")) {
+        if let Value::Str(name) = nav.get_str("border_fit") {
             match crate::ask::chrome::Fit::parse(&name) {
                 Some(fit) => settings.border_fit = fit,
                 None => problems.push(format!(
@@ -489,7 +489,7 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
                 )),
             }
         }
-        if let Value::Str(name) = nav.get(&Value::str("border_fg")) {
+        if let Value::Str(name) = nav.get_str("border_fg") {
             match crate::theme::Color::parse(&name) {
                 Some(colour) => settings.border_fg = Some(colour),
                 None => problems.push(format!(
@@ -497,7 +497,7 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
                 )),
             }
         }
-        if let Value::Str(name) = nav.get(&Value::str("filter_at")) {
+        if let Value::Str(name) = nav.get_str("filter_at") {
             match crate::ask::Where::parse(&name) {
                 Some(place) => settings.filter_at = place,
                 None => problems.push(format!(
@@ -507,17 +507,17 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
         }
     }
 
-    if let Value::Table(table) = oslo.get(&Value::str("history")) {
+    if let Value::Table(table) = oslo.get_str("history") {
         let table = table.borrow();
         if let Some(n) = number(&table, "size") {
             settings.history.size = Some(n.max(0) as usize);
         }
-        if let Value::Str(file) = table.get(&Value::str("file")) {
+        if let Value::Str(file) = table.get_str("file") {
             settings.history.file = Some(file.to_string());
         }
         flag(&table, "ignore_space", &mut settings.history.ignore_space);
         flag(&table, "ignore_dups", &mut settings.history.ignore_dups);
-        if let Value::Table(list) = table.get(&Value::str("ignore")) {
+        if let Value::Table(list) = table.get_str("ignore") {
             for value in list.borrow().sequence() {
                 match value {
                     Value::Str(pattern) => settings.history.ignore.push(pattern.to_string()),
@@ -580,7 +580,7 @@ fn fuzzy(
     slot: &mut Fuzzy,
     problems: &mut Vec<String>,
 ) {
-    match table.get(&Value::str("fuzzy")) {
+    match table.get_str("fuzzy") {
         Value::Nil => {}
         Value::Str(name) => match Fuzzy::parse(name.as_ref()) {
             Some(chosen) => *slot = chosen,

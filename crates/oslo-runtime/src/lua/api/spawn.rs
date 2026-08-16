@@ -87,7 +87,7 @@ fn start(args: &[Value]) -> LuaResult<Vec<Value>> {
     let Some(program) = argv.first().cloned() else {
         return Err(LuaError::new("oslo.spawn: no command to run".to_string()));
     };
-    let on_exit = match spec.get(&Value::str("on_exit")) {
+    let on_exit = match spec.get_str("on_exit") {
         Value::Nil => None,
         it @ Value::Function(_) => Some(it),
         _ => {
@@ -98,7 +98,7 @@ fn start(args: &[Value]) -> LuaResult<Vec<Value>> {
     };
     // A ceiling rather than a limit anybody should meet — but a background process nobody is
     // waiting for is exactly the kind that is never noticed hanging.
-    let timeout = match spec.get(&Value::str("timeout")).as_number() {
+    let timeout = match spec.get_str("timeout").as_number() {
         Some(n) if n.as_float() > 0.0 => Some(Duration::from_secs_f64(n.as_float() / 1000.0)),
         _ => None,
     };

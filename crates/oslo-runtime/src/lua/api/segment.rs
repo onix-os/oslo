@@ -62,12 +62,12 @@ pub fn constructor() -> Value {
         // Checked here rather than at render time: a segment with no `render` is a config mistake,
         // and finding out at the next keystroke — as a prompt that is quietly missing a piece — is
         // how a typo survives for weeks.
-        if !matches!(borrowed.get(&Value::str("render")), Value::Function(_)) {
+        if !matches!(borrowed.get_str("render"), Value::Function(_)) {
             return Err(LuaError::new(
                 "oslo.segment: `render` must be a function".to_string(),
             ));
         }
-        if !matches!(borrowed.get(&Value::str("name")), Value::Str(_)) {
+        if !matches!(borrowed.get_str("name"), Value::Str(_)) {
             return Err(LuaError::new(
                 "oslo.segment: `name` must be a string".to_string(),
             ));
@@ -106,13 +106,13 @@ pub fn describe(segment: &Value) -> (String, i64) {
         return (String::new(), 0);
     };
     let t = t.borrow();
-    let name = match t.get(&Value::str("name")) {
+    let name = match t.get_str("name") {
         Value::Str(s) => s.to_string(),
         _ => String::new(),
     };
     // Unspecified priority sits in the middle, so a segment that says nothing is dropped after the
     // ones that asked to go first and before the ones that asked to stay.
-    let priority = match t.get(&Value::str("priority")) {
+    let priority = match t.get_str("priority") {
         Value::Number(n) => n.as_int().unwrap_or(50),
         _ => 50,
     };
@@ -124,7 +124,7 @@ pub fn render_fn(segment: &Value) -> Option<Value> {
     let Value::Table(t) = segment else {
         return None;
     };
-    let f = t.borrow().get(&Value::str("render"));
+    let f = t.borrow().get_str("render");
     matches!(f, Value::Function(_)).then_some(f)
 }
 
@@ -145,12 +145,12 @@ pub fn spans_to_text(value: &Value, style_of: &dyn Fn(&str, &str) -> String) -> 
                     Value::Str(s) => out.push_str(s),
                     Value::Table(fields) => {
                         let fields = fields.borrow();
-                        let text = match fields.get(&Value::str("text")) {
+                        let text = match fields.get_str("text") {
                             Value::Str(s) => s.to_string(),
                             Value::Number(n) => n.to_string(),
                             _ => continue,
                         };
-                        let style = match fields.get(&Value::str("style")) {
+                        let style = match fields.get_str("style") {
                             Value::Str(s) => s.to_string(),
                             _ => String::new(),
                         };

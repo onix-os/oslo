@@ -33,7 +33,7 @@ fn a_handle_offers_every_verb_and_knows_its_own_name() {
             "no {name}"
         );
     }
-    match handle.get(&Value::str("name")) {
+    match handle.get_str("name") {
         Value::Str(name) => assert_eq!(name.as_ref(), "notes"),
         other => panic!("name is {}", other.type_name()),
     }

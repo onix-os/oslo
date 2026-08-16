@@ -48,11 +48,11 @@ pub fn build() -> Value {
     put(&mut api, "all", |_, _| {
         ok(list(messages::all().into_iter().map(|said| {
             let mut row = Table::new();
-            row.set(Value::str("level"), Value::str(said.level.word()));
-            row.set(Value::str("source"), Value::str(&said.source));
-            row.set(Value::str("text"), Value::str(&said.text));
-            row.set(Value::str("at"), Value::float(said.at));
-            row.set(Value::str("times"), Value::int(said.times as i64));
+            row.set_str("level", Value::str(said.level.word()));
+            row.set_str("source", Value::str(&said.source));
+            row.set_str("text", Value::str(&said.text));
+            row.set_str("at", Value::float(said.at));
+            row.set_str("times", Value::int(said.times as i64));
             Value::table(row)
         })))
     });

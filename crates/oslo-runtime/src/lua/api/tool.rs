@@ -44,19 +44,19 @@ pub fn install(oslo: &mut Table) {
             ));
         };
         let spec = spec.borrow();
-        let Value::Str(name) = spec.get(&Value::str("name")) else {
+        let Value::Str(name) = spec.get_str("name") else {
             return Err(LuaError::new(
                 "oslo.register_tool: `name` must be a string".to_string(),
             ));
         };
-        let rows = spec.get(&Value::str("rows"));
+        let rows = spec.get_str("rows");
         if !matches!(rows, Value::Function(_)) {
             return Err(LuaError::new(
                 "oslo.register_tool: `rows` must be a function".to_string(),
             ));
         }
-        let accepts = shape_of(&spec.get(&Value::str("accepts")), Shape::Nothing)?;
-        let produces = shape_of(&spec.get(&Value::str("produces")), Shape::Rows)?;
+        let accepts = shape_of(&spec.get_str("accepts"), Shape::Nothing)?;
+        let produces = shape_of(&spec.get_str("produces"), Shape::Rows)?;
 
         // The handler goes into the pipeline's own table as an opaque closure, so that asking
         // "is there a tool called this" does not mean reaching up into the Lua API. See
@@ -279,8 +279,8 @@ mod tests {
     #[test]
     fn a_lua_list_of_tables_becomes_records() {
         let mut row = Table::new();
-        row.set(Value::str("host"), Value::str("a"));
-        row.set(Value::str("ip"), Value::str("10.0.0.1"));
+        row.set_str("host", Value::str("a"));
+        row.set_str("ip", Value::str("10.0.0.1"));
         let mut list = Table::new();
         list.set(
             Value::int(1),
@@ -299,7 +299,7 @@ mod tests {
     #[test]
     fn a_nested_table_keeps_its_shape() {
         let mut inner = Table::new();
-        inner.set(Value::str("x"), Value::int(1));
+        inner.set_str("x", Value::int(1));
         let record = val_of(&Value::Table(std::rc::Rc::new(RefCell::new(inner))));
         let Val::Record(record) = record else {
             panic!("a map is a record, got {record:?}");

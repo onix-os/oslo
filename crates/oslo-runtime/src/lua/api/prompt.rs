@@ -46,16 +46,16 @@ pub(crate) const TITLE: &str = "prompt.title";
 
 /// Add `oslo.prompt`, `oslo.git` and `oslo.path.shorten`.
 pub fn install(oslo: &mut Table, _ui: &mut Table, registry: &Registry) {
-    oslo.set(Value::str("prompt"), build(registry));
+    oslo.set_str("prompt", build(registry));
     // **`oslo.ui.style` is not installed here.** It used to be, and `ui::prompt` installs one of
     // the same name *after* this runs — so this one was overwritten before any config could reach
     // it, and had been dead for as long as both existed. The survivor does everything this did and
     // more (borders, padding, width), and now accepts this one's two-argument call shape too.
-    oslo.set(Value::str("git"), git());
+    oslo.set_str("git", git());
     // The fine-grained shape: a prompt as a list of named, prioritised pieces rather than one
     // opaque string. See `super::segment`.
-    oslo.set(Value::str("segment"), super::segment::constructor());
-    oslo.set(Value::str("theme"), theme_table());
+    oslo.set_str("segment", super::segment::constructor());
+    oslo.set_str("theme", theme_table());
 }
 
 /// The `oslo.prompt` table.
@@ -152,7 +152,7 @@ fn theme_table() -> Value {
     styles.borrow_mut().metatable = Some(Rc::new(std::cell::RefCell::new(meta)));
 
     let mut theme_table = Table::new();
-    theme_table.set(Value::str("styles"), Value::Table(styles));
+    theme_table.set_str("styles", Value::Table(styles));
     Value::Table(Rc::new(std::cell::RefCell::new(theme_table)))
 }
 

@@ -52,7 +52,7 @@ fn a_handle_stops_its_own_timer_and_says_whether_it_had_one() {
     let Some(Value::Table(handle)) = answered.first() else {
         panic!("no handle")
     };
-    let Value::Function(stop) = handle.borrow().get(&Value::str("stop")) else {
+    let Value::Function(stop) = handle.borrow().get_str("stop") else {
         panic!("no stop")
     };
     assert!(any(), "the timer should be waiting");

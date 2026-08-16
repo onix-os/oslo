@@ -59,7 +59,7 @@ fn cancelling_forgets_the_callback() {
     let Value::Table(handle) = handle(99) else {
         panic!("no handle")
     };
-    let Value::Function(cancel) = handle.borrow().get(&Value::str("cancel")) else {
+    let Value::Function(cancel) = handle.borrow().get_str("cancel") else {
         panic!("no cancel")
     };
     let call = || match &*cancel {

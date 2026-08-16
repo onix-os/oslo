@@ -38,7 +38,7 @@ pub fn install(completion: &mut Table) {
                 "oslo.completion.provider: `name` is what this provider is called".to_string(),
             ));
         };
-        let answer @ Value::Function(_) = declared.get(&Value::str("answer")) else {
+        let answer @ Value::Function(_) = declared.get_str("answer") else {
             return Err(oslo_base::value::LuaError::new(
                 "oslo.completion.provider: `answer` must be a function of one argument".to_string(),
             ));
@@ -118,10 +118,10 @@ fn offers(value: Option<&Value>) -> Vec<oslo_ui::completion::provider::Offer> {
 
 fn context(ctx: &oslo_ui::completion::provider::Ctx) -> Value {
     let mut table = Table::new();
-    table.set(Value::str("command"), Value::str(&ctx.command));
-    table.set(Value::str("current"), Value::str(&ctx.current));
-    table.set(Value::str("arg"), Value::int(ctx.arg as i64));
-    table.set(Value::str("cwd"), Value::str(&ctx.cwd));
+    table.set_str("command", Value::str(&ctx.command));
+    table.set_str("current", Value::str(&ctx.current));
+    table.set_str("arg", Value::int(ctx.arg as i64));
+    table.set_str("cwd", Value::str(&ctx.cwd));
     table.set(
         Value::str("words"),
         super::util::list(ctx.words.iter().map(Value::str)),
@@ -142,7 +142,7 @@ fn string(table: &Table, key: &str) -> Option<String> {
 /// any set of fields would be, and it is written in the language the rest of the config is. A
 /// predicate that raises is read as *no*: a guard nobody can evaluate has not said yes.
 fn predicate(declared: &Table) -> Option<oslo_ui::completion::provider::Enabled> {
-    let asked @ Value::Function(_) = declared.get(&Value::str("enabled")) else {
+    let asked @ Value::Function(_) = declared.get_str("enabled") else {
         return None;
     };
     Some(Rc::new(move |ctx| {

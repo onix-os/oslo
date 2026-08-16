@@ -35,16 +35,16 @@ pub fn read_lua_theme(value: &Value) -> (Theme, Vec<String>) {
     let mut theme = Theme::default();
     let table = table.borrow();
 
-    if let Value::Table(syntax) = table.get(&Value::str("syntax")) {
+    if let Value::Table(syntax) = table.get_str("syntax") {
         read_syntax(&syntax.borrow(), &mut theme.syntax, &mut problems);
     }
-    if let Value::Table(pager) = table.get(&Value::str("pager")) {
+    if let Value::Table(pager) = table.get_str("pager") {
         read_pager(&pager.borrow(), &mut theme.pager, &mut problems);
     }
-    if let Value::Table(prompt) = table.get(&Value::str("prompt")) {
+    if let Value::Table(prompt) = table.get_str("prompt") {
         read_prompt(&prompt.borrow(), &mut theme.prompt, &mut problems);
     }
-    if let Value::Table(ui) = table.get(&Value::str("ui")) {
+    if let Value::Table(ui) = table.get_str("ui") {
         read_ui(&ui.borrow(), &mut theme.ui, &mut problems);
     }
 
@@ -91,11 +91,11 @@ fn style(value: &Value, path: &str, problems: &mut Vec<String>) -> Option<Style>
                     }
                 }
             }
-            out.bold = table.get(&Value::str("bold")).truthy();
-            out.dim = table.get(&Value::str("dim")).truthy();
-            out.italic = table.get(&Value::str("italic")).truthy();
-            out.underline = table.get(&Value::str("underline")).truthy();
-            out.reverse = table.get(&Value::str("reverse")).truthy();
+            out.bold = table.get_str("bold").truthy();
+            out.dim = table.get_str("dim").truthy();
+            out.italic = table.get_str("italic").truthy();
+            out.underline = table.get_str("underline").truthy();
+            out.reverse = table.get_str("reverse").truthy();
             Some(out)
         }
         other => {
@@ -116,7 +116,7 @@ fn read_syntax(table: &oslo_base::value::Table, into: &mut Syntax, problems: &mu
     // `builtin` and `function` inherit `command` unless named. That is fish's rule, and it is what
     // keeps a two-line theme from looking half-finished: setting `command` alone recolours all
     // three kinds of "this is the thing being run".
-    let inherits = !matches!(table.get(&Value::str("command")), Value::Nil);
+    let inherits = !matches!(table.get_str("command"), Value::Nil);
     for (name, slot) in [("builtin", 0), ("function", 1)] {
         let path = format!("{p}.{name}");
         let chosen = style(&table.get(&Value::str(name)), &path, problems);
@@ -178,12 +178,8 @@ fn read_syntax(table: &oslo_base::value::Table, into: &mut Syntax, problems: &mu
     // for `command` and for the same reason: the correction is the ghost's colour turned inside
     // out, so a theme that recolours the ghost and says nothing about the repair should not end up
     // with two unrelated greys on the same line.
-    let ghosted = !matches!(table.get(&Value::str("autosuggestion")), Value::Nil);
-    match style(
-        &table.get(&Value::str("repair")),
-        &format!("{p}.repair"),
-        problems,
-    ) {
+    let ghosted = !matches!(table.get_str("autosuggestion"), Value::Nil);
+    match style(&table.get_str("repair"), &format!("{p}.repair"), problems) {
         Some(chosen) => into.repair = chosen,
         None if ghosted => into.repair = reversed(into.autosuggestion),
         None => {}
@@ -226,7 +222,7 @@ fn read_pager(table: &oslo_base::value::Table, into: &mut Pager, problems: &mut 
         }
     }
 
-    if let Value::Table(kinds) = table.get(&Value::str("kind")) {
+    if let Value::Table(kinds) = table.get_str("kind") {
         read_kinds(&kinds.borrow(), &mut into.kind, problems);
     }
 }

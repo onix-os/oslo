@@ -122,12 +122,12 @@ impl Request {
         // Seconds, because that is the unit every number in this neighbourhood is measured in and
         // the ceiling exists for a 46-second command. A non-positive value would mean "kill it
         // before it starts", which nobody means, so it falls back to the default.
-        let timeout = match table.get(&Value::str("timeout")).as_number() {
+        let timeout = match table.get_str("timeout").as_number() {
             Some(n) if n.as_float() > 0.0 => Duration::from_secs_f64(n.as_float()),
             _ => json::TIMEOUT,
         };
 
-        let cache = table.get(&Value::str("cache")).truthy();
+        let cache = table.get_str("cache").truthy();
 
         Ok(Self {
             argv,

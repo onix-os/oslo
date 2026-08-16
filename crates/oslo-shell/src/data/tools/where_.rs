@@ -189,7 +189,7 @@ mod tests {
             panic!("a record is a table");
         };
         let t = t.borrow();
-        assert_eq!(as_text(&t.get(&Value::str("mount"))).as_deref(), Some("/"));
-        assert_eq!(as_int(&t.get(&Value::str("free"))), Some(500_000_000));
+        assert_eq!(as_text(&t.get_str("mount")).as_deref(), Some("/"));
+        assert_eq!(as_int(&t.get_str("free")), Some(500_000_000));
     }
 }

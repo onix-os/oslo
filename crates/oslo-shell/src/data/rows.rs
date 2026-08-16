@@ -185,10 +185,10 @@ pub(crate) fn ps_rows() -> Value {
     found.sort_by_key(|(pid, _, _)| *pid);
     for (i, (pid, comm, cmdline)) in found.iter().enumerate() {
         let mut row = Table::new();
-        row.set(Value::str("pid"), Value::int(*pid));
-        row.set(Value::str("name"), Value::str(comm));
-        row.set(Value::str("cmdline"), Value::str(cmdline));
-        row.set(Value::str("is_kernel"), Value::Bool(cmdline.is_empty()));
+        row.set_str("pid", Value::int(*pid));
+        row.set_str("name", Value::str(comm));
+        row.set_str("cmdline", Value::str(cmdline));
+        row.set_str("is_kernel", Value::Bool(cmdline.is_empty()));
         list.set(
             Value::int(i as i64 + 1),
             Value::Table(Rc::new(RefCell::new(row))),
@@ -206,25 +206,25 @@ fn stat_rows(paths: &[String]) -> Value {
     let mut list = Table::new();
     for (i, path) in paths.iter().enumerate() {
         let mut row = Table::new();
-        row.set(Value::str("path"), Value::str(path));
+        row.set_str("path", Value::str(path));
         match std::fs::symlink_metadata(path) {
             Ok(meta) => {
                 use std::os::unix::fs::MetadataExt;
-                row.set(Value::str("exists"), Value::Bool(true));
-                row.set(Value::str("size"), Value::int(meta.len() as i64));
-                row.set(Value::str("size_human"), Value::str(human(meta.len())));
-                row.set(Value::str("mode"), Value::int(meta.mode() as i64));
-                row.set(Value::str("uid"), Value::int(meta.uid() as i64));
-                row.set(Value::str("gid"), Value::int(meta.gid() as i64));
-                row.set(Value::str("mtime"), Value::int(meta.mtime()));
-                row.set(Value::str("is_dir"), Value::Bool(meta.is_dir()));
+                row.set_str("exists", Value::Bool(true));
+                row.set_str("size", Value::int(meta.len() as i64));
+                row.set_str("size_human", Value::str(human(meta.len())));
+                row.set_str("mode", Value::int(meta.mode() as i64));
+                row.set_str("uid", Value::int(meta.uid() as i64));
+                row.set_str("gid", Value::int(meta.gid() as i64));
+                row.set_str("mtime", Value::int(meta.mtime()));
+                row.set_str("is_dir", Value::Bool(meta.is_dir()));
                 row.set(
                     Value::str("is_symlink"),
                     Value::Bool(meta.file_type().is_symlink()),
                 );
             }
             Err(_) => {
-                row.set(Value::str("exists"), Value::Bool(false));
+                row.set_str("exists", Value::Bool(false));
             }
         }
         list.set(
@@ -255,8 +255,8 @@ fn env_rows(env: &std::sync::Arc<std::sync::Mutex<crate::env::Environment>>) -> 
     pairs.sort();
     for (i, (name, value)) in pairs.iter().enumerate() {
         let mut row = Table::new();
-        row.set(Value::str("name"), Value::str(name));
-        row.set(Value::str("value"), Value::str(value));
+        row.set_str("name", Value::str(name));
+        row.set_str("value", Value::str(value));
         list.set(
             Value::int(i as i64 + 1),
             Value::Table(Rc::new(RefCell::new(row))),
@@ -308,10 +308,10 @@ pub(crate) fn ls_rows(dir: &str) -> Value {
     names.sort_by(|a, b| a.0.cmp(&b.0));
     for (i, (name, meta)) in names.iter().enumerate() {
         let mut row = Table::new();
-        row.set(Value::str("name"), Value::str(name));
-        row.set(Value::str("size"), Value::int(meta.len() as i64));
-        row.set(Value::str("size_human"), Value::str(human(meta.len())));
-        row.set(Value::str("is_dir"), Value::Bool(meta.is_dir()));
+        row.set_str("name", Value::str(name));
+        row.set_str("size", Value::int(meta.len() as i64));
+        row.set_str("size_human", Value::str(human(meta.len())));
+        row.set_str("is_dir", Value::Bool(meta.is_dir()));
         row.set(
             Value::str("mode"),
             Value::int(std::os::unix::fs::MetadataExt::mode(meta) as i64),

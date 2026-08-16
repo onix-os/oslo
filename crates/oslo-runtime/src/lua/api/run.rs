@@ -242,18 +242,18 @@ impl Request {
         // way**: the safety this module is built on is that the list written is the list run, so
         // `oslo.run{"rm", name}` cannot turn one file into forty because `name` happened to hold a
         // `*`. A script that wants the pattern read says so, once, at the call site.
-        if table.get(&Value::str("glob")).truthy() {
+        if table.get_str("glob").truthy() {
             argv = expand_globs(&argv);
         }
 
         // `capture = true` is the short form for both streams, which is what a caller who just
         // wants the output means. The two are separable for the caller who does not.
-        let both = table.get(&Value::str("capture")).truthy();
+        let both = table.get_str("capture").truthy();
         Ok(Request {
             argv,
             capture: Capture {
-                stdout: both || table.get(&Value::str("capture_out")).truthy(),
-                stderr: both || table.get(&Value::str("capture_err")).truthy(),
+                stdout: both || table.get_str("capture_out").truthy(),
+                stderr: both || table.get_str("capture_err").truthy(),
             },
         })
     }
@@ -314,19 +314,19 @@ fn word(value: &Value) -> Option<String> {
 /// The result every command call answers with.
 fn result_table(outcome: &Outcome) -> Value {
     let mut table = Table::new();
-    table.set(Value::str("status"), Value::int(outcome.status as i64));
-    table.set(Value::str("ok"), Value::Bool(outcome.status == 0));
+    table.set_str("status", Value::int(outcome.status as i64));
+    table.set_str("ok", Value::Bool(outcome.status == 0));
     // Absent rather than empty when the stream was not captured: `r.out == nil` means nobody
     // listened, `r.out == ""` means the command printed nothing, and a script that cannot tell
     // them apart will eventually treat one as the other.
     if let Some(out) = &outcome.out {
-        table.set(Value::str("out"), Value::str(out));
+        table.set_str("out", Value::str(out));
     }
     if let Some(err) = &outcome.err {
-        table.set(Value::str("err"), Value::str(err));
+        table.set_str("err", Value::str(err));
     }
     if let Some(signal) = outcome.signal {
-        table.set(Value::str("signal"), Value::int(signal as i64));
+        table.set_str("signal", Value::int(signal as i64));
     }
     Value::table(table)
 }

@@ -135,8 +135,8 @@ pub fn install(interp: &Rc<Engine>) {
         oslo_ui::dropdown::set_provider(None);
         return;
     };
-    let function = match oslo.borrow().get(&Value::str("completion")) {
-        Value::Table(completion) => completion.borrow().get(&Value::str("columns")),
+    let function = match oslo.borrow().get_str("completion") {
+        Value::Table(completion) => completion.borrow().get_str("columns"),
         _ => Value::Nil,
     };
     if !matches!(function, Value::Function(_)) {
@@ -182,8 +182,8 @@ pub fn install_command_completer(interp: &Rc<Engine>) {
         oslo_ui::completion::set_command_completer(None);
         return;
     };
-    let table = match oslo.borrow().get(&Value::str("completion")) {
-        Value::Table(completion) => completion.borrow().get(&Value::str("for_command")),
+    let table = match oslo.borrow().get_str("completion") {
+        Value::Table(completion) => completion.borrow().get_str("for_command"),
         _ => Value::Nil,
     };
     let Value::Table(table) = table else {
@@ -377,6 +377,6 @@ mod tests {
         assert_eq!(int("entries"), Some(12));
         // Absent facts are nil rather than zero: a file whose `stat` failed has no size, and a
         // config testing `if c.size then` must be able to tell that from an empty file.
-        assert!(matches!(t.get(&Value::str("mtime")), Value::Nil));
+        assert!(matches!(t.get_str("mtime"), Value::Nil));
     }
 }

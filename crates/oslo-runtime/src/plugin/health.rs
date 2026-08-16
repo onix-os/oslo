@@ -111,7 +111,7 @@ mod tests {
             panic!("not a table")
         };
         assert!(matches!(
-            built.borrow().get(&Value::str("health")),
+            built.borrow().get_str("health"),
             Value::Function(_)
         ));
     }

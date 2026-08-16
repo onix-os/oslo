@@ -36,7 +36,7 @@ pub fn install(suggest: &mut Table) {
             ));
         };
         let declared = declared.borrow();
-        let name = match declared.get(&Value::str("name")) {
+        let name = match declared.get_str("name") {
             Value::Str(name) => name.to_string(),
             _ => {
                 return Err(oslo_base::value::LuaError::new(
@@ -47,10 +47,7 @@ pub fn install(suggest: &mut Table) {
             }
         };
         let named = name.clone();
-        let ask = match (
-            declared.get(&Value::str("answer")),
-            declared.get(&Value::str("request")),
-        ) {
+        let ask = match (declared.get_str("answer"), declared.get_str("request")) {
             (answer @ Value::Function(_), _) => {
                 oslo_ui::suggest::Ask::Now(Rc::new(move |ctx| {
                     // `call_here` rather than a held interpreter: the session's is a thread-local,
@@ -76,7 +73,7 @@ pub fn install(suggest: &mut Table) {
                 let debounce = millis(&declared, "debounce_ms", DEFAULT_DEBOUNCE_MS);
                 let timeout = millis(&declared, "timeout_ms", DEFAULT_TIMEOUT_MS);
                 let settle = millis(&declared, "settle_ms", DEFAULT_SETTLE_MS);
-                let on_late = match declared.get(&Value::str("on_late")) {
+                let on_late = match declared.get_str("on_late") {
                     Value::Str(word) => match word.as_ref() {
                         "fill" => oslo_ui::suggest::Late::Fill,
                         "replace" => oslo_ui::suggest::Late::Replace,
@@ -189,10 +186,10 @@ const DEFAULT_SETTLE_MS: u64 = 400;
 /// The table a provider is handed.
 fn context(ctx: &oslo_ui::suggest::Ctx) -> Value {
     let mut table = Table::new();
-    table.set(Value::str("line"), Value::str(&ctx.line));
-    table.set(Value::str("cursor"), Value::int(ctx.cursor as i64));
-    table.set(Value::str("cwd"), Value::str(&ctx.cwd));
-    table.set(Value::str("language"), Value::str(&ctx.language));
+    table.set_str("line", Value::str(&ctx.line));
+    table.set_str("cursor", Value::int(ctx.cursor as i64));
+    table.set_str("cwd", Value::str(&ctx.cwd));
+    table.set_str("language", Value::str(&ctx.language));
     Value::table(table)
 }
 
@@ -204,7 +201,7 @@ fn context(ctx: &oslo_ui::suggest::Ctx) -> Value {
 /// matters most. A predicate that raises is read as *no*: a guard nobody can evaluate has not said
 /// yes, and failing closed is the only safe direction for a guard about privacy.
 fn predicate(declared: &Table) -> Option<oslo_ui::suggest::Enabled> {
-    let asked @ Value::Function(_) = declared.get(&Value::str("enabled")) else {
+    let asked @ Value::Function(_) = declared.get_str("enabled") else {
         return None;
     };
     Some(Rc::new(move |ctx| {

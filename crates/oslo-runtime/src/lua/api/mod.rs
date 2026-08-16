@@ -76,12 +76,12 @@ pub fn install(host: &dyn Host, registry: &Registry, env: Arc<Mutex<Environment>
     let mut system = Table::new();
     let mut ui = Table::new();
     run::install(host, &mut oslo, &env);
-    oslo.set(Value::str("fs"), fs::build());
+    oslo.set_str("fs", fs::build());
     let mut paths = path::build();
     if let Value::Table(table) = &mut paths {
         prompt::shorten(&mut table.borrow_mut());
     }
-    oslo.set(Value::str("path"), paths);
+    oslo.set_str("path", paths);
     prompt::install(&mut oslo, &mut ui, registry);
     tool::install(&mut oslo);
     // `@` from Lua: the same file the builtin writes, so `@name` has one place to look.
@@ -91,7 +91,7 @@ pub fn install(host: &dyn Host, registry: &Registry, env: Arc<Mutex<Environment>
     //   if oslo.repair then … end
     #[cfg(feature = "vista")]
     {
-        oslo.set(Value::str("predict"), predict::build());
+        oslo.set_str("predict", predict::build());
         predict::install(&mut oslo, &env);
     }
     // The settings tables exist before the config runs, empty, so that
@@ -155,11 +155,8 @@ pub fn install(host: &dyn Host, registry: &Registry, env: Arc<Mutex<Environment>
     // spelling `oslo.completion.for_command.nix = …` indexes twice. Without this it died on
     // "attempt to index a nil value" while `oslo.completion.for_command = { … }` worked — the exact
     // split the settings loop above exists to prevent, one level down where nobody looked.
-    if let Value::Table(completion) = oslo.get(&Value::str("completion")) {
-        let missing = matches!(
-            completion.borrow().get(&Value::str("for_command")),
-            Value::Nil
-        );
+    if let Value::Table(completion) = oslo.get_str("completion") {
+        let missing = matches!(completion.borrow().get_str("for_command"), Value::Nil);
         if missing {
             completion.borrow_mut().set(
                 Value::str("for_command"),
@@ -174,30 +171,29 @@ pub fn install(host: &dyn Host, registry: &Registry, env: Arc<Mutex<Environment>
     }
     // `oslo.suggest.provider` — a ghost written in Lua. In the settings table for the same reason:
     // `oslo.suggest.sources` is next to it, and the two are read together.
-    if let Value::Table(table) = oslo.get(&Value::str("suggest")) {
+    if let Value::Table(table) = oslo.get_str("suggest") {
         suggest::install(&mut table.borrow_mut());
     }
     // `oslo.feature` — a namespace of functions rather than a settings table, because a feature is
     // not configuration. It is a runtime mask over configuration, and the two must not look alike.
-    oslo.set(Value::str("feature"), feature::build(registry));
-    oslo.set(Value::str("db"), db::build(host));
-    oslo.set(Value::str("state"), state::build());
-    oslo.set(Value::str("messages"), messages::build());
+    oslo.set_str("feature", feature::build(registry));
+    oslo.set_str("db", db::build(host));
+    oslo.set_str("state", state::build());
+    oslo.set_str("messages", messages::build());
     timer::install(&mut oslo);
     spawn::install(&mut oslo);
     builtin::install(&mut oslo);
-    oslo.set(Value::str("json"), json::build());
-    oslo.set(Value::str("re"), re::build());
-    oslo.set(Value::str("proc"), proc::build_proc());
-    oslo.set(Value::str("job"), proc::build_job());
+    oslo.set_str("json", json::build());
+    oslo.set_str("re", re::build());
+    oslo.set_str("proc", proc::build_proc());
+    oslo.set_str("job", proc::build_job());
 
     // The converters, plus `from_json` as an alias for `oslo.json.decode` — the same function
     // under the name the rest of the `from_*` family has.
     let converters = convert::build();
-    if let (Value::Table(into), Value::Table(json)) = (&converters, &oslo.get(&Value::str("json")))
-    {
-        let decode = json.borrow().get(&Value::str("decode"));
-        into.borrow_mut().set(Value::str("from_json"), decode);
+    if let (Value::Table(into), Value::Table(json)) = (&converters, &oslo.get_str("json")) {
+        let decode = json.borrow().get_str("decode");
+        into.borrow_mut().set_str("from_json", decode);
     }
     if let Value::Table(into) = &converters {
         for (name, f) in into.borrow().pairs() {
@@ -224,10 +220,10 @@ pub fn install(host: &dyn Host, registry: &Registry, env: Arc<Mutex<Environment>
 
     shell::install(&mut oslo, &mut system, &mut process, registry, &env);
 
-    oslo.set(Value::str("env"), Value::table(variables_t));
+    oslo.set_str("env", Value::table(variables_t));
     extend(&mut oslo, "proc", process);
-    oslo.set(Value::str("sys"), Value::table(system));
-    oslo.set(Value::str("ui"), Value::table(ui));
+    oslo.set_str("sys", Value::table(system));
+    oslo.set_str("ui", Value::table(ui));
     optional::install(&mut oslo, host, &env);
     let oslo = Value::table(oslo);
     publish(host, &oslo);
@@ -350,12 +346,12 @@ fn commands(oslo: &mut Table, env: &Arc<Mutex<Environment>>) {
         let mut result = Table::new();
         match captured {
             Ok(out) => {
-                result.set(Value::str("out"), Value::str(out.trim_end_matches('\n')));
-                result.set(Value::str("status"), Value::int(status as i64));
+                result.set_str("out", Value::str(out.trim_end_matches('\n')));
+                result.set_str("status", Value::int(status as i64));
             }
             Err(e) => {
-                result.set(Value::str("out"), Value::str(""));
-                result.set(Value::str("status"), Value::int(e.failure_status() as i64));
+                result.set_str("out", Value::str(""));
+                result.set_str("status", Value::int(e.failure_status() as i64));
             }
         }
         Ok(vec![Value::table(result)])

@@ -148,7 +148,7 @@ fn guesses(found: Vec<oslo_base::predict::Guess>) -> Value {
     let mut list = Table::new();
     for (at, guess) in found.into_iter().enumerate() {
         let mut row = Table::new();
-        row.set(Value::str("line"), Value::str(guess.line));
+        row.set_str("line", Value::str(guess.line));
         row.set(
             Value::str("probability"),
             Value::Number(Number::Float(guess.probability)),

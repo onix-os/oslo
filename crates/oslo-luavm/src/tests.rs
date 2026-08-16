@@ -51,7 +51,7 @@ fn a_scalar_survives_the_round_trip() {
 fn a_table_survives_the_round_trip() {
     let mut lua = Lua::core();
     let mut table = Table::new();
-    table.set(Value::str("name"), Value::str("oslo"));
+    table.set_str("name", Value::str("oslo"));
     table.set(Value::int(1), Value::str("first"));
     let original = Value::Table(Rc::new(RefCell::new(table)));
 

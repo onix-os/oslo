@@ -36,7 +36,7 @@ pub fn install(
     env: &Arc<Mutex<Environment>>,
 ) {
     facts(oslo, system, process, env);
-    oslo.set(Value::str("on"), hooks(registry));
+    oslo.set_str("on", hooks(registry));
 }
 
 /// What the shell knows about itself, split by subject rather than left on `oslo`.
@@ -126,7 +126,7 @@ fn facts(oslo: &mut Table, system: &mut Table, process: &mut Table, env: &Arc<Mu
     put(&mut opts, "names", |_, _| {
         ok(list(["default_mode"].into_iter().map(Value::str)))
     });
-    oslo.set(Value::str("opts"), Value::table(opts));
+    oslo.set_str("opts", Value::table(opts));
 }
 
 /// The shell variable an option name maps to.

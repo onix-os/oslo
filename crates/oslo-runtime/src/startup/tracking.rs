@@ -466,14 +466,14 @@ fn segment_table() -> oslo_base::value::Value {
         .enumerate()
     {
         let mut row = Table::new();
-        row.set(Value::str("text"), Value::str(&link.text));
-        row.set(Value::str("op"), Value::str(link.join.written()));
-        row.set(Value::str("ran"), Value::Bool(link.ran()));
-        row.set(Value::str("ms"), Value::int(link.duration_ms));
+        row.set_str("text", Value::str(&link.text));
+        row.set_str("op", Value::str(link.join.written()));
+        row.set_str("ran", Value::Bool(link.ran()));
+        row.set_str("ms", Value::int(link.duration_ms));
         // Absent rather than a number when the link never ran: any number here would be read as a
         // status, and "did not run" is neither success nor failure.
         if let Some(status) = link.status {
-            row.set(Value::str("status"), Value::int(i64::from(status)));
+            row.set_str("status", Value::int(i64::from(status)));
         }
         list.set(Value::int(i as i64 + 1), Value::table(row));
     }
