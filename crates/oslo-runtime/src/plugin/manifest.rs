@@ -19,7 +19,7 @@
 //!
 //! That is also why `install` can read one before you have decided to trust it.
 
-use oslo_lua::value::Value;
+use oslo_base::value::Value;
 use oslo_lua::{Interp, parse};
 use std::path::Path;
 
@@ -185,7 +185,7 @@ pub fn read(directory: &Path) -> Result<Manifest, String> {
 }
 
 /// One string field.
-fn string(table: &oslo_lua::value::Table, field: &str) -> Option<String> {
+fn string(table: &oslo_base::value::Table, field: &str) -> Option<String> {
     match table.get(&Value::str(field)) {
         Value::Str(text) => Some(text.to_string()),
         _ => None,
@@ -194,7 +194,7 @@ fn string(table: &oslo_lua::value::Table, field: &str) -> Option<String> {
 
 /// A list of plain strings.
 fn strings(
-    table: &oslo_lua::value::Table,
+    table: &oslo_base::value::Table,
     field: &str,
     path: &Path,
 ) -> Result<Vec<String>, String> {
@@ -215,7 +215,7 @@ fn strings(
 }
 
 /// A list of command names, each of which must be one the shell could dispatch.
-fn names(table: &oslo_lua::value::Table, field: &str, path: &Path) -> Result<Vec<String>, String> {
+fn names(table: &oslo_base::value::Table, field: &str, path: &Path) -> Result<Vec<String>, String> {
     let Value::Table(list) = table.get(&Value::str(field)) else {
         return Ok(Vec::new());
     };

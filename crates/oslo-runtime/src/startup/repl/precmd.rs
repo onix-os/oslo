@@ -18,7 +18,7 @@
 //! without the first one's answer suddenly meaning more than it did.
 
 use super::{History, Mode, remember, remember_history};
-use oslo_lua::Value;
+use oslo_base::value::Value;
 
 /// Write the line down, unless it is hidden. Answers the log row, for joining what it *did* to it.
 ///

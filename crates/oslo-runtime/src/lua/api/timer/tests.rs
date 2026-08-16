@@ -57,8 +57,8 @@ fn a_handle_stops_its_own_timer_and_says_whether_it_had_one() {
     };
     assert!(any(), "the timer should be waiting");
 
-    let call = |f: &std::rc::Rc<oslo_lua::value::Function>| match &**f {
-        oslo_lua::value::Function::Native { call, .. } => {
+    let call = |f: &std::rc::Rc<oslo_base::value::Function>| match &**f {
+        oslo_base::value::Function::Native { call, .. } => {
             let interp = oslo_lua::Interp::new("test");
             call(&interp, Vec::new()).expect("stop")
         }

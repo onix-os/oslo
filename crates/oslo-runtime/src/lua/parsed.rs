@@ -31,7 +31,7 @@
 //! plainly, and something it can see is a variable when it is not.
 
 use oslo_base::ast::types::{Command, CommandList, ListOp, Word, WordPart};
-use oslo_lua::value::{Table, Value};
+use oslo_base::value::{Table, Value};
 
 /// How a command joins the one before it.
 const FIRST: &str = "first";

@@ -31,8 +31,8 @@
 
 use super::util::{ok, put, text};
 use oslo_base::dirs;
-use oslo_lua::value::{Table, Value};
-use oslo_lua::{LuaError, LuaResult};
+use oslo_base::value::{Table, Value};
+use oslo_base::value::{LuaError, LuaResult};
 
 /// Install `oslo.mark`, `oslo.unmark` and `oslo.marks`.
 pub fn install(oslo: &mut Table) {

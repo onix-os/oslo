@@ -15,7 +15,7 @@
 //! test. See [`oslo_shell::direnv::devshell`] for what those are and why.
 
 use super::util::{put, text};
-use oslo_lua::{LuaError, Table, Value};
+use oslo_base::value::{LuaError, Table, Value};
 use oslo_shell::direnv::stdlib;
 use oslo_shell::env::Environment;
 #[cfg(feature = "nix")]

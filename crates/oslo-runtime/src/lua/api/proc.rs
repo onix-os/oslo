@@ -11,8 +11,8 @@
 use super::util::{failed, int, list, ok, opt_text, put, record, text};
 use nix::sys::signal::Signal;
 use nix::unistd::Pid;
-use oslo_lua::LuaError;
-use oslo_lua::value::{Table, Value};
+use oslo_base::value::LuaError;
+use oslo_base::value::{Table, Value};
 use oslo_shell::exec::job::{JobState, with_jobs};
 
 /// Build the `oslo.proc` table.

@@ -17,8 +17,8 @@
 //! closure here ignores its first and reads from the capture.
 
 use super::super::util::{ok, put, text};
-use oslo_lua::LuaError;
-use oslo_lua::value::{Table, Value};
+use oslo_base::value::LuaError;
+use oslo_base::value::{Table, Value};
 use oslo_ui::block::{Block, Overflow};
 use oslo_ui::theme::Style;
 use std::cell::RefCell;

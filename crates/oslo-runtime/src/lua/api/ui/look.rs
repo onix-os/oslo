@@ -13,8 +13,8 @@
 //! }
 //! ```
 
-use oslo_lua::LuaError;
-use oslo_lua::value::{Table, Value};
+use oslo_base::value::LuaError;
+use oslo_base::value::{Table, Value};
 use oslo_ui::ask::look::{Look, Preset, Where, Width};
 use oslo_ui::scanner::Scanner;
 use oslo_ui::theme::{Color, Style};

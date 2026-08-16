@@ -22,8 +22,8 @@
 //! a shape that has already been proven in Rust, not a guess that then constrains it.
 
 use super::util::{native, put};
-use oslo_lua::LuaError;
-use oslo_lua::value::{Table, Value};
+use oslo_base::value::LuaError;
+use oslo_base::value::{Table, Value};
 use oslo_shell::data::plan::Shape;
 use oslo_shell::data::{Record, Val};
 use std::cell::RefCell;

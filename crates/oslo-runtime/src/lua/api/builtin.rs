@@ -19,7 +19,7 @@
 //! its own; a declared arity would be a second, weaker parser that disagrees with the first.
 
 use super::util::put;
-use oslo_lua::value::{Table, Value};
+use oslo_base::value::{Table, Value};
 use oslo_lua::{Interp, LuaError, LuaResult};
 use std::cell::RefCell;
 use std::collections::HashMap;

@@ -433,7 +433,7 @@ fn nothing_to_run(
     // function; here it is a hook.
     if let Some(status) = oslo_base::hooks::ask_hook_here(
         oslo_base::hooks::at::COMMAND_NOT_FOUND,
-        vec![oslo_lua::value::Value::str(cmd_name)],
+        vec![oslo_base::value::Value::str(cmd_name)],
     ) {
         return Ok(status);
     }

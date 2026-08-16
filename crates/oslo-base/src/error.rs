@@ -22,7 +22,7 @@ pub enum ShellError {
 
     Io(std::io::Error),
 
-    Lua(oslo_lua::LuaError),
+    Lua(crate::value::LuaError),
 
     Nix(nix::Error),
 
@@ -134,8 +134,8 @@ impl From<std::io::Error> for ShellError {
     }
 }
 
-impl From<oslo_lua::LuaError> for ShellError {
-    fn from(e: oslo_lua::LuaError) -> Self {
+impl From<crate::value::LuaError> for ShellError {
+    fn from(e: crate::value::LuaError) -> Self {
         ShellError::Lua(e)
     }
 }

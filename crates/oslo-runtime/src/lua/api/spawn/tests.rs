@@ -63,7 +63,7 @@ fn cancelling_forgets_the_callback() {
         panic!("no cancel")
     };
     let call = || match &*cancel {
-        oslo_lua::value::Function::Native { call, .. } => {
+        oslo_base::value::Function::Native { call, .. } => {
             let interp = oslo_lua::Interp::new("test");
             call(&interp, Vec::new()).expect("cancel")
         }

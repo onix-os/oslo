@@ -11,7 +11,7 @@
 //! would be a second source of truth to keep in step. What the parser buys is that the *caller*
 //! never has to `awk` a column out of text whose layout shifts with the mount point's length.
 
-use oslo_lua::value::{Table, Value};
+use oslo_base::value::{Table, Value};
 use std::cell::RefCell;
 use std::rc::Rc;
 

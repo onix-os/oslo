@@ -32,14 +32,14 @@
 //! field that recorded the type would be a promise the Tab key does not keep.
 
 use super::util::{ok, put};
-use oslo_lua::value::{Table, Value};
+use oslo_base::value::{Table, Value};
 use oslo_ui::spec::{CommandSpec, OptionSpec, SubcommandSpec};
 
 /// Add `spec` to the `oslo.completion` table.
 pub fn install(completion: &mut Table) {
     put(completion, "spec", |_, args| {
         let Some(Value::Table(declared)) = args.first() else {
-            return Err(oslo_lua::LuaError::new(
+            return Err(oslo_base::value::LuaError::new(
                 "oslo.completion.spec: one table, as in { command = \"notes\", … }".to_string(),
             ));
         };
@@ -47,7 +47,7 @@ pub fn install(completion: &mut Table) {
         // `command` rather than `name`, because the table's other `name`s are the subcommands' and
         // two meanings of one key in nested tables is how a config file becomes guesswork.
         let Some(command) = string(&declared, "command") else {
-            return Err(oslo_lua::LuaError::new(
+            return Err(oslo_base::value::LuaError::new(
                 "oslo.completion.spec: `command` is which command this describes".to_string(),
             ));
         };

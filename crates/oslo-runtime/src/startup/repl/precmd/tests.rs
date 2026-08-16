@@ -1,5 +1,5 @@
 use super::*;
-use oslo_lua::value::Table;
+use oslo_base::value::Table;
 
 fn table(fields: &[(&str, Value)]) -> Option<Value> {
     let mut table = Table::new();

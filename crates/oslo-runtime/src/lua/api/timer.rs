@@ -28,8 +28,8 @@
 //! you run something. A timer is for "not now" and "not on every prompt", not for a clock.
 
 use super::util::{ok, put, record};
-use oslo_lua::value::{Table, Value};
-use oslo_lua::{LuaError, LuaResult};
+use oslo_base::value::{Table, Value};
+use oslo_base::value::{LuaError, LuaResult};
 use std::cell::RefCell;
 use std::time::{Duration, Instant};
 

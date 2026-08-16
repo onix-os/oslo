@@ -9,7 +9,7 @@
 //! [`super::util::failed`].
 
 use super::util::{failed, int, list, ok, opt_text, put, record, text};
-use oslo_lua::value::{Table, Value};
+use oslo_base::value::{Table, Value};
 use std::fs;
 use std::os::unix::fs::{MetadataExt, PermissionsExt};
 use std::path::Path;

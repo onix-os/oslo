@@ -15,7 +15,7 @@
 //! reads the way it looks. `row` is bound too, for a column whose name is not a Lua identifier.
 
 use crate::data::{Record, Val};
-use oslo_lua::value::{Number, Table, Value};
+use oslo_base::value::{Number, Table, Value};
 
 /// Evaluate `expression` against each row, keeping the ones it is true for.
 ///

@@ -29,7 +29,7 @@
 
 use super::util::{put, text};
 use crate::lua::engine::borrow_env;
-use oslo_lua::value::{Number, Table, Value};
+use oslo_base::value::{Number, Table, Value};
 use oslo_shell::env::Environment;
 use oslo_ui::shell::Shell;
 use std::sync::{Arc, Mutex};

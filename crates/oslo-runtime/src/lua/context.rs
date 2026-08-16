@@ -10,7 +10,7 @@
 //! Gathered once per prompt and handed to every segment. Mirrors the `ctx` hexe passes its own
 //! segments, so a config moves between the two without rewriting.
 
-use oslo_lua::value::{Table, Value};
+use oslo_base::value::{Table, Value};
 use std::cell::RefCell;
 use std::rc::Rc;
 

@@ -1,7 +1,7 @@
 //! Shared plumbing for the `oslo.*` namespaces: registering functions, reading arguments, and the
 //! one failure shape they all use.
 
-use oslo_lua::value::{Function, Table, Value};
+use oslo_base::value::{Function, Table, Value};
 use oslo_lua::{Interp, LuaError, LuaResult};
 use std::rc::Rc;
 

@@ -9,7 +9,7 @@
 //! the moment they want it bold.
 
 use super::{Color, KindColors, Pager, Prompt, Style, Syntax, Theme};
-use oslo_lua::Value;
+use oslo_base::value::Value;
 
 /// Read `oslo.theme`, answering the theme and what was wrong with it.
 ///
@@ -53,7 +53,7 @@ pub fn read_lua_theme(value: &Value) -> (Theme, Vec<String>) {
 
 /// One style field, left alone when the config does not name it.
 fn field(
-    table: &oslo_lua::Table,
+    table: &oslo_base::value::Table,
     name: &str,
     path: &str,
     slot: &mut Style,
@@ -108,7 +108,7 @@ fn style(value: &Value, path: &str, problems: &mut Vec<String>) -> Option<Style>
     }
 }
 
-fn read_syntax(table: &oslo_lua::Table, into: &mut Syntax, problems: &mut Vec<String>) {
+fn read_syntax(table: &oslo_base::value::Table, into: &mut Syntax, problems: &mut Vec<String>) {
     let p = "oslo.theme.syntax";
     // `command` first, because the two that fall back to it need its final value.
     field(table, "command", p, &mut into.command, problems);
@@ -199,7 +199,7 @@ fn reversed(style: Style) -> Style {
     }
 }
 
-fn read_pager(table: &oslo_lua::Table, into: &mut Pager, problems: &mut Vec<String>) {
+fn read_pager(table: &oslo_base::value::Table, into: &mut Pager, problems: &mut Vec<String>) {
     let p = "oslo.theme.pager";
     field(table, "text", p, &mut into.text, problems);
     field(table, "text_sel", p, &mut into.text_sel, problems);
@@ -231,7 +231,7 @@ fn read_pager(table: &oslo_lua::Table, into: &mut Pager, problems: &mut Vec<Stri
     }
 }
 
-fn read_kinds(table: &oslo_lua::Table, into: &mut KindColors, problems: &mut Vec<String>) {
+fn read_kinds(table: &oslo_base::value::Table, into: &mut KindColors, problems: &mut Vec<String>) {
     let p = "oslo.theme.pager.kind";
     field(table, "command", p, &mut into.command, problems);
     field(table, "builtin", p, &mut into.builtin, problems);
@@ -243,7 +243,7 @@ fn read_kinds(table: &oslo_lua::Table, into: &mut KindColors, problems: &mut Vec
     field(table, "other", p, &mut into.other, problems);
 }
 
-fn read_prompt(table: &oslo_lua::Table, into: &mut Prompt, problems: &mut Vec<String>) {
+fn read_prompt(table: &oslo_base::value::Table, into: &mut Prompt, problems: &mut Vec<String>) {
     let p = "oslo.theme.prompt";
     field(table, "cwd", p, &mut into.cwd, problems);
     field(table, "git", p, &mut into.git, problems);
@@ -258,7 +258,7 @@ fn read_prompt(table: &oslo_lua::Table, into: &mut Prompt, problems: &mut Vec<St
 }
 
 /// `oslo.theme.ui` — the input widgets' palette.
-fn read_ui(table: &oslo_lua::Table, ui: &mut super::Ui, problems: &mut Vec<String>) {
+fn read_ui(table: &oslo_base::value::Table, ui: &mut super::Ui, problems: &mut Vec<String>) {
     field(table, "accent", "oslo.theme.ui", &mut ui.accent, problems);
     field(
         table,

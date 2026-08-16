@@ -32,7 +32,7 @@
 use super::util::{ok, put, text};
 use oslo_base::store;
 use oslo_base::track::kv::Store;
-use oslo_lua::value::{Table, Value};
+use oslo_base::value::{Table, Value};
 use oslo_lua::{Interp, LuaError, LuaResult};
 use std::cell::RefCell;
 use std::collections::HashMap;

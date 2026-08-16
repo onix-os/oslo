@@ -45,7 +45,7 @@ mod defined;
 
 use super::util::{ok, put, text};
 use oslo_base::secrets::{self, Store};
-use oslo_lua::value::{Table, Value};
+use oslo_base::value::{Table, Value};
 
 /// Build the `oslo.secret` table.
 pub fn build() -> Value {
@@ -159,7 +159,7 @@ pub fn build() -> Value {
 }
 
 /// What a bare `oslo.secret.X` does, against the store this shell would use.
-type Direct = fn(&Store, &[Value]) -> oslo_lua::LuaResult<Vec<Value>>;
+type Direct = fn(&Store, &[Value]) -> oslo_base::value::LuaResult<Vec<Value>>;
 const DIRECT: &[(&str, Direct)] = &[
     ("get", |store, args| {
         let name = text(args, 1, "oslo.secret.get")?;

@@ -143,7 +143,7 @@ fn drawn_by_config(id: usize, pid: i32, command: &str, status: i32, ended: bool)
             ("pid", int(i64::from(pid))),
             ("text", text(command)),
             ("status", int(i64::from(status))),
-            ("ended", oslo_lua::value::Value::Bool(ended)),
+            ("ended", oslo_base::value::Value::Bool(ended)),
         ],
     )
 }

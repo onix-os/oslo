@@ -15,8 +15,8 @@
 
 use super::util::{ok, put, text};
 use crate::lua::engine::Registry;
-use oslo_lua::LuaError;
-use oslo_lua::value::{Table, Value};
+use oslo_base::value::LuaError;
+use oslo_base::value::{Table, Value};
 use oslo_ui::theme::{self, Color, Style};
 use std::rc::Rc;
 

@@ -23,14 +23,14 @@
 //! other way round, with `yieldsToGroupIds` declared by the provider; that is the part not copied.
 
 use super::util::{ok, put, text};
-use oslo_lua::value::{Table, Value};
+use oslo_base::value::{Table, Value};
 use std::rc::Rc;
 
 /// Add `provider` to the `oslo.suggest` table.
 pub fn install(suggest: &mut Table) {
     put(suggest, "provider", |_, args| {
         let Some(Value::Table(declared)) = args.first() else {
-            return Err(oslo_lua::LuaError::new(
+            return Err(oslo_base::value::LuaError::new(
                 "oslo.suggest.provider: one table, as in { name = \"tldr\", answer = f }"
                     .to_string(),
             ));
@@ -39,7 +39,7 @@ pub fn install(suggest: &mut Table) {
         let name = match declared.get(&Value::str("name")) {
             Value::Str(name) => name.to_string(),
             _ => {
-                return Err(oslo_lua::LuaError::new(
+                return Err(oslo_base::value::LuaError::new(
                     "oslo.suggest.provider: `name` is what this provider is called, and what \
                      `messages` blames when it misbehaves"
                         .to_string(),
@@ -81,7 +81,7 @@ pub fn install(suggest: &mut Table) {
                         "fill" => oslo_ui::suggest::Late::Fill,
                         "replace" => oslo_ui::suggest::Late::Replace,
                         other => {
-                            return Err(oslo_lua::LuaError::new(format!(
+                            return Err(oslo_base::value::LuaError::new(format!(
                                 "oslo.suggest.provider: on_late = {other:?} is not one of \
                                  \"fill\" (draw only if nothing else did) or \"replace\" \
                                  (draw over what another source gave)"
@@ -124,7 +124,7 @@ pub fn install(suggest: &mut Table) {
                 }
             }
             _ => {
-                return Err(oslo_lua::LuaError::new(
+                return Err(oslo_base::value::LuaError::new(
                     "oslo.suggest.provider: one of `answer` (fast, answers now) or `request` \
                      (slow, calls reply later) must be a function"
                         .to_string(),
@@ -158,7 +158,7 @@ pub fn install(suggest: &mut Table) {
             Ok(_name) => {
                 // One at a time is not offered yet: the registry replaces by name, which covers
                 // editing a provider, and nothing has asked to remove exactly one.
-                Err(oslo_lua::LuaError::new(
+                Err(oslo_base::value::LuaError::new(
                     "oslo.suggest.forget takes no arguments; it drops every provider".to_string(),
                 ))
             }
@@ -231,7 +231,7 @@ fn millis(declared: &Table, key: &str, fallback: u64) -> std::time::Duration {
 }
 
 /// Report once per failure rather than per keystroke: a provider that raises does so on every key.
-fn complain(name: &str, problem: &oslo_lua::LuaError) {
+fn complain(name: &str, problem: &oslo_base::value::LuaError) {
     oslo_base::messages::say(
         oslo_base::messages::Level::Error,
         format!("suggest/{name}"),

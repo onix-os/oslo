@@ -10,7 +10,7 @@
 
 use super::{Settings, Sort, Source};
 use crate::matching::Fuzzy;
-use oslo_lua::Value;
+use oslo_base::value::Value;
 
 pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
     let mut settings = Settings::default();
@@ -531,7 +531,7 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
     (settings, problems)
 }
 
-fn number(table: &oslo_lua::Table, name: &str) -> Option<i64> {
+fn number(table: &oslo_base::value::Table, name: &str) -> Option<i64> {
     table.get(&Value::str(name)).as_number()?.as_int()
 }
 
@@ -540,7 +540,7 @@ fn number(table: &oslo_lua::Table, name: &str) -> Option<i64> {
 /// A name nothing answers to is reported rather than silently ignored: a cursor that quietly keeps
 /// its default looks exactly like oslo not reading the config at all.
 fn cursor(
-    table: &oslo_lua::Table,
+    table: &oslo_base::value::Table,
     name: &str,
     slot: &mut crate::vi::Cursor,
     problems: &mut Vec<String>,
@@ -561,7 +561,7 @@ fn cursor(
 ///
 /// `false` and "absent" have to be told apart, or `descriptions = false` would be indistinguishable
 /// from not setting it and could never turn anything off.
-fn flag(table: &oslo_lua::Table, name: &str, slot: &mut bool) {
+fn flag(table: &oslo_base::value::Table, name: &str, slot: &mut bool) {
     match table.get(&Value::str(name)) {
         Value::Nil => {}
         value => *slot = value.truthy(),
@@ -574,7 +574,7 @@ fn flag(table: &oslo_lua::Table, name: &str, slot: &mut bool) {
 /// you reach for first, and `fuzzy = "loose"` is what you reach for once you want to tune it. A
 /// name nothing answers to is reported rather than ignored — a typo that silently leaves fuzzy
 /// matching off looks exactly like the feature not working.
-fn fuzzy(table: &oslo_lua::Table, path: &str, slot: &mut Fuzzy, problems: &mut Vec<String>) {
+fn fuzzy(table: &oslo_base::value::Table, path: &str, slot: &mut Fuzzy, problems: &mut Vec<String>) {
     match table.get(&Value::str("fuzzy")) {
         Value::Nil => {}
         Value::Str(name) => match Fuzzy::parse(name.as_ref()) {

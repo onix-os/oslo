@@ -24,8 +24,8 @@
 use super::util::{list, ok, put, record, text};
 use crate::lua::engine::Registry;
 use oslo_base::feature;
-use oslo_lua::LuaError;
-use oslo_lua::value::{Table, Value};
+use oslo_base::value::LuaError;
+use oslo_base::value::{Table, Value};
 use std::rc::Rc;
 
 /// Registry key prefix for the predicate attached to a feature.

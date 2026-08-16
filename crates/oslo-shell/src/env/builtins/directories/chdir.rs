@@ -248,11 +248,11 @@ fn refused(from: &str, to: &str) -> bool {
         oslo_base::hooks::answer_hook_with(
             oslo_base::hooks::at::PRE_CHANGE_DIR,
             vec![oslo_base::hooks::fields(&[
-                ("from", oslo_lua::value::Value::str(from)),
-                ("to", oslo_lua::value::Value::str(to)),
+                ("from", oslo_base::value::Value::str(from)),
+                ("to", oslo_base::value::Value::str(to)),
             ])],
         ),
-        Some(oslo_lua::value::Value::Bool(false))
+        Some(oslo_base::value::Value::Bool(false))
     )
 }
 

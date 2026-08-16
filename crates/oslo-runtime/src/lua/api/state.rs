@@ -26,7 +26,7 @@
 //! anything — that is what `oslo.db` and `oslo.json` are for when a fact should outlive the shell.
 
 use super::util::{ok, put, text};
-use oslo_lua::value::{Table, Value};
+use oslo_base::value::{Table, Value};
 use std::cell::RefCell;
 use std::collections::HashMap;
 
@@ -98,7 +98,7 @@ mod tests {
             panic!("no {name}")
         };
         match &*f {
-            oslo_lua::value::Function::Native { call, .. } => {
+            oslo_base::value::Function::Native { call, .. } => {
                 let interp = oslo_lua::Interp::new("test");
                 call(&interp, args)
                     .expect(name)

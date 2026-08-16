@@ -13,7 +13,7 @@
 //! calls the shell's own globber, so the two interfaces cannot drift apart.
 
 use crate::lua::engine::{BUILTIN_KEY_PREFIX, PROMPT_KEY, Registry, borrow_env, call_lua_builtin};
-use oslo_lua::value::{Table, Value};
+use oslo_base::value::{Table, Value};
 use oslo_lua::{Interp, LuaError};
 use oslo_shell::env::Environment;
 use std::cell::RefCell;

@@ -6,7 +6,7 @@
 //! `if oslo.nix then … end`.
 
 use oslo_lua::Interp;
-use oslo_lua::value::Table;
+use oslo_base::value::Table;
 // Every use of it is behind a feature, so a default build has none.
 #[cfg(any(
     feature = "direnv",
@@ -14,7 +14,7 @@ use oslo_lua::value::Table;
     feature = "secrets",
     feature = "plugin"
 ))]
-use oslo_lua::value::Value;
+use oslo_base::value::Value;
 use oslo_shell::env::Environment;
 use std::sync::{Arc, Mutex};
 

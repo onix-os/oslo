@@ -27,7 +27,7 @@
 //! held **right now**, which is what [`super::state_is_held`] answers.
 
 use super::LuaEngine;
-use oslo_lua::value::Value;
+use oslo_base::value::Value;
 use std::cell::{Cell, RefCell};
 
 thread_local! {

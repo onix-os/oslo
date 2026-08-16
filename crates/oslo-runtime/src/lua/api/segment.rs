@@ -29,8 +29,8 @@
 //! instead of being truncated mid-word.
 
 use super::util::native;
-use oslo_lua::LuaError;
-use oslo_lua::value::Value;
+use oslo_base::value::LuaError;
+use oslo_base::value::Value;
 use std::rc::Rc;
 
 /// The key a segment table is tagged with, so a bare table cannot be mistaken for one.

@@ -48,7 +48,7 @@
 //! every field a handler could want is passed in rather than looked up.
 
 use oslo_base::hooks;
-use oslo_lua::value::{Table, Value};
+use oslo_base::value::{Table, Value};
 
 /// Whether a config drew this report itself.
 ///

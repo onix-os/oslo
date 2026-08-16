@@ -20,26 +20,26 @@
 //! subcommands oslo already knows, competing in one ranking rather than replacing them.
 
 use super::util::{ok, put};
-use oslo_lua::value::{Table, Value};
+use oslo_base::value::{Table, Value};
 use std::rc::Rc;
 
 /// Add `provider` to the `oslo.completion` table.
 pub fn install(completion: &mut Table) {
     put(completion, "provider", |_, args| {
         let Some(Value::Table(declared)) = args.first() else {
-            return Err(oslo_lua::LuaError::new(
+            return Err(oslo_base::value::LuaError::new(
                 "oslo.completion.provider: one table, as in { name = \"tldr\", answer = f }"
                     .to_string(),
             ));
         };
         let declared = declared.borrow();
         let Some(name) = string(&declared, "name") else {
-            return Err(oslo_lua::LuaError::new(
+            return Err(oslo_base::value::LuaError::new(
                 "oslo.completion.provider: `name` is what this provider is called".to_string(),
             ));
         };
         let answer @ Value::Function(_) = declared.get(&Value::str("answer")) else {
-            return Err(oslo_lua::LuaError::new(
+            return Err(oslo_base::value::LuaError::new(
                 "oslo.completion.provider: `answer` must be a function of one argument".to_string(),
             ));
         };

@@ -3,7 +3,7 @@
 use crate::lua::context::Context;
 use oslo_base::error::{Result, ShellError};
 use oslo_lua as eval;
-use oslo_lua::value::Value;
+use oslo_base::value::Value;
 use oslo_lua::{Interp, LuaResult};
 use oslo_shell::env::Environment;
 use std::cell::RefCell;
@@ -357,7 +357,7 @@ impl LuaEngine {
 
     /// A table for a hook, from plain pairs — the shape most of them hand over.
     pub fn hook_fields(fields: &[(&str, Value)]) -> Value {
-        let mut t = oslo_lua::value::Table::new();
+        let mut t = oslo_base::value::Table::new();
         for (name, value) in fields {
             t.set(Value::str(*name), value.clone());
         }
@@ -375,7 +375,7 @@ impl LuaEngine {
     /// that wants to log a command wants to know where it ran, and `oslo.sys.cwd()` asked from
     /// inside the handler answers the same thing only until the command is a `cd`.
     pub fn command_started(text: &str, cwd: &str, mode: &str) -> Value {
-        let mut t = oslo_lua::value::Table::new();
+        let mut t = oslo_base::value::Table::new();
         t.set(Value::str("text"), Value::str(text));
         t.set(Value::str("cwd"), Value::str(cwd));
         t.set(Value::str("mode"), Value::str(mode));
@@ -404,7 +404,7 @@ impl LuaEngine {
         status: i32,
         duration: std::time::Duration,
     ) -> Value {
-        let mut t = oslo_lua::value::Table::new();
+        let mut t = oslo_base::value::Table::new();
         t.set(Value::str("text"), Value::str(text));
         t.set(Value::str("cwd"), Value::str(cwd));
         t.set(Value::str("mode"), Value::str(mode));

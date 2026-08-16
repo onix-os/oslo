@@ -2,7 +2,7 @@
 
 use super::queue;
 use oslo_lua as eval;
-use oslo_lua::LuaResult;
+use oslo_base::value::LuaResult;
 use oslo_shell::env::Environment;
 use std::sync::{Mutex, MutexGuard};
 

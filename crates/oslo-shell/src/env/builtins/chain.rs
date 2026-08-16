@@ -123,7 +123,7 @@ fn drawn_by_config(segments: &[segments::Segment]) -> bool {
                 let mut row = vec![
                     ("text", text(&link.text)),
                     ("op", text(link.join.written())),
-                    ("ran", oslo_lua::value::Value::Bool(link.ran())),
+                    ("ran", oslo_base::value::Value::Bool(link.ran())),
                     ("ms", int(link.duration_ms)),
                 ];
                 // Absent rather than a number when it never ran: any number here reads as a status.

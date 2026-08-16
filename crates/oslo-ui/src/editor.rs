@@ -19,7 +19,7 @@
 //! Answering `nil` means "leave it alone", which is what a binding that only looks at the line
 //! wants.
 
-use oslo_lua::value::{Table, Value};
+use oslo_base::value::{Table, Value};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;

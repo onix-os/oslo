@@ -17,7 +17,7 @@
 use super::ACTIVE;
 use crate::lua::engine::Registry;
 use oslo_lua::Interp;
-use oslo_lua::value::Value;
+use oslo_base::value::Value;
 
 /// Fire an answering hook using whatever interpreter is on this thread.
 ///

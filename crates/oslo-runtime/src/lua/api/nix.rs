@@ -25,8 +25,8 @@
 //! to talk to nix. What is here is the argument reading and the conversion to Lua.
 
 use super::util::{failed, ok, put};
-use oslo_lua::value::{Table, Value};
-use oslo_lua::{LuaError, LuaResult};
+use oslo_base::value::{Table, Value};
+use oslo_base::value::{LuaError, LuaResult};
 use oslo_shell::nix_shell::{cache, json};
 use std::time::Duration;
 

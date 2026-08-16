@@ -24,7 +24,7 @@
 //! reuse and waits for one run, which is the only time it can be seen.
 
 use crate::lua::context::Context;
-use oslo_lua::value::Value;
+use oslo_base::value::Value;
 use std::collections::{HashMap, HashSet};
 use std::sync::{Mutex, OnceLock};
 use std::time::Duration;

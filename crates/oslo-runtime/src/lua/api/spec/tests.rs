@@ -1,5 +1,5 @@
 use super::*;
-use oslo_lua::value::Value;
+use oslo_base::value::Value;
 
 /// Build the Lua table a spec is declared with, by running the source through the interpreter — so
 /// what is tested is the shape somebody types, not a hand-built table that happens to parse.

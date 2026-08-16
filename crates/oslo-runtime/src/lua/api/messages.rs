@@ -18,7 +18,7 @@
 
 use super::util::{list, ok, put, text};
 use oslo_base::messages::{self, Level};
-use oslo_lua::value::{Table, Value};
+use oslo_base::value::{Table, Value};
 
 pub fn build() -> Value {
     let mut api = Table::new();

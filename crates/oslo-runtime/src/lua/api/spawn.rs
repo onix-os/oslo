@@ -30,8 +30,8 @@
 //! sends bytes and a status; the handler is looked up here, by id.
 
 use super::util::{ok, put};
-use oslo_lua::value::{Table, Value};
-use oslo_lua::{LuaError, LuaResult};
+use oslo_base::value::{Table, Value};
+use oslo_base::value::{LuaError, LuaResult};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};

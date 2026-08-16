@@ -10,7 +10,7 @@
 //! offered where it costs nothing — when the next stage asks for it.
 
 use crate::data::{Record, Val};
-use oslo_lua::value::Value;
+use oslo_base::value::Value;
 
 /// Rows for a `sh.*` helper that already answers in rows.
 ///
@@ -106,7 +106,7 @@ pub fn ls(args: &[String]) -> Result<Vec<Record>, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use oslo_lua::value::Table;
+    use oslo_base::value::Table;
     use std::cell::RefCell;
     use std::rc::Rc;
 
