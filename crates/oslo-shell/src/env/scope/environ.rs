@@ -21,12 +21,14 @@ pub(super) fn is_environ_safe(name: &str, value: &str) -> bool {
 /// The last line of defence for callers that reach [`Environment::set_var`] without doing their
 /// own validation (`read`, a `for` loop variable, a `${x=default}` expansion): the assignment is
 /// dropped with a diagnostic rather than aborting the shell.
-pub(super) fn reject_unrepresentable(name: &str, value: &str) -> bool {
+/// `origin` is [`Environment::origin`]'s answer, so a script names its own file and line — the
+/// caller has it and this does not, which is the only reason it is a parameter.
+pub(super) fn reject_unrepresentable(origin: &str, name: &str, value: &str) -> bool {
     if name.is_empty() || name.contains(['=', '\0']) {
-        eprintln!("oslo: {}: not a valid identifier", name);
+        eprintln!("{origin}{name}: not a valid identifier");
         true
     } else if value.contains('\0') {
-        eprintln!("oslo: {}: value contains a NUL byte", name);
+        eprintln!("{origin}{name}: value contains a NUL byte");
         true
     } else {
         false

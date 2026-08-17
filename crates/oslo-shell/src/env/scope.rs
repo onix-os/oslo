@@ -364,10 +364,10 @@ impl Environment {
             self.published_line = 0;
         }
         if self.is_readonly(name) {
-            eprintln!("oslo: {}: is read only", name);
+            eprintln!("{}{}: is read only", self.origin(), name);
             return false;
         }
-        if reject_unrepresentable(name, value) {
+        if reject_unrepresentable(&self.origin(), name, value) {
             return false;
         }
         if let Some(array) = self.arrays.get_mut(name) {
@@ -462,7 +462,7 @@ impl Environment {
     pub fn export_var(&mut self, name: &str) -> bool {
         if let Some((val, _)) = self.vars.get(name) {
             let val = val.clone();
-            if reject_unrepresentable(name, &val) {
+            if reject_unrepresentable(&self.origin(), name, &val) {
                 return false;
             }
             if let Some((_, exp)) = self.vars.get_mut(name) {
@@ -470,7 +470,7 @@ impl Environment {
             }
             environ_set(name, &val);
         } else {
-            if reject_unrepresentable(name, "") {
+            if reject_unrepresentable(&self.origin(), name, "") {
                 return false;
             }
             // Recorded, not created. See `pending_exports`.

@@ -25,11 +25,23 @@ use common::oslo_bin;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 
-/// Every `.rs` file the builtins are made of, except the test modules beside them.
+/// The directories whose diagnostics a script should see its own name in.
+///
+/// **Three, not one.** `builtins` is where the sweep started; `data/tools` is the structured
+/// verbs, which are builtins in every sense that matters here and had the same hardcoded prefix;
+/// and `env/scope` is where a plain `x=2` against a read-only name is refused, which is a
+/// diagnostic about a *line of a script* with no builtin involved at all.
+const SPEAKING_FOR_A_SCRIPT: [&str; 3] = [
+    "crates/oslo-shell/src/env/builtins",
+    "crates/oslo-shell/src/data/tools",
+    "crates/oslo-shell/src/env/scope",
+];
+
+/// Every `.rs` file those are made of, except the test modules beside them.
 fn builtin_sources() -> Vec<(PathBuf, String)> {
-    let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("crates/oslo-shell/src/env/builtins");
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"));
     let mut found = Vec::new();
-    let mut stack = vec![root];
+    let mut stack: Vec<PathBuf> = SPEAKING_FOR_A_SCRIPT.iter().map(|d| root.join(d)).collect();
     while let Some(dir) = stack.pop() {
         for entry in std::fs::read_dir(&dir).unwrap_or_else(|e| panic!("read {dir:?}: {e}")) {
             let path = entry.expect("dir entry").path();
@@ -106,6 +118,10 @@ fn a_builtin_that_fails_in_a_script_names_the_file_and_the_line() {
         ("trap -z EXIT", "trap:"),
         ("printf -Z", "printf:"),
         ("times -Z", "times:"),
+        // Not a builtin at all: a plain assignment the environment refuses.
+        ("readonly ROZZ=1; ROZZ=2", "ROZZ:"),
+        // A structured verb, which had the same hardcoded prefix as the builtins did.
+        ("ls | length extra", "length:"),
     ];
 
     for (number, (line, builtin)) in cases.iter().enumerate() {

@@ -267,6 +267,10 @@ pub(super) fn run(
         };
         let words = expand_words(env, simple)?;
 
+        // Published for the same reason `exec_custom_builtin` publishes it: a structured verb is a
+        // builtin in every sense that matters to whoever is reading the diagnostic, and this is the
+        // one place they are all dispatched from. See `env::scope::origin`.
+        let _origin = crate::env::scope::origin::Published::new(env.origin());
         let (status, produced) =
             match crate::data::tools::run_tool(&name, &words, rows.take(), bytes.as_deref()) {
                 Some(outcome) => outcome,

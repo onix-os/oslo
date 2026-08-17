@@ -174,7 +174,11 @@ fn invoke_dynamic_builtin(env: &mut Environment, args: &[String]) -> Result<i32>
         // Reachable only if a caller dispatched with an argv[0] that is not the builtin's name.
         // Loud and non-zero: the mistake this whole item exists to undo was a silent `Ok(0)`.
         None => {
-            eprintln!("oslo: {}: registered builtin could not be resolved", name);
+            eprintln!(
+                "{}{}: registered builtin could not be resolved",
+                env.origin(),
+                name
+            );
             Ok(127)
         }
     }
