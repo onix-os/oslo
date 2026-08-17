@@ -51,11 +51,61 @@ pub(crate) fn run_lua_line(
     text: &str,
     last_status: i32,
 ) -> Result<i32, ShellError> {
-    match lua.eval_script(text) {
+    if let Some(status) = leaving(text) {
+        return Err(ShellError::Exit(status));
+    }
+    match lua.eval_script(&as_a_prompt_line(lua, text)) {
         Ok(()) => Ok(last_status),
         Err(ShellError::Lua(e)) if e.exit.is_some() => Err(ShellError::Exit(e.exit.unwrap_or(0))),
         Err(e) => Err(e),
     }
+}
+
+/// `exit`, and `exit 3`, typed at a Lua prompt.
+///
+/// **Because it is a shell prompt before it is a Lua one.** `exit` is a word every shell answers
+/// and Lua has no meaning for at all: as an expression it is an unset global, so the prompt read
+/// it, printed `nil`, and stayed open. There is no way to leave a Lua prompt that a shell user
+/// would guess — `os.exit()` is the Lua answer and nobody arrives knowing it.
+///
+/// Only the bare word, so a script that has a variable called `exit` is untouched by this: `exit`
+/// alone leaves, `exit(0)` and `print(exit)` are Lua.
+fn leaving(text: &str) -> Option<i32> {
+    let mut words = text.split_whitespace();
+    let first = words.next()?;
+    if !matches!(first, "exit" | "quit") {
+        return None;
+    }
+    match words.next() {
+        None => Some(0),
+        Some(code) if words.next().is_none() => code.parse().ok(),
+        Some(_) => None,
+    }
+}
+
+/// The source to actually run for one typed line.
+///
+/// **A prompt is mostly expressions, and Lua chunks are statements.** `1 + 1`, `x * 2`, `os.time`
+/// and `{1,2}` are every one of them a syntax error as a chunk — "expression is not a statement" —
+/// so the Lua prompt could evaluate nothing and print nothing. Every Lua REPL solves it the same
+/// way and so does this: try the line as the tail of a `return` first, and if that parses, run it
+/// wrapped so whatever it produced is printed.
+///
+/// `print` does the printing rather than Rust, because that is what makes `__tostring` work and
+/// what lets a config replace `print` and have the prompt obey it — the same property the
+/// reference interpreter has.
+///
+/// **The line goes on a line of its own** inside the wrapper. Written inline, a trailing `--`
+/// comment would swallow the closing bracket that follows it.
+fn as_a_prompt_line(lua: &LuaEngine, text: &str) -> String {
+    // A statement stays a statement: `x = 5` is not an expression list and must not be wrapped.
+    if !lua.compiles(&format!("return\n{text}\n")) {
+        return text.to_string();
+    }
+    format!(
+        "local __oslo_answer = table.pack(\n{text}\n)\n\
+         if __oslo_answer.n > 0 then print(table.unpack(__oslo_answer, 1, __oslo_answer.n)) end\n"
+    )
 }
 
 /// `$IGNOREEOF`: how many end-of-file characters to ignore before ending the shell.

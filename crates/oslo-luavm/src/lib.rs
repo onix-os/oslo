@@ -77,6 +77,28 @@ fn syntax_wording(message: &str) -> String {
     message.to_string()
 }
 
+/// Take the VM's own category word off the front of a failure.
+///
+/// **Lua names no stage in front of a position.** `lua: stdin:1: attempt to call a nil value` is
+/// the whole of what the reference interpreter prints; the VM instead renders `runtime error: …`
+/// for a fault and `lua error: …` for a value raised by `error()`. Kept, they stacked up: one
+/// mistyped line at the prompt answered
+///
+/// ```text
+/// oslo: Lua error: (oslo lua): runtime error: (oslo lua):1: could not call a nil value
+/// ```
+///
+/// — three labels and the chunk twice, for one nil. The stage is also the half a reader can do
+/// nothing with: the position and the message are what say where to look.
+fn plain_wording(message: &str) -> String {
+    for category in ["runtime error: ", "lua error: "] {
+        if let Some(rest) = message.strip_prefix(category) {
+            return rest.to_string();
+        }
+    }
+    message.to_string()
+}
+
 /// A Lua interpreter, and the shell's whole view of one.
 pub struct Engine {
     lua: RefCell<Lua>,
@@ -239,10 +261,15 @@ impl Engine {
         if let Some(status) = taken_exit() {
             return LuaError::exit_request(status);
         }
+        let message = plain_wording(&syntax_wording(&error.to_string()));
+        let chunk = self.chunk.borrow().clone();
         // The VM has already put `chunk:line:` in front where it knows one, so the message is
-        // taken whole rather than positioned again.
-        LuaError::without_position(syntax_wording(&error.to_string()))
-            .in_chunk(self.chunk.borrow().clone())
+        // taken whole rather than positioned again — which is what this function always meant to
+        // do, and what naming the chunk a second time undid.
+        if message.starts_with(&format!("{chunk}:")) {
+            return LuaError::without_position(message);
+        }
+        LuaError::new(message).in_chunk(chunk)
     }
 }
 
@@ -302,6 +329,15 @@ impl Host for Engine {
 /// A bare VM rather than the session's, so an unfinished line cannot run a metamethod or see a
 /// half-built global. It costs an arena per keystroke that ends a line, which is nothing against a
 /// terminal round trip.
+///
+/// **Asked of the statement only, deliberately.** The prompt now tries a line as an expression
+/// before it tries it as a chunk, so `1 +` is an unfinished *expression* and a REPL that knew it
+/// would ask for the rest of the sum. Asking the parser that question is what cannot be done here:
+/// luna reports `EndOfStream` both when it ran out of tokens *and* when a complete block was
+/// followed by tokens it did not want (`parse_chunk`, where a leftover `end` is "expected the end
+/// of the stream"). `x = = 2` lands in the second case as an expression, so believing it would
+/// leave the prompt waiting for a line that can never finish it — and a prompt that will not come
+/// back is a worse answer than a syntax error. So `1 +` is reported rather than continued.
 pub fn is_complete(source: &str) -> bool {
     use luna::compiler::{ParseError, ParseErrorKind};
 

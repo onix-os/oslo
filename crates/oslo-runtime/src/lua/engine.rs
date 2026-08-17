@@ -253,6 +253,15 @@ impl LuaEngine {
         self.run(script, "(oslo lua)")
     }
 
+    /// Whether `source` compiles, without running any of it.
+    ///
+    /// **Compiled and thrown away, never run.** The prompt uses this to tell an expression from a
+    /// statement, and the only safe way to ask that question is to parse: running `f()` to find
+    /// out whether it was an expression would have called `f`.
+    pub fn compiles(&self, source: &str) -> bool {
+        self.interp.load(source, "(oslo lua)").is_ok()
+    }
+
     pub fn load_file(&self, path: &str) -> Result<()> {
         let content = std::fs::read_to_string(path)?;
         self.eval_as(&content, path)

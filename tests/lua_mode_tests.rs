@@ -242,3 +242,114 @@ fn a_failing_hook_is_reported_and_the_rest_still_run() {
     assert!(out.contains("SECOND"), "{out}");
     assert!(out.contains("\nran"), "{out}");
 }
+
+/// **The Lua prompt evaluates expressions and shows what they came to.**
+///
+/// It could not. A Lua chunk is a sequence of *statements*, so every one of `1 + 1`, `x * 2`,
+/// `os.time`, `"a string"` and `{1,2}` was a syntax error — "expression is not a statement" — and
+/// the one thing a prompt is mostly used for was the one thing it refused. Every Lua REPL solves
+/// it the same way: try the line as the tail of a `return` first.
+#[test]
+fn the_lua_prompt_evaluates_an_expression_and_prints_it() {
+    let lua = &[("OSLO_DEFAULT_MODE", "lua")];
+    for (typed_line, wanted) in [
+        ("1 + 1", "2"),
+        ("2 ^ 10", "1024.0"),
+        ("\"a \" .. \"string\"", "a string"),
+        ("#(\"abc\")", "3"),
+        ("math.max(3, 9)", "9"),
+        ("(\"x\"):rep(3)", "xxx"),
+    ] {
+        let out = typed(&format!("{typed_line}\n"), lua);
+        assert!(
+            out.lines().any(|line| line.trim() == wanted),
+            "`{typed_line}` should print {wanted:?}, printed {out:?}"
+        );
+    }
+}
+
+/// Several values print the way Lua prints several values, and none prints nothing.
+#[test]
+fn the_lua_prompt_shows_every_value_and_stays_quiet_for_none() {
+    let lua = &[("OSLO_DEFAULT_MODE", "lua")];
+
+    let several = typed("1, 2, 3\n", lua);
+    assert!(
+        several.lines().any(|line| line.trim() == "1\t2\t3"),
+        "{several}"
+    );
+
+    // A statement is not an expression and must not grow an answer: `x = 5` prints nothing, and
+    // `print` already printed, so wrapping it must not add a `nil` under what it said.
+    let assigned = typed("x = 5\nx * 2\n", lua);
+    assert!(
+        assigned.lines().any(|line| line.trim() == "10"),
+        "{assigned}"
+    );
+    assert!(
+        !assigned.lines().any(|line| line.trim() == "nil"),
+        "an assignment answered something: {assigned}"
+    );
+
+    // `print` already printed, so wrapping the line must not put a `nil` under what it said.
+    let printed = typed("print(\"said\")\n", lua);
+    assert_eq!(
+        printed.lines().filter(|line| line.trim() == "said").count(),
+        1,
+        "print said it more than once: {printed}"
+    );
+    assert!(
+        !printed.lines().any(|line| line.trim() == "nil"),
+        "print grew an answer: {printed}"
+    );
+}
+
+/// `nil` and `false` are answers, not silence — a prompt that hid them would be lying about what
+/// the expression came to.
+#[test]
+fn the_lua_prompt_shows_a_falsey_answer() {
+    let lua = &[("OSLO_DEFAULT_MODE", "lua")];
+    for (typed_line, wanted) in [("nil", "nil"), ("false", "false"), ("1 == 2", "false")] {
+        let out = typed(&format!("{typed_line}\n"), lua);
+        assert!(
+            out.lines().any(|line| line.trim() == wanted),
+            "`{typed_line}` should print {wanted:?}: {out}"
+        );
+    }
+}
+
+/// **`exit` leaves a Lua prompt**, which is the word every shell answers and Lua has no meaning
+/// for. As an expression it is an unset global, so the prompt printed `nil` and stayed open —
+/// there was no way out that a shell user would guess.
+#[test]
+fn exit_leaves_the_lua_prompt() {
+    let lua = &[("OSLO_DEFAULT_MODE", "lua")];
+    let out = typed("exit\nprint(\"AFTER\")\n", lua);
+    assert!(
+        !out.contains("AFTER"),
+        "the shell kept reading after exit: {out}"
+    );
+    assert!(!out.contains("nil"), "exit answered a value: {out}");
+}
+
+/// A line that is a whole statement still runs as one, and a failure still says where.
+#[test]
+fn a_statement_still_runs_and_a_failure_still_says_where() {
+    let lua = &[("OSLO_DEFAULT_MODE", "lua")];
+    let out = typed("local t = {} ; t.x = 1 ; print(t.x)\n", lua);
+    assert!(out.lines().any(|line| line.trim() == "1"), "{out}");
+
+    // One label and one position, where this used to read
+    // `Lua error: (oslo lua): runtime error: (oslo lua):1: …`.
+    let failed = typed("nosuchfn_zz()\n", lua);
+    assert!(failed.contains("(oslo lua):1:"), "{failed}");
+    assert!(
+        !failed.contains("runtime error:"),
+        "the VM's own category leaked: {failed}"
+    );
+    assert_eq!(
+        failed.matches("(oslo lua)").count(),
+        1,
+        "the chunk was named twice: {failed}"
+    );
+}

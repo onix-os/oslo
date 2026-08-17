@@ -85,7 +85,15 @@ impl LuaError {
     }
 
     /// Name the source this came out of, if it is not already named.
+    ///
+    /// **Respects `bare` exactly as [`Self::at`] does**, and for the same reason: `bare` means the
+    /// position was refused, and a chunk is half a position. `error("x", 0)` asks Lua for no
+    /// position at all and was reaching an uncaught top level as `file: lua error: x` — the file
+    /// it had declined, in front of a message that was already carrying one.
     pub fn in_chunk(mut self, chunk: impl Into<String>) -> Self {
+        if self.bare {
+            return self;
+        }
         if self.chunk.is_none() {
             self.chunk = Some(chunk.into());
         }

@@ -186,7 +186,10 @@ pub fn run_lua_source(source: &str, name: &str, args: &[String]) -> i32 {
         if let Some(code) = requested_exit(&e) {
             return code;
         }
-        eprintln!("oslo: {}: {}", name, e);
+        // The error names its own file, and with a *line* where the VM knew one — `e.lua:3: …`
+        // rather than the `e.lua: ` this used to put in front of it. Naming the script here as
+        // well printed it twice for every failure.
+        eprintln!("oslo: {e}");
         return 1;
     }
     env.lock().map(|guard| guard.last_status).unwrap_or(1)
