@@ -170,8 +170,8 @@ end)
 **A handle is an object.** The verbs live behind `__index`, so `pairs(db)` walks nothing, a typo
 (`db.nmae = 1`) is refused rather than quietly added, and `db.get("k")` with a dot is a message
 rather than a read of the wrong key. `<close>` shuts the file at the end of the block and every verb
-says so afterwards; a handle without it is released when it is collected, because the session holds
-databases only weakly. The same shape is what `oslo.spawn`, `oslo.after`/`oslo.every` and
+says so afterwards; a handle without it holds the file until the session ends, because oslo's Lua
+runs no finalizers. The same shape is what `oslo.spawn`, `oslo.after`/`oslo.every` and
 `oslo.fs.mktempdir` answer with.
 
 `open` takes a **name, never a path**. `oslo.db.open("../history")` is refused before anything is

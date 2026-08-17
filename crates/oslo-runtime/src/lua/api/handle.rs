@@ -39,8 +39,6 @@ pub(super) struct Handle {
     shown: Option<String>,
     /// What `__close` runs, if anything.
     closer: Option<Value>,
-    /// Whether the collector runs the closer too. See [`Handle::on_close`].
-    on_collect: bool,
     /// Shared with every verb, so closing the handle is something they can all see.
     closed: Rc<Cell<bool>>,
 }
@@ -52,7 +50,6 @@ impl Handle {
             name,
             shown: None,
             closer: None,
-            on_collect: false,
             closed: Rc::new(Cell::new(false)),
         }
     }
@@ -93,11 +90,10 @@ impl Handle {
     /// Called at most once, and every verb refuses afterwards: a release that runs twice is a bug
     /// the caller cannot see, and so is a verb that acts on something already given up.
     ///
-    /// **The collector is not included by default**, which the shape of the API decides rather than
-    /// taste. `oslo.db.open` is written down — the handle is the point of the call — so a database
-    /// nobody kept is one nobody wants, and [`and_on_collect`](Self::and_on_collect) says so.
-    /// `oslo.spawn{…}` is written for its effect and its handle is usually dropped on the spot; a
-    /// `__gc` that cancelled would cancel nearly every spawn in the shell.
+    /// **`<close>` is the only way this runs.** `__gc` would be the obvious backstop for a handle
+    /// nobody closed, and the metatable would carry it — but luna does not run finalizers, so
+    /// setting one would be a promise nothing keeps. A handle left unclosed holds what it holds
+    /// until the session ends, which is what every handle did before this existed.
     pub(super) fn on_close(&mut self, name: &'static str, f: impl Fn() + 'static) -> &mut Self {
         let closed = Rc::clone(&self.closed);
         self.closer = Some(native(name, move |_, _| {
@@ -116,12 +112,6 @@ impl Handle {
     /// thing rather than `oslo.fs.tempdir: 0x…`.
     pub(super) fn shows(&mut self, text: impl Into<String>) -> &mut Self {
         self.shown = Some(text.into());
-        self
-    }
-
-    /// Run the closer for a handle nobody closed, when it is collected.
-    pub(super) fn and_on_collect(&mut self) -> &mut Self {
-        self.on_collect = true;
         self
     }
 
@@ -152,11 +142,6 @@ impl Handle {
             );
         }
         if let Some(closer) = self.closer {
-            // `__close` for `local h <close> = …`, and `__gc` as the backstop where a handle nobody
-            // kept is a handle nobody wants. The same function, and it runs once — see `on_close`.
-            if self.on_collect {
-                meta.set_str("__gc", closer.clone());
-            }
             meta.set_str("__close", closer);
         }
 

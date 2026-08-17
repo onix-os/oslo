@@ -6,14 +6,23 @@ API would look like if it had been designed after the switch rather than before 
 
 ## What the VM actually provides
 
-Measured against the shipped binary, not assumed — all fourteen pass:
+Measured against the shipped binary, not assumed — thirteen pass:
 
 | | | | |
 |---|---|---|---|
 | coroutines | `coroutine.wrap` | `goto`/labels | metatable `__index` |
-| `__close` (to-be-closed) | `__gc` finalizers | weak tables | `<const>` enforced |
-| `string.pack` | `utf8` | `//` integer division | `io.open` on a real file |
-| `os.date`/`os.time` | `debug.traceback` | | |
+| `__close` (to-be-closed) | weak tables | `<const>` enforced | `string.pack` |
+| `utf8` | `//` integer division | `io.open` on a real file | `os.date`/`os.time` |
+| `debug.traceback` | | | |
+
+And two do not, both to do with *when* things are released:
+
+* **`__gc` never fires.** `setmetatable({}, {__gc = …})` runs no finalizer, and `collectgarbage()`
+  frees nothing a native was holding onto. So there is no backstop for a handle nobody closes — see
+  §1, which is written around that.
+* **A generic `for` does not close its fourth value.** Lua 5.4 closes the loop's closing value on
+  `break` and on error; luna does not, which is what would otherwise have made
+  `for line in oslo.lines{…} do … break … end` reap its child.
 
 Plus, from luna 0.5.0 and not yet used by anything here: **frozen tables**, a **memory ceiling**,
 **typed userdata** (`UserRef`), and a **serde bridge** that can serialise a Lua value into any serde
@@ -57,17 +66,22 @@ db:set("last", os.date())
 database anyway. It does not: the verbs read their first real argument at position 2, so a dot call
 is `db:get: argument #2 must be a string, got no value`. The comment was stale.
 
-**Whether the collector closes too is per handle**, and the shape of the call decides it:
-
-| handle | `__close` | `__gc` |
-|---|---|---|
-| `oslo.db.open` | shuts the file — the store is held in one place all the verbs share | yes: the handle is the point of the call, and the session holds databases only weakly |
-| `oslo.spawn` | forgets the callback | no — a spawn's handle is usually dropped on the spot |
-| `oslo.after` / `oslo.every` | stops the timer | no — same reason |
-| `oslo.fs.mktempdir` | removes the directory | no — `remove_dir_all` on a path still in use is unrecoverable |
+| handle | what `<close>` does |
+|---|---|
+| `oslo.db.open` | shuts the file — the store is held in one place all the verbs share, and the session's map of open databases is weak so emptying it is enough |
+| `oslo.spawn` | forgets the callback |
+| `oslo.after` / `oslo.every` | stops the timer |
+| `oslo.fs.mktempdir` | removes the directory |
 
 `oslo.fs.mktempdir` answers a handle rather than a path as a result: `tmp.path` is the directory and
 `tostring(tmp)` is the same string, so it still reads as a path wherever one is wanted.
+
+**There is no `__gc` backstop, and this is a luna gap rather than a choice.** The table above says
+what the metatables would carry if finalizers ran; measured, they do not — `setmetatable({}, {__gc =
+…})` never fires, and `collectgarbage()` releases nothing a native was holding. So a handle nobody
+closes holds what it holds until the session ends, exactly as before. `<close>` is the whole of the
+improvement, and it is enough: 60 databases opened with `<close>` leave the process on 4 file
+descriptors, and 60 opened without leave it on 244.
 
 A file handle oslo does not yet have is the fifth — see §2.
 

@@ -23,9 +23,10 @@
 //! made — but they read their first real argument at position 2, so `db.get("k")` with a dot is a
 //! message rather than a silent read of the wrong key. See [`super::handle`].
 //!
-//! Closing shuts the file: the store is held in one place all the verbs share, and `__close` empties
-//! it. A `db` without `<close>` is still fine — the session holds databases only weakly, so one
-//! nobody keeps is released when it is collected.
+//! Closing shuts the file: the store is held in one place all the verbs share, `__close` empties it,
+//! and the session's own map of open databases is weak so that emptying is enough. A handle without
+//! `<close>` holds the file until the session ends — luna runs no finalizers, so there is no
+//! backstop and none is claimed.
 //!
 //! # Values are bytes
 //!
@@ -220,11 +221,9 @@ fn handle(name: &str, store: Rc<Store>) -> Value {
     // only a `Weak`. A second handle on the same name keeps its own, so this cannot shut a database
     // somebody else is still using.
     let it = Rc::clone(&held);
-    table
-        .on_close("oslo.db.close", move || {
-            it.borrow_mut().take();
-        })
-        .and_on_collect();
+    table.on_close("oslo.db.close", move || {
+        it.borrow_mut().take();
+    });
 
     table.build()
 }
