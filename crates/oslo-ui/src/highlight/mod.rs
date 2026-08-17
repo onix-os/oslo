@@ -226,6 +226,18 @@ fn command_token(name: &str, ctx: &Context<'_>) -> TokenType {
     if RUNS_AS_ANOTHER_USER.contains(&name) {
         return TokenType::Danger;
     }
+    // `\cmd` and `\\cmd` ask for the thing the shell's own name is standing in front of, so they
+    // must be resolved by what they will actually *reach* — not looked up with the backslash
+    // still on, which resolves to nothing and paints a working line as an error. The same bug
+    // `=cmd` has below, and the rules are `exec::simple::escape`'s table.
+    if let Some(rest) = name.strip_prefix(r"\\") {
+        // Only the builtin is skipped; a function by that name still answers.
+        return escaped_token(rest, ctx, true);
+    }
+    if let Some(rest) = name.strip_prefix('\\') {
+        // Alias, function and builtin all skipped — only a program on `$PATH` can answer.
+        return escaped_token(rest, ctx, false);
+    }
     if (ctx.is_builtin)(name) {
         return TokenType::Builtin;
     }
@@ -261,6 +273,35 @@ fn command_token(name: &str, ctx: &Context<'_>) -> TokenType {
             TokenType::Command
         } else {
             TokenType::Error
+        };
+    }
+    if CommandIndex::contains(ctx.path, name) {
+        TokenType::Command
+    } else {
+        TokenType::Error
+    }
+}
+
+/// What a backslash-escaped command word resolves to.
+///
+/// `functions_answer` is the difference between the two forms: `\\cmd` leaves a shell function in
+/// the running and `\cmd` does not. Neither can reach a builtin, so a name that is *only* a
+/// builtin — `\cd` on a machine with no `/usr/bin/cd` — is an error, and saying so is the point:
+/// that line will not run.
+fn escaped_token(name: &str, ctx: &Context<'_>, functions_answer: bool) -> TokenType {
+    if name.is_empty() {
+        return TokenType::Plain;
+    }
+    if RUNS_AS_ANOTHER_USER.contains(&name) {
+        return TokenType::Danger;
+    }
+    if functions_answer && (ctx.is_function)(name) {
+        return TokenType::Function;
+    }
+    if name.contains('/') {
+        return match which::which(name).is_ok() {
+            true => TokenType::Command,
+            false => TokenType::Error,
         };
     }
     if CommandIndex::contains(ctx.path, name) {
@@ -323,215 +364,5 @@ pub fn command_resolves(name: &str, path: &str, known: impl FnOnce(&str) -> bool
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    /// A context that answers from fixed sets, so classification is testable with no shell.
-    fn ctx<'a>(
-        builtins: &'a dyn Fn(&str) -> bool,
-        functions: &'a dyn Fn(&str) -> bool,
-        check_paths: bool,
-    ) -> Context<'a> {
-        Context {
-            path: "/nonexistent-zz",
-            is_builtin: builtins,
-            is_function: functions,
-            check_paths,
-        }
-    }
-
-    fn kinds(line: &str, ctx: &Context<'_>) -> Vec<(String, TokenType)> {
-        classify(&lex(line), ctx)
-            .into_iter()
-            .filter(|(_, t)| *t != TokenType::Plain)
-            .collect()
-    }
-
-    #[test]
-    fn a_command_resolves_to_one_of_four_colours() {
-        let builtins = |n: &str| n == "cd";
-        let functions = |n: &str| n == "deploy";
-        let c = ctx(&builtins, &functions, false);
-
-        assert_eq!(kinds("cd /tmp", &c)[0].1, TokenType::Builtin);
-        assert_eq!(kinds("deploy now", &c)[0].1, TokenType::Function);
-        // Nothing resolves it, so it is wrong — fish's most useful colour.
-        assert_eq!(kinds("nosuchcmd-zz x", &c)[0].1, TokenType::Error);
-        assert_eq!(kinds("if true; then fi", &c)[0].1, TokenType::Keyword);
-    }
-
-    /// An absolute path that is not there is as wrong as a name that is not there.
-    #[test]
-    fn a_path_command_is_checked_as_a_path() {
-        let no = |_: &str| false;
-        let c = ctx(&no, &no, false);
-        assert_eq!(kinds("/nonexistent-zz/prog x", &c)[0].1, TokenType::Error);
-        assert_eq!(kinds("/bin/sh -c x", &c)[0].1, TokenType::Command);
-    }
-
-    #[test]
-    fn options_and_parameters_are_told_apart() {
-        let no = |_: &str| false;
-        let c = ctx(&no, &no, false);
-        let seen = kinds("cmd -l --long plain", &c);
-        assert_eq!(seen[1].1, TokenType::Option);
-        assert_eq!(seen[2].1, TokenType::Option);
-        assert_eq!(seen[3].1, TokenType::Param);
-        // A bare `-` is a parameter, not an option: it means stdin to half the tools there are.
-        assert_eq!(kinds("cmd -", &c)[1].1, TokenType::Param);
-    }
-
-    /// The colour that tells you the file you named is really there.
-    #[test]
-    fn a_parameter_naming_a_real_file_is_marked() {
-        let dir = tempfile::tempdir().expect("tempdir");
-        let file = dir.path().join("here.txt");
-        std::fs::write(&file, b"x").expect("write");
-        let no = |_: &str| false;
-        let c = ctx(&no, &no, true);
-
-        let line = format!(
-            "cmd {} {}",
-            file.display(),
-            dir.path().join("gone").display()
-        );
-        let seen = kinds(&line, &c);
-        assert_eq!(seen[1].1, TokenType::ValidPath);
-        assert_eq!(seen[2].1, TokenType::Param);
-    }
-
-    /// A syscall per word per keystroke is exactly what the command index exists to avoid, so the
-    /// number of them is bounded rather than left to the length of the line.
-    #[test]
-    fn path_checking_is_capped_and_can_be_turned_off() {
-        let dir = tempfile::tempdir().expect("tempdir");
-        let mut names = Vec::new();
-        for i in 0..12 {
-            let f = dir.path().join(format!("f{i}"));
-            std::fs::write(&f, b"x").expect("write");
-            names.push(f.display().to_string());
-        }
-        let no = |_: &str| false;
-
-        let line = format!("cmd {}", names.join(" "));
-        let capped = kinds(&line, &ctx(&no, &no, true));
-        let marked = capped
-            .iter()
-            .filter(|(_, t)| *t == TokenType::ValidPath)
-            .count();
-        assert!(
-            marked <= MAX_PATH_CHECKS,
-            "{marked} paths checked, cap is {MAX_PATH_CHECKS}"
-        );
-
-        // And off entirely, nothing is stat'd.
-        let off = kinds(&line, &ctx(&no, &no, false));
-        assert!(off.iter().all(|(_, t)| *t != TokenType::ValidPath));
-    }
-
-    #[test]
-    fn every_lexical_role_reaches_a_colour() {
-        let no = |_: &str| false;
-        let c = ctx(&no, &no, false);
-        let seen = kinds(r#"echo "q" $V >f 2>&1 | wc; true & # note"#, &c);
-        let types: Vec<TokenType> = seen.iter().map(|(_, t)| *t).collect();
-        for wanted in [
-            TokenType::DoubleQuote,
-            TokenType::Variable,
-            TokenType::Redirection,
-            TokenType::Operator,
-            TokenType::End,
-            TokenType::Comment,
-        ] {
-            assert!(types.contains(&wanted), "{wanted:?} missing from {seen:?}");
-        }
-    }
-
-    #[test]
-    fn painting_reassembles_the_line_once_the_escapes_are_stripped() {
-        let _held = theme::held_at(theme::Depth::Ansi16);
-        let no = |_: &str| false;
-        let line = "echo 'a b' $HOME | wc -l";
-        let painted = paint(line, &ctx(&no, &no, false));
-        let stripped: String = {
-            let mut out = String::new();
-            let mut chars = painted.chars();
-            while let Some(ch) = chars.next() {
-                if ch != '\x1b' {
-                    out.push(ch);
-                    continue;
-                }
-                for c in chars.by_ref() {
-                    if c.is_ascii_alphabetic() {
-                        break;
-                    }
-                }
-            }
-            out
-        };
-        assert_eq!(stripped, line);
-    }
-
-    /// Strip the escapes from a painted line, leaving what the terminal actually shows.
-    fn shown(painted: &str) -> String {
-        let mut out = String::new();
-        let mut chars = painted.chars();
-        while let Some(ch) = chars.next() {
-            if ch != '\x1b' {
-                out.push(ch);
-                continue;
-            }
-            for c in chars.by_ref() {
-                if c.is_ascii_alphabetic() {
-                    break;
-                }
-            }
-        }
-        out
-    }
-
-    /// Danger padding preserves the source line's cell count.
-    #[test]
-    fn padding_sudo_does_not_change_a_single_column() {
-        let _held = theme::held_at(theme::Depth::Ansi16);
-        let no = |_: &str| false;
-        for line in [
-            "sudo ls",
-            "sudo",
-            "echo a && sudo ls -l",
-            "sudo  ls",
-            "  sudo ls",
-        ] {
-            assert_eq!(
-                shown(&paint(line, &ctx(&no, &no, false))),
-                line,
-                "the painted line must be the line"
-            );
-        }
-    }
-
-    /// And it really does widen the field, or the test above would pass on a no-op.
-    #[test]
-    fn the_red_field_reaches_past_the_word() {
-        let _held = theme::held_at(theme::Depth::Ansi16);
-        let no = |_: &str| false;
-        let mut tokens = classify(&lex("echo a && sudo ls"), &ctx(&no, &no, false));
-        pad_danger(&mut tokens);
-        let danger: Vec<&String> = tokens
-            .iter()
-            .filter(|(_, kind)| *kind == TokenType::Danger)
-            .map(|(text, _)| text)
-            .collect();
-        assert_eq!(danger, vec![" sudo "], "a space of red on each side");
-    }
-
-    #[test]
-    fn a_builtin_resolves_without_touching_the_disk() {
-        assert!(command_resolves("cd", "/nonexistent", |n| n == "cd"));
-        assert!(!command_resolves(
-            "definitely-not-a-command",
-            "/nonexistent",
-            |_| false
-        ));
-    }
-}
+#[path = "paint/tests.rs"]
+mod tests;
