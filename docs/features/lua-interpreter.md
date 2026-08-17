@@ -105,6 +105,13 @@ local tmp <close> = oslo.fs.mktempdir()      -- the directory is removed here
 `h:close()` is the same call as leaving a `<close>` scope, and answers whether it was the one that
 did the closing.
 
+**No handle sets `__gc`**, and the reason differs by kind. For a database, a file or a pipe there is
+nothing a finalizer would do that collection does not already: the verbs hold Rust values, and
+collecting the handle drops them. `<close>` buys the *moment*, not the release. For a spawn, a timer
+or a temporary directory a finalizer would be wrong — those handles are normally written for the
+effect and thrown away, so `__gc` would cancel the callback, stop the timer, and remove a directory
+whose path had been copied out.
+
 **Anything that iterates is lazy, and the iterator is a handle too.** A generic `for` needs
 something callable and a scope-bound release needs a metatable, so these carry `__call` — one value
 that works in both positions, rather than two returns a caller has to remember to keep together:
@@ -209,19 +216,12 @@ The standard library is complete enough that oslo's own tests no longer notice i
 `pairs` iterates in insertion order, recursion is bounded by a catchable error, and floats print as
 Lua 5.4 prints them.
 
-Five things remain, and one of them is oslo's own. **Two are about when things are released**, and
-they are why `<close>` is the only cleanup oslo's handles promise:
+Four things remain, and one of them is oslo's own:
 
-* **`__gc` never fires.** `setmetatable({}, {__gc = …})` runs no finalizer, and `collectgarbage()`
-  frees nothing a Rust binding was holding. So there is no backstop for a handle nobody closed: 60
-  databases opened with `<close>` leave the process on 4 file descriptors, and 60 opened without
-  leave it on 244.
 * **A generic `for` does not close its fourth value.** Lua 5.4 closes the loop's closing value when
   the loop ends, `break` and error included; luna does not. That is what would otherwise have made
   `for line in oslo.lines{…} do … break … end` reap its child by itself, and it is why the
   iterators oslo hands out are `__call`able handles you can also `<close>`.
-
-The other three:
 
 * **A runtime error is `userdata`, where Lua 5.4 raises a string.** `tostring(err)` reaches the
   message, so nothing is lost — but `err:find("…")`, the idiom for inspecting one, cannot index a

@@ -118,10 +118,13 @@ impl Handle {
     /// Called at most once, and every verb refuses afterwards: a release that runs twice is a bug
     /// the caller cannot see, and so is a verb that acts on something already given up.
     ///
-    /// **`<close>` is the only way this runs.** `__gc` would be the obvious backstop for a handle
-    /// nobody closed, and the metatable would carry it — but luna does not run finalizers, so
-    /// setting one would be a promise nothing keeps. A handle left unclosed holds what it holds
-    /// until the session ends, which is what every handle did before this existed.
+    /// **No handle sets `__gc`, and the reason is different for the two halves of the list.**
+    /// Finalizers do run — but for a database, a file or a pipe there is nothing for one to do: the
+    /// verbs hold Rust values, and collecting the handle drops them, which shuts the descriptor
+    /// without any Lua being involved. `<close>` buys *promptness*, not the release itself. For a
+    /// spawn, a timer or a temporary directory a finalizer would be actively wrong: their handles
+    /// are normally written for the effect and thrown away, so `__gc` would cancel the callback,
+    /// stop the timer and `remove_dir_all` a path somebody had copied out.
     /// It is also the `close` verb, so `h:close()` and leaving a `<close>` scope are the same thing
     /// rather than two things a caller has to know are the same. Registered directly, without the
     /// refusal every other verb gets: closing twice is not a mistake worth an error.

@@ -25,8 +25,8 @@
 //!
 //! Closing shuts the file: the store is held in one place all the verbs share, `__close` empties it,
 //! and the session's own map of open databases is weak so that emptying is enough. A handle without
-//! `<close>` holds the file until the session ends — luna runs no finalizers, so there is no
-//! backstop and none is claimed.
+//! `<close>` is released when it is collected — the same weak map is what makes that work, with no
+//! `__gc` involved. `<close>` buys the *moment*, which is what matters when a config opens sixty.
 //!
 //! # Values are bytes
 //!

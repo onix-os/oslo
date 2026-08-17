@@ -6,22 +6,24 @@ API would look like if it had been designed after the switch rather than before 
 
 ## What the VM actually provides
 
-Measured against the shipped binary, not assumed — thirteen pass:
+Measured against the shipped binary, not assumed — all fourteen pass:
 
 | | | | |
 |---|---|---|---|
 | coroutines | `coroutine.wrap` | `goto`/labels | metatable `__index` |
-| `__close` (to-be-closed) | weak tables | `<const>` enforced | `string.pack` |
-| `utf8` | `//` integer division | `io.open` on a real file | `os.date`/`os.time` |
-| `debug.traceback` | | | |
+| `__close` (to-be-closed) | `__gc` finalizers | weak tables | `<const>` enforced |
+| `string.pack` | `utf8` | `//` integer division | `io.open` on a real file |
+| `os.date`/`os.time` | `debug.traceback` | | |
 
-And two do not, both to do with *when* things are released:
+`__gc` is the one that is easy to measure wrongly, and I did: the collector is incremental, so two
+`collectgarbage()` calls prove nothing. With enough collection finalizers run, and so do the `Drop`s
+of the Rust values a native was holding — 60 databases opened and abandoned take the process to 244
+file descriptors and back to 4 once the collector has been through.
 
-* **`__gc` never fires.** `setmetatable({}, {__gc = …})` runs no finalizer, and `collectgarbage()`
-  frees nothing a native was holding onto. So there is no backstop for a handle nobody closes — see
-  §1, which is written around that.
-* **A generic `for` does not close its fourth value.** Lua 5.4 closes the loop's closing value on
-  `break` and on error; luna does not, which is what would otherwise have made
+One thing does not work:
+
+* **A generic `for` does not close its fourth value.** Lua 5.4 closes the loop's closing value when
+  the loop ends, `break` and error included; luna does not, which is what would otherwise have made
   `for line in oslo.lines{…} do … break … end` reap its child.
 
 Plus, from luna 0.5.0 and not yet used by anything here: **frozen tables**, a **memory ceiling**,
@@ -76,12 +78,13 @@ is `db:get: argument #2 must be a string, got no value`. The comment was stale.
 `oslo.fs.mktempdir` answers a handle rather than a path as a result: `tmp.path` is the directory and
 `tostring(tmp)` is the same string, so it still reads as a path wherever one is wanted.
 
-**There is no `__gc` backstop, and this is a luna gap rather than a choice.** The table above says
-what the metatables would carry if finalizers ran; measured, they do not — `setmetatable({}, {__gc =
-…})` never fires, and `collectgarbage()` releases nothing a native was holding. So a handle nobody
-closes holds what it holds until the session ends, exactly as before. `<close>` is the whole of the
-improvement, and it is enough: 60 databases opened with `<close>` leave the process on 4 file
-descriptors, and 60 opened without leave it on 244.
+**No handle sets `__gc`**, and the reason differs by kind. For a database, a file or a pipe there is
+nothing a finalizer would do that collection does not already: the verbs hold Rust values, and
+collecting the handle drops them, which shuts the descriptor with no Lua involved. `<close>` buys the
+*moment*, which is what matters when a config opens sixty. For a spawn, a timer or a temporary
+directory a finalizer would be actively wrong — those handles are normally written for the effect
+and thrown away, so `__gc` would cancel the callback, stop the timer, and `remove_dir_all` a path
+somebody had copied out.
 
 A file handle oslo does not yet have is the fifth — see §2.
 
