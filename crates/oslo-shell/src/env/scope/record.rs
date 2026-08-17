@@ -25,6 +25,39 @@ impl Environment {
         self.published_line = line;
     }
 
+    /// Where a diagnostic about the command now running should say it came from.
+    ///
+    /// ```text
+    /// script.sh: line 4: nosuchcommand: command not found     in a script
+    /// oslo: nosuchcommand: command not found                  at a prompt, or under -c
+    /// ```
+    ///
+    /// **Because a script that fails should say where.** Every diagnostic oslo printed began
+    /// `oslo: `, so a failure in a two-hundred-line script named the shell and the command and
+    /// nothing about *which line* — the one thing the person fixing it needs. Every other shell
+    /// answers with the file and the line, and `$LINENO` was already being published at each
+    /// command boundary, so both halves of the answer were there and unused.
+    ///
+    /// **Only for a file**, which is the whole of the condition. A prompt has no line worth
+    /// naming — every typed command is line one — and `-c` has no file, so both keep the plain
+    /// `oslo: ` that a reader already associates with the shell talking about itself. That is also
+    /// what bash does. A sourced file names *itself* rather than its includer — see
+    /// [`Environment::enter_source_file`].
+    pub fn origin(&self) -> String {
+        // `script_frames` is pushed only for a file — `main` for a script, `source` for a sourced
+        // one — and nothing is pushed for `-c` or for standard input. See `enter_script_frame`.
+        if self.script_frames.is_empty() {
+            return "oslo: ".to_string();
+        }
+        // Zero means nothing has published a line yet: a command the shell built for itself, a
+        // `$(…)` body re-lexed into a list. Naming the file alone is still better than naming
+        // neither, and inventing a line would be worse than both.
+        if self.published_line == 0 {
+            return format!("{}: ", self.current_file());
+        }
+        format!("{}: line {}: ", self.current_file(), self.published_line)
+    }
+
     /// Record every stage of a pipeline's exit status, left to right. A one-command pipeline
     /// records a single status, as bash's `PIPESTATUS` does.
     ///

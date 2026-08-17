@@ -490,7 +490,7 @@ pub fn eval_command(env: &mut Environment, command: &Command) -> Result<i32> {
             // the next command still runs. Propagating the error here made it fatal, which is the
             // one thing bash reserves for a special builtin in POSIX mode.
             if let Err(e) = guard.apply(env, redirections) {
-                return Ok(report_redirect_failure(&e));
+                return Ok(report_redirect_failure(&env.origin(), &e));
             }
             eval_compound_command(env, kind)
         }

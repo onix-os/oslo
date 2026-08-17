@@ -308,7 +308,7 @@ fn run_builtin(
         RedirectGuard::new()
     };
     if let Err(e) = guard.apply(env, redirections) {
-        return posix::redirect_failure(env, name, report_redirect_failure(&e));
+        return posix::redirect_failure(env, name, report_redirect_failure(&env.origin(), &e));
     }
     let result = execute_builtin(env, name, words);
     posix::resolve_builtin_result(env, name, result)
@@ -475,9 +475,9 @@ fn report_unrunnable(
     if let Err(e) = guard.apply(env, redirections) {
         // The redirection failed too. That is the failure the user has to fix first, and it is
         // the one bash reports here as well.
-        return Ok(report_redirect_failure(&e));
+        return Ok(report_redirect_failure(&env.origin(), &e));
     }
-    eprintln!("oslo: {}: {}", cmd_name, reason);
+    eprintln!("{}{}: {}", env.origin(), cmd_name, reason);
     Ok(status)
 }
 
@@ -495,7 +495,7 @@ fn call_function(
     if let Err(e) = guard.apply(env, redirections) {
         // The body does not run at all: `f < /nonexistent` is a failed command, not a call whose
         // stdin happens to be the shell's.
-        return Ok(report_redirect_failure(&e));
+        return Ok(report_redirect_failure(&env.origin(), &e));
     }
 
     let old_pos = env.swap_positional(words[1..].to_vec());
@@ -523,8 +523,8 @@ fn call_function(
 /// decides whether the shell survives it. Callers on a path that cannot be a special builtin —
 /// a function, a compound, an external command, a command word with no builtin behind it — use
 /// this answer directly, because for them the question never arises.
-pub(crate) fn report_redirect_failure(err: &ShellError) -> i32 {
-    eprintln!("oslo: {}", err);
+pub(crate) fn report_redirect_failure(origin: &str, err: &ShellError) -> i32 {
+    eprintln!("{origin}{err}");
     1
 }
 
@@ -540,7 +540,7 @@ fn apply_wordless_redirections(env: &mut Environment, redirections: &[Redirectio
     let mut guard = RedirectGuard::new();
     match guard.apply(env, redirections) {
         Ok(()) => 0,
-        Err(e) => report_redirect_failure(&e),
+        Err(e) => report_redirect_failure(&env.origin(), &e),
     }
 }
 

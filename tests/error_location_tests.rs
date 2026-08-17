@@ -1,0 +1,159 @@
+//! Where a diagnostic says it came from.
+//!
+//! A script that fails should name the file and the line, because that is the one thing the person
+//! fixing it needs and the one thing every other shell already tells them. oslo prefixed every
+//! diagnostic with `oslo: ` instead, so a failure two hundred lines into a script named the shell
+//! and the command and nothing about *where*.
+//!
+//! The rule is bash's: a file gets `name: line N: `, and a prompt or a `-c` gets `oslo: ` — those
+//! have no line worth naming, since every typed command is line one.
+
+mod common;
+
+use common::oslo_bin;
+use std::process::{Command, Stdio};
+
+/// Run `script` as a file and answer what reached stderr, with the temporary path shortened to the
+/// bare filename so a case can assert on it.
+#[track_caller]
+fn in_a_file(script: &str) -> String {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let path = dir.path().join("case.sh");
+    std::fs::write(&path, script).expect("write script");
+    let out = Command::new(oslo_bin())
+        .arg(&path)
+        .current_dir(dir.path())
+        .env("HOME", dir.path())
+        .env_remove("ENV")
+        .stdin(Stdio::null())
+        .output()
+        .expect("spawn oslo");
+    String::from_utf8_lossy(&out.stderr)
+        .replace(&path.to_string_lossy().to_string(), "case.sh")
+        .trim_end()
+        .to_string()
+}
+
+/// The same source through `-c`, which has no file.
+#[track_caller]
+fn with_dash_c(script: &str) -> String {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let out = Command::new(oslo_bin())
+        .arg("-c")
+        .arg(script)
+        .current_dir(dir.path())
+        .env("HOME", dir.path())
+        .env_remove("ENV")
+        .stdin(Stdio::null())
+        .output()
+        .expect("spawn oslo");
+    String::from_utf8_lossy(&out.stderr).trim_end().to_string()
+}
+
+/// **The line is the line the command is on**, not the line the script ends on.
+#[test]
+fn a_command_that_is_not_there_names_the_file_and_the_line() {
+    let seen = in_a_file("echo one\n\n\nnosuchcommand_xyz\necho two\n");
+    assert_eq!(
+        seen,
+        "case.sh: line 4: nosuchcommand_xyz: command not found"
+    );
+}
+
+#[test]
+fn a_file_that_cannot_be_run_names_where_it_was_run_from() {
+    let seen = in_a_file("echo one\n/etc/passwd\n");
+    assert!(seen.starts_with("case.sh: line 2: /etc/passwd: "), "{seen}");
+}
+
+/// `cd` is a builtin and had its own diagnostic; it has to carry the location too, or the rule is
+/// one a reader cannot rely on.
+#[test]
+fn a_builtin_that_fails_names_the_file_and_the_line() {
+    let seen = in_a_file("echo one\necho two\ncd /nonexistent-dir-xyz\n");
+    assert!(seen.starts_with("case.sh: line 3: cd: "), "{seen}");
+}
+
+/// A redirection that cannot be opened is the command's failure, and is reported the same way.
+#[test]
+fn a_redirection_that_fails_names_the_file_and_the_line() {
+    let seen = in_a_file("echo one\ncat < /nonexistent-zz\n");
+    assert!(seen.starts_with("case.sh: line 2: "), "{seen}");
+    assert!(seen.contains("/nonexistent-zz"), "{seen}");
+}
+
+/// **Every line, not just the first.** The number comes from `$LINENO`, which is republished at
+/// each command boundary — a version that reported the same line twice would look right on any
+/// one-failure test.
+#[test]
+fn each_failure_names_its_own_line() {
+    let seen = in_a_file("nosuch_a\necho middle\nnosuch_b\n\nnosuch_c\n");
+    let lines: Vec<&str> = seen.lines().collect();
+    assert_eq!(lines.len(), 3, "{seen}");
+    assert!(
+        lines[0].starts_with("case.sh: line 1: nosuch_a: "),
+        "{seen}"
+    );
+    assert!(
+        lines[1].starts_with("case.sh: line 3: nosuch_b: "),
+        "{seen}"
+    );
+    assert!(
+        lines[2].starts_with("case.sh: line 5: nosuch_c: "),
+        "{seen}"
+    );
+}
+
+/// A line inside a loop is the line of the command, however many times it runs.
+#[test]
+fn a_line_inside_a_loop_is_the_commands_own() {
+    let seen = in_a_file("for i in 1 2; do\n  nosuchcommand_xyz\ndone\n");
+    for line in seen.lines() {
+        assert!(line.starts_with("case.sh: line 2: "), "{seen}");
+    }
+    assert_eq!(seen.lines().count(), 2, "{seen}");
+}
+
+/// **`-c` keeps `oslo: `**, because there is no file to name — and that is what bash does too.
+#[test]
+fn dash_c_has_no_file_and_says_so_the_old_way() {
+    let seen = with_dash_c("nosuchcommand_xyz");
+    assert_eq!(seen, "oslo: nosuchcommand_xyz: command not found");
+}
+
+#[test]
+fn dash_c_keeps_the_old_prefix_for_a_builtin_too() {
+    let seen = with_dash_c("cd /nonexistent-dir-xyz");
+    assert!(seen.starts_with("oslo: cd: "), "{seen}");
+}
+
+/// A sourced file names *itself*, not the script that sourced it, and the line is its own.
+///
+/// **Not by swapping `$0`**, which stays the outer script — POSIX says a sourced file shares the
+/// caller's positional parameters and `$0` is one of them, and bash agrees. The location is tracked
+/// separately; both halves were checked against bash 5.3.9.
+#[test]
+fn a_sourced_file_names_itself() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let inner = dir.path().join("inner.sh");
+    std::fs::write(&inner, "echo inner\nnosuchcommand_xyz\n").expect("write inner");
+    let outer = dir.path().join("outer.sh");
+    std::fs::write(&outer, format!("echo outer\n. {}\n", inner.display())).expect("write outer");
+
+    let out = Command::new(oslo_bin())
+        .arg(&outer)
+        .current_dir(dir.path())
+        .env("HOME", dir.path())
+        .env_remove("ENV")
+        .stdin(Stdio::null())
+        .output()
+        .expect("spawn oslo");
+    let seen = String::from_utf8_lossy(&out.stderr)
+        .replace(&inner.to_string_lossy().to_string(), "inner.sh")
+        .trim_end()
+        .to_string();
+    assert!(
+        seen.starts_with("inner.sh: line 2: nosuchcommand_xyz: "),
+        "{seen}"
+    );
+}

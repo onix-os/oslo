@@ -133,6 +133,9 @@ pub struct Environment {
     /// sentinel pushed there would make `caller` answer yes at the top level of every script, and
     /// the `while caller $i` idiom depends on it answering no.
     script_frames: Vec<String>,
+    /// The files whose commands are running, innermost last — for a diagnostic's location only.
+    /// See [`Environment::enter_source_file`].
+    source_files: Vec<String>,
     /// How deep the current `source`/`eval` chain is.
     script_depth: DepthGuard,
     /// The `set -e`/`set -o pipefail` options. Read through the accessors in the `options`
@@ -187,6 +190,7 @@ impl Environment {
             function_depth: DepthGuard::new(MAX_FUNCTION_DEPTH),
             call_stack: Vec::new(),
             script_frames: Vec::new(),
+            source_files: Vec::new(),
             script_depth: DepthGuard::new(MAX_SCRIPT_DEPTH),
             options: ShellOptions::default(),
         };

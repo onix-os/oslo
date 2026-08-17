@@ -256,15 +256,19 @@ fn refused(from: &str, to: &str) -> bool {
     )
 }
 
-/// The diagnostic a failed move prints, naming `caller`.
+/// The diagnostic a failed move prints, naming `caller`, after `origin` — see
+/// [`Environment::origin`](crate::env::Environment::origin).
 ///
 /// Split out so that a caller which tried something else after the failure can still emit the
 /// original error, unchanged, when the something else came to nothing too.
-pub fn report_failure(caller: &str, operand: &str, e: &io::Error) {
+pub fn report_failure(origin: &str, caller: &str, operand: &str, e: &io::Error) {
     if operand.is_empty() {
-        eprintln!("oslo: {caller}: {NULL_DIRECTORY}");
+        eprintln!("{origin}{caller}: {NULL_DIRECTORY}");
     } else {
-        eprintln!("oslo: {caller}: {operand}: {}", oslo_base::error::reason(e));
+        eprintln!(
+            "{origin}{caller}: {operand}: {}",
+            oslo_base::error::reason(e)
+        );
     }
 }
 
@@ -281,7 +285,7 @@ pub fn change_directory(
     match attempt_directory(env, operand, mode) {
         Ok(destination) => Some(destination),
         Err(e) => {
-            report_failure(caller, operand, &e);
+            report_failure(&env.origin(), caller, operand, &e);
             None
         }
     }

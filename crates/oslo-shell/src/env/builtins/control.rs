@@ -196,6 +196,8 @@ pub fn builtin_source(env: &mut Environment, args: &[String]) -> Result<i32> {
     // `$FUNCNAME`'s outermost entry, as bash spells it: a function called from a sourced file
     // reads `f source`. `eval` gets none, and bash gives it none either.
     env.enter_script_frame("source");
+    // And the file itself, so a failure inside it names it rather than the script that sourced it.
+    env.enter_source_file(file_path);
     let result =
         match crate::syntax::parse_with_aliases(&content, !env.get_aliases().is_empty(), &|n| {
             env.get_alias(n).map(str::to_string)
@@ -208,6 +210,7 @@ pub fn builtin_source(env: &mut Environment, args: &[String]) -> Result<i32> {
                 Ok(2)
             }
         };
+    env.exit_source_file();
     env.exit_script_frame();
     env.exit_nested_script();
 

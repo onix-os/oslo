@@ -133,7 +133,7 @@ pub fn builtin_cd(env: &mut Environment, args: &[String]) -> Result<i32> {
             }
             // Nothing else worked, so the original failure is the answer — the same message from
             // the same place it has always come from.
-            report_failure("cd", &target, &e);
+            report_failure(&env.origin(), "cd", &target, &e);
             Ok(1)
         }
     }

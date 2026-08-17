@@ -101,7 +101,7 @@ pub(crate) fn run_external(
                 // whole table — so the guard saves no copies for the new program to inherit.
                 let mut guard = RedirectGuard::for_exec();
                 if let Err(e) = guard.apply(env, redirections) {
-                    std::process::exit(report_redirect_failure(&e));
+                    std::process::exit(report_redirect_failure(&env.origin(), &e));
                 }
 
                 let failed = nix::unistd::execv(&c_path, &c_args);

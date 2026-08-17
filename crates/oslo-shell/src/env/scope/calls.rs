@@ -88,6 +88,30 @@ impl Environment {
         self.publish_call_stack();
     }
 
+    /// Note the file whose commands are about to run, for a diagnostic's location.
+    ///
+    /// **Its own stack rather than `$0`.** A diagnostic from inside a sourced file names *that*
+    /// file — bash reports `inner.sh: line 4:` for a failure there, not the script that sourced it
+    /// — but `$0` deliberately does *not* change across `source`, because POSIX says a sourced
+    /// file shares the caller's positional parameters and `$0` is one of them. Swapping
+    /// `shell_name` would have made the message right and `$0` wrong.
+    ///
+    /// A stack because a sourced file may source another, and the innermost is the one a failure
+    /// belongs to. See [`Environment::origin`](crate::env::Environment::origin).
+    pub fn enter_source_file(&mut self, path: &str) {
+        self.source_files.push(path.to_string());
+    }
+
+    /// Leave the file [`Self::enter_source_file`] pushed.
+    pub fn exit_source_file(&mut self) {
+        self.source_files.pop();
+    }
+
+    /// The file a diagnostic should name: the innermost sourced one, or `$0` for the script itself.
+    pub(crate) fn current_file(&self) -> &str {
+        self.source_files.last().unwrap_or(&self.shell_name)
+    }
+
     /// The shell functions currently executing, innermost last.
     ///
     /// A frame entered through [`Self::enter_function`] rather than
