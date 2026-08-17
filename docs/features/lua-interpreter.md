@@ -390,7 +390,7 @@ The standard library is complete enough that oslo's own tests no longer notice i
 `pairs` iterates in insertion order, recursion is bounded by a catchable error, and floats print as
 Lua 5.4 prints them.
 
-Four things remain, and one of them is oslo's own:
+Two things remain, both the VM's:
 
 * **A generic `for` does not close its fourth value.** Lua 5.4 closes the loop's closing value when
   the loop ends, `break` and error included; luna does not. That is what would otherwise have made
@@ -401,20 +401,23 @@ Four things remain, and one of them is oslo's own:
   message, so nothing is lost — but `err:find("…")`, the idiom for inspecting one, cannot index a
   userdata. `error("…")` and `require`'s "module not found" are already strings; it is the errors
   the VM itself raises that are not.
-* **`require` does not detect a module that requires itself.** Reference Lua marks a module as in
-  progress and reports `loop or previous error loading module`; here the recursion runs to the call
-  depth limit and reports a stack overflow instead. It stops, catchably — it just says the wrong
-  thing about why.
-* **`os.setlocale` is absent**, the last of the standard names. Nothing in a shell reaches for it.
+Neither is reachable from ordinary shell use.
 
-Neither of the first two is reachable from ordinary shell use.
+**Three that used to be here are gone**, and what they cost is worth recording. `require` now marks
+a module as in progress and reports `loop or previous error in loading module 'x'` rather than
+recursing to a stack overflow; `os.setlocale` exists and answers for `C`, which on a static
+musl-linked binary is not merely the current locale but the only one — both in
+`crates/oslo-runtime/src/lua/api/policy.rs`. And a name assigned a table and then a string *does*
+move back to the shell now: a script's non-string globals are kept in a table beside `_G` rather
+than in it, so the name never lands there and `__newindex` keeps firing — see
+[`globals`](#what-makes-it-different).
 
-**The third is `_ENV`, and it belongs here rather than to the VM.** A name assigned a table and then
-a string stays in `_G` instead of moving to the shell, because the globals metatable's `__newindex`
-does not fire for a name `_G` already has — see [`globals`](#what-makes-it-different). Expressing
-the rule exactly needs an always-empty `_ENV` proxy with the real names in a backing table, which
-`Closure::load_with_env` makes possible; it costs a metamethod on every global access, which is why
-it has not been done for one test.
+That last one has a price, paid deliberately: reading a script's own table global is a metamethod
+rather than a raw hit, and `rawget(_G, "x")` and `pairs(_G)` no longer see script globals, there
+being no `__pairs` in Lua 5.4 to intercept. The standard library is untouched by both, since those
+names really are in `_G`. The alternative — an always-empty `_ENV` with everything in a backing
+table, which `Closure::load_with_env` makes possible — has no raw-access divergence at all and
+costs a metamethod on *every* global read, `print` included.
 
 **Three names oslo refuses on purpose**, and those are not gaps — see
 `crates/oslo-runtime/src/lua/api/policy.rs`. `os.execute` and `io.popen` would run their argument

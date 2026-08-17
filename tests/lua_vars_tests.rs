@@ -99,41 +99,67 @@ fn a_non_string_global_stays_in_lua() {
     assert_eq!(out, "table\t3\nnil");
 }
 
-/// A name lives in exactly one of the two homes, so becoming a table moves it out of the shell.
+/// A name lives in exactly one of the two homes, so changing its type moves it.
+///
+/// **Both directions.** Going *to* a table always worked; coming back did not — a name that had
+/// held a non-string was in `_G` from then on, and `__newindex`, the only thing that sends a
+/// string to the shell, does not fire for a name `_G` already has. `x = {}` then `x = "s"` left
+/// `$x` unset, and that was written down in two places as a divergence oslo lived with.
+///
+/// It lives with it no longer: a script's tables are kept *beside* `_G` rather than in it, so the
+/// name never lands there and the metamethod keeps firing. See `crates/oslo-luavm/src/globals.rs`.
 #[test]
-fn a_name_that_becomes_a_table_leaves_no_copy_in_the_shell() {
+fn a_name_that_changes_type_moves_rather_than_leaving_a_copy() {
     let out = lua(r#"
         x = "a string"
         print(oslo.env.get("x"), type(x))
         x = {1, 2}
         -- The shell variable is gone, not stale.
         print(oslo.env.get("x"), type(x))
+        x = "back to a string"
+        print(oslo.env.get("x"), type(x))
     "#);
-    assert_eq!(out, "a string\tstring\nnil\ttable");
+    assert_eq!(
+        out,
+        "a string\tstring\nnil\ttable\nback to a string\tstring"
+    );
 }
 
-/// **The divergence, asserted rather than wished away.**
-///
-/// Going the other way does *not* move the name back: once it has held a non-string it lives in
-/// `_G`, and `__newindex` — which is the only thing that sends a string to the shell — does not
-/// fire for a name `_G` already has. So `x = {}` then `x = "s"` leaves `$x` unset.
-///
-/// This is written down in `crates/oslo-luavm/src/globals.rs` and in
-/// `docs/features/lua-interpreter.md`, both of which call it a known divergence from the tree
-/// walker that came before. This case used to assert the behaviour those two files say oslo does
-/// not have, so it could only ever fail; what it guards now is that the divergence stays the shape
-/// it is documented to be, rather than quietly becoming some third thing.
-///
-/// **If this starts failing, the gap was closed** — assert the better behaviour here and take the
-/// paragraph out of both files.
+/// The same round trip through a function, which is the other thing a shell variable cannot hold.
 #[test]
-fn a_name_that_has_held_a_table_stays_in_lua_afterwards() {
+fn a_function_global_gives_the_name_back_when_it_becomes_a_string() {
     let out = lua(r#"
-        x = {1, 2}
-        x = "back to a string"
-        print(oslo.env.get("x"), type(x), x)
+        f = function() return 7 end
+        print(f(), oslo.env.get("f"))
+        f = "now a string"
+        print(oslo.env.get("f"), type(f))
+        f = nil
+        print(oslo.env.get("f"), type(f))
     "#);
-    assert_eq!(out, "nil\tstring\tback to a string");
+    assert_eq!(out, "7\tnil\nnow a string\tstring\nnil\tnil");
+}
+
+/// **What keeping them beside `_G` costs**, pinned so it is a decision rather than a surprise.
+///
+/// A script's own globals are not raw-visible: `rawget` and `pairs` go straight to the table and
+/// there is no `__pairs` in Lua 5.4 to intercept them. The standard library is unaffected — those
+/// names really are in `_G` — and nothing in oslo enumerates `_G`, which is the reason this is the
+/// cheaper half of the trade. See the module docs in `crates/oslo-luavm/src/globals.rs`.
+#[test]
+fn a_script_global_is_reachable_but_not_raw_visible() {
+    let out = lua(r#"
+        held = {1}
+        -- Ordinary reads find it, through the metatable.
+        print("read", held[1], _G.held[1])
+        -- Raw ones do not, and neither does walking _G.
+        print("raw", rawget(_G, "held"))
+        local seen = false
+        for name in pairs(_G) do if name == "held" then seen = true end end
+        print("walked", seen)
+        -- The standard library is still exactly where Lua expects it.
+        print("stdlib", rawget(_G, "print") ~= nil)
+    "#);
+    assert_eq!(out, "read\t1\t1\nraw\tnil\nwalked\tfalse\nstdlib\ttrue");
 }
 
 #[test]
