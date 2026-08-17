@@ -162,61 +162,11 @@ together.
 
 A child killed by SIGQUIT is treated the same way, for the same reason.
 
-### Taking the terminal back from a job that will not give it up
-
-```lua
-oslo.misc.interrupt_escape = 3      -- off by default; the short form of the table below
-oslo.misc.interrupt_escape = { after = 3, action = "stop", notify = true }
-```
-
-`action` is `stop`, `kill`, `hup` or `quit`. `notify` decides whether the press *before* the last
-says what the next one will do — on by default, because two Ctrl-C into a job that is ignoring them
-is exactly when somebody is deciding whether anything is listening at all.
-
-Reading the wait status is enough for a job that *dies*. It is no use at all for one that does not:
-
-```sh
- -c 'trap "" INT; sleep 300'
-^C ^C ^C          nothing, and nothing can — the shell is not being signalled
-```
-
-The shell is outside the group the kernel is signalling, so something has to *observe* the interrupt
-and act, and the only way to observe it is to be in that group. With the setting on, oslo forks
-**one small process per interactive session** — a sentinel — which joins whichever group owns the
-terminal and counts the interrupts. On the *n*th it leaves the group and sends it `SIGSTOP`.
-
-**Stopped, not killed**, and that is most of the value. `SIGSTOP` cannot be caught or ignored, so it
-works on exactly the programs this exists for; `waitpid` already returns `Stopped`, so the shell's
-own Ctrl-Z path takes over and the job lands in the job table. You get a prompt back and `fg`, `bg`
-and `kill %1` all work on what is left — the decision about a job that will not listen stays with
-you. It also means no new signal is aimed at the shell, so there is nothing for a `trap` to collide
-with.
-
-Leaving with a job stopped is then its own question, and `exit` asks it: the first one warns and
-stays, the second leaves. A job the shell stopped *for* you is precisely the one you would otherwise
-walk away from without knowing.
-
-**Off by default**, because it costs a helper process and changes what Ctrl-C means. Nothing is
-forked in a shell that has not asked. Two presses change nothing, a job that does not trap the
-interrupt still dies of the first, and all of it is tested on a real pty.
-
-A config can watch it happen and ask about it:
-
-```lua
-oslo.on["on-job-escalated"](function(e)
-  -- e.action ("stopped"), e.presses, e.pgid, e.signal, e.text
-end)
-
-oslo.job.watcher()   -- { after = 3, action = "stop", notify = true, running = true }
-```
-
-`watcher()` reports whether anything is actually *doing* it as well as what was configured — the two
-come apart in a shell with no job control, where nothing is forked and Ctrl-C means what it always
-did.
-
-What it cannot do is rescue a process wedged in an uninterruptible kernel call — `SIGSTOP` waits for
-the syscall to return exactly as `SIGKILL` does. Nothing can, and it is worth knowing which case you
-are in.
+Reading the wait status is enough for a job that *dies*, and no use at all for one that does not —
+`sh -c 'trap "" INT; sleep 300'` takes the terminal and keeps it. Opting into
+`oslo.misc.interrupt_escape` puts a watcher inside the job's process group so a repeated Ctrl-C has
+somewhere to land; see [the job that will not take a Ctrl-C](interrupt-escape.md). Off by default,
+and a shell that has not asked for it behaves exactly as this section describes.
 
 ## What makes it different
 

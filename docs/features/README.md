@@ -89,6 +89,7 @@ scripts/demo/embed.sh                            # put the players back in the d
 |---|---|
 | [Structured pipelines](structured-pipelines.md) | Rows for the next stage, text for you — decided before anything runs |
 | [POSIX, where it counts](posix-fidelity.md) | What a script is guaranteed, and the corpus that proves it |
+| [The job that will not take a Ctrl-C](interrupt-escape.md) | Why the shell never sees the keystroke, and the watcher that does |
 
 ## Typing
 
