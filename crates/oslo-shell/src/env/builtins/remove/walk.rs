@@ -134,6 +134,9 @@ pub fn remove_tree(root: &Path, shown: &str, walk: &Walk) -> Outcome {
         return done(report(std::fs::remove_dir(root), shown, true, walk), false);
     }
 
+    // Held for the whole descent — see `Descriptors`.
+    let _budget = Descriptors::widened();
+
     let level = match open_dir(None, root, walk, shown) {
         Ok(level) => level,
         Err(()) => return done(1, false),
@@ -171,6 +174,54 @@ pub fn remove_tree(root: &Path, shown: &str, walk: &Walk) -> Outcome {
     done(failures, interrupted)
 }
 
+/// The soft descriptor limit, raised to the hard one for as long as a descent needs it.
+///
+/// # Why this is here at all
+///
+/// Traversing by descriptor costs one descriptor per level currently open, and there is no way
+/// around that for a walk that happens *inside* the shell: the alternative is `fchdir`, which is
+/// how GNU's `rm` keeps the cost at one — and which a builtin cannot use, because the working
+/// directory it would be moving is the shell's own. `std::fs::remove_dir_all` pays the same cost
+/// and fails the same way, measured: a 1500-deep tree under `ulimit -n 1024` defeats both, and
+/// removes nothing.
+///
+/// Raising the *soft* limit to the hard one is something any process may do, and is what makes the
+/// difference between "no" and "yes" for every depth anyone will really meet — a typical hard
+/// limit is half a million. It is put back on the way out, so `ulimit -n` reports what it always
+/// did and nothing the shell runs afterwards can tell this happened. Nothing is spawned during a
+/// walk, so there is no child to inherit the raised limit in between.
+struct Descriptors(Option<rlimit::Rlimit>);
+
+/// The pair `getrlimit` answers, kept in its own type so the guard reads as what it restores.
+mod rlimit {
+    pub type Rlimit = (nix::sys::resource::rlim_t, nix::sys::resource::rlim_t);
+}
+
+impl Descriptors {
+    fn widened() -> Descriptors {
+        use nix::sys::resource::{Resource, getrlimit, setrlimit};
+        let Ok((soft, hard)) = getrlimit(Resource::RLIMIT_NOFILE) else {
+            return Descriptors(None);
+        };
+        if soft >= hard {
+            return Descriptors(None);
+        }
+        match setrlimit(Resource::RLIMIT_NOFILE, hard, hard) {
+            Ok(()) => Descriptors(Some((soft, hard))),
+            Err(_) => Descriptors(None),
+        }
+    }
+}
+
+impl Drop for Descriptors {
+    fn drop(&mut self) {
+        use nix::sys::resource::{Resource, setrlimit};
+        if let Some((soft, hard)) = self.0 {
+            let _ = setrlimit(Resource::RLIMIT_NOFILE, soft, hard);
+        }
+    }
+}
+
 /// Open a directory without following a link, reporting and answering `Err` if it will not open.
 fn open_dir(parent: Option<RawFd>, path: &Path, walk: &Walk, shown: &str) -> Result<Level, ()> {
     // **`O_NOFOLLOW` is the whole defence.** If the name became a symlink since it was stat-ed,
@@ -181,6 +232,17 @@ fn open_dir(parent: Option<RawFd>, path: &Path, walk: &Walk, shown: &str) -> Res
         Ok(fd) => Ok(Rc::new(unsafe { OwnedFd::from_raw_fd(fd) })),
         Err(e) => {
             complain(walk, shown, e);
+            // **The one error whose cause is not in the message.** `Too many open files` under a
+            // path several thousand components long says nothing about why, and the why is the
+            // only actionable part: the tree is deeper than the descriptor limit, and `Descriptors`
+            // has already raised it as far as it is allowed to.
+            if e == Errno::EMFILE || e == Errno::ENFILE {
+                eprintln!(
+                    "{}rm: this tree is deeper than the open-file limit allows; \
+                     raise the hard limit (`ulimit -Hn`) or remove it in parts",
+                    walk.origin
+                );
+            }
             Err(())
         }
     }

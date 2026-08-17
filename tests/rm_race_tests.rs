@@ -204,6 +204,86 @@ fn verbose_names_every_entry() {
     );
 }
 
+/// **A tree deeper than the soft descriptor limit is still removed.**
+///
+/// Traversing by descriptor costs one per level currently open, so a deep tree meets `EMFILE`
+/// where a path-based walk would not. `std::fs::remove_dir_all` has the same cost and fails the
+/// same way — measured, at 1500 levels under a 1024 limit, removing nothing. GNU's `rm` escapes it
+/// with `fchdir`, which a builtin cannot use without moving the shell's own working directory, so
+/// `rm` raises the *soft* limit to the hard one for the descent and puts it back afterwards.
+///
+/// The child is given a low soft limit and the real hard limit, which is the ordinary shape of a
+/// login shell — and the shape this test would have failed under before the guard existed.
+#[test]
+fn a_tree_deeper_than_the_soft_descriptor_limit_is_still_removed() {
+    use std::os::unix::process::CommandExt;
+
+    let dir = tempfile::tempdir().expect("tempdir");
+    let root = dir.path().join("deep");
+    let mut path = root.clone();
+    for _ in 0..1500 {
+        path = path.join("d");
+    }
+    std::fs::create_dir_all(&path).expect("create the deep tree");
+
+    let mut command = Command::new(oslo_bin());
+    command
+        .arg("-c")
+        .arg("rm -rf deep")
+        .current_dir(dir.path())
+        .env("HOME", dir.path())
+        .env_remove("ENV")
+        .stdin(Stdio::null());
+    unsafe {
+        command.pre_exec(|| {
+            // Soft well below the depth, hard left where it is: `rm` may raise its own ceiling,
+            // and without doing so it cannot finish.
+            use nix::sys::resource::{Resource, getrlimit, setrlimit};
+            let (_, hard) = getrlimit(Resource::RLIMIT_NOFILE)?;
+            setrlimit(Resource::RLIMIT_NOFILE, 256, hard)?;
+            Ok(())
+        });
+    }
+
+    let out = command.output().expect("spawn oslo");
+    assert!(
+        out.status.success(),
+        "status {:?}: {}",
+        out.status.code(),
+        String::from_utf8_lossy(&out.stderr)
+            .chars()
+            .take(300)
+            .collect::<String>()
+    );
+    assert!(!root.exists(), "the deep tree survived");
+}
+
+/// And the raise is given back: a command after the `rm` sees the limit it started with.
+#[test]
+fn the_descriptor_limit_is_put_back_after_the_walk() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    std::fs::create_dir_all(dir.path().join("t/a/b")).expect("create");
+
+    let out = Command::new(oslo_bin())
+        .arg("-c")
+        .arg("before=$(ulimit -Sn); rm -rf t; echo \"$before $(ulimit -Sn)\"")
+        .current_dir(dir.path())
+        .env("HOME", dir.path())
+        .env_remove("ENV")
+        .stdin(Stdio::null())
+        .output()
+        .expect("spawn oslo");
+
+    let said = String::from_utf8_lossy(&out.stdout);
+    let mut parts = said.split_whitespace();
+    let before = parts.next().expect("a limit before");
+    let after = parts.next().expect("a limit after");
+    assert_eq!(
+        before, after,
+        "rm left the descriptor limit changed: {said}"
+    );
+}
+
 /// Sanity: the helper reads a prompt that has no newline after it.
 #[test]
 fn the_reader_stops_on_an_unterminated_prompt() {
