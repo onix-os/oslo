@@ -15,6 +15,8 @@ vista = ["oslo-base/vista", "oslo-ui/vista"]
 scratch = ["oslo-shell/scratch"]
 # `direnv` — see the note on `oslo-shell`.
 direnv = ["oslo-shell/direnv"]
+# The calculator: `oslo.math` in Lua, and the `math` builtin the shell registers.
+math = ["oslo-shell/math", "dep:oslo-math"]
 # `argc` — see the note on `oslo-shell`.
 argc = ["oslo-shell/argc"]
 # `nix` — see the note on `oslo-shell`.
@@ -33,6 +35,7 @@ plugin = []
 oslo-base = { path = "../oslo-base" }
 oslo-luavm = { path = "../oslo-luavm" }
 oslo-shell = { path = "../oslo-shell" }
+oslo-math = { path = "../oslo-math", optional = true }
 oslo-ui = { path = "../oslo-ui" }
 
 # Terminal setup at startup, the signal handling the read loop installs, and `inotify` for

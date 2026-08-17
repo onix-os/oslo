@@ -22,6 +22,9 @@ direnv = ["oslo-shell/direnv", "oslo-runtime/direnv"]
 
 nix = ["oslo-shell/nix", "oslo-runtime/nix"]
 
+# `math` — the calculator: units and dimensional analysis, as the `math` builtin and `oslo.math`.
+math = ["oslo-shell/math", "oslo-runtime/math"]
+
 plugin = ["oslo-runtime/plugin"]
 
 argc = ["oslo-shell/argc", "oslo-runtime/argc", "dep:argc"]
@@ -63,6 +66,7 @@ oslo-ui = { path = "crates/oslo-ui" }
 members = [
   "crates/oslo-base",
   "crates/oslo-luavm",
+  "crates/oslo-math",
   "crates/oslo-runtime",
   "crates/oslo-shell",
   "crates/oslo-ui",

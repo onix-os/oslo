@@ -15,6 +15,9 @@ scratch = []
 # `direnv` — directory environments: `.env.lua`, `.envrc`, and the dev shell an `.envrc` can ask
 # for. Off by default; a build without it never reads a directory file and never runs one.
 direnv = []
+# `math` — the calculator: units, dimensional analysis, constants and number bases. Off by
+# default; a build without it has no `math` builtin and does not link the engine at all.
+math = ["dep:oslo-math"]
 # `argc` — the `argc` builtin, and the `Runtime` oslo implements for it. Off by default; a build
 # without it has no builtin of that name, so the word falls through to `$PATH`.
 argc = ["dep:argc"]
@@ -25,6 +28,8 @@ nix = []
 
 [dependencies]
 oslo-base = { path = "../oslo-base" }
+# The calculator, behind the `math` feature — see the feature list above.
+oslo-math = { path = "../oslo-math", optional = true }
 # The argument parser behind the `argc` builtin. Vendored; see `vendor/argc`.
 argc = { path = "../../vendor/argc", default-features = false, features = [
     "eval", "eval-bash", "compgen",

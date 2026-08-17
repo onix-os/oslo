@@ -39,6 +39,8 @@ mod history;
 mod json;
 mod machine;
 pub(crate) mod mark;
+#[cfg(feature = "math")]
+mod math;
 mod messages;
 #[cfg(feature = "nix")]
 mod nix;
@@ -195,6 +197,8 @@ pub fn install(host: &dyn Host, registry: &Registry, env: Arc<Mutex<Environment>
     oslo.set_str("db", db::build(host));
     oslo.set_str("state", state::build());
     oslo.set_str("messages", messages::build());
+    #[cfg(feature = "math")]
+    oslo.set_str("math", Value::table(math::build()));
     timer::install(&mut oslo);
     spawn::install(&mut oslo);
     builtin::install(&mut oslo);

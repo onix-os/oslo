@@ -35,6 +35,8 @@ mod r#let;
 mod locate;
 mod mapfile;
 mod mark;
+#[cfg(feature = "math")]
+mod math;
 mod messages;
 mod nav;
 mod process;
@@ -195,6 +197,9 @@ pub fn register_default_builtins(env: &mut Environment) {
     env.register_custom_builtin("direnv", direnv::builtin_direnv);
     // A script's own arguments, parsed from the comments that declare them. A builtin rather than
     // the `eval "$(argc …)"` line bash needs, because the parser is linked in — see `crate::argc`.
+    #[cfg(feature = "math")]
+    env.register_custom_builtin("math", math::builtin_math);
+
     #[cfg(feature = "argc")]
     env.register_custom_builtin("argc", crate::argc::builtin_argc);
 
