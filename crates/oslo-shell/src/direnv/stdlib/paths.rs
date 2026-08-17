@@ -8,6 +8,7 @@
 
 use super::{absolute, fault, here};
 use crate::env::Environment;
+use crate::env::lists;
 use oslo_base::error::Result;
 use std::path::{Path, PathBuf};
 
@@ -57,71 +58,14 @@ fn prepend(env: &mut Environment, name: &str, dirs: &[String], function: &str) -
     if dirs.is_empty() {
         return fault(function, "needs a directory");
     }
-    let base = here();
-    let mut entries: Vec<String> = dirs
-        .iter()
-        .map(|dir| absolute(dir, &base).to_string_lossy().into_owned())
-        .collect();
-    let existing = env.get_var(name).unwrap_or_default().to_string();
-    for entry in existing.split(':').filter(|part| !part.is_empty()) {
-        if !entries.iter().any(|already| already == entry) {
-            entries.push(entry.to_string());
-        }
-    }
-    env.set_var(name, &entries.join(":"), true);
+    lists::prepend(env, name, dirs, &here());
     Ok(0)
 }
 
 /// Drop every entry of `name` matching any of `patterns`.
 fn remove(env: &mut Environment, name: &str, patterns: &[String]) -> Result<i32> {
-    let existing = env.get_var(name).unwrap_or_default().to_string();
-    let kept: Vec<&str> = existing
-        .split(':')
-        .filter(|part| !part.is_empty())
-        .filter(|part| !patterns.iter().any(|pattern| glob(pattern, part)))
-        .collect();
-    env.set_var(name, &kept.join(":"), true);
+    lists::remove(env, name, patterns);
     Ok(0)
-}
-
-/// Whether `text` matches a `*`/`?` pattern.
-///
-/// The shell's own globber is not reachable here: it matches *filenames*, walking the directory
-/// tree as it goes, and a `PATH_rm` pattern names entries that need not exist. `*` crosses `/`
-/// for the same reason — direnv's `PATH_rm "/nix/*"` is meant to take out everything under it.
-fn glob(pattern: &str, text: &str) -> bool {
-    let (pattern, text): (Vec<char>, Vec<char>) =
-        (pattern.chars().collect(), text.chars().collect());
-    let (mut p, mut t) = (0usize, 0usize);
-    // Where to resume if a `*` turns out to have swallowed too little: the classic backtracking
-    // pair, which is linear in practice and cannot blow up on a pattern of nothing but stars.
-    let (mut star, mut resume) = (None, 0usize);
-    while t < text.len() {
-        match pattern.get(p) {
-            Some('*') => {
-                star = Some(p);
-                resume = t;
-                p += 1;
-            }
-            Some('?') => {
-                p += 1;
-                t += 1;
-            }
-            Some(c) if *c == text[t] => {
-                p += 1;
-                t += 1;
-            }
-            _ => match star {
-                Some(at) => {
-                    p = at + 1;
-                    resume += 1;
-                    t = resume;
-                }
-                None => return false,
-            },
-        }
-    }
-    pattern[p..].iter().all(|c| *c == '*')
 }
 
 /// `expand_path <path> [base]` — print `path` absolute, without touching the disk.

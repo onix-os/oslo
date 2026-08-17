@@ -159,7 +159,7 @@ fn normalize(path: &Path) -> String {
 }
 
 /// Expand a leading `~` from `$HOME`.
-fn expand_tilde(path: &str) -> String {
+pub(super) fn expand_tilde(path: &str) -> String {
     let Some(rest) = path.strip_prefix('~') else {
         return path.to_string();
     };

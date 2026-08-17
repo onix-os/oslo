@@ -11,6 +11,7 @@ pub mod edit;
 pub mod editor;
 pub mod finder;
 pub mod frecency_store;
+pub mod git;
 pub mod highlight;
 mod hinting;
 pub mod keys;

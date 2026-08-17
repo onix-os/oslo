@@ -25,14 +25,18 @@ mod builtin;
 mod complete;
 mod convert;
 mod db;
+mod digest;
 #[cfg(feature = "direnv")]
 mod direnv;
+mod envlist;
 pub(crate) mod external;
 /// `oslo.feature` — turning parts of the shell off and on while it runs.
 pub mod feature;
 mod fs;
+mod git;
 mod handle;
 mod json;
+mod machine;
 pub(crate) mod mark;
 mod messages;
 #[cfg(feature = "nix")]
@@ -188,6 +192,9 @@ pub fn install(host: &dyn Host, registry: &Registry, env: Arc<Mutex<Environment>
     spawn::install(&mut oslo);
     builtin::install(&mut oslo);
     oslo.set_str("json", json::build());
+    oslo.set_str("hash", digest::hash());
+    oslo.set_str("hex", digest::hex());
+    oslo.set_str("base64", digest::base64());
     oslo.set_str("re", re::build());
     oslo.set_str("proc", proc::build_proc());
     oslo.set_str("job", proc::build_job());
@@ -223,6 +230,8 @@ pub fn install(host: &dyn Host, registry: &Registry, env: Arc<Mutex<Environment>
     );
 
     shell::install(&mut oslo, &mut system, &mut process, registry, &env);
+    // What the machine can say about itself, for a prompt that would otherwise shell out.
+    machine::install(&mut system);
 
     oslo.set_str("env", Value::table(variables_t));
     extend(&mut oslo, "proc", process);
@@ -361,6 +370,9 @@ fn variables(oslo: &mut Table, env: &Arc<Mutex<Environment>>) {
         }
         Ok(vec![Value::table(table)])
     });
+
+    // `$PATH` and its relatives as the lists they are. See [`super::envlist`].
+    envlist::install(oslo, env);
 }
 
 /// The working directory and pathname expansion.
