@@ -28,6 +28,7 @@
 
 use super::signals;
 use crate::env::Environment;
+use crate::env::origin_now;
 use nix::libc;
 use oslo_base::error::{Result, ShellError};
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
@@ -209,7 +210,7 @@ pub fn run_debug_trap(env: &mut Environment) {
     IN_DEBUG_TRAP.store(false, Ordering::SeqCst);
 
     if let Err(e) = outcome {
-        eprintln!("oslo: trap: DEBUG: {e}");
+        eprintln!("{}trap: DEBUG: {e}", origin_now());
     }
 }
 
@@ -247,7 +248,7 @@ pub fn run_exit_trap(env: &mut Environment, status: i32) -> i32 {
         Ok(_) => status,
         Err(ShellError::Exit(code)) => code,
         Err(e) => {
-            eprintln!("oslo: {}", e);
+            eprintln!("{}{}", origin_now(), e);
             status
         }
     }

@@ -38,12 +38,23 @@ pub fn run(args: &[String]) -> i32 {
     };
 
     match args.first().map(String::as_str) {
-        None | Some("list" | "ls") => list(),
-        Some("show") => show(&named(1)),
-        Some("fingerprint") => fingerprint(&named(1)),
+        // Each of these names one profile at most, so a second word is a mistake rather than a
+        // second profile — `oslo profile show a b` reported on `a` and said nothing about `b`.
+        None => list(),
+        Some(name @ ("list" | "ls")) => MENU.extra(name, args, 0).unwrap_or_else(list),
+        Some("show") => MENU
+            .extra("show", args, 1)
+            .unwrap_or_else(|| show(&named(1))),
+        Some("fingerprint") => MENU
+            .extra("fingerprint", args, 1)
+            .unwrap_or_else(|| fingerprint(&named(1))),
         Some("key") => key(&args[1..]),
-        Some("export") => export(&named(1)),
-        Some("import") => import(&named(1)),
+        Some("export") => MENU
+            .extra("export", args, 1)
+            .unwrap_or_else(|| export(&named(1))),
+        Some("import") => MENU
+            .extra("import", args, 1)
+            .unwrap_or_else(|| import(&named(1))),
         Some("sync") => sync::run(&args[1..]),
         // The two halves the far end of a sync runs, over ssh rather than typed. In the help
         // because a command that exists and is undocumented is worse than one that does not.

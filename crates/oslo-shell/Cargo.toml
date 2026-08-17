@@ -38,6 +38,9 @@ oslo-ui = { path = "../oslo-ui" }
 # limits and `times`'s getrusage.
 nix = { version = "0.29", features = [
     "process", "signal", "term", "fs", "user", "resource", "hostname", "poll",
+    # `dir` is `fdopendir`: `rm -r` reads each level through the descriptor it already holds
+    # rather than by path, which is what stops a symlink swapped in mid-walk from redirecting it.
+    "dir",
 ] }
 
 # `[[ str =~ ere ]]`. See the root manifest for why the feature set is trimmed.

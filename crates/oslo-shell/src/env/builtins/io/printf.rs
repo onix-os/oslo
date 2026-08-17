@@ -14,22 +14,37 @@
 //! Both share `echo`'s decoder, so `\0ddd`, `\xHH` and the control escapes mean the same thing in
 //! every builtin that writes bytes.
 
-use crate::env::builtins::io::echo::expand_escapes;
+mod format;
+
+use crate::env::origin_now;
 use crate::env::scope::Environment;
+use format::render;
+pub use format::shell_quote;
 use oslo_base::error::Result;
 
-/// `printf FORMAT [ARGUMENT]...`
-pub fn builtin_printf(_env: &mut Environment, args: &[String]) -> Result<i32> {
-    let operands = &args[1..];
-    // `--` ends the options, and there are no options — but `printf -- '%s\n' x` is common enough
-    // in scripts written defensively that refusing it would be a nuisance.
-    let operands = match operands.first().map(String::as_str) {
-        Some("--") => &operands[1..],
-        _ => operands,
+/// The usage line, under the diagnostic that caused it and unprefixed, as bash leaves its own.
+const USAGE: &str = "printf: usage: printf [-v var] format [arguments]";
+
+/// `printf [-v NAME] FORMAT [ARGUMENT]...`
+pub fn builtin_printf(env: &mut Environment, args: &[String]) -> Result<i32> {
+    let (into, operands) = match parse(&args[1..]) {
+        Parsed::Options(into, operands) => (into, operands),
+        Parsed::Usage(message) => {
+            eprintln!("{}printf: {message}", origin_now());
+            eprintln!("{USAGE}");
+            return Ok(2);
+        }
     };
 
+    if let Some(name) = into
+        && !crate::env::scope::is_valid_identifier(name)
+    {
+        eprintln!("{}printf: `{name}': not a valid identifier", origin_now());
+        return Ok(2);
+    }
+
     let Some(format) = operands.first() else {
-        eprintln!("oslo: printf: usage: printf format [arguments]");
+        eprintln!("{USAGE}");
         return Ok(2);
     };
     let arguments = &operands[1..];
@@ -53,6 +68,13 @@ pub fn builtin_printf(_env: &mut Environment, args: &[String]) -> Result<i32> {
         }
     }
 
+    // `-v` puts the result in a variable rather than on stdout, which is the whole reason scripts
+    // reach for it: building a string with `%s`/`%d` padding without a subshell to capture it.
+    if let Some(name) = into {
+        env.set_var(name, &String::from_utf8_lossy(&out), false);
+        return Ok(status);
+    }
+
     // A write failure outranks a formatting one: if the output never arrived, the status has to
     // say so whatever the format string did.
     match super::write_stdout("printf", &out) {
@@ -61,534 +83,127 @@ pub fn builtin_printf(_env: &mut Environment, args: &[String]) -> Result<i32> {
     }
 }
 
-/// One pass over the format. `next` indexes the next unconsumed argument.
-fn render(
-    format: &str,
-    args: &[String],
-    next: &mut usize,
-    out: &mut Vec<u8>,
-) -> std::result::Result<(), i32> {
-    let chars: Vec<char> = format.chars().collect();
-    let mut i = 0;
-    let mut status = Ok(());
+/// What the leading operands turned out to be.
+enum Parsed<'a> {
+    /// The `-v` name, if one was given, and the operands after the options.
+    Options(Option<&'a str>, &'a [String]),
+    Usage(String),
+}
 
-    while i < chars.len() {
-        if chars[i] != '%' {
-            // Literal text, escapes and all. Collected in one run so the decoder sees whole
-            // sequences rather than a backslash at a time.
-            let start = i;
-            while i < chars.len() && chars[i] != '%' {
-                i += 1;
-            }
-            let literal: String = chars[start..i].iter().collect();
-            let (bytes, _) = expand_escapes(&literal);
-            out.extend_from_slice(&bytes);
-            continue;
+/// Split the options off the front.
+///
+/// **An option this does not know is an error, not a format string.** `printf -Z` used to print
+/// `-Z` and report success, and `printf -v out '%s' hi` — an idiom common enough that scripts
+/// written for bash use it freely — printed `-v` and left `out` untouched. Both are the same
+/// mistake: a word beginning with `-` was never examined before being used as the format.
+fn parse(operands: &[String]) -> Parsed<'_> {
+    let mut into: Option<&str> = None;
+    let mut rest = operands;
+
+    while let Some(word) = rest.first() {
+        // A lone `-` is a format that prints a dash, and `--` ends the options — the defensive
+        // spelling `printf -- '%s\n' x` that scripts use to guard against exactly this parser.
+        if word == "--" {
+            rest = &rest[1..];
+            break;
         }
-
-        // `%%` is a literal percent and consumes no argument.
-        if i + 1 < chars.len() && chars[i + 1] == '%' {
-            out.push(b'%');
-            i += 2;
-            continue;
+        if !word.starts_with('-') || word == "-" {
+            break;
         }
-
-        let Some(spec) = Spec::parse(&chars, &mut i) else {
-            // A trailing `%` with nothing after it. bash prints it and carries on.
-            out.push(b'%');
-            i = chars.len();
-            continue;
+        let Some(attached) = word.strip_prefix("-v") else {
+            return Parsed::Usage(format!("{word}: invalid option"));
         };
-
-        // Each `*` eats an argument before the conversion's own, as C and every shell do.
-        let mut sizes = Vec::new();
-        for _ in 0..spec.star_count() {
-            let value = args.get(*next).map(String::as_str).unwrap_or("0");
-            if *next < args.len() {
-                *next += 1;
-            }
-            // A width that is not a number is reported and treated as 0, exactly as an unreadable
-            // *argument* is: the format itself is still valid, so the rest of the line is still
-            // what the author asked for. bash and dash both say something here and carry on.
-            sizes.push(parse_int(value).unwrap_or_else(|()| {
-                eprintln!("oslo: printf: {value}: invalid number");
-                status = Err(1);
-                0
-            }));
-        }
-        let spec = spec.with_sizes(&sizes);
-
-        let arg = args.get(*next).map(String::as_str).unwrap_or("");
-        if *next < args.len() {
-            *next += 1;
-        }
-        match spec.render(arg, out) {
-            Ok(()) => {}
-            // A bad *argument* is reported and the format carries on, printing 0 — bash does the
-            // same, because the rest of the line is still what the author asked for.
-            Err(Bad::Argument(code)) => status = Err(code),
-            // A conversion letter that does not exist is a bug in the format itself, so nothing
-            // further in it can be trusted; bash stops there and prints no more of the line.
-            Err(Bad::Format(code)) => return Err(code),
-        }
-    }
-    status
-}
-
-/// Why a conversion failed, which decides whether the rest of the format still runs.
-enum Bad {
-    /// The argument could not be read as the conversion wanted. Reported; the format continues.
-    Argument(i32),
-    /// The conversion letter does not exist. The format is wrong, so rendering stops.
-    Format(i32),
-}
-
-/// A width or a precision: written out, or `*` meaning "the next argument says".
-#[derive(Clone, Copy, PartialEq, Eq)]
-enum Size {
-    Fixed(usize),
-    /// `%*d` and `%.*f`. The argument is consumed **before** the one being converted, which is the
-    /// order C and every shell use — `printf '%*d' 5 42` is width 5, value 42.
-    FromArgument,
-}
-
-/// One `%` conversion: its flags, width, precision and the letter that decides the type.
-struct Spec {
-    flags: String,
-    width: Option<Size>,
-    precision: Option<Size>,
-    conversion: char,
-}
-
-impl Spec {
-    /// How many arguments this conversion eats before its own: one per `*`.
-    fn star_count(&self) -> usize {
-        usize::from(self.width == Some(Size::FromArgument))
-            + usize::from(self.precision == Some(Size::FromArgument))
-    }
-
-    /// Replace each `*` with the number that was read for it, in written order.
-    ///
-    /// A **negative** width means left-justify at that width, exactly as a `-` flag would — C says
-    /// so, and `printf '%*s' -6 hi` is how a script asks for it without knowing the sign up front.
-    fn with_sizes(mut self, sizes: &[i64]) -> Self {
-        let mut next = sizes.iter().copied();
-        if self.width == Some(Size::FromArgument) {
-            let n = next.next().unwrap_or(0);
-            if n < 0 {
-                self.flags.push('-');
-            }
-            self.width = Some(Size::Fixed(n.unsigned_abs() as usize));
-        }
-        if self.precision == Some(Size::FromArgument) {
-            // A negative precision means "no precision given" in C, not a precision of zero.
-            self.precision = match next.next().unwrap_or(0) {
-                n if n < 0 => None,
-                n => Some(Size::Fixed(n as usize)),
+        if attached.is_empty() {
+            let Some(name) = rest.get(1) else {
+                return Parsed::Usage("-v: option requires an argument".to_string());
             };
-        }
-        self
-    }
-
-    /// The width, once every `*` has been resolved.
-    fn width(&self) -> Option<usize> {
-        match self.width {
-            Some(Size::Fixed(n)) => Some(n),
-            _ => None,
-        }
-    }
-
-    /// The precision, once every `*` has been resolved.
-    fn precision(&self) -> Option<usize> {
-        match self.precision {
-            Some(Size::Fixed(n)) => Some(n),
-            _ => None,
-        }
-    }
-
-    /// Parse a conversion starting at `chars[*i] == '%'`, leaving `*i` just past it.
-    fn parse(chars: &[char], i: &mut usize) -> Option<Self> {
-        let mut j = *i + 1;
-        let mut flags = String::new();
-        while j < chars.len() && matches!(chars[j], '-' | '+' | ' ' | '#' | '0') {
-            flags.push(chars[j]);
-            j += 1;
-        }
-        // `*` takes the number from an argument. Required by every shell that scripts are written
-        // against — `printf '%c %*u. %s\n'` is how `select-editor` lines its menu up — and without
-        // it the `*` reached the conversion letter and the whole format was refused.
-        let take_size = |j: &mut usize| -> Option<Size> {
-            if chars.get(*j) == Some(&'*') {
-                *j += 1;
-                return Some(Size::FromArgument);
-            }
-            take_number(chars, j).map(Size::Fixed)
-        };
-        let width = take_size(&mut j);
-        let precision = if j < chars.len() && chars[j] == '.' {
-            j += 1;
-            Some(take_size(&mut j).unwrap_or(Size::Fixed(0)))
+            into = Some(name);
+            rest = &rest[2..];
         } else {
-            None
-        };
-        // C's length modifiers are accepted and ignored: a shell has one integer type, so `%ld`
-        // and `%d` cannot differ, and scripts written against C's printf pass them. Skipping them
-        // is not cosmetic — bash reads `%zb` as `%b`, so treating `z` as the conversion letter
-        // made a valid format an error. `q` is deliberately absent: in a shell it is a
-        // *conversion*, not a modifier.
-        while j < chars.len() && matches!(chars[j], 'h' | 'l' | 'L' | 'j' | 'z' | 't') {
-            j += 1;
-        }
-        let conversion = *chars.get(j)?;
-        *i = j + 1;
-        Some(Self {
-            flags,
-            width,
-            precision,
-            conversion,
-        })
-    }
-
-    fn render(&self, arg: &str, out: &mut Vec<u8>) -> std::result::Result<(), Bad> {
-        let mut status = Ok(());
-        let body: Vec<u8> = match self.conversion {
-            's' => {
-                let mut s = arg.to_string();
-                if let Some(p) = self.precision() {
-                    s.truncate(p.min(s.len()));
-                }
-                s.into_bytes()
-            }
-            // bash's `%b`: the argument's escapes are decoded, which is the only way to get
-            // `\n` out of *data* rather than out of the format.
-            'b' => expand_escapes(arg).0,
-            // bash's `%q`: quote the argument so the shell would read it back as this exact
-            // string. What a script uses to build a command line out of untrusted data.
-            'q' => shell_quote(arg).into_bytes(),
-            'c' => arg
-                .chars()
-                .next()
-                .map(String::from)
-                .unwrap_or_default()
-                .into_bytes(),
-            'd' | 'i' => match parse_int(arg) {
-                Ok(n) => self.signed(n.to_string()).into_bytes(),
-                Err(()) => {
-                    eprintln!("oslo: printf: {}: invalid number", arg);
-                    status = Err(Bad::Argument(1));
-                    b"0".to_vec()
-                }
-            },
-            'u' => match parse_int(arg) {
-                Ok(n) => (n as u64).to_string().into_bytes(),
-                Err(()) => {
-                    eprintln!("oslo: printf: {}: invalid number", arg);
-                    status = Err(Bad::Argument(1));
-                    b"0".to_vec()
-                }
-            },
-            'o' | 'x' | 'X' => match parse_int(arg) {
-                Ok(n) => {
-                    let n = n as u64;
-                    // `#` is C's alternate form: a leading `0` on octal, `0x`/`0X` on hex. It is
-                    // how a script prints a number something else will read back as one, and it
-                    // was parsed and then dropped — `printf '%#x' 255` gave `ff`.
-                    let alt = self.flags.contains('#');
-                    match self.conversion {
-                        'o' => match alt && n != 0 {
-                            true => format!("0{n:o}"),
-                            false => format!("{n:o}"),
-                        },
-                        'x' => match alt && n != 0 {
-                            true => format!("0x{n:x}"),
-                            false => format!("{n:x}"),
-                        },
-                        _ => match alt && n != 0 {
-                            true => format!("0X{n:X}"),
-                            false => format!("{n:X}"),
-                        },
-                    }
-                    .into_bytes()
-                }
-                Err(()) => {
-                    eprintln!("oslo: printf: {}: invalid number", arg);
-                    status = Err(Bad::Argument(1));
-                    b"0".to_vec()
-                }
-            },
-            'f' | 'F' | 'e' | 'E' | 'g' | 'G' => {
-                let value: f64 = arg.trim().parse().unwrap_or_else(|_| {
-                    if !arg.is_empty() {
-                        eprintln!("oslo: printf: {}: invalid number", arg);
-                        status = Err(Bad::Argument(1));
-                    }
-                    0.0
-                });
-                let p = self.precision().unwrap_or(6);
-                let rendered = match self.conversion {
-                    'e' => c_exponent(&format!("{:.*e}", p, value), 'e'),
-                    'E' => c_exponent(&format!("{:.*E}", p, value), 'E'),
-                    'g' | 'G' => self.general(value, p),
-                    _ => format!("{:.*}", p, value),
-                };
-                self.signed(rendered).into_bytes()
-            }
-            other => {
-                eprintln!("oslo: printf: `%{}': invalid format character", other);
-                return Err(Bad::Format(1));
-            }
-        };
-
-        out.extend_from_slice(&self.pad(body));
-        status
-    }
-
-    /// Put back the sign the flags asked for.
-    ///
-    /// `+` prints one on a non-negative number and ` ` prints a space in its place, which is how a
-    /// column of numbers is kept in line. Both were parsed and then ignored, so `printf '%+d' 5`
-    /// gave `5`. `+` wins when both are given, as in C.
-    fn signed(&self, rendered: String) -> String {
-        if rendered.starts_with('-') {
-            return rendered;
-        }
-        match (self.flags.contains('+'), self.flags.contains(' ')) {
-            (true, _) => format!("+{rendered}"),
-            (false, true) => format!(" {rendered}"),
-            (false, false) => rendered,
+            // `-vout`, which bash accepts as readily as `-v out`.
+            into = Some(attached);
+            rest = &rest[1..];
         }
     }
 
-    /// `%g`: whichever of `%e` and `%f` is the shorter honest answer, C's rule.
-    ///
-    /// It used to fall through to `%f`, so `printf '%g' 1e20` printed twenty-one digits and a
-    /// fraction where C prints `1e+20` — the one conversion whose whole purpose is not to do that.
-    ///
-    /// The rule, from C99 7.19.6.1: with precision `p` (0 read as 1) and `x` the exponent `%e`
-    /// would use, `%f` with precision `p - 1 - x` when `p > x >= -4`, and `%e` with precision
-    /// `p - 1` otherwise. Trailing zeros come off unless `#` asked for them.
-    fn general(&self, value: f64, precision: usize) -> String {
-        let p = precision.max(1);
-        let exponent = match value == 0.0 {
-            true => 0,
-            false => value.abs().log10().floor() as i32,
-        };
-        let wide = (p as i32) > exponent && exponent >= -4;
-        let mut rendered = match wide {
-            true => format!("{:.*}", (p as i32 - 1 - exponent).max(0) as usize, value),
-            // Formatted in the case it will be printed in: `c_exponent` finds the marker in the
-            // text, so asking it for `E` while writing `e` leaves the exponent unnormalised.
-            false => match self.conversion == 'G' {
-                true => c_exponent(&format!("{:.*E}", p - 1, value), 'E'),
-                false => c_exponent(&format!("{:.*e}", p - 1, value), 'e'),
-            },
-        };
-        if self.flags.contains('#') || !rendered.contains('.') {
-            return rendered;
-        }
-        // Only the fraction's zeros, and only up to the exponent — `1.500000e+20` loses three
-        // zeros and keeps its `e+20`.
-        let (mantissa, tail) = match rendered.find(['e', 'E']) {
-            Some(at) => (rendered[..at].to_string(), rendered[at..].to_string()),
-            None => (rendered.clone(), String::new()),
-        };
-        let trimmed = mantissa.trim_end_matches('0').trim_end_matches('.');
-        rendered = format!("{trimmed}{tail}");
-        rendered
-    }
-
-    /// Apply width, with `-` for left and `0` for zero-fill.
-    ///
-    /// Zero-fill is ignored for `%s`, as in C: padding a string with zeros produces `000abc`,
-    /// which no caller means.
-    fn pad(&self, body: Vec<u8>) -> Vec<u8> {
-        let Some(width) = self.width() else {
-            return body;
-        };
-        if body.len() >= width {
-            return body;
-        }
-        let fill = if self.flags.contains('0')
-            && !self.flags.contains('-')
-            && !matches!(self.conversion, 's' | 'b' | 'c')
-        {
-            b'0'
-        } else {
-            b' '
-        };
-        let padding = vec![fill; width - body.len()];
-        if self.flags.contains('-') {
-            let mut out = body;
-            out.extend_from_slice(&padding);
-            out
-        } else {
-            let mut out = padding;
-            out.extend_from_slice(&body);
-            out
-        }
-    }
-}
-
-/// Quote `text` so that reading it back as shell input yields `text` exactly.
-///
-/// Backslash-escaping rather than wrapping in single quotes. Both are correct shell and read back
-/// the same, but bash prints `a\ b` where quoting would print `'a b'`, and the differential corpus
-/// compares bytes — matching the form is what lets `%q` be covered by it at all.
-///
-/// A control character has no backslash spelling outside `$'...'`, which is where those go; a
-/// string that needs nothing is printed as itself, and an empty one as `''` so it does not vanish.
-pub fn shell_quote(text: &str) -> String {
-    if text.is_empty() {
-        return "''".to_string();
-    }
-    if text
-        .chars()
-        .all(|c| c.is_ascii_alphanumeric() || "_-./=:+@,%^".contains(c))
-    {
-        return text.to_string();
-    }
-    if text.chars().any(|c| c.is_control()) {
-        let mut out = String::from("$'");
-        for c in text.chars() {
-            match c {
-                '\n' => out.push_str("\\n"),
-                '\t' => out.push_str("\\t"),
-                '\r' => out.push_str("\\r"),
-                '\'' => out.push_str("\\'"),
-                '\\' => out.push_str("\\\\"),
-                c if c.is_control() => out.push_str(&format!("\\{:03o}", c as u32)),
-                c => out.push(c),
-            }
-        }
-        out.push('\'');
-        return out;
-    }
-    let mut out = String::with_capacity(text.len() * 2);
-    for c in text.chars() {
-        if !c.is_ascii_alphanumeric() && !"_-./=:+@,%^".contains(c) {
-            out.push('\\');
-        }
-        out.push(c);
-    }
-    out
-}
-
-/// Rewrite Rust's exponent to C's, which is what every other `printf` prints.
-///
-/// Rust renders `1234.5` as `1.234500e3`; C — and therefore bash, dash and coreutils — renders it
-/// `1.234500e+03`, with an explicit sign and at least two digits. A script comparing `printf %e`
-/// output against a recorded value would differ on every number without this.
-fn c_exponent(rendered: &str, marker: char) -> String {
-    let Some((mantissa, exponent)) = rendered.split_once(marker) else {
-        return rendered.to_string();
-    };
-    let (sign, digits) = match exponent.strip_prefix('-') {
-        Some(rest) => ('-', rest),
-        None => ('+', exponent.strip_prefix('+').unwrap_or(exponent)),
-    };
-    format!("{mantissa}{marker}{sign}{:0>2}", digits)
-}
-
-fn take_number(chars: &[char], j: &mut usize) -> Option<usize> {
-    let start = *j;
-    while *j < chars.len() && chars[*j].is_ascii_digit() {
-        *j += 1;
-    }
-    if *j == start {
-        return None;
-    }
-    chars[start..*j].iter().collect::<String>().parse().ok()
-}
-
-/// Parse an integer argument the way `printf` does.
-///
-/// An empty argument is 0 rather than an error: a format reused past the end of its arguments
-/// gets empty strings, and `printf '%d\n' 1 2` must not complain about a third that is not there.
-/// A leading `'` or `"` means "the numeric value of the next character", which is POSIX and is how
-/// scripts get a character's codepoint without `od`.
-fn parse_int(arg: &str) -> std::result::Result<i64, ()> {
-    let text = arg.trim();
-    if text.is_empty() {
-        return Ok(0);
-    }
-    if let Some(rest) = text.strip_prefix(['\'', '"']) {
-        return Ok(rest.chars().next().map(|c| c as i64).unwrap_or(0));
-    }
-    let (sign, digits) = match text.strip_prefix('-') {
-        Some(rest) => (-1, rest),
-        None => (1, text.strip_prefix('+').unwrap_or(text)),
-    };
-    let value = if let Some(hex) = digits
-        .strip_prefix("0x")
-        .or_else(|| digits.strip_prefix("0X"))
-    {
-        i64::from_str_radix(hex, 16)
-    } else if digits.len() > 1 && digits.starts_with('0') {
-        i64::from_str_radix(&digits[1..], 8)
-    } else {
-        digits.parse()
-    };
-    value.map(|v| sign * v).map_err(|_| ())
+    Parsed::Options(into, rest)
 }
 
 #[cfg(test)]
 mod tests {
-    use super::{parse_int, render};
+    use super::{Parsed, builtin_printf, parse};
+    use crate::env::scope::Environment;
 
-    /// One pass of the formatter, as a string.
-    fn printf(format: &str, args: &[&str]) -> String {
-        let args: Vec<String> = args.iter().map(|a| a.to_string()).collect();
-        let mut out = Vec::new();
-        let mut next = 0;
-        render(format, &args, &mut next, &mut out).expect("format");
-        String::from_utf8(out).expect("utf8")
+    fn words(parts: &[&str]) -> Vec<String> {
+        parts.iter().map(|s| s.to_string()).collect()
     }
 
-    /// **The flags were parsed and then dropped.** `+`, a space and `#` all reached the `Spec` and
-    /// none of them reached the output, so `printf '%+d' 5` gave `5` and `printf '%#x' 255` gave
-    /// `ff`. Every expectation here is bash's, run side by side.
-    #[test]
-    fn the_sign_and_alternate_form_flags_are_honoured() {
-        assert_eq!(printf("%+d|%+d", &["5", "-5"]), "+5|-5");
-        assert_eq!(printf("[% d][% d]", &["5", "-5"]), "[ 5][-5]");
-        // `+` wins when both are given, as in C.
-        assert_eq!(printf("%+ d", &["5"]), "+5");
-        assert_eq!(printf("%#o|%#x|%#X", &["8", "255", "255"]), "010|0xff|0XFF");
-        // Zero takes no prefix: `0x0` is not what C prints.
-        assert_eq!(printf("%#o|%#x", &["0", "0"]), "0|0");
-        // And a float carries the sign too.
-        assert_eq!(printf("%+.1f", &["1.5"]), "+1.5");
+    fn split(parts: &[&str]) -> Parsed<'static> {
+        // Leaked so the borrow outlives the call; a test's allocation, not the shell's.
+        let operands: &'static [String] = Box::leak(words(parts).into_boxed_slice());
+        parse(operands)
     }
 
-    /// **`%g` is the conversion whose whole purpose is not to print twenty-one digits**, and it
-    /// used to fall through to `%f` and do exactly that.
-    ///
-    /// C's rule: `%f` when the exponent fits inside the precision, `%e` otherwise, with the
-    /// trailing zeros taken off unless `#` asked for them.
+    /// **The bug.** A word starting with `-` was used as the format without ever being looked
+    /// at, so `printf -Z` printed `-Z` and reported success.
     #[test]
-    fn g_chooses_between_fixed_and_exponent_as_c_does() {
-        assert_eq!(printf("%g", &["1.5"]), "1.5");
-        assert_eq!(printf("%g", &["100000"]), "100000");
-        assert_eq!(printf("%g", &["0.0001"]), "0.0001");
-        // Past six significant figures, and past 1e-4, it turns into an exponent.
-        assert_eq!(printf("%g", &["1e20"]), "1e+20");
-        assert_eq!(printf("%g", &["0.00001"]), "1e-05");
-        assert_eq!(printf("%G", &["1e20"]), "1E+20");
-        // `#` keeps the zeros the rule would otherwise strip.
-        assert_eq!(printf("%#g", &["1.5"]), "1.50000");
+    fn an_unknown_option_is_refused_rather_than_printed() {
+        let mut env = Environment::new();
+        for bad in ["-Z", "-x", "--nosuch"] {
+            assert_eq!(
+                builtin_printf(&mut env, &words(&["printf", bad])).unwrap(),
+                2,
+                "{bad}"
+            );
+        }
+    }
+
+    /// `-v NAME` assigns instead of printing — the idiom that silently printed `-v` before.
+    #[test]
+    fn dash_v_assigns_the_result_to_a_variable() {
+        let mut env = Environment::new();
+        let args = words(&["printf", "-v", "out", "%s-%s", "a", "b"]);
+        assert_eq!(builtin_printf(&mut env, &args).unwrap(), 0);
+        assert_eq!(env.get_var("out"), Some("a-b"));
+    }
+
+    /// bash takes the name attached to the flag too, and scripts written for it use both.
+    #[test]
+    fn dash_v_takes_an_attached_name() {
+        let mut env = Environment::new();
+        let args = words(&["printf", "-vout", "%s", "hi"]);
+        assert_eq!(builtin_printf(&mut env, &args).unwrap(), 0);
+        assert_eq!(env.get_var("out"), Some("hi"));
+    }
+
+    /// A reused format collects into the variable whole, rather than the last pass only.
+    #[test]
+    fn a_reused_format_assigns_every_pass() {
+        let mut env = Environment::new();
+        let args = words(&["printf", "-v", "out", "%s\n", "a", "b"]);
+        assert_eq!(builtin_printf(&mut env, &args).unwrap(), 0);
+        assert_eq!(env.get_var("out"), Some("a\nb\n"));
     }
 
     #[test]
-    fn integers_are_read_in_every_base_a_shell_accepts() {
-        assert_eq!(parse_int("42"), Ok(42));
-        assert_eq!(parse_int("-7"), Ok(-7));
-        assert_eq!(parse_int("+7"), Ok(7));
-        assert_eq!(parse_int("0x1f"), Ok(31));
-        assert_eq!(parse_int("010"), Ok(8));
-        // An empty argument is 0: a reused format runs past its arguments and must not complain.
-        assert_eq!(parse_int(""), Ok(0));
-        // POSIX: a leading quote means the next character's value.
-        assert_eq!(parse_int("'A"), Ok(65));
-        assert_eq!(parse_int("abc"), Err(()));
+    fn dash_v_wants_a_name_and_a_usable_one() {
+        let mut env = Environment::new();
+        assert_eq!(
+            builtin_printf(&mut env, &words(&["printf", "-v"])).unwrap(),
+            2
+        );
+        let args = words(&["printf", "-v", "1bad", "%s", "hi"]);
+        assert_eq!(builtin_printf(&mut env, &args).unwrap(), 2);
+        assert!(env.get_var("1bad").is_none());
+    }
+
+    /// The two spellings that must keep meaning a format: `--` ends the options, and a lone
+    /// `-` is a format that prints a dash.
+    #[test]
+    fn a_double_dash_and_a_lone_dash_are_not_options() {
+        assert!(
+            matches!(split(&["--", "%s", "x"]), Parsed::Options(None, rest) if rest.len() == 2)
+        );
+        assert!(matches!(split(&["-"]), Parsed::Options(None, rest) if rest.len() == 1));
     }
 }

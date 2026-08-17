@@ -25,7 +25,11 @@ pub fn run(args: &[String]) -> i32 {
         "remove" | "rm" => remove(rest),
         "edit" => edit(rest),
         "run" => run_macro(rest),
-        "publish" => publish(rest),
+        // Takes nothing — the `_args` on `publish` says so — so a word after it was read as
+        // nothing at all rather than as the mistake it is.
+        "publish" => help::MENU
+            .extra("publish", args, 0)
+            .unwrap_or_else(|| publish(rest)),
         "show" | "list" => list::show(rest),
         "off" => switch(rest, false),
         "on" => switch(rest, true),

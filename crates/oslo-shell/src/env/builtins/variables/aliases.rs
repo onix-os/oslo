@@ -2,6 +2,7 @@
 
 use super::options;
 use super::quoting::single_quoted;
+use crate::env::origin_now;
 use crate::env::scope::Environment;
 use oslo_base::error::Result;
 
@@ -47,7 +48,7 @@ pub fn builtin_alias(env: &mut Environment, args: &[String]) -> Result<i32> {
             Some(idx) => {
                 let name = &arg[..idx];
                 if !is_valid_alias_name(name) {
-                    eprintln!("oslo: alias: `{}': invalid alias name", name);
+                    eprintln!("{}alias: `{}': invalid alias name", origin_now(), name);
                     status = 1;
                     continue;
                 }
@@ -56,7 +57,7 @@ pub fn builtin_alias(env: &mut Environment, args: &[String]) -> Result<i32> {
             None => match env.get_alias(arg) {
                 Some(value) => println!("alias {}={}", arg, single_quoted(value)),
                 None => {
-                    eprintln!("oslo: alias: {}: not found", arg);
+                    eprintln!("{}alias: {}: not found", origin_now(), arg);
                     status = 1;
                 }
             },
@@ -91,7 +92,7 @@ pub fn builtin_unalias(env: &mut Environment, args: &[String]) -> Result<i32> {
         // Removing something that was not there is a failure, not a no-op: `unalias ls ||
         // add_default` has to be able to tell the difference.
         if env.get_alias(name).is_none() {
-            eprintln!("oslo: unalias: {}: not found", name);
+            eprintln!("{}unalias: {}: not found", origin_now(), name);
             status = 1;
             continue;
         }

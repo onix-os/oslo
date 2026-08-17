@@ -16,6 +16,7 @@ pub use echo::builtin_echo;
 pub use printf::{builtin_printf, shell_quote};
 pub use read::builtin_read;
 
+use crate::env::origin_now;
 use std::io::Write;
 use std::os::fd::BorrowedFd;
 
@@ -52,7 +53,7 @@ pub(crate) fn write_stdout(name: &str, bytes: &[u8]) -> i32 {
             // killed anyway, and bash prints nothing for it either.
             Err(nix::errno::Errno::EPIPE) => return 1,
             Err(e) => {
-                eprintln!("oslo: {name}: write error: {}", e.desc());
+                eprintln!("{}{name}: write error: {}", origin_now(), e.desc());
                 return 1;
             }
         }

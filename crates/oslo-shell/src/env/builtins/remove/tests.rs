@@ -157,7 +157,10 @@ fn a_trashed_file_is_moved_rather_than_destroyed() {
     };
 
     let file = dir.path().join("file");
-    assert!(remove_operand(&file, "file", &options, &mode));
+    assert!(matches!(
+        remove_operand(&file, "file", &options, &mode, "oslo: "),
+        Removal::Gone
+    ));
     assert!(gone(&dir, "file"), "gone from where it was");
     assert_eq!(
         std::fs::read_to_string(bin.path().join("file")).unwrap(),

@@ -3,6 +3,7 @@
 use super::deparse::function_definition;
 use super::quoting::quote_minimal;
 use crate::env::options::{SetError, SetListing, ShellOption, parse_set_args};
+use crate::env::origin_now;
 use crate::env::scope::{Environment, is_valid_identifier};
 use oslo_base::error::{Result, ShellError};
 
@@ -30,7 +31,7 @@ pub fn builtin_set(env: &mut Environment, args: &[String]) -> Result<i32> {
     let parsed = match parse_set_args(args) {
         Ok(parsed) => parsed,
         Err(err) => {
-            eprintln!("oslo: set: {}", err);
+            eprintln!("{}set: {}", origin_now(), err);
             // The usage line answers "which letters are there?", so it follows a bad *letter*
             // and not a bad `-o` name, where it would list nothing relevant.
             if matches!(err, SetError::InvalidOption(_)) {
@@ -133,7 +134,11 @@ pub fn builtin_shift(env: &mut Environment, args: &[String]) -> Result<i32> {
         match args[1].parse::<usize>() {
             Ok(num) => num,
             Err(_) => {
-                eprintln!("oslo: shift: {}: numeric argument required", args[1]);
+                eprintln!(
+                    "{}shift: {}: numeric argument required",
+                    origin_now(),
+                    args[1]
+                );
                 return Ok(1);
             }
         }
@@ -143,7 +148,7 @@ pub fn builtin_shift(env: &mut Environment, args: &[String]) -> Result<i32> {
 
     let pos = env.get_positional().to_vec();
     if n > pos.len() {
-        eprintln!("oslo: shift: shift count out of range");
+        eprintln!("{}shift: shift count out of range", origin_now());
         return Ok(1);
     }
 

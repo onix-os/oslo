@@ -4,6 +4,7 @@ mod environ;
 mod frames;
 mod names;
 mod options;
+pub mod origin;
 mod record;
 mod registry;
 mod seed;
@@ -289,7 +290,11 @@ impl Environment {
     /// `match` of its own: the second list is what let `register_custom_builtin("echo", …)`
     /// register a function nothing would ever call (PLAN R5.6, R9.8).
     pub fn exec_custom_builtin(&mut self, name: &str, args: &[String]) -> Option<Result<i32>> {
-        self.builtins.lookup(name).map(|func| func(self, args))
+        let func = self.builtins.lookup(name)?;
+        // Published here because this is the only way in, so one write covers every builtin and
+        // every private helper under it — see `origin::here`.
+        let _origin = origin::Published::new(self.origin());
+        Some(func(self, args))
     }
 
     /// A variable's value as a single string.
@@ -359,10 +364,10 @@ impl Environment {
             self.published_line = 0;
         }
         if self.is_readonly(name) {
-            eprintln!("oslo: {}: is read only", name);
+            eprintln!("{}{}: is read only", self.origin(), name);
             return false;
         }
-        if reject_unrepresentable(name, value) {
+        if reject_unrepresentable(&self.origin(), name, value) {
             return false;
         }
         if let Some(array) = self.arrays.get_mut(name) {
@@ -457,7 +462,7 @@ impl Environment {
     pub fn export_var(&mut self, name: &str) -> bool {
         if let Some((val, _)) = self.vars.get(name) {
             let val = val.clone();
-            if reject_unrepresentable(name, &val) {
+            if reject_unrepresentable(&self.origin(), name, &val) {
                 return false;
             }
             if let Some((_, exp)) = self.vars.get_mut(name) {
@@ -465,7 +470,7 @@ impl Environment {
             }
             environ_set(name, &val);
         } else {
-            if reject_unrepresentable(name, "") {
+            if reject_unrepresentable(&self.origin(), name, "") {
                 return false;
             }
             // Recorded, not created. See `pending_exports`.

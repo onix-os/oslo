@@ -18,6 +18,7 @@ pub use resolve::{Kind, ways};
 /// Render a function definition as shell source; also what `set` and `declare -f` need to print.
 pub use unparse::format_function;
 
+use crate::env::origin_now;
 use crate::env::scope::Environment;
 use crate::exec::eval_command_list;
 use oslo_base::error::{Result, ShellError};
@@ -29,7 +30,12 @@ use std::fs;
 /// merely *starts* with digits is not a number, or `exit 1x` would silently exit 1.
 fn numeric_operand<T: std::str::FromStr>(name: &str, raw: &str) -> std::result::Result<T, ()> {
     raw.trim().parse::<T>().map_err(|_| {
-        eprintln!("oslo: {}: {}: numeric argument required", name, raw);
+        eprintln!(
+            "{}{}: {}: numeric argument required",
+            origin_now(),
+            name,
+            raw
+        );
     })
 }
 
@@ -41,7 +47,12 @@ fn loop_depth(name: &str, args: &[String]) -> std::result::Result<usize, i32> {
             // `break 0` is not a loop count; the message is the same one bash gives a
             // non-numeric operand, and `numeric_operand` has not printed it in this branch.
             Ok(0) => {
-                eprintln!("oslo: {}: {}: numeric argument required", name, raw);
+                eprintln!(
+                    "{}{}: {}: numeric argument required",
+                    origin_now(),
+                    name,
+                    raw
+                );
                 Err(1)
             }
             Ok(n) => Ok(n),
@@ -91,7 +102,7 @@ pub fn builtin_return(env: &mut Environment, args: &[String]) -> Result<i32> {
 /// meant to reveal. It is a usage error, and bash leaves with 2.
 pub fn builtin_exit(env: &mut Environment, args: &[String]) -> Result<i32> {
     if args.len() > 2 {
-        eprintln!("oslo: exit: too many arguments");
+        eprintln!("{}exit: too many arguments", origin_now());
         // Not an exit: bash refuses the request and leaves the shell running.
         return Ok(1);
     }
@@ -149,7 +160,7 @@ fn refuse_over_stopped_jobs(env: &mut Environment) -> bool {
     if stopped == 0 {
         return false;
     }
-    eprintln!("oslo: exit: there are stopped jobs");
+    eprintln!("{}exit: there are stopped jobs", origin_now());
     env.note_exit_warned();
     true
 }
@@ -199,7 +210,7 @@ pub fn builtin_eval(env: &mut Environment, args: &[String]) -> Result<i32> {
             // for a shell that is not in POSIX mode, so the ordinary case is unchanged. Measured —
             // `bash --posix -c 'eval "if"; echo ALIVE'` prints nothing and exits 2.
             Err(e) => {
-                eprintln!("oslo: eval: {}", e);
+                eprintln!("{}eval: {}", origin_now(), e);
                 Err(oslo_base::error::ShellError::utility_error("eval", 2))
             }
         };
@@ -209,7 +220,7 @@ pub fn builtin_eval(env: &mut Environment, args: &[String]) -> Result<i32> {
 
 pub fn builtin_source(env: &mut Environment, args: &[String]) -> Result<i32> {
     if args.len() < 2 {
-        eprintln!("oslo: source: filename argument required");
+        eprintln!("{}source: filename argument required", origin_now());
         return Ok(1);
     }
 
@@ -246,7 +257,7 @@ pub fn builtin_source(env: &mut Environment, args: &[String]) -> Result<i32> {
             // As with `eval`: the sourced file failing to parse leaves `source` with status 2 and
             // the calling script still running.
             Err(e) => {
-                eprintln!("oslo: {}: {}", file_path, e);
+                eprintln!("{}{}: {}", origin_now(), file_path, e);
                 Ok(2)
             }
         };

@@ -17,6 +17,7 @@
 
 use super::handlers::{self, DEFAULT_ACTION};
 use super::signals;
+use crate::env::origin_now;
 use crate::env::scope::Environment;
 use oslo_base::error::Result;
 
@@ -79,6 +80,10 @@ impl Condition {
     }
 }
 
+/// The usage line, printed under the diagnostic that caused it. Unprefixed, as bash leaves its
+/// own: the line above already said where, and this one is a reminder rather than a report.
+const USAGE: &str = "trap: usage: trap [-lp] [[action] condition ...]";
+
 /// bash's non-POSIX conditions that oslo still does not run. Recognised so the diagnostic can be
 /// truthful rather than claiming the name does not exist.
 const UNSUPPORTED: [&str; 2] = ["ERR", "RETURN"];
@@ -113,11 +118,26 @@ pub fn builtin_trap(env: &mut Environment, args: &[String]) -> Result<i32> {
     }
 
     // `--` ends the options, so `trap -- - EXIT` can reset a condition without `-` being read as
-    // an option letter.
-    let operands = match operands.first().map(String::as_str) {
-        Some("--") => &operands[1..],
-        _ => operands,
+    // an option letter — and so `trap -- -x EXIT` can install an action that starts with one.
+    let (operands, options_ended) = match operands.first().map(String::as_str) {
+        Some("--") => (&operands[1..], true),
+        _ => (operands, false),
     };
+
+    // **An option this does not know is an error, not an action.** Everything after `-l`, `-p` and
+    // `--` used to fall through to "the first operand is the handler text", so `trap -z EXIT`
+    // installed a handler that ran the command `-z`: status 0 at the time, and a `command not
+    // found` at exit, when the cleanup the script was relying on did not happen. That is the same
+    // failure the `-` case at the top of this file was written to stop, one operand along.
+    if !options_ended
+        && let Some(first) = operands.first()
+        && first.starts_with('-')
+        && first.as_str() != "-"
+    {
+        eprintln!("{}trap: {first}: invalid option", origin_now());
+        eprintln!("{USAGE}");
+        return Ok(2);
+    }
 
     let Some(first) = operands.first() else {
         return Ok(list(env, &[]));
@@ -135,7 +155,11 @@ pub fn builtin_trap(env: &mut Environment, args: &[String]) -> Result<i32> {
     };
 
     if conditions.is_empty() {
-        eprintln!("oslo: trap: usage: trap [-lp] [[action] condition ...]");
+        eprintln!(
+            "{}trap: an action needs a condition to run on",
+            origin_now()
+        );
+        eprintln!("{USAGE}");
         return Ok(2);
     }
 
@@ -152,7 +176,11 @@ pub fn builtin_trap(env: &mut Environment, args: &[String]) -> Result<i32> {
 /// Record one condition's new disposition, and tell the kernel about it. False on a bad operand.
 fn apply(env: &mut Environment, spec: &str, action: &str) -> bool {
     let Some(condition) = resolve(spec) else {
-        eprintln!("oslo: trap: {}: invalid signal specification", spec);
+        eprintln!(
+            "{}trap: {}: invalid signal specification",
+            origin_now(),
+            spec
+        );
         return false;
     };
 
@@ -160,7 +188,8 @@ fn apply(env: &mut Environment, spec: &str, action: &str) -> bool {
         // Honest refusal rather than a silent no-op: a script that sets an ERR trap and gets
         // status 0 back is entitled to believe the handler will run.
         eprintln!(
-            "oslo: trap: {}: condition not supported; no handler was installed",
+            "{}trap: {}: condition not supported; no handler was installed",
+            origin_now(),
             name
         );
         return false;
@@ -197,7 +226,11 @@ fn list(env: &Environment, conditions: &[String]) -> i32 {
             match resolve(spec) {
                 Some(condition) => wanted.push(condition),
                 None => {
-                    eprintln!("oslo: trap: {}: invalid signal specification", spec);
+                    eprintln!(
+                        "{}trap: {}: invalid signal specification",
+                        origin_now(),
+                        spec
+                    );
                     status = 1;
                 }
             }
@@ -351,5 +384,37 @@ mod tests {
     fn an_action_with_no_condition_is_a_usage_error() {
         let mut env = Environment::new();
         assert_eq!(run(&mut env, &["trap", "echo x"]), 2);
+    }
+
+    /// **A typo in a flag must not become the handler.** `trap -z EXIT` reported success and
+    /// installed `-z` as the EXIT action, so the failure surfaced at exit as `-z: command not
+    /// found` — by which point the cleanup the script wanted had not run and could not.
+    #[test]
+    fn an_unknown_option_is_refused_rather_than_installed() {
+        let mut env = Environment::new();
+        for bad in ["-z", "--nosuch", "-Z", "-lp"] {
+            assert_eq!(run(&mut env, &["trap", bad, "EXIT"]), 2, "{bad}");
+            assert_eq!(env.get_trap("EXIT"), None, "{bad} was installed anyway");
+        }
+    }
+
+    /// `-` is still a reset and not an option, which is the case the check has to step around.
+    #[test]
+    fn a_bare_dash_is_not_read_as_an_option() {
+        let mut env = Environment::new();
+        run(&mut env, &["trap", "echo x", "EXIT"]);
+        assert_eq!(run(&mut env, &["trap", "-", "EXIT"]), 0);
+        assert_eq!(
+            handlers::disposition(&env, "EXIT"),
+            handlers::Disposition::Default
+        );
+    }
+
+    /// And `--` still ends them, so an action may legitimately start with a dash.
+    #[test]
+    fn a_double_dash_lets_an_action_start_with_one() {
+        let mut env = Environment::new();
+        assert_eq!(run(&mut env, &["trap", "--", "-z", "EXIT"]), 0);
+        assert_eq!(env.get_trap("EXIT"), Some("-z"));
     }
 }

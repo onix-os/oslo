@@ -64,10 +64,10 @@ pub fn run(args: &[String]) -> i32 {
             print!("{}", MENU.overview(Paint::detect()));
             0
         }
-        Some("files") => files(),
-        Some("timing") => timing(),
+        Some("files") => MENU.extra("files", args, 0).unwrap_or_else(files),
+        Some("timing") => MENU.extra("timing", args, 0).unwrap_or_else(timing),
         Some("which") => match args.get(1) {
-            Some(key) => which(key),
+            Some(key) => MENU.extra("which", args, 1).unwrap_or_else(|| which(key)),
             None => MENU.missing("which needs a setting, as in `oslo config which vi.enabled`"),
         },
         Some(other) => MENU.unknown(other),

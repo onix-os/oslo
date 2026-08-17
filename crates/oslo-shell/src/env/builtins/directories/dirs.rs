@@ -6,6 +6,7 @@
 
 use super::chdir::logical_pwd;
 use super::stack::{is_index, resolve_index, stack, store};
+use crate::env::origin_now;
 use crate::env::scope::Environment;
 use oslo_base::error::Result;
 
@@ -57,7 +58,7 @@ fn parse_options(args: &[String]) -> std::result::Result<Options, i32> {
             continue;
         }
         let Some(flags) = arg.strip_prefix('-').filter(|rest| !rest.is_empty()) else {
-            eprintln!("oslo: dirs: {arg}: invalid number");
+            eprintln!("{}dirs: {arg}: invalid number", origin_now());
             eprintln!("{DIRS_USAGE}");
             return Err(2);
         };
@@ -69,7 +70,7 @@ fn parse_options(args: &[String]) -> std::result::Result<Options, i32> {
                 // `-v` is `-p` plus the indices, so it wins over a preceding `-p`.
                 'v' => options.layout = Layout::Numbered,
                 other => {
-                    eprintln!("oslo: dirs: -{other}: invalid number");
+                    eprintln!("{}dirs: -{other}: invalid number", origin_now());
                     eprintln!("{DIRS_USAGE}");
                     return Err(2);
                 }
@@ -97,7 +98,7 @@ pub fn builtin_dirs(env: &mut Environment, args: &[String]) -> Result<i32> {
 
     if let Some(spec) = options.index {
         let Some(index) = resolve_index(&spec, entries.len()) else {
-            eprintln!("oslo: dirs: directory stack empty");
+            eprintln!("{}dirs: directory stack empty", origin_now());
             return Ok(1);
         };
         println!("{}", present(env, &entries[index], options.long));

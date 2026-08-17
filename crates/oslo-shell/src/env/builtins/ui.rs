@@ -24,6 +24,7 @@
 //! `ui choose a b c` are both the obvious thing.
 
 use crate::env::Environment;
+use crate::env::origin_now;
 use oslo_base::error::Result;
 mod chrome;
 mod lists;
@@ -80,7 +81,7 @@ fn run(called: &str, args: &[String]) -> i32 {
             0
         }
         other => {
-            eprintln!("oslo: {called}: {other}: not a widget");
+            eprintln!("{}{called}: {other}: not a widget", origin_now());
             usage(called, Where::Error);
             2
         }
@@ -186,7 +187,7 @@ fn run_input(args: &[String]) -> i32 {
                     Shared::Bad(status) => return status,
                     Shared::NotMine => {}
                 }
-                eprintln!("oslo: ui input: {other}: unknown option");
+                eprintln!("{}ui input: {other}: unknown option", origin_now());
                 return 2;
             }
         }
@@ -214,7 +215,7 @@ fn run_confirm(args: &[String]) -> i32 {
                     Chromed::Bad(status) => return status,
                     Chromed::NotMine => {}
                 }
-                eprintln!("oslo: ui confirm: {other}: unknown option");
+                eprintln!("{}ui confirm: {other}: unknown option", origin_now());
                 return 2;
             }
             other => question = Some(other.to_string()),
@@ -261,7 +262,7 @@ fn run_style(args: &[String]) -> i32 {
                 spec.padding_x = parts.next().and_then(|n| n.parse().ok()).unwrap_or(0);
             }
             other if other.starts_with("--") => {
-                eprintln!("oslo: ui style: {other}: unknown option");
+                eprintln!("{}ui style: {other}: unknown option", origin_now());
                 return 2;
             }
             other => words.push(other.to_string()),
@@ -326,7 +327,7 @@ fn run_write(args: &[String]) -> i32 {
                     Chromed::Bad(status) => return status,
                     Chromed::NotMine => {}
                 }
-                eprintln!("oslo: ui write: {other}: unknown option");
+                eprintln!("{}ui write: {other}: unknown option", origin_now());
                 return 2;
             }
         }
@@ -345,7 +346,10 @@ fn run_format(args: &[String]) -> i32 {
             "--type" | "-t" => match As::parse(&take(args, &mut at)) {
                 Some(parsed) => kind = parsed,
                 None => {
-                    eprintln!("oslo: ui format: not a type; try markdown, template, code, text");
+                    eprintln!(
+                        "{}ui format: not a type; try markdown, template, code, text",
+                        origin_now()
+                    );
                     return 2;
                 }
             },
@@ -354,13 +358,13 @@ fn run_format(args: &[String]) -> i32 {
                 match pair.split_once('=') {
                     Some((key, value)) => values.push((key.to_string(), value.to_string())),
                     None => {
-                        eprintln!("oslo: ui format: --field wants key=value");
+                        eprintln!("{}ui format: --field wants key=value", origin_now());
                         return 2;
                     }
                 }
             }
             other if other.starts_with("--") => {
-                eprintln!("oslo: ui format: {other}: unknown option");
+                eprintln!("{}ui format: {other}: unknown option", origin_now());
                 return 2;
             }
             other => words.push(other.to_string()),
@@ -388,12 +392,15 @@ fn run_join(args: &[String]) -> i32 {
             "--align" => match Align::parse(&take(args, &mut at)) {
                 Some(parsed) => align = parsed,
                 None => {
-                    eprintln!("oslo: ui join: not an alignment; try top, center, bottom");
+                    eprintln!(
+                        "{}ui join: not an alignment; try top, center, bottom",
+                        origin_now()
+                    );
                     return 2;
                 }
             },
             other if other.starts_with("--") => {
-                eprintln!("oslo: ui join: {other}: unknown option");
+                eprintln!("{}ui join: {other}: unknown option", origin_now());
                 return 2;
             }
             other => blocks.push(other.to_string()),
@@ -425,7 +432,10 @@ fn run_log(args: &[String]) -> i32 {
             "--level" | "-l" => match Level::parse(&take(args, &mut at)) {
                 Some(level) => entry.level = level,
                 None => {
-                    eprintln!("oslo: ui log: not a level; try debug, info, warn, error, fatal");
+                    eprintln!(
+                        "{}ui log: not a level; try debug, info, warn, error, fatal",
+                        origin_now()
+                    );
                     return 2;
                 }
             },
@@ -435,13 +445,13 @@ fn run_log(args: &[String]) -> i32 {
                 match pair.split_once('=') {
                     Some((key, value)) => entry.fields.push((key.to_string(), value.to_string())),
                     None => {
-                        eprintln!("oslo: ui log: --field wants key=value");
+                        eprintln!("{}ui log: --field wants key=value", origin_now());
                         return 2;
                     }
                 }
             }
             other if other.starts_with("--") => {
-                eprintln!("oslo: ui log: {other}: unknown option");
+                eprintln!("{}ui log: {other}: unknown option", origin_now());
                 return 2;
             }
             other => words.push(other.to_string()),
@@ -473,7 +483,7 @@ fn run_pager(args: &[String]) -> i32 {
                     Chromed::Bad(status) => return status,
                     Chromed::NotMine => {}
                 }
-                eprintln!("oslo: ui pager: {other}: unknown option");
+                eprintln!("{}ui pager: {other}: unknown option", origin_now());
                 return 2;
             }
             other => words.push(other.to_string()),
@@ -508,7 +518,7 @@ fn run_spin(args: &[String]) -> i32 {
                 break;
             }
             other if other.starts_with("--") => {
-                eprintln!("oslo: ui spin: {other}: unknown option");
+                eprintln!("{}ui spin: {other}: unknown option", origin_now());
                 return 2;
             }
             _ => {

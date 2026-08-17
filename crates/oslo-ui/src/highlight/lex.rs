@@ -92,6 +92,21 @@ pub fn lex(line: &str) -> Vec<Span> {
             break;
         }
 
+        // **`\rm` and `\\rm` are commands, not escapes.** A leading backslash on the command word
+        // is oslo's way of asking for the thing its own name is standing in front of — `\cmd`
+        // skips the alias, the function and the builtin, `\\cmd` skips only the builtin. Lexed as
+        // an ordinary escape, `\rm` came out as a `\r` span and an `m` span: the first letter took
+        // the escape colour and the rest read as an argument. See `exec::simple::escape`.
+        if ch == '\\'
+            && command_position
+            && let Some(len) = escaped_command_len(rest)
+        {
+            push(&mut spans, &rest[..len], Role::CommandWord);
+            i += len;
+            command_position = false;
+            continue;
+        }
+
         if ch == '\\' {
             // The escape and the character it escapes are one span, so a `\` at end of line does
             // not swallow the newline that is not there yet.
@@ -162,12 +177,7 @@ pub fn lex(line: &str) -> Vec<Span> {
         }
 
         // An ordinary word, up to the next thing that is not part of one.
-        let end = rest
-            .find(|c: char| {
-                c.is_whitespace()
-                    || matches!(c, '|' | '&' | ';' | '<' | '>' | '\'' | '"' | '$' | '\\')
-            })
-            .unwrap_or(rest.len());
+        let end = rest.find(ends_word).unwrap_or(rest.len());
         let word = &rest[..end];
 
         // An assignment prefix — `FOO=bar cmd` — leaves the next word still in command position.
@@ -194,6 +204,27 @@ pub fn lex(line: &str) -> Vec<Span> {
     }
 
     spans
+}
+
+/// Where an ordinary word ends: the characters that cannot be part of one.
+fn ends_word(c: char) -> bool {
+    c.is_whitespace() || matches!(c, '|' | '&' | ';' | '<' | '>' | '\'' | '"' | '$' | '\\')
+}
+
+/// How many bytes of an escaped command word `rest` begins with, if it begins with one.
+///
+/// `\cmd` and `\\cmd` only, and only when a *name* follows: `\ file` is an escaped space and
+/// `\$HOME` an escaped dollar, both of which are ordinary escapes wherever they appear. The
+/// doubled form is tried first, or `\\rm` would be read as `\` + `\rm`.
+fn escaped_command_len(rest: &str) -> Option<usize> {
+    let after = rest
+        .strip_prefix(r"\\")
+        .or_else(|| rest.strip_prefix('\\'))?;
+    if after.chars().next().is_none_or(ends_word) {
+        return None;
+    }
+    let name = after.find(ends_word).unwrap_or(after.len());
+    Some(rest.len() - after.len() + name)
 }
 
 /// Whether what comes next begins a word, which is what makes a `#` a comment.
@@ -407,159 +438,5 @@ fn redirection_len(rest: &str) -> Option<usize> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn roles(line: &str) -> Vec<(String, Role)> {
-        lex(line)
-            .into_iter()
-            .filter(|s| s.role != Role::Plain)
-            .map(|s| (s.text, s.role))
-            .collect()
-    }
-
-    /// The one invariant everything else rests on: the spans put the line back together exactly.
-    #[test]
-    fn spans_reassemble_into_the_original_line() {
-        for line in [
-            "echo hi",
-            "ls -l | wc -l",
-            "echo \"a b\" $HOME",
-            "git commit -m 'x' && true",
-            "cat <<EOF",
-            "grep -n 'x' f.txt 2>&1 >out # a comment",
-            "FOO=bar cmd arg",
-            "echo ${HOME}/x $(date) \\$literal",
-            "if true; then echo y; fi",
-            "echo 'unclosed",
-            "echo \\",
-            "",
-        ] {
-            let joined: String = lex(line).iter().map(|s| s.text.as_str()).collect();
-            assert_eq!(joined, line, "for {line:?}");
-        }
-    }
-
-    #[test]
-    fn the_first_word_of_each_command_is_a_command_word() {
-        let found: Vec<String> = lex("ls | wc; grep x && true")
-            .into_iter()
-            .filter(|s| s.role == Role::CommandWord)
-            .map(|s| s.text)
-            .collect();
-        assert_eq!(found, vec!["ls", "wc", "grep", "true"]);
-    }
-
-    /// A keyword does not consume the command position — `if grep` still has `grep` as the
-    /// command, which is what makes an unknown command after `if` still show up as wrong.
-    #[test]
-    fn a_keyword_leaves_the_command_position_open() {
-        let spans = lex("if grep x; then echo y; fi");
-        let keywords: Vec<&str> = spans
-            .iter()
-            .filter(|s| s.role == Role::Keyword)
-            .map(|s| s.text.as_str())
-            .collect();
-        assert_eq!(keywords, vec!["if", "then", "fi"]);
-        let commands: Vec<&str> = spans
-            .iter()
-            .filter(|s| s.role == Role::CommandWord)
-            .map(|s| s.text.as_str())
-            .collect();
-        assert_eq!(commands, vec!["grep", "echo"]);
-    }
-
-    /// `FOO=bar cmd` runs `cmd`, so the assignment must not eat the command position.
-    #[test]
-    fn an_assignment_prefix_is_not_the_command() {
-        let spans = lex("FOO=bar BAZ=1 cmd arg");
-        let commands: Vec<&str> = spans
-            .iter()
-            .filter(|s| s.role == Role::CommandWord)
-            .map(|s| s.text.as_str())
-            .collect();
-        assert_eq!(commands, vec!["cmd"]);
-        // And `x=1` alone is not a command at all.
-        assert!(
-            lex("x=1").iter().all(|s| s.role != Role::CommandWord),
-            "{:?}",
-            lex("x=1")
-        );
-    }
-
-    #[test]
-    fn redirections_are_told_apart_from_operators_and_separators() {
-        assert_eq!(
-            roles("a > b >> c 2>&1 <<<x"),
-            vec![
-                ("a".into(), Role::CommandWord),
-                (">".into(), Role::Redirection),
-                ("b".into(), Role::Word),
-                (">>".into(), Role::Redirection),
-                ("c".into(), Role::Word),
-                ("2>&1".into(), Role::Redirection),
-                ("<<<".into(), Role::Redirection),
-                ("x".into(), Role::Word),
-            ]
-        );
-        // `;` and a lone `&` end a command; `|`, `||` and `&&` join two.
-        assert_eq!(roles("a; b & c | d && e")[1].1, Role::End);
-        assert_eq!(roles("a | b")[1].1, Role::Operator);
-        assert_eq!(roles("a && b")[1].1, Role::Operator);
-    }
-
-    /// A `#` is a comment only at the start of a word. This is the same rule that had to be fixed
-    /// in the shell's own lexer, and getting it wrong greys out the rest of a good line.
-    #[test]
-    fn a_hash_inside_a_word_is_not_a_comment() {
-        assert!(roles("echo a#b").iter().all(|(_, r)| *r != Role::Comment));
-        assert!(roles("echo $#").iter().all(|(_, r)| *r != Role::Comment));
-        let commented = roles("echo x # note");
-        assert_eq!(
-            commented.last().map(|(t, r)| (t.as_str(), *r)),
-            Some(("# note", Role::Comment))
-        );
-    }
-
-    #[test]
-    fn expansions_run_to_their_closing_bracket() {
-        assert_eq!(roles("echo ${HOME}")[1], ("${HOME}".into(), Role::Variable));
-        assert_eq!(roles("echo $(date)")[1], ("$(date)".into(), Role::Variable));
-        // Nested, which a naive scan to the first `)` gets wrong.
-        assert_eq!(
-            roles("echo $(echo $(date))")[1],
-            ("$(echo $(date))".into(), Role::Variable)
-        );
-        assert_eq!(roles("echo $?")[1], ("$?".into(), Role::Variable));
-        assert_eq!(roles("echo $HOME")[1], ("$HOME".into(), Role::Variable));
-    }
-
-    /// A line being typed is usually unfinished, so an unclosed quote is a span rather than an
-    /// error — deciding the line is incomplete is the validator's job, not the highlighter's.
-    #[test]
-    fn an_unclosed_quote_runs_to_the_end_rather_than_failing() {
-        assert_eq!(roles("echo 'abc")[1], ("'abc".into(), Role::SingleQuote));
-        assert_eq!(roles("echo \"a b")[1], ("\"a b".into(), Role::DoubleQuote));
-        // A backslash inside double quotes escapes the quote that would have closed them. The
-        // string is split at the escape now, so the pieces are what to check.
-        let pieces: String = roles(r#"echo "a\"b""#)[1..]
-            .iter()
-            .map(|(text, _)| text.as_str())
-            .collect();
-        assert_eq!(pieces, r#""a\"b""#);
-    }
-
-    #[test]
-    fn escapes_are_their_own_span() {
-        let spans = roles(r"echo a\ b");
-        assert!(
-            spans.iter().any(|(t, r)| t == r"\ " && *r == Role::Escape),
-            "{spans:?}"
-        );
-        // A trailing backslash does not run past the end of the line.
-        assert_eq!(
-            lex(r"echo \").iter().map(|s| s.text.len()).sum::<usize>(),
-            6
-        );
-    }
-}
+#[path = "lex/tests.rs"]
+mod tests;

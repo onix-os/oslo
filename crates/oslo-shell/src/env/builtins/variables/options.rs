@@ -4,6 +4,7 @@
 //! called `-p` and `unalias -a` deleted an alias called `-a`. One parser, used by all of them,
 //! is what stops that class of bug coming back one builtin at a time.
 
+use crate::env::origin_now;
 use oslo_base::error::ShellError;
 
 /// The option letters found before the operands, and where the operands start.
@@ -62,7 +63,7 @@ pub fn parse(args: &[String], accepted: &str) -> Result<Options, char> {
 /// and carries on — matching bash on both. Outside POSIX mode every one of them folds back to
 /// `Ok(2)`, which is what this function used to return directly.
 pub fn invalid(builtin: &str, letter: char, usage: &str) -> ShellError {
-    eprintln!("oslo: {}: -{}: invalid option", builtin, letter);
+    eprintln!("{}{}: -{}: invalid option", origin_now(), builtin, letter);
     eprintln!("{}", usage);
     ShellError::utility_error(format!("{}: -{}: invalid option", builtin, letter), 2)
 }

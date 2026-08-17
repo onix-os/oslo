@@ -8,3 +8,5 @@ pub mod scope;
 pub mod universal;
 
 pub use scope::Environment;
+/// Where the builtin now running should say its diagnostics came from — see [`scope::origin`].
+pub use scope::origin::origin_now;

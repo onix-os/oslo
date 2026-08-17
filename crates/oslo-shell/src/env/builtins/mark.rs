@@ -20,6 +20,7 @@
 //! reserved for something else, so no builtin may take the start of a line.
 
 use crate::env::Environment;
+use crate::env::origin_now;
 use oslo_base::dirs;
 use oslo_base::error::Result;
 
@@ -38,12 +39,12 @@ pub fn builtin_mark(env: &mut Environment, args: &[String]) -> Result<i32> {
         Some("-d" | "--delete") => match args.get(1) {
             Some(name) => remove(name),
             None => {
-                eprintln!("oslo: mark: -d takes the name of a mark");
+                eprintln!("{}mark: -d takes the name of a mark", origin_now());
                 Ok(2)
             }
         },
         Some(flag) if flag.starts_with('-') => {
-            eprintln!("oslo: mark: {flag}: not an option\n{USAGE}");
+            eprintln!("{}mark: {flag}: not an option\n{USAGE}", origin_now());
             Ok(2)
         }
         chosen => toggle(env, chosen),
@@ -63,7 +64,7 @@ usage: mark              mark this directory, or unmark it if it is marked
 /// name-keyed toggle would leave behind and then refuse to replace.
 fn toggle(env: &mut Environment, chosen: Option<&str>) -> Result<i32> {
     let Some(here) = current_directory(env) else {
-        eprintln!("oslo: mark: cannot tell which directory this is");
+        eprintln!("{}mark: cannot tell which directory this is", origin_now());
         return Ok(1);
     };
     if let Some(existing) = dirs::mark_of(&here) {
@@ -76,7 +77,7 @@ fn toggle(env: &mut Environment, chosen: Option<&str>) -> Result<i32> {
                     Ok(0)
                 }
                 Err(problem) => {
-                    eprintln!("oslo: mark: {problem}");
+                    eprintln!("{}mark: {problem}", origin_now());
                     Ok(1)
                 }
             };
@@ -87,7 +88,7 @@ fn toggle(env: &mut Environment, chosen: Option<&str>) -> Result<i32> {
                 Ok(0)
             }
             Err(problem) => {
-                eprintln!("oslo: mark: {problem}");
+                eprintln!("{}mark: {problem}", origin_now());
                 Ok(1)
             }
         };
@@ -98,7 +99,10 @@ fn toggle(env: &mut Environment, chosen: Option<&str>) -> Result<i32> {
         None => match basename(&here) {
             Some(name) => name,
             None => {
-                eprintln!("oslo: mark: {here} has no name to mark it by; `mark NAME` chooses one");
+                eprintln!(
+                    "{}mark: {here} has no name to mark it by; `mark NAME` chooses one",
+                    origin_now()
+                );
                 return Ok(1);
             }
         },
@@ -120,7 +124,7 @@ fn toggle(env: &mut Environment, chosen: Option<&str>) -> Result<i32> {
             Ok(0)
         }
         Err(problem) => {
-            eprintln!("oslo: mark: {problem}");
+            eprintln!("{}mark: {problem}", origin_now());
             Ok(1)
         }
     }
@@ -133,11 +137,11 @@ fn remove(name: &str) -> Result<i32> {
             Ok(0)
         }
         Ok(false) => {
-            eprintln!("oslo: mark: @{name} is not marked");
+            eprintln!("{}mark: @{name} is not marked", origin_now());
             Ok(1)
         }
         Err(problem) => {
-            eprintln!("oslo: mark: {problem}");
+            eprintln!("{}mark: {problem}", origin_now());
             Ok(1)
         }
     }

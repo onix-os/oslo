@@ -21,6 +21,30 @@ fn tool_output(args: &[&str]) -> String {
     String::from_utf8_lossy(&out.stdout).into_owned() + &String::from_utf8_lossy(&out.stderr)
 }
 
+/// Whether a tool the README names is compiled into *this* binary.
+///
+/// **`default = []`.** Four tools sit behind cargo features, so a plain `cargo test` builds a
+/// shell that truthfully does not list them, while the README describes the binary `make build`
+/// produces — which has them all. Asserting against the smaller build made this test fail on
+/// `secret` for a README that was perfectly correct.
+///
+/// The README already says it: *"whichever of `direnv`, `plugin` and `scratch` this build has"*.
+/// The prose knew these were conditional and the test did not, so the test was the half that was
+/// wrong. It cannot read that sentence, so the same fact is written here.
+///
+/// Only these four are excused, and only when their own feature is off. Any other name still has
+/// to be a real tool, which is the claim this test exists for: `oslo aliases` was advertised for
+/// as long as the README had existed and was never a tool at all.
+fn built_into_this_binary(name: &str) -> bool {
+    match name {
+        "direnv" => cfg!(feature = "direnv"),
+        "plugin" => cfg!(feature = "plugin"),
+        "scratch" => cfg!(feature = "scratch"),
+        "secret" => cfg!(feature = "secrets"),
+        _ => true,
+    }
+}
+
 /// Every tool the README names is one `--help` lists, and the reverse.
 ///
 /// `oslo aliases` was advertised for as long as the README has existed and was never a tool; the
@@ -62,6 +86,9 @@ fn the_readme_names_the_tools_that_exist() {
     for named in sentence.split('`').skip(1).step_by(2) {
         let named = named.trim();
         if named.is_empty() || named.contains(' ') || named.starts_with("oslo") {
+            continue;
+        }
+        if !built_into_this_binary(named) {
             continue;
         }
         assert!(

@@ -25,6 +25,7 @@
 //! answered badly.
 
 use crate::env::builtins::control::{self, Kind};
+use crate::env::origin_now;
 use crate::env::scope::Environment;
 use oslo_base::error::Result;
 use std::path::PathBuf;
@@ -164,7 +165,7 @@ fn parse_options(args: &[String]) -> std::result::Result<(Options, &[String]), i
                 'b' => opts.binaries = true,
                 'm' => opts.manuals = true,
                 other => {
-                    eprintln!("oslo: whereis: -{other}: invalid option");
+                    eprintln!("{}whereis: -{other}: invalid option", origin_now());
                     eprintln!("whereis: usage: whereis [-bm] name [name ...]");
                     return Err(2);
                 }

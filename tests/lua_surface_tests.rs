@@ -2,15 +2,20 @@
 //!
 //! # The rule this enforces
 //!
-//! `stdlib/mod.rs` and `docs/features/lua-interpreter.md` both state it: **everything unimplemented
-//! is present and erroring, never `nil`.** `coroutine.wrap` raises "not implemented in oslo's Lua"
-//! and names the file and line; left `nil` the first use is `attempt to index a nil value`, and the
-//! reader goes looking for a typo that is not there.
+//! **Nothing on the standard surface is `nil`.** Left `nil`, the first use of a name is `attempt
+//! to call a nil value` and the reader goes looking for a typo that is not there; present, it
+//! either works or says why it will not.
 //!
 //! Twenty names were `nil` — among them `io.stderr`, which is how a Lua program complains, and
 //! `table.move`, which cannot be written in Lua without getting the overlapping case wrong. The
 //! rule was stated in two places and checked in none, which is the only reason twenty could
 //! accumulate.
+//!
+//! **The VM has since grown most of what it once refused**, so the second half of the rule is no
+//! longer "unimplemented names error by name" — there are none left. What remains is oslo's own
+//! three refusals, which are deliberate and are checked below. `os.setlocale` was the last name
+//! still missing, and it is answered rather than refused: see
+//! `crates/oslo-runtime/src/lua/api/policy.rs`.
 //!
 //! So this walks the standard surface and asks. A name added to Lua's library and forgotten here
 //! fails the walk rather than waiting for somebody's script to find it.
@@ -87,19 +92,64 @@ fn every_standard_name_exists() {
 
 /// **And the ones that refuse, refuse by name** — which is the half of the rule that makes it
 /// useful rather than merely tidy.
+///
+/// **This case used to name `string.pack` and `coroutine.wrap`**, which the VM has since grown; it
+/// was asserting that two working functions were broken, and failed the moment they started
+/// working. What it was really guarding is that a name a reader cannot use says which name it was,
+/// and the names that do that now are oslo's three deliberate refusals — see
+/// `crates/oslo-runtime/src/lua/api/policy.rs`. `os.execute` and `io.popen` shared one sentence
+/// that named neither of them until this test was pointed at them.
 #[test]
-fn an_unimplemented_name_says_what_it_is() {
-    let printed = lua(
-        "local ok, err = pcall(function() return string.pack('i4', 1) end)\nprint(err)\n\
-         local ok2, err2 = pcall(function() return coroutine.wrap(print) end)\nprint(err2)\n",
-    );
+fn a_refused_name_says_what_it_is() {
+    let printed = lua("for _, probe in ipairs{\n\
+         \x20 {'os.execute', function() return os.execute('true') end},\n\
+         \x20 {'io.popen', function() return io.popen('true') end},\n\
+         \x20 {'os.tmpname', function() return os.tmpname() end},\n\
+         } do\n\
+         \x20 local ok, err = pcall(probe[2])\n\
+         \x20 print(probe[1] .. ' | ' .. tostring(ok) .. ' | ' .. tostring(err))\n\
+         end\n");
+    for name in ["os.execute", "io.popen", "os.tmpname"] {
+        let line = printed
+            .lines()
+            .find(|line| line.starts_with(name))
+            .unwrap_or_else(|| panic!("{name} did not run: {printed}"));
+        assert!(line.contains("| false |"), "{name} did not refuse: {line}");
+        // The refusal has to carry the name, or a traceback through a line that calls two of them
+        // says which problem there is and not which call has it.
+        assert!(
+            line.split('|').nth(2).is_some_and(|why| why.contains(name)),
+            "{name} refused without naming itself: {line}"
+        );
+    }
+}
+
+/// **`os.setlocale` was the one standard name that was `nil`**, and it is answerable rather than
+/// refusable: this binary is static and musl-linked, so `C` is not just the current locale, it is
+/// the only one. The answers are Lua's own contract — `nil` for a locale that cannot be honoured.
+#[test]
+fn setlocale_answers_for_the_only_locale_there_is() {
+    let printed = lua("print('ask', os.setlocale())\n\
+         print('c', os.setlocale('C'))\n\
+         print('posix', os.setlocale('POSIX'))\n\
+         print('native', os.setlocale(''))\n\
+         print('other', tostring(os.setlocale('en_US.UTF-8')))\n\
+         print('category', os.setlocale('C', 'time'))\n\
+         local ok, err = pcall(function() return os.setlocale('C', 'bogus') end)\n\
+         print('badcat', tostring(ok), tostring(err))\n");
+    for wanted in [
+        "ask\tC",
+        "c\tC",
+        "posix\tC",
+        "native\tC",
+        "other\tnil",
+        "category\tC",
+    ] {
+        assert!(printed.contains(wanted), "wanted {wanted:?} in: {printed}");
+    }
     assert!(
-        printed.contains("string.pack is not implemented in oslo's Lua"),
-        "{printed}"
-    );
-    assert!(
-        printed.contains("coroutine.wrap is not implemented in oslo's Lua"),
-        "{printed}"
+        printed.contains("invalid option 'bogus'"),
+        "a category nobody defines should be reported: {printed}"
     );
 }
 
