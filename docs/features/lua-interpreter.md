@@ -81,7 +81,7 @@ them ignore the `Host` entirely. Their bodies never changed.
 
 ## What makes it different
 
-oslo's config is `config.lua`, and the values a config produces are the same `Value` the shell reads
+oslo's config is `init.lua`, and the values a config produces are the same `Value` the shell reads
 — no serialisation step, no second config format, and no separate configuration language to learn
 beside the one the prompt already speaks.
 
@@ -94,9 +94,9 @@ all on a system where oslo is the only shell installed.
 **The configuration is a Lua program, and it is one program even when it is several files.**
 
 ```lua
--- config.lua
+-- init.lua
 local oslo = require "oslo"      -- the same table the global names, not a copy of it
-require "prompt"                 -- prompt.lua, beside this file
+require "aliases"                -- aliases.lua, beside this file
 ```
 
 `require "oslo"` answers with the table `oslo` *is*. That is worth stating because the obvious
@@ -110,7 +110,7 @@ The search path is set by `lua::api::policy` from the environment at startup:
 
 ```lua
 -- ~/.config/oslo/?.lua and ?/init.lua — the config's own directory, so a second file
--- beside config.lua is `require "prompt"` rather than an absolute path spelled out.
+-- beside init.lua is `require "aliases"` rather than an absolute path spelled out.
 -- Then ~/.config/oslo/lua/, for a library kept apart from the config that uses it.
 -- Then the system 5.4 directories. Rooted at $XDG_CONFIG_HOME, else $HOME/.config.
 print(package.path)

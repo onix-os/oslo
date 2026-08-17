@@ -9,7 +9,7 @@
 //! quietly ran coreutils and looked correct. Only a name a config invented has nothing to fall
 //! through to.
 //!
-//! These drive Lua scripts rather than a config file: `config.lua` is read only by the interactive
+//! These drive Lua scripts rather than a config file: `init.lua` is read only by the interactive
 //! REPL, and a script reaches the same registration and the same dispatch without needing a pty.
 
 mod common;

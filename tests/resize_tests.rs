@@ -47,7 +47,7 @@ fn bytes_redrawn_on_resize(config: &str) -> usize {
     if !config.is_empty() {
         let dir = home.path().join("config/oslo");
         fs::create_dir_all(&dir).expect("config directory");
-        fs::write(dir.join("config.lua"), config).expect("config");
+        fs::write(dir.join("init.lua"), config).expect("config");
     }
 
     let master_fd = master.as_raw_fd();

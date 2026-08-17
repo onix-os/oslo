@@ -161,7 +161,7 @@ pub(super) const SUBCOMMANDS: &[Sub] = &[
         args: "[FILE]",
         about: "write every entry out as text",
         flags: &[],
-        note: "A database is not a dotfiles repository: an alias in `config.lua` is \
+        note: "A database is not a dotfiles repository: an alias in `init.lua` is \
                version-controlled, diffable and copied to a new machine with the rest of your \
                configuration, and one in here is none of those. This is the way back out. Without \
                a FILE it writes to stdout. A header line carries the kind, the name, `off` if it \

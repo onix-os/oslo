@@ -285,7 +285,7 @@ fn tools_section(paint: Paint) -> String {
 /// - **`$NO_COLOR`** is honoured, but it is a convention oslo did not invent and behaves the same
 ///   in every program that respects it.
 /// - **Anything the config decides.** The editing mode, the toggle key, the theme and the
-///   suggestion keys live in `config.lua`, and a variable that shadowed one would be a second
+///   suggestion keys live in `init.lua`, and a variable that shadowed one would be a second
 ///   place for the same setting to disagree from itself.
 ///
 /// `$PATH`, `$PS1`, `$IFS`, `$ENV` and the rest of POSIX's are absent for a different reason: they
@@ -308,7 +308,7 @@ const ENVIRONMENT: &[(&str, &str)] = &[
         "OSLO_SESSION",
         "this shell's session; exported, so a child can name the one it is in",
     ),
-    ("XDG_CONFIG_HOME", "where config.lua lives (~/.config)"),
+    ("XDG_CONFIG_HOME", "where init.lua lives (~/.config)"),
     (
         "XDG_DATA_HOME",
         "where the store lives (~/.local/share/oslo)",
@@ -321,7 +321,7 @@ fn environment_section(paint: Paint) -> String {
         s,
         "\n{}  {}",
         paint.head("ENVIRONMENT"),
-        paint.dim("everything else is config.lua, or POSIX's")
+        paint.dim("everything else is init.lua, or POSIX's")
     );
     for (name, about) in ENVIRONMENT {
         s.push_str(&row(name, paint.key(name), about));

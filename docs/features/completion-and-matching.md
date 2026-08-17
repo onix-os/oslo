@@ -297,7 +297,7 @@ come from the spec registry, so a command nobody has written a spec for offers n
 only paths.
 
 A declared spec lives for the session that declared it. There is no file it is read from and nothing
-writes one out, so a spec belongs in `config.lua` or in a plugin — which is where the code that knows
+writes one out, so a spec belongs in `init.lua` or in a plugin — which is where the code that knows
 the command's shape already is.
 
 ## Where it lives

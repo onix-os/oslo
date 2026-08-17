@@ -232,7 +232,7 @@ fn abbreviations_are_read_in_both_forms() {
         "oslo = { abbr = {
              gco = 'git checkout',
              gst = 'git status',
-             brc = { '~/.config/oslo/config.lua', anywhere = true },
+             brc = { '~/.config/oslo/init.lua', anywhere = true },
              tmp = { expansion = '/tmp' },
          } }",
     );
@@ -243,7 +243,7 @@ fn abbreviations_are_read_in_both_forms() {
         vec![
             (
                 "brc".to_string(),
-                "~/.config/oslo/config.lua".to_string(),
+                "~/.config/oslo/init.lua".to_string(),
                 true
             ),
             ("gco".to_string(), "git checkout".to_string(), false),

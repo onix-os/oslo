@@ -28,9 +28,9 @@ use oslo_luavm::Host;
 ///
 /// **The config directory itself is on the path, not only `lua/` under it.** A configuration that
 /// has grown a second file — a prompt, a set of key bindings — should join it with
-/// `require "prompt"`, and that only works if the directory the file is *in* is searched. Without
+/// `require "aliases"`, and that only works if the directory the file is *in* is searched. Without
 /// it the only way to reach a sibling was
-/// `dofile(oslo.env.get("HOME") .. "/.config/oslo/prompt.lua")`: an absolute path, spelled out, in
+/// `dofile(oslo.env.get("HOME") .. "/.config/oslo/aliases.lua")`: an absolute path, spelled out, in
 /// a language that has had a module system for twenty years. `lua/` is still searched after it, for
 /// a library kept apart from the configuration that uses it.
 ///

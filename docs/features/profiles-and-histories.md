@@ -78,7 +78,7 @@ are asking the same question of a different history — and the bar's right end 
 
 ```
 ┌─ per profile ─────────────────────┐   ┌─ one copy, whatever the profile ─────┐
-│ history/<name>/hist.db            │   │ ~/.config/oslo/config.lua            │
+│ history/<name>/hist.db            │   │ ~/.config/oslo/init.lua            │
 │   history events (the finder)     │   │ $HISTFILE, if you set one            │
 │   directory and run rows          │   │   (Up arrow, the `history` builtin)  │
 │   what `cd NAME` can jump to      │   │ oslo/universal                       │

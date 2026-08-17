@@ -28,7 +28,7 @@ Startup files follow POSIX too:
 | | |
 |---|---|
 | **login** (`-l`, or `argv[0]` starting `-`) | `/etc/profile`, then `~/.profile` |
-| **interactive** | `~/.config/oslo/config.lua` |
+| **interactive** | `~/.config/oslo/init.lua` |
 | **any** | `$ENV`, last |
 
 `/etc/profile.d` is not walked separately — `/etc/profile` does that itself with `run-parts`, and a

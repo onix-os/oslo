@@ -195,7 +195,7 @@ which nothing carries rows.
   that never ends never returns.
 * **Structure cannot cross a process, a function or a compound command**, and a command name that
   comes out of an expansion — `$cmd foo` — is not known when the planner runs, so it is bytes.
-* **A registered tool only exists at an interactive prompt.** `config.lua` is read by the REPL;
+* **A registered tool only exists at an interactive prompt.** `init.lua` is read by the REPL;
   `oslo -c` and `oslo script.sh` do not read it, so `hosts | where …` in a script is
   `hosts: command not found`.
 * `sort-by` is ascending only, with no descending form; `from` knows only `json`; `to` knows

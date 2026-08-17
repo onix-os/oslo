@@ -76,7 +76,7 @@ a record, and a row that ends up with no columns is dropped.
 
 ### A worked example
 
-`$XDG_CONFIG_HOME/oslo/config.lua`:
+`$XDG_CONFIG_HOME/oslo/init.lua`:
 
 ```lua
 oslo.register_tool{
@@ -180,7 +180,7 @@ composes with `where` and `sort-by` without either side knowing about the other.
 ## Configuration
 
 There are no settings — the whole surface is three calls, made from
-`$XDG_CONFIG_HOME/oslo/config.lua` or any `conf.d/*.lua` beside it, plus one directory.
+`$XDG_CONFIG_HOME/oslo/init.lua` or any `conf.d/*.lua` beside it, plus one directory.
 
 ```lua
 oslo.register_tool{ name = "mounts", accepts = "nothing", produces = "rows",

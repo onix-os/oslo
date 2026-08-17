@@ -261,7 +261,7 @@ an absent field as a veto would make every table-returning handler hide its line
 
 ## What it cannot do
 
-- **No `oslo <plugin>` subcommand.** `oslo -c` and scripts never read `config.lua` and never read
+- **No `oslo <plugin>` subcommand.** `oslo -c` and scripts never read `init.lua` and never read
   the index; a plugin extends the shell you type at, and a script depending on one would break for
   anybody who had not installed it.
 - **Reserve a name before something mentions it.** `type note` before `note` has ever been typed

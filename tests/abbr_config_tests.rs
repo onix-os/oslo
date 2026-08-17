@@ -15,7 +15,7 @@ use std::process::{Command, Output, Stdio};
 
 fn repl_with_config(config: &str, script: &str, home: &Path) -> Output {
     std::fs::create_dir_all(home.join(".config/oslo")).expect("config dir");
-    std::fs::write(home.join(".config/oslo/config.lua"), config).expect("write config");
+    std::fs::write(home.join(".config/oslo/init.lua"), config).expect("write config");
     // A directory of its own to run in, so a `.env.lua` anywhere above cannot join in.
     let work = home.join("work");
     std::fs::create_dir_all(&work).expect("work dir");

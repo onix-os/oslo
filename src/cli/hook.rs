@@ -56,7 +56,7 @@ const SUBCOMMANDS: &[Sub] = &[
         args: "NAME [FIELD=VALUE]...",
         about: "fire it against your configuration and report what ran",
         flags: &[],
-        note: "Your `config.lua` is loaded into *this* process and the hook is fired there, so a \
+        note: "Your `init.lua` is loaded into *this* process and the hook is fired there, so a \
                handler that prints prints here. Nothing of your session is touched, and a hook \
                that changes the shell changes this one.",
     },

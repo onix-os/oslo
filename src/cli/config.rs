@@ -2,7 +2,7 @@
 //!
 //! # Why provenance needed a command
 //!
-//! A session's configuration now comes from three places: `config.lua`, every `conf.d/*.lua` before
+//! A session's configuration now comes from three places: `init.lua`, every `conf.d/*.lua` before
 //! it, and — since plugins — code somebody else wrote. "Why is my keybinding not working" had no
 //! answer at all, and the honest one is usually "something later set it again".
 //!
@@ -48,7 +48,7 @@ const SUBCOMMANDS: &[Sub] = &[
         args: "SETTING",
         about: "which file last set a setting, and to what",
         flags: &[],
-        note: "Written as it is in `config.lua`, dots and all: `oslo config which vi.enabled`. The \
+        note: "Written as it is in `init.lua`, dots and all: `oslo config which vi.enabled`. The \
                load is reproduced here rather than asked of the running shell, so the answer is \
                what a *new* session would see.",
     },
@@ -94,7 +94,7 @@ fn files() -> i32 {
 
 /// What each file and plugin costs a session at startup.
 ///
-/// **The same load the shell does, measured.** A session now reads `conf.d/*.lua`, `config.lua`,
+/// **The same load the shell does, measured.** A session now reads `conf.d/*.lua`, `init.lua`,
 /// every installed plugin's index entry and whatever those register — five suspects when a shell
 /// feels slow, and until this there was no instrument at all. Neovim grew `--startuptime` for the
 /// same reason: the alternative is commenting lines out until it stops.

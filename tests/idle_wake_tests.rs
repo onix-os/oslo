@@ -45,7 +45,7 @@ impl Shell {
         Shell::with_config("")
     }
 
-    /// The same, with a `config.lua` in place before the first prompt — which is how anything that
+    /// The same, with a `init.lua` in place before the first prompt — which is how anything that
     /// has to be registered *without typing* gets registered.
     fn with_config(config: &str) -> Shell {
         let pty = openpty(None, None).expect("open pty");
@@ -55,7 +55,7 @@ impl Shell {
         if !config.is_empty() {
             let dir = home.path().join("config/oslo");
             std::fs::create_dir_all(&dir).expect("config directory");
-            std::fs::write(dir.join("config.lua"), config).expect("config");
+            std::fs::write(dir.join("init.lua"), config).expect("config");
         }
         let mut command = Command::new(common::oslo_bin());
         command

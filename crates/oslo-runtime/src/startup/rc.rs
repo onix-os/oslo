@@ -5,7 +5,7 @@
 //! and script shells read no configuration at all. Two files fix that, and they are deliberately
 //! different in kind:
 //!
-//! * The **config** is Lua, is `$XDG_CONFIG_HOME/oslo/config.lua`, and is loaded by
+//! * The **config** is Lua, is `$XDG_CONFIG_HOME/oslo/init.lua`, and is loaded by
 //!   [`super::lua_init`] rather than sourced here. There is no shell-syntax config file at all:
 //!   one file, one language, one place.
 //!
@@ -82,7 +82,7 @@ pub fn load_startup_files(env: &mut Environment, interactive: bool, login: bool)
 /// and `~/.profile` for everybody else, exactly as every other shell resolves it.
 ///
 /// There is no `~/.oslo_profile`. bash looks for `~/.bash_profile` first so that bash-only login
-/// setup has somewhere to live, but oslo's own configuration is `config.lua` — a second oslo-only
+/// setup has somewhere to live, but oslo's own configuration is `init.lua` — a second oslo-only
 /// file would be a third place to look and a question about which one wins.
 fn home_profile(env: &mut Environment) -> Option<PathBuf> {
     let home = env.get_var("HOME").map(str::to_string)?;

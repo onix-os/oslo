@@ -325,7 +325,7 @@ fn interactive(home: &Home, input: &str) -> String {
     let config = home.path().join(".config/oslo");
     std::fs::create_dir_all(&config).expect("mkdir");
     std::fs::write(
-        config.join("config.lua"),
+        config.join("init.lua"),
         "oslo.misc.welcome = false\noslo.prompt.left = function() return \"> \" end\n",
     )
     .expect("config");

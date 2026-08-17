@@ -2,14 +2,14 @@
 //!
 //! # After the config, deliberately
 //!
-//! Three sources define an alias: `alias` in a script, `oslo.alias` in `config.lua`, and
+//! Three sources define an alias: `alias` in a script, `oslo.alias` in `init.lua`, and
 //! `oslo macros add`. The ordinary shell rule is that the last definition wins, and this applies it
 //! to sources: **the database is applied after the configuration, so the database wins.**
 //!
 //! That is the deliberate half. The database is the one you can change without editing a file, so
 //! `oslo macros add gco …` taking effect is what you asked for; a config that has to be edited and
 //! re-sourced would be the more surprising winner. The cost is that a stored entry can shadow one
-//! you wrote in `config.lua` — which is why what the config defined is written out here, so that the
+//! you wrote in `init.lua` — which is why what the config defined is written out here, so that the
 //! manager can show you both, and so that *removing* the stored one puts the configured one back
 //! rather than leaving a hole.
 //!
@@ -22,7 +22,7 @@
 //! # And only where the config is read
 //!
 //! This runs from the interactive loop, beside `load_config`, and from nowhere else — so a script or
-//! an `oslo -c` sees none of it. That is not a new restriction: `config.lua` is read by this loop and
+//! an `oslo -c` sees none of it. That is not a new restriction: `init.lua` is read by this loop and
 //! by nothing else either, so a non-interactive shell has never had aliases to expand.
 
 use oslo_base::macros::live::{Applied, Stamps};

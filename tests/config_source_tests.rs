@@ -94,7 +94,7 @@ fn a_shell_file_can_be_sourced_from_the_lua_config() {
     )
     .unwrap();
     std::fs::write(
-        config.join("config.lua"),
+        config.join("init.lua"),
         format!("oslo.source({:?})\n", profile.to_str().unwrap()),
     )
     .unwrap();
@@ -118,7 +118,7 @@ fn sourcing_a_missing_file_does_not_stop_the_config() {
     let config = dir.path().join(".config/oslo");
     std::fs::create_dir_all(&config).unwrap();
     std::fs::write(
-        config.join("config.lua"),
+        config.join("init.lua"),
         "oslo.source('/no/such/profile')\noslo.env.set_alias('after', 'echo still-loaded')\n",
     )
     .unwrap();

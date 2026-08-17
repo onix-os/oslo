@@ -8,8 +8,8 @@
 //!   `local oslo = require "oslo"; oslo.completion.max_rows = 42` wrote into something nothing
 //!   would ever read.
 //! * `package.path` covered `~/.config/oslo/lua/` but not `~/.config/oslo/` itself, so a second
-//!   config file beside `config.lua` could not be reached by name. The only way in was
-//!   `dofile(oslo.env.get("HOME") .. "/.config/oslo/prompt.lua")` — an absolute path, written out
+//!   config file beside `init.lua` could not be reached by name. The only way in was
+//!   `dofile(oslo.env.get("HOME") .. "/.config/oslo/aliases.lua")` — an absolute path, written out
 //!   by hand, in a language that has had a module system for twenty years.
 
 mod common;
@@ -44,7 +44,7 @@ fn repl(input: &str, home: &Path) -> Output {
     child.wait_with_output().expect("oslo output")
 }
 
-/// Write `config.lua`, plus any siblings, into a throwaway config directory.
+/// Write `init.lua`, plus any siblings, into a throwaway config directory.
 fn configured(files: &[(&str, &str)]) -> tempfile::TempDir {
     let home = tempfile::tempdir().expect("tempdir");
     let dir = home.path().join(".config/oslo");
@@ -59,7 +59,7 @@ fn configured(files: &[(&str, &str)]) -> tempfile::TempDir {
 #[test]
 fn requiring_oslo_answers_the_table_the_global_names() {
     let home = configured(&[(
-        "config.lua",
+        "init.lua",
         r#"
         local oslo = require "oslo"
         print("SAME:" .. tostring(oslo == _G.oslo))
@@ -81,7 +81,7 @@ fn requiring_oslo_answers_the_table_the_global_names() {
 #[test]
 fn a_setting_written_through_the_module_takes_effect() {
     let home = configured(&[(
-        "config.lua",
+        "init.lua",
         r#"
         local oslo = require "oslo"
         oslo.completion.max_rows = 7
@@ -101,13 +101,13 @@ fn a_setting_written_through_the_module_takes_effect() {
 
 /// **A second config file is reached by name, not by absolute path.**
 ///
-/// This is what makes two files one configuration: `prompt.lua` beside `config.lua` is
+/// This is what makes two files one configuration: `prompt.lua` beside `init.lua` is
 /// `require "prompt"`, the same way any other Lua program would say it.
 #[test]
 fn a_sibling_config_file_is_a_module() {
     let home = configured(&[
         (
-            "config.lua",
+            "init.lua",
             r#"
             local prompt = require "prompt"
             print("SIBLING:" .. prompt.name())
@@ -135,7 +135,7 @@ fn a_sibling_config_file_is_a_module() {
 #[test]
 fn a_sibling_module_can_configure_the_shell() {
     let home = configured(&[
-        ("config.lua", r#"require "settings""#),
+        ("init.lua", r#"require "settings""#),
         (
             "settings.lua",
             r#"
@@ -161,7 +161,7 @@ fn a_sibling_module_can_configure_the_shell() {
 #[test]
 fn each_namespace_is_a_module_of_its_own() {
     let home = configured(&[(
-        "config.lua",
+        "init.lua",
         r#"
         local ui = require "oslo.ui"
         print("NS:" .. tostring(ui == _G.oslo.ui))

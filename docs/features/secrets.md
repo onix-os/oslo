@@ -135,9 +135,9 @@ through `age-plugin-yubikey`. A store that names one never reaches the code abov
 ## Configuration is a file, not Lua
 
 `oslo secret get` is dispatched as a tool: it never builds an `Environment`, never reads
-`config.lua`, never starts a Lua interpreter. That is not an oversight. `$(oslo secret get
+`init.lua`, never starts a Lua interpreter. That is not an oversight. `$(oslo secret get
 gh-token)` has to work from `dash`, from `cron`, from a `Makefile` and from a container, none of
-which have run an oslo config — so configuration that only existed after `config.lua` had run would
+which have run an oslo config — so configuration that only existed after `init.lua` had run would
 apply in your interactive shell and silently not apply anywhere else.
 
 So it is a flat file that the process doing the decrypting reads for itself:
@@ -288,7 +288,7 @@ oslo macros add --var 'GITHUB_TOKEN=$(oslo secret get gh-token)'
 
 Nothing has run yet. The first time something in a shell reads `$GITHUB_TOKEN`, that line is
 evaluated — once, in that shell — and from then on it is an ordinary exported variable. A shell that
-never mentions the name never decrypts anything. The same line as an `export` in `config.lua`
+never mentions the name never decrypts anything. The same line as an `export` in `init.lua`
 decrypts at every shell start, on every machine, for ever, whether or not anything wanted it.
 
 ## From Lua
@@ -466,7 +466,7 @@ secrets; the second is reached only through `oslo.secret.mine()`.
 | `post-secret-access` | it just was |
 | `oslo.secret.through(argv, base64)` | not a hook: the binary-safe pipe a handler calls to reach another program |
 
-There is no `config.lua` for any of this, and that is the point of the section above: a path read
+There is no `init.lua` for any of this, and that is the point of the section above: a path read
 after Lua has run is a path a `cron` job never sees.
 
 ## Measurements

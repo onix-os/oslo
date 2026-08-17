@@ -130,7 +130,7 @@ fn hook_test_runs_the_handler_in_your_config() {
     let dir = home.path().join("config/oslo");
     std::fs::create_dir_all(&dir).expect("config dir");
     std::fs::write(
-        dir.join("config.lua"),
+        dir.join("init.lua"),
         "oslo.on[\"post-change-dir\"](function(e) print(\"went to \" .. tostring(e.to)) end)\n",
     )
     .expect("config");
@@ -157,7 +157,7 @@ fn hook_test_reports_what_an_answering_hook_decided() {
     let dir = home.path().join("config/oslo");
     std::fs::create_dir_all(&dir).expect("config dir");
     std::fs::write(
-        dir.join("config.lua"),
+        dir.join("init.lua"),
         "oslo.on[\"pre-cmd\"](function(e) return \"instead: \" .. tostring(e.text) end)\n",
     )
     .expect("config");

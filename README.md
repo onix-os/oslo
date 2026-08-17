@@ -201,7 +201,7 @@ TPM, `age-plugin-yubikey` through `age`. In Lua, it is a hook. The filing around
 the lazy variable — never changes.
 
 All of it is one flat file beside the key, because `$(oslo secret get …)` is a child process that
-never reads `config.lua`: configuration that only existed after Lua had run would apply in your
+never reads `init.lua`: configuration that only existed after Lua had run would apply in your
 shell and silently not in `cron`. The file declares *which* mechanism a store uses, so a process
 with no Lua that meets `crypto hook` says so instead of quietly doing something else.
 
@@ -958,14 +958,14 @@ found on `$PATH` — so a bare `history` can only ever have been typed by a pers
 
 ## Configuration
 
-`~/.config/oslo/config.lua`. One file, one language, one place — there is no shell-syntax config.
+`~/.config/oslo/init.lua`. One file, one language, one place — there is no shell-syntax config.
 
 What a shell reads before its first command, and when:
 
 | | |
 |---|---|
 | **login** (`-l`, or `argv[0]` starting `-`) | `/etc/profile`, then `~/.profile` |
-| **interactive** | `~/.config/oslo/config.lua` |
+| **interactive** | `~/.config/oslo/init.lua` |
 | **any** | `$ENV`, last, since `~/.profile` is where it is usually set |
 
 The profile files are POSIX's and shell syntax, and oslo is a `/bin/sh` before it is anything else
@@ -985,7 +985,7 @@ oslo.on.cd(function(dir) print("now in " .. dir) end)
 oslo.on["command-not-found"](function(name) print(name .. " is not installed") end)
 ```
 
-Anything in `~/.config/oslo/conf.d/*.lua` runs first, in name order, and `config.lua` runs last.
+Anything in `~/.config/oslo/conf.d/*.lua` runs first, in name order, and `init.lua` runs last.
 That directory is fish's, and it is there for the same reason: a plugin or a dotfile repo needs
 somewhere to add a line without editing a file it does not own, and the file you wrote by hand
 keeps the final say.
@@ -994,9 +994,9 @@ keeps the final say.
 split it is the language's own — `require`, against a search path that is this directory:
 
 ```lua
--- ~/.config/oslo/config.lua
+-- ~/.config/oslo/init.lua
 local oslo = require "oslo"      -- the table the global names, not a copy
-require "prompt"                 -- ~/.config/oslo/prompt.lua
+require "aliases"                -- ~/.config/oslo/aliases.lua
 require "keys"                   -- ~/.config/oslo/keys.lua
 ```
 
@@ -1039,7 +1039,7 @@ oslo.notify.after       = 10          -- seconds a command must run to be worth 
 oslo.notify.command     = nil         -- e.g. "notify-send {title} {body}", instead of the escape
 
 oslo.abbr.gco = "git checkout"
-oslo.abbr.brc = { "~/.config/oslo/config.lua", anywhere = true }
+oslo.abbr.brc = { "~/.config/oslo/init.lua", anywhere = true }
 
 oslo.builtin.rm.to_tmp     = false    -- move removals aside instead of destroying them
 oslo.builtin.rm.max_to_tmp = 100      -- MB; anything larger is destroyed

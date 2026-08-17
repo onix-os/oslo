@@ -202,7 +202,7 @@ cannot be reached any other way *before the first command runs* — `set -o posi
 script is already too late to have decided how that line's command word was searched for.
 
 `$OSLO_ALLHIST` is an environment variable rather than a Lua setting for a reason that only matters
-once oslo is `/bin/sh`: `-c` does not read `config.lua`, so a setting would mean starting an
+once oslo is `/bin/sh`: `-c` does not read `init.lua`, so a setting would mean starting an
 interpreter and running your config on every `system()` call on the machine. `0`, `false`, `no` and
 `off` mean off, rather than merely being non-empty.
 
