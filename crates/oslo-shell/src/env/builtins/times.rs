@@ -13,7 +13,14 @@ use nix::sys::time::TimeVal;
 use oslo_base::error::Result;
 
 /// `times` — print the shell's and its children's CPU time.
-pub fn builtin_times(_env: &mut Environment, _args: &[String]) -> Result<i32> {
+pub fn builtin_times(_env: &mut Environment, args: &[String]) -> Result<i32> {
+    // `times` takes nothing at all, so anything given to it is a mistake worth naming rather than
+    // discarding — a discarded `-p` is a script asking for a format it will not get.
+    if let Some(extra) = args.get(1) {
+        eprintln!("{}times: {extra}: invalid option", crate::env::origin_now());
+        eprintln!("times: usage: times");
+        return Ok(2);
+    }
     // A shell's `times` cannot fail in any other shell, so an unreadable clock prints zeroes
     // rather than aborting a script on a diagnostic.
     let t = cpu_times().unwrap_or([0.0; 4]);
