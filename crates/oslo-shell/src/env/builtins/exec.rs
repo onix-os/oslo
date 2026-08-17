@@ -91,6 +91,26 @@ pub fn makes_redirections_permanent(cmd_name: &str, words: &[String]) -> bool {
         && matches!(parse(words), Ok(inv) if inv.operands.is_empty())
 }
 
+/// Why `exec` could not run `name`.
+///
+/// **A name with a `/` in it was pointed at something in particular**, so the answer is the
+/// system's: `exec /etc` said `not found` about a directory that is plainly there, and
+/// `exec /var/empty/x` said it about a path whose parent is unreadable. Both are the shell
+/// guessing when it could have asked. A bare word really was searched for and not found, and keeps
+/// the wording — and the `exec: ` prefix — that bash gives it.
+fn unavailable(name: &str) -> String {
+    if !name.contains('/') {
+        return format!("exec: {name}: not found");
+    }
+    let reason = match std::fs::metadata(name) {
+        Err(e) => oslo_base::error::reason(&e),
+        Ok(meta) if meta.is_dir() => "Is a directory".to_string(),
+        // It is there and it is a file, so what stopped `resolve_program` was the execute bit.
+        Ok(_) => "Permission denied".to_string(),
+    };
+    format!("{name}: {reason}")
+}
+
 /// `exec [-cl] [-a name] [command [args…]]`.
 pub fn builtin_exec(_env: &mut Environment, args: &[String]) -> Result<i32> {
     let inv = match parse(args) {
@@ -110,7 +130,7 @@ pub fn builtin_exec(_env: &mut Environment, args: &[String]) -> Result<i32> {
 
     let name = &inv.operands[0];
     let Some(program) = resolve_program(name) else {
-        eprintln!("{}exec: {}: not found", origin_now(), name);
+        eprintln!("{}{}", origin_now(), unavailable(name));
         // POSIX: a non-interactive shell exits when `exec` cannot find its command. Signalling
         // the exit rather than returning a status is what stops the rest of the script running
         // with descriptors that were set up for a program that never started.
@@ -146,7 +166,17 @@ pub fn builtin_exec(_env: &mut Environment, args: &[String]) -> Result<i32> {
     };
 
     // Only reachable when the exec failed; on success this process no longer exists.
-    eprintln!("{}exec: {}: {}", origin_now(), name, failure_text(failure));
+    //
+    // Named the same way [`unavailable`] names it, so `exec /etc` and `exec /etc/passwd` do not
+    // disagree about whether a path gets an `exec: ` in front of it. bash draws the line in the
+    // same place: the builtin puts its name on a *word* it searched for and failed to find, and
+    // stays out of the way when the system is reporting on a path.
+    let label = if name.contains('/') {
+        name.to_string()
+    } else {
+        format!("exec: {name}")
+    };
+    eprintln!("{}{label}: {}", origin_now(), failure_text(failure));
     Err(ShellError::Exit(NOT_EXECUTABLE))
 }
 
