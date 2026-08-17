@@ -13,7 +13,7 @@
 //! the argument that the worst case is then "nothing happened". The worst case is not that —
 //! `ldd =olso`, one transposed pair, handed `ldd` a word starting with `=` and came back with
 //! `ldd: ./=olso: No such file or directory`, which names a file nobody wrote and never mentions
-//! the shorthand. See [`equals`].
+//! the shorthand. See `equals_field`.
 //!
 //! Quoting takes it back: `echo "=ls"` is a literal, exactly as `echo "@proj"` is.
 //!

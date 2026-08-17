@@ -155,7 +155,7 @@ would make every documentation edit a refusal to run.
 ## The database
 
 ```lua
-local db = oslo.db.open("notes")
+local db <close> = oslo.db.open("notes")
 db:set("k", "v")          -- bytes, exactly: no trimming, no added newline
 db:get("k")               -- "v", or nil
 db:has("k")               -- an empty value is still present
@@ -166,6 +166,13 @@ db:write(function(w)      -- one transaction; nothing lands if it raises
   w:delete("b")
 end)
 ```
+
+**A handle is an object.** The verbs live behind `__index`, so `pairs(db)` walks nothing, a typo
+(`db.nmae = 1`) is refused rather than quietly added, and `db.get("k")` with a dot is a message
+rather than a read of the wrong key. `<close>` shuts the file at the end of the block and every verb
+says so afterwards; a handle without it is released when it is collected, because the session holds
+databases only weakly. The same shape is what `oslo.spawn`, `oslo.after`/`oslo.every` and
+`oslo.fs.mktempdir` answer with.
 
 `open` takes a **name, never a path**. `oslo.db.open("../history")` is refused before anything is
 opened, so a plugin cannot reach out of the directory these live in — oslo's own history and

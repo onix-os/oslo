@@ -29,43 +29,47 @@ Three assumptions are baked into the current surface, and each one was true of t
 
 ---
 
-## 1. Handles become objects — the highest value, and the smallest change
+## 1. Handles become objects — **done**
 
-`oslo.db.open` today answers a plain table of closures with **no metatable**. Three things follow,
-all of them bad, and all of them fixed by the same change:
+Every handle oslo hands out was a plain table of closures with **no metatable**, and three things
+followed from that:
 
 ```lua
 local db = oslo.db.open("notes")
--- `db.get("k")` — a dot instead of a colon — reads the right database anyway, because the
---   closures captured the store and ignore `self`. The module's own docs call this out as a
---   mistake it cannot detect.
--- `__begin` and `__commit` are *visible*: internals of `db:write` sitting in the public surface.
--- Nothing closes the store. It lives until the session ends.
+-- `__begin` and `__commit` were *visible*: internals of `db:write` sitting in the public surface,
+--   walked by `pairs` and callable by anyone.
+-- `db.nmae = 1` added a key. Nothing refused it.
+-- Nothing closed the store. It lived until the session ended.
 ```
 
-With a metatable, all three go:
+`crates/oslo-runtime/src/lua/api/handle.rs` is the builder they now share. `__index` carries the
+verbs, `__name` is what an error message calls the thing, `__newindex` refuses the typo, and
+`__close` releases — after which every verb says the handle is closed:
 
 ```lua
-local db <close> = oslo.db.open("notes")   -- closed at the end of the block, deterministically
+local db <close> = oslo.db.open("notes")   -- the file is shut at the end of the block
 db:set("last", os.date())
--- db.get("k")  --> error: use db:get, not db.get
--- pairs(db)    --> the verbs, without the internals
+-- pairs(db)   --> nothing; the handle has no keys of its own
+-- db.nmae = 1 --> error: oslo.db: cannot set "nmae" on a handle
 ```
 
-`__index` carries the verbs, `__close` releases the store, `__gc` is the backstop for a handle
-nobody closed, and `__newindex` refuses writes so a typo cannot silently add a field to a handle.
+`db.get("k")` with a dot was described here, and in the module's own docs, as reading the right
+database anyway. It does not: the verbs read their first real argument at position 2, so a dot call
+is `db:get: argument #2 must be a string, got no value`. The comment was stale.
 
-**The same shape applies to every handle oslo hands out**, and there are four:
+**Whether the collector closes too is per handle**, and the shape of the call decides it:
 
-| handle | `__close` should | today |
+| handle | `__close` | `__gc` |
 |---|---|---|
-| `oslo.db.open` | commit and release the store | never released |
-| `oslo.spawn` | wait for and reap the child | a table; the child is reaped elsewhere |
-| `oslo.fs.mktempdir` | remove the directory | removed by nobody |
-| a file handle oslo does not yet have | close the descriptor | there is none — see §2 |
+| `oslo.db.open` | shuts the file — the store is held in one place all the verbs share | yes: the handle is the point of the call, and the session holds databases only weakly |
+| `oslo.spawn` | forgets the callback | no — a spawn's handle is usually dropped on the spot |
+| `oslo.after` / `oslo.every` | stops the timer | no — same reason |
+| `oslo.fs.mktempdir` | removes the directory | no — `remove_dir_all` on a path still in use is unrecoverable |
 
-This is the change I would make first. It is contained, it deletes a documented footgun, and
-`<close>` is the single most useful thing the VM gained that a shell config can feel.
+`oslo.fs.mktempdir` answers a handle rather than a path as a result: `tmp.path` is the directory and
+`tostring(tmp)` is the same string, so it still reads as a path wherever one is wanted.
+
+A file handle oslo does not yet have is the fifth — see §2.
 
 ## 2. Streaming, via coroutines
 
@@ -146,8 +150,7 @@ nothing enforces it. Frozen tables are what would turn that from a statement int
 
 ## Order I would do them in
 
-1. **Handles as objects** (§1) — deletes a footgun, hides internals that are currently leaking, and
-   gives `<close>`. Contained to four call sites.
+1. ~~**Handles as objects** (§1)~~ — **done**: `api/handle.rs`, and the four call sites use it.
 2. **Streaming producers** (§2) — the largest new *capability*; makes long-running commands and big
    trees usable at all.
 3. **Structured errors** (§3) — additive, `__tostring` keeps everything working.

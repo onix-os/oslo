@@ -90,24 +90,10 @@ pub fn build() -> Value {
 mod tests {
     use super::*;
 
+    use super::super::util::probe;
+
     fn call(built: &Value, name: &str, args: Vec<Value>) -> Value {
-        let Value::Table(table) = built else {
-            panic!("not a table")
-        };
-        let Value::Function(f) = table.borrow().get(&Value::str(name)) else {
-            panic!("no {name}")
-        };
-        match &*f {
-            oslo_base::value::Function::Native { call, .. } => {
-                let interp = oslo_lua::Interp::new("test");
-                call(&interp, args)
-                    .expect(name)
-                    .first()
-                    .cloned()
-                    .unwrap_or(Value::Nil)
-            }
-            _ => panic!("not native"),
-        }
+        probe::first(&probe::field(built, name), args)
     }
 
     #[test]

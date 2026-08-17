@@ -179,9 +179,27 @@ fn mktemp_creates_the_file_rather_than_naming_one() {
         local a = oslo.fs.mktemp("t")
         local b = oslo.fs.mktemp("t")
         print(a ~= b, oslo.fs.exists(a), oslo.fs.exists(b))
-        print(oslo.fs.stat(oslo.fs.mktempdir("d")).type)
+        print(oslo.fs.stat(oslo.fs.mktempdir("d").path).type)
     "#);
     assert_eq!(out, "true\ttrue\ttrue\ndirectory");
+}
+
+/// **A temporary directory is the one thing in `oslo.fs` with a lifetime**, so it answers a handle
+/// rather than a path: `<close>` removes it at the end of the block, and `tostring` is the path so
+/// it still reads as one.
+#[test]
+fn a_temporary_directory_is_removed_at_the_end_of_its_block() {
+    let out = lua(r#"
+        local path
+        do
+          local tmp <close> = oslo.fs.mktempdir("scope")
+          path = tmp.path
+          oslo.fs.write(tmp.path .. "/x", "hi")
+          print(tostring(tmp) == path, oslo.fs.exists(path .. "/x"))
+        end
+        print(oslo.fs.exists(path))
+    "#);
+    assert_eq!(out, "true\ttrue\nfalse");
 }
 
 #[test]

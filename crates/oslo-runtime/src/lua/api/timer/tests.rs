@@ -52,18 +52,10 @@ fn a_handle_stops_its_own_timer_and_says_whether_it_had_one() {
     let Some(Value::Table(handle)) = answered.first() else {
         panic!("no handle")
     };
-    let Value::Function(stop) = handle.borrow().get_str("stop") else {
-        panic!("no stop")
-    };
+    let stop = super::super::util::probe::field(&Value::Table(handle.clone()), "stop");
     assert!(any(), "the timer should be waiting");
 
-    let call = |f: &std::rc::Rc<oslo_base::value::Function>| match &**f {
-        oslo_base::value::Function::Native { call, .. } => {
-            let interp = oslo_lua::Interp::new("test");
-            call(&interp, Vec::new()).expect("stop")
-        }
-        _ => panic!("not native"),
-    };
+    let call = |f: &Value| super::super::util::probe::call(f, Vec::new()).expect("stop");
     assert_eq!(call(&stop).first().map(Value::truthy), Some(true));
     assert!(!any(), "stopping should take it out of the list");
     // Stopping twice says there was nothing left to stop.

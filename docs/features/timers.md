@@ -13,6 +13,11 @@ Both take a delay in **milliseconds** and a function, and both answer with a han
 method is `:stop()`. Stopping a timer that has already gone returns `false`; stopping a live one
 returns `true`.
 
+A handle is an object: it has no keys of its own, writing a field on it is refused, and
+`local t <close> = oslo.every(…)` stops the timer at the end of the block. Being *collected* does
+not stop it — a timer is set for its effect and its handle is usually dropped on the spot, so a
+finalizer that stopped would stop nearly every timer in the shell.
+
 ## When they actually fire
 
 **Between commands, never during one, and never while you are typing.** The read loop checks what

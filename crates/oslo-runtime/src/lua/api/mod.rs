@@ -31,6 +31,7 @@ pub(crate) mod external;
 /// `oslo.feature` — turning parts of the shell off and on while it runs.
 pub mod feature;
 mod fs;
+mod handle;
 mod json;
 pub(crate) mod mark;
 mod messages;

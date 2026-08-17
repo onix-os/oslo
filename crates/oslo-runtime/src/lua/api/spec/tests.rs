@@ -5,14 +5,15 @@ use oslo_base::value::Value;
 /// what is tested is the shape somebody types, not a hand-built table that happens to parse.
 fn declare(source: &str) -> Result<(), String> {
     oslo_ui::spec::custom::forget();
-    let interp = oslo_lua::Interp::new("spec test");
+    let engine = oslo_luavm::Engine::new();
     let mut completion = Table::new();
     install(&mut completion);
     let mut oslo = Table::new();
     oslo.set_str("completion", Value::table(completion));
-    interp.set_global("oslo", Value::table(oslo));
-    let ast = oslo_lua::parse(source).map_err(|e| e.to_string())?;
-    interp.run_ast(&ast).map(|_| ()).map_err(|e| e.to_string())
+    oslo_luavm::Host::set_global(&engine, "oslo", Value::table(oslo));
+    oslo_luavm::Host::eval(&engine, source, "=spec test")
+        .map(|_| ())
+        .map_err(|e| e.to_string())
 }
 
 #[test]

@@ -27,7 +27,7 @@
 //! So `oslo.every(1000, …)` at an idle prompt does not tick once a second. It ticks the next time
 //! you run something. A timer is for "not now" and "not on every prompt", not for a clock.
 
-use super::util::{ok, put, record};
+use super::util::{ok, put};
 use oslo_base::value::{LuaError, LuaResult};
 use oslo_base::value::{Table, Value};
 use std::cell::RefCell;
@@ -107,18 +107,28 @@ fn schedule(args: &[Value], called: &str, repeating: bool) -> LuaResult<Vec<Valu
 
 /// What a timer answers with: `t:stop()` and nothing else.
 fn handle(id: u64) -> Value {
-    record(vec![(
-        "stop",
-        super::util::native("timer handle", move |_, _| {
-            let had = TIMERS.with(|timers| {
-                let mut timers = timers.borrow_mut();
-                let before = timers.len();
-                timers.retain(|timer| timer.id != id);
-                before != timers.len()
-            });
-            ok(Value::Bool(had))
-        }),
-    )])
+    let mut table = super::handle::Handle::new("oslo.timer");
+
+    table.verb("stop", move |_, _| ok(Value::Bool(forget(id))));
+
+    // `<close>` stops it, the collector does not: `oslo.every` is written for its effect and its
+    // handle is usually dropped, so a `__gc` that stopped would stop nearly every timer in the
+    // shell. See [`super::handle::Handle::on_close`].
+    table.on_close("oslo.timer.close", move || {
+        forget(id);
+    });
+
+    table.build()
+}
+
+/// Take timer `id` out of the list, answering whether it was there.
+fn forget(id: u64) -> bool {
+    TIMERS.with(|timers| {
+        let mut timers = timers.borrow_mut();
+        let before = timers.len();
+        timers.retain(|timer| timer.id != id);
+        before != timers.len()
+    })
 }
 
 /// Run whatever is due. Called by the read loop where nothing is held.

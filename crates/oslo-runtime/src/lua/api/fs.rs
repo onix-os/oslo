@@ -176,13 +176,44 @@ fn writing(it: &mut Table) {
         }
     });
 
+    // oslo.fs.mktempdir(prefix) -> a handle on a directory that did not exist a moment ago
+    //
+    // **A handle rather than a path, because a temporary directory is the one thing in `oslo.fs`
+    // with a lifetime.** Every other call here acts on a path somebody else owns; this one *makes*
+    // something, and until there was `<close>` there was nowhere to say when it should go:
+    //
+    //     local tmp <close> = oslo.fs.mktempdir()
+    //     oslo.fs.write(tmp.path .. "/notes", body)
+    //
+    // `tostring(tmp)` is the path, so a handle reads as one wherever a message wants it.
     put(it, "mktempdir", |_, args| {
         let prefix = opt_text(&args, 1, "oslo.fs.mktempdir")?.unwrap_or_else(|| "oslo".to_string());
         match unique_temp(&prefix, true) {
-            Ok(path) => ok(Value::str(path)),
+            Ok(path) => ok(tempdir(path)),
             Err(e) => failed("mktempdir", e),
         }
     });
+}
+
+/// The handle `mktempdir` answers with.
+fn tempdir(path: String) -> Value {
+    let mut handle = super::handle::Handle::new("oslo.fs.tempdir");
+    handle.field("path", Value::str(&path)).shows(&path);
+
+    let it = path.clone();
+    handle.verb("remove", move |_, _| {
+        ok(Value::Bool(fs::remove_dir_all(&it).is_ok()))
+    });
+
+    // **`<close>` removes it, and the collector does not.** `remove_dir_all` on a path a config
+    // still means to use is not a mistake anything could recover from, and a handle whose `.path`
+    // has been copied elsewhere looks unreachable to the collector while the directory is still in
+    // use. Leaving it for the system to clean is the safe half of that trade.
+    handle.on_close("oslo.fs.tempdir.close", move || {
+        let _ = fs::remove_dir_all(&path);
+    });
+
+    handle.build()
 }
 
 fn listing(it: &mut Table) {

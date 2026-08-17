@@ -59,16 +59,8 @@ fn cancelling_forgets_the_callback() {
     let Value::Table(handle) = handle(99) else {
         panic!("no handle")
     };
-    let Value::Function(cancel) = handle.borrow().get_str("cancel") else {
-        panic!("no cancel")
-    };
-    let call = || match &*cancel {
-        oslo_base::value::Function::Native { call, .. } => {
-            let interp = oslo_lua::Interp::new("test");
-            call(&interp, Vec::new()).expect("cancel")
-        }
-        _ => panic!("not native"),
-    };
+    let cancel = super::super::util::probe::field(&Value::Table(handle), "cancel");
+    let call = || super::super::util::probe::call(&cancel, Vec::new()).expect("cancel");
     assert_eq!(call().first().map(Value::truthy), Some(true));
     // Twice says there was nothing left to cancel.
     assert_eq!(call().first().map(Value::truthy), Some(false));

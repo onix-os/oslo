@@ -97,3 +97,7 @@ pub fn list(values: impl IntoIterator<Item = Value>) -> Value {
     }
     Value::table(table)
 }
+
+#[cfg(test)]
+#[path = "util/probe.rs"]
+pub(super) mod probe;

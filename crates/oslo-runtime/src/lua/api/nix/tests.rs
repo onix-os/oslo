@@ -78,8 +78,18 @@ fn an_empty_table_is_refused_rather_than_running_a_bare_nix() {
 /// in it is not a compile error, and startup only prints a complaint that nothing would read.
 #[test]
 fn the_table_offers_the_primitives_and_the_helpers() {
-    let interp = oslo_lua::Interp::new("test");
-    let Value::Table(built) = build(&interp) else {
+    // The helpers are added *in Lua*, by indexing the global — see `add_helpers` — so this needs a
+    // VM with `oslo.nix` standing in it, and reads the result back out of the global.
+    let engine = oslo_luavm::Engine::new();
+    let mut oslo = Table::new();
+    oslo.set_str("nix", build());
+    oslo_luavm::Host::set_global(&engine, "oslo", Value::table(oslo));
+    super::add_helpers(&engine);
+
+    let Value::Table(oslo) = oslo_luavm::Host::global(&engine, "oslo") else {
+        panic!("oslo is not a table")
+    };
+    let Value::Table(built) = oslo.borrow().get_str("nix") else {
         panic!("not a table")
     };
     let built = built.borrow();

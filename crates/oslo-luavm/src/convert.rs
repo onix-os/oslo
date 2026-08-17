@@ -7,7 +7,7 @@
 //!
 //! # Functions cross too, and that is what makes the port small
 //!
-//! [`Function::Held`](oslo_base::value::Function::Held) is an `Rc<dyn Any>` the shell never looks
+//! [`oslo_base::value::Function::Held`] is an `Rc<dyn Any>` the shell never looks
 //! inside. Two different things travel in it, and this file is the only place that knows which:
 //!
 //! - a [`Native`] — a Rust closure going *in*, wrapped as a luna callback;

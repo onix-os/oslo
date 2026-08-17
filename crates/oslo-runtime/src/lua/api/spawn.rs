@@ -134,13 +134,22 @@ fn start(args: &[Value]) -> LuaResult<Vec<Value>> {
 /// longer want is a different decision from not wanting it, and a shell that reaped a `git fetch`
 /// because a prompt segment was dismissed would be surprising in a way nobody could debug.
 fn handle(id: u64) -> Value {
-    super::util::record(vec![(
-        "cancel",
-        super::util::native("spawn handle", move |_, _| {
-            let had = WAITING.with(|slot| slot.borrow_mut().remove(&id).is_some());
-            ok(Value::Bool(had))
-        }),
-    )])
+    let mut table = super::handle::Handle::new("oslo.spawn");
+
+    table.verb("cancel", move |_, _| {
+        let had = WAITING.with(|slot| slot.borrow_mut().remove(&id).is_some());
+        ok(Value::Bool(had))
+    });
+
+    // **`<close>` cancels, and the collector does not.** A spawn is written for its callback and
+    // its handle is usually dropped on the spot, so a `__gc` that cancelled would cancel almost
+    // every spawn in the shell. Saying `local job <close> = oslo.spawn{…}` is asking for the work
+    // to be scoped to the block, which is a different thing and a deliberate one.
+    table.on_close("oslo.spawn.close", move || {
+        WAITING.with(|slot| slot.borrow_mut().remove(&id));
+    });
+
+    table.build()
 }
 
 /// Run the process. On a worker thread, so blocking here costs nothing.
