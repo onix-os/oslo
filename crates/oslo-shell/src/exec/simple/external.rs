@@ -141,8 +141,15 @@ pub(crate) fn run_external(
                 // reach it instead of the shell, and what lets it read from the tty at all.
                 if let Some(pgid) = pgid {
                     job::give_terminal_to(pgid);
+                    // And a watcher inside that group, because the shell is now outside it and
+                    // will not see a Ctrl-C at all. Three of them kill the job. See
+                    // [`job::sentinel`].
+                    job::watch(pgid);
                 }
                 let status = wait_for_child(child, cmd_name, words);
+                if pgid.is_some() {
+                    job::stand_down();
+                }
                 // Taken back with SIGTTOU blocked: at this moment the shell is not the foreground
                 // group, so an unguarded `tcsetpgrp` would stop the shell itself.
                 job::reclaim_terminal();

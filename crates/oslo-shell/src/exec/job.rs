@@ -26,6 +26,7 @@ mod control;
 mod reap;
 mod report;
 mod resume;
+mod sentinel;
 mod signals;
 mod table;
 
@@ -40,6 +41,8 @@ pub use signals::{
     reset_signals_for_child,
 };
 pub use table::{Job, JobState, JobTable, with_jobs};
+
+pub(crate) use sentinel::{stand_down, watch};
 
 pub(crate) use control::{
     give_terminal_to, join_foreground_group, join_group_in_child, place_child,

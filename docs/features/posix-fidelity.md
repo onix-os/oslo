@@ -162,6 +162,32 @@ together.
 
 A child killed by SIGQUIT is treated the same way, for the same reason.
 
+### Ctrl-C three times, for a job that will not take one
+
+Reading the wait status is enough for a job that *dies*. It is no use at all for one that does not:
+
+```sh
+$ sh -c 'trap "" INT; sleep 300'
+^C ^C ^C          nothing, and nothing can — the shell is not being signalled
+```
+
+The shell is outside the group the kernel is signalling, and no key produces `SIGKILL`, because the
+tty driver cannot send one. Something has to *observe* the interrupt and call `kill` itself, and the
+only way to observe it is to be in the group.
+
+So oslo forks **one small process per interactive session** — a sentinel — which joins whichever
+group currently owns the terminal and counts the interrupts it receives. On the third it leaves the
+group and sends `SIGKILL` to it. It reads no input, writes no output, holds no terminal, dies with
+the shell, and is forked lazily, so a script, an `oslo -c` or a session spent in builtins never pays
+for it. The count resets when a job starts, so three presses means three *during one command*.
+
+**Two presses change nothing**, and a job that does not trap the interrupt still dies of the first —
+both are tested on a real pty, along with the shell surviving the escalation.
+
+What this cannot do is rescue you from a process wedged in an uninterruptible kernel call: `SIGKILL`
+is recorded and delivered when the call returns, which for a large `unlink` on a slow filesystem may
+be a while. Nothing can, and it is worth knowing which case you are in.
+
 ## What makes it different
 
 **`sh` is a personality, not a path.** Invoked as `sh`, oslo enters POSIX mode; invoked as `oslo` it
