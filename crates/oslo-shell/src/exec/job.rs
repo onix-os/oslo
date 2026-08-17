@@ -37,7 +37,7 @@ pub use reap::reap_background_jobs;
 pub use report::describe;
 pub use resume::{continue_in_background, foreground_job};
 pub use signals::{
-    forget_interrupt, install_shell_signals, interrupt_pending, note_interrupt,
+    forget_interrupt, install_shell_signals, interrupt_pending, interrupt_waiting, note_interrupt,
     reset_signals_for_child,
 };
 pub use table::{Job, JobState, JobTable, with_jobs};

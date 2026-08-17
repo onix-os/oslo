@@ -120,6 +120,20 @@ pub fn interrupt_pending() -> bool {
     local || delivered
 }
 
+/// Whether a SIGINT is waiting, **without** taking it.
+///
+/// For the builtins that run long enough to need interrupting from the inside — `rm -r` over a
+/// large tree is the one this was written for. A builtin runs in the shell process, so the
+/// keystroke sets the flag and then nothing looks at it until the command is already over; a walk
+/// that polls this can stop between entries instead.
+///
+/// **Peeking rather than draining** is the whole point. [`interrupt_pending`] is the command
+/// boundary's, and a builtin that cleared the flag would leave the evaluator with no evidence the
+/// keystroke happened — the `rm` would stop, and the `&&` after it would run anyway.
+pub fn interrupt_waiting() -> bool {
+    LOCAL_INTERRUPT.with(std::cell::Cell::get) || SIGINT_RECEIVED.load(Ordering::SeqCst)
+}
+
 /// Drop an interrupt that arrived before the shell asked for the next command.
 ///
 /// A SIGINT is only ever *cleared* by [`interrupt_pending`], and the only caller of that is the
