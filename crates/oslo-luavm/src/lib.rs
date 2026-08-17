@@ -117,6 +117,34 @@ impl Engine {
         *self.varargs.borrow_mut() = args;
     }
 
+    /// How many bytes the VM's heap is holding, or `None` while it is running.
+    ///
+    /// Only a *change* in this is worth reading. The absolute figure counts every string, table and
+    /// closure the session has accumulated, which says more about how long the shell has been up
+    /// than about whatever is being measured.
+    pub fn memory_used(&self) -> Option<usize> {
+        self.lua.try_borrow().map(|lua| lua.total_memory()).ok()
+    }
+
+    /// Stop whatever is running once the VM's heap passes `limit` bytes. `None` removes it.
+    ///
+    /// **Coarse on purpose, and only useful around something with an end.** The check happens
+    /// between slices of the executor, so a single slice can overshoot, and the limit is on the
+    /// whole VM rather than on one chunk — there is one heap and everything shares it. What it is
+    /// for is bounding a chunk whose allocation could run away, by setting the ceiling to what is
+    /// in use plus a margin and taking it off again afterwards. See `plugin::load`.
+    ///
+    /// Answers whether it was applied; a VM that is already running cannot be reconfigured.
+    pub fn set_memory_limit(&self, limit: Option<usize>) -> bool {
+        match self.lua.try_borrow_mut() {
+            Ok(mut lua) => {
+                lua.set_memory_limit(limit);
+                true
+            }
+            Err(_) => false,
+        }
+    }
+
     /// Compile and run `source`, answering what it returned.
     ///
     /// Re-entrant, like [`call_function`](Self::call_function): a chunk compiled while the VM is

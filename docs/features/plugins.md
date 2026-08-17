@@ -206,6 +206,20 @@ token can shell out to `oslo secret get` whatever its manifest says. The declara
 *catchable* — it is a claim, printed before trust is decided, that its behaviour can be held against.
 And as above, a plugin's encrypted store is protected from the disk rather than from other plugins.
 
+## A ceiling on the load
+
+A plugin's entry file runs under a memory ceiling: whatever the interpreter is already using, plus
+64 MB. A load that allocates without end is stopped, and you are told which plugin and why:
+
+```
+oslo: plugin greedy: it was stopped part-way through loading: it asked for more than 64 MB of memory
+```
+
+The shell answers the next command as usual. **This is not the sandbox the section above says does
+not exist** — the plugin's hooks and callbacks run later with no ceiling at all, and any of them can
+start a command. What it stops is the load that would otherwise take the session down with it, which
+is a mistake far more likely than malice.
+
 ## Testing one
 
 ```lua

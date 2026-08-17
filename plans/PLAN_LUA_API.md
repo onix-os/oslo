@@ -147,20 +147,44 @@ VM global on every miss is the expensive way to write `string[key]`.
 `oslo.run` is not included: its failure is already `r.ok`, `r.status` and `r.err`, which is
 structure, and wrapping the status in an object would only add a layer.
 
-## 4. A sandbox for plugins
+## 4. A sandbox for plugins — **one of three; the other two do not hold up**
 
-luna 0.5.0 added **frozen tables** and a **memory ceiling**, and oslo has a plugin system that runs
-somebody else's Lua. Today a plugin gets the same unrestricted `oslo` the config does.
+### The memory ceiling — done
 
-```lua
--- a plugin could be loaded with:
---   * `oslo` frozen, so it cannot redefine oslo.run for everything else in the session
---   * a memory ceiling, so a runaway table is an error rather than an OOM
---   * `oslo.secret` filtered to the names its manifest declared (the manifest already declares them)
+A plugin's entry file now loads under a ceiling of whatever the VM is already using plus 64 MB, and
+the ceiling comes off when it returns. A load that allocates without end is stopped, the shell
+answers the next command, and the person who installed it is told which plugin and why:
+
+```
+oslo: plugin greedy: it was stopped part-way through loading: it asked for more than 64 MB of memory
 ```
 
-The manifest already *records* which secrets a plugin says it will read — the disclosure exists and
-nothing enforces it. Frozen tables are what would turn that from a statement into a boundary.
+Its own `<close>`-shaped honesty: the plugin's *hooks* run later, unbounded. What this stops is the
+load that would take the session down with it — the runaway table, not the hostile author.
+
+### Secrets filtered to the manifest — already done
+
+The section said "the disclosure exists and nothing enforces it". Not so:
+`api/secret.rs` refuses an undeclared name with `not declared in this plugin's `secrets = { … }``,
+and has for as long as the manifest has had the field. There was nothing to add.
+
+### Frozen tables — no
+
+`table.freeze` exists and works. It cannot do the job here, for three reasons that compound:
+
+1. **There is no unfreeze.** luna's Lua binding only ever passes `true`, so freezing `oslo` is for
+   the rest of the session. Plugins load *lazily*, on first use of a name they declared — so the
+   freeze would land mid-session and the config's own later writes would start failing.
+2. **One VM, one `oslo`.** A plugin does not get a copy; freezing for a plugin is freezing for the
+   config. Doing this properly means a `Lua` per plugin, or an environment built for one.
+3. **It would not be a boundary anyway.** `docs/features/plugins.md` already argues this at length,
+   and the argument is right: a plugin that wants your token can run `oslo secret get`. Locking the
+   table while leaving `sh` and `oslo.run` open is a lock on the door of a room with no walls.
+
+The one thing freezing would genuinely buy — a plugin cannot *accidentally* clobber `oslo.run` for
+everything else — is worth having, and is worth having at the price of a per-plugin environment
+rather than at the price of freezing the config's own API. That is a bigger change than this
+section, and it belongs with the plugin system rather than with the Lua surface.
 
 ## 5. Binary, and text that is text
 
@@ -189,7 +213,8 @@ nothing enforces it. Frozen tables are what would turn that from a statement int
 2. ~~**Streaming producers** (§2)~~ — **done** for `oslo.fs.walk`, `oslo.fs.lines` and
    `oslo.lines`; the structured pipeline needs an `oslo-shell` change first.
 3. ~~**Structured errors** (§3)~~ — **done**: `api/problem.rs`, `oslo.fs` and `oslo.db`.
-4. **Plugin sandbox** (§4) — turns an existing disclosure into an actual boundary.
+4. ~~**Plugin sandbox** (§4)~~ — the memory ceiling is **done**; the secret filtering already
+   existed; frozen tables cannot deliver a boundary without a per-plugin environment.
 5. **Binary-safe reads** (§5) — narrow, but currently silently corrupts.
 
 ## What I would not do

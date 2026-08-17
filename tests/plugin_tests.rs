@@ -303,6 +303,40 @@ fn a_requirement_this_oslo_meets_is_no_obstacle() {
     assert!(session.contains("REQUIREMENT-MET"), "{session}");
 }
 
+/// **A load that allocates without end is stopped, and the shell survives it.**
+///
+/// Not a sandbox — the plugin's hooks run later with no ceiling, and any of them can start a
+/// command. What this is for is the plugin whose entry file would otherwise take the session down
+/// with it, which is a mistake far more likely than malice. See `lua/engine/plugin.rs`.
+#[test]
+fn a_plugin_that_allocates_without_end_is_stopped_rather_than_taking_the_shell_with_it() {
+    let home = Home::new();
+    let source = home.candidate(
+        "greedy",
+        r#"return { name = "greedy", builtins = { "greed" } }"#,
+        r#"
+local hoard = {}
+while true do hoard[#hoard + 1] = string.rep("x", 4096) end
+oslo.register_builtin("greed", function() return 0 end)
+"#,
+    );
+    assert!(
+        home.plugin(&["install", source.to_str().unwrap(), "--yes"])
+            .status
+            .success()
+    );
+    // `greed` is what makes it load — plugins are read on first use of a name they declared. The
+    // claim is that the shell answers the *next* command, which it cannot do if the load took it.
+    //
+    // The marker is split by a quote the shell removes, so what is asserted on is the shell's
+    // *output* and not the pty echoing the line back.
+    let session = interactive(&home, "greed\necho STILL''-HERE\nexit\n");
+    assert!(session.contains("STILL-HERE"), "{session}");
+    // And it says so, rather than leaving a plugin that registered nothing looking like one with
+    // nothing to register.
+    assert!(session.contains("more than 64 MB"), "{session}");
+}
+
 #[test]
 fn a_git_source_without_a_revision_is_refused_before_anything_is_fetched() {
     let home = Home::new();
