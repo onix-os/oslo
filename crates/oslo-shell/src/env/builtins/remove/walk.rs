@@ -1,4 +1,4 @@
-//! Removing an operand one entry at a time.
+//! Removing an operand one entry at a time, through descriptors rather than paths.
 //!
 //! # Why not `remove_dir_all`
 //!
@@ -16,23 +16,49 @@
 //! gone" are different problems.
 //!
 //! So the walk is oslo's own: it reports the path that actually failed, carries on to the entries
-//! that can still go, and prints a `-v` line per entry rather than one for the whole tree.
+//! that can still go, prints a `-v` line per entry, prompts per entry under `-i`, and can be
+//! stopped with a Ctrl-C part-way through.
 //!
-//! # Three things the walk has to get right
+//! # Why every operation names a descriptor and a filename
 //!
-//! * **A symlink is one entry.** Descending into what it points at is how `rm -r` deletes a home
-//!   directory; `symlink_metadata` per entry is what stops it, and `is_dir()` on that is false for
-//!   a link to a directory.
+//! The first version of this walk did all of that by path — `read_dir("a/b")`,
+//! `remove_file("a/b/c")` — and was therefore open to the oldest race there is. Between deciding
+//! that `a/b` is a directory and reading it, anything that can write to `a` may replace `a/b` with
+//! a symlink; every later path-based call then resolves through the link, and `rm -r` empties
+//! somewhere it was never pointed at. Not theoretical: swapping the directory while the walk sat
+//! on an `-i` prompt deleted a file outside the tree on the first attempt.
+//!
+//! The fix is the one `std` and GNU's `rm` both use: hold an **open descriptor** for each
+//! directory and reach everything inside it with `openat`, `fstatat`, `unlinkat` and `fdopendir`.
+//! A descriptor still refers to the directory that was opened even if the name now points
+//! somewhere else, so a filename is resolved once, by the kernel, against something that cannot be
+//! substituted. `O_NOFOLLOW` on the descent turns the attack into a plain error.
+//!
+//! The operand itself is still named by path, because that is the name the user typed and there is
+//! no earlier descriptor to anchor it to. GNU has the same exposure in the same place.
+//!
+//! # Three more things the walk has to get right
+//!
+//! * **A symlink is one entry.** Never descended into, only unlinked — `is_dir` is asked of an
+//!   `fstatat` that does not follow links.
 //! * **An explicit stack, not recursion.** Depth is whatever the filesystem holds, and a tree deep
-//!   enough to overflow the Rust stack is a tree someone can build on purpose.
+//!   enough to overflow the Rust stack is a tree someone can build on purpose. One descriptor is
+//!   held per level currently open, which is the same cost `std` pays.
 //! * **A parent whose child failed says nothing.** It cannot be removed either, but the `ENOTEMPTY`
 //!   is a consequence of a failure already reported, and printing one per level buries the line
 //!   that says what is actually wrong.
 
-use oslo_base::error::reason;
-use std::fs::Metadata;
+use nix::dir::Dir;
+use nix::errno::Errno;
+use nix::fcntl::{AtFlags, OFlag, openat};
+use nix::sys::stat::{FileStat, Mode, SFlag, fstatat};
+use nix::unistd::{AccessFlags, UnlinkatFlags, faccessat, unlinkat};
+use std::ffi::{OsStr, OsString};
 use std::io::IsTerminal;
-use std::path::{Path, PathBuf};
+use std::os::fd::{AsRawFd, FromRawFd, OwnedFd, RawFd};
+use std::os::unix::ffi::OsStrExt;
+use std::path::Path;
+use std::rc::Rc;
 
 /// How one operand should be taken apart.
 pub struct Walk {
@@ -57,98 +83,211 @@ pub struct Outcome {
     pub interrupted: bool,
 }
 
-/// One item of work. `Leave` is pushed under a directory's children so the directory itself is
-/// removed after them, carrying the failure count from when it was entered.
+/// A directory the walk currently has open, shared by every step naming something inside it.
+///
+/// `Rc` rather than a plain field so the descriptor lives exactly as long as the steps that need
+/// it: the last child popped off the stack drops the last handle, and the level closes.
+type Level = Rc<OwnedFd>;
+
+/// One item of work, each naming a filename *within* an open directory.
 enum Step {
-    Enter(PathBuf, String),
-    Leave(PathBuf, String, usize),
+    /// Remove `name`, descending into it first when it is a directory.
+    Enter {
+        parent: Level,
+        name: OsString,
+        shown: String,
+    },
+    /// Remove the directory `name`, whose contents have now been dealt with. `before` is the
+    /// failure count from when it was entered.
+    Leave {
+        parent: Level,
+        name: OsString,
+        shown: String,
+        before: usize,
+    },
 }
 
 /// Remove `root`, and everything under it when `recursive`.
 pub fn remove_tree(root: &Path, shown: &str, walk: &Walk) -> Outcome {
-    let mut failures = 0usize;
-    let mut stack = vec![Step::Enter(root.to_path_buf(), shown.to_string())];
+    // The operand is named by path — see the module docs — and only what is *inside* it is reached
+    // through a descriptor.
+    let meta = match std::fs::symlink_metadata(root) {
+        Ok(meta) => meta,
+        // The caller stats and reports before calling; reaching here means it went in between.
+        Err(_) => return done(usize::from(!walk.force), false),
+    };
 
+    if !meta.is_dir() {
+        if !ask_path(walk, shown, describe(&meta), root) {
+            return done(0, false);
+        }
+        return done(
+            report(std::fs::remove_file(root), shown, false, walk),
+            false,
+        );
+    }
+
+    if !walk.recursive {
+        if !ask_path(walk, shown, "directory", root) {
+            return done(0, false);
+        }
+        return done(report(std::fs::remove_dir(root), shown, true, walk), false);
+    }
+
+    let level = match open_dir(None, root, walk, shown) {
+        Ok(level) => level,
+        Err(()) => return done(1, false),
+    };
+
+    let mut failures = 0usize;
+    let mut stack = Vec::new();
+    match children(&level, shown) {
+        Ok(entries) => {
+            // The operand gets the same descend prompt its subdirectories do — asked here rather
+            // than in `visit` only because the operand has no parent descriptor to be reached from.
+            if !entries.is_empty()
+                && walk.interactive
+                && !walk.force
+                && !confirm(&walk.origin, &format!("descend into directory '{shown}'"))
+            {
+                return done(0, false);
+            }
+            queue(&mut stack, entries);
+        }
+        Err(e) => {
+            complain(walk, shown, e);
+            failures += 1;
+        }
+    }
+
+    let interrupted = drain(&mut stack, walk, &mut failures);
+
+    // The operand goes last, and only if everything under it did. Still by path, and still safe:
+    // `remove_dir` will not follow a symlink, so the worst a swap can do here is fail.
+    if !interrupted && failures == 0 && ask_path(walk, shown, "directory", root) {
+        failures += report(std::fs::remove_dir(root), shown, true, walk);
+    }
+
+    done(failures, interrupted)
+}
+
+/// Open a directory without following a link, reporting and answering `Err` if it will not open.
+fn open_dir(parent: Option<RawFd>, path: &Path, walk: &Walk, shown: &str) -> Result<Level, ()> {
+    // **`O_NOFOLLOW` is the whole defence.** If the name became a symlink since it was stat-ed,
+    // the open fails with `ELOOP` rather than landing somewhere else.
+    let flags = OFlag::O_RDONLY | OFlag::O_DIRECTORY | OFlag::O_NOFOLLOW | OFlag::O_CLOEXEC;
+    match openat(parent, path, flags, Mode::empty()) {
+        // SAFETY: `openat` answers a descriptor it does not keep, so this is its only owner.
+        Ok(fd) => Ok(Rc::new(unsafe { OwnedFd::from_raw_fd(fd) })),
+        Err(e) => {
+            complain(walk, shown, e);
+            Err(())
+        }
+    }
+}
+
+/// Work the stack down to nothing, or until a Ctrl-C says to stop. `true` if it was stopped.
+fn drain(stack: &mut Vec<Step>, walk: &Walk, failures: &mut usize) -> bool {
     while let Some(step) = stack.pop() {
         // Between entries, which is the only place a builtin can be stopped: it runs in the shell
         // process, so the keystroke sets a flag that nothing would otherwise look at until the
         // whole `rm` had finished. Peeked rather than taken — see `job::interrupt_waiting`.
         if crate::exec::job::interrupt_waiting() {
-            return Outcome {
-                failed: failures > 0,
-                interrupted: true,
-            };
+            return true;
         }
         match step {
-            Step::Enter(path, shown) => {
-                let Some(meta) = look(&path, &shown, walk, &mut failures) else {
+            Step::Enter {
+                parent,
+                name,
+                shown,
+            } => visit(stack, &parent, &name, &shown, walk, failures),
+            Step::Leave {
+                parent,
+                name,
+                shown,
+                before,
+            } => {
+                // Something under it could not go, so it cannot either — and the entry that
+                // actually failed has already said so.
+                if *failures > before {
                     continue;
-                };
-                if meta.is_dir() {
-                    descend(&mut stack, path, shown, walk, &mut failures);
-                } else {
-                    unlink(&path, &shown, &meta, walk, &mut failures);
                 }
-            }
-            Step::Leave(path, shown, before) => {
-                if failures > before {
+                if !ask_at(walk, &shown, "directory", &parent, &name) {
                     continue;
                 }
-                if !ask(walk, &shown, "directory", &path) {
-                    continue;
-                }
-                take(
-                    std::fs::remove_dir(&path),
-                    &shown,
-                    true,
-                    walk,
-                    &mut failures,
+                let gone = unlinkat(
+                    Some(parent.as_raw_fd()),
+                    name.as_os_str(),
+                    UnlinkatFlags::RemoveDir,
                 );
+                *failures += report_nix(gone, &shown, true, walk);
             }
         }
     }
-
-    Outcome {
-        failed: failures > 0,
-        interrupted: false,
-    }
+    false
 }
 
-/// The entry's own metadata, or `None` when it is not there to remove.
-fn look(path: &Path, shown: &str, walk: &Walk, failures: &mut usize) -> Option<Metadata> {
-    match std::fs::symlink_metadata(path) {
-        Ok(meta) => Some(meta),
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound && walk.force => None,
+/// Deal with one name inside an open directory.
+fn visit(
+    stack: &mut Vec<Step>,
+    parent: &Level,
+    name: &OsString,
+    shown: &str,
+    walk: &Walk,
+    failures: &mut usize,
+) {
+    let at = Some(parent.as_raw_fd());
+    let stat = match fstatat(at, name.as_os_str(), AtFlags::AT_SYMLINK_NOFOLLOW) {
+        Ok(stat) => stat,
+        Err(Errno::ENOENT) if walk.force => return,
         Err(e) => {
-            complain(walk, shown, &e);
-            *failures += 1;
-            None
-        }
-    }
-}
-
-/// Queue a directory's children, then the directory itself.
-fn descend(stack: &mut Vec<Step>, path: PathBuf, shown: String, walk: &Walk, failures: &mut usize) {
-    if !walk.recursive {
-        if !ask(walk, &shown, "directory", &path) {
-            return;
-        }
-        take(std::fs::remove_dir(&path), &shown, true, walk, failures);
-        return;
-    }
-
-    let children = match read_children(&path, &shown) {
-        Ok(children) => children,
-        Err(e) => {
-            complain(walk, &shown, &e);
+            complain(walk, shown, e);
             *failures += 1;
             return;
         }
     };
 
-    // The descend prompt is asked only when there is something to descend into; GNU asks an empty
-    // directory the one question that applies to it, which `Leave` puts a few lines below.
-    if !children.is_empty()
+    // A symlink is an entry, never a way down: this is the test that keeps `rm -r` inside the tree
+    // it was pointed at.
+    let directory = kind_bits(&stat) == SFlag::S_IFDIR.bits();
+    if !directory || !walk.recursive {
+        let kind = if directory {
+            "directory"
+        } else {
+            kind_of(&stat)
+        };
+        if !ask_at(walk, shown, kind, parent, name) {
+            return;
+        }
+        let how = if directory {
+            UnlinkatFlags::RemoveDir
+        } else {
+            UnlinkatFlags::NoRemoveDir
+        };
+        let gone = unlinkat(at, name.as_os_str(), how);
+        *failures += report_nix(gone, shown, directory, walk);
+        return;
+    }
+
+    let level = match open_dir(at, Path::new(name), walk, shown) {
+        Ok(level) => level,
+        Err(()) => {
+            *failures += 1;
+            return;
+        }
+    };
+    let entries = match children(&level, shown) {
+        Ok(entries) => entries,
+        Err(e) => {
+            complain(walk, shown, e);
+            *failures += 1;
+            return;
+        }
+    };
+
+    // The descend prompt is asked only when there is something to descend into; an empty directory
+    // gets the one question that applies to it, from the `Leave` step below.
+    if !entries.is_empty()
         && walk.interactive
         && !walk.force
         && !confirm(&walk.origin, &format!("descend into directory '{shown}'"))
@@ -156,86 +295,145 @@ fn descend(stack: &mut Vec<Step>, path: PathBuf, shown: String, walk: &Walk, fai
         return;
     }
 
-    stack.push(Step::Leave(path, shown, *failures));
-    // Reversed, so popping yields them in the order the directory listed them — the order `-v`
-    // output and GNU's both come out in.
-    for child in children.into_iter().rev() {
-        stack.push(child);
+    stack.push(Step::Leave {
+        parent: Rc::clone(parent),
+        name: name.clone(),
+        shown: shown.to_string(),
+        before: *failures,
+    });
+    queue(stack, entries);
+}
+
+/// Push children so that popping yields them in the order the directory listed them.
+fn queue(stack: &mut Vec<Step>, entries: Vec<Step>) {
+    for entry in entries.into_iter().rev() {
+        stack.push(entry);
     }
 }
 
-/// A directory's entries as steps, with the operand's spelling carried down the path.
-fn read_children(path: &Path, shown: &str) -> std::io::Result<Vec<Step>> {
+/// The entries of an open directory, as steps that name it as their parent.
+///
+/// Read through `fdopendir` on a duplicate of the descriptor, because `Dir` closes what it is
+/// given and the level's own handle has `unlinkat` calls still to come.
+fn children(level: &Level, shown: &str) -> Result<Vec<Step>, Errno> {
+    let copy: RawFd = nix::unistd::dup(level.as_raw_fd())?;
+    let mut dir = Dir::from_fd(copy)?;
     let stem = shown.trim_end_matches('/');
-    let mut children = Vec::new();
-    for entry in std::fs::read_dir(path)? {
+    let mut entries = Vec::new();
+    for entry in dir.iter() {
         let entry = entry?;
-        let name = entry.file_name();
-        children.push(Step::Enter(
-            entry.path(),
-            format!("{stem}/{}", name.to_string_lossy()),
-        ));
+        let raw = entry.file_name().to_bytes();
+        if raw == b"." || raw == b".." {
+            continue;
+        }
+        let name = OsStr::from_bytes(raw).to_os_string();
+        // Lossy only for the *message*: every operation uses the bytes above, so a name that is
+        // not valid UTF-8 is still removed correctly and merely printed with a replacement char.
+        entries.push(Step::Enter {
+            parent: Rc::clone(level),
+            shown: format!("{stem}/{}", name.to_string_lossy()),
+            name,
+        });
     }
-    Ok(children)
+    Ok(entries)
 }
 
-/// Remove one non-directory entry.
-fn unlink(path: &Path, shown: &str, meta: &Metadata, walk: &Walk, failures: &mut usize) {
-    if !ask(walk, shown, describe(meta), path) {
-        return;
-    }
-    take(std::fs::remove_file(path), shown, false, walk, failures);
+/// The file-type half of a `stat`'s mode.
+fn kind_bits(stat: &FileStat) -> nix::libc::mode_t {
+    stat.st_mode & SFlag::S_IFMT.bits()
 }
 
-/// Record what a removal did, and say so under `-v`.
-fn take(
-    removed: std::io::Result<()>,
-    shown: &str,
-    directory: bool,
-    walk: &Walk,
-    failures: &mut usize,
-) {
+/// Say what happened, and answer 1 when it failed so callers can add it up.
+fn report(removed: std::io::Result<()>, shown: &str, directory: bool, walk: &Walk) -> usize {
     match removed {
         Ok(()) => {
-            if walk.verbose {
-                if directory {
-                    println!("removed directory '{shown}'");
-                } else {
-                    println!("removed '{shown}'");
-                }
-            }
+            announce(shown, directory, walk);
+            0
         }
         Err(e) => {
-            complain(walk, shown, &e);
-            *failures += 1;
+            eprintln!(
+                "{}rm: cannot remove '{shown}': {}",
+                walk.origin,
+                oslo_base::error::reason(&e)
+            );
+            1
         }
     }
 }
 
-/// Whether this entry may go.
+/// The same, for the `nix` calls that answer an `Errno`.
+fn report_nix(removed: Result<(), Errno>, shown: &str, directory: bool, walk: &Walk) -> usize {
+    match removed {
+        Ok(()) => {
+            announce(shown, directory, walk);
+            0
+        }
+        Err(e) => {
+            complain(walk, shown, e);
+            1
+        }
+    }
+}
+
+fn announce(shown: &str, directory: bool, walk: &Walk) {
+    if !walk.verbose {
+        return;
+    }
+    if directory {
+        println!("removed directory '{shown}'");
+    } else {
+        println!("removed '{shown}'");
+    }
+}
+
+fn complain(walk: &Walk, shown: &str, e: Errno) {
+    eprintln!("{}rm: cannot remove '{shown}': {}", walk.origin, e.desc());
+}
+
+/// Whether this entry may go, for something named inside an open directory.
 ///
 /// **`-f` never asks, `-i` always asks, and in between there is the write-protected prompt** — the
 /// one GNU raises for a file the user cannot write to, and only when someone is at the terminal to
 /// answer it. A script's stdin is not a tty, so this is silent everywhere it would otherwise hang.
-fn ask(walk: &Walk, shown: &str, kind: &str, path: &Path) -> bool {
+fn ask_at(walk: &Walk, shown: &str, kind: &str, parent: &Level, name: &OsString) -> bool {
     if walk.force {
         return true;
     }
     if walk.interactive {
         return confirm(&walk.origin, &format!("remove {kind} '{shown}'"));
     }
-    if !std::io::stdin().is_terminal() || writable(path) {
+    if !std::io::stdin().is_terminal() {
+        return true;
+    }
+    let writable = faccessat(
+        Some(parent.as_raw_fd()),
+        name.as_os_str(),
+        AccessFlags::W_OK,
+        AtFlags::AT_EACCESS,
+    )
+    .is_ok();
+    writable
+        || confirm(
+            &walk.origin,
+            &format!("remove write-protected {kind} '{shown}'"),
+        )
+}
+
+/// The same question about the operand, which has a path and no parent descriptor.
+fn ask_path(walk: &Walk, shown: &str, kind: &str, path: &Path) -> bool {
+    if walk.force {
+        return true;
+    }
+    if walk.interactive {
+        return confirm(&walk.origin, &format!("remove {kind} '{shown}'"));
+    }
+    if !std::io::stdin().is_terminal() || nix::unistd::access(path, AccessFlags::W_OK).is_ok() {
         return true;
     }
     confirm(
         &walk.origin,
         &format!("remove write-protected {kind} '{shown}'"),
     )
-}
-
-/// Whether the user could write to this path, which is what decides the extra prompt.
-fn writable(path: &Path) -> bool {
-    nix::unistd::access(path, nix::unistd::AccessFlags::W_OK).is_ok()
 }
 
 /// Anything but a `y` answer means no, as it does in `rm` and in `find -ok`.
@@ -249,15 +447,40 @@ pub fn confirm(origin: &str, question: &str) -> bool {
     }
 }
 
-fn complain(walk: &Walk, shown: &str, e: &std::io::Error) {
-    eprintln!("{}rm: cannot remove '{shown}': {}", walk.origin, reason(e));
+fn done(failures: usize, interrupted: bool) -> Outcome {
+    Outcome {
+        failed: failures > 0,
+        interrupted,
+    }
 }
 
-/// What `rm` calls this kind of entry when it asks about it.
+/// What `rm` calls this kind of entry when it asks about it, from a `stat`.
+fn kind_of(stat: &FileStat) -> &'static str {
+    let bits = kind_bits(stat);
+    if bits == SFlag::S_IFLNK.bits() {
+        "symbolic link"
+    } else if bits == SFlag::S_IFDIR.bits() {
+        "directory"
+    } else if bits == SFlag::S_IFIFO.bits() {
+        "fifo"
+    } else if bits == SFlag::S_IFSOCK.bits() {
+        "socket"
+    } else if bits == SFlag::S_IFCHR.bits() {
+        "character special file"
+    } else if bits == SFlag::S_IFBLK.bits() {
+        "block special file"
+    } else if stat.st_size == 0 {
+        "regular empty file"
+    } else {
+        "regular file"
+    }
+}
+
+/// The same, for the operand, which the caller already holds a `Metadata` for.
 ///
 /// GNU's wording, because a prompt is something people answer by reading it, and "regular empty
 /// file" is the difference between deleting a stub and deleting a day's work.
-pub fn describe(meta: &Metadata) -> &'static str {
+pub fn describe(meta: &std::fs::Metadata) -> &'static str {
     use std::os::unix::fs::FileTypeExt;
     let kind = meta.file_type();
     if kind.is_symlink() {
