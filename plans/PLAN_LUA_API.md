@@ -186,22 +186,48 @@ everything else — is worth having, and is worth having at the price of a per-p
 rather than at the price of freezing the config's own API. That is a bigger change than this
 section, and it belongs with the plugin system rather than with the Lua surface.
 
-## 5. Binary, and text that is text
+## 5. Binary, and text that is text — **not done, and here is the size of it**
 
-`string.pack`/`unpack` and byte-exact strings both work now. Two consequences:
+`oslo.fs.read` still goes through `String::from_utf8_lossy`, so a binary file comes back with
+replacement characters. The section treated this as narrow. It is not, and the reason is one type:
 
-* `oslo.fs.read` can return bytes that are not UTF-8 without mangling them — today the boundary
-  goes through `String::from_utf8_lossy`, so a binary file comes back with replacement characters.
-* `utf8.len` and `utf8.offset` exist, so `oslo.ui.width` and friends could stop guessing about
-  multi-byte input.
+```rust
+pub enum Value {
+    …
+    Str(Rc<str>),      // oslo-base/src/value.rs
+}
+```
+
+**A Lua string is bytes; oslo's is UTF-8.** Every value crossing into the VM goes
+`Own::Str(s) => LunaStr::from_slice(&ctx, s.as_bytes())`, so the VM end has always been fine — the
+loss is at oslo's own type, which cannot hold the bytes to hand over. `string.pack` working changes
+nothing about that.
+
+Two ways out, and both are bigger than this section:
+
+* **`Str(Rc<[u8]>)`** — what real Lua does, and the right answer. It is the shell's central value
+  type: roughly 150 sites match `Value::Str(s)` and use `s` as a `&str`, across all four crates.
+* **A second `Bytes` variant** — smaller to write and worse to live with. Lua has one string type,
+  so `t["a"]` and `t[<bytes "a">]` must be the same key and must compare equal; keeping that true
+  across two variants means every comparison and every `Key` has to know about both, and the ones
+  that forget fail silently.
+
+The second half of the section was a misreading on my part: `oslo.ui.width` is the *terminal's*
+width, not a string's, and display width is already computed in Rust with `unicode-width`, which
+handles east-asian wide and combining characters that `utf8.len` would count wrong. There is nothing
+for `utf8.len` to fix there.
 
 ## 6. Smaller things the VM unlocked
 
 * **`os.date` exists**, so a prompt can show a clock without shelling out. Worth a note in the docs
   rather than an API.
-* **`debug.traceback`** means a failing hook could report *where* it failed. Today a broken
-  `pre-cmd` says what went wrong and not where.
-* **Weak tables** make a completion cache that does not pin memory.
+* ~~**`debug.traceback`** means a failing hook could report *where* it failed.~~ It already does. A
+  handler that raises reports `…/init.lua:2: could not index into a nil value` — file and line. A
+  traceback would add the call chain above that line, which is worth less than the line itself. What
+  those messages *do* need is tidying: the chunk name is printed twice, and a `pre-cmd` handler is
+  announced as `key hook`.
+* **Weak tables** make a completion cache that does not pin memory. No cache in the shell has been
+  measured as a memory problem, so this is a solution looking for one.
 * **The serde bridge** could give `oslo.toml.decode` and `oslo.yaml.decode` for the price of a
   dependency each, rather than a hand-written parser — the same way `oslo.json` works today.
 
@@ -215,7 +241,8 @@ section, and it belongs with the plugin system rather than with the Lua surface.
 3. ~~**Structured errors** (§3)~~ — **done**: `api/problem.rs`, `oslo.fs` and `oslo.db`.
 4. ~~**Plugin sandbox** (§4)~~ — the memory ceiling is **done**; the secret filtering already
    existed; frozen tables cannot deliver a boundary without a per-plugin environment.
-5. **Binary-safe reads** (§5) — narrow, but currently silently corrupts.
+5. **Binary-safe reads** (§5) — **not done**: it is `Value::Str(Rc<str>)` across four crates, not a
+   change to `oslo.fs.read`. See the section for the two shapes it could take.
 
 ## What I would not do
 
