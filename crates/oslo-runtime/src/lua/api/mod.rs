@@ -63,6 +63,7 @@ mod suggest;
 pub(crate) mod timer;
 pub(crate) mod tool;
 mod ui;
+mod watch;
 
 pub mod hooks;
 pub(crate) use shell::handlers as hook_handlers;

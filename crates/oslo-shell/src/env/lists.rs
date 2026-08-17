@@ -17,6 +17,10 @@
 //! * **Idempotent.** A configuration is loaded and reloaded — on an edit, on a nested shell, on
 //!   `direnv allow` — and appending unconditionally grows the variable every time until it is pages
 //!   long. An entry already present moves to the front rather than appearing twice.
+//! * **Deduplicating, as a consequence.** The list is rebuilt on every change, so duplicates that
+//!   were already in it collapse — adding one entry to a `$PATH` holding two copies of `/usr/bin`
+//!   leaves it one longer than it started, not two. Worth knowing rather than worth avoiding: a
+//!   repeated entry is a slower lookup that can never change an answer.
 //! * **Absolute.** `./bin` means the bin directory of wherever the caller is *now*, which is not
 //!   where the shell will be standing when the entry is used.
 //! * **No empty entries.** A trailing or doubled colon means "the current directory" to the dynamic

@@ -35,9 +35,10 @@ oslo-luavm = { path = "../oslo-luavm" }
 oslo-shell = { path = "../oslo-shell" }
 oslo-ui = { path = "../oslo-ui" }
 
-# Terminal setup at startup, and the signal handling the read loop installs.
+# Terminal setup at startup, the signal handling the read loop installs, and `inotify` for
+# `oslo.fs.watch`.
 nix = { version = "0.29", features = [
-    "process", "signal", "term", "fs", "user", "poll",
+    "process", "signal", "term", "fs", "user", "poll", "inotify",
 ] }
 
 # `oslo.re`, and history's own matching.

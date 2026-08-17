@@ -26,6 +26,8 @@ pub fn build() -> Value {
     writing(&mut it);
     listing(&mut it);
     metadata(&mut it);
+    // Being told about a change rather than asking. See [`super::watch`].
+    super::watch::install(&mut it);
 
     Value::table(it)
 }

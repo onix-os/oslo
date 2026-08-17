@@ -87,3 +87,15 @@ fn the_pattern_matcher_crosses_slashes_and_survives_many_stars() {
     // Nothing but stars against a long subject must not take exponential time.
     assert!(glob(&"*".repeat(20), &"a".repeat(200)));
 }
+
+/// **Rebuilding the list collapses duplicates that were already in it.** A side effect rather than
+/// a goal, and worth pinning either way — a caller counting entries before and after an add would
+/// otherwise be surprised by a list that did not grow.
+#[test]
+fn a_change_collapses_duplicates_that_were_already_there() {
+    let mut env = env_with("P", "/usr/bin:/opt:/usr/bin");
+    assert_eq!(entries(&env, "P").len(), 3);
+
+    prepend(&mut env, "P", &["/new".to_string()], Path::new("/base"));
+    assert_eq!(entries(&env, "P"), ["/new", "/usr/bin", "/opt"]);
+}

@@ -151,6 +151,97 @@ What a *name* is remains text: a path, a variable, a command word. Handing `oslo
 to something expecting one of those is a message rather than a mangling, and `oslo.json.encode`
 refuses bytes outright, since no JSON string could hold them and still be the same bytes.
 
+### Facts the shell already knows, without a process
+
+A prompt draws on every keystroke that changes the line, so anything it asks for has to be cheap.
+These are the questions people shell out for, answered from files the kernel already keeps:
+
+```lua
+oslo.git.head()          -- { branch = "main", commit = "…", detached = false }
+oslo.git.operation()     -- "rebase" while one is part-way through, else nil
+oslo.git.upstream()      -- "origin/main", or nil when the branch tracks nothing
+oslo.git.stash()         -- how many entries; 0 outside a repository
+oslo.git.tag()           -- a tag pointing at HEAD
+
+oslo.sys.kernel()        -- "7.0.0-29-generic"
+oslo.sys.cpus()          -- what this shell may run on, cgroup quota included
+oslo.sys.loadavg()       -- { 1, 5, 15 }
+oslo.sys.memory()        -- bytes: total, available, free, swap_total, swap_free
+oslo.sys.uptime()        -- seconds
+```
+
+`oslo.git` reads `.git` — one to three small file reads and no `git` process. It handles a linked
+worktree, where `.git` is a *file* and the refs live in the repository it was linked from.
+**`dirty` and `ahead`/`behind` are deliberately absent**: both mean real work through the object
+database, and a hand-rolled wrong answer is worse than no answer. Ask for those off the prompt:
+
+```lua
+oslo.every(2000, function()
+  oslo.spawn{ "git", "status", "--porcelain",
+    on_exit = function(out) oslo.state.set("git.dirty", out ~= "") end }
+end)
+```
+
+`oslo.sys.memory()` answers bytes, not `39G`, for the same reason the structured pipeline hands a
+`Size` over as a number: a caller comparing needs one, and a caller showing has `oslo.ui`.
+
+### `$PATH` is a list
+
+```lua
+oslo.env.path_add("~/.local/bin")               -- front, once, absolute, tilde expanded
+oslo.env.path_add("./node_modules/.bin")        -- relative to where you are now
+oslo.env.path_add("/opt/fallback", { last = true })
+oslo.env.path_add("/usr/share/man", { var = "MANPATH" })
+oslo.env.path_remove("/nix/*")                  -- a pattern; answers how many went
+oslo.env.has_path("~/.cargo/bin")
+for _, dir in ipairs(oslo.env.path()) do … end
+```
+
+The alternative is string surgery on `oslo.env.get("PATH")`, and each of its edge cases is one
+somebody hits: the missing separator, appending where prepending was meant so the project's tool
+loses to the system one, a reload that grows the variable every time, `./bin` resolving against
+wherever the shell later stands, and the empty entry a trailing colon leaves — which means "the
+current directory" to the dynamic linker. These were `oslo.direnv.path_add`, behind a feature; they
+are in every build now, over the same implementation `PATH_add` in an `.envrc` uses.
+
+### Bytes, summarised and carried
+
+```lua
+oslo.hash.sha256("hello")               -- lower-case hex
+oslo.hash.file("/usr/bin/oslo")         -- streamed; the file is never held in memory
+oslo.hex.encode(oslo.fs.read("k.bin"))  -- and oslo.hex.decode back
+oslo.base64.decode(token)               -- wrapping at 64 or 76 columns is ignored
+```
+
+These only became possible when a shell value could hold arbitrary bytes: hashing what
+`oslo.fs.read` used to answer for a binary file hashed a lossy rendering, giving a checksum that
+matched nothing and no sign of why. `oslo.base64` hides nothing and protects nothing — it is a
+change of alphabet. `oslo.secret` is what encrypts.
+
+### Being told when a file changes
+
+```lua
+local watch <close> = oslo.fs.watch("src", { "write", "create", "delete" })
+oslo.every(500, function()
+  for change in watch do
+    if change.name:match("%.rs$") then oslo.spawn{ "cargo", "check" } end
+  end
+end)
+```
+
+The kinds are `write` (saved — one event per save, not one per `write(2)`), `modify`, `create`,
+`delete`, `move`, `attrib`, `open` and `read`; no list means all of them. A change carries `name`,
+`path`, `kind` and `directory`.
+
+**Polling is the interface, and that is not laziness.** A Lua handler runs only at a safe point — a
+command boundary or an idle prompt — so a callback promising "when the file changes" would be a lie
+about *when*. This is a queue instead: the kernel fills it whether or not anyone is looking, the
+handle drains it when a timer gets round to it, and nothing is lost in between. That last part is
+what a `stat`-and-compare loop cannot do at all, since it only ever sees the state a file ended in.
+
+It does not recurse — inotify watches a directory, not a tree — and `<close>` is what releases the
+kernel's watch.
+
 ### A failure carries facts, and is still the message
 
 `nil, message` is the convention everywhere in `oslo.*`, and the second value is now an object:
