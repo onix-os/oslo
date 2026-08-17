@@ -142,15 +142,31 @@ impl Parser<'_> {
     /// to convert into, so an `in` with nothing usable after it is the inch. `2 in in cm` reads
     /// correctly for the same reason — the first `in` is followed by a word that cannot begin a
     /// value, so it stays an inch, and the second one converts.
+    /// **The left side is everything; the right side is a unit.** `1 + 1 m in cm` converts the
+    /// sum, so what comes before binds as loosely as possible — but what comes *after* is a unit
+    /// expression and stops there. Read greedily, `100 cm in m + 5 m` converted a metre into
+    /// six-metre units and answered `0.167 m`, silently, for a line that plainly means "one metre
+    /// plus five". A unit is a name, a product of names, or one divided by another: `m`, `km/h`,
+    /// `kg m/s^2` — never a sum.
     fn conversion(&mut self) -> Result<Expr, String> {
         let mut left = self.bit_or()?;
         loop {
-            if !self.starts_a_conversion() {
-                return Ok(left);
+            if self.starts_a_conversion() {
+                self.at += 1;
+                left = Expr::Convert(Box::new(left), Box::new(self.product()?));
+                continue;
             }
-            self.at += 1;
-            let right = self.bit_or()?;
-            left = Expr::Convert(Box::new(left), Box::new(right));
+            // A sum *after* a conversion, which the level below has already stopped reading:
+            // `100 cm in m + 5 m` is six metres, and the `+ 5 m` belongs to the converted value
+            // rather than to the unit. Without this the `+` was simply left over.
+            let op = if self.eat(&Token::Plus) {
+                Binary::Add
+            } else if self.eat(&Token::Minus) {
+                Binary::Subtract
+            } else {
+                return Ok(left);
+            };
+            left = Expr::Binary(op, Box::new(left), Box::new(self.bit_or()?));
         }
     }
 

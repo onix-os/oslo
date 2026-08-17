@@ -168,3 +168,43 @@ fn a_name_in_the_table_is_never_split_into_a_prefix() {
     answers("1 ms in s", "0.001 s");
     answers("1 µm in nm", "1000 nm");
 }
+
+/// **A conversion target is a unit, not the rest of the line.**
+///
+/// Read greedily, `100 cm in m + 5 m` converted one metre into six-metre units and answered
+/// `0.166 m` — silently, for a line that plainly means "one metre plus five". The left of `in`
+/// still takes everything, so `1 + 1 m in cm` converts the sum; only the right side stops.
+#[test]
+fn a_conversion_target_stops_at_a_sum() {
+    answers("100 cm in m + 5 m", "6 m");
+    answers("0xff in dec + 1", "256");
+    answers("5 km in miles + 1 mile", "4.10685596119 miles");
+    answers("2 m in cm + 3 m in cm", "500 cm");
+    // And a unit built with `/` or juxtaposition is still read whole.
+    answers("100 km/h in m/s", "27.7777777778 m·s⁻¹");
+    answers("1 N in kg m/s^2", "1 kg·m·s⁻²");
+    // The left side is still everything: this fails because `1 + 1 m` is genuinely wrong.
+    refuses("1 + 1 m in cm", "cannot add");
+}
+
+/// Every spelling of a base, because a calculator in a shell is asked this constantly.
+#[test]
+fn every_spelling_of_a_base_is_understood() {
+    for (source, wanted) in [
+        ("0xff in dec", "255"),
+        ("0xff in decimal", "255"),
+        ("0xff in base10", "255"),
+        ("255 in hex", "0xff"),
+        ("255 in hexadecimal", "0xff"),
+        ("255 in base16", "0xff"),
+        ("255 in bin", "0b11111111"),
+        ("255 in binary", "0b11111111"),
+        ("255 in base2", "0b11111111"),
+        ("255 in oct", "0o377"),
+        ("255 in octal", "0o377"),
+        ("0o755 in dec", "493"),
+        ("3735928559 in hex", "0xdeadbeef"),
+    ] {
+        answers(source, wanted);
+    }
+}
