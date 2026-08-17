@@ -225,6 +225,30 @@ symlinks, which over `oslo.fs.walk` in Lua would cost a `stat` and a boundary cr
 subdirectory it cannot read is counted rather than fatal — `usage("/etc")` answers for somebody who
 is not root, and `unreadable == 0` is how you tell a complete total from a floor.
 
+### Processes and filesystems, as fields
+
+```lua
+local p = oslo.proc.info(oslo.proc.pid())
+-- p.pid, p.ppid, p.name, p.state, p.threads, p.rss, p.size, p.uid,
+-- p.command, p.argv, p.exe, p.cwd
+for _, child in ipairs(oslo.proc.children(oslo.proc.pid())) do … end
+
+local d = oslo.fs.disk(".")   -- { total, free, available, files, files_free }
+```
+
+`ps` is the canonical thing to shell out to and the canonical thing to get wrong: its columns are
+padded to a width that depends on their contents, `COMMAND` contains spaces so it cannot be the
+*n*th field, and a process whose name has a space in it — which is allowed — breaks every
+`awk '{print $2}'` ever written. `p.argv` is the arguments exactly as they were passed, because
+`/proc/<pid>/cmdline` is NUL-separated. `p.state` is `"zombie"`, not `"Z"`. `p.rss` is bytes.
+
+`p.exe` and `p.cwd` are nil for a process that is not yours — those are `/proc` symlinks only the
+owner may read, and nil says "unavailable" where `""` would look like a process with no executable.
+
+`oslo.fs.disk` answers for the filesystem the path is *on*, so any path on the mount does.
+**`free` and `available` differ on purpose**: a filesystem reserves a percentage for root, so
+`available` is what you may write and `free` is what exists. `df` shows the first.
+
 ### History as rows, not as a file
 
 ```lua

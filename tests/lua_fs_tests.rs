@@ -371,3 +371,23 @@ fn usage_carries_on_past_what_it_cannot_read_and_says_so() {
     // The readable half is counted, the shut one is reported rather than silently missing.
     assert_eq!(out, "5\t1\t1");
 }
+
+/// **What `df` answers, for the filesystem a path is on.** `free` and `available` differ because a
+/// filesystem reserves a percentage for root — a script asking whether it can save something wants
+/// `available`, which is the one `df` shows and calls "Avail".
+#[test]
+fn disk_reports_the_filesystem_a_path_is_on() {
+    let out = lua(r#"
+        local d = oslo.fs.disk(".")
+        print(d.total > 0, d.available <= d.free, d.free <= d.total, d.files_free <= d.files)
+        -- Bytes, not blocks: a filesystem anybody runs a test on has more than a megabyte.
+        print(d.total > 1024 * 1024)
+        -- Any path on the mount answers for the mount, so a file does as well as a directory.
+        oslo.fs.write("f", "x")
+        print(oslo.fs.disk("f").total == d.total)
+        -- Somewhere that is not there is a message rather than a raise.
+        local gone, err = oslo.fs.disk("nope/at/all")
+        print(gone, err.kind)
+    "#);
+    assert_eq!(out, "true\ttrue\ttrue\ttrue\ntrue\ntrue\nnil\tnot-found");
+}

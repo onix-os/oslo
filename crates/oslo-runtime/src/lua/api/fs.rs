@@ -11,13 +11,13 @@
 use super::util::{
     failed, failed_between, failed_path, int, list, ok, opt_text, put, raw, record, text,
 };
-use oslo_base::value::{LuaError, Table, Value};
-use std::cell::RefCell;
+use oslo_base::value::{Table, Value};
 use std::fs;
 use std::os::unix::fs::{MetadataExt, PermissionsExt};
 use std::path::Path;
-use std::rc::Rc;
 use std::time::UNIX_EPOCH;
+
+mod handles;
 
 pub fn build() -> Value {
     let mut it = Table::new();
@@ -54,7 +54,7 @@ fn reading(it: &mut Table) {
     put(it, "lines", |_, args| {
         let path = text(&args, 1, "oslo.fs.lines")?;
         match fs::File::open(&path) {
-            Ok(file) => ok(reader(std::io::BufReader::new(file))),
+            Ok(file) => ok(handles::reader(std::io::BufReader::new(file))),
             Err(e) => failed_path(&path, &e),
         }
     });
@@ -206,31 +206,10 @@ fn writing(it: &mut Table) {
     put(it, "mktempdir", |_, args| {
         let prefix = opt_text(&args, 1, "oslo.fs.mktempdir")?.unwrap_or_else(|| "oslo".to_string());
         match unique_temp(&prefix, true) {
-            Ok(path) => ok(tempdir(path)),
+            Ok(path) => ok(handles::tempdir(path)),
             Err(e) => failed("mktempdir", e),
         }
     });
-}
-
-/// The handle `mktempdir` answers with.
-fn tempdir(path: String) -> Value {
-    let mut handle = super::handle::Handle::new("oslo.fs.tempdir");
-    handle.field("path", Value::str(&path)).shows(&path);
-
-    let it = path.clone();
-    handle.verb("remove", move |_, _| {
-        ok(Value::Bool(fs::remove_dir_all(&it).is_ok()))
-    });
-
-    // **`<close>` removes it, and the collector does not.** `remove_dir_all` on a path a config
-    // still means to use is not a mistake anything could recover from, and a handle whose `.path`
-    // has been copied elsewhere looks unreachable to the collector while the directory is still in
-    // use. Leaving it for the system to clean is the safe half of that trade.
-    handle.on_close("oslo.fs.tempdir.close", move || {
-        let _ = fs::remove_dir_all(&path);
-    });
-
-    handle.build()
 }
 
 fn listing(it: &mut Table) {
@@ -271,7 +250,7 @@ fn listing(it: &mut Table) {
     put(it, "walk", |_, args| {
         let root = opt_text(&args, 1, "oslo.fs.walk")?.unwrap_or_else(|| ".".to_string());
         match fs::read_dir(&root) {
-            Ok(reading) => ok(walker(reading)),
+            Ok(reading) => ok(handles::walker(reading)),
             Err(e) => failed_path(&root, &e),
         }
     });
@@ -304,6 +283,36 @@ fn listing(it: &mut Table) {
             ("files", Value::int(total.files as i64)),
             ("dirs", Value::int(total.dirs as i64)),
             ("unreadable", Value::int(total.unreadable as i64)),
+        ]))
+    });
+
+    // oslo.fs.disk(path) -> { total, free, available, files, files_free }, or nil + message
+    //
+    // **What `df` answers, for the filesystem `path` is on** — not for `path` itself. Any path on
+    // the mount does, so `oslo.fs.disk(".")` is the usual call and `oslo.fs.disk("/")` is the one
+    // people write first.
+    //
+    // `free` and `available` differ, and the difference is the point: a filesystem reserves a
+    // percentage for root, so `available` is what *you* may write and `free` is what exists. `df`
+    // shows the first and calls it "Avail"; a script checking whether it can save something wants
+    // that one.
+    put(it, "disk", |_, args| {
+        let path = text(&args, 1, "oslo.fs.disk")?;
+        let stats = match nix::sys::statvfs::statvfs(path.as_str()) {
+            Ok(stats) => stats,
+            Err(e) => return failed_path(&path, &std::io::Error::from(e)),
+        };
+        // `fragment_size` rather than `block_size`: the block counts are in fragments, and the two
+        // are equal on every filesystem anybody uses — which is exactly why using the wrong one is
+        // a bug that never shows up until it does.
+        let unit = stats.fragment_size() as u64;
+        let bytes = |blocks: u64| Value::int(blocks.saturating_mul(unit) as i64);
+        ok(record(vec![
+            ("total", bytes(stats.blocks())),
+            ("free", bytes(stats.blocks_free())),
+            ("available", bytes(stats.blocks_available())),
+            ("files", Value::int(stats.files() as i64)),
+            ("files_free", Value::int(stats.files_free() as i64)),
         ]))
     });
 
@@ -452,101 +461,6 @@ fn measure(root: &Path, total: &mut Usage) -> std::io::Result<()> {
         }
     }
     Ok(())
-}
-
-/// Collect every path under `root`, depth first.
-/// The iterator `oslo.fs.lines` answers: one line per call, `nil` at the end.
-///
-/// A trailing newline ends the last line rather than starting an empty one, which is what `wc -l`
-/// counts and what a caller means by "the lines of this file".
-fn reader(file: std::io::BufReader<fs::File>) -> Value {
-    let source = Rc::new(RefCell::new(Some(file)));
-    let mut handle = super::handle::Handle::new("oslo.fs.lines");
-
-    let it = Rc::clone(&source);
-    handle.calls("oslo.fs.lines", move |_, _| {
-        use std::io::BufRead;
-        let mut slot = it.borrow_mut();
-        let Some(buffered) = slot.as_mut() else {
-            return ok(Value::Nil);
-        };
-        let mut line = Vec::new();
-        match buffered.read_until(b'\n', &mut line) {
-            Ok(0) => {
-                *slot = None;
-                ok(Value::Nil)
-            }
-            Ok(_) => {
-                if line.last() == Some(&b'\n') {
-                    line.pop();
-                }
-                ok(Value::bytes(&line))
-            }
-            Err(e) => {
-                *slot = None;
-                Err(LuaError::new(format!("oslo.fs.lines: {e}")))
-            }
-        }
-    });
-
-    handle.on_close("oslo.fs.lines.close", move || {
-        source.borrow_mut().take();
-    });
-
-    handle.build()
-}
-
-/// The iterator `oslo.fs.walk` answers: a handle that is also callable.
-///
-/// ```lua
-/// for path in oslo.fs.walk("/etc") do print(path) end
-///
-/// local tree <close> = oslo.fs.walk("/nix/store")   -- the open directories are let go here
-/// for path in tree do if path:find("cache") then break end end
-/// ```
-///
-/// **A stack of open directories rather than recursion**, because the recursion was what made this
-/// eager: a function that has to return before the caller sees anything cannot answer one path at a
-/// time. One `ReadDir` per level is also one file descriptor per level, which is why the handle
-/// closes — a loop abandoned deep in a tree is holding them until it does. See
-/// [`super::handle::Handle::calls`].
-fn walker(root: fs::ReadDir) -> Value {
-    let stack = Rc::new(RefCell::new(vec![root]));
-    let mut handle = super::handle::Handle::new("oslo.fs.walk");
-
-    let it = Rc::clone(&stack);
-    handle.calls("oslo.fs.walk", move |_, _| {
-        let mut stack = it.borrow_mut();
-        loop {
-            let Some(level) = stack.last_mut() else {
-                return ok(Value::Nil);
-            };
-            let Some(entry) = level.next() else {
-                stack.pop();
-                continue;
-            };
-            let entry = entry.map_err(|e| LuaError::new(format!("oslo.fs.walk: {e}")))?;
-            let path = entry.path();
-            // `symlink_metadata`, so a symlink to a parent directory is listed and not descended
-            // into. Following it is how a walk never finishes.
-            let is_dir = path
-                .symlink_metadata()
-                .map_err(|e| LuaError::new(format!("oslo.fs.walk: {}: {e}", path.display())))?
-                .is_dir();
-            if is_dir {
-                // Pushed before the directory itself is answered, so the next call descends —
-                // which is what makes it depth first, with a directory before its contents.
-                let below = fs::read_dir(&path)
-                    .map_err(|e| LuaError::new(format!("oslo.fs.walk: {}: {e}", path.display())))?;
-                stack.push(below);
-            }
-            return ok(Value::str(path.to_string_lossy()));
-        }
-    });
-
-    handle.on_close("oslo.fs.walk.close", move || stack.borrow_mut().clear());
-
-    handle.build()
 }
 
 /// Create a file or directory under `$TMPDIR` whose name nothing else holds.

@@ -19,6 +19,10 @@ use oslo_shell::exec::job::{JobState, with_jobs};
 pub fn build_proc() -> Value {
     let mut proc = Table::new();
 
+    // What a process *is*, read from `/proc` rather than parsed out of `ps`. See
+    // [`super::procinfo`].
+    super::procinfo::install(&mut proc);
+
     // oslo.proc.kill(pid, signal) -> true, or nil + message
     put(&mut proc, "kill", |_, args| {
         let pid = int(&args, 1, "oslo.proc.kill")?;

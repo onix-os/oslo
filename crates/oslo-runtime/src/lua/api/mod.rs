@@ -49,6 +49,7 @@ mod policy;
 mod predict;
 mod problem;
 mod proc;
+mod procinfo;
 pub(crate) mod prompt;
 mod publish;
 mod re;
