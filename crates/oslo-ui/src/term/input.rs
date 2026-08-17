@@ -178,6 +178,12 @@ fn text_key(bytes: &[u8], alt: bool) -> Key {
         return Key::Ignored;
     };
     match text.chars().next() {
+        // **Alt+Enter, the one chord that arrives in both encodings.** A terminal without the
+        // kitty protocol sends it as `ESC` then `CR`, which landed on the control-character arm
+        // below and was discarded. It is spelled the same as the kitty decoder spells it, so a
+        // binding does not have to know which terminal it is on — and it is the only way to send
+        // a block from a prompt where Enter inserts a newline. See `startup::mode`.
+        Some('\r' | '\n') if alt => Key::Alt('\r'),
         Some(c) if !c.is_control() && alt => Key::Alt(c),
         Some(c) if !c.is_control() => Key::Char(c),
         _ => Key::Ignored,

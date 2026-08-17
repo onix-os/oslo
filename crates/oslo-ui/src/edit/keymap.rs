@@ -47,8 +47,10 @@ pub enum Action {
     Lower,
     Capitalise,
 
-    /// Enter: run what is on the line.
+    /// Ctrl+Enter, Alt+Enter: run what is on the line, whatever Enter is set to do.
     Accept,
+    /// Enter: run the line, or add a line to it — see [`super::session::set_enter_adds_a_line`].
+    AcceptOrNewline,
     /// Ctrl-C: abandon this line and start a new one.
     Abort,
     /// Ctrl-D on an empty line: end of input.
@@ -93,7 +95,10 @@ pub fn action(key: Key) -> Action {
         // `unix-line-discard` and it cuts to the *cursor*, not the whole line.
         Key::Clear => Action::KillToStart,
 
-        Key::Accept => Action::Accept,
+        Key::Accept => Action::AcceptOrNewline,
+        // Ctrl+Enter and Alt+Enter, which decode to the same key on purpose — see
+        // `term::keyboard`. Always sends, whatever Enter has been set to do.
+        Key::Alt('\r') => Action::Accept,
         Key::Abort => Action::Abort,
         Key::ToggleScope => Action::Complete,
         Key::BackTab => Action::CompleteBack,

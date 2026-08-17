@@ -50,6 +50,12 @@ pub(super) fn read_command(
     // Read once per command, not per line: it is a setting, and a line that changed it mid-command
     // would classify its own continuation differently from its first line.
     let lua_prefix = mode::lua_prefix(&env_struct.lock().unwrap());
+    // What Enter does, which is a property of the language and so is set again on every switch
+    // below. Shell is never affected: a shell prompt where Enter did not run the line would break
+    // every habit anyone has, and the multi-line case there is already a continuation prompt.
+    let enter = mode::enter_key(&env_struct.lock().unwrap());
+    let adds_a_line = |language: Mode| language == Mode::Lua && enter == mode::Enter::Newline;
+    oslo_ui::edit::session::set_enter_adds_a_line(adds_a_line(*current));
     let mut buffer = String::new();
     let mut secret = false;
     let mut heredoc = HeredocTracker::default();
@@ -258,6 +264,7 @@ pub(super) fn read_command(
                         &fields,
                     );
                     *current = switched;
+                    oslo_ui::edit::session::set_enter_adds_a_line(adds_a_line(switched));
                     crate::lua::engine::fire_at_here(
                         crate::lua::api::hooks::at::POST_MODE_CHANGE,
                         &fields,

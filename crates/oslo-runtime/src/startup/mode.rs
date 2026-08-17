@@ -166,6 +166,36 @@ pub fn starting_mode(env: &Environment) -> Mode {
     }
 }
 
+/// What Enter does at a **Lua** prompt.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Enter {
+    /// Send when the block is finished, add a line when it is not. The default.
+    Smart,
+    /// Always add a line. Ctrl+Enter or Alt+Enter sends.
+    Newline,
+}
+
+/// Read `$OSLO_LUA_ENTER`.
+///
+/// **`smart` is the default, and the reason is that the alternative can lock you out.** With
+/// `newline`, the only way to send is Ctrl+Enter or Alt+Enter — and Ctrl+Enter does not exist on a
+/// terminal without the kitty keyboard protocol, because in the legacy encoding Ctrl+Enter *is*
+/// Enter (Ctrl-M is CR). Alt+Enter is decoded in both encodings, so `newline` always has one way
+/// out; it is still not a default worth choosing for someone who did not ask.
+///
+/// `smart` is what a Lua REPL usually does and what oslo has always done: a finished block runs, an
+/// unfinished one asks for more. `newline` is for writing a function at the prompt, where every
+/// Enter meaning "run this" is an interruption.
+pub fn enter_key(env: &Environment) -> Enter {
+    match env
+        .get_var("OSLO_LUA_ENTER")
+        .map(|value| value.trim().to_string())
+    {
+        Some(value) if value == "newline" => Enter::Newline,
+        _ => Enter::Smart,
+    }
+}
+
 /// The key that switches the prompt between shell and Lua.
 ///
 /// **A constant, not a setting.** There was an `$OSLO_TOGGLE_KEY`; it is gone, because the key

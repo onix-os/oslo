@@ -69,9 +69,15 @@ fn typing_is_an_insert_of_the_character() {
     assert_eq!(action(Key::Char('日')), Action::Insert('日'));
 }
 
+/// **Enter ends the line, and Ctrl/Alt+Enter ends it unconditionally.**
+///
+/// Enter is `AcceptOrNewline` rather than `Accept` because a Lua prompt may be set to add a line
+/// with it (`$OSLO_LUA_ENTER=newline`); the session resolves which. The chord is the one that
+/// always sends, which is what makes that setting safe to turn on — see `session::apply`.
 #[test]
 fn the_line_is_ended_by_enter_and_abandoned_by_ctrl_c() {
-    assert_eq!(action(Key::Accept), Action::Accept);
+    assert_eq!(action(Key::Accept), Action::AcceptOrNewline);
+    assert_eq!(action(Key::Alt('\r')), Action::Accept);
     assert_eq!(action(Key::Abort), Action::Abort);
 }
 

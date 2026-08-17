@@ -151,6 +151,32 @@ the entries added since the last clear, so re-seeding N lines wrote all N again 
 once at startup and again on every toggle — and it could not work anyway, since the language can
 change mid-line from somewhere that cannot reach the editor.
 
+### Completion, suggestions and the flat namespace
+
+A Lua line is completed **as Lua and only as Lua**. Every shell answer — a command name, a path, a
+`$variable`, an `@mark` — is either useless there or actively wrong: `$HO`+Tab used to produce
+`$HOME`, which is a lexer error in the language being typed, while `pri`+Tab and `oslo.`+Tab
+offered nothing at all.
+
+What is offered instead comes from the session itself: the globals, the keys of the table being
+indexed (`oslo.ma`→`oslo.math`, `os.tim`→`os.time`), the methods after a `:`, and Lua's reserved
+words. Nothing is offered inside a string or a comment, where a name is not a name. The ghost
+suggestion draws from the same source, and only when exactly one name matches — a hint is a promise
+that the accept key gives you *that*.
+
+The split is deliberate: working out **what is being typed** is text and lives in the editor;
+working out **what names exist** needs the interpreter. Only names cross between them, never
+values — `_G` is cyclic and deep-copying it to answer a Tab would be absurd.
+
+**Every `oslo` member is also a global.** `fs`, `json`, `git`, `run`, `path` and the rest need no
+prefix, and `oslo.fs` keeps working. Three rules keep that from taking anything away:
+
+* a name already in `_G` is never replaced — `math` is Lua's;
+* two tables under one name are **merged**, missing keys only, which is what makes `math` work:
+  `math.floor` and `math.pi` stay exactly where they were and `math.eval`, `math.convert` and
+  `math.session` join them. The two share no key, and a test checks that rather than assuming it;
+* only tables and functions are lifted, so there is no bare `version` global holding a string.
+
 ## What makes it different
 
 oslo's log keeps the language beside each line, in a mode column, because recalling a Lua line
@@ -197,6 +223,24 @@ export OSLO_LUA_PREFIX=,
 ```lua
 oslo.opts.set("lua_prefix", ",")
 ```
+
+What Enter does at a Lua prompt. `smart` — the default — sends a finished block and adds a line to
+an unfinished one, which is what a Lua REPL usually does. `newline` always adds a line, and
+**Ctrl+Enter or Alt+Enter sends**.
+
+```sh
+export OSLO_LUA_ENTER=newline
+```
+
+```lua
+oslo.opts.set("lua_enter", "newline")
+```
+
+> **Alt+Enter is the one that always works.** Ctrl+Enter does not exist on a terminal without the
+> kitty keyboard protocol: in the legacy encoding Ctrl-M *is* Enter, so the two cannot be told
+> apart, and a prompt whose only send key was Ctrl+Enter would be a prompt that never ran anything.
+> Alt+Enter is decoded in both encodings and mapped to the same action, so `newline` always has a
+> way out of a block. That is also why `smart` is the default rather than the other way round.
 
 Watching the switch. One hook covers vi-mode changes too, so a handler that cares about only one
 reads `kind`.

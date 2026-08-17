@@ -5,6 +5,7 @@
 
 use super::buffer::{Buffer, Case};
 use super::keymap::{Action, action};
+
 use super::screen;
 pub use crate::term::Key;
 use crate::term::{InputEvent, Keys, PasteError, Restore, Screen};
@@ -12,6 +13,9 @@ use std::io::Write;
 
 mod assist;
 pub use assist::{Assist, NoAssist};
+
+mod enter;
+pub use enter::set_enter_adds_a_line;
 
 /// What a `key` hook asked the editor to do with the keystroke it just saw.
 ///
@@ -279,6 +283,18 @@ impl Session {
             },
 
             Action::Accept => Step::Accept,
+            // **Enter, which may mean either thing.** Ordinarily it sends and the caller decides
+            // whether the block was finished. Where it has been set to add a line instead, this is
+            // the only key that changes: Ctrl+Enter and Alt+Enter still send, so there is always a
+            // way out of a block. See `set_enter_adds_a_line`.
+            Action::AcceptOrNewline => {
+                if enter::adds_a_line() {
+                    self.buffer.insert_str("\n");
+                    changed(true)
+                } else {
+                    Step::Accept
+                }
+            }
             Action::Abort => Step::Interrupted,
             Action::Eof => Step::Eof,
             Action::Redraw => Step::ClearScreen,

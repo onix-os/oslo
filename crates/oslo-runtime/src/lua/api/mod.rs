@@ -257,6 +257,11 @@ pub fn install(host: &dyn Host, registry: &Registry, env: Arc<Mutex<Environment>
     nix::add_helpers(host);
     // Last, so it replaces the standard names rather than being replaced by them.
     policy::apply(host);
+    // And then the shorthand: `oslo.fs` is also `fs`, `oslo.math.eval` is also `math.eval`.
+    //
+    // After `policy::apply`, so a name policy replaced is the one that gets lifted. Nothing in
+    // `_G` is overwritten — see `flatten_namespace` — so this can only add.
+    host.flatten_namespace("oslo");
 }
 /// Fold everything in `additions` into the table already on `oslo` under `name`.
 ///

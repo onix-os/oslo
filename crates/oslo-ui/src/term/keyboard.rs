@@ -60,7 +60,13 @@ pub fn decode(sequence: &[u8]) -> Key {
         if ctrl {
             return match code {
                 9 => Key::Ctrl('i'),
-                13 => Key::Ctrl('m'),
+                // **Ctrl+Enter, which only exists here.** In the legacy encoding Ctrl+Enter and
+                // Enter are both `CR` — Ctrl-M *is* Enter — so there is no telling them apart and
+                // this used to answer `Ctrl('m')`, which is Enter under another name. The kitty
+                // protocol reports the modifier, so the two become separable, and a prompt that
+                // wants Enter for a newline gets a send key. Alt+Enter is the same act for a
+                // terminal that cannot do this.
+                13 => Key::Alt('\r'),
                 27 => Key::Ctrl('['),
                 _ => Key::Ignored,
             };

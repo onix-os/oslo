@@ -70,9 +70,43 @@ fn entries_of(base: &str) -> Option<Listing> {
     Some(entries)
 }
 
+/// The grey suffix to draw after a half-typed **Lua** name.
+///
+/// The same source completion uses, reduced to one answer: a hint is a promise that pressing the
+/// accept key gives you *this*, so it is offered only when there is a single candidate. Two names
+/// sharing a prefix is what the dropdown is for.
+///
+/// Only after at least two characters. One letter matches most of a namespace, so hinting from it
+/// means grey text that changes on every keystroke and is right by luck.
+fn lua_hint(line: &str, pos: usize) -> Option<String> {
+    let typed = super::completion::lua::typed_at(line, pos)?;
+    if typed.stem.chars().count() < 2 {
+        return None;
+    }
+    let (_, candidates) = super::completion::lua::candidates(line, pos)?;
+    let [only] = candidates.as_slice() else {
+        return None;
+    };
+    only.display
+        .strip_prefix(&typed.stem)
+        .and_then(|rest| (!rest.is_empty()).then(|| rest.to_string()))
+}
+
 impl OsloHelper {
     /// Return the command-name suffix to draw after the cursor.
     pub fn command_hint(&self, line: &str, pos: usize) -> Option<String> {
+        // **A Lua prompt suggests Lua names**, and it asks before anything below reads `word`:
+        // `current_word` is a *shell* reading of the line, and `command_position` is a shell idea
+        // that a Lua expression has no version of.
+        //
+        // Everything below offers a *command* — a builtin, an alias, a shell function, something
+        // on `$PATH`. None of those are Lua, so at a Lua prompt `l` was answered with `ls`: a
+        // suggestion that cannot run in the language being typed, which is worse than none. That
+        // left history as the only Lua suggestion; now the names that exist suggest too.
+        if super::prompt::language().is_some_and(|language| language == "lua") {
+            return lua_hint(line, pos);
+        }
+
         let word = current_word(line, pos);
         // A half-typed quoted argument is a filename, not a command, and guessing at it in grey
         // text is worse than saying nothing.
@@ -80,17 +114,6 @@ impl OsloHelper {
             return None;
         }
         let stem = word.stem.as_str();
-
-        // **Only in shell.** Everything below offers a *command* — a builtin, an alias, a shell
-        // function, something on `$PATH`. None of those are Lua, so at a Lua prompt `l` was being
-        // answered with `ls`: a suggestion that cannot run in the language being typed, which is
-        // worse than no suggestion at all.
-        //
-        // History still suggests here, and it is filtered by language too — see
-        // `startup::recall`. So a Lua prompt suggests Lua you have actually written.
-        if super::prompt::language().is_some_and(|language| language != "sh") {
-            return None;
-        }
 
         let env = self.env.lock().unwrap();
         let path = env.var("PATH").unwrap_or_default().to_string();
