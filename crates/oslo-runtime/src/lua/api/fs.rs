@@ -288,6 +288,11 @@ fn listing(it: &mut Table) {
     // `bytes` is the sum of file sizes, not blocks — the number `ls` shows, not the one `du`
     // does. Those differ by the filesystem's allocation, and the question a script asks is almost
     // always "how much is this", not "how much does it cost my disk".
+    //
+    // **A subdirectory it cannot read is counted rather than fatal**, so `usage("/etc")` answers
+    // for somebody who is not root. `unreadable == 0` means the total is everything; anything
+    // else means it is a floor. The root not being there is still `nil` — that is a mistake in
+    // the call rather than something met while walking.
     put(it, "usage", |_, args| {
         let root = text(&args, 1, "oslo.fs.usage")?;
         let mut total = Usage::default();
@@ -298,6 +303,7 @@ fn listing(it: &mut Table) {
             ("bytes", Value::int(total.bytes as i64)),
             ("files", Value::int(total.files as i64)),
             ("dirs", Value::int(total.dirs as i64)),
+            ("unreadable", Value::int(total.unreadable as i64)),
         ]))
     });
 
@@ -401,6 +407,8 @@ struct Usage {
     bytes: u64,
     files: usize,
     dirs: usize,
+    /// How many directories could not be read, and so are not in the total.
+    unreadable: usize,
 }
 
 /// Add `root` and everything under it into `total`.
@@ -410,12 +418,30 @@ struct Usage {
 ///
 /// `symlink_metadata`, so a link is counted as the link it is and never followed. Following one is
 /// how a walk of a tree containing a link to its own parent never finishes.
+///
+/// # A directory it cannot read is counted, not fatal
+///
+/// The first version stopped on the first `EACCES`, which made `usage("/etc")` answer `nil` for
+/// anybody who is not root — one unreadable subdirectory losing the whole total. `du` warns and
+/// carries on, and that is the right shape; the only thing wrong with it is that a caller cannot
+/// tell a complete answer from a partial one afterwards. So the skipped directories are *counted*:
+/// `unreadable == 0` means the total is everything, and anything else means it is a floor.
+///
+/// The root itself is different, and stays fatal — see `oslo.fs.usage`. "That directory is not
+/// there" is a mistake in the call, not a thing found while walking.
 fn measure(root: &Path, total: &mut Usage) -> std::io::Result<()> {
     let mut pending = vec![root.to_path_buf()];
+    // Read once here rather than inside the loop, so the root's own failure reaches the caller.
+    let mut first = Some(fs::read_dir(root)?);
     while let Some(dir) = pending.pop() {
-        for entry in fs::read_dir(&dir)? {
-            let entry = entry?;
-            let meta = entry.path().symlink_metadata()?;
+        let Some(listing) = first.take().or_else(|| fs::read_dir(&dir).ok()) else {
+            total.unreadable += 1;
+            continue;
+        };
+        for entry in listing.flatten() {
+            let Ok(meta) = entry.path().symlink_metadata() else {
+                continue;
+            };
             if meta.is_dir() {
                 total.dirs += 1;
                 pending.push(entry.path());

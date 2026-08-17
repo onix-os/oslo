@@ -345,9 +345,29 @@ fn usage_adds_up_a_tree_without_following_links() {
         oslo.fs.write("tree/inner/b", "1234567890") -- 10
         oslo.fs.symlink("..", "tree/inner/up")      -- 2, the length of ".."
         local u = oslo.fs.usage("tree")
-        print(u.bytes, u.files, u.dirs)
+        print(u.bytes, u.files, u.dirs, u.unreadable)
         local missing, err = oslo.fs.usage("tree/nope")
         print(missing, err.kind)
     "#);
-    assert_eq!(out, "17\t3\t1\nnil\tnot-found");
+    assert_eq!(out, "17\t3\t1\t0\nnil\tnot-found");
+}
+
+/// **A subdirectory it cannot read is counted, not fatal.** Stopping on the first `EACCES` made
+/// `usage("/etc")` answer nil for anybody who is not root — one unreadable directory losing the
+/// whole total. `unreadable` is how a caller tells a complete answer from a floor.
+#[test]
+fn usage_carries_on_past_what_it_cannot_read_and_says_so() {
+    let out = lua(r#"
+        oslo.fs.mkdir("tree/open")
+        oslo.fs.mkdir("tree/shut")
+        oslo.fs.write("tree/open/a", "12345")
+        oslo.fs.write("tree/shut/hidden", "1234567890")
+        assert(oslo.fs.chmod("tree/shut", 0))     -- unreadable, unenterable
+
+        local u = oslo.fs.usage("tree")
+        print(u.bytes, u.files, u.unreadable)
+        oslo.fs.chmod("tree/shut", 0x1C0)         -- 0700, so the tempdir can be cleaned up
+    "#);
+    // The readable half is counted, the shut one is reported rather than silently missing.
+    assert_eq!(out, "5\t1\t1");
 }
