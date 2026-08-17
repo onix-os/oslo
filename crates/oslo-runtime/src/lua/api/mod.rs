@@ -35,6 +35,7 @@ pub mod feature;
 mod fs;
 mod git;
 mod handle;
+mod history;
 mod json;
 mod machine;
 pub(crate) mod mark;
@@ -142,6 +143,10 @@ pub fn install(host: &dyn Host, registry: &Registry, env: Arc<Mutex<Environment>
             );
         }
     }
+
+    // Reading what has been run, merged into the settings namespace of the same name rather than
+    // replacing it: `oslo.history` is one subject and should not be two tables. See [`history`].
+    extend(&mut oslo, "history", history::build());
 
     // `oslo.builtin` is the same thing one level deeper: it is a namespace *per builtin*, so
     // `oslo.builtin.rm.to_tmp = true` indexes twice and both tables have to be here. A new

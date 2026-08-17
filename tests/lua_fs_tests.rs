@@ -316,3 +316,38 @@ fn realpath_resolves_links_where_normalize_does_not() {
     "#);
     assert_eq!(out, "real\nreal");
 }
+
+/// **`touch` is both halves**: it creates what is missing and moves the timestamp of what is not.
+/// Written by hand as `append(path, "")` it does only the first, which is the half nobody wanted.
+#[test]
+fn touch_creates_what_is_missing_and_dates_what_is_not() {
+    let out = lua(r#"
+        print(oslo.fs.exists("t"), oslo.fs.touch("t"), oslo.fs.exists("t"), oslo.fs.stat("t").size)
+        -- An existing file keeps its contents.
+        oslo.fs.write("t", "kept")
+        oslo.fs.touch("t")
+        print(oslo.fs.read("t"), oslo.fs.stat("t").size)
+        -- Under a directory that is not there, a message rather than a raise.
+        local ok, err = oslo.fs.touch("nope/t")
+        print(ok, err.kind)
+    "#);
+    assert_eq!(out, "false\ttrue\ttrue\t0\nkept\t4\nnil\tnot-found");
+}
+
+/// **What `du -s --apparent-size` answers**, and a symlink is counted as the link it is: its size
+/// is the length of its target, and it is never followed. Following one is how a tree containing a
+/// link to its own parent never finishes.
+#[test]
+fn usage_adds_up_a_tree_without_following_links() {
+    let out = lua(r#"
+        oslo.fs.mkdir("tree/inner")
+        oslo.fs.write("tree/a", "12345")           -- 5
+        oslo.fs.write("tree/inner/b", "1234567890") -- 10
+        oslo.fs.symlink("..", "tree/inner/up")      -- 2, the length of ".."
+        local u = oslo.fs.usage("tree")
+        print(u.bytes, u.files, u.dirs)
+        local missing, err = oslo.fs.usage("tree/nope")
+        print(missing, err.kind)
+    "#);
+    assert_eq!(out, "17\t3\t1\nnil\tnot-found");
+}

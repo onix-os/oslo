@@ -162,6 +162,25 @@ fn writing(it: &mut Table) {
         }
     });
 
+    // oslo.fs.touch(path) -> true, or nil + message
+    //
+    // Creates the file when it is not there, and moves its timestamps to now when it is — the two
+    // halves of what `touch` means, and neither is one line of the rest of this module. Written by
+    // hand it is `oslo.fs.exists` then `oslo.fs.append(path, "")`, which creates the file but
+    // leaves the timestamp of an existing one alone: the half people actually wanted.
+    put(it, "touch", |_, args| {
+        let path = text(&args, 1, "oslo.fs.touch")?;
+        let opened = fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(false)
+            .open(&path);
+        match opened.and_then(|file| file.set_modified(std::time::SystemTime::now())) {
+            Ok(()) => ok(Value::Bool(true)),
+            Err(e) => failed_path(&path, &e),
+        }
+    });
+
     // oslo.fs.mktemp(prefix) -> a path that did not exist a moment ago
     //
     // The file is created, not just named. Returning a name for the caller to open is the classic
@@ -259,6 +278,29 @@ fn listing(it: &mut Table) {
 
     // oslo.fs.glob(pattern) — the shell's own globber, so the two languages agree about what
     // `*.conf` means down to the last edge case.
+    // oslo.fs.usage(dir) -> { bytes = …, files = …, dirs = … }, or nil + message
+    //
+    // **What `du -s` answers, and for the same reason it exists as a command**: adding up a tree is
+    // a loop nobody wants to write twice, and writing it over `oslo.fs.walk` in Lua costs a
+    // `stat` call *and* a boundary crossing per file. Symlinks are counted as links and never
+    // followed, so a link back up the tree cannot make the total infinite.
+    //
+    // `bytes` is the sum of file sizes, not blocks — the number `ls` shows, not the one `du`
+    // does. Those differ by the filesystem's allocation, and the question a script asks is almost
+    // always "how much is this", not "how much does it cost my disk".
+    put(it, "usage", |_, args| {
+        let root = text(&args, 1, "oslo.fs.usage")?;
+        let mut total = Usage::default();
+        if let Err(e) = measure(Path::new(&root), &mut total) {
+            return failed_path(&root, &e);
+        }
+        ok(record(vec![
+            ("bytes", Value::int(total.bytes as i64)),
+            ("files", Value::int(total.files as i64)),
+            ("dirs", Value::int(total.dirs as i64)),
+        ]))
+    });
+
     put(it, "glob", |_, args| {
         let pattern = text(&args, 1, "oslo.fs.glob")?;
         let field = [oslo_shell::expand::Run::new(
@@ -351,6 +393,39 @@ fn seconds(meta: &fs::Metadata) -> i64 {
         .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
         .map(|d| d.as_secs() as i64)
         .unwrap_or(0)
+}
+
+/// What a tree adds up to. See `oslo.fs.usage`.
+#[derive(Default)]
+struct Usage {
+    bytes: u64,
+    files: usize,
+    dirs: usize,
+}
+
+/// Add `root` and everything under it into `total`.
+///
+/// **An explicit stack rather than recursion**, so a deep tree cannot take the shell down with a
+/// stack overflow — a directory nobody controls is exactly where one would come from.
+///
+/// `symlink_metadata`, so a link is counted as the link it is and never followed. Following one is
+/// how a walk of a tree containing a link to its own parent never finishes.
+fn measure(root: &Path, total: &mut Usage) -> std::io::Result<()> {
+    let mut pending = vec![root.to_path_buf()];
+    while let Some(dir) = pending.pop() {
+        for entry in fs::read_dir(&dir)? {
+            let entry = entry?;
+            let meta = entry.path().symlink_metadata()?;
+            if meta.is_dir() {
+                total.dirs += 1;
+                pending.push(entry.path());
+            } else {
+                total.files += 1;
+                total.bytes += meta.len();
+            }
+        }
+    }
+    Ok(())
 }
 
 /// Collect every path under `root`, depth first.

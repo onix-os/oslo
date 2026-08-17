@@ -218,6 +218,37 @@ These only became possible when a shell value could hold arbitrary bytes: hashin
 matched nothing and no sign of why. `oslo.base64` hides nothing and protects nothing — it is a
 change of alphabet. `oslo.secret` is what encrypts.
 
+`oslo.fs` gained two that were awkward to write by hand: `oslo.fs.touch(path)` does both halves —
+creating what is missing *and* dating what is not, where `append(path, "")` does only the first —
+and `oslo.fs.usage(dir)` adds up a tree into `{ bytes, files, dirs }` without following symlinks,
+which over `oslo.fs.walk` in Lua would cost a `stat` and a boundary crossing per file.
+
+### History as rows, not as a file
+
+```lua
+for _, c in ipairs(oslo.history.commands{ limit = 200 }) do
+  -- c.line, c.mode, c.runs, c.last_at, c.dir, c.places, c.worked, c.session, c.host, c.root
+end
+
+oslo.history.forget("curl -H 'Authorization: Bearer …' …")
+```
+
+The finder over this is one opinion about what to show. **Anybody else's needs the rows** — "what do
+I run in this project", "which of my commands have only ever failed", "what did I run last week and
+not since" are each one loop over a table, and none of them is a feature the shell should grow. A
+history *file* cannot answer any of them; it is a list of lines. The tracker has been writing the
+directory, the count, the exit status and the rest on every command since long before there was
+anything to read it with.
+
+`forget` takes the line out of every directory *and* out of the log, not only the aggregate — a
+half-forgotten line is one that comes back on the next start. Having it as a function rather than
+only as the finder's Delete key means "forget anything matching this" can be a rule applied on every
+start, which a key press cannot be.
+
+**Only an interactive shell has a store.** A script, an `oslo -c` and a subshell see an empty
+history — they have nowhere to write to either. `commands()` answers an empty list rather than nil
+there, so the loop above is safe in a file that might be run either way.
+
 ### Being told when a file changes
 
 ```lua
