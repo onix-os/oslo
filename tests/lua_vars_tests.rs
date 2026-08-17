@@ -99,22 +99,41 @@ fn a_non_string_global_stays_in_lua() {
     assert_eq!(out, "table\t3\nnil");
 }
 
-/// A name lives in exactly one of the two homes, so changing its type moves it.
+/// A name lives in exactly one of the two homes, so becoming a table moves it out of the shell.
 #[test]
-fn a_name_that_changes_type_moves_rather_than_leaving_a_copy() {
+fn a_name_that_becomes_a_table_leaves_no_copy_in_the_shell() {
     let out = lua(r#"
         x = "a string"
         print(oslo.env.get("x"), type(x))
         x = {1, 2}
         -- The shell variable is gone, not stale.
         print(oslo.env.get("x"), type(x))
-        x = "back to a string"
-        print(oslo.env.get("x"), type(x))
     "#);
-    assert_eq!(
-        out,
-        "a string\tstring\nnil\ttable\nback to a string\tstring"
-    );
+    assert_eq!(out, "a string\tstring\nnil\ttable");
+}
+
+/// **The divergence, asserted rather than wished away.**
+///
+/// Going the other way does *not* move the name back: once it has held a non-string it lives in
+/// `_G`, and `__newindex` — which is the only thing that sends a string to the shell — does not
+/// fire for a name `_G` already has. So `x = {}` then `x = "s"` leaves `$x` unset.
+///
+/// This is written down in `crates/oslo-luavm/src/globals.rs` and in
+/// `docs/features/lua-interpreter.md`, both of which call it a known divergence from the tree
+/// walker that came before. This case used to assert the behaviour those two files say oslo does
+/// not have, so it could only ever fail; what it guards now is that the divergence stays the shape
+/// it is documented to be, rather than quietly becoming some third thing.
+///
+/// **If this starts failing, the gap was closed** — assert the better behaviour here and take the
+/// paragraph out of both files.
+#[test]
+fn a_name_that_has_held_a_table_stays_in_lua_afterwards() {
+    let out = lua(r#"
+        x = {1, 2}
+        x = "back to a string"
+        print(oslo.env.get("x"), type(x), x)
+    "#);
+    assert_eq!(out, "nil\tstring\tback to a string");
 }
 
 #[test]

@@ -69,13 +69,17 @@ pub(super) fn apply(host: &dyn Host) {
             if args.first().is_none_or(|v| matches!(v, Value::Nil)) {
                 return Ok(vec![Value::Bool(true)]);
             }
-            Err(LuaError::new(REPLACE_WITH_RUN))
+            Err(LuaError::new(replace_with_run("os.execute")))
         }),
     );
     host.set_field(
         &["io", "popen"],
-        native("io.popen", |_, _| Err(LuaError::new(REPLACE_WITH_RUN))),
+        native("io.popen", |_, _| {
+            Err(LuaError::new(replace_with_run("io.popen")))
+        }),
     );
+    host.set_field(&["os", "setlocale"], setlocale());
+    guard_require(host);
     host.set_field(
         &["os", "tmpname"],
         native("os.tmpname", |_, _| {
@@ -87,6 +91,108 @@ pub(super) fn apply(host: &dyn Host) {
     );
 }
 
-const REPLACE_WITH_RUN: &str = "this runs its argument through /bin/sh — another shell, from inside this one, and absent \
-     entirely where oslo is the only one installed. Use oslo.run{\"cmd\", \"arg\"}, which takes an \
-     argv and needs no shell to read it.";
+/// Make `require` notice a module that is already loading, instead of recursing until the stack
+/// runs out.
+///
+/// **A module that requires itself took the VM down.** `package.loaded[name]` is only written
+/// *after* a loader returns, so the VM's `require` had nothing to check on the way in: a file
+/// containing `require` of its own name re-entered the search and kept re-entering it, and what
+/// came back was `stack overflow` — a message about the machine, from a mistake in one line of
+/// Lua. A cycle across two modules did the same.
+///
+/// Lua answers `loop or previous error in loading module 'x'`, which names the thing that is
+/// wrong; this puts that answer back by keeping the in-progress set the VM does not.
+///
+/// **Cleared however the load ends.** A marker left behind by a *failed* load would report a loop
+/// on the next attempt, turning one broken module into a module that can never be loaded again —
+/// which is why `pcall` is here rather than a plain call.
+///
+/// Written in Lua because it wraps a function the VM installed: reaching it from a native callback
+/// would mean calling back into the interpreter to do what one line of Lua already does.
+fn guard_require(host: &dyn Host) {
+    let source = r#"
+        local plain = require
+        local loading = {}
+        require = function(name, ...)
+            local key = tostring(name)
+            if loading[key] then
+                error("loop or previous error in loading module '" .. key .. "'", 2)
+            end
+            loading[key] = true
+            local answer = table.pack(pcall(plain, name, ...))
+            loading[key] = nil
+            if not answer[1] then
+                -- Level 0: the error already carries its own position, and adding this
+                -- wrapper's would name a file the person did not write.
+                error(answer[2], 0)
+            end
+            -- `require` answers the module *and* the loader data, so both are passed on.
+            return table.unpack(answer, 2, answer.n)
+        end
+    "#;
+    if let Err(e) = host.eval(source, "=oslo.require") {
+        oslo_base::messages::error("oslo require", e.to_string());
+    }
+}
+
+/// The only locale a static binary has, and the name C gives it.
+const C_LOCALE: &str = "C";
+
+/// The categories `setlocale` accepts, from the Lua manual.
+const CATEGORIES: [&str; 6] = ["all", "collate", "ctype", "monetary", "numeric", "time"];
+
+/// `os.setlocale([locale [, category]])` — the one standard name the VM does not define.
+///
+/// **A gap rather than a refusal**, and the only one on the standard surface: left `nil`, the first
+/// use of it is `attempt to call a nil value` and the reader goes looking for a typo that is not
+/// there. It is also the one name here that is genuinely *answerable* — this binary is static and
+/// musl-linked, so `C` is not merely the current locale, it is the only one there is.
+///
+/// So the answers are the true ones rather than a stub's: asking gives `"C"`, asking for `"C"`,
+/// `"POSIX"` or `""` succeeds and gives `"C"`, and asking for anything else gives `nil` — which is
+/// exactly what Lua specifies for a locale the implementation cannot honour, and exactly what
+/// stock Lua answers on a machine that lacks the locale asked for.
+fn setlocale() -> Value {
+    native("os.setlocale", |_, args| {
+        // Checked even though the answer does not depend on it: a typo in the category is a
+        // mistake Lua reports, and accepting it here would be this file's own silent acceptance.
+        match args.get(1) {
+            None | Some(Value::Nil) => {}
+            Some(Value::Str(category)) if CATEGORIES.contains(&category.as_ref()) => {}
+            Some(Value::Str(category)) => {
+                return Err(LuaError::new(format!(
+                    "bad argument #2 to 'setlocale' (invalid option '{category}')"
+                )));
+            }
+            Some(other) => {
+                return Err(LuaError::new(format!(
+                    "bad argument #2 to 'setlocale' (string expected, got {})",
+                    other.type_name()
+                )));
+            }
+        }
+        Ok(vec![match args.first() {
+            // `nil`, or nothing at all, asks which locale is in force rather than setting one.
+            None | Some(Value::Nil) => Value::str(C_LOCALE),
+            // `""` is "the native locale", which on this binary is the same one.
+            Some(Value::Str(asked)) if matches!(asked.as_ref(), "C" | "POSIX" | "") => {
+                Value::str(C_LOCALE)
+            }
+            _ => Value::Nil,
+        }])
+    })
+}
+
+/// The refusal `os.execute` and `io.popen` share, with the name of the one that was called.
+///
+/// **Named, because the two of them said the same nameless sentence.** "this runs its argument
+/// through /bin/sh" told a reader what the problem was and not which call had it, and a traceback
+/// pointing at a line that uses both is exactly the case where that matters. `os.tmpname` had
+/// named itself since it was written; these two now do too.
+fn replace_with_run(name: &str) -> String {
+    format!(
+        "{name} runs its argument through /bin/sh — another shell, from inside this one, and \
+         absent entirely where oslo is the only one installed. Use oslo.run{{\"cmd\", \"arg\"}}, \
+         which takes an argv and needs no shell to read it."
+    )
+}
