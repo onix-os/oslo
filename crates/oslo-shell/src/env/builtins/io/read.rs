@@ -51,6 +51,11 @@ struct OptionError {
     status: i32,
 }
 
+/// The option letters this `read` has, printed under a usage error. Unprefixed, as bash leaves
+/// its own — the line above it has already said where the error came from.
+const USAGE: &str = "read: usage: read [-ers] [-a array] [-d delim] [-n nchars] [-N nchars] [-p prompt] \
+     [-t timeout] [-u fd] [name ...]";
+
 fn usage(message: String) -> OptionError {
     OptionError { message, status: 2 }
 }
@@ -199,6 +204,12 @@ pub fn builtin_read(env: &mut Environment, args: &[String]) -> Result<i32> {
         Ok(opts) => opts,
         Err(err) => {
             eprintln!("{}read: {}", origin_now(), err.message);
+            // A usage error prints the usage under it, the way every other builtin here does and
+            // the way bash does; an option whose *argument* was wrong is not a spelling problem
+            // and a list of option letters would not help with it.
+            if err.status == 2 {
+                eprintln!("{USAGE}");
+            }
             return Ok(err.status);
         }
     };

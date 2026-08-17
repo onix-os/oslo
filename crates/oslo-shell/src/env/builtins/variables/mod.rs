@@ -47,8 +47,10 @@ pub use scoped::{builtin_local, builtin_readonly};
 /// The whole word is quoted back, not the part before the `=`, so `export '=1'` names what the
 /// user actually typed.
 fn not_an_identifier(builtin: &str, word: &str) {
+    // Backtick-then-quote, which is bash's spelling and the one `declare`, `mapfile` and `printf`
+    // already use here. This was the only place left writing it with two apostrophes.
     eprintln!(
-        "{}{}: '{}': not a valid identifier",
+        "{}{}: `{}': not a valid identifier",
         origin_now(),
         builtin,
         word

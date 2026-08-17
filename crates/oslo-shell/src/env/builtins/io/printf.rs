@@ -44,7 +44,7 @@ pub fn builtin_printf(env: &mut Environment, args: &[String]) -> Result<i32> {
     }
 
     let Some(format) = operands.first() else {
-        eprintln!("{}printf: usage: printf format [arguments]", origin_now());
+        eprintln!("{USAGE}");
         return Ok(2);
     };
     let arguments = &operands[1..];
