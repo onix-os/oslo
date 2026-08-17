@@ -363,3 +363,110 @@ fn exiting_over_a_stopped_job_asks_first() {
     );
     assert!(stayed, "exit left despite the warning:\n{}", shell.text());
 }
+
+/// **The count is the short form of a table**, and both have to work: almost everybody writes the
+/// number, so a bare `= 3` cannot be a documented alias that quietly does nothing.
+#[test]
+fn the_table_form_configures_the_action() {
+    let marker = "3666";
+    let mut shell = Shell::with_config(
+        "oslo.misc.welcome = false\n\
+         oslo.misc.interrupt_escape = { after = 3, action = \"kill\", notify = false }\n",
+    );
+    assert!(shell.until(|seen| seen.contains('$') || seen.contains('>')));
+    stubborn(&mut shell, marker);
+
+    for _ in 0..3 {
+        shell.interrupt();
+    }
+    let gone = (0..40).any(|_| {
+        if !running(marker) {
+            return true;
+        }
+        sleep(Duration::from_millis(100));
+        false
+    });
+    // `notify = false` means the press before the last says nothing.
+    let quiet = !shell.text().contains("press ^C again");
+    cleanup(marker);
+
+    assert!(gone, "action = kill did not kill:\n{}", shell.text());
+    assert!(quiet, "notify = false still announced:\n{}", shell.text());
+}
+
+/// **A feature nobody knows fired is a feature nobody has.** Two Ctrl-C into a job that is
+/// ignoring them is exactly when a person is deciding whether anything is listening.
+#[test]
+fn the_press_before_the_last_says_what_is_coming() {
+    let marker = "3777";
+    let mut shell = Shell::start();
+    assert!(shell.until(|seen| seen.contains('$') || seen.contains('>')));
+    stubborn(&mut shell, marker);
+
+    shell.interrupt();
+    shell.interrupt();
+    let told = shell.until(|seen| seen.contains("press ^C again"));
+    // And it has not acted yet — the notice is a warning, not the thing itself.
+    let untouched = running(marker) && !stopped(marker);
+    cleanup(marker);
+
+    assert!(told, "no notice on the second press:\n{}", shell.text());
+    assert!(
+        untouched,
+        "the notice came with an action:\n{}",
+        shell.text()
+    );
+}
+
+/// The shell says what happened in its own voice, and a config can act on it.
+///
+/// Both matter: a stopped job otherwise looks exactly like one somebody typed Ctrl-Z at, and
+/// `on-job-escalated` is how a configuration gets to decide what that is worth.
+#[test]
+fn the_shell_reports_it_and_a_hook_can_see_it() {
+    let marker = "3888";
+    let mut shell = Shell::with_config(
+        "oslo.misc.welcome = false\n\
+         oslo.misc.interrupt_escape = 3\n\
+         oslo.on[\"on-job-escalated\"](function(e)\n\
+         \x20 print(\"SAW \" .. tostring(e.action) .. \" \" .. tostring(e.presses))\n\
+         end)\n",
+    );
+    assert!(shell.until(|seen| seen.contains('$') || seen.contains('>')));
+    stubborn(&mut shell, marker);
+
+    for _ in 0..3 {
+        shell.interrupt();
+    }
+    let said = shell.until(|seen| seen.contains("stopped after 3 interrupts"));
+    // The hook is deferred to the next safe point, so give the shell one.
+    shell.type_line("echo ONWARDS");
+    let hooked = shell.until(|seen| seen.contains("SAW stopped 3"));
+    cleanup(marker);
+
+    assert!(said, "the shell said nothing about it:\n{}", shell.text());
+    assert!(hooked, "on-job-escalated never fired:\n{}", shell.text());
+}
+
+/// `oslo.job.watcher()` reports the setting *and* whether anything is doing it — which come apart
+/// in a shell with no job control, where the watcher is never forked.
+#[test]
+fn the_watcher_reports_itself() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let script = dir.path().join("w.lua");
+    std::fs::write(
+        &script,
+        "local w = oslo.job.watcher()\n\
+         print(w.after, w.action, w.notify, w.running)\n",
+    )
+    .expect("write");
+    let out = Command::new(common::oslo_bin())
+        .arg(&script)
+        .env("HOME", dir.path())
+        .env_remove("ENV")
+        .output()
+        .expect("spawn oslo");
+    let seen = String::from_utf8_lossy(&out.stdout).trim_end().to_string();
+    // A script has no job control, so nothing is watching whatever the setting says.
+    assert_eq!(seen, "0\tstop\ttrue\tfalse", "{seen}");
+}

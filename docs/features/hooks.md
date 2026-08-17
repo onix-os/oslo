@@ -126,6 +126,7 @@ Fields marked *(strings)* are strings even when they read as numbers: a notifyin
 | `on-job-state` | the job reaper, on a transition | `{ id, pid, text, from, to, background }` *(strings)* | — |
 | `on-focus-change` | a focus report from the terminal | `{ focused }` — `"1"` / `""` | — |
 | `on-variable-change` | an assignment, `export`, `unset`, `universal`, or the store re-read | `{ name, action, scope, source, exported }` *(strings)* | — |
+| `on-job-escalated` | repeated Ctrl-C took the terminal back from a job | `{ pgid, signal, action, presses, text }` *(strings)* | — |
 | `on-time-report` | a `time`-prefixed pipeline | `{ real_ms, user_ms, sys_ms }` *(strings)* | — |
 | `on-command-not-found` | the end of the command search | the command name, a bare string | a number is the status, and means handled |
 | `on-idle-timeout` | the editor's timed read | `{ seconds }` *(string)* | — |

@@ -92,22 +92,61 @@ fn the_readme_counts_the_hooks_correctly() {
         })
         .count();
 
-    let words = [
-        (10, "ten"),
-        (20, "twenty"),
-        (30, "thirty"),
-        (40, "forty"),
-        (50, "fifty"),
-    ];
-    let expected = words
-        .iter()
-        .find(|(n, _)| *n == listed)
-        .map(|(_, word)| *word);
+    let expected = in_words(listed);
     assert_eq!(
         Some(claim.as_str()),
-        expected,
-        "the README opens the hooks section with {claim:?}, and `oslo hook list` has {listed}"
+        expected.as_deref(),
+        "the README opens the hooks section with {claim:?}, and `oslo hook list` has {listed} — \
+         it should read {:?}",
+        expected
+            .as_deref()
+            .unwrap_or("<a number this cannot spell>")
     );
+}
+
+/// A count as the word the README would write, for anything under a hundred.
+///
+/// **Spelled rather than looked up**, because the table this replaced held only the multiples of
+/// ten: the moment a thirty-first hook was added the README could not be made to pass at all, and
+/// the test said so by failing rather than by naming the word to use. A count is not going to stop
+/// at a round number.
+fn in_words(n: usize) -> Option<String> {
+    const ONES: [&str; 20] = [
+        "zero",
+        "one",
+        "two",
+        "three",
+        "four",
+        "five",
+        "six",
+        "seven",
+        "eight",
+        "nine",
+        "ten",
+        "eleven",
+        "twelve",
+        "thirteen",
+        "fourteen",
+        "fifteen",
+        "sixteen",
+        "seventeen",
+        "eighteen",
+        "nineteen",
+    ];
+    const TENS: [&str; 10] = [
+        "", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety",
+    ];
+    match n {
+        0..=19 => Some(ONES[n].to_string()),
+        20..=99 => {
+            let (tens, ones) = (n / 10, n % 10);
+            Some(match ones {
+                0 => TENS[tens].to_string(),
+                _ => format!("{}-{}", TENS[tens], ONES[ones]),
+            })
+        }
+        _ => None,
+    }
 }
 
 /// Every structured-pipeline example in the README runs, and names columns that exist.

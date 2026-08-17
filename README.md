@@ -1192,7 +1192,7 @@ no way to say "redraw the accepted line differently". oslo owns its own editor, 
 
 ### The hooks
 
-Thirty moments, named `pre-`, `post-` or `on-`; `oslo hook list` prints the current set.
+Thirty-one moments, named `pre-`, `post-` or `on-`; `oslo hook list` prints the current set.
 Kebab-case cannot be a Lua field, so every one is also spelled with underscores —
 `oslo.on.pre_cmd` and `oslo.on["pre-cmd"]` are the same hook.
 

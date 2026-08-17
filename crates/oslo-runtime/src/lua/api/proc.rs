@@ -77,6 +77,25 @@ fn signal_named(name: &str) -> Result<Signal, LuaError> {
 pub fn build_job() -> Value {
     let mut job = Table::new();
 
+    // oslo.job.watcher() -> what repeated Ctrl-C is set up to do, and whether anything is doing it
+    //
+    // **Reports the setting *and* whether it is live**, because those come apart in the one way
+    // that matters: a config can ask for escalation in a shell that is not interactive, or has no
+    // job control, and there the watcher is never forked and Ctrl-C means what it always did. A
+    // caller reading only the setting would report a feature that is not running.
+    put(&mut job, "watcher", |_, _| {
+        let escape = oslo_ui::settings::current().misc.interrupt_escape;
+        ok(record(vec![
+            ("after", Value::int(escape.after as i64)),
+            ("action", Value::str(escape.action.name())),
+            ("notify", Value::Bool(escape.notify)),
+            (
+                "running",
+                Value::Bool(escape.after > 0 && oslo_shell::exec::job::watcher_started()),
+            ),
+        ]))
+    });
+
     // oslo.job.list() -> the same jobs `jobs` prints, as records
     put(&mut job, "list", |_, _| {
         let jobs = with_jobs(|table| {

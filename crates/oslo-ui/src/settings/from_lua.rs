@@ -168,9 +168,32 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
         if let Value::Str(greeting) = table.get_str("greeting") {
             settings.misc.greeting = Some(greeting.to_string());
         }
+        // `interrupt_escape` takes a bare count or a table, and the count is what almost everybody
+        // writes — so the short form has to work rather than being a documented alias nobody uses.
         if let Some(count) = number(&table, "interrupt_escape") {
             // A negative count is nonsense rather than "off"; clamping says so without raising.
-            settings.misc.interrupt_escape = count.max(0) as u64;
+            settings.misc.interrupt_escape.after = count.max(0) as u64;
+        } else if let Value::Table(escape) = table.get_str("interrupt_escape") {
+            let escape = escape.borrow();
+            if let Some(count) = number(&escape, "after") {
+                settings.misc.interrupt_escape.after = count.max(0) as u64;
+            }
+            flag(
+                &escape,
+                "notify",
+                &mut settings.misc.interrupt_escape.notify,
+            );
+            if let Value::Str(name) = escape.get_str("action") {
+                match super::EscapeAction::from_name(&name) {
+                    Some(action) => settings.misc.interrupt_escape.action = action,
+                    // Named and wrong is a typo worth reporting: silently keeping `stop` would
+                    // look identical to the config having been read.
+                    None => problems.push(format!(
+                        "oslo.misc.interrupt_escape.action: {name:?} is not an action; they are {}",
+                        super::EscapeAction::NAMES.join(", ")
+                    )),
+                }
+            }
         }
         if let Some(seconds) = number(&table, "idle_timeout") {
             settings.misc.idle_timeout = seconds.max(0) as u64;

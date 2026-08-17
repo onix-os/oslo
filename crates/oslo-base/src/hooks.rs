@@ -90,6 +90,9 @@ pub mod at {
     /// typed something here or because a shell in another window did, and a status line that
     /// redraws on the second but not the first — or the other way about — needs to be told which.
     pub const VARIABLE_CHANGE: usize = 29;
+    /// The watcher acted on a job that would not take an interrupt. See
+    /// `oslo_shell::exec::job::sentinel`.
+    pub const JOB_ESCALATED: usize = 30;
 }
 
 /// The four ways a hook is reached, supplied by whoever can actually run one.

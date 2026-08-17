@@ -165,8 +165,13 @@ A child killed by SIGQUIT is treated the same way, for the same reason.
 ### Taking the terminal back from a job that will not give it up
 
 ```lua
-oslo.misc.interrupt_escape = 3   -- off by default
+oslo.misc.interrupt_escape = 3      -- off by default; the short form of the table below
+oslo.misc.interrupt_escape = { after = 3, action = "stop", notify = true }
 ```
+
+`action` is `stop`, `kill`, `hup` or `quit`. `notify` decides whether the press *before* the last
+says what the next one will do — on by default, because two Ctrl-C into a job that is ignoring them
+is exactly when somebody is deciding whether anything is listening at all.
 
 Reading the wait status is enough for a job that *dies*. It is no use at all for one that does not:
 
@@ -194,6 +199,20 @@ walk away from without knowing.
 **Off by default**, because it costs a helper process and changes what Ctrl-C means. Nothing is
 forked in a shell that has not asked. Two presses change nothing, a job that does not trap the
 interrupt still dies of the first, and all of it is tested on a real pty.
+
+A config can watch it happen and ask about it:
+
+```lua
+oslo.on["on-job-escalated"](function(e)
+  -- e.action ("stopped"), e.presses, e.pgid, e.signal, e.text
+end)
+
+oslo.job.watcher()   -- { after = 3, action = "stop", notify = true, running = true }
+```
+
+`watcher()` reports whether anything is actually *doing* it as well as what was configured — the two
+come apart in a shell with no job control, where nothing is forked and Ctrl-C means what it always
+did.
 
 What it cannot do is rescue a process wedged in an uninterruptible kernel call — `SIGSTOP` waits for
 the syscall to return exactly as `SIGKILL` does. Nothing can, and it is worth knowing which case you

@@ -201,6 +201,18 @@ pub const HOOKS: &[Hook] = &[
         aliases: &[],
         answers: false,
     },
+    // Fired when repeated Ctrl-C took the terminal back from a job. Observation only: the action
+    // has already happened by the time this runs, because what acted was a signal handler in
+    // another process — see `oslo_shell::exec::job::sentinel`.
+    //
+    // **Appended, not inserted.** `resolve` indexes by position in this array and `at::` names the
+    // same numbers, so putting a hook in the middle silently renumbers every one after it: the
+    // first draft of this entry sat before `on-variable-change` and quietly broke it.
+    Hook {
+        name: "on-job-escalated",
+        aliases: &[],
+        answers: false,
+    },
 ];
 
 /// The moments something on a hot path has to ask about, by index into [`HOOKS`].
@@ -299,6 +311,7 @@ mod tests {
             (at::PROCESS_EXIT, "on-process-exit"),
             (at::JOB_STATE, "on-job-state"),
             (at::FOCUS_CHANGE, "on-focus-change"),
+            (at::JOB_ESCALATED, "on-job-escalated"),
             (at::VARIABLE_CHANGE, "on-variable-change"),
             (at::TIME_REPORT, "on-time-report"),
             (at::COMMAND_NOT_FOUND, "on-command-not-found"),

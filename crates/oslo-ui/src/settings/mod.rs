@@ -10,7 +10,9 @@
 
 use super::matching::Fuzzy;
 
+mod escape;
 mod nav;
+pub use escape::{EscapeAction, InterruptEscape};
 pub use nav::{Icons, Nav, TypeNav};
 
 /// Everything configurable that is not a colour.
@@ -317,21 +319,8 @@ pub struct Misc {
     /// `oslo.misc.warnings = false`; the default cannot be silence, or an installation that is
     /// half-finished looks finished.
     pub warnings: bool,
-    /// How many interrupts in one command before the shell takes the terminal back. `0` is off.
-    ///
-    /// **For the job that will not take a Ctrl-C.** A shell doing job control is not in the
-    /// terminal's foreground group, so it never sees the keystroke at all — a program that traps
-    /// `INT` and keeps going leaves you with a wedged terminal and no way out but a new window.
-    /// With this set, the *n*th interrupt stops the job and hands it to the job table, so you get
-    /// a prompt back and `fg`, `bg` and `kill %1` all work on it.
-    ///
-    /// **Off by default**, because it costs a helper process per interactive session — see
-    /// `exec::job::sentinel` — and because it is a change to what Ctrl-C means, which nobody
-    /// should discover by accident.
-    ///
-    /// It cannot rescue a process wedged in an uninterruptible kernel call: `SIGSTOP` waits for
-    /// the syscall to return, exactly as `SIGKILL` does. Nothing can.
-    pub interrupt_escape: u64,
+    /// What repeated Ctrl-C should do to a job that will not take one. See [`InterruptEscape`].
+    pub interrupt_escape: InterruptEscape,
 }
 
 impl Default for Misc {
@@ -347,7 +336,7 @@ impl Default for Misc {
             nested_ask: true,
             warnings: true,
             // Off: it costs a process, and it changes what Ctrl-C means.
-            interrupt_escape: 0,
+            interrupt_escape: InterruptEscape::default(),
         }
     }
 }

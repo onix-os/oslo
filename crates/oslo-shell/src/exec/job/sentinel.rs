@@ -57,7 +57,7 @@ use nix::unistd::{ForkResult, Pid, fork, setpgid};
 use std::io::{Read, Write};
 use std::os::unix::io::{FromRawFd, IntoRawFd};
 use std::sync::Mutex;
-use std::sync::atomic::{AtomicI32, AtomicU32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI32, AtomicU32, Ordering};
 
 /// In the *sentinel*: how many interrupts in one job before it acts. Sent by the shell, so the
 /// setting lives in one place and the sentinel needs no configuration of its own.
@@ -77,37 +77,91 @@ static WATCHING: AtomicI32 = AtomicI32::new(0);
 /// In the *sentinel*: interrupts seen since the current job started.
 static SEEN: AtomicU32 = AtomicU32::new(0);
 
-/// Start watching `pgid`: the group that now owns the terminal.
+/// In the *sentinel*: the signal to send when the count is reached.
+static ACTION: AtomicI32 = AtomicI32::new(libc::SIGSTOP);
+
+/// In the *sentinel*: whether to say what the next press will do.
+static ANNOUNCE: AtomicBool = AtomicBool::new(true);
+
+/// In the *sentinel*: where to report what it did. `-1` until it is forked.
+static EVENT_FD: AtomicI32 = AtomicI32::new(-1);
+
+/// In the *shell*: the read end of the watcher's report pipe. See [`take_events`].
+static EVENTS: Mutex<Option<std::fs::File>> = Mutex::new(None);
+
+/// What the shell asks the watcher to do about one job.
+///
+/// A struct rather than three arguments because it is what crosses the pipe, and every field of it
+/// comes from the same setting — see [`oslo_ui::settings::InterruptEscape`].
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct Orders {
+    /// The group that owns the terminal, or `0` for "watch nothing".
+    pub pgid: i32,
+    /// How many interrupts before acting. `0` never acts.
+    pub after: u32,
+    /// The signal to send, as a number so the sentinel needs no vocabulary of its own.
+    pub signal: i32,
+    /// Whether the press before the last says what the next one will do.
+    pub notify: bool,
+}
+
+impl Orders {
+    /// The eight bytes that cross the pipe. Fixed width, so a short read is a broken pipe rather
+    /// than a misparse.
+    fn encode(self) -> [u8; 16] {
+        let mut out = [0u8; 16];
+        out[0..4].copy_from_slice(&self.pgid.to_ne_bytes());
+        out[4..8].copy_from_slice(&self.after.to_ne_bytes());
+        out[8..12].copy_from_slice(&self.signal.to_ne_bytes());
+        out[12..16].copy_from_slice(&u32::from(self.notify).to_ne_bytes());
+        out
+    }
+
+    fn decode(raw: [u8; 16]) -> Orders {
+        let word = |at: usize| i32::from_ne_bytes([raw[at], raw[at + 1], raw[at + 2], raw[at + 3]]);
+        Orders {
+            pgid: word(0),
+            after: word(4) as u32,
+            signal: word(8),
+            notify: word(12) != 0,
+        }
+    }
+}
+
+/// Start watching the group that now owns the terminal.
 ///
 /// Called after the terminal is handed over, so the sentinel joins a group the tty is already
 /// signalling. Silent about every failure — a shell that cannot fork a helper is a working shell
 /// with the interrupt behaviour it had before.
-pub(crate) fn watch(pgid: Pid, after: u32) {
-    tell(pgid.as_raw(), after);
+pub(crate) fn watch(orders: Orders) {
+    tell(orders);
 }
 
 /// Stop watching: the job is over and the shell has the terminal back.
 pub(crate) fn stand_down() {
-    tell(0, 0);
+    tell(Orders {
+        pgid: 0,
+        after: 0,
+        signal: 0,
+        notify: false,
+    });
 }
 
-/// Send a group id to the sentinel, starting it if this is the first foreground job.
-fn tell(pgid: i32, after: u32) {
+/// Send orders to the sentinel, starting it if this is the first foreground job.
+fn tell(orders: Orders) {
     let Ok(mut channel) = CHANNEL.lock() else {
         return;
     };
     if channel.is_none() {
         // Nothing to stand down from if it was never started, and starting one to immediately tell
         // it to do nothing would fork on the way *out* of the first job.
-        if pgid == 0 {
+        if orders.pgid == 0 {
             return;
         }
         *channel = start();
     }
     if let Some(pipe) = channel.as_mut()
-        && pipe
-            .write_all(&[pgid.to_ne_bytes(), after.to_ne_bytes()].concat())
-            .is_err()
+        && pipe.write_all(&orders.encode()).is_err()
     {
         // The sentinel is gone. Forget it rather than retrying every command; the shell is
         // otherwise unaffected.
@@ -116,25 +170,91 @@ fn tell(pgid: i32, after: u32) {
 }
 
 /// Fork the sentinel, answering the pipe to talk to it with.
+///
+/// Two pipes, because the traffic runs both ways: orders down, and *events* back — see
+/// [`take_events`]. Without the second one the shell could see that a job stopped and never learn
+/// whether that was Ctrl-Z or the watcher acting, which are different things to tell somebody.
 fn start() -> Option<std::fs::File> {
-    let (read, write) = nix::unistd::pipe().ok()?;
+    let (orders_read, orders_write) = nix::unistd::pipe().ok()?;
+    let (events_read, events_write) = nix::unistd::pipe().ok()?;
     // SAFETY: the child calls only syscalls — no allocation, no locks, no Rust destructors that
     // could be waiting on a mutex another thread held at the moment of the fork.
     match unsafe { fork() } {
         Ok(ForkResult::Child) => {
-            drop(write);
-            run(read.into_raw_fd());
+            drop(orders_write);
+            drop(events_read);
+            run(orders_read.into_raw_fd(), events_write.into_raw_fd());
         }
         Ok(ForkResult::Parent { .. }) => {
-            drop(read);
-            Some(unsafe { std::fs::File::from_raw_fd(write.into_raw_fd()) })
+            drop(orders_read);
+            drop(events_write);
+            // Non-blocking, because the shell drains this *after* a job ends and must not wait on
+            // a watcher that had nothing to say — which is the ordinary case.
+            let back = events_read.into_raw_fd();
+            unsafe {
+                let flags = libc::fcntl(back, libc::F_GETFL);
+                libc::fcntl(back, libc::F_SETFL, flags | libc::O_NONBLOCK);
+            }
+            if let Ok(mut slot) = EVENTS.lock() {
+                *slot = Some(unsafe { std::fs::File::from_raw_fd(back) });
+            }
+            Some(unsafe { std::fs::File::from_raw_fd(orders_write.into_raw_fd()) })
         }
         Err(_) => None,
     }
 }
 
+/// What the watcher did, once. Read by the shell after a job ends.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) struct Escalation {
+    /// The group it acted on.
+    pub pgid: i32,
+    /// The signal it sent.
+    pub signal: i32,
+    /// How many interrupts it had counted by then.
+    pub presses: u32,
+}
+
+/// Whether the watcher has actually been forked in this shell.
+///
+/// **Distinct from the setting.** A config can ask for escalation in a shell with no job control —
+/// a script, an `oslo -c`, a session with no terminal — and there nothing is forked and Ctrl-C
+/// means exactly what it always did. Reporting the setting alone would claim a feature that is not
+/// running. See `oslo.job.watcher()`.
+pub fn started() -> bool {
+    CHANNEL.lock().map(|held| held.is_some()).unwrap_or(false)
+}
+
+/// The events the watcher has reported since this was last asked.
+///
+/// **Drained rather than polled.** The shell is inside `waitpid` for the whole time the watcher is
+/// awake, so there is no moment to read this until the job ends — and by then the answer is either
+/// there or it never will be. Non-blocking, so "nothing happened" costs one `read` returning
+/// `EAGAIN`.
+pub(crate) fn take_events() -> Vec<Escalation> {
+    let Ok(mut slot) = EVENTS.lock() else {
+        return Vec::new();
+    };
+    let Some(pipe) = slot.as_mut() else {
+        return Vec::new();
+    };
+    let mut seen = Vec::new();
+    let mut word = [0u8; 12];
+    while let Ok(()) = pipe.read_exact(&mut word) {
+        let field =
+            |at: usize| i32::from_ne_bytes([word[at], word[at + 1], word[at + 2], word[at + 3]]);
+        seen.push(Escalation {
+            pgid: field(0),
+            signal: field(4),
+            presses: field(8) as u32,
+        });
+    }
+    seen
+}
+
 /// The sentinel itself. Never returns.
-fn run(orders: std::os::unix::io::RawFd) -> ! {
+fn run(orders: std::os::unix::io::RawFd, events: std::os::unix::io::RawFd) -> ! {
+    EVENT_FD.store(events, Ordering::SeqCst);
     // Die with the shell. Without this a sentinel outlives a shell that was killed rather than
     // exited, and would sit in a process group forever.
     let _ = nix::sys::prctl::set_pdeathsig(Signal::SIGKILL);
@@ -162,7 +282,7 @@ fn run(orders: std::os::unix::io::RawFd) -> ! {
     }
 
     let mut orders = unsafe { std::fs::File::from_raw_fd(orders) };
-    let mut word = [0u8; 8];
+    let mut word = [0u8; 16];
     loop {
         match orders.read_exact(&mut word) {
             Ok(()) => {}
@@ -172,17 +292,18 @@ fn run(orders: std::os::unix::io::RawFd) -> ! {
             Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
             Err(_) => break,
         }
-        let pgid = i32::from_ne_bytes([word[0], word[1], word[2], word[3]]);
-        let after = u32::from_ne_bytes([word[4], word[5], word[6], word[7]]);
+        let told = Orders::decode(word);
         // Set before joining, so an interrupt delivered during the `setpgid` is attributed to the
         // job rather than to whatever the sentinel was in before.
         SEEN.store(0, Ordering::SeqCst);
-        ESCALATE_AFTER.store(after, Ordering::SeqCst);
-        WATCHING.store(pgid, Ordering::SeqCst);
-        if pgid != 0 {
+        ESCALATE_AFTER.store(told.after, Ordering::SeqCst);
+        ACTION.store(told.signal, Ordering::SeqCst);
+        ANNOUNCE.store(told.notify, Ordering::SeqCst);
+        WATCHING.store(told.pgid, Ordering::SeqCst);
+        if told.pgid != 0 {
             // `ESRCH` when the job finished before this ran, which is a race the shell wins and
             // the sentinel does not need to care about: the next order will be a 0.
-            let _ = setpgid(Pid::from_raw(0), Pid::from_raw(pgid));
+            let _ = setpgid(Pid::from_raw(0), Pid::from_raw(told.pgid));
         }
     }
     std::process::exit(0);
@@ -198,20 +319,48 @@ extern "C" fn on_interrupt(_: libc::c_int) {
     if pgid == 0 || after == 0 {
         return;
     }
-    if SEEN.fetch_add(1, Ordering::SeqCst) + 1 < after {
+    let seen = SEEN.fetch_add(1, Ordering::SeqCst) + 1;
+    if seen < after {
+        // **The press before the last says what the next one will do.** Two Ctrl-C into a job that
+        // is ignoring them, a person is deciding whether anything is listening at all — and a
+        // feature nobody knows fired is a feature nobody has. One line answers it.
+        //
+        // `write` straight to the terminal, because this runs in a signal handler: it is on the
+        // list of calls that are safe there, and `eprintln!` allocates and takes a lock.
+        if seen + 1 == after && ANNOUNCE.load(Ordering::SeqCst) {
+            const AGAIN: &[u8] = b"\r\noslo: press ^C again to take the terminal back\r\n";
+            unsafe {
+                libc::write(2, AGAIN.as_ptr() as *const libc::c_void, AGAIN.len());
+            }
+        }
         return;
     }
     // **Leave the group before signalling it.** The sentinel is *in* the group it is about to
     // signal, and `kill(-pgid, …)` does not spare the sender — a `SIGSTOP` would stop the sentinel
     // along with the job, and it would never read another order.
+    let signal = ACTION.load(Ordering::SeqCst);
     unsafe {
         libc::setpgid(0, 0);
-        // **`SIGSTOP`, and the whole group.** It cannot be caught or ignored, which is the entire
-        // point — the programs this exists for are the ones that caught the interrupt. `waitpid`
-        // then returns `Stopped`, and the shell's own path for Ctrl-Z takes over from there: the
-        // job is recorded, the terminal comes back, the prompt returns. Nothing is destroyed, and
-        // `fg`, `bg` and `kill %1` all work on what is left.
-        libc::kill(-pgid, libc::SIGSTOP);
+        // **The whole group**, because a job is its process group — signalling the leader alone
+        // would leave a pipeline's other stages and any grandchildren behind.
+        //
+        // `SIGSTOP` by default, and it is the one that destroys nothing: it cannot be caught or
+        // ignored — the entire point, since the programs this exists for are the ones that caught
+        // the interrupt — and `waitpid` already reports it, so the shell's own Ctrl-Z path takes
+        // over. A config can ask for `kill`, `hup` or `quit` instead.
+        libc::kill(-pgid, signal);
+    }
+    // Tell the shell, so it can say *why* the job stopped rather than leaving it looking like a
+    // Ctrl-Z somebody typed. Twelve bytes, one `write`, no allocation — see `take_events`.
+    let fd = EVENT_FD.load(Ordering::SeqCst);
+    if fd >= 0 {
+        let mut event = [0u8; 12];
+        event[0..4].copy_from_slice(&pgid.to_ne_bytes());
+        event[4..8].copy_from_slice(&signal.to_ne_bytes());
+        event[8..12].copy_from_slice(&(seen as i32).to_ne_bytes());
+        unsafe {
+            libc::write(fd, event.as_ptr() as *const libc::c_void, event.len());
+        }
     }
     // And stop watching: the shell is about to send a fresh order for the next job, and until it
     // does there is nothing here worth acting on.

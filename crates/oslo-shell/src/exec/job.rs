@@ -42,7 +42,9 @@ pub use signals::{
 };
 pub use table::{Job, JobState, JobTable, with_jobs};
 
-pub(crate) use sentinel::{stand_down, watch};
+pub use sentinel::started as watcher_started;
+
+pub(crate) use sentinel::{Orders, stand_down, take_events, watch};
 
 pub(crate) use control::{
     give_terminal_to, join_foreground_group, join_group_in_child, place_child,
