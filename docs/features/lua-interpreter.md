@@ -89,6 +89,38 @@ beside the one the prompt already speaks.
 run their argument through `/bin/sh` — someone else's shell, from inside this one, and nothing at
 all on a system where oslo is the only shell installed.
 
+### Handles, and things that stream
+
+**Everything oslo hands out that owns something is an object with a metatable**, built by
+`api/handle.rs`. The verbs live behind `__index`, so `pairs` over a handle shows nothing to get
+wrong and internals stay internal; `__newindex` refuses a typo rather than adding a field; and
+`<close>` releases at the end of the block, after which every verb says so.
+
+```lua
+local db <close> = oslo.db.open("notes")     -- the file is shut here
+local tmp <close> = oslo.fs.mktempdir()      -- the directory is removed here
+```
+
+`oslo.db.open`, `oslo.spawn`, `oslo.after`/`oslo.every` and `oslo.fs.mktempdir` are the four.
+`h:close()` is the same call as leaving a `<close>` scope, and answers whether it was the one that
+did the closing.
+
+**Anything that iterates is lazy, and the iterator is a handle too.** A generic `for` needs
+something callable and a scope-bound release needs a metatable, so these carry `__call` — one value
+that works in both positions, rather than two returns a caller has to remember to keep together:
+
+```lua
+for line in oslo.lines{"cargo", "build"} do oslo.ui.log(line) end
+for path in oslo.fs.walk("/etc") do print(path) end
+for line in oslo.fs.lines("/proc/mounts") do … end
+
+local out <close> = oslo.lines{"journalctl", "-f"}   -- reaped when the block ends
+for line in out do if line:find("error") then break end end
+```
+
+A loop that runs out cleans up on its own. A loop that `break`s does not, because luna does not
+close a `for`'s closing value — which is what `<close>` and `:close()` are for.
+
 ## Configuration
 
 **The configuration is a Lua program, and it is one program even when it is several files.**
@@ -153,7 +185,19 @@ The standard library is complete enough that oslo's own tests no longer notice i
 `pairs` iterates in insertion order, recursion is bounded by a catchable error, and floats print as
 Lua 5.4 prints them.
 
-Three things remain, and one of them is oslo's own:
+Five things remain, and one of them is oslo's own. **Two are about when things are released**, and
+they are why `<close>` is the only cleanup oslo's handles promise:
+
+* **`__gc` never fires.** `setmetatable({}, {__gc = …})` runs no finalizer, and `collectgarbage()`
+  frees nothing a Rust binding was holding. So there is no backstop for a handle nobody closed: 60
+  databases opened with `<close>` leave the process on 4 file descriptors, and 60 opened without
+  leave it on 244.
+* **A generic `for` does not close its fourth value.** Lua 5.4 closes the loop's closing value when
+  the loop ends, `break` and error included; luna does not. That is what would otherwise have made
+  `for line in oslo.lines{…} do … break … end` reap its child by itself, and it is why the
+  iterators oslo hands out are `__call`able handles you can also `<close>`.
+
+The other three:
 
 * **A runtime error is `userdata`, where Lua 5.4 raises a string.** `tostring(err)` reaches the
   message, so nothing is lost — but `err:find("…")`, the idiom for inspecting one, cannot index a

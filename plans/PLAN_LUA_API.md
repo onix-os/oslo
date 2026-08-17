@@ -85,32 +85,40 @@ descriptors, and 60 opened without leave it on 244.
 
 A file handle oslo does not yet have is the fifth — see §2.
 
-## 2. Streaming, via coroutines
+## 2. Streaming — **done for the filesystem and for commands**
 
-**Everything the API produces is materialised whole**, because the tree walker could not suspend.
-That is fine for `ls` and wrong for anything long:
-
-```lua
--- today: this cannot be written at all
-oslo.run{"journalctl", "-f", capture = true}   -- captures forever, returns never
-```
-
-Coroutines make the iterator form possible, and it is the form a shell wants:
+The section as written said everything the API produces is materialised whole. `oslo.lines` was
+already the exception and had been since before the VM, so the real gap was narrower and sharper:
+**the things that streamed could not be let go of, and the things that could not stream were on the
+filesystem.**
 
 ```lua
-for line in oslo.run.lines{"journalctl", "-f"} do
-  if line:find("error") then oslo.ui.log(line) end
-end
+for line in oslo.lines{"cargo", "build"} do oslo.ui.log(line) end
+for path in oslo.fs.walk("/etc") do print(path) end          -- was: one table, the whole tree
+for line in oslo.fs.lines("/var/log/syslog") do … end        -- was: the whole file, as a table
 
-for entry in oslo.fs.walk("/large/tree") do ... end   -- today: one table, all of it
-for row in oslo.rows("ps") do ... end                 -- a structured producer, lazily
+local out <close> = oslo.lines{"journalctl", "-f"}
+for line in out do if line:find("error") then break end end  -- reaped when the block ends
 ```
 
-Three call sites want it: `oslo.run` (process output), `oslo.fs.walk`/`ls` (large trees), and the
-structured pipeline (a Lua tool that produces rows one at a time instead of building a table).
+**Not coroutines, and not because coroutines are missing.** They work. But the producer here is
+Rust — a directory being read, a pipe being drained — and a coroutine would only be a wrapper
+around the same native call. What was actually needed was somewhere to put the *cleanup*, and
+`__call` on a handle is that: one value a generic `for` accepts and `<close>` releases, rather than
+an iterator function and a separate closer the caller has to keep together.
 
-The pipeline case is the interesting one: a Lua `rows` function currently has to return the whole
-table, so `mytool | head -1` still computes everything. A coroutine producer makes `head` cheap.
+luna does not close a `for`'s closing value, so a loop that `break`s still needs `<close>` or
+`:close()` said out loud. A loop that runs to the end cleans up by itself.
+
+### What is left: the structured pipeline
+
+`oslo.register_tool`'s `rows` function still returns a whole table, so `mytool | head -1` computes
+everything. **This is not a Lua-side change.** The pipeline's own contract is
+`Fn(&[String], Option<&[Record]>) -> Result<Vec<Record>, String>` — `Vec<Record>`, materialised, in
+`oslo_shell::data::custom`. Accepting a coroutine at the Lua boundary and draining it into that
+`Vec` would give the tool author the generator notation and make `head` no cheaper, which is the
+wrong half of the change. Making it lazy means an iterator contract through `oslo-shell`'s tool
+plumbing, and belongs with that work rather than with this.
 
 ## 3. Errors that carry more than a sentence
 
@@ -165,8 +173,8 @@ nothing enforces it. Frozen tables are what would turn that from a statement int
 ## Order I would do them in
 
 1. ~~**Handles as objects** (§1)~~ — **done**: `api/handle.rs`, and the four call sites use it.
-2. **Streaming producers** (§2) — the largest new *capability*; makes long-running commands and big
-   trees usable at all.
+2. ~~**Streaming producers** (§2)~~ — **done** for `oslo.fs.walk`, `oslo.fs.lines` and
+   `oslo.lines`; the structured pipeline needs an `oslo-shell` change first.
 3. **Structured errors** (§3) — additive, `__tostring` keeps everything working.
 4. **Plugin sandbox** (§4) — turns an existing disclosure into an actual boundary.
 5. **Binary-safe reads** (§5) — narrow, but currently silently corrupts.

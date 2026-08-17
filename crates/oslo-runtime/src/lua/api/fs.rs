@@ -9,10 +9,12 @@
 //! [`super::util::failed`].
 
 use super::util::{failed, int, list, ok, opt_text, put, record, text};
-use oslo_base::value::{Table, Value};
+use oslo_base::value::{LuaError, Table, Value};
+use std::cell::RefCell;
 use std::fs;
 use std::os::unix::fs::{MetadataExt, PermissionsExt};
 use std::path::Path;
+use std::rc::Rc;
 use std::time::UNIX_EPOCH;
 
 pub fn build() -> Value {
@@ -39,24 +41,15 @@ fn reading(it: &mut Table) {
         }
     });
 
-    // oslo.fs.lines(path) -> {"first", "second", ...}
+    // oslo.fs.lines(path) -> an iterator over the file's lines
     //
-    // Reads the whole file. Streaming would need an iterator holding an open descriptor across
-    // Lua calls, and this evaluator has no `__close` to shut one; the honest version comes with
-    // `oslo.lines`, which is a live command's output rather than a file.
+    // **The descriptor stays open between calls**, which is what makes this the right way to read
+    // a log. It used to read the whole file and answer a table, because there was no `__close` to
+    // shut a held descriptor with; there is one now.
     put(it, "lines", |_, args| {
         let path = text(&args, 1, "oslo.fs.lines")?;
-        match fs::read(&path) {
-            Ok(bytes) => {
-                let content = String::from_utf8_lossy(&bytes);
-                // A trailing newline ends the last line rather than starting an empty one, which
-                // is what `wc -l` counts and what a caller means by "the lines of this file".
-                let body = content.strip_suffix('\n').unwrap_or(&content);
-                if body.is_empty() {
-                    return ok(list([]));
-                }
-                ok(list(body.split('\n').map(Value::str)))
-            }
+        match fs::File::open(&path) {
+            Ok(file) => ok(reader(std::io::BufReader::new(file))),
             Err(e) => failed(&path, e),
         }
     });
@@ -242,17 +235,21 @@ fn listing(it: &mut Table) {
         ok(list(entries.into_iter().map(|(_, v)| v)))
     });
 
-    // oslo.fs.walk(dir) -> every path under `dir`, depth first, directories before their contents
+    // oslo.fs.walk(dir) -> an iterator over every path under `dir`, depth first, directories
+    // before their contents
+    //
+    // **Lazy, because a tree has no size you can promise.** The table this used to answer was the
+    // whole of `/nix/store` before the first line of the loop ran; the iterator opens one directory
+    // at a time and stops the moment the loop does.
     //
     // Symlinks are not followed. A link back up the tree is what turns "walk this directory" into
     // an infinite loop, and a script written against a tree it does not control will meet one.
     put(it, "walk", |_, args| {
         let root = opt_text(&args, 1, "oslo.fs.walk")?.unwrap_or_else(|| ".".to_string());
-        let mut found = Vec::new();
-        if let Err(e) = walk(Path::new(&root), &mut found) {
-            return failed(&root, e);
+        match fs::read_dir(&root) {
+            Ok(reading) => ok(walker(reading)),
+            Err(e) => failed(&root, e),
         }
-        ok(list(found.into_iter().map(Value::str)))
     });
 
     // oslo.fs.glob(pattern) — the shell's own globber, so the two languages agree about what
@@ -352,18 +349,98 @@ fn seconds(meta: &fs::Metadata) -> i64 {
 }
 
 /// Collect every path under `root`, depth first.
-fn walk(root: &Path, found: &mut Vec<String>) -> std::io::Result<()> {
-    for entry in fs::read_dir(root)? {
-        let entry = entry?;
-        let path = entry.path();
-        found.push(path.to_string_lossy().into_owned());
-        // `symlink_metadata`, so a symlink to a parent directory is listed and not descended
-        // into. Following it is how a walk never finishes.
-        if entry.path().symlink_metadata()?.is_dir() {
-            walk(&path, found)?;
+/// The iterator `oslo.fs.lines` answers: one line per call, `nil` at the end.
+///
+/// A trailing newline ends the last line rather than starting an empty one, which is what `wc -l`
+/// counts and what a caller means by "the lines of this file".
+fn reader(file: std::io::BufReader<fs::File>) -> Value {
+    let source = Rc::new(RefCell::new(Some(file)));
+    let mut handle = super::handle::Handle::new("oslo.fs.lines");
+
+    let it = Rc::clone(&source);
+    handle.calls("oslo.fs.lines", move |_, _| {
+        use std::io::BufRead;
+        let mut slot = it.borrow_mut();
+        let Some(buffered) = slot.as_mut() else {
+            return ok(Value::Nil);
+        };
+        let mut line = Vec::new();
+        match buffered.read_until(b'\n', &mut line) {
+            Ok(0) => {
+                *slot = None;
+                ok(Value::Nil)
+            }
+            Ok(_) => {
+                if line.last() == Some(&b'\n') {
+                    line.pop();
+                }
+                ok(Value::str(String::from_utf8_lossy(&line)))
+            }
+            Err(e) => {
+                *slot = None;
+                Err(LuaError::new(format!("oslo.fs.lines: {e}")))
+            }
         }
-    }
-    Ok(())
+    });
+
+    handle.on_close("oslo.fs.lines.close", move || {
+        source.borrow_mut().take();
+    });
+
+    handle.build()
+}
+
+/// The iterator `oslo.fs.walk` answers: a handle that is also callable.
+///
+/// ```lua
+/// for path in oslo.fs.walk("/etc") do print(path) end
+///
+/// local tree <close> = oslo.fs.walk("/nix/store")   -- the open directories are let go here
+/// for path in tree do if path:find("cache") then break end end
+/// ```
+///
+/// **A stack of open directories rather than recursion**, because the recursion was what made this
+/// eager: a function that has to return before the caller sees anything cannot answer one path at a
+/// time. One `ReadDir` per level is also one file descriptor per level, which is why the handle
+/// closes — a loop abandoned deep in a tree is holding them until it does. See
+/// [`super::handle::Handle::calls`].
+fn walker(root: fs::ReadDir) -> Value {
+    let stack = Rc::new(RefCell::new(vec![root]));
+    let mut handle = super::handle::Handle::new("oslo.fs.walk");
+
+    let it = Rc::clone(&stack);
+    handle.calls("oslo.fs.walk", move |_, _| {
+        let mut stack = it.borrow_mut();
+        loop {
+            let Some(level) = stack.last_mut() else {
+                return ok(Value::Nil);
+            };
+            let Some(entry) = level.next() else {
+                stack.pop();
+                continue;
+            };
+            let entry = entry.map_err(|e| LuaError::new(format!("oslo.fs.walk: {e}")))?;
+            let path = entry.path();
+            // `symlink_metadata`, so a symlink to a parent directory is listed and not descended
+            // into. Following it is how a walk never finishes.
+            let is_dir = path
+                .symlink_metadata()
+                .map_err(|e| LuaError::new(format!("oslo.fs.walk: {}: {e}", path.display())))?
+                .is_dir();
+            if is_dir {
+                // Pushed before the directory itself is answered, so the next call descends —
+                // which is what makes it depth first, with a directory before its contents.
+                let below = fs::read_dir(&path)
+                    .map_err(|e| LuaError::new(format!("oslo.fs.walk: {}: {e}", path.display())))?;
+                stack.push(below);
+            }
+            return ok(Value::str(path.to_string_lossy()));
+        }
+    });
+
+    handle.on_close("oslo.fs.walk.close", move || stack.borrow_mut().clear());
+
+    handle.build()
 }
 
 /// Create a file or directory under `$TMPDIR` whose name nothing else holds.

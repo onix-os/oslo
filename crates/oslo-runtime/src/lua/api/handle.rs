@@ -39,6 +39,8 @@ pub(super) struct Handle {
     shown: Option<String>,
     /// What `__close` runs, if anything.
     closer: Option<Value>,
+    /// What calling the handle runs, if it is callable at all.
+    called: Option<Value>,
     /// Shared with every verb, so closing the handle is something they can all see.
     closed: Rc<Cell<bool>>,
 }
@@ -50,6 +52,7 @@ impl Handle {
             name,
             shown: None,
             closer: None,
+            called: None,
             closed: Rc::new(Cell::new(false)),
         }
     }
@@ -79,6 +82,31 @@ impl Handle {
         self
     }
 
+    /// Make the handle itself callable, as `handle(…)`.
+    ///
+    /// **Which is what lets one value be both an iterator and a thing that closes.** A generic
+    /// `for` needs something callable; releasing at the end of a block needs something with a
+    /// metatable. `__call` is how `for line in oslo.lines{…} do` and
+    /// `local out <close> = oslo.lines{…}` are the same handle rather than two returns the caller
+    /// has to keep together.
+    ///
+    /// The call is handed `self` first, exactly as a `:` call is.
+    pub(super) fn calls(
+        &mut self,
+        name: &'static str,
+        f: impl Fn(&dyn Host, Vec<Value>) -> LuaResult<Vec<Value>> + 'static,
+    ) -> &mut Self {
+        let closed = Rc::clone(&self.closed);
+        let owner = self.name;
+        self.called = Some(native(name, move |host, args| {
+            if closed.get() {
+                return Err(LuaError::new(format!("{owner}: the handle is closed")));
+            }
+            f(host, args)
+        }));
+        self
+    }
+
     /// Add a plain value, reached as `handle.field`.
     pub(super) fn field(&mut self, name: &str, value: Value) -> &mut Self {
         self.verbs.set_str(name, value);
@@ -94,14 +122,22 @@ impl Handle {
     /// nobody closed, and the metatable would carry it — but luna does not run finalizers, so
     /// setting one would be a promise nothing keeps. A handle left unclosed holds what it holds
     /// until the session ends, which is what every handle did before this existed.
+    /// It is also the `close` verb, so `h:close()` and leaving a `<close>` scope are the same thing
+    /// rather than two things a caller has to know are the same. Registered directly, without the
+    /// refusal every other verb gets: closing twice is not a mistake worth an error.
     pub(super) fn on_close(&mut self, name: &'static str, f: impl Fn() + 'static) -> &mut Self {
         let closed = Rc::clone(&self.closed);
-        self.closer = Some(native(name, move |_, _| {
-            if !closed.replace(true) {
+        // Answers whether *this* call did the closing, the way `t:stop()` and `job:cancel()` do, so
+        // a second `h:close()` is `false` rather than an error. `__close` ignores what it is given.
+        let closer = native(name, move |_, _| {
+            let first = !closed.replace(true);
+            if first {
                 f();
             }
-            Ok(Vec::new())
-        }));
+            Ok(vec![Value::Bool(first)])
+        });
+        self.verbs.set_str("close", closer.clone());
+        self.closer = Some(closer);
         self
     }
 
@@ -140,6 +176,9 @@ impl Handle {
                 "__tostring",
                 native("__tostring", move |_, _| Ok(vec![Value::str(&shown)])),
             );
+        }
+        if let Some(called) = self.called {
+            meta.set_str("__call", called);
         }
         if let Some(closer) = self.closer {
             meta.set_str("__close", closer);

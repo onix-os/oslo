@@ -59,12 +59,36 @@ fn a_missing_file_answers_rather_than_raising() {
 #[test]
 fn lines_does_not_invent_a_trailing_empty_one() {
     let out = lua(r#"
+        local function count(path)
+          local n = 0
+          for _ in oslo.fs.lines(path) do n = n + 1 end
+          return n
+        end
         oslo.fs.write("a", "one\ntwo\n")
         oslo.fs.write("b", "one\ntwo")
         oslo.fs.write("c", "")
-        print(#oslo.fs.lines("a"), #oslo.fs.lines("b"), #oslo.fs.lines("c"))
+        print(count("a"), count("b"), count("c"))
     "#);
     assert_eq!(out, "2\t2\t0");
+}
+
+/// **The file is read as it is asked for**, which is the point of the iterator: a loop that stops
+/// at the first line has not read the rest, and `<close>` shuts the descriptor.
+#[test]
+fn lines_holds_the_file_open_and_lets_it_go() {
+    let out = lua(r#"
+        oslo.fs.write("big", "one\ntwo\nthree\n")
+        local first
+        do
+          local f <close> = oslo.fs.lines("big")
+          first = f()
+        end
+        print(first)
+        -- Reading a file that is not there is a message, before anything is read.
+        local it, why = oslo.fs.lines("nope")
+        print(it == nil, why ~= nil)
+    "#);
+    assert_eq!(out, "one\ntrue\ttrue");
 }
 
 #[test]
@@ -149,11 +173,33 @@ fn walk_lists_a_tree_without_following_links_out_of_it() {
         oslo.fs.write("d/inner/f", "")
         -- A link back to the top would make a following walk never finish.
         oslo.fs.symlink("..", "d/inner/up")
-        local found = oslo.fs.walk("d")
+        local found = {}
+        for path in oslo.fs.walk("d") do found[#found + 1] = path end
         table.sort(found)
         print(#found, table.concat(found, " "))
     "#);
     assert_eq!(out, "3\td/inner d/inner/f d/inner/up");
+}
+
+/// **The walk is lazy**, which is the whole reason it answers an iterator: a loop that stops after
+/// one entry has read one directory, not the tree. `<close>` lets go of the descriptors it opened
+/// on the way down.
+#[test]
+fn walk_stops_when_the_loop_does() {
+    let out = lua(r#"
+        oslo.fs.mkdir("d/inner/deeper")
+        oslo.fs.write("d/inner/deeper/f", "")
+        local seen = 0
+        do
+          local tree <close> = oslo.fs.walk("d")
+          for _ in tree do seen = seen + 1; break end
+        end
+        print(seen)
+        -- A directory that is not there is a message, before anything is walked.
+        local it, why = oslo.fs.walk("d/nope")
+        print(it == nil, why ~= nil)
+    "#);
+    assert_eq!(out, "1\ntrue\ttrue");
 }
 
 #[test]

@@ -97,29 +97,39 @@ pub fn install(host: &dyn Host, oslo: &mut Table, env: &Arc<Mutex<Environment>>)
     host.set_global("sh", sugar(env));
 }
 
-/// The iterator `oslo.lines` returns: one line per call, nil at the end.
-///
-/// The child is reaped when its output runs out, so a loop that runs to completion leaves no
-/// zombie. A loop abandoned part-way does — the iterator is a plain function with no `__close`
-/// for this evaluator to call, so there is nowhere to put the cleanup. `oslo.run{…, capture =
-/// true}` is the form with no such edge.
-fn line_reader(child: nix::unistd::Pid, reader: std::os::fd::OwnedFd) -> Value {
-    use std::cell::RefCell;
-    use std::io::BufRead;
+/// A command being read a line at a time, and the child behind it.
+struct Reading {
+    child: nix::unistd::Pid,
+    /// Emptied once the output runs out or the reader is let go.
+    source: std::cell::RefCell<Option<std::io::BufReader<std::fs::File>>>,
+    reaped: std::cell::Cell<bool>,
+}
 
-    let source = RefCell::new(Some(std::io::BufReader::new(std::fs::File::from(reader))));
-    native("lines iterator", move |_, _| {
-        let mut slot = source.borrow_mut();
+impl Reading {
+    /// Let the pipe go and collect the child. Safe to call more than once.
+    ///
+    /// **The reader is dropped before the wait.** Waiting first on a child that is still writing
+    /// into a pipe nobody drains is a deadlock; closing the read end sends it `SIGPIPE` instead,
+    /// which is what a shell's `head` does to the command feeding it.
+    fn finish(&self) {
+        self.source.borrow_mut().take();
+        if !self.reaped.replace(true) {
+            oslo_shell::exec::argv::reap(self.child);
+        }
+    }
+
+    /// The next line, or `nil` once there are none.
+    fn line(&self) -> LuaResult<Vec<Value>> {
+        use std::io::BufRead;
+        let mut slot = self.source.borrow_mut();
         let Some(buffered) = slot.as_mut() else {
             return Ok(vec![Value::Nil]);
         };
         let mut line = String::new();
         match buffered.read_line(&mut line) {
             Ok(0) => {
-                // Dropped before the wait, so the child sees its reader go away rather than
-                // blocking on a pipe nobody will drain.
-                *slot = None;
-                oslo_shell::exec::argv::reap(child);
+                drop(slot);
+                self.finish();
                 Ok(vec![Value::Nil])
             }
             Ok(_) => {
@@ -127,12 +137,52 @@ fn line_reader(child: nix::unistd::Pid, reader: std::os::fd::OwnedFd) -> Value {
                 Ok(vec![Value::str(line)])
             }
             Err(e) => {
-                *slot = None;
-                oslo_shell::exec::argv::reap(child);
+                drop(slot);
+                self.finish();
                 Err(LuaError::new(format!("oslo.lines: {e}")))
             }
         }
-    })
+    }
+}
+
+impl Drop for Reading {
+    fn drop(&mut self) {
+        self.finish();
+    }
+}
+
+/// What `oslo.lines` answers: an iterator that is also a handle.
+///
+/// ```lua
+/// for line in oslo.lines{"cargo", "build"} do oslo.ui.log(line) end
+///
+/// local out <close> = oslo.lines{"journalctl", "-f"}   -- reaped at the end of the block
+/// for line in out do if line:find("error") then break end end
+/// ```
+///
+/// **One value, because a `for` and a `<close>` want different things of it.** A generic `for` needs
+/// something callable and a scope-bound release needs a metatable, so the handle is callable through
+/// `__call` — see [`super::handle::Handle::calls`]. The alternative was two returns the caller had
+/// to remember to keep together, and the one they would forget is the one that reaps.
+///
+/// A loop that runs out reaps the child on its own. A loop that `break`s does not — luna does not
+/// close a `for`'s closing value — so `<close>` or `out:close()` is how an abandoned read is
+/// collected, and `Drop` is what catches the rest at teardown.
+fn line_reader(child: nix::unistd::Pid, reader: std::os::fd::OwnedFd) -> Value {
+    let reading = Rc::new(Reading {
+        child,
+        source: std::cell::RefCell::new(Some(std::io::BufReader::new(std::fs::File::from(reader)))),
+        reaped: std::cell::Cell::new(false),
+    });
+
+    let mut handle = super::handle::Handle::new("oslo.lines");
+
+    let it = Rc::clone(&reading);
+    handle.calls("oslo.lines", move |_, _| it.line());
+
+    handle.on_close("oslo.lines.close", move || reading.finish());
+
+    handle.build()
 }
 
 /// The `sh` table: any name on it becomes that command.

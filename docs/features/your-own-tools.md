@@ -84,7 +84,7 @@ oslo.register_tool{
   produces = "rows",
   rows = function(argv)
     local rows = {}
-    for _, line in ipairs(oslo.fs.lines("/proc/mounts")) do
+    for line in oslo.fs.lines("/proc/mounts") do
       local device, point, kind, opts = line:match("^(%S+)%s+(%S+)%s+(%S+)%s+(%S+)")
       if device then
         rows[#rows + 1] = { device = device, point = point, kind = kind,
