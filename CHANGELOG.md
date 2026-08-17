@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.4.1] - 2026-08-17
+
+### <!-- 0 -->⛰️  Features
+
+- The config file is init.lua
+
 ## [0.4.0] - 2026-08-16
 
 ### <!-- 0 -->⛰️  Features
