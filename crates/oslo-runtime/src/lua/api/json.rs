@@ -114,6 +114,15 @@ fn to_json(value: &Value, depth: usize) -> LuaResult<Json> {
             // JSON has no infinity and no NaN. Null is what every other encoder writes for them.
             .unwrap_or(Json::Null),
         Value::Str(s) => Json::String(s.to_string()),
+        // **Refused rather than mangled.** A JSON string is a sequence of Unicode characters, so
+        // there is no encoding of these bytes that is still the same bytes — writing them lossily
+        // would produce a document that parses and no longer says what was handed over.
+        // `oslo.fs.read` on a binary file lands here, and this is what tells you so.
+        Value::Bytes(_) => {
+            return Err(LuaError::new(
+                "oslo.json.encode: the value is bytes rather than text, and JSON has no form for it",
+            ));
+        }
         Value::Table(t) => table_to_json(t, depth)?,
         Value::Function(_) => {
             return Err(LuaError::new(

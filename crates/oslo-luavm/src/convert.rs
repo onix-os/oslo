@@ -50,6 +50,9 @@ fn into_lua_seen<'gc>(ctx: Context<'gc>, value: &Own, seen: &mut Crossed<'gc>) -
         // Copied, not borrowed: `IntoValue for &str` wants `&'static`, and the shell's strings
         // are `Rc<str>` owned by a value that outlives nothing in particular.
         Own::Str(s) => Value::String(LunaStr::from_slice(&ctx, s.as_bytes())),
+        // One Lua string type, arrived at from two: the VM's strings have always been bytes, and
+        // this is the half of the shell's that is not text. See [`Own::Bytes`].
+        Own::Bytes(b) => Value::String(LunaStr::from_slice(&ctx, b)),
         Own::Table(table) => {
             let id = Rc::as_ptr(table) as *const () as usize;
             if let Some(already) = seen.get(&id) {
@@ -179,7 +182,11 @@ fn from_lua_within<'gc>(ctx: Context<'gc>, value: Value<'gc>, seen: &mut Brought
         Value::Boolean(b) => Own::Bool(b),
         Value::Integer(i) => Own::Number(Number::Int(i)),
         Value::Number(f) => Own::Number(Number::Float(f)),
-        Value::String(s) => Own::str(String::from_utf8_lossy(s.as_bytes())),
+        // **`Own::bytes`, not `from_utf8_lossy`.** A Lua string is a byte string, and coming out
+        // through a lossy conversion meant every byte the VM held that was not text became `U+FFFD`
+        // on the way to the shell — `string.pack` was unusable and a file read through the VM came
+        // back changed. `Own::bytes` keeps text as text and everything else as itself.
+        Value::String(s) => Own::bytes(s.as_bytes()),
         // Rooted in the VM's registry, so the collector keeps it while the shell holds it. This is
         // how a hook, a completer or a prompt handler survives past the call that installed it.
         Value::Function(f) => Own::Function(Rc::new(Function::Held(Rc::new(ctx.stash(f))))),

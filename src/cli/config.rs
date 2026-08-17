@@ -222,6 +222,9 @@ fn read(_engine: &oslo_runtime::LuaEngine, key: &str) -> Option<String> {
     match value {
         Value::Nil => None,
         Value::Str(text) => Some(text.to_string()),
+        // No setting is bytes, and one that has been made so is worth saying rather than rendering
+        // lossily into something that looks like a value somebody chose.
+        Value::Bytes(b) => Some(format!("<{} bytes, not text>", b.len())),
         Value::Bool(b) => Some(b.to_string()),
         Value::Number(n) => Some(n.to_string()),
         Value::Function(_) => Some("<a function>".to_string()),

@@ -111,6 +111,8 @@ pub enum Key {
     /// Non-integral floats, keyed by their bit pattern.
     Float(u64),
     Str(Rc<str>),
+    /// A string key that is not text. Disjoint from [`Key::Str`] — see [`Value::Bytes`].
+    Bytes(Rc<[u8]>),
     /// A table or function used as a key, identified by address.
     Ref(usize),
 }
@@ -132,6 +134,7 @@ impl Key {
                 }
             },
             Value::Str(s) => Key::Str(Rc::clone(s)),
+            Value::Bytes(b) => Key::Bytes(Rc::clone(b)),
             Value::Table(t) => Key::Ref(Rc::as_ptr(t) as usize),
             Value::Function(f) => Key::Ref(Rc::as_ptr(f) as usize),
         })
@@ -144,6 +147,7 @@ impl Key {
             Key::Int(i) => Value::Number(Number::Int(*i)),
             Key::Float(bits) => Value::Number(Number::Float(f64::from_bits(*bits))),
             Key::Str(s) => Value::Str(Rc::clone(s)),
+            Key::Bytes(b) => Value::Bytes(Rc::clone(b)),
             // A table used as a key cannot be recovered from its address alone; the table stores
             // the original alongside it. See `Table::pairs`.
             Key::Ref(_) => Value::Nil,
@@ -338,6 +342,23 @@ pub enum Value {
     Bool(bool),
     Number(Number),
     Str(Rc<str>),
+    /// A string that is *not* text: bytes that are not valid UTF-8.
+    ///
+    /// **The invariant is what makes two variants safe.** A Lua string is a byte string and there is
+    /// exactly one of them, so `t["a"]` and `t[<the bytes "a">]` have to be the same key and have to
+    /// compare equal. That would be a trap if the two variants overlapped — and they cannot, because
+    /// [`Value::bytes`] is the only way to build this one and it hands valid UTF-8 to
+    /// [`Value::Str`]. Valid and invalid UTF-8 are disjoint, so no `Bytes` can name the same string
+    /// as any `Str`, and equality and keying stay exactly Lua's.
+    ///
+    /// What it buys is that `oslo.fs.read` on a PNG answers the PNG. Before this the boundary went
+    /// through `String::from_utf8_lossy` and every byte that was not text came back as `U+FFFD` —
+    /// a read that looked like it worked and had quietly changed the file.
+    ///
+    /// Everything that matches `Value::Str` and falls through to a catch-all therefore treats this
+    /// as "not text", which is right: a path, a variable name and a command word are all text, and
+    /// a caller handing one of them a run of arbitrary bytes has made a mistake worth a message.
+    Bytes(Rc<[u8]>),
     Table(Rc<RefCell<Table>>),
     Function(Rc<Function>),
 }
@@ -345,6 +366,26 @@ pub enum Value {
 impl Value {
     pub fn str(s: impl AsRef<str>) -> Value {
         Value::Str(Rc::from(s.as_ref()))
+    }
+
+    /// A Lua string from bytes: text when they are text, and the bytes themselves when they are not.
+    ///
+    /// The only constructor of [`Value::Bytes`], which is what holds its invariant. See there.
+    pub fn bytes(b: impl AsRef<[u8]>) -> Value {
+        let b = b.as_ref();
+        match std::str::from_utf8(b) {
+            Ok(text) => Value::Str(Rc::from(text)),
+            Err(_) => Value::Bytes(Rc::from(b)),
+        }
+    }
+
+    /// The bytes of a string value, whichever variant carries them.
+    pub fn as_bytes(&self) -> Option<&[u8]> {
+        match self {
+            Value::Str(s) => Some(s.as_bytes()),
+            Value::Bytes(b) => Some(b),
+            _ => None,
+        }
     }
 
     pub fn int(i: i64) -> Value {
@@ -373,7 +414,7 @@ impl Value {
             Value::Nil => "nil",
             Value::Bool(_) => "boolean",
             Value::Number(_) => "number",
-            Value::Str(_) => "string",
+            Value::Str(_) | Value::Bytes(_) => "string",
             Value::Table(_) => "table",
             Value::Function(_) => "function",
         }
@@ -392,6 +433,8 @@ impl Value {
                 _ => a.as_float() == b.as_float(),
             },
             (Value::Str(a), Value::Str(b)) => a == b,
+            // Never equal to a `Str`: one is valid UTF-8 and the other is not. See `Value::Bytes`.
+            (Value::Bytes(a), Value::Bytes(b)) => a == b,
             (Value::Table(a), Value::Table(b)) => Rc::ptr_eq(a, b),
             (Value::Function(a), Value::Function(b)) => Rc::ptr_eq(a, b),
             _ => false,
@@ -405,6 +448,9 @@ impl Value {
             Value::Bool(b) => b.to_string(),
             Value::Number(n) => n.to_string(),
             Value::Str(s) => s.to_string(),
+            // Lossy, and only here: `tostring` has to answer *something*, and this is the one
+            // place a byte string is being asked for its rendering rather than its contents.
+            Value::Bytes(b) => String::from_utf8_lossy(b).into_owned(),
             Value::Table(t) => format!("table: {:p}", Rc::as_ptr(t)),
             Value::Function(f) => format!("function: {:p}", Rc::as_ptr(f)),
         }
@@ -517,3 +563,7 @@ mod tests {
         assert_eq!(string_keys(&t), ["a", "c", "b"]);
     }
 }
+
+#[cfg(test)]
+#[path = "value/bytes_tests.rs"]
+mod byte_string_tests;

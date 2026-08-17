@@ -119,22 +119,29 @@ impl Reading {
     }
 
     /// The next line, or `nil` once there are none.
+    ///
+    /// **`read_until` rather than `read_line`**, because a command's output is not promised to be
+    /// UTF-8 and `read_line` *fails* on a byte that is not — one stray byte anywhere in the stream
+    /// and the whole loop stopped with an I/O error. The line crosses as `Value::bytes`, which is
+    /// text when it is text.
     fn line(&self) -> LuaResult<Vec<Value>> {
         use std::io::BufRead;
         let mut slot = self.source.borrow_mut();
         let Some(buffered) = slot.as_mut() else {
             return Ok(vec![Value::Nil]);
         };
-        let mut line = String::new();
-        match buffered.read_line(&mut line) {
+        let mut line = Vec::new();
+        match buffered.read_until(b'\n', &mut line) {
             Ok(0) => {
                 drop(slot);
                 self.finish();
                 Ok(vec![Value::Nil])
             }
             Ok(_) => {
-                line.truncate(line.trim_end_matches('\n').len());
-                Ok(vec![Value::str(line)])
+                if line.last() == Some(&b'\n') {
+                    line.pop();
+                }
+                Ok(vec![Value::bytes(&line)])
             }
             Err(e) => {
                 drop(slot);

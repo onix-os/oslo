@@ -128,6 +128,29 @@ for line in out do if line:find("error") then break end end
 A loop that runs out cleans up on its own. A loop that `break`s does not, because luna does not
 close a `for`'s closing value — which is what `<close>` and `:close()` are for.
 
+### A string is bytes
+
+```lua
+local png = oslo.fs.read("logo.png")   -- the file, exactly
+#png                                    -- its size
+oslo.fs.write("copy.png", png)          -- byte for byte
+string.unpack("<i4", oslo.db.open("d"):get("row"))
+```
+
+`oslo.fs.read` used to go through `String::from_utf8_lossy`, so every byte that was not text came
+back as `U+FFFD` — a read that looked like it had worked and had quietly changed the file. The same
+happened to anything `string.pack` produced on its way out to the shell, and `oslo.lines` failed
+outright on a command whose output had one non-UTF-8 byte in it.
+
+**There is still exactly one string type.** `type()` says `string` either way, `t["a"]` and the
+table indexed by the bytes `a` are the same slot, and equality is Lua's. Internally the shell keeps
+two representations — `Value::Str` for text, `Value::Bytes` for what is not — and they cannot
+overlap, because valid and invalid UTF-8 are disjoint and one constructor decides which you get.
+
+What a *name* is remains text: a path, a variable, a command word. Handing `oslo.fs.read`'s answer
+to something expecting one of those is a message rather than a mangling, and `oslo.json.encode`
+refuses bytes outright, since no JSON string could hold them and still be the same bytes.
+
 ### A failure carries facts, and is still the message
 
 `nil, message` is the convention everywhere in `oslo.*`, and the second value is now an object:

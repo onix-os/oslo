@@ -32,11 +32,12 @@ format.
 
 ## What the API's shape still assumes
 
-Three assumptions are baked into the current surface, and each one was true of the tree walker:
+Four assumptions were baked into the surface, each one true of the tree walker. None is left:
 
-1. **A handle is a table of closures**, because there were no metatables to hang behaviour on.
-2. **Everything is eager**, because there were no coroutines to suspend.
-3. **A failure is `nil, "message"`**, because there was no way to give an error object behaviour.
+1. ~~**A handle is a table of closures**~~, because there were no metatables to hang behaviour on.
+2. ~~**Everything is eager**~~, because there was nothing to hang a suspended read's cleanup on.
+3. ~~**A failure is `nil, "message"`**~~, because there was no way to give an error object behaviour.
+4. ~~**A string is text**~~, because the shell's own value could not hold anything else.
 
 ---
 
@@ -186,36 +187,48 @@ everything else — is worth having, and is worth having at the price of a per-p
 rather than at the price of freezing the config's own API. That is a bigger change than this
 section, and it belongs with the plugin system rather than with the Lua surface.
 
-## 5. Binary, and text that is text — **not done, and here is the size of it**
+## 5. Binary, and text that is text — **done**
 
-`oslo.fs.read` still goes through `String::from_utf8_lossy`, so a binary file comes back with
-replacement characters. The section treated this as narrow. It is not, and the reason is one type:
-
-```rust
-pub enum Value {
-    …
-    Str(Rc<str>),      // oslo-base/src/value.rs
-}
+```lua
+local png = oslo.fs.read("logo.png")   -- the file, exactly
+oslo.fs.write("copy.png", png)          -- byte for byte
+string.unpack("<i4", db:get("row"))     -- and through the shell and back
 ```
 
-**A Lua string is bytes; oslo's is UTF-8.** Every value crossing into the VM goes
-`Own::Str(s) => LunaStr::from_slice(&ctx, s.as_bytes())`, so the VM end has always been fine — the
-loss is at oslo's own type, which cannot hold the bytes to hand over. `string.pack` working changes
-nothing about that.
+The loss was never in the VM: luna's strings have always been bytes, and the boundary already went
+`LunaStr::from_slice(&ctx, s.as_bytes())`. It was oslo's own `Value::Str(Rc<str>)`, which had
+nothing to hand over — so `from_utf8_lossy` sat on both sides of the crossing. Three things were
+silently wrong because of it: `oslo.fs.read` on a binary file, anything `string.pack` produced on
+its way out, and `oslo.lines` on a command whose output had one non-UTF-8 byte, which `read_line`
+rejects outright and which killed the whole loop.
 
-Two ways out, and both are bigger than this section:
+### It cost three match arms, not a refactor
 
-* **`Str(Rc<[u8]>)`** — what real Lua does, and the right answer. It is the shell's central value
-  type: roughly 150 sites match `Value::Str(s)` and use `s` as a `&str`, across all four crates.
-* **A second `Bytes` variant** — smaller to write and worse to live with. Lua has one string type,
-  so `t["a"]` and `t[<bytes "a">]` must be the same key and must compare equal; keeping that true
-  across two variants means every comparison and every `Key` has to know about both, and the ones
-  that forget fail silently.
+I first judged this at ~150 sites, on the assumption that the fix was widening `Str` to `Rc<[u8]>`.
+That was the wrong shape. A second variant works, and the objection I raised against it — that Lua
+has one string type, so `t["a"]` and `t[<bytes "a">]` must be the same key — is answered by an
+invariant rather than by discipline:
 
-The second half of the section was a misreading on my part: `oslo.ui.width` is the *terminal's*
-width, not a string's, and display width is already computed in Rust with `unicode-width`, which
-handles east-asian wide and combining characters that `utf8.len` would count wrong. There is nothing
-for `utf8.len` to fix there.
+```rust
+Value::Bytes(Rc<[u8]>)   // built only by Value::bytes, which routes valid UTF-8 to Value::Str
+```
+
+**Valid and invalid UTF-8 are disjoint**, so no `Bytes` can name the same string as any `Str`. There
+is nothing for a comparison or a `Key` to get wrong, and nothing to remember. `value/bytes_tests.rs`
+pins it.
+
+The whole workspace had **three** non-exhaustive matches after the variant was added: the boundary,
+`oslo.json`, and `oslo config which`. Everything else has a catch-all that already means "not text",
+which is the correct answer for a path, a variable name or a command word — so `text()` refuses
+bytes and a new `raw()` accepts them, for the calls that write content rather than read a name.
+
+`oslo.json.encode` refuses bytes: no JSON string could hold them and still be the same bytes.
+
+### The second half was a misreading
+
+`oslo.ui.width` is the *terminal's* width, not a string's, and display width is already computed in
+Rust with `unicode-width` — which handles east-asian wide and combining characters that `utf8.len`
+would count wrong. There was nothing for `utf8.len` to fix there.
 
 ## 6. Smaller things the VM unlocked
 
@@ -241,8 +254,7 @@ for `utf8.len` to fix there.
 3. ~~**Structured errors** (§3)~~ — **done**: `api/problem.rs`, `oslo.fs` and `oslo.db`.
 4. ~~**Plugin sandbox** (§4)~~ — the memory ceiling is **done**; the secret filtering already
    existed; frozen tables cannot deliver a boundary without a per-plugin environment.
-5. **Binary-safe reads** (§5) — **not done**: it is `Value::Str(Rc<str>)` across four crates, not a
-   change to `oslo.fs.read`. See the section for the two shapes it could take.
+5. ~~**Binary-safe reads** (§5)~~ — **done**: a disjoint `Value::Bytes`, three match arms.
 
 ## What I would not do
 

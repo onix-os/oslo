@@ -160,7 +160,9 @@ fn handle(name: &str, store: Rc<Store>) -> Value {
         let store = open(&it, "db:get")?;
         let key = text(&args, 2, "db:get")?;
         Ok(vec![match store::get(&store, &key) {
-            Some(value) => Value::str(String::from_utf8_lossy(&value)),
+            // The bytes as they were stored. This module has always said a value is bytes; until
+            // the shell had a value that could hold them, it was not quite true.
+            Some(value) => Value::bytes(&value),
             None => Value::Nil,
         }])
     });
@@ -176,8 +178,8 @@ fn handle(name: &str, store: Rc<Store>) -> Value {
     table.verb("set", move |_, args| {
         let store = open(&it, "db:set")?;
         let key = text(&args, 2, "db:set")?;
-        let value = text(&args, 3, "db:set")?;
-        match store::set(&store, &key, value.as_bytes()) {
+        let value = super::util::raw(&args, 3, "db:set")?;
+        match store::set(&store, &key, &value) {
             Ok(()) => ok(Value::Bool(true)),
             Err(message) => Ok(vec![
                 Value::Nil,
@@ -310,13 +312,13 @@ fn staging_table(staged: &Rc<RefCell<Vec<Change>>>, store: &Rc<Store>) -> Value 
     let into = Rc::clone(staged);
     table.verb("set", move |_, args| {
         let key = text(&args, 2, "w:set")?;
-        let value = text(&args, 3, "w:set")?;
+        let value = super::util::raw(&args, 3, "w:set")?;
         if key.is_empty() || key.len() > store::MAX_KEY || value.len() > store::MAX_VALUE {
             return Err(LuaError::new(format!(
                 "w:set: {key:?} or its value is out of range"
             )));
         }
-        into.borrow_mut().push(Change::Set(key, value.into_bytes()));
+        into.borrow_mut().push(Change::Set(key, value));
         ok(Value::Bool(true))
     });
 

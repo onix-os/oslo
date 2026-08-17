@@ -9,7 +9,7 @@
 //! [`super::util::failed`].
 
 use super::util::{
-    failed, failed_between, failed_path, int, list, ok, opt_text, put, record, text,
+    failed, failed_between, failed_path, int, list, ok, opt_text, put, raw, record, text,
 };
 use oslo_base::value::{LuaError, Table, Value};
 use std::cell::RefCell;
@@ -35,10 +35,11 @@ fn reading(it: &mut Table) {
     put(it, "read", |_, args| {
         let path = text(&args, 1, "oslo.fs.read")?;
         match fs::read(&path) {
-            // Lossy rather than refusing: a shell reads config files and log files, and one stray
-            // byte in a mostly-text file should not make the whole thing unreadable. A caller who
-            // needs the bytes exactly is reading something this API is the wrong tool for.
-            Ok(bytes) => ok(Value::str(String::from_utf8_lossy(&bytes))),
+            // **The bytes, exactly.** This went through `String::from_utf8_lossy` until Lua
+            // strings could be bytes at oslo`s end too, so reading a PNG answered a PNG with every
+            // non-text byte replaced by `U+FFFD` — a read that looked like it had worked. Text is
+            // still text; only what was never text is now itself. See `oslo_base::value::Value`.
+            Ok(bytes) => ok(Value::bytes(&bytes)),
             Err(e) => failed_path(&path, &e),
         }
     });
@@ -68,7 +69,7 @@ fn writing(it: &mut Table) {
     // oslo.fs.write(path, contents) -> true, or nil + message
     put(it, "write", |_, args| {
         let path = text(&args, 1, "oslo.fs.write")?;
-        let contents = text(&args, 2, "oslo.fs.write")?;
+        let contents = raw(&args, 2, "oslo.fs.write")?;
         match fs::write(&path, contents) {
             Ok(()) => ok(Value::Bool(true)),
             Err(e) => failed_path(&path, &e),
@@ -78,9 +79,9 @@ fn writing(it: &mut Table) {
     put(it, "append", |_, args| {
         use std::io::Write;
         let path = text(&args, 1, "oslo.fs.append")?;
-        let contents = text(&args, 2, "oslo.fs.append")?;
+        let contents = raw(&args, 2, "oslo.fs.append")?;
         let opened = fs::OpenOptions::new().create(true).append(true).open(&path);
-        match opened.and_then(|mut f| f.write_all(contents.as_bytes())) {
+        match opened.and_then(|mut f| f.write_all(&contents)) {
             Ok(()) => ok(Value::Bool(true)),
             Err(e) => failed_path(&path, &e),
         }
@@ -376,7 +377,7 @@ fn reader(file: std::io::BufReader<fs::File>) -> Value {
                 if line.last() == Some(&b'\n') {
                     line.pop();
                 }
-                ok(Value::str(String::from_utf8_lossy(&line)))
+                ok(Value::bytes(&line))
             }
             Err(e) => {
                 *slot = None;

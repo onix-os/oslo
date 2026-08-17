@@ -45,6 +45,25 @@ pub fn text(args: &[Value], n: usize, function: &str) -> LuaResult<String> {
     }
 }
 
+/// Argument `n` as bytes, for a call that writes what it is given rather than reading it.
+///
+/// **Separate from [`text`], because the two want opposite things of a byte string.** A path, a
+/// variable name or a command word has to be text, and `text` refusing a run of arbitrary bytes is
+/// what catches the caller who passed the contents of a file where a name goes. What
+/// `oslo.fs.write` is handed, on the other hand, is *content*: refusing it because it is not UTF-8
+/// would mean the only thing `oslo.fs.read` cannot round-trip is exactly the thing it was taught to
+/// read. Numbers count here too, for the same reason they do in `text`.
+pub fn raw(args: &[Value], n: usize, function: &str) -> LuaResult<Vec<u8>> {
+    match args.get(n - 1) {
+        Some(value) if value.as_bytes().is_some() => Ok(value.as_bytes().unwrap_or(&[]).to_vec()),
+        Some(Value::Number(x)) => Ok(x.to_string().into_bytes()),
+        other => Err(LuaError::new(format!(
+            "{function}: argument #{n} must be a string, got {}",
+            other.map_or("no value", Value::type_name)
+        ))),
+    }
+}
+
 /// Argument `n` as a string, or `None` when it was not given.
 pub fn opt_text(args: &[Value], n: usize, function: &str) -> LuaResult<Option<String>> {
     match args.get(n - 1) {
