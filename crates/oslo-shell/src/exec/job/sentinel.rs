@@ -1,4 +1,7 @@
-//! Ctrl-C three times kills the foreground job outright.
+//! Ctrl-C enough times takes the terminal back from a job that will not listen.
+//!
+//! Off unless `oslo.misc.interrupt_escape` is set to how many presses it should take. Nothing here
+//! runs — not even the fork — in a shell that has not asked for it.
 //!
 //! # Why this needs a second process at all
 //!
@@ -15,21 +18,32 @@
 //! ^C ^C ^C          nothing happens, and nothing can — the shell is not being signalled
 //! ```
 //!
-//! and there is no keystroke that produces `SIGKILL`, because the tty driver cannot send one.
-//! Something has to *observe* the Ctrl-C and then call `kill` itself, and the only way to observe
-//! it is to be in the group the kernel is signalling.
+//! Something has to *observe* the Ctrl-C and act, and the only way to observe it is to be in the
+//! group the kernel is signalling.
 //!
 //! So: one small process, forked once per interactive session, that joins whichever process group
-//! currently owns the terminal and counts the interrupts it receives. On the third it sends
-//! `SIGKILL` to that group. It reads no input, writes no output, and holds no terminal.
+//! currently owns the terminal and counts the interrupts it receives. It reads no input, writes no
+//! output, and holds no terminal.
+//!
+//! # It stops the job; it does not kill it
+//!
+//! `SIGSTOP`, not `SIGKILL`, and the difference is most of the value. It cannot be caught or
+//! ignored — so it works on exactly the programs this exists for — and `waitpid` already returns
+//! `Stopped` for it, which means the shell's existing path takes over: the job goes into the job
+//! table, the terminal comes back, and the prompt returns. Nothing is destroyed. `fg`, `bg` and
+//! `kill %1` all then work on it, so the decision about what to do with a job that will not
+//! listen stays with the person, where it belongs.
+//!
+//! That also means there is **no new signal aimed at the shell**, and so nothing for a user `trap`
+//! to collide with — a shell-side handler could be replaced by `trap ... USR1` and the feature
+//! would silently stop working.
 //!
 //! # What it will not save you from
 //!
-//! **A process wedged in an uninterruptible kernel call cannot be killed by anything**, `SIGKILL`
-//! included — the signal is recorded and delivered when the call returns, which for a large
-//! `unlink` on a slow filesystem may be a while. This helps against a program that catches or
-//! ignores the signal, or spins retrying, which is the common case; it cannot help against `D`
-//! state, and nothing can.
+//! **A process wedged in an uninterruptible kernel call.** `SIGSTOP` is recorded and delivered when
+//! the syscall returns, exactly as `SIGKILL` is, so a task blocked on a dead NFS mount is beyond
+//! this and beyond everything else. What this helps with is a program that catches or ignores the
+//! interrupt, or spins retrying it, which is the case a person can otherwise do nothing about.
 //!
 //! # The counter resets per job, not on a timer
 //!
@@ -45,8 +59,9 @@ use std::os::unix::io::{FromRawFd, IntoRawFd};
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicI32, AtomicU32, Ordering};
 
-/// How many interrupts in one job before the group is killed.
-const ESCALATE_AFTER: u32 = 3;
+/// In the *sentinel*: how many interrupts in one job before it acts. Sent by the shell, so the
+/// setting lives in one place and the sentinel needs no configuration of its own.
+static ESCALATE_AFTER: AtomicU32 = AtomicU32::new(0);
 
 /// The pipe the shell tells the sentinel through, and nothing else.
 ///
@@ -67,17 +82,17 @@ static SEEN: AtomicU32 = AtomicU32::new(0);
 /// Called after the terminal is handed over, so the sentinel joins a group the tty is already
 /// signalling. Silent about every failure — a shell that cannot fork a helper is a working shell
 /// with the interrupt behaviour it had before.
-pub(crate) fn watch(pgid: Pid) {
-    tell(pgid.as_raw());
+pub(crate) fn watch(pgid: Pid, after: u32) {
+    tell(pgid.as_raw(), after);
 }
 
 /// Stop watching: the job is over and the shell has the terminal back.
 pub(crate) fn stand_down() {
-    tell(0);
+    tell(0, 0);
 }
 
 /// Send a group id to the sentinel, starting it if this is the first foreground job.
-fn tell(pgid: i32) {
+fn tell(pgid: i32, after: u32) {
     let Ok(mut channel) = CHANNEL.lock() else {
         return;
     };
@@ -90,7 +105,9 @@ fn tell(pgid: i32) {
         *channel = start();
     }
     if let Some(pipe) = channel.as_mut()
-        && pipe.write_all(&pgid.to_ne_bytes()).is_err()
+        && pipe
+            .write_all(&[pgid.to_ne_bytes(), after.to_ne_bytes()].concat())
+            .is_err()
     {
         // The sentinel is gone. Forget it rather than retrying every command; the shell is
         // otherwise unaffected.
@@ -145,7 +162,7 @@ fn run(orders: std::os::unix::io::RawFd) -> ! {
     }
 
     let mut orders = unsafe { std::fs::File::from_raw_fd(orders) };
-    let mut word = [0u8; 4];
+    let mut word = [0u8; 8];
     loop {
         match orders.read_exact(&mut word) {
             Ok(()) => {}
@@ -155,10 +172,12 @@ fn run(orders: std::os::unix::io::RawFd) -> ! {
             Err(e) if e.kind() == std::io::ErrorKind::Interrupted => continue,
             Err(_) => break,
         }
-        let pgid = i32::from_ne_bytes(word);
+        let pgid = i32::from_ne_bytes([word[0], word[1], word[2], word[3]]);
+        let after = u32::from_ne_bytes([word[4], word[5], word[6], word[7]]);
         // Set before joining, so an interrupt delivered during the `setpgid` is attributed to the
         // job rather than to whatever the sentinel was in before.
         SEEN.store(0, Ordering::SeqCst);
+        ESCALATE_AFTER.store(after, Ordering::SeqCst);
         WATCHING.store(pgid, Ordering::SeqCst);
         if pgid != 0 {
             // `ESRCH` when the job finished before this ran, which is a race the shell wins and
@@ -169,29 +188,32 @@ fn run(orders: std::os::unix::io::RawFd) -> ! {
     std::process::exit(0);
 }
 
-/// The sentinel's `SIGINT` handler: count, and kill the group on the third.
+/// The sentinel's `SIGINT` handler: count, and stop the group once there have been enough.
 ///
-/// Touches two atomics and calls `kill`, all of which are async-signal-safe. Nothing here
-/// allocates or takes a lock.
+/// Touches three atomics and calls `setpgid` and `kill`, all of which POSIX lists as safe to call
+/// from a handler. Nothing here allocates or takes a lock.
 extern "C" fn on_interrupt(_: libc::c_int) {
     let pgid = WATCHING.load(Ordering::SeqCst);
-    if pgid == 0 {
+    let after = ESCALATE_AFTER.load(Ordering::SeqCst);
+    if pgid == 0 || after == 0 {
         return;
     }
-    if SEEN.fetch_add(1, Ordering::SeqCst) + 1 < ESCALATE_AFTER {
+    if SEEN.fetch_add(1, Ordering::SeqCst) + 1 < after {
         return;
     }
-    // **Leave the group before killing it.** The sentinel is *in* the group it is about to signal,
-    // and `kill(-pgid, SIGKILL)` does not spare the sender — it would take itself with the job,
-    // the pipe would close, and the shell would have to fork a replacement for the next command.
-    // `setpgid` is on the list of calls a handler may make, as are `kill` and the atomics here.
+    // **Leave the group before signalling it.** The sentinel is *in* the group it is about to
+    // signal, and `kill(-pgid, …)` does not spare the sender — a `SIGSTOP` would stop the sentinel
+    // along with the job, and it would never read another order.
     unsafe {
         libc::setpgid(0, 0);
-        // The whole group, because a job is its process group — killing the leader alone would
-        // leave a pipeline's other stages and any grandchildren behind.
-        libc::kill(-pgid, libc::SIGKILL);
+        // **`SIGSTOP`, and the whole group.** It cannot be caught or ignored, which is the entire
+        // point — the programs this exists for are the ones that caught the interrupt. `waitpid`
+        // then returns `Stopped`, and the shell's own path for Ctrl-Z takes over from there: the
+        // job is recorded, the terminal comes back, the prompt returns. Nothing is destroyed, and
+        // `fg`, `bg` and `kill %1` all work on what is left.
+        libc::kill(-pgid, libc::SIGSTOP);
     }
-    // And stop watching: the group is gone, and its id could in principle be reused by a later
-    // job that has not asked to be killed.
+    // And stop watching: the shell is about to send a fresh order for the next job, and until it
+    // does there is nothing here worth acting on.
     WATCHING.store(0, Ordering::SeqCst);
 }

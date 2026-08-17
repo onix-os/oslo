@@ -136,6 +136,11 @@ pub struct Environment {
     /// The files whose commands are running, innermost last — for a diagnostic's location only.
     /// See [`Environment::enter_source_file`].
     source_files: Vec<String>,
+    /// Whether the command just before this one was an `exit` refused over stopped jobs.
+    ///
+    /// See `builtins::control::refuse_over_stopped_jobs`. On `Environment` rather than a global
+    /// because a subshell must not inherit half a confirmation.
+    exit_warned: bool,
     /// How deep the current `source`/`eval` chain is.
     script_depth: DepthGuard,
     /// The `set -e`/`set -o pipefail` options. Read through the accessors in the `options`
@@ -191,6 +196,7 @@ impl Environment {
             call_stack: Vec::new(),
             script_frames: Vec::new(),
             source_files: Vec::new(),
+            exit_warned: false,
             script_depth: DepthGuard::new(MAX_SCRIPT_DEPTH),
             options: ShellOptions::default(),
         };

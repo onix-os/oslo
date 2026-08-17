@@ -95,6 +95,9 @@ pub fn builtin_exit(env: &mut Environment, args: &[String]) -> Result<i32> {
         // Not an exit: bash refuses the request and leaves the shell running.
         return Ok(1);
     }
+    if refuse_over_stopped_jobs(env) {
+        return Ok(1);
+    }
     let code = match args.get(1) {
         // Bare `exit` carries the last command's status out, so `cmd; exit` is `cmd; exit $?` —
         // **except inside the EXIT trap**, where it carries out the status the shell was already
@@ -112,6 +115,43 @@ pub fn builtin_exit(env: &mut Environment, args: &[String]) -> Result<i32> {
         },
     };
     Err(ShellError::Exit(exit_status(code)))
+}
+
+/// Whether this `exit` should be refused because there are stopped jobs, and say so if it is.
+///
+/// **The first `exit` warns and stays; a second one leaves.** bash's behaviour, and it exists
+/// because a stopped job is invisible: leaving without a word means the work is either killed or
+/// silently orphaned, and either way the person did not decide it. Asking twice is the whole
+/// mechanism — the warning is the reminder, and repeating the command is the confirmation.
+///
+/// Interactive shells only. A script has nobody to warn and must not stop for one, and it is where
+/// a refusal would be a hang rather than a prompt.
+///
+/// **This mattered more once `oslo.misc.interrupt_escape` existed.** Ctrl-Z is deliberate, so
+/// somebody who stopped a job knows it is there; a job stopped by the escalation is one the shell
+/// stopped *for* you, and that is exactly the job you would otherwise walk away from.
+fn refuse_over_stopped_jobs(env: &mut Environment) -> bool {
+    if !env.interactive() || !crate::exec::job::job_control_active() {
+        return false;
+    }
+    // Cleared by every other command, so the confirmation has to be the *next* thing typed —
+    // `exit`, a command, `exit` asks again, which is what makes it a confirmation rather than a
+    // flag that drifts.
+    if env.take_exit_warned() {
+        return false;
+    }
+    let stopped = crate::exec::job::with_jobs(|jobs| {
+        jobs.jobs()
+            .iter()
+            .filter(|job| matches!(job.state, crate::exec::job::JobState::Stopped))
+            .count()
+    });
+    if stopped == 0 {
+        return false;
+    }
+    eprintln!("oslo: exit: there are stopped jobs");
+    env.note_exit_warned();
+    true
 }
 
 /// Fold a requested status into the 0..=255 a process can actually report.

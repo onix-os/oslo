@@ -139,15 +139,19 @@ pub(crate) fn run_external(
                 let pgid = job::place_foreground_child(child, None);
                 // R7.1: while the job runs, it owns the terminal — that is what makes Ctrl-C
                 // reach it instead of the shell, and what lets it read from the tty at all.
+                // Only when a config asked for it, and `0` — the default — means the sentinel is
+                // never even forked. See [`job::sentinel`].
+                let escape = oslo_ui::settings::current().misc.interrupt_escape as u32;
                 if let Some(pgid) = pgid {
                     job::give_terminal_to(pgid);
                     // And a watcher inside that group, because the shell is now outside it and
-                    // will not see a Ctrl-C at all. Three of them kill the job. See
-                    // [`job::sentinel`].
-                    job::watch(pgid);
+                    // will not see a Ctrl-C at all.
+                    if escape > 0 {
+                        job::watch(pgid, escape);
+                    }
                 }
                 let status = wait_for_child(child, cmd_name, words);
-                if pgid.is_some() {
+                if pgid.is_some() && escape > 0 {
                     job::stand_down();
                 }
                 // Taken back with SIGTTOU blocked: at this moment the shell is not the foreground

@@ -162,31 +162,42 @@ together.
 
 A child killed by SIGQUIT is treated the same way, for the same reason.
 
-### Ctrl-C three times, for a job that will not take one
+### Taking the terminal back from a job that will not give it up
+
+```lua
+oslo.misc.interrupt_escape = 3   -- off by default
+```
 
 Reading the wait status is enough for a job that *dies*. It is no use at all for one that does not:
 
 ```sh
-$ sh -c 'trap "" INT; sleep 300'
+ -c 'trap "" INT; sleep 300'
 ^C ^C ^C          nothing, and nothing can — the shell is not being signalled
 ```
 
-The shell is outside the group the kernel is signalling, and no key produces `SIGKILL`, because the
-tty driver cannot send one. Something has to *observe* the interrupt and call `kill` itself, and the
-only way to observe it is to be in the group.
+The shell is outside the group the kernel is signalling, so something has to *observe* the interrupt
+and act, and the only way to observe it is to be in that group. With the setting on, oslo forks
+**one small process per interactive session** — a sentinel — which joins whichever group owns the
+terminal and counts the interrupts. On the *n*th it leaves the group and sends it `SIGSTOP`.
 
-So oslo forks **one small process per interactive session** — a sentinel — which joins whichever
-group currently owns the terminal and counts the interrupts it receives. On the third it leaves the
-group and sends `SIGKILL` to it. It reads no input, writes no output, holds no terminal, dies with
-the shell, and is forked lazily, so a script, an `oslo -c` or a session spent in builtins never pays
-for it. The count resets when a job starts, so three presses means three *during one command*.
+**Stopped, not killed**, and that is most of the value. `SIGSTOP` cannot be caught or ignored, so it
+works on exactly the programs this exists for; `waitpid` already returns `Stopped`, so the shell's
+own Ctrl-Z path takes over and the job lands in the job table. You get a prompt back and `fg`, `bg`
+and `kill %1` all work on what is left — the decision about a job that will not listen stays with
+you. It also means no new signal is aimed at the shell, so there is nothing for a `trap` to collide
+with.
 
-**Two presses change nothing**, and a job that does not trap the interrupt still dies of the first —
-both are tested on a real pty, along with the shell surviving the escalation.
+Leaving with a job stopped is then its own question, and `exit` asks it: the first one warns and
+stays, the second leaves. A job the shell stopped *for* you is precisely the one you would otherwise
+walk away from without knowing.
 
-What this cannot do is rescue you from a process wedged in an uninterruptible kernel call: `SIGKILL`
-is recorded and delivered when the call returns, which for a large `unlink` on a slow filesystem may
-be a while. Nothing can, and it is worth knowing which case you are in.
+**Off by default**, because it costs a helper process and changes what Ctrl-C means. Nothing is
+forked in a shell that has not asked. Two presses change nothing, a job that does not trap the
+interrupt still dies of the first, and all of it is tested on a real pty.
+
+What it cannot do is rescue a process wedged in an uninterruptible kernel call — `SIGSTOP` waits for
+the syscall to return exactly as `SIGKILL` does. Nothing can, and it is worth knowing which case you
+are in.
 
 ## What makes it different
 

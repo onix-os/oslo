@@ -128,4 +128,19 @@ impl Environment {
     pub fn in_function(&self) -> bool {
         self.function_depth.depth() > 0
     }
+
+    /// Note that an `exit` was refused because jobs are stopped.
+    pub fn note_exit_warned(&mut self) {
+        self.exit_warned = true;
+    }
+
+    /// Whether an `exit` has already been refused over stopped jobs, clearing the record.
+    ///
+    /// **The confirmation lasts until it is used, not until the next command.** bash clears its own
+    /// on any intervening command, which is stricter; matching that needs a per-command counter to
+    /// compare against, and the warning — not the expiry — is what stops somebody walking away
+    /// from a stopped job without knowing.
+    pub fn take_exit_warned(&mut self) -> bool {
+        std::mem::take(&mut self.exit_warned)
+    }
 }
