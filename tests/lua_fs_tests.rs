@@ -391,3 +391,25 @@ fn disk_reports_the_filesystem_a_path_is_on() {
     "#);
     assert_eq!(out, "true\ttrue\ttrue\ttrue\ntrue\ntrue\nnil\tnot-found");
 }
+
+/// **A directory it cannot read is counted, not fatal.** This raised mid-iteration, which ended the
+/// whole loop — so `for path in oslo.fs.walk("/etc")` as an ordinary user stopped at the first
+/// unreadable subdirectory having seen a fraction of the tree. It *raised* rather than answering,
+/// too, so the `nil, message` convention could not catch it and the script simply died.
+#[test]
+fn walk_carries_on_past_what_it_cannot_read_and_says_so() {
+    let out = lua(r#"
+        oslo.fs.mkdir("d/open")
+        oslo.fs.mkdir("d/shut/inner")
+        oslo.fs.write("d/open/a", "")
+        assert(oslo.fs.chmod("d/shut", 0))      -- unreadable, unenterable
+
+        local seen, w = {}, oslo.fs.walk("d")
+        for path in w do seen[#seen + 1] = path end
+        table.sort(seen)
+        print(#seen, table.concat(seen, " "), w:unreadable())
+        oslo.fs.chmod("d/shut", 0x1C0)          -- 0700, so the tempdir can be cleaned up
+    "#);
+    // The shut directory is still *named* — it is a real entry — and only its contents are missing.
+    assert_eq!(out, "3\td/open d/open/a d/shut\t1");
+}

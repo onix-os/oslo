@@ -221,9 +221,12 @@ change of alphabet. `oslo.secret` is what encrypts.
 `oslo.fs` gained two that were awkward to write by hand: `oslo.fs.touch(path)` does both halves —
 creating what is missing *and* dating what is not, where `append(path, "")` does only the first —
 and `oslo.fs.usage(dir)` adds up a tree into `{ bytes, files, dirs, unreadable }` without following
-symlinks, which over `oslo.fs.walk` in Lua would cost a `stat` and a boundary crossing per file. A
-subdirectory it cannot read is counted rather than fatal — `usage("/etc")` answers for somebody who
-is not root, and `unreadable == 0` is how you tell a complete total from a floor.
+symlinks, which over `oslo.fs.walk` in Lua would cost a `stat` and a boundary crossing per file.
+
+**A directory neither can read is counted rather than fatal**, and both say how many they skipped —
+`usage(dir).unreadable` and `walk(dir):unreadable()`. That is what lets `/etc` be walked or measured
+by somebody who is not root: the walk used to *raise* at the first unreadable subdirectory, ending
+the loop with a fraction of the tree seen and no way to catch it.
 
 ### Processes and filesystems, as fields
 

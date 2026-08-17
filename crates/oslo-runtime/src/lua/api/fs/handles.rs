@@ -90,9 +90,11 @@ pub(super) fn reader(file: std::io::BufReader<fs::File>) -> Value {
 /// [`super::super::handle::Handle::calls`].
 pub(super) fn walker(root: fs::ReadDir) -> Value {
     let stack = Rc::new(RefCell::new(vec![root]));
+    let skipped = Rc::new(std::cell::Cell::new(0usize));
     let mut handle = super::super::handle::Handle::new("oslo.fs.walk");
 
     let it = Rc::clone(&stack);
+    let missed = Rc::clone(&skipped);
     handle.calls("oslo.fs.walk", move |_, _| {
         let mut stack = it.borrow_mut();
         loop {
@@ -103,23 +105,44 @@ pub(super) fn walker(root: fs::ReadDir) -> Value {
                 stack.pop();
                 continue;
             };
-            let entry = entry.map_err(|e| LuaError::new(format!("oslo.fs.walk: {e}")))?;
+            // **A directory it cannot read is counted, not fatal.** This used to raise, which
+            // ended the whole loop — and `for path in oslo.fs.walk("/etc")` as an ordinary user
+            // meets `/etc/ssl/private` and stops there, having walked a fraction of the tree. It
+            // raised rather than answering `nil`, too, so the `nil, message` convention could not
+            // even catch it: the script died. `oslo.fs.usage` had the same bug and the same fix.
+            let Ok(entry) = entry else {
+                missed.set(missed.get() + 1);
+                continue;
+            };
             let path = entry.path();
             // `symlink_metadata`, so a symlink to a parent directory is listed and not descended
             // into. Following it is how a walk never finishes.
-            let is_dir = path
-                .symlink_metadata()
-                .map_err(|e| LuaError::new(format!("oslo.fs.walk: {}: {e}", path.display())))?
-                .is_dir();
-            if is_dir {
+            let Ok(meta) = path.symlink_metadata() else {
+                missed.set(missed.get() + 1);
+                continue;
+            };
+            if meta.is_dir() {
                 // Pushed before the directory itself is answered, so the next call descends —
-                // which is what makes it depth first, with a directory before its contents.
-                let below = fs::read_dir(&path)
-                    .map_err(|e| LuaError::new(format!("oslo.fs.walk: {}: {e}", path.display())))?;
-                stack.push(below);
+                // which is what makes it depth first, with a directory before its contents. One
+                // that will not open is still *named* — it is a real entry — and only its
+                // contents are missing.
+                match fs::read_dir(&path) {
+                    Ok(below) => stack.push(below),
+                    Err(_) => missed.set(missed.get() + 1),
+                }
             }
             return ok(Value::str(path.to_string_lossy()));
         }
+    });
+
+    // oslo.fs.walk(…):unreadable() -> how many directories were skipped so far
+    //
+    // **How a caller tells a complete walk from a partial one.** Skipping silently would make
+    // `for path in oslo.fs.walk("/")` look like it had seen everything; this is the same answer
+    // `oslo.fs.usage` gives as a field, in the only place an iterator has to put one.
+    let missed = Rc::clone(&skipped);
+    handle.verb("unreadable", move |_, _| {
+        ok(Value::int(missed.get() as i64))
     });
 
     handle.on_close("oslo.fs.walk.close", move || stack.borrow_mut().clear());
