@@ -42,6 +42,7 @@ mod path;
 mod policy;
 #[cfg(feature = "vista")]
 mod predict;
+mod problem;
 mod proc;
 pub(crate) mod prompt;
 mod re;
@@ -178,6 +179,7 @@ pub fn install(host: &dyn Host, registry: &Registry, env: Arc<Mutex<Environment>
     // `oslo.feature` — a namespace of functions rather than a settings table, because a feature is
     // not configuration. It is a runtime mask over configuration, and the two must not look alike.
     oslo.set_str("feature", feature::build(registry));
+    problem::install(host);
     oslo.set_str("db", db::build(host));
     oslo.set_str("state", state::build());
     oslo.set_str("messages", messages::build());

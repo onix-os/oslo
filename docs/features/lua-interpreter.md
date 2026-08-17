@@ -121,6 +121,30 @@ for line in out do if line:find("error") then break end end
 A loop that runs out cleans up on its own. A loop that `break`s does not, because luna does not
 close a `for`'s closing value — which is what `<close>` and `:close()` are for.
 
+### A failure carries facts, and is still the message
+
+`nil, message` is the convention everywhere in `oslo.*`, and the second value is now an object:
+
+```lua
+local text, err = oslo.fs.read("/nope")
+print(err)                       -- /nope: No such file or directory (os error 2)
+print(err.kind, err.code)        -- not-found  2
+if err.kind == "permission" then … end
+```
+
+`err.kind` is one of `not-found`, `permission`, `exists`, `invalid`, `truncated`, `timeout`,
+`interrupted`, `other`; `err.code` is the errno; `err.path` is what the call was about, and
+`err.to` as well for `rename` and `copy`. `oslo.db` adds `name` and its own `kind`.
+
+**Everything that read the message still reads it.** `tostring(err)` and `print(err)` give the same
+sentence as before, `"oops: " .. err` concatenates, and `err:find(…)`, `err:match(…)` and
+`err:upper()` work because `__index` falls through to the string library. The only observable
+change is that `type(err)` is now `"table"`.
+
+The point is that matching English was the only way to ask what went wrong, and a translated C
+library or a reworded message broke it. The kind and the errno are the facts; the sentence is a
+rendering of them.
+
 ## Configuration
 
 **The configuration is a Lua program, and it is one program even when it is several files.**

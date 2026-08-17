@@ -8,7 +8,9 @@
 //! directory is not readable — so every call answers `nil, message` rather than raising. See
 //! [`super::util::failed`].
 
-use super::util::{failed, int, list, ok, opt_text, put, record, text};
+use super::util::{
+    failed, failed_between, failed_path, int, list, ok, opt_text, put, record, text,
+};
 use oslo_base::value::{LuaError, Table, Value};
 use std::cell::RefCell;
 use std::fs;
@@ -37,7 +39,7 @@ fn reading(it: &mut Table) {
             // byte in a mostly-text file should not make the whole thing unreadable. A caller who
             // needs the bytes exactly is reading something this API is the wrong tool for.
             Ok(bytes) => ok(Value::str(String::from_utf8_lossy(&bytes))),
-            Err(e) => failed(&path, e),
+            Err(e) => failed_path(&path, &e),
         }
     });
 
@@ -50,7 +52,7 @@ fn reading(it: &mut Table) {
         let path = text(&args, 1, "oslo.fs.lines")?;
         match fs::File::open(&path) {
             Ok(file) => ok(reader(std::io::BufReader::new(file))),
-            Err(e) => failed(&path, e),
+            Err(e) => failed_path(&path, &e),
         }
     });
 
@@ -69,7 +71,7 @@ fn writing(it: &mut Table) {
         let contents = text(&args, 2, "oslo.fs.write")?;
         match fs::write(&path, contents) {
             Ok(()) => ok(Value::Bool(true)),
-            Err(e) => failed(&path, e),
+            Err(e) => failed_path(&path, &e),
         }
     });
 
@@ -80,7 +82,7 @@ fn writing(it: &mut Table) {
         let opened = fs::OpenOptions::new().create(true).append(true).open(&path);
         match opened.and_then(|mut f| f.write_all(contents.as_bytes())) {
             Ok(()) => ok(Value::Bool(true)),
-            Err(e) => failed(&path, e),
+            Err(e) => failed_path(&path, &e),
         }
     });
 
@@ -93,7 +95,7 @@ fn writing(it: &mut Table) {
         let path = text(&args, 1, "oslo.fs.mkdir")?;
         match fs::create_dir_all(&path) {
             Ok(()) => ok(Value::Bool(true)),
-            Err(e) => failed(&path, e),
+            Err(e) => failed_path(&path, &e),
         }
     });
 
@@ -103,7 +105,7 @@ fn writing(it: &mut Table) {
         let recursive = args.get(1).is_some_and(Value::truthy);
         let meta = match fs::symlink_metadata(&path) {
             Ok(meta) => meta,
-            Err(e) => return failed(&path, e),
+            Err(e) => return failed_path(&path, &e),
         };
         // A symlink is removed as a link, never followed — deleting what a link points at when
         // asked to delete the link is how a cleanup script destroys someone's home directory.
@@ -116,7 +118,7 @@ fn writing(it: &mut Table) {
         };
         match removed {
             Ok(()) => ok(Value::Bool(true)),
-            Err(e) => failed(&path, e),
+            Err(e) => failed_path(&path, &e),
         }
     });
 
@@ -125,7 +127,7 @@ fn writing(it: &mut Table) {
         let to = text(&args, 2, "oslo.fs.rename")?;
         match fs::rename(&from, &to) {
             Ok(()) => ok(Value::Bool(true)),
-            Err(e) => failed(&format!("{from} -> {to}"), e),
+            Err(e) => failed_between(&from, &to, &e),
         }
     });
 
@@ -134,7 +136,7 @@ fn writing(it: &mut Table) {
         let to = text(&args, 2, "oslo.fs.copy")?;
         match fs::copy(&from, &to) {
             Ok(bytes) => ok(Value::int(bytes as i64)),
-            Err(e) => failed(&format!("{from} -> {to}"), e),
+            Err(e) => failed_between(&from, &to, &e),
         }
     });
 
@@ -143,7 +145,7 @@ fn writing(it: &mut Table) {
         let link = text(&args, 2, "oslo.fs.symlink")?;
         match std::os::unix::fs::symlink(&target, &link) {
             Ok(()) => ok(Value::Bool(true)),
-            Err(e) => failed(&link, e),
+            Err(e) => failed_path(&link, &e),
         }
     });
 
@@ -153,7 +155,7 @@ fn writing(it: &mut Table) {
         let mode = int(&args, 2, "oslo.fs.chmod")?;
         match fs::set_permissions(&path, fs::Permissions::from_mode(mode as u32)) {
             Ok(()) => ok(Value::Bool(true)),
-            Err(e) => failed(&path, e),
+            Err(e) => failed_path(&path, &e),
         }
     });
 
@@ -218,7 +220,7 @@ fn listing(it: &mut Table) {
         let dir = opt_text(&args, 1, "oslo.fs.ls")?.unwrap_or_else(|| ".".to_string());
         let read = match fs::read_dir(&dir) {
             Ok(read) => read,
-            Err(e) => return failed(&dir, e),
+            Err(e) => return failed_path(&dir, &e),
         };
         let mut entries: Vec<(String, Value)> = Vec::new();
         for entry in read.flatten() {
@@ -248,7 +250,7 @@ fn listing(it: &mut Table) {
         let root = opt_text(&args, 1, "oslo.fs.walk")?.unwrap_or_else(|| ".".to_string());
         match fs::read_dir(&root) {
             Ok(reading) => ok(walker(reading)),
-            Err(e) => failed(&root, e),
+            Err(e) => failed_path(&root, &e),
         }
     });
 
@@ -284,7 +286,7 @@ fn metadata(it: &mut Table) {
                     .unwrap_or_else(|| path.clone());
                 ok(describe(&name, &meta))
             }
-            Err(e) => failed(&path, e),
+            Err(e) => failed_path(&path, &e),
         }
     });
 
@@ -292,7 +294,7 @@ fn metadata(it: &mut Table) {
         let path = text(&args, 1, "oslo.fs.realpath")?;
         match fs::canonicalize(&path) {
             Ok(resolved) => ok(Value::str(resolved.to_string_lossy())),
-            Err(e) => failed(&path, e),
+            Err(e) => failed_path(&path, &e),
         }
     });
 
@@ -300,7 +302,7 @@ fn metadata(it: &mut Table) {
         let path = text(&args, 1, "oslo.fs.readlink")?;
         match fs::read_link(&path) {
             Ok(target) => ok(Value::str(target.to_string_lossy())),
-            Err(e) => failed(&path, e),
+            Err(e) => failed_path(&path, &e),
         }
     });
 

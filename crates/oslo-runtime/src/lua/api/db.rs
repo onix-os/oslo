@@ -103,7 +103,15 @@ pub fn build(host: &dyn Host) -> Value {
         let name = text(&args, 1, "oslo.db.open")?;
         match opened(&name) {
             Ok(store) => ok(handle(&name, store)),
-            Err(message) => Ok(vec![Value::Nil, Value::str(message)]),
+            // The name is carried alongside the sentence, so a caller that opens several does not
+            // have to read English to find out which one refused.
+            Err(message) => Ok(vec![
+                Value::Nil,
+                super::problem::new(
+                    message,
+                    vec![("name", Value::str(&name)), ("kind", Value::str("open"))],
+                ),
+            ]),
         }
     });
 
@@ -114,7 +122,10 @@ pub fn build(host: &dyn Host) -> Value {
             Some(path) => ok(Value::str(path.to_string_lossy())),
             None => Ok(vec![
                 Value::Nil,
-                Value::str(format!("{name:?}: not a name")),
+                super::problem::new(
+                    format!("{name:?}: not a name"),
+                    vec![("name", Value::str(&name)), ("kind", Value::str("name"))],
+                ),
             ]),
         }
     });
@@ -168,7 +179,13 @@ fn handle(name: &str, store: Rc<Store>) -> Value {
         let value = text(&args, 3, "db:set")?;
         match store::set(&store, &key, value.as_bytes()) {
             Ok(()) => ok(Value::Bool(true)),
-            Err(message) => Ok(vec![Value::Nil, Value::str(message)]),
+            Err(message) => Ok(vec![
+                Value::Nil,
+                super::problem::new(
+                    message,
+                    vec![("key", Value::str(&key)), ("kind", Value::str("write"))],
+                ),
+            ]),
         }
     });
 
@@ -263,10 +280,13 @@ fn commit(store: &Rc<Store>, staged: &Rc<RefCell<Vec<Change>>>) -> LuaResult<Vec
         Some(()) => ok(Value::Bool(true)),
         None => Ok(vec![
             Value::Nil,
-            Value::str(format!(
-                "{}: the write did not commit",
-                store.path().display()
-            )),
+            super::problem::new(
+                format!("{}: the write did not commit", store.path().display()),
+                vec![
+                    ("path", Value::str(store.path().to_string_lossy())),
+                    ("kind", Value::str("write")),
+                ],
+            ),
         ]),
     }
 }

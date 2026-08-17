@@ -77,7 +77,45 @@ pub fn ok(value: Value) -> LuaResult<Vec<Value>> {
 /// handles, not a bug in it. A raised error is kept for a *caller* mistake — a missing argument,
 /// a name that cannot exist — which is a bug in the script and should stop it.
 pub fn failed(context: &str, e: impl std::fmt::Display) -> LuaResult<Vec<Value>> {
-    Ok(vec![Value::Nil, Value::str(format!("{context}: {e}"))])
+    Ok(vec![
+        Value::Nil,
+        super::problem::new(format!("{context}: {e}"), Vec::new()),
+    ])
+}
+
+/// The same, where the call was about a path and the failure came from the operating system.
+///
+/// The answer carries `path`, `kind` and `code` alongside the message, so a caller can ask what
+/// went wrong instead of matching the sentence that says so. See [`super::problem`].
+pub fn failed_path(path: &str, e: &std::io::Error) -> LuaResult<Vec<Value>> {
+    let mut facts = vec![
+        ("path", Value::str(path)),
+        ("kind", Value::str(super::problem::kind_of(e.kind()))),
+    ];
+    if let Some(code) = e.raw_os_error() {
+        facts.push(("code", Value::int(code as i64)));
+    }
+    Ok(vec![
+        Value::Nil,
+        super::problem::new(format!("{path}: {e}"), facts),
+    ])
+}
+
+/// A filesystem call with two ends — `rename`, `copy` — where `path` alone would not say which one
+/// failed, so the answer carries both.
+pub fn failed_between(from: &str, to: &str, e: &std::io::Error) -> LuaResult<Vec<Value>> {
+    let mut facts = vec![
+        ("path", Value::str(from)),
+        ("to", Value::str(to)),
+        ("kind", Value::str(super::problem::kind_of(e.kind()))),
+    ];
+    if let Some(code) = e.raw_os_error() {
+        facts.push(("code", Value::int(code as i64)));
+    }
+    Ok(vec![
+        Value::Nil,
+        super::problem::new(format!("{from} -> {to}: {e}"), facts),
+    ])
 }
 
 /// Build a table from `(key, value)` pairs.

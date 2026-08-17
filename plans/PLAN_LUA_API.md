@@ -120,19 +120,29 @@ everything. **This is not a Lua-side change.** The pipeline's own contract is
 wrong half of the change. Making it lazy means an iterator contract through `oslo-shell`'s tool
 plumbing, and belongs with that work rather than with this.
 
-## 3. Errors that carry more than a sentence
-
-The convention is `nil, message`, and it is the right convention — but the second value can be an
-object now:
+## 3. Errors that carry more than a sentence — **done**
 
 ```lua
-local ok, err = oslo.fs.read("/nope")
--- today: err is a string, and a caller wanting the path or the errno parses English
--- possible: err.path, err.code, err.kind == "not-found", with __tostring giving today's string
+local text, err = oslo.fs.read("/nope")
+print(err)                       -- /nope: No such file or directory (os error 2)
+print(err.kind, err.code)        -- not-found  2
 ```
 
-`__tostring` keeps every existing `print(err)` working, so this is additive. Worth doing for
-`oslo.fs`, `oslo.run` and `oslo.db`, where the failure has structure worth reading.
+`api/problem.rs` builds them. `kind` is one of `not-found`, `permission`, `exists`, `invalid`,
+`truncated`, `timeout`, `interrupted`, `other`; `code` is the errno; `path` is what the call was
+about, plus `to` for `rename` and `copy`. `oslo.db` carries `name` and a kind of its own.
+
+**Additive in practice, not just in principle.** `__tostring` was the plan's argument and it is not
+enough on its own — oslo's own tests write `err:find("nope.txt")`, which a table cannot answer. So
+the metatable also has `__concat`, and an `__index` that falls through to the string library, which
+means `err:find`, `err:match` and `err:upper` all still work on the message. The fallthrough is
+compiled Lua rather than a native, because it has to reach `string`, and a Rust callback indexing a
+VM global on every miss is the expensive way to write `string[key]`.
+
+`type(err)` is `"table"` now. That is the whole of the break.
+
+`oslo.run` is not included: its failure is already `r.ok`, `r.status` and `r.err`, which is
+structure, and wrapping the status in an object would only add a layer.
 
 ## 4. A sandbox for plugins
 
@@ -175,7 +185,7 @@ nothing enforces it. Frozen tables are what would turn that from a statement int
 1. ~~**Handles as objects** (§1)~~ — **done**: `api/handle.rs`, and the four call sites use it.
 2. ~~**Streaming producers** (§2)~~ — **done** for `oslo.fs.walk`, `oslo.fs.lines` and
    `oslo.lines`; the structured pipeline needs an `oslo-shell` change first.
-3. **Structured errors** (§3) — additive, `__tostring` keeps everything working.
+3. ~~**Structured errors** (§3)~~ — **done**: `api/problem.rs`, `oslo.fs` and `oslo.db`.
 4. **Plugin sandbox** (§4) — turns an existing disclosure into an actual boundary.
 5. **Binary-safe reads** (§5) — narrow, but currently silently corrupts.
 
