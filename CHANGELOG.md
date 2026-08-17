@@ -1,5 +1,57 @@
 # Changelog
 
+## [0.4.2] - 2026-08-17
+
+### <!-- 0 -->⛰️  Features
+
+- Assignments name the script and line too
+- -v assigns, unknown options refused
+- Diagnostics name the script and line
+- A watcher API — action, notice, report and hook
+- Interrupt escape stops a job instead of killing it
+- Three interrupts kill a job that ignores them
+- Proc.info, proc.children and fs.disk
+- History as rows, fs.touch and fs.usage
+- Oslo.fs.watch, and $PATH as a list
+- Oslo.git reads the repository without running git
+- A string is bytes, so a binary read is the file
+- A load runs under a memory ceiling
+- A failure carries its kind, code and path
+- Fs.walk and fs.lines stream, iterators close
+- Handles are objects, with <close>
+
+### <!-- 1 -->🐛 Bug Fixes
+
+- A global that changes type moves between homes
+- Require detects a loop, os.setlocale exists
+- The README check honours the build's features
+- Subcommands refuse operands they cannot read
+- \cmd and \\cmd are commands, not escapes
+- Verbs refuse arguments they cannot read
+- Widen the fd limit so deep trees still go
+- Usage lines and quoting match bash
+- Print the message, not its category
+- Name the real reason a path will not run
+- Traverse by descriptor, not by path
+- Refuse arguments instead of ignoring
+- An unknown option is not the action
+- Walk the tree and name what failed
+- Fs.walk skips what it cannot read instead of raising
+- A script diagnostic names its file and line
+- Fs.usage counts what it cannot read instead of failing
+- No __gc backstop, because luna runs none
+
+### <!-- 2 -->🚜 Refactor
+
+- Require-ability moves to its own module
+
+### <!-- 3 -->📚 Documentation
+
+- A page for the interrupt escape
+- What §5 and §6 actually cost
+- Finalizers do run; say why no handle sets one
+- What a richer lua api would contain
+
 ## [0.4.1] - 2026-08-17
 
 ### <!-- 0 -->⛰️  Features
