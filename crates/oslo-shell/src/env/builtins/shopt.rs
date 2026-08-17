@@ -22,6 +22,7 @@
 //! guessed at, so a typo and a gap are never confused.
 
 use crate::env::options::ShellOption;
+use crate::env::origin_now;
 use crate::env::scope::Environment;
 use oslo_base::error::Result;
 use std::sync::atomic::{AtomicU32, Ordering};
@@ -161,7 +162,7 @@ pub fn builtin_shopt(env: &mut Environment, args: &[String]) -> Result<i32> {
                 'q' => flags.quiet = true,
                 'o' => flags.bridge = true,
                 other => {
-                    eprintln!("oslo: shopt: -{}: invalid option", other);
+                    eprintln!("{}shopt: -{}: invalid option", origin_now(), other);
                     eprintln!("{}", USAGE);
                     return Ok(2);
                 }
@@ -202,7 +203,7 @@ fn list_all(flags: &Flags) -> i32 {
 /// One named option: set it, or report it.
 fn one(flags: &Flags, name: &str) -> i32 {
     let Some(index) = OPTIONS.iter().position(|o| o.name == name) else {
-        eprintln!("oslo: shopt: {}: invalid shell option name", name);
+        eprintln!("{}shopt: {}: invalid shell option name", origin_now(), name);
         eprintln!("{}", USAGE);
         return 1;
     };
@@ -256,7 +257,7 @@ fn bridged(env: &mut Environment, flags: &Flags, names: &[String]) -> i32 {
     let mut status = 0;
     for name in names {
         let Some(option) = ShellOption::from_name(name) else {
-            eprintln!("oslo: shopt: {}: invalid option name", name);
+            eprintln!("{}shopt: {}: invalid option name", origin_now(), name);
             status = 1;
             continue;
         };

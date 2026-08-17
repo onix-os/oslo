@@ -23,6 +23,7 @@
 //! answers the same number again. oslo follows POSIX, which is also the corpus oracle — see
 //! [`JobTable::take_status`].
 
+use crate::env::origin_now;
 use nix::errno::Errno;
 use nix::sys::wait::{WaitStatus, waitpid};
 use nix::unistd::Pid;
@@ -39,7 +40,7 @@ pub fn builtin_wait(env: &mut Environment, args: &[String]) -> Result<i32> {
     let opts = match Options::parse(&args[1..]) {
         Ok(opts) => opts,
         Err(bad) => {
-            eprintln!("oslo: wait: {}: invalid option", bad);
+            eprintln!("{}wait: {}: invalid option", origin_now(), bad);
             eprintln!("wait: usage: wait [-fn] [-p var] [id ...]");
             return Ok(2);
         }
@@ -166,7 +167,7 @@ fn resolve(id: &str) -> std::result::Result<Target, i32> {
         return match resolve_job(id) {
             Some(target) => Ok(target),
             None => {
-                eprintln!("oslo: wait: {}: no such job", id);
+                eprintln!("{}wait: {}: no such job", origin_now(), id);
                 Err(NO_SUCH_CHILD)
             }
         };
@@ -174,7 +175,11 @@ fn resolve(id: &str) -> std::result::Result<Target, i32> {
     match id.parse::<i32>() {
         Ok(n) if n > 0 => Ok(resolve_pid(Pid::from_raw(n))),
         _ => {
-            eprintln!("oslo: wait: `{}': not a pid or valid job spec", id);
+            eprintln!(
+                "{}wait: `{}': not a pid or valid job spec",
+                origin_now(),
+                id
+            );
             Err(1)
         }
     }

@@ -35,6 +35,8 @@ mod parameters;
 pub(crate) mod quoting;
 mod scoped;
 
+use crate::env::origin_now;
+
 pub use aliases::{builtin_alias, builtin_unalias};
 pub use exporting::{builtin_export, builtin_unset};
 pub use parameters::{builtin_set, builtin_shift};
@@ -45,7 +47,12 @@ pub use scoped::{builtin_local, builtin_readonly};
 /// The whole word is quoted back, not the part before the `=`, so `export '=1'` names what the
 /// user actually typed.
 fn not_an_identifier(builtin: &str, word: &str) {
-    eprintln!("oslo: {}: '{}': not a valid identifier", builtin, word);
+    eprintln!(
+        "{}{}: '{}': not a valid identifier",
+        origin_now(),
+        builtin,
+        word
+    );
 }
 
 #[cfg(test)]

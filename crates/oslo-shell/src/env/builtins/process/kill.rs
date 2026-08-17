@@ -7,6 +7,7 @@
 //! resolved to a number first, and an unresolvable spec returns before a single signal is sent.
 
 use super::signals;
+use crate::env::origin_now;
 use crate::env::scope::Environment;
 use crate::exec::job::with_jobs;
 use nix::errno::Errno;
@@ -33,7 +34,7 @@ pub fn builtin_kill(_env: &mut Environment, args: &[String]) -> Result<i32> {
     // error, never a silent fallback to TERM.
     let spec = inv.spec.unwrap_or("TERM");
     let Some(signum) = signals::parse_spec(spec) else {
-        eprintln!("oslo: kill: {spec}: invalid signal specification");
+        eprintln!("{}kill: {spec}: invalid signal specification", origin_now());
         return Ok(1);
     };
 
@@ -54,10 +55,10 @@ pub fn builtin_kill(_env: &mut Environment, args: &[String]) -> Result<i32> {
             match signal_job(operand, signum) {
                 Ok(()) => any_succeeded = true,
                 Err(JobSignal::NoSuchJob) => {
-                    eprintln!("oslo: kill: {operand}: no such job");
+                    eprintln!("{}kill: {operand}: no such job", origin_now());
                 }
                 Err(JobSignal::Failed(e)) => {
-                    eprintln!("oslo: kill: ({operand}) - {}", e.desc());
+                    eprintln!("{}kill: ({operand}) - {}", origin_now(), e.desc());
                 }
             }
             continue;
@@ -65,9 +66,12 @@ pub fn builtin_kill(_env: &mut Environment, args: &[String]) -> Result<i32> {
         match operand.parse::<i32>() {
             Ok(pid) => match send(pid, signum) {
                 Ok(()) => any_succeeded = true,
-                Err(e) => eprintln!("oslo: kill: ({operand}) - {}", e.desc()),
+                Err(e) => eprintln!("{}kill: ({operand}) - {}", origin_now(), e.desc()),
             },
-            Err(_) => eprintln!("oslo: kill: `{operand}': not a pid or valid job spec"),
+            Err(_) => eprintln!(
+                "{}kill: `{operand}': not a pid or valid job spec",
+                origin_now()
+            ),
         }
     }
 
@@ -139,7 +143,7 @@ fn list(specs: &[String]) -> i32 {
         match describe(spec) {
             Some(line) => println!("{line}"),
             None => {
-                eprintln!("oslo: kill: {spec}: invalid signal specification");
+                eprintln!("{}kill: {spec}: invalid signal specification", origin_now());
                 status = 1;
             }
         }

@@ -8,6 +8,7 @@
 //! and the clever part can only ever turn an error into a success — never a success into a surprise.
 
 use super::chdir::{PathMode, attempt_directory, logical_pwd, report_failure};
+use crate::env::origin_now;
 use crate::env::scope::Environment;
 use oslo_base::error::Result;
 use std::env;
@@ -54,7 +55,7 @@ pub fn builtin_cd(env: &mut Environment, args: &[String]) -> Result<i32> {
     let (mode, operands) = match parse_mode(args) {
         Ok(parsed) => parsed,
         Err(flag) => {
-            eprintln!("oslo: cd: {flag}: invalid option");
+            eprintln!("{}cd: {flag}: invalid option", origin_now());
             eprintln!("{CD_USAGE}");
             return Ok(2);
         }
@@ -63,7 +64,7 @@ pub fn builtin_cd(env: &mut Environment, args: &[String]) -> Result<i32> {
     if operands.len() > 1 {
         // A usage error rather than a failed cd: the shell has not moved, and bash reports 2
         // for every builtin whose arguments do not parse.
-        eprintln!("oslo: cd: too many arguments");
+        eprintln!("{}cd: too many arguments", origin_now());
         return Ok(2);
     }
 
@@ -79,7 +80,7 @@ pub fn builtin_cd(env: &mut Environment, args: &[String]) -> Result<i32> {
         None => match env.get_var("HOME").map(str::to_string) {
             Some(home) if !home.is_empty() => home,
             _ => {
-                eprintln!("oslo: cd: HOME not set");
+                eprintln!("{}cd: HOME not set", origin_now());
                 return Ok(1);
             }
         },
@@ -88,7 +89,7 @@ pub fn builtin_cd(env: &mut Environment, args: &[String]) -> Result<i32> {
             match env.get_var("OLDPWD").map(str::to_string) {
                 Some(old) if !old.is_empty() => old,
                 _ => {
-                    eprintln!("oslo: cd: OLDPWD not set");
+                    eprintln!("{}cd: OLDPWD not set", origin_now());
                     return Ok(1);
                 }
             }
@@ -106,7 +107,10 @@ pub fn builtin_cd(env: &mut Environment, args: &[String]) -> Result<i32> {
             match super::ring::nth_back(n) {
                 Some(path) => path,
                 None => {
-                    eprintln!("oslo: cd: {operand}: no such entry in the directory history");
+                    eprintln!(
+                        "{}cd: {operand}: no such entry in the directory history",
+                        origin_now()
+                    );
                     return Ok(1);
                 }
             }
@@ -144,7 +148,7 @@ pub fn builtin_pwd(env: &mut Environment, args: &[String]) -> Result<i32> {
         // Operands are ignored: `pwd` has none, and bash does not complain about extras.
         Ok(parsed) => parsed,
         Err(flag) => {
-            eprintln!("oslo: pwd: {flag}: invalid option");
+            eprintln!("{}pwd: {flag}: invalid option", origin_now());
             eprintln!("{PWD_USAGE}");
             return Ok(2);
         }
@@ -155,7 +159,10 @@ pub fn builtin_pwd(env: &mut Environment, args: &[String]) -> Result<i32> {
         PathMode::Physical => match env::current_dir() {
             Ok(path) => println!("{}", path.display()),
             Err(e) => {
-                eprintln!("oslo: pwd: error retrieving current directory: {e}");
+                eprintln!(
+                    "{}pwd: error retrieving current directory: {e}",
+                    origin_now()
+                );
                 return Ok(1);
             }
         },

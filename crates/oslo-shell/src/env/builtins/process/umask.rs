@@ -5,6 +5,7 @@
 //! both silent no-ops that reported success. The parse now returns a value or a diagnostic, and
 //! the only way to reach `umask(2)` is through a value.
 
+use crate::env::origin_now;
 use crate::env::scope::Environment;
 use nix::sys::stat::{Mode, mode_t, umask};
 use oslo_base::error::Result;
@@ -58,7 +59,7 @@ pub fn builtin_umask(_env: &mut Environment, args: &[String]) -> Result<i32> {
                 'S' => symbolic = true,
                 'p' => as_command = true,
                 _ => {
-                    eprintln!("oslo: umask: -{c}: invalid option");
+                    eprintln!("{}umask: -{c}: invalid option", origin_now());
                     eprintln!("umask: usage: umask [-p] [-S] [mode]");
                     return Ok(2);
                 }
@@ -79,7 +80,7 @@ pub fn builtin_umask(_env: &mut Environment, args: &[String]) -> Result<i32> {
             Ok(0)
         }
         Err(e) => {
-            eprintln!("oslo: umask: {e}");
+            eprintln!("{}umask: {e}", origin_now());
             Ok(1)
         }
     }

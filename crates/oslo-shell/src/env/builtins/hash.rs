@@ -10,6 +10,7 @@
 //! is what bash does too.
 
 use crate::env::builtins::spawn::resolve_program;
+use crate::env::origin_now;
 use crate::env::scope::Environment;
 use oslo_base::error::Result;
 use std::cell::RefCell;
@@ -46,7 +47,7 @@ pub fn builtin_hash(_env: &mut Environment, args: &[String]) -> Result<i32> {
                     cleared = true;
                 }
                 other => {
-                    eprintln!("oslo: hash: -{}: invalid option", other);
+                    eprintln!("{}hash: -{}: invalid option", origin_now(), other);
                     eprintln!("hash: usage: hash [-r] [name ...]");
                     return Ok(2);
                 }
@@ -72,7 +73,7 @@ pub fn builtin_hash(_env: &mut Environment, args: &[String]) -> Result<i32> {
                 t.borrow_mut().insert(name.clone(), (path, 0));
             }),
             None => {
-                eprintln!("oslo: hash: {}: not found", name);
+                eprintln!("{}hash: {}: not found", origin_now(), name);
                 status = 1;
             }
         }

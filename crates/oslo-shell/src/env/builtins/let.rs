@@ -5,6 +5,7 @@
 //! relative to intuition — `let` succeeds when the last expression is non-zero, because that is
 //! what makes `if let "x > 3"` read the way an arithmetic condition should.
 
+use crate::env::origin_now;
 use crate::env::scope::Environment;
 use crate::expand::arithmetic::eval_arithmetic;
 use oslo_base::error::Result;
@@ -21,7 +22,7 @@ pub fn builtin_let(env: &mut Environment, args: &[String]) -> Result<i32> {
         exprs = &exprs[1..];
     }
     if exprs.is_empty() {
-        eprintln!("oslo: let: expression expected");
+        eprintln!("{}let: expression expected", origin_now());
         return Ok(1);
     }
 
@@ -32,7 +33,7 @@ pub fn builtin_let(env: &mut Environment, args: &[String]) -> Result<i32> {
             // An unparseable expression is the builtin's failure, not the shell's: bash reports
             // it, gives `let` status 1, and carries on with the next command.
             Err(e) => {
-                eprintln!("oslo: let: {}", e);
+                eprintln!("{}let: {}", origin_now(), e);
                 return Ok(1);
             }
         }

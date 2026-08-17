@@ -36,6 +36,7 @@ mod whereis;
 pub use whereis::builtin_whereis;
 
 use crate::env::builtins::control::{self, Kind};
+use crate::env::origin_now;
 use crate::env::scope::Environment;
 use oslo_base::error::Result;
 
@@ -165,7 +166,7 @@ fn parse_options(args: &[String]) -> std::result::Result<(Options, &[String]), i
             "--read-alias" | "--read-functions" | "--tty-only" => {}
             _ if !arg.starts_with('-') || arg == "-" => break,
             _ if arg.starts_with("--") => {
-                eprintln!("oslo: which: {arg}: invalid option");
+                eprintln!("{}which: {arg}: invalid option", origin_now());
                 eprintln!("which: usage: which [-as] [--skip-alias] name [name ...]");
                 return Err(2);
             }
@@ -175,7 +176,7 @@ fn parse_options(args: &[String]) -> std::result::Result<(Options, &[String]), i
                         'a' => opts.all = true,
                         's' => opts.silent = true,
                         other => {
-                            eprintln!("oslo: which: -{other}: invalid option");
+                            eprintln!("{}which: -{other}: invalid option", origin_now());
                             eprintln!("which: usage: which [-as] [--skip-alias] name [name ...]");
                             return Err(2);
                         }

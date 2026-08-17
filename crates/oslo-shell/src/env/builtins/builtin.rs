@@ -5,6 +5,7 @@
 //! That is what makes a recursive wrapper writable — `cd() { builtin cd "$@" && ls; }` calls the
 //! real `cd`, not itself.
 
+use crate::env::origin_now;
 use crate::env::scope::Environment;
 use oslo_base::error::Result;
 
@@ -28,7 +29,7 @@ pub fn builtin_builtin(env: &mut Environment, args: &[String]) -> Result<i32> {
         },
         Some(result) => result,
         None => {
-            eprintln!("oslo: builtin: {}: not a shell builtin", name);
+            eprintln!("{}builtin: {}: not a shell builtin", origin_now(), name);
             Ok(1)
         }
     }

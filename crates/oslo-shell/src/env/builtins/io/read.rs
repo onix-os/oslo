@@ -2,6 +2,7 @@
 
 use super::read_input::{InputSpec, is_terminal, probe_readable, read_logical_line, status_of};
 use super::read_split::{all_fields, assign_fields};
+use crate::env::origin_now;
 use crate::env::scope::{Environment, ShellArray};
 use oslo_base::error::Result;
 use std::os::fd::RawFd;
@@ -197,7 +198,7 @@ pub fn builtin_read(env: &mut Environment, args: &[String]) -> Result<i32> {
     let opts = match parse_options(args) {
         Ok(opts) => opts,
         Err(err) => {
-            eprintln!("oslo: read: {}", err.message);
+            eprintln!("{}read: {}", origin_now(), err.message);
             return Ok(err.status);
         }
     };
@@ -231,7 +232,7 @@ pub fn builtin_read(env: &mut Environment, args: &[String]) -> Result<i32> {
     let line = match read_logical_line(&spec) {
         Ok(line) => line,
         Err(err) => {
-            eprintln!("oslo: read: {}: {err}", opts.fd);
+            eprintln!("{}read: {}: {err}", origin_now(), opts.fd);
             return Ok(1);
         }
     };

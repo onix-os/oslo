@@ -8,6 +8,7 @@
 //! pointing where the command's redirections say (`crate::exec::redirect::RedirectGuard` is
 //! applied by the caller before the builtin is entered), and a forked child inherits them.
 
+use crate::env::origin_now;
 use nix::sys::wait::{WaitPidFlag, WaitStatus, waitpid};
 use nix::unistd::{ForkResult, Pid, fork};
 use oslo_base::error::{Result, ShellError};
@@ -71,7 +72,7 @@ pub fn run_external(program: &Path, argv: &[String], display_name: &str) -> Resu
         Ok(ForkResult::Child) => {
             crate::exec::job::reset_signals_for_child();
             let _ = nix::unistd::execv(&c_path, &c_args);
-            eprintln!("oslo: {}: cannot execute", display_name);
+            eprintln!("{}{}: cannot execute", origin_now(), display_name);
             std::process::exit(NOT_EXECUTABLE);
         }
         Ok(ForkResult::Parent { child }) => Ok(wait_for_child(child)),

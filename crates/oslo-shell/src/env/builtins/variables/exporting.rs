@@ -3,6 +3,7 @@
 use super::options;
 use super::quoting::single_quoted;
 use crate::env::announce::{Change, Scope, Source, announce};
+use crate::env::origin_now;
 use crate::env::scope::{Environment, is_valid_identifier};
 use oslo_base::error::{Result, ShellError};
 
@@ -114,7 +115,7 @@ fn export_functions(env: &Environment, names: &[String]) -> i32 {
     let mut status = 0;
     for name in names {
         if env.get_function(name).is_none() {
-            eprintln!("oslo: export: {}: not a function", name);
+            eprintln!("{}export: {}: not a function", origin_now(), name);
             status = 1;
         }
     }
@@ -132,7 +133,7 @@ fn unexport(env: &mut Environment, name: &str) -> bool {
         return true;
     };
     if env.is_readonly(name) {
-        eprintln!("oslo: export: {}: readonly variable", name);
+        eprintln!("{}export: {}: readonly variable", origin_now(), name);
         return false;
     }
     env.unset_var(name);
@@ -150,7 +151,10 @@ pub fn builtin_unset(env: &mut Environment, args: &[String]) -> Result<i32> {
         Err(letter) => return Err(options::invalid("unset", letter, UNSET_USAGE)),
     };
     if opts.has('f') && opts.has('v') {
-        eprintln!("oslo: unset: cannot simultaneously unset a function and a variable");
+        eprintln!(
+            "{}unset: cannot simultaneously unset a function and a variable",
+            origin_now()
+        );
         return Ok(2);
     }
 
@@ -161,7 +165,7 @@ pub fn builtin_unset(env: &mut Environment, args: &[String]) -> Result<i32> {
         // `unset 'a[1]'` drops one element and leaves the rest of the array where it was.
         if let Some(result) = crate::env::builtins::arrays::unset_element(env, name) {
             if let Err(e) = result {
-                eprintln!("oslo: unset: {}", e);
+                eprintln!("{}unset: {}", origin_now(), e);
                 status = 1;
             }
             continue;
@@ -183,7 +187,11 @@ pub fn builtin_unset(env: &mut Environment, args: &[String]) -> Result<i32> {
             continue;
         }
         if env.is_readonly(name) {
-            eprintln!("oslo: unset: {}: cannot unset: readonly variable", name);
+            eprintln!(
+                "{}unset: {}: cannot unset: readonly variable",
+                origin_now(),
+                name
+            );
             status = 1;
             refused = true;
             continue;

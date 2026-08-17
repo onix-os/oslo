@@ -11,6 +11,7 @@
 //!   build a restoring [`crate::exec::redirect::RedirectGuard`] or a non-restoring one.
 
 use crate::env::builtins::spawn::{NOT_EXECUTABLE, NOT_FOUND, exec_cstring, resolve_program};
+use crate::env::origin_now;
 use crate::env::scope::Environment;
 use oslo_base::error::{Result, ShellError};
 use std::ffi::CString;
@@ -95,7 +96,7 @@ pub fn builtin_exec(_env: &mut Environment, args: &[String]) -> Result<i32> {
     let inv = match parse(args) {
         Ok(inv) => inv,
         Err(msg) => {
-            eprintln!("oslo: exec: {}", msg);
+            eprintln!("{}exec: {}", origin_now(), msg);
             eprintln!("exec: usage: exec [-cl] [-a name] [command [arguments ...]]");
             return Ok(2);
         }
@@ -109,7 +110,7 @@ pub fn builtin_exec(_env: &mut Environment, args: &[String]) -> Result<i32> {
 
     let name = &inv.operands[0];
     let Some(program) = resolve_program(name) else {
-        eprintln!("oslo: exec: {}: not found", name);
+        eprintln!("{}exec: {}: not found", origin_now(), name);
         // POSIX: a non-interactive shell exits when `exec` cannot find its command. Signalling
         // the exit rather than returning a status is what stops the rest of the script running
         // with descriptors that were set up for a program that never started.
@@ -145,7 +146,7 @@ pub fn builtin_exec(_env: &mut Environment, args: &[String]) -> Result<i32> {
     };
 
     // Only reachable when the exec failed; on success this process no longer exists.
-    eprintln!("oslo: exec: {}: {}", name, failure_text(failure));
+    eprintln!("{}exec: {}: {}", origin_now(), name, failure_text(failure));
     Err(ShellError::Exit(NOT_EXECUTABLE))
 }
 

@@ -19,6 +19,7 @@
 //! it would need the variable layer to report writes, which is a change to `Environment`
 //! ([`crate::env::scope`]) rather than to this builtin.
 
+use crate::env::origin_now;
 use crate::env::scope::Environment;
 use oslo_base::error::Result;
 use std::cell::RefCell;
@@ -64,7 +65,10 @@ enum Step {
 /// `getopts optstring name [args…]`.
 pub fn builtin_getopts(env: &mut Environment, args: &[String]) -> Result<i32> {
     let (Some(optstring), Some(name)) = (args.get(1), args.get(2)) else {
-        eprintln!("oslo: getopts: usage: getopts optstring name [arg ...]");
+        eprintln!(
+            "{}getopts: usage: getopts optstring name [arg ...]",
+            origin_now()
+        );
         return Ok(2);
     };
 
@@ -155,7 +159,7 @@ fn report(opt: &str, name: &str, silent: bool, print_errors: bool, env: &mut Env
     if let Some(text) = message {
         if print_errors {
             let bad = env.get_var("OPTARG").unwrap_or_default().to_string();
-            eprintln!("oslo: getopts: {} -- {}", text, bad);
+            eprintln!("{}getopts: {} -- {}", origin_now(), text, bad);
         }
         // Outside silent mode the offending character is *not* left in OPTARG: a script reading
         // it would mistake it for a real option argument. Silent mode is the opposite — reporting

@@ -9,6 +9,7 @@
 //! buffered read would swallow input past the last delimiter, and a later command sharing the
 //! descriptor (`{ mapfile -n 1 a; cat; } < f`) would find the file already drained.
 
+use crate::env::origin_now;
 use crate::env::scope::{Environment, ShellArray, is_valid_identifier};
 use nix::errno::Errno;
 use oslo_base::error::Result;
@@ -67,7 +68,7 @@ pub fn builtin_mapfile(env: &mut Environment, args: &[String]) -> Result<i32> {
     let (opts, operands) = match parse_options(args) {
         Ok(parsed) => parsed,
         Err(e) => {
-            eprintln!("oslo: mapfile: {}", e.message);
+            eprintln!("{}mapfile: {}", origin_now(), e.message);
             eprintln!("{}", USAGE);
             return Ok(e.status);
         }
@@ -76,14 +77,18 @@ pub fn builtin_mapfile(env: &mut Environment, args: &[String]) -> Result<i32> {
     // bash ignores operands after the first, so `mapfile a b` fills `a` and leaves `b` alone.
     let name = operands.first().map_or(DEFAULT_ARRAY, String::as_str);
     if !is_valid_identifier(name) {
-        eprintln!("oslo: mapfile: `{}': not a valid identifier", name);
+        eprintln!(
+            "{}mapfile: `{}': not a valid identifier",
+            origin_now(),
+            name
+        );
         return Ok(1);
     }
 
     let records = match read_records(&opts) {
         Ok(records) => records,
         Err(errno) => {
-            eprintln!("oslo: mapfile: read error: {}", errno);
+            eprintln!("{}mapfile: read error: {}", origin_now(), errno);
             return Ok(1);
         }
     };

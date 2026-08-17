@@ -1,6 +1,7 @@
 //! `nav` — browse directories and leave the shell in the selected one.
 
 use crate::env::Environment;
+use crate::env::origin_now;
 use oslo_base::error::Result;
 use oslo_ui::ask::Preset;
 use oslo_ui::ask::chrome::Chrome;
@@ -15,7 +16,7 @@ pub fn builtin_nav(env: &mut Environment, args: &[String]) -> Result<i32> {
         Err(status) => return Ok(status),
     };
     if !start.is_dir() {
-        eprintln!("oslo: nav: {}: not a directory", start.display());
+        eprintln!("{}nav: {}: not a directory", origin_now(), start.display());
         return Ok(1);
     }
 
@@ -69,7 +70,7 @@ pub fn builtin_nav(env: &mut Environment, args: &[String]) -> Result<i32> {
         Outcome::ChangeTo(path) => change_directory(env, path),
         Outcome::Cancelled => Ok(1),
         Outcome::NoTerminal => {
-            eprintln!("oslo: nav: no terminal available");
+            eprintln!("{}nav: no terminal available", origin_now());
             Ok(2)
         }
     }
@@ -87,12 +88,12 @@ fn operand(args: &[String]) -> std::result::Result<Option<&str>, i32> {
             }
             "--" if options => options = false,
             value if options && value.starts_with('-') => {
-                eprintln!("oslo: nav: {value}: unknown option");
+                eprintln!("{}nav: {value}: unknown option", origin_now());
                 return Err(2);
             }
             value if path.is_none() => path = Some(value),
             _ => {
-                eprintln!("oslo: nav: too many arguments");
+                eprintln!("{}nav: too many arguments", origin_now());
                 return Err(2);
             }
         }

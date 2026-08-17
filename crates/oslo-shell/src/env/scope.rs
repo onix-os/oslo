@@ -4,6 +4,7 @@ mod environ;
 mod frames;
 mod names;
 mod options;
+pub mod origin;
 mod record;
 mod registry;
 mod seed;
@@ -289,7 +290,11 @@ impl Environment {
     /// `match` of its own: the second list is what let `register_custom_builtin("echo", …)`
     /// register a function nothing would ever call (PLAN R5.6, R9.8).
     pub fn exec_custom_builtin(&mut self, name: &str, args: &[String]) -> Option<Result<i32>> {
-        self.builtins.lookup(name).map(|func| func(self, args))
+        let func = self.builtins.lookup(name)?;
+        // Published here because this is the only way in, so one write covers every builtin and
+        // every private helper under it — see `origin::here`.
+        let _origin = origin::Published::new(self.origin());
+        Some(func(self, args))
     }
 
     /// A variable's value as a single string.
