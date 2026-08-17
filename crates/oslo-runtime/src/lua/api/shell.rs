@@ -124,7 +124,9 @@ fn facts(oslo: &mut Table, system: &mut Table, process: &mut Table, env: &Arc<Mu
     // `toggle_key` was here. It is now `oslo.keys`, which is where every other key binding already
     // lived — see `crate::startup::mode::TOGGLE_KEY`.
     put(&mut opts, "names", |_, _| {
-        ok(list(["default_mode"].into_iter().map(Value::str)))
+        ok(list(
+            ["default_mode", "lua_prefix"].into_iter().map(Value::str),
+        ))
     });
     oslo.set_str("opts", Value::table(opts));
 }

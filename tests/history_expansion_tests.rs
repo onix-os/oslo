@@ -41,12 +41,16 @@ fn repl(dir: &std::path::Path, lines: &str) -> (String, String) {
     )
 }
 
+/// **The forms a prompt still expands.** `!` at the start of a shell line is also the prefix that
+/// runs one line as Lua, so `startup::mode::classify` keeps only the events no Lua expression can
+/// begin with — `!!`, `!$`, `!^`, `!*`, `!?str?` — and sends the rest to Lua. `!name` and the
+/// numbered events are covered by [`a_named_event_is_lua_at_the_prompt`] instead.
 #[test]
 fn the_prompt_expands_history_references() {
     let dir = tempfile::tempdir().expect("tempdir");
     let (stdout, stderr) = repl(
         dir.path(),
-        "echo alpha beta gamma\n!!\necho pre !$ post\n!echo\n^pre^POST\nexit\n",
+        "echo alpha beta gamma\n!!\necho pre !$ post\n^pre^POST\nexit\n",
     );
 
     let count = |want: &str| stdout.lines().filter(|line| line.ends_with(want)).count();
@@ -57,9 +61,8 @@ fn the_prompt_expands_history_references() {
     );
     assert_eq!(
         count("pre gamma post"),
-        2,
-        "`!$` takes the previous line's last word, and `!echo` re-runs that line — the most \
-         recent one starting with `echo`, not the first: {stdout:?}"
+        1,
+        "`!$` takes the previous line's last word: {stdout:?}"
     );
     assert_eq!(
         count("POST gamma post"),
@@ -76,15 +79,38 @@ fn the_prompt_expands_history_references() {
 #[test]
 fn an_unresolvable_reference_runs_nothing_and_leaves_the_status_alone() {
     let dir = tempfile::tempdir().expect("tempdir");
-    let (stdout, stderr) = repl(dir.path(), "true\n!nosuch\necho status=$?\nexit\n");
+    // `!?nosuch?` rather than `!nosuch`: the bare-word form is Lua now, and this is the
+    // containing-text form, which stays history because Lua has no `?`.
+    let (stdout, stderr) = repl(dir.path(), "true\n!?nosuch?\necho status=$?\nexit\n");
 
     assert!(
-        stderr.contains("!nosuch: event not found"),
+        stderr.contains("event not found"),
         "the reason must be reported: {stderr:?}"
     );
     assert!(
         stdout.lines().any(|line| line.ends_with("status=0")),
         "a failed expansion runs nothing, so `$?` is untouched: {stdout:?}"
+    );
+}
+
+/// **A `!` followed by a name is one line of Lua**, not the last command starting with that name.
+///
+/// The two cannot be told apart — `!print` is a plausible spelling of both — so the split is made
+/// on what *can* begin a Lua expression. A bare word can, so it is Lua; `!!` and `!$` cannot, so
+/// they stay history. The history finder is what replaces `!name` at the prompt.
+#[test]
+fn a_named_event_is_lua_at_the_prompt() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let (stdout, _) = repl(dir.path(), "echo findme\n!print(2 * 21)\nexit\n");
+
+    assert!(
+        stdout.lines().any(|line| line.trim() == "42"),
+        "`!print(...)` should have run as Lua: {stdout:?}"
+    );
+    assert_eq!(
+        stdout.lines().filter(|l| l.ends_with("findme")).count(),
+        1,
+        "nothing should have been re-run from history: {stdout:?}"
     );
 }
 

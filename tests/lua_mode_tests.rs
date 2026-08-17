@@ -42,16 +42,50 @@ fn typed(input: &str, env: &[(&str, &str)]) -> String {
     text
 }
 
+/// The same, with `config` installed as the session's `init.lua`.
+///
+/// **How Lua runs before a shell command now.** There is no prefix that reaches Lua from a shell
+/// prompt, so anything that has to be in place *before* a command runs — a hook, a variable —
+/// goes where a user would really put it: the config.
+#[track_caller]
+fn typed_with_config(config: &str, input: &str, env: &[(&str, &str)]) -> String {
+    let dir = tempfile::tempdir().expect("tempdir");
+    std::fs::create_dir_all(dir.path().join(".config/oslo")).expect("config dir");
+    std::fs::write(dir.path().join(".config/oslo/init.lua"), config).expect("write config");
+    let mut child = Command::new(oslo_bin())
+        .arg("-i")
+        .current_dir(dir.path())
+        .env("HOME", dir.path())
+        .env_remove("ENV")
+        .env_remove("XDG_CONFIG_HOME")
+        .envs(env.iter().copied())
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("spawn oslo");
+    child
+        .stdin
+        .as_mut()
+        .expect("stdin")
+        .write_all(input.as_bytes())
+        .expect("write");
+    let output = child.wait_with_output().expect("wait");
+    let mut text = String::from_utf8_lossy(&output.stdout).into_owned();
+    text.push_str(&String::from_utf8_lossy(&output.stderr));
+    text
+}
+
 #[test]
 fn a_session_starts_in_shell_mode() {
     let out = typed("echo hello\n", &[]);
     assert!(out.contains("hello"), "{out}");
 }
 
+/// **`!` runs one line as Lua from a shell prompt**, without changing the mode.
 #[test]
-fn the_equals_prefix_runs_one_lua_line_from_shell_mode() {
-    let out = typed("echo one\n=print(1 + 1)\necho two\n", &[]);
-    // The prefix does not change the mode: the shell line after it is still shell.
+fn the_bang_prefix_runs_one_lua_line_from_shell_mode() {
+    let out = typed("echo one\n!print(1 + 1)\necho two\n", &[]);
     let expected = ["one", "2", "two"];
     let lines: Vec<&str> = out
         .lines()
@@ -60,34 +94,118 @@ fn the_equals_prefix_runs_one_lua_line_from_shell_mode() {
     assert_eq!(lines, vec!["one", "2", "two"], "{out}");
 }
 
+/// **The prefix is a setting**, and choosing a character history does not want retires the
+/// carve-out entirely: with `,` as the prefix, `!!` is bash's again and nothing about `!` is
+/// special. `none` turns the escape off, and a value that is not a single punctuation character
+/// is ignored rather than half-honoured.
+#[test]
+fn the_lua_prefix_is_configurable() {
+    let comma = typed(
+        "echo one\n!!\n,print(2 * 21)\n,5 + 5\n",
+        &[("OSLO_LUA_PREFIX", ",")],
+    );
+    assert_eq!(
+        comma.matches("one").count(),
+        3,
+        "`!!` should be pure history once `!` is not the prefix: {comma}"
+    );
+    assert!(
+        comma.lines().any(|line| line.trim() == "42") && comma.lines().any(|l| l.trim() == "10"),
+        "`,` should have run both lines as Lua: {comma}"
+    );
+
+    let off = typed("!print(9)\n", &[("OSLO_LUA_PREFIX", "none")]);
+    assert!(
+        !off.lines().any(|line| line.trim() == "9"),
+        "`none` should leave no Lua escape at all: {off}"
+    );
+
+    let bogus = typed("!print(7)\n", &[("OSLO_LUA_PREFIX", "lua")]);
+    assert!(
+        bogus.lines().any(|line| line.trim() == "7"),
+        "a multi-character setting should fall back to `!`: {bogus}"
+    );
+}
+
+/// **What `!` still shares with history**, which is the whole of the rule: history keeps the
+/// characters no Lua expression can begin with, and everything else after a `!` is Lua.
+#[test]
+fn history_keeps_the_forms_no_lua_expression_can_start_with() {
+    // `!!` re-runs the line before it: typed once, echoed by the expansion, run twice.
+    let bang = typed("echo remembered\n!!\n", &[]);
+    assert_eq!(
+        bang.matches("remembered").count(),
+        3,
+        "!! should have echoed and re-run the line: {bang}"
+    );
+
+    // A digit *can* begin a Lua expression, so `!5 + 5` is arithmetic rather than event five.
+    let sum = typed("!5 + 5\n", &[]);
+    assert!(sum.lines().any(|line| line.trim() == "10"), "{sum}");
+
+    // And `=` is oslo's own shorthand for where a program lives, which the old `=` prefix ate.
+    let equals = typed("echo =ls\n", &[]);
+    assert!(equals.contains("/ls"), "{equals}");
+}
+
 #[test]
 fn the_default_mode_is_configurable() {
     let out = typed("print('from lua')\n", &[("OSLO_DEFAULT_MODE", "lua")]);
     assert!(out.contains("from lua"), "{out}");
 }
 
+/// **The Lua prompt has no prefix.** It is a REPL: every line is Lua, and a `!` is a syntax error
+/// there exactly as it is in any other Lua interpreter. There used to be a `!` meaning "one shell
+/// line"; running a program from Lua is `oslo.run`, and a second syntax for it was a second thing
+/// to know.
 #[test]
-fn the_bang_prefix_runs_one_shell_line_from_lua_mode() {
+fn the_lua_prompt_takes_no_prefix() {
     let out = typed(
         "print('lua one')\n!echo shell\nprint('lua two')\n",
         &[("OSLO_DEFAULT_MODE", "lua")],
     );
-    let expected = ["lua one", "shell", "lua two"];
-    let lines: Vec<&str> = out
-        .lines()
-        .filter_map(|line| expected.iter().find(|want| line.ends_with(**want)).copied())
-        .collect();
-    assert_eq!(lines, vec!["lua one", "shell", "lua two"], "{out}");
+    assert!(out.contains("lua one"), "{out}");
+    assert!(out.contains("lua two"), "{out}");
+    // The `!` line neither ran a command nor silently did nothing: it is Lua, and it does not parse.
+    assert!(
+        !out.contains("\nshell"),
+        "the bang escaped to the shell: {out}"
+    );
+    assert!(out.contains("syntax error"), "{out}");
 }
 
-/// The two languages share one namespace, so a variable set in one is readable in the other on
-/// the next line. That is the whole reason switching mid-session is useful.
+/// Running a program from a Lua prompt is `oslo.run`, which is the one way and always was.
+#[test]
+fn a_program_runs_from_lua_through_the_api() {
+    let out = typed(
+        "oslo.run{\"echo\", \"from-lua\"}\n",
+        &[("OSLO_DEFAULT_MODE", "lua")],
+    );
+    assert!(out.contains("from-lua"), "{out}");
+}
+
+/// The two languages share one namespace, so a variable set in one is readable in the other. That
+/// is the whole reason switching mid-session is useful.
+///
+/// **Shown without mixing languages on one line**, because nothing mixes them any more: the
+/// shell's side is set in the environment or by a config, and the other side reads it as itself.
+/// Every name here is one nothing else uses — an inherited variable of the same name would make
+/// this pass or fail for a reason that has nothing to do with the crossing.
 #[test]
 fn a_variable_crosses_between_the_modes() {
-    let out = typed("export greeting=hello\n=print(greeting)\n", &[]);
+    // Shell to Lua: what the session inherits is a Lua global.
+    let out = typed(
+        "print(crossing_in_zz)\n",
+        &[("OSLO_DEFAULT_MODE", "lua"), ("crossing_in_zz", "hello")],
+    );
     assert!(out.contains("hello"), "{out}");
 
-    let back = typed("=name = 'world'\necho $name\n", &[]);
+    // Lua to shell: a global a config assigns is a shell variable.
+    let back = typed_with_config(
+        "crossing_out_zz = 'world'\n",
+        "echo $crossing_out_zz\n",
+        &[],
+    );
     assert!(back.contains("world"), "{back}");
 }
 
@@ -116,8 +234,9 @@ fn the_current_mode_is_published_for_the_prompt_to_read() {
     let out = typed("echo mode is $OSLO_MODE\n", &[]);
     assert!(out.contains("mode is sh"), "{out}");
 
+    // From Lua, the same question is asked of the environment directly — there is no escape.
     let lua = typed(
-        "!echo mode is $OSLO_MODE\n",
+        "print('mode is ' .. oslo.env.get('OSLO_MODE'))\n",
         &[("OSLO_DEFAULT_MODE", "lua")],
     );
     assert!(lua.contains("mode is lua"), "{lua}");
@@ -174,8 +293,9 @@ fn a_lua_line_is_not_rewritten_by_history_expansion() {
 
 #[test]
 fn a_precmd_hook_sees_each_command_as_typed() {
-    let out = typed(
-        "=oslo.on.precmd(function(c) print('PRE ' .. c.text .. ' in ' .. c.cwd) end)\necho hi\n",
+    let out = typed_with_config(
+        "oslo.on.precmd(function(c) print('PRE ' .. c.text .. ' in ' .. c.cwd) end)\n",
+        "echo hi\n",
         &[],
     );
     assert!(out.contains("PRE echo hi in /"), "{out}");
@@ -187,9 +307,10 @@ fn a_precmd_hook_sees_each_command_as_typed() {
 /// ended, and whether it worked. The status alone was all this used to be handed.
 #[test]
 fn a_postcmd_hook_is_handed_the_status() {
-    let out = typed(
-        "=oslo.on.postcmd(function(c) print('POST ' .. c.text .. ' ' .. c.status \
-         .. ' ' .. tostring(c.ok) .. ' ' .. type(c.duration_ms)) end)\nfalse\n",
+    let out = typed_with_config(
+        "oslo.on.postcmd(function(c) print('POST ' .. c.text .. ' ' .. c.status \
+         .. ' ' .. tostring(c.ok) .. ' ' .. type(c.duration_ms)) end)\n",
+        "false\n",
         &[],
     );
     assert!(out.contains("POST false 1 false number"), "{out}");
@@ -199,8 +320,9 @@ fn a_postcmd_hook_is_handed_the_status() {
 /// hook silent for exactly the commands one is usually installed to notice.
 #[test]
 fn a_postcmd_hook_fires_for_a_command_that_failed() {
-    let out = typed(
-        "=oslo.on.postcmd(function(c) print('POST ' .. c.status) end)\nno-such-command-anywhere\n",
+    let out = typed_with_config(
+        "oslo.on.postcmd(function(c) print('POST ' .. c.status) end)\n",
+        "no-such-command-anywhere\n",
         &[],
     );
     assert!(out.contains("POST 127"), "{out}");
@@ -208,9 +330,9 @@ fn a_postcmd_hook_fires_for_a_command_that_failed() {
 
 #[test]
 fn a_cd_hook_fires_only_when_the_directory_changed() {
-    let out = typed(
-        "=oslo.on.cd(function(d) print('CD ' .. d.to .. ' from ' .. d.from) end)\n\
-         echo not a cd\ncd /tmp\n",
+    let out = typed_with_config(
+        "oslo.on.cd(function(d) print('CD ' .. d.to .. ' from ' .. d.from) end)\n",
+        "echo not a cd\ncd /tmp\n",
         &[],
     );
     assert!(out.contains("CD /tmp"), "{out}");
@@ -221,21 +343,36 @@ fn a_cd_hook_fires_only_when_the_directory_changed() {
 /// returns a handle rather than taking a name.
 #[test]
 fn a_hook_handle_removes_the_handler_it_stands_for() {
-    let out = typed(
-        "=h = oslo.on.precmd(function(c) print('PRE ' .. c.text) end)\necho one\n=h:remove()\necho two\n",
+    // The handle is kept as a global by the config, so a later Lua line can reach it. Removing it
+    // happens from a Lua prompt, which is where Lua now lives.
+    let out = typed_with_config(
+        "h = oslo.on.precmd(function(c) print('PRE ' .. c.text) end)\n",
+        "echo one\n",
         &[],
     );
     assert!(out.contains("PRE echo one"), "{out}");
-    assert!(!out.contains("PRE echo two"), "{out}");
+
+    // The hook fires for the removal line too — it runs *before* the command, and the command is
+    // the removal. What has to stop is everything after it.
+    let removed = typed_with_config(
+        "h = oslo.on.precmd(function(c) print('PRE ' .. c.text) end)\n",
+        "h:remove()\nprint('after')\n",
+        &[("OSLO_DEFAULT_MODE", "lua")],
+    );
+    assert!(removed.contains("after"), "{removed}");
+    assert!(
+        !removed.contains("PRE print('after')"),
+        "the handler fired after it was removed: {removed}"
+    );
 }
 
 /// One broken hook must not disable the others, or silently stop the command from running.
 #[test]
 fn a_failing_hook_is_reported_and_the_rest_still_run() {
-    let out = typed(
-        "=oslo.on.precmd(function() error('broken') end)\n\
-         =oslo.on.precmd(function() print('SECOND') end)\n\
-         echo ran\n",
+    let out = typed_with_config(
+        "oslo.on.precmd(function() error('broken') end)\n\
+         oslo.on.precmd(function() print('SECOND') end)\n",
+        "echo ran\n",
         &[],
     );
     assert!(out.contains("broken"), "{out}");

@@ -47,11 +47,14 @@ pub(super) fn read_command(
     // the one about to be typed. Nothing else drains the flag, so leaving it set made the next
     // command abort at its first boundary with 130 and no output.
     oslo_shell::exec::job::forget_interrupt();
+    // Read once per command, not per line: it is a setting, and a line that changed it mid-command
+    // would classify its own continuation differently from its first line.
+    let lua_prefix = mode::lua_prefix(&env_struct.lock().unwrap());
     let mut buffer = String::new();
     let mut secret = false;
     let mut heredoc = HeredocTracker::default();
-    // The language *this* command is being read in. It follows `current` until a `!` or `=`
-    // prefix sends one line the other way; a continuation line never re-decides.
+    // The language *this* command is being read in. It follows `current` until a `!` prefix at a
+    // shell prompt sends one line to Lua; a continuation line never re-decides.
     let mut reading = *current;
     // Carried across a toggle, so switching language mid-command does not lose what was typed.
     let mut typed = String::new();
@@ -180,7 +183,7 @@ pub(super) fn read_command(
         let split = typed_point.min(typed.len());
 
         // The editor produces a `raw` line, and everything below is common to however it was
-        // read — mode prefixes, history expansion, here-document tracking, and the completeness
+        // read — the mode prefix, history expansion, here-document tracking, and the completeness
         // check that decides whether to ask for another line under `PS2`.
         let raw = {
             let cursor = typed[..split].chars().count();
@@ -241,10 +244,7 @@ pub(super) fn read_command(
                     // way out, so this only covers the gap between the two.
                     print!("\x1b[?25l");
                     let _ = std::io::Write::flush(&mut std::io::stdout());
-                    let switched = match *current {
-                        Mode::Shell => Mode::Lua,
-                        Mode::Lua => Mode::Shell,
-                    };
+                    let switched = current.other();
                     // The other half of `pre`/`post-mode-change`: `kind = "language"` here, and
                     // `kind = "vi"` from the editor. One hook for both, because "the mode changed"
                     // is the same question — a handler that cares about only one reads `kind`.
@@ -322,10 +322,11 @@ pub(super) fn read_command(
             raw.as_str()
         };
 
-        // `=` and `!` are read once, off the first line. They send this one command the other way
-        // without touching the mode the prompt goes back to.
+        // The prefix is read once, off the first line of a *shell* command: it runs that one line
+        // as Lua without touching the mode the prompt goes back to. A Lua line is never examined —
+        // that prompt is a REPL. See `startup::mode`.
         let line = if buffer.is_empty() {
-            match mode::classify(*current, line) {
+            match mode::classify(*current, line, lua_prefix) {
                 Line::Normal(text) => text,
                 Line::OneOff { mode, text } => {
                     reading = mode;

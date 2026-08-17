@@ -14,7 +14,7 @@ installed, and a shell whose meaning depends on that is one you cannot write scr
 The language is a single value in the read loop, `current` in
 `startup::read::read_command`. It lives for the whole session: switching is a property of the
 session, not of one line. A second value, `reading`, is the language *this* command is being read
-in — it follows `current` until a `=` or `!` prefix sends one line the other way.
+in — it follows `current` until a `!` prefix at a shell prompt sends one line to Lua.
 
 Everything outside the loop learns the language from a different place. `oslo-ui` keeps one
 process-wide record of what the prompt on screen says, written by `prompt::note_row` before each
@@ -72,27 +72,60 @@ segment one cell wider than `sh` would put the text a cell away from where the e
 is. The width is measured across the list rather than hard-coded, so adding a language cannot
 quietly bring the shifting back.
 
-### The two prefixes
+### One prefix, and it goes one way
 
-`=` and `!` are read off the first line only, after it has been trimmed and before anything parses
-it, and only when something follows — a bare `=` is not a Lua chunk, and `!` alone is how history
-expansion is spelled.
+`!` is read off the first line of a **shell** command, after it has been trimmed and before
+anything parses it, and only when something follows.
 
 ```
 first physical line, typed at a prompt reading mode M
         │
-        ├─ M = shell → escape is '='        ├─ M = lua → escape is '!'
+        ├─ M = lua → nothing is read off it. Every line is Lua.
         │
-        ├─ line starts with the escape AND the rest is not blank?
-        │      yes ──► Line::OneOff { mode: M.other(), text }   ← mode unchanged
-        │      no  ──► Line::Normal(line)                       ← run as M
+        ├─ M = shell, line starts with '!', rest is not blank,
+        │             and the rest does not open a history reference?
+        │      yes ──► Line::OneOff { mode: Lua, text }   ← mode unchanged
+        │      no  ──► Line::Normal(line)                 ← run as shell
         │
         └─ a continuation line is never re-examined: by then the language is decided
 ```
 
-Neither prefix touches `current`, so the prompt comes back in the language it was already in. Both
-languages share one namespace, so `export greeting=hello` then `=print(greeting)` prints `hello`,
-and `=name = 'world'` then `echo $name` prints `world` (`tests/lua_mode_tests.rs`).
+**Why `!` and not `=`.** `=` is a character a shell already spends: `FOO=bar` is an assignment in
+every shell there is, `=cmd` is a real expansion in zsh, and oslo's own `=grep` answers where a
+program lives — so a leading `=` was three things at once and the prompt had to pick one. `!` is
+the shell's own reach-back character and only has to share with history expansion, which is a much
+cleaner split.
+
+**Why it goes one way.** A shell prompt is where you run programs, and reaching for Lua for one
+quick thing is exactly what an escape is for. A Lua prompt is not the mirror of that — it is a
+REPL, and `oslo.run{"ls", "-la"}` already runs a program from it. A second syntax for the same job
+is a second thing to know and one more way for a line to mean something you did not type. So the
+Lua side has **no prefixes at all**: every line is Lua, a leading `!` is a syntax error there
+exactly as it is in any other Lua interpreter, and Shift+Tab is how you leave.
+
+**What `!` shares with history.** `!!` is the most-typed two characters in any shell, so the line
+between them is drawn where it can be drawn without guessing:
+
+> History keeps the characters that **cannot begin a Lua expression**. Everything that can, is Lua.
+
+`!!`, `!$`, `!^`, `!*` and `!?str?` stay history — Lua has no `!`, `$` or `?` at all, and no
+expression opens with `^` or `*`. And `!5 + 5`, `!-x` and `!print(1)` are Lua. What that costs is
+bash's numbered events `!5` and `!-2`, and `!name`; all three are ambiguous by construction, and
+all three have the same better answer here in the history finder, which searches as you type and
+shows what it found before it runs.
+
+**The prefix is `$OSLO_LUA_PREFIX`**, one punctuation character, and that whole section is the
+price of `!` alone — it is charged only when `!` is the prefix. Bash and oslo between them already
+spend `= @ % : . # ~ $ > < & | * ? ^`, but `,` and `+` are claimed by neither and cannot begin a
+Lua expression either, so setting one of those makes the rule "a leading `,` is Lua" with no
+exceptions and hands every `!` form back to bash. `none` removes the escape; Shift+Tab still
+switches. A value that is not a single punctuation character is ignored rather than half-honoured,
+because a prompt that quietly reads a language other than the configured one is the exact failure
+this design exists to prevent.
+
+The prefix does not touch `current`, so the prompt comes back in the language it was already in.
+The two languages share one namespace either way: a variable the session inherits is a Lua global,
+and a global a config assigns is a shell variable (`tests/lua_mode_tests.rs`).
 
 ### What follows the language, and what does not
 
@@ -154,6 +187,17 @@ export OSLO_DEFAULT_MODE=lua
 oslo.opts.set("default_mode", "lua")
 ```
 
+The character that runs one line as Lua from a shell prompt. One punctuation character, or `none`
+for no escape at all.
+
+```sh
+export OSLO_LUA_PREFIX=,
+```
+
+```lua
+oslo.opts.set("lua_prefix", ",")
+```
+
 Watching the switch. One hook covers vi-mode changes too, so a handler that cares about only one
 reads `kind`.
 
@@ -192,21 +236,17 @@ the complete `$HISTFILE`-backed list. By default this never shows, because Up op
 finder and that filters on the mode column — but with `oslo.finder.enabled = false` the walk offers
 lines from both languages.
 
-A one-off prefix changes only how the line is run. While you are typing `=print(1)` at a shell
+The one-off prefix changes only how the line is run. While you are typing `!print(1)` at a shell
 prompt the row still says `sh`, so the suggestion, completion and colouring are the shell's for
-that line; only once it is accepted is it read as Lua.
-
-The prefix is read before any parsing, so a first line whose first character is `=` is never a
-shell line, and in Lua mode a first line starting with `!` is never Lua. Lua spells negation `not`
-and inequality `~=`, so nothing valid is lost there; in shell, a command literally named `=` is out
-of reach.
+that line; only once it is accepted is it read as Lua. A Lua line is never examined at all, so on
+that side what you see is always what runs.
 
 Toggling part-way through an unfinished multi-line command switches the language the *rest* of that
 command is read in, and the completeness check then asks the other parser about the whole buffer.
 Nothing warns about this.
 
 The toggle needs a terminal: with no tty, `read_line` reads a plain line off stdin and no key is
-ever seen, which is why `tests/lua_mode_tests.rs` covers the prefixes and `$OSLO_DEFAULT_MODE` but
+ever seen, which is why `tests/lua_mode_tests.rs` covers the language rules and `$OSLO_DEFAULT_MODE` but
 not the key.
 
 ## Where it lives
@@ -224,4 +264,4 @@ not the key.
 | `crates/oslo-ui/src/keys.rs` | `Action::ToggleLanguage`, `Action::Nothing` |
 | `crates/oslo-ui/src/prompt.rs` | `LANGUAGES`, `measured_width`, `render_default_left_prompt` |
 | `crates/oslo-runtime/src/startup/prompt.rs` | `primary_prompt`, `segment_context` |
-| `tests/lua_mode_tests.rs` | the prefixes, the shared namespace, per-language completeness |
+| `tests/lua_mode_tests.rs` | the language rules, the shared namespace, per-language completeness |

@@ -5,12 +5,29 @@
 //! `print(1)` is by looking at it, and a shell whose meaning depends on what happens to be
 //! installed is a shell you cannot write scripts against.
 //!
-//! For the one-off there are prefixes, which do not change the mode:
+//! **One prefix, and it goes one way**: `!` runs a single line as Lua from a shell prompt.
 //!
 //! ```text
-//! oslo$ =print(1 + 1)      -- one Lua line, from shell mode
-//! lua>  !ls -la            -- one shell line, from Lua mode
+//! oslo$ !print(1 + 1)      -- one Lua line, without leaving the shell
+//! lua>  print(1 + 1)       -- the Lua prompt is a REPL; there is no prefix
 //! ```
+//!
+//! **Why `!` and not `=`.** `=` is a character a shell already spends: `FOO=bar` is an assignment
+//! in every shell there is, `=cmd` is a real expansion in zsh, and oslo's own `=grep` answers
+//! where a program lives — a leading `=` was three things at once, and the prompt had to pick.
+//! `!` is the shell's own reach-back character, and it only has to share with history expansion,
+//! which is a smaller and much clearer split. See [`classify`].
+//!
+//! **And it is a setting**, because the choice is a taste and the rest of the prompt does not
+//! depend on it — see [`lua_prefix`]. Most of the free characters are freer than `!`: `,` and `+`
+//! are claimed by neither bash nor oslo, so choosing one of those retires the history carve-out
+//! [`classify`] documents and leaves `!!`, `!name` and `!5` doing what they do in bash.
+//!
+//! **Why it goes one way.** A shell prompt is where you run programs, and reaching for Lua for one
+//! quick thing is exactly what an escape is for. A Lua prompt is not the mirror of that: it is a
+//! REPL, `oslo.run{"ls", "-la"}` already runs a program from it, and a second syntax for that job
+//! is a second thing to know and one more way for a line to mean something you did not type. So
+//! the Lua side has no prefixes at all — every line there is Lua, and Shift+Tab is how you leave.
 //!
 //! **Why Shift+Tab.** `BackTab` is the only key in the Tab family a terminal delivers distinctly.
 //! Ctrl+Tab is indistinguishable from Tab in the legacy encoding every terminal still falls back
@@ -47,30 +64,93 @@ impl Mode {
     // switching language also threw away the branch, the vi mode and the directory.
 }
 
-/// What the user typed, once the prefixes have been read off it.
+/// What the user typed, once the prefix has been read off it.
 pub enum Line<'a> {
     /// Run it in the mode the prompt is in.
     Normal(&'a str),
-    /// A `!` or `=` prefix: run this one line in the other language, then carry on as before.
+    /// A `!` prefix at a shell prompt: run this one line as Lua, then carry on as before.
     OneOff { mode: Mode, text: &'a str },
 }
 
-/// Read a leading `!` or `=` off a line typed in `mode`.
+/// Read the Lua prefix off a line typed at a **shell** prompt.
 ///
-/// Only at the very start of a *first* line, and only when something follows: a bare `=` is not a
-/// Lua chunk, and `!` alone is how history expansion is spelled. A continuation line is never
-/// re-examined, because by then the language is already decided.
-pub fn classify(mode: Mode, line: &str) -> Line<'_> {
-    let escape = match mode {
-        Mode::Shell => '=',
-        Mode::Lua => '!',
+/// Only at the very start of a *first* line, and only when something follows: a bare prefix is not
+/// a command. A continuation line is never re-examined, because by then the language is decided.
+///
+/// A Lua line is never examined at all — see the module docs.
+///
+/// # The one thing `!` has to share
+///
+/// This part is the price of `!` specifically, and it is charged only when `!` is the prefix. In
+/// shell mode `!` also opens a **history reference**, and `!!` is the most-typed two characters in
+/// any shell. The line between the two is drawn where it can be drawn without guessing:
+///
+/// > History keeps the characters that **cannot begin a Lua expression**. Everything that can, is
+/// > Lua.
+///
+/// So `!!`, `!$`, `!^`, `!*` and `!?str?` stay history — Lua has no `!`, `$` or `?` at all, and no
+/// expression opens with `^` or `*`. And `!5 + 5`, `!-x` and `!print(1)` are Lua, because every
+/// one of those is something a person might reasonably type and mean.
+///
+/// What that costs is bash's `!5` and `!-2`, the numbered events, and `!name` — "the last line
+/// starting with *name*". All three are ambiguous by construction, and all three have the same
+/// better answer in this shell: the history finder searches as you type and shows you what it
+/// found *before* it runs. A numbered event you have to count to is the form nobody misses.
+///
+/// Set [`lua_prefix`] to a character history does not want and the whole section above stops
+/// applying: `,print(1)` is Lua, and every `!` form is bash's again.
+pub fn classify(mode: Mode, line: &str, prefix: Option<char>) -> Line<'_> {
+    // A Lua line is a Lua line. Nothing is read off it.
+    if mode == Mode::Lua {
+        return Line::Normal(line);
+    }
+    let Some(prefix) = prefix else {
+        return Line::Normal(line);
     };
-    match line.strip_prefix(escape) {
-        Some(rest) if !rest.trim().is_empty() => Line::OneOff {
-            mode: mode.other(),
-            text: rest,
-        },
-        _ => Line::Normal(line),
+    let Some(rest) = line.strip_prefix(prefix) else {
+        return Line::Normal(line);
+    };
+    if rest.trim().is_empty() || (prefix == '!' && opens_a_history_reference(rest)) {
+        return Line::Normal(line);
+    }
+    Line::OneOff {
+        mode: Mode::Lua,
+        text: rest,
+    }
+}
+
+/// Whether what follows a `!` makes it a history reference rather than one line of Lua.
+///
+/// **Only the characters no Lua expression can start with.** `!`, `$` and `?` are not Lua syntax
+/// anywhere; `^` and `*` are binary operators, so a line cannot open with one. A digit or a `-`
+/// *can* open a Lua expression — `5 + 5`, `-x` — so those are Lua, which costs bash's numbered
+/// events and buys a rule with no guessing in it.
+fn opens_a_history_reference(after: &str) -> bool {
+    matches!(after.chars().next(), Some('!' | '$' | '^' | '*' | '?'))
+}
+
+/// The character that runs one line as Lua from a shell prompt.
+///
+/// `!` unless `$OSLO_LUA_PREFIX` says otherwise, and `None` — no escape at all, every shell line
+/// is shell — when it is set to an empty string or to `none`.
+///
+/// **One character, and it must be punctuation.** A letter would make `x = 1` unreachable the
+/// moment someone picked `x`, and a multi-character prefix is a small language of its own to parse
+/// against history and quoting both. Anything else is ignored rather than half-honoured, because a
+/// prompt that silently reads a different language than the one configured is the failure this
+/// whole module exists to avoid.
+pub fn lua_prefix(env: &Environment) -> Option<char> {
+    let Some(setting) = env.get_var("OSLO_LUA_PREFIX") else {
+        return Some('!');
+    };
+    let setting = setting.trim();
+    if setting.is_empty() || setting == "none" {
+        return None;
+    }
+    let mut chars = setting.chars();
+    match (chars.next(), chars.next()) {
+        (Some(one), None) if one.is_ascii_punctuation() => Some(one),
+        _ => Some('!'),
     }
 }
 
