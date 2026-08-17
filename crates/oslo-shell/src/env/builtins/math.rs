@@ -19,6 +19,21 @@
 //! One line: the answer, unit included. `--unit` and `--value` print one half each, for the case
 //! where the answer is going into another command rather than onto a screen — `$(math --value '5
 //! km in miles')` is a number a script can compare.
+//!
+//! # Which `-` is an option
+//!
+//! Only the `--long` ones, plus the short flags spelled out above. Everything else beginning with
+//! a `-` is an operand, because `math -5` and `math -40 degC in degF` are the ordinary way to write
+//! a negative number and there is no reading of them as a flag worth preferring. A mistyped option
+//! still gets an error rather than a confusing arithmetic failure, since `--valu` is the shape a
+//! mistake actually takes.
+//!
+//! # There are no variables here
+//!
+//! Every run builds a fresh scope and drops it, so `math 'x = 5'` is refused rather than answered:
+//! it could only report `5` and forget the name, and the line after it — the one that wanted `x` —
+//! would fail instead. Remembering is what `oslo.math.session()` is for, and the refusal says so.
+//! This is the split on purpose: the builtin answers one question, Lua holds a conversation.
 
 use crate::env::origin_now;
 use crate::env::scope::Environment;
@@ -30,7 +45,7 @@ pub fn builtin_math(_env: &mut Environment, args: &[String]) -> Result<i32> {
     let mut only_operands = false;
 
     for arg in args.iter().skip(1) {
-        if !only_operands && arg.starts_with('-') && arg.len() > 1 {
+        if !only_operands && arg.len() > 1 {
             match arg.as_str() {
                 "--" => only_operands = true,
                 "--value" | "-v" => wants = Show::Value,
@@ -42,11 +57,16 @@ pub fn builtin_math(_env: &mut Environment, args: &[String]) -> Result<i32> {
                     println!("{HELP}");
                     return Ok(0);
                 }
-                other => {
+                // A `-` in front of a number is a minus sign, not a flag. Only the `--long` form
+                // is worth an error, because that is the shape a mistyped option actually has:
+                // `math -5` and `math -pi` are arithmetic, and demanding `math -- -5` for them
+                // makes the escape hatch part of ordinary use.
+                other if other.starts_with("--") => {
                     eprintln!("{}math: {other}: unknown option", origin_now());
                     eprintln!("{USAGE}");
                     return Ok(2);
                 }
+                _ => words.push(arg),
             }
             continue;
         }
@@ -127,7 +147,12 @@ EXAMPLES
   math 255 in hex
   math '0xff | 0x0f'
   math '20% of 250'
-  math '1 GiB in MB'";
+  math '1 GiB in MB'
+  math -40 degC in degF     a leading minus is a minus, not an option
+
+NOTES
+  Nothing is remembered between runs, so there are no variables here. A
+  session in Lua keeps them:  s = oslo.math.session(); s:eval('r = 3')";
 
 #[cfg(test)]
 #[path = "math/tests.rs"]

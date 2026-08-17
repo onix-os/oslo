@@ -22,11 +22,29 @@ use std::collections::HashMap;
 #[derive(Default, Clone, Debug)]
 pub struct Scope {
     pub names: HashMap<String, Value>,
+    /// Whether a name defined here outlives the expression that defined it.
+    ///
+    /// False for the one-shot [`crate::calculate`], which builds a fresh scope every call: there,
+    /// an assignment is a question with no answer, and the honest reply is to say so rather than
+    /// to report the value and drop the name.
+    pub remembers: bool,
 }
 
 impl Scope {
+    /// A scope that keeps what it is told — what a session is built on.
     pub fn new() -> Scope {
-        Scope::default()
+        Scope {
+            names: HashMap::new(),
+            remembers: true,
+        }
+    }
+
+    /// A scope for a single expression, which refuses to be assigned to.
+    pub fn forgetful() -> Scope {
+        Scope {
+            remembers: false,
+            ..Scope::new()
+        }
     }
 }
 
@@ -108,6 +126,11 @@ pub fn eval(expr: &Expr, scope: &mut Scope) -> Result<Value, String> {
         Expr::Number(value, base) => Ok(Value::in_base(*value, *base)),
         Expr::Name(name) => name_value(name, scope),
         Expr::Assign(name, body) => {
+            if !scope.remembers {
+                return Err(format!(
+                    "nothing here remembers {name} — a session does: oslo.math.session()"
+                ));
+            }
             let value = eval(body, scope)?;
             scope.names.insert(name.clone(), value.clone());
             Ok(value)

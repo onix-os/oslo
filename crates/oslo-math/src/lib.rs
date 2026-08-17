@@ -51,8 +51,12 @@ pub use value::Value;
 ///
 /// The answer is already rendered, because that is what both callers want: the shell prints it and
 /// Lua receives it as a string beside the number.
+///
+/// **An assignment is an error here**, not a value. The scope is built fresh on every call, so
+/// `x = 5` could only ever report `5` and forget the name — which reads exactly like it worked.
+/// Somewhere to put a name is what [`Scope`] and `oslo.math.session()` are for.
 pub fn calculate(source: &str) -> Result<Answer, String> {
-    let mut scope = Scope::new();
+    let mut scope = Scope::forgetful();
     calculate_in(source, &mut scope)
 }
 

@@ -79,7 +79,9 @@ pub fn build() -> Table {
 /// One expression, with no memory. `just_the_number` picks `value` over `eval`.
 fn answer(args: Vec<Value>, just_the_number: bool) -> oslo_base::value::LuaResult<Vec<Value>> {
     let source = text_at(&args, 0, "oslo.math.eval")?;
-    let mut scope = oslo_math::Scope::new();
+    // Forgetful, like the `math` builtin: this scope dies with the call, so an assignment here is
+    // a name with nowhere to live. `oslo.math.session()` is the shape that keeps one.
+    let mut scope = oslo_math::Scope::forgetful();
     finish(
         oslo_math::calculate_in(&source, &mut scope),
         just_the_number,

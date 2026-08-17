@@ -30,6 +30,44 @@ fn shell(line: &str) -> (String, Option<i32>) {
     (text.trim_end().to_string(), out.status.code())
 }
 
+/// **A minus sign is not a flag.** `math -5` used to answer `-5: unknown option`, which made `--`
+/// part of ordinary use for anything starting with a negative number.
+///
+/// The rule that replaced it: only the `--long` form can be a mistyped option, because that is the
+/// shape a mistyped option has. A single `-` in front of anything else is arithmetic.
+#[test]
+fn a_leading_minus_is_arithmetic_rather_than_an_option() {
+    for (line, wanted) in [
+        ("math -5", "-5"),
+        ("math -- -5", "-5"),
+        ("math '-2 ^ 2'", "-4"),
+        ("math '-1 m in cm'", "-100 cm"),
+        ("math -pi", "-3.14159265359"),
+        // The flags themselves still win, and still apply to a negative answer.
+        ("math --value '-1 km in m'", "-1000"),
+        ("math -v '-1 km in m'", "-1000"),
+    ] {
+        let (out, code) = shell(line);
+        assert_eq!(out, wanted, "for {line:?}");
+        assert_eq!(code, Some(0), "for {line:?}");
+    }
+
+    // A mistyped long option is still worth an error rather than a puzzling arithmetic failure.
+    let (out, code) = shell("math --valu '1 + 1'");
+    assert!(out.contains("unknown option"), "{out:?}");
+    assert_eq!(code, Some(2));
+}
+
+/// **The `math` builtin has no memory**, so it says so instead of accepting a definition and
+/// throwing it away. Remembering is what the Lua session is for.
+#[test]
+fn the_builtin_refuses_to_be_assigned_to() {
+    let (out, code) = shell("math 'x = 5'");
+    assert!(out.contains("remembers"), "{out:?}");
+    assert!(out.contains("oslo.math.session()"), "{out:?}");
+    assert_eq!(code, Some(1));
+}
+
 /// **The arguments are joined**, so the shell's own word splitting does not have to be fought.
 #[test]
 fn the_words_of_an_expression_need_no_quoting() {

@@ -107,6 +107,20 @@ fn temperature_shifts_rather_than_scaling() {
     answers("212 degF in degC", "100 degC");
 }
 
+/// **A scope with no memory refuses to be assigned to** rather than reporting the value and
+/// dropping the name.
+///
+/// `calculate` builds a fresh scope every call, so `x = 5` answering `5` looks exactly like it
+/// worked — and the next line, which is where the name was wanted, would say `x` is undefined. The
+/// refusal names the thing that does keep one.
+#[test]
+fn a_one_shot_scope_refuses_an_assignment() {
+    refuses("x = 5", "remembers");
+    refuses("r = 3", "oslo.math.session()");
+    // Only the assignment itself: `=` is not otherwise spent, and reading a name still works.
+    answers("pi * 2", "6.28318530718");
+}
+
 /// A scope remembers, which is what makes a session useful rather than a single sum.
 #[test]
 fn variables_are_remembered() {
