@@ -84,10 +84,18 @@ pub fn run(args: &[String]) -> i32 {
             print!("{}", MENU.overview(Paint::detect()));
             0
         }
-        Some("status") => status(args.get(1)),
-        Some("allow") => decide(args.get(1), true),
-        Some("deny") => decide(args.get(1), false),
-        Some("prune") => prune(),
+        // Each of these reads one path at most; a second was silently dropped, so a line naming
+        // two directories allowed one of them and said nothing about the other.
+        Some("status") => MENU
+            .extra("status", args, 1)
+            .unwrap_or_else(|| status(args.get(1))),
+        Some("allow") => MENU
+            .extra("allow", args, 1)
+            .unwrap_or_else(|| decide(args.get(1), true)),
+        Some("deny") => MENU
+            .extra("deny", args, 1)
+            .unwrap_or_else(|| decide(args.get(1), false)),
+        Some("prune") => MENU.extra("prune", args, 0).unwrap_or_else(prune),
         // Named rather than lumped in with a typo: somebody asking for these has the right idea and
         // the wrong process, and the answer is where to go, not "no such subcommand".
         Some(session @ ("reload" | "edit")) => {

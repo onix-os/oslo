@@ -19,7 +19,7 @@
 //! can be reproduced.
 
 use crate::cli::help::Paint;
-use crate::cli::help::menu::{CALL, Menu, SUBCOMMANDS as HEADING, Sub};
+use crate::cli::help::menu::{CALL, Menu, SUBCOMMANDS as HEADING, Sub, describe_extra};
 use oslo_runtime::lua::api::hooks::{HOOKS, resolve, watched};
 
 pub(crate) const MENU: Menu = Menu {
@@ -72,9 +72,14 @@ pub fn run(args: &[String]) -> i32 {
             print!("{}", MENU.overview(Paint::detect()));
             0
         }
-        Some("list") => list(args.iter().any(|a| a == "--attached")),
+        // `--attached` is the one word `list` reads; anything else is a mistake rather than a
+        // decoration, and answering the full list anyway made it look acted on.
+        Some("list") => match args[1..].iter().find(|word| *word != "--attached") {
+            Some(bad) => MENU.wrong("list", &describe_extra(bad)),
+            None => list(args.iter().any(|a| a == "--attached")),
+        },
         Some("show") => match args.get(1) {
-            Some(name) => show(name),
+            Some(name) => MENU.extra("show", args, 1).unwrap_or_else(|| show(name)),
             None => MENU.missing("show needs a hook name, as in `oslo hook show pre-cmd`"),
         },
         Some("test") => match args.get(1) {
