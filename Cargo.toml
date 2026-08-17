@@ -1,10 +1,10 @@
 [package]
 name = "oslo"
-version = "0.4.2"
-edition = "2024"
-rust-version = "1.90"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
 description = "oslo"
-license = "MIT"
 readme = "README.md"
 publish = false
 
@@ -61,6 +61,20 @@ tempfile = "3.17"
 [dev-dependencies]
 oslo-base = { path = "crates/oslo-base" }
 oslo-ui = { path = "crates/oslo-ui" }
+
+# **One version for the whole tree, in one place.** The crates had drifted into three — the binary
+# at 0.4.x, four libraries at 0.2.x and two new ones at 0.1.0 — which says nothing true about any
+# of them: they are released together, always, as one binary. Every manifest now inherits from
+# here, so there is exactly one line in the repository that carries the number.
+#
+# The release tool bumps it by rewriting the `version = "…"` line it finds, and this is now the
+# only one; `scripts/project-meta.sh` reads it the same way, falling back here when `[package]`
+# inherits rather than states it.
+[workspace.package]
+version = "0.4.2"
+edition = "2024"
+rust-version = "1.90"
+license = "MIT"
 
 [workspace]
 members = [

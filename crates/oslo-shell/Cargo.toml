@@ -1,9 +1,9 @@
 [package]
 name = "oslo-shell"
-version = "0.2.21"
-edition = "2024"
-rust-version = "1.90"
-license = "MIT"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
 description = "oslo's shell: syntax adaptation, expansion, execution, builtins, the structured pipeline and directory environments."
 
 [features]

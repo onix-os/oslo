@@ -1,9 +1,9 @@
 [package]
 name = "oslo-base"
-version = "0.2.21"
-edition = "2024"
-rust-version = "1.90"
-license = "MIT"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
 description = "The bottom of oslo: the syntax tree, the error type, feature bits, the hook registry, and the tracking store."
 
 
