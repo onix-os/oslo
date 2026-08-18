@@ -222,6 +222,10 @@ pipeline.
   records it as such.
 - **A `{%…}` word is rendered, not re-parsed.** The rendering is the same one the job table uses to
   label a job, and it is deliberately approximate about quoting.
+- **`{%…}` names the command as it *ran*, not as it was typed.** An alias is already expanded by the
+  time there is a tree to walk, so with `alias cat='head -99'` the stage `cat hosts.txt` reports
+  `{%0}` as `head -99 hosts.txt`. That is the truthful answer — it is what executed — but it is not
+  the text on your screen, and a hook that rewrites a command has the same effect.
 - **Out of range is empty, never an error.** Input is ragged; a three-line file asked for `{9}` gives
   nothing and lets the command decide.
 - **No parallelism, and no `each`.** Iteration is `for`. Many values become many *arguments* to one

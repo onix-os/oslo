@@ -34,6 +34,14 @@ printf 'notes\n' > "$WORK/docs/notes.md"
 printf 'log line\n' > "$WORK/build/output.log"
 : > "$WORK/.hidden"
 
+# Three columns and three rows, for the stream-coordinate demo: a coordinate is about *position*,
+# so the file it reads has to have one worth pointing at.
+cat > "$WORK/hosts.txt" <<'EOF'
+web-01  10.0.0.1  nginx
+web-02  10.0.0.2  apache
+db-01   10.0.0.9  postgres
+EOF
+
 # A git worktree, so `cd root`, the prompt's branch segment and the tracking store all have
 # something real to answer with.
 if command -v git >/dev/null; then

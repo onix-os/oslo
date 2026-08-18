@@ -1,0 +1,47 @@
+# Stream coordinates: a stage addressing what the stage before it printed.
+cols 120
+rows 20
+speed 0.05
+
+# The file every line of this demo reads. Three rows, three columns: position is the whole point.
+run cat hosts.txt
+wait 2.0
+
+# What a shell makes you write to get one field out of one line.
+run cat hosts.txt | head -1 | awk '{print $1}'
+wait 2.4
+clear
+
+# The same question as a coordinate: line 0, word 0 of what `cat` printed.
+run cat hosts.txt | echo {0:0}
+wait 2.4
+
+# Nothing is marked, so how many dimensions you write says what you mean.
+run cat hosts.txt | echo {0}
+wait 1.8
+run cat hosts.txt | echo {-1:0}
+wait 2.2
+clear
+
+# `*` gives many arguments to ONE command — this is the xargs case, without xargs.
+run cat hosts.txt | echo ping {*:0}
+wait 2.6
+
+# A value is one argument whatever is in it: no field splitting, no re-globbing.
+run cat hosts.txt | printf '[%s]\n' {*:0}
+wait 2.6
+clear
+
+# `{%n}` is what the stage *was*, where `{n}` is what it printed.
+#
+# `sort` rather than `cat` deliberately: a demo runs against the recording user's real config, and
+# `{%n}` reports the command as it *ran* — an alias is already expanded by the time a coordinate is
+# substituted, so on a machine where `cat` is aliased this line would truthfully, confusingly, name
+# whatever it was aliased to.
+run sort hosts.txt | echo "ran {%0:0} on {%0:1}"
+wait 2.6
+
+# Both halves of the same stage, in one line — and `sort` reordered, so `first` is `db-01` rather
+# than the file's first line. A coordinate reads what the stage *printed*, never the file behind it.
+run sort hosts.txt | echo cmd={%0:0} first={0:0} last={-1:0}
+wait 3.0
