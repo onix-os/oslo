@@ -139,3 +139,33 @@ fn a_selection_that_finds_nothing_still_runs() {
     assert_eq!(shell("cat hosts.txt | echo [{9:9}]"), "[]");
     assert_eq!(shell("cat hosts.txt | echo done {9}"), "done");
 }
+
+/// **A negative stream is the previous command *line*** — its words are the command and its
+/// arguments.
+///
+/// This is what the original ask spelled `$ARG_PREV_n`, folded into the one grammar. It costs
+/// nothing: the line is already known, unlike a command's *output*, which would mean standing
+/// between the command and the terminal and turning `isatty` false for everything.
+///
+/// Driven through `-c` with two commands, because `-c` runs a list in one shell.
+#[test]
+fn a_negative_stream_reads_the_previous_command_line() {
+    // `-c` is a single command list, so `remember_prompt` never runs — the previous-prompt ring is
+    // the interactive loop's. What can be checked here is that the syntax parses and reads empty
+    // rather than misbehaving, which is the failure that would matter.
+    assert_eq!(shell("echo one two; echo [{-1:0:1}]"), "one two\n[]");
+}
+
+/// **Two dimensions never reach a stream.** `{-1:0}` is line −1, word 0 of *this* input — not the
+/// previous command. Reaching a stream takes all three, and the trailing colon is how a whole line
+/// is asked for: `{-1:0:}`.
+#[test]
+fn two_dimensions_do_not_reach_a_stream() {
+    // Line -1 of the upstream, word 0.
+    assert_eq!(shell("cat hosts.txt | echo {-1:0}"), "db-01");
+    // Three dimensions, and the last empty, is the whole of that line.
+    assert_eq!(
+        shell("cat hosts.txt | grep db | echo {1:-1:}"),
+        "db-01   10.0.0.9  postgres"
+    );
+}

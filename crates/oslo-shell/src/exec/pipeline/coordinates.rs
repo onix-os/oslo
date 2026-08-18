@@ -58,7 +58,7 @@ pub(super) fn uses_coordinates(pipeline: &Pipeline) -> bool {
 
 /// Run the stages one at a time, threading each one's output into the next.
 pub(super) fn run(env: &mut Environment, pipeline: &Pipeline) -> Result<i32> {
-    let mut streams = Streams::default();
+    let mut streams = Streams::for_this_pipeline();
     let mut statuses = Vec::with_capacity(pipeline.commands.len());
     let mut upstream: Option<String> = None;
 

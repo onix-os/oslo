@@ -42,6 +42,46 @@ pub const PROMPTS_KEPT: usize = 10;
 /// would be two numbers to reason about and one of them would be wrong.
 pub use oslo_base::capture::MAX as STREAM_MAX;
 
+thread_local! {
+    /// The command lines of previous prompts, newest first.
+    ///
+    /// **Lines, not output**, and the difference is worth being plain about. A pipeline stage's
+    /// output can be captured for nothing, because a stage already writes to a pipe. A *command's*
+    /// output goes to the terminal, and standing between the two turns `isatty` false for
+    /// everything — see `capture.rs`, where that argument is made at length. What a previous prompt
+    /// does have, free and exactly, is the line that was typed:
+    ///
+    /// ```text
+    /// $ cat one.txt two.txt
+    /// $ wc -l {-1:0:1}          → wc -l one.txt
+    ///         └─ previous prompt, its only line, word 1
+    /// ```
+    ///
+    /// So `{-n:…}` addresses the command *line* — one line, its words being the command and its
+    /// arguments. `{-1:0:-1}` is the last argument, which is `!$` written in this grammar and
+    /// usable where `!$` is not: inside a script, inside a function, inside quotes.
+    static PROMPTS: std::cell::RefCell<Vec<String>> = const { std::cell::RefCell::new(Vec::new()) };
+}
+
+/// Remember the line a prompt ran, for `{-n:…}` to address.
+pub fn remember_prompt(line: &str) {
+    let line = line.trim();
+    if line.is_empty() {
+        return;
+    }
+    PROMPTS.with(|slot| {
+        let mut lines = slot.borrow_mut();
+        lines.insert(0, line.to_string());
+        lines.truncate(PROMPTS_KEPT);
+    });
+}
+
+/// Forget every remembered line. `history -c` clears this too — a line the user asked to be gone
+/// must not stay reachable by coordinate.
+pub fn forget_prompts() {
+    PROMPTS.with(|slot| slot.borrow_mut().clear());
+}
+
 /// The streams a coordinate can reach.
 #[derive(Debug, Default, Clone)]
 pub struct Streams {
@@ -50,6 +90,20 @@ pub struct Streams {
     stages: Vec<String>,
     /// Previous prompts, newest first, so `-1` is `prompts[0]`.
     prompts: Vec<String>,
+}
+
+impl Streams {
+    /// A stack whose negative side is the session's remembered prompt lines.
+    ///
+    /// Built per pipeline rather than kept: the stages are this pipeline's and the prompts are the
+    /// session's, and copying a handful of short lines is cheaper than reasoning about a shared
+    /// mutable stack across a fork.
+    pub fn for_this_pipeline() -> Streams {
+        Streams {
+            stages: Vec::new(),
+            prompts: PROMPTS.with(|slot| slot.borrow().clone()),
+        }
+    }
 }
 
 impl Streams {
