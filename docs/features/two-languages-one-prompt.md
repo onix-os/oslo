@@ -249,6 +249,62 @@ export OSLO_LUA_PREFIX=,
 oslo.opts.set("lua_prefix", ",")
 ```
 
+What Enter does at a Lua prompt: `auto` (the default), `newline` or `smart`.
+
+**The default is not a choice oslo makes blind — it asks the terminal.** A Lua prompt is where you
+write a block, so Enter *should* add a line and Ctrl+Enter should send. But Ctrl+Enter only exists
+on a terminal that reports modifiers: in the legacy encoding Ctrl-M *is* Enter, the same byte, with
+nothing to tell them apart. Picking either behaviour blind is wrong one way or the other — `newline`
+on a plain terminal is a prompt that can never run anything, and `smart` everywhere takes block
+editing from everyone whose terminal is fine.
+
+So oslo negotiates before the first prompt (`CSI ? u`, with a Primary DA barrier — see
+`oslo_ui::term::negotiate`) and reads the answer:
+
+| the terminal | Enter | what sends |
+|---|---|---|
+| reports modifiers — kitty, foot, ghostty, WezTerm, Alacritty with the protocol on | adds a line | **Ctrl+Enter** |
+| does not | **sends** | Enter |
+
+Either way there is always a key that sends, and no behaviour appears on a terminal that cannot
+support it. Force one if your terminal reports wrongly:
+
+```sh
+export OSLO_LUA_ENTER=newline   # Enter always adds a line; Ctrl+Enter (or Alt+Enter) sends
+export OSLO_LUA_ENTER=smart     # Enter always sends a finished block
+```
+
+**Ask what your terminal actually answered**, rather than guessing from behaviour:
+
+```lua
+oslo.sys.terminal()   --> { kitty_keyboard = true, synchronized_output = true, … }
+```
+
+`kitty_keyboard` is the one that decides all of this. If it is `false`, Ctrl+Enter and Ctrl+Tab do
+not reach oslo at all and no setting can change that — the keystroke is indistinguishable from
+plain Enter and plain Tab before it ever leaves the terminal.
+
+The language a session starts in. Both spellings reach the same shell variable.
+
+```sh
+export OSLO_DEFAULT_MODE=lua
+```
+
+```lua
+oslo.opts.set("default_mode", "lua")
+```
+
+The character that runs one line as Lua from a shell prompt. One punctuation character, or `none`
+for no escape at all.
+
+```sh
+export OSLO_LUA_PREFIX=,
+```
+
+```lua
+oslo.opts.set("lua_prefix", ",")
+```
+
 What Enter does at a Lua prompt. **`newline` is the default**: Enter adds a line and **Ctrl+Enter
 sends**. A Lua prompt is where you write a block — a function, a loop, an `if` — and an Enter that
 means "run this now" interrupts writing every one of them. `smart` is the older behaviour and what

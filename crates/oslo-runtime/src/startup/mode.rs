@@ -181,33 +181,52 @@ pub fn starting_mode(env: &Environment) -> Mode {
 /// What Enter does at a **Lua** prompt.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Enter {
-    /// Send when the block is finished, add a line when it is not. The default.
+    /// Send when the block is finished, add a line when it is not.
     Smart,
-    /// Always add a line. Ctrl+Enter or Alt+Enter sends.
+    /// Always add a line. Ctrl+Enter sends.
     Newline,
 }
 
-/// Read `$OSLO_LUA_ENTER`. `newline` is the default; `smart` is the other choice.
+/// Read `$OSLO_LUA_ENTER`: `auto` (the default), `newline` or `smart`.
 ///
-/// **A Lua prompt is where you write a block, not a line.** A function, a loop, an `if` — every one
-/// of them is several lines, and an Enter that means "run this now" interrupts writing every one of
-/// them. So Enter adds a line and **Ctrl+Enter sends**.
+/// # Why the default is a question about the terminal
 ///
-/// **Ctrl+Enter needs a terminal that reports modifiers**, because in the legacy encoding Ctrl-M
-/// *is* Enter — the same byte, nothing to tell apart. Only the kitty keyboard protocol separates
-/// them. Where it cannot arrive, **Alt+Enter** decodes to the same key (`ESC` then `CR`), so this
-/// default cannot leave a prompt with no way to send. The fallback is what makes it safe to be a
-/// default; Ctrl+Enter is the key it is for.
+/// A Lua prompt is where you write a *block* — a function, a loop, an `if` — and an Enter that
+/// means "run this now" interrupts writing every one of them. So `newline` is what the prompt
+/// wants. But `newline` is only usable if some other key can send, and the key for that is
+/// **Ctrl+Enter**, which does not exist on most terminals: in the legacy encoding Ctrl-M *is*
+/// Enter, the same byte, with nothing to tell them apart. Only the kitty keyboard protocol reports
+/// the modifier separately.
 ///
-/// `smart` is the older behaviour and what most Lua REPLs do: a finished block runs on Enter, an
-/// unfinished one asks for more. It is worth having for anyone whose terminal eats Alt.
+/// Choosing one of those behaviours blind is wrong either way round. Defaulting to `newline` gives
+/// a prompt that cannot run anything on a terminal without the protocol; defaulting to `smart`
+/// takes the block editing away from everyone who *does* have it.
+///
+/// So it is not chosen blind. oslo negotiates with the terminal before the first prompt — it sends
+/// `CSI ? u` and a Primary DA barrier, and a terminal that speaks the protocol answers `CSI ? … u`
+/// (see `oslo_ui::term::negotiate`). `auto` reads that verified answer:
+///
+/// | terminal | Enter | sends |
+/// |---|---|---|
+/// | reports modifiers (kitty, foot, ghostty, WezTerm, …) | adds a line | **Ctrl+Enter** |
+/// | does not | **sends** | Enter |
+///
+/// Either way there is a key that sends and a way to write a block, and neither behaviour appears
+/// on a terminal that cannot support it. `newline` and `smart` force one regardless, for a terminal
+/// that lies in either direction.
 pub fn enter_key(env: &Environment) -> Enter {
     match env
         .get_var("OSLO_LUA_ENTER")
         .map(|value| value.trim().to_string())
+        .as_deref()
     {
-        Some(value) if value == "smart" => Enter::Smart,
-        _ => Enter::Newline,
+        Some("newline") => Enter::Newline,
+        Some("smart") => Enter::Smart,
+        // `auto`, and anything unrecognised: ask the terminal rather than guess.
+        _ => match oslo_ui::term::keyboard::supported() {
+            true => Enter::Newline,
+            false => Enter::Smart,
+        },
     }
 }
 
@@ -251,3 +270,48 @@ pub fn double_tab(env: &Environment) -> bool {
 /// oslo.keys["ctrl-space"] = "none"      -- as does this
 /// ```
 pub const TOGGLE_KEYS: &[&str] = &["shift-tab", "ctrl-space", "ctrl-tab"];
+
+#[cfg(test)]
+mod tests {
+    use super::{Enter, enter_key};
+    use oslo_shell::Environment;
+
+    /// **The default asks the terminal instead of guessing**, because the answer decides whether
+    /// there is a key that can send at all.
+    ///
+    /// `newline` needs Ctrl+Enter, and Ctrl+Enter needs a terminal that reports modifiers — in the
+    /// legacy encoding Ctrl-M *is* Enter. Defaulting to it blind gives a prompt that cannot run
+    /// anything; defaulting to `smart` blind takes block editing from everyone whose terminal is
+    /// fine. So neither is the default: the negotiated answer is.
+    #[test]
+    fn the_default_follows_what_the_terminal_reported() {
+        let mut env = Environment::new();
+
+        oslo_ui::term::keyboard::remember_support(true);
+        assert_eq!(
+            enter_key(&env),
+            Enter::Newline,
+            "with modifiers reported, Ctrl+Enter exists and Enter can add a line"
+        );
+
+        oslo_ui::term::keyboard::remember_support(false);
+        assert_eq!(
+            enter_key(&env),
+            Enter::Smart,
+            "without them, Enter is the only key that can send"
+        );
+
+        // **Either can be forced**, for a terminal that reports wrongly in either direction.
+        for (setting, wanted) in [("newline", Enter::Newline), ("smart", Enter::Smart)] {
+            env.set_var("OSLO_LUA_ENTER", setting, false);
+            assert_eq!(enter_key(&env), wanted, "for {setting:?}");
+        }
+
+        // An unrecognised value falls back to asking rather than to a silent choice.
+        env.set_var("OSLO_LUA_ENTER", "wiggle", false);
+        assert_eq!(enter_key(&env), Enter::Smart);
+        oslo_ui::term::keyboard::remember_support(true);
+        assert_eq!(enter_key(&env), Enter::Newline);
+        oslo_ui::term::keyboard::remember_support(false);
+    }
+}
