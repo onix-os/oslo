@@ -218,15 +218,34 @@ impl OsloHelper {
         }
         let settings = settings::current();
         let recallable = !Self::consumes_its_arguments(line, &settings.suggest.skip_history);
-        for source in &settings.suggest.sources {
+
+        // **Each prompt has its own list**, because most sources answer with shell and cannot be
+        // typed at a Lua prompt at all. `oslo.suggest.sources` is the shell's, `lua_sources` is
+        // Lua's, and the Lua default is `names` alone — an editor offers what exists, not what you
+        // typed last week. See `settings::Suggest::lua_sources`.
+        let lua = prompt::language().is_some_and(|language| language == "lua");
+        let sources = match lua {
+            true => &settings.suggest.lua_sources,
+            false => &settings.suggest.sources,
+        };
+        for source in sources {
             let found = match source {
                 // oslo's own set, not a flat editor history: `recall` is language-filtered and
                 // knows which directory you are standing in, so `cargo run --ex` answers with
                 // this project's example.
                 settings::Source::History if recallable => recall::suggest(line),
                 settings::Source::History => None,
-                settings::Source::Completion => self.command_hint(line, pos),
-                settings::Source::Path => self.path_hint(line, pos),
+                // The names that exist in the session — the Lua answer to `Completion`, and
+                // meaningless at a shell prompt, where a name is a program rather than a value.
+                settings::Source::Names if lua => hinting::lua_hint(line, pos),
+                settings::Source::Names => None,
+                // **Shell-shaped, so they decline at a Lua prompt** rather than offering something
+                // that cannot be written there. Listing one under `lua_sources` is not an error —
+                // it is a config asking for a thing that has no Lua meaning, and the honest answer
+                // is nothing rather than a `$PATH` name in a Lua expression.
+                settings::Source::Completion if !lua => self.command_hint(line, pos),
+                settings::Source::Path if !lua => self.path_hint(line, pos),
+                settings::Source::Completion | settings::Source::Path => None,
                 // The model, which knows what usually follows what you have been doing. It
                 // answers with a whole line, so what is offered is the remainder — the same shape
                 // `recall` returns, since both continue what has been typed rather than replace
@@ -237,6 +256,8 @@ impl OsloHelper {
                 // refusing to parse. A config is shared between machines and a build without
                 // `predict` should not reject one written for a build with it — an unusable source
                 // is skipped exactly like a source that had nothing to say.
+                #[cfg(feature = "vista")]
+                settings::Source::Prediction if lua => None,
                 #[cfg(feature = "vista")]
                 settings::Source::Prediction => oslo_base::predict::suggest_here(Some(line), 1)
                     .into_iter()

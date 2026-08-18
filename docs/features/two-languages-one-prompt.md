@@ -169,6 +169,28 @@ The split is deliberate: working out **what is being typed** is text and lives i
 working out **what names exist** needs the interpreter. Only names cross between them, never
 values — `_G` is cyclic and deep-copying it to answer a Tab would be absurd.
 
+**Each prompt has its own suggestion sources**, and the Lua default is `names` alone:
+
+```lua
+oslo.suggest.sources     = { "history", "completion", "path" }   -- the shell prompt
+oslo.suggest.lua_sources = { "names" }                            -- the Lua prompt
+```
+
+Three of the shell sources answer with *shell* — `path` completes a filename in command position,
+`predict` is a model trained on commands, `completion` offers names from `$PATH` — and not one of
+them can be typed at a Lua prompt. Sharing a single list meant a config written for the shell
+silently decided what Lua did, and what it usually decided was nothing at all: a config saying
+`{ "predict", "history", "path" }` got no Lua suggestions whatsoever.
+
+**`history` is deliberately absent from the Lua default.** A Lua prompt should behave like an
+editor — what it offers is what *exists* in the session, not what you happened to type last week.
+Add `"history"` to `lua_sources` if you want the old behaviour. A source listed on the wrong side
+answers nothing rather than erroring, because a `$PATH` name inside a Lua expression is not a
+suggestion, it is a syntax error waiting to be accepted.
+
+Tab is split the same way and more simply: a Lua line never reaches the shell completer at all, so
+`oslo.completion.sources` — which filters *kinds* — governs the shell prompt only.
+
 **Every `oslo` member is also a global.** `fs`, `json`, `git`, `run`, `path` and the rest need no
 prefix, and `oslo.fs` keeps working. Three rules keep that from taking anything away:
 

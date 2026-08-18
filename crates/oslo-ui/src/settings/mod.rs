@@ -247,6 +247,12 @@ pub enum Source {
     /// has been measured against `History` on a real history rather than assumed to be better.
     /// Ask for it by name until then.
     Prediction,
+    /// The names that exist in the Lua session: globals, and the fields of the table being
+    /// indexed.
+    ///
+    /// **The Lua answer to `Completion`**, and the only source of the five that is not about a
+    /// shell. `Completion` offers something on `$PATH`, which a Lua line cannot call.
+    Names,
     /// Whatever a config or a plugin registered with `oslo.suggest.provider`.
     ///
     /// **A source among the sources.** Where a plugin's answer sits relative to your own history is
@@ -262,6 +268,7 @@ impl Source {
             "completion" | "completions" => Some(Source::Completion),
             "path" | "paths" | "file" => Some(Source::Path),
             "predict" | "prediction" => Some(Source::Prediction),
+            "names" | "name" | "globals" => Some(Source::Names),
             "provider" | "providers" | "plugin" => Some(Source::Provider),
             _ => None,
         }
@@ -385,8 +392,20 @@ impl Default for Finder {
 /// `oslo.suggest`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Suggest {
-    /// The sources to try, in order. Empty turns suggestions off entirely.
+    /// The sources to try at a **shell** prompt, in order. Empty turns suggestions off entirely.
     pub sources: Vec<Source>,
+    /// The sources to try at a **Lua** prompt.
+    ///
+    /// **A separate list, because a Lua prompt is not a shell prompt wearing a hat.** Three of the
+    /// shell sources answer with shell — `path` completes a filename in command position,
+    /// `predict` is a model trained on commands, `completion` offers names from `$PATH` — and none
+    /// of them can be typed at a Lua prompt. Sharing one list meant a config tuned for the shell
+    /// silently decided what Lua did, and what it usually decided was nothing at all.
+    ///
+    /// **`history` is deliberately not the default here.** A Lua prompt should behave like an
+    /// editor: what it offers is what *exists* — the names in the session — not what you happened
+    /// to type last week. History is still available by asking for it.
+    pub lua_sources: Vec<Source>,
     /// The key that takes the whole ghost suggestion, e.g. `"right"`.
     ///
     /// The action was always bindable through `oslo.keys`, but not under the name the suggestion
@@ -413,12 +432,19 @@ impl Default for Suggest {
         // anything that can be ranked.
         Suggest {
             sources: vec![Source::History, Source::Completion, Source::Path],
+            // Names only: an editor offers what exists, and nothing else here can be written in
+            // Lua. See the field.
+            lua_sources: vec![Source::Names],
             accept: None,
             accept_word: None,
             skip_history: vec!["rm".to_string()],
         }
     }
 }
+
+#[cfg(test)]
+#[path = "suggest_tests.rs"]
+mod suggest_tests;
 
 /// `oslo.history`.
 #[derive(Debug, Clone, PartialEq, Eq)]

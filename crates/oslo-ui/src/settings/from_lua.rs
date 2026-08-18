@@ -107,7 +107,16 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
 
     if let Value::Table(table) = oslo.get_str("suggest") {
         let table = table.borrow();
-        if let Value::Table(list) = table.get_str("sources") {
+        // Two lists, read the same way: `sources` is the shell prompt's and `lua_sources` is the
+        // Lua prompt's. Separate because most of the sources answer with shell — see
+        // `settings::Suggest::lua_sources`.
+        for (field, slot) in [
+            ("sources", &mut settings.suggest.sources),
+            ("lua_sources", &mut settings.suggest.lua_sources),
+        ] {
+            let Value::Table(list) = table.get(&Value::str(field)) else {
+                continue;
+            };
             let mut sources = Vec::new();
             for value in list.borrow().sequence() {
                 let Value::Str(name) = value else { continue };
@@ -118,12 +127,12 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
                     // kind of thing that gets blamed on the shell.
                     Some(_) => {}
                     None => problems.push(format!(
-                        "oslo.suggest.sources: '{name}' is not a source; \
-                         the sources are history, completion, path, predict and provider"
+                        "oslo.suggest.{field}: '{name}' is not a source; \
+                         the sources are history, completion, names, path, predict and provider"
                     )),
                 }
             }
-            settings.suggest.sources = sources;
+            *slot = sources;
         }
         // Canonical, and checked, like every other key a config names: these are compared against
         // the editor's own name for the key that was pressed, so `"Ctrl-F"` or `"return"` was

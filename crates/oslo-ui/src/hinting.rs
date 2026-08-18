@@ -78,7 +78,7 @@ fn entries_of(base: &str) -> Option<Listing> {
 ///
 /// Only after at least two characters. One letter matches most of a namespace, so hinting from it
 /// means grey text that changes on every keystroke and is right by luck.
-fn lua_hint(line: &str, pos: usize) -> Option<String> {
+pub(crate) fn lua_hint(line: &str, pos: usize) -> Option<String> {
     let typed = super::completion::lua::typed_at(line, pos)?;
     if typed.stem.chars().count() < 2 {
         return None;
@@ -103,8 +103,12 @@ impl OsloHelper {
         // on `$PATH`. None of those are Lua, so at a Lua prompt `l` was answered with `ls`: a
         // suggestion that cannot run in the language being typed, which is worse than none. That
         // left history as the only Lua suggestion; now the names that exist suggest too.
+        // **Nothing here at a Lua prompt.** Everything below offers a *command* — a builtin, an
+        // alias, a shell function, something on `$PATH` — and none of those can be written in Lua.
+        // The Lua answer is `Source::Names`, which the suggestion list reaches directly; this
+        // source is the shell one and says so by declining.
         if super::prompt::language().is_some_and(|language| language == "lua") {
-            return lua_hint(line, pos);
+            return None;
         }
 
         let word = current_word(line, pos);

@@ -123,12 +123,6 @@ impl Session {
             return changed(true);
         }
 
-        // Tab twice on an empty line switches language — the fallback for a terminal that
-        // cannot deliver Shift+Tab. See `shortcuts::tab`.
-        if let Some(step) = shortcuts::tab(self, key) {
-            return step;
-        }
-
         // **The `key` hook sees the keystroke before anything else, ordinary characters included.**
         //
         // First, because a hook that cannot see a key before its binding runs cannot implement the
@@ -164,6 +158,17 @@ impl Session {
         // an explicit binding has to beat a heuristic about what someone probably meant.
         if let Some(bound) = assist.binding(key) {
             return self.perform(bound, assist);
+        }
+
+        // Tab twice on an empty line switches language — the fallback for a terminal that cannot
+        // deliver Shift+Tab. See `shortcuts::tab`.
+        //
+        // **After the hook and after the bindings**, both deliberately: the `key` hook is
+        // documented to see every keystroke before anything acts on it, and a config that bound
+        // Tab to something meant it. This is oslo's own default, and a default is the thing that
+        // gives way.
+        if let Some(step) = shortcuts::tab(self, key) {
+            return step;
         }
 
         // **Right at the end of the line takes the ghost suggestion**, and moves the cursor
@@ -292,18 +297,9 @@ impl Session {
             },
 
             Action::Accept => Step::Accept,
-            // **Enter, which may mean either thing.** Ordinarily it sends and the caller decides
-            // whether the block was finished. Where it has been set to add a line instead, this is
-            // the only key that changes: Ctrl+Enter and Alt+Enter still send, so there is always a
-            // way out of a block. See `set_enter_adds_a_line`.
-            Action::AcceptOrNewline => {
-                if shortcuts::adds_a_line() {
-                    self.buffer.insert_str("\n");
-                    changed(true)
-                } else {
-                    Step::Accept
-                }
-            }
+            // **Enter, which may mean either thing** — see `shortcuts::enter`, including why a
+            // blank line has to send.
+            Action::AcceptOrNewline => shortcuts::enter(self),
             Action::Abort => Step::Interrupted,
             Action::Eof => Step::Eof,
             Action::Redraw => Step::ClearScreen,
