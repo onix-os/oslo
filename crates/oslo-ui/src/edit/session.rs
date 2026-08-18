@@ -15,7 +15,6 @@ mod assist;
 pub use assist::{Assist, NoAssist};
 
 mod shortcuts;
-pub use shortcuts::set_double_tab_toggles;
 
 /// What a `key` hook asked the editor to do with the keystroke it just saw.
 ///

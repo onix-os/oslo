@@ -115,14 +115,10 @@ bash's numbered events `!5` and `!-2`, and `!name`; all three are ambiguous by c
 all three have the same better answer here in the history finder, which searches as you type and
 shows what it found before it runs.
 
-**The prefix is `$OSLO_LUA_PREFIX`**, one punctuation character, and that whole section is the
-price of `!` alone — it is charged only when `!` is the prefix. Bash and oslo between them already
-spend `= @ % : . # ~ $ > < & | * ? ^`, but `,` and `+` are claimed by neither and cannot begin a
-Lua expression either, so setting one of those makes the rule "a leading `,` is Lua" with no
-exceptions and hands every `!` form back to bash. `none` removes the escape; Shift+Tab still
-switches. A value that is not a single punctuation character is ignored rather than half-honoured,
-because a prompt that quietly reads a language other than the configured one is the exact failure
-this design exists to prevent.
+**The prefix is `!` and does not move.** The carve-out above is written against that character
+specifically — which forms history keeps depends on which ones Lua could have meant — so a prefix
+that could be reconfigured would take the history rules with it, and the two would be free to
+disagree.
 
 The prefix does not touch `current`, so the prompt comes back in the language it was already in.
 The two languages share one namespace either way: a variable the session inherits is a Lua global,
@@ -261,16 +257,12 @@ oslo.keys["ctrl-tab"] = "none"          -- and this
 modifiers ever sends it, because Ctrl-I *is* Tab in the legacy encoding.
 
 **Tab twice on an empty line** is the third, and the one nothing can take away — a plain Tab is a
-plain Tab everywhere. It is on by default, because the other two fail *silently* on a machine where
+plain Tab everywhere. It is always on, because the other two fail *silently* on a machine where
 nothing looks wrong, and a fallback you have to go and find is not much of a fallback.
 
 It applies only on an empty line, so Tab keeps its whole ordinary meaning the moment there is
 anything to complete. What it costs is Tab at an empty prompt, which otherwise lists every name on
 `$PATH`.
-
-```sh
-export OSLO_DOUBLE_TAB=off      # give the empty-prompt listing back
-```
 
 The language a session starts in. Both spellings reach the same shell variable.
 
@@ -280,17 +272,6 @@ export OSLO_DEFAULT_MODE=lua
 
 ```lua
 oslo.opts.set("default_mode", "lua")
-```
-
-The character that runs one line as Lua from a shell prompt. One punctuation character, or `none`
-for no escape at all.
-
-```sh
-export OSLO_LUA_PREFIX=,
-```
-
-```lua
-oslo.opts.set("lua_prefix", ",")
 ```
 
 **Multi-line Lua**, which is not a setting. Enter always ends the *line*; the reader accumulates
@@ -336,27 +317,6 @@ oslo.on.on_key(function(k)
 end)
 ```
 
-The language a session starts in. Both spellings reach the same shell variable.
-
-```sh
-export OSLO_DEFAULT_MODE=lua
-```
-
-```lua
-oslo.opts.set("default_mode", "lua")
-```
-
-The character that runs one line as Lua from a shell prompt. One punctuation character, or `none`
-for no escape at all.
-
-```sh
-export OSLO_LUA_PREFIX=,
-```
-
-```lua
-oslo.opts.set("lua_prefix", ",")
-```
-
 What Enter does at a Lua prompt: `auto` (the default), `newline` or `smart`.
 
 **The default is not a choice oslo makes blind — it asks the terminal.** A Lua prompt is where you
@@ -388,27 +348,6 @@ oslo.sys.terminal()   --> { kitty_keyboard = true, synchronized_output = true, �
 `kitty_keyboard` is the one that decides all of this. If it is `false`, Ctrl+Enter and Ctrl+Tab do
 not reach oslo at all and no setting can change that — the keystroke is indistinguishable from
 plain Enter and plain Tab before it ever leaves the terminal.
-
-The language a session starts in. Both spellings reach the same shell variable.
-
-```sh
-export OSLO_DEFAULT_MODE=lua
-```
-
-```lua
-oslo.opts.set("default_mode", "lua")
-```
-
-The character that runs one line as Lua from a shell prompt. One punctuation character, or `none`
-for no escape at all.
-
-```sh
-export OSLO_LUA_PREFIX=,
-```
-
-```lua
-oslo.opts.set("lua_prefix", ",")
-```
 
 
 

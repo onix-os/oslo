@@ -12,13 +12,13 @@
 //! * events — `!!` (previous line), `!n`, `!-n`, `!str` (most recent line starting with `str`),
 //!   `!?str?` (most recent line containing `str`);
 //!
-//! **Three of those may not reach the prompt**, and that is a decision made one layer up rather
-//! than a gap here. While `!` is also the prefix that runs one line as Lua — the default —
+//! **Three of those do not reach the prompt**, and that is a decision made one layer up rather
+//! than a gap here. `!` is also the prefix that runs one line as Lua, and
 //! `startup::mode::classify` reads it first: it keeps `!!`, `!$`, `!^`, `!*` and `!?str?` for
 //! history, the forms no Lua expression can begin with, and sends `!n`, `!-n` and `!str` to Lua
-//! instead. Point `$OSLO_LUA_PREFIX` at another character and all five come back. Everything stays
-//! implemented and tested here either way: this module is what a non-prompt caller would use, and
-//! which forms the prompt spends is not this layer's question to answer.
+//! instead. Everything stays implemented and tested here either way: this module is what a
+//! non-prompt caller would use, and which forms the prompt spends is not this layer's question to
+//! answer.
 //! * word designators — `!$`, `!^`, `!*` as shorthands on the previous line, and the general
 //!   `!event:designator` with `0`, `n`, `^`, `$`, `*`, `n-m`, `n*`;
 //! * quick substitution — `^old^new` and `^old^new^suffix`, only when `^` opens the line.

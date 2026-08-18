@@ -47,10 +47,6 @@ pub(super) fn read_command(
     // the one about to be typed. Nothing else drains the flag, so leaving it set made the next
     // command abort at its first boundary with 130 and no output.
     oslo_shell::exec::job::forget_interrupt();
-    // Read once per command, not per line: it is a setting, and a line that changed it mid-command
-    // would classify its own continuation differently from its first line.
-    let lua_prefix = mode::lua_prefix(&env_struct.lock().unwrap());
-    oslo_ui::edit::session::set_double_tab_toggles(mode::double_tab(&env_struct.lock().unwrap()));
     // Read once per command: a line that changed it mid-block would read its own continuation
     // under a different rule from its first line. `oslo.lua.enter`, from the config — never
     // inferred from the terminal, see `settings::Lua::enter`.
@@ -344,11 +340,11 @@ pub(super) fn read_command(
             raw.as_str()
         };
 
-        // The prefix is read once, off the first line of a *shell* command: it runs that one line
-        // as Lua without touching the mode the prompt goes back to. A Lua line is never examined —
-        // that prompt is a REPL. See `startup::mode`.
+        // The prefix is read off the first line of a *shell* command: it runs that one line as Lua
+        // without touching the mode the prompt goes back to. A Lua line is never examined — that
+        // prompt is a REPL. See `startup::mode`.
         let line = if buffer.is_empty() {
-            match mode::classify(*current, line, lua_prefix) {
+            match mode::classify(*current, line) {
                 Line::Normal(text) => text,
                 Line::OneOff { mode, text } => {
                     reading = mode;

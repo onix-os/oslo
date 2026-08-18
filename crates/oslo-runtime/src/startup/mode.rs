@@ -18,11 +18,6 @@
 //! `!` is the shell's own reach-back character, and it only has to share with history expansion,
 //! which is a smaller and much clearer split. See [`classify`].
 //!
-//! **And it is a setting**, because the choice is a taste and the rest of the prompt does not
-//! depend on it — see [`lua_prefix`]. Most of the free characters are freer than `!`: `,` and `+`
-//! are claimed by neither bash nor oslo, so choosing one of those retires the history carve-out
-//! [`classify`] documents and leaves `!!`, `!name` and `!5` doing what they do in bash.
-//!
 //! **Why it goes one way.** A shell prompt is where you run programs, and reaching for Lua for one
 //! quick thing is exactly what an escape is for. A Lua prompt is not the mirror of that: it is a
 //! REPL, `oslo.run{"ls", "-la"}` already runs a program from it, and a second syntax for that job
@@ -42,10 +37,20 @@
 //! both already decoded to `Key::Ctrl(' ')` before any of this was bound. Its own weakness is that
 //! an input method may claim it first, which is why none of them is the only one.
 //!
-//! **Tab twice on an empty line** is the third and the one nothing can take away — see
-//! [`double_tab`]. Both of the others fail silently on a machine where nothing looks wrong, so the
-//! fallback is on by default rather than waiting to be found. All three are configurable, because a
-//! key that collides with someone's terminal or window manager is worth being able to move.
+//! **Tab twice on an empty line** is the third and the one nothing can take away. Both of the
+//! others fail silently on a machine where nothing looks wrong, so this one is always there rather
+//! than waiting to be found; it costs Tab at an empty prompt, which otherwise lists every name on
+//! `$PATH`. The three named keys are configurable through `oslo.keys`, because a key that collides
+//! with someone's terminal or window manager is worth being able to move.
+//!
+//! **How a Lua block spanning several lines is read** — not a setting, and not the editor's job.
+//! Enter always ends the *line*. [`super::read`] accumulates lines into a block and shows the
+//! continuation prompt while it wants more, which is how oslo already read an unfinished `for` loop
+//! in shell and how every REPL does it. A block that has already asked for more keeps asking until
+//! an **empty line** ends it — Python's rule, and there for Python's reason: after
+//! `local function f()` the parser is satisfied again at `end`, so running the moment it is
+//! satisfied would mean no line after `end` could ever be typed. `oslo.lua.enter = "newline"` makes
+//! Enter always start another line, so a block ends only on an empty one.
 
 use oslo_shell::Environment;
 /// The language the next line will be read as.
@@ -109,20 +114,15 @@ pub enum Line<'a> {
 /// better answer in this shell: the history finder searches as you type and shows you what it
 /// found *before* it runs. A numbered event you have to count to is the form nobody misses.
 ///
-/// Set [`lua_prefix`] to a character history does not want and the whole section above stops
-/// applying: `,print(1)` is Lua, and every `!` form is bash's again.
-pub fn classify(mode: Mode, line: &str, prefix: Option<char>) -> Line<'_> {
+pub fn classify(mode: Mode, line: &str) -> Line<'_> {
     // A Lua line is a Lua line. Nothing is read off it.
     if mode == Mode::Lua {
         return Line::Normal(line);
     }
-    let Some(prefix) = prefix else {
+    let Some(rest) = line.strip_prefix(LUA_PREFIX) else {
         return Line::Normal(line);
     };
-    let Some(rest) = line.strip_prefix(prefix) else {
-        return Line::Normal(line);
-    };
-    if rest.trim().is_empty() || (prefix == '!' && opens_a_history_reference(rest)) {
+    if rest.trim().is_empty() || opens_a_history_reference(rest) {
         return Line::Normal(line);
     }
     Line::OneOff {
@@ -143,28 +143,11 @@ fn opens_a_history_reference(after: &str) -> bool {
 
 /// The character that runs one line as Lua from a shell prompt.
 ///
-/// `!` unless `$OSLO_LUA_PREFIX` says otherwise, and `None` — no escape at all, every shell line
-/// is shell — when it is set to an empty string or to `none`.
-///
-/// **One character, and it must be punctuation.** A letter would make `x = 1` unreachable the
-/// moment someone picked `x`, and a multi-character prefix is a small language of its own to parse
-/// against history and quoting both. Anything else is ignored rather than half-honoured, because a
-/// prompt that silently reads a different language than the one configured is the failure this
-/// whole module exists to avoid.
-pub fn lua_prefix(env: &Environment) -> Option<char> {
-    let Some(setting) = env.get_var("OSLO_LUA_PREFIX") else {
-        return Some('!');
-    };
-    let setting = setting.trim();
-    if setting.is_empty() || setting == "none" {
-        return None;
-    }
-    let mut chars = setting.chars();
-    match (chars.next(), chars.next()) {
-        (Some(one), None) if one.is_ascii_punctuation() => Some(one),
-        _ => Some('!'),
-    }
-}
+/// **A constant, for the reason `$OSLO_TOGGLE_KEY` is gone**: the carve-out [`classify`] documents
+/// is written against this character specifically — which `!` forms history keeps depends on which
+/// ones Lua could have meant — so a prefix that moved would take the history rules with it, and the
+/// two would be free to disagree.
+const LUA_PREFIX: char = '!';
 
 /// The mode a session starts in.
 ///
@@ -176,36 +159,6 @@ pub fn starting_mode(env: &Environment) -> Mode {
         Some("lua") => Mode::Lua,
         _ => Mode::Shell,
     }
-}
-
-/// **How a Lua block spanning several lines is read** — not a setting, and not the editor's job.
-///
-/// Enter always ends the *line*. `startup::read` accumulates lines into a block and shows the
-/// continuation prompt while it wants more, which is how oslo already read an unfinished `for` loop
-/// in shell and how every REPL does it. A block that has already asked for more keeps asking until
-/// an **empty line** ends it — Python's rule, and there for Python's reason: after
-/// `local function f()` the parser is satisfied again at `end`, so running the moment it is
-/// satisfied would mean no line after `end` could ever be typed.
-///
-/// `oslo.lua.enter = "newline"` makes Enter always start another line, so a block ends only on an
-/// empty one. It is a config setting rather than something oslo infers — see `settings::Lua`.
-///
-/// Whether Tab twice on an empty line switches language. `$OSLO_DOUBLE_TAB`, on unless `off`.
-///
-/// **The third way in, and the one that cannot fail.** Shift+Tab needs the terminal to report a
-/// modifier, and Alacritty without the kitty keyboard protocol does not; Ctrl+Space needs the
-/// terminal to *see* it, and ibus or fcitx claims it as the input-method switch first. Both of
-/// those fail silently, on a machine where nothing looks wrong. A plain Tab is a plain Tab
-/// everywhere.
-///
-/// It costs Tab at an empty prompt, which otherwise lists every name on `$PATH`.
-pub fn double_tab(env: &Environment) -> bool {
-    !matches!(
-        env.get_var("OSLO_DOUBLE_TAB")
-            .map(|v| v.trim().to_string())
-            .as_deref(),
-        Some("off" | "0" | "no" | "false")
-    )
 }
 
 /// The keys that switch the prompt between shell and Lua.

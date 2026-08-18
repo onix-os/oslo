@@ -9,34 +9,14 @@
 
 use super::{Session, Step};
 use crate::term::Key;
-use std::sync::atomic::{AtomicBool, Ordering};
-
-static DOUBLE_TAB: AtomicBool = AtomicBool::new(true);
-
-/// Whether Tab twice on an empty line switches language.
-///
-/// **On by default**, as the third of three, because each of the other two can fail on a machine
-/// where nothing is obviously wrong: Shift+Tab needs the terminal to report a modifier, and
-/// Alacritty without the kitty keyboard protocol does not; Ctrl+Space needs the terminal to *see*
-/// it, and ibus or fcitx claims it as the input-method switch first. A plain Tab is a plain Tab
-/// everywhere, so this is the one that cannot be taken away.
-///
-/// What it costs is Tab at an *empty* prompt, which otherwise offers every name on `$PATH` — a
-/// listing nobody reads. Only on an empty line, so Tab keeps its whole ordinary meaning the moment
-/// there is anything to complete. `$OSLO_DOUBLE_TAB=off` gives the empty-prompt listing back.
-pub fn set_double_tab_toggles(yes: bool) {
-    DOUBLE_TAB.store(yes, Ordering::Relaxed);
-}
-
-pub(super) fn double_tab_toggles() -> bool {
-    DOUBLE_TAB.load(Ordering::Relaxed)
-}
 
 /// **Tab twice on an empty line switches language.**
 ///
 /// Shift+Tab does it anywhere and is the key to reach for — but it only arrives on a terminal that
 /// reports modifiers, and on one that does not there was no way to switch at all. This needs
-/// nothing from the terminal: a plain Tab is a plain Tab everywhere.
+/// nothing from the terminal: a plain Tab is a plain Tab everywhere. So it is always on, as the
+/// third of three, because each of the other two can fail on a machine where nothing is obviously
+/// wrong — Ctrl+Space is claimed by ibus and fcitx as the input-method switch.
 ///
 /// **Why it needs a remembered flag when double-space needs no memory.** A space inserts itself, so
 /// "the line is one space" *is* the record that the last key was a space. Tab inserts nothing, so
@@ -50,7 +30,7 @@ pub(super) fn double_tab_toggles() -> bool {
 pub(super) fn tab(session: &mut Session, key: Key) -> Option<Step> {
     // Read and cleared on every key, so only two *consecutive* Tabs count.
     let armed = std::mem::replace(&mut session.tab_armed, false);
-    if key != Key::ToggleScope || !session.buffer.text().is_empty() || !double_tab_toggles() {
+    if key != Key::ToggleScope || !session.buffer.text().is_empty() {
         return None;
     }
     if armed {
@@ -62,7 +42,7 @@ pub(super) fn tab(session: &mut Session, key: Key) -> Option<Step> {
 
 #[cfg(test)]
 mod tests {
-    use super::super::{Key, Session, Step, set_double_tab_toggles};
+    use super::super::{Key, Session, Step};
     use crate::edit::session::NoAssist;
 
     fn run(start: &str, keys: &[Key]) -> (Session, Vec<Step>) {
@@ -85,8 +65,7 @@ mod tests {
     /// no record that a Tab was pressed.
     #[test]
     fn a_second_tab_on_an_empty_line_switches_language() {
-        // On by default: it is the one of the three that no terminal or input method can take
-        // away, so it is not something a user should have to find a setting for.
+        // Always on: it is the one of the three that no terminal or input method can take away.
         let (_, steps) = run("", &[Key::ToggleScope, Key::ToggleScope]);
         assert_eq!(
             steps,
@@ -117,15 +96,5 @@ mod tests {
             !steps.contains(&Step::ToggleLanguage),
             "Tab on a non-empty line is completion: {steps:?}"
         );
-
-        set_double_tab_toggles(false);
-        let (_, steps) = run("", &[Key::ToggleScope, Key::ToggleScope]);
-        assert!(
-            !steps.contains(&Step::ToggleLanguage),
-            "turned off, it is completion again: {steps:?}"
-        );
-        // Left at the real default: this is a process-wide flag, so a test that changed it and did
-        // not put it back would decide the answer for whatever ran next.
-        set_double_tab_toggles(true);
     }
 }

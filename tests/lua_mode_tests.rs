@@ -94,39 +94,6 @@ fn the_bang_prefix_runs_one_lua_line_from_shell_mode() {
     assert_eq!(lines, vec!["one", "2", "two"], "{out}");
 }
 
-/// **The prefix is a setting**, and choosing a character history does not want retires the
-/// carve-out entirely: with `,` as the prefix, `!!` is bash's again and nothing about `!` is
-/// special. `none` turns the escape off, and a value that is not a single punctuation character
-/// is ignored rather than half-honoured.
-#[test]
-fn the_lua_prefix_is_configurable() {
-    let comma = typed(
-        "echo one\n!!\n,print(2 * 21)\n,5 + 5\n",
-        &[("OSLO_LUA_PREFIX", ",")],
-    );
-    assert_eq!(
-        comma.matches("one").count(),
-        3,
-        "`!!` should be pure history once `!` is not the prefix: {comma}"
-    );
-    assert!(
-        comma.lines().any(|line| line.trim() == "42") && comma.lines().any(|l| l.trim() == "10"),
-        "`,` should have run both lines as Lua: {comma}"
-    );
-
-    let off = typed("!print(9)\n", &[("OSLO_LUA_PREFIX", "none")]);
-    assert!(
-        !off.lines().any(|line| line.trim() == "9"),
-        "`none` should leave no Lua escape at all: {off}"
-    );
-
-    let bogus = typed("!print(7)\n", &[("OSLO_LUA_PREFIX", "lua")]);
-    assert!(
-        bogus.lines().any(|line| line.trim() == "7"),
-        "a multi-character setting should fall back to `!`: {bogus}"
-    );
-}
-
 /// **What `!` still shares with history**, which is the whole of the rule: history keeps the
 /// characters no Lua expression can begin with, and everything else after a `!` is Lua.
 #[test]
