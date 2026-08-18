@@ -1,7 +1,7 @@
 # Two languages, one prompt
 
-oslo's prompt reads one language at a time — POSIX shell or Lua — and Shift-Tab or Ctrl-Space
-switches between them without disturbing the line you are typing. It exists because a shell that
+oslo's prompt reads one language at a time — POSIX shell or Lua — and Shift-Tab, Ctrl-Space or Tab
+twice switches between them without disturbing the line you are typing. It exists because a shell that
 guessed the language by looking at the line would decide what `print(1)` means from whatever
 happens to be installed, and a shell whose meaning depends on that is one you cannot write
 scripts against.
@@ -212,12 +212,16 @@ oslo.keys["shift-tab"] = "none"         -- and this turns a default off
 oslo.keys["ctrl-space"] = "none"        -- as does this
 ```
 
-Tab twice on an empty line is a third way in, for the corner where both of those fail. It is off
-unless asked for, because it costs Tab at an empty prompt — which otherwise offers every name on
-`$PATH` — and both defaults have to fail at once before that trade is worth making.
+**Tab twice on an empty line** is the third, and the one nothing can take away — a plain Tab is a
+plain Tab everywhere. It is on by default, because the other two fail *silently* on a machine where
+nothing looks wrong, and a fallback you have to go and find is not much of a fallback.
+
+It applies only on an empty line, so Tab keeps its whole ordinary meaning the moment there is
+anything to complete. What it costs is Tab at an empty prompt, which otherwise lists every name on
+`$PATH`.
 
 ```sh
-export OSLO_DOUBLE_TAB=on
+export OSLO_DOUBLE_TAB=off      # give the empty-prompt listing back
 ```
 
 The language a session starts in. Both spellings reach the same shell variable.

@@ -40,21 +40,19 @@ pub(super) fn adds_a_line() -> bool {
     ADDS_A_LINE.load(Ordering::Relaxed)
 }
 
-static DOUBLE_TAB: AtomicBool = AtomicBool::new(false);
+static DOUBLE_TAB: AtomicBool = AtomicBool::new(true);
 
 /// Whether Tab twice on an empty line switches language.
 ///
-/// **Off by default, because Ctrl+Space made it unnecessary.** This was written as the fallback for
-/// a terminal that cannot report Shift+Tab — Alacritty without the kitty keyboard protocol, where
-/// there was otherwise no way to change language at all. Ctrl+Space solves the same problem
-/// strictly better: it works anywhere on the line rather than only on an empty one, it is one
-/// chord rather than a timing-free but stateful pair, and it costs nothing that was already there.
+/// **On by default**, as the third of three, because each of the other two can fail on a machine
+/// where nothing is obviously wrong: Shift+Tab needs the terminal to report a modifier, and
+/// Alacritty without the kitty keyboard protocol does not; Ctrl+Space needs the terminal to *see*
+/// it, and ibus or fcitx claims it as the input-method switch first. A plain Tab is a plain Tab
+/// everywhere, so this is the one that cannot be taken away.
 ///
-/// It is kept because it costs one flag and one branch, and because Ctrl+Space has a failure of its
-/// own: ibus and fcitx claim it as the input-method switch, and an IME grabs it before the terminal
-/// sees it. `$OSLO_DOUBLE_TAB=on` is the third way in for anyone in that corner.
-///
-/// The cost when on is Tab at an *empty* prompt, which otherwise offers every name on `$PATH`.
+/// What it costs is Tab at an *empty* prompt, which otherwise offers every name on `$PATH` — a
+/// listing nobody reads. Only on an empty line, so Tab keeps its whole ordinary meaning the moment
+/// there is anything to complete. `$OSLO_DOUBLE_TAB=off` gives the empty-prompt listing back.
 pub fn set_double_tab_toggles(yes: bool) {
     DOUBLE_TAB.store(yes, Ordering::Relaxed);
 }
@@ -141,15 +139,8 @@ mod tests {
     /// no record that a Tab was pressed.
     #[test]
     fn a_second_tab_on_an_empty_line_switches_language() {
-        // **Off by default**, so Tab at an empty prompt is completion until this is asked for.
-        // Ctrl+Space and Shift+Tab are the two that need no setting.
-        let (_, steps) = run("", &[Key::ToggleScope, Key::ToggleScope]);
-        assert!(
-            !steps.contains(&Step::ToggleLanguage),
-            "not until it is turned on: {steps:?}"
-        );
-
-        set_double_tab_toggles(true);
+        // On by default: it is the one of the three that no terminal or input method can take
+        // away, so it is not something a user should have to find a setting for.
         let (_, steps) = run("", &[Key::ToggleScope, Key::ToggleScope]);
         assert_eq!(
             steps,
@@ -187,8 +178,8 @@ mod tests {
             !steps.contains(&Step::ToggleLanguage),
             "turned off, it is completion again: {steps:?}"
         );
-        // Left at the real default: this is a process-wide flag, so a test that raised it and did
+        // Left at the real default: this is a process-wide flag, so a test that changed it and did
         // not put it back would decide the answer for whatever ran next.
-        set_double_tab_toggles(false);
+        set_double_tab_toggles(true);
     }
 }

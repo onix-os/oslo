@@ -41,9 +41,10 @@
 //! before either was bound to anything. Its own weakness is that an input method may claim it
 //! first, which is why neither is the only one.
 //!
-//! [`double_tab`] is a third way in for the corner where both fail, off unless asked for. All of
-//! them are configurable, because a key that collides with someone's terminal or window manager is
-//! worth being able to move.
+//! **Tab twice on an empty line** is the third and the one nothing can take away — see
+//! [`double_tab`]. Both of the others fail silently on a machine where nothing looks wrong, so the
+//! fallback is on by default rather than waiting to be found. All three are configurable, because a
+//! key that collides with someone's terminal or window manager is worth being able to move.
 
 use oslo_shell::Environment;
 /// The language the next line will be read as.
@@ -206,21 +207,21 @@ pub fn enter_key(env: &Environment) -> Enter {
     }
 }
 
-/// Whether Tab twice on an empty line switches language. `$OSLO_DOUBLE_TAB`, off unless `on`.
+/// Whether Tab twice on an empty line switches language. `$OSLO_DOUBLE_TAB`, on unless `off`.
 ///
-/// **A third way in, for the corner where both defaults fail.** Shift+Tab needs the terminal to
-/// report a modifier and Alacritty without the kitty keyboard protocol does not; Ctrl+Space needs
-/// the terminal to *see* it, and ibus or fcitx claims it as the input-method switch. A plain Tab
-/// is a plain Tab everywhere and answers to neither problem.
+/// **The third way in, and the one that cannot fail.** Shift+Tab needs the terminal to report a
+/// modifier, and Alacritty without the kitty keyboard protocol does not; Ctrl+Space needs the
+/// terminal to *see* it, and ibus or fcitx claims it as the input-method switch first. Both of
+/// those fail silently, on a machine where nothing looks wrong. A plain Tab is a plain Tab
+/// everywhere.
 ///
-/// Off by default because it costs Tab at an empty prompt, and both defaults have to fail at once
-/// before that trade is worth making.
+/// It costs Tab at an empty prompt, which otherwise lists every name on `$PATH`.
 pub fn double_tab(env: &Environment) -> bool {
-    matches!(
+    !matches!(
         env.get_var("OSLO_DOUBLE_TAB")
             .map(|v| v.trim().to_string())
             .as_deref(),
-        Some("on" | "1" | "yes" | "true")
+        Some("off" | "0" | "no" | "false")
     )
 }
 
