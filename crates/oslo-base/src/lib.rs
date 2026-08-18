@@ -28,6 +28,8 @@ pub mod background;
 /// word means: a highlighter that did not know `{a,b}` painted a valid path as a dead one.
 pub mod brace;
 pub mod capture;
+/// Stream coordinates — `{line:word}` addressing of what a command printed.
+pub mod coords;
 /// The `@name` directory table, shared by expansion and completion.
 pub mod dirs;
 pub mod error;
