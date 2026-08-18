@@ -109,7 +109,13 @@ pub(super) fn read_command(
                 ctx
             })
             .or_else(|| rc::ps2_if_set(&mut env_struct.lock().unwrap()))
-            .unwrap_or_else(|| oslo_ui::prompt::continuation_marker(reading.name(), block_indent))
+            .unwrap_or_else(|| {
+                oslo_ui::prompt::continuation_marker(
+                    reading.name(),
+                    block_indent,
+                    oslo_ui::prompt::block_depth(&buffer),
+                )
+            })
         };
 
         // The right prompt is no longer computed here. It is built by the `render` closure
@@ -215,6 +221,7 @@ pub(super) fn read_command(
             let mut render = {
                 let at_start = buffer.is_empty();
                 let indent = block_indent;
+                let nesting = oslo_ui::prompt::block_depth(&buffer);
                 let language = *current;
                 let reading_now = reading;
                 move || -> (String, String) {
@@ -233,7 +240,11 @@ pub(super) fn read_command(
                         })
                         .or_else(|| rc::ps2_if_set(&mut env_struct.lock().unwrap()))
                         .unwrap_or_else(|| {
-                            oslo_ui::prompt::continuation_marker(reading_now.name(), indent)
+                            oslo_ui::prompt::continuation_marker(
+                                reading_now.name(),
+                                indent,
+                                nesting,
+                            )
                         })
                     };
                     drop(_timed);

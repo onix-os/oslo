@@ -138,6 +138,20 @@ impl OsloHelper {
         if line.is_empty() {
             return String::new();
         }
+        // **A Lua line is painted as Lua.** Everything below reads the line as a command and its
+        // arguments, and at a Lua prompt that is not merely unhelpful: `print` is not on `$PATH`
+        // and `nil` is not a command, so both came out in the *unknown command* style — red and
+        // underlined, the same as a typo. Every valid Lua line looked like an error.
+        if prompt::language().is_some_and(|language| language == "lua") {
+            let theme = theme::current();
+            // Asked of the session, so a name that exists is drawn as what it is. The globals are
+            // fetched once per paint rather than once per name — this runs on every keystroke.
+            let globals: std::collections::HashMap<String, bool> =
+                completion::lua::global_names().into_iter().collect();
+            return highlight::lua::paint(line, &theme, theme::depth(), &|name: &str| {
+                globals.get(name).copied()
+            });
+        }
         // **The guard is held for the whole paint**, so the closures below can ask the environment
         // directly. Snapshotting into two `HashSet`s existed only because they each re-took the
         // lock; it cost a `String` and a hash per builtin, function and alias — around 170 of them

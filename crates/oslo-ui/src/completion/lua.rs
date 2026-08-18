@@ -31,6 +31,18 @@ thread_local! {
     static NAMES: std::cell::RefCell<Option<NameSource>> = const { std::cell::RefCell::new(None) };
 }
 
+/// The global names in the session, each with whether it is callable.
+///
+/// The highlighter's half of the same source: completion asks for the keys of one table, and painting a
+/// line asks for the globals so a name that exists can be drawn as what it is. Empty when no source
+/// is installed, which is every non-interactive session — and then names are simply left plain.
+pub fn global_names() -> Vec<(String, bool)> {
+    match NAMES.with(|slot| slot.borrow().clone()) {
+        Some(source) => source(&[]),
+        None => Vec::new(),
+    }
+}
+
 /// Install the source of Lua names. `None` removes it.
 pub fn set_name_source(source: Option<NameSource>) {
     NAMES.with(|slot| *slot.borrow_mut() = source);

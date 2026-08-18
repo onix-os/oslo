@@ -571,4 +571,4 @@ pub fn refreshing() -> bool {
 
 #[path = "prompt/continuation.rs"]
 mod continuation;
-pub use continuation::continuation_marker;
+pub use continuation::{block_depth, continuation_marker};
