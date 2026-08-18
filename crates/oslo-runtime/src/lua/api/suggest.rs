@@ -5,7 +5,7 @@
 //!   name = "tldr",
 //!   answer = function(ctx) return "git commit --amend" end,
 //! }
-//! oslo.suggest.sources = { "history", "provider", "path" }
+//! oslo.suggest.sh_sources = { "history", "provider", "path" }
 //! ```
 //!
 //! # It answers the whole line, not the tail
@@ -18,7 +18,7 @@
 //! # Where it sits is the config's decision
 //!
 //! Registering a provider does not put it in front of anything. It is asked when
-//! `oslo.suggest.sources` says `provider`, in the position that list gives it — so a plugin cannot
+//! `oslo.suggest.sh_sources` says `provider`, in the position that list gives it — so a plugin cannot
 //! decide it outranks the history of what you have really run. VS Code's inline providers work the
 //! other way round, with `yieldsToGroupIds` declared by the provider; that is the part not copied.
 

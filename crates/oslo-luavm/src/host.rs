@@ -56,6 +56,13 @@ pub trait Host {
     /// Answers whether the path existed and the write landed.
     fn set_field(&self, path: &[&str], value: Own) -> bool;
 
+    /// Lift the members of a global table to globals of their own — `oslo.fs` also as `fs`.
+    ///
+    /// Defaulted to doing nothing, because it is a convenience of the real engine rather than
+    /// something every host has to have an answer for: the tree walker and the test doubles
+    /// implement this trait too, and a shorthand they do not offer is not a failure.
+    fn flatten_namespace(&self, _table: &str) {}
+
     /// What the running source is called, for the position on an error.
     fn chunk(&self) -> String;
 

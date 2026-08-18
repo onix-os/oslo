@@ -51,7 +51,7 @@ nix = { version = "0.29", features = [
 # `[[ str =~ ere ]]`. See the root manifest for why the feature set is trimmed.
 regex = { version = "1", default-features = false, features = [
     "std", "unicode-case", "unicode-perl",
-    "perf-literal", "perf-inline",
+    "perf-inline",
 ] }
 
 # The structured pipeline's JSON, and a core capability rather than a library a user can install:

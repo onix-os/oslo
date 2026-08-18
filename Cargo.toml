@@ -42,7 +42,7 @@ nix = { version = "0.29", features = [
 ] }
 regex = { version = "1", default-features = false, features = [
     "std", "unicode-case", "unicode-perl",
-    "perf-literal", "perf-inline",
+    "perf-inline",
 ] }
 serde_json = { version = "1", features = ["preserve_order"] }
 which = "7.0"
@@ -105,6 +105,11 @@ harness = false
 required-features = ["vista"]
 
 [profile.release]
+# **Unwinding is not needed and costs 820 KB.** It used to be: the history store could panic on a
+# corrupt page, so every read and write went through `catch_unwind`. tagdata v0.1.4 validates a
+# page pointer before following it and reports `InvalidDB` instead, so those guards are gone and
+# nothing is left that has to survive a panic. `.gcc_except_table` alone falls from 261 KB to 7 KB.
+panic = "abort"
 lto = "fat"
 codegen-units = 1
 strip = "symbols"
@@ -113,11 +118,16 @@ opt-level = "s"
 [profile.release.package."*"]
 opt-level = "s"
 
+# Likewise, and here the pin was buying nothing at all: parsing 4000 shell blocks took 118 ms at
+# both settings.
 [profile.release.package.brush-parser]
-opt-level = 3
+opt-level = "s"
 
+# Size, not speed, and measured rather than assumed: at `opt-level = 3` painting a 57-character
+# line took 2.41 µs per keystroke and at "s" it takes 3.02 µs. A keystroke is ~100 ms apart, so the
+# difference is 0.0006% of the gap between two keys — and it is 250 KB of binary.
 [profile.release.package.oslo-ui]
-opt-level = 3
+opt-level = "s"
 
 [profile.release.package.argc]
 opt-level = "s"

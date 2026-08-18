@@ -1,5 +1,6 @@
 //! Builds completion candidates for Tab.
 
+pub mod lua;
 mod paths;
 pub(crate) use paths::executable;
 pub(crate) use paths::glob_matches_anything;
@@ -73,6 +74,14 @@ pub fn set_command_completer(hook: Option<CommandCompleter>) {
     FOR_COMMAND.with(|slot| *slot.borrow_mut() = hook);
 }
 
+/// Whether the prompt is reading Lua rather than shell.
+///
+/// Unknown counts as shell: a prompt that has not said is a plain one, and the shell answers are
+/// the ones that were always given.
+fn is_lua() -> bool {
+    super::prompt::language().is_some_and(|language| language == "lua")
+}
+
 /// Ask the config to complete this command, if it wants to.
 fn config_candidates(
     command: &str,
@@ -106,6 +115,15 @@ fn config_candidates(
 impl OsloHelper {
     /// Return context-quoted candidates and their replacement byte offset.
     pub fn candidates(&self, line: &str, pos: usize) -> (usize, Vec<CompletionCandidate>) {
+        // **A Lua line is completed as Lua, and only as Lua.** Everything below answers a shell
+        // question — a command, a path, a `$variable`, an `@mark` — and at a Lua prompt those are
+        // not merely unhelpful but wrong: `$HO` completed to `$HOME`, which is a lexer error in
+        // the language being typed. So this returns whatever the Lua side answers, including
+        // nothing, rather than falling through to answers that cannot be written here.
+        if is_lua() {
+            return lua::candidates(line, pos).unwrap_or((pos, Vec::new()));
+        }
+
         // oslo's own shorthands first: both look like ordinary words and neither completes like
         // one, so the retarget has to happen before anything reads `stem`.
         let sugared = sugar::at_segment(sugar::equals_segment(sugar::escaped_segment(
@@ -207,7 +225,7 @@ impl OsloHelper {
         // `oslo.completion.sources`: drop the kinds the config did not ask for. Applied after the
         // builders rather than inside them, so a kind is filtered by the name it already carries
         // and adding a new kind needs no change here.
-        if let Some(wanted) = &crate::settings::current().completion.sources {
+        if let Some(wanted) = &crate::settings::current().completion.sh_sources {
             out.retain(|c| {
                 c.kind
                     .as_deref()

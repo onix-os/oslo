@@ -248,6 +248,20 @@ fn to_candidates(values: &[Value]) -> Option<Vec<(String, Option<String>)>> {
     Some(out)
 }
 
+/// Let the Lua prompt complete against the names that actually exist in this session.
+///
+/// The editor knows what is being *typed* — where the name starts, whether a dot or a colon comes
+/// before it, whether the cursor is inside a string. Only the interpreter knows what a name *is*.
+/// This hands over the second half, and nothing but names crosses: see
+/// [`oslo_ui::completion::lua`] for the split and [`Engine::names_at`] for why the values stay in
+/// the VM.
+pub fn install_lua_completer(interp: &Rc<Engine>) {
+    let interp = Rc::clone(interp);
+    oslo_ui::completion::lua::set_name_source(Some(Rc::new(move |path: &[String]| {
+        interp.names_at(path)
+    })));
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

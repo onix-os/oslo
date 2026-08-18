@@ -1,9 +1,10 @@
 # Two languages, one prompt
 
-oslo's prompt reads one language at a time — POSIX shell or Lua — and Shift-Tab switches between
-them without disturbing the line you are typing. It exists because a shell that guessed the
-language by looking at the line would decide what `print(1)` means from whatever happens to be
-installed, and a shell whose meaning depends on that is one you cannot write scripts against.
+oslo's prompt reads one language at a time — POSIX shell or Lua — and Shift-Tab, Ctrl-Space or Tab
+twice switches between them without disturbing the line you are typing. It exists because a shell that
+guessed the language by looking at the line would decide what `print(1)` means from whatever
+happens to be installed, and a shell whose meaning depends on that is one you cannot write
+scripts against.
 
 <!-- demo:begin -->
 [![two-languages-one-prompt demo](https://asciinema.org/a/1262753.svg)](https://asciinema.org/a/1262753)
@@ -114,14 +115,10 @@ bash's numbered events `!5` and `!-2`, and `!name`; all three are ambiguous by c
 all three have the same better answer here in the history finder, which searches as you type and
 shows what it found before it runs.
 
-**The prefix is `$OSLO_LUA_PREFIX`**, one punctuation character, and that whole section is the
-price of `!` alone — it is charged only when `!` is the prefix. Bash and oslo between them already
-spend `= @ % : . # ~ $ > < & | * ? ^`, but `,` and `+` are claimed by neither and cannot begin a
-Lua expression either, so setting one of those makes the rule "a leading `,` is Lua" with no
-exceptions and hands every `!` form back to bash. `none` removes the escape; Shift+Tab still
-switches. A value that is not a single punctuation character is ignored rather than half-honoured,
-because a prompt that quietly reads a language other than the configured one is the exact failure
-this design exists to prevent.
+**The prefix is `!` and does not move.** The carve-out above is written against that character
+specifically — which forms history keeps depends on which ones Lua could have meant — so a prefix
+that could be reconfigured would take the history rules with it, and the two would be free to
+disagree.
 
 The prefix does not touch `current`, so the prompt comes back in the language it was already in.
 The two languages share one namespace either way: a variable the session inherits is a Lua global,
@@ -151,6 +148,76 @@ the entries added since the last clear, so re-seeding N lines wrote all N again 
 once at startup and again on every toggle — and it could not work anyway, since the language can
 change mid-line from somewhere that cannot reach the editor.
 
+### Completion, suggestions and the flat namespace
+
+A Lua line is completed **as Lua and only as Lua**. Every shell answer — a command name, a path, a
+`$variable`, an `@mark` — is either useless there or actively wrong: `$HO`+Tab used to produce
+`$HOME`, which is a lexer error in the language being typed, while `pri`+Tab and `oslo.`+Tab
+offered nothing at all.
+
+What is offered instead comes from the session itself: the globals, the keys of the table being
+indexed (`oslo.ma`→`oslo.math`, `os.tim`→`os.time`), the methods after a `:`, and Lua's reserved
+words. Nothing is offered inside a string or a comment, where a name is not a name. The ghost
+suggestion draws from the same source, and only when exactly one name matches — a hint is a promise
+that the accept key gives you *that*.
+
+The split is deliberate: working out **what is being typed** is text and lives in the editor;
+working out **what names exist** needs the interpreter. Only names cross between them, never
+values — `_G` is cyclic and deep-copying it to answer a Tab would be absurd.
+
+**Each prompt has its own suggestion sources**, and the Lua default is `names` alone:
+
+```lua
+oslo.suggest.sh_sources  = { "history", "completion", "path" }   -- the shell prompt
+oslo.suggest.lua_sources = { "completion" }                      -- the Lua prompt
+```
+
+**What `completion` means as a source**: ask this prompt's completer — the same machinery Tab uses
+— and take the single answer a ghost can promise. It is *one* source with two answers, because
+"complete what is being typed" is one idea: a command name at a shell prompt (builtin, alias,
+function, `$PATH`), a Lua name at a Lua one (a global, or a field of the table being indexed).
+`names` and `globals` are accepted spellings for the Lua reading.
+
+Three of the shell sources answer with *shell* — `path` completes a filename in command position,
+`predict` is a model trained on commands, `completion` offers names from `$PATH` — and not one of
+them can be typed at a Lua prompt. Sharing a single list meant a config written for the shell
+silently decided what Lua did, and what it usually decided was nothing at all: a config saying
+`{ "predict", "history", "path" }` got no Lua suggestions whatsoever.
+
+**`history` is deliberately absent from the Lua default.** A Lua prompt should behave like an
+editor — what it offers is what *exists* in the session, not what you happened to type last week.
+Add `"history"` to `lua_sources` if you want the old behaviour. `path` and `predict` are the two
+that are shell-shaped with no Lua reading at all; listing either under `lua_sources` answers
+nothing rather than erroring, because a filename in the middle of a Lua expression is not a
+suggestion, it is a syntax error waiting to be accepted.
+
+**Tab is split the same way.** A Lua line never reaches the shell completer at all, and the kind
+filter has one list per prompt, because the two share no kind of candidate between them:
+
+```lua
+oslo.completion.sh_sources  = { "command", "file", "dir" }
+oslo.completion.lua_sources = { "function", "field", "keyword" }
+```
+
+Unset means every kind, which is the default for both. A single list could only ever have been
+right for one prompt — a shell filter naming `file` and `command` silently emptied every Lua
+dropdown.
+
+Everything else on `oslo.completion` — `fuzzy`, `sort`, `case_sensitive`, `max_rows` — is about how
+matching and drawing work rather than about what a candidate *is*, so it is shared and applies to
+both. `fuzzy` in particular used not to reach the Lua prompt at all: it was the one place in the
+shell where a prefix was the only thing that could match, so `os.dfft` offered nothing where
+`os.difftime` was plainly meant.
+
+**Every `oslo` member is also a global.** `fs`, `json`, `git`, `run`, `path` and the rest need no
+prefix, and `oslo.fs` keeps working. Three rules keep that from taking anything away:
+
+* a name already in `_G` is never replaced — `math` is Lua's;
+* two tables under one name are **merged**, missing keys only, which is what makes `math` work:
+  `math.floor` and `math.pi` stay exactly where they were and `math.eval`, `math.convert` and
+  `math.session` join them. The two share no key, and a test checks that rather than assuming it;
+* only tables and functions are lifted, so there is no bare `version` global holding a string.
+
 ## What makes it different
 
 oslo's log keeps the language beside each line, in a mode column, because recalling a Lua line
@@ -168,14 +235,34 @@ falls back to, so binding it would silently do nothing on a plain tty.
 
 ## Configuration
 
-The key. There is no `$OSLO_TOGGLE_KEY`; bindings live in one table so there is no second place for
+The keys. There is no `$OSLO_TOGGLE_KEY`; bindings live in one table so there is no second place for
 them to disagree from.
+
+**Three keys switch it, and they fail in different places.** `Shift+Tab` has to be *reported* as
+Shift+Tab, and a terminal that does not report the modifier — Alacritty without the kitty keyboard
+protocol — leaves no way to change language at all. `Ctrl+Space` asks the terminal for nothing: it
+is `NUL` on a plain tty and `CSI 32;5u` under the kitty protocol, and oslo decoded both to the same
+key long before either was bound to anything. Its own weakness is that ibus and fcitx claim it as
+the input-method switch, and an IME takes it before the terminal sees it. Hence two.
 
 ```lua
 -- "toggle-mode" is the same action under another name.
 oslo.keys["f2"] = "toggle-language"     -- another key as well
-oslo.keys["shift-tab"] = "none"         -- and this turns the default off
+oslo.keys["shift-tab"] = "none"         -- and this turns a default off
+oslo.keys["ctrl-space"] = "none"        -- as does this
+oslo.keys["ctrl-tab"] = "none"          -- and this
 ```
+
+**Ctrl+Tab** is a toggle too, on the same terms as Ctrl+Enter: only a terminal that reports
+modifiers ever sends it, because Ctrl-I *is* Tab in the legacy encoding.
+
+**Tab twice on an empty line** is the third, and the one nothing can take away — a plain Tab is a
+plain Tab everywhere. It is always on, because the other two fail *silently* on a machine where
+nothing looks wrong, and a fallback you have to go and find is not much of a fallback.
+
+It applies only on an empty line, so Tab keeps its whole ordinary meaning the moment there is
+anything to complete. What it costs is Tab at an empty prompt, which otherwise lists every name on
+`$PATH`.
 
 The language a session starts in. Both spellings reach the same shell variable.
 
@@ -187,21 +274,93 @@ export OSLO_DEFAULT_MODE=lua
 oslo.opts.set("default_mode", "lua")
 ```
 
-The character that runs one line as Lua from a shell prompt. One punctuation character, or `none`
-for no escape at all.
+**Multi-line Lua**, which is not a setting. Enter always ends the *line*; the reader accumulates
+lines into a block and shows the continuation prompt while it wants more — the same path an
+unfinished `for` loop already took in shell. A block that has asked for more keeps asking until an
+**empty line** ends it:
 
-```sh
-export OSLO_LUA_PREFIX=,
+```
+lua > local function sq(x)
+   >   return x * x
+   > end
+   > print(sq(9))
+   >                  <- Enter on an empty line runs the block
+81
 ```
 
+A one-liner still runs on Enter: `1 + 1` answers `2` without ceremony. The empty line is Python's
+rule and it is there for Python's reason — after `local function sq(x)` the parser is satisfied
+again at `end`, so running the moment it is satisfied would mean no line after `end` could ever be
+typed.
+
+**`oslo.lua.enter = "newline"`** makes Enter always start another line, so even a one-liner waits
+for the empty line. It is a config setting and oslo never infers it — it briefly chose from the
+keyboard-protocol probe, which was still oslo choosing, and it chose wrong whenever Ctrl+Enter was
+*grabbed* by the terminal or the window manager. No probe can see a grab.
+
 ```lua
-oslo.opts.set("lua_prefix", ",")
+if oslo.term.kitty_keyboard() then
+  oslo.lua.enter = "newline"
+end
 ```
 
-Watching the switch. One hook covers vi-mode changes too, so a handler that cares about only one
-reads `kind`.
+**A `key` hook is told which prompt it is at**, as `k.language` (`"sh"` or `"lua"`). This matters
+for exactly the case above: a shell shortcut bound to Enter-on-an-empty-line will otherwise fire at
+a Lua prompt and make a block impossible to finish.
 
 ```lua
+oslo.on.on_key(function(k)
+  if k.language ~= "sh" then return end
+  if k.name == "enter" and k.text == "" then
+    return { text = "ls", submit = true }
+  end
+end)
+```
+
+What Enter does at a Lua prompt: `auto` (the default), `newline` or `smart`.
+
+**The default is not a choice oslo makes blind — it asks the terminal.** A Lua prompt is where you
+write a block, so Enter *should* add a line and Ctrl+Enter should send. But Ctrl+Enter only exists
+on a terminal that reports modifiers: in the legacy encoding Ctrl-M *is* Enter, the same byte, with
+nothing to tell them apart. Picking either behaviour blind is wrong one way or the other — `newline`
+on a plain terminal is a prompt that can never run anything, and `smart` everywhere takes block
+editing from everyone whose terminal is fine.
+
+So oslo negotiates before the first prompt (`CSI ? u`, with a Primary DA barrier — see
+`oslo_ui::term::negotiate`) and reads the answer:
+
+| the terminal | Enter | what sends |
+|---|---|---|
+| reports modifiers — kitty, foot, ghostty, WezTerm, Alacritty with the protocol on | adds a line | **Ctrl+Enter** |
+| does not | **sends** | Enter |
+
+Either way there is always a key that sends, and no behaviour appears on a terminal that cannot
+support it. Force one if your terminal reports wrongly:
+
+
+
+**Ask what your terminal actually answered**, rather than guessing from behaviour:
+
+```lua
+oslo.sys.terminal()   --> { kitty_keyboard = true, synchronized_output = true, … }
+```
+
+`kitty_keyboard` is the one that decides all of this. If it is `false`, Ctrl+Enter and Ctrl+Tab do
+not reach oslo at all and no setting can change that — the keystroke is indistinguishable from
+plain Enter and plain Tab before it ever leaves the terminal.
+
+
+
+```lua
+oslo.opts.set("lua_enter", "smart")
+```
+
+> **Ctrl+Enter needs a terminal that reports modifiers.** In the legacy encoding Ctrl-M *is* Enter
+> — the same byte — so there is nothing to tell them apart; only the kitty keyboard protocol
+> separates them. Where it cannot arrive, **Alt+Enter** decodes to the same key (`ESC` then `CR`),
+> so `newline` never leaves a prompt with no way to send. That fallback is what makes it safe as a
+> default, not the key you should reach for.
+lua
 -- m is { kind = "language", from = "sh", to = "lua" }
 oslo.on.pre_mode_change(function(m)  end)
 oslo.on.post_mode_change(function(m) end)

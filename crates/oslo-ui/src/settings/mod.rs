@@ -20,6 +20,8 @@ pub use nav::{Icons, Nav, TypeNav};
 pub struct Settings {
     pub completion: Completion,
     pub suggest: Suggest,
+    /// `oslo.lua`: what the Lua prompt does that the shell prompt does not.
+    pub lua: Lua,
     pub history: History,
     /// `oslo.vi`: whether vi mode is on, and the cursor for each mode.
     pub vi: Vi,
@@ -195,11 +197,21 @@ pub struct Completion {
     pub fuzzy: Fuzzy,
     /// How candidates are ordered: by how often they are used, or by name.
     pub sort: Sort,
-    /// The kinds of candidate offered at all. `None` means every kind, which is the default.
+    /// The kinds of candidate offered at a **shell** prompt. `None` means every kind, the default.
     ///
     /// Kept as the kind strings the candidates already carry, so adding a kind does not mean
     /// touching an enum here as well.
-    pub sources: Option<Vec<String>>,
+    ///
+    /// `oslo.completion.sh_sources`, named to match [`Self::lua_sources`] and
+    /// `oslo.suggest.sh_sources`.
+    pub sh_sources: Option<Vec<String>>,
+    /// The kinds of candidate offered at a **Lua** prompt: `function`, `field`, `keyword`.
+    ///
+    /// A separate list for the same reason the suggestion sources are separate — the two prompts
+    /// do not share a single kind of candidate between them, so one filter could only ever be
+    /// wrong for one of them. A shell filter naming `file` and `option` would have silently
+    /// emptied every Lua dropdown.
+    pub lua_sources: Option<Vec<String>>,
 }
 
 /// `oslo.completion.sort`.
@@ -226,7 +238,8 @@ impl Default for Completion {
             // have already said "help me" by pressing Tab.
             fuzzy: Fuzzy::Smart,
             sort: Sort::default(),
-            sources: None,
+            sh_sources: None,
+            lua_sources: None,
         }
     }
 }
@@ -236,7 +249,17 @@ impl Default for Completion {
 pub enum Source {
     /// A line the user has actually run.
     History,
-    /// A command name being typed.
+    /// **Whatever this prompt's completer offers** — the same machinery Tab uses, reduced to the
+    /// single answer a ghost can promise.
+    ///
+    /// What that *is* follows the language, because "complete what is being typed" is one idea
+    /// with two answers: at a shell prompt a command name — a builtin, an alias, a function,
+    /// something on `$PATH` — and at a Lua prompt a Lua name, meaning a global or a field of the
+    /// table being indexed. `names` and `globals` are accepted spellings for the Lua reading.
+    ///
+    /// There was briefly a separate `Names` source for the Lua half. That was a mistake: two names
+    /// for one job, and a config had to know which prompt it was writing for to pick the right
+    /// word.
     Completion,
     /// A file or directory.
     Path,
@@ -250,7 +273,7 @@ pub enum Source {
     /// Whatever a config or a plugin registered with `oslo.suggest.provider`.
     ///
     /// **A source among the sources.** Where a plugin's answer sits relative to your own history is
-    /// one line of `oslo.suggest.sources`, and it is your line — the plugin does not get to decide
+    /// one line of `oslo.suggest.sh_sources`, and it is your line — the plugin does not get to decide
     /// that it outranks what you have actually run.
     Provider,
 }
@@ -259,7 +282,9 @@ impl Source {
     fn parse(name: &str) -> Option<Source> {
         match name {
             "history" => Some(Source::History),
-            "completion" | "completions" => Some(Source::Completion),
+            // `names` and `globals` are the Lua reading of the same source, taken as spellings
+            // rather than as a source of their own — see `Source::Completion`.
+            "completion" | "completions" | "names" | "name" | "globals" => Some(Source::Completion),
             "path" | "paths" | "file" => Some(Source::Path),
             "predict" | "prediction" => Some(Source::Prediction),
             "provider" | "providers" | "plugin" => Some(Source::Provider),
@@ -385,8 +410,23 @@ impl Default for Finder {
 /// `oslo.suggest`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Suggest {
-    /// The sources to try, in order. Empty turns suggestions off entirely.
-    pub sources: Vec<Source>,
+    /// The sources to try at a **shell** prompt, in order. Empty turns suggestions off entirely.
+    ///
+    /// `oslo.suggest.sh_sources`. It was `sources`, which read as "the sources" — the one list —
+    /// right up until there were two of them and the other one had to be called something else.
+    pub sh_sources: Vec<Source>,
+    /// The sources to try at a **Lua** prompt.
+    ///
+    /// **A separate list, because a Lua prompt is not a shell prompt wearing a hat.** Three of the
+    /// shell sources answer with shell — `path` completes a filename in command position,
+    /// `predict` is a model trained on commands, `completion` offers names from `$PATH` — and none
+    /// of them can be typed at a Lua prompt. Sharing one list meant a config tuned for the shell
+    /// silently decided what Lua did, and what it usually decided was nothing at all.
+    ///
+    /// **`history` is deliberately not the default here.** A Lua prompt should behave like an
+    /// editor: what it offers is what *exists* — the names in the session — not what you happened
+    /// to type last week. History is still available by asking for it.
+    pub lua_sources: Vec<Source>,
     /// The key that takes the whole ghost suggestion, e.g. `"right"`.
     ///
     /// The action was always bindable through `oslo.keys`, but not under the name the suggestion
@@ -412,13 +452,24 @@ impl Default for Suggest {
         // fish's order. History first because a line the user has run is a better guess than
         // anything that can be ranked.
         Suggest {
-            sources: vec![Source::History, Source::Completion, Source::Path],
+            sh_sources: vec![Source::History, Source::Completion, Source::Path],
+            // The completer alone: an editor offers what exists, and at a Lua prompt that is the
+            // names in the session. See the field.
+            lua_sources: vec![Source::Completion],
             accept: None,
             accept_word: None,
             skip_history: vec!["rm".to_string()],
         }
     }
 }
+
+#[cfg(test)]
+#[path = "suggest_tests.rs"]
+mod suggest_tests;
+
+#[path = "lua.rs"]
+mod lua_settings;
+pub use lua_settings::{Enter, Lua};
 
 /// `oslo.history`.
 #[derive(Debug, Clone, PartialEq, Eq)]

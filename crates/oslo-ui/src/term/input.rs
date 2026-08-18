@@ -26,6 +26,15 @@ pub enum Key {
     Clear,
     ToggleScope,
     BackTab,
+    /// Ctrl+Enter: send the block, whatever plain Enter is set to do.
+    ///
+    /// Only a terminal that reports modifiers produces this — in the legacy encoding Ctrl-M *is*
+    /// Enter, the same byte. Alt+Enter decodes to it as well, so a terminal without the kitty
+    /// keyboard protocol still has one way to send.
+    Submit,
+    /// Ctrl+Tab: switch language. Reported only under the kitty keyboard protocol, for the same
+    /// reason — plain Tab and Ctrl+Tab are both `0x09` otherwise.
+    CtrlTab,
     Resized,
     Ctrl(char),
     Alt(char),
@@ -178,6 +187,12 @@ fn text_key(bytes: &[u8], alt: bool) -> Key {
         return Key::Ignored;
     };
     match text.chars().next() {
+        // **Alt+Enter, the stand-in for Ctrl+Enter where that cannot arrive.** A terminal without
+        // the kitty protocol sends it as `ESC` then `CR`, which landed on the control-character
+        // arm below and was discarded. It decodes to `Submit` — the same key Ctrl+Enter produces —
+        // so nothing downstream has to know which terminal it is on, and a prompt where Enter
+        // inserts a newline always has a way to send. See `startup::mode`.
+        Some('\r' | '\n') if alt => Key::Submit,
         Some(c) if !c.is_control() && alt => Key::Alt(c),
         Some(c) if !c.is_control() => Key::Char(c),
         _ => Key::Ignored,

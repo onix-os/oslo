@@ -84,6 +84,30 @@ fn facts(oslo: &mut Table, system: &mut Table, process: &mut Table, env: &Arc<Mu
         ok(Value::Bool(guard.shell_name.starts_with('-')))
     });
 
+    // oslo.sys.terminal() — what the terminal answered when oslo asked, before the first prompt.
+    //
+    // **Negotiated, not guessed from `$TERM`.** oslo sends `CSI ? u` and a Primary DA barrier at
+    // startup and reads what comes back, so these are the terminal's own answers. They decide real
+    // behaviour — `kitty_keyboard` is why Ctrl+Enter and Ctrl+Tab either exist or do not — and
+    // until this existed there was no way to see which side of that a session had landed on. That
+    // turned every "this key does nothing" into a guess.
+    put(system, "terminal", |_, _| {
+        let mut out = Table::new();
+        match oslo_ui::term::capability::snapshot_if_initialized() {
+            Some(caps) => {
+                out.set_str("kitty_keyboard", Value::Bool(caps.kitty_keyboard));
+                out.set_str("synchronized_output", Value::Bool(caps.synchronized_output));
+                out.set_str("bracketed_paste", Value::Bool(caps.bracketed_paste));
+                out.set_str("semantic_clicks", Value::Bool(caps.semantic_clicks));
+                out.set_str("legacy_clicks", Value::Bool(caps.legacy_clicks));
+            }
+            // Nothing was negotiated: a script, a pipe, `$TERM=dumb`. Reported as absent rather
+            // than as false, because "not asked" and "asked and told no" are different facts.
+            None => out.set_str("negotiated", Value::Bool(false)),
+        }
+        ok(Value::table(out))
+    });
+
     // oslo.proc.status() -> $? — the status of the last command, whichever language ran it.
     let env_status = Arc::clone(env);
     put(process, "status", move |_, _| {
@@ -124,9 +148,7 @@ fn facts(oslo: &mut Table, system: &mut Table, process: &mut Table, env: &Arc<Mu
     // `toggle_key` was here. It is now `oslo.keys`, which is where every other key binding already
     // lived — see `crate::startup::mode::TOGGLE_KEY`.
     put(&mut opts, "names", |_, _| {
-        ok(list(
-            ["default_mode", "lua_prefix"].into_iter().map(Value::str),
-        ))
+        ok(list(["default_mode"].into_iter().map(Value::str)))
     });
     oslo.set_str("opts", Value::table(opts));
 }

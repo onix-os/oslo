@@ -64,6 +64,7 @@ pub(crate) mod spawn;
 mod spec;
 mod state;
 mod suggest;
+mod term;
 pub(crate) mod timer;
 pub(crate) mod tool;
 mod ui;
@@ -127,6 +128,7 @@ pub fn install(host: &dyn Host, registry: &Registry, env: Arc<Mutex<Environment>
     for name in [
         "completion",
         "suggest",
+        "lua",
         "history",
         "keys",
         "finder",
@@ -186,7 +188,7 @@ pub fn install(host: &dyn Host, registry: &Registry, env: Arc<Mutex<Environment>
         complete::install(&mut completion.borrow_mut());
     }
     // `oslo.suggest.provider` — a ghost written in Lua. In the settings table for the same reason:
-    // `oslo.suggest.sources` is next to it, and the two are read together.
+    // `oslo.suggest.sh_sources` is next to it, and the two are read together.
     if let Value::Table(table) = oslo.get_str("suggest") {
         suggest::install(&mut table.borrow_mut());
     }
@@ -247,6 +249,8 @@ pub fn install(host: &dyn Host, registry: &Registry, env: Arc<Mutex<Environment>
     oslo.set_str("env", Value::table(variables_t));
     extend(&mut oslo, "proc", process);
     oslo.set_str("sys", Value::table(system));
+    // What this terminal can do, asked of the terminal itself. See [`term`].
+    oslo.set_str("term", Value::table(term::build()));
     oslo.set_str("ui", Value::table(ui));
     optional::install(&mut oslo, host, &env);
     let oslo = Value::table(oslo);
@@ -257,6 +261,11 @@ pub fn install(host: &dyn Host, registry: &Registry, env: Arc<Mutex<Environment>
     nix::add_helpers(host);
     // Last, so it replaces the standard names rather than being replaced by them.
     policy::apply(host);
+    // And then the shorthand: `oslo.fs` is also `fs`, `oslo.math.eval` is also `math.eval`.
+    //
+    // After `policy::apply`, so a name policy replaced is the one that gets lifted. Nothing in
+    // `_G` is overwritten — see `flatten_namespace` — so this can only add.
+    host.flatten_namespace("oslo");
 }
 /// Fold everything in `additions` into the table already on `oslo` under `name`.
 ///

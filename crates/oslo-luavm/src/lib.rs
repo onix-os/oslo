@@ -139,6 +139,117 @@ impl Engine {
         *self.varargs.borrow_mut() = args;
     }
 
+    /// Lift the members of the global `table` to globals in their own right, so `oslo.fs` is `fs`.
+    ///
+    /// Three rules, and each one exists to avoid taking something away:
+    ///
+    /// * **A name already in `_G` is never replaced.** `math` is Lua's, and a session where
+    ///   `math.floor` had quietly become something else would be worse than one where `math.eval`
+    ///   simply did not exist.
+    /// * **Two tables under one name are merged**, missing keys only. This is what makes `math`
+    ///   work: Lua's `floor`, `pi` and `sqrt` stay exactly where they were and oslo's `eval`,
+    ///   `convert` and `session` join them. The two share no key, which is checked by the test
+    ///   rather than assumed.
+    /// * **Only tables and functions are lifted.** A bare `version` global holding a string is
+    ///   noise; a namespace or something callable is what the shorthand is for.
+    ///
+    /// Set **raw**, deliberately: `_G`'s `__newindex` sends values beside the table rather than
+    /// into it (see [`globals`]), and a name that is not really in `_G` is invisible to
+    /// `pairs(_G)`, to `rawget`, and to the completion that reads them.
+    pub fn flatten_namespace(&self, table: &str) {
+        let Ok(mut lua) = self.lua.try_borrow_mut() else {
+            return;
+        };
+        lua.enter(|ctx| {
+            let globals = ctx.globals();
+            let key = Value::String(luna::String::from_slice(&ctx, table.as_bytes()));
+            let Value::Table(source) = globals.get_value(ctx, key) else {
+                return;
+            };
+            for (name, value) in source.iter(ctx).collect::<Vec<_>>() {
+                let Value::String(_) = name else { continue };
+                if !matches!(value, Value::Table(_) | Value::Function(_)) {
+                    continue;
+                }
+                match globals.get_value(ctx, name) {
+                    // Free: take it.
+                    Value::Nil => {
+                        let _ = globals.set(ctx, name, value);
+                    }
+                    // Taken by a table, and this is one too: fill in what it does not have.
+                    Value::Table(existing) => {
+                        let Value::Table(adding) = value else {
+                            continue;
+                        };
+                        for (key, value) in adding.iter(ctx).collect::<Vec<_>>() {
+                            if matches!(existing.get_value(ctx, key), Value::Nil) {
+                                let _ = existing.set(ctx, key, value);
+                            }
+                        }
+                    }
+                    // Taken by something that is not a table. Left alone.
+                    _ => {}
+                }
+            }
+        });
+    }
+
+    /// The string keys of the table reached by `path`, each with whether it is callable.
+    ///
+    /// `[]` answers the globals. This is what completion needs and it is deliberately *not*
+    /// [`Host::global`]: that converts the value it finds into the shell's own type, which for
+    /// `_G` means deep-copying every table in the session — and `_G._G` means doing it forever.
+    /// Here nothing leaves the VM but names.
+    ///
+    /// **Through the metatable as well**, because oslo's globals are reached that way: `_G` has an
+    /// `__index` and the names behind it are exactly the ones a bare `fs` or `math` resolves to. A
+    /// list that skipped them would omit the names this exists to offer. Only one level of it is
+    /// followed and a table is never visited twice, so a cyclic `__index` cannot spin.
+    pub fn names_at(&self, path: &[String]) -> Vec<(String, bool)> {
+        let Ok(mut lua) = self.lua.try_borrow_mut() else {
+            return Vec::new();
+        };
+        lua.enter(|ctx| {
+            let mut table = ctx.globals();
+            for step in path {
+                let key = Value::String(luna::String::from_slice(&ctx, step.as_bytes()));
+                match table.get_value(ctx, key) {
+                    Value::Table(next) => table = next,
+                    _ => return Vec::new(),
+                }
+            }
+            let mut out = Vec::new();
+            let mut current = Some(table);
+            // A depth cap rather than a visited-set: an `__index` chain that loops is bounded by
+            // this, and four links is already deeper than any real one.
+            let mut depth = 0;
+            while let Some(table) = current.take() {
+                if depth > 4 {
+                    break;
+                }
+                depth += 1;
+                for (key, value) in table.iter(ctx) {
+                    let Value::String(name) = key else { continue };
+                    let Ok(name) = std::str::from_utf8(name.as_bytes()) else {
+                        continue;
+                    };
+                    out.push((name.to_string(), matches!(value, Value::Function(_))));
+                }
+                current = table
+                    .metatable()
+                    .map(|meta| {
+                        let key = Value::String(luna::String::from_slice(&ctx, b"__index"));
+                        meta.get_value(ctx, key)
+                    })
+                    .and_then(|index| match index {
+                        Value::Table(next) => Some(next),
+                        _ => None,
+                    });
+            }
+            out
+        })
+    }
+
     /// How many bytes the VM's heap is holding, or `None` while it is running.
     ///
     /// Only a *change* in this is worth reading. The absolute figure counts every string, table and
@@ -274,6 +385,10 @@ impl Engine {
 }
 
 impl Host for Engine {
+    fn flatten_namespace(&self, table: &str) {
+        Engine::flatten_namespace(self, table);
+    }
+
     fn global(&self, name: &str) -> Own {
         let Ok(mut lua) = self.lua.try_borrow_mut() else {
             return host::with_running(|host| host.global(name)).unwrap_or(Own::Nil);

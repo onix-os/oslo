@@ -13,7 +13,7 @@ description = "The bottom of oslo: the syntax tree, the error type, feature bits
 # the Lua *API*, which sits at the top of the stack.
 
 # `track` only. All engine access stays behind `track::kv`.
-tagdata = { git = "https://github.com/robolibs/tagdata", tag = "0.1.3", features = ["maintenance"] }
+tagdata = { git = "https://github.com/robolibs/tagdata", tag = "v0.1.4", features = ["maintenance"] }
 getrandom = "0.4"
 # The predictor behind command prediction and repair. Pure Rust with no dependencies of its own,
 # which is why it can be here at the bottom of the stack beside the history it reads.
@@ -43,7 +43,7 @@ sha2 = "0.10"
 # measured reasons — see the note in the root manifest.
 regex = { version = "1", default-features = false, features = [
     "std", "unicode-case", "unicode-perl",
-    "perf-literal", "perf-inline",
+    "perf-inline",
 ] }
 
 # `ShellError::Nix`, the hostname a session is recorded under, and `isatty` — which is how

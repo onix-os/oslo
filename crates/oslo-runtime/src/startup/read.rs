@@ -47,9 +47,10 @@ pub(super) fn read_command(
     // the one about to be typed. Nothing else drains the flag, so leaving it set made the next
     // command abort at its first boundary with 130 and no output.
     oslo_shell::exec::job::forget_interrupt();
-    // Read once per command, not per line: it is a setting, and a line that changed it mid-command
-    // would classify its own continuation differently from its first line.
-    let lua_prefix = mode::lua_prefix(&env_struct.lock().unwrap());
+    // Read once per command: a line that changed it mid-block would read its own continuation
+    // under a different rule from its first line. `oslo.lua.enter`, from the config — never
+    // inferred from the terminal, see `settings::Lua::enter`.
+    let lua_enter = oslo_ui::settings::current().lua.enter;
     let mut buffer = String::new();
     let mut secret = false;
     let mut heredoc = HeredocTracker::default();
@@ -89,13 +90,22 @@ pub(super) fn read_command(
         let prompt = if buffer.is_empty() {
             prompt::primary_prompt(env_struct, lua, last_status, *current)
         } else {
+            // A `prompt.continuation` written in Lua wins, then `$PS2`, then oslo's own marker.
+            // Both of the first two are things somebody asked for by name; the third is only a
+            // default, and a default that overrode either would be a setting that does nothing.
             lua.render_with("prompt.continuation", &{
                 let mut ctx = prompt::segment_context(last_status, *current, None);
                 // The one fact that is different here, and the reason the field exists.
                 ctx.continuation = true;
                 ctx
             })
-            .unwrap_or_else(|| rc::ps2(&mut env_struct.lock().unwrap()))
+            .or_else(|| rc::ps2_if_set(&mut env_struct.lock().unwrap()))
+            .unwrap_or_else(|| {
+                oslo_ui::prompt::continuation_marker(
+                    reading.name(),
+                    oslo_ui::prompt::block_depth(&buffer),
+                )
+            })
         };
 
         // The right prompt is no longer computed here. It is built by the `render` closure
@@ -193,13 +203,14 @@ pub(super) fn read_command(
                 Some(helper),
                 // Position the completion menu from the prompt's displayed width.
                 oslo_ui::prompt::printed_width(&prompt),
-                Some(mode::TOGGLE_KEY.to_string()),
+                mode::TOGGLE_KEYS.iter().map(|k| k.to_string()).collect(),
             );
             assist.begin();
             // Handed as a *function* so the editor can rebuild it when the vi mode changes —
             // see `read_line`. It is not called per keystroke; the generation counter decides.
             let mut render = {
                 let at_start = buffer.is_empty();
+                let nesting = oslo_ui::prompt::block_depth(&buffer);
                 let language = *current;
                 let reading_now = reading;
                 move || -> (String, String) {
@@ -207,12 +218,19 @@ pub(super) fn read_command(
                     let left = if at_start {
                         prompt::primary_prompt(env_struct, lua, last_status, language)
                     } else {
+                        // The same three, in the same order, as the measuring copy above: a
+                        // `prompt.continuation` written in Lua, then `$PS2`, then oslo's own
+                        // marker. They have to agree — this closure draws the row and the other
+                        // one is what the width was measured from.
                         lua.render_with("prompt.continuation", &{
                             let mut ctx = prompt::segment_context(last_status, language, None);
                             ctx.continuation = true;
                             ctx
                         })
-                        .unwrap_or_else(|| rc::ps2(&mut env_struct.lock().unwrap()))
+                        .or_else(|| rc::ps2_if_set(&mut env_struct.lock().unwrap()))
+                        .unwrap_or_else(|| {
+                            oslo_ui::prompt::continuation_marker(reading_now.name(), nesting)
+                        })
                     };
                     drop(_timed);
                     let _timed = crate::startup::timing::open("prompt-right");
@@ -322,11 +340,11 @@ pub(super) fn read_command(
             raw.as_str()
         };
 
-        // The prefix is read once, off the first line of a *shell* command: it runs that one line
-        // as Lua without touching the mode the prompt goes back to. A Lua line is never examined —
-        // that prompt is a REPL. See `startup::mode`.
+        // The prefix is read off the first line of a *shell* command: it runs that one line as Lua
+        // without touching the mode the prompt goes back to. A Lua line is never examined — that
+        // prompt is a REPL. See `startup::mode`.
         let line = if buffer.is_empty() {
-            match mode::classify(*current, line, lua_prefix) {
+            match mode::classify(*current, line) {
                 Line::Normal(text) => text,
                 Line::OneOff { mode, text } => {
                     reading = mode;
@@ -354,19 +372,29 @@ pub(super) fn read_command(
         // Observed on the expanded text, which is what actually goes into the buffer.
         heredoc.observe(&expanded);
 
+        // **A Lua block, once it has started, ends on a blank line.** Python's rule, and it is
+        // there for the same reason: after `local function f()` the next complete-looking thing is
+        // `end`, and running the moment the parser is satisfied means a block can never be extended
+        // — no line after `end` could ever be typed. So a block that has already asked for more
+        // keeps asking until an empty line says it is done.
+        //
+        // Only after the first line. A one-liner runs on Enter exactly as it always has, which is
+        // what `1 + 1` at a REPL must do.
+        //
+        // With `lua_enter = "newline"` that applies from the very first line: Enter always starts
+        // another, and only an empty one runs the block. Without it, a one-liner runs on Enter and
+        // the rule takes effect once a block has begun.
+        let blank_ends_it = reading == Mode::Lua
+            && (!buffer.is_empty() || lua_enter == oslo_ui::settings::Enter::Newline);
+        if blank_ends_it && expanded.trim().is_empty() {
+            return finish(buffer, reading, secret, helper);
+        }
         buffer.push_str(&expanded);
-        if is_complete(&buffer, reading) {
+        if !blank_ends_it && is_complete(&buffer, reading) {
             // The frecency table is fed from here rather than from the editor's `validate`,
             // because with editor multi-line off (which is what `PS2` costs) `validate` never
             // sees a multi-line command whole — see `OsloHelper::record_command_use`.
-            {
-                helper.record_command_use(&buffer);
-            }
-            return Input::Command {
-                text: buffer,
-                mode: reading,
-                secret,
-            };
+            return finish(buffer, reading, secret, helper);
         }
         buffer.push('\n');
         announce_prompt = Some(oslo_ui::marks::PromptKind::Continuation);
@@ -414,6 +442,16 @@ impl HeredocTracker {
 /// Lua answers through its own parser rather than through Lua's `<eof>`-in-the-message trick,
 /// which is all the reference implementation's C API can expose. Having our own parser means
 /// asking it directly.
+/// Hand the accumulated block back as a command.
+///
+/// The frecency table is fed from here rather than from the editor's `validate`, because the
+/// editor never sees a multi-line command whole — it edits one line at a time and this is what
+/// joins them.
+fn finish(text: String, mode: Mode, secret: bool, helper: &oslo_ui::OsloHelper) -> Input {
+    helper.record_command_use(&text);
+    Input::Command { text, mode, secret }
+}
+
 pub(super) fn is_complete(source: &str, mode: Mode) -> bool {
     match mode {
         Mode::Lua => oslo_luavm::is_complete(source),

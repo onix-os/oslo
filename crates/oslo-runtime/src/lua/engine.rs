@@ -103,6 +103,8 @@ pub fn call_here(f: &Value, args: Vec<Value>) -> LuaResult<Vec<Value>> {
 mod borrow;
 /// The hook reach-backs, which every fire site outside this file uses.
 mod hooks;
+#[path = "engine/installs.rs"]
+mod installs;
 /// Running a plugin's entry file on this session's interpreter.
 #[cfg(feature = "plugin")]
 mod plugin;
@@ -496,14 +498,6 @@ impl LuaEngine {
         oslo_ui::settings::read_lua_settings(&self.interp.global("oslo"))
     }
 
-    /// Install `oslo.completion.columns` as the dropdown's column provider.
-    ///
-    /// Called after the config has run, for the same reason the theme is read then rather than
-    /// pushed in as it goes: a config may set the function, change its mind, and set another.
-    pub fn install_column_provider(&self) {
-        crate::lua::columns::install(&self.interp);
-    }
-
     /// Render a list of segments into one string, dropping the least important until it fits.
     fn render_segments(&self, list: &Value, ctx: &Context) -> Option<String> {
         use crate::lua::api::segment;
@@ -548,11 +542,6 @@ impl LuaEngine {
         let budget = ctx.cols.max(20) / 2;
         let kept = segment::fit(pieces, budget);
         Some(kept.into_iter().map(|p| p.text).collect())
-    }
-
-    /// Install `oslo.completion.for_command`, the per-command completion hook.
-    pub fn install_command_completer(&self) {
-        crate::lua::columns::install_command_completer(&self.interp);
     }
 
     /// The prompt function currently installed, if any.

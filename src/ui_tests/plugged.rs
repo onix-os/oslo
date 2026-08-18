@@ -27,7 +27,7 @@ fn a_registered_provider_answers_the_ghost() {
     use crate::ui::suggest::{self, Ask, Only, Provider};
 
     let mut with_provider = settings::current().as_ref().clone();
-    with_provider.suggest.sources = vec![Source::Provider];
+    with_provider.suggest.sh_sources = vec![Source::Provider];
     settings::install(with_provider);
 
     suggest::forget();

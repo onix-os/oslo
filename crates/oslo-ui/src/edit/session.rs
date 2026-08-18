@@ -5,6 +5,7 @@
 
 use super::buffer::{Buffer, Case};
 use super::keymap::{Action, action};
+
 use super::screen;
 pub use crate::term::Key;
 use crate::term::{InputEvent, Keys, PasteError, Restore, Screen};
@@ -12,6 +13,8 @@ use std::io::Write;
 
 mod assist;
 pub use assist::{Assist, NoAssist};
+
+mod shortcuts;
 
 /// What a `key` hook asked the editor to do with the keystroke it just saw.
 ///
@@ -33,6 +36,8 @@ pub enum KeyHook {
 #[derive(Debug, Default)]
 pub struct Session {
     pub buffer: Buffer,
+    /// Whether the key before this one was a Tab on an empty line. See [`shortcuts::tab`].
+    tab_armed: bool,
     /// Vi mode, when `oslo.vi.enabled` asked for it.
     ///
     /// `None` is emacs, and then nothing vi-shaped is consulted at all. With it on, insert mode
@@ -47,6 +52,7 @@ impl Session {
         buffer.set(text, cursor);
         Session {
             buffer,
+            tab_armed: false,
             vi: crate::vi::enabled().then(super::vi::Vi::default),
         }
     }
@@ -151,6 +157,17 @@ impl Session {
         // an explicit binding has to beat a heuristic about what someone probably meant.
         if let Some(bound) = assist.binding(key) {
             return self.perform(bound, assist);
+        }
+
+        // Tab twice on an empty line switches language — the fallback for a terminal that cannot
+        // deliver Shift+Tab. See `shortcuts::tab`.
+        //
+        // **After the hook and after the bindings**, both deliberately: the `key` hook is
+        // documented to see every keystroke before anything acts on it, and a config that bound
+        // Tab to something meant it. This is oslo's own default, and a default is the thing that
+        // gives way.
+        if let Some(step) = shortcuts::tab(self, key) {
+            return step;
         }
 
         // **Right at the end of the line takes the ghost suggestion**, and moves the cursor

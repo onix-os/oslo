@@ -34,18 +34,31 @@ fn a_false_flag_is_not_the_same_as_an_absent_one() {
 #[test]
 fn the_completion_sources_are_read_including_an_empty_list() {
     let (all, _) = settings_from("oslo = { completion = {} }");
-    assert_eq!(all.completion.sources, None, "unset means every kind");
+    assert_eq!(all.completion.sh_sources, None, "unset means every kind");
+    assert_eq!(all.completion.lua_sources, None);
 
     let (some, problems) =
-        settings_from("oslo = { completion = { sources = {'command', 'dir'} } }");
+        settings_from("oslo = { completion = { sh_sources = {'command', 'dir'} } }");
     assert!(problems.is_empty(), "{problems:?}");
     assert_eq!(
-        some.completion.sources.as_deref(),
+        some.completion.sh_sources.as_deref(),
         Some(["command".to_string(), "dir".to_string()].as_slice())
     );
 
-    let (none, _) = settings_from("oslo = { completion = { sources = {} } }");
-    assert_eq!(none.completion.sources.as_deref(), Some([].as_slice()));
+    let (none, _) = settings_from("oslo = { completion = { sh_sources = {} } }");
+    assert_eq!(none.completion.sh_sources.as_deref(), Some([].as_slice()));
+
+    // **One kind filter per prompt.** The two prompts share no kind of candidate — the shell has
+    // `command`, `file`, `dir`; Lua has `function`, `field`, `keyword` — so a single list could
+    // only ever be right for one of them, and a shell filter silently emptied every Lua dropdown.
+    let (lua, problems) =
+        settings_from("oslo = { completion = { lua_sources = {'function', 'field'} } }");
+    assert!(problems.is_empty(), "{problems:?}");
+    assert_eq!(
+        lua.completion.lua_sources.as_deref(),
+        Some(["function".to_string(), "field".to_string()].as_slice())
+    );
+    assert_eq!(lua.completion.sh_sources, None, "the shell's is untouched");
 }
 
 #[test]
@@ -74,7 +87,7 @@ fn the_suggestion_keys_are_read_under_their_own_names() {
     assert_eq!(settings.suggest.accept.as_deref(), Some("right"));
     assert_eq!(settings.suggest.accept_word.as_deref(), Some("alt-f"));
     // Naming them does not disturb the sources.
-    assert_eq!(settings.suggest.sources, Suggest::default().sources);
+    assert_eq!(settings.suggest.sh_sources, Suggest::default().sh_sources);
 }
 
 /// **These are checked like every other key a config names.** They are compared against the
@@ -100,27 +113,27 @@ fn a_suggestion_key_that_cannot_fire_is_reported() {
 #[test]
 fn suggestion_sources_keep_the_order_they_were_written_in() {
     let (settings, problems) =
-        settings_from("oslo = { suggest = { sources = {'path', 'history'} } }");
+        settings_from("oslo = { suggest = { sh_sources = {'path', 'history'} } }");
     assert!(problems.is_empty(), "{problems:?}");
     assert_eq!(
-        settings.suggest.sources,
+        settings.suggest.sh_sources,
         vec![Source::Path, Source::History]
     );
 
     // An empty list turns suggestions off, which is a thing someone may want.
-    let (off, _) = settings_from("oslo = { suggest = { sources = {} } }");
-    assert!(off.suggest.sources.is_empty());
+    let (off, _) = settings_from("oslo = { suggest = { sh_sources = {} } }");
+    assert!(off.suggest.sh_sources.is_empty());
 }
 
 /// A typo that silently turns a source off is the kind of thing that gets blamed on the shell.
 #[test]
 fn an_unknown_source_is_named() {
     let (settings, problems) =
-        settings_from("oslo = { suggest = { sources = {'history', 'psychic'} } }");
+        settings_from("oslo = { suggest = { sh_sources = {'history', 'psychic'} } }");
     assert_eq!(problems.len(), 1, "{problems:?}");
     assert!(problems[0].contains("psychic"), "{problems:?}");
     // The ones that were understood still take effect.
-    assert_eq!(settings.suggest.sources, vec![Source::History]);
+    assert_eq!(settings.suggest.sh_sources, vec![Source::History]);
 }
 
 #[test]

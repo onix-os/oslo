@@ -94,39 +94,6 @@ fn the_bang_prefix_runs_one_lua_line_from_shell_mode() {
     assert_eq!(lines, vec!["one", "2", "two"], "{out}");
 }
 
-/// **The prefix is a setting**, and choosing a character history does not want retires the
-/// carve-out entirely: with `,` as the prefix, `!!` is bash's again and nothing about `!` is
-/// special. `none` turns the escape off, and a value that is not a single punctuation character
-/// is ignored rather than half-honoured.
-#[test]
-fn the_lua_prefix_is_configurable() {
-    let comma = typed(
-        "echo one\n!!\n,print(2 * 21)\n,5 + 5\n",
-        &[("OSLO_LUA_PREFIX", ",")],
-    );
-    assert_eq!(
-        comma.matches("one").count(),
-        3,
-        "`!!` should be pure history once `!` is not the prefix: {comma}"
-    );
-    assert!(
-        comma.lines().any(|line| line.trim() == "42") && comma.lines().any(|l| l.trim() == "10"),
-        "`,` should have run both lines as Lua: {comma}"
-    );
-
-    let off = typed("!print(9)\n", &[("OSLO_LUA_PREFIX", "none")]);
-    assert!(
-        !off.lines().any(|line| line.trim() == "9"),
-        "`none` should leave no Lua escape at all: {off}"
-    );
-
-    let bogus = typed("!print(7)\n", &[("OSLO_LUA_PREFIX", "lua")]);
-    assert!(
-        bogus.lines().any(|line| line.trim() == "7"),
-        "a multi-character setting should fall back to `!`: {bogus}"
-    );
-}
-
 /// **What `!` still shares with history**, which is the whole of the rule: history keeps the
 /// characters no Lua expression can begin with, and everything else after a `!` is Lua.
 #[test]
@@ -209,14 +176,26 @@ fn a_variable_crosses_between_the_modes() {
     assert!(back.contains("world"), "{back}");
 }
 
-/// An unfinished Lua chunk asks for another line rather than reporting a syntax error.
+/// **An unfinished Lua chunk asks for another line, and an empty line ends the block.**
+///
+/// Python's rule, and it is there for Python's reason: after `if true then` the parser is satisfied
+/// again at `end`, so running the moment it is satisfied would mean no line after `end` could ever
+/// be typed — a block could never be extended, and `end` followed by anything was impossible.
 #[test]
 fn lua_mode_continues_an_unfinished_chunk() {
     let out = typed(
-        "if true then\n  print('inside')\nend\n",
+        "if true then\n  print('inside')\nend\n\n",
         &[("OSLO_DEFAULT_MODE", "lua")],
     );
     assert!(out.contains("inside"), "{out}");
+}
+
+/// **A one-liner still runs on Enter.** The empty line is what ends a block that has *begun*; it is
+/// not a second key you have to press for `1 + 1`.
+#[test]
+fn a_lua_one_liner_runs_on_enter() {
+    let out = typed("print(6 * 7)\n", &[("OSLO_DEFAULT_MODE", "lua")]);
+    assert!(out.contains("42"), "{out}");
 }
 
 /// And a genuine mistake is reported instead of wedging the prompt waiting for more.

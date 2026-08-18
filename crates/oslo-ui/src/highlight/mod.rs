@@ -12,6 +12,7 @@
 //! [`Context::check_paths`]).
 
 pub(crate) mod lex;
+pub(crate) mod lua;
 #[path = "paths.rs"]
 mod paths;
 use paths::{names_an_existing_file, touches_a_variable};

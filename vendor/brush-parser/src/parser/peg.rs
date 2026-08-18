@@ -111,13 +111,25 @@ peg::parser! {
             non_posix_extensions_enabled() c:arithmetic_for_clause() { ast::CompoundCommand::ArithmeticForClause(c) } /
             expected!("compound command")
 
+        // **The two opening parens must touch.** The tokenizer emits `(` twice for `((` and twice
+        // for `( (` alike, so the grammar alone cannot tell an arithmetic command from a subshell
+        // that begins with another subshell — and this rule is tried first, so `( ( echo hi ) )`
+        // parsed as arithmetic and then failed at evaluation with "Invalid character in arithmetic
+        // expression". bash reads it as nested subshells and prints `hi`.
+        //
+        // The source positions are what distinguish them: in `((` the second paren starts where the
+        // first one ends. Guarding here rather than in the tokenizer keeps `$((`, `for ((` and
+        // every other spelling on the path they already take.
         pub(crate) rule arithmetic_command() -> ast::ArithmeticCommand =
-            start:specific_operator("(") specific_operator("(") expr:arithmetic_expression() specific_operator(")") end:specific_operator(")") {
+            start:specific_operator("(") second:specific_operator("(") expr:arithmetic_expression() specific_operator(")") end:specific_operator(")") {?
+                if start.location().end.index != second.location().start.index {
+                    return Err("arithmetic command requires adjacent parens");
+                }
                 let loc = SourceSpan::within(
                     start.location(),
                     end.location()
                 );
-                ast::ArithmeticCommand { expr, loc }
+                Ok(ast::ArithmeticCommand { expr, loc })
             }
 
         pub(crate) rule arithmetic_expression() -> ast::UnexpandedArithmeticExpr =

@@ -8,7 +8,7 @@
 //! blank the rest — and every value nothing answers to is reported rather than ignored, because a
 //! typo that silently leaves a feature off looks exactly like the feature being broken.
 
-use super::{Settings, Sort, Source};
+use super::{Enter, Settings, Sort, Source};
 use oslo_base::value::Value;
 
 pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
@@ -72,7 +72,15 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
             "case_sensitive",
             &mut settings.completion.case_sensitive,
         );
-        if let Value::Table(list) = table.get_str("sources") {
+        // One kind filter per prompt: the two share no kind of candidate, so a single list could
+        // only ever be right for one of them. See `settings::Completion::lua_sources`.
+        for (field, slot) in [
+            ("sh_sources", &mut settings.completion.sh_sources),
+            ("lua_sources", &mut settings.completion.lua_sources),
+        ] {
+            let Value::Table(list) = table.get(&Value::str(field)) else {
+                continue;
+            };
             let mut kinds = Vec::new();
             for value in list.borrow().sequence() {
                 if let Value::Str(name) = value {
@@ -86,7 +94,7 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
                     }
                 }
             }
-            settings.completion.sources = Some(kinds);
+            *slot = Some(kinds);
         }
         if let Value::Str(name) = table.get_str("sort") {
             match name.as_ref() {
@@ -105,9 +113,31 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
         );
     }
 
+    if let Value::Table(table) = oslo.get_str("lua") {
+        let table = table.borrow();
+        if let Value::Str(name) = table.get_str("enter") {
+            match name.as_ref() {
+                "newline" | "line" => settings.lua.enter = Enter::Newline,
+                "run" | "runs" | "send" => settings.lua.enter = Enter::Runs,
+                other => problems.push(format!(
+                    "oslo.lua.enter: '{other}' is not a behaviour; use 'run' or 'newline'"
+                )),
+            }
+        }
+    }
+
     if let Value::Table(table) = oslo.get_str("suggest") {
         let table = table.borrow();
-        if let Value::Table(list) = table.get_str("sources") {
+        // Two lists, read the same way: `sources` is the shell prompt's and `lua_sources` is the
+        // Lua prompt's. Separate because most of the sources answer with shell — see
+        // `settings::Suggest::lua_sources`.
+        for (field, slot) in [
+            ("sh_sources", &mut settings.suggest.sh_sources),
+            ("lua_sources", &mut settings.suggest.lua_sources),
+        ] {
+            let Value::Table(list) = table.get(&Value::str(field)) else {
+                continue;
+            };
             let mut sources = Vec::new();
             for value in list.borrow().sequence() {
                 let Value::Str(name) = value else { continue };
@@ -118,12 +148,12 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
                     // kind of thing that gets blamed on the shell.
                     Some(_) => {}
                     None => problems.push(format!(
-                        "oslo.suggest.sources: '{name}' is not a source; \
-                         the sources are history, completion, path, predict and provider"
+                        "oslo.suggest.{field}: '{name}' is not a source; \
+                         the sources are history, completion, names, path, predict and provider"
                     )),
                 }
             }
-            settings.suggest.sources = sources;
+            *slot = sources;
         }
         // Canonical, and checked, like every other key a config names: these are compared against
         // the editor's own name for the key that was pressed, so `"Ctrl-F"` or `"return"` was

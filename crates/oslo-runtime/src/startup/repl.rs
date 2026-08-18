@@ -84,6 +84,11 @@ pub fn run_repl(login: bool) -> ! {
         // set, since what is read is the whole `oslo` table each time.
         config::apply(&lua);
     }
+    // **Not part of the config**, which is why it is out here: completing a Lua name against the
+    // names that exist is what the Lua prompt *is*, not something a config file switches on. It
+    // was installed from `config::apply` and so ran only for a session that had a config file at
+    // all — every fresh `$HOME` had a Lua prompt that completed nothing.
+    lua.install_lua_completer();
     // **A shell inside a shell says so before it becomes one.** After the config, so a setting can
     // turn the question off; before everything below, so answering "no" pays for none of it.
     super::nested::ask_before_nesting();

@@ -568,3 +568,7 @@ pub fn refresh_finished() {
 pub fn refreshing() -> bool {
     crate::pending::outstanding()
 }
+
+#[path = "prompt/continuation.rs"]
+mod continuation;
+pub use continuation::{block_depth, continuation_marker};
