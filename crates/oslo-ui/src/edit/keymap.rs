@@ -47,10 +47,11 @@ pub enum Action {
     Lower,
     Capitalise,
 
-    /// Ctrl+Enter: run what is on the line, whatever Enter is set to do.
+    /// Enter, and Ctrl+Enter: run what is on the line.
+    ///
+    /// One line. A Lua block spanning several is accumulated by the *reader* behind a continuation
+    /// prompt, not by putting newlines in a buffer the editor draws as one row.
     Accept,
-    /// Enter: run the line, or add a line to it — see [`super::session::set_enter_adds_a_line`].
-    AcceptOrNewline,
     /// Ctrl-C: abandon this line and start a new one.
     Abort,
     /// Ctrl-D on an empty line: end of input.
@@ -95,7 +96,7 @@ pub fn action(key: Key) -> Action {
         // `unix-line-discard` and it cuts to the *cursor*, not the whole line.
         Key::Clear => Action::KillToStart,
 
-        Key::Accept => Action::AcceptOrNewline,
+        Key::Accept => Action::Accept,
         // Ctrl+Enter, and Alt+Enter where that cannot arrive — both decode to `Submit` on
         // purpose, see `term::input`. Always sends, whatever Enter has been set to do.
         Key::Submit => Action::Accept,

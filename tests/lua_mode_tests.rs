@@ -209,14 +209,26 @@ fn a_variable_crosses_between_the_modes() {
     assert!(back.contains("world"), "{back}");
 }
 
-/// An unfinished Lua chunk asks for another line rather than reporting a syntax error.
+/// **An unfinished Lua chunk asks for another line, and an empty line ends the block.**
+///
+/// Python's rule, and it is there for Python's reason: after `if true then` the parser is satisfied
+/// again at `end`, so running the moment it is satisfied would mean no line after `end` could ever
+/// be typed — a block could never be extended, and `end` followed by anything was impossible.
 #[test]
 fn lua_mode_continues_an_unfinished_chunk() {
     let out = typed(
-        "if true then\n  print('inside')\nend\n",
+        "if true then\n  print('inside')\nend\n\n",
         &[("OSLO_DEFAULT_MODE", "lua")],
     );
     assert!(out.contains("inside"), "{out}");
+}
+
+/// **A one-liner still runs on Enter.** The empty line is what ends a block that has *begun*; it is
+/// not a second key you have to press for `1 + 1`.
+#[test]
+fn a_lua_one_liner_runs_on_enter() {
+    let out = typed("print(6 * 7)\n", &[("OSLO_DEFAULT_MODE", "lua")]);
+    assert!(out.contains("42"), "{out}");
 }
 
 /// And a genuine mistake is reported instead of wedging the prompt waiting for more.

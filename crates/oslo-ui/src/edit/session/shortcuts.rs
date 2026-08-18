@@ -1,44 +1,15 @@
-//! The two keys whose meaning *this prompt* decides, rather than the keymap.
+//! Keys whose meaning *this prompt* decides, rather than the keymap.
 //!
-//! Both are here because both are the same shape of question — an ordinary key that means one
-//! thing at a shell prompt and may mean another at a Lua one — and because both are settings with
-//! a default that has to be argued for rather than assumed.
-//!
-//! # Enter
-//!
-//! At a shell prompt Enter runs the line, and nothing here changes that: a shell where Enter did
-//! not run the line would break every habit anyone has, and an unfinished command already gets a
-//! continuation prompt. At a **Lua** prompt it is a real choice, because a Lua block is often
-//! several lines and every Enter meaning "run this" interrupts writing one.
-//!
-//! # Why this is safe to turn on
-//!
-//! Ctrl+Enter and Alt+Enter always send, whatever Enter is set to do — they decode to one key on
-//! purpose (see [`crate::term::keyboard`]). That matters more than it looks: **Ctrl+Enter does not
-//! exist on a terminal without the kitty keyboard protocol.** In the legacy encoding Ctrl-M *is*
-//! Enter, so the two cannot be told apart, and a prompt whose only send key was Ctrl+Enter would
-//! be a prompt that never runs anything. Alt+Enter arrives in both encodings, so there is always a
-//! way out of a block.
+//! **Enter is not one of them, and that was a mistake worth recording.** It briefly inserted a
+//! newline into the buffer so a Lua block could be typed across several lines. The editor edits one
+//! line and draws one line, so the buffer held `\n` while the screen redrew the prompt over itself
+//! — the block was invisible and the prompt appeared to stutter. Multi-line input is the *reader's*
+//! job, not the editor's: `startup::read` accumulates lines and shows a continuation prompt, which
+//! is how every REPL does it and how oslo already did it for shell.
 
 use super::{Session, Step};
 use crate::term::Key;
 use std::sync::atomic::{AtomicBool, Ordering};
-
-static ADDS_A_LINE: AtomicBool = AtomicBool::new(false);
-
-/// Choose what Enter does: add a line to the block, or send it.
-///
-/// **A global rather than a field on the session**, and for once that is the honest shape: the
-/// prompt changes language from a key handler that has no way to reach the session, and this
-/// belongs to the language rather than to the line being edited. The REPL sets it again on every
-/// switch, so toggling to Lua mid-line still gets the right answer for the next Enter.
-pub fn set_enter_adds_a_line(yes: bool) {
-    ADDS_A_LINE.store(yes, Ordering::Relaxed);
-}
-
-pub(super) fn adds_a_line() -> bool {
-    ADDS_A_LINE.load(Ordering::Relaxed)
-}
 
 static DOUBLE_TAB: AtomicBool = AtomicBool::new(true);
 
@@ -59,34 +30,6 @@ pub fn set_double_tab_toggles(yes: bool) {
 
 pub(super) fn double_tab_toggles() -> bool {
     DOUBLE_TAB.load(Ordering::Relaxed)
-}
-
-/// What Enter does right now: send the block, or add a line to it.
-///
-/// **A blank line sends, and that is not a nicety — it is the only thing that makes `newline` mode
-/// survivable.** The designed send key is Ctrl+Enter, which needs a terminal that reports modifiers;
-/// where it does not arrive — no kitty protocol, or the chord grabbed by the terminal or the window
-/// manager before oslo sees it — every Enter appended another line and *nothing ever ran*. The
-/// buffer grew until Ctrl+C. A capability probe cannot save this, because a grabbed key looks
-/// exactly like a supported one.
-///
-/// So the escape is a key that cannot be taken away: press Enter on a line you have not typed
-/// anything on. It is what Python, IPython and every other block-reading REPL do, and it needs no
-/// modifier, no protocol and no setting.
-pub(super) fn enter(session: &mut Session) -> Step {
-    if !adds_a_line() {
-        return Step::Accept;
-    }
-    let text = session.buffer.text();
-    // The line the cursor is on, which is what "blank line" has to mean — not the whole buffer.
-    let current = text.rsplit('\n').next().unwrap_or("");
-    // An empty buffer is not a block waiting to be sent; it is an empty prompt, and Enter there
-    // does what it does everywhere else.
-    if text.trim().is_empty() || current.trim().is_empty() {
-        return Step::Accept;
-    }
-    session.buffer.insert_str("\n");
-    Step::Continue { redraw: true }
 }
 
 /// **Tab twice on an empty line switches language.**
@@ -119,7 +62,7 @@ pub(super) fn tab(session: &mut Session, key: Key) -> Option<Step> {
 
 #[cfg(test)]
 mod tests {
-    use super::super::{Key, Session, Step, set_double_tab_toggles, set_enter_adds_a_line};
+    use super::super::{Key, Session, Step, set_double_tab_toggles};
     use crate::edit::session::NoAssist;
 
     fn run(start: &str, keys: &[Key]) -> (Session, Vec<Step>) {
@@ -133,50 +76,6 @@ mod tests {
             .map(|k| session.apply(*k, &mut assist))
             .collect();
         (session, steps)
-    }
-
-    /// **Enter sends by default**, adds a line only where that was asked for, and the chord sends
-    /// either way — which is the property the module docs turn on.
-    #[test]
-    fn enter_sends_unless_it_has_been_asked_to_add_a_line() {
-        let (session, steps) = run("print(1)", &[Key::Accept]);
-        assert_eq!(steps, vec![Step::Accept], "the default is to send");
-        assert_eq!(session.buffer.text(), "print(1)");
-
-        set_enter_adds_a_line(true);
-        let (session, steps) = run("do", &[Key::Accept, Key::Char('x')]);
-        assert!(
-            matches!(steps[0], Step::Continue { .. }),
-            "Enter should not have sent: {steps:?}"
-        );
-        assert_eq!(session.buffer.text(), "do\nx", "it added a line");
-
-        // The chord sends regardless, which is the immediate way out of the block.
-        let (_, steps) = run("do\nend", &[Key::Submit]);
-        assert_eq!(steps, vec![Step::Accept], "Ctrl+Enter always sends");
-
-        // **And Enter on a blank line sends**, which is the way out that needs no chord at all.
-        // Without it, a terminal that cannot deliver Ctrl+Enter — or one where the chord is
-        // grabbed before oslo sees it — left every Enter appending another line and nothing ever
-        // running. The buffer grew until Ctrl+C.
-        let (_, steps) = run("do\nend", &[Key::Accept, Key::Accept]);
-        assert_eq!(
-            steps,
-            vec![Step::Continue { redraw: true }, Step::Accept],
-            "the first opens a blank line, the second sends: {steps:?}"
-        );
-
-        // An empty prompt is not a block waiting to be sent.
-        let (_, steps) = run("", &[Key::Accept]);
-        assert_eq!(
-            steps,
-            vec![Step::Accept],
-            "an empty line is just an empty line"
-        );
-
-        set_enter_adds_a_line(false);
-        let (_, steps) = run("print(1)", &[Key::Accept]);
-        assert_eq!(steps, vec![Step::Accept], "and back to sending");
     }
 
     /// **Tab twice on an empty line switches language**, which is the fallback for a terminal that

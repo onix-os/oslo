@@ -293,6 +293,70 @@ export OSLO_LUA_PREFIX=,
 oslo.opts.set("lua_prefix", ",")
 ```
 
+**Multi-line Lua**, which is not a setting. Enter always ends the *line*; the reader accumulates
+lines into a block and shows the continuation prompt while it wants more — the same path an
+unfinished `for` loop already took in shell. A block that has asked for more keeps asking until an
+**empty line** ends it:
+
+```
+lua > local function sq(x)
+   >   return x * x
+   > end
+   > print(sq(9))
+   >                  <- Enter on an empty line runs the block
+81
+```
+
+A one-liner still runs on Enter: `1 + 1` answers `2` without ceremony. The empty line is Python's
+rule and it is there for Python's reason — after `local function sq(x)` the parser is satisfied
+again at `end`, so running the moment it is satisfied would mean no line after `end` could ever be
+typed.
+
+**`oslo.lua.enter = "newline"`** makes Enter always start another line, so even a one-liner waits
+for the empty line. It is a config setting and oslo never infers it — it briefly chose from the
+keyboard-protocol probe, which was still oslo choosing, and it chose wrong whenever Ctrl+Enter was
+*grabbed* by the terminal or the window manager. No probe can see a grab.
+
+```lua
+if oslo.term.kitty_keyboard() then
+  oslo.lua.enter = "newline"
+end
+```
+
+**A `key` hook is told which prompt it is at**, as `k.language` (`"sh"` or `"lua"`). This matters
+for exactly the case above: a shell shortcut bound to Enter-on-an-empty-line will otherwise fire at
+a Lua prompt and make a block impossible to finish.
+
+```lua
+oslo.on.on_key(function(k)
+  if k.language ~= "sh" then return end
+  if k.name == "enter" and k.text == "" then
+    return { text = "ls", submit = true }
+  end
+end)
+```
+
+The language a session starts in. Both spellings reach the same shell variable.
+
+```sh
+export OSLO_DEFAULT_MODE=lua
+```
+
+```lua
+oslo.opts.set("default_mode", "lua")
+```
+
+The character that runs one line as Lua from a shell prompt. One punctuation character, or `none`
+for no escape at all.
+
+```sh
+export OSLO_LUA_PREFIX=,
+```
+
+```lua
+oslo.opts.set("lua_prefix", ",")
+```
+
 What Enter does at a Lua prompt: `auto` (the default), `newline` or `smart`.
 
 **The default is not a choice oslo makes blind — it asks the terminal.** A Lua prompt is where you
@@ -313,10 +377,7 @@ So oslo negotiates before the first prompt (`CSI ? u`, with a Primary DA barrier
 Either way there is always a key that sends, and no behaviour appears on a terminal that cannot
 support it. Force one if your terminal reports wrongly:
 
-```sh
-export OSLO_LUA_ENTER=newline   # Enter always adds a line; Ctrl+Enter (or Alt+Enter) sends
-export OSLO_LUA_ENTER=smart     # Enter always sends a finished block
-```
+
 
 **Ask what your terminal actually answered**, rather than guessing from behaviour:
 
@@ -349,14 +410,7 @@ export OSLO_LUA_PREFIX=,
 oslo.opts.set("lua_prefix", ",")
 ```
 
-What Enter does at a Lua prompt. **`newline` is the default**: Enter adds a line and **Ctrl+Enter
-sends**. A Lua prompt is where you write a block — a function, a loop, an `if` — and an Enter that
-means "run this now" interrupts writing every one of them. `smart` is the older behaviour and what
-most Lua REPLs do: a finished block runs on Enter, an unfinished one asks for more.
 
-```sh
-export OSLO_LUA_ENTER=smart     # Enter sends again
-```
 
 ```lua
 oslo.opts.set("lua_enter", "smart")

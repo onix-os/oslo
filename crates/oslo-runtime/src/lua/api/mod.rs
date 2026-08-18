@@ -64,6 +64,7 @@ pub(crate) mod spawn;
 mod spec;
 mod state;
 mod suggest;
+mod term;
 pub(crate) mod timer;
 pub(crate) mod tool;
 mod ui;
@@ -127,6 +128,7 @@ pub fn install(host: &dyn Host, registry: &Registry, env: Arc<Mutex<Environment>
     for name in [
         "completion",
         "suggest",
+        "lua",
         "history",
         "keys",
         "finder",
@@ -247,6 +249,8 @@ pub fn install(host: &dyn Host, registry: &Registry, env: Arc<Mutex<Environment>
     oslo.set_str("env", Value::table(variables_t));
     extend(&mut oslo, "proc", process);
     oslo.set_str("sys", Value::table(system));
+    // What this terminal can do, asked of the terminal itself. See [`term`].
+    oslo.set_str("term", Value::table(term::build()));
     oslo.set_str("ui", Value::table(ui));
     optional::install(&mut oslo, host, &env);
     let oslo = Value::table(oslo);

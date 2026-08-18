@@ -88,6 +88,20 @@ pub fn key_table(name: &str, pressed: Option<char>, text: &str, cursor: usize) -
                 None => Value::Nil,
             },
         );
+        // **Which language the prompt is reading**, `"sh"` or `"lua"`.
+        //
+        // A handler that acts on a key without knowing this acts in both, and the two prompts want
+        // opposite things from the same keystroke. Enter on an empty line is the case that found
+        // it: as a shell shortcut it runs `ls`, and at a Lua prompt it is what ends a multi-line
+        // block — so a config with the shell shortcut made Lua blocks impossible to finish, with
+        // nothing on screen to connect the two.
+        t.set_str(
+            "language",
+            match crate::prompt::language() {
+                Some(language) => Value::str(language),
+                None => Value::str("sh"),
+            },
+        );
     }
     table
 }

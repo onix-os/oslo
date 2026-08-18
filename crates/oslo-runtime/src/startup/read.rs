@@ -50,13 +50,11 @@ pub(super) fn read_command(
     // Read once per command, not per line: it is a setting, and a line that changed it mid-command
     // would classify its own continuation differently from its first line.
     let lua_prefix = mode::lua_prefix(&env_struct.lock().unwrap());
-    // What Enter does, which is a property of the language and so is set again on every switch
-    // below. Shell is never affected: a shell prompt where Enter did not run the line would break
-    // every habit anyone has, and the multi-line case there is already a continuation prompt.
-    let enter = mode::enter_key(&env_struct.lock().unwrap());
-    let adds_a_line = |language: Mode| language == Mode::Lua && enter == mode::Enter::Newline;
-    oslo_ui::edit::session::set_enter_adds_a_line(adds_a_line(*current));
     oslo_ui::edit::session::set_double_tab_toggles(mode::double_tab(&env_struct.lock().unwrap()));
+    // Read once per command: a line that changed it mid-block would read its own continuation
+    // under a different rule from its first line. `oslo.lua.enter`, from the config — never
+    // inferred from the terminal, see `settings::Lua::enter`.
+    let lua_enter = oslo_ui::settings::current().lua.enter;
     let mut buffer = String::new();
     let mut secret = false;
     let mut heredoc = HeredocTracker::default();
@@ -265,7 +263,6 @@ pub(super) fn read_command(
                         &fields,
                     );
                     *current = switched;
-                    oslo_ui::edit::session::set_enter_adds_a_line(adds_a_line(switched));
                     crate::lua::engine::fire_at_here(
                         crate::lua::api::hooks::at::POST_MODE_CHANGE,
                         &fields,
@@ -362,19 +359,29 @@ pub(super) fn read_command(
         // Observed on the expanded text, which is what actually goes into the buffer.
         heredoc.observe(&expanded);
 
+        // **A Lua block, once it has started, ends on a blank line.** Python's rule, and it is
+        // there for the same reason: after `local function f()` the next complete-looking thing is
+        // `end`, and running the moment the parser is satisfied means a block can never be extended
+        // — no line after `end` could ever be typed. So a block that has already asked for more
+        // keeps asking until an empty line says it is done.
+        //
+        // Only after the first line. A one-liner runs on Enter exactly as it always has, which is
+        // what `1 + 1` at a REPL must do.
+        //
+        // With `lua_enter = "newline"` that applies from the very first line: Enter always starts
+        // another, and only an empty one runs the block. Without it, a one-liner runs on Enter and
+        // the rule takes effect once a block has begun.
+        let blank_ends_it = reading == Mode::Lua
+            && (!buffer.is_empty() || lua_enter == oslo_ui::settings::Enter::Newline);
+        if blank_ends_it && expanded.trim().is_empty() {
+            return finish(buffer, reading, secret, helper);
+        }
         buffer.push_str(&expanded);
-        if is_complete(&buffer, reading) {
+        if !blank_ends_it && is_complete(&buffer, reading) {
             // The frecency table is fed from here rather than from the editor's `validate`,
             // because with editor multi-line off (which is what `PS2` costs) `validate` never
             // sees a multi-line command whole — see `OsloHelper::record_command_use`.
-            {
-                helper.record_command_use(&buffer);
-            }
-            return Input::Command {
-                text: buffer,
-                mode: reading,
-                secret,
-            };
+            return finish(buffer, reading, secret, helper);
         }
         buffer.push('\n');
         announce_prompt = Some(oslo_ui::marks::PromptKind::Continuation);
@@ -422,6 +429,16 @@ impl HeredocTracker {
 /// Lua answers through its own parser rather than through Lua's `<eof>`-in-the-message trick,
 /// which is all the reference implementation's C API can expose. Having our own parser means
 /// asking it directly.
+/// Hand the accumulated block back as a command.
+///
+/// The frecency table is fed from here rather than from the editor's `validate`, because the
+/// editor never sees a multi-line command whole — it edits one line at a time and this is what
+/// joins them.
+fn finish(text: String, mode: Mode, secret: bool, helper: &oslo_ui::OsloHelper) -> Input {
+    helper.record_command_use(&text);
+    Input::Command { text, mode, secret }
+}
+
 pub(super) fn is_complete(source: &str, mode: Mode) -> bool {
     match mode {
         Mode::Lua => oslo_luavm::is_complete(source),

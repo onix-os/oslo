@@ -15,7 +15,7 @@ mod assist;
 pub use assist::{Assist, NoAssist};
 
 mod shortcuts;
-pub use shortcuts::{set_double_tab_toggles, set_enter_adds_a_line};
+pub use shortcuts::set_double_tab_toggles;
 
 /// What a `key` hook asked the editor to do with the keystroke it just saw.
 ///
@@ -297,9 +297,6 @@ impl Session {
             },
 
             Action::Accept => Step::Accept,
-            // **Enter, which may mean either thing** — see `shortcuts::enter`, including why a
-            // blank line has to send.
-            Action::AcceptOrNewline => shortcuts::enter(self),
             Action::Abort => Step::Interrupted,
             Action::Eof => Step::Eof,
             Action::Redraw => Step::ClearScreen,

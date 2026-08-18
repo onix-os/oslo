@@ -20,6 +20,8 @@ pub use nav::{Icons, Nav, TypeNav};
 pub struct Settings {
     pub completion: Completion,
     pub suggest: Suggest,
+    /// `oslo.lua`: what the Lua prompt does that the shell prompt does not.
+    pub lua: Lua,
     pub history: History,
     /// `oslo.vi`: whether vi mode is on, and the cursor for each mode.
     pub vi: Vi,
@@ -464,6 +466,10 @@ impl Default for Suggest {
 #[cfg(test)]
 #[path = "suggest_tests.rs"]
 mod suggest_tests;
+
+#[path = "lua.rs"]
+mod lua_settings;
+pub use lua_settings::{Enter, Lua};
 
 /// `oslo.history`.
 #[derive(Debug, Clone, PartialEq, Eq)]

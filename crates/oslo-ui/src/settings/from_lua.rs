@@ -8,7 +8,7 @@
 //! blank the rest — and every value nothing answers to is reported rather than ignored, because a
 //! typo that silently leaves a feature off looks exactly like the feature being broken.
 
-use super::{Settings, Sort, Source};
+use super::{Enter, Settings, Sort, Source};
 use oslo_base::value::Value;
 
 pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
@@ -111,6 +111,19 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
             &mut settings.completion.fuzzy,
             &mut problems,
         );
+    }
+
+    if let Value::Table(table) = oslo.get_str("lua") {
+        let table = table.borrow();
+        if let Value::Str(name) = table.get_str("enter") {
+            match name.as_ref() {
+                "newline" | "line" => settings.lua.enter = Enter::Newline,
+                "run" | "runs" | "send" => settings.lua.enter = Enter::Runs,
+                other => problems.push(format!(
+                    "oslo.lua.enter: '{other}' is not a behaviour; use 'run' or 'newline'"
+                )),
+            }
+        }
     }
 
     if let Value::Table(table) = oslo.get_str("suggest") {

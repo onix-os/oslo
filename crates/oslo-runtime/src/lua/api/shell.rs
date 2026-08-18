@@ -149,9 +149,7 @@ fn facts(oslo: &mut Table, system: &mut Table, process: &mut Table, env: &Arc<Mu
     // lived — see `crate::startup::mode::TOGGLE_KEY`.
     put(&mut opts, "names", |_, _| {
         ok(list(
-            ["default_mode", "lua_prefix", "lua_enter"]
-                .into_iter()
-                .map(Value::str),
+            ["default_mode", "lua_prefix"].into_iter().map(Value::str),
         ))
     });
     oslo.set_str("opts", Value::table(opts));
