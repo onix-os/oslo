@@ -31,8 +31,9 @@ bresilla@tron | I | lua > for _, f in ipairs(sh.ls(".")) do print(f.name) end
 ```
 
 Each language keeps its own history, suggestions, completion and syntax colouring. A `!` prefix
-runs one line as Lua from a shell prompt (`!print(("x"):rep(40))`) without changing the mode; `!!`
-and `!$` are still history, because history keeps the characters no Lua expression can start with.
+runs one line as Lua from a shell prompt (`!print(("x"):rep(40))`) without changing the mode. History
+keeps what it always had — `!!`, `!$`, `!^`, `!*`, `!?str?` and the numbered `!5` and `!-2` — and a
+space is how you say you meant Lua: `!5` is event five, `! 5 + 5` is ten.
 The Lua prompt takes **no prefix at all** — it is a REPL, every line is Lua, and `oslo.run{"ls", "-la"}` is
 how you run a program from it.
 

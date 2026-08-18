@@ -12,13 +12,12 @@
 //! * events — `!!` (previous line), `!n`, `!-n`, `!str` (most recent line starting with `str`),
 //!   `!?str?` (most recent line containing `str`);
 //!
-//! **Three of those do not reach the prompt**, and that is a decision made one layer up rather
-//! than a gap here. `!` is also the prefix that runs one line as Lua, and
-//! `startup::mode::classify` reads it first: it keeps `!!`, `!$`, `!^`, `!*` and `!?str?` for
-//! history, the forms no Lua expression can begin with, and sends `!n`, `!-n` and `!str` to Lua
-//! instead. Everything stays implemented and tested here either way: this module is what a
-//! non-prompt caller would use, and which forms the prompt spends is not this layer's question to
-//! answer.
+//! **One of those does not reach the prompt**, and that is a decision made one layer up rather than
+//! a gap here. `!` is also the prefix that runs one line as Lua, and `startup::mode::classify`
+//! reads it first. It keeps `!!`, `!$`, `!^`, `!*`, `!?str?` and the numbered `!n` and `!-n` for
+//! history, and sends `!str` to Lua — because `!print(1)` has exactly that shape. Everything stays
+//! implemented and tested here either way: this module is what a non-prompt caller would use, and
+//! which forms the prompt spends is not this layer's question to answer.
 //! * word designators — `!$`, `!^`, `!*` as shorthands on the previous line, and the general
 //!   `!event:designator` with `0`, `n`, `^`, `$`, `*`, `n-m`, `n*`;
 //! * quick substitution — `^old^new` and `^old^new^suffix`, only when `^` opens the line.

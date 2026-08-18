@@ -94,8 +94,8 @@ fn the_bang_prefix_runs_one_lua_line_from_shell_mode() {
     assert_eq!(lines, vec!["one", "2", "two"], "{out}");
 }
 
-/// **What `!` still shares with history**, which is the whole of the rule: history keeps the
-/// characters no Lua expression can begin with, and everything else after a `!` is Lua.
+/// **What `!` still shares with history**: the characters no Lua expression can begin with, and —
+/// by choice rather than deduction — every digit. A space is how you say you meant Lua.
 #[test]
 fn history_keeps_the_forms_no_lua_expression_can_start_with() {
     // `!!` re-runs the line before it: typed once, echoed by the expansion, run twice.
@@ -106,9 +106,33 @@ fn history_keeps_the_forms_no_lua_expression_can_start_with() {
         "!! should have echoed and re-run the line: {bang}"
     );
 
-    // A digit *can* begin a Lua expression, so `!5 + 5` is arithmetic rather than event five.
-    let sum = typed("!5 + 5\n", &[]);
+    // **A digit is an event number.** `!1` is the first line, not the Lua expression `1`.
+    let first = typed("echo alpha\necho beta\n!1\n", &[]);
+    assert_eq!(
+        first.matches("alpha").count(),
+        3,
+        "!1 should have echoed and re-run the first line: {first}"
+    );
+    let back = typed("echo alpha\necho beta\n!-2\n", &[]);
+    assert_eq!(
+        back.matches("alpha").count(),
+        3,
+        "!-2 should reach two events back: {back}"
+    );
+
+    // **A space is the escape**, and it is the only way to write a Lua line that opens with a
+    // number. It needs no rule of its own: a space is not a character history claims.
+    let sum = typed("! 5 + 5\n", &[]);
     assert!(sum.lines().any(|line| line.trim() == "10"), "{sum}");
+    let negative = typed("! -3 + 1\n", &[]);
+    assert!(
+        negative.lines().any(|line| line.trim() == "-2"),
+        "{negative}"
+    );
+
+    // A letter was never ambiguous, so it still needs no space.
+    let lua = typed("!print(6 * 7)\n", &[]);
+    assert!(lua.lines().any(|line| line.trim() == "42"), "{lua}");
 
     // And `=` is oslo's own shorthand for where a program lives, which the old `=` prefix ate.
     let equals = typed("echo =ls\n", &[]);

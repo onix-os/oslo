@@ -107,13 +107,31 @@ exactly as it is in any other Lua interpreter, and Shift+Tab is how you leave.
 **What `!` shares with history.** `!!` is the most-typed two characters in any shell, so the line
 between them is drawn where it can be drawn without guessing:
 
-> History keeps the characters that **cannot begin a Lua expression**. Everything that can, is Lua.
+> History keeps the characters that **cannot begin a Lua expression** — and every digit. A space is
+> how you say you meant Lua.
 
-`!!`, `!$`, `!^`, `!*` and `!?str?` stay history — Lua has no `!`, `$` or `?` at all, and no
-expression opens with `^` or `*`. And `!5 + 5`, `!-x` and `!print(1)` are Lua. What that costs is
-bash's numbered events `!5` and `!-2`, and `!name`; all three are ambiguous by construction, and
-all three have the same better answer here in the history finder, which searches as you type and
-shows what it found before it runs.
+`!!`, `!$`, `!^`, `!*` and `!?str?` stay history and need no argument: Lua has no `!`, `$` or `?` at
+all, and no expression opens with `^` or `*`.
+
+The digits do need one. `!5` reads as Lua exactly as well as it reads as event five, so nothing
+about what Lua can parse decides it — what decides it is that `!5` and `!-2` are forty years of
+muscle memory, and `!5` as a Lua literal is not something anyone types on purpose.
+
+```sh
+!5          # history event 5
+! 5 + 5     # Lua, 10
+!-2         # history, two events back
+! -x        # Lua
+!print(1)   # Lua — a letter was never ambiguous
+```
+
+The space is not a special case: it is simply not one of the characters history claims, so a line
+beginning `! ` was already reaching Lua, and Lua does not care about the space.
+
+What it still costs is `!name`, "the last line starting with *name*". That one cannot come back —
+`!print(1)` has exactly its shape, and running one Lua line is the whole reason the prefix exists.
+The history finder is the better answer to the same question: it searches as you type and shows
+what it found before it runs.
 
 **The prefix is `!` and does not move.** The carve-out above is written against that character
 specifically — which forms history keeps depends on which ones Lua could have meant — so a prefix

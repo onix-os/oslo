@@ -102,17 +102,35 @@ pub enum Line<'a> {
 /// shell mode `!` also opens a **history reference**, and `!!` is the most-typed two characters in
 /// any shell. The line between the two is drawn where it can be drawn without guessing:
 ///
-/// > History keeps the characters that **cannot begin a Lua expression**. Everything that can, is
-/// > Lua.
+/// > History keeps the characters that **cannot begin a Lua expression** — *and every digit*.
+/// > A space is how you say you meant Lua.
 ///
-/// So `!!`, `!$`, `!^`, `!*` and `!?str?` stay history — Lua has no `!`, `$` or `?` at all, and no
-/// expression opens with `^` or `*`. And `!5 + 5`, `!-x` and `!print(1)` are Lua, because every
-/// one of those is something a person might reasonably type and mean.
+/// `!!`, `!$`, `!^`, `!*` and `!?str?` stay history because Lua has no `!`, `$` or `?` at all and
+/// no expression opens with `^` or `*`. Those need no exception; the digits do.
 ///
-/// What that costs is bash's `!5` and `!-2`, the numbered events, and `!name` — "the last line
-/// starting with *name*". All three are ambiguous by construction, and all three have the same
-/// better answer in this shell: the history finder searches as you type and shows you what it
-/// found *before* it runs. A numbered event you have to count to is the form nobody misses.
+/// **A digit is history, and that is a choice rather than a deduction.** `!5` could be either —
+/// event five, or the Lua expression `5` — so no rule about what Lua can parse decides it. What
+/// decides it is that `!5` and `!-2` are *forty years of muscle memory* and `!5` as a Lua literal
+/// is a thing nobody types on purpose. So a digit immediately after the `!` is an event number, and
+/// so is a `-` with a digit behind it.
+///
+/// **The space is the escape**, and it costs one keystroke in the rarer case:
+///
+/// ```text
+/// !5          → history event 5
+/// ! 5 + 5     → Lua, 10
+/// !-2         → history, two events back
+/// ! -x        → Lua
+/// !print(1)   → Lua, because a letter was never ambiguous
+/// ```
+///
+/// It falls out rather than being special-cased: a leading space is not one of the characters
+/// history claims, so ` 5 + 5` was already reaching Lua — and Lua does not care about the space.
+///
+/// What this still costs is `!name`, "the last line starting with *name*". That one cannot come
+/// back: `!print(1)` has exactly its shape, and running one Lua line is the whole reason the prefix
+/// exists. The history finder searches as you type and shows what it found before running it, which
+/// is the better answer to the same question.
 ///
 pub fn classify(mode: Mode, line: &str) -> Line<'_> {
     // A Lua line is a Lua line. Nothing is read off it.
@@ -133,12 +151,19 @@ pub fn classify(mode: Mode, line: &str) -> Line<'_> {
 
 /// Whether what follows a `!` makes it a history reference rather than one line of Lua.
 ///
-/// **Only the characters no Lua expression can start with.** `!`, `$` and `?` are not Lua syntax
-/// anywhere; `^` and `*` are binary operators, so a line cannot open with one. A digit or a `-`
-/// *can* open a Lua expression — `5 + 5`, `-x` — so those are Lua, which costs bash's numbered
-/// events and buys a rule with no guessing in it.
+/// **The characters no Lua expression can start with, plus the digits.** `!`, `$` and `?` are not
+/// Lua syntax anywhere and `^` and `*` are binary operators, so those five need no argument. A
+/// digit does: `!5` reads as Lua just as well as it reads as event five, and it is history because
+/// that is what people type it for. `! 5` is the Lua one — see [`classify`].
 fn opens_a_history_reference(after: &str) -> bool {
-    matches!(after.chars().next(), Some('!' | '$' | '^' | '*' | '?'))
+    let mut chars = after.chars();
+    match chars.next() {
+        Some('!' | '$' | '^' | '*' | '?') => true,
+        Some(digit) if digit.is_ascii_digit() => true,
+        // `!-2` is two events back. `!-x` is Lua, so the digit has to be there.
+        Some('-') => chars.next().is_some_and(|c| c.is_ascii_digit()),
+        _ => false,
+    }
 }
 
 /// The character that runs one line as Lua from a shell prompt.
