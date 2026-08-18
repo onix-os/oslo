@@ -105,6 +105,11 @@ harness = false
 required-features = ["vista"]
 
 [profile.release]
+# **Unwinding is not needed and costs 820 KB.** It used to be: the history store could panic on a
+# corrupt page, so every read and write went through `catch_unwind`. tagdata v0.1.4 validates a
+# page pointer before following it and reports `InvalidDB` instead, so those guards are gone and
+# nothing is left that has to survive a panic. `.gcc_except_table` alone falls from 261 KB to 7 KB.
+panic = "abort"
 lto = "fat"
 codegen-units = 1
 strip = "symbols"

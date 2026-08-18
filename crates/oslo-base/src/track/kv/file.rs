@@ -2,7 +2,6 @@
 
 use std::fs::{File, OpenOptions as FileOpenOptions, Permissions};
 use std::os::unix::fs::{DirBuilderExt, OpenOptionsExt, PermissionsExt};
-use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::path::{Path, PathBuf};
 
 use tagdata::{DB, FormatInfo, OpenOptions};
@@ -20,11 +19,7 @@ pub(super) fn open(path: &Path) -> Option<DB> {
     if !is_a_database(path) {
         return None;
     }
-    catch_unwind(AssertUnwindSafe(|| {
-        OpenOptions::new().pagesize(PAGE_SIZE).open(path).ok()
-    }))
-    .ok()
-    .flatten()
+    OpenOptions::new().pagesize(PAGE_SIZE).open(path).ok()
 }
 
 /// Locks database initialization.
