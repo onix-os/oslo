@@ -61,7 +61,10 @@ fn extended_test_to_and_or(expr: &ast::ExtendedTestExpr) -> Result<oslo_ast::And
         ast::ExtendedTestExpr::UnaryTest(pred, word) => {
             let op = unary_predicate_op(pred);
             Ok(bracket_and_or(
-                vec![oslo_ast::Word::from_literal(op), operand(word)?],
+                vec![
+                    oslo_ast::Word::from_literal(op),
+                    operand(word, Coordinates::Substituted)?,
+                ],
                 false,
             ))
         }
@@ -71,14 +74,36 @@ fn extended_test_to_and_or(expr: &ast::ExtendedTestExpr) -> Result<oslo_ast::And
             // quoted and mean something different from the rest of it. See [`mark_quoted_runs`].
             let right = match op == "=~" {
                 true => marked_operand(right)?,
-                false => operand(right)?,
+                false => operand(right, Coordinates::Substituted)?,
             };
             Ok(bracket_and_or(
-                vec![operand(left)?, oslo_ast::Word::from_literal(op), right],
+                vec![
+                    operand(left, Coordinates::Substituted)?,
+                    oslo_ast::Word::from_literal(op),
+                    right,
+                ],
                 negate,
             ))
         }
     }
+}
+
+/// Whether a bare stream coordinate in this operand is left for the substitution to find.
+///
+/// **The right operand of `=~` is a regex, and a regex already owns `{}`.** `{4}` is a repeat
+/// count there, not line 4, and `^([0-9]{4})-([0-9]{2})` parses as a coordinate perfectly well —
+/// so leaving it bare fed the quantifiers to the stream substitution, which resolved them against
+/// nothing and handed the matcher `^([0-9])-([0-9])`. That is the worst shape a bug can take: the
+/// match still *succeeds* on a short string, so `[[ 20 =~ ^[0-9]{4} ]]` was true.
+///
+/// Nowhere else has this problem, because brace expansion runs on a word's source text before the
+/// lexer sees it — by the time there is a syntax tree, an ordinary command word has already become
+/// its several words and has no braces left to mistake. The positions that still hold a literal
+/// brace are exactly the ones bash refuses to brace-expand, and a regex is one of them.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Coordinates {
+    Substituted,
+    Literal,
 }
 
 /// One operand of a predicate, in a form that cannot become anything other than one word.
@@ -95,7 +120,7 @@ fn extended_test_to_and_or(expr: &ast::ExtendedTestExpr) -> Result<oslo_ast::And
 /// already written rather than adding a second set. It does not make the `==` right-hand side
 /// literal: pattern-versus-text is decided from the *source* quoting by [`binary_predicate_op`],
 /// before this runs, and is carried in the operator word.
-fn operand(word: &ast::Word) -> Result<oslo_ast::Word> {
+fn operand(word: &ast::Word, coordinates: Coordinates) -> Result<oslo_ast::Word> {
     let inner = single_word(word)?;
     if let Some(expanding) = relex_inside_quotes(word.as_ref(), &inner) {
         return Ok(expanding);
@@ -116,7 +141,9 @@ fn operand(word: &ast::Word) -> Result<oslo_ast::Word> {
     // to leave bare on the same grounds — a substituted value arrives already quoted and cannot
     // split or glob however many spaces are in it.
     if let [oslo_ast::WordPart::Literal(text)] = inner.parts.as_slice()
-        && (text.starts_with('@') || crate::exec::streams::holds_a_coordinate(text))
+        && (text.starts_with('@')
+            || (coordinates == Coordinates::Substituted
+                && crate::exec::streams::holds_a_coordinate(text)))
     {
         return Ok(inner);
     }
@@ -247,7 +274,7 @@ pub const QUOTED_CLOSE: char = '\u{2}';
 /// `conditionals::matching::eval_regex_match` escapes what arrives between them. A word with no
 /// quoted part gets no marks and travels exactly as it did.
 fn marked_operand(word: &ast::Word) -> Result<oslo_ast::Word> {
-    let plain = operand(word)?;
+    let plain = operand(word, Coordinates::Literal)?;
     let marked = mark_quoted_runs(&plain);
     Ok(marked.unwrap_or(plain))
 }

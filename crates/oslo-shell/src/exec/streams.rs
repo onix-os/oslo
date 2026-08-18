@@ -272,20 +272,30 @@ pub fn holds_a_coordinate(text: &str) -> bool {
 /// **A function definition is not rewritten.** `f(){ echo {0:0}; }` defines a function whose body
 /// is run later, when this stream is gone — baking today's text into it would make the definition
 /// mean something different from what was written.
+///
+/// **Nor is a scalar assignment.** `w=x{1..3}` is text in bash — a scalar right-hand side is one of
+/// the few places brace expansion deliberately does not reach — and rewriting it there made it
+/// empty instead.
+///
+/// That is the rule the whole walk follows, and it is worth stating once: **a coordinate goes where
+/// a brace expands.** Brace expansion runs on a word's source text before the lexer sees it, so by
+/// the time there is a tree to walk an ordinary command word has already become its several words
+/// and has no brace left to mistake. Whatever still holds a literal brace here is somewhere bash
+/// refused to expand one, and a coordinate has no more business there than `{a,b}` does. The rule
+/// cuts *through* assignments rather than around them: `a=(x{1,2})` expands and takes coordinates,
+/// `w=x{1..3}` does neither.
 pub fn rewrite_command(command: &mut Command, streams: &Streams) {
     match command {
         Command::Simple(simple) => {
             rewrite(&mut simple.words, streams);
             for assignment in &mut simple.assignments {
-                match &mut assignment.value {
-                    AssignmentValue::Scalar(word) => rewrite_word(word, streams),
-                    AssignmentValue::Array(elements) => {
-                        for element in elements {
-                            if let Some(index) = &mut element.index {
-                                rewrite_word(index, streams);
-                            }
-                            rewrite_word(&mut element.value, streams);
-                        }
+                // The scalar case is deliberately absent — see the note above. An array literal is
+                // the other half of the same rule: `a=(x{1,2} {3..4})` *is* brace-expanded by bash,
+                // so it is a word list, so a coordinate belongs there. The subscript is not — an
+                // index is arithmetic, where a brace never expanded either.
+                if let AssignmentValue::Array(elements) = &mut assignment.value {
+                    for element in elements {
+                        rewrite_word(&mut element.value, streams);
                     }
                 }
             }
@@ -473,16 +483,18 @@ fn only_literal(word: &Word) -> Option<&str> {
 /// The two walks mirror each other and a test holds them together.
 pub fn command_uses_coordinates(command: &Command) -> bool {
     match command {
+        // Array values but not scalars and not subscripts, mirroring `rewrite_command` exactly: a
+        // gate that claimed more would take a pipeline off the concurrent path to rewrite nothing.
         Command::Simple(simple) => {
             any_word(&simple.words)
                 || simple
                     .assignments
                     .iter()
                     .any(|assignment| match &assignment.value {
-                        AssignmentValue::Scalar(word) => is_one(word),
-                        AssignmentValue::Array(elements) => elements.iter().any(|element| {
-                            element.index.as_ref().is_some_and(is_one) || is_one(&element.value)
-                        }),
+                        AssignmentValue::Scalar(_) => false,
+                        AssignmentValue::Array(elements) => {
+                            elements.iter().any(|element| is_one(&element.value))
+                        }
                     })
                 || any_redirection(&simple.redirections)
         }

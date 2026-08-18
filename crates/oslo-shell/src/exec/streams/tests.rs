@@ -290,3 +290,55 @@ fn a_lone_coordinate_still_multiplies() {
     streams.push_stage(HOSTS);
     assert_eq!(words("{*:0}", &streams), vec!["web-01", "web-02", "db-01"]);
 }
+
+/// **A coordinate goes where a brace expands**, and the gate must agree with the rewriter about it.
+///
+/// A scalar right-hand side is text in bash — `w=x{1..3}` stays `x{1..3}` — and reading a
+/// coordinate there emptied it. An array literal is the other half: bash *does* expand
+/// `a=(x{1,2})`, so a coordinate belongs there. If these two answers ever drift apart, a pipeline
+/// leaves the concurrent path to be rewritten in a way that changes nothing.
+#[test]
+fn an_assignment_is_claimed_only_where_a_brace_expands() {
+    let scalar = assigned(AssignmentValue::Scalar(literal("x{0:0}")));
+    assert!(
+        !command_uses_coordinates(&scalar),
+        "a scalar right-hand side is not a word list"
+    );
+
+    let array = assigned(AssignmentValue::Array(vec![oslo_base::ast::ArrayElement {
+        index: None,
+        value: literal("{0:0}"),
+    }]));
+    assert!(
+        command_uses_coordinates(&array),
+        "an array literal is a word list"
+    );
+
+    // And the rewriter makes the same two calls.
+    let mut streams = Streams::default();
+    streams.push_stage(HOSTS);
+    for (mut command, expected) in [(scalar, "x{0:0}"), (array, "web-01")] {
+        rewrite_command(&mut command, &streams);
+        let Command::Simple(simple) = &command else {
+            unreachable!("built as simple")
+        };
+        let word = match &simple.assignments[0].value {
+            AssignmentValue::Scalar(word) => word,
+            AssignmentValue::Array(elements) => &elements[0].value,
+        };
+        assert_eq!(shown(word), expected);
+    }
+}
+
+/// A simple command that is one assignment, for the test above.
+fn assigned(value: AssignmentValue) -> Command {
+    Command::Simple(oslo_base::ast::SimpleCommand {
+        assignments: vec![oslo_base::ast::Assignment {
+            target: oslo_base::ast::AssignmentTarget::Name("w".to_string()),
+            value,
+            append: false,
+        }],
+        words: Vec::new(),
+        redirections: Vec::new(),
+    })
+}

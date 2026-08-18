@@ -349,17 +349,18 @@ fn hostile_bytes_are_survivable() {
 
 /// **A coordinate works everywhere a word can go**, not only in the argument list.
 ///
-/// All three of these used to be left as text and then read as nothing: the command ran and did the
-/// wrong thing without saying so. A redirection wrote to a file literally called `{0:0}`, an
-/// assignment set the literal text, and a compound stage printed a blank.
+/// These used to be left as text and then read as nothing: the command ran and did the wrong thing
+/// without saying so. A redirection wrote to a file literally called `{0:0}`, and a compound stage
+/// printed a blank.
 #[test]
 fn a_coordinate_works_wherever_a_word_does() {
     // A redirection target.
     assert_eq!(shell("cat hosts.txt | cat > {0:0}; ls web-01"), "web-01");
-    // An assignment prefix.
+    // **Not a scalar assignment**, which is the one word-shaped place bash does not expand a brace
+    // either — see `a_brace_form_that_is_not_a_coordinate_is_left_alone` for what that buys.
     assert_eq!(
         shell(r#"cat hosts.txt | x={0:0} sh -c 'echo [$x]'"#),
-        "[web-01]"
+        "[{0:0}]"
     );
     // A subshell and a group.
     assert_eq!(shell("cat hosts.txt | (echo [{0:0}])"), "[web-01]");
@@ -532,4 +533,68 @@ fn deep_nesting_is_survivable() {
         "; }".repeat(depth)
     );
     assert_eq!(shell(&line), "[web-01]");
+}
+
+/// **A brace that is not a coordinate keeps its own meaning**, and the two collide in real syntax.
+///
+/// `{4}` is a coordinate — line 4 — and it is also a regex repeat count. `{1..3}` is a coordinate
+/// range and also a brace sequence. Both parse as coordinates perfectly well, so the rule cannot be
+/// "try it and see": brace expansion runs on a word's source text *before* the lexer, so an
+/// ordinary command word has already become its several words by the time there is a tree to
+/// rewrite. Whatever still holds a literal brace is somewhere bash refused to expand one.
+#[test]
+fn a_brace_form_that_is_not_a_coordinate_is_left_alone() {
+    // An assignment's right-hand side is text in bash. Rewriting it emptied it.
+    assert_eq!(shell(r#"w=x{1..3}; echo "$w""#), "x{1..3}");
+    assert_eq!(shell(r#"w={4}; echo "$w""#), "{4}");
+    assert_eq!(
+        shell(r#"a=(x{1,2} {3..4}); printf '%s\n' "${a[@]}""#),
+        "x1\nx2\n3\n4"
+    );
+    // A command word still brace-expands, because that ran before any of this.
+    assert_eq!(shell("echo {1..3}"), "1 2 3");
+    assert_eq!(shell("echo {a,b}"), "a b");
+}
+
+/// **The one place this departs from bash on purpose**, written down so it stays a decision.
+///
+/// bash leaves a one-item group like `{5}` alone, so unlike `{1..3}` it is still a literal brace
+/// when the tree is walked — and a one-item group is exactly the shape of a one-dimension
+/// coordinate. oslo reads it as line 5, which is the whole point of `{0}` meaning the first line.
+///
+/// The cost is that with nothing captured it reads empty where bash would have echoed the text
+/// back. That is the same answer `{0:0}` gives with nothing captured, so it is at least consistent
+/// with itself — and unlike the regex and scalar-assignment cases, nothing else in the shell wanted
+/// those characters.
+#[test]
+fn a_one_item_group_is_a_coordinate_not_a_literal() {
+    assert_eq!(
+        shell("cat hosts.txt | echo [{1}]"),
+        "[web-02  10.0.0.2  apache]"
+    );
+    // With no stream behind it, empty — where bash would print `{5}`.
+    assert_eq!(shell("echo [{5}]"), "[]");
+}
+
+/// **A regex owns `{}`**, so the right operand of `=~` never reads as a coordinate.
+///
+/// The failure this guards was silent and said *yes*: the quantifier was resolved against no
+/// stream, `^[0-9]{4}` became `^[0-9]`, and a two-digit string matched a four-digit pattern.
+#[test]
+fn a_regex_quantifier_survives_the_match() {
+    assert_eq!(shell("[[ 20 =~ ^[0-9]{4} ]] && echo yes || echo no"), "no");
+    assert_eq!(
+        shell("[[ 2024 =~ ^[0-9]{4} ]] && echo yes || echo no"),
+        "yes"
+    );
+    assert_eq!(shell("[[ a =~ ^a{3} ]] && echo yes || echo no"), "no");
+    assert_eq!(
+        shell(r#"l=2024-05; [[ $l =~ ^([0-9]{4})-([0-9]{2}) ]]; echo "${BASH_REMATCH[1]}""#),
+        "2024"
+    );
+    // A coordinate still reads on the *left*, which is the side that holds a value.
+    assert_eq!(
+        shell("cat hosts.txt | [[ {0:0} =~ ^web ]] && echo matched"),
+        "matched"
+    );
 }
