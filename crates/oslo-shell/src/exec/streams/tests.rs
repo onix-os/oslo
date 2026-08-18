@@ -7,9 +7,26 @@ const HOSTS: &str = "web-01  10.0.0.1\nweb-02  10.0.0.2\ndb-01   10.0.0.9\n";
 fn words(text: &str, streams: &Streams) -> Vec<String> {
     substitute(text, streams)
         .expect("a coordinate")
-        .into_iter()
-        .map(|runs| runs.iter().map(|r| r.text.as_str()).collect::<String>())
+        .iter()
+        .map(shown)
         .collect()
+}
+
+/// A word as its characters, ignoring which parts were quoted.
+fn shown(word: &Word) -> String {
+    word.parts
+        .iter()
+        .map(|part| match part {
+            WordPart::Literal(text) | WordPart::SingleQuoted(text) => text.as_str(),
+            _ => "?",
+        })
+        .collect()
+}
+
+fn literal(text: &str) -> Word {
+    Word {
+        parts: vec![WordPart::Literal(text.to_string())],
+    }
 }
 
 /// **Zero and up walk back through this pipeline.** `{0:…}` is the stage that just finished, which
@@ -86,15 +103,20 @@ fn a_value_is_one_argument_and_never_globs() {
     let mut streams = Streams::default();
     streams.push_stage("my file.txt  100\n*.rs  200\n");
 
-    let runs = substitute("{0}", &streams).expect("a coordinate");
-    assert_eq!(runs.len(), 1, "one line is one argument: {runs:?}");
-    assert_eq!(runs[0][0].text, "my file.txt  100");
-    assert_eq!(runs[0][0].origin, Origin::Quoted);
+    let out = substitute("{0}", &streams).expect("a coordinate");
+    assert_eq!(out.len(), 1, "one line is one argument: {out:?}");
+    assert_eq!(
+        out[0].parts,
+        vec![WordPart::SingleQuoted("my file.txt  100".to_string())],
+        "single-quoted, so it is never split or globbed"
+    );
 
     // And the glob character survives as text rather than matching anything.
-    let runs = substitute("{1:0}", &streams).expect("a coordinate");
-    assert_eq!(runs[0][0].text, "*.rs");
-    assert_eq!(runs[0][0].origin, Origin::Quoted);
+    let out = substitute("{1:0}", &streams).expect("a coordinate");
+    assert_eq!(
+        out[0].parts,
+        vec![WordPart::SingleQuoted("*.rs".to_string())]
+    );
 }
 
 /// The cheap pre-scan must not miss a coordinate, and must not claim an ordinary brace group.
@@ -176,4 +198,66 @@ fn two_dimensions_stay_in_this_stream() {
         vec!["from-the-prompt"],
         "stream -1, line 0"
     );
+}
+
+/// **Rewriting walks a command's words**, replacing the coordinates and leaving everything else
+/// exactly as it was.
+#[test]
+fn rewriting_replaces_only_the_coordinates() {
+    let mut streams = Streams::default();
+    streams.push_stage(HOSTS);
+
+    let mut words = vec![literal("ssh"), literal("{0:0}"), literal("uptime")];
+    assert!(rewrite(&mut words, &streams));
+    assert_eq!(
+        words.iter().map(shown).collect::<Vec<_>>(),
+        vec!["ssh", "web-01", "uptime"]
+    );
+
+    // One word becoming three arguments, in the middle of a command.
+    let mut words = vec![literal("ping"), literal("{*:1}"), literal("-c1")];
+    assert!(rewrite(&mut words, &streams));
+    assert_eq!(
+        words.iter().map(shown).collect::<Vec<_>>(),
+        vec!["ping", "10.0.0.1", "10.0.0.2", "10.0.0.9", "-c1"]
+    );
+}
+
+/// **A quoted coordinate is text.** Every other expansion offers a way to write the characters
+/// themselves, and this one does too.
+#[test]
+fn a_quoted_coordinate_is_left_alone() {
+    let mut streams = Streams::default();
+    streams.push_stage(HOSTS);
+
+    let mut words = vec![
+        literal("echo"),
+        Word {
+            parts: vec![WordPart::SingleQuoted("{0:0}".to_string())],
+        },
+    ];
+    assert!(!rewrite(&mut words, &streams), "nothing to rewrite");
+    assert_eq!(
+        words.iter().map(shown).collect::<Vec<_>>(),
+        vec!["echo", "{0:0}"]
+    );
+}
+
+/// **The gate.** A command with no coordinate must answer `false`, because that is what keeps every
+/// ordinary pipeline on the path it always took.
+#[test]
+fn the_gate_is_closed_for_ordinary_commands() {
+    assert!(!command_uses_coordinates(&[literal("ls"), literal("-la")]));
+    assert!(!command_uses_coordinates(&[
+        literal("mkdir"),
+        literal("{a,b}")
+    ]));
+    assert!(command_uses_coordinates(&[
+        literal("ssh"),
+        literal("{0:0}")
+    ]));
+    assert!(command_uses_coordinates(&[
+        literal("cat"),
+        literal("x{-1:0:}y")
+    ]));
 }

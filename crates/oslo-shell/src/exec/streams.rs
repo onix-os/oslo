@@ -21,12 +21,14 @@
 //!
 //! # A value is one argument
 //!
-//! Every substituted value is `Origin::Quoted`, so a line holding a space, a `*` or a `$` arrives
-//! at the command whole and is never re-split or re-globbed. This is the same guarantee
-//! `expand::sugar` gives a marked directory's expansion, and for the same reason: a shell that
-//! field-splits its own substitutions is a shell that executes filenames.
+//! Substitution happens on the **syntax tree**, before any expansion runs, and every value becomes
+//! a single-quoted word part. Single quotes are literal throughout in every shell there is, so a
+//! line holding a space, a `*` or a `$` arrives at the command whole and is never field-split or
+//! re-globbed. Reusing the quoting the shell already has beats inventing a new origin and teaching
+//! six expansions about it — and a shell that field-splits its own substitutions is a shell that
+//! executes filenames.
 
-use crate::expand::word::{Origin, Run};
+use oslo_base::ast::{Word, WordPart};
 use oslo_base::coords::{self, Coord};
 
 /// How many prompts back a coordinate may reach.
@@ -122,52 +124,103 @@ pub fn looks_like_a_coordinate(text: &str) -> bool {
     })
 }
 
-/// Replace the coordinates in one word, answering the words it becomes.
+/// Replace the coordinate in one piece of literal text, answering the words it becomes.
 ///
 /// One word can become several: `{*:0}` on three lines is three arguments, the way `"$@"` is. A
-/// word that is *only* a coordinate expands to one argument per value; a coordinate with text
-/// around it joins its values with a space, because `pre{*:0}post` has to stay one word to mean
-/// anything.
-pub fn substitute(text: &str, streams: &Streams) -> Option<Vec<Vec<Run>>> {
-    let (before, coord, inside, after) = split(text)?;
+/// word that is *only* a coordinate becomes one argument per value; a coordinate with text around
+/// it joins its values with a space, because `host-{*:0}.lan` has to stay one word to mean
+/// anything at all.
+///
+/// `None` when the text holds no coordinate, so an ordinary brace group falls through to the brace
+/// expansion that already handles it.
+pub fn substitute(text: &str, streams: &Streams) -> Option<Vec<Word>> {
+    let (before, coord, after) = split(text)?;
     let values = match streams.text(&coord) {
         Some(stream) => coords::select(&coord, stream),
         // Nothing captured: the coordinate reads empty rather than refusing to run, which is the
         // rule everywhere else in this feature.
         None => Vec::new(),
     };
-    let _ = inside;
 
     // A bare coordinate becomes one argument per value.
     if before.is_empty() && after.is_empty() {
-        return Some(
-            values
-                .into_iter()
-                .map(|value| vec![Run::new(value, Origin::Quoted)])
-                .collect(),
-        );
+        return Some(values.into_iter().map(quoted).collect());
     }
     // Anything else is one word, with the values joined.
-    let mut runs = Vec::new();
+    let mut parts = Vec::new();
     if !before.is_empty() {
-        runs.push(Run::new(before, Origin::Literal));
+        parts.push(WordPart::Literal(before.to_string()));
     }
-    runs.push(Run::new(values.join(" "), Origin::Quoted));
+    parts.push(WordPart::SingleQuoted(values.join(" ")));
     if !after.is_empty() {
-        runs.push(Run::new(after, Origin::Literal));
+        parts.push(WordPart::Literal(after.to_string()));
     }
-    Some(vec![runs])
+    Some(vec![Word { parts }])
 }
 
-/// Split a word around its first coordinate: `(before, coord, inside, after)`.
-fn split(text: &str) -> Option<(&str, Coord, &str, &str)> {
+/// One value as one word that cannot be split or globbed.
+fn quoted(value: String) -> Word {
+    Word {
+        parts: vec![WordPart::SingleQuoted(value)],
+    }
+}
+
+/// Split a word around its first coordinate: `(before, coord, after)`.
+fn split(text: &str) -> Option<(&str, Coord, &str)> {
     let open = text.find('{')?;
     let close = open + text[open..].find('}')?;
-    let inside = &text[open + 1..close];
-    let coord = coords::parse(inside)?;
-    Some((&text[..open], coord, inside, &text[close + 1..]))
+    let coord = coords::parse(&text[open + 1..close])?;
+    Some((&text[..open], coord, &text[close + 1..]))
 }
 
 #[cfg(test)]
 #[path = "streams/tests.rs"]
 mod tests;
+
+/// Rewrite every coordinate in a simple command's words, in place.
+///
+/// **Only `Literal` parts are looked at.** A coordinate inside single or double quotes is text the
+/// user quoted on purpose, and `echo "{0:1}"` printing a literal `{0:1}` is the same promise every
+/// other expansion keeps — there is always a way to write the characters themselves.
+///
+/// Answers whether anything changed, so a caller can tell a command that needed the stack from one
+/// that merely looked like it might.
+pub fn rewrite(words: &mut Vec<Word>, streams: &Streams) -> bool {
+    let mut out = Vec::with_capacity(words.len());
+    let mut changed = false;
+    for word in words.drain(..) {
+        let Some(text) = only_literal(&word) else {
+            out.push(word);
+            continue;
+        };
+        match substitute(text, streams) {
+            Some(replacements) => {
+                changed = true;
+                out.extend(replacements);
+            }
+            None => out.push(word),
+        }
+    }
+    *words = out;
+    changed
+}
+
+/// The text of a word that is one unquoted literal, which is the only shape a coordinate can be
+/// written in.
+fn only_literal(word: &Word) -> Option<&str> {
+    match word.parts.as_slice() {
+        [WordPart::Literal(text)] => Some(text.as_str()),
+        _ => None,
+    }
+}
+
+/// Whether any word of a command could carry a coordinate.
+///
+/// The gate for the whole feature: a pipeline that answers `false` runs down the path it always
+/// did, forked concurrently, with nothing captured and nothing to pay for.
+pub fn command_uses_coordinates(words: &[Word]) -> bool {
+    words
+        .iter()
+        .filter_map(only_literal)
+        .any(looks_like_a_coordinate)
+}
