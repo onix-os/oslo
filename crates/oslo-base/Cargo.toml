@@ -43,7 +43,7 @@ sha2 = "0.10"
 # measured reasons — see the note in the root manifest.
 regex = { version = "1", default-features = false, features = [
     "std", "unicode-case", "unicode-perl",
-    "perf-literal", "perf-inline",
+    "perf-inline",
 ] }
 
 # `ShellError::Nix`, the hostname a session is recorded under, and `isatty` — which is how
