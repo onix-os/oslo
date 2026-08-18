@@ -1,128 +1,141 @@
 {
-  description = "oslo Rust development shell";
+  description = "oslo shell and Rust development environment";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs?rev=4c1018dae018162ec878d42fec712642d214fdfa";
     flake-utils.url = "github:numtide/flake-utils";
-    nixgl.url = "github:nix-community/nixGL";
-    # Rust with extra targets. nixpkgs' plain `rustc` ships only the host's std, so a
-    # `--target x86_64-unknown-linux-musl` build fails on `cfg-if` with "can't find crate for
-    # core" — nothing to do with the code. The static musl binary is what oslo releases, so the
-    # target has to be buildable in the dev shell, not only in CI.
     rust-overlay.url = "github:oxalica/rust-overlay";
   };
 
   outputs =
-    { nixpkgs, flake-utils, nixgl, rust-overlay, ... }:
-    flake-utils.lib.eachDefaultSystem (
+    { nixpkgs, flake-utils, rust-overlay, ... }:
+    let
+      systems = [
+        "x86_64-linux"
+        "aarch64-linux"
+      ];
+      manifest = builtins.fromTOML (builtins.readFile ./Cargo.toml);
+      version = manifest.workspace.package.version;
+      fullFeatures = builtins.filter (name: name != "default") (
+        builtins.attrNames manifest.features
+      );
+    in
+    flake-utils.lib.eachSystem systems (
       system:
       let
-        overlays = [
-          rust-overlay.overlays.default
-          (final: prev: {
-            xorg = prev.xorg // {
-              libX11 = final.libx11;
-              libxcb = final.libxcb;
-              libxshmfence = final.libxshmfence;
-            };
-          })
-        ];
-
         pkgs = import nixpkgs {
-          inherit system overlays;
-          config = {
-            allowUnfree = true;
-            nvidia.acceptLicense = true;
-          };
+          inherit system;
+          overlays = [ rust-overlay.overlays.default ];
         };
+        lib = pkgs.lib;
+        rustTarget =
+          {
+            x86_64-linux = "x86_64-unknown-linux-musl";
+            aarch64-linux = "aarch64-unknown-linux-musl";
+          }
+          .${system};
+        toolchain = pkgs.rust-bin.stable."1.94.0".default.override {
+          targets = [ rustTarget ];
+          extensions = [
+            "rust-src"
+            "rust-analyzer"
+            "clippy"
+            "rustfmt"
+          ];
+        };
+        mkOslo =
+          { minimal ? false }:
+          let
+            binaryName = if minimal then "oslo-minimal" else "oslo";
+          in
+          pkgs.pkgsStatic.rustPlatform.buildRustPackage {
+            pname = binaryName;
+            inherit version;
+            src = ./.;
 
-        nvidiaVersion = builtins.getEnv "NVIDIA_VERSION";
-        hasNvidia = nvidiaVersion != "";
+            cargoLock = {
+              lockFile = ./Cargo.lock;
+              outputHashes = {
+                "luna-0.5.0" = "sha256-YJsEKm7UykhqNQjhLPBgpmCHQZQhDLFVAENSD43SyAw=";
+                "tagdata-0.1.3" = "sha256-I2oyG08+jAeo0ibjT/mieuiTl3VD2l6gAlGPVDUn1rA=";
+                "vista-recall-0.1.2" = "sha256-Zi3pKV0pZNZh/XM8dE+uhHIJuieT977D0bAD91/qrhY=";
+              };
+            };
+            buildNoDefaultFeatures = true;
+            buildFeatures = lib.optionals (!minimal) fullFeatures;
+            cargoBuildFlags = [
+              "--bin"
+              "oslo"
+            ];
+            stripAllList = [ "bin" ];
 
-        nixglPkgs = import "${nixgl}/default.nix" ({
-          inherit pkgs;
-        } // pkgs.lib.optionalAttrs hasNvidia {
-          inherit nvidiaVersion;
-          nvidiaHash = null;
-        });
+            doCheck = false;
+            doInstallCheck = true;
+            nativeInstallCheckInputs = [ pkgs.binutils ];
+            postInstall = lib.optionalString minimal ''
+              mv "$out/bin/oslo" "$out/bin/${binaryName}"
+            '';
+            installCheckPhase = ''
+              runHook preInstallCheck
 
-        nixGLTarget =
-          if hasNvidia
-          then "${nixglPkgs.nixGLNvidia}/bin/nixGLNvidia-${nvidiaVersion}"
-          else "${nixglPkgs.nixGLIntel}/bin/nixGLIntel";
-        nixVulkanTarget =
-          if hasNvidia
-          then "${nixglPkgs.nixVulkanNvidia}/bin/nixVulkanNvidia-${nvidiaVersion}"
-          else "${nixglPkgs.nixVulkanIntel}/bin/nixVulkanIntel";
+              binary="$out/bin/${binaryName}"
+              test "$("$binary" --version)" = "oslo version ${version}"
+              test "$("$binary" -c 'printf ok')" = "ok"
 
-        nixGLAlias = pkgs.runCommand "nixGL" { } ''
-          mkdir -p $out/bin
-          ln -s ${nixGLTarget} $out/bin/nixGL
-        '';
-        nixVulkanAlias = pkgs.runCommand "nixVulkan" { } ''
-          mkdir -p $out/bin
-          ln -s ${nixVulkanTarget} $out/bin/nixVulkan
-        '';
+              if readelf -l "$binary" | grep -q 'program interpreter'; then
+                echo "error: $binary requests a dynamic loader" >&2
+                exit 1
+              fi
+              if readelf -d "$binary" 2>/dev/null | grep -q NEEDED; then
+                echo "error: $binary has dynamic dependencies" >&2
+                exit 1
+              fi
 
-        guiLibs = with pkgs; [
-          alsa-lib
-          udev
-          vulkan-loader
-          libxkbcommon
-          wayland
-          libx11
-          libxcursor
-          libxi
-          libxrandr
-        ];
+              runHook postInstallCheck
+            '';
+
+            meta = {
+              description = "POSIX shell in Rust with an embedded Lua runtime";
+              homepage = "https://github.com/onix-os/oslo";
+              license = lib.licenses.mit;
+              mainProgram = binaryName;
+              platforms = lib.platforms.linux;
+            };
+          };
+        oslo = mkOslo { };
+        osloMinimal = mkOslo { minimal = true; };
+        mkApp = package: binaryName: {
+          type = "app";
+          program = "${package}/bin/${binaryName}";
+          meta.description = "Run ${binaryName}";
+        };
       in
       {
+        packages = {
+          inherit oslo;
+          "oslo-minimal" = osloMinimal;
+          default = oslo;
+        };
+
+        apps = {
+          default = mkApp oslo "oslo";
+          oslo = mkApp oslo "oslo";
+          "oslo-minimal" = mkApp osloMinimal "oslo-minimal";
+        };
+
+        checks = {
+          inherit oslo;
+          "oslo-minimal" = osloMinimal;
+        };
+
         devShells.default = pkgs.mkShell {
           packages = [
-            # One toolchain, with the musl target, replacing the separate rustc/cargo/rustfmt/
-            # clippy derivations — mixing a targeted rustc with an untargeted cargo is how you get
-            # a std that exists but cannot be found.
-            (pkgs.rust-bin.stable.latest.default.override {
-              targets = [ "x86_64-unknown-linux-musl" ];
-              extensions = [ "rust-src" "rust-analyzer" "clippy" "rustfmt" ];
-            })
+            toolchain
+            pkgs.binutils
+            pkgs.git
             pkgs.git-cliff
-            pkgs.clang
-            pkgs.mold
-            pkgs.pkg-config
-
-            # Working out where the binary and the source went. Each answers a different question,
-            # and the first two answer it about *different* things — which is the reason to have
-            # both rather than pick one.
-            #
-            #   cargo-bloat     which functions and which crates the machine code came from.
-            #                   Needs symbols, so it wants a build with `strip` off.
-            #   bloaty          the same question asked of a finished ELF, section by section,
-            #                   and the only one of these that can diff two binaries.
-            #   cargo-machete   dependencies declared and never named in the source. Fast, and
-            #                   occasionally wrong about a crate reached only through a macro.
-            #   cargo-udeps     the same, decided by the compiler rather than by grep, so it is
-            #                   right where machete guesses — at the cost of a nightly rebuild.
-            #   tokei           lines by language and by directory, for the half of this that is
-            #                   about source rather than about the binary.
-            pkgs.cargo-bloat
-            pkgs.bloaty
-            pkgs.cargo-machete
-            pkgs.cargo-udeps
-            pkgs.tokei
-
-            nixGLAlias
-            nixVulkanAlias
-            nixglPkgs.nixGLIntel
-            nixglPkgs.nixVulkanIntel
-          ] ++ pkgs.lib.optionals hasNvidia [
-            nixglPkgs.nixGLNvidia
-            nixglPkgs.nixVulkanNvidia
-          ] ++ guiLibs;
-
-          LD_LIBRARY_PATH = pkgs.lib.makeLibraryPath guiLibs;
-          WGPU_VALIDATION = "0";
-          WGPU_DEBUG = "0";
+            pkgs.gnumake
+          ];
         };
       }
     );
