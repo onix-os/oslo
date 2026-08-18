@@ -11,6 +11,10 @@ This is the job `xargs` exists for, without `xargs`: no `-I{}`, no second quotin
 process reading a format string. The same grammar reaches back through the pipeline, back through
 the session, and at what each stage *was* as well as what it printed.
 
+<!-- demo:begin -->
+[![stream-coordinates demo](https://asciinema.org/a/1263429.svg)](https://asciinema.org/a/1263429)
+<!-- demo:end -->
+
 ## How it works
 
 A **stream** is text something produced. Two kinds go on one stack, and the sign of the first
