@@ -72,24 +72,46 @@ fn entries_of(base: &str) -> Option<Listing> {
 
 /// The grey suffix to draw after a half-typed **Lua** name.
 ///
-/// The same source completion uses, reduced to one answer: a hint is a promise that pressing the
-/// accept key gives you *this*, so it is offered only when there is a single candidate. Two names
-/// sharing a prefix is what the dropdown is for.
+/// # Why this is not "the one candidate"
 ///
-/// Only after at least two characters. One letter matches most of a namespace, so hinting from it
-/// means grey text that changes on every keystroke and is right by luck.
+/// It was, and the effect was a ghost that almost never appeared. A shell prompt has history behind
+/// it, so a few characters usually pin a whole line; a Lua prompt has a namespace, where several
+/// names share a prefix nearly all the time — `os.t` is `time` and `tmpname`, `str` is a dozen
+/// things. Requiring a unique match meant the feature was silent exactly when a namespace is
+/// hardest to remember.
+///
+/// So what is offered is the **longest prefix every candidate agrees on**. That can never be wrong:
+/// accepting it types characters you would have had to type anyway, whichever name you meant. With
+/// one candidate it is the whole name, which is the old behaviour unchanged.
+///
+/// Only after two characters. One letter agrees with most of a namespace, so hinting from it means
+/// grey text that changes on every keystroke and is right by luck.
 pub(crate) fn lua_hint(line: &str, pos: usize) -> Option<String> {
     let typed = super::completion::lua::typed_at(line, pos)?;
     if typed.stem.chars().count() < 2 {
         return None;
     }
     let (_, candidates) = super::completion::lua::candidates(line, pos)?;
-    let [only] = candidates.as_slice() else {
-        return None;
-    };
-    only.display
+    let mut names = candidates.iter().map(|c| c.display.as_str());
+    let first = names.next()?;
+    let agreed = names.fold(first.to_string(), |shared, name| {
+        common_prefix(&shared, name)
+    });
+    // A candidate that does not extend what was typed has nothing to offer — and a *fuzzy* match
+    // may not even start with it, in which case there is no suffix to draw at all.
+    agreed
         .strip_prefix(&typed.stem)
-        .and_then(|rest| (!rest.is_empty()).then(|| rest.to_string()))
+        .filter(|rest| !rest.is_empty())
+        .map(str::to_string)
+}
+
+/// The longest prefix `a` and `b` share, cut on a character boundary.
+fn common_prefix(a: &str, b: &str) -> String {
+    a.chars()
+        .zip(b.chars())
+        .take_while(|(x, y)| x == y)
+        .map(|(x, _)| x)
+        .collect()
 }
 
 impl OsloHelper {
@@ -342,5 +364,50 @@ impl Ranked {
             return self.name.len() < other.name.len();
         }
         self.name < other.name
+    }
+}
+
+#[cfg(test)]
+mod lua_hint_tests {
+    use super::lua_hint;
+    use crate::completion::lua::set_name_source;
+
+    fn offering(names: &'static [(&'static str, bool)]) {
+        set_name_source(Some(std::rc::Rc::new(move |_: &[String]| {
+            names
+                .iter()
+                .map(|(n, callable)| ((*n).to_string(), *callable))
+                .collect()
+        })));
+    }
+
+    /// **The ghost is the prefix every candidate agrees on**, so it appears even when the name is
+    /// not yet pinned down — and accepting it can never type the wrong thing.
+    #[test]
+    fn the_ghost_offers_what_every_candidate_agrees_on() {
+        offering(&[("difftime", true), ("date", true), ("remove", true)]);
+        // `da` pins one name, so the whole of it is offered.
+        assert_eq!(lua_hint("da", 2).as_deref(), Some("te"));
+
+        // Two names share `d`, and they agree on nothing past it: no ghost rather than a guess.
+        offering(&[("difftime", true), ("dofile", true)]);
+        assert_eq!(lua_hint("di", 2).as_deref(), Some("fftime"));
+
+        // Several names agreeing on more than what was typed offer the shared part.
+        offering(&[("tostring", true), ("tonumber", true)]);
+        assert_eq!(
+            lua_hint("to", 2),
+            None,
+            "when the candidates agree on nothing past what was typed, there is no ghost"
+        );
+        offering(&[("setmetatable", true), ("setlocale", true)]);
+        assert_eq!(lua_hint("se", 2).as_deref(), Some("t"));
+    }
+
+    /// One letter agrees with most of a namespace, so nothing is offered from it.
+    #[test]
+    fn a_single_character_offers_nothing() {
+        offering(&[("print", true), ("pairs", true)]);
+        assert_eq!(lua_hint("p", 1), None);
     }
 }

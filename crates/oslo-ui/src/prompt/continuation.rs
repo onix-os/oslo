@@ -11,11 +11,12 @@
 /// exactly the thing an editor should be doing for you. Capped, so a deeply nested block cannot
 /// push the code off the screen.
 ///
-/// **Right-aligned to `width`**, the printed width of the primary prompt this block began under.
-/// The point is that the *code* lines up: everything you type on a continuation row starts in the
-/// same column as the first line, so a block reads as a block instead of as a ragged left edge. A
-/// `width` of zero, or one too small to hold the marker, just gives the marker and a space.
-pub fn continuation_marker(language: &str, width: usize, depth_of_block: usize) -> String {
+/// **At column zero.** It was right-aligned under the primary prompt so the code lined up with the
+/// first line; that put the marker adrift in the middle of the row, a different distance from the
+/// left edge in every directory, and the thing you are reading down a block is the *marker* — it is
+/// what tells you the block is still open and how deep it is. A fixed left edge is what makes that
+/// readable.
+pub fn continuation_marker(language: &str, depth_of_block: usize) -> String {
     let mark = match language {
         // One extra `>` per level of nesting, so the marker says how deep the block is and how many
         // `end`s are still owed. A block you have been typing for four lines is exactly where that
@@ -23,17 +24,12 @@ pub fn continuation_marker(language: &str, width: usize, depth_of_block: usize) 
         "lua" => ">".repeat(3 + depth_of_block.min(6)),
         _ => ">".to_string(),
     };
-    let mark = mark.as_str();
     let theme = super::theme::current();
-    let depth = super::theme::depth();
     // One trailing space, so the text does not touch the marker.
-    let painted = theme.prompt.continuation.paint(&format!("{mark} "), depth);
-    // Padding is plain spaces rather than part of the painted run: a background colour stretched
-    // across the indent would draw a bar to the left of every continuation line.
-    match width.checked_sub(mark.chars().count() + 1) {
-        Some(pad) => format!("{}{painted}", " ".repeat(pad)),
-        None => painted,
-    }
+    theme
+        .prompt
+        .continuation
+        .paint(&format!("{mark} "), super::theme::depth())
 }
 
 /// How deeply nested the Lua source in `block` is: how many `end`s and `until`s it still owes.
@@ -117,33 +113,22 @@ fn words_outside_text(source: &str) -> Vec<String> {
 mod tests {
     use super::continuation_marker;
 
-    /// **`>>>` at a Lua prompt, `>` at a shell one**, padded so the code lines up under the first
-    /// line of the block rather than starting in column zero.
+    /// **`>>>` at a Lua prompt, `>` at a shell one**, at column zero.
     #[test]
     fn the_marker_names_the_language_and_lines_the_block_up() {
-        let lua = continuation_marker("lua", 20, 0);
-        let plain: String = strip(&lua);
-        assert_eq!(plain, format!("{}>>> ", " ".repeat(16)));
-        assert_eq!(plain.chars().count(), 20, "it fills the prompt's width");
-
-        let shell = strip(&continuation_marker("sh", 20, 0));
-        assert_eq!(shell, format!("{}> ", " ".repeat(18)));
-
-        // A width too small to hold the marker gives the marker rather than a panic or a negative
-        // pad — the block simply starts at column zero.
-        assert_eq!(strip(&continuation_marker("lua", 0, 0)), ">>> ");
-        assert_eq!(strip(&continuation_marker("lua", 2, 0)), ">>> ");
+        assert_eq!(strip(&continuation_marker("lua", 0)), ">>> ");
+        assert_eq!(strip(&continuation_marker("sh", 0)), "> ");
     }
 
     /// **One extra `>` per level**, so the marker says how many `end`s are still owed.
     #[test]
     fn the_marker_grows_with_the_nesting() {
-        assert_eq!(strip(&continuation_marker("lua", 0, 1)), ">>>> ");
-        assert_eq!(strip(&continuation_marker("lua", 0, 3)), ">>>>>> ");
+        assert_eq!(strip(&continuation_marker("lua", 1)), ">>>> ");
+        assert_eq!(strip(&continuation_marker("lua", 3)), ">>>>>> ");
         // Capped, so a deeply nested block cannot push the code off the screen.
-        assert_eq!(strip(&continuation_marker("lua", 0, 99)), ">>>>>>>>> ");
+        assert_eq!(strip(&continuation_marker("lua", 99)), ">>>>>>>>> ");
         // A shell block is unaffected: its marker says nothing about depth.
-        assert_eq!(strip(&continuation_marker("sh", 0, 3)), "> ");
+        assert_eq!(strip(&continuation_marker("sh", 3)), "> ");
     }
 
     /// **Depth is counted from tokens, and strings and comments are not tokens.**

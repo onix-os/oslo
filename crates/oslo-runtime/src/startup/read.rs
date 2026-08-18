@@ -70,9 +70,6 @@ pub(super) fn read_command(
     // Language and vi redraws reuse the current prompt region. Only accepting an incomplete
     // physical line opens a continuation region inside the same interaction.
     let mut announce_prompt = Some(oslo_ui::marks::PromptKind::Primary);
-    // The printed width of the prompt this block began under, so the continuation marker can be
-    // padded to put every line of the block in the same column. Zero until the first line is drawn.
-    let mut block_indent = 0usize;
 
     loop {
         // Every line starts in insert mode as far as the editor is concerned, so the mode this
@@ -95,9 +92,7 @@ pub(super) fn read_command(
         }
 
         let prompt = if buffer.is_empty() {
-            let drawn = prompt::primary_prompt(env_struct, lua, last_status, *current);
-            block_indent = oslo_ui::prompt::printed_width(&drawn);
-            drawn
+            prompt::primary_prompt(env_struct, lua, last_status, *current)
         } else {
             // A `prompt.continuation` written in Lua wins, then `$PS2`, then oslo's own marker.
             // Both of the first two are things somebody asked for by name; the third is only a
@@ -112,7 +107,6 @@ pub(super) fn read_command(
             .unwrap_or_else(|| {
                 oslo_ui::prompt::continuation_marker(
                     reading.name(),
-                    block_indent,
                     oslo_ui::prompt::block_depth(&buffer),
                 )
             })
@@ -220,7 +214,6 @@ pub(super) fn read_command(
             // see `read_line`. It is not called per keystroke; the generation counter decides.
             let mut render = {
                 let at_start = buffer.is_empty();
-                let indent = block_indent;
                 let nesting = oslo_ui::prompt::block_depth(&buffer);
                 let language = *current;
                 let reading_now = reading;
@@ -240,11 +233,7 @@ pub(super) fn read_command(
                         })
                         .or_else(|| rc::ps2_if_set(&mut env_struct.lock().unwrap()))
                         .unwrap_or_else(|| {
-                            oslo_ui::prompt::continuation_marker(
-                                reading_now.name(),
-                                indent,
-                                nesting,
-                            )
+                            oslo_ui::prompt::continuation_marker(reading_now.name(), nesting)
                         })
                     };
                     drop(_timed);
