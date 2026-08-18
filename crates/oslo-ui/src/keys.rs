@@ -92,6 +92,11 @@ pub fn canonical(name: &str) -> Option<String> {
         "up" | "down" | "left" | "right" | "home" | "end" | "pageup" | "pagedown" | "space" => {
             return same(name);
         }
+        // **Ctrl+Space, spelled the way people say it.** The editor produces this name for
+        // `Key::Ctrl(' ')`; without this arm the only spelling that matched was `"ctrl- "`, with a
+        // literal space, because the generic `ctrl-<one char>` rule below is what accepted it.
+        // Both spellings are taken, and both collapse to this one.
+        "ctrl-space" | "ctrl- " | "c-space" => return Some("ctrl-space".to_string()),
         _ => {}
     }
     if let Some(rest) = name.strip_prefix("f")

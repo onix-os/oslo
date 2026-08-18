@@ -27,9 +27,12 @@ pub struct ShellAssist<'a> {
     /// What was on the line when the walk started, so coming back out restores it rather than
     /// blanking it. oslo has always promised this; it is the reason a walk is not destructive.
     composing: Option<String>,
-    /// The key that switches language — `crate::startup::mode::TOGGLE_KEY`, unless the config
-    /// unbound it with `oslo.keys["shift-tab"] = "none"`.
-    toggle: Option<String>,
+    /// The keys that switch language — `crate::startup::mode::TOGGLE_KEYS`, less any the config
+    /// unbound with `oslo.keys["shift-tab"] = "none"`.
+    ///
+    /// A list rather than one name because Shift+Tab needs the terminal to report a modifier and
+    /// Ctrl+Space does not. See `TOGGLE_KEYS` for which cost each one carries.
+    toggle: Vec<String>,
 }
 
 impl<'a> ShellAssist<'a> {
@@ -37,7 +40,7 @@ impl<'a> ShellAssist<'a> {
         history: Vec<String>,
         helper: Option<&'a OsloHelper>,
         prompt_cols: usize,
-        toggle: Option<String>,
+        toggle: Vec<String>,
     ) -> ShellAssist<'a> {
         ShellAssist {
             helper,
@@ -349,7 +352,10 @@ impl Assist for ShellAssist<'_> {
         // oslo's own default, for a key the ordinary keymap does not already answer. Reached only
         // when the config said nothing about this key: `oslo.keys["shift-tab"] = "none"` returns
         // above and so cancels it.
-        (Some(name.as_str()) == self.toggle.as_deref()).then_some(Bound::ToggleLanguage)
+        self.toggle
+            .iter()
+            .any(|key| key == name.as_str())
+            .then_some(Bound::ToggleLanguage)
     }
 
     fn key_name(&mut self, key: Key) -> Option<String> {
@@ -472,7 +478,7 @@ mod tests {
             entries.iter().map(|e| e.to_string()).collect(),
             None,
             0,
-            Some("shift-tab".to_string()),
+            vec!["shift-tab".to_string(), "ctrl-space".to_string()],
         )
     }
 

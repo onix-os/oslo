@@ -56,6 +56,7 @@ pub(super) fn read_command(
     let enter = mode::enter_key(&env_struct.lock().unwrap());
     let adds_a_line = |language: Mode| language == Mode::Lua && enter == mode::Enter::Newline;
     oslo_ui::edit::session::set_enter_adds_a_line(adds_a_line(*current));
+    oslo_ui::edit::session::set_double_tab_toggles(mode::double_tab(&env_struct.lock().unwrap()));
     let mut buffer = String::new();
     let mut secret = false;
     let mut heredoc = HeredocTracker::default();
@@ -199,7 +200,7 @@ pub(super) fn read_command(
                 Some(helper),
                 // Position the completion menu from the prompt's displayed width.
                 oslo_ui::prompt::printed_width(&prompt),
-                Some(mode::TOGGLE_KEY.to_string()),
+                mode::TOGGLE_KEYS.iter().map(|k| k.to_string()).collect(),
             );
             assist.begin();
             // Handed as a *function* so the editor can rebuild it when the vi mode changes —

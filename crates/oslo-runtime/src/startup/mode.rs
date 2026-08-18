@@ -29,11 +29,21 @@
 //! is a second thing to know and one more way for a line to mean something you did not type. So
 //! the Lua side has no prefixes at all — every line there is Lua, and Shift+Tab is how you leave.
 //!
-//! **Why Shift+Tab.** `BackTab` is the only key in the Tab family a terminal delivers distinctly.
-//! Ctrl+Tab is indistinguishable from Tab in the legacy encoding every terminal still falls back
-//! to, so binding it would silently do nothing on a plain tty. It is configurable all the same,
-//! because a key that collides with someone's terminal or window manager is worth being able to
-//! move.
+//! **Why two keys switch it.** `BackTab` is the only key in the Tab family a terminal delivers
+//! distinctly — Ctrl+Tab is indistinguishable from Tab in the legacy encoding, so binding it would
+//! silently do nothing on a plain tty. But "delivers distinctly" still asks something of the
+//! terminal, and not every one answers: Alacritty without the kitty keyboard protocol reports no
+//! modifier for Shift+Tab, which left no way to change language at all.
+//!
+//! So there are two, and they fail in different places — see [`TOGGLE_KEYS`]. **Shift+Tab** is the
+//! one to reach for. **Ctrl+Space** asks the terminal for nothing: it is `NUL` in the legacy
+//! encoding and `CSI 32;5u` under the kitty protocol, and both already decoded to `Key::Ctrl(' ')`
+//! before either was bound to anything. Its own weakness is that an input method may claim it
+//! first, which is why neither is the only one.
+//!
+//! [`double_tab`] is a third way in for the corner where both fail, off unless asked for. All of
+//! them are configurable, because a key that collides with someone's terminal or window manager is
+//! worth being able to move.
 
 use oslo_shell::Environment;
 /// The language the next line will be read as.
@@ -196,14 +206,43 @@ pub fn enter_key(env: &Environment) -> Enter {
     }
 }
 
-/// The key that switches the prompt between shell and Lua.
+/// Whether Tab twice on an empty line switches language. `$OSLO_DOUBLE_TAB`, off unless `on`.
 ///
-/// **A constant, not a setting.** There was an `$OSLO_TOGGLE_KEY`; it is gone, because the key
+/// **A third way in, for the corner where both defaults fail.** Shift+Tab needs the terminal to
+/// report a modifier and Alacritty without the kitty keyboard protocol does not; Ctrl+Space needs
+/// the terminal to *see* it, and ibus or fcitx claims it as the input-method switch. A plain Tab
+/// is a plain Tab everywhere and answers to neither problem.
+///
+/// Off by default because it costs Tab at an empty prompt, and both defaults have to fail at once
+/// before that trade is worth making.
+pub fn double_tab(env: &Environment) -> bool {
+    matches!(
+        env.get_var("OSLO_DOUBLE_TAB")
+            .map(|v| v.trim().to_string())
+            .as_deref(),
+        Some("on" | "1" | "yes" | "true")
+    )
+}
+
+/// The keys that switch the prompt between shell and Lua.
+///
+/// **Two, because one of them asks something of the terminal.** Shift+Tab has to be *reported* as
+/// Shift+Tab, and a terminal that sends a bare Tab for it leaves no way to change language at all —
+/// which is what happened in Alacritty. Ctrl+Space asks for nothing: it is `NUL` in the legacy
+/// encoding and `CSI 32;5u` under the kitty protocol, and oslo already decoded both to
+/// `Key::Ctrl(' ')` before either was bound to anything.
+///
+/// Ctrl+Space has one cost worth knowing: it is the default input-method switch in ibus and fcitx,
+/// and an IME grabs it before the terminal sees it. That is a reason to have two keys, not a reason
+/// to prefer either.
+///
+/// **Constants, not a setting.** There was an `$OSLO_TOGGLE_KEY`; it is gone, because the key
 /// bindings already live in one place and a variable that could also set one was a second place
 /// for them to disagree from. The config does both jobs:
 ///
 /// ```lua
 /// oslo.keys["f2"] = "toggle-language"   -- another key as well
-/// oslo.keys["shift-tab"] = "none"       -- and this one turns the default off
+/// oslo.keys["shift-tab"] = "none"       -- and this one turns a default off
+/// oslo.keys["ctrl-space"] = "none"      -- as does this
 /// ```
-pub const TOGGLE_KEY: &str = "shift-tab";
+pub const TOGGLE_KEYS: &[&str] = &["shift-tab", "ctrl-space"];

@@ -1,9 +1,10 @@
 # Two languages, one prompt
 
-oslo's prompt reads one language at a time — POSIX shell or Lua — and Shift-Tab switches between
-them without disturbing the line you are typing. It exists because a shell that guessed the
-language by looking at the line would decide what `print(1)` means from whatever happens to be
-installed, and a shell whose meaning depends on that is one you cannot write scripts against.
+oslo's prompt reads one language at a time — POSIX shell or Lua — and Shift-Tab or Ctrl-Space
+switches between them without disturbing the line you are typing. It exists because a shell that
+guessed the language by looking at the line would decide what `print(1)` means from whatever
+happens to be installed, and a shell whose meaning depends on that is one you cannot write
+scripts against.
 
 <!-- demo:begin -->
 [![two-languages-one-prompt demo](https://asciinema.org/a/1262753.svg)](https://asciinema.org/a/1262753)
@@ -194,13 +195,29 @@ falls back to, so binding it would silently do nothing on a plain tty.
 
 ## Configuration
 
-The key. There is no `$OSLO_TOGGLE_KEY`; bindings live in one table so there is no second place for
+The keys. There is no `$OSLO_TOGGLE_KEY`; bindings live in one table so there is no second place for
 them to disagree from.
+
+**Two keys switch it, and they fail in different places.** `Shift+Tab` has to be *reported* as
+Shift+Tab, and a terminal that does not report the modifier — Alacritty without the kitty keyboard
+protocol — leaves no way to change language at all. `Ctrl+Space` asks the terminal for nothing: it
+is `NUL` on a plain tty and `CSI 32;5u` under the kitty protocol, and oslo decoded both to the same
+key long before either was bound to anything. Its own weakness is that ibus and fcitx claim it as
+the input-method switch, and an IME takes it before the terminal sees it. Hence two.
 
 ```lua
 -- "toggle-mode" is the same action under another name.
 oslo.keys["f2"] = "toggle-language"     -- another key as well
-oslo.keys["shift-tab"] = "none"         -- and this turns the default off
+oslo.keys["shift-tab"] = "none"         -- and this turns a default off
+oslo.keys["ctrl-space"] = "none"        -- as does this
+```
+
+Tab twice on an empty line is a third way in, for the corner where both of those fail. It is off
+unless asked for, because it costs Tab at an empty prompt — which otherwise offers every name on
+`$PATH` — and both defaults have to fail at once before that trade is worth making.
+
+```sh
+export OSLO_DOUBLE_TAB=on
 ```
 
 The language a session starts in. Both spellings reach the same shell variable.

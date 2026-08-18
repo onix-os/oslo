@@ -22,8 +22,8 @@ in [scripts/demo](scripts/demo/) so it can be made again after the code changes.
 
 ## Two languages, one prompt
 
-Shift+Tab switches between shell and Lua **in place** — your line, your cursor and your history stay
-where they are.
+Shift+Tab (or Ctrl+Space) switches between shell and Lua **in place** — your line, your cursor and
+your history stay where they are.
 
 ```
 bresilla@tron | I | sh  > ls -la                    ❮  (develop)  ~/src/oslo

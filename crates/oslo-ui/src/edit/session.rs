@@ -14,8 +14,8 @@ use std::io::Write;
 mod assist;
 pub use assist::{Assist, NoAssist};
 
-mod enter;
-pub use enter::set_enter_adds_a_line;
+mod shortcuts;
+pub use shortcuts::{set_double_tab_toggles, set_enter_adds_a_line};
 
 /// What a `key` hook asked the editor to do with the keystroke it just saw.
 ///
@@ -37,6 +37,8 @@ pub enum KeyHook {
 #[derive(Debug, Default)]
 pub struct Session {
     pub buffer: Buffer,
+    /// Whether the key before this one was a Tab on an empty line. See [`shortcuts::tab`].
+    tab_armed: bool,
     /// Vi mode, when `oslo.vi.enabled` asked for it.
     ///
     /// `None` is emacs, and then nothing vi-shaped is consulted at all. With it on, insert mode
@@ -51,6 +53,7 @@ impl Session {
         buffer.set(text, cursor);
         Session {
             buffer,
+            tab_armed: false,
             vi: crate::vi::enabled().then(super::vi::Vi::default),
         }
     }
@@ -118,6 +121,12 @@ impl Session {
         if key == Key::Resized {
             crate::prompt::invalidate();
             return changed(true);
+        }
+
+        // Tab twice on an empty line switches language — the fallback for a terminal that
+        // cannot deliver Shift+Tab. See `shortcuts::tab`.
+        if let Some(step) = shortcuts::tab(self, key) {
+            return step;
         }
 
         // **The `key` hook sees the keystroke before anything else, ordinary characters included.**
@@ -288,7 +297,7 @@ impl Session {
             // the only key that changes: Ctrl+Enter and Alt+Enter still send, so there is always a
             // way out of a block. See `set_enter_adds_a_line`.
             Action::AcceptOrNewline => {
-                if enter::adds_a_line() {
+                if shortcuts::adds_a_line() {
                     self.buffer.insert_str("\n");
                     changed(true)
                 } else {

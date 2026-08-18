@@ -11,6 +11,11 @@ use oslo_ui::term::Key;
 /// Lua about every letter typed would put a hash lookup on the hot path for nothing.
 pub(super) fn key_name(key: Key) -> Option<String> {
     Some(match key {
+        // **Named before the general `ctrl-` case**, or it comes out as `"ctrl- "` with a literal
+        // space in it — a name that works, that nobody would guess, and that no documentation
+        // could sensibly print. Ctrl+Space is the language toggle's second default, so this is a
+        // name people will actually write.
+        Key::Ctrl(' ') => "ctrl-space".to_string(),
         Key::Ctrl(c) => format!("ctrl-{c}"),
         Key::Alt(c) if !c.is_control() => format!("alt-{c}"),
         Key::ToggleScope => "tab".to_string(),
@@ -81,5 +86,39 @@ pub(super) fn hook_key_name(key: Key) -> (String, Option<char>) {
         // moved under it — but it is not a key and is named so that no config mistakes it for one.
         Key::Resized => ("resized".to_string(), None),
         Key::Ignored => ("ignored".to_string(), None),
+    }
+}
+
+#[cfg(test)]
+mod ctrl_space_tests {
+    use super::key_name;
+    use oslo_ui::term::Key;
+
+    /// **Ctrl+Space has a name people can write.**
+    ///
+    /// It arrives as `Key::Ctrl(' ')` from both encodings — `NUL` on a plain tty, `CSI 32;5u` under
+    /// the kitty protocol — and the generic `ctrl-<char>` rule named it `"ctrl- "`, with a literal
+    /// space. That bound correctly and could not be documented or guessed. It is one of the two
+    /// default language toggles, so the name is one people will type.
+    #[test]
+    fn ctrl_space_is_named_ctrl_space() {
+        assert_eq!(key_name(Key::Ctrl(' ')).as_deref(), Some("ctrl-space"));
+        // The other control chords are untouched.
+        assert_eq!(key_name(Key::Ctrl('r')).as_deref(), Some("ctrl-r"));
+        assert_eq!(key_name(Key::BackTab).as_deref(), Some("shift-tab"));
+        // Plain Space is still `space`, and is a different key from the chord.
+        assert_eq!(key_name(Key::Char(' ')).as_deref(), Some("space"));
+    }
+
+    /// Both defaults resolve to the same name the toggle list holds.
+    #[test]
+    fn both_default_toggles_name_themselves() {
+        for key in [Key::BackTab, Key::Ctrl(' ')] {
+            let name = key_name(key).expect("a name");
+            assert!(
+                crate::startup::mode::TOGGLE_KEYS.contains(&name.as_str()),
+                "{name:?} should be a default toggle"
+            );
+        }
     }
 }
