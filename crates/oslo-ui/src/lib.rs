@@ -235,17 +235,17 @@ impl OsloHelper {
                 // this project's example.
                 settings::Source::History if recallable => recall::suggest(line),
                 settings::Source::History => None,
-                // The names that exist in the session — the Lua answer to `Completion`, and
-                // meaningless at a shell prompt, where a name is a program rather than a value.
-                settings::Source::Names if lua => hinting::lua_hint(line, pos),
-                settings::Source::Names => None,
-                // **Shell-shaped, so they decline at a Lua prompt** rather than offering something
-                // that cannot be written there. Listing one under `lua_sources` is not an error —
-                // it is a config asking for a thing that has no Lua meaning, and the honest answer
-                // is nothing rather than a `$PATH` name in a Lua expression.
-                settings::Source::Completion if !lua => self.command_hint(line, pos),
+                // **One source, two answers.** "Complete what is being typed" is the same idea at
+                // both prompts; what it completes is not. A command name at a shell prompt, a Lua
+                // name at a Lua one.
+                settings::Source::Completion if lua => hinting::lua_hint(line, pos),
+                settings::Source::Completion => self.command_hint(line, pos),
+                // **Shell-shaped, so it declines at a Lua prompt** rather than offering something
+                // that cannot be written there. Listing it under `lua_sources` is not an error —
+                // it is a config asking for a thing with no Lua meaning, and the honest answer is
+                // nothing rather than a filename in the middle of a Lua expression.
                 settings::Source::Path if !lua => self.path_hint(line, pos),
-                settings::Source::Completion | settings::Source::Path => None,
+                settings::Source::Path => None,
                 // The model, which knows what usually follows what you have been doing. It
                 // answers with a whole line, so what is offered is the remainder — the same shape
                 // `recall` returns, since both continue what has been typed rather than replace

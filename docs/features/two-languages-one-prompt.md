@@ -173,8 +173,14 @@ values — `_G` is cyclic and deep-copying it to answer a Tab would be absurd.
 
 ```lua
 oslo.suggest.sources     = { "history", "completion", "path" }   -- the shell prompt
-oslo.suggest.lua_sources = { "names" }                            -- the Lua prompt
+oslo.suggest.lua_sources = { "completion" }                      -- the Lua prompt
 ```
+
+**What `completion` means as a source**: ask this prompt's completer — the same machinery Tab uses
+— and take the single answer a ghost can promise. It is *one* source with two answers, because
+"complete what is being typed" is one idea: a command name at a shell prompt (builtin, alias,
+function, `$PATH`), a Lua name at a Lua one (a global, or a field of the table being indexed).
+`names` and `globals` are accepted spellings for the Lua reading.
 
 Three of the shell sources answer with *shell* — `path` completes a filename in command position,
 `predict` is a model trained on commands, `completion` offers names from `$PATH` — and not one of
@@ -184,8 +190,9 @@ silently decided what Lua did, and what it usually decided was nothing at all: a
 
 **`history` is deliberately absent from the Lua default.** A Lua prompt should behave like an
 editor — what it offers is what *exists* in the session, not what you happened to type last week.
-Add `"history"` to `lua_sources` if you want the old behaviour. A source listed on the wrong side
-answers nothing rather than erroring, because a `$PATH` name inside a Lua expression is not a
+Add `"history"` to `lua_sources` if you want the old behaviour. `path` and `predict` are the two
+that are shell-shaped with no Lua reading at all; listing either under `lua_sources` answers
+nothing rather than erroring, because a filename in the middle of a Lua expression is not a
 suggestion, it is a syntax error waiting to be accepted.
 
 Tab is split the same way and more simply: a Lua line never reaches the shell completer at all, so

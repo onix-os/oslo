@@ -236,7 +236,17 @@ impl Default for Completion {
 pub enum Source {
     /// A line the user has actually run.
     History,
-    /// A command name being typed.
+    /// **Whatever this prompt's completer offers** — the same machinery Tab uses, reduced to the
+    /// single answer a ghost can promise.
+    ///
+    /// What that *is* follows the language, because "complete what is being typed" is one idea
+    /// with two answers: at a shell prompt a command name — a builtin, an alias, a function,
+    /// something on `$PATH` — and at a Lua prompt a Lua name, meaning a global or a field of the
+    /// table being indexed. `names` and `globals` are accepted spellings for the Lua reading.
+    ///
+    /// There was briefly a separate `Names` source for the Lua half. That was a mistake: two names
+    /// for one job, and a config had to know which prompt it was writing for to pick the right
+    /// word.
     Completion,
     /// A file or directory.
     Path,
@@ -247,12 +257,6 @@ pub enum Source {
     /// has been measured against `History` on a real history rather than assumed to be better.
     /// Ask for it by name until then.
     Prediction,
-    /// The names that exist in the Lua session: globals, and the fields of the table being
-    /// indexed.
-    ///
-    /// **The Lua answer to `Completion`**, and the only source of the five that is not about a
-    /// shell. `Completion` offers something on `$PATH`, which a Lua line cannot call.
-    Names,
     /// Whatever a config or a plugin registered with `oslo.suggest.provider`.
     ///
     /// **A source among the sources.** Where a plugin's answer sits relative to your own history is
@@ -265,10 +269,11 @@ impl Source {
     fn parse(name: &str) -> Option<Source> {
         match name {
             "history" => Some(Source::History),
-            "completion" | "completions" => Some(Source::Completion),
+            // `names` and `globals` are the Lua reading of the same source, taken as spellings
+            // rather than as a source of their own — see `Source::Completion`.
+            "completion" | "completions" | "names" | "name" | "globals" => Some(Source::Completion),
             "path" | "paths" | "file" => Some(Source::Path),
             "predict" | "prediction" => Some(Source::Prediction),
-            "names" | "name" | "globals" => Some(Source::Names),
             "provider" | "providers" | "plugin" => Some(Source::Provider),
             _ => None,
         }
@@ -432,9 +437,9 @@ impl Default for Suggest {
         // anything that can be ranked.
         Suggest {
             sources: vec![Source::History, Source::Completion, Source::Path],
-            // Names only: an editor offers what exists, and nothing else here can be written in
-            // Lua. See the field.
-            lua_sources: vec![Source::Names],
+            // The completer alone: an editor offers what exists, and at a Lua prompt that is the
+            // names in the session. See the field.
+            lua_sources: vec![Source::Completion],
             accept: None,
             accept_word: None,
             skip_history: vec!["rm".to_string()],
