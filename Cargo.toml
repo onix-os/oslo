@@ -113,11 +113,16 @@ opt-level = "s"
 [profile.release.package."*"]
 opt-level = "s"
 
+# Likewise, and here the pin was buying nothing at all: parsing 4000 shell blocks took 118 ms at
+# both settings.
 [profile.release.package.brush-parser]
-opt-level = 3
+opt-level = "s"
 
+# Size, not speed, and measured rather than assumed: at `opt-level = 3` painting a 57-character
+# line took 2.41 µs per keystroke and at "s" it takes 3.02 µs. A keystroke is ~100 ms apart, so the
+# difference is 0.0006% of the gap between two keys — and it is 250 KB of binary.
 [profile.release.package.oslo-ui]
-opt-level = 3
+opt-level = "s"
 
 [profile.release.package.argc]
 opt-level = "s"
