@@ -178,38 +178,53 @@ pub fn looks_like_a_coordinate(text: &str) -> bool {
     })
 }
 
-/// Replace the coordinate in one piece of literal text, answering the words it becomes.
+/// Replace every coordinate in one piece of literal text, answering the words it becomes.
 ///
-/// One word can become several: `{*:0}` on three lines is three arguments, the way `"$@"` is. A
-/// word that is *only* a coordinate becomes one argument per value; a coordinate with text around
-/// it joins its values with a space, because `host-{*:0}.lan` has to stay one word to mean
-/// anything at all.
+/// One word can become several: `{*:0}` on three lines is three arguments, the way `"$@"` is. That
+/// only happens for a word that is a coordinate and **nothing else** — `{0:0}-{1:0}` has to stay one
+/// word to mean anything, so there the values are joined with a space and the text between them is
+/// kept.
 ///
 /// `None` when the text holds no coordinate, so an ordinary brace group falls through to the brace
 /// expansion that already handles it.
 pub fn substitute(text: &str, streams: &Streams) -> Option<Vec<Word>> {
-    let (before, coord, after) = split(text)?;
-    let values = match streams.text(&coord) {
-        Some(stream) => coords::select(&coord, stream),
+    // A word that is one coordinate and nothing else: one argument per value.
+    if let Some((before, coord, after)) = split(text)
+        && before.is_empty()
+        && after.is_empty()
+    {
+        return Some(values(&coord, streams).into_iter().map(quoted).collect());
+    }
+
+    // Otherwise every coordinate is replaced where it stands, and the word stays one word.
+    let mut parts = Vec::new();
+    let mut rest = text;
+    let mut found = false;
+    while let Some((before, coord, after)) = split(rest) {
+        found = true;
+        if !before.is_empty() {
+            parts.push(WordPart::Literal(before.to_string()));
+        }
+        parts.push(WordPart::SingleQuoted(values(&coord, streams).join(" ")));
+        rest = after;
+    }
+    if !found {
+        return None;
+    }
+    if !rest.is_empty() {
+        parts.push(WordPart::Literal(rest.to_string()));
+    }
+    Some(vec![Word { parts }])
+}
+
+/// What a coordinate reads, or nothing when its stream was never captured.
+fn values(coord: &Coord, streams: &Streams) -> Vec<String> {
+    match streams.text(coord) {
+        Some(stream) => coords::select(coord, stream),
         // Nothing captured: the coordinate reads empty rather than refusing to run, which is the
         // rule everywhere else in this feature.
         None => Vec::new(),
-    };
-
-    // A bare coordinate becomes one argument per value.
-    if before.is_empty() && after.is_empty() {
-        return Some(values.into_iter().map(quoted).collect());
     }
-    // Anything else is one word, with the values joined.
-    let mut parts = Vec::new();
-    if !before.is_empty() {
-        parts.push(WordPart::Literal(before.to_string()));
-    }
-    parts.push(WordPart::SingleQuoted(values.join(" ")));
-    if !after.is_empty() {
-        parts.push(WordPart::Literal(after.to_string()));
-    }
-    Some(vec![Word { parts }])
 }
 
 /// One value as one word that cannot be split or globbed.
@@ -220,16 +235,21 @@ fn quoted(value: String) -> Word {
 }
 
 /// Split a word around its first coordinate: `(before, coord, after)`.
+///
+/// Scans forward for a `{` that opens one, so `a{b}c{0:0}` finds the coordinate rather than giving
+/// up at the brace group in front of it.
 fn split(text: &str) -> Option<(&str, Coord, &str)> {
-    let open = text.find('{')?;
-    let close = open + text[open..].find('}')?;
-    let coord = coords::parse(&text[open + 1..close])?;
-    Some((&text[..open], coord, &text[close + 1..]))
+    let mut from = 0;
+    while let Some(open) = text[from..].find('{') {
+        let open = from + open;
+        let close = open + text[open..].find('}')?;
+        if let Some(coord) = coords::parse(&text[open + 1..close]) {
+            return Some((&text[..open], coord, &text[close + 1..]));
+        }
+        from = open + 1;
+    }
+    None
 }
-
-#[cfg(test)]
-#[path = "streams/tests.rs"]
-mod tests;
 
 /// Rewrite every coordinate in a simple command's words, in place.
 ///
@@ -278,3 +298,7 @@ pub fn command_uses_coordinates(words: &[Word]) -> bool {
         .filter_map(only_literal)
         .any(looks_like_a_coordinate)
 }
+
+#[cfg(test)]
+#[path = "streams/tests.rs"]
+mod tests;

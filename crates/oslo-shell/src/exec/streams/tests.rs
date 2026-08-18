@@ -261,3 +261,32 @@ fn the_gate_is_closed_for_ordinary_commands() {
         literal("x{-1:0:}y")
     ]));
 }
+
+/// **Every coordinate in a word is replaced, not just the first**, and a brace group in front of
+/// one does not stop the scan.
+#[test]
+fn a_word_may_hold_several_coordinates() {
+    let mut streams = Streams::default();
+    streams.push_stage(HOSTS);
+
+    assert_eq!(words("{0:0}-{1:0}", &streams), vec!["web-01-web-02"]);
+    assert_eq!(words("a{b}c{0:0}", &streams), vec!["a{b}cweb-01"]);
+    assert_eq!(
+        words("{0:0}/{1:0}/{-1:0}", &streams),
+        vec!["web-01/web-02/db-01"]
+    );
+    // Several coordinates make one word, so a `*` among them joins rather than multiplying.
+    assert_eq!(
+        words("[{*:0}]-[{0:0}]", &streams),
+        vec!["[web-01 web-02 db-01]-[web-01]"]
+    );
+}
+
+/// A word that is a coordinate and nothing else still becomes one argument per value — the rule
+/// above must not have taken that away.
+#[test]
+fn a_lone_coordinate_still_multiplies() {
+    let mut streams = Streams::default();
+    streams.push_stage(HOSTS);
+    assert_eq!(words("{*:0}", &streams), vec!["web-01", "web-02", "db-01"]);
+}

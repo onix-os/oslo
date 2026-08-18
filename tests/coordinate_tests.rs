@@ -169,3 +169,81 @@ fn two_dimensions_do_not_reach_a_stream() {
         "db-01   10.0.0.9  postgres"
     );
 }
+
+/// **Every coordinate in a word is replaced, not just the first.**
+///
+/// `{0:0}-{1:0}` used to come back as `alpha-{1:0}`: the scan found one coordinate and stopped.
+#[test]
+fn every_coordinate_in_a_word_is_replaced() {
+    assert_eq!(shell("cat hosts.txt | echo {0:0}-{1:0}"), "web-01-web-02");
+    assert_eq!(
+        shell("cat hosts.txt | echo {0:0}{1:0}{-1:0}"),
+        "web-01web-02db-01"
+    );
+    assert_eq!(
+        shell("cat hosts.txt | echo pre-{0:0}-mid-{-1:0}-post"),
+        "pre-web-01-mid-db-01-post"
+    );
+    // And a brace group in front of one does not hide it.
+    assert_eq!(shell("cat hosts.txt | echo a{b}c{0:0}"), "a{b}cweb-01");
+}
+
+/// **An endless upstream stops.**
+///
+/// Reading to EOF and truncating afterwards is fine for a file and fatal for a tap: `yes | echo
+/// {0:0}` hung for ever, and so did `yes | head -3 | echo {0:0}` — capturing the first stage to EOF
+/// defeats `head`'s early exit, because the thing draining `yes` is no longer `head`. The read is
+/// bounded instead, and closing it kills the producer with `SIGPIPE` exactly as `head` would.
+#[test]
+fn an_endless_upstream_is_cut_off() {
+    assert_eq!(shell("yes | echo {0:0}"), "y");
+    assert_eq!(shell("yes | head -3 | echo {0:0}"), "y");
+}
+
+/// A malformed coordinate is left as text — no panic, no crash, and no swallowing of a brace group.
+#[test]
+fn a_malformed_coordinate_is_left_alone() {
+    for text in [
+        "{}",
+        "{:::}",
+        "{0:1:2:3}",
+        "{--1}",
+        "{-}",
+        "{0:0",
+        "{ 0:0 }",
+        // Far past what an index can hold: refused rather than overflowing.
+        "{999999999999999999999}",
+    ] {
+        assert_eq!(
+            shell(&format!("cat hosts.txt | echo [{text}]")),
+            format!("[{text}]"),
+            "for {text}"
+        );
+    }
+}
+
+/// The shapes real text arrives in.
+#[test]
+fn the_edges_of_real_input() {
+    // No trailing newline still has a last line.
+    assert_eq!(shell(r#"printf "x y" | echo [{0:1}]"#), "[y]");
+    // Nothing at all reads as nothing.
+    assert_eq!(shell("true | echo [{0:0}]"), "[]");
+    assert_eq!(shell(r#"printf "\n" | echo [{0}]"#), "[]");
+    // A blank line in the middle is a line, and keeps the ones after it in place.
+    assert_eq!(shell(r#"printf "a\n\nb\n" | echo [{1}][{2:0}]"#), "[][b]");
+    // Tabs separate words, as whitespace does everywhere else in a shell.
+    assert_eq!(shell(r#"printf "a\tb\n" | echo [{0:1}]"#), "[b]");
+    // Leading whitespace is not a word.
+    assert_eq!(shell(r#"printf "   a   b\n" | echo [{0:0}]"#), "[a]");
+    // A line of only spaces has no words, but is still a line.
+    assert_eq!(shell(r#"printf "   \n" | echo [{0:0}][{0}]"#), "[][   ]");
+    // Non-ASCII is text like any other.
+    assert_eq!(shell(r#"printf "héllo wörld\n" | echo [{0:1}]"#), "[wörld]");
+}
+
+/// A coordinate may be the command itself.
+#[test]
+fn a_coordinate_can_name_the_command() {
+    assert_eq!(shell(r#"printf "echo\n" | {0:0} ran-it"#), "ran-it");
+}

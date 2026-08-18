@@ -156,13 +156,7 @@ fn run_in_child(
             let text = match capture {
                 Some((reader, writer)) => {
                     let _ = close(writer.into_raw_fd());
-                    let mut out = Vec::new();
-                    use std::io::Read;
-                    let _ = std::fs::File::from(reader).read_to_end(&mut out);
-                    // A shell word is a C string and cannot carry a NUL, so a coordinate reading
-                    // one would build an argv that dies at exec. Dropped the way command
-                    // substitution drops them.
-                    out.retain(|&b| b != 0);
+                    let out = read_bounded(std::fs::File::from(reader));
                     String::from_utf8_lossy(&out).into_owned()
                 }
                 None => String::new(),
@@ -171,4 +165,33 @@ fn run_in_child(
         }
         Err(e) => Err(ShellError::ExecutionError(format!("Fork failed: {e}"))),
     }
+}
+
+/// Read at most [`streams::STREAM_MAX`] bytes, then let go.
+///
+/// **Bounded during the read, not after it.** Reading to EOF and truncating afterwards is the same
+/// answer for a file and a catastrophe for a tap that never closes: `yes | echo {0:0}` hung for
+/// ever, and so did `yes | head -3 | echo {0:0}` — capturing the first stage to EOF defeats `head`'s
+/// early exit, because the thing draining `yes` is no longer `head`.
+///
+/// Dropping the reader at the cap closes it, and the next write the producer attempts kills it with
+/// `SIGPIPE` — which is exactly what `head` does to `yes` in an ordinary pipeline. So a stage that
+/// produces without end is stopped by the mechanism that always stopped it.
+fn read_bounded(mut file: std::fs::File) -> Vec<u8> {
+    use std::io::Read;
+    let mut out = Vec::new();
+    let mut chunk = [0u8; 64 * 1024];
+    while out.len() < streams::STREAM_MAX {
+        match file.read(&mut chunk) {
+            Ok(0) | Err(_) => break,
+            Ok(n) => out.extend_from_slice(&chunk[..n]),
+        }
+    }
+    out.truncate(streams::STREAM_MAX);
+    // A shell word is a C string and cannot carry a NUL, so a coordinate reading one would build an
+    // argv that dies at exec. Dropped the way command substitution drops them.
+    out.retain(|&b| b != 0);
+    // Dropped here, deliberately: closing the read end is what stops an endless producer.
+    drop(file);
+    out
 }
