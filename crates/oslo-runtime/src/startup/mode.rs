@@ -186,24 +186,27 @@ pub enum Enter {
     Newline,
 }
 
-/// Read `$OSLO_LUA_ENTER`.
+/// Read `$OSLO_LUA_ENTER`. `newline` is the default; `smart` is the other choice.
 ///
-/// **`smart` is the default, and the reason is that the alternative can lock you out.** With
-/// `newline`, the only way to send is Ctrl+Enter or Alt+Enter — and Ctrl+Enter does not exist on a
-/// terminal without the kitty keyboard protocol, because in the legacy encoding Ctrl+Enter *is*
-/// Enter (Ctrl-M is CR). Alt+Enter is decoded in both encodings, so `newline` always has one way
-/// out; it is still not a default worth choosing for someone who did not ask.
+/// **A Lua prompt is where you write a block, not a line.** A function, a loop, an `if` — every one
+/// of them is several lines, and an Enter that means "run this now" interrupts writing every one of
+/// them. So Enter adds a line and **Alt+Enter sends**.
 ///
-/// `smart` is what a Lua REPL usually does and what oslo has always done: a finished block runs, an
-/// unfinished one asks for more. `newline` is for writing a function at the prompt, where every
-/// Enter meaning "run this" is an interruption.
+/// **Alt+Enter, not only Ctrl+Enter, and that is the load-bearing part.** Ctrl+Enter does not exist
+/// on a terminal without the kitty keyboard protocol: in the legacy encoding Ctrl-M *is* Enter, so
+/// there is nothing to tell them apart. Alt+Enter arrives in both encodings — `ESC` then `CR` on a
+/// plain tty — and both spellings map to one action, so this default cannot leave a prompt with no
+/// way to send. That is what makes it safe to be a default at all.
+///
+/// `smart` is the older behaviour and what most Lua REPLs do: a finished block runs on Enter, an
+/// unfinished one asks for more. It is worth having for anyone whose terminal eats Alt.
 pub fn enter_key(env: &Environment) -> Enter {
     match env
         .get_var("OSLO_LUA_ENTER")
         .map(|value| value.trim().to_string())
     {
-        Some(value) if value == "newline" => Enter::Newline,
-        _ => Enter::Smart,
+        Some(value) if value == "smart" => Enter::Smart,
+        _ => Enter::Newline,
     }
 }
 

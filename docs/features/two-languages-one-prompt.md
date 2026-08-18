@@ -245,28 +245,25 @@ export OSLO_LUA_PREFIX=,
 oslo.opts.set("lua_prefix", ",")
 ```
 
-What Enter does at a Lua prompt. `smart` — the default — sends a finished block and adds a line to
-an unfinished one, which is what a Lua REPL usually does. `newline` always adds a line, and
-**Ctrl+Enter or Alt+Enter sends**.
+What Enter does at a Lua prompt. **`newline` is the default**: Enter adds a line and **Alt+Enter
+sends**. A Lua prompt is where you write a block — a function, a loop, an `if` — and an Enter that
+means "run this now" interrupts writing every one of them. `smart` is the older behaviour and what
+most Lua REPLs do: a finished block runs on Enter, an unfinished one asks for more.
 
 ```sh
-export OSLO_LUA_ENTER=newline
+export OSLO_LUA_ENTER=smart     # Enter sends again
 ```
 
 ```lua
-oslo.opts.set("lua_enter", "newline")
+oslo.opts.set("lua_enter", "smart")
 ```
 
-> **Alt+Enter is the one that always works.** Ctrl+Enter does not exist on a terminal without the
-> kitty keyboard protocol: in the legacy encoding Ctrl-M *is* Enter, so the two cannot be told
-> apart, and a prompt whose only send key was Ctrl+Enter would be a prompt that never ran anything.
-> Alt+Enter is decoded in both encodings and mapped to the same action, so `newline` always has a
-> way out of a block. That is also why `smart` is the default rather than the other way round.
-
-Watching the switch. One hook covers vi-mode changes too, so a handler that cares about only one
-reads `kind`.
-
-```lua
+> **Use Alt+Enter, not Ctrl+Enter, unless you know your terminal reports modifiers.** Ctrl+Enter
+> does not exist on a terminal without the kitty keyboard protocol: in the legacy encoding Ctrl-M
+> *is* Enter, so there is nothing to tell them apart. Alt+Enter arrives in both encodings — `ESC`
+> then `CR` on a plain tty — and both spellings reach the same action. That is what makes
+> `newline` safe as a default: there is no terminal where it leaves the prompt with no way to send.
+lua
 -- m is { kind = "language", from = "sh", to = "lua" }
 oslo.on.pre_mode_change(function(m)  end)
 oslo.on.post_mode_change(function(m) end)
