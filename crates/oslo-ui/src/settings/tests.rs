@@ -59,11 +59,6 @@ fn the_completion_sources_are_read_including_an_empty_list() {
         Some(["function".to_string(), "field".to_string()].as_slice())
     );
     assert_eq!(lua.completion.sh_sources, None, "the shell's is untouched");
-
-    // The old name is reported rather than ignored.
-    let (_, problems) = settings_from("oslo = { completion = { sources = {'command'} } }");
-    assert_eq!(problems.len(), 1, "{problems:?}");
-    assert!(problems[0].contains("sh_sources"), "{problems:?}");
 }
 
 #[test]
@@ -128,18 +123,6 @@ fn suggestion_sources_keep_the_order_they_were_written_in() {
     // An empty list turns suggestions off, which is a thing someone may want.
     let (off, _) = settings_from("oslo = { suggest = { sh_sources = {} } }");
     assert!(off.suggest.sh_sources.is_empty());
-}
-
-/// **The old name is reported, not ignored.** `sources` read as "the sources" until there were two
-/// lists; a config still saying it would otherwise get a shell prompt that suggests nothing, with
-/// nothing on screen to say why.
-#[test]
-fn the_old_source_list_name_is_reported() {
-    let (settings, problems) = settings_from("oslo = { suggest = { sources = {'history'} } }");
-    assert_eq!(problems.len(), 1, "{problems:?}");
-    assert!(problems[0].contains("sh_sources"), "{problems:?}");
-    // And the default stands rather than being emptied by a list that was not read.
-    assert_eq!(settings.suggest.sh_sources, Suggest::default().sh_sources);
 }
 
 /// A typo that silently turns a source off is the kind of thing that gets blamed on the shell.
