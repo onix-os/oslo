@@ -12,6 +12,8 @@ pub mod procsub;
 pub mod redirect;
 pub mod simple;
 pub mod stored;
+/// The stack of streams a coordinate reads from. See [`streams`].
+pub mod streams;
 pub mod substitution;
 
 pub use job::JobManager;

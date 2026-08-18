@@ -502,6 +502,10 @@ pub fn run_repl(login: bool) -> ! {
                 //
                 // `after` rather than `before`, so a `cd` is reflected in the directory the hook is
                 // told about; and the same `elapsed` the notice and the history column use.
+                // Remembered for `{-n:…}`: the line, not its output. A stage's output is free to
+                // capture because a stage already writes to a pipe; a command's is not, and the
+                // line is what a previous prompt has to offer for nothing. See `exec::streams`.
+                oslo_shell::exec::streams::remember_prompt(&text);
                 let done = LuaEngine::command_finished(
                     &text,
                     &after,
@@ -521,6 +525,10 @@ pub fn run_repl(login: bool) -> ! {
                 // offering `history -c` for ever, the two views of one store disagreeing. Handled
                 // like a secret line, which is the same shape: run it, write nothing down.
                 if secret || cleared_history {
+                    // A line the user asked to be gone must not stay reachable by coordinate.
+                    if cleared_history {
+                        oslo_shell::exec::streams::forget_prompts();
+                    }
                     tracker.forget_boundary();
                 } else {
                     tracker.write_down(&tracking::Finished {

@@ -109,8 +109,14 @@ fn operand(word: &ast::Word) -> Result<oslo_ast::Word> {
     // so it cannot split or glob however many spaces are in it, and a name that resolves to
     // nothing keeps its own text. One literal part only, so nothing here can expand to a field
     // this was wrapping to protect.
+    //
+    // **A stream coordinate is left bare for exactly the same reason**, and it is the same bug
+    // written twice: `test {0:0} = alpha` was true and `[[ {0:0} == alpha ]]` false, because the
+    // wrapping hid the coordinate from the substitution that runs over literal words. It is safe
+    // to leave bare on the same grounds — a substituted value arrives already quoted and cannot
+    // split or glob however many spaces are in it.
     if let [oslo_ast::WordPart::Literal(text)] = inner.parts.as_slice()
-        && text.starts_with('@')
+        && (text.starts_with('@') || crate::exec::streams::holds_a_coordinate(text))
     {
         return Ok(inner);
     }

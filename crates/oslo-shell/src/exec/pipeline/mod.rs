@@ -15,6 +15,7 @@
 //! knows which command of a list POSIX makes it answerable for. Constructs whose *conditions* are
 //! exempt reach in through `suspend_errexit`.
 
+mod coordinates;
 mod describe;
 mod errexit;
 mod interrupt;
@@ -357,6 +358,13 @@ fn run_stages(env: &mut Environment, pipeline: &Pipeline) -> Result<i32> {
         // the first structured tool is small and its blast radius is already measured.
         return structured::run(env, pipeline, &sinks, run_byte_stages);
     }
+    // **The second question asked before anything runs**, and the same shape as the first: a stage
+    // that reads its upstream by coordinate cannot start until that upstream has finished, so the
+    // whole pipeline runs one stage at a time. A pipeline with no coordinate in it — which is
+    // nearly all of them — answers `false` here and forks concurrently as it always has.
+    if coordinates::uses_coordinates(pipeline) {
+        return coordinates::run(env, pipeline);
+    }
     run_byte_stages(env, pipeline)
 }
 
@@ -467,7 +475,7 @@ fn run_byte_stages(env: &mut Environment, pipeline: &Pipeline) -> Result<i32> {
 /// R6.4: `set -o pipefail` swaps "the last stage" for "the rightmost stage that failed", so
 /// `false | true` reports 1 while `true | false | true` still reports the 1 in the middle. Without
 /// the option the leftmost stages are invisible, which is the default POSIX rule.
-fn pipeline_status(env: &Environment, stages: &[i32]) -> i32 {
+pub(super) fn pipeline_status(env: &Environment, stages: &[i32]) -> i32 {
     if env.pipefail() {
         // Rightmost, not first: `exit 3 | exit 4` is 4 in bash, the failure closest to the output.
         if let Some(failed) = stages.iter().rev().find(|s| **s != 0) {
