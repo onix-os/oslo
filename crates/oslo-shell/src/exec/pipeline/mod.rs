@@ -15,6 +15,7 @@
 //! knows which command of a list POSIX makes it answerable for. Constructs whose *conditions* are
 //! exempt reach in through `suspend_errexit`.
 
+mod coordinates;
 mod describe;
 mod errexit;
 mod interrupt;
@@ -356,6 +357,13 @@ fn run_stages(env: &mut Environment, pipeline: &Pipeline) -> Result<i32> {
         // wired now, with the corpus proving it is never reached, so that the commit which adds
         // the first structured tool is small and its blast radius is already measured.
         return structured::run(env, pipeline, &sinks, run_byte_stages);
+    }
+    // **The second question asked before anything runs**, and the same shape as the first: a stage
+    // that reads its upstream by coordinate cannot start until that upstream has finished, so the
+    // whole pipeline runs one stage at a time. A pipeline with no coordinate in it — which is
+    // nearly all of them — answers `false` here and forks concurrently as it always has.
+    if coordinates::uses_coordinates(pipeline) {
+        return coordinates::run(env, pipeline);
     }
     run_byte_stages(env, pipeline)
 }
