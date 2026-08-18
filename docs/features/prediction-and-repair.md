@@ -192,7 +192,7 @@ Both `thefuck` and `sudo !!`-style aliases *run* the corrected command. oslo put
 ## Configuration
 
 ```lua
-oslo.suggest.sources = { "predict", "history", "path" }   -- not in the default order
+oslo.suggest.sh_sources = { "predict", "history", "path" }   -- not in the default order
 
 oslo.keys["f4"] = function(line)
   if line.text == "" then return oslo.repair() or "" end   -- the command that just failed

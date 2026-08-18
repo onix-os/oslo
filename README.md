@@ -86,6 +86,36 @@ corpus scripts and requires zero structured edges. There is no new pipe operator
 is already valid POSIX, so the operator would itself be the hazard. Design:
 `docs/features/structured-pipelines.md`.
 
+## Stream coordinates
+
+A stage can address what the stage before it printed, by position — the job `xargs` exists for,
+without `xargs`:
+
+```sh
+cat hosts.txt | ssh {0:0} uptime      # line 0, word 0 of what `cat` printed
+cat hosts.txt | ping {*:0}            # word 0 of every line — one process, many arguments
+```
+
+How many dimensions you write says what you mean, read right to left: `{2}` is line 2, `{0:1}` is
+line 0 word 1, `{1:0:1}` steps a stage further back first. Ranges are `..` and include both ends,
+as brace expansion's already do. Negative counts from the end, and below zero walks back through the
+session rather than the pipeline: `{-1:0:0}` is the first word of the previous prompt.
+
+`{%n}` is what the stage *was*, where `{n}` is what it printed:
+
+```sh
+cat one.txt | echo "ran {%0:0} on {%0:1} and got {*}"
+#             →     ran cat      on one.txt  and got …the file…
+```
+
+Every value arrives as **one argument**, single-quoted before any expansion runs, so a filename with
+a space in it stays one filename and a `*` in the data is never re-globbed. Double quotes expand and
+single quotes are literal, the same split as `"$x"` and `'$x'`.
+
+A pipeline holding one runs its stages one at a time; one that does not — nearly all of them — is
+asked once and forks concurrently as it always did. Design:
+`docs/features/stream-coordinates.md`.
+
 ## The prompt
 
 Named segments with priorities, so a narrow terminal drops the least important piece rather than
@@ -459,7 +489,7 @@ cargo build --release --features vista
 ```
 
 ```lua
-oslo.suggest.sources = { "predict", "history", "path" }
+oslo.suggest.sh_sources = { "predict", "history", "path" }
 ```
 
 `predict` is a model of what *this* shell does, learned from the commands you have actually run and
@@ -1560,7 +1590,7 @@ oslo.keys["f4"] = function(line)
 end
 ```
 
-`oslo.suggest.sources` still *parses* `"predict"` without the feature — a config is shared between
+`oslo.suggest.sh_sources` still *parses* `"predict"` without the feature — a config is shared between
 machines, and a source that cannot answer is skipped exactly like one that had nothing to say.
 
 Every `.rs` file is under 600 lines, enforced by `scripts/check-loc.sh`.

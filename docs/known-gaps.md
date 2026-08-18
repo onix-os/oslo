@@ -87,10 +87,19 @@ temporary file is the portable spelling, and it is what POSIX offers.
 | Was | Now |
 |---|---|
 | `for ((;;))` with touching separators | every spelling runs, empty sections and all |
+| `( ( cmd ) )` read as an arithmetic command | only *adjacent* parens open one; spaced parens are nested subshells |
 | A structured tool at the head of a pipeline | `printf 'a\nb\n' \| oslo -c 'lines \| length'` answers 2, not 0 |
 | Process substitution generally | works wherever `/dev/fd` exists, which is every ordinary Linux system |
 
-The first was closed by this audit and is worth a word, because the shape of it recurs. The
+The first two share a shape, which is why it is worth a word: both were the tokenizer's longest
+match disagreeing with the grammar. `( (` and `((` produce the same two `(` tokens, so the
+arithmetic rule — tried first — matched a subshell that happened to open with another subshell, and
+`( ( echo hi ) )` died evaluating `echo hi` as an expression. The fix reads the source positions the
+tokens already carry and requires the two parens to touch, so a spaced pair backtracks into the
+subshell rule. Guarding in the grammar rather than the tokenizer leaves `$((`, `for ((` and every
+other spelling on the path they already take.
+
+The `for` case is the same story told earlier. The
 tokenizer takes the longest match, so `for ((;;))` carries **one** `;;` operator — the token that
 ends a `case` item — where the grammar reads two separators. `for (( ; ; ))` parsed, which made it
 look like a rule about spaces. The fix is two lines in the grammar: an arithmetic section now

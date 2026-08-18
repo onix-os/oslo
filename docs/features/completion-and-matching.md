@@ -28,7 +28,7 @@ Tab
  │                     one for this command; else the spec's subcommands and  │
  │                     flags; else read_dir of the stem's directory           │
  │                                                                            │
- ├─ oslo.completion.sources   drop the kinds the config did not ask for ◄─────┘
+ ├─ oslo.completion.sh_sources   drop the kinds the config did not ask for ◄─────┘
  ├─ sort   frecency descending, name as tie-break  (or name alone, sort="alpha")
  ├─ dedup  on the replacement text
  │
@@ -140,16 +140,21 @@ oslo.completion.descriptions   = true        -- the description column
 oslo.completion.show_kind      = true        -- the kind badge
 oslo.completion.case_sensitive = false       -- true stops the chain after its first pass
 oslo.completion.sort           = "frecency"  -- or "alpha"
-oslo.completion.sources        = { "command", "builtin", "dir", "file" }  -- all kinds
+oslo.completion.sh_sources     = { "command", "builtin", "dir", "file" }  -- shell prompt
+oslo.completion.lua_sources    = { "function", "field", "keyword" }       -- Lua prompt
 ```
 
 `fuzzy` also takes a boolean: `true` means `smart`, `false` means `off`. A preset name nothing
 answers to is reported at startup rather than ignored, because a typo that silently leaves fuzzy
 matching off looks exactly like the feature not working.
 
-`sources` names the kinds a candidate already carries — `command`, `builtin`, `alias`, `function`,
-`variable`, `dir`, `file`, `flag`, `subcommand`. `directory` and `func` are accepted as spellings
-of `dir` and `function`.
+**The source list is per language**, and there is no combined `sources`. The kinds are not the same
+on the two sides — a shell prompt completes commands and paths, a Lua prompt completes the names in
+scope — so one list could only ever be right for one of them.
+
+`sh_sources` names the kinds a shell candidate already carries — `command`, `builtin`, `alias`,
+`function`, `variable`, `dir`, `file`, `flag`, `subcommand`. `directory` and `func` are accepted as
+spellings of `dir` and `function`.
 
 Two hooks replace parts of it from Lua:
 
@@ -176,7 +181,7 @@ command rather than adding to them.
 ```lua
 oslo.completion.provider {
   name = "tldr",
-  kind = "example",        -- the badge, and the name `oslo.completion.sources` filters on
+  kind = "example",        -- the badge, and the name `oslo.completion.sh_sources` filters on
   when = "git",            -- this command only; omit and it answers for every command
   score_offset = 20,       -- a nudge in the ranking, not a position above it
   max_items = 10,
@@ -194,7 +199,7 @@ compete in the same ranking rather than being stapled to one end.
 
 Which is why a provider has the two things `for_command` never had:
 
-- **a kind**, so `oslo.completion.sources` can name it and the badge column can show it. A
+- **a kind**, so `oslo.completion.sh_sources` can name it and the badge column can show it. A
   `for_command` candidate reports none at all, which is why setting `sources` silently removes every
   config-supplied candidate. A provider that declares no `kind` is badged with its own name.
 - **a score offset**, because merging means competing. It is added to the frecency score in the
@@ -285,7 +290,7 @@ finder does mark scattered positions; the dropdown does not.
 only filter rather than the last pass of a chain. Turning it off leaves those lists empty as soon
 as a query is typed. The `--exact` flag on the list builtins sets the same thing.
 
-A `for_command` hook reports no kind, so its candidates carry none — and `oslo.completion.sources`
+A `for_command` hook reports no kind, so its candidates carry none — and `oslo.completion.sh_sources`
 filters on the kind. Setting `sources` therefore removes every config-supplied candidate.
 
 Frecency is keyed on the displayed name alone, with no notion of where you were or what you were

@@ -19,7 +19,7 @@ A release publishes two per architecture, and one page below describes something
 **[Prediction and repair](prediction-and-repair.md) is `oslo` only.** It is behind the `vista`
 cargo feature, so `oslo-minimal` has no model: it learns nothing, writes no `.model` file, offers no
 `predict` suggestions, draws no correction after a mistyped line, and has neither `oslo.repair` nor
-`oslo.predict`. A config written for one runs under the other — `oslo.suggest.sources` still accepts
+`oslo.predict`. A config written for one runs under the other — `oslo.suggest.sh_sources` still accepts
 `"predict"` and simply gets no answer from it — as long as it asks before calling a name:
 `if oslo.repair then … end`.
 
@@ -88,6 +88,7 @@ scripts/demo/embed.sh                            # put the players back in the d
 | | |
 |---|---|
 | [Structured pipelines](structured-pipelines.md) | Rows for the next stage, text for you — decided before anything runs |
+| [Stream coordinates](stream-coordinates.md) | `{0:1}` — a stage addressing what the one before it printed, and what it was |
 | [POSIX, where it counts](posix-fidelity.md) | What a script is guaranteed, and the corpus that proves it |
 | [The job that will not take a Ctrl-C](interrupt-escape.md) | Why the shell never sees the keystroke, and the watcher that does |
 

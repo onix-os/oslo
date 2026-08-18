@@ -126,6 +126,49 @@ parameterised forms, and Kitty's disambiguated `CSI P`, `CSI Q`, `CSI S`. **`CSI
 not F3**, because it is also the cursor-position report; F3 arrives as `CSI 13~` under
 disambiguation. A modified or repeat/release F-key decodes to `Ignored`, not to the plain key.
 
+### Asking the terminal, and telling a config what it said
+
+oslo does not guess what a terminal supports from `$TERM`. It asks — the kitty keyboard query
+(`CSI ? u`) and the rest go out behind a Primary DA barrier, which every terminal answers, so a
+terminal that ignores a query is detected by the barrier arriving without it rather than by a
+timeout.
+
+What that negotiation learned is readable from Lua, because a config has the same problem the shell
+does and no way to answer it otherwise:
+
+```lua
+oslo.term.kitty_keyboard()      --> true — Ctrl+Enter and Ctrl+Tab exist at all
+oslo.term.all()                 --> { kitty_keyboard = true, bracketed_paste = true, … }
+oslo.term.origins()             --> where each answer came from: asked, assumed, or configured
+oslo.term.negotiated()          --> whether the asking finished
+oslo.term.semantic()            --> "osc133" | "vscode633" | "none"
+oslo.term.size()                --> { columns = 120, rows = 40 }
+oslo.term.colors()              --> "truecolor" | "256" | "16" | "none"
+oslo.term.background()          --> the terminal's own background colour, if it answered
+```
+
+Fourteen capabilities have a predicate each: `kitty_keyboard`, `synchronized_output`,
+`bracketed_paste`, `semantic_clicks`, `legacy_clicks`, `osc99_notifications`, `osc99_unfocused`,
+`osc9_progress`, `osc133_cmdline_url`, `osc1337_user_vars`, `semantic_basic`, `semantic_secondary`,
+`semantic_right_prompt`, `vscode_rich`. They come from one table in the source, so `all()`,
+`origins()` and the individual predicates cannot drift apart.
+
+**`kitty_keyboard` is the one that decides things**, because Ctrl-I *is* Tab and Ctrl-M *is* Enter in
+the legacy encoding — a chord involving either is indistinguishable from the plain key before it
+leaves the terminal. That is why the Lua prompt's Enter behaviour is a config decision rather than
+something oslo infers:
+
+```lua
+if oslo.term.kitty_keyboard() then
+  oslo.lua.enter = "newline"   -- Enter adds a line, Ctrl+Enter sends
+end
+```
+
+oslo does **not** make that choice itself, and the reason is worth recording: it briefly did, from
+this very probe, and it chose wrong whenever Ctrl+Enter was *grabbed* by the terminal or the window
+manager. No probe can see a grab. A capability answer says the encoding exists, not that the
+keystroke reaches you.
+
 ## What makes it different
 
 In bash and zsh, OSC 133 and OSC 7 come from a shell function you source — VS Code, iTerm2 and kitty

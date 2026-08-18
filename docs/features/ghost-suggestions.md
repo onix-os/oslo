@@ -22,7 +22,7 @@ about what pressing Right will do.
                  ├─ line empty, or cursor not at the end ─────────────────► nothing
                  ├─ feature "suggest" masked off at runtime ─────────────► nothing
                  │
-                 ▼  for each source in oslo.suggest.sources, in the written order:
+                 ▼  for each source in oslo.suggest.sh_sources, in the written order:
    ┌───────────────────────────────────────────────────────────────────────────┐
    │ history     recall::suggest — the language the prompt is reading NOW      │
    │             skipped when the first word is in oslo.suggest.skip_history   │
@@ -117,7 +117,7 @@ skipped exactly like one that had nothing to say. The practical consequence is t
 is a safe thing to write on a machine you have not checked:
 
 ```lua
-oslo.suggest.sources = { "predict", "history", "path" }
+oslo.suggest.sh_sources = { "predict", "history", "path" }
 ```
 
 Under `oslo` the model answers first; under `oslo-minimal` it is silently skipped and history
@@ -140,7 +140,7 @@ frame, since a remembered one can be stale by exactly the keystroke that accepte
 ## What makes it different
 
 The ghost is part of the shell rather than a layer over the line editor: four sources, ordered by
-`oslo.suggest.sources`, first-answer-wins, with no plugin to install and nothing to enable.
+`oslo.suggest.sh_sources`, first-answer-wins, with no plugin to install and nothing to enable.
 
 The per-language split follows from oslo reading two languages at one prompt. It is the reason the
 suggestion cannot be delegated to the line editor's own history: the editor holds one history, and
@@ -153,11 +153,19 @@ means different things in different projects, and a flat history only knows whic
 
 ## Configuration
 
+**Two lists, one per language.** `sh_sources` is the shell prompt's and `lua_sources` is the Lua
+prompt's, because most of the sources answer with shell: a history of shell lines suggested at a Lua
+prompt is never right, and a Lua prompt wants completion — the names in scope — rather than what you
+typed yesterday. There is no combined `sources`; a single list could only ever be right for one of
+them.
+
 ```lua
-oslo.suggest.sources = { "history", "completion", "path" }   -- the default order
-oslo.suggest.sources = { "predict", "history", "path" }      -- ask the model first; `oslo` only
-oslo.suggest.sources = { "provider", "history" }              -- a plugin first, then your history
-oslo.suggest.sources = {}                                    -- no suggestions at all
+oslo.suggest.sh_sources  = { "history", "completion", "path" }  -- the shell prompt's default order
+oslo.suggest.lua_sources = { "completion" }                     -- the Lua prompt's default
+
+oslo.suggest.sh_sources = { "predict", "history", "path" }      -- ask the model first; `oslo` only
+oslo.suggest.sh_sources = { "provider", "history" }             -- a plugin first, then your history
+oslo.suggest.sh_sources = {}                                    -- no suggestions at all
 
 oslo.suggest.skip_history = { "rm", "shred", "trash" }       -- {} means every command
 oslo.suggest.accept       = "ctrl-f"   -- as well as Right, which always accepts
@@ -191,7 +199,7 @@ oslo.suggest.provider {
     if ctx.line:match("^git com") then return "git commit --amend" end
   end,
 }
-oslo.suggest.sources = { "history", "provider", "path" }
+oslo.suggest.sh_sources = { "history", "provider", "path" }
 ```
 
 **It answers the whole line, not the tail.** That is what a provider naturally has — a page, a table
@@ -199,7 +207,7 @@ of examples, a model all know *the command*, not the seven characters left to ty
 the remainder.
 
 **Where it sits is your decision.** Registering puts a provider in front of nothing; it is asked when
-`oslo.suggest.sources` says `provider`, in the position that list gives it. VS Code's inline
+`oslo.suggest.sh_sources` says `provider`, in the position that list gives it. VS Code's inline
 providers work the other way round — `yieldsToGroupIds` is declared by the *provider*, so the plugin
 decides whether it defers to you. That is the part deliberately not copied.
 
@@ -269,7 +277,7 @@ oslo.suggest.provider {
 
 **`fill` never changes what is on screen.** A provider set this way answers in a second pass that
 runs only when every source declined, so it can add a suggestion but never take one over — and its
-position in `oslo.suggest.sources` stops mattering, because "answer when nobody else did" is a
+position in `oslo.suggest.sh_sources` stops mattering, because "answer when nobody else did" is a
 different question from "answer before history".
 
 **`replace` answers in its own turn**, which is what puts it ahead of whatever is listed after it.

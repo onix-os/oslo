@@ -368,22 +368,30 @@ So oslo negotiates before the first prompt (`CSI ? u`, with a Primary DA barrier
 Either way there is always a key that sends, and no behaviour appears on a terminal that cannot
 support it. Force one if your terminal reports wrongly:
 
-
+```lua
+oslo.lua.enter = "newline"   -- "auto" (the default), "newline" or "smart"
+```
 
 **Ask what your terminal actually answered**, rather than guessing from behaviour:
 
 ```lua
-oslo.sys.terminal()   --> { kitty_keyboard = true, synchronized_output = true, … }
+oslo.sys.terminal()             --> { kitty_keyboard = true, synchronized_output = true, … }
+oslo.term.kitty_keyboard()      --> the one capability this depends on, on its own
 ```
 
 `kitty_keyboard` is the one that decides all of this. If it is `false`, Ctrl+Enter and Ctrl+Tab do
 not reach oslo at all and no setting can change that — the keystroke is indistinguishable from
-plain Enter and plain Tab before it ever leaves the terminal.
+plain Enter and plain Tab before it ever leaves the terminal. Every capability, and where each
+answer came from, is in [the terminal page](terminal-integration.md).
 
-
+**oslo does not read the probe for you**, and the reason is worth recording: it briefly did, and it
+chose wrong whenever Ctrl+Enter was *grabbed* by the terminal or the window manager. No probe can
+see a grab. So the setting is yours, and asking is a line of config:
 
 ```lua
-oslo.opts.set("lua_enter", "smart")
+if oslo.term.kitty_keyboard() then
+  oslo.lua.enter = "newline"
+end
 ```
 
 > **Ctrl+Enter needs a terminal that reports modifiers.** In the legacy encoding Ctrl-M *is* Enter
@@ -391,7 +399,8 @@ oslo.opts.set("lua_enter", "smart")
 > separates them. Where it cannot arrive, **Alt+Enter** decodes to the same key (`ESC` then `CR`),
 > so `newline` never leaves a prompt with no way to send. That fallback is what makes it safe as a
 > default, not the key you should reach for.
-lua
+
+```lua
 -- m is { kind = "language", from = "sh", to = "lua" }
 oslo.on.pre_mode_change(function(m)  end)
 oslo.on.post_mode_change(function(m) end)

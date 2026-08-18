@@ -128,7 +128,7 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
 
     if let Value::Table(table) = oslo.get_str("suggest") {
         let table = table.borrow();
-        // Two lists, read the same way: `sources` is the shell prompt's and `lua_sources` is the
+        // Two lists, read the same way: `sh_sources` is the shell prompt's and `lua_sources` is the
         // Lua prompt's. Separate because most of the sources answer with shell — see
         // `settings::Suggest::lua_sources`.
         for (field, slot) in [
