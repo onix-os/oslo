@@ -128,6 +128,19 @@ muscle memory, and `!5` as a Lua literal is not something anyone types on purpos
 The space is not a special case: it is simply not one of the characters history claims, so a line
 beginning `! ` was already reaching Lua, and Lua does not care about the space.
 
+Word designators come with the event, which is what makes a numbered one worth having — you typed
+the wrong command in front of the right arguments, and only the arguments are worth keeping:
+
+```sh
+cd /a/very/long/path       # …meant to cat something under it
+cat !1*/notes.md           # → cat /a/very/long/path/notes.md
+```
+
+`!n*` is every word but the command; `!n:0` is the command itself, `!n:^` and `!n:$` the first and
+last arguments. Ranges are written `!n:1..2` — **the same `..` a stream coordinate uses**, both ends
+included, either end omittable, so `{0:1..2}` and `!1:1..2` name the same two words. bash's `n-m`
+still works; its `n-` stops one word short of the end, where `n..` runs to it.
+
 What it still costs is `!name`, "the last line starting with *name*". That one cannot come back —
 `!print(1)` has exactly its shape, and running one Lua line is the whole reason the prefix exists.
 The history finder is the better answer to the same question: it searches as you type and shows

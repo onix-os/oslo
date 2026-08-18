@@ -11,16 +11,23 @@
 //!
 //! * events — `!!` (previous line), `!n`, `!-n`, `!str` (most recent line starting with `str`),
 //!   `!?str?` (most recent line containing `str`);
-//!
-//! **One of those does not reach the prompt**, and that is a decision made one layer up rather than
-//! a gap here. `!` is also the prefix that runs one line as Lua, and `startup::mode::classify`
-//! reads it first. It keeps `!!`, `!$`, `!^`, `!*`, `!?str?` and the numbered `!n` and `!-n` for
-//! history, and sends `!str` to Lua — because `!print(1)` has exactly that shape. Everything stays
-//! implemented and tested here either way: this module is what a non-prompt caller would use, and
-//! which forms the prompt spends is not this layer's question to answer.
 //! * word designators — `!$`, `!^`, `!*` as shorthands on the previous line, and the general
-//!   `!event:designator` with `0`, `n`, `^`, `$`, `*`, `n-m`, `n*`;
+//!   `!event:designator` with `0`, `n`, `^`, `$`, `*`, `n-m`, `n*`, and oslo's `n..m`;
 //! * quick substitution — `^old^new` and `^old^new^suffix`, only when `^` opens the line.
+//!
+//! **`..` is the one addition to bash's set**, so a range of words reads the same here as it does
+//! in a stream coordinate: `{0:1..2}` and `!1:1..2` are the same two words of the same line, both
+//! ends included. It is not a synonym for `-` — bash's `n-` stops one short of the last word, a
+//! quirk with no counterpart in the rest of the shell, and `n..` runs through to the end. A single
+//! dot is never a range, which is why the `:` stays required before one: `!1:1.bak` keeps its
+//! suffix.
+//!
+//! **`!str` does not reach the prompt**, and that is a decision made one layer up rather than a gap
+//! here. `!` is also the prefix that runs one line as Lua, and `startup::mode::classify` reads it
+//! first: it keeps every other form, including the numbered `!n` and `!-n`, and sends `!str` to Lua
+//! — because `!print(1)` has exactly that shape. It stays implemented and tested here either way.
+//! This module is what a non-prompt caller would use, and which forms the prompt spends is not this
+//! layer's question to answer.
 //!
 //! Deliberately absent: the `:h`/`:t`/`:r`/`:s` modifiers and `!#`. They are rare, and an
 //! unimplemented modifier is silently *wrong* rather than loudly missing, so the parser rejects
@@ -305,6 +312,18 @@ fn word_designator(
     };
 
     match c {
+        // `..m` and `..` — a range with no start, which is word *zero*, the command word. See the
+        // note on `..` in the digit arm below.
+        '.' if opens_a_range(chars, at) => {
+            let (to_digits, to_end) = take_digits(chars, at + 2);
+            match to_digits.is_empty() {
+                true => Ok((pick(0, last, "..")?, at + 2)),
+                false => {
+                    let to = number(&to_digits, "..")?;
+                    Ok((pick(0, to, &format!("..{to_digits}"))?, to_end))
+                }
+            }
+        }
         // `^` is the *first argument*, not the command word: `!^` of `echo a b` is `a`.
         '^' => Ok((pick(1, 1, "^")?, at + 1)),
         '$' => Ok((pick(last, last, "$")?, at + 1)),
@@ -324,6 +343,22 @@ fn word_designator(
                 .map_err(|_| HistoryError::BadWordSpecifier(format!(":{digits}")))?;
             match chars.get(end) {
                 Some('*') => Ok((pick(from, last, &format!("{digits}*"))?, end + 1)),
+                // **`n..m` and `n..`**, so a range reads the same here as it does in a stream
+                // coordinate — `{0:1..2}` and `!1:1..2` are the same two words of the same line.
+                //
+                // Deliberately *not* a synonym for `-`: bash's `n-` is "n through the second to
+                // last word", a quirk with no counterpart anywhere else. `n..` is n through the
+                // last, which is what a range with no end means in every other grammar oslo has.
+                Some('.') if opens_a_range(chars, end) => {
+                    let (to_digits, to_end) = take_digits(chars, end + 2);
+                    match to_digits.is_empty() {
+                        true => Ok((pick(from, last, &format!("{digits}.."))?, end + 2)),
+                        false => {
+                            let to = number(&to_digits, &format!("{digits}.."))?;
+                            Ok((pick(from, to, &format!("{digits}..{to_digits}"))?, to_end))
+                        }
+                    }
+                }
                 Some('-') => {
                     let (to_digits, to_end) = take_digits(chars, end + 1);
                     if to_digits.is_empty() {
@@ -341,6 +376,24 @@ fn word_designator(
         }
         other => Err(HistoryError::BadWordSpecifier(format!(":{other}"))),
     }
+}
+
+/// Whether a `..` starts at `at`. One dot is not a range — it is somebody's filename.
+///
+/// **The `:` is never optional before a range**, which is why this is only ever asked at a position
+/// a designator already owns. `:` *is* optional before `^`, `$` and `*` because none of those can
+/// begin the text someone meant to keep — but a dot can, and `cp !1.bak` losing its suffix to a
+/// half-parsed range would be exactly the kind of silent surprise this grammar exists to avoid.
+/// `{0:1..2}` writes the colon too, so requiring it is also what makes the two read the same.
+fn opens_a_range(chars: &[char], at: usize) -> bool {
+    chars.get(at) == Some(&'.') && chars.get(at + 1) == Some(&'.')
+}
+
+/// A word index, or the error naming the designator it came from.
+fn number(digits: &str, spec: &str) -> Result<usize, HistoryError> {
+    digits
+        .parse()
+        .map_err(|_| HistoryError::BadWordSpecifier(format!(":{spec}")))
 }
 
 fn take_digits(chars: &[char], at: usize) -> (String, usize) {
@@ -364,174 +417,5 @@ fn is_event_delimiter(c: char) -> bool {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn history() -> Vec<String> {
-        ["echo alpha beta gamma", "ls -l /tmp", "echo A B"]
-            .iter()
-            .map(|s| s.to_string())
-            .collect()
-    }
-
-    fn expanded(line: &str) -> String {
-        match expand(line, &history()) {
-            Ok(Expansion::Expanded(s)) => s,
-            other => panic!("{line:?} expected an expansion, got {other:?}"),
-        }
-    }
-
-    fn err(line: &str) -> HistoryError {
-        match expand(line, &history()) {
-            Err(e) => e,
-            other => panic!("{line:?} expected an error, got {other:?}"),
-        }
-    }
-
-    #[test]
-    fn events_and_designators_match_bash() {
-        // (input, expansion) — every row checked against `bash -i` with the same history.
-        let cases = [
-            ("!!", "echo A B"),
-            ("!-1", "echo A B"),
-            ("!-3", "echo alpha beta gamma"),
-            ("!1", "echo alpha beta gamma"),
-            ("!3", "echo A B"),
-            ("!ls", "ls -l /tmp"),
-            ("!echo", "echo A B"),
-            ("!?tmp?", "ls -l /tmp"),
-            ("!?tmp", "ls -l /tmp"),
-            ("sudo !!", "sudo echo A B"),
-            ("echo pre !$ post", "echo pre B post"),
-            ("echo pre !^ post", "echo pre A post"),
-            ("echo pre !* post", "echo pre A B post"),
-            ("echo <!!:0>", "echo <echo>"),
-            ("echo <!1:2>", "echo <beta>"),
-            ("echo <!1:1-2>", "echo <alpha beta>"),
-            ("echo <!1:1*>", "echo <alpha beta gamma>"),
-            ("echo <!1:1->", "echo <alpha beta>"),
-            ("echo <!1:$>", "echo <gamma>"),
-            // `[!!]` is the one bracket bash still expands, because `!!` wins over the glob rule.
-            ("echo [!!]", "echo [echo A B]"),
-            // A `[` with no `]` is not a bracket expression, so the reference stands.
-            ("echo [!$", "echo [B"),
-            ("echo [a!$]", "echo [aB]"),
-            // Expansion happens inside double quotes but not inside single quotes.
-            ("echo \"!$\"", "echo \"B\""),
-            ("echo 'x' !$", "echo 'x' B"),
-            // Two references in one line. Both resolve against the stored history, so the second
-            // `!!` is still the previous *entry* and not what the first one just produced.
-            ("!ls | !!", "ls -l /tmp | echo A B"),
-            ("echo X!^X", "echo XAX"),
-        ];
-        for (input, want) in cases {
-            assert_eq!(expanded(input), want, "expanding {input:?}");
-        }
-    }
-
-    #[test]
-    fn lines_without_a_reference_are_left_alone() {
-        // A `!` that bash treats as data: before whitespace, `=` and `(`, at end of line, inside
-        // single quotes, and after a backslash.
-        let cases = [
-            "echo hello",
-            "echo a! b",
-            "echo a!=b",
-            "test 1 != 2",
-            "echo 5!",
-            "echo !",
-            "echo '!!'",
-            "echo '!$'",
-            "echo \\!",
-            "echo \"\\!\"",
-            "! true",
-            "if ! grep -q x f; then echo no; fi",
-            "echo a!(b)",
-            // Glob bracket negation, the reason the `[!` rule exists at all.
-            "ls [!a]*",
-            "echo [!$]",
-            "echo [!1]",
-        ];
-        for input in cases {
-            assert_eq!(
-                expand(input, &history()),
-                Ok(Expansion::Unchanged),
-                "{input:?} must be left alone"
-            );
-        }
-    }
-
-    #[test]
-    fn a_backslash_survives_into_the_shells_own_quote_removal() {
-        // The pass must not eat the backslash: `echo \!` prints `!` only because the shell still
-        // sees the escape afterwards.
-        assert_eq!(expand("echo \\!", &history()), Ok(Expansion::Unchanged));
-        assert_eq!(expanded("echo \\a !!"), "echo \\a echo A B");
-    }
-
-    #[test]
-    fn quick_substitution_edits_the_previous_line() {
-        assert_eq!(expanded("^A^Z"), "echo Z B");
-        assert_eq!(expanded("^A^Z^"), "echo Z B");
-        assert_eq!(expanded("^A^Z^ | cat"), "echo Z B | cat");
-        // Only the first occurrence, and only when `^` opens the line.
-        assert_eq!(expand("echo a^b^c", &history()), Ok(Expansion::Unchanged));
-        assert_eq!(
-            err("^nope^x"),
-            HistoryError::SubstitutionFailed("^nope^x".to_string())
-        );
-    }
-
-    #[test]
-    fn unresolvable_references_are_errors_not_guesses() {
-        assert_eq!(
-            err("!nosuch"),
-            HistoryError::EventNotFound("!nosuch".to_string())
-        );
-        assert_eq!(err("!99"), HistoryError::EventNotFound("!99".to_string()));
-        assert_eq!(err("!0"), HistoryError::EventNotFound("!0".to_string()));
-        assert_eq!(err("!-9"), HistoryError::EventNotFound("!-9".to_string()));
-        assert_eq!(
-            err("!?zzz?"),
-            HistoryError::EventNotFound("!?zzz".to_string())
-        );
-        // Out of range and unknown designators both refuse rather than silently drop the word.
-        assert_eq!(
-            err("echo !!:9"),
-            HistoryError::BadWordSpecifier(":9".to_string())
-        );
-        assert_eq!(
-            err("echo !!:h"),
-            HistoryError::BadWordSpecifier(":h".to_string())
-        );
-    }
-
-    #[test]
-    fn an_empty_history_cannot_satisfy_any_reference() {
-        assert_eq!(
-            expand("!!", &[]),
-            Err(HistoryError::EventNotFound("!!".to_string()))
-        );
-        assert_eq!(
-            expand("^a^b", &[]),
-            Err(HistoryError::EventNotFound("!!".to_string()))
-        );
-        assert_eq!(expand("echo hi", &[]), Ok(Expansion::Unchanged));
-    }
-
-    #[test]
-    fn error_text_names_the_reference_that_failed() {
-        assert_eq!(
-            HistoryError::EventNotFound("!x".into()).to_string(),
-            "!x: event not found"
-        );
-        assert_eq!(
-            HistoryError::BadWordSpecifier(":9".into()).to_string(),
-            ":9: bad word specifier"
-        );
-        assert_eq!(
-            HistoryError::SubstitutionFailed("^a^b".into()).to_string(),
-            "^a^b: substitution failed"
-        );
-    }
-}
+#[path = "history_expand/tests.rs"]
+mod tests;
