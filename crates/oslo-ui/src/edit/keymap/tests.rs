@@ -71,13 +71,13 @@ fn typing_is_an_insert_of_the_character() {
 
 /// **Enter ends the line, and Ctrl/Alt+Enter ends it unconditionally.**
 ///
-/// Enter is `AcceptOrNewline` rather than `Accept` because a Lua prompt may be set to add a line
-/// with it (`$OSLO_LUA_ENTER=newline`); the session resolves which. The chord is the one that
-/// always sends, which is what makes that setting safe to turn on — see `session::apply`.
+/// Enter is `AcceptOrNewline` rather than `Accept` because a Lua prompt adds a line with it by
+/// default (`$OSLO_LUA_ENTER`); the session resolves which. `Submit` — Ctrl+Enter, or Alt+Enter
+/// where that cannot arrive — is the one that always sends, which is what makes that default safe.
 #[test]
 fn the_line_is_ended_by_enter_and_abandoned_by_ctrl_c() {
     assert_eq!(action(Key::Accept), Action::AcceptOrNewline);
-    assert_eq!(action(Key::Alt('\r')), Action::Accept);
+    assert_eq!(action(Key::Submit), Action::Accept);
     assert_eq!(action(Key::Abort), Action::Abort);
 }
 

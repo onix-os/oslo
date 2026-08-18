@@ -198,7 +198,7 @@ falls back to, so binding it would silently do nothing on a plain tty.
 The keys. There is no `$OSLO_TOGGLE_KEY`; bindings live in one table so there is no second place for
 them to disagree from.
 
-**Two keys switch it, and they fail in different places.** `Shift+Tab` has to be *reported* as
+**Three keys switch it, and they fail in different places.** `Shift+Tab` has to be *reported* as
 Shift+Tab, and a terminal that does not report the modifier — Alacritty without the kitty keyboard
 protocol — leaves no way to change language at all. `Ctrl+Space` asks the terminal for nothing: it
 is `NUL` on a plain tty and `CSI 32;5u` under the kitty protocol, and oslo decoded both to the same
@@ -210,7 +210,11 @@ the input-method switch, and an IME takes it before the terminal sees it. Hence 
 oslo.keys["f2"] = "toggle-language"     -- another key as well
 oslo.keys["shift-tab"] = "none"         -- and this turns a default off
 oslo.keys["ctrl-space"] = "none"        -- as does this
+oslo.keys["ctrl-tab"] = "none"          -- and this
 ```
+
+**Ctrl+Tab** is a toggle too, on the same terms as Ctrl+Enter: only a terminal that reports
+modifiers ever sends it, because Ctrl-I *is* Tab in the legacy encoding.
 
 **Tab twice on an empty line** is the third, and the one nothing can take away — a plain Tab is a
 plain Tab everywhere. It is on by default, because the other two fail *silently* on a machine where
@@ -245,7 +249,7 @@ export OSLO_LUA_PREFIX=,
 oslo.opts.set("lua_prefix", ",")
 ```
 
-What Enter does at a Lua prompt. **`newline` is the default**: Enter adds a line and **Alt+Enter
+What Enter does at a Lua prompt. **`newline` is the default**: Enter adds a line and **Ctrl+Enter
 sends**. A Lua prompt is where you write a block — a function, a loop, an `if` — and an Enter that
 means "run this now" interrupts writing every one of them. `smart` is the older behaviour and what
 most Lua REPLs do: a finished block runs on Enter, an unfinished one asks for more.
@@ -258,11 +262,11 @@ export OSLO_LUA_ENTER=smart     # Enter sends again
 oslo.opts.set("lua_enter", "smart")
 ```
 
-> **Use Alt+Enter, not Ctrl+Enter, unless you know your terminal reports modifiers.** Ctrl+Enter
-> does not exist on a terminal without the kitty keyboard protocol: in the legacy encoding Ctrl-M
-> *is* Enter, so there is nothing to tell them apart. Alt+Enter arrives in both encodings — `ESC`
-> then `CR` on a plain tty — and both spellings reach the same action. That is what makes
-> `newline` safe as a default: there is no terminal where it leaves the prompt with no way to send.
+> **Ctrl+Enter needs a terminal that reports modifiers.** In the legacy encoding Ctrl-M *is* Enter
+> — the same byte — so there is nothing to tell them apart; only the kitty keyboard protocol
+> separates them. Where it cannot arrive, **Alt+Enter** decodes to the same key (`ESC` then `CR`),
+> so `newline` never leaves a prompt with no way to send. That fallback is what makes it safe as a
+> default, not the key you should reach for.
 lua
 -- m is { kind = "language", from = "sh", to = "lua" }
 oslo.on.pre_mode_change(function(m)  end)

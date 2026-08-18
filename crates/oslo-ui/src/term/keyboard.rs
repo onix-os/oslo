@@ -54,19 +54,20 @@ pub fn decode(sequence: &[u8]) -> Key {
         if code == 9 && shift {
             return Key::BackTab;
         }
+        // Alt+Enter is the same act, and spells itself the same, for a terminal that cannot
+        // report Ctrl+Enter.
         if alt && code == 13 {
-            return Key::Alt('\r');
+            return Key::Submit;
         }
         if ctrl {
             return match code {
-                9 => Key::Ctrl('i'),
-                // **Ctrl+Enter, which only exists here.** In the legacy encoding Ctrl+Enter and
-                // Enter are both `CR` — Ctrl-M *is* Enter — so there is no telling them apart and
-                // this used to answer `Ctrl('m')`, which is Enter under another name. The kitty
-                // protocol reports the modifier, so the two become separable, and a prompt that
-                // wants Enter for a newline gets a send key. Alt+Enter is the same act for a
-                // terminal that cannot do this.
-                13 => Key::Alt('\r'),
+                // **Ctrl+Tab and Ctrl+Enter exist only here.** In the legacy encoding each is
+                // indistinguishable from the key it modifies — Ctrl-I *is* Tab and Ctrl-M *is*
+                // Enter, the same bytes — so this used to answer `Ctrl('i')` and `Ctrl('m')`,
+                // which are those two keys under another name. The kitty protocol reports the
+                // modifier, which is what makes them separable at all.
+                9 => Key::CtrlTab,
+                13 => Key::Submit,
                 27 => Key::Ctrl('['),
                 _ => Key::Ignored,
             };
@@ -148,6 +149,11 @@ mod tests {
         assert_eq!(decode(b"\x1b[105;5u"), Key::Ctrl('i'));
         assert_eq!(decode(b"\x1b[13u"), Key::Accept);
         assert_eq!(decode(b"\x1b[109;5u"), Key::Ctrl('m'));
+        // **The two chords only this protocol can report.** `Ctrl('i')` and `Ctrl('m')` above are
+        // the *letters*; these are Ctrl held with the Tab and Enter keys themselves, which the
+        // legacy encoding cannot tell apart from bare Tab and bare Enter.
+        assert_eq!(decode(b"\x1b[9;5u"), Key::CtrlTab);
+        assert_eq!(decode(b"\x1b[13;5u"), Key::Submit);
         assert_eq!(decode(b"\x1b[27u"), Key::Cancel);
         assert_eq!(decode(b"\x1b[91;5u"), Key::Ctrl('['));
     }
@@ -156,7 +162,9 @@ mod tests {
     fn modifiers_and_functional_keys_decode() {
         assert_eq!(decode(b"\x1b[9;2u"), Key::BackTab);
         assert_eq!(decode(b"\x1b[107;6u"), Key::Ctrl('K'));
-        assert_eq!(decode(b"\x1b[13;3u"), Key::Alt('\r'));
+        // Alt+Enter stands in for Ctrl+Enter where that cannot arrive, so it decodes to the same
+        // key rather than to a second one nothing is bound to.
+        assert_eq!(decode(b"\x1b[13;3u"), Key::Submit);
         assert_eq!(decode(b"\x1b[47;5u"), Key::Ctrl('/'));
         assert_eq!(decode(b"\x1b[57350u"), Key::Left);
         assert_eq!(decode(b"\x1b[57350;1:1u"), Key::Left);

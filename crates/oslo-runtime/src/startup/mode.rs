@@ -35,11 +35,12 @@
 //! terminal, and not every one answers: Alacritty without the kitty keyboard protocol reports no
 //! modifier for Shift+Tab, which left no way to change language at all.
 //!
-//! So there are two, and they fail in different places — see [`TOGGLE_KEYS`]. **Shift+Tab** is the
-//! one to reach for. **Ctrl+Space** asks the terminal for nothing: it is `NUL` in the legacy
-//! encoding and `CSI 32;5u` under the kitty protocol, and both already decoded to `Key::Ctrl(' ')`
-//! before either was bound to anything. Its own weakness is that an input method may claim it
-//! first, which is why neither is the only one.
+//! So there are three, and they fail in different places — see [`TOGGLE_KEYS`]. **Shift+Tab** is
+//! the one to reach for. **Ctrl+Tab** is the one people expect, and like Ctrl+Enter it exists only
+//! under the kitty protocol, because Ctrl-I *is* Tab otherwise. **Ctrl+Space** asks the terminal
+//! for nothing: it is `NUL` in the legacy encoding and `CSI 32;5u` under the kitty protocol, and
+//! both already decoded to `Key::Ctrl(' ')` before any of this was bound. Its own weakness is that
+//! an input method may claim it first, which is why none of them is the only one.
 //!
 //! **Tab twice on an empty line** is the third and the one nothing can take away — see
 //! [`double_tab`]. Both of the others fail silently on a machine where nothing looks wrong, so the
@@ -190,13 +191,13 @@ pub enum Enter {
 ///
 /// **A Lua prompt is where you write a block, not a line.** A function, a loop, an `if` — every one
 /// of them is several lines, and an Enter that means "run this now" interrupts writing every one of
-/// them. So Enter adds a line and **Alt+Enter sends**.
+/// them. So Enter adds a line and **Ctrl+Enter sends**.
 ///
-/// **Alt+Enter, not only Ctrl+Enter, and that is the load-bearing part.** Ctrl+Enter does not exist
-/// on a terminal without the kitty keyboard protocol: in the legacy encoding Ctrl-M *is* Enter, so
-/// there is nothing to tell them apart. Alt+Enter arrives in both encodings — `ESC` then `CR` on a
-/// plain tty — and both spellings map to one action, so this default cannot leave a prompt with no
-/// way to send. That is what makes it safe to be a default at all.
+/// **Ctrl+Enter needs a terminal that reports modifiers**, because in the legacy encoding Ctrl-M
+/// *is* Enter — the same byte, nothing to tell apart. Only the kitty keyboard protocol separates
+/// them. Where it cannot arrive, **Alt+Enter** decodes to the same key (`ESC` then `CR`), so this
+/// default cannot leave a prompt with no way to send. The fallback is what makes it safe to be a
+/// default; Ctrl+Enter is the key it is for.
 ///
 /// `smart` is the older behaviour and what most Lua REPLs do: a finished block runs on Enter, an
 /// unfinished one asks for more. It is worth having for anyone whose terminal eats Alt.
@@ -249,4 +250,4 @@ pub fn double_tab(env: &Environment) -> bool {
 /// oslo.keys["shift-tab"] = "none"       -- and this one turns a default off
 /// oslo.keys["ctrl-space"] = "none"      -- as does this
 /// ```
-pub const TOGGLE_KEYS: &[&str] = &["shift-tab", "ctrl-space"];
+pub const TOGGLE_KEYS: &[&str] = &["shift-tab", "ctrl-space", "ctrl-tab"];

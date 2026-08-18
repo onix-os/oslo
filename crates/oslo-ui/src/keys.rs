@@ -97,6 +97,12 @@ pub fn canonical(name: &str) -> Option<String> {
         // literal space, because the generic `ctrl-<one char>` rule below is what accepted it.
         // Both spellings are taken, and both collapse to this one.
         "ctrl-space" | "ctrl- " | "c-space" => return Some("ctrl-space".to_string()),
+        // **Ctrl+Tab and Ctrl+Enter, which only a terminal that reports modifiers ever sends.**
+        // Accepted as names because they are real chords with real bindings; on a terminal that
+        // cannot report them the binding is simply never reached. That is a property of the
+        // terminal, not a name that binds nothing — which is what this function refuses.
+        "ctrl-tab" | "c-tab" => return Some("ctrl-tab".to_string()),
+        "ctrl-enter" | "ctrl-return" | "c-enter" => return Some("ctrl-enter".to_string()),
         _ => {}
     }
     if let Some(rest) = name.strip_prefix("f")

@@ -16,6 +16,11 @@ pub(super) fn key_name(key: Key) -> Option<String> {
         // could sensibly print. Ctrl+Space is the language toggle's second default, so this is a
         // name people will actually write.
         Key::Ctrl(' ') => "ctrl-space".to_string(),
+        // The two chords the kitty keyboard protocol makes separable at all. In the legacy
+        // encoding Ctrl-I *is* Tab and Ctrl-M *is* Enter, so on a terminal that does not report
+        // modifiers neither of these is ever produced and a binding on it simply never fires.
+        Key::CtrlTab => "ctrl-tab".to_string(),
+        Key::Submit => "ctrl-enter".to_string(),
         Key::Ctrl(c) => format!("ctrl-{c}"),
         Key::Alt(c) if !c.is_control() => format!("alt-{c}"),
         Key::ToggleScope => "tab".to_string(),
@@ -71,6 +76,8 @@ pub(super) fn hook_key_name(key: Key) -> (String, Option<char>) {
         Key::Delete => ("delete".to_string(), None),
         Key::ToggleScope => ("tab".to_string(), None),
         Key::BackTab => ("shift-tab".to_string(), None),
+        Key::CtrlTab => ("ctrl-tab".to_string(), None),
+        Key::Submit => ("ctrl-enter".to_string(), None),
         Key::Clear => ("ctrl-u".to_string(), None),
         Key::Up => ("up".to_string(), None),
         Key::Down => ("down".to_string(), None),
@@ -90,7 +97,7 @@ pub(super) fn hook_key_name(key: Key) -> (String, Option<char>) {
 }
 
 #[cfg(test)]
-mod ctrl_space_tests {
+mod chord_tests {
     use super::key_name;
     use oslo_ui::term::Key;
 
@@ -110,10 +117,21 @@ mod ctrl_space_tests {
         assert_eq!(key_name(Key::Char(' ')).as_deref(), Some("space"));
     }
 
-    /// Both defaults resolve to the same name the toggle list holds.
+    /// **Ctrl+Tab and Ctrl+Enter have names too**, and only a terminal that reports modifiers ever
+    /// produces them — in the legacy encoding Ctrl-I *is* Tab and Ctrl-M *is* Enter.
+    #[test]
+    fn the_kitty_only_chords_are_named() {
+        assert_eq!(key_name(Key::CtrlTab).as_deref(), Some("ctrl-tab"));
+        assert_eq!(key_name(Key::Submit).as_deref(), Some("ctrl-enter"));
+        // The letters are a different key from the chord and keep their own names.
+        assert_eq!(key_name(Key::Ctrl('i')).as_deref(), Some("ctrl-i"));
+        assert_eq!(key_name(Key::Ctrl('m')).as_deref(), Some("ctrl-m"));
+    }
+
+    /// Every default toggle resolves to the same name the toggle list holds.
     #[test]
     fn both_default_toggles_name_themselves() {
-        for key in [Key::BackTab, Key::Ctrl(' ')] {
+        for key in [Key::BackTab, Key::Ctrl(' '), Key::CtrlTab] {
             let name = key_name(key).expect("a name");
             assert!(
                 crate::startup::mode::TOGGLE_KEYS.contains(&name.as_str()),

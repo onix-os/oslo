@@ -47,7 +47,7 @@ pub enum Action {
     Lower,
     Capitalise,
 
-    /// Ctrl+Enter, Alt+Enter: run what is on the line, whatever Enter is set to do.
+    /// Ctrl+Enter: run what is on the line, whatever Enter is set to do.
     Accept,
     /// Enter: run the line, or add a line to it — see [`super::session::set_enter_adds_a_line`].
     AcceptOrNewline,
@@ -96,9 +96,9 @@ pub fn action(key: Key) -> Action {
         Key::Clear => Action::KillToStart,
 
         Key::Accept => Action::AcceptOrNewline,
-        // Ctrl+Enter and Alt+Enter, which decode to the same key on purpose — see
-        // `term::keyboard`. Always sends, whatever Enter has been set to do.
-        Key::Alt('\r') => Action::Accept,
+        // Ctrl+Enter, and Alt+Enter where that cannot arrive — both decode to `Submit` on
+        // purpose, see `term::input`. Always sends, whatever Enter has been set to do.
+        Key::Submit => Action::Accept,
         Key::Abort => Action::Abort,
         Key::ToggleScope => Action::Complete,
         Key::BackTab => Action::CompleteBack,
@@ -122,8 +122,11 @@ pub fn action(key: Key) -> Action {
         Key::Alt('c') => Action::Capitalise,      // capitalize-word
 
         // A resize is not an edit: the loop redraws on it and the buffer is untouched.
+        // `CtrlTab` is not an editing action: it is resolved by name as a language toggle, the
+        // same way `shift-tab` is, so the table has nothing to say about it.
         Key::Ctrl(_)
         | Key::Alt(_)
+        | Key::CtrlTab
         | Key::Function(_)
         | Key::PageUp
         | Key::PageDown

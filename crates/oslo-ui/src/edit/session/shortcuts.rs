@@ -124,8 +124,8 @@ mod tests {
         assert_eq!(session.buffer.text(), "do\nx", "it added a line");
 
         // The chord sends regardless, which is the way out of the block.
-        let (_, steps) = run("do\nend", &[Key::Alt('\r')]);
-        assert_eq!(steps, vec![Step::Accept], "Ctrl/Alt+Enter always sends");
+        let (_, steps) = run("do\nend", &[Key::Submit]);
+        assert_eq!(steps, vec![Step::Accept], "Ctrl+Enter always sends");
 
         set_enter_adds_a_line(false);
         let (_, steps) = run("print(1)", &[Key::Accept]);
