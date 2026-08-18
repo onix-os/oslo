@@ -70,6 +70,9 @@ pub(super) fn read_command(
     // Language and vi redraws reuse the current prompt region. Only accepting an incomplete
     // physical line opens a continuation region inside the same interaction.
     let mut announce_prompt = Some(oslo_ui::marks::PromptKind::Primary);
+    // The printed width of the prompt this block began under, so the continuation marker can be
+    // padded to put every line of the block in the same column. Zero until the first line is drawn.
+    let mut block_indent = 0usize;
 
     loop {
         // Every line starts in insert mode as far as the editor is concerned, so the mode this
@@ -92,15 +95,21 @@ pub(super) fn read_command(
         }
 
         let prompt = if buffer.is_empty() {
-            prompt::primary_prompt(env_struct, lua, last_status, *current)
+            let drawn = prompt::primary_prompt(env_struct, lua, last_status, *current);
+            block_indent = oslo_ui::prompt::printed_width(&drawn);
+            drawn
         } else {
+            // A `prompt.continuation` written in Lua wins, then `$PS2`, then oslo's own marker.
+            // Both of the first two are things somebody asked for by name; the third is only a
+            // default, and a default that overrode either would be a setting that does nothing.
             lua.render_with("prompt.continuation", &{
                 let mut ctx = prompt::segment_context(last_status, *current, None);
                 // The one fact that is different here, and the reason the field exists.
                 ctx.continuation = true;
                 ctx
             })
-            .unwrap_or_else(|| rc::ps2(&mut env_struct.lock().unwrap()))
+            .or_else(|| rc::ps2_if_set(&mut env_struct.lock().unwrap()))
+            .unwrap_or_else(|| oslo_ui::prompt::continuation_marker(reading.name(), block_indent))
         };
 
         // The right prompt is no longer computed here. It is built by the `render` closure
@@ -205,6 +214,7 @@ pub(super) fn read_command(
             // see `read_line`. It is not called per keystroke; the generation counter decides.
             let mut render = {
                 let at_start = buffer.is_empty();
+                let indent = block_indent;
                 let language = *current;
                 let reading_now = reading;
                 move || -> (String, String) {
@@ -212,12 +222,19 @@ pub(super) fn read_command(
                     let left = if at_start {
                         prompt::primary_prompt(env_struct, lua, last_status, language)
                     } else {
+                        // The same three, in the same order, as the measuring copy above: a
+                        // `prompt.continuation` written in Lua, then `$PS2`, then oslo's own
+                        // marker. They have to agree — this closure draws the row and the other
+                        // one is what the width was measured from.
                         lua.render_with("prompt.continuation", &{
                             let mut ctx = prompt::segment_context(last_status, language, None);
                             ctx.continuation = true;
                             ctx
                         })
-                        .unwrap_or_else(|| rc::ps2(&mut env_struct.lock().unwrap()))
+                        .or_else(|| rc::ps2_if_set(&mut env_struct.lock().unwrap()))
+                        .unwrap_or_else(|| {
+                            oslo_ui::prompt::continuation_marker(reading_now.name(), indent)
+                        })
                     };
                     drop(_timed);
                     let _timed = crate::startup::timing::open("prompt-right");

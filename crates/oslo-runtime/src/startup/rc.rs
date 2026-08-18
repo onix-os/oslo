@@ -170,10 +170,16 @@ pub fn rps1(env: &mut Environment) -> Option<String> {
 
 /// The continuation prompt, shown for the second and later lines of one command.
 pub fn ps2(env: &mut Environment) -> String {
-    match env.get_var("PS2").map(str::to_string) {
-        Some(raw) => expand_prompt(env, &raw),
-        None => "> ".to_string(),
-    }
+    ps2_if_set(env).unwrap_or_else(|| "> ".to_string())
+}
+
+/// `$PS2`, or `None` when the user never set one.
+///
+/// The distinction the built-in continuation marker needs: it is a *default*, so it must not
+/// override a `$PS2` somebody wrote, and "unset" cannot be told from "set to `> `" otherwise.
+pub fn ps2_if_set(env: &mut Environment) -> Option<String> {
+    let raw = env.get_var("PS2").map(str::to_string)?;
+    Some(expand_prompt(env, &raw))
 }
 
 /// Turn a prompt string into what is printed.
