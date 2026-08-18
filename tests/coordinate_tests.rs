@@ -442,3 +442,94 @@ fn a_nested_pipeline_keeps_its_own_stream() {
         "[x-web-01]\n[x-web-02]\n[x-db-01]"
     );
 }
+
+/// **`[[ … ]]` and `test` must agree**, and they did not.
+///
+/// `[[ ]]` wraps each operand in double quotes so it cannot split — which also hid the coordinate
+/// from the substitution, so `test {0:0} = alpha` was true while `[[ {0:0} == alpha ]]` was false.
+/// The same test written two ways disagreeing.
+///
+/// The fix has a precedent in the same function: `@name` is left unwrapped there for exactly this
+/// reason. A substituted value arrives already quoted, so leaving it bare cannot split or glob.
+#[test]
+fn a_conditional_agrees_with_test() {
+    assert_eq!(
+        shell("cat hosts.txt | [[ {0:0} == web-01 ]] && echo yes"),
+        "yes"
+    );
+    assert_eq!(
+        shell("cat hosts.txt | test {0:0} = web-01 && echo yes"),
+        "yes"
+    );
+    assert_eq!(
+        shell("cat hosts.txt | [[ {0:0} != zzz ]] && echo yes"),
+        "yes"
+    );
+    // And brace expansion inside `[[ ]]` is untouched by the change.
+    assert_eq!(shell(r#"[[ "{0..2}" == "{0..2}" ]] && echo yes"#), "yes");
+}
+
+/// The compound branches the first pass did not reach.
+#[test]
+fn every_compound_branch_substitutes() {
+    assert_eq!(
+        shell("cat hosts.txt | if false; then echo a; elif true; then echo [{0:0}]; fi"),
+        "[web-01]"
+    );
+    assert_eq!(
+        shell("cat hosts.txt | if false; then echo a; else echo [{0:0}]; fi"),
+        "[web-01]"
+    );
+    assert_eq!(
+        shell("cat hosts.txt | for ((i=0;i<2;i++)); do echo [{0:0}]; done"),
+        "[web-01]\n[web-01]"
+    );
+    assert_eq!(
+        shell("cat hosts.txt | case zz in web-01) echo no;; *) echo [{0:0}];; esac"),
+        "[web-01]"
+    );
+    // A coordinate as a case *pattern*.
+    assert_eq!(
+        shell("cat hosts.txt | case web-01 in {0:0}) echo matched;; esac"),
+        "matched"
+    );
+}
+
+/// A heredoc body and an array literal are words too.
+#[test]
+fn heredocs_and_arrays_substitute() {
+    assert_eq!(
+        shell("cat hosts.txt | cat <<EOF\nhere=[{0:0}]\nEOF"),
+        "here=[web-01]"
+    );
+    assert_eq!(
+        shell(r#"cat hosts.txt | { a=({0:0} {1:0}); echo "[${a[0]}][${a[1]}]"; }"#),
+        "[web-01][web-02]"
+    );
+}
+
+/// Traps, exit status and negation behave as they do anywhere else.
+#[test]
+fn the_surrounding_shell_is_unchanged() {
+    assert_eq!(
+        shell(r#"cat hosts.txt | { trap "echo trapped" EXIT; echo [{0:0}]; }"#),
+        "[web-01]\ntrapped"
+    );
+    assert_eq!(
+        shell("cat hosts.txt | { echo [{0:0}]; exit 7; }; echo rc=$?"),
+        "[web-01]\nrc=7"
+    );
+    assert_eq!(shell("! cat hosts.txt | grep -q {0:0}; echo rc=$?"), "rc=1");
+}
+
+/// The walk recurses, so it must not run out of stack on a deeply nested stage.
+#[test]
+fn deep_nesting_is_survivable() {
+    let depth = 80;
+    let line = format!(
+        "cat hosts.txt | {}echo [{{0:0}}]{}",
+        "{ ".repeat(depth),
+        "; }".repeat(depth)
+    );
+    assert_eq!(shell(&line), "[web-01]");
+}

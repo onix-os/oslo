@@ -253,6 +253,14 @@ fn split(text: &str) -> Option<(&str, Coord, &str)> {
     None
 }
 
+/// Whether this text really holds a coordinate, parsed rather than guessed.
+///
+/// [`looks_like_a_coordinate`] is the cheap scan used to decide whether to bother; this is the
+/// answer. `{0..2}` passes the scan and fails here, because it is brace expansion.
+pub fn holds_a_coordinate(text: &str) -> bool {
+    split(text).is_some()
+}
+
 /// Rewrite every coordinate a command can hold.
 ///
 /// **Everywhere a word can appear, not only the argument list.** A coordinate in a redirection
