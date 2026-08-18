@@ -346,3 +346,99 @@ fn hostile_bytes_are_survivable() {
     // A great many lines and a great many words.
     assert_eq!(shell("seq 1 20000 | echo [{-1:0}]"), "[20000]");
 }
+
+/// **A coordinate works everywhere a word can go**, not only in the argument list.
+///
+/// All three of these used to be left as text and then read as nothing: the command ran and did the
+/// wrong thing without saying so. A redirection wrote to a file literally called `{0:0}`, an
+/// assignment set the literal text, and a compound stage printed a blank.
+#[test]
+fn a_coordinate_works_wherever_a_word_does() {
+    // A redirection target.
+    assert_eq!(shell("cat hosts.txt | cat > {0:0}; ls web-01"), "web-01");
+    // An assignment prefix.
+    assert_eq!(
+        shell(r#"cat hosts.txt | x={0:0} sh -c 'echo [$x]'"#),
+        "[web-01]"
+    );
+    // A subshell and a group.
+    assert_eq!(shell("cat hosts.txt | (echo [{0:0}])"), "[web-01]");
+    assert_eq!(shell("cat hosts.txt | { echo [{0:0}]; }"), "[web-01]");
+    // A condition and a case subject.
+    assert_eq!(
+        shell("cat hosts.txt | if true; then echo [{0:0}]; fi"),
+        "[web-01]"
+    );
+    assert_eq!(
+        shell("cat hosts.txt | case {0:0} in web-01) echo matched;; esac"),
+        "matched"
+    );
+}
+
+/// **The xargs shape, with no new keyword.** `for` plus `{*:n}` is the "run this once per line"
+/// case, using the loop the shell already had — which is why this design has no `each` builtin.
+#[test]
+fn for_over_a_coordinate_is_the_iteration_case() {
+    assert_eq!(
+        shell("cat hosts.txt | for h in {*:0}; do echo host=$h; done"),
+        "host=web-01\nhost=web-02\nhost=db-01"
+    );
+    assert_eq!(
+        shell("cat hosts.txt | for a in {*:1}; do echo ip=$a; done"),
+        "ip=10.0.0.1\nip=10.0.0.2\nip=10.0.0.9"
+    );
+}
+
+/// **A function definition is not rewritten.** Its body runs later, when this stream is gone, so
+/// baking today's text into it would make the definition mean something other than what was
+/// written.
+#[test]
+fn a_function_body_is_not_baked() {
+    assert_eq!(
+        shell(r#"cat hosts.txt | { f(){ echo "body {0:0}"; }; f; }"#),
+        "body {0:0}"
+    );
+}
+
+/// **The gate must see everywhere the rewriter writes.** A gate that read only the argument list
+/// would leave these on the concurrent path, where the rewriter never runs — so the substitution
+/// would simply not happen, silently. Each of these is a place only the gate's walk can find.
+#[test]
+fn the_gate_sees_everywhere_the_rewriter_writes() {
+    for line in [
+        "cat hosts.txt | cat > {0:0}",
+        "cat hosts.txt | x={0:0} true",
+        "cat hosts.txt | (true {0:0})",
+        "cat hosts.txt | for x in {0:0}; do true; done",
+        "cat hosts.txt | case {0:0} in *) true;; esac",
+    ] {
+        // If the gate missed it the coordinate would survive into the output as literal text.
+        let out = shell(&format!("{line}; echo done"));
+        assert!(!out.contains("{0:0}"), "the gate missed {line:?}: {out:?}");
+    }
+}
+
+/// **Where the recursion stops: a nested pipeline owns its own stream.**
+///
+/// `cat f | (echo {0:0})` names the outer pipe, because the subshell has nothing feeding it. But a
+/// pipeline *inside* a loop body has its own upstream, and its coordinate means that one — so it
+/// must not be rewritten from outside. Getting this wrong made the loop print blanks: the outer
+/// walk claimed the inner coordinate and resolved it against a stream that did not exist.
+#[test]
+fn a_nested_pipeline_keeps_its_own_stream() {
+    // The inner pipeline resolves against its own upstream, once per iteration.
+    assert_eq!(
+        shell(r#"for i in 1 2 3; do printf "v$i\n" | echo [{0:0}]; done"#),
+        "[v1]\n[v2]\n[v3]"
+    );
+    // A loop *as a stage* still reads the outer stream, because it has no pipeline of its own.
+    assert_eq!(
+        shell("cat hosts.txt | for h in {*:0}; do echo $h; done"),
+        "web-01\nweb-02\ndb-01"
+    );
+    // And both at once: the loop reads the outer stream, the inner pipeline reads its own.
+    assert_eq!(
+        shell(r#"cat hosts.txt | for h in {*:0}; do printf "x-$h\n" | echo [{0:0}]; done"#),
+        "[x-web-01]\n[x-web-02]\n[x-db-01]"
+    );
+}

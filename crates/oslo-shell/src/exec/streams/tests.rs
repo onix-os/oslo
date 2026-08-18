@@ -247,19 +247,19 @@ fn a_quoted_coordinate_is_left_alone() {
 /// ordinary pipeline on the path it always took.
 #[test]
 fn the_gate_is_closed_for_ordinary_commands() {
-    assert!(!command_uses_coordinates(&[literal("ls"), literal("-la")]));
-    assert!(!command_uses_coordinates(&[
-        literal("mkdir"),
-        literal("{a,b}")
-    ]));
-    assert!(command_uses_coordinates(&[
-        literal("ssh"),
-        literal("{0:0}")
-    ]));
-    assert!(command_uses_coordinates(&[
-        literal("cat"),
-        literal("x{-1:0:}y")
-    ]));
+    assert!(!command_uses_coordinates(&simple(&["ls", "-la"])));
+    assert!(!command_uses_coordinates(&simple(&["mkdir", "{a,b}"])));
+    assert!(command_uses_coordinates(&simple(&["ssh", "{0:0}"])));
+    assert!(command_uses_coordinates(&simple(&["cat", "x{-1:0:}y"])));
+}
+
+/// A simple command from its words, for the gate tests.
+fn simple(words: &[&str]) -> Command {
+    Command::Simple(oslo_base::ast::SimpleCommand {
+        assignments: Vec::new(),
+        words: words.iter().map(|w| literal(w)).collect(),
+        redirections: Vec::new(),
+    })
 }
 
 /// **Every coordinate in a word is replaced, not just the first**, and a brace group in front of

@@ -28,7 +28,9 @@
 //! six expansions about it — and a shell that field-splits its own substitutions is a shell that
 //! executes filenames.
 
-use oslo_base::ast::{Word, WordPart};
+use oslo_base::ast::{
+    AssignmentValue, CaseItem, Command, CommandList, CompoundCommand, Redirection, Word, WordPart,
+};
 use oslo_base::coords::{self, Coord};
 
 /// How many prompts back a coordinate may reach.
@@ -251,6 +253,170 @@ fn split(text: &str) -> Option<(&str, Coord, &str)> {
     None
 }
 
+/// Rewrite every coordinate a command can hold.
+///
+/// **Everywhere a word can appear, not only the argument list.** A coordinate in a redirection
+/// target, an assignment's value or the body of a loop used to be left as text and then read as
+/// nothing — `cat f | cat > {0:0}` wrote to a file called `{0:0}`, and `cat f | (echo {0:0})`
+/// printed a blank line. Both failed *silently*, which is the worst way for a substitution to fail:
+/// the command runs, and does the wrong thing.
+///
+/// **A function definition is not rewritten.** `f(){ echo {0:0}; }` defines a function whose body
+/// is run later, when this stream is gone — baking today's text into it would make the definition
+/// mean something different from what was written.
+pub fn rewrite_command(command: &mut Command, streams: &Streams) {
+    match command {
+        Command::Simple(simple) => {
+            rewrite(&mut simple.words, streams);
+            for assignment in &mut simple.assignments {
+                match &mut assignment.value {
+                    AssignmentValue::Scalar(word) => rewrite_word(word, streams),
+                    AssignmentValue::Array(elements) => {
+                        for element in elements {
+                            if let Some(index) = &mut element.index {
+                                rewrite_word(index, streams);
+                            }
+                            rewrite_word(&mut element.value, streams);
+                        }
+                    }
+                }
+            }
+            rewrite_redirections(&mut simple.redirections, streams);
+        }
+        Command::Compound { kind, redirections } => {
+            rewrite_compound(kind, streams);
+            rewrite_redirections(redirections, streams);
+        }
+        // Deliberately untouched — see the note above.
+        Command::FunctionDef { .. } => {}
+    }
+}
+
+fn rewrite_redirections(redirections: &mut [Redirection], streams: &Streams) {
+    for redirection in redirections {
+        rewrite_word(&mut redirection.target, streams);
+        if let Some(body) = &mut redirection.heredoc_content {
+            rewrite_word(body, streams);
+        }
+    }
+}
+
+fn rewrite_compound(kind: &mut CompoundCommand, streams: &Streams) {
+    match kind {
+        CompoundCommand::If {
+            condition,
+            then_branch,
+            elif_branches,
+            else_branch,
+        } => {
+            rewrite_list(condition, streams);
+            rewrite_list(then_branch, streams);
+            for (condition, body) in elif_branches {
+                rewrite_list(condition, streams);
+                rewrite_list(body, streams);
+            }
+            if let Some(body) = else_branch {
+                rewrite_list(body, streams);
+            }
+        }
+        CompoundCommand::While { condition, body } | CompoundCommand::Until { condition, body } => {
+            rewrite_list(condition, streams);
+            rewrite_list(body, streams);
+        }
+        CompoundCommand::For { items, body, .. } => {
+            if let Some(items) = items {
+                let mut words = std::mem::take(items);
+                rewrite(&mut words, streams);
+                *items = words;
+            }
+            rewrite_list(body, streams);
+        }
+        CompoundCommand::Case { word, items } => {
+            rewrite_word(word, streams);
+            for item in items.iter_mut() {
+                rewrite_case_item(item, streams);
+            }
+        }
+        CompoundCommand::ArithmeticFor { body, .. } => rewrite_list(body, streams),
+        CompoundCommand::Subshell(list) | CompoundCommand::Group(list) => {
+            rewrite_list(list, streams)
+        }
+        // Arithmetic is a string the arithmetic parser owns, not a word list.
+        CompoundCommand::Arithmetic(_) => {}
+    }
+}
+
+fn rewrite_case_item(item: &mut CaseItem, streams: &Streams) {
+    let mut patterns = std::mem::take(&mut item.patterns);
+    rewrite(&mut patterns, streams);
+    item.patterns = patterns;
+    rewrite_list(&mut item.body, streams);
+}
+
+fn rewrite_list(list: &mut CommandList, streams: &Streams) {
+    for item in &mut list.items {
+        rewrite_pipeline(&mut item.and_or.first, streams);
+        for (_, pipeline) in &mut item.and_or.rest {
+            rewrite_pipeline(pipeline, streams);
+        }
+    }
+}
+
+/// A nested pipeline is rewritten only when it has no stream of its own.
+///
+/// **Where the recursion has to stop.** `cat f | (echo {0:0})` names the outer pipe, because the
+/// subshell has nothing feeding it — so it is rewritten from here. But
+/// `for i in 1 2; do printf "$i\n" | echo {0:0}; done` does not: that inner pipeline has its own
+/// upstream, and its coordinate means *that* one. Rewriting it from out here answered with the
+/// enclosing stream, which for a loop at the top of a pipeline is nothing at all — the loop printed
+/// three blanks.
+///
+/// So a nested pipeline of two or more stages is left alone. It reaches `run_stages` in its own
+/// right and asks the same question there.
+fn rewrite_pipeline(pipeline: &mut oslo_base::ast::Pipeline, streams: &Streams) {
+    if pipeline.commands.len() > 1 {
+        return;
+    }
+    for command in &mut pipeline.commands {
+        rewrite_command(command, streams);
+    }
+}
+
+/// Rewrite one word in place, when it is a lone literal holding a coordinate.
+///
+/// A word that becomes *several* cannot be put back in a slot that holds one, so a redirection
+/// target or an assignment value takes the values joined — which is what a single slot can mean.
+fn rewrite_word(word: &mut Word, streams: &Streams) {
+    let Some(text) = only_literal(word) else {
+        return;
+    };
+    let Some(mut replacements) = substitute(text, streams) else {
+        return;
+    };
+    *word = match replacements.len() {
+        1 => replacements.remove(0),
+        _ => Word {
+            parts: vec![WordPart::SingleQuoted(
+                replacements
+                    .iter()
+                    .map(|word| {
+                        word.parts
+                            .iter()
+                            .map(|part| match part {
+                                WordPart::Literal(text) | WordPart::SingleQuoted(text) => {
+                                    text.as_str()
+                                }
+                                _ => "",
+                            })
+                            .collect::<String>()
+                    })
+                    .collect::<Vec<_>>()
+                    .join(" "),
+            )],
+        },
+    };
+}
+
 /// Rewrite every coordinate in a simple command's words, in place.
 ///
 /// **Only `Literal` parts are looked at.** A coordinate inside single or double quotes is text the
@@ -288,15 +454,100 @@ fn only_literal(word: &Word) -> Option<&str> {
     }
 }
 
-/// Whether any word of a command could carry a coordinate.
+/// Whether a command could carry a coordinate anywhere.
 ///
 /// The gate for the whole feature: a pipeline that answers `false` runs down the path it always
 /// did, forked concurrently, with nothing captured and nothing to pay for.
-pub fn command_uses_coordinates(words: &[Word]) -> bool {
-    words
-        .iter()
-        .filter_map(only_literal)
-        .any(looks_like_a_coordinate)
+///
+/// **It looks everywhere [`rewrite_command`] writes.** A gate that read only the argument list
+/// while the rewriter also handled redirections would leave `cat f | cat > {0:0}` on the concurrent
+/// path, where the rewriter never runs — the substitution would not happen, and would not say so.
+/// The two walks mirror each other and a test holds them together.
+pub fn command_uses_coordinates(command: &Command) -> bool {
+    match command {
+        Command::Simple(simple) => {
+            any_word(&simple.words)
+                || simple
+                    .assignments
+                    .iter()
+                    .any(|assignment| match &assignment.value {
+                        AssignmentValue::Scalar(word) => is_one(word),
+                        AssignmentValue::Array(elements) => elements.iter().any(|element| {
+                            element.index.as_ref().is_some_and(is_one) || is_one(&element.value)
+                        }),
+                    })
+                || any_redirection(&simple.redirections)
+        }
+        Command::Compound { kind, redirections } => {
+            any_compound(kind) || any_redirection(redirections)
+        }
+        // Not rewritten, so not a reason to leave the concurrent path.
+        Command::FunctionDef { .. } => false,
+    }
+}
+
+fn is_one(word: &Word) -> bool {
+    only_literal(word).is_some_and(looks_like_a_coordinate)
+}
+
+fn any_word(words: &[Word]) -> bool {
+    words.iter().any(is_one)
+}
+
+fn any_redirection(redirections: &[Redirection]) -> bool {
+    redirections.iter().any(|redirection| {
+        is_one(&redirection.target) || redirection.heredoc_content.as_ref().is_some_and(is_one)
+    })
+}
+
+fn any_compound(kind: &CompoundCommand) -> bool {
+    match kind {
+        CompoundCommand::If {
+            condition,
+            then_branch,
+            elif_branches,
+            else_branch,
+        } => {
+            any_list(condition)
+                || any_list(then_branch)
+                || elif_branches
+                    .iter()
+                    .any(|(condition, body)| any_list(condition) || any_list(body))
+                || else_branch.as_ref().is_some_and(any_list)
+        }
+        CompoundCommand::While { condition, body } | CompoundCommand::Until { condition, body } => {
+            any_list(condition) || any_list(body)
+        }
+        CompoundCommand::For { items, body, .. } => {
+            items.as_ref().is_some_and(|items| any_word(items)) || any_list(body)
+        }
+        CompoundCommand::Case { word, items } => {
+            is_one(word)
+                || items
+                    .iter()
+                    .any(|item| any_word(&item.patterns) || any_list(&item.body))
+        }
+        CompoundCommand::ArithmeticFor { body, .. } => any_list(body),
+        CompoundCommand::Subshell(list) | CompoundCommand::Group(list) => any_list(list),
+        CompoundCommand::Arithmetic(_) => false,
+    }
+}
+
+fn any_list(list: &CommandList) -> bool {
+    list.items.iter().any(|item| {
+        any_pipeline(&item.and_or.first)
+            || item
+                .and_or
+                .rest
+                .iter()
+                .any(|(_, pipeline)| any_pipeline(pipeline))
+    })
+}
+
+/// Mirrors [`rewrite_pipeline`], including where it stops: a nested pipeline with stages of its own
+/// is not this stage's business, so finding a coordinate in one must not open the gate here.
+fn any_pipeline(pipeline: &oslo_base::ast::Pipeline) -> bool {
+    pipeline.commands.len() == 1 && pipeline.commands.iter().any(command_uses_coordinates)
 }
 
 #[cfg(test)]

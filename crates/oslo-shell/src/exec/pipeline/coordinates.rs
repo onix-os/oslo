@@ -47,13 +47,10 @@ use std::os::fd::{AsRawFd, IntoRawFd};
 ///
 /// The gate. Answering `false` is the common case and must stay cheap.
 pub(super) fn uses_coordinates(pipeline: &Pipeline) -> bool {
-    pipeline.commands.iter().any(|command| match command {
-        Command::Simple(simple) => streams::command_uses_coordinates(&simple.words),
-        // A compound stage — `{ …; }`, a loop, a subshell — is not rewritten. Its words are not a
-        // flat list, and a coordinate inside a loop body raises a question this design has not
-        // answered: which iteration's stream is it. Left for when somebody wants it.
-        _ => false,
-    })
+    pipeline
+        .commands
+        .iter()
+        .any(streams::command_uses_coordinates)
 }
 
 /// Run the stages one at a time, threading each one's output into the next.
@@ -91,12 +88,9 @@ pub(super) fn run(env: &mut Environment, pipeline: &Pipeline) -> Result<i32> {
 /// run again, and a stage that rewrote itself would answer the second time around with the first
 /// time's text.
 fn rewritten(command: &Command, streams: &Streams) -> Command {
-    let Command::Simple(simple) = command else {
-        return command.clone();
-    };
-    let mut simple = simple.clone();
-    streams::rewrite(&mut simple.words, streams);
-    Command::Simple(simple)
+    let mut command = command.clone();
+    streams::rewrite_command(&mut command, streams);
+    command
 }
 
 /// Run one stage: feed it `input`, and keep what it prints when `keep` is set.
