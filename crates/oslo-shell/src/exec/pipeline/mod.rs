@@ -475,7 +475,7 @@ fn run_byte_stages(env: &mut Environment, pipeline: &Pipeline) -> Result<i32> {
 /// R6.4: `set -o pipefail` swaps "the last stage" for "the rightmost stage that failed", so
 /// `false | true` reports 1 while `true | false | true` still reports the 1 in the middle. Without
 /// the option the leftmost stages are invisible, which is the default POSIX rule.
-fn pipeline_status(env: &Environment, stages: &[i32]) -> i32 {
+pub(super) fn pipeline_status(env: &Environment, stages: &[i32]) -> i32 {
     if env.pipefail() {
         // Rightmost, not first: `exit 3 | exit 4` is 4 in bash, the failure closest to the output.
         if let Some(failed) = stages.iter().rev().find(|s| **s != 0) {

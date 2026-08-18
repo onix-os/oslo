@@ -247,3 +247,102 @@ fn the_edges_of_real_input() {
 fn a_coordinate_can_name_the_command() {
     assert_eq!(shell(r#"printf "echo\n" | {0:0} ran-it"#), "ran-it");
 }
+
+/// **`pipefail` reports the rightmost stage that failed**, and the coordinate path must use the
+/// same rule as the concurrent one.
+///
+/// It did not: it took the last status directly, so `set -o pipefail; false | echo {0:0}` reported
+/// 0 while the same pipeline without a coordinate reported 1. A status that depends on whether a
+/// coordinate happens to be present is a status nobody can rely on.
+#[test]
+fn pipefail_is_obeyed() {
+    assert_eq!(
+        shell("set -o pipefail; false | echo {0:0} >/dev/null; echo rc=$?"),
+        "rc=1"
+    );
+    assert_eq!(
+        shell("set -o pipefail; echo x | false | echo {0:0} >/dev/null; echo rc=$?"),
+        "rc=1"
+    );
+    // Without the option, only the last stage decides — the POSIX default.
+    assert_eq!(shell("false | echo {0:0} >/dev/null; echo rc=$?"), "rc=0");
+}
+
+/// **Only stdout is a stream.** Standard error goes where it always went and never lands in a
+/// coordinate — a diagnostic is not data.
+#[test]
+fn stderr_is_not_captured() {
+    assert_eq!(
+        shell(r#"sh -c "echo OUT; echo ERR >&2" | echo [{0:0}]"#),
+        "[OUT]\nERR"
+    );
+    assert_eq!(shell(r#"sh -c "echo ERR >&2" | echo [{0:0}]"#), "[]\nERR");
+}
+
+/// A coordinate is rewritten afresh every time the command runs, so a loop does not answer with
+/// the first iteration's text for ever. This is why the command is cloned rather than rewritten.
+#[test]
+fn a_loop_substitutes_each_time_around() {
+    assert_eq!(
+        shell(r#"for i in 1 2 3; do printf "v$i\n" | echo [{0:0}]; done"#),
+        "[v1]\n[v2]\n[v3]"
+    );
+}
+
+/// Shell functions work on both sides of the pipe.
+#[test]
+fn functions_are_ordinary_stages() {
+    assert_eq!(
+        shell(r#"f(){ echo "got $1"; }; printf "a b\n" | f {0:1}"#),
+        "got b"
+    );
+    assert_eq!(shell("f(){ echo from-fn; }; f | echo {0:0}"), "from-fn");
+}
+
+/// With no upstream at all, a coordinate reads empty rather than failing.
+#[test]
+fn no_upstream_reads_empty() {
+    assert_eq!(shell("echo [{0:0}]"), "[]");
+    assert_eq!(shell("echo [{-1:0:0}]"), "[]");
+}
+
+/// Redirections, heredocs and nesting are all ordinary around a coordinate.
+#[test]
+fn the_usual_shell_machinery_still_works() {
+    assert_eq!(shell("cat < hosts.txt | echo {0:0}"), "web-01");
+    assert_eq!(shell("cat hosts.txt | echo {0:0} > out; cat out"), "web-01");
+    assert_eq!(shell("cat nope 2>/dev/null | echo [{0:0}]"), "[]");
+    // A stage that itself used a coordinate is just another stream.
+    assert_eq!(
+        shell(r#"printf "p q\n" | echo {0:1} | echo second=[{0:0}]"#),
+        "second=[q]"
+    );
+}
+
+/// Reaching back several stages, and every word of every line.
+#[test]
+fn reaching_back_and_reaching_wide() {
+    assert_eq!(shell("echo w x y z | cat | cat | echo {0:2}"), "y");
+    assert_eq!(shell("echo w x y z | cat | cat | echo {2:0:0}"), "w");
+    assert_eq!(
+        shell(r#"printf "a b\nc d\n" | printf "<%s>" {*:*}"#),
+        "<a><b><c><d>"
+    );
+}
+
+/// **Bytes that are not text do not bring the shell down.** A stream is whatever the command
+/// printed, and some commands print anything at all.
+#[test]
+fn hostile_bytes_are_survivable() {
+    // Invalid UTF-8 is replaced, not fatal.
+    assert_eq!(shell(r#"printf "\xff\xfe ok\n" | echo [{0:1}]"#), "[ok]");
+    // NULs are dropped, as command substitution drops them: a shell word is a C string.
+    assert_eq!(shell(r#"printf "a\0b c\n" | echo [{0:1}]"#), "[c]");
+    // A stage that dies part-way still leaves what it managed to print.
+    assert_eq!(
+        shell(r#"sh -c "echo one; kill -9 \$\$" | echo [{0:0}]"#),
+        "[one]"
+    );
+    // A great many lines and a great many words.
+    assert_eq!(shell("seq 1 20000 | echo [{-1:0}]"), "[20000]");
+}

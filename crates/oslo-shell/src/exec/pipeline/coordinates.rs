@@ -32,7 +32,7 @@
 //! started reading, and the child cannot start until the parent stops writing. `tempfile` is a
 //! dependency of this crate for the same reason in `direnv`, where the comment says so.
 
-use super::{eval_command, status_of, wait_for_status};
+use super::{eval_command, pipeline_status, status_of, wait_for_status};
 use crate::env::Environment;
 use crate::env::builtins::run_exit_trap;
 use crate::exec::compound::flush_stdout;
@@ -77,7 +77,10 @@ pub(super) fn run(env: &mut Environment, pipeline: &Pipeline) -> Result<i32> {
         upstream = Some(kept);
     }
 
-    let status = *statuses.last().unwrap_or(&0);
+    // The same rule the concurrent path uses, and taken from the same place: with `pipefail` the
+    // status is the rightmost stage that *failed*, not the rightmost stage. Computing it here
+    // instead was a silent lie — `set -o pipefail; false | echo {0:0}` reported 0.
+    let status = pipeline_status(env, &statuses);
     env.set_pipeline_status(statuses);
     Ok(status)
 }
