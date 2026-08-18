@@ -87,9 +87,39 @@ impl Sel {
     }
 }
 
+/// Which half of a stage a coordinate reads: what it printed, or what it *was*.
+///
+/// ```text
+/// cat one.txt | echo "ran {%0:0} on {%0:1} and got {*}"
+///                          │         │              └─ the output
+///                          │         └─ its argument      one.txt
+///                          └─ the command name            cat
+/// ```
+///
+/// **Why `%` and not `!`.** `!` reads better — it is already the shell's reach-back character, and
+/// `!!` has meant "the last command" for forty years. It is also unusable: history expansion runs
+/// over the line before any of this, sees `!0` inside the braces and fails the line with
+/// `!0: event not found`. `%` survives both the lexer and history, and its other meaning — `%1`
+/// for a job — is only ever a whole word, never something inside a brace.
+///
+/// **A command has no line dimension**, because a command line is one line. So `%` shifts what the
+/// dimensions mean by one: `{%1:0}` is *one stage back, word 0*, where `{1:0}` is line 1, word 0.
+/// That is the same right-to-left rule the module docs give — the last dimension is always the
+/// word — with the line simply absent.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Subject {
+    /// What the stage printed.
+    #[default]
+    Output,
+    /// The stage's own command line, its words being the command and its arguments.
+    Command,
+}
+
 /// A parsed coordinate.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Coord {
+    /// Output or command. See [`Subject`].
+    pub subject: Subject,
     /// How far back down the stack. `At(0)` — this command's own input — unless three dimensions
     /// were written.
     pub stream: Sel,
@@ -104,6 +134,9 @@ pub struct Coord {
 /// Answers `None` for anything that is not a coordinate, so an ordinary brace group falls through
 /// to the expansions that already handle it.
 pub fn parse(inside: &str) -> Option<Coord> {
+    if let Some(rest) = inside.strip_prefix('%') {
+        return parse_command(rest);
+    }
     let parts: Vec<&str> = inside.split(':').collect();
     let (stream, line, word) = match parts.as_slice() {
         [line] => (None, *line, None),
@@ -118,12 +151,38 @@ pub fn parse(inside: &str) -> Option<Coord> {
         Some(text) => Some(dimension(text)?),
     };
     Some(Coord {
+        subject: Subject::Output,
         stream: match stream {
             Some("") | None => Sel::At(0),
             Some(text) => dimension(text)?,
         },
         line: dimension(line)?,
         word,
+    })
+}
+
+/// The inside of a `{%…}` — one or two dimensions, because a command line has no line dimension.
+///
+/// `{%0}` is the whole command, `{%0:0}` its name, `{%0:1}` its first argument, `{%0:*}` every
+/// word of it. The line is pinned to zero so the same [`select`] serves both subjects.
+fn parse_command(rest: &str) -> Option<Coord> {
+    let parts: Vec<&str> = rest.split(':').collect();
+    let (stream, word) = match parts.as_slice() {
+        [stream] => (*stream, None),
+        [stream, word] => (*stream, Some(*word)),
+        _ => return None,
+    };
+    Some(Coord {
+        subject: Subject::Command,
+        stream: match stream {
+            "" => Sel::At(0),
+            text => dimension(text)?,
+        },
+        line: Sel::At(0),
+        word: match word {
+            Some("") | None => None,
+            Some(text) => Some(dimension(text)?),
+        },
     })
 }
 
@@ -183,6 +242,26 @@ pub fn select(coord: &Coord, text: &str) -> Vec<String> {
         }
     }
     out
+}
+
+/// Apply a command coordinate's word dimension to a command's words.
+///
+/// **The words arrive already separated**, rather than being split back out of a rendered line.
+/// A command's arguments are known exactly, and an argument that contains a space is the whole
+/// reason this feature is careful about words elsewhere — rendering `cat 'my file.txt'` to one
+/// string and splitting it again would hand back `'my` and `file.txt'`.
+pub fn select_words(coord: &Coord, words: &[String]) -> Vec<String> {
+    let Some(word) = coord.word else {
+        // No word dimension: the whole command line, one value — the same rule as a whole line.
+        return match words.is_empty() {
+            true => Vec::new(),
+            false => vec![words.join(" ")],
+        };
+    };
+    word.resolve(words.len())
+        .into_iter()
+        .map(|at| words[at].clone())
+        .collect()
 }
 
 #[cfg(test)]

@@ -90,6 +90,9 @@ pub struct Streams {
     /// This pipeline's finished stages, oldest first. Index 0 of a coordinate is the *last* of
     /// these — the stage feeding the command being built.
     stages: Vec<String>,
+    /// What each of those stages *was*, as words, parallel to `stages`. Kept as words rather than
+    /// a line because an argument may contain a space — see [`coords::select_words`].
+    commands: Vec<Vec<String>>,
     /// Previous prompts, newest first, so `-1` is `prompts[0]`.
     prompts: Vec<String>,
 }
@@ -103,6 +106,7 @@ impl Streams {
     pub fn for_this_pipeline() -> Streams {
         Streams {
             stages: Vec::new(),
+            commands: Vec::new(),
             prompts: PROMPTS.with(|slot| slot.borrow().clone()),
         }
     }
@@ -114,6 +118,14 @@ impl Streams {
         self.stages.push(cap(text.into()));
     }
 
+    /// Note what a pipeline stage *was*, as the words it was written with.
+    ///
+    /// Pushed alongside [`Streams::push_stage`] and kept the same length, so `{%0}` and `{0}` name
+    /// the same stage.
+    pub fn push_command(&mut self, words: Vec<String>) {
+        self.commands.push(words);
+    }
+
     /// Note what a whole command printed, and start a fresh pipeline.
     ///
     /// The stages are cleared because they belonged to the pipeline that just ended: a coordinate
@@ -121,6 +133,7 @@ impl Streams {
     /// is over, which is a different stream than the one it names.
     pub fn push_prompt(&mut self, text: impl Into<String>) {
         self.stages.clear();
+        self.commands.clear();
         self.prompts.insert(0, cap(text.into()));
         self.prompts.truncate(PROMPTS_KEPT);
     }
@@ -129,19 +142,14 @@ impl Streams {
     /// keeping, or one whose output was never captured.
     pub fn end_pipeline(&mut self) {
         self.stages.clear();
+        self.commands.clear();
     }
 
     /// The text a coordinate's stream dimension names, if there is one.
     ///
     /// `None` where nothing was captured, which reads as an empty selection rather than an error.
     pub fn text(&self, coord: &Coord) -> Option<&str> {
-        let at = match coord.stream {
-            coords::Sel::At(at) => at,
-            // A range of *streams* is not meaningful — `{0..2:0:0}` would mean "the same line of
-            // three different commands", which is a question nobody asks and a syntax nobody would
-            // reach for by accident. The first is taken, so the coordinate still reads.
-            coords::Sel::Span { from, .. } => from.unwrap_or(0),
-        };
+        let at = self.stream_index(coord);
         match at >= 0 {
             // Counting back from the newest stage: 0 is the one that just finished.
             true => {
@@ -155,7 +163,44 @@ impl Streams {
             false => self.prompts.get((-at - 1) as usize).map(String::as_str),
         }
     }
+
+    /// The words of the command a `{%…}` coordinate names.
+    ///
+    /// **Both directions answer**, and they answer from different places for the same reason the
+    /// output side does. Forward is a stage of this pipeline, whose words were recorded as it ran.
+    /// Backward is a previous prompt, where the line that was typed is all there ever was — so
+    /// `{%-1:0}` and `{-1:0:0}` are two spellings of the same word, and the `%` one is the one that
+    /// says what it means.
+    pub fn command_words(&self, coord: &Coord) -> Option<Vec<String>> {
+        let at = self.stream_index(coord);
+        match at >= 0 {
+            true => self
+                .commands
+                .len()
+                .checked_sub(at as usize + 1)
+                .map(|i| self.commands[i].clone()),
+            false => self
+                .prompts
+                .get((-at - 1) as usize)
+                .map(|line| line.split_whitespace().map(str::to_string).collect()),
+        }
+    }
+
+    /// Which stream a coordinate names, as a signed index.
+    ///
+    /// A range of *streams* is not meaningful — `{0..2:0:0}` would mean "the same line of three
+    /// different commands", which is a question nobody asks and a syntax nobody would reach for by
+    /// accident. The first is taken, so the coordinate still reads.
+    fn stream_index(&self, coord: &Coord) -> isize {
+        match coord.stream {
+            coords::Sel::At(at) => at,
+            coords::Sel::Span { from, .. } => from.unwrap_or(0),
+        }
+    }
 }
+
+mod quoted;
+use quoted::{holds_a_quoted_coordinate, rewrite_inside_quotes};
 
 /// Keep the head, not the tail: a coordinate counts from the start, and `{-1}` on a truncated
 /// stream is honestly the last line *of what was kept*.
@@ -174,9 +219,9 @@ pub fn looks_like_a_coordinate(text: &str) -> bool {
     let bytes = text.as_bytes();
     bytes.iter().enumerate().any(|(i, b)| {
         *b == b'{'
-            && bytes
-                .get(i + 1)
-                .is_some_and(|n| n.is_ascii_digit() || matches!(n, b'-' | b'*' | b':' | b'.'))
+            && bytes.get(i + 1).is_some_and(|n| {
+                n.is_ascii_digit() || matches!(n, b'-' | b'*' | b':' | b'.' | b'%')
+            })
     })
 }
 
@@ -221,11 +266,17 @@ pub fn substitute(text: &str, streams: &Streams) -> Option<Vec<Word>> {
 
 /// What a coordinate reads, or nothing when its stream was never captured.
 fn values(coord: &Coord, streams: &Streams) -> Vec<String> {
-    match streams.text(coord) {
-        Some(stream) => coords::select(coord, stream),
-        // Nothing captured: the coordinate reads empty rather than refusing to run, which is the
-        // rule everywhere else in this feature.
-        None => Vec::new(),
+    // Nothing captured: the coordinate reads empty rather than refusing to run, which is the rule
+    // everywhere else in this feature.
+    match coord.subject {
+        coords::Subject::Output => match streams.text(coord) {
+            Some(stream) => coords::select(coord, stream),
+            None => Vec::new(),
+        },
+        coords::Subject::Command => match streams.command_words(coord) {
+            Some(words) => coords::select_words(coord, &words),
+            None => Vec::new(),
+        },
     }
 }
 
@@ -287,7 +338,20 @@ pub fn holds_a_coordinate(text: &str) -> bool {
 pub fn rewrite_command(command: &mut Command, streams: &Streams) {
     match command {
         Command::Simple(simple) => {
-            rewrite(&mut simple.words, streams);
+            match regex_operand_of_a_conditional(&simple.words) {
+                // Every word but the regex, and one word each: an operand of `[[ ]]` is one operand
+                // however many spaces are in it.
+                Some(skip) => {
+                    for (at, word) in simple.words.iter_mut().enumerate() {
+                        if at != skip {
+                            rewrite_word(word, streams);
+                        }
+                    }
+                }
+                None => {
+                    rewrite(&mut simple.words, streams);
+                }
+            }
             for assignment in &mut simple.assignments {
                 // The scalar case is deliberately absent — see the note above. An array literal is
                 // the other half of the same rule: `a=(x{1,2} {3..4})` *is* brace-expanded by bash,
@@ -406,6 +470,7 @@ fn rewrite_pipeline(pipeline: &mut oslo_base::ast::Pipeline, streams: &Streams) 
 /// target or an assignment value takes the values joined — which is what a single slot can mean.
 fn rewrite_word(word: &mut Word, streams: &Streams) {
     let Some(text) = only_literal(word) else {
+        rewrite_inside_quotes(word, streams);
         return;
     };
     let Some(mut replacements) = substitute(text, streams) else {
@@ -437,17 +502,22 @@ fn rewrite_word(word: &mut Word, streams: &Streams) {
 
 /// Rewrite every coordinate in a simple command's words, in place.
 ///
-/// **Only `Literal` parts are looked at.** A coordinate inside single or double quotes is text the
-/// user quoted on purpose, and `echo "{0:1}"` printing a literal `{0:1}` is the same promise every
-/// other expansion keeps — there is always a way to write the characters themselves.
+/// **Single quotes are literal and double quotes expand**, which is the rule every other expansion
+/// in the shell already follows: `echo "$x"` is the value and `echo '$x'` is the text. A coordinate
+/// had been literal in *both*, which made `echo "ran {%0:0} and got {0}"` — a coordinate in the
+/// middle of a message, the obvious thing to want — impossible to write.
+///
+/// Inside quotes the values join with a space and the word stays one word, because that is what a
+/// quoted word means. Outside, a lone coordinate still becomes one argument per value.
 ///
 /// Answers whether anything changed, so a caller can tell a command that needed the stack from one
 /// that merely looked like it might.
 pub fn rewrite(words: &mut Vec<Word>, streams: &Streams) -> bool {
     let mut out = Vec::with_capacity(words.len());
     let mut changed = false;
-    for word in words.drain(..) {
+    for mut word in words.drain(..) {
         let Some(text) = only_literal(&word) else {
+            changed |= rewrite_inside_quotes(&mut word, streams);
             out.push(word);
             continue;
         };
@@ -472,103 +542,24 @@ fn only_literal(word: &Word) -> Option<&str> {
     }
 }
 
-/// Whether a command could carry a coordinate anywhere.
+/// Where the regex lives in a lowered `[[ … =~ … ]]`, if this command is one.
 ///
-/// The gate for the whole feature: a pipeline that answers `false` runs down the path it always
-/// did, forked concurrently, with nothing captured and nothing to pay for.
-///
-/// **It looks everywhere [`rewrite_command`] writes.** A gate that read only the argument list
-/// while the rewriter also handled redirections would leave `cat f | cat > {0:0}` on the concurrent
-/// path, where the rewriter never runs — the substitution would not happen, and would not say so.
-/// The two walks mirror each other and a test holds them together.
-pub fn command_uses_coordinates(command: &Command) -> bool {
-    match command {
-        // Array values but not scalars and not subscripts, mirroring `rewrite_command` exactly: a
-        // gate that claimed more would take a pipeline off the concurrent path to rewrite nothing.
-        Command::Simple(simple) => {
-            any_word(&simple.words)
-                || simple
-                    .assignments
-                    .iter()
-                    .any(|assignment| match &assignment.value {
-                        AssignmentValue::Scalar(_) => false,
-                        AssignmentValue::Array(elements) => {
-                            elements.iter().any(|element| is_one(&element.value))
-                        }
-                    })
-                || any_redirection(&simple.redirections)
-        }
-        Command::Compound { kind, redirections } => {
-            any_compound(kind) || any_redirection(redirections)
-        }
-        // Not rewritten, so not a reason to leave the concurrent path.
-        Command::FunctionDef { .. } => false,
+/// **A regex is not a word list, and it is the one operand that has to be found by position.**
+/// `syntax::brush_adapter::extended_test` keeps coordinates out of it by refusing to leave it bare
+/// — but it wraps every operand in a synthetic `DoubleQuoted` to stop `[[ ]]` field-splitting, and
+/// once double quotes started expanding, walking into that wrapper reached the regex again and ate
+/// its `{4}` quantifiers. The lowered form is `[[ left op right ]]`, so the operand after `=~` is
+/// found here and left alone.
+fn regex_operand_of_a_conditional(words: &[Word]) -> Option<usize> {
+    if only_literal(words.first()?)? != "[[" {
+        return None;
     }
+    let at = words.iter().position(|w| only_literal(w) == Some("=~"))?;
+    Some(at + 1)
 }
 
-fn is_one(word: &Word) -> bool {
-    only_literal(word).is_some_and(looks_like_a_coordinate)
-}
-
-fn any_word(words: &[Word]) -> bool {
-    words.iter().any(is_one)
-}
-
-fn any_redirection(redirections: &[Redirection]) -> bool {
-    redirections.iter().any(|redirection| {
-        is_one(&redirection.target) || redirection.heredoc_content.as_ref().is_some_and(is_one)
-    })
-}
-
-fn any_compound(kind: &CompoundCommand) -> bool {
-    match kind {
-        CompoundCommand::If {
-            condition,
-            then_branch,
-            elif_branches,
-            else_branch,
-        } => {
-            any_list(condition)
-                || any_list(then_branch)
-                || elif_branches
-                    .iter()
-                    .any(|(condition, body)| any_list(condition) || any_list(body))
-                || else_branch.as_ref().is_some_and(any_list)
-        }
-        CompoundCommand::While { condition, body } | CompoundCommand::Until { condition, body } => {
-            any_list(condition) || any_list(body)
-        }
-        CompoundCommand::For { items, body, .. } => {
-            items.as_ref().is_some_and(|items| any_word(items)) || any_list(body)
-        }
-        CompoundCommand::Case { word, items } => {
-            is_one(word)
-                || items
-                    .iter()
-                    .any(|item| any_word(&item.patterns) || any_list(&item.body))
-        }
-        CompoundCommand::ArithmeticFor { body, .. } => any_list(body),
-        CompoundCommand::Subshell(list) | CompoundCommand::Group(list) => any_list(list),
-        CompoundCommand::Arithmetic(_) => false,
-    }
-}
-
-fn any_list(list: &CommandList) -> bool {
-    list.items.iter().any(|item| {
-        any_pipeline(&item.and_or.first)
-            || item
-                .and_or
-                .rest
-                .iter()
-                .any(|(_, pipeline)| any_pipeline(pipeline))
-    })
-}
-
-/// Mirrors [`rewrite_pipeline`], including where it stops: a nested pipeline with stages of its own
-/// is not this stage's business, so finding a coordinate in one must not open the gate here.
-fn any_pipeline(pipeline: &oslo_base::ast::Pipeline) -> bool {
-    pipeline.commands.len() == 1 && pipeline.commands.iter().any(command_uses_coordinates)
-}
+mod gate;
+pub use gate::command_uses_coordinates;
 
 #[cfg(test)]
 #[path = "streams/tests.rs"]

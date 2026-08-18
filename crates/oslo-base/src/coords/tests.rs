@@ -18,6 +18,7 @@ fn the_count_of_dimensions_decides_their_meaning() {
     assert_eq!(
         parse("2"),
         Some(Coord {
+            subject: Subject::Output,
             stream: Sel::At(0),
             line: Sel::At(2),
             word: None
@@ -26,6 +27,7 @@ fn the_count_of_dimensions_decides_their_meaning() {
     assert_eq!(
         parse("0:1"),
         Some(Coord {
+            subject: Subject::Output,
             stream: Sel::At(0),
             line: Sel::At(0),
             word: Some(Sel::At(1))
@@ -34,6 +36,7 @@ fn the_count_of_dimensions_decides_their_meaning() {
     assert_eq!(
         parse("1:0:1"),
         Some(Coord {
+            subject: Subject::Output,
             stream: Sel::At(1),
             line: Sel::At(0),
             word: Some(Sel::At(1))

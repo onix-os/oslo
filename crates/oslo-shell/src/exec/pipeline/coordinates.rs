@@ -56,6 +56,20 @@ pub(super) fn uses_coordinates(pipeline: &Pipeline) -> bool {
 /// Run the stages one at a time, threading each one's output into the next.
 pub(super) fn run(env: &mut Environment, pipeline: &Pipeline) -> Result<i32> {
     let mut streams = Streams::for_this_pipeline();
+
+    // **One command is not a pipeline, and must not become one.** `super::run_byte_stages` runs a
+    // lone command with `eval_command` in *this* shell; forking it here instead made every builtin
+    // that changes the shell change a child that then exits — `declare -a b="(y{1,2})"` left `b`
+    // unset, because the word merely *looked* like it held a coordinate and that was enough to
+    // take this path. There is no upstream stage to wait for either, so there is nothing the
+    // sequential machinery below would do for it.
+    if let [only] = pipeline.commands.as_slice() {
+        let command = rewritten(only, &streams);
+        let status = eval_command(env, &command)?;
+        env.set_pipeline_status(vec![status]);
+        return Ok(status);
+    }
+
     let mut statuses = Vec::with_capacity(pipeline.commands.len());
     let mut upstream: Option<String> = None;
 
@@ -70,6 +84,10 @@ pub(super) fn run(env: &mut Environment, pipeline: &Pipeline) -> Result<i32> {
         if last {
             break;
         }
+        // Both halves of the stage, pushed together so `{0}` and `{%0}` name the same one. The
+        // words are taken from the *rewritten* command, so a stage that itself read a coordinate
+        // reports what it actually ran rather than what was typed.
+        streams.push_command(words_of(&command));
         streams.push_stage(kept.clone());
         upstream = Some(kept);
     }
@@ -91,6 +109,28 @@ fn rewritten(command: &Command, streams: &Streams) -> Command {
     let mut command = command.clone();
     streams::rewrite_command(&mut command, streams);
     command
+}
+
+/// A stage as the words it was written with, for `{%…}` to address.
+///
+/// A simple command gives its words one by one, which is the case the feature is for and the only
+/// one where a word dimension means anything. Anything else — a group, a loop — is one value: its
+/// rendered text, so `{%0}` still answers with something true and `{%0:1}` reads nothing rather
+/// than slicing a construct into pieces that were never arguments.
+///
+/// The rendering is [`super::describe`], which the job table already uses to label a job. It is
+/// deliberately approximate about quoting, and that is the right trade here too: `{%0:1}` naming
+/// the argument as typed is the whole ask, and reproducing the grammar exactly would mean a second
+/// unrunnable copy of it.
+fn words_of(command: &Command) -> Vec<String> {
+    match command {
+        Command::Simple(simple) => simple
+            .words
+            .iter()
+            .map(super::describe::describe_word)
+            .collect(),
+        other => vec![super::describe::describe_command(other)],
+    }
 }
 
 /// Run one stage: feed it `input`, and keep what it prints when `keep` is set.
