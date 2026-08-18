@@ -174,11 +174,27 @@ pub fn candidates(line: &str, pos: usize) -> Option<(usize, Vec<CompletionCandid
     let mut out = Vec::new();
 
     // Names from the Lua state itself: the globals, or the keys of the table being indexed.
+    // **The same matching the shell prompt gets.** `oslo.completion.fuzzy` used not to reach here
+    // at all, so `mth` offered nothing where `math` would have — a Lua prompt was the one place in
+    // the shell where a prefix was the only thing that could match.
+    let settings = crate::settings::current();
+    let matcher = super::matchers(settings.completion.fuzzy);
     if let Some(source) = source {
-        for (name, callable) in source(&typed.path) {
-            if !name.starts_with(&typed.stem) {
-                continue;
-            }
+        let names: Vec<(String, bool)> = source(&typed.path);
+        // Each way of matching in turn, stopping at the first that finds anything, so an exact
+        // match never arrives diluted with looser ones.
+        let matched: Vec<&(String, bool)> = matcher
+            .iter()
+            .map(|how| {
+                names
+                    .iter()
+                    .filter(|(name, _)| how.matches(name, &typed.stem))
+                    .collect::<Vec<_>>()
+            })
+            .find(|found| !found.is_empty())
+            .unwrap_or_default();
+        for (name, callable) in matched {
+            let (name, callable) = (name.clone(), *callable);
             // A method is reached with `:` and called, so it is never offered as a bare table.
             if typed.method && !callable {
                 continue;
@@ -211,6 +227,15 @@ pub fn candidates(line: &str, pos: usize) -> Option<(usize, Vec<CompletionCandid
         }
     }
 
+    // `oslo.completion.lua_sources`: drop the kinds the config did not ask for, by the name each
+    // candidate already carries. Separate from the shell's list because the two share no kind.
+    if let Some(wanted) = &settings.completion.lua_sources {
+        out.retain(|c| {
+            c.kind
+                .as_deref()
+                .is_some_and(|kind| wanted.iter().any(|w| w == kind))
+        });
+    }
     out.sort_by(|a, b| a.display.cmp(&b.display));
     out.dedup_by(|a, b| a.display == b.display);
     Some((typed.at, out))

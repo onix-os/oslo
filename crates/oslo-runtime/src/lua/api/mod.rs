@@ -186,7 +186,7 @@ pub fn install(host: &dyn Host, registry: &Registry, env: Arc<Mutex<Environment>
         complete::install(&mut completion.borrow_mut());
     }
     // `oslo.suggest.provider` — a ghost written in Lua. In the settings table for the same reason:
-    // `oslo.suggest.sources` is next to it, and the two are read together.
+    // `oslo.suggest.sh_sources` is next to it, and the two are read together.
     if let Value::Table(table) = oslo.get_str("suggest") {
         suggest::install(&mut table.borrow_mut());
     }

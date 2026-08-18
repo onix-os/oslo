@@ -2,12 +2,12 @@
 //!
 //! ```lua
 //! oslo.suggest.provider { name = "tldr", answer = function(ctx) return "…" end }
-//! oslo.suggest.sources = { "history", "provider", "predict", "path" }
+//! oslo.suggest.sh_sources = { "history", "provider", "predict", "path" }
 //! ```
 //!
 //! # A source among the sources, not a replacement for them
 //!
-//! `provider` takes its place in `oslo.suggest.sources` like the four built-in names, so where a
+//! `provider` takes its place in `oslo.suggest.sh_sources` like the four built-in names, so where a
 //! plugin's answer sits relative to your own history is one line of config and it is *your* line.
 //! VS Code has the same mechanism the other way round — `yieldsToGroupIds` is declared by the
 //! provider, so the plugin decides whether it defers to you. That is the thing worth not copying.

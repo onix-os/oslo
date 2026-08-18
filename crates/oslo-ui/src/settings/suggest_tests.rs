@@ -17,7 +17,7 @@ fn the_lua_prompt_has_its_own_sources_and_no_history() {
         "a Lua prompt is not a history prompt"
     );
     assert_eq!(
-        suggest.sources,
+        suggest.sh_sources,
         vec![Source::History, Source::Completion, Source::Path]
     );
 }

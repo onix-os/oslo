@@ -72,7 +72,20 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
             "case_sensitive",
             &mut settings.completion.case_sensitive,
         );
-        if let Value::Table(list) = table.get_str("sources") {
+        if matches!(table.get_str("sources"), Value::Table(_)) {
+            problems.push(
+                "oslo.completion.sources: renamed to sh_sources, beside lua_sources".to_string(),
+            );
+        }
+        // One kind filter per prompt: the two share no kind of candidate, so a single list could
+        // only ever be right for one of them. See `settings::Completion::lua_sources`.
+        for (field, slot) in [
+            ("sh_sources", &mut settings.completion.sh_sources),
+            ("lua_sources", &mut settings.completion.lua_sources),
+        ] {
+            let Value::Table(list) = table.get(&Value::str(field)) else {
+                continue;
+            };
             let mut kinds = Vec::new();
             for value in list.borrow().sequence() {
                 if let Value::Str(name) = value {
@@ -86,7 +99,7 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
                     }
                 }
             }
-            settings.completion.sources = Some(kinds);
+            *slot = Some(kinds);
         }
         if let Value::Str(name) = table.get_str("sort") {
             match name.as_ref() {
@@ -110,8 +123,16 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
         // Two lists, read the same way: `sources` is the shell prompt's and `lua_sources` is the
         // Lua prompt's. Separate because most of the sources answer with shell — see
         // `settings::Suggest::lua_sources`.
+        // The old spelling, reported rather than ignored. A config that still says `sources` is
+        // asking for something that no longer exists, and silence there means a shell that quietly
+        // suggests nothing — which is the failure this whole area has already produced once.
+        if matches!(table.get_str("sources"), Value::Table(_)) {
+            problems.push(
+                "oslo.suggest.sources: renamed to sh_sources, beside lua_sources".to_string(),
+            );
+        }
         for (field, slot) in [
-            ("sources", &mut settings.suggest.sources),
+            ("sh_sources", &mut settings.suggest.sh_sources),
             ("lua_sources", &mut settings.suggest.lua_sources),
         ] {
             let Value::Table(list) = table.get(&Value::str(field)) else {

@@ -225,7 +225,7 @@ impl OsloHelper {
         // `oslo.completion.sources`: drop the kinds the config did not ask for. Applied after the
         // builders rather than inside them, so a kind is filtered by the name it already carries
         // and adding a new kind needs no change here.
-        if let Some(wanted) = &crate::settings::current().completion.sources {
+        if let Some(wanted) = &crate::settings::current().completion.sh_sources {
             out.retain(|c| {
                 c.kind
                     .as_deref()

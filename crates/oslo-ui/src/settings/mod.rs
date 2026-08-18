@@ -195,11 +195,21 @@ pub struct Completion {
     pub fuzzy: Fuzzy,
     /// How candidates are ordered: by how often they are used, or by name.
     pub sort: Sort,
-    /// The kinds of candidate offered at all. `None` means every kind, which is the default.
+    /// The kinds of candidate offered at a **shell** prompt. `None` means every kind, the default.
     ///
     /// Kept as the kind strings the candidates already carry, so adding a kind does not mean
     /// touching an enum here as well.
-    pub sources: Option<Vec<String>>,
+    ///
+    /// `oslo.completion.sh_sources`, named to match [`Self::lua_sources`] and
+    /// `oslo.suggest.sh_sources`.
+    pub sh_sources: Option<Vec<String>>,
+    /// The kinds of candidate offered at a **Lua** prompt: `function`, `field`, `keyword`.
+    ///
+    /// A separate list for the same reason the suggestion sources are separate — the two prompts
+    /// do not share a single kind of candidate between them, so one filter could only ever be
+    /// wrong for one of them. A shell filter naming `file` and `option` would have silently
+    /// emptied every Lua dropdown.
+    pub lua_sources: Option<Vec<String>>,
 }
 
 /// `oslo.completion.sort`.
@@ -226,7 +236,8 @@ impl Default for Completion {
             // have already said "help me" by pressing Tab.
             fuzzy: Fuzzy::Smart,
             sort: Sort::default(),
-            sources: None,
+            sh_sources: None,
+            lua_sources: None,
         }
     }
 }
@@ -260,7 +271,7 @@ pub enum Source {
     /// Whatever a config or a plugin registered with `oslo.suggest.provider`.
     ///
     /// **A source among the sources.** Where a plugin's answer sits relative to your own history is
-    /// one line of `oslo.suggest.sources`, and it is your line — the plugin does not get to decide
+    /// one line of `oslo.suggest.sh_sources`, and it is your line — the plugin does not get to decide
     /// that it outranks what you have actually run.
     Provider,
 }
@@ -398,7 +409,10 @@ impl Default for Finder {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Suggest {
     /// The sources to try at a **shell** prompt, in order. Empty turns suggestions off entirely.
-    pub sources: Vec<Source>,
+    ///
+    /// `oslo.suggest.sh_sources`. It was `sources`, which read as "the sources" — the one list —
+    /// right up until there were two of them and the other one had to be called something else.
+    pub sh_sources: Vec<Source>,
     /// The sources to try at a **Lua** prompt.
     ///
     /// **A separate list, because a Lua prompt is not a shell prompt wearing a hat.** Three of the
@@ -436,7 +450,7 @@ impl Default for Suggest {
         // fish's order. History first because a line the user has run is a better guess than
         // anything that can be ranked.
         Suggest {
-            sources: vec![Source::History, Source::Completion, Source::Path],
+            sh_sources: vec![Source::History, Source::Completion, Source::Path],
             // The completer alone: an editor offers what exists, and at a Lua prompt that is the
             // names in the session. See the field.
             lua_sources: vec![Source::Completion],

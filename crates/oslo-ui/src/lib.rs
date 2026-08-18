@@ -203,7 +203,7 @@ impl OsloHelper {
         })
     }
 
-    /// The ghost suggestion for `line`, in `oslo.suggest.sources` order, as plain text.
+    /// The ghost suggestion for `line`, in this prompt's source order, as plain text.
     ///
     /// Only at the end of the line: a suggestion *continues* what you have typed, so offering one
     /// for a cursor sitting mid-line would be a claim about the wrong position.
@@ -220,13 +220,13 @@ impl OsloHelper {
         let recallable = !Self::consumes_its_arguments(line, &settings.suggest.skip_history);
 
         // **Each prompt has its own list**, because most sources answer with shell and cannot be
-        // typed at a Lua prompt at all. `oslo.suggest.sources` is the shell's, `lua_sources` is
+        // typed at a Lua prompt at all. `oslo.suggest.sh_sources` is the shell's, `lua_sources` is
         // Lua's, and the Lua default is `names` alone — an editor offers what exists, not what you
         // typed last week. See `settings::Suggest::lua_sources`.
         let lua = prompt::language().is_some_and(|language| language == "lua");
         let sources = match lua {
             true => &settings.suggest.lua_sources,
-            false => &settings.suggest.sources,
+            false => &settings.suggest.sh_sources,
         };
         for source in sources {
             let found = match source {

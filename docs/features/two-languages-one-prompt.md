@@ -172,7 +172,7 @@ values — `_G` is cyclic and deep-copying it to answer a Tab would be absurd.
 **Each prompt has its own suggestion sources**, and the Lua default is `names` alone:
 
 ```lua
-oslo.suggest.sources     = { "history", "completion", "path" }   -- the shell prompt
+oslo.suggest.sh_sources  = { "history", "completion", "path" }   -- the shell prompt
 oslo.suggest.lua_sources = { "completion" }                      -- the Lua prompt
 ```
 
@@ -195,8 +195,23 @@ that are shell-shaped with no Lua reading at all; listing either under `lua_sour
 nothing rather than erroring, because a filename in the middle of a Lua expression is not a
 suggestion, it is a syntax error waiting to be accepted.
 
-Tab is split the same way and more simply: a Lua line never reaches the shell completer at all, so
-`oslo.completion.sources` — which filters *kinds* — governs the shell prompt only.
+**Tab is split the same way.** A Lua line never reaches the shell completer at all, and the kind
+filter has one list per prompt, because the two share no kind of candidate between them:
+
+```lua
+oslo.completion.sh_sources  = { "command", "file", "dir" }
+oslo.completion.lua_sources = { "function", "field", "keyword" }
+```
+
+Unset means every kind, which is the default for both. A single list could only ever have been
+right for one prompt — a shell filter naming `file` and `command` silently emptied every Lua
+dropdown.
+
+Everything else on `oslo.completion` — `fuzzy`, `sort`, `case_sensitive`, `max_rows` — is about how
+matching and drawing work rather than about what a candidate *is*, so it is shared and applies to
+both. `fuzzy` in particular used not to reach the Lua prompt at all: it was the one place in the
+shell where a prefix was the only thing that could match, so `os.dfft` offered nothing where
+`os.difftime` was plainly meant.
 
 **Every `oslo` member is also a global.** `fs`, `json`, `git`, `run`, `path` and the rest need no
 prefix, and `oslo.fs` keeps working. Three rules keep that from taking anything away:
