@@ -1,0 +1,45 @@
+# A calculator that knows units, inside the shell that is already running.
+cols 100
+rows 18
+speed 0.05
+
+# Ordinary arithmetic first, so the units are clearly the addition rather than the point.
+run math '2 + 2'
+wait 1.4
+run math 'sqrt(2)'
+wait 2.0
+
+# The units come with the answer, and a conversion is checked rather than looked up.
+run math '3 km in miles'
+wait 2.2
+run math '1 day + 3 hours in minutes'
+wait 2.6
+clear
+
+# **Dimensions, not unit names.** Mass times acceleration is what it is — nothing declared a newton.
+run math '10 kg * 9.81 m/s^2'
+wait 2.8
+
+# Which is why this is a refusal rather than a number nobody could use.
+run math '3 km + 2 s'
+wait 2.2
+run math '3 km in seconds'
+wait 2.6
+clear
+
+# Division is left to right, as everywhere else — so the dimension is how you notice a misreading.
+run math -k '5 GB / 40 MB/s'
+wait 2.2
+run math -k '5 GB / (40 MB/s)'
+wait 2.2
+run math '5 GB / (40 MB/s) in minutes'
+wait 2.8
+clear
+
+# Nothing remembers anything between invocations, and it says so rather than losing the assignment.
+run math 'x = 5'
+wait 2.6
+
+# A scope that persists is a Lua object. `!` runs one Lua line from a shell prompt.
+run !s = oslo.math.session(); s:eval("rate = 40 MB/s"); print(s:eval("5 GB / rate").text)
+wait 3.0

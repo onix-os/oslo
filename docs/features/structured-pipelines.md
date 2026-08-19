@@ -168,7 +168,7 @@ Run on this branch, release build, on the machine this was written on.
 
 | what | result |
 | --- | --- |
-| `tests/posix_stays_on_the_byte_path.rs` over `tests/corpus` | 416 scripts, 0 structured edges, 5.33 s |
+| `tests/posix_stays_on_the_byte_path.rs` over `tests/corpus` | 419 scripts, 0 structured edges, 5.33 s |
 | `ls \| grep x` | 0 structured edges |
 | `df \| where 'free > 0' \| length` | 2 structured edges |
 | `cat pw.txt \| parse '{user}:{x}:{uid}:{rest}' \| where 'uid > 100' \| get user` | 2 structured edges |

@@ -1,6 +1,6 @@
 # Hooks
 
-Twenty-two moments in a shell's life that a config can attach to, from `pre-cmd` down to every
+Thirty-one moments in a shell's life that a config can attach to, from `pre-cmd` down to every
 keystroke. They exist so that a prompt integration, a `direnv` clone or a package-manager handler is
 a function in your config rather than a shell function that has to be re-sourced into every session.
 

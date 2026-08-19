@@ -18,8 +18,8 @@ in the shell.
 > make build TYPE=minimal     # no nix integration at all
 > ```
 >
-> It costs **68 KB** — 6,832,384 bytes without it against 6,902,016 with — the second-smallest of
-> the five optional features. It is off because a `/bin/sh` on a distribution has no business
+> It costs **48 KB** — 6,271,776 bytes without it against 6,320,928 with — the second-smallest of
+> the nine optional features. It is off because a `/bin/sh` on a distribution has no business
 > knowing what a flake is, not because of the size.
 >
 > Without it there is no `oslo.nix` at all, and a config asks before using it the way it asks about

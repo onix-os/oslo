@@ -81,7 +81,7 @@ Structure flows only between two stages that **both** declare they understand it
 that can carry a declaration is one oslo invented. A script written before oslo existed cannot name
 one, so every edge in it plans to bytes.
 
-That is not a promise, it is a build failure: `tests/posix_stays_on_the_byte_path.rs` runs all 416
+That is not a promise, it is a build failure: `tests/posix_stays_on_the_byte_path.rs` runs all 419
 corpus scripts and requires zero structured edges. There is no new pipe operator either — `a |> b`
 is already valid POSIX, so the operator would itself be the hazard. Design:
 `docs/features/structured-pipelines.md`.
@@ -797,7 +797,7 @@ The language is the real thing: pipelines, redirections including heredocs and h
 control flow, functions, `${var:-d}` and the rest of parameter expansion, arithmetic, globbing,
 field splitting, job control with proper process groups and `tcsetpgrp`.
 
-Correctness is measured rather than asserted. 416 scripts in `tests/corpus` run under both oslo and
+Correctness is measured rather than asserted. 419 scripts in `tests/corpus` run under both oslo and
 bash and are compared byte for byte, with known differences listed in
 `tests/differential/expected_fail.rs` as a two-way ratchet — the suite fails if a listed case starts
 passing, so a stale entry cannot survive. Unit and integration tests run alongside it.

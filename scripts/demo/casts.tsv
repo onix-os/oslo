@@ -11,6 +11,7 @@ interrupt-escape	1263434
 line-editor	1262740
 lua-interpreter	1262741
 macros	1262943
+math	1263448
 nav	1262742
 nix	1263435
 oslo	1262743

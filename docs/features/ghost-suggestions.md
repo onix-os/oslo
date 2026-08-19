@@ -2,7 +2,7 @@
 
 The grey text drawn past the cursor: what the rest of the line would be if you kept going. It exists
 so that the commands you already run are one keystroke away instead of a search, and it is built out
-of four sources you order yourself rather than one hard-wired guess.
+of five sources you order yourself rather than one hard-wired guess.
 
 <!-- demo:begin -->
 [![ghost-suggestions demo](https://asciinema.org/a/1262737.svg)](https://asciinema.org/a/1262737)
@@ -139,7 +139,7 @@ frame, since a remembered one can be stale by exactly the keystroke that accepte
 
 ## What makes it different
 
-The ghost is part of the shell rather than a layer over the line editor: four sources, ordered by
+The ghost is part of the shell rather than a layer over the line editor: five sources, ordered by
 `oslo.suggest.sh_sources`, first-answer-wins, with no plugin to install and nothing to enable.
 
 The per-language split follows from oslo reading two languages at one prompt. It is the reason the

@@ -28,7 +28,7 @@ opens the finder is unbound and does whatever it otherwise would; the `oslo.scra
 read and simply mean nothing, so one config works under both with nothing to ask.
 
 **[Directory environments](directory-environments.md) are `oslo` only**, behind the `direnv` cargo
-feature — the largest of the three at 200 KB, and off because it is the one part of the shell that
+feature — the largest of the three at 164 KB, and off because it is the one part of the shell that
 reads a file on arrival in a directory and can run what it finds there. In `oslo-minimal` `cd` is
 just `cd`, and the word `direnv` falls through to `$PATH` so the real one still works.
 
@@ -40,19 +40,23 @@ for it the way it asks about anything optional — `if oslo.nix then … end`.
 **[Plugins](plugins.md) are half `oslo`-only.** `oslo.db` — a database a config owns — and the
 `pre-cmd` veto that lets a hook decline to have a line recorded are in **both** binaries: they are
 capabilities, and a config should not have to ask whether they exist. *Installing* is behind the
-`plugin` cargo feature at 88 KB, because fetching somebody's code and deciding whether to trust it
+`plugin` cargo feature at 80 KB, because fetching somebody's code and deciding whether to trust it
 is not something a `/bin/sh` does. In `oslo-minimal` the word `plugin` falls through to `$PATH`.
 
 **[Secrets](secrets.md) are `oslo` only**, and are two cargo features rather than one. `secrets` is
 the filing — stores, names, `oslo secret run`, the lazy variable, `oslo.secret`, the hooks — at
-104 KB and one package, with no crypto of its own; `crypt` is the built-in mechanism — a sealed box,
-a key you keep and recipients you publish — at 60 KB and seventeen more. A distribution can ship the first alone and name the machine's own tool. In `oslo-minimal`
+108 KB and one package, with no crypto of its own; `crypt` is the built-in mechanism — a sealed box,
+a key you keep and recipients you publish — at 72 KB and seventeen more. A distribution can ship the first alone and name the machine's own tool. In `oslo-minimal`
 there is neither.
 
 **[Arguments in comments](argc.md) is `oslo` only**, behind the `argc` cargo feature and the largest
-of them at 308 KB — it vendors a parser and brings five crates oslo does not otherwise link. In
+of them at 300 KB — it vendors a parser and brings five crates oslo does not otherwise link. In
 `oslo-minimal` there is no `argc` builtin and no `--argc-eval`, so the word `argc` falls through to
 `$PATH` and the real one still works.
+
+**[The calculator](math.md) is `oslo` only**, behind the `math` cargo feature at 96 KB — `math '3 km
+in miles'` and `oslo.math`, with dimensions rather than a table of conversion pairs. In
+`oslo-minimal` the word `math` falls through to `$PATH`.
 
 **[Syncing](syncing.md) is in both, and carries one part fewer in `oslo-minimal`.** History and
 macros travel from either binary; secrets are behind the feature above, so a build without them has
@@ -97,12 +101,13 @@ scripts/demo/embed.sh                            # put the players back in the d
 | | |
 |---|---|
 | [The line editor](line-editor.md) | oslo owns the row it edits: buffer, layout, redraw, keymaps |
-| [Ghost suggestions](ghost-suggestions.md) | The grey continuation, and the four sources you order yourself |
+| [Ghost suggestions](ghost-suggestions.md) | The grey continuation, and the five sources you order yourself |
 | [Prediction and repair](prediction-and-repair.md) | A model of what you run: what comes next, and what you meant |
 | [Completion and matching](completion-and-matching.md) | The dropdown, and matching as a transform rather than a prefix test |
 | [Abbreviations](abbreviations.md) | `gco ` becomes `git checkout ` in the buffer, where you can see it |
 | [Macros](macros.md) | `oslo macros` — aliases, abbreviations, functions, scripts and variables, in a database with a manager |
 | [Arguments in comments](argc.md) | A script declares its options in comments and the shell parses them |
+| [A calculator that knows units](math.md) | `math '3 km in miles'` — dimensions, so `3 km + 2 s` is a refusal |
 
 ## Memory
 
