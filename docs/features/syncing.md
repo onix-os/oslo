@@ -16,6 +16,10 @@ macros    here +1 ~0 -0   there +1 ~0 -0   unchanged 0
 secrets   here +1 ~0 -0   there +1 ~0 -0   unchanged 0
 ```
 
+<!-- demo:begin -->
+[![syncing demo](https://asciinema.org/a/1263431.svg)](https://asciinema.org/a/1263431)
+<!-- demo:end -->
+
 ## Three storages, one rule
 
 The three things that travel are stored in three completely different ways. History is an

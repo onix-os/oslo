@@ -23,6 +23,10 @@ adds commands to the shell you type at — and nothing else in oslo had to chang
 > It is behind the **`plugin`** cargo feature and costs **108 KB**: 5,902,720 bytes without it
 > against 6,013,312 with. In `oslo-minimal` the word `plugin` falls through to `$PATH`.
 
+<!-- demo:begin -->
+[![plugins demo](https://asciinema.org/a/1263436.svg)](https://asciinema.org/a/1263436)
+<!-- demo:end -->
+
 ## What a plugin is
 
 A directory with a manifest and some Lua:

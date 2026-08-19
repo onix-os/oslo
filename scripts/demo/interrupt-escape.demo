@@ -1,0 +1,31 @@
+# The job that will not take a Ctrl-C, and the way out of it.
+cols 100
+rows 18
+speed 0.05
+
+# A program that catches SIGINT and carries on. Every shell hands it the terminal and waits — the
+# driver sends ^C to the *foreground* group, so the shell never sees the keystroke at all.
+run !oslo.misc.interrupt_escape = 3
+wait 1.4
+run sh -c 'trap "" INT; sleep 300'
+wait 2.0
+
+# Three presses. The first two go where they always went, and are ignored.
+key C-c
+wait 1.0
+key C-c
+wait 1.6
+key C-c
+wait 2.6
+clear
+
+# **Stopped, not killed.** It is in the job table, and every job-control verb still means what it
+# always meant — this is the ordinary `[1]+ Stopped`, the same one Ctrl-Z produces.
+run jobs
+wait 2.4
+
+# So it is still yours to deal with.
+run kill -9 %1
+wait 1.6
+run jobs
+wait 2.0

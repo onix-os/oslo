@@ -1,0 +1,44 @@
+# Asking for something: the widgets the shell already owns.
+cols 100
+rows 22
+speed 0.05
+
+# A list to pick from. The shell draws it — nothing is installed beside the shell to do this.
+run ui choose alpha beta gamma
+wait 1.8
+key Down
+wait 0.7
+key Enter
+wait 1.8
+clear
+
+# **The answer is stdout; the panel is stderr.** That is what makes the widget usable in a
+# substitution: the question is on screen while it is being asked, and only the answer is captured.
+run picked=$(ui choose alpha beta gamma)
+wait 1.6
+key Down
+wait 0.5
+key Down
+wait 0.5
+key Enter
+wait 1.2
+run echo "captured: $picked"
+wait 2.4
+clear
+
+# A yes/no, with the keys it accepts named in the legend.
+run ui confirm "deploy to production?"
+wait 2.2
+key Right
+wait 0.8
+key Enter
+wait 1.6
+clear
+
+# A spinner around a command that has nothing to say while it works.
+run ui spin --title building -- sleep 3
+wait 4.2
+
+# And the same widgets from any other shell, as a program rather than a builtin.
+run oslo userin style --border rounded --padding "1 3" "the same body, three doors"
+wait 3.0

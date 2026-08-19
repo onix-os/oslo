@@ -32,6 +32,10 @@ line after it is the part that says *why*.
 The job is **stopped, not killed**. It is in the job table, and `fg`, `bg` and `kill %1` all mean
 what they always meant.
 
+<!-- demo:begin -->
+[![interrupt-escape demo](https://asciinema.org/a/1263434.svg)](https://asciinema.org/a/1263434)
+<!-- demo:end -->
+
 ## Why the shell cannot see your Ctrl-C
 
 This is the whole design, and the rest follows from it.

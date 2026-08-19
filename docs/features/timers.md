@@ -18,6 +18,10 @@ A handle is an object: it has no keys of its own, writing a field on it is refus
 not stop the timer — which is the useful default, since `oslo.every(…)` is normally written for its
 effect and its handle thrown away.
 
+<!-- demo:begin -->
+[![timers demo](https://asciinema.org/a/1263432.svg)](https://asciinema.org/a/1263432)
+<!-- demo:end -->
+
 ## When they actually fire
 
 **Between commands, never during one, and never while you are typing.** The read loop checks what
@@ -34,11 +38,19 @@ terminal does.
 So this is the part worth reading twice:
 
 ```lua
-oslo.every(1000, function() print("tick") end)
+oslo.every(1500, function() print("tick") end)
 ```
 
-at an idle prompt **does not tick once a second**. It ticks the next time you run something. A timer
-here is for "not now" and "not on every prompt". It is not a clock.
+at an idle prompt **does** tick — four times over seven untouched seconds, measured. That is what
+the idle wake buys: the editor's read is given the nearest deadline rather than "for ever", so a
+timer set for five minutes fires in five minutes instead of waiting for the next keystroke to be
+noticed.
+
+What it still is not is a clock. A tick lands at one of the three moments the shell is holding
+nothing — top of the read loop, after a command, or an idle wake — so one that comes due *while a
+command is running* waits for it to finish, and a long command absorbs every tick that fell inside
+it rather than firing them in a burst afterwards. The promise is "close to when you asked, never in
+the middle of something", not "on the second".
 
 The alternative is a real event loop — neovim has one, and `vim.uv` timers fire whenever it turns.
 That means libuv or `tokio` inside a shell that deliberately removed `tokio`, and every Lua callback

@@ -1,0 +1,31 @@
+# Timers: the only things in oslo that mean "later".
+cols 110
+rows 18
+speed 0.05
+
+# `oslo.after` runs a function once, in milliseconds. `!` runs one Lua line from a shell prompt.
+run !oslo.after(2000, function() print("after: two seconds later") end)
+# Nothing is typed here. The prompt is idle, and the timer fires into it anyway.
+wait 3.2
+clear
+
+# `oslo.every` repeats, and answers with a handle. It ticks at an idle prompt because the editor's
+# read is given the nearest deadline rather than "for ever".
+run !beat = oslo.every(1200, function() print("tick") end)
+wait 5.0
+
+# The handle's only method. Stopping a live timer answers true; stopping a gone one answers false.
+run !print("stopped:", beat:stop())
+wait 1.4
+# And now nothing arrives, however long the prompt sits.
+wait 3.0
+clear
+
+# What it is not: a clock. A tick lands only where the shell is holding nothing, so a long command
+# absorbs every tick that fell inside it rather than firing them in a burst afterwards.
+run !beat = oslo.every(1000, function() print("tick") end)
+wait 1.4
+run sleep 5; echo the command finished
+wait 6.5
+run !beat:stop()
+wait 1.5
