@@ -12,7 +12,10 @@
 /.devbox
 /.zig-cache
 /zig-out
-/target
+# Anchored `/target` only ever matched the workspace root, so a `cargo doc` or a rust-analyzer
+# flycheck run inside `vendor/luna` left 7,000 files that `git add -A` swept into a release commit.
+# Unanchored, so it matches at any depth.
+target/
 /.venv
 /.pixi
 /.micromamba
@@ -48,6 +51,11 @@ compile_commands.json
 # `vendor/` is deliberately not listed: it is somebody else's code and is added explicitly.
 !crates/**/
 !crates/**
+
+# …but not a build directory inside one. The re-inclusion above is broad on purpose, and it undoes
+# `target/` along with everything else: four `crates/oslo-shell/target/oslo-jump*/track.db` files
+# from a test run were tracked this way. Listed after the re-inclusion, because last match wins.
+crates/**/target/
 
 # The other directories cargo builds from, so no global pattern can quietly empty one of them.
 !bench/**
