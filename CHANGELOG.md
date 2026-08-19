@@ -1,5 +1,72 @@
 # Changelog
 
+## [0.4.3] - 2026-08-19
+
+### <!-- 0 -->⛰️  Features
+
+- .. ranges words the way a coordinate does
+- A digit after ! is an event, a space means lua
+- {%n} is the stage, {n} is what it printed
+- Substitute wherever a word can appear
+- A negative stream is the previous command line
+- Run a coordinate pipeline one stage at a time
+- Rewrite a command's words from the stack
+- The stack a coordinate reads from
+- Parse and select stream coordinates
+- Paint lua as lua, and show block depth
+- A continuation marker per language
+- Oslo.term exposes negotiated capabilities
+- Sh_sources and lua_sources for ghost and tab
+- The lua prompt gets its own suggestion sources
+- Enter follows what the terminal reports
+- Ctrl+enter sends, ctrl+tab switches
+- Enter adds a line, alt+enter sends
+- Double tab is on by default
+- Ctrl+space switches language too
+- The REPL completes Lua, not shell
+- ! runs one Lua line, prefix configurable
+- A calculator with units, behind the math feature
+- The prompt evaluates expressions and shows them
+
+### <!-- 1 -->🐛 Bug Fixes
+
+- Put back the globals a row borrowed
+- A coordinate goes where a brace expands
+- A conditional agrees with test
+- Obey pipefail on the coordinate path
+- Replace every coordinate, and bound the read
+- Only adjacent parens open an arithmetic command
+- The marker sits at column zero
+- Drop the renamed-key warning
+- A leading minus is arithmetic, not a flag
+- A conversion target is a unit, not the rest
+
+### <!-- 2 -->🚜 Refactor
+
+- Drop the two env vars nobody asked for
+- One completion source, two answers
+
+### <!-- 3 -->📚 Documentation
+
+- 1611 lines down to 177, and every example run
+- Sweep every page against the binary
+- A recording for the six pages that had none
+- Embed the recording
+- A demo for the coordinate page
+- A page for stream coordinates, and the renames it exposed
+
+### <!-- 4 -->⚡ Performance
+
+- Abort on panic, now that the store cannot
+- Size over speed for ui and parser
+- Drop the regex literal accelerator
+
+### <!-- 7 -->⚙️ Miscellaneous Tasks
+
+- Refactor Nix flake to simplify and optimize
+- Drop a stray file from testing
+- One version for the whole workspace
+
 ## [0.4.2] - 2026-08-17
 
 ### <!-- 0 -->⛰️  Features
