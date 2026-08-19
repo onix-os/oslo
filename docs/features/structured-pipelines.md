@@ -46,6 +46,20 @@ byte path exactly as it always did, with stdout pointed at a pipe, and its captu
 the first tool is given — which is how `kubectl … | from json | where …` works with a program that
 knows nothing about oslo.
 
+**And it may end with them.** Where the tools stop, what they made is rendered — the transport form,
+never the drawn table — and handed to the rest of the pipeline as its standard input. That is how
+`ls | first 2 | cat` and `ps | first 3 | to json | jq .` work. A tool that *prints* rather than
+producing rows is carried the same way: whether a byte suffix exists is known before any stage runs,
+so the tool half's own stdout is captured for its duration.
+
+```
+  ps | first 3 | to json | jq .
+  └──── in this process, rows ───┘   └─ forked, on descriptors, reading what the tools wrote
+```
+
+Both halves report their own statuses, so `PIPESTATUS` and `pipefail` describe the pipeline that was
+written rather than the halves it happened to run in.
+
 The vocabulary is the whole of what can carry structure:
 
 | name | accepts | produces |
@@ -181,15 +195,11 @@ which nothing carries rows.
 
 ## What it cannot do
 
-* **A non-tool cannot follow a tool.** `df | first 1 | to json | jq .` prints the JSON to the
-  shell's own stdout and then falls back to the byte path for the whole pipeline, where `first` and
-  `to` are not commands: two `command not found` lines, and an exit status of 0. Piping oslo's own
-  stdout works — `oslo -c 'df | first 1 | to json' | jq .` — but an external stage inside a
-  structured pipeline does not.
-* **Redirections and structure do not mix.** `df | where 'free > 0' > out.txt` takes the whole
-  pipeline back to bytes, where `where` is not a command, and exits 127. Worse, when an earlier edge
-  still carries rows the redirection on a later structured stage is ignored outright:
-  `df | first 2 | to json > o.json` prints to stdout and never creates the file.
+* **A redirection in the *middle* of a pipeline takes it back to bytes.**
+  `ls | first 2 > mid.txt | cat` answers `first: command not found` and creates an empty file: the
+  planner forces text for a redirected stage that is not the last one, because nothing would apply
+  its redirection, and with no rows edge left the whole line falls to the byte path. A redirection
+  on the *last* stage is fine — `ls | first 2 | to json > o.json` writes the file.
 * **Nothing streams.** Every stage materialises the whole table, and the byte prefix is read to end
   of file into a `String` before the first tool runs. `ps | first 1` reads every process; a prefix
   that never ends never returns.

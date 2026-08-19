@@ -9,6 +9,9 @@
 //! readable as it was, and so the seam between the two is one function rather than a condition
 //! threaded through the old code. See `docs/features/structured-pipelines.md`.
 
+mod handover;
+use handover::{Printed, byte_suffix_at, hand_over, runnable_here};
+
 use super::Pipeline;
 use crate::data::{Sink, Stage};
 use crate::env::Environment;
@@ -258,7 +261,39 @@ pub(super) fn run(
         }
     };
 
+    // **Decided before any stage runs**, because a tool that *prints* — `to json` writes with
+    // `println!` and hands back no rows — would otherwise have written past the seam already. With
+    // a byte suffix coming, the tool half's stdout goes to a scratch file for its duration.
+    let mut printed = match byte_suffix_at(pipeline, start) {
+        Some(_) => Some(Printed::start()?),
+        None => None,
+    };
+
     for (i, command) in pipeline.commands.iter().enumerate().skip(start) {
+        // **Where this half stops.** A stage that is not a tool cannot run here, and what happens
+        // next depends entirely on whether anything has run yet.
+        if !runnable_here(command) {
+            return match i > start {
+                // Nothing structured has happened, so the byte path can have the whole pipeline
+                // exactly as it always did.
+                false => fallback(env, pipeline),
+                // Some of it *has* run, and falling back would run it again — `ls | first 2 | cat`
+                // executed the structured `ls`, then re-ran the whole line on the byte path where
+                // `first` is not a command: empty output, `first: command not found`, and status 0.
+                // A wrong answer that reported success, which is the failure this project opens by
+                // saying it does not have. So the rows made so far are rendered and handed to the
+                // rest of the pipeline as its standard input.
+                true => hand_over(
+                    env,
+                    pipeline,
+                    i,
+                    rows.take(),
+                    printed.take(),
+                    &mut statuses,
+                    fallback,
+                ),
+            };
+        }
         let Command::Simple(simple) = command else {
             return fallback(env, pipeline);
         };
@@ -274,10 +309,23 @@ pub(super) fn run(
         let (status, produced) =
             match crate::data::tools::run_tool(&name, &words, rows.take(), bytes.as_deref()) {
                 Some(outcome) => outcome,
-                // A stage the planner thought was a tool but which cannot run here. Falling back for
-                // the whole pipeline is the only honest answer: half of it has not run yet, so there
-                // is nothing to undo.
-                None => return fallback(env, pipeline),
+                // Registered, but it declined to run — a shape it cannot take, an argument it will
+                // not have. Same rule as above: whole pipeline back to bytes if nothing has run,
+                // hand over what there is if something has.
+                None => {
+                    return match i > start {
+                        false => fallback(env, pipeline),
+                        true => hand_over(
+                            env,
+                            pipeline,
+                            i,
+                            rows.take(),
+                            printed.take(),
+                            &mut statuses,
+                            fallback,
+                        ),
+                    };
+                }
             };
         statuses.push(status);
         rows = produced;
