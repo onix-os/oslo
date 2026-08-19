@@ -30,6 +30,11 @@ pub enum Role {
     /// A glob metacharacter: `*`, `?`, `[…]`. Lit apart from the word it sits in, because whether
     /// a word will expand is the thing you most want to know before pressing Enter.
     Glob,
+    /// A stream coordinate: `{0:1}`, `{-1:0:1}`, `{%0:0}`. Lit apart from the word it sits in for
+    /// the same reason a glob is — and for one more. `{4}` is a coordinate here and a literal
+    /// `{4}` in bash, `{1..3}` is brace expansion in both; the two are a character apart and read
+    /// identically. Colour is the only thing that can tell them apart before Enter.
+    Coordinate,
     /// A bare number: `2` in `sleep 2`, `644` in `chmod 644`.
     Number,
     /// The `NAME=` of an assignment, without the value.
@@ -227,6 +232,38 @@ fn escaped_command_len(rest: &str) -> Option<usize> {
     Some(rest.len() - after.len() + name)
 }
 
+/// Split a word around its first stream coordinate: `(before, coordinate, after)`.
+///
+/// **Parsed, not guessed**, by the same [`oslo_base::coords::parse`] the shell substitutes with —
+/// so what is lit is exactly what will be replaced. Scans forward past a brace group that is not
+/// one, so `a{b}c{0:0}` finds the coordinate rather than giving up at the first `{`.
+///
+/// **And brace expansion is asked first**, because both parsers accept `{1..3}` and only one of
+/// them gets it. Brace expansion runs on a word's source text *before* the lexer the shell uses, so
+/// in a command word `{1..3}` becomes three words and never reaches the substitution — lighting it
+/// as a coordinate would promise something that does not happen. Asking
+/// [`oslo_base::brace::expand_braces_text`] rather than re-deciding here is what keeps the two
+/// answers the same one.
+fn split_coordinate(word: &str) -> Option<(&str, &str, &str)> {
+    let mut from = 0;
+    while let Some(open) = word[from..].find('{') {
+        let open = from + open;
+        let close = open + word[open..].find('}')?;
+        let inside = &word[open + 1..close];
+        let group = &word[open..=close];
+        if oslo_base::coords::parse(inside).is_some() && !expands_as_braces(group) {
+            return Some((&word[..open], group, &word[close + 1..]));
+        }
+        from = open + 1;
+    }
+    None
+}
+
+/// Whether brace expansion would claim this group, in which case it is not a coordinate.
+fn expands_as_braces(group: &str) -> bool {
+    oslo_base::brace::expand_braces_text(group) != vec![group.to_string()]
+}
+
 /// Whether what comes next begins a word, which is what makes a `#` a comment.
 fn starts_word(spans: &[Span]) -> bool {
     match spans.last() {
@@ -252,6 +289,19 @@ fn push_word(spans: &mut Vec<Span>, word: &str) {
     }
     if !word.is_empty() && word.bytes().all(|b| b.is_ascii_digit()) {
         push(spans, word, Role::Number);
+        return;
+    }
+    // Before the glob scan, because a coordinate may hold a `*` — `{*:0}` is one coordinate and
+    // not a glob with braces round it, and lighting the `*` separately inside one would say the
+    // opposite of what is true.
+    if let Some((before, coord, after)) = split_coordinate(word) {
+        if !before.is_empty() {
+            push_word(spans, before);
+        }
+        push(spans, coord, Role::Coordinate);
+        if !after.is_empty() {
+            push_word(spans, after);
+        }
         return;
     }
     let mut at = 0;

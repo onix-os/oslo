@@ -14,6 +14,8 @@ use std::io::Write;
 mod assist;
 pub use assist::{Assist, NoAssist};
 
+mod preview;
+
 mod shortcuts;
 
 /// What a `key` hook asked the editor to do with the keystroke it just saw.

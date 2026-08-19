@@ -44,6 +44,8 @@ pub enum TokenType {
     SingleQuote,
     DoubleQuote,
     Glob,
+    /// A stream coordinate — `{0:1}`, `{%0:0}`. See `lex::Role::Coordinate`.
+    Coordinate,
     Number,
     Assignment,
     Escape,
@@ -69,6 +71,7 @@ impl TokenType {
             TokenType::Option => syntax.option,
             TokenType::Danger => syntax.danger,
             TokenType::Glob => syntax.glob,
+            TokenType::Coordinate => syntax.coordinate,
             TokenType::Number => syntax.number,
             TokenType::Assignment => syntax.assignment,
             TokenType::SingleQuote => syntax.single_quote,
@@ -188,6 +191,7 @@ pub fn classify(spans: &[Span], ctx: &Context<'_>) -> Vec<(String, TokenType)> {
                 }
             }
             Role::Glob => TokenType::Glob,
+            Role::Coordinate => TokenType::Coordinate,
             Role::Number => TokenType::Number,
             Role::Assignment => TokenType::Assignment,
             Role::SingleQuote => TokenType::SingleQuote,

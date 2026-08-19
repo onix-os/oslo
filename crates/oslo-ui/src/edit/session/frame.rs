@@ -99,10 +99,20 @@ pub(super) fn draw(
                 let safe = DisplayMap::new(&hint);
                 assist.paint_hint(safe.plain())
             })
-            // Only when there is no suggestion, which costs nothing to arrange: a continuation
-            // exists when what was typed is the *start* of something, and a repair exists when it
-            // is a near-miss of something. Drawing both would put two different futures for the
-            // same line in the same place.
+            // **One of the three, never two.** They are drawn in the same place and are three
+            // different futures for the same line: a continuation exists when what was typed is the
+            // *start* of something, a preview when it holds a coordinate, a repair when it is a
+            // near-miss of something else.
+            //
+            // The preview goes above the repair, and that order was decided by watching it:
+            // `wc -l {-1:0:1}` drew `-> wc [-9]`, a guess at a word that was not a mistake, and the
+            // preview never got a turn. A repair is a proposal about what you *meant*; a preview is
+            // a fact about what the line will do, and it only exists when there is a coordinate to
+            // be certain about. Between a guess and a fact, the fact.
+            //
+            // The preview is reached only here, in the drawing. `Bound::AcceptHint` asks
+            // `take_hint` and `take_repair` for their own text, so no key can put one in the buffer.
+            .or_else(|| coordinate(session, assist))
             .or_else(|| repair(session, assist))
             .unwrap_or_default()
     } else {
@@ -131,6 +141,20 @@ fn repair(session: &Session, assist: &mut dyn Assist) -> Option<String> {
     let fixed = assist.repair_text(&raw, session.buffer.cursor())?;
     let safe = DisplayMap::new(&fixed);
     Some(format!(" {}", assist.paint_repair(&raw, safe.plain())))
+}
+
+/// What the line's last stream coordinate will become, drawn after it as ` ↳ one.txt`.
+///
+/// The arrow rather than the repair's `->`: they sit in the same place and mean different things,
+/// and one of them can be accepted. Painted as a hint, because it is the same kind of grey
+/// not-yet-real text — see [`super::preview`] for why only the session axis can be shown.
+fn coordinate(session: &Session, assist: &mut dyn Assist) -> Option<String> {
+    let text = super::preview::preview(&session.buffer.text())?;
+    let safe = DisplayMap::new(&text);
+    Some(format!(
+        " {}",
+        assist.paint_hint(&format!("↳ {}", safe.plain()))
+    ))
 }
 
 pub(super) fn into_at(placed: &layout::Placed) -> screen::At {
