@@ -13,6 +13,8 @@
 //!
 //! The row's columns are bound as globals for the duration of the expression, so `free < 1e9`
 //! reads the way it looks. `row` is bound too, for a column whose name is not a Lua identifier.
+//! **For the duration and no longer** — whatever those names held before is put back, because a
+//! column is free to be called `type`. See [`Bound`].
 
 use crate::data::{Record, Val};
 use oslo_base::value::{Number, Table, Value};
@@ -43,12 +45,8 @@ pub fn filter(rows: &[Record], expression: &str) -> (Vec<Record>, Option<String>
     let mut failure = None;
     for row in rows {
         // The columns are visible as themselves for the length of one evaluation, so
-        // `free < 1e9` reads the way it looks.
-        let names: Vec<String> = row.columns().to_vec();
-        for (name, value) in names.iter().zip(row.values()) {
-            engine.set_global(name, to_lua(value));
-        }
-        engine.set_global("row", to_lua(&Val::Record(row.clone())));
+        // `free < 1e9` reads the way it looks. `Bound` puts back whatever they were.
+        let _bound = Bound::new(&engine, row);
 
         match engine.call_function(&compiled, Vec::new()) {
             Ok(values) => {
@@ -62,14 +60,53 @@ pub fn filter(rows: &[Record], expression: &str) -> (Vec<Record>, Option<String>
                 }
             }
         }
-
-        // Cleared again, or a column called `x` would still be a global at the next prompt.
-        for name in &names {
-            engine.set_global(name, Value::Nil);
-        }
-        engine.set_global("row", Value::Nil);
     }
     (kept, failure)
+}
+
+/// The globals a row occupies while its expression runs, put back on the way out.
+///
+/// **Restored, not cleared**, and the difference was a real bug. Setting them back to `nil`
+/// afterwards is right only if nothing was there before — and a column is free to be called `type`,
+/// which is a Lua *builtin*. `stale | where 'days > 180'` therefore left `type` nil for the rest of
+/// the session, and the next thing to call it died with "could not call a nil value" a long way
+/// from here. A user's own global goes the same way.
+///
+/// Every original is read **before** anything is set, so a column named `row` cannot save the value
+/// the column binding just wrote over it. Restoring happens in `Drop`, so an expression that fails
+/// mid-evaluation does not leave the globals it borrowed lying around.
+struct Bound<'a> {
+    engine: &'a Engine,
+    saved: Vec<(String, Value)>,
+}
+
+impl<'a> Bound<'a> {
+    fn new(engine: &'a Engine, row: &Record) -> Bound<'a> {
+        let names: Vec<String> = row
+            .columns()
+            .iter()
+            .cloned()
+            .chain(std::iter::once("row".to_string()))
+            .collect();
+        let saved: Vec<(String, Value)> = names
+            .iter()
+            .map(|name| (name.clone(), engine.global(name)))
+            .collect();
+
+        for (name, value) in row.columns().iter().zip(row.values()) {
+            engine.set_global(name, to_lua(value));
+        }
+        engine.set_global("row", to_lua(&Val::Record(row.clone())));
+        Bound { engine, saved }
+    }
+}
+
+impl Drop for Bound<'_> {
+    fn drop(&mut self) {
+        for (name, value) in self.saved.drain(..) {
+            self.engine.set_global(&name, value);
+        }
+    }
 }
 
 /// The session's engine, or a fresh one when the filter is running outside a session.
@@ -127,20 +164,12 @@ pub fn for_each(rows: &[Record], expression: &str) -> Option<String> {
 
     let mut failure = None;
     for row in rows {
-        let names: Vec<String> = row.columns().to_vec();
-        for (name, value) in names.iter().zip(row.values()) {
-            engine.set_global(name, to_lua(value));
-        }
-        engine.set_global("row", to_lua(&Val::Record(row.clone())));
+        let _bound = Bound::new(&engine, row);
         if let Err(e) = engine.call_function(&compiled, Vec::new())
             && failure.is_none()
         {
             failure = Some(format!("each: {e}"));
         }
-        for name in &names {
-            engine.set_global(name, Value::Nil);
-        }
-        engine.set_global("row", Value::Nil);
     }
     failure
 }
@@ -191,5 +220,54 @@ mod tests {
         let t = t.borrow();
         assert_eq!(as_text(&t.get_str("mount")).as_deref(), Some("/"));
         assert_eq!(as_int(&t.get_str("free")), Some(500_000_000));
+    }
+
+    /// **A filter puts back the globals it borrowed**, which is not the same as clearing them.
+    ///
+    /// A column may be called `type`, and `type` is a Lua builtin. Setting the bindings to `nil`
+    /// afterwards destroyed it for the rest of the session, and the failure surfaced far away —
+    /// `oslo.nix.inputs()` died with "could not call a nil value" only after some earlier `where`
+    /// had run over a row with a `type` column.
+    #[test]
+    fn a_filter_restores_what_it_shadowed() {
+        let engine = session_engine();
+        engine.set_global("type", Value::Str("a builtin stands here".into()));
+        engine.set_global("mine", Value::Str("a global of my own".into()));
+
+        let rows = vec![Record::from_pairs([
+            ("type", Val::Str("github".into())),
+            ("mine", Val::Str("clobbered".into())),
+            ("days", Val::Int(200)),
+        ])];
+        let (kept, failure) = filter(&rows, "days > 100");
+        assert!(failure.is_none(), "{failure:?}");
+        assert_eq!(kept.len(), 1);
+
+        assert_eq!(
+            as_text(&engine.global("type")).as_deref(),
+            Some("a builtin stands here"),
+            "the filter left `type` changed"
+        );
+        assert_eq!(
+            as_text(&engine.global("mine")).as_deref(),
+            Some("a global of my own")
+        );
+
+        // A name that was *not* there before is still not there afterwards — the original
+        // intention, which the fix must not lose.
+        assert!(matches!(engine.global("days"), Value::Nil));
+    }
+
+    /// `each` binds the same way and must put the same things back.
+    #[test]
+    fn for_each_restores_what_it_shadowed() {
+        let engine = session_engine();
+        engine.set_global("type", Value::Str("still here".into()));
+        let rows = vec![Record::from_pairs([("type", Val::Str("github".into()))])];
+        assert!(for_each(&rows, "local _ = type").is_none());
+        assert_eq!(
+            as_text(&engine.global("type")).as_deref(),
+            Some("still here")
+        );
     }
 }
