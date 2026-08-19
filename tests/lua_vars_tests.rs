@@ -100,6 +100,14 @@ fn a_non_string_global_stays_in_lua() {
 }
 
 /// A name lives in exactly one of the two homes, so changing its type moves it.
+///
+/// **Both directions.** Going *to* a table always worked; coming back did not — a name that had
+/// held a non-string was in `_G` from then on, and `__newindex`, the only thing that sends a
+/// string to the shell, does not fire for a name `_G` already has. `x = {}` then `x = "s"` left
+/// `$x` unset, and that was written down in two places as a divergence oslo lived with.
+///
+/// It lives with it no longer: a script's tables are kept *beside* `_G` rather than in it, so the
+/// name never lands there and the metamethod keeps firing. See `crates/oslo-luavm/src/globals.rs`.
 #[test]
 fn a_name_that_changes_type_moves_rather_than_leaving_a_copy() {
     let out = lua(r#"
@@ -115,6 +123,43 @@ fn a_name_that_changes_type_moves_rather_than_leaving_a_copy() {
         out,
         "a string\tstring\nnil\ttable\nback to a string\tstring"
     );
+}
+
+/// The same round trip through a function, which is the other thing a shell variable cannot hold.
+#[test]
+fn a_function_global_gives_the_name_back_when_it_becomes_a_string() {
+    let out = lua(r#"
+        f = function() return 7 end
+        print(f(), oslo.env.get("f"))
+        f = "now a string"
+        print(oslo.env.get("f"), type(f))
+        f = nil
+        print(oslo.env.get("f"), type(f))
+    "#);
+    assert_eq!(out, "7\tnil\nnow a string\tstring\nnil\tnil");
+}
+
+/// **What keeping them beside `_G` costs**, pinned so it is a decision rather than a surprise.
+///
+/// A script's own globals are not raw-visible: `rawget` and `pairs` go straight to the table and
+/// there is no `__pairs` in Lua 5.4 to intercept them. The standard library is unaffected — those
+/// names really are in `_G` — and nothing in oslo enumerates `_G`, which is the reason this is the
+/// cheaper half of the trade. See the module docs in `crates/oslo-luavm/src/globals.rs`.
+#[test]
+fn a_script_global_is_reachable_but_not_raw_visible() {
+    let out = lua(r#"
+        held = {1}
+        -- Ordinary reads find it, through the metatable.
+        print("read", held[1], _G.held[1])
+        -- Raw ones do not, and neither does walking _G.
+        print("raw", rawget(_G, "held"))
+        local seen = false
+        for name in pairs(_G) do if name == "held" then seen = true end end
+        print("walked", seen)
+        -- The standard library is still exactly where Lua expects it.
+        print("stdlib", rawget(_G, "print") ~= nil)
+    "#);
+    assert_eq!(out, "read\t1\t1\nraw\tnil\nwalked\tfalse\nstdlib\ttrue");
 }
 
 #[test]

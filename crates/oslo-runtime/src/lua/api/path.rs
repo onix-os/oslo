@@ -6,12 +6,12 @@
 //! That is why these return plain values while `oslo.fs` returns `nil, message`.
 //!
 //! Paths are byte strings in the kernel and `String`s here, which is the same compromise
-//! [`oslo_lua::value::Value`] makes everywhere. A filename that is not valid UTF-8 is
+//! [`oslo_base::value::Value`] makes everywhere. A filename that is not valid UTF-8 is
 //! rare and survives round-tripping through the shell; it does not survive this API, and that is
 //! recorded rather than hidden.
 
 use super::util::{list, put, text};
-use oslo_lua::value::{Table, Value};
+use oslo_base::value::{Table, Value};
 use std::path::{Component, Path, PathBuf};
 
 pub fn build() -> Value {
@@ -159,7 +159,7 @@ fn normalize(path: &Path) -> String {
 }
 
 /// Expand a leading `~` from `$HOME`.
-fn expand_tilde(path: &str) -> String {
+pub(super) fn expand_tilde(path: &str) -> String {
     let Some(rest) = path.strip_prefix('~') else {
         return path.to_string();
     };

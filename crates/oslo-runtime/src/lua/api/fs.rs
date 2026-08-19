@@ -8,12 +8,16 @@
 //! directory is not readable — so every call answers `nil, message` rather than raising. See
 //! [`super::util::failed`].
 
-use super::util::{failed, int, list, ok, opt_text, put, record, text};
-use oslo_lua::value::{Table, Value};
+use super::util::{
+    failed, failed_between, failed_path, int, list, ok, opt_text, put, raw, record, text,
+};
+use oslo_base::value::{Table, Value};
 use std::fs;
 use std::os::unix::fs::{MetadataExt, PermissionsExt};
 use std::path::Path;
 use std::time::UNIX_EPOCH;
+
+mod handles;
 
 pub fn build() -> Value {
     let mut it = Table::new();
@@ -22,6 +26,8 @@ pub fn build() -> Value {
     writing(&mut it);
     listing(&mut it);
     metadata(&mut it);
+    // Being told about a change rather than asking. See [`super::watch`].
+    super::watch::install(&mut it);
 
     Value::table(it)
 }
@@ -31,33 +37,25 @@ fn reading(it: &mut Table) {
     put(it, "read", |_, args| {
         let path = text(&args, 1, "oslo.fs.read")?;
         match fs::read(&path) {
-            // Lossy rather than refusing: a shell reads config files and log files, and one stray
-            // byte in a mostly-text file should not make the whole thing unreadable. A caller who
-            // needs the bytes exactly is reading something this API is the wrong tool for.
-            Ok(bytes) => ok(Value::str(String::from_utf8_lossy(&bytes))),
-            Err(e) => failed(&path, e),
+            // **The bytes, exactly.** This went through `String::from_utf8_lossy` until Lua
+            // strings could be bytes at oslo`s end too, so reading a PNG answered a PNG with every
+            // non-text byte replaced by `U+FFFD` — a read that looked like it had worked. Text is
+            // still text; only what was never text is now itself. See `oslo_base::value::Value`.
+            Ok(bytes) => ok(Value::bytes(&bytes)),
+            Err(e) => failed_path(&path, &e),
         }
     });
 
-    // oslo.fs.lines(path) -> {"first", "second", ...}
+    // oslo.fs.lines(path) -> an iterator over the file's lines
     //
-    // Reads the whole file. Streaming would need an iterator holding an open descriptor across
-    // Lua calls, and this evaluator has no `__close` to shut one; the honest version comes with
-    // `oslo.lines`, which is a live command's output rather than a file.
+    // **The descriptor stays open between calls**, which is what makes this the right way to read
+    // a log. It used to read the whole file and answer a table, because there was no `__close` to
+    // shut a held descriptor with; there is one now.
     put(it, "lines", |_, args| {
         let path = text(&args, 1, "oslo.fs.lines")?;
-        match fs::read(&path) {
-            Ok(bytes) => {
-                let content = String::from_utf8_lossy(&bytes);
-                // A trailing newline ends the last line rather than starting an empty one, which
-                // is what `wc -l` counts and what a caller means by "the lines of this file".
-                let body = content.strip_suffix('\n').unwrap_or(&content);
-                if body.is_empty() {
-                    return ok(list([]));
-                }
-                ok(list(body.split('\n').map(Value::str)))
-            }
-            Err(e) => failed(&path, e),
+        match fs::File::open(&path) {
+            Ok(file) => ok(handles::reader(std::io::BufReader::new(file))),
+            Err(e) => failed_path(&path, &e),
         }
     });
 
@@ -73,21 +71,21 @@ fn writing(it: &mut Table) {
     // oslo.fs.write(path, contents) -> true, or nil + message
     put(it, "write", |_, args| {
         let path = text(&args, 1, "oslo.fs.write")?;
-        let contents = text(&args, 2, "oslo.fs.write")?;
+        let contents = raw(&args, 2, "oslo.fs.write")?;
         match fs::write(&path, contents) {
             Ok(()) => ok(Value::Bool(true)),
-            Err(e) => failed(&path, e),
+            Err(e) => failed_path(&path, &e),
         }
     });
 
     put(it, "append", |_, args| {
         use std::io::Write;
         let path = text(&args, 1, "oslo.fs.append")?;
-        let contents = text(&args, 2, "oslo.fs.append")?;
+        let contents = raw(&args, 2, "oslo.fs.append")?;
         let opened = fs::OpenOptions::new().create(true).append(true).open(&path);
-        match opened.and_then(|mut f| f.write_all(contents.as_bytes())) {
+        match opened.and_then(|mut f| f.write_all(&contents)) {
             Ok(()) => ok(Value::Bool(true)),
-            Err(e) => failed(&path, e),
+            Err(e) => failed_path(&path, &e),
         }
     });
 
@@ -100,17 +98,17 @@ fn writing(it: &mut Table) {
         let path = text(&args, 1, "oslo.fs.mkdir")?;
         match fs::create_dir_all(&path) {
             Ok(()) => ok(Value::Bool(true)),
-            Err(e) => failed(&path, e),
+            Err(e) => failed_path(&path, &e),
         }
     });
 
     // oslo.fs.remove(path, recursive)
     put(it, "remove", |_, args| {
         let path = text(&args, 1, "oslo.fs.remove")?;
-        let recursive = args.get(1).is_some_and(oslo_lua::Value::truthy);
+        let recursive = args.get(1).is_some_and(Value::truthy);
         let meta = match fs::symlink_metadata(&path) {
             Ok(meta) => meta,
-            Err(e) => return failed(&path, e),
+            Err(e) => return failed_path(&path, &e),
         };
         // A symlink is removed as a link, never followed — deleting what a link points at when
         // asked to delete the link is how a cleanup script destroys someone's home directory.
@@ -123,7 +121,7 @@ fn writing(it: &mut Table) {
         };
         match removed {
             Ok(()) => ok(Value::Bool(true)),
-            Err(e) => failed(&path, e),
+            Err(e) => failed_path(&path, &e),
         }
     });
 
@@ -132,7 +130,7 @@ fn writing(it: &mut Table) {
         let to = text(&args, 2, "oslo.fs.rename")?;
         match fs::rename(&from, &to) {
             Ok(()) => ok(Value::Bool(true)),
-            Err(e) => failed(&format!("{from} -> {to}"), e),
+            Err(e) => failed_between(&from, &to, &e),
         }
     });
 
@@ -141,7 +139,7 @@ fn writing(it: &mut Table) {
         let to = text(&args, 2, "oslo.fs.copy")?;
         match fs::copy(&from, &to) {
             Ok(bytes) => ok(Value::int(bytes as i64)),
-            Err(e) => failed(&format!("{from} -> {to}"), e),
+            Err(e) => failed_between(&from, &to, &e),
         }
     });
 
@@ -150,7 +148,7 @@ fn writing(it: &mut Table) {
         let link = text(&args, 2, "oslo.fs.symlink")?;
         match std::os::unix::fs::symlink(&target, &link) {
             Ok(()) => ok(Value::Bool(true)),
-            Err(e) => failed(&link, e),
+            Err(e) => failed_path(&link, &e),
         }
     });
 
@@ -160,7 +158,26 @@ fn writing(it: &mut Table) {
         let mode = int(&args, 2, "oslo.fs.chmod")?;
         match fs::set_permissions(&path, fs::Permissions::from_mode(mode as u32)) {
             Ok(()) => ok(Value::Bool(true)),
-            Err(e) => failed(&path, e),
+            Err(e) => failed_path(&path, &e),
+        }
+    });
+
+    // oslo.fs.touch(path) -> true, or nil + message
+    //
+    // Creates the file when it is not there, and moves its timestamps to now when it is — the two
+    // halves of what `touch` means, and neither is one line of the rest of this module. Written by
+    // hand it is `oslo.fs.exists` then `oslo.fs.append(path, "")`, which creates the file but
+    // leaves the timestamp of an existing one alone: the half people actually wanted.
+    put(it, "touch", |_, args| {
+        let path = text(&args, 1, "oslo.fs.touch")?;
+        let opened = fs::OpenOptions::new()
+            .write(true)
+            .create(true)
+            .truncate(false)
+            .open(&path);
+        match opened.and_then(|file| file.set_modified(std::time::SystemTime::now())) {
+            Ok(()) => ok(Value::Bool(true)),
+            Err(e) => failed_path(&path, &e),
         }
     });
 
@@ -176,10 +193,20 @@ fn writing(it: &mut Table) {
         }
     });
 
+    // oslo.fs.mktempdir(prefix) -> a handle on a directory that did not exist a moment ago
+    //
+    // **A handle rather than a path, because a temporary directory is the one thing in `oslo.fs`
+    // with a lifetime.** Every other call here acts on a path somebody else owns; this one *makes*
+    // something, and until there was `<close>` there was nowhere to say when it should go:
+    //
+    //     local tmp <close> = oslo.fs.mktempdir()
+    //     oslo.fs.write(tmp.path .. "/notes", body)
+    //
+    // `tostring(tmp)` is the path, so a handle reads as one wherever a message wants it.
     put(it, "mktempdir", |_, args| {
         let prefix = opt_text(&args, 1, "oslo.fs.mktempdir")?.unwrap_or_else(|| "oslo".to_string());
         match unique_temp(&prefix, true) {
-            Ok(path) => ok(Value::str(path)),
+            Ok(path) => ok(handles::tempdir(path)),
             Err(e) => failed("mktempdir", e),
         }
     });
@@ -194,7 +221,7 @@ fn listing(it: &mut Table) {
         let dir = opt_text(&args, 1, "oslo.fs.ls")?.unwrap_or_else(|| ".".to_string());
         let read = match fs::read_dir(&dir) {
             Ok(read) => read,
-            Err(e) => return failed(&dir, e),
+            Err(e) => return failed_path(&dir, &e),
         };
         let mut entries: Vec<(String, Value)> = Vec::new();
         for entry in read.flatten() {
@@ -211,21 +238,84 @@ fn listing(it: &mut Table) {
         ok(list(entries.into_iter().map(|(_, v)| v)))
     });
 
-    // oslo.fs.walk(dir) -> every path under `dir`, depth first, directories before their contents
+    // oslo.fs.walk(dir) -> an iterator over every path under `dir`, depth first, directories
+    // before their contents
+    //
+    // **Lazy, because a tree has no size you can promise.** The table this used to answer was the
+    // whole of `/nix/store` before the first line of the loop ran; the iterator opens one directory
+    // at a time and stops the moment the loop does.
     //
     // Symlinks are not followed. A link back up the tree is what turns "walk this directory" into
     // an infinite loop, and a script written against a tree it does not control will meet one.
     put(it, "walk", |_, args| {
         let root = opt_text(&args, 1, "oslo.fs.walk")?.unwrap_or_else(|| ".".to_string());
-        let mut found = Vec::new();
-        if let Err(e) = walk(Path::new(&root), &mut found) {
-            return failed(&root, e);
+        match fs::read_dir(&root) {
+            Ok(reading) => ok(handles::walker(reading)),
+            Err(e) => failed_path(&root, &e),
         }
-        ok(list(found.into_iter().map(Value::str)))
     });
 
     // oslo.fs.glob(pattern) — the shell's own globber, so the two languages agree about what
     // `*.conf` means down to the last edge case.
+    // oslo.fs.usage(dir) -> { bytes = …, files = …, dirs = … }, or nil + message
+    //
+    // **What `du -s` answers, and for the same reason it exists as a command**: adding up a tree is
+    // a loop nobody wants to write twice, and writing it over `oslo.fs.walk` in Lua costs a
+    // `stat` call *and* a boundary crossing per file. Symlinks are counted as links and never
+    // followed, so a link back up the tree cannot make the total infinite.
+    //
+    // `bytes` is the sum of file sizes, not blocks — the number `ls` shows, not the one `du`
+    // does. Those differ by the filesystem's allocation, and the question a script asks is almost
+    // always "how much is this", not "how much does it cost my disk".
+    //
+    // **A subdirectory it cannot read is counted rather than fatal**, so `usage("/etc")` answers
+    // for somebody who is not root. `unreadable == 0` means the total is everything; anything
+    // else means it is a floor. The root not being there is still `nil` — that is a mistake in
+    // the call rather than something met while walking.
+    put(it, "usage", |_, args| {
+        let root = text(&args, 1, "oslo.fs.usage")?;
+        let mut total = Usage::default();
+        if let Err(e) = measure(Path::new(&root), &mut total) {
+            return failed_path(&root, &e);
+        }
+        ok(record(vec![
+            ("bytes", Value::int(total.bytes as i64)),
+            ("files", Value::int(total.files as i64)),
+            ("dirs", Value::int(total.dirs as i64)),
+            ("unreadable", Value::int(total.unreadable as i64)),
+        ]))
+    });
+
+    // oslo.fs.disk(path) -> { total, free, available, files, files_free }, or nil + message
+    //
+    // **What `df` answers, for the filesystem `path` is on** — not for `path` itself. Any path on
+    // the mount does, so `oslo.fs.disk(".")` is the usual call and `oslo.fs.disk("/")` is the one
+    // people write first.
+    //
+    // `free` and `available` differ, and the difference is the point: a filesystem reserves a
+    // percentage for root, so `available` is what *you* may write and `free` is what exists. `df`
+    // shows the first and calls it "Avail"; a script checking whether it can save something wants
+    // that one.
+    put(it, "disk", |_, args| {
+        let path = text(&args, 1, "oslo.fs.disk")?;
+        let stats = match nix::sys::statvfs::statvfs(path.as_str()) {
+            Ok(stats) => stats,
+            Err(e) => return failed_path(&path, &std::io::Error::from(e)),
+        };
+        // `fragment_size` rather than `block_size`: the block counts are in fragments, and the two
+        // are equal on every filesystem anybody uses — which is exactly why using the wrong one is
+        // a bug that never shows up until it does.
+        let unit = stats.fragment_size() as u64;
+        let bytes = |blocks: u64| Value::int(blocks.saturating_mul(unit) as i64);
+        ok(record(vec![
+            ("total", bytes(stats.blocks())),
+            ("free", bytes(stats.blocks_free())),
+            ("available", bytes(stats.blocks_available())),
+            ("files", Value::int(stats.files() as i64)),
+            ("files_free", Value::int(stats.files_free() as i64)),
+        ]))
+    });
+
     put(it, "glob", |_, args| {
         let pattern = text(&args, 1, "oslo.fs.glob")?;
         let field = [oslo_shell::expand::Run::new(
@@ -256,7 +346,7 @@ fn metadata(it: &mut Table) {
                     .unwrap_or_else(|| path.clone());
                 ok(describe(&name, &meta))
             }
-            Err(e) => failed(&path, e),
+            Err(e) => failed_path(&path, &e),
         }
     });
 
@@ -264,7 +354,7 @@ fn metadata(it: &mut Table) {
         let path = text(&args, 1, "oslo.fs.realpath")?;
         match fs::canonicalize(&path) {
             Ok(resolved) => ok(Value::str(resolved.to_string_lossy())),
-            Err(e) => failed(&path, e),
+            Err(e) => failed_path(&path, &e),
         }
     });
 
@@ -272,7 +362,7 @@ fn metadata(it: &mut Table) {
         let path = text(&args, 1, "oslo.fs.readlink")?;
         match fs::read_link(&path) {
             Ok(target) => ok(Value::str(target.to_string_lossy())),
-            Err(e) => failed(&path, e),
+            Err(e) => failed_path(&path, &e),
         }
     });
 
@@ -320,16 +410,54 @@ fn seconds(meta: &fs::Metadata) -> i64 {
         .unwrap_or(0)
 }
 
-/// Collect every path under `root`, depth first.
-fn walk(root: &Path, found: &mut Vec<String>) -> std::io::Result<()> {
-    for entry in fs::read_dir(root)? {
-        let entry = entry?;
-        let path = entry.path();
-        found.push(path.to_string_lossy().into_owned());
-        // `symlink_metadata`, so a symlink to a parent directory is listed and not descended
-        // into. Following it is how a walk never finishes.
-        if entry.path().symlink_metadata()?.is_dir() {
-            walk(&path, found)?;
+/// What a tree adds up to. See `oslo.fs.usage`.
+#[derive(Default)]
+struct Usage {
+    bytes: u64,
+    files: usize,
+    dirs: usize,
+    /// How many directories could not be read, and so are not in the total.
+    unreadable: usize,
+}
+
+/// Add `root` and everything under it into `total`.
+///
+/// **An explicit stack rather than recursion**, so a deep tree cannot take the shell down with a
+/// stack overflow — a directory nobody controls is exactly where one would come from.
+///
+/// `symlink_metadata`, so a link is counted as the link it is and never followed. Following one is
+/// how a walk of a tree containing a link to its own parent never finishes.
+///
+/// # A directory it cannot read is counted, not fatal
+///
+/// The first version stopped on the first `EACCES`, which made `usage("/etc")` answer `nil` for
+/// anybody who is not root — one unreadable subdirectory losing the whole total. `du` warns and
+/// carries on, and that is the right shape; the only thing wrong with it is that a caller cannot
+/// tell a complete answer from a partial one afterwards. So the skipped directories are *counted*:
+/// `unreadable == 0` means the total is everything, and anything else means it is a floor.
+///
+/// The root itself is different, and stays fatal — see `oslo.fs.usage`. "That directory is not
+/// there" is a mistake in the call, not a thing found while walking.
+fn measure(root: &Path, total: &mut Usage) -> std::io::Result<()> {
+    let mut pending = vec![root.to_path_buf()];
+    // Read once here rather than inside the loop, so the root's own failure reaches the caller.
+    let mut first = Some(fs::read_dir(root)?);
+    while let Some(dir) = pending.pop() {
+        let Some(listing) = first.take().or_else(|| fs::read_dir(&dir).ok()) else {
+            total.unreadable += 1;
+            continue;
+        };
+        for entry in listing.flatten() {
+            let Ok(meta) = entry.path().symlink_metadata() else {
+                continue;
+            };
+            if meta.is_dir() {
+                total.dirs += 1;
+                pending.push(entry.path());
+            } else {
+                total.files += 1;
+                total.bytes += meta.len();
+            }
         }
     }
     Ok(())

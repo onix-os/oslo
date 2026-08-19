@@ -10,7 +10,7 @@
 
 mod assign;
 mod autocd;
-mod autoload;
+pub(crate) mod autoload;
 mod declare;
 /// `\command` and `\\command`, which decide how much of the shell a name skips past.
 mod escape;
@@ -64,7 +64,7 @@ fn eval_simple_command_inner(env: &mut Environment, simple: &SimpleCommand) -> R
     let mut backslashes = 0;
     if let Some(first) = rest.next() {
         (escape, backslashes) = escape::intent(first, env.interactive());
-        words.extend(expand_word(env, first)?);
+        words.extend(crate::expand::expand_command_word(env, first)?);
     }
 
     if words.is_empty() {
@@ -133,13 +133,54 @@ fn eval_simple_command_inner(env: &mut Environment, simple: &SimpleCommand) -> R
         return run_command_word(env, &cmd_name, &words, &simple.redirections, escape);
     }
 
+    // **A here-document is expanded without the prefix assignments in scope**, which is what bash
+    // and dash both do:
+    //
+    // ```text
+    // x=1 cat <<EOF     bash, dash: []
+    // [$x]              oslo, before this: [1]
+    // EOF
+    // ```
+    //
+    // The body used to be expanded down in `redirect::apply`, which runs after the scope below is
+    // pushed — so the document saw a variable that belongs to the command's environment and not to
+    // the shell's. Expanded here instead, and carried down as a literal: the parser already uses
+    // that shape for a quoted delimiter, so nothing expands it a second time.
+    let redirections = heredocs_expanded(env, &simple.redirections)?;
+
     env.push_scope();
     for (name, value) in &prefix_assignments {
         env.set_local_exported_var(name, value);
     }
-    let result = run_command_word(env, &cmd_name, &words, &simple.redirections, escape);
+    let result = run_command_word(env, &cmd_name, &words, &redirections, escape);
     env.pop_scope();
     result
+}
+
+/// The redirections with every here-document body already expanded.
+///
+/// Only the bodies: a redirection *target* is expanded by `redirect::apply` at the moment it is
+/// opened, and bash expands that one with the assignments in scope — `x=/tmp/f x=1 cat > $x` is
+/// not a case anybody writes, but the two halves genuinely differ and following bash on each is
+/// cheaper than explaining a rule of our own.
+fn heredocs_expanded(
+    env: &mut Environment,
+    redirections: &[Redirection],
+) -> Result<Vec<Redirection>> {
+    let mut out = Vec::with_capacity(redirections.len());
+    for redir in redirections {
+        let mut redir = redir.clone();
+        if matches!(
+            redir.kind,
+            RedirectKind::Heredoc | RedirectKind::HeredocStrip
+        ) && let Some(word) = &redir.heredoc_content
+        {
+            let text = expand_word_to_string(env, word)?;
+            redir.heredoc_content = Some(Word::from_literal(&text));
+        }
+        out.push(redir);
+    }
+    Ok(out)
 }
 
 /// Run a command that has no command word: `x=1`, or `x=1 $empty`.
@@ -267,7 +308,7 @@ fn run_builtin(
         RedirectGuard::new()
     };
     if let Err(e) = guard.apply(env, redirections) {
-        return posix::redirect_failure(env, name, report_redirect_failure(&e));
+        return posix::redirect_failure(env, name, report_redirect_failure(&env.origin(), &e));
     }
     let result = execute_builtin(env, name, words);
     posix::resolve_builtin_result(env, name, result)
@@ -392,14 +433,18 @@ fn nothing_to_run(
     // function; here it is a hook.
     if let Some(status) = oslo_base::hooks::ask_hook_here(
         oslo_base::hooks::at::COMMAND_NOT_FOUND,
-        vec![oslo_lua::value::Value::str(cmd_name)],
+        vec![oslo_base::value::Value::str(cmd_name)],
     ) {
         return Ok(status);
     }
     // Nobody handled it, so say what a person needs next: the name that was probably meant. Only
     // when the shell is interactive — a script's stderr is read by machines, and bash says exactly
     // "command not found" there.
-    let hint = if env.interactive() {
+    //
+    // **Not for a word starting with `@`.** That position is reserved and `@name` does not expand
+    // there, so there is no command it could have been meant to be: `@proj` was answered with
+    // "did you mean gprof?", which is a guess about a word the shell has decided not to read.
+    let hint = if env.interactive() && !cmd_name.starts_with('@') {
         let path = env.get_var("PATH").unwrap_or_default().to_string();
         oslo_ui::command_index::nearest(&path, cmd_name)
     } else {
@@ -430,9 +475,9 @@ fn report_unrunnable(
     if let Err(e) = guard.apply(env, redirections) {
         // The redirection failed too. That is the failure the user has to fix first, and it is
         // the one bash reports here as well.
-        return Ok(report_redirect_failure(&e));
+        return Ok(report_redirect_failure(&env.origin(), &e));
     }
-    eprintln!("oslo: {}: {}", cmd_name, reason);
+    eprintln!("{}{}: {}", env.origin(), cmd_name, reason);
     Ok(status)
 }
 
@@ -450,7 +495,7 @@ fn call_function(
     if let Err(e) = guard.apply(env, redirections) {
         // The body does not run at all: `f < /nonexistent` is a failed command, not a call whose
         // stdin happens to be the shell's.
-        return Ok(report_redirect_failure(&e));
+        return Ok(report_redirect_failure(&env.origin(), &e));
     }
 
     let old_pos = env.swap_positional(words[1..].to_vec());
@@ -478,8 +523,8 @@ fn call_function(
 /// decides whether the shell survives it. Callers on a path that cannot be a special builtin —
 /// a function, a compound, an external command, a command word with no builtin behind it — use
 /// this answer directly, because for them the question never arises.
-pub(crate) fn report_redirect_failure(err: &ShellError) -> i32 {
-    eprintln!("oslo: {}", err);
+pub(crate) fn report_redirect_failure(origin: &str, err: &ShellError) -> i32 {
+    eprintln!("{origin}{err}");
     1
 }
 
@@ -495,7 +540,7 @@ fn apply_wordless_redirections(env: &mut Environment, redirections: &[Redirectio
     let mut guard = RedirectGuard::new();
     match guard.apply(env, redirections) {
         Ok(()) => 0,
-        Err(e) => report_redirect_failure(&e),
+        Err(e) => report_redirect_failure(&env.origin(), &e),
     }
 }
 

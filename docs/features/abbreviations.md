@@ -137,7 +137,7 @@ At the prompt, where it is the shorter thing to type:
 ```sh
 abbr gco 'git checkout'                          # define
 abbr gc 'git commit -m "%"'                      # % is where the cursor lands
-abbr --anywhere brc '~/.config/oslo/config.lua'  # fires in any word, not just a command
+abbr --anywhere brc '~/.config/oslo/init.lua'  # fires in any word, not just a command
 abbr                                             # list, sorted, in a form you can paste
 abbr -e gco                                      # remove (--erase also works)
 ```
@@ -147,7 +147,7 @@ In the config, for the ones you want every session:
 ```lua
 oslo.abbr.gco = "git checkout"
 oslo.abbr.gc  = 'git commit -m "%"'
-oslo.abbr.brc = { "~/.config/oslo/config.lua", anywhere = true }
+oslo.abbr.brc = { "~/.config/oslo/init.lua", anywhere = true }
 oslo.abbr.tmp = { expansion = "/tmp" }
 ```
 

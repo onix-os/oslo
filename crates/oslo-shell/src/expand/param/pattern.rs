@@ -223,7 +223,7 @@ mod tests {
     #[test]
     fn a_quoted_metacharacter_is_a_character() {
         use crate::expand::word::{Origin, Run};
-        let literal = ShellPattern::from_runs(&[Run::new("a*", Origin::Quoted)]);
+        let literal = crate::expand::glob::pattern_from_runs(&[Run::new("a*", Origin::Quoted)]);
         assert_eq!(remove_prefix("a*c", &literal, false), "c");
         assert_eq!(remove_prefix("axc", &literal, false), "axc");
     }

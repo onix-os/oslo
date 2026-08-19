@@ -20,7 +20,7 @@ fn at(rows: usize, cursor_row: usize, cursor_col: usize) -> At {
 fn the_first_draw_does_not_move_up() {
     let out = redraw(0, "$ ls", at(1, 0, 4));
     assert!(!out.contains("\x1b[0A"), "a zero-row move: {out:?}");
-    assert!(out.starts_with("\r\x1b[J"), "{out:?}");
+    assert!(out.starts_with("\r\x1b[K"), "{out:?}");
     assert!(out.contains("$ ls"));
     assert!(out.ends_with("\r\x1b[4C"), "{out:?}");
 }
@@ -40,7 +40,29 @@ fn the_erase_happens_before_anything_is_drawn() {
 #[test]
 fn a_redraw_returns_to_the_top_of_the_block() {
     let out = redraw(2, "frame", at(3, 1, 5));
-    assert!(out.starts_with("\x1b[2A\r\x1b[J"), "{out:?}");
+    assert!(out.starts_with("\x1b[2A\r\x1b[K"), "{out:?}");
+}
+
+/// **The erase never begins at the screen's own origin.**
+///
+/// `ESC[J` from row 0, column 0 is an erase of the whole screen, and a terminal that keeps
+/// scrollback moves what was visible into history before clearing it — so every keystroke after a
+/// `Ctrl-L` pushed another copy of the half-typed prompt into the buffer. Ten keystrokes, ten
+/// lines, measured in tmux. The row this erases from is stepped down to first, which is the same
+/// idiom `paint.rs` and `dropdown` already use.
+#[test]
+fn the_erase_never_starts_at_the_screen_origin() {
+    let out = redraw(0, "$ ls", at(1, 0, 4));
+    let erase = out.find("\x1b[J").expect("erases");
+    let down = out.find("\x1b[B").expect("steps down before erasing");
+    assert!(
+        down < erase,
+        "the erase-to-end runs before stepping off row zero: {out:?}"
+    );
+    assert!(
+        out[..erase].ends_with("\x1b[B\r"),
+        "the erase must run from column zero of the row below: {out:?}"
+    );
 }
 
 /// The cursor is placed by walking up from the *last* row, because that is where writing the

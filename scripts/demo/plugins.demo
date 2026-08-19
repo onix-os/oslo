@@ -1,0 +1,45 @@
+# Plugins: somebody else's Lua, installed once — with a database and a trust gate.
+#
+# **Off camera**: a scratch HOME, so nothing here touches the recording user's own plugin store, and
+# `$OSLO_DIR` so `oslo plugin` is the binary being demonstrated rather than whichever is installed.
+setup rm -rf /tmp/oslo-demo-plug
+setup mkdir -p /tmp/oslo-demo-plug/src
+setup cp -r $OSLO_DIR/../../../examples/plugins/notes /tmp/oslo-demo-plug/src/notes
+env HOME=/tmp/oslo-demo-plug
+env XDG_DATA_HOME=/tmp/oslo-demo-plug/data
+env XDG_CONFIG_HOME=/tmp/oslo-demo-plug/cfg
+env PATH=$OSLO_DIR:/usr/bin:/bin
+cols 104
+rows 20
+speed 0.05
+
+# What a plugin declares. A table and nothing else — read before it is trusted, in an interpreter
+# with no `oslo` in it, so a manifest can be inspected without being run.
+run cat ~/src/notes/plugin.lua
+wait 3.4
+clear
+
+# Installing shows what it reserves *before* you decide. Nothing of the plugin runs during an
+# install.
+run oslo plugin install ~/src/notes --yes
+wait 2.4
+run oslo plugin list
+wait 2.4
+clear
+
+# The names it reserved are now commands in the shell you type at — a builtin…
+run note "buy milk"
+wait 1.2
+run note "ship the release"
+wait 1.2
+run note
+wait 2.6
+
+# …and a structured tool, so the shell's own verbs work on what a plugin produces.
+run notes | cols note
+wait 3.0
+clear
+
+# And a way to ask why one is not working, including the plugin's own checks.
+run oslo plugin doctor
+wait 3.0

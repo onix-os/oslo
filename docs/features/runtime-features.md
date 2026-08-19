@@ -49,7 +49,7 @@ those constants against the table rather than trusting them.
 |---|---|---|---|
 | 0 | `direnv` | `Direnv::arrive` | the files on disk: `.env.lua`, `.envrc` |
 | 1 | `vi` | `vi::enabled()` | `oslo.vi.enabled`, which is `false` by default |
-| 2 | `suggest` | `OsloHelper::suggest` | `oslo.suggest.sources` |
+| 2 | `suggest` | `OsloHelper::suggest` | `oslo.suggest.sh_sources` |
 | 3 | `abbr` | the editor's expand-on-space path | `oslo.abbr` |
 | 4 | `notify` | `slow_command_notice` | `oslo.notify.after`, 10 seconds by default |
 | 5 | `marks` | `marks::enabled()` | whether the terminal can take marks, decided at startup |

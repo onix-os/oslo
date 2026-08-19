@@ -492,8 +492,15 @@ fn a_brace_list_completes_the_item_being_typed() {
 
     // The replacement span is the item, not the whole word, so accepting it keeps the brace.
     let line = format!("rm {d}/{{alpha.kv,be");
-    let (start, _) = h.candidates(&line, line.len());
+    let (start, candidates) = h.candidates(&line, line.len());
     assert_eq!(&line[start..], "be");
+
+    // **And the replacement is the item too.** Pinning only the offset left the other half of the
+    // pair unchecked, and the two disagreed: the candidate was built as a whole path and inserted
+    // where the path already was, so accepting it gave `rm /dir/{alpha.kv,/dir/beta.kv` — a
+    // different and longer path than the one typed, on the command this test uses as its example.
+    let taken = format!("{}{}", &line[..start], candidates[0].replacement);
+    assert_eq!(taken, format!("rm {d}/{{alpha.kv,beta.kv"), "{taken}");
 
     // A closed list is an ordinary word again: the brace is done, so a following path completes
     // against the directory as usual.

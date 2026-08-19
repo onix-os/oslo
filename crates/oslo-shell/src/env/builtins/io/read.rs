@@ -2,6 +2,7 @@
 
 use super::read_input::{InputSpec, is_terminal, probe_readable, read_logical_line, status_of};
 use super::read_split::{all_fields, assign_fields};
+use crate::env::origin_now;
 use crate::env::scope::{Environment, ShellArray};
 use oslo_base::error::Result;
 use std::os::fd::RawFd;
@@ -49,6 +50,11 @@ struct OptionError {
     message: String,
     status: i32,
 }
+
+/// The option letters this `read` has, printed under a usage error. Unprefixed, as bash leaves
+/// its own — the line above it has already said where the error came from.
+const USAGE: &str = "read: usage: read [-ers] [-a array] [-d delim] [-n nchars] [-N nchars] [-p prompt] \
+     [-t timeout] [-u fd] [name ...]";
 
 fn usage(message: String) -> OptionError {
     OptionError { message, status: 2 }
@@ -197,7 +203,13 @@ pub fn builtin_read(env: &mut Environment, args: &[String]) -> Result<i32> {
     let opts = match parse_options(args) {
         Ok(opts) => opts,
         Err(err) => {
-            eprintln!("oslo: read: {}", err.message);
+            eprintln!("{}read: {}", origin_now(), err.message);
+            // A usage error prints the usage under it, the way every other builtin here does and
+            // the way bash does; an option whose *argument* was wrong is not a spelling problem
+            // and a list of option letters would not help with it.
+            if err.status == 2 {
+                eprintln!("{USAGE}");
+            }
             return Ok(err.status);
         }
     };
@@ -231,7 +243,7 @@ pub fn builtin_read(env: &mut Environment, args: &[String]) -> Result<i32> {
     let line = match read_logical_line(&spec) {
         Ok(line) => line,
         Err(err) => {
-            eprintln!("oslo: read: {}: {err}", opts.fd);
+            eprintln!("{}read: {}: {err}", origin_now(), opts.fd);
             return Ok(1);
         }
     };

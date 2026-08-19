@@ -4,7 +4,7 @@
 //! reporters live there. This is only the part that knows what a `direnv::Event` contains — it
 //! stays in the binary because the *rendering* it stands in front of does too.
 
-use crate::lua::eval::value::Value;
+use oslo_base::value::Value;
 use oslo_shell::direnv::Event;
 use oslo_shell::direnv::diff::Change;
 use oslo_ui::report::{self, rows, text};

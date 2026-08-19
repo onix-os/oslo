@@ -204,7 +204,9 @@ pub fn open(
             | Key::Resized
             | Key::Home
             | Key::End
-            | Key::BackTab => {}
+            | Key::BackTab
+            | Key::Submit
+            | Key::CtrlTab => {}
         }
     }
 }

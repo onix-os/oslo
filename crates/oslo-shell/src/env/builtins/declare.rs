@@ -21,6 +21,7 @@
 //! [`Environment::set_local_var`]: crate::env::Environment::set_local_var
 
 use super::arrays::array_elements;
+use crate::env::origin_now;
 use crate::env::scope::{Environment, ShellArray, array_literal_body, is_valid_identifier};
 use oslo_base::error::Result;
 
@@ -67,14 +68,24 @@ pub fn builtin_declare(env: &mut Environment, args: &[String]) -> Result<i32> {
                 // land on element 0 and the last write would win — see the collision pinned in
                 // `tests/corpus/array_element_assignment.sh`.
                 (false, 'A') => {
-                    eprintln!("oslo: {}: -A: associative arrays are not supported", name);
+                    eprintln!(
+                        "{}{}: -A: associative arrays are not supported",
+                        origin_now(),
+                        name
+                    );
                     return Ok(2);
                 }
                 // Every remaining letter names an attribute this shell has no representation
                 // for. Saying so beats declaring a scalar and calling it an array.
                 (plus, c) => {
                     let sign = if plus { '+' } else { '-' };
-                    eprintln!("oslo: {}: {}{}: attribute not supported", name, sign, c);
+                    eprintln!(
+                        "{}{}: {}{}: attribute not supported",
+                        origin_now(),
+                        name,
+                        sign,
+                        c
+                    );
                     return Ok(2);
                 }
             }
@@ -108,7 +119,12 @@ fn apply(env: &mut Environment, operand: &str, attrs: &Attributes, builtin: &str
     };
 
     if !is_valid_identifier(name) {
-        eprintln!("oslo: {}: `{}': not a valid identifier", builtin, operand);
+        eprintln!(
+            "{}{}: `{}': not a valid identifier",
+            origin_now(),
+            builtin,
+            operand
+        );
         return Ok(false);
     }
 
@@ -204,7 +220,7 @@ fn print_variables(env: &mut Environment, names: &[String]) -> i32 {
         match env.get_var(name).map(str::to_string) {
             Some(value) => render(env, name, &value),
             None => {
-                eprintln!("oslo: declare: {}: not found", name);
+                eprintln!("{}declare: {}: not found", origin_now(), name);
                 status = 1;
             }
         }

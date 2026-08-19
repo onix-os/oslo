@@ -15,6 +15,7 @@ mod wait;
 
 pub use wait::builtin_wait;
 
+use crate::env::origin_now;
 use crate::env::scope::Environment;
 use crate::exec::job::{
     Job, JobState, JobTable, continue_in_background, describe, foreground_job, job_control_active,
@@ -40,7 +41,7 @@ pub fn builtin_jobs(_env: &mut Environment, args: &[String]) -> Result<i32> {
             // lists everything rather than silently listing nothing: an honest superset.
             'n' => {}
             other => {
-                eprintln!("oslo: jobs: -{}: invalid option", other);
+                eprintln!("{}jobs: -{}: invalid option", origin_now(), other);
                 eprintln!("jobs: usage: jobs [-lnprs] [jobspec ...]");
                 return Ok(2);
             }
@@ -48,9 +49,17 @@ pub fn builtin_jobs(_env: &mut Environment, args: &[String]) -> Result<i32> {
     }
 
     let (lines, finished) = with_jobs(|jobs| {
-        let selected = match select(jobs, &operands, "jobs") {
-            Ok(ids) => ids,
-            Err(status) => return (Err(status), Vec::new()),
+        // **Every job, not the current one.** `jobs` with no operand is a *listing*, where the
+        // other three builtins that share `select` — `fg`, `bg`, `disown` — act on one job and
+        // default to the one you mean. Sharing the default made `jobs` report the newest and hide
+        // the rest, so `kill $(jobs -p)` killed one of them and `jobs` after three `&`s looked
+        // like the first two had never started.
+        let selected = match operands.is_empty() {
+            true => jobs.jobs().iter().map(|job| job.id).collect(),
+            false => match select(jobs, &operands, "jobs") {
+                Ok(ids) => ids,
+                Err(status) => return (Err(status), Vec::new()),
+            },
         };
         let mut lines = Vec::new();
         let mut finished = Vec::new();
@@ -127,7 +136,7 @@ pub fn builtin_fg(_env: &mut Environment, args: &[String]) -> Result<i32> {
 /// `bg [jobspec …]` — continue stopped jobs in the background.
 pub fn builtin_bg(_env: &mut Environment, args: &[String]) -> Result<i32> {
     if !job_control_active() {
-        eprintln!("oslo: bg: no job control");
+        eprintln!("{}bg: no job control", origin_now());
         return Ok(1);
     }
     let (_, operands) = split_operands(&args[1..]);
@@ -136,7 +145,7 @@ pub fn builtin_bg(_env: &mut Environment, args: &[String]) -> Result<i32> {
         Err(status) => return Ok(status),
     };
     if ids.is_empty() {
-        eprintln!("oslo: bg: current: no such job");
+        eprintln!("{}bg: current: no such job", origin_now());
         return Ok(1);
     }
     for id in ids {
@@ -153,6 +162,12 @@ pub fn builtin_bg(_env: &mut Environment, args: &[String]) -> Result<i32> {
 }
 
 /// `disown [-ahr] [jobspec …]` — stop tracking a job, so the shell forgets it exists.
+///
+/// **`-h` is a narrower thing here than in bash, and deliberately.** There it marks a job to be
+/// spared the SIGHUP an exiting shell sends its jobs; oslo never sends one — `shopt huponexit` is
+/// fixed off and says so — so there is nothing to be spared. What is left is the other half of the
+/// same flag: the job stays in the table and `jobs` keeps listing it, where a bare `disown` drops
+/// it. The shell simply stops reporting on it.
 pub fn builtin_disown(_env: &mut Environment, args: &[String]) -> Result<i32> {
     let mut all = false;
     let mut running_only = false;
@@ -164,7 +179,7 @@ pub fn builtin_disown(_env: &mut Environment, args: &[String]) -> Result<i32> {
             'r' => running_only = true,
             'h' => keep_listed = true,
             other => {
-                eprintln!("oslo: disown: -{}: invalid option", other);
+                eprintln!("{}disown: -{}: invalid option", origin_now(), other);
                 eprintln!("disown: usage: disown [-h] [-ar] [jobspec ... | pid ...]");
                 return Ok(2);
             }
@@ -185,15 +200,14 @@ pub fn builtin_disown(_env: &mut Environment, args: &[String]) -> Result<i32> {
         Err(status) => return Ok(status),
     };
     if targets.is_empty() {
-        eprintln!("oslo: disown: current: no such job");
+        eprintln!("{}disown: current: no such job", origin_now());
         return Ok(1);
     }
 
     with_jobs(|jobs| {
         for id in targets {
-            // `-h` keeps the job listed and only exempts it from the shell's exit-time SIGHUP;
-            // without it the job leaves the table altogether. Marking it as already notified is
-            // what that exemption amounts to here — the shell stops reporting on it.
+            // Marked as already notified rather than removed: the entry stays findable by `jobs`
+            // and by `wait`, and the shell says nothing more about it.
             match keep_listed {
                 true => {
                     if let Some(job) = jobs.get_mut(id) {
@@ -243,7 +257,7 @@ fn one_job(args: &[String], name: &str) -> Result<Option<usize>> {
         // terminal, so there is nothing to hand over and nothing to take back. bash says exactly
         // this and fails, and a script that sees success here would wait on a job that is not
         // in the foreground at all.
-        eprintln!("oslo: {}: no job control", name);
+        eprintln!("{}{}: no job control", origin_now(), name);
         return Ok(None);
     }
     let (_, operands) = split_operands(args);
@@ -254,7 +268,7 @@ fn one_job(args: &[String], name: &str) -> Result<Option<usize>> {
     match ids.first() {
         Some(id) => Ok(Some(*id)),
         None => {
-            eprintln!("oslo: {}: current: no such job", name);
+            eprintln!("{}{}: current: no such job", origin_now(), name);
             Ok(None)
         }
     }
@@ -278,7 +292,7 @@ fn select(
         match jobs.lookup(operand) {
             Some(id) => out.push(id),
             None => {
-                eprintln!("oslo: {}: {}: no such job", name, operand);
+                eprintln!("{}{}: {}: no such job", origin_now(), name, operand);
                 return Err(NO_SUCH_JOB);
             }
         }
@@ -356,6 +370,42 @@ mod tests {
         // No operands means the current job — what a bare `fg`/`bg`/`disown` acts on.
         assert_eq!(select(&jobs, &[], "fg"), Ok(vec![2]));
         assert_eq!(select(&JobTable::default(), &[], "fg"), Ok(vec![]));
+    }
+
+    /// **A bare `jobs` lists every job**, where the three builtins that act on *one* default to the
+    /// current one.
+    ///
+    /// Sharing `select`'s default made `jobs` report only the newest: three `&`s in a row looked
+    /// like the first two had never started, and `kill $(jobs -p)` — the idiom the `-p` flag is for
+    /// — killed exactly one of them.
+    #[test]
+    fn a_bare_jobs_lists_every_job() {
+        let mut jobs = JobTable::default();
+        for (pid, text) in [(31, "a"), (32, "b"), (33, "c")] {
+            jobs.add_background(Pid::from_raw(pid), vec![Pid::from_raw(pid)], text.into());
+        }
+        let listed = listing(&mut jobs, &[]);
+        assert_eq!(listed.len(), 3, "{listed:?}");
+        assert!(listed[0].contains(" a"), "{listed:?}");
+        assert!(listed[2].contains(" c"), "{listed:?}");
+
+        // Named operands still narrow it, as they always did.
+        assert_eq!(listing(&mut jobs, &args(&["%2"])).len(), 1);
+    }
+
+    /// The lines `jobs` would print for these operands.
+    fn listing(jobs: &mut JobTable, operands: &[String]) -> Vec<String> {
+        let selected: Vec<usize> = match operands.is_empty() {
+            true => jobs.jobs().iter().map(|job| job.id).collect(),
+            false => select(jobs, operands, "jobs").expect("operands resolve"),
+        };
+        selected
+            .into_iter()
+            .filter_map(|id| {
+                let marker = jobs.marker(id);
+                jobs.get(id).map(|job| long_form(job, marker, false))
+            })
+            .collect()
     }
 
     #[test]

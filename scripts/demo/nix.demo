@@ -1,0 +1,30 @@
+# nix, as data: every `nix --json` answer as an ordinary Lua table.
+cols 104
+rows 20
+speed 0.05
+
+# Two facts that need no flake at all. `!` runs one Lua line from a shell prompt.
+run !print(oslo.nix.system(), oslo.nix.dirty())
+wait 2.4
+
+# The flake's own description, read from `nix flake metadata --json`.
+run !print(oslo.nix.metadata().description)
+wait 2.6
+clear
+
+# **The reason to read the lock**: how far behind every input is. It costs no evaluation, and
+# nothing else in a shell can tell you a project is pinned to a three-year-old nixpkgs.
+run !for _, i in ipairs(oslo.nix.inputs()) do print(i.days, i.name) end
+wait 3.4
+clear
+
+# There is no `oslo nix` command, deliberately. Anything worth typing is a tool a config registers —
+# and returning the rows rather than printing them is what puts it in a pipeline.
+run !oslo.register_tool{ name = "stale", rows = function() return oslo.nix.inputs() end }
+wait 1.8
+run stale
+wait 3.0
+
+# Which is the whole point of rows: the shell's own verbs work on it now.
+run stale | where 'days > 180' | cols name days
+wait 3.4

@@ -168,7 +168,7 @@ Run on this branch, release build, on the machine this was written on.
 
 | what | result |
 | --- | --- |
-| `tests/posix_stays_on_the_byte_path.rs` over `tests/corpus` | 416 scripts, 0 structured edges, 5.33 s |
+| `tests/posix_stays_on_the_byte_path.rs` over `tests/corpus` | 419 scripts, 0 structured edges, 5.33 s |
 | `ls \| grep x` | 0 structured edges |
 | `df \| where 'free > 0' \| length` | 2 structured edges |
 | `cat pw.txt \| parse '{user}:{x}:{uid}:{rest}' \| where 'uid > 100' \| get user` | 2 structured edges |
@@ -195,7 +195,7 @@ which nothing carries rows.
   that never ends never returns.
 * **Structure cannot cross a process, a function or a compound command**, and a command name that
   comes out of an expansion — `$cmd foo` — is not known when the planner runs, so it is bytes.
-* **A registered tool only exists at an interactive prompt.** `config.lua` is read by the REPL;
+* **A registered tool only exists at an interactive prompt.** `init.lua` is read by the REPL;
   `oslo -c` and `oslo script.sh` do not read it, so `hosts | where …` in a script is
   `hosts: command not found`.
 * `sort-by` is ascending only, with no descending form; `from` knows only `json`; `to` knows
@@ -204,8 +204,6 @@ which nothing carries rows.
   edge, so no edge can carry rows. Structure is offered only where it costs nothing.
 * The README's `ps | where 'cpu > 10'` cannot work: `ps` rows carry no CPU column, so the filter
   reports `attempt to compare number with nil` and keeps nothing.
-* Six files point at `docs/research/dual-channel-pipe.md` for the design, and four more at
-  `docs/built-in-tools.md`. Neither file exists in the repository.
 
 ## Where it lives
 

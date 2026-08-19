@@ -10,7 +10,7 @@
 //! offered where it costs nothing — when the next stage asks for it.
 
 use crate::data::{Record, Val};
-use oslo_lua::value::Value;
+use oslo_base::value::Value;
 
 /// Rows for a `sh.*` helper that already answers in rows.
 ///
@@ -83,16 +83,30 @@ pub fn ps() -> Vec<Record> {
     rows_of(&crate::data::rows::ps_rows())
 }
 
-/// A directory listing.
-pub fn ls(args: &[String]) -> Vec<Record> {
-    let path = args.first().map(String::as_str).unwrap_or(".");
-    as_sizes(rows_of(&crate::data::rows::ls_rows(path)), &["size"])
+/// A directory listing, or why there is not one.
+///
+/// **`Result`, like `df::rows`.** `ls_rows` answers an empty table for a directory that does not
+/// exist, cannot be read, or is not a directory at all — the same answer it gives for a directory
+/// that is genuinely empty. Routed through `Some((0, rows))` that became `ls /nope | length` saying
+/// `0` with status 0 and nothing on stderr, where the ordinary `ls` refuses outright. A wrong
+/// answer where a refusal would have been survivable is the shape this module warns about.
+pub fn ls(args: &[String]) -> Result<Vec<Record>, String> {
+    // The same rule the Lua front end uses, from the same place: a leading `-` is a flag, not a
+    // directory. Taking it as one made `ls -la | where …` answer an empty listing without a word.
+    let path = crate::data::rows::ls_where(args);
+    // Asked here because the lister has nowhere to put the answer: it hands back a table either
+    // way. One extra `read_dir` on the path that is about to be walked anyway.
+    std::fs::read_dir(path).map_err(|e| format!("ls: {path}: {e}"))?;
+    Ok(as_sizes(
+        rows_of(&crate::data::rows::ls_rows(path)),
+        &["size"],
+    ))
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use oslo_lua::value::Table;
+    use oslo_base::value::Table;
     use std::cell::RefCell;
     use std::rc::Rc;
 

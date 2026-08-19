@@ -16,16 +16,27 @@ cd "$(dirname "$0")/.."
 
 [ -f Cargo.toml ] || exit 0
 
-# Only the `[package]` section: a dependency called `name` further down the file would otherwise
-# be picked up and quietly rename the project. Trailing \r is stripped so a checkout with CRLF
-# endings does not produce a name that looks right and compares unequal everywhere it is used.
+# Only the `[package]` and `[workspace.package]` sections: a dependency called `name` further down
+# the file would otherwise be picked up and quietly rename the project. Trailing \r is stripped so
+# a checkout with CRLF endings does not produce a name that looks right and compares unequal
+# everywhere it is used.
+#
+# **The version may be inherited rather than stated.** Every crate in this tree takes its version
+# from `[workspace.package]`, so `[package]` says `version.workspace = true` and the number itself
+# is one line further down. Read from `[package]` first — a crate that states its own still wins —
+# and fall back to the workspace's. Without the fallback this printed nothing, and the name and
+# version are what every `make` target puts in its banner.
 sed -e 's/\r$//' Cargo.toml |
     awk '
-        /^\[/            { in_package = ($0 == "[package]"); next }
-        !in_package      { next }
+        /^\[/            { in_package = ($0 == "[package]");
+                           in_workspace = ($0 == "[workspace.package]"); next }
         /^[[:space:]]*#/ { next }
-        $1 == "name"     { name = $3 }
-        $1 == "version"  { version = $3 }
-        END              { gsub(/"/, "", name); gsub(/"/, "", version);
+        in_package       { if ($1 == "name")    name = $3
+                           if ($1 == "version") version = $3
+                           next }
+        in_workspace     { if ($1 == "version") shared = $3
+                           next }
+        END              { if (version == "") version = shared
+                           gsub(/"/, "", name); gsub(/"/, "", version);
                            if (name != "") print name; if (version != "") print version }
     '

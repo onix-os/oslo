@@ -5,6 +5,7 @@
 //! this list is the one place to change if dispatch changes.
 
 use super::format_function;
+use crate::env::origin_now;
 use crate::env::scope::Environment;
 use oslo_base::ast::Command;
 use oslo_base::error::Result;
@@ -37,6 +38,13 @@ pub enum Kind {
     File(PathBuf),
     /// A row in the macro database — looked up only once `$PATH` has failed, as dispatch does.
     Stored(oslo_base::macros::Kind),
+    /// A name the shell runs that no file on `$PATH` accounts for: a structured verb, a registered
+    /// tool, a function still sitting in the autoload directory. `kind` is vocab's own word for it.
+    ///
+    /// Dispatch reaches all of these, so a `type` that did not was describing a different shell —
+    /// `command -v greetings` answered "no" until the function had been called once in this
+    /// process, which is exactly the wrong answer for `command -v X || install_x`.
+    Vocabulary(&'static str),
 }
 
 impl Kind {
@@ -59,6 +67,7 @@ impl Kind {
             Kind::File(_) => "",
             Kind::Stored(oslo_base::macros::Kind::Func) => "stored function",
             Kind::Stored(_) => "stored script",
+            Kind::Vocabulary(kind) => kind,
         }
     }
 
@@ -84,6 +93,11 @@ impl Kind {
             Kind::File(_) => "file",
             Kind::Stored(oslo_base::macros::Kind::Func) => "function",
             Kind::Stored(_) => "file",
+            // The word for how it *behaves*, the rule the stored kinds already follow: an
+            // autoloadable runs like a function, a verb or a tool like a builtin.
+            Kind::Vocabulary("function" | "macro") => "function",
+            Kind::Vocabulary("script") => "file",
+            Kind::Vocabulary(_) => "builtin",
         }
     }
 
@@ -98,6 +112,7 @@ impl Kind {
             Kind::File(path) => format!("{name} is {}", path.display()),
             Kind::Stored(oslo_base::macros::Kind::Func) => format!("{name} is a stored function"),
             Kind::Stored(_) => format!("{name} is a stored script"),
+            Kind::Vocabulary(kind) => format!("{name} is a shell {kind}"),
         }
     }
 }
@@ -137,7 +152,7 @@ fn parse_options(args: &[String]) -> std::result::Result<(Options, &[String]), i
                 'P' => opts.force_path = true,
                 'f' => opts.no_functions = true,
                 other => {
-                    eprintln!("oslo: type: -{other}: invalid option");
+                    eprintln!("{}type: -{other}: invalid option", origin_now());
                     eprintln!("type: usage: type [-afptP] name [name ...]");
                     return Err(2);
                 }
@@ -202,6 +217,16 @@ fn resolve(env: &Environment, name: &str, opts: &Options) -> Vec<Kind> {
     {
         kinds.push(Kind::Stored(kind));
     }
+    // And the names `$PATH` cannot account for. Vocab first because it is a lookup in a map the
+    // prompt already keeps; the autoload directory is asked directly afterwards because a `-c`
+    // shell never calls `names::refresh` and so has an empty vocab while still running the file.
+    if opts.all || kinds.is_empty() {
+        if let Some(kind) = oslo_base::vocab::kind_of(name) {
+            kinds.push(Kind::Vocabulary(kind));
+        } else if crate::exec::simple::autoload::path_for(env, name).is_some() {
+            kinds.push(Kind::Vocabulary("function"));
+        }
+    }
     kinds
 }
 
@@ -240,7 +265,7 @@ pub fn builtin_type(env: &mut Environment, args: &[String]) -> Result<i32> {
             // `-t`, `-p` and `-P` are meant to be read by scripts: they report "no" with an exit
             // status and stay silent, where bare `type` complains.
             if !opts.terse && !opts.path && !opts.force_path {
-                eprintln!("oslo: type: {name}: not found");
+                eprintln!("{}type: {name}: not found", origin_now());
             }
             status = 1;
             continue;

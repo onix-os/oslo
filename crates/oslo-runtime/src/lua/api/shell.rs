@@ -12,8 +12,8 @@
 
 use super::util::{list, native, ok, put, record, text};
 use crate::lua::engine::{Registry, borrow_env};
-use oslo_lua::value::{Table, Value};
-use oslo_lua::{LuaError, Value as V};
+use oslo_base::value::{LuaError, Value as V};
+use oslo_base::value::{Table, Value};
 use oslo_shell::env::Environment;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
@@ -36,7 +36,7 @@ pub fn install(
     env: &Arc<Mutex<Environment>>,
 ) {
     facts(oslo, system, process, env);
-    oslo.set(Value::str("on"), hooks(registry));
+    oslo.set_str("on", hooks(registry));
 }
 
 /// What the shell knows about itself, split by subject rather than left on `oslo`.
@@ -84,6 +84,30 @@ fn facts(oslo: &mut Table, system: &mut Table, process: &mut Table, env: &Arc<Mu
         ok(Value::Bool(guard.shell_name.starts_with('-')))
     });
 
+    // oslo.sys.terminal() — what the terminal answered when oslo asked, before the first prompt.
+    //
+    // **Negotiated, not guessed from `$TERM`.** oslo sends `CSI ? u` and a Primary DA barrier at
+    // startup and reads what comes back, so these are the terminal's own answers. They decide real
+    // behaviour — `kitty_keyboard` is why Ctrl+Enter and Ctrl+Tab either exist or do not — and
+    // until this existed there was no way to see which side of that a session had landed on. That
+    // turned every "this key does nothing" into a guess.
+    put(system, "terminal", |_, _| {
+        let mut out = Table::new();
+        match oslo_ui::term::capability::snapshot_if_initialized() {
+            Some(caps) => {
+                out.set_str("kitty_keyboard", Value::Bool(caps.kitty_keyboard));
+                out.set_str("synchronized_output", Value::Bool(caps.synchronized_output));
+                out.set_str("bracketed_paste", Value::Bool(caps.bracketed_paste));
+                out.set_str("semantic_clicks", Value::Bool(caps.semantic_clicks));
+                out.set_str("legacy_clicks", Value::Bool(caps.legacy_clicks));
+            }
+            // Nothing was negotiated: a script, a pipe, `$TERM=dumb`. Reported as absent rather
+            // than as false, because "not asked" and "asked and told no" are different facts.
+            None => out.set_str("negotiated", Value::Bool(false)),
+        }
+        ok(Value::table(out))
+    });
+
     // oslo.proc.status() -> $? — the status of the last command, whichever language ran it.
     let env_status = Arc::clone(env);
     put(process, "status", move |_, _| {
@@ -126,7 +150,7 @@ fn facts(oslo: &mut Table, system: &mut Table, process: &mut Table, env: &Arc<Mu
     put(&mut opts, "names", |_, _| {
         ok(list(["default_mode"].into_iter().map(Value::str)))
     });
-    oslo.set(Value::str("opts"), Value::table(opts));
+    oslo.set_str("opts", Value::table(opts));
 }
 
 /// The shell variable an option name maps to.

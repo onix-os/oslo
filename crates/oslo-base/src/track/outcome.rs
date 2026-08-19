@@ -68,6 +68,35 @@ impl Outcome {
 /// the wait status is eight bits and a signal becomes `128 + n`.
 const NEVER_RAN: i64 = -1;
 
+/// The outcome half of a commit, without the commit.
+///
+/// Free rather than a method so a caller already inside a transaction — the boundary, which has
+/// just resolved the very directory these rows name — can write them there instead of opening a
+/// second one. Every transaction is a pair of `fsync`s on the thread the next prompt is waiting on.
+pub(super) fn write_outcomes(
+    writer: &super::kv::Writer<'_, '_>,
+    history_id: u64,
+    rows: &[Outcome],
+) -> Option<()> {
+    for row in rows {
+        writer.put(Tree::Outcome, slot(history_id, row.segment), encode(row))?;
+    }
+    super::sync::complete_local(writer, history_id, rows)
+}
+
+/// The rows with the directory written into segment zero, which is the only one that carries it.
+pub(super) fn settled(rows: &[Outcome], here: u64) -> Vec<Outcome> {
+    rows.iter()
+        .map(|row| match row.segment {
+            0 => Outcome {
+                dir_id: here,
+                ..row.clone()
+            },
+            _ => row.clone(),
+        })
+        .collect()
+}
+
 /// The key: the log row's id descending, then the segment index.
 pub(super) fn slot(history_id: u64, segment: u32) -> Vec<u8> {
     Key::with_capacity(16)
@@ -249,13 +278,16 @@ impl super::Track {
             return true;
         }
         self.store
-            .write(|writer| {
-                for row in rows {
-                    writer.put(Tree::Outcome, slot(history_id, row.segment), encode(row))?;
-                }
-                super::sync::complete_local(writer, history_id, rows)
-            })
+            .write(|writer| write_outcomes(writer, history_id, rows))
             .is_some()
+    }
+
+    /// The same, for rows that do not yet say where they ran.
+    ///
+    /// The caller building the rows does not know the directory id — the boundary resolves it —
+    /// so it leaves segment zero at `0` and this fills in what the last boundary settled on.
+    pub fn record_outcome_here(&self, history_id: u64, rows: &[Outcome]) -> bool {
+        self.record_outcome(history_id, &settled(rows, self.current_dir_id()))
     }
 
     /// Everything recorded about the line at `history_id`, segment order.

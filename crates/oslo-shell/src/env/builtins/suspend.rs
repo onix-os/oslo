@@ -5,6 +5,7 @@
 //! and resume it with `SIGCONT`. Without job control there is nothing on the other side to do the
 //! resuming, so bash refuses rather than wedging the session, and so does this.
 
+use crate::env::origin_now;
 use crate::env::scope::Environment;
 use nix::sys::signal::{Signal, kill};
 use nix::unistd::Pid;
@@ -18,7 +19,7 @@ pub fn builtin_suspend(env: &mut Environment, args: &[String]) -> Result<i32> {
             "-f" => force = true,
             "--" => break,
             other => {
-                eprintln!("oslo: suspend: {}: invalid option", other);
+                eprintln!("{}suspend: {}: invalid option", origin_now(), other);
                 eprintln!("suspend: usage: suspend [-f]");
                 return Ok(2);
             }
@@ -28,11 +29,11 @@ pub fn builtin_suspend(env: &mut Environment, args: &[String]) -> Result<i32> {
     if !env.monitor() {
         // bash's own wording, and its status. A shell run from a script has no job control, so
         // this is the answer `bash -c suspend` gives too.
-        eprintln!("oslo: suspend: cannot suspend: no job control");
+        eprintln!("{}suspend: cannot suspend: no job control", origin_now());
         return Ok(1);
     }
     if is_login_shell(env) && !force {
-        eprintln!("oslo: suspend: cannot suspend a login shell");
+        eprintln!("{}suspend: cannot suspend a login shell", origin_now());
         return Ok(1);
     }
 
@@ -41,7 +42,7 @@ pub fn builtin_suspend(env: &mut Environment, args: &[String]) -> Result<i32> {
     match kill(Pid::from_raw(0), Signal::SIGSTOP) {
         Ok(()) => Ok(0),
         Err(errno) => {
-            eprintln!("oslo: suspend: cannot suspend: {}", errno);
+            eprintln!("{}suspend: cannot suspend: {}", origin_now(), errno);
             Ok(1)
         }
     }

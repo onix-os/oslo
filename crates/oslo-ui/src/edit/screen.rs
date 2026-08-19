@@ -46,7 +46,14 @@ pub fn redraw(from_row: usize, frame: &str, at: At) -> String {
     out.push('\r');
     // Everything from here down is the block's, so erasing it all and redrawing is both correct
     // and the only thing that removes a frame that has become shorter.
-    out.push_str("\x1b[J");
+    //
+    // **Never `ESC[J` from the screen's own origin.** When the block starts at row 0 — which
+    // `Ctrl-L` guarantees, since it homes the cursor and clears — an erase-to-end from there is an
+    // erase of the whole screen, and a terminal keeping scrollback moves what was visible into
+    // history first. One duplicate prompt line per keystroke, ten for `echo hello`. So: clear this
+    // row by itself, step down, erase the rest from a row that is never the origin, and come back.
+    // `paint.rs` and `dropdown` already erase this way.
+    out.push_str("\x1b[K\x1b[B\r\x1b[J\x1b[A\r");
 
     out.push_str(frame);
 

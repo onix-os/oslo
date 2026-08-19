@@ -55,6 +55,7 @@ pub mod redact;
 pub(crate) mod row;
 pub mod score;
 pub mod write;
+pub mod writer;
 
 pub use db::{Run, Step, Track, Visit};
 pub use outcome::Outcome;

@@ -15,7 +15,7 @@
 //! test. See [`oslo_shell::direnv::devshell`] for what those are and why.
 
 use super::util::{put, text};
-use oslo_lua::{LuaError, Table, Value};
+use oslo_base::value::{LuaError, Table, Value};
 use oslo_shell::direnv::stdlib;
 use oslo_shell::env::Environment;
 #[cfg(feature = "nix")]
@@ -72,7 +72,7 @@ fn nix_develop(it: &mut Table, env: &Arc<Mutex<Environment>>) {
             // `nix_develop{ hook = true, functions = true }`, and optionally the installable.
             Some(Value::Table(options)) => {
                 let options = options.borrow();
-                let named = match options.get(&Value::str("flake")) {
+                let named = match options.get_str("flake") {
                     Value::Str(name) => vec![name.to_string()],
                     _ => Vec::new(),
                 };
@@ -94,6 +94,8 @@ fn nix_develop(it: &mut Table, env: &Arc<Mutex<Environment>>) {
             devshell::apply_with(&mut guard, &forwarded, want)
                 .map_err(|e| LuaError::new(format!("oslo.direnv.nix_develop: {e}")))?
         };
-        Ok(vec![Value::Number(oslo_lua::Number::Int(count as i64))])
+        Ok(vec![Value::Number(oslo_base::value::Number::Int(
+            count as i64,
+        ))])
     });
 }

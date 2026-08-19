@@ -24,7 +24,7 @@
 //! reuse and waits for one run, which is the only time it can be seen.
 
 use crate::lua::context::Context;
-use oslo_lua::value::Value;
+use oslo_base::value::Value;
 use std::collections::{HashMap, HashSet};
 use std::sync::{Mutex, OnceLock};
 use std::time::Duration;
@@ -43,11 +43,11 @@ pub fn spec_of(value: &Value) -> Option<Spec> {
         return None;
     };
     let t = t.borrow();
-    let Value::Str(command) = t.get(&Value::str("command")) else {
+    let Value::Str(command) = t.get_str("command") else {
         return None;
     };
     let mut args = Vec::new();
-    if let Value::Table(list) = t.get(&Value::str("args")) {
+    if let Value::Table(list) = t.get_str("args") {
         let list = list.borrow();
         for i in 1..=list.length() {
             match list.get(&Value::int(i)) {
@@ -57,7 +57,7 @@ pub fn spec_of(value: &Value) -> Option<Spec> {
             }
         }
     }
-    let timeout = match t.get(&Value::str("timeout_ms")) {
+    let timeout = match t.get_str("timeout_ms") {
         Value::Number(n) => n.as_int().unwrap_or(200).max(1) as u64,
         // Long enough for a tool doing real work, short enough that a hung one is noticed as a
         // pause rather than as a dead shell.
@@ -67,7 +67,7 @@ pub fn spec_of(value: &Value) -> Option<Spec> {
         command: command.to_string(),
         args,
         timeout: Duration::from_millis(timeout),
-        asynchronous: t.get(&Value::str("async")).truthy(),
+        asynchronous: t.get_str("async").truthy(),
     })
 }
 

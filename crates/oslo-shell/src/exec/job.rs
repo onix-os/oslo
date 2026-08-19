@@ -23,21 +23,28 @@
 //!   should never need it.
 
 mod control;
+mod reap;
 mod report;
 mod resume;
+mod sentinel;
 mod signals;
 mod table;
 
 pub use control::{
     enable_job_control, init_job_control, job_control_active, leave_job_control, shell_pgid,
 };
+pub use reap::reap_background_jobs;
 pub use report::describe;
 pub use resume::{continue_in_background, foreground_job};
 pub use signals::{
-    forget_interrupt, install_shell_signals, interrupt_pending, note_interrupt,
+    forget_interrupt, install_shell_signals, interrupt_pending, interrupt_waiting, note_interrupt,
     reset_signals_for_child,
 };
-pub use table::{Job, JobState, JobTable, reap_background_jobs, with_jobs};
+pub use table::{Job, JobState, JobTable, with_jobs};
+
+pub use sentinel::started as watcher_started;
+
+pub(crate) use sentinel::{Orders, stand_down, take_events, watch};
 
 pub(crate) use control::{
     give_terminal_to, join_foreground_group, join_group_in_child, place_child,

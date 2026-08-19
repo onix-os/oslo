@@ -21,10 +21,22 @@
 
 pub mod ast;
 /// The output of a command that was asked to keep it, for `copy --last`.
+pub mod background;
+/// Brace expansion — `{a,b}`, `{1..9}` — shared by the parser and the highlighter.
+///
+/// Here rather than in the shell because the prompt has to agree with the expander about what a
+/// word means: a highlighter that did not know `{a,b}` painted a valid path as a dead one.
+pub mod brace;
 pub mod capture;
+/// Stream coordinates — `{line:word}` addressing of what a command printed.
+pub mod coords;
+/// The `@name` directory table, shared by expansion and completion.
+pub mod dirs;
 pub mod error;
 /// Parts of the shell a config can turn off and on again while it runs.
 pub mod feature;
+/// Shell pattern matching — `*`, `?`, `[…]` — shared by expansion, `case`, and the prompt.
+pub mod glob;
 pub mod hooks;
 pub mod macros;
 /// What this session said, kept after it has scrolled off.
@@ -39,8 +51,14 @@ pub mod quiet;
 pub mod secrets;
 /// A database a config or a plugin owns, kept apart from oslo's own.
 pub mod store;
-pub mod track;
 /// The shell's version, as one number rather than one per crate.
+/// Tilde expansion — `~`, `~user`, `~+`, `~-` — shared by the shell and the prompt.
+pub mod tilde;
+pub mod track;
+/// The dynamic value the shell and its Lua share — tables, numbers, strings.
+pub mod value;
 pub mod version;
+/// Names the shell can run that `$PATH` has never heard of, for the prompt to draw.
+pub mod vocab;
 
 pub use error::{Result, ShellError};

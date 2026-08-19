@@ -3,6 +3,7 @@
 use super::options;
 use super::quoting::single_quoted;
 use crate::env::builtins::arrays::array_elements;
+use crate::env::origin_now;
 use crate::env::scope::{Environment, array_literal_body, is_valid_identifier};
 use oslo_base::error::Result;
 
@@ -31,7 +32,7 @@ pub fn builtin_local(env: &mut Environment, args: &[String]) -> Result<i32> {
     // the line that declared it — the opposite of what was asked for. Refusing is what bash does,
     // and silence here is how a script ends up with a leaked global it never sees.
     if !env.in_function() {
-        eprintln!("oslo: local: can only be used in a function");
+        eprintln!("{}local: can only be used in a function", origin_now());
         return Ok(1);
     }
 

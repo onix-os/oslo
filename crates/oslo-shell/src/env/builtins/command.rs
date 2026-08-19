@@ -7,6 +7,7 @@
 
 use crate::env::builtins::control::is_keyword;
 use crate::env::builtins::spawn::{NOT_FOUND, resolve_program, run_external};
+use crate::env::origin_now;
 use crate::env::scope::Environment;
 use oslo_base::error::Result;
 use std::path::PathBuf;
@@ -46,7 +47,7 @@ pub fn builtin_command(env: &mut Environment, args: &[String]) -> Result<i32> {
                 'v' => mode = Mode::Terse,
                 'V' => mode = Mode::Verbose,
                 other => {
-                    eprintln!("oslo: command: -{}: invalid option", other);
+                    eprintln!("{}command: -{}: invalid option", origin_now(), other);
                     eprintln!("command: usage: command [-pVv] command [arg ...]");
                     return Ok(2);
                 }
@@ -87,7 +88,7 @@ fn run(env: &mut Environment, operands: &[String], default_path: bool) -> Result
     match lookup_program(name, default_path) {
         Some(path) => run_external(&path, operands, name),
         None => {
-            eprintln!("oslo: {}: command not found", name);
+            eprintln!("{}{}: command not found", origin_now(), name);
             Ok(NOT_FOUND)
         }
     }
@@ -112,7 +113,7 @@ fn describe(
                 // `-v` is silent on failure: every `if command -v foo >/dev/null 2>&1` probe in
                 // the wild relies on the status alone, and bash prints nothing there either.
                 if mode == Mode::Verbose {
-                    eprintln!("oslo: command: {}: not found", name);
+                    eprintln!("{}command: {}: not found", origin_now(), name);
                 }
                 status = 1;
             }
@@ -140,7 +141,24 @@ fn terse_description(env: &Environment, name: &str, default_path: bool) -> Optio
     }
     // A stored macro is found after `$PATH` and has no path to print, so it answers with its own
     // name — the same word a function answers with, and one this shell can run.
-    crate::exec::stored::kind_of(name).map(|_| name.to_string())
+    if crate::exec::stored::kind_of(name).is_some() {
+        return Some(name.to_string());
+    }
+    // And the rest of what runs without `$PATH` knowing: a structured verb, a registered tool, a
+    // function still in the autoload directory. `command -v X >/dev/null || …` is the commonest
+    // probe there is, and answering "no" for a name this shell will happily run makes every one of
+    // them wrong. Same word, for the same reason as the macro above.
+    runs_without_path(env, name).then(|| name.to_string())
+}
+
+/// Whether the shell can run `name` even though `$PATH` cannot account for it.
+///
+/// Vocab first, because the prompt keeps that map anyway; then the autoload directory directly,
+/// because a `-c` shell never calls `names::refresh` and so has an empty vocab while still being
+/// perfectly able to load the file.
+fn runs_without_path(env: &Environment, name: &str) -> bool {
+    oslo_base::vocab::kind_of(name).is_some()
+        || crate::exec::simple::autoload::path_for(env, name).is_some()
 }
 
 /// What `command -V name` prints: a sentence naming the kind of thing `name` is.
@@ -163,7 +181,14 @@ fn verbose_description(env: &Environment, name: &str, default_path: bool) -> Opt
     if let Some(path) = lookup_program(name, default_path) {
         return Some(format!("{} is {}", name, path.display()));
     }
-    crate::exec::stored::kind_of(name).map(|kind| format!("{} is {}", name, stored_as(kind)))
+    if let Some(kind) = crate::exec::stored::kind_of(name) {
+        return Some(format!("{} is {}", name, stored_as(kind)));
+    }
+    match oslo_base::vocab::kind_of(name) {
+        Some(kind) => Some(format!("{} is a shell {}", name, kind)),
+        None => crate::exec::simple::autoload::path_for(env, name)
+            .map(|_| format!("{} is a function", name)),
+    }
 }
 
 /// How a stored macro is named to someone reading `-V` or `type`.

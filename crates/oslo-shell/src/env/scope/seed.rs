@@ -1,4 +1,5 @@
-//! The variables the shell describes *itself* with.
+//! What a fresh shell starts with: the variables it describes *itself* with, and the three aliases
+//! a person at a prompt is given.
 //!
 //! Every one is set only if the name is not already taken, so a caller who exported their own
 //! `$UID` or `$OSTYPE` keeps it. They are here rather than in `scope.rs` because they answer one
@@ -8,6 +9,24 @@ use super::Environment;
 use super::environ::environ_set;
 
 impl Environment {
+    /// The three conveniences oslo ships — `ll`, `la`, `l` — for an interactive session only.
+    ///
+    /// **They used to be seeded in [`Environment::new`], which is every shell there is.** A script
+    /// that defined `l() { … }` got `ls -CF` instead of its own function, because an alias is
+    /// resolved before a function and the shell had quietly put one there. bash and dash both run
+    /// the function; oslo now does too. It is also what the README promises about every extension
+    /// oslo adds: unreachable from shell written before oslo existed.
+    ///
+    /// Called by the REPL when it builds the session's environment. A subshell forked from that
+    /// session inherits the table by copy, so `(ll)` still works where you typed it.
+    pub fn seed_interactive_aliases(&mut self) {
+        for (name, expansion) in [("ll", "ls -la"), ("la", "ls -A"), ("l", "ls -CF")] {
+            self.aliases
+                .entry(name.to_string())
+                .or_insert_with(|| expansion.to_string());
+        }
+    }
+
     /// Set the variables that describe the process the shell is running as.
     ///
     /// Unset, these fail *quietly* and wrongly: `[ "$UID" = 0 ]` is the root check in most install
@@ -153,6 +172,22 @@ impl Environment {
         }
     }
 
+    /// `OPTIND`, which POSIX says a shell starts at 1.
+    ///
+    /// **`shift $((OPTIND-1))` is the line every option-parsing script ends with**, and it runs
+    /// whether or not `getopts` matched anything. Unset, `$OPTIND` expands to nothing, the
+    /// arithmetic reads it as 0 and the line becomes `shift -1` — "numeric argument required",
+    /// status 1, and the positional parameters left where they were. bash and dash both start it
+    /// at 1.
+    ///
+    /// Not exported, as in bash: it describes this shell's scan, and a child inheriting a
+    /// half-finished cursor would be told something untrue.
+    pub(super) fn seed_option_index(&mut self) {
+        self.vars
+            .entry("OPTIND".to_string())
+            .or_insert_with(|| ("1".to_string(), false));
+    }
+
     pub(super) fn seed_compatibility_vars(&mut self) {
         let (major, minor, patch) = Self::BASH_COMPAT;
         if !self.vars.contains_key("BASH_VERSION") {
@@ -200,6 +235,32 @@ mod pwd_tests {
                 .ok()
                 .and_then(|p| std::fs::canonicalize(p).ok()),
             "PWD must name the directory the process is actually in"
+        );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Environment;
+
+    /// **`OPTIND` starts at 1**, which is what `shift $((OPTIND-1))` depends on.
+    ///
+    /// That line ends every option-parsing script and runs whether or not `getopts` matched
+    /// anything. Unset, the arithmetic read the empty expansion as 0 and the line became
+    /// `shift -1`: "numeric argument required", status 1, positional parameters untouched.
+    #[test]
+    fn the_option_index_starts_at_one() {
+        let env = Environment::new();
+        assert_eq!(env.get_var("OPTIND"), Some("1"));
+    }
+
+    /// And it describes *this* shell, so it is not handed to children.
+    #[test]
+    fn the_option_index_is_not_exported() {
+        let env = Environment::new();
+        assert!(
+            !env.get_exported_vars().contains_key("OPTIND"),
+            "a child would be told a cursor that is not its own"
         );
     }
 }

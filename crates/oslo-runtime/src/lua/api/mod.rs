@@ -13,8 +13,9 @@
 //! calls the shell's own globber, so the two interfaces cannot drift apart.
 
 use crate::lua::engine::{BUILTIN_KEY_PREFIX, PROMPT_KEY, Registry, borrow_env, call_lua_builtin};
-use oslo_lua::value::{Table, Value};
-use oslo_lua::{Interp, LuaError};
+use oslo_base::value::LuaError;
+use oslo_base::value::{Table, Value};
+use oslo_luavm::Host;
 use oslo_shell::env::Environment;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -24,22 +25,35 @@ mod builtin;
 mod complete;
 mod convert;
 mod db;
+mod digest;
 #[cfg(feature = "direnv")]
 mod direnv;
+mod envlist;
 pub(crate) mod external;
 /// `oslo.feature` — turning parts of the shell off and on while it runs.
 pub mod feature;
 mod fs;
+mod git;
+mod handle;
+mod history;
 mod json;
+mod machine;
+pub(crate) mod mark;
+#[cfg(feature = "math")]
+mod math;
 mod messages;
 #[cfg(feature = "nix")]
 mod nix;
 mod optional;
 mod path;
+mod policy;
 #[cfg(feature = "vista")]
 mod predict;
+mod problem;
 mod proc;
+mod procinfo;
 pub(crate) mod prompt;
+mod publish;
 mod re;
 mod run;
 #[cfg(feature = "secrets")]
@@ -50,18 +64,20 @@ pub(crate) mod spawn;
 mod spec;
 mod state;
 mod suggest;
+mod term;
 pub(crate) mod timer;
 pub(crate) mod tool;
 mod ui;
+mod watch;
 
 pub mod hooks;
 pub(crate) use shell::handlers as hook_handlers;
 pub(crate) mod util;
 
-use util::{native, put, text};
+use util::{put, text};
 
 /// Build the `oslo` table and install it as a global.
-pub fn install(interp: &Rc<Interp>, registry: &Registry, env: Arc<Mutex<Environment>>) {
+pub fn install(host: &dyn Host, registry: &Registry, env: Arc<Mutex<Environment>>) {
     let mut oslo = Table::new();
     // **Four namespaces, declared before anything fills them.** `oslo` had grown a flat surface of
     // twenty-two names where `nix_develop` sat between `login` and `path_add`, which tells a reader
@@ -72,21 +88,23 @@ pub fn install(interp: &Rc<Interp>, registry: &Registry, env: Arc<Mutex<Environm
     let mut process = Table::new();
     let mut system = Table::new();
     let mut ui = Table::new();
-    run::install(interp, &mut oslo, &env);
-    oslo.set(Value::str("fs"), fs::build());
+    run::install(host, &mut oslo, &env);
+    oslo.set_str("fs", fs::build());
     let mut paths = path::build();
     if let Value::Table(table) = &mut paths {
         prompt::shorten(&mut table.borrow_mut());
     }
-    oslo.set(Value::str("path"), paths);
+    oslo.set_str("path", paths);
     prompt::install(&mut oslo, &mut ui, registry);
     tool::install(&mut oslo);
+    // `@` from Lua: the same file the builtin writes, so `@name` has one place to look.
+    mark::install(&mut oslo);
     // `oslo.predict.*`, `oslo.repair` and `oslo.last_failed` exist only in a build that has the
     // model. A config guards on them the way it guards on any other optional surface:
     //   if oslo.repair then … end
     #[cfg(feature = "vista")]
     {
-        oslo.set(Value::str("predict"), predict::build());
+        oslo.set_str("predict", predict::build());
         predict::install(&mut oslo, &env);
     }
     // The settings tables exist before the config runs, empty, so that
@@ -110,6 +128,7 @@ pub fn install(interp: &Rc<Interp>, registry: &Registry, env: Arc<Mutex<Environm
     for name in [
         "completion",
         "suggest",
+        "lua",
         "history",
         "keys",
         "finder",
@@ -129,6 +148,10 @@ pub fn install(interp: &Rc<Interp>, registry: &Registry, env: Arc<Mutex<Environm
             );
         }
     }
+
+    // Reading what has been run, merged into the settings namespace of the same name rather than
+    // replacing it: `oslo.history` is one subject and should not be two tables. See [`history`].
+    extend(&mut oslo, "history", history::build());
 
     // `oslo.builtin` is the same thing one level deeper: it is a namespace *per builtin*, so
     // `oslo.builtin.rm.to_tmp = true` indexes twice and both tables have to be here. A new
@@ -150,11 +173,8 @@ pub fn install(interp: &Rc<Interp>, registry: &Registry, env: Arc<Mutex<Environm
     // spelling `oslo.completion.for_command.nix = …` indexes twice. Without this it died on
     // "attempt to index a nil value" while `oslo.completion.for_command = { … }` worked — the exact
     // split the settings loop above exists to prevent, one level down where nobody looked.
-    if let Value::Table(completion) = oslo.get(&Value::str("completion")) {
-        let missing = matches!(
-            completion.borrow().get(&Value::str("for_command")),
-            Value::Nil
-        );
+    if let Value::Table(completion) = oslo.get_str("completion") {
+        let missing = matches!(completion.borrow().get_str("for_command"), Value::Nil);
         if missing {
             completion.borrow_mut().set(
                 Value::str("for_command"),
@@ -168,31 +188,36 @@ pub fn install(interp: &Rc<Interp>, registry: &Registry, env: Arc<Mutex<Environm
         complete::install(&mut completion.borrow_mut());
     }
     // `oslo.suggest.provider` — a ghost written in Lua. In the settings table for the same reason:
-    // `oslo.suggest.sources` is next to it, and the two are read together.
-    if let Value::Table(table) = oslo.get(&Value::str("suggest")) {
+    // `oslo.suggest.sh_sources` is next to it, and the two are read together.
+    if let Value::Table(table) = oslo.get_str("suggest") {
         suggest::install(&mut table.borrow_mut());
     }
     // `oslo.feature` — a namespace of functions rather than a settings table, because a feature is
     // not configuration. It is a runtime mask over configuration, and the two must not look alike.
-    oslo.set(Value::str("feature"), feature::build(registry));
-    oslo.set(Value::str("db"), db::build());
-    oslo.set(Value::str("state"), state::build());
-    oslo.set(Value::str("messages"), messages::build());
+    oslo.set_str("feature", feature::build(registry));
+    problem::install(host);
+    oslo.set_str("db", db::build(host));
+    oslo.set_str("state", state::build());
+    oslo.set_str("messages", messages::build());
+    #[cfg(feature = "math")]
+    oslo.set_str("math", Value::table(math::build()));
     timer::install(&mut oslo);
     spawn::install(&mut oslo);
     builtin::install(&mut oslo);
-    oslo.set(Value::str("json"), json::build());
-    oslo.set(Value::str("re"), re::build());
-    oslo.set(Value::str("proc"), proc::build_proc());
-    oslo.set(Value::str("job"), proc::build_job());
+    oslo.set_str("json", json::build());
+    oslo.set_str("hash", digest::hash());
+    oslo.set_str("hex", digest::hex());
+    oslo.set_str("base64", digest::base64());
+    oslo.set_str("re", re::build());
+    oslo.set_str("proc", proc::build_proc());
+    oslo.set_str("job", proc::build_job());
 
     // The converters, plus `from_json` as an alias for `oslo.json.decode` — the same function
     // under the name the rest of the `from_*` family has.
     let converters = convert::build();
-    if let (Value::Table(into), Value::Table(json)) = (&converters, &oslo.get(&Value::str("json")))
-    {
-        let decode = json.borrow().get(&Value::str("decode"));
-        into.borrow_mut().set(Value::str("from_json"), decode);
+    if let (Value::Table(into), Value::Table(json)) = (&converters, &oslo.get_str("json")) {
+        let decode = json.borrow().get_str("decode");
+        into.borrow_mut().set_str("from_json", decode);
     }
     if let Value::Table(into) = &converters {
         for (name, f) in into.borrow().pairs() {
@@ -218,65 +243,30 @@ pub fn install(interp: &Rc<Interp>, registry: &Registry, env: Arc<Mutex<Environm
     );
 
     shell::install(&mut oslo, &mut system, &mut process, registry, &env);
+    // What the machine can say about itself, for a prompt that would otherwise shell out.
+    machine::install(&mut system);
 
-    oslo.set(Value::str("env"), Value::table(variables_t));
+    oslo.set_str("env", Value::table(variables_t));
     extend(&mut oslo, "proc", process);
-    oslo.set(Value::str("sys"), Value::table(system));
-    oslo.set(Value::str("ui"), Value::table(ui));
-    optional::install(&mut oslo, interp, &env);
+    oslo.set_str("sys", Value::table(system));
+    // What this terminal can do, asked of the terminal itself. See [`term`].
+    oslo.set_str("term", Value::table(term::build()));
+    oslo.set_str("ui", Value::table(ui));
+    optional::install(&mut oslo, host, &env);
     let oslo = Value::table(oslo);
-    publish(interp, &oslo);
-    interp.set_global("oslo", oslo);
+    host.set_global("oslo", oslo);
+    // After the global exists, because these are written in Lua and reach the table through it.
+    publish::publish(host);
+    #[cfg(feature = "nix")]
+    nix::add_helpers(host);
+    // Last, so it replaces the standard names rather than being replaced by them.
+    policy::apply(host);
+    // And then the shorthand: `oslo.fs` is also `fs`, `oslo.math.eval` is also `math.eval`.
+    //
+    // After `policy::apply`, so a name policy replaced is the one that gets lifted. Nothing in
+    // `_G` is overwritten — see `flatten_namespace` — so this can only add.
+    host.flatten_namespace("oslo");
 }
-
-/// Make every `oslo.X` table `require`-able as `oslo.X`.
-///
-/// **This is what makes them libraries rather than fields on a global.** A namespace you can only
-/// reach by indexing a global is a naming convention; a module you can `require` is a thing with a
-/// name, that can be aliased locally, shadowed by one of your own in `~/.config/oslo/lua`, and
-/// depended on by a library that never mentions `oslo` at all:
-///
-/// ```lua
-/// local ui = require "oslo.ui"
-/// local env = require "oslo.env"
-/// ```
-///
-/// Registered in `package.preload` rather than on disk, so the lookup never touches the filesystem
-/// and a user's own `oslo/ui.lua` cannot shadow the built-in by accident — `preload` wins.
-fn publish(interp: &Rc<Interp>, oslo: &Value) {
-    let Value::Table(table) = oslo else { return };
-    let Value::Table(package) = interp.global("package") else {
-        return;
-    };
-    let Value::Table(preload) = package.borrow().get(&Value::str("preload")) else {
-        return;
-    };
-    // Only the tables. A function on `oslo` is not a module, and registering one would make
-    // `require "oslo.glob"` answer with something that is not what `require` promises.
-    let entries: Vec<(String, Value)> = table
-        .borrow()
-        .pairs()
-        .into_iter()
-        .filter_map(|(name, value)| match (&name, &value) {
-            (Value::Str(name), Value::Table(_)) => Some((name.to_string(), value.clone())),
-            _ => None,
-        })
-        .collect();
-    for (name, value) in entries {
-        let module = value.clone();
-        preload.borrow_mut().set(
-            Value::str(format!("oslo.{name}")),
-            native("preload", move |_, _| Ok(vec![module.clone()])),
-        );
-    }
-    // `require "oslo"` answers with the whole thing, so a script can take the lot in one line.
-    let whole = oslo.clone();
-    preload.borrow_mut().set(
-        Value::str("oslo"),
-        native("preload", move |_, _| Ok(vec![whole.clone()])),
-    );
-}
-
 /// Fold everything in `additions` into the table already on `oslo` under `name`.
 ///
 /// `proc` is built by its own module and then extended here, because running a command and
@@ -346,12 +336,12 @@ fn commands(oslo: &mut Table, env: &Arc<Mutex<Environment>>) {
         let mut result = Table::new();
         match captured {
             Ok(out) => {
-                result.set(Value::str("out"), Value::str(out.trim_end_matches('\n')));
-                result.set(Value::str("status"), Value::int(status as i64));
+                result.set_str("out", Value::str(out.trim_end_matches('\n')));
+                result.set_str("status", Value::int(status as i64));
             }
             Err(e) => {
-                result.set(Value::str("out"), Value::str(""));
-                result.set(Value::str("status"), Value::int(e.failure_status() as i64));
+                result.set_str("out", Value::str(""));
+                result.set_str("status", Value::int(e.failure_status() as i64));
             }
         }
         Ok(vec![Value::table(result)])
@@ -400,6 +390,9 @@ fn variables(oslo: &mut Table, env: &Arc<Mutex<Environment>>) {
         }
         Ok(vec![Value::table(table)])
     });
+
+    // `$PATH` and its relatives as the lists they are. See [`super::envlist`].
+    envlist::install(oslo, env);
 }
 
 /// The working directory and pathname expansion.
@@ -558,7 +551,7 @@ fn shell(
     // `oslo.register_builtin('ls', …)` made `ls /` print nothing and exit 0.
     let env_builtin = Arc::clone(env);
     let registry_builtin = Rc::clone(registry);
-    put(oslo, "register_builtin", move |interp, args| {
+    put(oslo, "register_builtin", move |host, args| {
         let declared = builtin::declaration(&args)?;
         // Stored first: if the shell registration fails there is no name in the registry
         // pointing at a callback that is not there.
@@ -566,7 +559,7 @@ fn shell(
             format!("{BUILTIN_KEY_PREFIX}{}", declared.name),
             declared.run.clone(),
         );
-        builtin::remember(interp, &declared);
+        builtin::remember(host, &declared);
 
         let mut guard = borrow_env(&env_builtin)?;
         let key = declared.name.clone();

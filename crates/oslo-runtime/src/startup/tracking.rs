@@ -57,6 +57,73 @@ pub(super) struct Tracker {
     worktree: Option<(String, Option<String>)>,
 }
 
+/// A boundary's answers from the prompt thread, on their way to the thread that writes them.
+struct Prepared {
+    dwell: i64,
+    /// Whether the command left the shell somewhere else, which is what makes it an arrival.
+    moved: bool,
+    here: Option<String>,
+    there: Option<String>,
+}
+
+/// A [`Run`] that owns its text.
+///
+/// `Run` borrows the line and the mode name off the loop's locals, which are gone by the time the
+/// writer thread gets to them.
+struct Ran {
+    argv: String,
+    mode: String,
+    status: Option<i32>,
+    duration_ms: i64,
+}
+
+impl Ran {
+    fn of(run: Run<'_>) -> Ran {
+        Ran {
+            argv: run.argv.to_string(),
+            mode: run.mode.to_string(),
+            status: run.status,
+            duration_ms: run.duration_ms,
+        }
+    }
+
+    fn borrow(&self) -> Run<'_> {
+        Run {
+            argv: &self.argv,
+            mode: &self.mode,
+            status: self.status,
+            duration_ms: self.duration_ms,
+        }
+    }
+}
+
+/// The boundary itself: one transaction, and the only part that waits on a disk.
+fn commit(
+    track: &Track,
+    prepared: &Prepared,
+    before: &str,
+    after: &str,
+    run: Option<Run<'_>>,
+    settled: Option<(u64, &[track::Outcome])>,
+) {
+    let step = Step {
+        ran_in: Visit {
+            path: before,
+            root: prepared.here.as_deref(),
+        },
+        moved_to: prepared.moved.then_some(Visit {
+            path: after,
+            root: prepared.there.as_deref(),
+        }),
+        dwell_ms: prepared.dwell,
+        run,
+    };
+    match settled {
+        Some((history_id, rows)) => track.record_settled(&step, history_id, rows),
+        None => track.record(&step),
+    };
+}
+
 impl Tracker {
     /// Open the store, hand it to the process, and tell it where the shell is standing.
     pub(super) fn start(here: &str, settings: &history::Settings) -> Tracker {
@@ -111,12 +178,43 @@ impl Tracker {
         tracker
     }
 
-    /// Write down one turn of the loop.
-    pub(super) fn boundary(&mut self, before: &str, after: &str, run: Option<Run<'_>>) {
-        let Some(track) = track::store() else {
+    /// Write down one turn of the loop, and — when the caller has one to give — what its line did.
+    ///
+    /// The outcome rides along because the directory it names is the one this boundary is about to
+    /// resolve. Two writes that need the same answer are one write.
+    ///
+    /// **Prepared here and written elsewhere.** Closing the dwell segment and resolving the
+    /// worktrees needs this `Tracker` and the locals the loop is holding; committing needs neither,
+    /// and committing is the part that waits on a disk. See [`track::writer`].
+    ///
+    pub(super) fn boundary(
+        &mut self,
+        before: &str,
+        after: &str,
+        run: Option<Run<'_>>,
+        settled: Option<(u64, Vec<track::Outcome>)>,
+    ) {
+        if track::store().is_none() {
             return;
-        };
-        self.write(track, before, after, run);
+        }
+        let prepared = self.prepare(before, after);
+        // Owned, because the thread that writes this down outlives every local it came from.
+        let (before, after) = (before.to_string(), after.to_string());
+        let run = run.map(Ran::of);
+        track::writer::defer(move || {
+            let Some(track) = track::store() else {
+                return;
+            };
+            let settled = settled.as_ref().map(|(id, rows)| (*id, rows.as_slice()));
+            commit(
+                track,
+                &prepared,
+                &before,
+                &after,
+                run.as_ref().map(Ran::borrow),
+                settled,
+            );
+        });
     }
 
     /// Record a second line for the same command boundary — a link a `pre-record` rule kept.
@@ -125,18 +223,25 @@ impl Tracker {
     /// recorded; crediting them again would count one command's seconds twice and make the
     /// directory look busier than it was.
     pub(super) fn also_ran(&mut self, here: &str, run: Option<Run<'_>>) {
-        let Some(track) = track::store() else {
+        if track::store().is_none() {
             return;
-        };
+        }
         let root = self.worktree_of(here);
-        track.record(&Step {
-            ran_in: Visit {
-                path: here,
-                root: root.as_deref(),
-            },
-            moved_to: None,
-            dwell_ms: 0,
-            run,
+        let here = here.to_string();
+        let run = run.map(Ran::of);
+        track::writer::defer(move || {
+            let Some(track) = track::store() else {
+                return;
+            };
+            track.record(&Step {
+                ran_in: Visit {
+                    path: &here,
+                    root: root.as_deref(),
+                },
+                moved_to: None,
+                dwell_ms: 0,
+                run: run.as_ref().map(Ran::borrow),
+            });
         });
     }
 
@@ -150,27 +255,38 @@ impl Tracker {
         self.since = SystemTime::now();
     }
 
-    /// The statements, against a store the caller has already found.
+    /// [`Tracker::boundary`] without the thread: prepare, then commit, right here.
     ///
-    /// Separate from [`Tracker::boundary`] so that it can be tested against a store in a temporary
-    /// directory rather than against the process-global one, which can only ever be set once.
-    fn write(&mut self, track: &Track, before: &str, after: &str, run: Option<Run<'_>>) {
+    /// For tests, which need a store in a temporary directory rather than the process-global one —
+    /// that can only ever be set once — and need the write to have happened by the time the call
+    /// returns rather than shortly afterwards.
+    #[cfg(test)]
+    fn write(
+        &mut self,
+        track: &Track,
+        before: &str,
+        after: &str,
+        run: Option<Run<'_>>,
+        settled: Option<(u64, &[track::Outcome])>,
+    ) {
+        let prepared = self.prepare(before, after);
+        commit(track, &prepared, before, after, run, settled);
+    }
+
+    /// Everything about a boundary that only this `Tracker` can answer.
+    ///
+    /// The dwell because it closes a segment held here, the worktrees because they are cached here.
+    /// Both are cheap and neither touches the store, which is what makes the rest deferrable.
+    fn prepare(&mut self, before: &str, after: &str) -> Prepared {
         let dwell = self.close_segment();
         let moved = after != before;
         let here = self.worktree_of(before);
-        let there = if moved { self.worktree_of(after) } else { None };
-        track.record(&Step {
-            ran_in: Visit {
-                path: before,
-                root: here.as_deref(),
-            },
-            moved_to: moved.then_some(Visit {
-                path: after,
-                root: there.as_deref(),
-            }),
-            dwell_ms: dwell,
-            run,
-        });
+        Prepared {
+            dwell,
+            moved,
+            here,
+            there: if moved { self.worktree_of(after) } else { None },
+        }
     }
 
     /// Close the open dwell segment and start the next one.
@@ -230,6 +346,7 @@ fn millis(elapsed: Duration) -> i64 {
 }
 
 /// What a `pre-record` handler decided about a finished line.
+#[derive(Clone)]
 pub(super) enum Recording {
     /// Nothing was attached, or the handler declined to answer. Record as typed.
     AsTyped,
@@ -255,7 +372,7 @@ pub(super) fn ask_what_to_record(
     result: &Result<i32, ShellError>,
     elapsed: Duration,
 ) -> Recording {
-    use crate::lua::eval::value::Value;
+    use oslo_base::value::Value;
     let status = match result {
         Ok(status) => *status,
         Err(err) => err.failure_status(),
@@ -341,22 +458,22 @@ pub(super) fn settle_log_row(history_id: u64, decided: &Recording, typed: &str) 
 }
 
 /// The links of the line that just ran, as the table a handler walks.
-fn segment_table() -> crate::lua::eval::value::Value {
-    use crate::lua::eval::value::{Table, Value};
+fn segment_table() -> oslo_base::value::Value {
+    use oslo_base::value::{Table, Value};
     let mut list = Table::new();
     for (i, link) in oslo_shell::exec::pipeline::segments::taken()
         .iter()
         .enumerate()
     {
         let mut row = Table::new();
-        row.set(Value::str("text"), Value::str(&link.text));
-        row.set(Value::str("op"), Value::str(link.join.written()));
-        row.set(Value::str("ran"), Value::Bool(link.ran()));
-        row.set(Value::str("ms"), Value::int(link.duration_ms));
+        row.set_str("text", Value::str(&link.text));
+        row.set_str("op", Value::str(link.join.written()));
+        row.set_str("ran", Value::Bool(link.ran()));
+        row.set_str("ms", Value::int(link.duration_ms));
         // Absent rather than a number when the link never ran: any number here would be read as a
         // status, and "did not run" is neither success nor failure.
         if let Some(status) = link.status {
-            row.set(Value::str("status"), Value::int(i64::from(status)));
+            row.set_str("status", Value::int(i64::from(status)));
         }
         list.set(Value::int(i as i64 + 1), Value::table(row));
     }
@@ -372,22 +489,23 @@ fn segment_table() -> crate::lua::eval::value::Value {
 /// The links come from `exec::pipeline::segments`, which the read loop armed for this line. A line
 /// that was not a chain records one row for itself and no links, which is the common case and
 /// costs one small write.
-pub(super) fn record_outcome(history_id: u64, result: &Result<i32, ShellError>, elapsed: Duration) {
+pub(super) fn outcome_rows(
+    result: &Result<i32, ShellError>,
+    elapsed: Duration,
+) -> Vec<track::Outcome> {
     let status = outcome_status(result);
     // The predictor held this line when the log wrote it, because a command's status does not
     // exist until here. This is what lets it learn that a failure was followed by a retyping,
-    // which is the whole of what repair is built on. Outside the store check: a shell with no
-    // tracking database still has a model.
+    // which is the whole of what repair is built on.
+    //
+    // **On this thread, because its other half is.** `predict::record` runs inside `append`, which
+    // is on the prompt thread; the two are a strict pair through one held slot. Queue one of them
+    // and the model learns a line's status against the line before it.
     #[cfg(feature = "vista")]
     oslo_base::predict::settle(status);
-    let Some(track) = track::store() else {
-        return;
-    };
-    let mut rows = vec![track::Outcome::line(
-        track.current_dir_id(),
-        status,
-        millis(elapsed),
-    )];
+    // `0` for now: the directory is what the boundary resolves, and the boundary is what writes
+    // these. The store fills segment zero in whichever way the rows reach it.
+    let mut rows = vec![track::Outcome::line(0, status, millis(elapsed))];
     // Only when it *was* a chain. One link is the line itself, already in row zero.
     let links = oslo_shell::exec::pipeline::segments::taken();
     if links.len() > 1 {
@@ -400,7 +518,15 @@ pub(super) fn record_outcome(history_id: u64, result: &Result<i32, ShellError>, 
             dir_id: 0,
         }));
     }
-    track.record_outcome(history_id, &rows);
+    rows
+}
+
+/// The outcome on its own, for the lines whose boundary could not carry it.
+pub(super) fn record_outcome(history_id: u64, rows: &[track::Outcome]) {
+    let Some(track) = track::store() else {
+        return;
+    };
+    track.record_outcome_here(history_id, rows);
 }
 
 /// What the line reported, in the shape the outcome row and the model both take.
@@ -415,136 +541,10 @@ fn outcome_status(result: &Result<i32, ShellError>) -> Option<i32> {
     }
 }
 
+#[path = "tracking/finished.rs"]
+mod finished;
+pub(in crate::startup) use finished::Finished;
+
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    const SH: &str = "sh";
-
-    fn store() -> (tempfile::TempDir, Track) {
-        let dir = tempfile::tempdir().expect("a temp dir");
-        let track = Track::open(&dir.path().join("track.db")).expect("the database opens");
-        (dir, track)
-    }
-
-    fn tracker() -> Tracker {
-        Tracker {
-            since: SystemTime::now(),
-            worktree: None,
-        }
-    }
-
-    /// The whole point of the write path, asserted through the read side: the same prefix means a
-    /// different line depending on where it is typed.
-    #[test]
-    fn a_command_is_attributed_to_where_it_started_not_where_it_left_you() {
-        let (_dir, track) = store();
-        let mut tracker = tracker();
-
-        // `cd /w/beta` ran in /w and left the shell in /w/beta.
-        tracker.write(
-            &track,
-            "/w",
-            "/w/beta",
-            ran("cd /w/beta", SH, &Ok(0), Duration::from_millis(1)),
-        );
-        tracker.write(
-            &track,
-            "/w/beta",
-            "/w/beta",
-            ran(
-                "cargo run --example abc",
-                SH,
-                &Ok(0),
-                Duration::from_millis(20),
-            ),
-        );
-
-        assert_eq!(
-            track.suggestion_here("/w/beta", SH, "cargo run --ex"),
-            Some("cargo run --example abc".to_string())
-        );
-        assert_eq!(
-            track.suggestion_here("/w", SH, "cargo run --ex"),
-            None,
-            "the cd was attributed to /w; what it ran into was not"
-        );
-        assert_eq!(
-            track.suggestion_here("/w", SH, "cd /w/b"),
-            Some("cd /w/beta".to_string())
-        );
-    }
-
-    /// A command that never finished parsing is not a command, and a command that failed is
-    /// recorded as having failed rather than not recorded at all.
-    #[test]
-    fn what_reaches_the_store_and_what_does_not() {
-        let syntax = Err(ShellError::SyntaxError("unexpected token".to_string()));
-        assert!(ran("mypassword )", SH, &syntax, Duration::ZERO).is_none());
-
-        let failed = ran("cargo buidl", SH, &Ok(101), Duration::from_millis(3));
-        assert_eq!(failed.map(|run| run.status), Some(Some(101)));
-
-        // `exit 0` succeeded, however the loop learned about it.
-        let quit = ran("exit", SH, &Err(ShellError::Exit(0)), Duration::ZERO);
-        assert_eq!(quit.map(|run| run.status), Some(Some(0)));
-    }
-
-    /// A session that was told to leave no trace leaves none of this either.
-    #[test]
-    fn a_session_that_keeps_no_history_opens_no_store() {
-        let kept = |file: Option<&str>, no_trace, max_size| {
-            keeps_a_record(&history::Settings {
-                ignore_space: true,
-                ignore_dups: false,
-                file: file.map(std::path::PathBuf::from),
-                no_trace,
-                max_size,
-            })
-        };
-        assert!(kept(Some("/home/u/.oslo_history"), false, 10_000));
-        assert!(
-            !kept(None, true, 10_000),
-            "HISTFILE= disables the store with it"
-        );
-        assert!(
-            !kept(Some("/home/u/.oslo_history"), false, 0),
-            "and so does HISTSIZE=0"
-        );
-        // **The regression this pair exists to catch.** No history file is the default now, and a
-        // shell nobody has configured must still keep a store — the finder, `cd` ranking and the
-        // model all live in it.
-        assert!(
-            kept(None, false, 10_000),
-            "no history file is not a request to leave no trace"
-        );
-    }
-
-    /// A secret line leaves nothing behind — not the line, not the directory, not the minutes.
-    #[test]
-    fn a_secret_line_is_not_a_boundary_at_all() {
-        let (_dir, track) = store();
-        let mut tracker = tracker();
-        tracker.forget_boundary();
-
-        // Nothing was written, so the directory the secret command ran in is not even known.
-        assert_eq!(track.suggestion_here("/w/alpha", SH, "pass"), None);
-        assert!(track.directories_named("alpha", "/w", 10).is_empty());
-
-        // The next ordinary command still records normally.
-        tracker.write(
-            &track,
-            "/w",
-            "/w/alpha",
-            ran("cd alpha", SH, &Ok(0), Duration::ZERO),
-        );
-        assert_eq!(
-            track
-                .directories_named("alpha", "/w", 10)
-                .into_iter()
-                .map(|found| found.path)
-                .collect::<Vec<_>>(),
-            vec!["/w/alpha".to_string()]
-        );
-    }
-}
+#[path = "tracking/tests.rs"]
+mod tests;

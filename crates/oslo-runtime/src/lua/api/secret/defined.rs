@@ -33,7 +33,7 @@
 
 use super::super::util::{ok, put, text};
 use oslo_base::secrets::{self, Store};
-use oslo_lua::value::{Table, Value};
+use oslo_base::value::{Table, Value};
 use std::cell::RefCell;
 use std::collections::HashMap;
 
@@ -43,7 +43,7 @@ thread_local! {
 }
 
 /// `oslo.secret.define(name, handlers)`.
-pub fn define(args: &[Value]) -> oslo_lua::LuaResult<Vec<Value>> {
+pub fn define(args: &[Value]) -> oslo_base::value::LuaResult<Vec<Value>> {
     let name = text(args, 1, "oslo.secret.define")?;
     if name == secrets::USER || name.starts_with(secrets::PLUGIN) {
         return Ok(vec![
@@ -167,7 +167,7 @@ pub fn handle(store: Store) -> Value {
 }
 
 /// Call one of a defined store's handlers, if it has that one.
-fn call(store: &str, which: &str, args: Vec<Value>) -> oslo_lua::LuaResult<Option<String>> {
+fn call(store: &str, which: &str, args: Vec<Value>) -> oslo_base::value::LuaResult<Option<String>> {
     let handler = DEFINED.with(|slot| slot.borrow().get(store).and_then(|h| field(h, which)));
     let Some(f) = handler else {
         return Ok(None);
@@ -179,7 +179,7 @@ fn call(store: &str, which: &str, args: Vec<Value>) -> oslo_lua::LuaResult<Optio
             // as absent is the answer that does not invent a value.
             _ => None,
         }),
-        Err(problem) => Err(oslo_lua::LuaError::new(format!(
+        Err(problem) => Err(oslo_base::value::LuaError::new(format!(
             "{store}: its `{which}` failed: {problem}"
         ))),
     }

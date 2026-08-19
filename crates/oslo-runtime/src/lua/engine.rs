@@ -2,9 +2,8 @@
 
 use crate::lua::context::Context;
 use oslo_base::error::{Result, ShellError};
-use oslo_lua as eval;
-use oslo_lua::value::Value;
-use oslo_lua::{Interp, LuaResult};
+use oslo_base::value::{LuaError, LuaResult, Table, Value};
+use oslo_luavm::{Engine, Host};
 use oslo_shell::env::Environment;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -30,7 +29,7 @@ thread_local! {
     /// Per-thread because the interpreter is: a builtin invoked from a thread that never ran
     /// [`LuaEngine::setup_bindings`] finds nothing here and says so, rather than reaching into
     /// another thread's state.
-    static ACTIVE: RefCell<Option<(Rc<Interp>, Registry)>> = const { RefCell::new(None) };
+    static ACTIVE: RefCell<Option<(Rc<Engine>, Registry)>> = const { RefCell::new(None) };
 
     /// The shell state the `oslo.*` API reaches, kept so that code far from it can ask whether it
     /// is currently *held*.
@@ -60,8 +59,8 @@ pub(crate) fn state_is_held() -> bool {
 }
 
 /// The interpreter on this thread, if there is one, as a handle that can outlive the borrow.
-pub fn interpreter_handle() -> Option<Rc<Interp>> {
-    // Published into `oslo_lua::current` as well, for callers below this crate. See there.
+pub fn interpreter_handle() -> Option<Rc<Engine>> {
+    // Published into `oslo_luavm::current` as well, for callers below this crate. See there.
     ACTIVE.with(|slot| slot.borrow().as_ref().map(|(interp, _)| Rc::clone(interp)))
 }
 
@@ -69,7 +68,7 @@ pub fn interpreter_handle() -> Option<Rc<Interp>> {
 ///
 /// The same reach-back the hooks use, for callers that need more than one call against the same
 /// interpreter — a filter evaluating one parsed expression against every row, for instance.
-pub fn with_interpreter<T>(f: impl FnOnce(&Interp) -> T) -> Option<T> {
+pub fn with_interpreter<T>(f: impl FnOnce(&Engine) -> T) -> Option<T> {
     let (interp, _) = ACTIVE.with(|slot| slot.borrow().clone())?;
     Some(f(&interp))
 }
@@ -93,17 +92,19 @@ pub fn host_value(key: &str) -> Option<Value> {
 /// name — a key binding written in the config, for instance, which the editor holds directly.
 pub fn call_here(f: &Value, args: Vec<Value>) -> LuaResult<Vec<Value>> {
     let Some((interp, _)) = ACTIVE.with(|slot| slot.borrow().clone()) else {
-        return Err(eval::LuaError::new(
+        return Err(LuaError::new(
             "no Lua interpreter on this thread".to_string(),
         ));
     };
-    interp.call(f, args)
+    interp.call_function(f, args)
 }
 
 /// Taking and releasing the shell state, which is also where deferred hooks are drained.
 mod borrow;
 /// The hook reach-backs, which every fire site outside this file uses.
 mod hooks;
+#[path = "engine/installs.rs"]
+mod installs;
 /// Running a plugin's entry file on this session's interpreter.
 #[cfg(feature = "plugin")]
 mod plugin;
@@ -152,11 +153,11 @@ pub(crate) fn call_lua_builtin(name: &str, args: &[String]) -> i32 {
 
     // Argv reaches the callback as one table, which is the `function(argv)` shape the API has
     // always documented.
-    let mut argv = eval::Table::new();
+    let mut argv = Table::new();
     for (i, arg) in args.iter().enumerate() {
         argv.set(Value::int(i as i64 + 1), Value::str(arg));
     }
-    match interp.call(&callback, vec![Value::table(argv)]) {
+    match interp.call_function(&callback, vec![Value::table(argv)]) {
         Ok(values) => status_from_lua(values.first()),
         Err(e) => {
             eprintln!("oslo: {}: {}", name, e);
@@ -178,7 +179,7 @@ struct ShellGlobals {
     env: Arc<Mutex<Environment>>,
 }
 
-impl eval::Globals for ShellGlobals {
+impl oslo_luavm::Globals for ShellGlobals {
     fn get(&self, name: &str) -> Option<String> {
         self.env.try_lock().ok()?.get_param(name)
     }
@@ -198,7 +199,7 @@ impl eval::Globals for ShellGlobals {
 
 pub struct LuaEngine {
     /// `Rc` because the shell reaches back in through [`ACTIVE`] while a call is still running.
-    interp: Rc<Interp>,
+    interp: Rc<Engine>,
     registry: Registry,
     /// Arguments passed to the chunk as `...`; see [`LuaEngine::set_script_args`].
     script_args: RefCell<Vec<Value>>,
@@ -223,7 +224,7 @@ impl LuaEngine {
             ask: hooks::ask_hook_here,
         });
         Ok(Self {
-            interp: Rc::new(Interp::new("=(oslo lua)")),
+            interp: Rc::new(Engine::new()),
             registry: Rc::new(RefCell::new(HashMap::new())),
             script_args: RefCell::new(Vec::new()),
         })
@@ -238,20 +239,29 @@ impl LuaEngine {
         // The same interpreter, published where code *below* this crate can reach it. A `where`
         // filter in a structured pipeline wants the config's interpreter so a predicate can call a
         // function the config defined, and the pipeline is part of the shell — it cannot ask
-        // upward. See `oslo_lua::current`.
-        oslo_lua::current::publish(Some(Rc::clone(&self.interp)));
+        // upward. See `oslo_luavm::current`.
+        oslo_luavm::current::publish(Some(Rc::clone(&self.interp)));
         // The same publication, for the question "can a hook act right now". Kept beside the
         // interpreter because the two are set up and torn down together.
         SHELL_STATE.with(|slot| *slot.borrow_mut() = Some(Arc::clone(&env)));
-        self.interp.set_host(Rc::new(ShellGlobals {
+        self.interp.set_globals_host(Rc::new(ShellGlobals {
             env: Arc::clone(&env),
         }));
-        crate::lua::api::install(&self.interp, &self.registry, env);
+        crate::lua::api::install(self.interp.as_ref(), &self.registry, env);
         Ok(())
     }
 
     pub fn eval_script(&self, script: &str) -> Result<()> {
         self.run(script, "(oslo lua)")
+    }
+
+    /// Whether `source` compiles, without running any of it.
+    ///
+    /// **Compiled and thrown away, never run.** The prompt uses this to tell an expression from a
+    /// statement, and the only safe way to ask that question is to parse: running `f()` to find
+    /// out whether it was an expression would have called `f`.
+    pub fn compiles(&self, source: &str) -> bool {
+        self.interp.load(source, "(oslo lua)").is_ok()
     }
 
     pub fn load_file(&self, path: &str) -> Result<()> {
@@ -278,7 +288,7 @@ impl LuaEngine {
     /// `arg[-1]` is the interpreter, matching `lua`'s own convention, so a script that
     /// re-executes itself can find the shell it is running under.
     pub fn set_script_args(&self, script: &str, args: &[String]) -> Result<()> {
-        let mut table = eval::Table::new();
+        let mut table = Table::new();
         table.set(
             Value::int(-1),
             Value::str(
@@ -300,12 +310,10 @@ impl LuaEngine {
     fn run(&self, source: &str, name: &str) -> Result<()> {
         // Both failures are named here: a chunk that does not parse and one that fails part-way
         // through are equally useless as `Lua error: attempt to call a nil value` with no file.
-        let ast = eval::parse(source).map_err(|e| ShellError::Lua(e.in_chunk(name)))?;
-        self.interp.set_chunk(name);
         self.interp.set_varargs(self.script_args.borrow().clone());
         let outcome = self
             .interp
-            .run_ast(&ast)
+            .eval(source, name)
             .map_err(|e| ShellError::Lua(e.in_chunk(name)));
         // A script is the one place with no loop to drain into. `oslo.run{"cd", d}` at the end of
         // a chunk would otherwise leave its `post-change-dir` queued for a REPL that never comes.
@@ -321,7 +329,7 @@ impl LuaEngine {
     /// how a config file becomes impossible to debug.
     pub fn fire_hook(&self, name: &str, args: Vec<Value>) {
         for handler in crate::lua::api::hook_handlers(&self.registry, name) {
-            if let Err(e) = self.interp.call(&handler, args.clone()) {
+            if let Err(e) = self.interp.call_function(&handler, args.clone()) {
                 oslo_base::messages::error(format!("{name} hook"), e.to_string());
             }
         }
@@ -357,7 +365,7 @@ impl LuaEngine {
 
     /// A table for a hook, from plain pairs — the shape most of them hand over.
     pub fn hook_fields(fields: &[(&str, Value)]) -> Value {
-        let mut t = oslo_lua::value::Table::new();
+        let mut t = oslo_base::value::Table::new();
         for (name, value) in fields {
             t.set(Value::str(*name), value.clone());
         }
@@ -375,10 +383,10 @@ impl LuaEngine {
     /// that wants to log a command wants to know where it ran, and `oslo.sys.cwd()` asked from
     /// inside the handler answers the same thing only until the command is a `cd`.
     pub fn command_started(text: &str, cwd: &str, mode: &str) -> Value {
-        let mut t = oslo_lua::value::Table::new();
-        t.set(Value::str("text"), Value::str(text));
-        t.set(Value::str("cwd"), Value::str(cwd));
-        t.set(Value::str("mode"), Value::str(mode));
+        let mut t = oslo_base::value::Table::new();
+        t.set_str("text", Value::str(text));
+        t.set_str("cwd", Value::str(cwd));
+        t.set_str("mode", Value::str(mode));
         // **Parsed only when somebody is listening.** The line is parsed again a moment later by
         // the shell either way, so this is one extra parse per command — worth nothing to a config
         // that asks for it and worth avoiding entirely for the far more common one that does not.
@@ -387,7 +395,7 @@ impl LuaEngine {
             && oslo_base::hooks::watched(oslo_base::hooks::at::PRE_CMD)
             && let Some(commands) = crate::lua::parsed::commands_of(text)
         {
-            t.set(Value::str("commands"), commands);
+            t.set_str("commands", commands);
         }
         Value::table(t)
     }
@@ -404,12 +412,12 @@ impl LuaEngine {
         status: i32,
         duration: std::time::Duration,
     ) -> Value {
-        let mut t = oslo_lua::value::Table::new();
-        t.set(Value::str("text"), Value::str(text));
-        t.set(Value::str("cwd"), Value::str(cwd));
-        t.set(Value::str("mode"), Value::str(mode));
-        t.set(Value::str("status"), Value::int(status as i64));
-        t.set(Value::str("ok"), Value::Bool(status == 0));
+        let mut t = oslo_base::value::Table::new();
+        t.set_str("text", Value::str(text));
+        t.set_str("cwd", Value::str(cwd));
+        t.set_str("mode", Value::str(mode));
+        t.set_str("status", Value::int(status as i64));
+        t.set_str("ok", Value::Bool(status == 0));
         t.set(
             Value::str("duration_ms"),
             Value::int(duration.as_millis() as i64),
@@ -460,7 +468,7 @@ impl LuaEngine {
         // there is no reason for the three shapes to disagree.
         //
         // Zero-argument functions are unaffected: Lua discards arguments a function does not name.
-        match self.interp.call(&value, vec![ctx.to_lua()]) {
+        match self.interp.call_function(&value, vec![ctx.to_lua()]) {
             Ok(values) => match values.first() {
                 Some(Value::Str(s)) => Some(s.to_string()),
                 Some(Value::Number(n)) => Some(n.to_string()),
@@ -479,7 +487,7 @@ impl LuaEngine {
     pub fn read_theme(&self) -> (oslo_ui::theme::Theme, Vec<String>) {
         let oslo = self.interp.global("oslo");
         let theme = match &oslo {
-            Value::Table(table) => table.borrow().get(&Value::str("theme")),
+            Value::Table(table) => table.borrow().get_str("theme"),
             _ => Value::Nil,
         };
         oslo_ui::theme::read_lua_theme(&theme)
@@ -488,14 +496,6 @@ impl LuaEngine {
     /// Read `oslo.completion`, `oslo.suggest` and `oslo.history` as they stand.
     pub fn read_settings(&self) -> (oslo_ui::settings::Settings, Vec<String>) {
         oslo_ui::settings::read_lua_settings(&self.interp.global("oslo"))
-    }
-
-    /// Install `oslo.completion.columns` as the dropdown's column provider.
-    ///
-    /// Called after the config has run, for the same reason the theme is read then rather than
-    /// pushed in as it goes: a config may set the function, change its mind, and set another.
-    pub fn install_column_provider(&self) {
-        crate::lua::columns::install(&self.interp);
     }
 
     /// Render a list of segments into one string, dropping the least important until it fits.
@@ -513,7 +513,7 @@ impl LuaEngine {
             let Some(render) = segment::render_fn(&seg) else {
                 continue;
             };
-            let produced = match self.interp.call(&render, vec![ctx_value.clone()]) {
+            let produced = match self.interp.call_function(&render, vec![ctx_value.clone()]) {
                 Ok(values) => values.first().cloned().unwrap_or(Value::Nil),
                 Err(e) => {
                     // Named, because with several segments "the prompt failed" does not say which.
@@ -544,11 +544,6 @@ impl LuaEngine {
         Some(kept.into_iter().map(|p| p.text).collect())
     }
 
-    /// Install `oslo.completion.for_command`, the per-command completion hook.
-    pub fn install_command_completer(&self) {
-        crate::lua::columns::install_command_completer(&self.interp);
-    }
-
     /// The prompt function currently installed, if any.
     ///
     /// For a caller that has to put it back — a `.env.lua` may set the prompt for its directory,
@@ -574,7 +569,7 @@ impl LuaEngine {
 
     pub fn render_prompt(&self) -> Option<String> {
         let prompt = self.registry.borrow().get(PROMPT_KEY).cloned()?;
-        match self.interp.call(&prompt, Vec::new()) {
+        match self.interp.call_function(&prompt, Vec::new()) {
             // Anything but a string is not a prompt. Rendering `nil` or a table's address into
             // the line the user types on is worse than falling back to the shell's default.
             Ok(values) => match values.first() {

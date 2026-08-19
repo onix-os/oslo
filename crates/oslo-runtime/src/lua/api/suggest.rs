@@ -5,7 +5,7 @@
 //!   name = "tldr",
 //!   answer = function(ctx) return "git commit --amend" end,
 //! }
-//! oslo.suggest.sources = { "history", "provider", "path" }
+//! oslo.suggest.sh_sources = { "history", "provider", "path" }
 //! ```
 //!
 //! # It answers the whole line, not the tail
@@ -18,28 +18,28 @@
 //! # Where it sits is the config's decision
 //!
 //! Registering a provider does not put it in front of anything. It is asked when
-//! `oslo.suggest.sources` says `provider`, in the position that list gives it — so a plugin cannot
+//! `oslo.suggest.sh_sources` says `provider`, in the position that list gives it — so a plugin cannot
 //! decide it outranks the history of what you have really run. VS Code's inline providers work the
 //! other way round, with `yieldsToGroupIds` declared by the provider; that is the part not copied.
 
 use super::util::{ok, put, text};
-use oslo_lua::value::{Table, Value};
+use oslo_base::value::{Table, Value};
 use std::rc::Rc;
 
 /// Add `provider` to the `oslo.suggest` table.
 pub fn install(suggest: &mut Table) {
     put(suggest, "provider", |_, args| {
         let Some(Value::Table(declared)) = args.first() else {
-            return Err(oslo_lua::LuaError::new(
+            return Err(oslo_base::value::LuaError::new(
                 "oslo.suggest.provider: one table, as in { name = \"tldr\", answer = f }"
                     .to_string(),
             ));
         };
         let declared = declared.borrow();
-        let name = match declared.get(&Value::str("name")) {
+        let name = match declared.get_str("name") {
             Value::Str(name) => name.to_string(),
             _ => {
-                return Err(oslo_lua::LuaError::new(
+                return Err(oslo_base::value::LuaError::new(
                     "oslo.suggest.provider: `name` is what this provider is called, and what \
                      `messages` blames when it misbehaves"
                         .to_string(),
@@ -47,10 +47,7 @@ pub fn install(suggest: &mut Table) {
             }
         };
         let named = name.clone();
-        let ask = match (
-            declared.get(&Value::str("answer")),
-            declared.get(&Value::str("request")),
-        ) {
+        let ask = match (declared.get_str("answer"), declared.get_str("request")) {
             (answer @ Value::Function(_), _) => {
                 oslo_ui::suggest::Ask::Now(Rc::new(move |ctx| {
                     // `call_here` rather than a held interpreter: the session's is a thread-local,
@@ -76,12 +73,12 @@ pub fn install(suggest: &mut Table) {
                 let debounce = millis(&declared, "debounce_ms", DEFAULT_DEBOUNCE_MS);
                 let timeout = millis(&declared, "timeout_ms", DEFAULT_TIMEOUT_MS);
                 let settle = millis(&declared, "settle_ms", DEFAULT_SETTLE_MS);
-                let on_late = match declared.get(&Value::str("on_late")) {
+                let on_late = match declared.get_str("on_late") {
                     Value::Str(word) => match word.as_ref() {
                         "fill" => oslo_ui::suggest::Late::Fill,
                         "replace" => oslo_ui::suggest::Late::Replace,
                         other => {
-                            return Err(oslo_lua::LuaError::new(format!(
+                            return Err(oslo_base::value::LuaError::new(format!(
                                 "oslo.suggest.provider: on_late = {other:?} is not one of \
                                  \"fill\" (draw only if nothing else did) or \"replace\" \
                                  (draw over what another source gave)"
@@ -124,7 +121,7 @@ pub fn install(suggest: &mut Table) {
                 }
             }
             _ => {
-                return Err(oslo_lua::LuaError::new(
+                return Err(oslo_base::value::LuaError::new(
                     "oslo.suggest.provider: one of `answer` (fast, answers now) or `request` \
                      (slow, calls reply later) must be a function"
                         .to_string(),
@@ -158,7 +155,7 @@ pub fn install(suggest: &mut Table) {
             Ok(_name) => {
                 // One at a time is not offered yet: the registry replaces by name, which covers
                 // editing a provider, and nothing has asked to remove exactly one.
-                Err(oslo_lua::LuaError::new(
+                Err(oslo_base::value::LuaError::new(
                     "oslo.suggest.forget takes no arguments; it drops every provider".to_string(),
                 ))
             }
@@ -189,10 +186,10 @@ const DEFAULT_SETTLE_MS: u64 = 400;
 /// The table a provider is handed.
 fn context(ctx: &oslo_ui::suggest::Ctx) -> Value {
     let mut table = Table::new();
-    table.set(Value::str("line"), Value::str(&ctx.line));
-    table.set(Value::str("cursor"), Value::int(ctx.cursor as i64));
-    table.set(Value::str("cwd"), Value::str(&ctx.cwd));
-    table.set(Value::str("language"), Value::str(&ctx.language));
+    table.set_str("line", Value::str(&ctx.line));
+    table.set_str("cursor", Value::int(ctx.cursor as i64));
+    table.set_str("cwd", Value::str(&ctx.cwd));
+    table.set_str("language", Value::str(&ctx.language));
     Value::table(table)
 }
 
@@ -204,7 +201,7 @@ fn context(ctx: &oslo_ui::suggest::Ctx) -> Value {
 /// matters most. A predicate that raises is read as *no*: a guard nobody can evaluate has not said
 /// yes, and failing closed is the only safe direction for a guard about privacy.
 fn predicate(declared: &Table) -> Option<oslo_ui::suggest::Enabled> {
-    let asked @ Value::Function(_) = declared.get(&Value::str("enabled")) else {
+    let asked @ Value::Function(_) = declared.get_str("enabled") else {
         return None;
     };
     Some(Rc::new(move |ctx| {
@@ -231,7 +228,7 @@ fn millis(declared: &Table, key: &str, fallback: u64) -> std::time::Duration {
 }
 
 /// Report once per failure rather than per keystroke: a provider that raises does so on every key.
-fn complain(name: &str, problem: &oslo_lua::LuaError) {
+fn complain(name: &str, problem: &oslo_base::value::LuaError) {
     oslo_base::messages::say(
         oslo_base::messages::Level::Error,
         format!("suggest/{name}"),

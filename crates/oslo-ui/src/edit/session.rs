@@ -5,6 +5,7 @@
 
 use super::buffer::{Buffer, Case};
 use super::keymap::{Action, action};
+
 use super::screen;
 pub use crate::term::Key;
 use crate::term::{InputEvent, Keys, PasteError, Restore, Screen};
@@ -12,6 +13,8 @@ use std::io::Write;
 
 mod assist;
 pub use assist::{Assist, NoAssist};
+
+mod shortcuts;
 
 /// What a `key` hook asked the editor to do with the keystroke it just saw.
 ///
@@ -33,6 +36,8 @@ pub enum KeyHook {
 #[derive(Debug, Default)]
 pub struct Session {
     pub buffer: Buffer,
+    /// Whether the key before this one was a Tab on an empty line. See [`shortcuts::tab`].
+    tab_armed: bool,
     /// Vi mode, when `oslo.vi.enabled` asked for it.
     ///
     /// `None` is emacs, and then nothing vi-shaped is consulted at all. With it on, insert mode
@@ -47,6 +52,7 @@ impl Session {
         buffer.set(text, cursor);
         Session {
             buffer,
+            tab_armed: false,
             vi: crate::vi::enabled().then(super::vi::Vi::default),
         }
     }
@@ -81,7 +87,10 @@ impl Session {
                 }
                 None => changed(false),
             },
-            Bound::AcceptHint => changed(self.take_hint(true, assist)),
+            // A correction falls to the same key under the same rule as Right — the two are drawn
+            // in the same place and never at once. Without the second half, a config that named its
+            // own accept key got half of what the key is documented to accept.
+            Bound::AcceptHint => changed(self.take_hint(true, assist) || self.take_repair(assist)),
             Bound::AcceptHintWord => changed(self.take_hint(false, assist)),
             Bound::Lua(name) => {
                 match assist.lua_key(&name, &self.buffer.text(), self.buffer.cursor()) {
@@ -148,6 +157,17 @@ impl Session {
         // an explicit binding has to beat a heuristic about what someone probably meant.
         if let Some(bound) = assist.binding(key) {
             return self.perform(bound, assist);
+        }
+
+        // Tab twice on an empty line switches language — the fallback for a terminal that cannot
+        // deliver Shift+Tab. See `shortcuts::tab`.
+        //
+        // **After the hook and after the bindings**, both deliberately: the `key` hook is
+        // documented to see every keystroke before anything acts on it, and a config that bound
+        // Tab to something meant it. This is oslo's own default, and a default is the thing that
+        // gives way.
+        if let Some(step) = shortcuts::tab(self, key) {
+            return step;
         }
 
         // **Right at the end of the line takes the ghost suggestion**, and moves the cursor
@@ -416,7 +436,17 @@ pub fn read_line(
                 at_row = 0;
                 continue;
             }
-            InputEvent::Focus(_) => continue,
+            // Decoded, and until now dropped. A status line that dims when you look away, or a
+            // plugin that pauses polling while the window is in the background, needs exactly this
+            // and had no way to hear it. An observer: the focus has already changed somewhere oslo
+            // does not control, so there is nothing for a handler to refuse.
+            InputEvent::Focus(focused) => {
+                oslo_base::hooks::fire_at_here(
+                    oslo_base::hooks::at::FOCUS_CHANGE,
+                    &[("focused", if focused { "1" } else { "" })],
+                );
+                continue;
+            }
             // A prompt rebuilt itself behind the editor. `repaint` is already true and the
             // generation check at the top of the loop picks the new text up.
             InputEvent::Refreshed => continue,

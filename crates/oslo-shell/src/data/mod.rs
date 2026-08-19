@@ -8,7 +8,7 @@
 //! ordering and one renderer instead of several.
 //!
 //! The design, and the reasoning behind every choice here, is in
-//! `docs/research/dual-channel-pipe.md`.
+//! `docs/features/structured-pipelines.md`.
 
 /// Tools a config registered, consulted by the pipeline.
 pub mod custom;

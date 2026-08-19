@@ -14,9 +14,8 @@
 //! [`JobTable::take_status`] so that a later `wait` can still report them, which is what keeps
 //! opportunistic reaping from stealing `wait $!`'s answer.
 
-use nix::sys::wait::{WaitPidFlag, WaitStatus, waitpid};
 use nix::unistd::Pid;
-use std::sync::atomic::{AtomicU8, AtomicUsize, Ordering};
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Mutex, MutexGuard, OnceLock};
 
 /// Where a job is in its life.
@@ -35,6 +34,17 @@ pub struct Job {
     pub pgid: Pid,
     /// The processes still expected to report. Empty once the job has ended.
     pub pids: Vec<Pid>,
+    /// Every process the job started, in pipeline order, and never shortened.
+    ///
+    /// **`pids` cannot answer "which stage was that?"** — it is what is *left*, so a pid's position
+    /// in it changes every time another one ends. A stage number that moved with the reaping order
+    /// would be worse than none.
+    pub stages: Vec<Pid>,
+    /// What each stage exited with, as it is learned.
+    ///
+    /// Kept per job rather than read back out of the shell's status list, which is bounded and
+    /// shared: a wide pipeline could push its own early stages out of it before the last one ends.
+    pub outcomes: Vec<(Pid, i32)>,
     /// The processes that already have, kept so the job stays findable by any of its pids.
     ///
     /// `wait $!` names a *pid*, and `$!` is a pipeline's last stage rather than its leader, so a
@@ -68,24 +78,66 @@ pub struct JobTable {
     /// Reaped exit statuses, newest last, so `wait PID` still has an answer for a child the
     /// opportunistic reaper collected first.
     statuses: Vec<(Pid, i32)>,
+    /// Children that left the job table while still alive, and must be reaped anyway.
+    ///
+    /// **`disown` gives up managing a job, not being its parent.** The kernel does not consult the
+    /// job table: a child of this process stays a zombie until this process waits for it, and
+    /// nothing else can. Dropping the pid with the job left a `<defunct>` entry for the rest of the
+    /// session — reproduced, not theorised.
+    ///
+    /// Nothing is remembered about them but the pid. They have no job, no status anybody can ask
+    /// for, and no report: the only obligation left is the one the kernel imposes.
+    orphans: Vec<Pid>,
+    /// What has happened to jobs and their processes since anybody last asked.
+    ///
+    /// **Recorded here and fired elsewhere, deliberately.** Everything that mutates this table does
+    /// so holding its mutex, and a Lua handler is entitled to ask the shell about its jobs — so
+    /// calling one from inside would be a handler waiting for a lock its own caller holds. The
+    /// transitions queue instead, and [`super::reap`] drains and fires them once the lock is gone.
+    transitions: Vec<Transition>,
 }
 
-/// How many statuses to remember for a `wait` that may never come.
-///
-/// Unbounded growth is a real leak in a long-lived interactive shell that backgrounds jobs and
-/// never waits for them; a fan-out of more than this many un-waited children is not a pattern a
-/// shell script has.
-const REMEMBERED_STATUSES: usize = 64;
+/// Something that happened to a job or one of its processes, waiting to be announced.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Transition {
+    /// One process of a job ended.
+    ProcessExit {
+        pid: Pid,
+        job: Option<usize>,
+        status: i32,
+        /// Which stage of the pipeline it was, counting from one. `None` for a process with no job.
+        stage: Option<usize>,
+        /// The signal that killed it, if one did.
+        signal: Option<i32>,
+    },
+    /// A job moved between running, stopped and ended.
+    JobState {
+        id: usize,
+        pgid: Pid,
+        text: String,
+        from: &'static str,
+        to: &'static str,
+        background: bool,
+    },
+}
 
-/// How many finished jobs a *non-interactive* shell keeps for a `jobs` that may never run.
-const REMEMBERED_COMPLETIONS: usize = 64;
+impl JobState {
+    /// The word a hook is given for this state.
+    fn word(&self) -> &'static str {
+        match self {
+            JobState::Running => "running",
+            JobState::Stopped => "stopped",
+            JobState::Completed(_) => "ended",
+        }
+    }
+}
 
 /// Children the shell believes are still alive, as a lock-free fast path.
 ///
 /// [`reap_background_jobs`] runs at every command boundary, including every iteration of a
 /// shell-level loop. Taking a mutex and entering the kernel there would tax the common case —
 /// no background jobs at all — for nothing.
-static LIVE_CHILDREN: AtomicUsize = AtomicUsize::new(0);
+pub(super) static LIVE_CHILDREN: AtomicUsize = AtomicUsize::new(0);
 
 fn table() -> &'static Mutex<JobTable> {
     static TABLE: OnceLock<Mutex<JobTable>> = OnceLock::new();
@@ -166,7 +218,9 @@ impl JobTable {
         self.jobs.push(Job {
             id,
             pgid,
+            stages: pids.clone(),
             pids,
+            outcomes: Vec::new(),
             ended: Vec::new(),
             command,
             state,
@@ -195,10 +249,17 @@ impl JobTable {
         } else if self.previous == Some(id) {
             self.previous = None;
         }
-        // A job still running when it is disowned is no longer ours to reap, so it stops counting
-        // towards the fast path. A completed one already stopped counting as each pid was reaped.
+        // **Still ours to reap, even when it is no longer ours to manage.** A completed job's pids
+        // were reaped as they ended and are already accounted for; anything still live here is a
+        // child of this process that only this process can collect, so it moves to [`orphans`]
+        // rather than being forgotten. `LIVE_CHILDREN` keeps counting it for the same reason: it is
+        // the fast path's "is there anything to reap", and the answer is still yes.
         if !matches!(job.state, JobState::Completed(_)) {
-            forget_children(job.pids.len());
+            for pid in &job.pids {
+                if !self.orphans.contains(pid) {
+                    self.orphans.push(*pid);
+                }
+            }
         }
         Some(job)
     }
@@ -256,6 +317,30 @@ impl JobTable {
         Some(self.statuses.remove(index).1)
     }
 
+    /// Take everything that has happened since the last drain, for a caller that no longer holds
+    /// the lock and can therefore afford to run Lua.
+    pub fn take_transitions(&mut self) -> Vec<Transition> {
+        std::mem::take(&mut self.transitions)
+    }
+
+    /// Note a job's move from one state to another, if it is a move at all.
+    fn note_state(&mut self, id: usize, from: &JobState, to: &JobState) {
+        if from.word() == to.word() {
+            return;
+        }
+        let (from, to) = (from.word(), to.word());
+        if let Some(job) = self.get(id) {
+            self.transitions.push(Transition::JobState {
+                id,
+                pgid: job.pgid,
+                text: job.command.clone(),
+                from,
+                to,
+                background: job.background,
+            });
+        }
+    }
+
     /// Every pid the shell still expects to outlive the current command.
     pub fn live_pids(&self) -> Vec<Pid> {
         self.jobs
@@ -265,220 +350,9 @@ impl JobTable {
             .flat_map(|j| j.pids.iter().copied())
             .collect()
     }
-
-    /// Drop the oldest finished jobs a script never asked about.
-    ///
-    /// A non-interactive shell has no prompt to report at, so a `Done` entry waits for a `jobs`
-    /// or a `wait` that may never come. bash bounds its list the same way rather than growing it
-    /// for the life of the shell; the cap is high enough that a script which *does* report its
-    /// jobs always finds them.
-    pub(super) fn forget_stale_completions(&mut self) {
-        let done: Vec<usize> = self
-            .jobs
-            .iter()
-            .filter(|job| matches!(job.state, JobState::Completed(_)))
-            .map(|job| job.id)
-            .collect();
-        for id in done
-            .iter()
-            .take(done.len().saturating_sub(REMEMBERED_COMPLETIONS))
-        {
-            self.remove(*id);
-        }
-    }
-
-    /// Every pid the reaper should ask about: a stopped job's processes are still alive, and a
-    /// stopped job is exactly the one that may be resumed and finish while nobody is watching.
-    fn reapable_pids(&self) -> Vec<Pid> {
-        self.jobs
-            .iter()
-            .filter(|j| !matches!(j.state, JobState::Completed(_)))
-            .flat_map(|j| j.pids.iter().copied())
-            .collect()
-    }
-
-    fn remember_status(&mut self, pid: Pid, status: i32) {
-        self.statuses.retain(|(p, _)| *p != pid);
-        self.statuses.push((pid, status));
-        if self.statuses.len() > REMEMBERED_STATUSES {
-            self.statuses.remove(0);
-        }
-    }
-
-    /// Fold one `waitpid` result into the table.
-    fn record(&mut self, status: WaitStatus) {
-        let Some(pid) = status.pid() else { return };
-        let job_id = self.job_of_pid(pid);
-        match status {
-            WaitStatus::Exited(_, code) => self.finish(job_id, pid, code),
-            WaitStatus::Signaled(_, sig, _) => self.finish(job_id, pid, 128 + sig as i32),
-            WaitStatus::Stopped(_, _) => {
-                if let Some(id) = job_id {
-                    self.promote(id);
-                    if let Some(job) = self.get_mut(id) {
-                        job.state = JobState::Stopped;
-                        job.notified = false;
-                    }
-                }
-            }
-            WaitStatus::Continued(_) => {
-                if let Some(job) = job_id.and_then(|id| self.get_mut(id)) {
-                    job.state = JobState::Running;
-                }
-            }
-            _ => {}
-        }
-    }
-
-    /// Stop expecting anything from `pid`: it is gone and left no status behind.
-    fn abandon(&mut self, pid: Pid) {
-        forget_children(1);
-        let Some(job) = self.job_of_pid(pid).and_then(|id| self.get_mut(id)) else {
-            return;
-        };
-        job.pids.retain(|p| *p != pid);
-        job.ended.push(pid);
-        if job.pids.is_empty() {
-            job.state = JobState::Completed(0);
-            job.notified = false;
-        }
-    }
-
-    /// A child of this job has ended; the job itself ends when its last process does.
-    fn finish(&mut self, job_id: Option<usize>, pid: Pid, code: i32) {
-        forget_children(1);
-        self.remember_status(pid, code);
-        let Some(job) = job_id.and_then(|id| self.get_mut(id)) else {
-            return;
-        };
-        job.pids.retain(|p| *p != pid);
-        job.ended.push(pid);
-        if job.pids.is_empty() {
-            // A pipeline's status is its last stage's, and the last stage is the last pid left.
-            job.state = JobState::Completed(code);
-            job.notified = false;
-        }
-    }
 }
 
-/// Drop `n` from the live-child count without ever wrapping below zero.
-///
-/// The count is a hint for the fast path, not a fact: a child the shell forked but never recorded
-/// — a command substitution whose reader raced the reaper — would otherwise take it negative and
-/// disable reaping for the rest of the session.
-fn forget_children(n: usize) {
-    let _ = LIVE_CHILDREN.fetch_update(Ordering::SeqCst, Ordering::SeqCst, |live| {
-        Some(live.saturating_sub(n))
-    });
-}
-
-/// Collect every child that has ended or stopped since the last command, and report what changed.
-///
-/// R7.4: this is what keeps `sleep 0 &` from leaving a `[oslo] <defunct>` entry behind for the
-/// rest of the session. It never blocks — `WNOHANG` — so a still-running job costs one syscall.
-///
-/// Each known pid is asked about *by name* rather than with a single `waitpid(-1)`. Both collect
-/// the same zombies, but `-1` also collects children this table has never heard of, and there is
-/// always at least one class of those: a `fork` whose parent is about to wait for it itself. In
-/// the shell those two never overlap — a command boundary is not a moment when a foreground child
-/// is outstanding — but the library is also used from test binaries that evaluate scripts on
-/// several threads at once, where `-1` reaped another thread's child and left its `waitpid` with
-/// `ECHILD`. Naming the pids makes the safety local instead of global.
-/// Reap children this shell never started, which only PID 1 has.
-///
-/// A double-forked process is reparented to init when its parent exits, and init is the only thing
-/// that can reap it. An `/bin/sh` serving as an initramfs init that skips this fills the process
-/// table with zombies — measured in the Alpine VM, which reported one left behind after every
-/// double fork.
-///
-/// Gated on being process 1 rather than done unconditionally, and that is not caution about cost:
-/// `waitpid(-1)` reaps *any* child, so an ordinary shell doing it could consume the status that a
-/// `wait $pid` was about to read. Init has no such caller, and no other process inherits orphans.
-///
-/// A status that turns out to belong to a known job is still recorded, so `$!` and `jobs` stay
-/// right if the sweep gets there first.
-fn reap_orphans_as_init() {
-    if !is_init() {
-        return;
-    }
-    with_jobs(|jobs| {
-        loop {
-            match waitpid(Pid::from_raw(-1), Some(WaitPidFlag::WNOHANG)) {
-                // Nothing has exited yet; the remaining children are still running.
-                Ok(WaitStatus::StillAlive) => break,
-                Ok(status) => jobs.record(status),
-                Err(nix::errno::Errno::EINTR) => continue,
-                // ECHILD: no children at all, which is the normal state for an idle init.
-                Err(_) => break,
-            }
-        }
-    });
-}
-
-/// Whether this process is PID 1, answered once rather than asked of the kernel per command.
-///
-/// **This was a `getpid(2)` on every command boundary** — measured at one syscall per simple
-/// command, including bare assignments — spent to discover that a shell is not init, which is the
-/// answer for every shell but one and never changes within a process.
-///
-/// `forgot_which_process_i_am` is what keeps that safe across `fork`: a child inherits this cache
-/// along with everything else, and a child of init is *not* init. Every forked child already calls
-/// [`super::reset_signals_for_child`], so the reset has one place to live.
-fn is_init() -> bool {
-    match KNOWN_INIT.load(Ordering::Relaxed) {
-        0 => {
-            let init = nix::unistd::getpid().as_raw() == 1;
-            KNOWN_INIT.store(if init { 2 } else { 1 }, Ordering::Relaxed);
-            init
-        }
-        2 => true,
-        _ => false,
-    }
-}
-
-/// Forget the cached answer, because this process is no longer the one that computed it.
-pub(crate) fn forgot_which_process_i_am() {
-    KNOWN_INIT.store(0, Ordering::Relaxed);
-}
-
-/// 0 = not yet asked, 1 = not init, 2 = init.
-static KNOWN_INIT: AtomicU8 = AtomicU8::new(0);
-
-pub fn reap_background_jobs() {
-    // Orphans first, and *before* the early return below: as PID 1 there are children to reap even
-    // when this shell started none of its own, which is exactly the case that early return skips.
-    reap_orphans_as_init();
-    if LIVE_CHILDREN.load(Ordering::SeqCst) == 0 {
-        return;
-    }
-    let flags = WaitPidFlag::WNOHANG | WaitPidFlag::WUNTRACED | WaitPidFlag::WCONTINUED;
-    with_jobs(|jobs| {
-        for pid in jobs.reapable_pids() {
-            loop {
-                match waitpid(pid, Some(flags)) {
-                    // `StillAlive` is what `WNOHANG` reports for a child with nothing to say yet.
-                    Ok(WaitStatus::StillAlive) => break,
-                    Ok(status) => {
-                        jobs.record(status);
-                        break;
-                    }
-                    // EINTR: a signal arrived instead — R7.6 removed `SA_RESTART`, so this is now
-                    // a normal outcome rather than an impossible one.
-                    Err(nix::errno::Errno::EINTR) => continue,
-                    // ECHILD: already reaped, or never ours. Either way there is nothing left to
-                    // wait for, and the entry must stop being counted or the fast path never
-                    // rearms. No status is invented for it — `wait` reporting "unknown pid" is
-                    // honest, where reporting 0 would be a fabricated success.
-                    Err(_) => {
-                        jobs.abandon(pid);
-                        break;
-                    }
-                }
-            }
-        }
-        super::report::announce_changes(jobs);
-    });
-}
+mod ending;
 
 #[cfg(test)]
 mod tests {
@@ -541,35 +415,5 @@ mod tests {
         table.remove(1);
         let id = table.add_background(Pid::from_raw(9), vec![Pid::from_raw(9)], "b".into());
         assert_eq!(id, 1);
-    }
-
-    /// R7.5's half of the bargain: a status the reaper collected is still available once, by pid.
-    ///
-    /// Once, not twice: `bash --posix` — the oracle the differential corpus runs against — answers
-    /// a repeated `wait $p` with 127. Default bash keeps the status instead, so this assertion is
-    /// a deliberate choice of POSIX over bash, not an accident.
-    #[test]
-    fn a_reaped_status_is_available_to_wait_exactly_once() {
-        let mut table = JobTable::default();
-        table.remember_status(Pid::from_raw(42), 7);
-        assert_eq!(table.take_status(Pid::from_raw(42)), Some(7));
-        assert_eq!(table.take_status(Pid::from_raw(42)), None);
-    }
-
-    /// The remembered-status list is bounded, or a shell that never waits leaks one entry per job.
-    #[test]
-    fn remembered_statuses_are_capped() {
-        let mut table = JobTable::default();
-        for pid in 0..(super::REMEMBERED_STATUSES as i32 + 10) {
-            table.remember_status(Pid::from_raw(pid + 1), pid);
-        }
-        assert_eq!(table.statuses.len(), super::REMEMBERED_STATUSES);
-        // The oldest were dropped, the newest kept.
-        assert_eq!(table.take_status(Pid::from_raw(1)), None);
-        assert!(
-            table
-                .take_status(Pid::from_raw(super::REMEMBERED_STATUSES as i32 + 10))
-                .is_some()
-        );
     }
 }

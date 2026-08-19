@@ -50,6 +50,9 @@ pub fn run_repl(login: bool) -> ! {
     // A REPL is interactive and reads its program from the terminal: `$-` says so with `i` and
     // `s`, which is how a sourced script tells an interactive shell from a batch one.
     interactive_env.set_option(ShellOption::Interactive, true);
+    // `ll`, `la`, `l` — a person's conveniences, and only a person's. They used to be seeded into
+    // every `Environment`, so a script that defined `l()` silently got `ls -CF`.
+    interactive_env.seed_interactive_aliases();
     interactive_env.set_option(ShellOption::StdinInput, true);
     history::register(&mut interactive_env);
 
@@ -81,6 +84,11 @@ pub fn run_repl(login: bool) -> ! {
         // set, since what is read is the whole `oslo` table each time.
         config::apply(&lua);
     }
+    // **Not part of the config**, which is why it is out here: completing a Lua name against the
+    // names that exist is what the Lua prompt *is*, not something a config file switches on. It
+    // was installed from `config::apply` and so ran only for a session that had a config file at
+    // all — every fresh `$HOME` had a Lua prompt that completed nothing.
+    lua.install_lua_completer();
     // **A shell inside a shell says so before it becomes one.** After the config, so a setting can
     // turn the question off; before everything below, so answering "no" pays for none of it.
     super::nested::ask_before_nesting();
@@ -161,12 +169,69 @@ pub fn run_repl(login: bool) -> ! {
     let mut universal_stamp = oslo_shell::env::universal::changed_at();
     oslo_shell::env::universal::apply(&mut env_struct.lock().unwrap());
 
+    // **What an idle prompt does when the background moves.** Installed here rather than in
+    // `terminal::initialize` because it needs the environment a universal refresh writes into, and
+    // the REPL is what owns it. Runs on the shell thread with no editor borrow held — see
+    // `oslo_base::background`.
+    let serviced = Arc::clone(&env_struct);
+    oslo_base::background::install_deadline(crate::lua::api::timer::next_due_in_ms);
+    // Before anything can finish on a thread, so the descriptor is in the set the first wait polls.
+    oslo_base::background::arm();
+    oslo_base::background::install(move || {
+        oslo_shell::exec::job::reap_background_jobs();
+        // A timer that came due, and anything `oslo.spawn` finished on a thread. The same safe
+        // point they already use at a command boundary — the shell holds nothing and Lua may run.
+        let fired = timers::fire();
+        let changed = match serviced.lock() {
+            Ok(mut env) => oslo_shell::env::universal::apply_if_changed(&mut env),
+            Err(_) => false,
+        };
+        // **The lock is gone by here, so anything the apply announced can run.** A hook fired while
+        // the shell's state is held is queued rather than called — it could look but not touch —
+        // and the queue is drained when the borrow that held it ends. This servicer takes the lock
+        // directly rather than through that borrow, so without this the `on-variable-change` for a
+        // value another terminal just set waited for the next command, which is the whole thing an
+        // idle wake exists to avoid.
+        crate::lua::engine::run_deferred_hooks();
+        // **A changed variable is invisible until the prompt is rebuilt.** `PS1` is expanded when
+        // the prompt is rendered, not on every repaint — so a theme another terminal just set would
+        // otherwise sit in the environment, correct and unseen, until the next command. This is the
+        // same door an asynchronous prompt already comes through.
+        //
+        // **A handler that ran is the same kind of news.** `oslo.after(1200, function() mood =
+        // "after" end)` changes what the prompt function returns, and without this the prompt was
+        // rebuilt only when a *universal variable* had also changed — so the new prompt appeared
+        // whenever something else happened to invalidate, and not otherwise.
+        if changed || fired {
+            oslo_ui::prompt::invalidate();
+        }
+        changed || fired
+    });
+    // Armed *after* the servicer, and only here: both checks want an interactive shell that has
+    // somewhere to deliver the news. A script reaps at its command boundaries and has no editor to
+    // wake, so the signal would buy it nothing and cost it an interrupted `read` in every library
+    // call that makes one.
+    oslo_ui::term::watch_for_children();
+    oslo_shell::env::universal::watch::start();
+
     // The directory whose `.env.lua` is loaded. Seeded from the arrival above, so the first prompt
     // does not run it a second time.
     let mut settled = here.clone();
 
     loop {
         timers::fire();
+        // **The names that run only after `$PATH` has failed** — stored macro funcs and scripts,
+        // autoloaded functions. The prompt paints them, completes them and declines to "correct"
+        // them, and until it could enumerate them every one was drawn as a command that does not
+        // exist while running perfectly.
+        //
+        // Once per prompt rather than per keystroke, and here rather than after a command so the
+        // *first* prompt knows them too: the set cannot change while a line is being typed, and
+        // reading it opens a database. A macro this shell just added is picked up by the prompt
+        // that follows the command that added it.
+        if let Ok(env) = env_struct.lock() {
+            oslo_shell::names::refresh(&env);
+        }
         // **Where the shell notices it has moved, by any route at all.**
         //
         // The directory environment used to be reconciled in one place only: after a command line
@@ -353,8 +418,13 @@ pub fn run_repl(login: bool) -> ! {
 
                 // `history -c` cannot reach the editor from inside a builtin, so it leaves a
                 // request behind and the loop carries it out.
-                if history::take_clear_request() {
+                let cleared_history = history::take_clear_request();
+                if cleared_history {
                     history.clear();
+                    // Anything still queued is from *earlier* lines, and landing after the clear
+                    // would put them straight back. The barrier is cheap here: `history -c` is a
+                    // deliberate act, not something typed a hundred times a minute.
+                    oslo_base::track::writer::settle();
                     // Every copy, or the ones left behind go on answering. The database, because
                     // clearing only the editor's would put every line back on the next start; and
                     // oslo's own recall set, which is what the ghost suggestion, the Up/Down walk
@@ -432,6 +502,10 @@ pub fn run_repl(login: bool) -> ! {
                 //
                 // `after` rather than `before`, so a `cd` is reflected in the directory the hook is
                 // told about; and the same `elapsed` the notice and the history column use.
+                // Remembered for `{-n:…}`: the line, not its output. A stage's output is free to
+                // capture because a stage already writes to a pipe; a command's is not, and the
+                // line is what a previous prompt has to offer for nothing. See `exec::streams`.
+                oslo_shell::exec::streams::remember_prompt(&text);
                 let done = LuaEngine::command_finished(
                     &text,
                     &after,
@@ -443,37 +517,29 @@ pub fn run_repl(login: bool) -> ! {
                 // Beside the hook rather than through it: a command that failed is exactly the one
                 // the `fails` column exists to count. Every argument here is a local this loop
                 // already had and used to drop.
-                if secret {
+                // **A line that cleared the history is not written into it.**
+                //
+                // The clear runs here, in the loop, because a builtin cannot reach the editor — but
+                // the tracking below runs afterwards, so `history -c` wrote its own boundary into
+                // the store it had just emptied. `history` showed nothing while Ctrl-R went on
+                // offering `history -c` for ever, the two views of one store disagreeing. Handled
+                // like a secret line, which is the same shape: run it, write nothing down.
+                if secret || cleared_history {
+                    // A line the user asked to be gone must not stay reachable by coordinate.
+                    if cleared_history {
+                        oslo_shell::exec::streams::forget_prompts();
+                    }
                     tracker.forget_boundary();
                 } else {
-                    // A `pre-record` rule may keep one link of a chain instead of the whole line,
-                    // or refuse it. Asked once, before anything is written down, and the answer
-                    // decides both what the aggregate learns and what the log ends up saying.
-                    let decided =
-                        tracking::ask_what_to_record(&text, &before, mode.name(), &res, elapsed);
-                    let lines = tracking::lines_to_record(&decided, &text);
-                    for (first, line) in lines.iter().enumerate().map(|(i, l)| (i == 0, l)) {
-                        let run = tracking::ran(line, mode.name(), &res, elapsed);
-                        // Only the first arrival records the *movement* and the dwell; a second
-                        // one would credit this directory twice for the same command.
-                        if first {
-                            tracker.boundary(&before, &after, run);
-                        } else {
-                            tracker.also_ran(&before, run);
-                        }
-                    }
-                    if lines.is_empty() {
-                        tracker.forget_boundary();
-                    }
-                    // What the line did, joined to the log row it went in under. **After the
-                    // boundary**, because that is what resolves the directory this then reads back
-                    // — one lookup between them rather than two.
-                    if let Some(id) = logged_as {
-                        tracking::settle_log_row(id, &decided, &text);
-                        if !lines.is_empty() {
-                            tracking::record_outcome(id, &res, elapsed);
-                        }
-                    }
+                    tracker.write_down(&tracking::Finished {
+                        text: &text,
+                        before: &before,
+                        after: &after,
+                        mode: mode.name(),
+                        result: &res,
+                        elapsed,
+                        logged_as,
+                    });
                 }
 
                 match res {

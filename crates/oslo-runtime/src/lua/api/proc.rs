@@ -11,13 +11,17 @@
 use super::util::{failed, int, list, ok, opt_text, put, record, text};
 use nix::sys::signal::Signal;
 use nix::unistd::Pid;
-use oslo_lua::LuaError;
-use oslo_lua::value::{Table, Value};
+use oslo_base::value::LuaError;
+use oslo_base::value::{Table, Value};
 use oslo_shell::exec::job::{JobState, with_jobs};
 
 /// Build the `oslo.proc` table.
 pub fn build_proc() -> Value {
     let mut proc = Table::new();
+
+    // What a process *is*, read from `/proc` rather than parsed out of `ps`. See
+    // [`super::procinfo`].
+    super::procinfo::install(&mut proc);
 
     // oslo.proc.kill(pid, signal) -> true, or nil + message
     put(&mut proc, "kill", |_, args| {
@@ -72,6 +76,25 @@ fn signal_named(name: &str) -> Result<Signal, LuaError> {
 /// Build the `oslo.job` table.
 pub fn build_job() -> Value {
     let mut job = Table::new();
+
+    // oslo.job.watcher() -> what repeated Ctrl-C is set up to do, and whether anything is doing it
+    //
+    // **Reports the setting *and* whether it is live**, because those come apart in the one way
+    // that matters: a config can ask for escalation in a shell that is not interactive, or has no
+    // job control, and there the watcher is never forked and Ctrl-C means what it always did. A
+    // caller reading only the setting would report a feature that is not running.
+    put(&mut job, "watcher", |_, _| {
+        let escape = oslo_ui::settings::current().misc.interrupt_escape;
+        ok(record(vec![
+            ("after", Value::int(escape.after as i64)),
+            ("action", Value::str(escape.action.name())),
+            ("notify", Value::Bool(escape.notify)),
+            (
+                "running",
+                Value::Bool(escape.after > 0 && oslo_shell::exec::job::watcher_started()),
+            ),
+        ]))
+    });
 
     // oslo.job.list() -> the same jobs `jobs` prints, as records
     put(&mut job, "list", |_, _| {

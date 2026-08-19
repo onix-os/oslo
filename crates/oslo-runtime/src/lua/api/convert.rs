@@ -9,7 +9,7 @@
 //! usually right is worse than one that is always asked.
 
 use super::util::{list, ok, opt_text, put, text};
-use oslo_lua::value::{Table, Value};
+use oslo_base::value::{Table, Value};
 
 pub fn build() -> Value {
     let mut it = Table::new();

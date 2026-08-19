@@ -37,8 +37,8 @@ pub fn decrypt(store: &str, name: &str, ciphertext: &[u8]) -> Result<Vec<u8>, St
 }
 
 /// What a handler is given: which store, which secret, and the payload as base64.
-fn told(store: &str, name: &str, payload: &[u8]) -> Vec<oslo_lua::value::Value> {
-    use oslo_lua::value::Value;
+fn told(store: &str, name: &str, payload: &[u8]) -> Vec<crate::value::Value> {
+    use crate::value::Value;
     vec![
         Value::str(store),
         Value::str(name),
@@ -47,12 +47,8 @@ fn told(store: &str, name: &str, payload: &[u8]) -> Vec<oslo_lua::value::Value> 
 }
 
 /// What comes back, if anything claimed the store.
-fn taken(
-    answer: Option<oslo_lua::value::Value>,
-    store: &str,
-    verb: &str,
-) -> Result<Vec<u8>, String> {
-    use oslo_lua::value::Value;
+fn taken(answer: Option<crate::value::Value>, store: &str, verb: &str) -> Result<Vec<u8>, String> {
+    use crate::value::Value;
     match answer {
         Some(Value::Str(text)) => decode(&text)
             .ok_or_else(|| format!("{store}: what on-secret-{verb} answered is not base64")),

@@ -34,6 +34,25 @@ printf 'notes\n' > "$WORK/docs/notes.md"
 printf 'log line\n' > "$WORK/build/output.log"
 : > "$WORK/.hidden"
 
+# A flake for the nix demo, **copied from this repository rather than invented**. `oslo.nix.inputs()`
+# reports how many days behind each input is, and that is the whole point of the call — a flake with
+# no inputs, or with local `path:` ones, would demonstrate the plumbing and none of the reason. The
+# lock comes with it, so the evaluation is offline and takes about 0.2 s.
+#
+# Copying rather than `cd`-ing into the repository keeps the rule the rest of this file follows: a
+# demo never runs inside the tree it documents.
+if [ -f flake.nix ] && [ -f flake.lock ]; then
+    cp flake.nix flake.lock "$WORK/"
+fi
+
+# Three columns and three rows, for the stream-coordinate demo: a coordinate is about *position*,
+# so the file it reads has to have one worth pointing at.
+cat > "$WORK/hosts.txt" <<'EOF'
+web-01  10.0.0.1  nginx
+web-02  10.0.0.2  apache
+db-01   10.0.0.9  postgres
+EOF
+
 # A git worktree, so `cd root`, the prompt's branch segment and the tracking store all have
 # something real to answer with.
 if command -v git >/dev/null; then

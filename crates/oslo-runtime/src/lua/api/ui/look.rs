@@ -13,8 +13,8 @@
 //! }
 //! ```
 
-use oslo_lua::LuaError;
-use oslo_lua::value::{Table, Value};
+use oslo_base::value::LuaError;
+use oslo_base::value::{Table, Value};
 use oslo_ui::ask::look::{Look, Preset, Where, Width};
 use oslo_ui::scanner::Scanner;
 use oslo_ui::theme::{Color, Style};
@@ -40,7 +40,7 @@ pub(crate) fn look_of(t: &Table) -> Result<Look, LuaError> {
         look.width = Width::parse(&name)
             .ok_or_else(|| LuaError::new(format!("{name}: list_width is content or full")))?;
     }
-    if let Value::Bool(reverse) = t.get(&Value::str("reverse")) {
+    if let Value::Bool(reverse) = t.get_str("reverse") {
         look.reverse = reverse;
     } else if flag(t, "reverse") {
         look.reverse = true;
@@ -69,7 +69,7 @@ pub(crate) fn look_of(t: &Table) -> Result<Look, LuaError> {
     }
     // A stripe is a background, and `stripe = false` is how a preset's stripe is turned off —
     // there is no colour that means "none".
-    if let Value::Bool(false) = t.get(&Value::str("stripe")) {
+    if let Value::Bool(false) = t.get_str("stripe") {
         look.stripe = None;
     } else if let Some(c) = colour(t, "stripe")? {
         look.stripe = Some(Style {
@@ -107,7 +107,7 @@ pub(crate) fn look_of(t: &Table) -> Result<Look, LuaError> {
     // `scanner = false` turns a preset's sweep off; a number is its width; `true` is the default
     // one. Three spellings because a bare `scanner = true` is what anyone writes first and a width
     // is the only thing anyone changes.
-    match t.get(&Value::str("scanner")) {
+    match t.get_str("scanner") {
         Value::Bool(false) => look.scanner = None,
         Value::Bool(true) => look.scanner = Some(Scanner::default()),
         Value::Number(n) => {

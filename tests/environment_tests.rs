@@ -45,11 +45,30 @@ fn an_alias_may_open_a_compound_command() {
     );
 }
 
+/// An alias body is expanded as *source text*, not as one argv[0].
+///
+/// `alias ll='ls -la'` then `ll` has to become two words. Expanded as a single word it would be a
+/// program literally named `ls -la`, and "command not found".
 #[test]
-fn builtin_default_aliases_work() {
-    // `ll` ships as `ls -la`; expanded as a single argv[0] it would be "command not found".
-    let r = run("ll");
+fn an_alias_body_becomes_several_words() {
+    let r = run("alias ll='ls -la'\nll >/dev/null");
     assert_eq!(r.status, 0, "stderr: {}", r.stderr);
+}
+
+/// **The conveniences oslo ships are a person's, and a script must not meet them.**
+///
+/// `ll`, `la` and `l` used to be seeded into every `Environment`, which is every script, every
+/// `sh -c` and every subshell — so a script that defined `l() { … }` silently got `ls -CF`, because
+/// an alias is resolved before a function. bash and dash both run the function.
+#[test]
+fn the_shipped_aliases_do_not_exist_in_a_script() {
+    for word in ["ll", "la", "l"] {
+        let r = run(word);
+        assert_eq!(r.status, 127, "`{word}` still expands: {}", r.stderr);
+    }
+    // And the name is the script's own to use.
+    let r = run("l() { echo MINE; }\nl");
+    assert_eq!(r.stdout.trim(), "MINE", "stderr: {}", r.stderr);
 }
 
 // --- exit status ---

@@ -200,7 +200,12 @@ fn run_script(invocation: &cli::Invocation, path: &str) -> ! {
                 &invocation.positional,
             )),
             // Streamed: a file is what polyglots and partial execution are about.
-            Language::Shell => run_program_reading(invocation, &script, Reading::Streamed),
+            // A script file is `main` in `$FUNCNAME`, which is what bash calls the frame a
+            // function was reached from. `-c` and standard input get none, and neither do they in
+            // bash.
+            Language::Shell => {
+                run_program_reading(invocation, &script, Reading::Streamed, Some("main"))
+            }
         },
         Err(_) => {
             eprintln!("oslo: {}: No such file or directory", path);
@@ -227,7 +232,7 @@ fn run_stdin(invocation: &cli::Invocation) -> ! {
         )),
         // A pipe is a stream, and bash and dash both run what they have read of one before a later
         // syntax error stops them.
-        Language::Shell => run_program_reading(invocation, &script, Reading::Streamed),
+        Language::Shell => run_program_reading(invocation, &script, Reading::Streamed, None),
     }
 }
 
@@ -263,11 +268,21 @@ enum Reading {
 }
 
 fn run_program(invocation: &Invocation, script: &str) -> ! {
-    run_program_reading(invocation, script, Reading::Whole)
+    run_program_reading(invocation, script, Reading::Whole, None)
 }
 
-fn run_program_reading(invocation: &Invocation, script: &str, reading: Reading) -> ! {
+fn run_program_reading(
+    invocation: &Invocation,
+    script: &str,
+    reading: Reading,
+    frame: Option<&str>,
+) -> ! {
     let mut env = Environment::new();
+    // How this program was reached, for `$FUNCNAME`'s outermost entry. See
+    // `Environment::enter_script_frame`; nothing is pushed for `-c` or standard input.
+    if let Some(frame) = frame {
+        env.enter_script_frame(frame);
+    }
     env.shell_name = invocation.name.clone();
     env.set_positional(invocation.positional.clone());
     apply_invocation_options(&mut env, invocation);

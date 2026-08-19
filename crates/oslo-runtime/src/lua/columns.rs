@@ -19,7 +19,8 @@
 //! not once per candidate. See [`oslo_ui::dropdown`]'s `columns` module for why that
 //! distinction is what makes a `stat` per row affordable at all.
 
-use oslo_lua::{Interp, Table, Value};
+use oslo_base::value::{Table, Value};
+use oslo_luavm::{Engine, Host};
 use oslo_ui::dropdown::{CompletionCandidate, Facts, human_age, human_mode, human_size};
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -129,13 +130,13 @@ fn cell_text(value: &Value) -> String {
 ///
 /// Removes any previously installed provider when it did not, so reloading a config that has
 /// dropped the function goes back to the built-in columns rather than keeping the old one.
-pub fn install(interp: &Rc<Interp>) {
+pub fn install(interp: &Rc<Engine>) {
     let Value::Table(oslo) = interp.global("oslo") else {
         oslo_ui::dropdown::set_provider(None);
         return;
     };
-    let function = match oslo.borrow().get(&Value::str("completion")) {
-        Value::Table(completion) => completion.borrow().get(&Value::str("columns")),
+    let function = match oslo.borrow().get_str("completion") {
+        Value::Table(completion) => completion.borrow().get_str("columns"),
         _ => Value::Nil,
     };
     if !matches!(function, Value::Function(_)) {
@@ -151,7 +152,7 @@ pub fn install(interp: &Rc<Interp>) {
     oslo_ui::dropdown::set_provider(Some(Rc::new(
         move |cand: &CompletionCandidate, facts: &Facts| {
             let arg = candidate_table(cand, facts);
-            match interp.call(&function, vec![arg]) {
+            match interp.call_function(&function, vec![arg]) {
                 Ok(values) => to_columns(&values),
                 Err(e) => {
                     if !complained.replace(true) {
@@ -176,13 +177,13 @@ pub fn install(interp: &Rc<Interp>) {
 ///   end,
 /// }
 /// ```
-pub fn install_command_completer(interp: &Rc<Interp>) {
+pub fn install_command_completer(interp: &Rc<Engine>) {
     let Value::Table(oslo) = interp.global("oslo") else {
         oslo_ui::completion::set_command_completer(None);
         return;
     };
-    let table = match oslo.borrow().get(&Value::str("completion")) {
-        Value::Table(completion) => completion.borrow().get(&Value::str("for_command")),
+    let table = match oslo.borrow().get_str("completion") {
+        Value::Table(completion) => completion.borrow().get_str("for_command"),
         _ => Value::Nil,
     };
     let Value::Table(table) = table else {
@@ -205,7 +206,7 @@ pub fn install_command_completer(interp: &Rc<Interp>) {
                     .set(Value::int(i as i64 + 1), Value::str(word));
             }
             let args = vec![Value::Table(argv), Value::str(current)];
-            match interp.call(&function, args) {
+            match interp.call_function(&function, args) {
                 Ok(values) => to_candidates(&values),
                 Err(e) => {
                     // Reported once: this runs on every Tab, and a raising hook would otherwise
@@ -247,16 +248,30 @@ fn to_candidates(values: &[Value]) -> Option<Vec<(String, Option<String>)>> {
     Some(out)
 }
 
+/// Let the Lua prompt complete against the names that actually exist in this session.
+///
+/// The editor knows what is being *typed* — where the name starts, whether a dot or a colon comes
+/// before it, whether the cursor is inside a string. Only the interpreter knows what a name *is*.
+/// This hands over the second half, and nothing but names crosses: see
+/// [`oslo_ui::completion::lua`] for the split and [`Engine::names_at`] for why the values stay in
+/// the VM.
+pub fn install_lua_completer(interp: &Rc<Engine>) {
+    let interp = Rc::clone(interp);
+    oslo_ui::completion::lua::set_name_source(Some(Rc::new(move |path: &[String]| {
+        interp.names_at(path)
+    })));
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-    use oslo_lua::parse;
 
     /// Run a config and ask the installed provider what it says about `cand`.
     fn columns_of(source: &str, cand: &CompletionCandidate, facts: &Facts) -> Option<Vec<String>> {
-        let interp = Rc::new(Interp::new("columns test"));
-        let ast = parse(source).expect("the test chunk must parse");
-        interp.run_ast(&ast).expect("the test chunk must run");
+        let interp = Rc::new(Engine::new());
+        interp
+            .eval(source, "columns test")
+            .expect("the test chunk must run");
         install(&interp);
         let out = oslo_ui::dropdown::columns_for(cand, facts);
         let builtin = oslo_ui::dropdown::builtin_columns(cand, facts);
@@ -309,9 +324,10 @@ mod tests {
     /// row would come out a column short and rag against every other one.
     #[test]
     fn a_nil_column_is_blank_rather_than_the_end_of_the_row() {
-        let interp = Rc::new(Interp::new("columns test"));
-        let ast = parse("t = { 'a', nil, 'c' }").expect("parses");
-        interp.run_ast(&ast).expect("runs");
+        let interp = Rc::new(Engine::new());
+        interp
+            .eval("t = { 'a', nil, 'c' }", "columns test")
+            .expect("runs");
         // The evaluator's constructor really does stop the sequence at the hole, which is what
         // makes the index scan necessary rather than merely tidy.
         let Value::Table(raw) = interp.global("t") else {
@@ -329,9 +345,10 @@ mod tests {
     /// The scan's tail is not a row of sixteen blank columns.
     #[test]
     fn only_the_columns_the_config_filled_are_drawn() {
-        let interp = Rc::new(Interp::new("columns test"));
-        let ast = parse("t = { 'a', 'b' }").expect("parses");
-        interp.run_ast(&ast).expect("runs");
+        let interp = Rc::new(Engine::new());
+        interp
+            .eval("t = { 'a', 'b' }", "columns test")
+            .expect("runs");
         let columns = to_columns(&[interp.global("t")]).expect("a table is a column list");
         assert_eq!(columns, vec!["a".to_string(), "b".to_string()]);
     }
@@ -374,6 +391,6 @@ mod tests {
         assert_eq!(int("entries"), Some(12));
         // Absent facts are nil rather than zero: a file whose `stat` failed has no size, and a
         // config testing `if c.size then` must be able to tell that from an empty file.
-        assert!(matches!(t.get(&Value::str("mtime")), Value::Nil));
+        assert!(matches!(t.get_str("mtime"), Value::Nil));
     }
 }

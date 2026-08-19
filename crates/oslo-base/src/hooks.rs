@@ -19,7 +19,7 @@
 //! *interpreter* is the bottom of this stack and the Lua *API* is the top, and only the first is
 //! named here. The same edge already exists as `ShellError::Lua`.
 
-use oslo_lua::value::{Table, Value};
+use crate::value::{Table, Value};
 use std::sync::OnceLock;
 
 /// The moments something on a hot path has to ask about, by index.
@@ -67,6 +67,32 @@ pub mod at {
     /// the value.
     pub const PRE_SECRET_ACCESS: usize = 24;
     pub const POST_SECRET_ACCESS: usize = 25;
+
+    /// One process of a job ended. Told the pid, the job it belonged to and how it went.
+    ///
+    /// **One per process, where [`JOB_FINISH`] is one per job.** A pipeline of three is three of
+    /// these and one of those, which is the difference a plugin watching a particular child needs
+    /// and could not previously get.
+    pub const PROCESS_EXIT: usize = 26;
+    /// A job changed state: running, stopped, or ended.
+    ///
+    /// The transition rather than the destination — `from` and `to` — because "it stopped" and "it
+    /// was already stopped" are different things to a status line.
+    pub const JOB_STATE: usize = 27;
+    /// The terminal gained or lost focus, where the terminal reports it at all.
+    ///
+    /// An observer and nothing more: the report arrives as input, and a handler that could veto it
+    /// would be vetoing something that has already happened somewhere oslo does not control.
+    pub const FOCUS_CHANGE: usize = 28;
+    /// A variable was set or erased, in this shell or in another one.
+    ///
+    /// **`source` is the field that earns this hook.** A universal variable can change because you
+    /// typed something here or because a shell in another window did, and a status line that
+    /// redraws on the second but not the first — or the other way about — needs to be told which.
+    pub const VARIABLE_CHANGE: usize = 29;
+    /// The watcher acted on a job that would not take an interrupt. See
+    /// `oslo_shell::exec::job::sentinel`.
+    pub const JOB_ESCALATED: usize = 30;
 }
 
 /// The four ways a hook is reached, supplied by whoever can actually run one.
@@ -164,7 +190,7 @@ mod tests {
             panic!("a hook payload is a table");
         };
         let table = table.borrow();
-        assert!(matches!(table.get(&Value::str("from")), Value::Str(s) if &*s == "/a"));
-        assert!(matches!(table.get(&Value::str("to")), Value::Str(s) if &*s == "/b"));
+        assert!(matches!(table.get_str("from"), Value::Str(s) if &*s == "/a"));
+        assert!(matches!(table.get_str("to"), Value::Str(s) if &*s == "/b"));
     }
 }

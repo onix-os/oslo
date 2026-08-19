@@ -2,14 +2,14 @@
 //!
 //! # After the config, deliberately
 //!
-//! Three sources define an alias: `alias` in a script, `oslo.alias` in `config.lua`, and
+//! Three sources define an alias: `alias` in a script, `oslo.alias` in `init.lua`, and
 //! `oslo macros add`. The ordinary shell rule is that the last definition wins, and this applies it
 //! to sources: **the database is applied after the configuration, so the database wins.**
 //!
 //! That is the deliberate half. The database is the one you can change without editing a file, so
 //! `oslo macros add gco …` taking effect is what you asked for; a config that has to be edited and
 //! re-sourced would be the more surprising winner. The cost is that a stored entry can shadow one
-//! you wrote in `config.lua` — which is why what the config defined is written out here, so that the
+//! you wrote in `init.lua` — which is why what the config defined is written out here, so that the
 //! manager can show you both, and so that *removing* the stored one puts the configured one back
 //! rather than leaving a hole.
 //!
@@ -22,7 +22,7 @@
 //! # And only where the config is read
 //!
 //! This runs from the interactive loop, beside `load_config`, and from nowhere else — so a script or
-//! an `oslo -c` sees none of it. That is not a new restriction: `config.lua` is read by this loop and
+//! an `oslo -c` sees none of it. That is not a new restriction: `init.lua` is read by this loop and
 //! by nothing else either, so a non-interactive shell has never had aliases to expand.
 
 use oslo_base::macros::live::{Applied, Stamps};
@@ -95,10 +95,19 @@ fn apply(env: &Arc<Mutex<Environment>>, wanted: &[Entry], had: &Applied, now: &A
             Kind::Abbrev => oslo_ui::abbr::add(
                 &entry.name,
                 &entry.body,
-                // The placement a stored abbreviation gets. `oslo macros` has no `--anywhere` yet,
-                // and command position is what an abbreviation is for; widening it later is adding
-                // a flag rather than changing what these mean.
-                oslo_ui::abbr::Placement::Command,
+                // **Whatever it already has, if it has one.**
+                //
+                // `want()` merges the macro database with `from_elsewhere` — and `from_elsewhere`
+                // is the snapshot *this shell* wrote a few lines ago, describing what its own
+                // config defined. So a config's `{ "| less", anywhere = true }` came straight back
+                // here and was re-added as `Command`, and the flag was gone before the first
+                // prompt. The config reader was right all along; this was the thief.
+                //
+                // A row that is genuinely only in the database has nothing in the table yet and
+                // gets the default: `oslo macros` has no `--anywhere`, and command position is
+                // what an abbreviation is for.
+                oslo_ui::abbr::placement_of(&entry.name)
+                    .unwrap_or(oslo_ui::abbr::Placement::Command),
             ),
             // **A value now; a recipe when somebody asks.**
             //

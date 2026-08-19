@@ -6,7 +6,7 @@
 //! ```
 //!
 //! **One source of facts.** The rows are the truth; the text face is a rendering of them. That is
-//! the shape `docs/built-in-tools.md` argues for, and the reason is that any tool with two
+//! the shape `docs/features/structured-pipelines.md` argues for, and the reason is that any tool with two
 //! independent implementations of "what the filesystems are" ends up with two answers.
 //!
 //! The facts come from the external `df`, not from re-implementing it. Parsing a tool that already

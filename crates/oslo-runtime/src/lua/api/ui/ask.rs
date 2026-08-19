@@ -16,7 +16,7 @@
 //! the caller's data. stderr is where a prompt belongs for the same reason `read -p` puts it there.
 
 use super::super::util::{ok, put, text};
-use oslo_lua::value::{Number, Table, Value};
+use oslo_base::value::{Number, Table, Value};
 use std::io::{BufRead, IsTerminal, Write};
 
 /// Write a prompt where a person will see it and a pipeline will not.

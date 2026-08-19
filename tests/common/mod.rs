@@ -82,6 +82,29 @@ pub fn run_in(dir: &std::path::Path, script: &str) -> Run {
     }
 }
 
+/// The same, with `--posix` — where POSIX and bash's default disagree.
+///
+/// A separate runner rather than a flag on [`run_in`], because almost nothing wants it: the
+/// interesting cases are the handful where the two modes are *supposed* to differ, and a test that
+/// took the mode as a parameter would invite passing the wrong one by accident.
+pub fn run_posix(script: &str) -> Run {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let output: Output = Command::new(oslo_bin())
+        .arg("--posix")
+        .arg("-c")
+        .arg(script)
+        .current_dir(dir.path())
+        .stdin(Stdio::null())
+        .output()
+        .expect("spawn oslo");
+
+    Run {
+        stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
+        stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
+        status: output.status.code().unwrap_or(-1),
+    }
+}
+
 /// Run in a fresh temporary directory.
 pub fn run(script: &str) -> Run {
     let dir = tempfile::tempdir().expect("tempdir");
@@ -111,4 +134,37 @@ pub fn assert_out_in(dir: &std::path::Path, script: &str, expected: &str) {
         dir.display(),
         r.stderr
     );
+}
+
+/// Refuse an oracle that is not bash, once per test binary.
+///
+/// **On a machine where oslo has been installed as `bash`, `bash` is oslo.** That is a supported
+/// thing to do — `~/.local/share/shell/bash` pointing at `/usr/bin/oslo` is how you try it as your
+/// daily shell — and with it on `$PATH` every comparison against "bash" becomes oslo against oslo:
+/// it passes, and proves nothing.
+///
+/// It was worse than nothing in `differential_tests`. `$BASH_VERSINFO` is part of oslo's bash
+/// compatibility, so the version check passed; the corpus reported *408 matching, 0 divergent*;
+/// and because every known divergence "matched", the run failed **demanding that three real gaps
+/// be deleted from `expected_fail.rs`** — `coproc` and `select` among them, which oslo refuses by
+/// name and does not implement. Following the instruction would have marked two unimplemented
+/// constructs as done and left nothing watching them.
+///
+/// `bash --version` tells the two apart: the real one says `GNU bash`, oslo says `oslo version …`.
+pub fn assert_oracle_is_bash() {
+    static CHECKED: std::sync::Once = std::sync::Once::new();
+    CHECKED.call_once(|| {
+        let banner = Command::new("bash")
+            .arg("--version")
+            .output()
+            .expect("bash must be on PATH: it is the oracle these tests compare against");
+        let banner = String::from_utf8_lossy(&banner.stdout).into_owned();
+        assert!(
+            banner.contains("GNU bash"),
+            "the oracle on $PATH is not bash — it said {:?}.\n\
+             oslo installed as `bash` is the usual cause, and comparing oslo against oslo proves \
+             nothing. Put a real bash ahead of it: PATH=/tmp/realbash:$PATH cargo test",
+            banner.lines().next().unwrap_or("").trim()
+        );
+    });
 }

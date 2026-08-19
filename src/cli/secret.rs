@@ -53,6 +53,18 @@ pub fn run(args: &[String]) -> i32 {
         }
     };
 
+    // The subcommands that read no operand at all. Checked in one place rather than in each arm,
+    // because `extra` reports as it answers and asking it twice would say it twice.
+    if let Some(name) = args.first().map(String::as_str)
+        && matches!(
+            name,
+            "list" | "ls" | "stores" | "where" | "paths" | "rotate"
+        )
+        && let Some(bad) = MENU.extra(name, &args, 0)
+    {
+        return bad;
+    }
+
     match args.first().map(String::as_str) {
         Some("set") => with_name(&args, |name| match store() {
             Ok(store) => set(&store, name),
@@ -179,10 +191,17 @@ fn store_argument(args: &[String]) -> Result<(Option<String>, Vec<String>), Stri
     Ok((name, rest))
 }
 
+/// **One name, and only one.** `set`, `get` and `rm` each act on a single secret; a second word
+/// was read as nothing at all, so `oslo secret rm old new` forgot `old` and said nothing about
+/// `new` — a silence that reads exactly like success.
 fn with_name(args: &[String], then: impl FnOnce(&str) -> i32) -> i32 {
+    let command = args.first().map(String::as_str);
     match args.get(1) {
-        Some(name) => then(name),
-        None => match args.first() {
+        Some(name) => match command.and_then(|c| MENU.extra(c, args, 1)) {
+            Some(bad) => bad,
+            None => then(name),
+        },
+        None => match command {
             Some(command) => MENU.wrong(command, "needs the name of a secret"),
             None => MENU.missing("needs a subcommand"),
         },

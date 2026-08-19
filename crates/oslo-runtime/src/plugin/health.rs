@@ -16,7 +16,7 @@
 //! Registered when the plugin loads, which is why `doctor` has to load a plugin to ask it.
 
 use super::doctor::State;
-use oslo_lua::value::{Table, Value};
+use oslo_base::value::{Table, Value};
 use std::cell::RefCell;
 use std::collections::HashMap;
 
@@ -31,12 +31,12 @@ pub fn build() -> Value {
     // oslo.plugin.health(name, function(report) … end)
     super::super::lua::api::util::put(&mut plugin, "health", |_, args| {
         let Some(Value::Str(name)) = args.first() else {
-            return Err(oslo_lua::LuaError::new(
+            return Err(oslo_base::value::LuaError::new(
                 "oslo.plugin.health: the first argument is the plugin's name".to_string(),
             ));
         };
         let Some(check @ Value::Function(_)) = args.get(1) else {
-            return Err(oslo_lua::LuaError::new(
+            return Err(oslo_base::value::LuaError::new(
                 "oslo.plugin.health: the second argument must be a function".to_string(),
             ));
         };
@@ -111,7 +111,7 @@ mod tests {
             panic!("not a table")
         };
         assert!(matches!(
-            built.borrow().get(&Value::str("health")),
+            built.borrow().get_str("health"),
             Value::Function(_)
         ));
     }

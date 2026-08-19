@@ -59,7 +59,7 @@ fn written(shell: &PtyShell) -> Vec<(String, String)> {
             }
             // The config is the one file that legitimately contains the marker: it is the rule
             // that matches it. Everything else the shell wrote is fair game.
-            if path.ends_with("config.lua") {
+            if path.ends_with("init.lua") {
                 continue;
             }
             // Lossily, because the tracking store is a binary file — a marker written into it is

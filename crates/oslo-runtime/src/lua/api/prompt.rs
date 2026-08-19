@@ -15,8 +15,8 @@
 
 use super::util::{ok, put, text};
 use crate::lua::engine::Registry;
-use oslo_lua::LuaError;
-use oslo_lua::value::{Table, Value};
+use oslo_base::value::LuaError;
+use oslo_base::value::{Table, Value};
 use oslo_ui::theme::{self, Color, Style};
 use std::rc::Rc;
 
@@ -46,16 +46,16 @@ pub(crate) const TITLE: &str = "prompt.title";
 
 /// Add `oslo.prompt`, `oslo.git` and `oslo.path.shorten`.
 pub fn install(oslo: &mut Table, _ui: &mut Table, registry: &Registry) {
-    oslo.set(Value::str("prompt"), build(registry));
+    oslo.set_str("prompt", build(registry));
     // **`oslo.ui.style` is not installed here.** It used to be, and `ui::prompt` installs one of
     // the same name *after* this runs — so this one was overwritten before any config could reach
     // it, and had been dead for as long as both existed. The survivor does everything this did and
     // more (borders, padding, width), and now accepts this one's two-argument call shape too.
-    oslo.set(Value::str("git"), git());
+    oslo.set_str("git", super::git::build());
     // The fine-grained shape: a prompt as a list of named, prioritised pieces rather than one
     // opaque string. See `super::segment`.
-    oslo.set(Value::str("segment"), super::segment::constructor());
-    oslo.set(Value::str("theme"), theme_table());
+    oslo.set_str("segment", super::segment::constructor());
+    oslo.set_str("theme", theme_table());
 }
 
 /// The `oslo.prompt` table.
@@ -152,7 +152,7 @@ fn theme_table() -> Value {
     styles.borrow_mut().metatable = Some(Rc::new(std::cell::RefCell::new(meta)));
 
     let mut theme_table = Table::new();
-    theme_table.set(Value::str("styles"), Value::Table(styles));
+    theme_table.set_str("styles", Value::Table(styles));
     Value::Table(Rc::new(std::cell::RefCell::new(theme_table)))
 }
 
@@ -182,29 +182,6 @@ pub fn style_named(name: &str) -> Style {
         // nothing *and* not be mistaken for a colour called "prompt.usr".
         other => Color::parse(other).map(Style::fg).unwrap_or_default(),
     }
-}
-
-/// `oslo.git` — what a prompt asks about a repository.
-fn git() -> Value {
-    let mut git = Table::new();
-
-    // oslo.git.branch() -> "main", a short hash when detached, or nil outside a repository.
-    put(&mut git, "branch", |_, _| {
-        ok(match oslo_ui::prompt::git_branch() {
-            Some(branch) => Value::str(branch),
-            None => Value::Nil,
-        })
-    });
-
-    // oslo.git.root() -> the working tree's top directory, or nil.
-    put(&mut git, "root", |_, _| {
-        ok(match oslo_ui::prompt::git_root() {
-            Some(root) => Value::str(root.display().to_string()),
-            None => Value::Nil,
-        })
-    });
-
-    Value::table(git)
 }
 
 /// `oslo.path.shorten` — added to the existing `oslo.path` table.

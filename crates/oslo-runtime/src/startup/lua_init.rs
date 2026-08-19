@@ -39,9 +39,13 @@ pub fn config_paths(env: &Environment) -> Vec<PathBuf> {
     // and what happens if I have two?" — and `.oslorc` in particular reads like a shell rc file to
     // anyone who has used one, which it has not been for some time. Configuration is Lua, the file
     // says so in its name, and there is exactly one place to put it.
+    //
+    // `init.lua`, because the directory is a Lua *package* and that is what a package's entry point
+    // is called — the same name nvim uses, and the one `require "oslo"` and `require "aliases"`
+    // already imply. `?/init.lua` is on `package.path` for exactly this reason.
     let mut paths = Vec::new();
     if let Some(xdg) = xdg {
-        paths.push(xdg.join("oslo/config.lua"));
+        paths.push(xdg.join("oslo/init.lua"));
     }
     let _ = home;
     paths
@@ -56,11 +60,11 @@ pub fn config_path(env: &Environment) -> Option<PathBuf> {
 ///
 /// fish's `conf.d`, and it exists for the same reason fish grew it: a plugin, a package manager or
 /// a dotfile repo needs somewhere to add a line of configuration **without editing a file it does
-/// not own**. Appending to `config.lua` means every uninstall is a text edit that can go wrong, and
+/// not own**. Appending to `init.lua` means every uninstall is a text edit that can go wrong, and
 /// two tools appending at once means a merge conflict in a file a person also writes by hand.
 ///
 /// Name order rather than directory order, so `10-path.lua` runs before `20-prompt.lua` and the
-/// result does not depend on what the filesystem feels like returning. `config.lua` runs **last**,
+/// result does not depend on what the filesystem feels like returning. `init.lua` runs **last**,
 /// so the file you wrote by hand has the final say over anything a package dropped in.
 pub fn config_files(env: &Environment) -> Vec<PathBuf> {
     let mut files = Vec::new();
@@ -182,7 +186,10 @@ pub fn run_lua_source(source: &str, name: &str, args: &[String]) -> i32 {
         if let Some(code) = requested_exit(&e) {
             return code;
         }
-        eprintln!("oslo: {}: {}", name, e);
+        // The error names its own file, and with a *line* where the VM knew one — `e.lua:3: …`
+        // rather than the `e.lua: ` this used to put in front of it. Naming the script here as
+        // well printed it twice for every failure.
+        eprintln!("oslo: {e}");
         return 1;
     }
     env.lock().map(|guard| guard.last_status).unwrap_or(1)

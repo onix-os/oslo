@@ -6,6 +6,7 @@
 //! one of them stops accepting something the others do.
 
 use super::{Shared, from_stdin, report, shared_flag, take};
+use crate::env::origin_now;
 use oslo_ui::ask::{Browse, Choice, Table, Want, choose, file, filter, parse_table, table};
 use oslo_ui::matching::Fuzzy;
 
@@ -32,7 +33,7 @@ pub(super) fn run_choose(args: &[String], filtering: bool) -> i32 {
                     Shared::Bad(status) => return status,
                     Shared::NotMine => {}
                 }
-                eprintln!("oslo: ui: {other}: unknown option");
+                eprintln!("{}ui: {other}: unknown option", origin_now());
                 return 2;
             }
             other => items.push(other.to_string()),
@@ -70,7 +71,7 @@ pub(super) fn run_file(args: &[String]) -> i32 {
                     Shared::Bad(status) => return status,
                     Shared::NotMine => {}
                 }
-                eprintln!("oslo: ui file: {other}: unknown option");
+                eprintln!("{}ui file: {other}: unknown option", origin_now());
                 return 2;
             }
             other => spec.start = std::path::PathBuf::from(other),
@@ -100,7 +101,7 @@ pub(super) fn run_table(args: &[String]) -> i32 {
                     Shared::Bad(status) => return status,
                     Shared::NotMine => {}
                 }
-                eprintln!("oslo: ui table: {other}: unknown option");
+                eprintln!("{}ui table: {other}: unknown option", origin_now());
                 return 2;
             }
         }

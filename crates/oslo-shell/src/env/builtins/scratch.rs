@@ -11,6 +11,7 @@
 //! Everything it does, the key does too. Nothing here is a second way of *deciding* anything.
 
 use super::super::Environment;
+use crate::env::origin_now;
 use crate::scratch::enter;
 use oslo_base::error::Result;
 
@@ -48,7 +49,7 @@ fn run(args: &[String]) -> i32 {
         // **Not a flag, so it is a name.** Refusing anything unrecognised would make `scratch -x` and
         // `scratch my-scratch` fail the same way, and only one of those is a mistake.
         Some(flag) if flag.starts_with('-') => {
-            eprintln!("oslo: scratch: {flag}: unknown option\n{USAGE}");
+            eprintln!("{}scratch: {flag}: unknown option\n{USAGE}", origin_now());
             2
         }
         Some(name) => enter_named(&key, name),
@@ -67,7 +68,7 @@ fn list() -> i32 {
             0
         }
         Err(err) => {
-            eprintln!("oslo: scratch: {err}");
+            eprintln!("{}scratch: {err}", origin_now());
             1
         }
     }
@@ -85,7 +86,7 @@ fn report(outcome: std::io::Result<enter::Went>) -> i32 {
     match outcome {
         Ok(_) => 0,
         Err(err) => {
-            eprintln!("oslo: scratch: {err}");
+            eprintln!("{}scratch: {err}", origin_now());
             1
         }
     }

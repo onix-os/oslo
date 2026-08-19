@@ -18,8 +18,8 @@ in the shell.
 > make build TYPE=minimal     # no nix integration at all
 > ```
 >
-> It costs **68 KB** — 6,832,384 bytes without it against 6,902,016 with — the second-smallest of
-> the five optional features. It is off because a `/bin/sh` on a distribution has no business
+> It costs **48 KB** — 6,271,776 bytes without it against 6,320,928 with — the second-smallest of
+> the nine optional features. It is off because a `/bin/sh` on a distribution has no business
 > knowing what a flake is, not because of the size.
 >
 > Without it there is no `oslo.nix` at all, and a config asks before using it the way it asks about
@@ -33,16 +33,25 @@ in the shell.
 > `.env.lua` can call `oslo.direnv.nix_develop()`; with `nix` alone there is no directory file to
 > ask, and `oslo.nix` is the whole of it.
 
+<!-- demo:begin -->
+[![nix demo](https://asciinema.org/a/1263435.svg)](https://asciinema.org/a/1263435)
+<!-- demo:end -->
+
 ## There is no `oslo nix` command
 
 Deliberately, and it is not coming. The feature is a Lua table; anything that wants to be typed is a
 tool a config registers, in three lines:
 
 ```lua
-oslo.register_tool("stale", function()
-  for _, i in ipairs(oslo.nix.inputs()) do print(i.days, i.name) end
-end)
+oslo.register_tool{
+  name = "stale",
+  rows = function() return oslo.nix.inputs() end,
+}
 ```
+
+`register_tool` takes a **table** — `name` and `rows` at least; see
+[your own tools](your-own-tools.md). Returning the inputs rather than printing them is what makes
+`stale | where 'days > 180'` work, because the rows are rows.
 
 ## How it works
 

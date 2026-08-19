@@ -11,8 +11,8 @@
 //! points are the accessors on [`Environment`], not this type:
 //!
 //! ```
-//! # use oslo::env::Environment;
-//! # use oslo::env::options::ShellOption;
+//! # use oslo_shell::env::Environment;
+//! # use oslo_shell::env::options::ShellOption;
 //! # let mut env = Environment::new();
 //! env.set_option(ShellOption::ErrExit, true);
 //! assert!(env.errexit()); // the named accessor, for the options with behaviour

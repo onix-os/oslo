@@ -17,17 +17,21 @@
 //!
 //! # Where a callback runs
 //!
-//! **Between commands, at the same safe point timers use** — never the instant the process exits.
-//! The process finishes on its own thread; what it produced waits in a queue until the read loop
-//! holds nothing and can call Lua. So a callback is late by up to one command, and that is the whole
-//! promise: this is not an async runtime, it is one process and one callback.
+//! **At the same safe point timers use** — never the instant the process exits. The process
+//! finishes on its own thread; what it produced waits in a queue until the shell holds nothing and
+//! can call Lua. This is not an async runtime: it is one process and one callback.
+//!
+//! That safe point now includes **an idle prompt**, not only a command boundary. The worker queues
+//! its result and nudges [`oslo_base::background`]; the editor's wait returns and delivers it. Before
+//! that, a callback for something that finished while you were reading the screen waited for your
+//! next keystroke — which for the last command of a session is for ever.
 //!
 //! A Lua value cannot cross threads — it is `Rc` — so the callback never leaves this one. The worker
 //! sends bytes and a status; the handler is looked up here, by id.
 
 use super::util::{ok, put};
-use oslo_lua::value::{Table, Value};
-use oslo_lua::{LuaError, LuaResult};
+use oslo_base::value::{LuaError, LuaResult};
+use oslo_base::value::{Table, Value};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::sync::{Mutex, OnceLock};
@@ -83,7 +87,7 @@ fn start(args: &[Value]) -> LuaResult<Vec<Value>> {
     let Some(program) = argv.first().cloned() else {
         return Err(LuaError::new("oslo.spawn: no command to run".to_string()));
     };
-    let on_exit = match spec.get(&Value::str("on_exit")) {
+    let on_exit = match spec.get_str("on_exit") {
         Value::Nil => None,
         it @ Value::Function(_) => Some(it),
         _ => {
@@ -94,7 +98,7 @@ fn start(args: &[Value]) -> LuaResult<Vec<Value>> {
     };
     // A ceiling rather than a limit anybody should meet — but a background process nobody is
     // waiting for is exactly the kind that is never noticed hanging.
-    let timeout = match spec.get(&Value::str("timeout")).as_number() {
+    let timeout = match spec.get_str("timeout").as_number() {
         Some(n) if n.as_float() > 0.0 => Some(Duration::from_secs_f64(n.as_float() / 1000.0)),
         _ => None,
     };
@@ -114,6 +118,11 @@ fn start(args: &[Value]) -> LuaResult<Vec<Value>> {
         if let Ok(mut done) = done().lock() {
             done.push(Finished { id, out, status });
         }
+        // **After the result is queued, never before.** The wake is what makes an idle editor come
+        // and look; waking first would have it look at a queue this thread has not filled yet, find
+        // nothing, and go back to sleep until the next keystroke — which is the delay this exists
+        // to remove. Nothing of the result crosses the pipe: it says only *go and look*.
+        oslo_base::background::nudge();
     });
 
     ok(handle(id))
@@ -125,13 +134,22 @@ fn start(args: &[Value]) -> LuaResult<Vec<Value>> {
 /// longer want is a different decision from not wanting it, and a shell that reaped a `git fetch`
 /// because a prompt segment was dismissed would be surprising in a way nobody could debug.
 fn handle(id: u64) -> Value {
-    super::util::record(vec![(
-        "cancel",
-        super::util::native("spawn handle", move |_, _| {
-            let had = WAITING.with(|slot| slot.borrow_mut().remove(&id).is_some());
-            ok(Value::Bool(had))
-        }),
-    )])
+    let mut table = super::handle::Handle::new("oslo.spawn");
+
+    table.verb("cancel", move |_, _| {
+        let had = WAITING.with(|slot| slot.borrow_mut().remove(&id).is_some());
+        ok(Value::Bool(had))
+    });
+
+    // **`<close>` cancels, and the collector does not.** A spawn is written for its callback and
+    // its handle is usually dropped on the spot, so a `__gc` that cancelled would cancel almost
+    // every spawn in the shell. Saying `local job <close> = oslo.spawn{…}` is asking for the work
+    // to be scoped to the block, which is a different thing and a deliberate one.
+    table.on_close("oslo.spawn.close", move || {
+        WAITING.with(|slot| slot.borrow_mut().remove(&id));
+    });
+
+    table.build()
 }
 
 /// Run the process. On a worker thread, so blocking here costs nothing.
@@ -223,10 +241,13 @@ pub fn deliver() {
 ///
 /// The shape every caller wants: a session with nothing spawned — every session, nearly always —
 /// costs one uncontended `try_lock` rather than a drain.
-pub fn deliver_if_any() {
+/// Answers whether a callback ran, so the caller can decide whether a drawn prompt is still true.
+pub fn deliver_if_any() -> bool {
     if any_done() {
         deliver();
+        return true;
     }
+    false
 }
 
 /// Whether anything has finished, so the loop can skip the lock.

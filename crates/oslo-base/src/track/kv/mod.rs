@@ -13,7 +13,6 @@ pub use key::{Fields, Key};
 pub use range::{Span, upper_bound};
 pub use tree::Tree;
 
-use std::panic::{AssertUnwindSafe, catch_unwind};
 use std::path::{Path, PathBuf};
 use tagdata::{
     DB, Data, Error as TagdataError, MergeConflictPolicy, MergeOptions, OpenOptions, Tx,
@@ -101,8 +100,8 @@ impl Store {
         if read_only {
             options = options.read_only();
         }
-        let db = catch_unwind(AssertUnwindSafe(|| options.open(path)))
-            .map_err(|_| format!("{}: database open panicked", path.display()))?
+        let db = options
+            .open(path)
             .map_err(|error| format!("{}: {error}", path.display()))?;
         Ok(Store {
             path: path.to_path_buf(),
@@ -148,9 +147,7 @@ impl Store {
     /// never committed because it changes nothing.
     pub fn read<T>(&self, work: impl FnOnce(&Reader<'_, '_>) -> Option<T>) -> Option<T> {
         let tx = self.db.tx(false).ok()?;
-        catch_unwind(AssertUnwindSafe(|| work(&Reader { tx: &tx })))
-            .ok()
-            .flatten()
+        work(&Reader { tx: &tx })
     }
 
     pub fn read_checked<T>(
@@ -161,8 +158,7 @@ impl Store {
             .db
             .tx(false)
             .map_err(|error| format!("{}: {error}", self.path.display()))?;
-        catch_unwind(AssertUnwindSafe(|| work(&Reader { tx: &tx })))
-            .map_err(|_| format!("{}: read transaction panicked", self.path.display()))?
+        work(&Reader { tx: &tx })
     }
 
     /// Write to the store, committing when `work` answers `Some` and discarding when it answers
@@ -176,12 +172,7 @@ impl Store {
     /// Dropping an uncommitted transaction rolls it back.
     pub fn write<T>(&self, work: impl FnOnce(&Writer<'_, '_>) -> Option<T>) -> Option<T> {
         let tx = self.db.tx(true).ok()?;
-        let value = catch_unwind(AssertUnwindSafe(|| {
-            let writer = Writer(Reader { tx: &tx });
-            work(&writer)
-        }))
-        .ok()
-        .flatten()?;
+        let value = work(&Writer(Reader { tx: &tx }))?;
         tx.commit().ok().map(|()| value)
     }
 
@@ -193,11 +184,7 @@ impl Store {
             .db
             .tx(true)
             .map_err(|error| format!("{}: {error}", self.path.display()))?;
-        let value = catch_unwind(AssertUnwindSafe(|| {
-            let writer = Writer(Reader { tx: &tx });
-            work(&writer)
-        }))
-        .map_err(|_| format!("{}: write transaction panicked", self.path.display()))??;
+        let value = work(&Writer(Reader { tx: &tx }))?;
         tx.commit()
             .map_err(|error| format!("{}: {error}", self.path.display()))?;
         Ok(value)
@@ -233,10 +220,12 @@ impl Store {
         let mut preserved = Vec::new();
         if overwrite {
             for data in source_bucket.cursor() {
-                let Data::KeyValue(source_pair) = data else {
+                // Every read can now report a corrupt page rather than panicking on one, so a row
+                // that cannot be read is skipped rather than taking the merge down with it.
+                let Ok(Data::KeyValue(source_pair)) = data else {
                     continue;
                 };
-                let Some(Data::KeyValue(destination_pair)) = destination.get(source_pair.key())
+                let Ok(Some(Data::KeyValue(destination_pair))) = destination.get(source_pair.key())
                 else {
                     continue;
                 };
@@ -375,7 +364,7 @@ impl Reader<'_, '_> {
     /// created yet, because an empty store and an empty bucket hold the same rows.
     pub fn get(&self, tree: Tree, key: &[u8]) -> Option<Vec<u8>> {
         let bucket = self.tx.get_bucket(tree.name()).ok()?;
-        match bucket.get(key)? {
+        match bucket.get(key).ok()?? {
             Data::KeyValue(pair) => Some(pair.value().to_vec()),
             Data::Bucket(_) => None,
         }
@@ -386,7 +375,7 @@ impl Reader<'_, '_> {
         self.tx
             .get_bucket(tree.name())
             .ok()
-            .and_then(|bucket| bucket.get_kv(key))
+            .and_then(|bucket| bucket.get_kv(key).ok().flatten())
             .is_some()
     }
 
@@ -400,7 +389,7 @@ impl Reader<'_, '_> {
             return;
         };
         for found in bucket.range(span.bounds()) {
-            if let Data::KeyValue(pair) = found
+            if let Ok(Data::KeyValue(pair)) = found
                 && visit(pair.key(), pair.value()) == Walk::Stop
             {
                 return;

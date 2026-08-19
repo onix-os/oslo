@@ -277,6 +277,8 @@ fn check_nounset(env: &Environment, name: &str, expansion_type: &ParamExpansion)
 /// so the branch silently stops firing depending on where you run the script.
 pub fn expand_word_to_string(env: &mut Environment, word: &Word) -> Result<String> {
     let fields = expand_word_fields(env, word)?;
+    let fields =
+        crate::expand::sugar::marked_fields(env, fields).map_err(ShellError::ExpansionError)?;
     if fields.len() == 1 {
         return Ok(field_text(&fields[0]));
     }
@@ -299,7 +301,10 @@ pub fn expand_word_to_string(env: &mut Environment, word: &Word) -> Result<Strin
 /// Several fields can only arise from `$@`; they are concatenated, which is the same text a
 /// context insisting on one string would have got.
 pub fn expand_word_to_pattern(env: &mut Environment, word: &Word) -> Result<Vec<Run>> {
-    Ok(expand_word_fields(env, word)?.concat())
+    let fields = expand_word_fields(env, word)?;
+    Ok(crate::expand::sugar::marked_fields(env, fields)
+        .map_err(ShellError::ExpansionError)?
+        .concat())
 }
 
 /// Full expansion of one word: parameters, substitutions, field splitting, then pathname
@@ -307,10 +312,32 @@ pub fn expand_word_to_pattern(env: &mut Environment, word: &Word) -> Result<Vec<
 ///
 /// Brace expansion is not here, and deliberately so. It is the one expansion that yields whole
 /// *words* rather than fields, and matching bash means running it on the word's source text
-/// before the word is lexed at all — so it lives in [`crate::expand::brace`] and is applied by
+/// before the word is lexed at all — so it lives in `oslo_base::brace` and is applied by
 /// the parser, once per word, at the positions where bash applies it. By the time a [`Word`]
 /// reaches this function its groups are already gone.
 pub fn expand_word(env: &mut Environment, word: &Word) -> Result<Vec<String>> {
+    expand_word_at(env, word, Place::Argument)
+}
+
+/// Where in a command a word sits, which only the shorthands care about.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum Place {
+    /// The command name.
+    Command,
+    /// Everything after it.
+    Argument,
+}
+
+/// The command word, which the shorthands leave alone.
+///
+/// **The start of a line is reserved.** A leading symbol is being kept for something else, so
+/// `@proj` typed on its own must not quietly become a path — it did, and then failed with
+/// `Is a directory`, which is the position spoken for by an error message nobody chose.
+pub fn expand_command_word(env: &mut Environment, word: &Word) -> Result<Vec<String>> {
+    expand_word_at(env, word, Place::Command)
+}
+
+fn expand_word_at(env: &mut Environment, word: &Word, place: Place) -> Result<Vec<String>> {
     let mut out = Vec::new();
     // `set -f` switches pathname expansion off wholesale, so the field's own text is the answer.
     // Read once per word rather than per field: an expansion cannot change the option mid-word.
@@ -318,21 +345,27 @@ pub fn expand_word(env: &mut Environment, word: &Word) -> Result<Vec<String>> {
     let fields = expand_word_fields(env, word)?;
     let ifs = ifs_of(env);
     for field in fields {
+        // **`@name` is substituted here, where a tilde is, and for the same reason.** It names a
+        // directory, so the glob that follows it is the user's own and has to run: `@proj/*.rs` was
+        // reaching the command with a literal `*` while `~/*.rs` and `$M/*.rs` both expanded. Done
+        // before the split and the glob, and only when the word is an argument.
+        let field = match place {
+            Place::Argument if env.interactive() => {
+                crate::expand::sugar::marked_directory(field).map_err(ShellError::ExpansionError)?
+            }
+            _ => field,
+        };
+        // **`=command` is substituted here too, and for the third of the same reasons.** It has to
+        // see the field's *origin* — `echo "=ls"` is a literal and must stay one — and the origin
+        // is gone by the time the field is a `String`. What it answers with is marked quoted, so
+        // the path is still not split or globbed afterwards.
+        let field =
+            crate::expand::sugar::equals_field(env, field).map_err(ShellError::ExpansionError)?;
         for split in split_field(ifs, field) {
             if glob {
                 out.extend(expand_glob(&split));
             } else {
                 out.push(field_text(&split));
-            }
-        }
-    }
-    // `=command` and `@name`, last and only at a prompt. Last because they answer with a path, and
-    // a path that has just been produced must not then be globbed or split again; interactive-only
-    // because `echo =foo` in a script has to print `=foo` the way every other `/bin/sh` does.
-    if env.interactive() {
-        for field in &mut out {
-            if let Some(expanded) = crate::expand::sugar::expand_field(env, field) {
-                *field = expanded;
             }
         }
     }

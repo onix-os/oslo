@@ -107,7 +107,7 @@ the source is read, and the parser runs only once the source is seen to contain 
 only because the script declared it, and losing to whatever happens to be in the current directory
 is how `--env <Tab>` came to complete `src/`. Found by recording it, not by reading it.
 
-The provider is named `argc` and badged `argc`, so `oslo.completion.sources` can filter it and a
+The provider is named `argc` and badged `argc`, so `oslo.completion.sh_sources` can filter it and a
 config that wants to replace it declares a provider of the same name.
 
 ## A default computed by a function

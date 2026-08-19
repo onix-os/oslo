@@ -1,6 +1,6 @@
 //! Per-command output parsers: `sh.df()` and friends, answering rows instead of text.
 //!
-//! The shape these follow is written up in `docs/built-in-tools.md`. The short version: a tool
+//! The shape these follow is written up in `docs/features/structured-pipelines.md`. The short version: a tool
 //! answers in text when a pipe asks and in a table when Lua asks, and the fields carry **values,
 //! not renderings** — `free` is a byte count, `free_human` is `"4.2G"`. A config that wants to
 //! compare needs the number; one that wants to draw wants the string; making each config derive
@@ -11,7 +11,7 @@
 //! would be a second source of truth to keep in step. What the parser buys is that the *caller*
 //! never has to `awk` a column out of text whose layout shifts with the mount point's length.
 
-use oslo_lua::value::{Table, Value};
+use oslo_base::value::{Table, Value};
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -136,9 +136,11 @@ pub fn row_answer(
             Some(df_rows(&out))
         }
         "env" => Some(env_rows(env)),
-        // `ls` answers the current directory. An argument-taking form is the next step and is
-        // deliberately not guessed at here.
-        "ls" => Some(ls_rows(args.first().map(String::as_str).unwrap_or("."))),
+        // **A leading `-` word is a flag, not a directory.** It used to be taken as one, so
+        // `ls -la` stat'd a path called `-la`, found nothing, and answered an empty listing —
+        // silently, from both front ends: `sh.ls("-la")` (the documentation's headline example of
+        // one builtin reached two ways) and `ls -la | where …` typed as shell. See [`ls_where`].
+        "ls" => Some(ls_rows(ls_where(args))),
         "ps" => Some(ps_rows()),
         "stat" => Some(stat_rows(args)),
         _ => None,
@@ -183,10 +185,10 @@ pub(crate) fn ps_rows() -> Value {
     found.sort_by_key(|(pid, _, _)| *pid);
     for (i, (pid, comm, cmdline)) in found.iter().enumerate() {
         let mut row = Table::new();
-        row.set(Value::str("pid"), Value::int(*pid));
-        row.set(Value::str("name"), Value::str(comm));
-        row.set(Value::str("cmdline"), Value::str(cmdline));
-        row.set(Value::str("is_kernel"), Value::Bool(cmdline.is_empty()));
+        row.set_str("pid", Value::int(*pid));
+        row.set_str("name", Value::str(comm));
+        row.set_str("cmdline", Value::str(cmdline));
+        row.set_str("is_kernel", Value::Bool(cmdline.is_empty()));
         list.set(
             Value::int(i as i64 + 1),
             Value::Table(Rc::new(RefCell::new(row))),
@@ -204,25 +206,25 @@ fn stat_rows(paths: &[String]) -> Value {
     let mut list = Table::new();
     for (i, path) in paths.iter().enumerate() {
         let mut row = Table::new();
-        row.set(Value::str("path"), Value::str(path));
+        row.set_str("path", Value::str(path));
         match std::fs::symlink_metadata(path) {
             Ok(meta) => {
                 use std::os::unix::fs::MetadataExt;
-                row.set(Value::str("exists"), Value::Bool(true));
-                row.set(Value::str("size"), Value::int(meta.len() as i64));
-                row.set(Value::str("size_human"), Value::str(human(meta.len())));
-                row.set(Value::str("mode"), Value::int(meta.mode() as i64));
-                row.set(Value::str("uid"), Value::int(meta.uid() as i64));
-                row.set(Value::str("gid"), Value::int(meta.gid() as i64));
-                row.set(Value::str("mtime"), Value::int(meta.mtime()));
-                row.set(Value::str("is_dir"), Value::Bool(meta.is_dir()));
+                row.set_str("exists", Value::Bool(true));
+                row.set_str("size", Value::int(meta.len() as i64));
+                row.set_str("size_human", Value::str(human(meta.len())));
+                row.set_str("mode", Value::int(meta.mode() as i64));
+                row.set_str("uid", Value::int(meta.uid() as i64));
+                row.set_str("gid", Value::int(meta.gid() as i64));
+                row.set_str("mtime", Value::int(meta.mtime()));
+                row.set_str("is_dir", Value::Bool(meta.is_dir()));
                 row.set(
                     Value::str("is_symlink"),
                     Value::Bool(meta.file_type().is_symlink()),
                 );
             }
             Err(_) => {
-                row.set(Value::str("exists"), Value::Bool(false));
+                row.set_str("exists", Value::Bool(false));
             }
         }
         list.set(
@@ -253,8 +255,8 @@ fn env_rows(env: &std::sync::Arc<std::sync::Mutex<crate::env::Environment>>) -> 
     pairs.sort();
     for (i, (name, value)) in pairs.iter().enumerate() {
         let mut row = Table::new();
-        row.set(Value::str("name"), Value::str(name));
-        row.set(Value::str("value"), Value::str(value));
+        row.set_str("name", Value::str(name));
+        row.set_str("value", Value::str(value));
         list.set(
             Value::int(i as i64 + 1),
             Value::Table(Rc::new(RefCell::new(row))),
@@ -267,6 +269,30 @@ fn env_rows(env: &std::sync::Arc<std::sync::Mutex<crate::env::Environment>>) -> 
 ///
 /// The text form of `ls` is genuinely ambiguous for a filename containing a newline, which is a
 /// legal filename. Rows have no such problem.
+/// Which directory an `ls` argument list names, ignoring its flags.
+///
+/// **The flags are accepted and have no effect, and that is not laziness.** A structured row
+/// carries `name`, `size`, `size_human`, `is_dir` and `mode` *always* — there is no short form to
+/// ask for with `-l`, and nothing is hidden for `-a` to reveal. What the flags change in `ls(1)` is
+/// how the answer is *printed*, and here that belongs to the renderer at the end of the pipeline.
+/// So they are taken as what they are — not directories — and the listing is the same either way.
+///
+/// `--` ends them, as everywhere else, so a directory really called `-la` is still reachable.
+pub(crate) fn ls_where(args: &[String]) -> &str {
+    let mut flags = true;
+    for arg in args {
+        if flags && arg == "--" {
+            flags = false;
+            continue;
+        }
+        if flags && arg.starts_with('-') && arg.len() > 1 {
+            continue;
+        }
+        return arg;
+    }
+    "."
+}
+
 pub(crate) fn ls_rows(dir: &str) -> Value {
     let mut list = Table::new();
     let Ok(entries) = std::fs::read_dir(dir) else {
@@ -282,10 +308,10 @@ pub(crate) fn ls_rows(dir: &str) -> Value {
     names.sort_by(|a, b| a.0.cmp(&b.0));
     for (i, (name, meta)) in names.iter().enumerate() {
         let mut row = Table::new();
-        row.set(Value::str("name"), Value::str(name));
-        row.set(Value::str("size"), Value::int(meta.len() as i64));
-        row.set(Value::str("size_human"), Value::str(human(meta.len())));
-        row.set(Value::str("is_dir"), Value::Bool(meta.is_dir()));
+        row.set_str("name", Value::str(name));
+        row.set_str("size", Value::int(meta.len() as i64));
+        row.set_str("size_human", Value::str(human(meta.len())));
+        row.set_str("is_dir", Value::Bool(meta.is_dir()));
         row.set(
             Value::str("mode"),
             Value::int(std::os::unix::fs::MetadataExt::mode(meta) as i64),
@@ -324,6 +350,37 @@ pub fn df_rows(output: &str) -> Value {
         list.set(Value::int(i as i64 + 1), filesystem_row(fs));
     }
     Value::Table(Rc::new(RefCell::new(list)))
+}
+
+#[cfg(test)]
+mod where_tests {
+    use super::ls_where;
+
+    fn words(list: &[&str]) -> Vec<String> {
+        list.iter().map(|w| w.to_string()).collect()
+    }
+
+    /// **A leading `-` is a flag, not a directory.**
+    ///
+    /// Taken as one, `ls -la` stat'd a path called `-la`, found nothing and answered an empty
+    /// listing without a word — from both front ends, so `sh.ls("-la")` (the documentation's
+    /// headline example) and `ls -la | where …` typed as shell were both silently empty.
+    #[test]
+    fn flags_do_not_name_a_directory() {
+        assert_eq!(ls_where(&words(&[])), ".");
+        assert_eq!(ls_where(&words(&["-la"])), ".");
+        assert_eq!(ls_where(&words(&["-l", "-a"])), ".");
+        assert_eq!(ls_where(&words(&["-l", "/tmp"])), "/tmp");
+        assert_eq!(ls_where(&words(&["/tmp", "-l"])), "/tmp");
+    }
+
+    /// A bare `-` is a name, and `--` ends the flags — so a directory really called `-la` is
+    /// still reachable, which is the only reason to have a rule about it at all.
+    #[test]
+    fn a_directory_that_looks_like_a_flag_is_still_reachable() {
+        assert_eq!(ls_where(&words(&["--", "-la"])), "-la");
+        assert_eq!(ls_where(&words(&["-"])), "-");
+    }
 }
 
 #[cfg(test)]

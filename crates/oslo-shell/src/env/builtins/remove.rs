@@ -23,11 +23,12 @@
 //! command everything depends on.
 
 mod trash;
+mod walk;
 
 use crate::env::options::ShellOption;
+use crate::env::origin_now;
 use crate::env::scope::Environment;
 use oslo_base::error::Result;
-use oslo_base::error::reason;
 use std::path::{Path, PathBuf};
 
 /// What the options add up to.
@@ -55,12 +56,13 @@ struct Mode {
 }
 
 pub fn builtin_rm(env: &mut Environment, args: &[String]) -> Result<i32> {
+    let origin = env.origin();
     let (options, operands) = match parse(args) {
         Parsed::Options(options, operands) => (options, operands),
         // An option this does not implement: the real `rm` gets the whole line, unchanged.
         Parsed::Delegate => return delegate(args),
         Parsed::Usage(message) => {
-            eprintln!("oslo: rm: {message}");
+            eprintln!("{origin}rm: {message}");
             return Ok(2);
         }
     };
@@ -70,18 +72,30 @@ pub fn builtin_rm(env: &mut Environment, args: &[String]) -> Result<i32> {
             // `rm -f` with nothing to remove is POSIX's one silent success.
             return Ok(0);
         }
-        eprintln!("oslo: rm: missing operand");
+        eprintln!("{origin}rm: missing operand");
+        eprintln!("Try 'rm --help' for more information.");
         return Ok(1);
     }
 
     let mode = mode_for(env, &options);
     let mut status = 0;
     for operand in operands {
-        if !remove_operand(Path::new(operand), operand, &options, &mode) {
-            status = 1;
+        match remove_operand(Path::new(operand), operand, &options, &mode, &origin) {
+            Removal::Gone => {}
+            Removal::Failed => status = 1,
+            // A Ctrl-C part-way through stops the whole line, not just the operand it landed in:
+            // the next one is as likely to be the big tree as the one that was interrupted.
+            Removal::Interrupted => return Ok(130),
         }
     }
     Ok(status)
+}
+
+/// What one operand came to.
+enum Removal {
+    Gone,
+    Failed,
+    Interrupted,
 }
 
 /// The behaviour this shell allows, which is the whole safety argument in five lines.
@@ -101,8 +115,14 @@ fn mode_for(env: &Environment, options: &Options) -> Mode {
     }
 }
 
-/// Remove one operand. `true` if it is gone (or was never there under `-f`).
-fn remove_operand(path: &Path, shown: &str, options: &Options, mode: &Mode) -> bool {
+/// Remove one operand.
+fn remove_operand(
+    path: &Path,
+    shown: &str,
+    options: &Options,
+    mode: &Mode,
+    origin: &str,
+) -> Removal {
     // `symlink_metadata`, never `metadata`: `rm link-to-dir` removes the link and must not
     // recurse into what it points at. That distinction is the difference between deleting one
     // entry and deleting someone's home directory.
@@ -110,65 +130,90 @@ fn remove_operand(path: &Path, shown: &str, options: &Options, mode: &Mode) -> b
         Ok(meta) => meta,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => {
             if options.force {
-                return true;
+                return Removal::Gone;
             }
-            eprintln!("oslo: rm: cannot remove '{shown}': No such file or directory");
-            return false;
+            eprintln!("{origin}rm: cannot remove '{shown}': No such file or directory");
+            return Removal::Failed;
         }
         Err(e) => {
-            eprintln!("oslo: rm: cannot remove '{shown}': {}", reason(&e));
-            return false;
+            eprintln!(
+                "{origin}rm: cannot remove '{shown}': {}",
+                oslo_base::error::reason(&e)
+            );
+            return Removal::Failed;
         }
     };
 
     if let Some(refusal) = refuse(path, shown, &meta, options, mode) {
-        eprintln!("oslo: rm: {refusal}");
-        return false;
+        eprintln!("{origin}rm: {refusal}");
+        return Removal::Failed;
     }
 
-    if options.interactive && !options.force && !confirm(shown, &meta) {
-        return true;
-    }
-
-    let directory = meta.is_dir();
     if let Some(trash) = &mode.trash
-        && let Some(outcome) = trash.take(path, shown, directory)
+        && let Some(outcome) = trashed(trash, path, shown, &meta, options, origin)
     {
-        return match outcome {
-            Ok(moved) => {
-                if options.verbose {
-                    println!("moved '{shown}' to '{}'", moved.display());
-                }
-                true
-            }
-            Err(e) => {
-                // **Not a fallback to destroying it.** The whole point of the trash is that a
-                // removal is recoverable; quietly unlinking a file the move could not save would
-                // be the one failure the user is relying on this not to have.
-                eprintln!("oslo: rm: cannot move '{shown}' to the trash: {e}");
-                false
-            }
-        };
+        return outcome;
     }
 
-    // **`-d` on its own is `rmdir`, not `rm -r`.** It removes an *empty* directory and fails on
-    // one with anything in it, which is the whole difference between the two flags — reaching for
-    // `remove_dir_all` here deleted a tree that GNU refuses to touch.
-    let removed = match (directory, options.recursive || mode.loose) {
-        (true, true) => std::fs::remove_dir_all(path),
-        (true, false) => std::fs::remove_dir(path),
-        (false, _) => std::fs::remove_file(path),
-    };
-    match removed {
-        Ok(()) => {
+    // **`-d` on its own is `rmdir`, not `rm -r`**, and asking for it explicitly says so louder
+    // than the prompt's convenience does: `loose` is what makes a typed `rm dir` work without
+    // `-r`, so a line that named `-d` has already said which of the two it meant.
+    let recursive = options.recursive || (mode.loose && !options.dir);
+    let outcome = walk::remove_tree(
+        path,
+        shown,
+        &walk::Walk {
+            origin: origin.to_string(),
+            force: options.force,
+            interactive: options.interactive,
+            recursive,
+            verbose: options.verbose,
+        },
+    );
+    match outcome {
+        walk::Outcome {
+            interrupted: true, ..
+        } => Removal::Interrupted,
+        walk::Outcome { failed: true, .. } => Removal::Failed,
+        _ => Removal::Gone,
+    }
+}
+
+/// Move the operand aside instead of destroying it, when the trash is on and it is small enough.
+///
+/// `None` means the trash declined it — too large — and the ordinary removal should go ahead.
+fn trashed(
+    trash: &trash::Trash,
+    path: &Path,
+    shown: &str,
+    meta: &std::fs::Metadata,
+    options: &Options,
+    origin: &str,
+) -> Option<Removal> {
+    // The prompt still comes first: a trashed removal is recoverable, not invisible, and `-i`
+    // asked to be told before anything moved.
+    if options.interactive
+        && !options.force
+        && !walk::confirm(
+            origin,
+            &format!("remove {} '{shown}'", walk::describe(meta)),
+        )
+    {
+        return Some(Removal::Gone);
+    }
+    match trash.take(path, shown, meta.is_dir())? {
+        Ok(moved) => {
             if options.verbose {
-                println!("removed '{shown}'");
+                println!("moved '{shown}' to '{}'", moved.display());
             }
-            true
+            Some(Removal::Gone)
         }
         Err(e) => {
-            eprintln!("oslo: rm: cannot remove '{shown}': {}", reason(&e));
-            false
+            // **Not a fallback to destroying it.** The whole point of the trash is that a
+            // removal is recoverable; quietly unlinking a file the move could not save would
+            // be the one failure the user is relying on this not to have.
+            eprintln!("{origin}rm: cannot move '{shown}' to the trash: {e}");
+            Some(Removal::Failed)
         }
     }
 }
@@ -194,7 +239,13 @@ fn refuse(
     // Only the real root, resolved — so a symlink pointing at `/` is caught too, and a directory
     // merely *named* `/` in a longer path is not.
     if path.canonicalize().is_ok_and(|full| full == Path::new("/")) {
-        return Some("it is dangerous to operate recursively on '/'".to_string());
+        // Both lines, because the second is the one that tells a reader the refusal is a policy
+        // with a way past it rather than a thing oslo cannot do.
+        return Some(
+            "it is dangerous to operate recursively on '/'\n\
+             rm: use --no-preserve-root to override this failsafe"
+                .to_string(),
+        );
     }
     if options.recursive || options.dir || mode.loose {
         return None;
@@ -213,18 +264,6 @@ fn ends_in_dot(operand: &str) -> bool {
     let last = trimmed.rsplit('/').next().unwrap_or(trimmed);
     // The empty case is `/` and its friends, which `refuse` catches by canonicalising instead.
     matches!(last, "." | "..")
-}
-
-/// `-i`. Anything but a `y` answer means no, as it does in `rm` and in `find -ok`.
-fn confirm(shown: &str, meta: &std::fs::Metadata) -> bool {
-    let kind = if meta.is_dir() { "directory" } else { "file" };
-    eprint!("oslo: rm: remove {kind} '{shown}'? ");
-    let _ = std::io::Write::flush(&mut std::io::stderr());
-    let mut answer = String::new();
-    match std::io::BufRead::read_line(&mut std::io::stdin().lock(), &mut answer) {
-        Ok(0) | Err(_) => false,
-        Ok(_) => matches!(answer.trim_start().chars().next(), Some('y') | Some('Y')),
-    }
 }
 
 /// What the argument list turned out to be.
@@ -297,7 +336,10 @@ const HELP: &str = "usage: rm [-dfirRvs] [--strict] file...";
 /// Hand the invocation to the real `rm`.
 fn delegate(args: &[String]) -> Result<i32> {
     let Some(program) = external_rm() else {
-        eprintln!("oslo: rm: unknown option, and no rm on PATH to hand it to");
+        eprintln!(
+            "{}rm: unknown option, and no rm on PATH to hand it to",
+            origin_now()
+        );
         return Ok(2);
     };
     super::spawn::run_external(&program, args, "rm")

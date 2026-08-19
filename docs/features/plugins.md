@@ -23,6 +23,10 @@ adds commands to the shell you type at — and nothing else in oslo had to chang
 > It is behind the **`plugin`** cargo feature and costs **108 KB**: 5,902,720 bytes without it
 > against 6,013,312 with. In `oslo-minimal` the word `plugin` falls through to `$PATH`.
 
+<!-- demo:begin -->
+[![plugins demo](https://asciinema.org/a/1263436.svg)](https://asciinema.org/a/1263436)
+<!-- demo:end -->
+
 ## What a plugin is
 
 A directory with a manifest and some Lua:
@@ -155,7 +159,7 @@ would make every documentation edit a refusal to run.
 ## The database
 
 ```lua
-local db = oslo.db.open("notes")
+local db <close> = oslo.db.open("notes")
 db:set("k", "v")          -- bytes, exactly: no trimming, no added newline
 db:get("k")               -- "v", or nil
 db:has("k")               -- an empty value is still present
@@ -166,6 +170,13 @@ db:write(function(w)      -- one transaction; nothing lands if it raises
   w:delete("b")
 end)
 ```
+
+**A handle is an object.** The verbs live behind `__index`, so `pairs(db)` walks nothing, a typo
+(`db.nmae = 1`) is refused rather than quietly added, and `db.get("k")` with a dot is a message
+rather than a read of the wrong key. `<close>` shuts the file at the end of the block and every verb
+says so afterwards; a handle without it is released when it is collected, so what `<close>` buys is
+the moment rather than the release. The same shape is what `oslo.spawn`, `oslo.after`/`oslo.every`
+and `oslo.fs.mktempdir` answer with.
 
 `open` takes a **name, never a path**. `oslo.db.open("../history")` is refused before anything is
 opened, so a plugin cannot reach out of the directory these live in — oslo's own history and
@@ -198,6 +209,20 @@ oslo.secret.get("gh-token")          -- yours, and only what it declared
 token can shell out to `oslo secret get` whatever its manifest says. The declaration makes a plugin
 *catchable* — it is a claim, printed before trust is decided, that its behaviour can be held against.
 And as above, a plugin's encrypted store is protected from the disk rather than from other plugins.
+
+## A ceiling on the load
+
+A plugin's entry file runs under a memory ceiling: whatever the interpreter is already using, plus
+64 MB. A load that allocates without end is stopped, and you are told which plugin and why:
+
+```
+oslo: plugin greedy: it was stopped part-way through loading: it asked for more than 64 MB of memory
+```
+
+The shell answers the next command as usual. **This is not the sandbox the section above says does
+not exist** — the plugin's hooks and callbacks run later with no ceiling at all, and any of them can
+start a command. What it stops is the load that would otherwise take the session down with it, which
+is a mistake far more likely than malice.
 
 ## Testing one
 
@@ -261,7 +286,7 @@ an absent field as a veto would make every table-returning handler hide its line
 
 ## What it cannot do
 
-- **No `oslo <plugin>` subcommand.** `oslo -c` and scripts never read `config.lua` and never read
+- **No `oslo <plugin>` subcommand.** `oslo -c` and scripts never read `init.lua` and never read
   the index; a plugin extends the shell you type at, and a script depending on one would break for
   anybody who had not installed it.
 - **Reserve a name before something mentions it.** `type note` before `note` has ever been typed

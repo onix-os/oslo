@@ -9,6 +9,7 @@
 
 use super::chdir::{PathMode, change_directory, logical_join, logical_pwd};
 use super::dirs::builtin_dirs;
+use crate::env::origin_now;
 use crate::env::scope::Environment;
 use oslo_base::error::Result;
 use std::path::PathBuf;
@@ -88,13 +89,13 @@ fn parse_args(
             }
             spec if is_index(spec) => Operand::Index(spec.to_string()),
             flag if flag.starts_with('-') || flag.starts_with('+') => {
-                eprintln!("oslo: {caller}: {flag}: invalid number");
+                eprintln!("{}{caller}: {flag}: invalid number", origin_now());
                 eprintln!("{usage}");
                 return Err(2);
             }
             dir if dirs_allowed => Operand::Dir(dir.to_string()),
             other => {
-                eprintln!("oslo: {caller}: {other}: invalid argument");
+                eprintln!("{}{caller}: {other}: invalid argument", origin_now());
                 eprintln!("{usage}");
                 return Err(2);
             }
@@ -102,7 +103,7 @@ fn parse_args(
         if operand.is_some() {
             // bash calls this a failed pushd rather than a usage error, and so does oslo: the
             // arguments parsed, there were simply too many of them.
-            eprintln!("oslo: {caller}: too many arguments");
+            eprintln!("{}{caller}: too many arguments", origin_now());
             return Err(1);
         }
         operand = Some(found);
@@ -120,7 +121,10 @@ pub fn builtin_pushd(env: &mut Environment, args: &[String]) -> Result<i32> {
     let next = match operand {
         Some(Operand::Index(spec)) => {
             let Some(index) = resolve_index(&spec, entries.len()) else {
-                eprintln!("oslo: pushd: {spec}: directory stack index out of range");
+                eprintln!(
+                    "{}pushd: {spec}: directory stack index out of range",
+                    origin_now()
+                );
                 return Ok(1);
             };
             match rotate(env, entries, index, no_cd) {
@@ -147,7 +151,7 @@ pub fn builtin_pushd(env: &mut Environment, args: &[String]) -> Result<i32> {
         }
         None => {
             if entries.len() < 2 {
-                eprintln!("oslo: pushd: no other directory");
+                eprintln!("{}pushd: no other directory", origin_now());
                 return Ok(1);
             }
             if no_cd {
@@ -202,7 +206,7 @@ pub fn builtin_popd(env: &mut Environment, args: &[String]) -> Result<i32> {
 
     let mut entries = stack(env);
     if entries.len() < 2 {
-        eprintln!("oslo: popd: directory stack empty");
+        eprintln!("{}popd: directory stack empty", origin_now());
         return Ok(1);
     }
 
@@ -210,7 +214,10 @@ pub fn builtin_popd(env: &mut Environment, args: &[String]) -> Result<i32> {
         Some(Operand::Index(spec)) => match resolve_index(&spec, entries.len()) {
             Some(index) => index,
             None => {
-                eprintln!("oslo: popd: {spec}: directory stack index out of range");
+                eprintln!(
+                    "{}popd: {spec}: directory stack index out of range",
+                    origin_now()
+                );
                 return Ok(1);
             }
         },

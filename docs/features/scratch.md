@@ -21,7 +21,7 @@ One key reaches all of it, and it means the same thing wherever you press it.
 > make build TYPE=minimal     # the floor: no scratches, no keeper, no runtime directory
 > ```
 >
-> It costs **56 KB** — 6,331,360 bytes without it against 6,388,704 with — and **no dependency at
+> It costs **44 KB** — 6,275,872 bytes without it against 6,320,928 with — and **no dependency at
 > all**: it is `nix`, which oslo already links. Startup is unchanged, because nothing runs until the
 > key is pressed: 681 µs ± 133 with it against 707 µs ± 149 without, over 300 runs.
 >

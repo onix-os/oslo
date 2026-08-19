@@ -1,6 +1,6 @@
 # Hooks
 
-Twenty-two moments in a shell's life that a config can attach to, from `pre-cmd` down to every
+Thirty-one moments in a shell's life that a config can attach to, from `pre-cmd` down to every
 keystroke. They exist so that a prompt integration, a `direnv` clone or a package-manager handler is
 a function in your config rather than a shell function that has to be re-sourced into every session.
 
@@ -121,7 +121,12 @@ Fields marked *(strings)* are strings even when they read as numbers: a notifyin
 | `on-completion-start` | Tab, only with candidates | `{ word, line, count }` *(strings)* | — |
 | `on-completion-cancel` | the menu declined | `{ word }` | — |
 | `on-completion-select` | a candidate taken | `{ value, word }` | — |
-| `on-job-finish` | the job reaper, ended jobs only | `{ id, pid, text, status }` *(strings)* | — |
+| `on-job-finish` | the job reaper, ended jobs only | `{ id, pid, text, status, pipestatus }` *(strings)* | — |
+| `on-process-exit` | the job reaper, one per process | `{ pid, job, status, stage, signal }` *(strings)* | — |
+| `on-job-state` | the job reaper, on a transition | `{ id, pid, text, from, to, background }` *(strings)* | — |
+| `on-focus-change` | a focus report from the terminal | `{ focused }` — `"1"` / `""` | — |
+| `on-variable-change` | an assignment, `export`, `unset`, `universal`, or the store re-read | `{ name, action, scope, source, exported }` *(strings)* | — |
+| `on-job-escalated` | repeated Ctrl-C took the terminal back from a job | `{ pgid, signal, action, presses, text }` *(strings)* | — |
 | `on-time-report` | a `time`-prefixed pipeline | `{ real_ms, user_ms, sys_ms }` *(strings)* | — |
 | `on-command-not-found` | the end of the command search | the command name, a bare string | a number is the status, and means handled |
 | `on-idle-timeout` | the editor's timed read | `{ seconds }` *(string)* | — |
@@ -158,6 +163,69 @@ not a refusal — a handler that built a list and matched nothing meant "no chan
 
 An error raised by a handler is printed to stderr and the next handler is asked. A broken plugin
 must not silence a job notice, turn a missing command into a success, or stop the other handlers.
+
+### The three job hooks, and which one to want
+
+`on-job-finish` is one per **job**; `on-process-exit` is one per **process**. A pipeline of three
+stages is three of the latter and one of the former, which is the difference a plugin watching one
+particular child needs. `on-job-state` is the transition — `from` and `to`, both of `running`,
+`stopped` and `ended` — because "it stopped" and "it was already stopped" are different things to a
+status line.
+
+`stage` counts from one, in the order the pipeline was written, and does not move as the other
+stages end. `signal` is the signal that killed the process, empty when none did — `status` cannot
+answer that, because `128 + n` is also a status a program may exit with of its own accord.
+`pipestatus` is every stage's status in the same order, space-separated, with `?` for a stage that
+left none behind; `status` on its own is the last stage's, which is exactly what a pipeline's
+failure usually is not.
+
+**A backgrounded list is one process, not several.** `a | b &` runs the whole pipeline in a
+subshell, so this shell has one child and the job has one stage. A job with several is one the
+shell forked itself — a foreground pipeline that was stopped and resumed.
+
+**They fire after the job table's lock is released, not while it is held.** A handler is entitled to
+call `oslo.job.list()`, which takes that same lock; firing from inside the reaper would be a handler
+waiting for a lock its own caller holds. So the reaper records what happened, drops the lock, and
+then announces — which is also why the payload is a snapshot of strings rather than a live handle.
+
+**They fire at an idle prompt too, not only at a command boundary.** The `SIGCHLD` handler writes
+one byte down a pipe the editor's wait already watches beside the terminal; the wait returns, the
+reader services the background and repaints before going back to waiting.
+
+The obvious route — installing without `SA_RESTART` and letting the blocked `read` fail with
+`EINTR`, which is what `SIGWINCH` does for a resize — was tried and measured. That flag is not
+scoped to the editor: it makes every slow syscall in the process interruptible by every child exit,
+and a shell forks constantly. A loop whose body forks went from passing 12 runs out of 12 to 9.
+
+Only an interactive shell arms it. A script reaps at its command boundaries and has no editor to
+wake, so the signal would buy it nothing and cost it an interrupted `read` in every library call
+that makes one.
+
+### Watching variables
+
+`on-variable-change` fires for the four places you change one: an assignment, `export`, `unset`, and
+`universal` — plus the moment the universal store is re-read because *another* shell changed it.
+
+```lua
+oslo.on.on_variable_change(function(e)
+  if e.name == "THEME" and e.source == "remote" then
+    reload_theme(os.getenv("THEME"))
+  end
+end)
+```
+
+`source` is the field that earns the hook. A universal variable changes because you typed something
+here or because a shell in another window did, and a status line usually wants to act on one and not
+the other. `scope` is `shell` or `universal`, `action` is `set` or `erase`, and `exported` says
+whether a child would see it.
+
+Not fired for the shell's own bookkeeping. `PWD`, `?`, `_` and the rest go through the same
+internals, and a handler buried in those would be told everything and able to use none of it. The
+value is left out too: read it with `os.getenv` if you want it, which also means the hook costs
+nothing to fire for a large variable nobody looks at.
+
+**Nothing is attached, nothing is spent.** Every `x=1` in every script reaches the announcer, so it
+asks one atomic whether the hook has ever been attached to and returns if not.
 
 ## What makes it different
 

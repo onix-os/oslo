@@ -24,7 +24,7 @@
 //!
 //! # What loads plugins
 //!
-//! Only the interactive shell. `oslo -c` and a script never read `config.lua` and never read the
+//! Only the interactive shell. `oslo -c` and a script never read `init.lua` and never read the
 //! index either: a plugin extends the shell you type at, and a script that depended on one would
 //! break for anybody who had not installed it.
 

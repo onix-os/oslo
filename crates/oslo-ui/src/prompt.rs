@@ -28,8 +28,38 @@ pub fn git_branch() -> Option<String> {
 }
 
 /// The top of the working tree the current directory is in.
+///
+/// **Remembered for a moment, because one prompt asks seven times.** The branch, the dirty marker,
+/// the ahead/behind counts and the rest each want the root, and each was walking every directory up
+/// to `/` to find it — seven identical walks per frame, restatting the same ancestors.
+///
+/// The window is deliberately short rather than keyed on the directory alone. A cache that lived
+/// until the next `cd` would go on insisting there is no repository after a `git init` in the
+/// directory you are standing in, which is a wrong prompt for as long as you stay there. Sixty
+/// milliseconds is longer than a frame and shorter than anything a person would notice, so the
+/// seven walks collapse to one and the answer is never meaningfully stale.
 pub fn git_root() -> Option<PathBuf> {
-    git_root_of(&env::current_dir().ok()?)
+    use std::time::{Duration, Instant};
+    const REMEMBERED_FOR: Duration = Duration::from_millis(60);
+
+    let here = env::current_dir().ok()?;
+    thread_local! {
+        static CACHED: std::cell::RefCell<Option<(PathBuf, Instant, Option<PathBuf>)>> =
+            const { std::cell::RefCell::new(None) };
+    }
+    if let Some(hit) = CACHED.with(|slot| {
+        slot.borrow()
+            .as_ref()
+            .filter(|(at, when, _)| *at == here && when.elapsed() < REMEMBERED_FOR)
+            .map(|(_, _, root)| root.clone())
+    }) {
+        return hit;
+    }
+    let root = git_root_of(&here);
+    CACHED.with(|slot| {
+        *slot.borrow_mut() = Some((here, Instant::now(), root.clone()));
+    });
+    root
 }
 
 /// The top of the working tree `dir` belongs to.
@@ -495,8 +525,14 @@ static PROMPT_GENERATION: std::sync::atomic::AtomicU64 = std::sync::atomic::Atom
 
 /// Say that a prompt built now would differ from one built a moment ago.
 ///
-/// Called from the three places a prompt's inputs actually change: the vi mode, the language, and
-/// the working directory. Anything else — a keystroke, a redraw, a resize — leaves it alone.
+/// Called from the places a prompt's inputs actually change: the vi mode, the language, the working
+/// directory, a resize, and a timer or spawn callback that ran while the prompt sat idle. A
+/// keystroke and a plain redraw leave it alone.
+///
+/// **A resize belongs here**, and the note that used to say otherwise was describing a resize that
+/// never arrived: `term::input::parse` was discarding the marker as an undecodable byte. A prompt
+/// that measures the terminal is wrong at the new width, and redrawing the old string would only
+/// re-place a stale one.
 pub fn invalidate() {
     PROMPT_GENERATION.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
     // And tell the editor the frame is stale. Two counters rather than one because they answer
@@ -532,3 +568,7 @@ pub fn refresh_finished() {
 pub fn refreshing() -> bool {
     crate::pending::outstanding()
 }
+
+#[path = "prompt/continuation.rs"]
+mod continuation;
+pub use continuation::{block_depth, continuation_marker};

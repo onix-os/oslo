@@ -29,7 +29,7 @@
 
 use super::util::{put, text};
 use crate::lua::engine::borrow_env;
-use oslo_lua::value::{Number, Table, Value};
+use oslo_base::value::{Number, Table, Value};
 use oslo_shell::env::Environment;
 use oslo_ui::shell::Shell;
 use std::sync::{Arc, Mutex};
@@ -68,13 +68,34 @@ pub fn install(oslo: &mut Table, env: &Arc<Mutex<Environment>>) {
         };
         let guard = borrow_env(&env)?;
         let path = guard.var("PATH").unwrap_or_default().to_string();
-        let known = |name: &str| {
+        let has = |name: &str| {
             guard.is_builtin(name) || guard.alias(name).is_some() || guard.is_function(name)
         };
+        let begins = |stem: &str| {
+            guard.builtin_names().any(|n| n.starts_with(stem))
+                || guard.aliases().keys().any(|n| n.starts_with(stem))
+                || guard.functions().keys().any(|n| n.starts_with(stem))
+        };
+        let all = || {
+            guard
+                .builtin_names()
+                .map(str::to_string)
+                .chain(guard.aliases().keys().cloned())
+                .chain(guard.functions().keys().cloned())
+                .collect()
+        };
         Ok(vec![
-            oslo_ui::repair::of(&line, &path, &known)
-                .map(Value::str)
-                .unwrap_or(Value::Nil),
+            oslo_ui::repair::of(
+                &line,
+                &path,
+                &oslo_ui::repair::Known {
+                    has: &has,
+                    begins: &begins,
+                    all: &all,
+                },
+            )
+            .map(Value::str)
+            .unwrap_or(Value::Nil),
         ])
     });
 }
@@ -127,7 +148,7 @@ fn guesses(found: Vec<oslo_base::predict::Guess>) -> Value {
     let mut list = Table::new();
     for (at, guess) in found.into_iter().enumerate() {
         let mut row = Table::new();
-        row.set(Value::str("line"), Value::str(guess.line));
+        row.set_str("line", Value::str(guess.line));
         row.set(
             Value::str("probability"),
             Value::Number(Number::Float(guess.probability)),

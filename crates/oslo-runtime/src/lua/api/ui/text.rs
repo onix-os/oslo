@@ -13,7 +13,7 @@
 //! Rust and is shared with the dropdown rather than being left for a config to approximate.
 
 use super::super::util::{ok, put, text};
-use oslo_lua::value::{Number, Table, Value};
+use oslo_base::value::{Number, Table, Value};
 use oslo_ui::dropdown::width;
 
 /// An optional non-negative integer argument.

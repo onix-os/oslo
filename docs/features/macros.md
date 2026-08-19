@@ -16,7 +16,7 @@ oslo macros show                                 # the manager, on the whole scr
 The kind is required, because five kinds and a silent default is a trap. An inline body is for the
 three that fit on a line; a function and a script always open the editor.
 
-An alias in `config.lua` still works, and so does `alias` in a script. This is a second source, not
+An alias in `init.lua` still works, and so does `alias` in a script. This is a second source, not
 a replacement — see [Order](#order-config-first-database-last).
 
 <!-- demo:begin -->
@@ -52,7 +52,7 @@ value and the shell exports it at startup, which is unremarkable. `--var
 something reads `$GITHUB_TOKEN` — once, in that shell, and never in a shell that does not mention
 the name.
 
-That difference is the whole point of storing one. Written in `config.lua` as an `export`, the same
+That difference is the whole point of storing one. Written in `init.lua` as an `export`, the same
 line decrypts a secret at every shell start, on every machine, for ever, whether or not anything
 wanted it; here a session that never touches the token never runs the command at all. It is the same
 argument the [secrets](secrets.md) store makes about files, applied to time.
@@ -158,13 +158,13 @@ oslo macros add --alias gs …
 
 a new interactive shell
    │
-   ├─ config.lua                          alias gs = …
+   ├─ init.lua                          alias gs = …
    ├─ write macros/elsewhere.snapshot     ← what the *config* defined, for the manager
    └─ read macros.snapshot (3.6 µs)       the database wins, see below
 ```
 
 **Interactive shells only.** This runs beside `load_config` and nowhere else, so `oslo -c` and a
-script see none of it. That takes nothing away: `config.lua` is read by the same loop and by nothing
+script see none of it. That takes nothing away: `init.lua` is read by the same loop and by nothing
 else either, so a non-interactive shell has never had aliases to expand.
 
 ### And a change reaches the terminal beside this one
@@ -191,13 +191,13 @@ difference, and a rebuild cannot take it away from you.
 
 ## Order: config first, database last
 
-Three things define an alias — `alias` in a script, `oslo.alias` in `config.lua`, `oslo macros add`
+Three things define an alias — `alias` in a script, `oslo.alias` in `init.lua`, `oslo macros add`
 — and the ordinary shell rule is that the last definition wins. That rule is applied to the sources:
 the database is applied after the configuration, so **the database wins**.
 
 That is the deliberate half. The database is the one you can change without editing a file, so
 `oslo macros add --alias gco …` taking effect is what you asked for. The cost is that a stored entry
-can shadow one you wrote in `config.lua` — which is why a shell writes down what its config defined,
+can shadow one you wrote in `init.lua` — which is why a shell writes down what its config defined,
 and why the manager can show you both: **Tab** moves between `[stored]` and `[elsewhere]`.
 
 `[elsewhere]` is aliases, abbreviations and **every variable this shell has** — which is what makes
@@ -286,7 +286,7 @@ a child that also drives the terminal is how two programs end up fighting over t
 Piped, or with `--plain`, there is no widget and no colour: one tab-separated row per macro, every
 field included. A manager only a person can read is one you cannot script.
 
-A database is not a dotfiles repository: an alias in `config.lua` is version-controlled, diffable and
+A database is not a dotfiles repository: an alias in `init.lua` is version-controlled, diffable and
 copied to a new machine with the rest of your configuration, and one in here is none of those.
 `export` and `import` are the way back out, in a format meant to be read and hand-edited:
 
@@ -368,7 +368,7 @@ synced, so revision one is the truth about it.
 - **`[elsewhere]` cannot show a function or a script.** There is nothing to enumerate: one is a file
   on disk, the other a name in a Lua table.
 - **No aliases or abbreviations in a non-interactive shell.** `oslo -c` and a script never read
-  `config.lua` either. Functions and scripts are found when you call them, so those work anywhere.
+  `init.lua` either. Functions and scripts are found when you call them, so those work anywhere.
 - **A configured alias cannot be edited in place** — only copied into the database and edited there.
   The file it came from is yours, and writing to it would be this deciding how your config is
   formatted.

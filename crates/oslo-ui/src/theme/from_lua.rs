@@ -9,7 +9,7 @@
 //! the moment they want it bold.
 
 use super::{Color, KindColors, Pager, Prompt, Style, Syntax, Theme};
-use oslo_lua::Value;
+use oslo_base::value::Value;
 
 /// Read `oslo.theme`, answering the theme and what was wrong with it.
 ///
@@ -35,16 +35,16 @@ pub fn read_lua_theme(value: &Value) -> (Theme, Vec<String>) {
     let mut theme = Theme::default();
     let table = table.borrow();
 
-    if let Value::Table(syntax) = table.get(&Value::str("syntax")) {
+    if let Value::Table(syntax) = table.get_str("syntax") {
         read_syntax(&syntax.borrow(), &mut theme.syntax, &mut problems);
     }
-    if let Value::Table(pager) = table.get(&Value::str("pager")) {
+    if let Value::Table(pager) = table.get_str("pager") {
         read_pager(&pager.borrow(), &mut theme.pager, &mut problems);
     }
-    if let Value::Table(prompt) = table.get(&Value::str("prompt")) {
+    if let Value::Table(prompt) = table.get_str("prompt") {
         read_prompt(&prompt.borrow(), &mut theme.prompt, &mut problems);
     }
-    if let Value::Table(ui) = table.get(&Value::str("ui")) {
+    if let Value::Table(ui) = table.get_str("ui") {
         read_ui(&ui.borrow(), &mut theme.ui, &mut problems);
     }
 
@@ -53,7 +53,7 @@ pub fn read_lua_theme(value: &Value) -> (Theme, Vec<String>) {
 
 /// One style field, left alone when the config does not name it.
 fn field(
-    table: &oslo_lua::Table,
+    table: &oslo_base::value::Table,
     name: &str,
     path: &str,
     slot: &mut Style,
@@ -91,11 +91,11 @@ fn style(value: &Value, path: &str, problems: &mut Vec<String>) -> Option<Style>
                     }
                 }
             }
-            out.bold = table.get(&Value::str("bold")).truthy();
-            out.dim = table.get(&Value::str("dim")).truthy();
-            out.italic = table.get(&Value::str("italic")).truthy();
-            out.underline = table.get(&Value::str("underline")).truthy();
-            out.reverse = table.get(&Value::str("reverse")).truthy();
+            out.bold = table.get_str("bold").truthy();
+            out.dim = table.get_str("dim").truthy();
+            out.italic = table.get_str("italic").truthy();
+            out.underline = table.get_str("underline").truthy();
+            out.reverse = table.get_str("reverse").truthy();
             Some(out)
         }
         other => {
@@ -108,7 +108,7 @@ fn style(value: &Value, path: &str, problems: &mut Vec<String>) -> Option<Style>
     }
 }
 
-fn read_syntax(table: &oslo_lua::Table, into: &mut Syntax, problems: &mut Vec<String>) {
+fn read_syntax(table: &oslo_base::value::Table, into: &mut Syntax, problems: &mut Vec<String>) {
     let p = "oslo.theme.syntax";
     // `command` first, because the two that fall back to it need its final value.
     field(table, "command", p, &mut into.command, problems);
@@ -116,7 +116,7 @@ fn read_syntax(table: &oslo_lua::Table, into: &mut Syntax, problems: &mut Vec<St
     // `builtin` and `function` inherit `command` unless named. That is fish's rule, and it is what
     // keeps a two-line theme from looking half-finished: setting `command` alone recolours all
     // three kinds of "this is the thing being run".
-    let inherits = !matches!(table.get(&Value::str("command")), Value::Nil);
+    let inherits = !matches!(table.get_str("command"), Value::Nil);
     for (name, slot) in [("builtin", 0), ("function", 1)] {
         let path = format!("{p}.{name}");
         let chosen = style(&table.get(&Value::str(name)), &path, problems);
@@ -178,12 +178,8 @@ fn read_syntax(table: &oslo_lua::Table, into: &mut Syntax, problems: &mut Vec<St
     // for `command` and for the same reason: the correction is the ghost's colour turned inside
     // out, so a theme that recolours the ghost and says nothing about the repair should not end up
     // with two unrelated greys on the same line.
-    let ghosted = !matches!(table.get(&Value::str("autosuggestion")), Value::Nil);
-    match style(
-        &table.get(&Value::str("repair")),
-        &format!("{p}.repair"),
-        problems,
-    ) {
+    let ghosted = !matches!(table.get_str("autosuggestion"), Value::Nil);
+    match style(&table.get_str("repair"), &format!("{p}.repair"), problems) {
         Some(chosen) => into.repair = chosen,
         None if ghosted => into.repair = reversed(into.autosuggestion),
         None => {}
@@ -199,7 +195,7 @@ fn reversed(style: Style) -> Style {
     }
 }
 
-fn read_pager(table: &oslo_lua::Table, into: &mut Pager, problems: &mut Vec<String>) {
+fn read_pager(table: &oslo_base::value::Table, into: &mut Pager, problems: &mut Vec<String>) {
     let p = "oslo.theme.pager";
     field(table, "text", p, &mut into.text, problems);
     field(table, "text_sel", p, &mut into.text_sel, problems);
@@ -226,12 +222,12 @@ fn read_pager(table: &oslo_lua::Table, into: &mut Pager, problems: &mut Vec<Stri
         }
     }
 
-    if let Value::Table(kinds) = table.get(&Value::str("kind")) {
+    if let Value::Table(kinds) = table.get_str("kind") {
         read_kinds(&kinds.borrow(), &mut into.kind, problems);
     }
 }
 
-fn read_kinds(table: &oslo_lua::Table, into: &mut KindColors, problems: &mut Vec<String>) {
+fn read_kinds(table: &oslo_base::value::Table, into: &mut KindColors, problems: &mut Vec<String>) {
     let p = "oslo.theme.pager.kind";
     field(table, "command", p, &mut into.command, problems);
     field(table, "builtin", p, &mut into.builtin, problems);
@@ -243,7 +239,7 @@ fn read_kinds(table: &oslo_lua::Table, into: &mut KindColors, problems: &mut Vec
     field(table, "other", p, &mut into.other, problems);
 }
 
-fn read_prompt(table: &oslo_lua::Table, into: &mut Prompt, problems: &mut Vec<String>) {
+fn read_prompt(table: &oslo_base::value::Table, into: &mut Prompt, problems: &mut Vec<String>) {
     let p = "oslo.theme.prompt";
     field(table, "cwd", p, &mut into.cwd, problems);
     field(table, "git", p, &mut into.git, problems);
@@ -258,7 +254,7 @@ fn read_prompt(table: &oslo_lua::Table, into: &mut Prompt, problems: &mut Vec<St
 }
 
 /// `oslo.theme.ui` — the input widgets' palette.
-fn read_ui(table: &oslo_lua::Table, ui: &mut super::Ui, problems: &mut Vec<String>) {
+fn read_ui(table: &oslo_base::value::Table, ui: &mut super::Ui, problems: &mut Vec<String>) {
     field(table, "accent", "oslo.theme.ui", &mut ui.accent, problems);
     field(
         table,
@@ -275,14 +271,15 @@ fn read_ui(table: &oslo_lua::Table, ui: &mut super::Ui, problems: &mut Vec<Strin
 #[cfg(test)]
 mod tests {
     use super::*;
-    use oslo_lua as eval;
+    use oslo_luavm::{Engine, Host};
 
     /// Build `oslo.theme` by running a chunk, which is how a real config produces one.
     fn theme_from(source: &str) -> (Theme, Vec<String>) {
-        let interp = eval::Interp::new("theme test");
-        let ast = eval::parse(source).expect("the test chunk must parse");
-        interp.run_ast(&ast).expect("the test chunk must run");
-        read_lua_theme(&interp.global("theme"))
+        let engine = Engine::new();
+        engine
+            .eval(source, "theme test")
+            .expect("the test chunk must run");
+        read_lua_theme(&engine.global("theme"))
     }
 
     /// Naming one colour must not blank the other forty.

@@ -18,9 +18,14 @@ pub(super) const OVERHEAD_NO_DESC: usize = 4;
 const GUTTER: usize = 2;
 /// A label column narrower than this is not worth drawing; drop a column instead.
 const MIN_LABEL_COLS: usize = 6;
+
 /// An info column narrower than this says nothing; drop the column instead.
 const MIN_COL_COLS: usize = 8;
 /// Below this the label column stops growing on its own account.
+///
+/// It is also how much label the *indent* will be surrendered for: between this and
+/// [`MIN_LABEL_COLS`] is the difference between a menu that tells its candidates apart and one that
+/// shows four identical stubs.
 const LABEL_FLOOR: usize = 12;
 /// A badge narrower than this cannot spell the shortest kind (` dir `), so it is dropped whole.
 const MIN_BADGE_COLS: usize = 5;
@@ -135,8 +140,15 @@ pub fn compute_layout(
         columns.pop();
     }
 
-    // Keep at least a minimal box on screen; past that the indent is expendable. (Concession 1.)
-    let smallest_box = MIN_LABEL_COLS + OVERHEAD_NO_DESC;
+    // Keep a *readable* box on screen; past that the indent is expendable. (Concession 1.)
+    //
+    // **The floor is what the labels actually need, not the bare minimum.** `MIN_LABEL_COLS` is 6,
+    // and surrendering the indent only down to that meant a word typed near the right edge got six
+    // cells to show every candidate in — so `alpha`, `alberta`, `albacore` and `album` all rendered
+    // as the same stub and the menu said nothing at all. The indent is decoration; the labels are
+    // the point, so the labels are asked first and the indent gives way to them.
+    let readable = natural_label.clamp(MIN_LABEL_COLS, LABEL_FLOOR);
+    let smallest_box = readable + OVERHEAD_NO_DESC;
     let indent = indent_cols.min(cols.saturating_sub(smallest_box));
     let avail = cols.saturating_sub(indent);
 
@@ -293,6 +305,30 @@ mod tests {
         let tiny = layout(&c, 10, 16);
         assert!(!tiny.has_desc(), "{tiny:?}");
         assert!(tiny.row_width() <= 16, "{tiny:?}");
+    }
+
+    /// **The indent gives way to the labels, not the other way round.**
+    ///
+    /// A word typed near the right edge leaves a large indent, and the indent was only surrendered
+    /// down to `MIN_LABEL_COLS` — six cells. Four candidates sharing a prefix then rendered as four
+    /// identical stubs, which is a menu that has stopped saying anything. The indent is decoration;
+    /// the labels are the whole point.
+    #[test]
+    fn a_late_word_does_not_crush_the_labels_to_a_stub() {
+        let c = vec![
+            cand("albacore", None),
+            cand("alberta", None),
+            cand("album", None),
+            cand("alpha", None),
+        ];
+        // Typed 60 columns into a 70-column terminal: the natural indent cannot be afforded.
+        let l = layout(&c, 60, 70);
+        assert!(
+            l.label_w >= LABEL_FLOOR,
+            "the labels were crushed to {} cells: {l:?}",
+            l.label_w
+        );
+        assert!(l.row_width() <= 70, "{l:?}");
     }
 
     #[test]

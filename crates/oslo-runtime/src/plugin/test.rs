@@ -19,7 +19,7 @@
 //! machine and asks whether this plugin can work here, and a test runs against a machine with
 //! nothing on it and asks whether it works at all.
 
-use oslo_lua::value::{Table, Value};
+use oslo_base::value::{Table, Value};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -55,12 +55,12 @@ pub fn install(plugin: &mut Table) {
     // oslo.plugin.test(name, function(t) … end)
     crate::lua::api::util::put(plugin, "test", |_, args| {
         let Some(Value::Str(name)) = args.first() else {
-            return Err(oslo_lua::LuaError::new(
+            return Err(oslo_base::value::LuaError::new(
                 "oslo.plugin.test: the first argument is a name for the test".to_string(),
             ));
         };
         let Some(body @ Value::Function(_)) = args.get(1) else {
-            return Err(oslo_lua::LuaError::new(
+            return Err(oslo_base::value::LuaError::new(
                 "oslo.plugin.test: the second argument must be a function".to_string(),
             ));
         };

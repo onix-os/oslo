@@ -4,7 +4,7 @@ version = "0.0.0"
 publish = false
 edition = "2024"
 # Matches the crate under test; the fuzz job pins a nightly newer than this.
-rust-version = "1.89"
+rust-version = "1.90"
 
 [package.metadata]
 cargo-fuzz = true

@@ -27,7 +27,7 @@ fn a_registered_provider_answers_the_ghost() {
     use crate::ui::suggest::{self, Ask, Only, Provider};
 
     let mut with_provider = settings::current().as_ref().clone();
-    with_provider.suggest.sources = vec![Source::Provider];
+    with_provider.suggest.sh_sources = vec![Source::Provider];
     settings::install(with_provider);
 
     suggest::forget();
@@ -134,13 +134,24 @@ fn a_command_word_is_never_suggested_as_a_path() {
     let base = dir.path().display().to_string();
     let h = helper(Environment::new());
 
-    // In command position, even a stem that names a real file suggests nothing as a path.
+    // In command position, even a stem that names a real file suggests nothing as a path — a data
+    // file is not something that could run.
     let line = format!("{base}/not");
     assert_eq!(h.path_hint(&line, line.len()), None);
 
     // The same stem as an argument is fair game.
     let line = format!("cat {base}/not");
     assert_eq!(h.path_hint(&line, line.len()).as_deref(), Some("es.txt"));
+
+    // **But a command written as a path is still a command**, and one that runs is exactly what
+    // was meant: `./bui` reaches nothing on `$PATH`, so without this it had no ghost from any
+    // source at all. Executables and directories only, which is the rule bash follows.
+    use std::os::unix::fs::PermissionsExt;
+    let script = dir.path().join("build.sh");
+    std::fs::write(&script, b"#!/bin/sh\n").unwrap();
+    std::fs::set_permissions(&script, std::fs::Permissions::from_mode(0o755)).unwrap();
+    let line = format!("{base}/bui");
+    assert_eq!(h.path_hint(&line, line.len()).as_deref(), Some("ld.sh"));
 }
 
 /// Every argument would otherwise suggest `.git`, which is never what was meant.

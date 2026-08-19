@@ -27,9 +27,12 @@ pub struct ShellAssist<'a> {
     /// What was on the line when the walk started, so coming back out restores it rather than
     /// blanking it. oslo has always promised this; it is the reason a walk is not destructive.
     composing: Option<String>,
-    /// The key that switches language — `crate::startup::mode::TOGGLE_KEY`, unless the config
-    /// unbound it with `oslo.keys["shift-tab"] = "none"`.
-    toggle: Option<String>,
+    /// The keys that switch language — `crate::startup::mode::TOGGLE_KEYS`, less any the config
+    /// unbound with `oslo.keys["shift-tab"] = "none"`.
+    ///
+    /// A list rather than one name because Shift+Tab needs the terminal to report a modifier and
+    /// Ctrl+Space does not. See `TOGGLE_KEYS` for which cost each one carries.
+    toggle: Vec<String>,
 }
 
 impl<'a> ShellAssist<'a> {
@@ -37,7 +40,7 @@ impl<'a> ShellAssist<'a> {
         history: Vec<String>,
         helper: Option<&'a OsloHelper>,
         prompt_cols: usize,
-        toggle: Option<String>,
+        toggle: Vec<String>,
     ) -> ShellAssist<'a> {
         ShellAssist {
             helper,
@@ -103,6 +106,15 @@ fn open_finder(seed: &str) -> Option<oslo_ui::finder::Outcome> {
         return None;
     }
     let track = oslo_base::track::store()?;
+    // **The one read that has to be current.** The command you just ran is written on the writer
+    // thread, so for a moment after the prompt returns the store does not have it yet — and asking
+    // for your history and not finding the thing you just typed is the kind of wrong that makes a
+    // shell feel broken. Worse: with nothing else in the store the finder declines to open at all.
+    //
+    // Waited for here and nowhere else. This is a key somebody deliberately pressed, so a fraction
+    // of a millisecond is invisible; the ghost and the `cd` ranking read the same store on every
+    // keystroke and must not, which is the whole point of the writes being off this thread.
+    oslo_base::track::writer::settle();
     // Only this language's commands. The editor's history holds both, and offering a Lua line at a
     // shell prompt produces something that cannot run — the same crossing the ghost suggestion and
     // the arrow keys are already filtered for.
@@ -252,7 +264,13 @@ impl Assist for ShellAssist<'_> {
             // acceptance" belongs so that every caller agrees.
             candidates.into_iter().next()?
         } else {
-            let indent = self.prompt_cols + dropdown::visible_len(&line[..start]);
+            // **The column the word is on, not how far along the line it is.** Those are the same
+            // number only until the line wraps: past that, the absolute offset is wider than the
+            // terminal and the menu was clamped to the same place whatever was typed — a word at
+            // column 10 of the second row got a dropdown at column 31. The wrap is what the
+            // terminal does to the offset, so it is what the indent has to do too.
+            let cells = self.prompt_cols + dropdown::visible_len(&line[..start]);
+            let indent = cells % dropdown::terminal_cols().max(1);
             let Some(chosen) = dropdown::DropdownMenu::select_interactive(
                 candidates,
                 indent,
@@ -334,7 +352,10 @@ impl Assist for ShellAssist<'_> {
         // oslo's own default, for a key the ordinary keymap does not already answer. Reached only
         // when the config said nothing about this key: `oslo.keys["shift-tab"] = "none"` returns
         // above and so cancels it.
-        (Some(name.as_str()) == self.toggle.as_deref()).then_some(Bound::ToggleLanguage)
+        self.toggle
+            .iter()
+            .any(|key| key == name.as_str())
+            .then_some(Bound::ToggleLanguage)
     }
 
     fn key_name(&mut self, key: Key) -> Option<String> {
@@ -457,7 +478,7 @@ mod tests {
             entries.iter().map(|e| e.to_string()).collect(),
             None,
             0,
-            Some("shift-tab".to_string()),
+            vec!["shift-tab".to_string(), "ctrl-space".to_string()],
         )
     }
 

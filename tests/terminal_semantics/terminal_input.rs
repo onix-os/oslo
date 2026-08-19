@@ -180,6 +180,34 @@ fn paste_and_mouse_modes_are_balanced_on_editor_exits() {
     }
 }
 
+/// Ctrl-R the instant the prompt comes back still finds the command you just ran.
+///
+/// The log append happens on the writer thread now, so the store is a fraction of a millisecond
+/// behind the prompt. The finder is the one reader that cannot tolerate that: asking for your
+/// history and not being shown the line you just typed reads as the shell having lost it — and in
+/// a fresh session, where that line is the only one there is, the finder declines to open at all.
+///
+/// **No pause between the two sends**, because the pause is the bug. The mouse test above catches
+/// this by accident; this one is about the thing itself.
+#[test]
+fn the_finder_shows_a_command_typed_a_moment_ago() {
+    // The *first* thing a new prompt writes, not the last. `OSC 133;B` closes the frame, by which
+    // point the writer thread has had the whole redraw to catch up and the race no longer shows.
+    const PROMPT_START: &[u8] = b"\x1b[?2004h";
+
+    let mut shell = PtyShell::spawn("xterm-256color");
+    shell.wait_for_occurrences(PROMPT_START, 1);
+    shell.send(b"true zqxwvmarker\n");
+    shell.wait_for_occurrences(PROMPT_START, 2);
+    shell.send(b"\x12");
+    // The finder's match counter, which is the assertion: it says one row is being shown, and in a
+    // session one command old that row can only be the command. Not the line's own text — the
+    // terminal echoed that back when it was typed, so finding it proves nothing about the finder.
+    // `wait_for_text` panics on timeout, and timing out is exactly what an empty store causes:
+    // `open_finder` declines rather than opening on nothing.
+    shell.wait_for_text("1/1");
+}
+
 #[test]
 fn legacy_mouse_pauses_while_the_finder_owns_the_terminal() {
     let mut shell =

@@ -18,6 +18,7 @@ pub use resolve::{Kind, ways};
 /// Render a function definition as shell source; also what `set` and `declare -f` need to print.
 pub use unparse::format_function;
 
+use crate::env::origin_now;
 use crate::env::scope::Environment;
 use crate::exec::eval_command_list;
 use oslo_base::error::{Result, ShellError};
@@ -29,7 +30,12 @@ use std::fs;
 /// merely *starts* with digits is not a number, or `exit 1x` would silently exit 1.
 fn numeric_operand<T: std::str::FromStr>(name: &str, raw: &str) -> std::result::Result<T, ()> {
     raw.trim().parse::<T>().map_err(|_| {
-        eprintln!("oslo: {}: {}: numeric argument required", name, raw);
+        eprintln!(
+            "{}{}: {}: numeric argument required",
+            origin_now(),
+            name,
+            raw
+        );
     })
 }
 
@@ -41,7 +47,12 @@ fn loop_depth(name: &str, args: &[String]) -> std::result::Result<usize, i32> {
             // `break 0` is not a loop count; the message is the same one bash gives a
             // non-numeric operand, and `numeric_operand` has not printed it in this branch.
             Ok(0) => {
-                eprintln!("oslo: {}: {}: numeric argument required", name, raw);
+                eprintln!(
+                    "{}{}: {}: numeric argument required",
+                    origin_now(),
+                    name,
+                    raw
+                );
                 Err(1)
             }
             Ok(n) => Ok(n),
@@ -91,8 +102,11 @@ pub fn builtin_return(env: &mut Environment, args: &[String]) -> Result<i32> {
 /// meant to reveal. It is a usage error, and bash leaves with 2.
 pub fn builtin_exit(env: &mut Environment, args: &[String]) -> Result<i32> {
     if args.len() > 2 {
-        eprintln!("oslo: exit: too many arguments");
+        eprintln!("{}exit: too many arguments", origin_now());
         // Not an exit: bash refuses the request and leaves the shell running.
+        return Ok(1);
+    }
+    if refuse_over_stopped_jobs(env) {
         return Ok(1);
     }
     let code = match args.get(1) {
@@ -112,6 +126,43 @@ pub fn builtin_exit(env: &mut Environment, args: &[String]) -> Result<i32> {
         },
     };
     Err(ShellError::Exit(exit_status(code)))
+}
+
+/// Whether this `exit` should be refused because there are stopped jobs, and say so if it is.
+///
+/// **The first `exit` warns and stays; a second one leaves.** bash's behaviour, and it exists
+/// because a stopped job is invisible: leaving without a word means the work is either killed or
+/// silently orphaned, and either way the person did not decide it. Asking twice is the whole
+/// mechanism — the warning is the reminder, and repeating the command is the confirmation.
+///
+/// Interactive shells only. A script has nobody to warn and must not stop for one, and it is where
+/// a refusal would be a hang rather than a prompt.
+///
+/// **This mattered more once `oslo.misc.interrupt_escape` existed.** Ctrl-Z is deliberate, so
+/// somebody who stopped a job knows it is there; a job stopped by the escalation is one the shell
+/// stopped *for* you, and that is exactly the job you would otherwise walk away from.
+fn refuse_over_stopped_jobs(env: &mut Environment) -> bool {
+    if !env.interactive() || !crate::exec::job::job_control_active() {
+        return false;
+    }
+    // Cleared by every other command, so the confirmation has to be the *next* thing typed —
+    // `exit`, a command, `exit` asks again, which is what makes it a confirmation rather than a
+    // flag that drifts.
+    if env.take_exit_warned() {
+        return false;
+    }
+    let stopped = crate::exec::job::with_jobs(|jobs| {
+        jobs.jobs()
+            .iter()
+            .filter(|job| matches!(job.state, crate::exec::job::JobState::Stopped))
+            .count()
+    });
+    if stopped == 0 {
+        return false;
+    }
+    eprintln!("{}exit: there are stopped jobs", origin_now());
+    env.note_exit_warned();
+    true
 }
 
 /// Fold a requested status into the 0..=255 a process can actually report.
@@ -150,11 +201,17 @@ pub fn builtin_eval(env: &mut Environment, args: &[String]) -> Result<i32> {
             env.get_alias(n).map(str::to_string)
         }) {
             Ok(ast) => eval_command_list(env, &ast),
-            // A syntax error in evaluated text is the *builtin's* failure, not the script's: bash
-            // reports it, gives `eval` status 2, and carries on with the next command.
+            // A syntax error in evaluated text is the *builtin's* failure, not the script's:
+            // bash reports it, gives `eval` status 2, and carries on with the next command.
+            //
+            // **Under `--posix` it is fatal instead**, because `eval` is a special builtin and
+            // POSIX 2.8.1 ends a non-interactive shell on a utility error in one. Raised rather
+            // than decided here: `posix::resolve_builtin_result` folds it back to this same status
+            // for a shell that is not in POSIX mode, so the ordinary case is unchanged. Measured —
+            // `bash --posix -c 'eval "if"; echo ALIVE'` prints nothing and exits 2.
             Err(e) => {
-                eprintln!("oslo: eval: {}", e);
-                Ok(2)
+                eprintln!("{}eval: {}", origin_now(), e);
+                Err(oslo_base::error::ShellError::utility_error("eval", 2))
             }
         };
     env.exit_nested_script();
@@ -163,7 +220,7 @@ pub fn builtin_eval(env: &mut Environment, args: &[String]) -> Result<i32> {
 
 pub fn builtin_source(env: &mut Environment, args: &[String]) -> Result<i32> {
     if args.len() < 2 {
-        eprintln!("oslo: source: filename argument required");
+        eprintln!("{}source: filename argument required", origin_now());
         return Ok(1);
     }
 
@@ -176,7 +233,10 @@ pub fn builtin_source(env: &mut Environment, args: &[String]) -> Result<i32> {
                 file_path,
                 oslo_base::error::reason(&e)
             );
-            return Ok(1);
+            // `.` is a special builtin, so a file it cannot read ends a non-interactive shell in
+            // POSIX mode — `bash --posix -c '. /nonexistent; echo ALIVE'` prints nothing. Outside
+            // POSIX this folds back to status 1 and the script carries on, as it always did.
+            return Err(oslo_base::error::ShellError::utility_error("source", 1));
         }
     };
 
@@ -184,6 +244,11 @@ pub fn builtin_source(env: &mut Environment, args: &[String]) -> Result<i32> {
     // counter is entered only after the file is known to be readable, so a missing file still
     // costs nothing, and exited on every path out so a `return` cannot leave it drifting.
     env.enter_nested_script()?;
+    // `$FUNCNAME`'s outermost entry, as bash spells it: a function called from a sourced file
+    // reads `f source`. `eval` gets none, and bash gives it none either.
+    env.enter_script_frame("source");
+    // And the file itself, so a failure inside it names it rather than the script that sourced it.
+    env.enter_source_file(file_path);
     let result =
         match crate::syntax::parse_with_aliases(&content, !env.get_aliases().is_empty(), &|n| {
             env.get_alias(n).map(str::to_string)
@@ -192,10 +257,12 @@ pub fn builtin_source(env: &mut Environment, args: &[String]) -> Result<i32> {
             // As with `eval`: the sourced file failing to parse leaves `source` with status 2 and
             // the calling script still running.
             Err(e) => {
-                eprintln!("oslo: {}: {}", file_path, e);
+                eprintln!("{}{}: {}", origin_now(), file_path, e);
                 Ok(2)
             }
         };
+    env.exit_source_file();
+    env.exit_script_frame();
     env.exit_nested_script();
 
     // `return` ends a sourced script early and supplies its status.

@@ -38,6 +38,18 @@ pub struct Word<'a> {
     /// every keystroke would allocate for nothing. Redirection targets are left out, so
     /// `git >log commit -<TAB>` still knows it is completing options of `git commit`.
     pub prior_words: Vec<&'a str>,
+    /// How many bytes at the front of `stem` are **context rather than text to replace**.
+    ///
+    /// Zero for an ordinary word, where `start` points at the beginning of `stem` and a completion
+    /// replaces the whole of it. It is not zero when the word has been retargeted at a piece of
+    /// itself: `rm /dir/{alpha,be` completes `be` against `/dir/`, so the stem has to be `/dir/be`
+    /// for the directory to be read — and `start` points at the `be`, because `/dir/{alpha,` is
+    /// already on the line.
+    ///
+    /// **Getting this wrong writes the directory twice.** A candidate built as a whole path and
+    /// inserted at `start` gave `rm /dir/{alpha,/dir/beta`, which is a different and longer path
+    /// than the one that was typed — silently, on a command whose documented example is `rm`.
+    pub carried: usize,
 }
 
 /// Words after which bash expects another command rather than an argument.
@@ -152,6 +164,8 @@ pub fn current_word(line: &str, pos: usize) -> Word<'_> {
         quote: scan.quote,
         command_position,
         prior_words: scan.prior_words,
+        // The whole word is being replaced; nothing in front of it is context.
+        carried: 0,
     }
 }
 

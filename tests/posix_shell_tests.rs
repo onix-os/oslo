@@ -442,3 +442,83 @@ mod in_process {
         assert_eq!(lines, 2);
     }
 }
+
+/// Where POSIX mode and bash's default are *supposed* to differ.
+///
+/// Each of these runs a whole shell, twice, because the difference is whether the shell is still
+/// there afterwards — which an in-process test cannot observe.
+mod special_builtins {
+    use crate::common::{run, run_posix};
+
+    /// **A utility error in a special builtin ends a non-interactive POSIX shell** (POSIX 2.8.1).
+    ///
+    /// `export BAD-NAME=1` already did this. `.` on a file it cannot read, `unset` on a read-only name
+    /// and `eval` on text that will not parse did not: each printed its complaint, answered a status,
+    /// and let the script carry on — so a sourced file that was not there looked like a file that was
+    /// empty. Every status below is bash's, measured with `bash --posix`.
+    #[test]
+    fn a_special_builtins_utility_error_ends_a_posix_shell() {
+        for (line, status) in [
+            (". /nonexistent/oslo-test-file; echo ALIVE", 1),
+            ("readonly r=1; unset r; echo ALIVE", 1),
+            ("eval \"if\"; echo ALIVE", 2),
+        ] {
+            let r = run_posix(line);
+            assert_eq!(r.out(), "", "`{line}` carried on: {}", r.stdout);
+            assert_eq!(r.status, status, "`{line}` exited wrongly: {}", r.stderr);
+        }
+    }
+
+    /// And outside POSIX mode it is only a status, which is what bash does too.
+    #[test]
+    fn the_same_errors_are_not_fatal_outside_posix_mode() {
+        for line in [
+            ". /nonexistent/oslo-test-file; echo ALIVE",
+            "readonly r=1; unset r; echo ALIVE",
+            "eval \"if\"; echo ALIVE",
+        ] {
+            let r = run(line);
+            assert_eq!(r.out(), "ALIVE", "`{line}` stopped the shell: {}", r.stderr);
+        }
+    }
+
+    /// **A here-document is expanded before the command's prefix assignments exist.**
+    ///
+    /// `x=1 cat <<EOF` with `$x` in the body prints an empty line in bash and in dash: the
+    /// assignment belongs to the command's environment, and the document is not part of it. oslo
+    /// expanded the body down in the redirection code, which runs after the prefix scope is
+    /// pushed, so the document could see a variable the shell never had.
+    #[test]
+    fn a_heredoc_does_not_see_the_commands_prefix_assignments() {
+        let r = run("x=1 cat <<EOF\n[$x]\nEOF\n");
+        assert_eq!(r.out(), "[]", "stderr: {}", r.stderr);
+
+        // The same for a here-string, which travels the same path.
+        let r = run("x=1 cat <<< \"[$x]\"");
+        assert_eq!(r.out(), "[]", "stderr: {}", r.stderr);
+    }
+
+    /// And everything either side of that still holds: an ordinary body expands, a quoted
+    /// delimiter does not, and the assignment still reaches the command it was written for.
+    #[test]
+    fn the_ordinary_heredoc_cases_are_unchanged() {
+        let r = run("x=9; cat <<EOF\n[$x]\nEOF\n");
+        assert_eq!(r.out(), "[9]", "stderr: {}", r.stderr);
+
+        let r = run("x=9; cat <<\"EOF\"\n[$x]\nEOF\n");
+        assert_eq!(r.out(), "[$x]", "stderr: {}", r.stderr);
+
+        let r = run("x=1 env");
+        assert!(r.out().lines().any(|l| l == "x=1"), "stdout: {}", r.stdout);
+    }
+
+    /// `unset` still clears the names it can, and complains about the one it cannot.
+    ///
+    /// bash does both: `readonly r=1; x=2; unset r x` leaves `x` unset and reports `r`. Raising at the
+    /// first refusal would have made the rest of the line depend on the order it was written in.
+    #[test]
+    fn unset_clears_the_other_names_before_it_complains() {
+        let r = run("readonly r=1; x=2; unset r x; echo \"x=[$x]\"");
+        assert_eq!(r.out(), "x=[]", "stderr: {}", r.stderr);
+    }
+}

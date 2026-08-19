@@ -75,7 +75,7 @@ impl Environment {
     pub fn set_local_var(&mut self, name: &str, value: &str) -> bool {
         // Checked before `save_for_restore`: a name recorded in the frame is passed to
         // `environ_remove` when the scope pops, so an unusable one must never get in there.
-        if reject_unrepresentable(name, value) {
+        if reject_unrepresentable(&self.origin(), name, value) {
             return false;
         }
         self.save_for_restore(name);
@@ -87,7 +87,7 @@ impl Environment {
     /// This is what a command-prefix assignment (`FOO=bar cmd`) needs: `cmd` must see `FOO` in
     /// its environment, and the shell must not.
     pub fn set_local_exported_var(&mut self, name: &str, value: &str) -> bool {
-        if reject_unrepresentable(name, value) {
+        if reject_unrepresentable(&self.origin(), name, value) {
             return false;
         }
         self.save_for_restore(name);

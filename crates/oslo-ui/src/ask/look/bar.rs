@@ -113,16 +113,44 @@ impl Look {
             ),
             None => (String::new(), 0),
         };
-        let (left, left_cells) = self.slot(&self.left, view, depth);
-        let (right, right_cells) = self.slot(&self.right, view, depth);
+        let (mut left, mut left_cells) = self.slot(&self.left, view, depth);
+        let (mut right, mut right_cells) = self.slot(&self.right, view, depth);
+        let (mut sweep, mut sweep_cells) = (sweep, sweep_cells);
 
-        let fixed = self.pad * 2
-            + sweep_cells
-            + printed_width(&self.prompt)
-            + left_cells
-            + right_cells
-            // One cell for the caret, which is part of the input and has to fit.
-            + 1;
+        // One cell for the caret, which is part of the input and has to fit.
+        let spent = |sweep: usize, left: usize, right: usize| {
+            self.pad * 2 + sweep + printed_width(&self.prompt) + left + right + 1
+        };
+        // **The parts around the query are fitted too, in an order of concession.**
+        //
+        // `room` reserved a cell for what you type, and nothing ever asked whether what *surrounds*
+        // it fits. At 42 columns and below the row wrapped onto a second line and ate the list it
+        // was supposed to caption. So the decoration gives way, in the order a narrow terminal can
+        // spare it: the scanner animation first, then the left slot, then the right — the same
+        // shape `dropdown::compute_layout` already uses for its own columns.
+        //
+        // **Only when it genuinely does not fit.** The slots carry meaning — the left one names the
+        // scope being filtered — so they are not decoration to be surrendered for elbow room. The
+        // test is the one that produced the bug: the fixed parts plus a single cell for the query
+        // must not exceed the width, because that single cell is what pushed the row onto a second
+        // line and ate the list under it.
+        while spent(sweep_cells, left_cells, right_cells) >= view.cols {
+            if sweep_cells > 0 {
+                sweep = String::new();
+                sweep_cells = 0;
+            } else if left_cells > 0 {
+                left = String::new();
+                left_cells = 0;
+            } else if right_cells > 0 {
+                right = String::new();
+                right_cells = 0;
+            } else {
+                // Only the prompt and the padding are left, and those are the row.
+                break;
+            }
+        }
+
+        let fixed = spent(sweep_cells, left_cells, right_cells);
         let room = view.cols.saturating_sub(fixed).max(1);
 
         // **The caret is where you are typing, which on an empty field is the beginning.** It sat

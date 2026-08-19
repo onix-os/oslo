@@ -111,13 +111,25 @@ peg::parser! {
             non_posix_extensions_enabled() c:arithmetic_for_clause() { ast::CompoundCommand::ArithmeticForClause(c) } /
             expected!("compound command")
 
+        // **The two opening parens must touch.** The tokenizer emits `(` twice for `((` and twice
+        // for `( (` alike, so the grammar alone cannot tell an arithmetic command from a subshell
+        // that begins with another subshell — and this rule is tried first, so `( ( echo hi ) )`
+        // parsed as arithmetic and then failed at evaluation with "Invalid character in arithmetic
+        // expression". bash reads it as nested subshells and prints `hi`.
+        //
+        // The source positions are what distinguish them: in `((` the second paren starts where the
+        // first one ends. Guarding here rather than in the tokenizer keeps `$((`, `for ((` and
+        // every other spelling on the path they already take.
         pub(crate) rule arithmetic_command() -> ast::ArithmeticCommand =
-            start:specific_operator("(") specific_operator("(") expr:arithmetic_expression() specific_operator(")") end:specific_operator(")") {
+            start:specific_operator("(") second:specific_operator("(") expr:arithmetic_expression() specific_operator(")") end:specific_operator(")") {?
+                if start.location().end.index != second.location().start.index {
+                    return Err("arithmetic command requires adjacent parens");
+                }
                 let loc = SourceSpan::within(
                     start.location(),
                     end.location()
                 );
-                ast::ArithmeticCommand { expr, loc }
+                Ok(ast::ArithmeticCommand { expr, loc })
             }
 
         pub(crate) rule arithmetic_expression() -> ast::UnexpandedArithmeticExpr =
@@ -132,9 +144,21 @@ peg::parser! {
             // command instead.
             !arithmetic_end() !specific_operator(")") [_] {}
 
-        // TODO(arithmetic): evaluate arithmetic end; the semicolon is used in arithmetic for loops.
+        // Where one section of an arithmetic `for` stops.
+        //
+        // **`;;` belongs here as much as `;` does.** The tokenizer takes the longest match, so
+        // `for ((;;))` has one `;;` operator where the grammar reads two separators — and without
+        // this line an empty section did not *stop* at it, it consumed it: the initializer
+        // swallowed the `;;`, the rule then wanted a separator and found `))`, and the idiomatic
+        // infinite loop was a syntax error. `for (( ; ; ))` parsed, which is what made it look
+        // like a rule about spaces.
+        //
+        // Stopping is all that happens here; `arithmetic_for_condition` is what accepts the token
+        // and reads it as an empty condition. Neither touches the tokenizer, so `;;` goes on
+        // ending a `case` item everywhere else.
         rule arithmetic_end() -> () =
             specific_operator(")") specific_operator(")") {} /
+            specific_operator(";;") {} /
             specific_operator(";") {}
 
         rule subshell() -> ast::SubshellCommand =
@@ -183,8 +207,8 @@ peg::parser! {
         rule arithmetic_for_clause() -> ast::ArithmeticForClauseCommand =
             s:specific_word("for")
             specific_operator("(") specific_operator("(")
-                initializer:arithmetic_expression()? specific_operator(";")
-                condition:arithmetic_expression()? specific_operator(";")
+                initializer:arithmetic_expression()?
+                condition:arithmetic_for_condition()
                 updater:arithmetic_expression()?
             specific_operator(")") specific_operator(")")
             body:arithmetic_for_body() {
@@ -193,6 +217,21 @@ peg::parser! {
                 let loc = SourceSpan::within(start, end);
                 ast::ArithmeticForClauseCommand { initializer, condition, updater, body, loc }
             }
+
+        // The condition, and the two separators around it.
+        //
+        // **`for ((;;))` is one token, not two.** The tokenizer takes the longest match, so an
+        // empty condition fuses its separators into the `;;` that terminates a `case` item — and a
+        // rule asking for `;` twice never matched the idiomatic infinite loop, nor `for ((i=0;;i++))`.
+        // `for (( ; ; ))` worked, which is what made it look like a spacing quirk.
+        //
+        // Fixed here rather than in the tokenizer, deliberately: `;;` ends a `case` item far more
+        // often than it separates loop sections, and teaching the tokenizer to split it would
+        // break every `case` in every script. The grammar knows which one it is asking for; the
+        // tokenizer does not.
+        rule arithmetic_for_condition() -> Option<ast::UnexpandedArithmeticExpr> =
+            specific_operator(";;") { None } /
+            specific_operator(";") c:arithmetic_expression()? specific_operator(";") { c }
 
         rule arithmetic_for_body() -> ast::DoGroupCommand =
             sequential_sep()? body:do_group() { body } /

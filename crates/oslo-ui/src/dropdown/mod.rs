@@ -183,7 +183,22 @@ impl DropdownMenu {
                         .unwrap_or(menu.candidates.len() - 1);
                 }
                 InputEvent::Key(Key::Cancel) => break None,
-                InputEvent::Resized | InputEvent::Key(Key::Resized) => continue,
+                // **A resize closes the menu rather than re-rendering it.**
+                //
+                // Re-rendering was only half the frame: the menu came back at the new width, but
+                // the prompt and the line being typed sit *above* it and are the editor's to draw
+                // — this loop never reaches them. At any width that reflows, the stale line rewrapped
+                // off-screen and left a screen with a menu on it and nowhere to type, until the next
+                // keypress happened to repaint.
+                //
+                // So the event is handed back and the menu gives up its rows. The editor's own
+                // resize path invalidates the prompt and repaints the line, which is the half that
+                // was missing; Tab reopens the menu at the new width. Losing an open menu to a
+                // resize is a smaller surprise than losing the prompt.
+                resize @ (InputEvent::Resized | InputEvent::Key(Key::Resized)) => {
+                    keys.unread_event(resize);
+                    break None;
+                }
                 other => {
                     keys.unread_event(other);
                     break None;
@@ -404,8 +419,10 @@ mod frame_tests {
         }
     }
 
+    /// A resize closes the menu and hands the event on, so the editor can repaint the line the
+    /// menu cannot reach. The mouse click queued behind it must still survive.
     #[test]
-    fn resize_redraws_and_mouse_is_replayed() {
+    fn resize_closes_the_menu_and_is_handed_on() {
         let (reader, _writer) = nix::unistd::pipe().expect("pipe");
         let mut keys = Keys::editor(reader.as_raw_fd(), Vec::new(), false);
         let click = crate::term::mouse::Event {
@@ -417,8 +434,8 @@ mod frame_tests {
             alt: false,
             ctrl: false,
         };
-        keys.unread_event(InputEvent::Resized);
         keys.unread_event(InputEvent::Mouse(click));
+        keys.unread_event(InputEvent::Resized);
         assert!(
             DropdownMenu::select_interactive(
                 vec![candidate("one"), candidate("two")],
@@ -427,6 +444,11 @@ mod frame_tests {
                 &mut keys,
             )
             .is_none()
+        );
+        assert_eq!(
+            keys.read_event(),
+            Some(InputEvent::Resized),
+            "the editor has to see the resize, or the line is never repainted"
         );
         assert_eq!(keys.read_event(), Some(InputEvent::Mouse(click)));
     }

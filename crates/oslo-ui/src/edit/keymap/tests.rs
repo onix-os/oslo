@@ -69,9 +69,14 @@ fn typing_is_an_insert_of_the_character() {
     assert_eq!(action(Key::Char('日')), Action::Insert('日'));
 }
 
+/// **Enter ends the line, and Ctrl/Alt+Enter ends it unconditionally.**
+///
+/// Both end the line. A Lua block spanning several lines is accumulated by the reader behind a
+/// continuation prompt — the editor edits one line and draws one line.
 #[test]
 fn the_line_is_ended_by_enter_and_abandoned_by_ctrl_c() {
     assert_eq!(action(Key::Accept), Action::Accept);
+    assert_eq!(action(Key::Submit), Action::Accept);
     assert_eq!(action(Key::Abort), Action::Abort);
 }
 

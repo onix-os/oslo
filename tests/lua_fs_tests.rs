@@ -59,12 +59,36 @@ fn a_missing_file_answers_rather_than_raising() {
 #[test]
 fn lines_does_not_invent_a_trailing_empty_one() {
     let out = lua(r#"
+        local function count(path)
+          local n = 0
+          for _ in oslo.fs.lines(path) do n = n + 1 end
+          return n
+        end
         oslo.fs.write("a", "one\ntwo\n")
         oslo.fs.write("b", "one\ntwo")
         oslo.fs.write("c", "")
-        print(#oslo.fs.lines("a"), #oslo.fs.lines("b"), #oslo.fs.lines("c"))
+        print(count("a"), count("b"), count("c"))
     "#);
     assert_eq!(out, "2\t2\t0");
+}
+
+/// **The file is read as it is asked for**, which is the point of the iterator: a loop that stops
+/// at the first line has not read the rest, and `<close>` shuts the descriptor.
+#[test]
+fn lines_holds_the_file_open_and_lets_it_go() {
+    let out = lua(r#"
+        oslo.fs.write("big", "one\ntwo\nthree\n")
+        local first
+        do
+          local f <close> = oslo.fs.lines("big")
+          first = f()
+        end
+        print(first)
+        -- Reading a file that is not there is a message, before anything is read.
+        local it, why = oslo.fs.lines("nope")
+        print(it == nil, why ~= nil)
+    "#);
+    assert_eq!(out, "one\ntrue\ttrue");
 }
 
 #[test]
@@ -149,11 +173,33 @@ fn walk_lists_a_tree_without_following_links_out_of_it() {
         oslo.fs.write("d/inner/f", "")
         -- A link back to the top would make a following walk never finish.
         oslo.fs.symlink("..", "d/inner/up")
-        local found = oslo.fs.walk("d")
+        local found = {}
+        for path in oslo.fs.walk("d") do found[#found + 1] = path end
         table.sort(found)
         print(#found, table.concat(found, " "))
     "#);
     assert_eq!(out, "3\td/inner d/inner/f d/inner/up");
+}
+
+/// **The walk is lazy**, which is the whole reason it answers an iterator: a loop that stops after
+/// one entry has read one directory, not the tree. `<close>` lets go of the descriptors it opened
+/// on the way down.
+#[test]
+fn walk_stops_when_the_loop_does() {
+    let out = lua(r#"
+        oslo.fs.mkdir("d/inner/deeper")
+        oslo.fs.write("d/inner/deeper/f", "")
+        local seen = 0
+        do
+          local tree <close> = oslo.fs.walk("d")
+          for _ in tree do seen = seen + 1; break end
+        end
+        print(seen)
+        -- A directory that is not there is a message, before anything is walked.
+        local it, why = oslo.fs.walk("d/nope")
+        print(it == nil, why ~= nil)
+    "#);
+    assert_eq!(out, "1\ntrue\ttrue");
 }
 
 #[test]
@@ -179,9 +225,27 @@ fn mktemp_creates_the_file_rather_than_naming_one() {
         local a = oslo.fs.mktemp("t")
         local b = oslo.fs.mktemp("t")
         print(a ~= b, oslo.fs.exists(a), oslo.fs.exists(b))
-        print(oslo.fs.stat(oslo.fs.mktempdir("d")).type)
+        print(oslo.fs.stat(oslo.fs.mktempdir("d").path).type)
     "#);
     assert_eq!(out, "true\ttrue\ttrue\ndirectory");
+}
+
+/// **A temporary directory is the one thing in `oslo.fs` with a lifetime**, so it answers a handle
+/// rather than a path: `<close>` removes it at the end of the block, and `tostring` is the path so
+/// it still reads as one.
+#[test]
+fn a_temporary_directory_is_removed_at_the_end_of_its_block() {
+    let out = lua(r#"
+        local path
+        do
+          local tmp <close> = oslo.fs.mktempdir("scope")
+          path = tmp.path
+          oslo.fs.write(tmp.path .. "/x", "hi")
+          print(tostring(tmp) == path, oslo.fs.exists(path .. "/x"))
+        end
+        print(oslo.fs.exists(path))
+    "#);
+    assert_eq!(out, "true\ttrue\nfalse");
 }
 
 #[test]
@@ -251,4 +315,101 @@ fn realpath_resolves_links_where_normalize_does_not() {
         print(oslo.fs.readlink("link"))
     "#);
     assert_eq!(out, "real\nreal");
+}
+
+/// **`touch` is both halves**: it creates what is missing and moves the timestamp of what is not.
+/// Written by hand as `append(path, "")` it does only the first, which is the half nobody wanted.
+#[test]
+fn touch_creates_what_is_missing_and_dates_what_is_not() {
+    let out = lua(r#"
+        print(oslo.fs.exists("t"), oslo.fs.touch("t"), oslo.fs.exists("t"), oslo.fs.stat("t").size)
+        -- An existing file keeps its contents.
+        oslo.fs.write("t", "kept")
+        oslo.fs.touch("t")
+        print(oslo.fs.read("t"), oslo.fs.stat("t").size)
+        -- Under a directory that is not there, a message rather than a raise.
+        local ok, err = oslo.fs.touch("nope/t")
+        print(ok, err.kind)
+    "#);
+    assert_eq!(out, "false\ttrue\ttrue\t0\nkept\t4\nnil\tnot-found");
+}
+
+/// **What `du -s --apparent-size` answers**, and a symlink is counted as the link it is: its size
+/// is the length of its target, and it is never followed. Following one is how a tree containing a
+/// link to its own parent never finishes.
+#[test]
+fn usage_adds_up_a_tree_without_following_links() {
+    let out = lua(r#"
+        oslo.fs.mkdir("tree/inner")
+        oslo.fs.write("tree/a", "12345")           -- 5
+        oslo.fs.write("tree/inner/b", "1234567890") -- 10
+        oslo.fs.symlink("..", "tree/inner/up")      -- 2, the length of ".."
+        local u = oslo.fs.usage("tree")
+        print(u.bytes, u.files, u.dirs, u.unreadable)
+        local missing, err = oslo.fs.usage("tree/nope")
+        print(missing, err.kind)
+    "#);
+    assert_eq!(out, "17\t3\t1\t0\nnil\tnot-found");
+}
+
+/// **A subdirectory it cannot read is counted, not fatal.** Stopping on the first `EACCES` made
+/// `usage("/etc")` answer nil for anybody who is not root — one unreadable directory losing the
+/// whole total. `unreadable` is how a caller tells a complete answer from a floor.
+#[test]
+fn usage_carries_on_past_what_it_cannot_read_and_says_so() {
+    let out = lua(r#"
+        oslo.fs.mkdir("tree/open")
+        oslo.fs.mkdir("tree/shut")
+        oslo.fs.write("tree/open/a", "12345")
+        oslo.fs.write("tree/shut/hidden", "1234567890")
+        assert(oslo.fs.chmod("tree/shut", 0))     -- unreadable, unenterable
+
+        local u = oslo.fs.usage("tree")
+        print(u.bytes, u.files, u.unreadable)
+        oslo.fs.chmod("tree/shut", 0x1C0)         -- 0700, so the tempdir can be cleaned up
+    "#);
+    // The readable half is counted, the shut one is reported rather than silently missing.
+    assert_eq!(out, "5\t1\t1");
+}
+
+/// **What `df` answers, for the filesystem a path is on.** `free` and `available` differ because a
+/// filesystem reserves a percentage for root — a script asking whether it can save something wants
+/// `available`, which is the one `df` shows and calls "Avail".
+#[test]
+fn disk_reports_the_filesystem_a_path_is_on() {
+    let out = lua(r#"
+        local d = oslo.fs.disk(".")
+        print(d.total > 0, d.available <= d.free, d.free <= d.total, d.files_free <= d.files)
+        -- Bytes, not blocks: a filesystem anybody runs a test on has more than a megabyte.
+        print(d.total > 1024 * 1024)
+        -- Any path on the mount answers for the mount, so a file does as well as a directory.
+        oslo.fs.write("f", "x")
+        print(oslo.fs.disk("f").total == d.total)
+        -- Somewhere that is not there is a message rather than a raise.
+        local gone, err = oslo.fs.disk("nope/at/all")
+        print(gone, err.kind)
+    "#);
+    assert_eq!(out, "true\ttrue\ttrue\ttrue\ntrue\ntrue\nnil\tnot-found");
+}
+
+/// **A directory it cannot read is counted, not fatal.** This raised mid-iteration, which ended the
+/// whole loop — so `for path in oslo.fs.walk("/etc")` as an ordinary user stopped at the first
+/// unreadable subdirectory having seen a fraction of the tree. It *raised* rather than answering,
+/// too, so the `nil, message` convention could not catch it and the script simply died.
+#[test]
+fn walk_carries_on_past_what_it_cannot_read_and_says_so() {
+    let out = lua(r#"
+        oslo.fs.mkdir("d/open")
+        oslo.fs.mkdir("d/shut/inner")
+        oslo.fs.write("d/open/a", "")
+        assert(oslo.fs.chmod("d/shut", 0))      -- unreadable, unenterable
+
+        local seen, w = {}, oslo.fs.walk("d")
+        for path in w do seen[#seen + 1] = path end
+        table.sort(seen)
+        print(#seen, table.concat(seen, " "), w:unreadable())
+        oslo.fs.chmod("d/shut", 0x1C0)          -- 0700, so the tempdir can be cleaned up
+    "#);
+    // The shut directory is still *named* — it is a real entry — and only its contents are missing.
+    assert_eq!(out, "3\td/open d/open/a d/shut\t1");
 }

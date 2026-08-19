@@ -19,8 +19,9 @@
 //! its own; a declared arity would be a second, weaker parser that disagrees with the first.
 
 use super::util::put;
-use oslo_lua::value::{Table, Value};
-use oslo_lua::{Interp, LuaError, LuaResult};
+use oslo_base::value::{LuaError, LuaResult};
+use oslo_base::value::{Table, Value};
+use oslo_luavm::Host;
 use std::cell::RefCell;
 use std::collections::HashMap;
 
@@ -44,18 +45,18 @@ pub(super) fn declaration(args: &[Value]) -> LuaResult<Declared> {
     // apart by the first argument's type, so neither can be mistaken for the other.
     if let Some(Value::Table(spec)) = args.first() {
         let spec = spec.borrow();
-        let Value::Str(name) = spec.get(&Value::str("name")) else {
+        let Value::Str(name) = spec.get_str("name") else {
             return Err(LuaError::new(
                 "oslo.register_builtin: `name` must be a string",
             ));
         };
-        let run = spec.get(&Value::str("run"));
+        let run = spec.get_str("run");
         if !matches!(run, Value::Function(_)) {
             return Err(LuaError::new(
                 "oslo.register_builtin: `run` must be a function",
             ));
         }
-        let complete = match spec.get(&Value::str("complete")) {
+        let complete = match spec.get_str("complete") {
             Value::Nil => None,
             it @ Value::Function(_) => Some(it),
             _ => {
@@ -67,7 +68,7 @@ pub(super) fn declaration(args: &[Value]) -> LuaResult<Declared> {
         return Ok(Declared {
             name: named(&name)?,
             run,
-            desc: match spec.get(&Value::str("desc")) {
+            desc: match spec.get_str("desc") {
                 Value::Str(text) => Some(text.to_string()),
                 _ => None,
             },
@@ -109,7 +110,7 @@ fn named(name: &str) -> LuaResult<String> {
 /// where `lua::columns` already looks, so a declared completion is the same thing a config could
 /// have written by hand — one mechanism, reachable two ways, instead of two mechanisms that have to
 /// agree.
-pub(super) fn remember(interp: &Interp, declared: &Declared) {
+pub(super) fn remember(host: &dyn Host, declared: &Declared) {
     DECLARED.with(|slot| {
         slot.borrow_mut()
             .insert(declared.name.clone(), declared.desc.clone())
@@ -117,19 +118,12 @@ pub(super) fn remember(interp: &Interp, declared: &Declared) {
     let Some(complete) = &declared.complete else {
         return;
     };
-    let Value::Table(oslo) = interp.global("oslo") else {
-        return;
-    };
-    let completion = oslo.borrow().get(&Value::str("completion"));
-    let Value::Table(completion) = completion else {
-        return;
-    };
-    let for_command = completion.borrow().get(&Value::str("for_command"));
-    if let Value::Table(for_command) = for_command {
-        for_command
-            .borrow_mut()
-            .set(Value::str(&declared.name), complete.clone());
-    }
+    // Through the host rather than by fetching the table: what `global` answers is a copy of the
+    // VM's table, so inserting into it would land nowhere.
+    host.set_field(
+        &["oslo", "completion", "for_command", &declared.name],
+        complete.clone(),
+    );
 }
 
 /// Add `oslo.builtins()` — what a config has declared, and what each said it is for.
@@ -148,7 +142,7 @@ pub(super) fn install(oslo: &mut Table) {
         let mut out = Table::new();
         for (at, (name, desc)) in listed.into_iter().enumerate() {
             let mut row = Table::new();
-            row.set(Value::str("name"), Value::str(&name));
+            row.set_str("name", Value::str(&name));
             row.set(
                 Value::str("desc"),
                 desc.map(|d| Value::str(&d)).unwrap_or(Value::Nil),

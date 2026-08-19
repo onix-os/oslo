@@ -1,9 +1,9 @@
 [package]
 name = "oslo-runtime"
-version = "0.2.21"
-edition = "2024"
-rust-version = "1.89"
-license = "MIT"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
 description = "oslo's runtime: the Lua API a config is written against, the interpreter that owns it, and startup."
 [features]
 default = []
@@ -15,6 +15,8 @@ vista = ["oslo-base/vista", "oslo-ui/vista"]
 scratch = ["oslo-shell/scratch"]
 # `direnv` — see the note on `oslo-shell`.
 direnv = ["oslo-shell/direnv"]
+# The calculator: `oslo.math` in Lua, and the `math` builtin the shell registers.
+math = ["oslo-shell/math", "dep:oslo-math"]
 # `argc` — see the note on `oslo-shell`.
 argc = ["oslo-shell/argc"]
 # `nix` — see the note on `oslo-shell`.
@@ -24,26 +26,28 @@ nix = ["oslo-shell/nix"]
 secrets = ["oslo-base/secrets", "dep:base64"]
 
 # `plugin` — the manifest, the index, and loading a plugin's Lua on first use. See the workspace
-# root. `dep:sha2` is the trust gate: a plugin is loaded only while its files hash to what was
-# allowed at install.
-plugin = ["dep:sha2"]
+# root. Hashing is the trust gate — a plugin is loaded only while its files hash to what was allowed
+# at install — and `sha2` is no longer optional for it, because `oslo.hash` is in every build.
+plugin = []
 
 
 [dependencies]
 oslo-base = { path = "../oslo-base" }
-oslo-lua = { path = "../oslo-lua" }
+oslo-luavm = { path = "../oslo-luavm" }
 oslo-shell = { path = "../oslo-shell" }
+oslo-math = { path = "../oslo-math", optional = true }
 oslo-ui = { path = "../oslo-ui" }
 
-# Terminal setup at startup, and the signal handling the read loop installs.
+# Terminal setup at startup, the signal handling the read loop installs, and `inotify` for
+# `oslo.fs.watch`.
 nix = { version = "0.29", features = [
-    "process", "signal", "term", "fs", "user", "poll",
+    "process", "signal", "term", "fs", "user", "poll", "inotify",
 ] }
 
 # `oslo.re`, and history's own matching.
 regex = { version = "1", default-features = false, features = [
-    "std", "unicode-case", "unicode-gencat", "unicode-perl",
-    "perf-literal", "perf-inline",
+    "std", "unicode-case", "unicode-perl",
+    "perf-inline",
 ] }
 
 # `oslo.secret`'s seal/unseal, which hand a binary age file across the Lua boundary. Already in the
@@ -51,11 +55,14 @@ regex = { version = "1", default-features = false, features = [
 base64 = { version = "0.22", optional = true }
 
 # `oslo.json`.
-serde_json = "1"
+# `preserve_order` keeps a document's own column order: without it `serde_json::Map` is a
+# `BTreeMap`, so `from json` handed the record its fields alphabetised and `to text` printed them in
+# an order matching neither the document nor its own header.
+serde_json = { version = "1", features = ["preserve_order"] }
 
 # The `plugin` trust gate hashes a plugin's files. Optional, so a build without the feature does not
 # compile it at all.
-sha2 = { version = "0.10", optional = true }
+sha2 = "0.10"
 
 # Capturing an rc file's own output so it can be printed under the file that produced it.
 tempfile = "3.17"

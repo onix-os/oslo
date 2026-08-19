@@ -11,11 +11,8 @@ fn the_table_offers_test_beside_health() {
         panic!("not a table")
     };
     let built = built.borrow();
-    assert!(matches!(built.get(&Value::str("test")), Value::Function(_)));
-    assert!(matches!(
-        built.get(&Value::str("health")),
-        Value::Function(_)
-    ));
+    assert!(matches!(built.get_str("test"), Value::Function(_)));
+    assert!(matches!(built.get_str("health"), Value::Function(_)));
 }
 
 #[test]

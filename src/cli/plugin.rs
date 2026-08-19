@@ -22,8 +22,10 @@ pub fn run(args: &[String]) -> i32 {
     };
     let rest = &args[1..];
     match command {
-        "list" => list(),
-        "doctor" => doctor_command(rest.first().map(String::as_str)),
+        "list" => help::MENU.extra("list", args, 0).unwrap_or_else(list),
+        "doctor" => help::MENU
+            .extra("doctor", args, 1)
+            .unwrap_or_else(|| doctor_command(rest.first().map(String::as_str))),
         // The directory is optional: an author runs this from inside the plugin they are writing.
         "test" => test::run(rest.first().map(String::as_str)),
         "install" => match rest.first() {

@@ -10,7 +10,7 @@
 //!
 //! A diagnostic is printed once, into a terminal that is a scrollback and a `clear` away from
 //! losing it. That was survivable when the only things that spoke were the shell itself; a session
-//! now loads `conf.d/*.lua`, `config.lua`, plugins, prompt segments and timers, and every one of
+//! now loads `conf.d/*.lua`, `init.lua`, plugins, prompt segments and timers, and every one of
 //! them can fail in a single line twenty commands ago. Neovim keeps `:messages` for exactly this.
 //!
 //! # In memory, and only this process

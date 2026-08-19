@@ -5,6 +5,9 @@
 //! properties of the file rather than of the code that writes it.
 
 use super::*;
+
+#[path = "corrupt_tests.rs"]
+mod corrupt;
 use std::os::unix::fs::PermissionsExt;
 
 /// A store in a temporary directory, one level down, so that the directory-creating path is the
@@ -199,26 +202,6 @@ fn a_write_that_answers_nothing_leaves_the_store_as_it_found_it() {
         assert!(r.has(Tree::Run, &kept), "and so was the delete");
         Some(())
     });
-}
-
-#[test]
-fn a_panicking_write_does_not_poison_the_store() {
-    let (_dir, store) = store();
-    let abandoned = run_key(1, "sh", "abandoned");
-    let answered: Option<()> = store.write(|w| {
-        w.put(Tree::Run, abandoned.clone(), b"never".to_vec())?;
-        panic!("stop the transaction");
-    });
-
-    assert_eq!(answered, None);
-    assert_eq!(
-        store.read(|r| Some(r.has(Tree::Run, &abandoned))),
-        Some(false)
-    );
-    assert_eq!(
-        store.write(|w| w.put(Tree::Run, run_key(1, "sh", "after"), b"kept".to_vec())),
-        Some(())
-    );
 }
 
 /// The half-open range, end to end through the composite key: a seek to the lower bound and a walk

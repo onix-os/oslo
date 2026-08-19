@@ -6,6 +6,7 @@
 //! side reads the same names from a table and both build the same [`Look`].
 
 use super::take;
+use crate::env::origin_now;
 use oslo_ui::ask::look::{Look, Preset, Where, Width};
 use oslo_ui::scanner::Scanner;
 use oslo_ui::theme::{Color, Style};
@@ -137,7 +138,7 @@ pub(super) fn look_flag(look: &mut Look, args: &[String], at: &mut usize) -> Loo
 }
 
 fn bad(why: &str) -> Looked {
-    eprintln!("oslo: ui: {why}");
+    eprintln!("{}ui: {why}", origin_now());
     Looked::Bad(2)
 }
 

@@ -4,9 +4,9 @@
 //! # Why a file, and not Lua
 //!
 //! `oslo secret get` is dispatched as a tool: it never builds an `Environment`, never reads
-//! `config.lua`, never starts a Lua interpreter. That is not an oversight — `$(oslo secret get
+//! `init.lua`, never starts a Lua interpreter. That is not an oversight — `$(oslo secret get
 //! gh-token)` has to work from `dash`, from `cron`, from a `Makefile` and from a container, none of
-//! which have run an oslo config. Configuration that only existed after `config.lua` had run would
+//! which have run an oslo config. Configuration that only existed after `init.lua` had run would
 //! apply in an interactive shell and silently not apply everywhere else, which for a *recipient
 //! list* means encrypting to the wrong key and finding out at restore time.
 //!

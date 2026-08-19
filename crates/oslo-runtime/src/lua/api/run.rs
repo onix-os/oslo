@@ -23,15 +23,16 @@
 
 use super::util::native;
 use crate::lua::engine::borrow_env;
-use oslo_lua::value::{Table, Value};
-use oslo_lua::{Interp, LuaError, LuaResult};
+use oslo_base::value::{LuaError, LuaResult};
+use oslo_base::value::{Table, Value};
+use oslo_luavm::Host;
 use oslo_shell::env::Environment;
 use oslo_shell::exec::argv::{Capture, Outcome};
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
 /// Install `oslo.run`, `oslo.pipe` and the `sh` global.
-pub fn install(interp: &Rc<Interp>, oslo: &mut Table, env: &Arc<Mutex<Environment>>) {
+pub fn install(host: &dyn Host, oslo: &mut Table, env: &Arc<Mutex<Environment>>) {
     let env_run = Arc::clone(env);
     oslo.set(
         Value::str("run"),
@@ -93,45 +94,102 @@ pub fn install(interp: &Rc<Interp>, oslo: &mut Table, env: &Arc<Mutex<Environmen
         }),
     );
 
-    interp.set_global("sh", sugar(env));
+    host.set_global("sh", sugar(env));
 }
 
-/// The iterator `oslo.lines` returns: one line per call, nil at the end.
-///
-/// The child is reaped when its output runs out, so a loop that runs to completion leaves no
-/// zombie. A loop abandoned part-way does — the iterator is a plain function with no `__close`
-/// for this evaluator to call, so there is nowhere to put the cleanup. `oslo.run{…, capture =
-/// true}` is the form with no such edge.
-fn line_reader(child: nix::unistd::Pid, reader: std::os::fd::OwnedFd) -> Value {
-    use std::cell::RefCell;
-    use std::io::BufRead;
+/// A command being read a line at a time, and the child behind it.
+struct Reading {
+    child: nix::unistd::Pid,
+    /// Emptied once the output runs out or the reader is let go.
+    source: std::cell::RefCell<Option<std::io::BufReader<std::fs::File>>>,
+    reaped: std::cell::Cell<bool>,
+}
 
-    let source = RefCell::new(Some(std::io::BufReader::new(std::fs::File::from(reader))));
-    native("lines iterator", move |_, _| {
-        let mut slot = source.borrow_mut();
+impl Reading {
+    /// Let the pipe go and collect the child. Safe to call more than once.
+    ///
+    /// **The reader is dropped before the wait.** Waiting first on a child that is still writing
+    /// into a pipe nobody drains is a deadlock; closing the read end sends it `SIGPIPE` instead,
+    /// which is what a shell's `head` does to the command feeding it.
+    fn finish(&self) {
+        self.source.borrow_mut().take();
+        if !self.reaped.replace(true) {
+            oslo_shell::exec::argv::reap(self.child);
+        }
+    }
+
+    /// The next line, or `nil` once there are none.
+    ///
+    /// **`read_until` rather than `read_line`**, because a command's output is not promised to be
+    /// UTF-8 and `read_line` *fails* on a byte that is not — one stray byte anywhere in the stream
+    /// and the whole loop stopped with an I/O error. The line crosses as `Value::bytes`, which is
+    /// text when it is text.
+    fn line(&self) -> LuaResult<Vec<Value>> {
+        use std::io::BufRead;
+        let mut slot = self.source.borrow_mut();
         let Some(buffered) = slot.as_mut() else {
             return Ok(vec![Value::Nil]);
         };
-        let mut line = String::new();
-        match buffered.read_line(&mut line) {
+        let mut line = Vec::new();
+        match buffered.read_until(b'\n', &mut line) {
             Ok(0) => {
-                // Dropped before the wait, so the child sees its reader go away rather than
-                // blocking on a pipe nobody will drain.
-                *slot = None;
-                oslo_shell::exec::argv::reap(child);
+                drop(slot);
+                self.finish();
                 Ok(vec![Value::Nil])
             }
             Ok(_) => {
-                line.truncate(line.trim_end_matches('\n').len());
-                Ok(vec![Value::str(line)])
+                if line.last() == Some(&b'\n') {
+                    line.pop();
+                }
+                Ok(vec![Value::bytes(&line)])
             }
             Err(e) => {
-                *slot = None;
-                oslo_shell::exec::argv::reap(child);
+                drop(slot);
+                self.finish();
                 Err(LuaError::new(format!("oslo.lines: {e}")))
             }
         }
-    })
+    }
+}
+
+impl Drop for Reading {
+    fn drop(&mut self) {
+        self.finish();
+    }
+}
+
+/// What `oslo.lines` answers: an iterator that is also a handle.
+///
+/// ```lua
+/// for line in oslo.lines{"cargo", "build"} do oslo.ui.log(line) end
+///
+/// local out <close> = oslo.lines{"journalctl", "-f"}   -- reaped at the end of the block
+/// for line in out do if line:find("error") then break end end
+/// ```
+///
+/// **One value, because a `for` and a `<close>` want different things of it.** A generic `for` needs
+/// something callable and a scope-bound release needs a metatable, so the handle is callable through
+/// `__call` — see [`super::handle::Handle::calls`]. The alternative was two returns the caller had
+/// to remember to keep together, and the one they would forget is the one that reaps.
+///
+/// A loop that runs out reaps the child on its own. A loop that `break`s does not — luna does not
+/// close a `for`'s closing value — so `<close>` or `out:close()` is how an abandoned read is
+/// collected, and `Drop` is what catches the rest at teardown.
+fn line_reader(child: nix::unistd::Pid, reader: std::os::fd::OwnedFd) -> Value {
+    let reading = Rc::new(Reading {
+        child,
+        source: std::cell::RefCell::new(Some(std::io::BufReader::new(std::fs::File::from(reader)))),
+        reaped: std::cell::Cell::new(false),
+    });
+
+    let mut handle = super::handle::Handle::new("oslo.lines");
+
+    let it = Rc::clone(&reading);
+    handle.calls("oslo.lines", move |_, _| it.line());
+
+    handle.on_close("oslo.lines.close", move || reading.finish());
+
+    handle.build()
 }
 
 /// The `sh` table: any name on it becomes that command.
@@ -151,7 +209,7 @@ fn sugar(env: &Arc<Mutex<Environment>>) -> Value {
             let command = name.to_string();
             let env_call = Arc::clone(&env_index);
             // A command oslo can answer in rows does so. `sh.df()` gives a table with named
-            // fields rather than text nobody can parse safely — see `docs/built-in-tools.md`.
+            // fields rather than text nobody can parse safely — see `docs/features/structured-pipelines.md`.
             // Everything else falls through to running the external program, so a script keeps
             // working on a machine where oslo is not the shell.
             if oslo_shell::data::rows::answers_in_rows(&command) {
@@ -241,18 +299,18 @@ impl Request {
         // way**: the safety this module is built on is that the list written is the list run, so
         // `oslo.run{"rm", name}` cannot turn one file into forty because `name` happened to hold a
         // `*`. A script that wants the pattern read says so, once, at the call site.
-        if table.get(&Value::str("glob")).truthy() {
+        if table.get_str("glob").truthy() {
             argv = expand_globs(&argv);
         }
 
         // `capture = true` is the short form for both streams, which is what a caller who just
         // wants the output means. The two are separable for the caller who does not.
-        let both = table.get(&Value::str("capture")).truthy();
+        let both = table.get_str("capture").truthy();
         Ok(Request {
             argv,
             capture: Capture {
-                stdout: both || table.get(&Value::str("capture_out")).truthy(),
-                stderr: both || table.get(&Value::str("capture_err")).truthy(),
+                stdout: both || table.get_str("capture_out").truthy(),
+                stderr: both || table.get_str("capture_err").truthy(),
             },
         })
     }
@@ -313,19 +371,19 @@ fn word(value: &Value) -> Option<String> {
 /// The result every command call answers with.
 fn result_table(outcome: &Outcome) -> Value {
     let mut table = Table::new();
-    table.set(Value::str("status"), Value::int(outcome.status as i64));
-    table.set(Value::str("ok"), Value::Bool(outcome.status == 0));
+    table.set_str("status", Value::int(outcome.status as i64));
+    table.set_str("ok", Value::Bool(outcome.status == 0));
     // Absent rather than empty when the stream was not captured: `r.out == nil` means nobody
     // listened, `r.out == ""` means the command printed nothing, and a script that cannot tell
     // them apart will eventually treat one as the other.
     if let Some(out) = &outcome.out {
-        table.set(Value::str("out"), Value::str(out));
+        table.set_str("out", Value::str(out));
     }
     if let Some(err) = &outcome.err {
-        table.set(Value::str("err"), Value::str(err));
+        table.set_str("err", Value::str(err));
     }
     if let Some(signal) = outcome.signal {
-        table.set(Value::str("signal"), Value::int(signal as i64));
+        table.set_str("signal", Value::int(signal as i64));
     }
     Value::table(table)
 }

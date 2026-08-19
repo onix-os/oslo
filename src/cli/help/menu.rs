@@ -66,6 +66,18 @@ pub const OPERANDS: &str = "OPERANDS";
 /// What nearly every tool's USAGE line says after its name.
 pub const CALL: &str = "<subcommand> [argument]...";
 
+/// What to call a word a subcommand cannot use.
+///
+/// A leading `-` is somebody reaching for a flag that is not there, and "too many arguments" would
+/// send them counting operands instead of checking the spelling.
+pub fn describe_extra(word: &str) -> String {
+    if word.starts_with('-') && word.len() > 1 {
+        format!("{word:?}: unknown option")
+    } else {
+        format!("{word:?}: too many arguments")
+    }
+}
+
 /// A tool's help page, and the pages of the things under it.
 pub struct Menu {
     /// The words before the subcommand — `["secret"]`, or `["secret", "key"]` for a nested one.
@@ -215,6 +227,25 @@ impl Menu {
         }
         eprintln!("\noslo{} {name}: {what}", self.plain_path());
         2
+    }
+
+    /// Refuse an operand the subcommand was never going to read.
+    ///
+    /// **A word a tool ignores is a mistake, not a decoration.** `oslo config files EXTRA` printed
+    /// the list and reported success, so a name meant for a different subcommand — or a typo — read
+    /// as though it had been acted on. The same silent acceptance `printf -Z`, `trap -z EXIT` and
+    /// `ls | length extra` all had.
+    ///
+    /// `args` is the tool's own slice with the subcommand at `args[0]`, and `wanted` is how many
+    /// operands after it the subcommand actually reads. `None` means there was nothing extra, so
+    /// the caller carries on:
+    ///
+    /// ```ignore
+    /// Some("files") => MENU.extra("files", args, 0).unwrap_or_else(files),
+    /// ```
+    pub fn extra(&self, name: &str, args: &[String], wanted: usize) -> Option<i32> {
+        let extra = args.get(wanted + 1)?;
+        Some(self.wrong(name, &describe_extra(extra)))
     }
 
     /// The path with each word painted as a thing you type.

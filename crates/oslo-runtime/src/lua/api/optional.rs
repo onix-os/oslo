@@ -5,21 +5,21 @@
 //! file, and a config asks the same question the way `docs/features/runtime-features.md` says —
 //! `if oslo.nix then … end`.
 
-use oslo_lua::Interp;
-use oslo_lua::value::{Table, Value};
+use oslo_base::value::Table;
+use oslo_luavm::Host;
 use oslo_shell::env::Environment;
 use std::sync::{Arc, Mutex};
 
 /// The namespaces a build may or may not have, each behind its cargo feature — so a config asks
 /// whether one is there, `if oslo.nix then`, as `docs/features/runtime-features.md` says.
 #[allow(unused_variables)]
-pub fn install(oslo: &mut Table, interp: &Interp, env: &Arc<Mutex<Environment>>) {
+pub fn install(oslo: &mut Table, host: &dyn Host, env: &Arc<Mutex<Environment>>) {
     #[cfg(feature = "direnv")]
-    oslo.set(Value::str("direnv"), super::direnv::build(env));
+    oslo.set_str("direnv", super::direnv::build(env));
     #[cfg(feature = "nix")]
-    oslo.set(Value::str("nix"), super::nix::build(interp));
+    oslo.set_str("nix", super::nix::build());
     #[cfg(feature = "secrets")]
-    oslo.set(Value::str("secret"), super::secret::build());
+    oslo.set_str("secret", super::secret::build());
     #[cfg(feature = "plugin")]
-    oslo.set(Value::str("plugin"), crate::plugin::health::build());
+    oslo.set_str("plugin", crate::plugin::health::build());
 }

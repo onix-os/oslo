@@ -22,6 +22,7 @@
 //! nothing else, so in a script this reports an empty chain rather than a stale one.
 
 use crate::env::Environment;
+use crate::env::origin_now;
 use crate::exec::pipeline::segments;
 use oslo_base::error::Result;
 
@@ -31,7 +32,7 @@ pub fn builtin_chain(_env: &mut Environment, args: &[String]) -> Result<i32> {
         Some("resume") => Ok(resume()),
         Some("-h" | "--help") => Ok(usage()),
         Some(other) => {
-            eprintln!("oslo: chain: {other}: unknown argument");
+            eprintln!("{}chain: {other}: unknown argument", origin_now());
             Ok(usage())
         }
     }
@@ -50,7 +51,7 @@ fn usage() -> i32 {
 fn report() -> i32 {
     let segments = segments::last_chain();
     if segments.is_empty() {
-        eprintln!("oslo: chain: nothing has run yet");
+        eprintln!("{}chain: nothing has run yet", origin_now());
         return 1;
     }
     // The config gets first refusal. **Fired from inside a builtin**, so a handler may draw
@@ -123,7 +124,7 @@ fn drawn_by_config(segments: &[segments::Segment]) -> bool {
                 let mut row = vec![
                     ("text", text(&link.text)),
                     ("op", text(link.join.written())),
-                    ("ran", oslo_lua::value::Value::Bool(link.ran())),
+                    ("ran", oslo_base::value::Value::Bool(link.ran())),
                     ("ms", int(link.duration_ms)),
                 ];
                 // Absent rather than a number when it never ran: any number here reads as a status.
@@ -145,7 +146,10 @@ fn resume() -> i32 {
             0
         }
         None => {
-            eprintln!("oslo: chain: nothing to resume — the last chain did not stop part-way");
+            eprintln!(
+                "{}chain: nothing to resume — the last chain did not stop part-way",
+                origin_now()
+            );
             1
         }
     }

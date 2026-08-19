@@ -1,0 +1,15 @@
+[package]
+name = "oslo-math"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish = false
+description = "Calculation with units: a dimensional-analysis engine for the shell and for Lua."
+
+# **No dependencies, deliberately.** The obvious alternative was vendoring an existing calculator
+# crate; the one this was modelled on pulls `reqwest` and `rustls` for live currency rates, which
+# is an HTTP client and a TLS stack inside a static shell binary, for `2 + 2`. Everything here is
+# arithmetic, a table of units and a recursive-descent parser — none of which is worth a
+# dependency, and all of which has to keep working in an initramfs with no network at all.
+[dependencies]

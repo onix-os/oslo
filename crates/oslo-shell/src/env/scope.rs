@@ -1,8 +1,10 @@
 mod array;
+mod calls;
 mod environ;
 mod frames;
 mod names;
 mod options;
+pub mod origin;
 mod record;
 mod registry;
 mod seed;
@@ -124,6 +126,22 @@ pub struct Environment {
     /// The name of every shell function on that chain, outermost first. Pushed and popped with
     /// the counter above; read by `caller`.
     call_stack: Vec<String>,
+    /// How the code now running was reached: `main` for a script file, `source` for a sourced one.
+    ///
+    /// **Kept apart from [`Self::call_stack`] on purpose.** bash puts these in `$FUNCNAME` — a
+    /// function called from a script file sees `f main` — but they are not function frames, and
+    /// `caller` decides "am I inside a function at all" by asking whether that stack is empty. A
+    /// sentinel pushed there would make `caller` answer yes at the top level of every script, and
+    /// the `while caller $i` idiom depends on it answering no.
+    script_frames: Vec<String>,
+    /// The files whose commands are running, innermost last — for a diagnostic's location only.
+    /// See [`Environment::enter_source_file`].
+    source_files: Vec<String>,
+    /// Whether the command just before this one was an `exit` refused over stopped jobs.
+    ///
+    /// See `builtins::control::refuse_over_stopped_jobs`. On `Environment` rather than a global
+    /// because a subshell must not inherit half a confirmation.
+    exit_warned: bool,
     /// How deep the current `source`/`eval` chain is.
     script_depth: DepthGuard,
     /// The `set -e`/`set -o pipefail` options. Read through the accessors in the `options`
@@ -146,10 +164,10 @@ impl Environment {
 
         let pid = std::process::id();
 
-        let mut aliases = HashMap::new();
-        aliases.insert("ll".to_string(), "ls -la".to_string());
-        aliases.insert("la".to_string(), "ls -A".to_string());
-        aliases.insert("l".to_string(), "ls -CF".to_string());
+        // **No aliases here.** See [`Environment::seed_interactive_aliases`]: the three
+        // conveniences oslo ships belong to a person at a prompt, and this constructor is also
+        // every script, every `sh -c` and every subshell.
+        let aliases = HashMap::new();
 
         let mut env_struct = Self {
             vars,
@@ -177,6 +195,9 @@ impl Environment {
             loop_depth: 0,
             function_depth: DepthGuard::new(MAX_FUNCTION_DEPTH),
             call_stack: Vec::new(),
+            script_frames: Vec::new(),
+            source_files: Vec::new(),
+            exit_warned: false,
             script_depth: DepthGuard::new(MAX_SCRIPT_DEPTH),
             options: ShellOptions::default(),
         };
@@ -186,6 +207,7 @@ impl Environment {
         env_struct.seed_process_vars();
         env_struct.seed_field_separator();
         env_struct.seed_working_directory();
+        env_struct.seed_option_index();
         env_struct.seed_compatibility_vars();
         env_struct
     }
@@ -232,50 +254,6 @@ impl Environment {
         self.loop_depth > 0
     }
 
-    /// Begin a shell-function call; `Err` once the call chain is too deep to be safe.
-    ///
-    /// The caller must pair this with [`Self::exit_function`] on every path out of the call,
-    /// including an unwinding `return` or error. A refused entry is not entered and must not be
-    /// exited.
-    ///
-    /// Prefer [`Self::enter_function_named`]: `caller` can only report a name that was recorded
-    /// on the way in, and this form records the placeholder bash prints when it has none.
-    pub fn enter_function(&mut self) -> Result<()> {
-        self.enter_function_named(UNNAMED_FUNCTION)
-    }
-
-    /// Begin a shell-function call, recording which function it is.
-    ///
-    /// The name is what `caller n` reports as the second field. Kept beside the depth counter
-    /// rather than in a table of its own so the two cannot drift: one push, one pop, both here.
-    pub fn enter_function_named(&mut self, name: &str) -> Result<()> {
-        self.function_depth.enter()?;
-        self.call_stack.push(name.to_string());
-        Ok(())
-    }
-
-    pub fn exit_function(&mut self) {
-        self.function_depth.exit();
-        self.call_stack.pop();
-    }
-
-    /// The shell functions currently executing, innermost last.
-    ///
-    /// A frame entered through [`Self::enter_function`] rather than
-    /// [`Self::enter_function_named`] reads as [`UNNAMED_FUNCTION`].
-    pub fn call_stack(&self) -> &[String] {
-        &self.call_stack
-    }
-
-    /// Whether a shell function is currently executing.
-    ///
-    /// `local` needs this rather than the scope-frame stack, because a prefix assignment
-    /// (`FOO=bar cmd`) pushes a frame too — so a non-empty stack does not mean "inside a
-    /// function", and `local x=1` at the top level would silently create a global.
-    pub fn in_function(&self) -> bool {
-        self.function_depth.depth() > 0
-    }
-
     /// Begin a nested `source` or `eval`; `Err` once the chain is too deep to be safe.
     pub fn enter_nested_script(&mut self) -> Result<()> {
         self.script_depth.enter()
@@ -312,7 +290,11 @@ impl Environment {
     /// `match` of its own: the second list is what let `register_custom_builtin("echo", …)`
     /// register a function nothing would ever call (PLAN R5.6, R9.8).
     pub fn exec_custom_builtin(&mut self, name: &str, args: &[String]) -> Option<Result<i32>> {
-        self.builtins.lookup(name).map(|func| func(self, args))
+        let func = self.builtins.lookup(name)?;
+        // Published here because this is the only way in, so one write covers every builtin and
+        // every private helper under it — see `origin::here`.
+        let _origin = origin::Published::new(self.origin());
+        Some(func(self, args))
     }
 
     /// A variable's value as a single string.
@@ -382,10 +364,10 @@ impl Environment {
             self.published_line = 0;
         }
         if self.is_readonly(name) {
-            eprintln!("oslo: {}: is read only", name);
+            eprintln!("{}{}: is read only", self.origin(), name);
             return false;
         }
-        if reject_unrepresentable(name, value) {
+        if reject_unrepresentable(&self.origin(), name, value) {
             return false;
         }
         if let Some(array) = self.arrays.get_mut(name) {
@@ -480,7 +462,7 @@ impl Environment {
     pub fn export_var(&mut self, name: &str) -> bool {
         if let Some((val, _)) = self.vars.get(name) {
             let val = val.clone();
-            if reject_unrepresentable(name, &val) {
+            if reject_unrepresentable(&self.origin(), name, &val) {
                 return false;
             }
             if let Some((_, exp)) = self.vars.get_mut(name) {
@@ -488,7 +470,7 @@ impl Environment {
             }
             environ_set(name, &val);
         } else {
-            if reject_unrepresentable(name, "") {
+            if reject_unrepresentable(&self.origin(), name, "") {
                 return false;
             }
             // Recorded, not created. See `pending_exports`.
@@ -502,6 +484,14 @@ impl Environment {
             .iter()
             .map(|(k, (v, _))| (k.clone(), v.clone()))
             .collect()
+    }
+
+    /// Whether `name` would be handed to a child process.
+    ///
+    /// One lookup rather than building the whole exported map, which is what a caller that only
+    /// wants to answer this about a single name was otherwise reduced to.
+    pub fn is_exported(&self, name: &str) -> bool {
+        self.vars.get(name).is_some_and(|(_, exported)| *exported)
     }
 
     pub fn get_exported_vars(&self) -> HashMap<String, String> {

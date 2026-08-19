@@ -2,7 +2,7 @@
 //!
 //! # Why provenance needed a command
 //!
-//! A session's configuration now comes from three places: `config.lua`, every `conf.d/*.lua` before
+//! A session's configuration now comes from three places: `init.lua`, every `conf.d/*.lua` before
 //! it, and — since plugins — code somebody else wrote. "Why is my keybinding not working" had no
 //! answer at all, and the honest one is usually "something later set it again".
 //!
@@ -14,7 +14,8 @@
 
 use crate::cli::help::Paint;
 use crate::cli::help::menu::{CALL, Menu, SUBCOMMANDS as HEADING, Sub};
-use oslo_lua::Value;
+use oslo_base::value::Value;
+use oslo_luavm::Host;
 use std::path::PathBuf;
 
 pub(crate) const MENU: Menu = Menu {
@@ -47,7 +48,7 @@ const SUBCOMMANDS: &[Sub] = &[
         args: "SETTING",
         about: "which file last set a setting, and to what",
         flags: &[],
-        note: "Written as it is in `config.lua`, dots and all: `oslo config which vi.enabled`. The \
+        note: "Written as it is in `init.lua`, dots and all: `oslo config which vi.enabled`. The \
                load is reproduced here rather than asked of the running shell, so the answer is \
                what a *new* session would see.",
     },
@@ -63,10 +64,10 @@ pub fn run(args: &[String]) -> i32 {
             print!("{}", MENU.overview(Paint::detect()));
             0
         }
-        Some("files") => files(),
-        Some("timing") => timing(),
+        Some("files") => MENU.extra("files", args, 0).unwrap_or_else(files),
+        Some("timing") => MENU.extra("timing", args, 0).unwrap_or_else(timing),
         Some("which") => match args.get(1) {
-            Some(key) => which(key),
+            Some(key) => MENU.extra("which", args, 1).unwrap_or_else(|| which(key)),
             None => MENU.missing("which needs a setting, as in `oslo config which vi.enabled`"),
         },
         Some(other) => MENU.unknown(other),
@@ -93,7 +94,7 @@ fn files() -> i32 {
 
 /// What each file and plugin costs a session at startup.
 ///
-/// **The same load the shell does, measured.** A session now reads `conf.d/*.lua`, `config.lua`,
+/// **The same load the shell does, measured.** A session now reads `conf.d/*.lua`, `init.lua`,
 /// every installed plugin's index entry and whatever those register — five suspects when a shell
 /// feels slow, and until this there was no instrument at all. Neovim grew `--startuptime` for the
 /// same reason: the alternative is commenting lines out until it stops.
@@ -221,6 +222,9 @@ fn read(_engine: &oslo_runtime::LuaEngine, key: &str) -> Option<String> {
     match value {
         Value::Nil => None,
         Value::Str(text) => Some(text.to_string()),
+        // No setting is bytes, and one that has been made so is worth saying rather than rendering
+        // lossily into something that looks like a value somebody chose.
+        Value::Bytes(b) => Some(format!("<{} bytes, not text>", b.len())),
         Value::Bool(b) => Some(b.to_string()),
         Value::Number(n) => Some(n.to_string()),
         Value::Function(_) => Some("<a function>".to_string()),

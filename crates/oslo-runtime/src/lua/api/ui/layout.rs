@@ -7,7 +7,7 @@
 
 use super::super::util::{ok, put};
 use super::text::align_to;
-use oslo_lua::value::{Number, Table, Value};
+use oslo_base::value::{Number, Table, Value};
 use oslo_ui::dropdown::width;
 
 /// The strings in a Lua sequence, in order, skipping anything that is not one.

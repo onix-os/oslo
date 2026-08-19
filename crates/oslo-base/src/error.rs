@@ -22,7 +22,7 @@ pub enum ShellError {
 
     Io(std::io::Error),
 
-    Lua(oslo_lua::LuaError),
+    Lua(crate::value::LuaError),
 
     Nix(nix::Error),
 
@@ -95,12 +95,17 @@ impl std::fmt::Display for ShellError {
     /// **`ExecutionError` prints no category of its own.** Its message is already
     /// `what: why` — `/etc/default/alsa: Read-only file system` — and bash writes exactly that.
     /// "Execution error: " in front of it named the enum variant rather than telling anybody
-    /// anything. `Syntax error` and `Expansion error` keep theirs: those *are* what went wrong, and
-    /// two tests use the first as the signal that a script parsed.
+    /// anything. `Syntax error` keeps its own, because that *is* what went wrong and two tests use
+    /// it as the signal that a script parsed.
+    ///
+    /// **`ExpansionError` prints no category either, for the same reason as `ExecutionError`.** Its
+    /// messages are already `what: why` — `NOPE: unbound variable` — and the one shape that made
+    /// the prefix indefensible is `${x:?message}`, where POSIX says the *user's own* words go to
+    /// stderr and oslo was writing `Expansion error: x: my message` in front of them.
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             ShellError::SyntaxError(m) => write!(f, "Syntax error: {m}"),
-            ShellError::ExpansionError(m) => write!(f, "Expansion error: {m}"),
+            ShellError::ExpansionError(m) => write!(f, "{m}"),
             ShellError::ExecutionError(m) => write!(f, "{m}"),
             ShellError::Io(e) => write!(f, "{}", reason(e)),
             ShellError::Lua(e) => write!(f, "Lua error: {e}"),
@@ -134,8 +139,8 @@ impl From<std::io::Error> for ShellError {
     }
 }
 
-impl From<oslo_lua::LuaError> for ShellError {
-    fn from(e: oslo_lua::LuaError) -> Self {
+impl From<crate::value::LuaError> for ShellError {
+    fn from(e: crate::value::LuaError) -> Self {
         ShellError::Lua(e)
     }
 }
@@ -361,11 +366,22 @@ mod tests {
         let failed = ShellError::ExecutionError("/etc/thing: Read-only file system".to_string());
         assert_eq!(failed.to_string(), "/etc/thing: Read-only file system");
 
-        // The two that *are* a category keep it — and a test elsewhere uses the first as its
-        // signal that a script parsed.
+        // The one that *is* a category keeps it — and a test elsewhere uses it as its signal that
+        // a script parsed.
         let syntax = ShellError::SyntaxError("unexpected end of input".to_string());
         assert!(syntax.to_string().starts_with("Syntax error: "));
-        let expansion = ShellError::ExpansionError("NOPE: unbound variable".to_string());
-        assert!(expansion.to_string().starts_with("Expansion error: "));
+    }
+
+    /// An expansion error is `what: why` already, so it prints as itself.
+    ///
+    /// **The case that settled it**: `${x:?my message}` is POSIX's way of saying "fail with *this*
+    /// wording", and a category in front of the user's own words is the one thing it must not do.
+    #[test]
+    fn an_expansion_error_does_not_name_its_own_category() {
+        let unbound = ShellError::ExpansionError("NOPE: unbound variable".to_string());
+        assert_eq!(unbound.to_string(), "NOPE: unbound variable");
+
+        let asked_for = ShellError::ExpansionError("x: my message".to_string());
+        assert_eq!(asked_for.to_string(), "x: my message");
     }
 }

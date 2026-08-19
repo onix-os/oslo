@@ -73,6 +73,17 @@ pub fn all() -> Vec<(String, Abbreviation)> {
     out
 }
 
+/// Where `name` fires, if it is defined at all.
+///
+/// For a caller re-adding an abbreviation it did not originate — `startup::stored` folds the
+/// snapshot back in, and that snapshot is partly this shell's own config read back to it.
+pub fn placement_of(name: &str) -> Option<Placement> {
+    table()
+        .lock()
+        .ok()
+        .and_then(|t| t.get(name).map(|abbr| abbr.placement))
+}
+
 /// Forget everything, for a config reload.
 pub fn clear() {
     if let Ok(mut t) = table().lock() {

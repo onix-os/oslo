@@ -10,7 +10,7 @@
 //! Gathered once per prompt and handed to every segment. Mirrors the `ctx` hexe passes its own
 //! segments, so a config moves between the two without rewriting.
 
-use oslo_lua::value::{Table, Value};
+use oslo_base::value::{Table, Value};
 use std::cell::RefCell;
 use std::rc::Rc;
 
@@ -51,7 +51,7 @@ impl Context {
     /// The table a segment's `render(ctx)` is called with.
     pub fn to_lua(&self) -> Value {
         let mut t = Table::default();
-        t.set(Value::str("status"), Value::int(self.status as i64));
+        t.set_str("status", Value::int(self.status as i64));
         t.set(
             Value::str("duration_ms"),
             match self.duration_ms {
@@ -59,7 +59,7 @@ impl Context {
                 None => Value::Nil,
             },
         );
-        t.set(Value::str("cwd"), Value::str(&self.cwd));
+        t.set_str("cwd", Value::str(&self.cwd));
         t.set(
             Value::str("branch"),
             match &self.branch {
@@ -67,9 +67,9 @@ impl Context {
                 None => Value::Nil,
             },
         );
-        t.set(Value::str("user"), Value::str(&self.user));
-        t.set(Value::str("host"), Value::str(&self.host));
-        t.set(Value::str("language"), Value::str(&self.language));
+        t.set_str("user", Value::str(&self.user));
+        t.set_str("host", Value::str(&self.host));
+        t.set_str("language", Value::str(&self.language));
         t.set(
             Value::str("vimode"),
             match &self.vimode {
@@ -77,9 +77,9 @@ impl Context {
                 None => Value::Nil,
             },
         );
-        t.set(Value::str("cols"), Value::int(self.cols as i64));
-        t.set(Value::str("jobs"), Value::int(self.jobs as i64));
-        t.set(Value::str("continuation"), Value::Bool(self.continuation));
+        t.set_str("cols", Value::int(self.cols as i64));
+        t.set_str("jobs", Value::int(self.jobs as i64));
+        t.set_str("continuation", Value::Bool(self.continuation));
         t.set(
             Value::str("command"),
             match &self.command {
@@ -89,7 +89,7 @@ impl Context {
         );
         // `ok` reads better than `status == 0` in the common case, and is the check almost every
         // prompt makes.
-        t.set(Value::str("ok"), Value::Bool(self.status == 0));
+        t.set_str("ok", Value::Bool(self.status == 0));
         Value::Table(Rc::new(RefCell::new(t)))
     }
 }

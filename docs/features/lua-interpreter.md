@@ -1,10 +1,20 @@
 # The Lua interpreter
 
-`oslo-lua` is a Lua 5.4 evaluator written in Rust, with exactly one dependency: `full_moon`, the
-lossless Lua parser behind StyLua and selene, vendored in `vendor/full_moon`. It exists because oslo
-ships as a single statically linked musl binary and speaking Lua had to cost no C toolchain. The
-crate it replaced, `mlua`, binds the reference interpreter: it compiles some thirty thousand lines of
-C into the binary, and it keeps Lua values in a VM the shell can only pass strings across.
+oslo speaks Lua 5.4 through [`luna`](https://github.com/onix-os/luna), a stackless bytecode VM with
+a tracing garbage collector, written in pure Rust. Pure Rust is the requirement everything else
+follows from: oslo ships as a single statically linked musl binary, and speaking Lua had to cost no
+C toolchain. `mlua` — a binding to the reference interpreter — would compile some thirty thousand
+lines of C into the binary and need a musl cross-compiler to link it.
+
+It is a dependency **pinned to a tag** — `v0.5.0` — rather than vendored or tracked on a branch. A
+branch would make a build depend on the day it ran; a tag moves only when somebody moves it, and
+`cargo update` cannot move it at all. `Cargo.lock` records the commit behind the tag either way, so
+what the tag buys is a name a human can read in a diff. See `crates/oslo-luavm/Cargo.toml`.
+
+**This replaced a tree walker.** Until recently the evaluator was oslo's own, walking a `full_moon`
+AST. That crate and its parser are gone: 19,630 lines deleted, in exchange for coroutines, `goto`,
+byte-exact strings, collected cycles, unbounded recursion and roughly an order of magnitude in
+speed. What the trade cost is recorded under [What it cannot do yet](#what-it-cannot-do-yet).
 
 <!-- demo:begin -->
 [![lua-interpreter demo](https://asciinema.org/a/1262741.svg)](https://asciinema.org/a/1262741)
@@ -12,138 +22,334 @@ C into the binary, and it keeps Lua values in a VM the shell can only pass strin
 
 ## How it works
 
-`full_moon` parses and nothing else. Everything after the AST is oslo's own — a tree walker, not a
-bytecode VM. That is the same arrangement `brush-parser` has to the shell side, and it is the point:
-**one Rust core, two front ends.** A builtin is written once in Rust, and both `ls -la` typed as
-shell and `sh.ls("-la")` written in Lua reach it.
+luna compiles a chunk to bytecode and runs it on its own stack inside a `gc-arena` heap. That heap
+is the fact that shapes everything above it: a `luna::Value<'gc>` carries a garbage-collector
+lifetime and exists **only** inside `lua.enter(|ctx| …)`. It cannot be returned, stored in a struct,
+or built by code that has never heard of a VM.
+
+oslo's own `Value` — in `oslo-base`, an `Rc` anyone can keep — stays the interchange currency, and
+the two meet at exactly one place:
 
 ```text
-  source text
-      │   full_moon::parse                       oslo_lua::parse / is_complete
-      ▼
-  full_moon::ast::Ast ─────────────────────────────────────────────┐
-      │   Interp::run_ast                                          │ borrowed for
-      ▼                                                            │ the whole run
-  stmt::exec_block ──► stmt::exec_stmt ──► expr::eval / eval_multi  │
-      │                     │                       │              │
-      │ Flow::Normal        │ set_line(n)           │ ops::index   │
-      │ Flow::Break         │                       │ ops::arith   │
-      │ Flow::Return        ▼                       ▼              │
-      ▼               Scope (locals) ─parent─► Scope ─► _G ────────┘
-   Vec<Value>                                          │
-                                                       ▼
-                                            dyn Globals  (the shell)
+  the shell, forty-odd files            the boundary                    the VM
+  ────────────────────────────   ─────────────────────────────   ──────────────────────
+  oslo_base::value::Value        oslo_luavm::convert             luna::Value<'gc>
+  (owned, Rc, no lifetime)   ──►   into_lua / from_lua      ──►  (arena, 'gc lifetime)
+                                          │
+  structured pipeline,                    │  Engine  ── eval, load, call_function
+  settings, theme, hooks,                 │  Host    ── what a native may ask
+  the whole oslo.* API                    │  globals ── the shared namespace
 ```
 
-Three decisions in that picture are load-bearing.
+`oslo-base` has no dependency on any engine at all. That is what lets the structured pipeline,
+`settings`, `theme`, `hooks` and the ~200 registered callables be written, compiled and tested with
+no VM in scope — and it is why swapping the engine underneath was a change to one crate rather than
+to seventy files.
 
-**Every `Interp` method takes `&self`.** The mutable state sits behind `Cell` and `RefCell`. That is
-not style: a Lua script can call `oslo.proc.exec("build")`, the shell runs `build`, and `build` can
-turn out to be a builtin that same script registered — so control has to re-enter an interpreter
-that is still part-way through the outer call. With `&mut self` that second entry is unreachable.
-
-**Scopes hold variables, not copies.** A closure captures an `Rc<Scope>`, so `local n = 0; local
-function bump() n = n + 1 end` mutates the one `n`. Names resolve by walking the scope chain and
-falling through to globals; real Lua assigns every local a register index while compiling, which is
-much faster, and a hash lookup per variable is not what makes a shell slow.
-
-**Function bodies are shared, keyed by the address of their AST node.** Creating a function *value*
-used to deep-copy the whole body, which for a closure written inside a loop is once per iteration.
-The cache is emptied at both ends of `run_ast`, which is what makes an address a sound key: an entry
-can only live while the AST holding that node is borrowed by the call that made it.
-
-The crate sits at the bottom of the graph and depends on nothing above it. Everything else in oslo
-depends on *it*, because `oslo_lua::value::Value` is the shell's own interchange type — settings,
-themes, structured rows and job reports are all built as Lua tables in Rust before any Lua runs.
+### The crate graph
 
 ```text
-   oslo (bin + lib)
-        │
-   oslo-runtime ────────────┬───────────────┐
-        │                   │               │
-   oslo-shell ──────────► oslo-ui           │
-        │                   │               │
-        └────────┬──────────┘               │
-             oslo-base ─────────────────► oslo-lua ──► full_moon (vendored)
+  luna (pinned) ──► oslo-luavm ──► oslo-shell ──► oslo-runtime
+                          ▲              ▲              │
+                     oslo-base ──────────┴──────────────┘
 ```
-
-### The crate, file by file
-
-| File | Lines | What it holds |
-| --- | --- | --- |
-| `value.rs` | 485 | `Value`, `Number` (int/float subtypes), `Table` (array part, hash part, insertion order) |
-| `scope.rs` | 157 | `Scope` chain and `Closure` |
-| `expr.rs` | 502 | expressions; `eval` for one value, `eval_multi` for all of them |
-| `stmt.rs` | 375 | statements, and `Flow` for `break`/`return` |
-| `ops.rs` | 340 | operators and the metamethods behind them |
-| `lib.rs` | 487 | `Interp`, `LuaError`, `Globals`, `current` |
-| `stdlib/` | 2552 | `base`, `string`, `pattern`, `table`, `math`, `os`, `module`, `stub` |
-
-`stdlib/pattern.rs` is a direct translation of the backtracking matcher in Lua's own `lstrlib.c`.
-Lua patterns are not regular expressions — `%b()` matches balanced parentheses, `%f[%w]` is a
-frontier assertion, there is no alternation — so substituting the `regex` crate would have been less
-code and would have silently changed what every `string.gsub` in every script does.
 
 ### Crossing the boundary
 
-Globals are one namespace with two spellings. The host implements a three-method `Globals` trait, so
-an interpreter with no shell attached — a unit test, a `where` filter — behaves exactly as stock Lua.
+Three things cross, and each is a rule worth knowing before touching `convert.rs`:
 
-```text
-   reading `name`                        writing `name = v` from a script
-        │                                        │
-   in the scope chain? ──yes──► value      a local owns it? ──yes──► write the local
-        │ no                                     │ no
-   in _G? ─────────────yes──► value        v is a string? ──yes──► host.set(name, v)
-        │ no                                     │                 and clear _G[name]
-   host.get(name) ─────yes──► value              │ no
-        │ no                              _G[name] = v, host.unset(name)
-       nil
-```
+* **Tables are copied, not shared.** The tree walker's tables were the interpreter's own `Rc`, so
+  Rust could fetch a global table and mutate it and Lua would see the change. A VM table cannot
+  leave the collector, so what `Host::global` answers is a *snapshot*. Anything meaning to reach the
+  live table goes through `Host::set_field`, or is done in Lua. This is how
+  `package.preload` and `oslo.completion.for_command` are written.
+* **Metatables cross both ways.** They did not at first, and three whole surfaces were silently
+  dead — `sh.*`, `oslo.prompt` and `oslo.theme.styles` are each an *empty* table whose entire
+  behaviour is its metatable, so copying only the entries delivered `{}`.
+* **Identity is preserved.** A memo keyed on the `Rc` pointer means a value that was one thing stays
+  one thing: `oslo.from_json == oslo.json.decode` answers true, and a table containing itself stays
+  cyclic rather than being truncated — which is what lets `oslo.json.encode` refuse it by name.
 
-`_G` is consulted before the shell, and that ordering is the safety argument: a shell script that
-sets `type=deploy` or `print=/usr/bin/lpr` must not break `type()` and `print()` in Lua. Each name
-lives in exactly one of the two homes, so a name that changes type moves rather than leaving a stale
-copy behind. In practice `name = "world"` in Lua is `$name` in shell on the next line, and a table
-assigned to a global stays in `_G`, because a shell variable can only hold a string.
+Functions cross inside `Function::Held`, an `Rc<dyn Any>` the shell never looks inside. Two things
+travel in it and only `convert.rs` knows which: a `Native` (a Rust closure going in, wrapped as a
+luna callback) or a `StashedFunction` (a Lua function coming out, rooted so the collector keeps it
+while a hook or a completer holds it).
 
-Going the other way, a Lua function registered with `oslo.register_builtin` is called with argv as a
-table and its return value is turned into an exit status: `nil` and `true` are 0, `false` is 1, a
-number is itself, a string is parsed.
+**This is why the port was small.** All ~200 callables register through one helper, `util::native`,
+whose signature is oslo's own — `Fn(&dyn Host, Vec<Value>) -> LuaResult<Vec<Value>>` — and 198 of
+them ignore the `Host` entirely. Their bodies never changed.
 
 ## What makes it different
 
-oslo's config is `config.lua`, and the values a config produces are the same `Value` the shell reads
-— there is no serialisation step and no second config format, and no separate configuration
-language to learn beside the one the prompt already speaks.
+oslo's config is `init.lua`, and the values a config produces are the same `Value` the shell reads
+— no serialisation step, no second config format, and no separate configuration language to learn
+beside the one the prompt already speaks.
 
-Against stock Lua, four differences are deliberate:
+`io.popen` and `os.execute` are meant to refuse by name rather than work, because in real Lua both
+run their argument through `/bin/sh` — someone else's shell, from inside this one, and nothing at
+all on a system where oslo is the only shell installed.
 
-* **`pairs` iterates in insertion order.** Lua promises no order, but a table's hash part is walked
-  by a `HashMap` whose order changes between runs, and a record printed as columns would print them
-  shuffled. The hash part carries a `Vec<Key>` alongside it; lookup stays O(1) and only iteration
-  and removal pay.
-* **`package.path` has no `./?.lua`.** Stock Lua searches the working directory, which in a shell
-  is a hijack: `cd` somewhere untrusted, run a tool, load a stranger's `utils.lua`.
-* **`package.cpath` is empty.** A static binary cannot `dlopen` anything, and advertising a path
-  would turn an honest "module not found" into a confusing loader error.
-* **Everything unimplemented is present and erroring, never `nil`.** `coroutine` is a real table
-  whose every member raises `coroutine.create is not implemented in oslo's Lua`, with the file and
-  line. Left `nil`, the first use would be `attempt to index a nil value` and the reader would go
-  looking for a typo.
+### Handles, and things that stream
 
-`io.popen` and `os.execute` refuse by name rather than working, because in real Lua both run their
-argument through `/bin/sh` — someone else's shell, from inside this one, and nothing at all on a
-system where oslo is the only shell installed. Each error names its replacement.
+**Everything oslo hands out that owns something is an object with a metatable**, built by
+`api/handle.rs`. The verbs live behind `__index`, so `pairs` over a handle shows nothing to get
+wrong and internals stay internal; `__newindex` refuses a typo rather than adding a field; and
+`<close>` releases at the end of the block, after which every verb says so.
+
+```lua
+local db <close> = oslo.db.open("notes")     -- the file is shut here
+local tmp <close> = oslo.fs.mktempdir()      -- the directory is removed here
+```
+
+`oslo.db.open`, `oslo.spawn`, `oslo.after`/`oslo.every` and `oslo.fs.mktempdir` are the four.
+`h:close()` is the same call as leaving a `<close>` scope, and answers whether it was the one that
+did the closing.
+
+**No handle sets `__gc`**, and the reason differs by kind. For a database, a file or a pipe there is
+nothing a finalizer would do that collection does not already: the verbs hold Rust values, and
+collecting the handle drops them. `<close>` buys the *moment*, not the release. For a spawn, a timer
+or a temporary directory a finalizer would be wrong — those handles are normally written for the
+effect and thrown away, so `__gc` would cancel the callback, stop the timer, and remove a directory
+whose path had been copied out.
+
+**Anything that iterates is lazy, and the iterator is a handle too.** A generic `for` needs
+something callable and a scope-bound release needs a metatable, so these carry `__call` — one value
+that works in both positions, rather than two returns a caller has to remember to keep together:
+
+```lua
+for line in oslo.lines{"cargo", "build"} do oslo.ui.log(line) end
+for path in oslo.fs.walk("/etc") do print(path) end
+for line in oslo.fs.lines("/proc/mounts") do … end
+
+local out <close> = oslo.lines{"journalctl", "-f"}   -- reaped when the block ends
+for line in out do if line:find("error") then break end end
+```
+
+A loop that runs out cleans up on its own. A loop that `break`s does not, because luna does not
+close a `for`'s closing value — which is what `<close>` and `:close()` are for.
+
+### A string is bytes
+
+```lua
+local png = oslo.fs.read("logo.png")   -- the file, exactly
+#png                                    -- its size
+oslo.fs.write("copy.png", png)          -- byte for byte
+string.unpack("<i4", oslo.db.open("d"):get("row"))
+```
+
+`oslo.fs.read` used to go through `String::from_utf8_lossy`, so every byte that was not text came
+back as `U+FFFD` — a read that looked like it had worked and had quietly changed the file. The same
+happened to anything `string.pack` produced on its way out to the shell, and `oslo.lines` failed
+outright on a command whose output had one non-UTF-8 byte in it.
+
+**There is still exactly one string type.** `type()` says `string` either way, `t["a"]` and the
+table indexed by the bytes `a` are the same slot, and equality is Lua's. Internally the shell keeps
+two representations — `Value::Str` for text, `Value::Bytes` for what is not — and they cannot
+overlap, because valid and invalid UTF-8 are disjoint and one constructor decides which you get.
+
+What a *name* is remains text: a path, a variable, a command word. Handing `oslo.fs.read`'s answer
+to something expecting one of those is a message rather than a mangling, and `oslo.json.encode`
+refuses bytes outright, since no JSON string could hold them and still be the same bytes.
+
+### Facts the shell already knows, without a process
+
+A prompt draws on every keystroke that changes the line, so anything it asks for has to be cheap.
+These are the questions people shell out for, answered from files the kernel already keeps:
+
+```lua
+oslo.git.head()          -- { branch = "main", commit = "…", detached = false }
+oslo.git.operation()     -- "rebase" while one is part-way through, else nil
+oslo.git.upstream()      -- "origin/main", or nil when the branch tracks nothing
+oslo.git.stash()         -- how many entries; 0 outside a repository
+oslo.git.tag()           -- a tag pointing at HEAD
+
+oslo.sys.kernel()        -- "7.0.0-29-generic"
+oslo.sys.cpus()          -- what this shell may run on, cgroup quota included
+oslo.sys.loadavg()       -- { 1, 5, 15 }
+oslo.sys.memory()        -- bytes: total, available, free, swap_total, swap_free
+oslo.sys.uptime()        -- seconds
+```
+
+`oslo.git` reads `.git` — one to three small file reads and no `git` process. It handles a linked
+worktree, where `.git` is a *file* and the refs live in the repository it was linked from.
+**`dirty` and `ahead`/`behind` are deliberately absent**: both mean real work through the object
+database, and a hand-rolled wrong answer is worse than no answer. Ask for those off the prompt:
+
+```lua
+oslo.every(2000, function()
+  oslo.spawn{ "git", "status", "--porcelain",
+    on_exit = function(out) oslo.state.set("git.dirty", out ~= "") end }
+end)
+```
+
+`oslo.sys.memory()` answers bytes, not `39G`, for the same reason the structured pipeline hands a
+`Size` over as a number: a caller comparing needs one, and a caller showing has `oslo.ui`.
+
+### `$PATH` is a list
+
+```lua
+oslo.env.path_add("~/.local/bin")               -- front, once, absolute, tilde expanded
+oslo.env.path_add("./node_modules/.bin")        -- relative to where you are now
+oslo.env.path_add("/opt/fallback", { last = true })
+oslo.env.path_add("/usr/share/man", { var = "MANPATH" })
+oslo.env.path_remove("/nix/*")                  -- a pattern; answers how many went
+oslo.env.has_path("~/.cargo/bin")
+for _, dir in ipairs(oslo.env.path()) do … end
+```
+
+The alternative is string surgery on `oslo.env.get("PATH")`, and each of its edge cases is one
+somebody hits: the missing separator, appending where prepending was meant so the project's tool
+loses to the system one, a reload that grows the variable every time, `./bin` resolving against
+wherever the shell later stands, and the empty entry a trailing colon leaves — which means "the
+current directory" to the dynamic linker. These were `oslo.direnv.path_add`, behind a feature; they
+are in every build now, over the same implementation `PATH_add` in an `.envrc` uses.
+
+### Bytes, summarised and carried
+
+```lua
+oslo.hash.sha256("hello")               -- lower-case hex
+oslo.hash.file("/usr/bin/oslo")         -- streamed; the file is never held in memory
+oslo.hex.encode(oslo.fs.read("k.bin"))  -- and oslo.hex.decode back
+oslo.base64.decode(token)               -- wrapping at 64 or 76 columns is ignored
+```
+
+These only became possible when a shell value could hold arbitrary bytes: hashing what
+`oslo.fs.read` used to answer for a binary file hashed a lossy rendering, giving a checksum that
+matched nothing and no sign of why. `oslo.base64` hides nothing and protects nothing — it is a
+change of alphabet. `oslo.secret` is what encrypts.
+
+`oslo.fs` gained two that were awkward to write by hand: `oslo.fs.touch(path)` does both halves —
+creating what is missing *and* dating what is not, where `append(path, "")` does only the first —
+and `oslo.fs.usage(dir)` adds up a tree into `{ bytes, files, dirs, unreadable }` without following
+symlinks, which over `oslo.fs.walk` in Lua would cost a `stat` and a boundary crossing per file.
+
+**A directory neither can read is counted rather than fatal**, and both say how many they skipped —
+`usage(dir).unreadable` and `walk(dir):unreadable()`. That is what lets `/etc` be walked or measured
+by somebody who is not root: the walk used to *raise* at the first unreadable subdirectory, ending
+the loop with a fraction of the tree seen and no way to catch it.
+
+### Processes and filesystems, as fields
+
+```lua
+local p = oslo.proc.info(oslo.proc.pid())
+-- p.pid, p.ppid, p.name, p.state, p.threads, p.rss, p.size, p.uid,
+-- p.command, p.argv, p.exe, p.cwd
+for _, child in ipairs(oslo.proc.children(oslo.proc.pid())) do … end
+
+local d = oslo.fs.disk(".")   -- { total, free, available, files, files_free }
+```
+
+`ps` is the canonical thing to shell out to and the canonical thing to get wrong: its columns are
+padded to a width that depends on their contents, `COMMAND` contains spaces so it cannot be the
+*n*th field, and a process whose name has a space in it — which is allowed — breaks every
+`awk '{print $2}'` ever written. `p.argv` is the arguments exactly as they were passed, because
+`/proc/<pid>/cmdline` is NUL-separated. `p.state` is `"zombie"`, not `"Z"`. `p.rss` is bytes.
+
+`p.exe` and `p.cwd` are nil for a process that is not yours — those are `/proc` symlinks only the
+owner may read, and nil says "unavailable" where `""` would look like a process with no executable.
+
+`oslo.fs.disk` answers for the filesystem the path is *on*, so any path on the mount does.
+**`free` and `available` differ on purpose**: a filesystem reserves a percentage for root, so
+`available` is what you may write and `free` is what exists. `df` shows the first.
+
+### History as rows, not as a file
+
+```lua
+for _, c in ipairs(oslo.history.commands{ limit = 200 }) do
+  -- c.line, c.mode, c.runs, c.last_at, c.dir, c.places, c.worked, c.session, c.host, c.root
+end
+
+oslo.history.forget("curl -H 'Authorization: Bearer …' …")
+```
+
+The finder over this is one opinion about what to show. **Anybody else's needs the rows** — "what do
+I run in this project", "which of my commands have only ever failed", "what did I run last week and
+not since" are each one loop over a table, and none of them is a feature the shell should grow. A
+history *file* cannot answer any of them; it is a list of lines. The tracker has been writing the
+directory, the count, the exit status and the rest on every command since long before there was
+anything to read it with.
+
+`forget` takes the line out of every directory *and* out of the log, not only the aggregate — a
+half-forgotten line is one that comes back on the next start. Having it as a function rather than
+only as the finder's Delete key means "forget anything matching this" can be a rule applied on every
+start, which a key press cannot be.
+
+**Only an interactive shell has a store.** A script, an `oslo -c` and a subshell see an empty
+history — they have nowhere to write to either. `commands()` answers an empty list rather than nil
+there, so the loop above is safe in a file that might be run either way.
+
+### Being told when a file changes
+
+```lua
+local watch <close> = oslo.fs.watch("src", { "write", "create", "delete" })
+oslo.every(500, function()
+  for change in watch do
+    if change.name:match("%.rs$") then oslo.spawn{ "cargo", "check" } end
+  end
+end)
+```
+
+The kinds are `write` (saved — one event per save, not one per `write(2)`), `modify`, `create`,
+`delete`, `move`, `attrib`, `open` and `read`; no list means all of them. A change carries `name`,
+`path`, `kind` and `directory`.
+
+**Polling is the interface, and that is not laziness.** A Lua handler runs only at a safe point — a
+command boundary or an idle prompt — so a callback promising "when the file changes" would be a lie
+about *when*. This is a queue instead: the kernel fills it whether or not anyone is looking, the
+handle drains it when a timer gets round to it, and nothing is lost in between. That last part is
+what a `stat`-and-compare loop cannot do at all, since it only ever sees the state a file ended in.
+
+It does not recurse — inotify watches a directory, not a tree — and `<close>` is what releases the
+kernel's watch.
+
+### A failure carries facts, and is still the message
+
+`nil, message` is the convention everywhere in `oslo.*`, and the second value is now an object:
+
+```lua
+local text, err = oslo.fs.read("/nope")
+print(err)                       -- /nope: No such file or directory (os error 2)
+print(err.kind, err.code)        -- not-found  2
+if err.kind == "permission" then … end
+```
+
+`err.kind` is one of `not-found`, `permission`, `exists`, `invalid`, `truncated`, `timeout`,
+`interrupted`, `other`; `err.code` is the errno; `err.path` is what the call was about, and
+`err.to` as well for `rename` and `copy`. `oslo.db` adds `name` and its own `kind`.
+
+**Everything that read the message still reads it.** `tostring(err)` and `print(err)` give the same
+sentence as before, `"oops: " .. err` concatenates, and `err:find(…)`, `err:match(…)` and
+`err:upper()` work because `__index` falls through to the string library. The only observable
+change is that `type(err)` is now `"table"`.
+
+The point is that matching English was the only way to ask what went wrong, and a translated C
+library or a reworded message broke it. The kind and the errno are the facts; the sentence is a
+rendering of them.
 
 ## Configuration
 
-The interpreter has no settings of its own. What it exposes is the module search path, assembled
-from the environment at startup:
+**The configuration is a Lua program, and it is one program even when it is several files.**
 
 ```lua
--- ~/.config/oslo/lua/?.lua, then ?/init.lua, then the system 5.4 directories.
--- Rooted at $XDG_CONFIG_HOME when that is set, otherwise $HOME/.config.
+-- init.lua
+local oslo = require "oslo"      -- the same table the global names, not a copy of it
+require "aliases"                -- aliases.lua, beside this file
+```
+
+`require "oslo"` answers with the table `oslo` *is*. That is worth stating because the obvious
+implementation gets it wrong: values crossing the shell↔VM boundary are converted, so a `preload`
+that handed back a shell-side value produced a fresh table per call — and
+`require("oslo").completion.max_rows = 42` was written into a copy nothing would ever read. The
+registration is done in Lua, against the global, so identity holds and a setting lands.
+`tests/config_modules_tests.rs` holds that to it.
+
+The search path is set by `lua::api::policy` from the environment at startup:
+
+```lua
+-- ~/.config/oslo/?.lua and ?/init.lua — the config's own directory, so a second file
+-- beside init.lua is `require "aliases"` rather than an absolute path spelled out.
+-- Then ~/.config/oslo/lua/, for a library kept apart from the config that uses it.
+-- Then the system 5.4 directories. Rooted at $XDG_CONFIG_HOME, else $HOME/.config.
 print(package.path)
 
 -- So a library of your own lives beside the config that requires it:
@@ -157,67 +363,81 @@ package.path = "/opt/team/lua/?.lua;" .. package.path
 package.preload["team.colours"] = function() return { accent = "#89b4fa" } end
 ```
 
+`package.cpath` is the empty string, not unset: a static binary cannot `dlopen` anything, and
+advertising a C path would turn an honest "module not found" into a confusing loader error — but a
+`cpath` that is absent breaks `package.cpath == ""`, which is how a script asks.
+
 ## Measurements
 
-Timed with `os.clock()` inside the script, running `target/release/oslo` (fat LTO, `opt-level = 3`),
-each figure the spread over four runs:
+`target/release/oslo` at fat LTO, best of three, wall clock including process start (3.6 ms, from
+100 empty runs in 0.36 s). The tree-walker column is the figure the previous version of this
+document recorded, measured the same way.
 
-| What | Time |
-| --- | --- |
-| 1,000,000 iterations of `for i = 1, N do n = n + i end` | 0.218 – 0.246 s |
-| 1,000,000 table stores, `x[i] = i * 2` | 0.334 – 0.337 s |
-| 200,000 calls of a one-line Lua function | 0.072 – 0.078 s |
-| 100 processes, each parsing and running an empty chunk, no config to load | 0.20 – 0.23 s in total |
+| What | tree walker | luna |
+| --- | --- | --- |
+| 1,000,000 iterations of `for i = 1, N do n = n + i end` | 0.281 s | **0.02 s** |
+| 1,000,000 table stores, `x[i] = i * 2` | 0.444 s | **0.05 s** |
+| 200,000 calls of a one-line Lua function | 0.093 s | **0.02 s** |
+| 100 processes, each running an empty chunk | 0.61 s | **0.36 s** |
 
-That is roughly 220 ns per loop iteration and 380 ns per call — a tree walker's numbers, and far off
-a bytecode VM's. It is the trade the crate exists to make. One further number is recorded in the
-source rather than measured here: creating a function value used to deep-copy its body at **4.96 µs
-for a ten-line closure**, paid on every evaluation of the same `function … end`, which is why
-`Interp::bodies` exists. For size, `crates/oslo-lua` is 4,898 lines of Rust across 15 files and the
-vendored parser is 14,290, plus 926 in its derive crate.
+The benchmarks live in `bench/lua/`. The `_noos` variants time themselves from outside rather than
+with `os.clock()`, which is how these figures include process start.
 
-## What it cannot do
+## What it cannot do yet
 
-* **Coroutines.** Suspending mid-call needs either threads or a bytecode VM, and a tree walker
-  running on the Rust stack is neither. `goto` and `::labels::` parse and then refuse at run time
-  with `statement 'goto …' is not implemented in oslo's Lua`.
-* **Collect cycles.** Tables are `Rc<RefCell<…>>`, so `t.self = t` leaks. There is no tracing GC,
-  no weak tables, no `__gc` and no `__close`.
-* **Hold arbitrary bytes in a string.** `Value::Str` is `Rc<str>`, so byte operations go through
-  `String::from_utf8_lossy`: `string.char(255)` is three bytes long and reads back as 239, and
-  `("héllo"):sub(1, 2)` returns a replacement character where real Lua returns half a codepoint.
-  `#"héllo"` is still 6, and single-byte escapes such as `string.char(27)` are exact. The `utf8`
-  library is one of the tables that refuses.
-* **Enforce `<const>` and `<close>`.** The attributes parse and are ignored, so assigning to a
-  `<const>` local succeeds here and is a compile error in real Lua.
-* **File handles.** `io.open`, `io.lines` and friends need a userdata type and `__close`; the
-  `oslo.fs` functions cover what a shell script does with a file. `io.write` and `io.read` are real,
-  and `io.read` only does line formats.
-* **Match C's `printf` exactly.** `%g` ignores its precision and never switches to exponent form —
-  `string.format("%g", 1/3)` is `0.3333333333333333` — and `%a` is not a hex float.
-* **Recurse deeply.** There is no tail-call optimisation, so `MAX_DEPTH` is 200 nested calls, above
-  which the error is `stack overflow: too many nested calls`. A shell may not abort, and the ceiling
-  holds because oslo runs the interpreter on a 16 MiB stack it reserves itself
-  (`INTERPRETER_STACK`) rather than on whatever `ulimit -s` gave it.
-* **Catch an exit.** `oslo.proc.exit(n)` travels as an error so that it unwinds, and `pcall`
-  re-raises it — `pcall(oslo.proc.exit)` ends the shell, which is what "never returns" has to mean.
-* **`load` from a reader function.** Only the string form; the callback form exists for chunks too
-  large for memory, which a shell does not have.
+The standard library is complete enough that oslo's own tests no longer notice its edges: `os`,
+`io`, `package`/`require`, `utf8`, `debug`, `coroutine`, `string.pack` and `_G` are all there,
+`pairs` iterates in insertion order, recursion is bounded by a catchable error, and floats print as
+Lua 5.4 prints them.
+
+Two things remain, both the VM's:
+
+* **A generic `for` does not close its fourth value.** Lua 5.4 closes the loop's closing value when
+  the loop ends, `break` and error included; luna does not. That is what would otherwise have made
+  `for line in oslo.lines{…} do … break … end` reap its child by itself, and it is why the
+  iterators oslo hands out are `__call`able handles you can also `<close>`.
+
+* **A runtime error is `userdata`, where Lua 5.4 raises a string.** `tostring(err)` reaches the
+  message, so nothing is lost — but `err:find("…")`, the idiom for inspecting one, cannot index a
+  userdata. `error("…")` and `require`'s "module not found" are already strings; it is the errors
+  the VM itself raises that are not.
+Neither is reachable from ordinary shell use.
+
+**Three that used to be here are gone**, and what they cost is worth recording. `require` now marks
+a module as in progress and reports `loop or previous error in loading module 'x'` rather than
+recursing to a stack overflow; `os.setlocale` exists and answers for `C`, which on a static
+musl-linked binary is not merely the current locale but the only one — both in
+`crates/oslo-runtime/src/lua/api/policy.rs`. And a name assigned a table and then a string *does*
+move back to the shell now: a script's non-string globals are kept in a table beside `_G` rather
+than in it, so the name never lands there and `__newindex` keeps firing — see
+[`globals`](#what-makes-it-different).
+
+That last one has a price, paid deliberately: reading a script's own table global is a metamethod
+rather than a raw hit, and `rawget(_G, "x")` and `pairs(_G)` no longer see script globals, there
+being no `__pairs` in Lua 5.4 to intercept. The standard library is untouched by both, since those
+names really are in `_G`. The alternative — an always-empty `_ENV` with everything in a backing
+table, which `Closure::load_with_env` makes possible — has no raw-access divergence at all and
+costs a metamethod on *every* global read, `print` included.
+
+**Three names oslo refuses on purpose**, and those are not gaps — see
+`crates/oslo-runtime/src/lua/api/policy.rs`. `os.execute` and `io.popen` would run their argument
+through `/bin/sh`, another shell started from inside this one; `os.tmpname` names a file without
+creating it, leaving a window for somebody else to take the name. Each refusal names its
+replacement, and `package.path` is set there too, without stock Lua's `./?.lua` — in a shell,
+searching the working directory is a script hijack.
 
 ## Where it lives
 
 | Path | Key items |
 | --- | --- |
-| `crates/oslo-lua/src/lib.rs` | `Interp`, `LuaError`, `Flow`, `Globals`, `MAX_DEPTH`, `run`, `parse`, `is_complete`, `current::publish` |
-| `crates/oslo-lua/src/value.rs` | `Value`, `Number`, `Key`, `Table`, `Function`, `NativeFn`, `parse_number` |
-| `crates/oslo-lua/src/scope.rs` | `Scope::declare` / `get` / `set`, `Closure` |
-| `crates/oslo-lua/src/expr.rs`, `stmt.rs` | `eval`, `eval_multi`, `lookup`, `unsupported`; `exec_block`, `exec_stmt` |
-| `crates/oslo-lua/src/ops.rs` | `arith`, `compare`, `concat`, `index`, `set_index`, `metamethod`, `tostring` |
-| `crates/oslo-lua/src/stdlib/` | `install`, `native`, `module`, and the eight library files |
-| `crates/oslo-lua/src/stdlib/pattern.rs` | the `lstrlib.c` matcher, `Capture`, `Match` |
-| `crates/oslo-runtime/src/lua/engine.rs` | `LuaEngine`, `ShellGlobals` (the `Globals` impl), `call_lua_builtin`, `status_from_lua` |
-| `crates/oslo-runtime/src/lua/api/` | the `oslo.*` namespace; `api/run.rs` builds the `sh` table |
-| `crates/oslo-runtime/src/lib.rs` | `INTERPRETER_STACK`, the 16 MiB stack the interpreter runs on |
-| `crates/oslo-shell/src/data/tools/where_.rs` | a filter reaching the shell's interpreter through `oslo_lua::current` |
-| `vendor/full_moon/` | the parser, `lua54` feature, `default-features = false` |
-| `tests/lua_eval_tests.rs`, `tests/lua_corpus/` | the evaluator's tests and the hand-written corpus |
+| `crates/oslo-luavm/src/lib.rs` | `Engine`, `eval`, `load`, `call_function`, `is_complete`, `current::publish` |
+| `crates/oslo-luavm/src/convert.rs` | `into_lua`, `from_lua`, `raise` — values, metatables, functions, identity |
+| `crates/oslo-luavm/src/host.rs` | `Host`, `Native`, `CallbackHost`, `run_nested`, the re-entrancy slot |
+| `crates/oslo-luavm/src/globals.rs` | the shell's variables as Lua's global namespace |
+| `crates/oslo-base/src/value.rs` | `Value`, `Number`, `Key`, `Table`, `Function` — the shell's own, engine-free |
+| `crates/oslo-base/src/value/error.rs` | `LuaError`, `LuaResult` |
+| `crates/oslo-runtime/src/lua/engine.rs` | `LuaEngine`, `ShellGlobals`, `call_lua_builtin`, `status_from_lua` |
+| `crates/oslo-runtime/src/lua/api/` | the `oslo.*` namespace; `api/util.rs` registers every callable; `api/run.rs` builds `sh` |
+| `crates/oslo-shell/src/data/tools/where_.rs` | `where` and `each`, compiling one expression and running it per row |
+| `crates/oslo-runtime/src/lua/api/policy.rs` | the names oslo replaces, and where `require` looks |
+| `tests/lua_eval_tests.rs`, `tests/lua_corpus/` | the language tests and the hand-written corpus |

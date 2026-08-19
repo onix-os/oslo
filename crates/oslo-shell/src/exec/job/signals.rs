@@ -41,7 +41,7 @@ const RESET_IN_CHILD: [Signal; 6] = [
 /// in the window after `fork` where almost nothing else is.
 pub fn reset_signals_for_child() {
     // This process is not the one that cached whether it is init. See `table::is_init`.
-    super::table::forgot_which_process_i_am();
+    super::reap::forgot_which_process_i_am();
     let dfl = SigAction::new(SigHandler::SigDfl, SaFlags::empty(), SigSet::empty());
     for sig in RESET_IN_CHILD {
         // Errors are unreportable here (the child has not exec'd yet and stderr may belong to a
@@ -118,6 +118,20 @@ pub fn interrupt_pending() -> bool {
     let local = LOCAL_INTERRUPT.with(|flag| flag.replace(false));
     let delivered = SIGINT_RECEIVED.swap(false, Ordering::SeqCst);
     local || delivered
+}
+
+/// Whether a SIGINT is waiting, **without** taking it.
+///
+/// For the builtins that run long enough to need interrupting from the inside — `rm -r` over a
+/// large tree is the one this was written for. A builtin runs in the shell process, so the
+/// keystroke sets the flag and then nothing looks at it until the command is already over; a walk
+/// that polls this can stop between entries instead.
+///
+/// **Peeking rather than draining** is the whole point. [`interrupt_pending`] is the command
+/// boundary's, and a builtin that cleared the flag would leave the evaluator with no evidence the
+/// keystroke happened — the `rm` would stop, and the `&&` after it would run anyway.
+pub fn interrupt_waiting() -> bool {
+    LOCAL_INTERRUPT.with(std::cell::Cell::get) || SIGINT_RECEIVED.load(Ordering::SeqCst)
 }
 
 /// Drop an interrupt that arrived before the shell asked for the next command.

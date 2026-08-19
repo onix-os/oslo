@@ -62,7 +62,7 @@ pub(super) fn show(args: &[String]) -> i32 {
         let shadow = if entry.kind == Kind::Alias && configured.contains(&entry.name) {
             // Marked rather than silent: finding this out from a list is fine, finding it out by
             // wondering why your config stopped working is not.
-            paint.dim("  (shadows config.lua)")
+            paint.dim("  (shadows init.lua)")
         } else {
             String::new()
         };
@@ -101,7 +101,7 @@ fn screen() -> Option<i32> {
     }
 }
 
-/// The aliases `config.lua` defines, so `show` can say which stored ones win over one.
+/// The aliases `init.lua` defines, so `show` can say which stored ones win over one.
 ///
 /// Read from the snapshot's neighbour rather than by running Lua: this is a *label on a list*, and
 /// starting an interpreter to draw one would cost more than the list.

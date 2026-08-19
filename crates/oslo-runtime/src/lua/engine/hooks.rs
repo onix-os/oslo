@@ -16,8 +16,8 @@
 
 use super::ACTIVE;
 use crate::lua::engine::Registry;
-use oslo_lua::Interp;
-use oslo_lua::value::Value;
+use oslo_base::value::Value;
+use oslo_luavm::Engine;
 
 /// Fire an answering hook using whatever interpreter is on this thread.
 ///
@@ -123,7 +123,7 @@ pub(super) fn fire_now(index: usize, args: Vec<Value>) {
         return;
     };
     for handler in crate::lua::api::hook_handlers(&registry, name) {
-        if let Err(e) = interp.call(&handler, args.clone()) {
+        if let Err(e) = interp.call_function(&handler, args.clone()) {
             oslo_base::messages::error(format!("{name} hook"), e.to_string());
         }
     }
@@ -144,7 +144,7 @@ pub fn answer_hook_with(index: usize, args: Vec<Value>) -> Option<Value> {
     let name = crate::lua::api::hooks::HOOKS[index].name;
     let (interp, registry) = ACTIVE.with(|slot| slot.borrow().clone())?;
     for handler in crate::lua::api::hook_handlers(&registry, name) {
-        match interp.call(&handler, args.clone()) {
+        match interp.call_function(&handler, args.clone()) {
             Ok(values) => match values.first() {
                 None | Some(Value::Nil) => {}
                 Some(answer) => return Some(answer.clone()),
@@ -160,13 +160,13 @@ pub fn answer_hook_with(index: usize, args: Vec<Value>) -> Option<Value> {
 }
 
 pub(super) fn ask_hook_on(
-    interp: &Interp,
+    interp: &Engine,
     registry: &Registry,
     name: &str,
     args: Vec<Value>,
 ) -> Option<i32> {
     for handler in crate::lua::api::hook_handlers(registry, name) {
-        match interp.call(&handler, args.clone()) {
+        match interp.call_function(&handler, args.clone()) {
             Ok(values) => {
                 if let Some(Value::Number(n)) = values.first() {
                     return n.as_int().map(|i| i as i32);

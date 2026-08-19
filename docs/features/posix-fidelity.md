@@ -2,7 +2,7 @@
 
 oslo is meant to be `/bin/sh` on a machine, which means every `postinst`, every `configure` and every
 `Makefile` recipe on it runs through this shell. What it offers those scripts is not "we were
-careful": it is 416 scripts run under oslo and under bash and compared byte for byte, plus a rule
+careful": it is 419 scripts run under oslo and under bash and compared byte for byte, plus a rule
 that every extension oslo added is unreachable from shell written before oslo existed.
 
 <!-- demo:begin -->
@@ -18,10 +18,10 @@ that reported success. So the expected output comes from bash, the specification
 script on the machine was actually written against.
 
 ```
-tests/corpus/*.sh — 416 scripts, each declaring its oracle on line 1
+tests/corpus/*.sh — 419 scripts, each declaring its oracle on line 1
         │
         ├─ "# mode: posix"  (320) ──► argv  --posix -c  ─┐
-        └─ "# mode: bash"   ( 96) ──► argv  -c          ─┤ the SAME argv to both shells
+        └─ "# mode: bash"   ( 99) ──► argv  -c          ─┤ the SAME argv to both shells
                                                          │
         ┌────────────────────────────────────────────────┴──────────┐
         ▼                                                           ▼
@@ -114,7 +114,7 @@ string, so the gate reads the word's *shape* — `WordPart::Escaped` is a separa
 
 What the corpus exercises, by category: 94 builtin cases, 71 expansion, 43 shell options, 38
 redirections, 35 control flow, 25 arithmetic, 17 exit status, 15 traps, 15 quoting, 13 job control,
-10 syntax errors, 8 array, 8 robustness, 4 signals, 4 `[[ ]]` conditionals.
+12 syntax, 8 array, 8 robustness, 4 signals, 4 `[[ ]]` conditionals.
 
 | construct | notes |
 |---|---|
@@ -162,6 +162,12 @@ together.
 
 A child killed by SIGQUIT is treated the same way, for the same reason.
 
+Reading the wait status is enough for a job that *dies*, and no use at all for one that does not —
+`sh -c 'trap "" INT; sleep 300'` takes the terminal and keeps it. Opting into
+`oslo.misc.interrupt_escape` puts a watcher inside the job's process group so a repeated Ctrl-C has
+somewhere to land; see [the job that will not take a Ctrl-C](interrupt-escape.md). Off by default,
+and a shell that has not asked for it behaves exactly as this section describes.
+
 ## What makes it different
 
 **`sh` is a personality, not a path.** Invoked as `sh`, oslo enters POSIX mode; invoked as `oslo` it
@@ -202,29 +208,32 @@ cannot be reached any other way *before the first command runs* — `set -o posi
 script is already too late to have decided how that line's command word was searched for.
 
 `$OSLO_ALLHIST` is an environment variable rather than a Lua setting for a reason that only matters
-once oslo is `/bin/sh`: `-c` does not read `config.lua`, so a setting would mean starting an
+once oslo is `/bin/sh`: `-c` does not read `init.lua`, so a setting would mean starting an
 interpreter and running your config on every `system()` call on the machine. `0`, `false`, `no` and
 `off` mean off, rather than merely being non-empty.
 
 ## Measurements
 
-`target/release/oslo` at 0.2.27 against bash 5.3.9, every corpus script in its own scratch
+`target/release/oslo` at 0.4.2 against bash 5.3.9, every corpus script in its own scratch
 directory, comparing stdout and exit status; then the whole corpus again under
 `OSLO_AUDIT_STRUCTURED=1`:
 
 | | |
 |---|---:|
-| corpus scripts | 416 |
-| `# mode: posix` / `# mode: bash` | 320 / 96 |
-| matching bash | 413 |
-| differing | 3 |
-| reported a structured-edge count | 415 |
+| corpus scripts | 419 |
+| `# mode: posix` / `# mode: bash` | 320 / 99 |
+| matching bash | 417 |
+| differing | 2 |
+| reported a structured-edge count | 418 |
 | **reported a non-zero one** | **0** |
-| the differential suite, end to end | 2.9 s |
-| the byte-path audit over the corpus | 4.9 s |
+| the differential suite, end to end | 2.6 s |
+| the byte-path audit over the corpus | 3.8 s |
 
-The three that differ are exactly the three rows in `tests/differential/expected_fail.rs`:
-`arith_for_unspaced_sections.sh`, `syntax_unsupported_coproc.sh`, `syntax_unsupported_select.sh`.
+The two that differ are exactly the two rows in `tests/differential/expected_fail.rs`:
+`syntax_unsupported_coproc.sh` and `syntax_unsupported_select.sh`, both refused by name rather than
+guessed at. There was a third — `arith_for_unspaced_sections.sh` — and it is gone because the gap
+closed; see [known gaps](../known-gaps.md).
+
 The one that did not report is `builtin_exec_replaces_shell.sh` — the exemption the test already
 carries, because it replaced the process image and nothing registered at exit could run.
 
@@ -250,7 +259,7 @@ carries, because it replaced the process image and nothing registered at exit co
 - **Under `--posix`, a function named after a special builtin is defined and then never reached.**
   bash refuses the definition outright with `is a special builtin`. The net effect agrees — the
   function does not shadow — but the error is not.
-- **The corpus can only catch what somebody wrote a case for.** 416 scripts is not the language.
+- **The corpus can only catch what somebody wrote a case for.** 419 scripts is not the language.
   Three of the divergences it now covers were found by running every `#!/bin/sh` script on a Debian
   system under both oslo and dash, not by anybody enumerating them.
 - **A script cannot opt in to the interactive extras.** There is no flag; `-i` is the only switch,
@@ -267,7 +276,7 @@ carries, because it replaced the process image and nothing registered at exit co
 
 | path | what |
 |---|---|
-| `tests/corpus/` | the 416 scripts, mode declared on line 1 |
+| `tests/corpus/` | the 419 scripts, mode declared on line 1 |
 | `tests/differential_tests.rs` | `compare`, `mode_args`, `execute`, `oracle_version` |
 | `tests/differential/expected_fail.rs` | `EXPECTED_FAIL`, `KNOWN_DIVERGENT` — the ratchet |
 | `tests/posix_stays_on_the_byte_path.rs` | the zero-structured-edges assertion |

@@ -26,6 +26,27 @@ print("delete=" .. tostring(db:delete("b/1")) .. "," .. tostring(db:delete("b/1"
 local escaped, why = oslo.db.open("../history")
 print("escaped=" .. tostring(escaped) .. " refused=" .. tostring(why ~= nil))
 
+-- A handle is an object. Its verbs live behind `__index`, so it has no keys of its own and
+-- `db:write`'s internals are not part of what `pairs` walks.
+local keys = 0
+for _ in pairs(db) do keys = keys + 1 end
+print("own_keys=" .. keys)
+
+-- A typo is refused rather than quietly added, and a dot instead of a colon is a message rather
+-- than a read of the wrong key.
+print("typo=" .. tostring(not pcall(function() db.nmae = 1 end)))
+print("dot=" .. tostring(not pcall(function() return db.get("greeting") end)))
+
+-- `<close>` releases at the end of the block, and every verb says so afterwards.
+local kept
+do
+  local scoped <close> = oslo.db.open("corpus-scoped")
+  scoped:set("x", "y")
+  kept = scoped
+end
+print("after_close=" .. tostring(not pcall(function() return kept:get("x") end)))
+print("reopened=" .. tostring(oslo.db.open("corpus-scoped"):get("x")))
+
 --[[ expect
 opened=true
 get="hello\nworld"
@@ -34,4 +55,9 @@ has_missing=false has_empty=true
 prefix=a/1,a/2
 delete=true,false
 escaped=nil refused=true
+own_keys=0
+typo=true
+dot=true
+after_close=true
+reopened=y
 ]]

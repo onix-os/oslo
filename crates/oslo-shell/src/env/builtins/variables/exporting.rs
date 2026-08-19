@@ -2,6 +2,8 @@
 
 use super::options;
 use super::quoting::single_quoted;
+use crate::env::announce::{Change, Scope, Source, announce};
+use crate::env::origin_now;
 use crate::env::scope::{Environment, is_valid_identifier};
 use oslo_base::error::{Result, ShellError};
 
@@ -64,6 +66,14 @@ pub fn builtin_export(env: &mut Environment, args: &[String]) -> Result<i32> {
         if opts.has('n') && !unexport(env, name) {
             status = 1;
         }
+        announce(
+            name,
+            Change::Set {
+                exported: env.is_exported(name),
+            },
+            Scope::Shell,
+            Source::Local,
+        );
     }
 
     if bad_name {
@@ -105,7 +115,7 @@ fn export_functions(env: &Environment, names: &[String]) -> i32 {
     let mut status = 0;
     for name in names {
         if env.get_function(name).is_none() {
-            eprintln!("oslo: export: {}: not a function", name);
+            eprintln!("{}export: {}: not a function", origin_now(), name);
             status = 1;
         }
     }
@@ -123,7 +133,7 @@ fn unexport(env: &mut Environment, name: &str) -> bool {
         return true;
     };
     if env.is_readonly(name) {
-        eprintln!("oslo: export: {}: readonly variable", name);
+        eprintln!("{}export: {}: readonly variable", origin_now(), name);
         return false;
     }
     env.unset_var(name);
@@ -141,16 +151,21 @@ pub fn builtin_unset(env: &mut Environment, args: &[String]) -> Result<i32> {
         Err(letter) => return Err(options::invalid("unset", letter, UNSET_USAGE)),
     };
     if opts.has('f') && opts.has('v') {
-        eprintln!("oslo: unset: cannot simultaneously unset a function and a variable");
+        eprintln!(
+            "{}unset: cannot simultaneously unset a function and a variable",
+            origin_now()
+        );
         return Ok(2);
     }
 
     let mut status = 0;
+    // Whether any name was refused for being read-only. See the note where it is read.
+    let mut refused = false;
     for name in &args[opts.operands..] {
         // `unset 'a[1]'` drops one element and leaves the rest of the array where it was.
         if let Some(result) = crate::env::builtins::arrays::unset_element(env, name) {
             if let Err(e) = result {
-                eprintln!("oslo: unset: {}", e);
+                eprintln!("{}unset: {}", origin_now(), e);
                 status = 1;
             }
             continue;
@@ -172,13 +187,26 @@ pub fn builtin_unset(env: &mut Environment, args: &[String]) -> Result<i32> {
             continue;
         }
         if env.is_readonly(name) {
-            eprintln!("oslo: unset: {}: cannot unset: readonly variable", name);
+            eprintln!(
+                "{}unset: {}: cannot unset: readonly variable",
+                origin_now(),
+                name
+            );
             status = 1;
+            refused = true;
             continue;
         }
         env.unset_var(name);
+        announce(name, Change::Erased, Scope::Shell, Source::Local);
     }
 
+    // **After the whole line, not at the name that failed.** `unset` is a special builtin, so a
+    // read-only name ends a non-interactive shell in POSIX mode — but bash still unsets the other
+    // names first: `bash -c 'readonly r=1; x=2; unset r x; echo "[$x]"'` prints `[]`. Raising here
+    // keeps both, and outside POSIX `resolve_builtin_result` folds it back to the same status 1.
+    if refused {
+        return Err(ShellError::utility_error("unset: readonly variable", 1));
+    }
     Ok(status)
 }
 
@@ -188,6 +216,7 @@ mod tests {
     use super::{builtin_export, builtin_unset};
     use crate::env::builtins::builtin_readonly;
     use crate::env::scope::Environment;
+    use oslo_base::error::ShellError;
 
     /// The bug this whole rewrite is named for: `-p` used to be taken as a variable name.
     #[test]
@@ -227,10 +256,16 @@ mod tests {
         env.push_scope();
         assert!(env.set_local_var("RO_KEEP", "kept"));
         builtin_readonly(&mut env, &words(&["readonly", "RO_KEEP"])).unwrap();
-        assert_eq!(
-            builtin_unset(&mut env, &words(&["unset", "RO_KEEP"])).unwrap(),
-            1
-        );
+        // **A utility error, not a status.** `unset` is a POSIX special builtin, so this has to
+        // end a non-interactive shell in POSIX mode; `posix::resolve_builtin_result` is what
+        // decides that, and folds it back to this same 1 for a shell that is not in POSIX mode.
+        // Asserting the status here would have been asserting it below the layer that chooses.
+        match builtin_unset(&mut env, &words(&["unset", "RO_KEEP"])) {
+            Err(ShellError::UtilityError { status, fatal, .. }) => {
+                assert_eq!((status, fatal), (1, 1));
+            }
+            other => panic!("expected a utility error, got {other:?}"),
+        }
         assert_eq!(env.get_var("RO_KEEP"), Some("kept"));
         env.pop_scope();
     }

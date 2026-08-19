@@ -13,6 +13,12 @@
 //! two moments the shell holds nothing and can safely call Lua, and they are already where deferred
 //! hooks drain.
 //!
+//! **And at an idle prompt.** A prompt sitting untouched is a third such moment: the shell holds
+//! nothing there either, and it is where a timer set for "in five minutes" would otherwise have
+//! waited for the next keystroke to be noticed — the one moment its author did not mean.
+//! [`next_due_in_ms`] is what the editor's wait is given instead of "for ever", so the wake happens
+//! when the timer says rather than when the terminal does.
+//!
 //! The alternative is a real event loop — neovim has one, and `vim.uv` timers fire whenever it turns.
 //! That means libuv or `tokio` in a shell that deliberately removed `tokio`, plus every Lua callback
 //! becoming a thing that can run in the middle of an expansion. The trade taken here is the honest
@@ -21,9 +27,9 @@
 //! So `oslo.every(1000, …)` at an idle prompt does not tick once a second. It ticks the next time
 //! you run something. A timer is for "not now" and "not on every prompt", not for a clock.
 
-use super::util::{ok, put, record};
-use oslo_lua::value::{Table, Value};
-use oslo_lua::{LuaError, LuaResult};
+use super::util::{ok, put};
+use oslo_base::value::{LuaError, LuaResult};
+use oslo_base::value::{Table, Value};
 use std::cell::RefCell;
 use std::time::{Duration, Instant};
 
@@ -101,18 +107,28 @@ fn schedule(args: &[Value], called: &str, repeating: bool) -> LuaResult<Vec<Valu
 
 /// What a timer answers with: `t:stop()` and nothing else.
 fn handle(id: u64) -> Value {
-    record(vec![(
-        "stop",
-        super::util::native("timer handle", move |_, _| {
-            let had = TIMERS.with(|timers| {
-                let mut timers = timers.borrow_mut();
-                let before = timers.len();
-                timers.retain(|timer| timer.id != id);
-                before != timers.len()
-            });
-            ok(Value::Bool(had))
-        }),
-    )])
+    let mut table = super::handle::Handle::new("oslo.timer");
+
+    table.verb("stop", move |_, _| ok(Value::Bool(forget(id))));
+
+    // `<close>` stops it, the collector does not: `oslo.every` is written for its effect and its
+    // handle is usually dropped, so a `__gc` that stopped would stop nearly every timer in the
+    // shell. See [`super::handle::Handle::on_close`].
+    table.on_close("oslo.timer.close", move || {
+        forget(id);
+    });
+
+    table.build()
+}
+
+/// Take timer `id` out of the list, answering whether it was there.
+fn forget(id: u64) -> bool {
+    TIMERS.with(|timers| {
+        let mut timers = timers.borrow_mut();
+        let before = timers.len();
+        timers.retain(|timer| timer.id != id);
+        before != timers.len()
+    })
 }
 
 /// Run whatever is due. Called by the read loop where nothing is held.
@@ -120,8 +136,12 @@ fn handle(id: u64) -> Value {
 /// **The list is taken before anything runs.** A handler may set another timer — a poll that
 /// reschedules itself is the ordinary case — and appending to a list being iterated is how that
 /// becomes either a panic or an accidental infinite loop.
-pub fn fire_due() {
-    for (id, handler) in settle(Instant::now()) {
+/// Answers whether anything actually ran, which the caller needs to decide whether the prompt is
+/// still true — a handler that changed what `oslo.prompt.left` reads leaves a drawn prompt stale.
+pub fn fire_due() -> bool {
+    let due = settle(Instant::now());
+    let ran = !due.is_empty();
+    for (id, handler) in due {
         if let Err(problem) = crate::lua::engine::call_here(&handler, Vec::new()) {
             eprintln!("oslo: timer: {problem}");
             // A repeating timer that raises is stopped rather than left to raise on every command
@@ -129,6 +149,7 @@ pub fn fire_due() {
             TIMERS.with(|timers| timers.borrow_mut().retain(|timer| timer.id != id));
         }
     }
+    ran
 }
 
 /// Take what is due at `now`, leaving the list as it should be afterwards.
@@ -171,6 +192,26 @@ fn settle(now: Instant) -> Vec<(u64, Value)> {
 /// Whether anything is waiting, so the loop can skip the check entirely.
 pub fn any() -> bool {
     TIMERS.with(|timers| !timers.borrow().is_empty())
+}
+
+/// How long until the soonest timer is due, in milliseconds. `None` when nothing is waiting.
+///
+/// **For the editor's wait, so a timer fires while you sit there.** A timer used to come due only
+/// at a command boundary: set one for five seconds, touch nothing, and it fired when you next
+/// pressed Enter — which is the one moment its author did not mean. This is the deadline the idle
+/// wait is given instead of "for ever".
+///
+/// Zero for something already due, which is a poll that returns at once rather than a negative
+/// timeout, which `poll` reads as "no timeout at all".
+pub fn next_due_in_ms() -> Option<u64> {
+    let now = Instant::now();
+    TIMERS.with(|timers| {
+        timers
+            .borrow()
+            .iter()
+            .map(|timer| timer.due.saturating_duration_since(now).as_millis() as u64)
+            .min()
+    })
 }
 
 #[cfg(test)]

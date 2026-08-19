@@ -13,14 +13,14 @@
 //! # A table, evaluated in an interpreter of its own
 //!
 //! It is Lua because oslo is, and writing a manifest in JSON in a Lua-first shell would be a small
-//! daily insult. It is evaluated in a **fresh [`Interp`] with no `oslo` global**, so a manifest that
+//! daily insult. It is evaluated in a **fresh [`Engine`] with no `oslo` global**, so a manifest that
 //! tries to do something — register a builtin, open a database, read a file — finds nothing to do it
 //! with. Reading what a plugin *claims* must not be the moment its code first runs.
 //!
 //! That is also why `install` can read one before you have decided to trust it.
 
-use oslo_lua::value::Value;
-use oslo_lua::{Interp, parse};
+use oslo_base::value::Value;
+use oslo_luavm::Engine;
 use std::path::Path;
 
 /// The file a plugin directory must contain.
@@ -86,11 +86,10 @@ pub fn read(directory: &Path) -> Result<Manifest, String> {
     let path = directory.join(FILE);
     let source =
         std::fs::read_to_string(&path).map_err(|error| format!("{}: {error}", path.display()))?;
-    let ast = parse(&source).map_err(|error| format!("{}: {error}", path.display()))?;
-
-    let interp = Interp::new(path.to_string_lossy().into_owned());
-    let returned = interp
-        .run_ast(&ast)
+    // A fresh engine, so a manifest is read somewhere it can reach nothing — see the module note.
+    let engine = Engine::new();
+    let returned = engine
+        .eval(&source, &path.to_string_lossy())
         .map_err(|error| format!("{}: {error}", path.display()))?;
     let Some(Value::Table(table)) = returned.first() else {
         return Err(format!("{}: must return a table", path.display()));
@@ -185,7 +184,7 @@ pub fn read(directory: &Path) -> Result<Manifest, String> {
 }
 
 /// One string field.
-fn string(table: &oslo_lua::value::Table, field: &str) -> Option<String> {
+fn string(table: &oslo_base::value::Table, field: &str) -> Option<String> {
     match table.get(&Value::str(field)) {
         Value::Str(text) => Some(text.to_string()),
         _ => None,
@@ -194,7 +193,7 @@ fn string(table: &oslo_lua::value::Table, field: &str) -> Option<String> {
 
 /// A list of plain strings.
 fn strings(
-    table: &oslo_lua::value::Table,
+    table: &oslo_base::value::Table,
     field: &str,
     path: &Path,
 ) -> Result<Vec<String>, String> {
@@ -215,7 +214,7 @@ fn strings(
 }
 
 /// A list of command names, each of which must be one the shell could dispatch.
-fn names(table: &oslo_lua::value::Table, field: &str, path: &Path) -> Result<Vec<String>, String> {
+fn names(table: &oslo_base::value::Table, field: &str, path: &Path) -> Result<Vec<String>, String> {
     let Value::Table(list) = table.get(&Value::str(field)) else {
         return Ok(Vec::new());
     };

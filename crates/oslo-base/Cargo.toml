@@ -1,9 +1,9 @@
 [package]
 name = "oslo-base"
-version = "0.2.21"
-edition = "2024"
-rust-version = "1.89"
-license = "MIT"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
 description = "The bottom of oslo: the syntax tree, the error type, feature bits, the hook registry, and the tracking store."
 
 
@@ -11,10 +11,9 @@ description = "The bottom of oslo: the syntax tree, the error type, feature bits
 # The interpreter, for the two things down here that carry a Lua value: `ShellError::Lua` and the
 # payload a hook is fired with. Both point downward — this crate names the Lua *evaluator*, never
 # the Lua *API*, which sits at the top of the stack.
-oslo-lua = { path = "../oslo-lua" }
 
 # `track` only. All engine access stays behind `track::kv`.
-tagdata = { git = "https://github.com/robolibs/tagdata", tag = "0.1.3", features = ["maintenance"] }
+tagdata = { git = "https://github.com/robolibs/tagdata", tag = "v0.1.4", features = ["maintenance"] }
 getrandom = "0.4"
 # The predictor behind command prediction and repair. Pure Rust with no dependencies of its own,
 # which is why it can be here at the bottom of the stack beside the history it reads.
@@ -43,13 +42,13 @@ sha2 = "0.10"
 # `track`'s query matching. Trimmed to the same feature set the shell uses, and for the same
 # measured reasons — see the note in the root manifest.
 regex = { version = "1", default-features = false, features = [
-    "std", "unicode-case", "unicode-gencat", "unicode-perl",
-    "perf-literal", "perf-inline",
+    "std", "unicode-case", "unicode-perl",
+    "perf-inline",
 ] }
 
 # `ShellError::Nix`, the hostname a session is recorded under, and `isatty` — which is how
 # `track::nested` tells a terminal it can name from a pipe it cannot.
-nix = { version = "0.29", features = ["hostname", "fs"] }
+nix = { version = "0.29", features = ["hostname", "fs", "inotify", "user"] }
 
 
 # The Lua boundary for a hook-backed store: a `Value::Str` is UTF-8 and an age file is not, so

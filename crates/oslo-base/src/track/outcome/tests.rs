@@ -166,6 +166,63 @@ fn a_line_with_no_outcome_is_returned_but_unfinished() {
     assert_eq!(seen[0].status, None, "not zero, and not a failure");
 }
 
+/// The boundary and the outcome in one transaction, which is what halves a command's commits.
+///
+/// The directory has to be the one the boundary *just* resolved — it is the whole reason the two
+/// were separate writes, and the whole reason they need not be.
+#[test]
+fn a_boundary_stamps_the_outcome_with_the_directory_it_resolved() {
+    use crate::track::{Step, Visit};
+
+    let (_dir, track) = temp_db();
+    let id = track.append("cargo build", MODE_SHELL).expect("an id");
+    let step = Step {
+        ran_in: Visit {
+            path: "/w/project",
+            root: None,
+        },
+        moved_to: None,
+        dwell_ms: 0,
+        run: None,
+    };
+
+    assert!(track.record_settled(&step, id, &[Outcome::line(0, Some(0), 12)]));
+
+    let rows = track.outcome_of(id);
+    assert_eq!(rows.len(), 1);
+    assert_eq!(rows[0].status, Some(0));
+    assert_ne!(rows[0].dir_id, 0, "the boundary resolved a directory");
+    assert_eq!(
+        rows[0].dir_id,
+        track.current_dir_id(),
+        "and the outcome names that one, not a second lookup's answer"
+    );
+}
+
+/// The same answer by the longer road, for the lines whose boundary could not carry them.
+#[test]
+fn an_outcome_written_on_its_own_still_finds_the_directory() {
+    use crate::track::{Step, Visit};
+
+    let (_dir, track) = temp_db();
+    let id = track.append("cargo test", MODE_SHELL).expect("an id");
+    track.record(&Step {
+        ran_in: Visit {
+            path: "/w/project",
+            root: None,
+        },
+        moved_to: None,
+        dwell_ms: 0,
+        run: None,
+    });
+
+    assert!(track.record_outcome_here(id, &[Outcome::line(0, Some(1), 3)]));
+
+    let rows = track.outcome_of(id);
+    assert_eq!(rows[0].dir_id, track.current_dir_id());
+    assert_ne!(rows[0].dir_id, 0);
+}
+
 /// The session and its counter survive the join, which is what makes per-shell ordering possible.
 #[test]
 fn an_observation_carries_the_session_it_belongs_to() {

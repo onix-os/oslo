@@ -101,7 +101,7 @@ pub(crate) fn run_external(
                 // whole table — so the guard saves no copies for the new program to inherit.
                 let mut guard = RedirectGuard::for_exec();
                 if let Err(e) = guard.apply(env, redirections) {
-                    std::process::exit(report_redirect_failure(&e));
+                    std::process::exit(report_redirect_failure(&env.origin(), &e));
                 }
 
                 let failed = nix::unistd::execv(&c_path, &c_args);
@@ -139,10 +139,31 @@ pub(crate) fn run_external(
                 let pgid = job::place_foreground_child(child, None);
                 // R7.1: while the job runs, it owns the terminal — that is what makes Ctrl-C
                 // reach it instead of the shell, and what lets it read from the tty at all.
+                // Only when a config asked for it, and `0` — the default — means the sentinel is
+                // never even forked. See [`job::sentinel`].
+                let escape = oslo_ui::settings::current().misc.interrupt_escape;
+                let watching = escape.after > 0;
                 if let Some(pgid) = pgid {
                     job::give_terminal_to(pgid);
+                    // And a watcher inside that group, because the shell is now outside it and
+                    // will not see a Ctrl-C at all.
+                    if watching {
+                        job::watch(job::Orders {
+                            pgid: pgid.as_raw(),
+                            after: escape.after as u32,
+                            signal: escape_signal(escape.action),
+                            notify: escape.notify,
+                        });
+                    }
                 }
                 let status = wait_for_child(child, cmd_name, words);
+                if pgid.is_some() && watching {
+                    job::stand_down();
+                    // Whatever the watcher did, said in the shell's own voice — and a hook, so a
+                    // config can act on it. Drained here because the shell was inside `waitpid`
+                    // for the whole time the watcher was awake.
+                    report_escalations(cmd_name, words);
+                }
                 // Taken back with SIGTTOU blocked: at this moment the shell is not the foreground
                 // group, so an unguarded `tcsetpgrp` would stop the shell itself.
                 job::reclaim_terminal();
@@ -186,9 +207,22 @@ fn wait_for_child(child: Pid, cmd_name: &str, words: &[String]) -> i32 {
                 // interrupt machinery hears nothing, and the only evidence that a key was pressed
                 // is this wait status. Without noting it, `while true; do sleep 1; done` runs
                 // forever under a keyboard full of `^C`, and `sleep 5; echo hi` still prints,
-                // because the next command boundary has nothing to poll. Both diverge from bash
-                // and from dash, which end the loop and swallow the rest of the line.
-                if matches!(sig, Signal::SIGINT | Signal::SIGQUIT) {
+                // because the next command boundary has nothing to poll.
+                //
+                // **Interactive only, and that is the whole of the difference.** A script shares
+                // its process group with the terminal, so a real Ctrl-C reaches the *shell* too
+                // and its own handler sees it — there is nothing to infer. Inferring anyway meant
+                // a child that merely died by SIGINT of its own accord, `kill -INT $$` or a
+                // program re-raising it after cleanup, silently abandoned the rest of the script:
+                //
+                // ```text
+                // echo before                    bash, dash: before / after=130 / rc=0
+                // sh -c 'kill -INT $$'           oslo, before this: before / rc=130
+                // echo "after=$?"
+                // ```
+                if matches!(sig, Signal::SIGINT | Signal::SIGQUIT)
+                    && crate::exec::pipeline::is_interactive()
+                {
                     job::note_interrupt();
                 }
                 return 128 + sig as i32;
@@ -229,6 +263,52 @@ fn remember_stopped(child: Pid, cmd_name: &str, words: &[String]) {
     });
     if let Some(line) = line {
         eprintln!("{}", line);
+    }
+}
+
+/// The signal a configured escape action sends.
+///
+/// Here rather than on the settings type because a signal number is the shell's vocabulary, not a
+/// configuration one — `oslo-ui` has no business knowing what `SIGSTOP` is.
+fn escape_signal(action: oslo_ui::settings::EscapeAction) -> i32 {
+    use oslo_ui::settings::EscapeAction;
+    match action {
+        EscapeAction::Stop => nix::libc::SIGSTOP,
+        EscapeAction::Kill => nix::libc::SIGKILL,
+        EscapeAction::Hup => nix::libc::SIGHUP,
+        EscapeAction::Quit => nix::libc::SIGQUIT,
+    }
+}
+
+/// Say what the watcher did, and let a config act on it.
+///
+/// **The shell says it, not the watcher.** A stopped job otherwise looks exactly like one somebody
+/// suspended with Ctrl-Z, and "I stopped this for you because you asked three times" is a different
+/// sentence from "you pressed Ctrl-Z". The watcher reports the fact; the wording and the hook
+/// belong here, where there is an allocator and a hook table.
+fn report_escalations(cmd_name: &str, words: &[String]) {
+    for event in job::take_events() {
+        let action = match event.signal {
+            s if s == nix::libc::SIGSTOP => "stopped",
+            s if s == nix::libc::SIGKILL => "killed",
+            s if s == nix::libc::SIGHUP => "hung up",
+            s if s == nix::libc::SIGQUIT => "quit",
+            _ => "signalled",
+        };
+        eprintln!(
+            "oslo: {cmd_name}: {action} after {} interrupts",
+            event.presses
+        );
+        oslo_base::hooks::fire_at_here(
+            oslo_base::hooks::at::JOB_ESCALATED,
+            &[
+                ("pgid", &event.pgid.to_string()),
+                ("signal", &event.signal.to_string()),
+                ("action", action),
+                ("presses", &event.presses.to_string()),
+                ("text", &words.join(" ")),
+            ],
+        );
     }
 }
 

@@ -19,7 +19,7 @@ hundred hand-written rules and this does with none).
 > make build TYPE=minimal     # the floor: no model, nothing to learn from
 > ```
 >
-> It costs 341 KB — 5,663,840 bytes without it against 6,013,312 with — on a binary meant to be
+> It costs 297 KB — 6,016,512 bytes without it against 6,320,928 with — on a binary meant to be
 > `/bin/sh`, which is the whole argument for a distribution shipping `oslo-minimal` as the system
 > shell. Without it the shell learns nothing, writes no model and reads none; a config that has to
 > work under both asks before using the names, `if oslo.repair then … end`.
@@ -192,7 +192,7 @@ Both `thefuck` and `sudo !!`-style aliases *run* the corrected command. oslo put
 ## Configuration
 
 ```lua
-oslo.suggest.sources = { "predict", "history", "path" }   -- not in the default order
+oslo.suggest.sh_sources = { "predict", "history", "path" }   -- not in the default order
 
 oslo.keys["f4"] = function(line)
   if line.text == "" then return oslo.repair() or "" end   -- the command that just failed

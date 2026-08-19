@@ -19,7 +19,7 @@
 //! Answering `nil` means "leave it alone", which is what a binding that only looks at the line
 //! wants.
 
-use oslo_lua::value::{Table, Value};
+use oslo_base::value::{Table, Value};
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
@@ -56,15 +56,15 @@ pub fn handler(key: &str) -> Option<Value> {
 /// What a handler is told about the line.
 pub fn line_table(text: &str, cursor: usize) -> Value {
     let mut t = Table::new();
-    t.set(Value::str("text"), Value::str(text));
+    t.set_str("text", Value::str(text));
     // Bytes, matching what Lua's own string functions count. Handing over a character index would
     // disagree with `#line.text` the moment anything is not ASCII.
-    t.set(Value::str("cursor"), Value::int(cursor as i64));
+    t.set_str("cursor", Value::int(cursor as i64));
     // The word the cursor is in, since almost every binding wants it and working it out in Lua
     // means re-implementing the shell's own tokeniser badly.
     let (start, end) = word_bounds(text, cursor);
-    t.set(Value::str("word"), Value::str(&text[start..end]));
-    t.set(Value::str("word_start"), Value::int(start as i64));
+    t.set_str("word", Value::str(&text[start..end]));
+    t.set_str("word_start", Value::int(start as i64));
     Value::Table(Rc::new(RefCell::new(t)))
 }
 
@@ -80,12 +80,26 @@ pub fn key_table(name: &str, pressed: Option<char>, text: &str, cursor: usize) -
     let table = line_table(text, cursor);
     if let Value::Table(t) = &table {
         let mut t = t.borrow_mut();
-        t.set(Value::str("name"), Value::str(name));
+        t.set_str("name", Value::str(name));
         t.set(
             Value::str("char"),
             match pressed {
                 Some(c) => Value::str(c.to_string()),
                 None => Value::Nil,
+            },
+        );
+        // **Which language the prompt is reading**, `"sh"` or `"lua"`.
+        //
+        // A handler that acts on a key without knowing this acts in both, and the two prompts want
+        // opposite things from the same keystroke. Enter on an empty line is the case that found
+        // it: as a shell shortcut it runs `ls`, and at a Lua prompt it is what ends a multi-line
+        // block — so a config with the shell shortcut made Lua blocks impossible to finish, with
+        // nothing on screen to connect the two.
+        t.set_str(
+            "language",
+            match crate::prompt::language() {
+                Some(language) => Value::str(language),
+                None => Value::str("sh"),
             },
         );
     }
@@ -148,17 +162,17 @@ pub fn answer_from(answer: &Value) -> Option<Answer> {
         }),
         Value::Table(t) => {
             let t = t.borrow();
-            let Value::Str(text) = t.get(&Value::str("text")) else {
+            let Value::Str(text) = t.get_str("text") else {
                 return None;
             };
-            let cursor = match t.get(&Value::str("cursor")) {
+            let cursor = match t.get_str("cursor") {
                 Value::Number(n) => n.as_int().map(|i| i.max(0) as usize),
                 _ => None,
             };
             Some(Answer {
                 text: text.to_string(),
                 cursor,
-                submit: matches!(t.get(&Value::str("submit")), Value::Bool(true)),
+                submit: matches!(t.get_str("submit"), Value::Bool(true)),
             })
         }
         _ => None,
@@ -196,8 +210,8 @@ mod tests {
         );
 
         let mut t = Table::new();
-        t.set(Value::str("text"), Value::str("sudo ls"));
-        t.set(Value::str("cursor"), Value::int(4));
+        t.set_str("text", Value::str("sudo ls"));
+        t.set_str("cursor", Value::int(4));
         let answer = Value::Table(Rc::new(RefCell::new(t)));
         assert_eq!(line_from(&answer), Some(("sudo ls".to_string(), Some(4))));
     }

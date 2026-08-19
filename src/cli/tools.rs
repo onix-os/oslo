@@ -142,6 +142,13 @@ pub fn run(tool: &'static Tool, args: &[String]) -> i32 {
     if tool.name == "config" {
         return crate::cli::config::run(args);
     }
+    if tool.name == "hook" {
+        return crate::cli::hook::run(args);
+    }
+    #[cfg(feature = "direnv")]
+    if tool.name == "direnv" {
+        return crate::cli::direnv::run(args);
+    }
     if tool.name == "profile" {
         return crate::cli::profile::run(args);
     }

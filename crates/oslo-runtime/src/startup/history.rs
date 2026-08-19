@@ -168,7 +168,7 @@ pub const ALLHIST: &str = "OSLO_ALLHIST";
 /// Whether `$OSLO_ALLHIST` asks for `sh -c` commands to be recorded.
 ///
 /// **Off unless asked**, and an environment variable rather than a config setting for a reason
-/// that only matters once oslo is `/bin/sh`: `-c` does not read `config.lua`, so a Lua setting
+/// that only matters once oslo is `/bin/sh`: `-c` does not read `init.lua`, so a Lua setting
 /// would mean starting an interpreter and running the user's config on *every* `system()` call on
 /// the machine. This is one `getenv`.
 ///

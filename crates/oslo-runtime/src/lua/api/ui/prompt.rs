@@ -21,7 +21,7 @@
 //! table is also how the caller writes only the two they care about.
 
 use super::super::util::{ok, put};
-use oslo_lua::value::{Table, Value};
+use oslo_base::value::{Table, Value};
 use oslo_ui::ask::chrome::{Chrome, Fit, Place};
 use oslo_ui::ask::{
     Align, Answer, As, Border, Browse, Choice, Confirm, Entry, Input, Level, Pager, Spin, Styling,
@@ -111,11 +111,11 @@ fn named_values(table: &Table) -> Vec<(String, String)> {
 /// widget's fields as far as a caller is concerned — nobody wants to pass two tables to ask a
 /// question. A name that is not a placement is refused rather than defaulted: `align_x = "centre"`
 /// works, `align_x = "centred"` says so.
-fn chrome_of(t: &Table) -> Result<Chrome, oslo_lua::LuaError> {
+fn chrome_of(t: &Table) -> Result<Chrome, oslo_base::value::LuaError> {
     let mut chrome = Chrome::default();
     // Absent leaves the default on, so `legend = false` is the only spelling that turns it off and
     // `legend = nil` cannot mean "off" by accident.
-    if let Value::Bool(shown) = t.get(&Value::str("legend")) {
+    if let Value::Bool(shown) = t.get_str("legend") {
         chrome.legend = shown;
     }
     chrome.fullscreen = flag(t, "fullscreen") || flag(t, "alt");
@@ -127,26 +127,26 @@ fn chrome_of(t: &Table) -> Result<Chrome, oslo_lua::LuaError> {
     chrome.legend_gap = size(t, "legend_gap", chrome.legend_gap);
     if let Some(name) = maybe(t, "border") {
         chrome.border = Border::parse(&name)
-            .ok_or_else(|| oslo_lua::LuaError::new(format!("{name}: not a border")))?;
+            .ok_or_else(|| oslo_base::value::LuaError::new(format!("{name}: not a border")))?;
     }
     if let Some(colour) = maybe(t, "border_fg") {
-        chrome.border_style = theme::Style::fg(
-            theme::Color::parse(&colour)
-                .ok_or_else(|| oslo_lua::LuaError::new(format!("{colour}: not a colour")))?,
-        );
+        chrome.border_style =
+            theme::Style::fg(theme::Color::parse(&colour).ok_or_else(|| {
+                oslo_base::value::LuaError::new(format!("{colour}: not a colour"))
+            })?);
     }
     for (field, slot) in [("fit", 0), ("border_fit", 0)] {
         let _ = slot;
         if let Some(name) = maybe(t, field) {
             chrome.fit = Fit::parse(&name).ok_or_else(|| {
-                oslo_lua::LuaError::new(format!("{name}: fit is \"content\" or \"full\""))
+                oslo_base::value::LuaError::new(format!("{name}: fit is \"content\" or \"full\""))
             })?;
         }
     }
     for (field, axis) in [("align_x", true), ("align_y", false)] {
         if let Some(name) = maybe(t, field) {
             let place = Place::parse(&name)
-                .ok_or_else(|| oslo_lua::LuaError::new(format!("{name}: not a {field}")))?;
+                .ok_or_else(|| oslo_base::value::LuaError::new(format!("{name}: not a {field}")))?;
             if axis {
                 chrome.align_x = place;
             } else {
@@ -157,7 +157,7 @@ fn chrome_of(t: &Table) -> Result<Chrome, oslo_lua::LuaError> {
     // `align = "center"` sets both, which is what anyone centring a full-screen widget means.
     if let Some(name) = maybe(t, "align") {
         let place = Place::parse(&name)
-            .ok_or_else(|| oslo_lua::LuaError::new(format!("{name}: not an alignment")))?;
+            .ok_or_else(|| oslo_base::value::LuaError::new(format!("{name}: not an alignment")))?;
         chrome.align_x = place;
         chrome.align_y = place;
     }
@@ -375,7 +375,7 @@ pub fn install(ui: &mut Table) {
                     }
                 }
                 time = maybe(&t, "time");
-                if let Value::Table(pairs) = t.get(&Value::str("fields")) {
+                if let Value::Table(pairs) = t.get_str("fields") {
                     fields.extend(named_values(&pairs.borrow()));
                     // Table iteration has no order, and a log line whose fields moved between runs
                     // is one nobody can diff.
@@ -401,7 +401,7 @@ pub fn install(ui: &mut Table) {
         // shell-side `ui log --level fatal` exits non-zero instead, because there is no chunk
         // there to unwind.
         if level == Level::Fatal {
-            return Err(oslo_lua::LuaError::new("ui.log: fatal"));
+            return Err(oslo_base::value::LuaError::new("ui.log: fatal"));
         }
         ok(Value::Nil)
     });
@@ -428,7 +428,7 @@ pub fn install(ui: &mut Table) {
                         }
                     }
                 }
-                if let Value::Table(pairs) = t.get(&Value::str("fields")) {
+                if let Value::Table(pairs) = t.get_str("fields") {
                     values.extend(named_values(&pairs.borrow()));
                     // Sorted for the same reason `log`'s fields are: table iteration has no order,
                     // and `template` applies replacements in sequence — so overlapping keys would
@@ -493,7 +493,7 @@ pub fn install(ui: &mut Table) {
                 for (key, value) in spec.borrow().pairs() {
                     merged.set(key, value);
                 }
-                merged.set(Value::str("text"), args[0].clone());
+                merged.set_str("text", args[0].clone());
                 vec![Value::table(merged)]
             }
             _ => args,
@@ -523,7 +523,7 @@ pub fn install(ui: &mut Table) {
                 settings.style.bold = flag(&t, "bold");
                 settings.padding_x = size(&t, "padding_x", 0);
                 settings.padding_y = size(&t, "padding_y", 0);
-                settings.width = match t.get(&Value::str("width")) {
+                settings.width = match t.get_str("width") {
                     Value::Number(n) => n.as_int().map(|i| i.max(0) as usize),
                     _ => None,
                 };
@@ -541,7 +541,7 @@ pub fn install(ui: &mut Table) {
 /// The two parsers are asked with `?` rather than `unwrap_or_default`: a misspelt colour or a
 /// preset that does not exist has to be an error a script can see. Defaulting quietly is how
 /// `look = "histry"` would draw the plain list and leave nothing at all to explain why.
-fn list_widget(args: &[Value], filtering: bool) -> Result<Value, oslo_lua::LuaError> {
+fn list_widget(args: &[Value], filtering: bool) -> Result<Value, oslo_base::value::LuaError> {
     let t = spec(args);
     let t = t.borrow();
     let mut chosen = items(&t, "items");

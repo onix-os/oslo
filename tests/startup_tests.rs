@@ -69,7 +69,9 @@ fn err(o: &Output) -> String {
     String::from_utf8_lossy(&o.stderr).into_owned()
 }
 
+/// Run the oracle, having first checked that it *is* one — see `common::assert_oracle_is_bash`.
 fn bash(args: &[&str]) -> String {
+    common::assert_oracle_is_bash();
     let o = Command::new("bash")
         .args(args)
         .stdin(Stdio::null())
@@ -155,7 +157,7 @@ fn the_config_is_read_by_an_interactive_shell_only() {
     let dir = tempfile::tempdir().unwrap();
     let config = dir.path().join(".config/oslo");
     std::fs::create_dir_all(&config).unwrap();
-    std::fs::write(config.join("config.lua"), "MARK = 'from-config'\n").unwrap();
+    std::fs::write(config.join("init.lua"), "MARK = 'from-config'\n").unwrap();
 
     let interactive = repl("echo $MARK\n", &[("HISTFILE", "")], dir.path());
     assert!(
@@ -178,7 +180,7 @@ fn an_alias_from_the_config_is_visible_at_the_prompt() {
     let config = dir.path().join(".config/oslo");
     std::fs::create_dir_all(&config).unwrap();
     std::fs::write(
-        config.join("config.lua"),
+        config.join("init.lua"),
         "oslo.env.set_alias('hi', 'echo aliased')\n",
     )
     .unwrap();
@@ -197,7 +199,7 @@ fn a_shell_syntax_config_is_refused_by_name() {
     let dir = tempfile::tempdir().unwrap();
     let config = dir.path().join(".config/oslo");
     std::fs::create_dir_all(&config).unwrap();
-    std::fs::write(config.join("config.lua"), "alias hi='echo aliased'\n").unwrap();
+    std::fs::write(config.join("init.lua"), "alias hi='echo aliased'\n").unwrap();
 
     let o = repl("echo alive\n", &[("HISTFILE", "")], dir.path());
     assert!(
@@ -207,7 +209,7 @@ fn a_shell_syntax_config_is_refused_by_name() {
     );
     let diagnostic = err(&o);
     assert!(
-        diagnostic.contains("config.lua"),
+        diagnostic.contains("init.lua"),
         "the diagnostic must name the file: {diagnostic:?}"
     );
 }
@@ -216,7 +218,7 @@ fn a_shell_syntax_config_is_refused_by_name() {
 #[test]
 fn a_config_under_xdg_is_read_too() {
     let dir = tempfile::tempdir().unwrap();
-    let config = dir.path().join(".config/oslo/config.lua");
+    let config = dir.path().join(".config/oslo/init.lua");
     std::fs::create_dir_all(config.parent().unwrap()).unwrap();
     std::fs::write(&config, "oslo.env.set_alias('hi', 'echo xdg-alias')\n").unwrap();
 
@@ -229,7 +231,7 @@ fn a_broken_config_reports_and_leaves_the_shell_usable() {
     let dir = tempfile::tempdir().unwrap();
     let config = dir.path().join(".config/oslo");
     std::fs::create_dir_all(&config).unwrap();
-    std::fs::write(config.join("config.lua"), "this is not lua(((\n").unwrap();
+    std::fs::write(config.join("init.lua"), "this is not lua(((\n").unwrap();
 
     let o = repl("echo alive\n", &[("HISTFILE", "")], dir.path());
     assert!(out(&o).contains("alive"), "{:?}", out(&o));
@@ -483,7 +485,7 @@ fn history_is_a_builtin_even_in_a_script() {
 #[test]
 fn a_broken_config_is_reported_and_the_shell_still_starts() {
     let dir = tempfile::tempdir().unwrap();
-    let init = dir.path().join(".config/oslo/config.lua");
+    let init = dir.path().join(".config/oslo/init.lua");
     std::fs::create_dir_all(init.parent().unwrap()).unwrap();
     std::fs::write(&init, "this is not lua(((\n").unwrap();
 
@@ -495,7 +497,7 @@ fn a_broken_config_is_reported_and_the_shell_still_starts() {
     );
     let diagnostic = err(&o);
     assert!(
-        diagnostic.contains("config.lua"),
+        diagnostic.contains("init.lua"),
         "the diagnostic must name the user's file: {diagnostic:?}"
     );
 }
@@ -503,7 +505,7 @@ fn a_broken_config_is_reported_and_the_shell_still_starts() {
 #[test]
 fn a_working_config_still_applies() {
     let dir = tempfile::tempdir().unwrap();
-    let init = dir.path().join(".config/oslo/config.lua");
+    let init = dir.path().join(".config/oslo/init.lua");
     std::fs::create_dir_all(init.parent().unwrap()).unwrap();
     std::fs::write(&init, "oslo.env.set_alias('hi', 'echo lua-alias')\n").unwrap();
 

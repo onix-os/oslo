@@ -305,13 +305,16 @@ fn run_all(cases: &[Case]) -> Vec<(String, Verdict)> {
     })
 }
 
-/// The oracle's `(major, minor)`, asserting it is new enough to arbitrate anything at all.
+/// The oracle's `(major, minor)`, asserting it is new enough — and that it is bash at all.
 ///
 /// The corpus uses constructs bash grew in 4.x (`${v^^}`, `&>`), so an ancient oracle would
 /// report differences that say nothing about oslo — so fail with the reason rather than with 40
 /// mystery divergences. The minor version matters too: it decides which cases carry a
 /// `# needs-bash:` line this runner cannot honour.
+///
+/// The oracle is also checked to *be* bash — see `common::assert_oracle_is_bash`.
 fn oracle_version() -> (u32, u32) {
+    common::assert_oracle_is_bash();
     let out = Command::new("bash")
         .args(["-c", "echo ${BASH_VERSINFO[0]}.${BASH_VERSINFO[1]}"])
         .output()

@@ -92,7 +92,7 @@ impl PtyShell {
         if let Some(config) = config {
             let directory = home.path().join(".config/oslo");
             std::fs::create_dir_all(&directory).expect("create config directory");
-            std::fs::write(directory.join("config.lua"), config).expect("write config");
+            std::fs::write(directory.join("init.lua"), config).expect("write config");
         }
         let mut command = Command::new(common::oslo_bin());
         command

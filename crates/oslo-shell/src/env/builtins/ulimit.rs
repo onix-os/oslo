@@ -11,6 +11,7 @@
 //! has headroom it does not have will happily open the files it cannot open, which is why this
 //! builtin refused the set direction outright until it could implement it.
 
+use crate::env::origin_now;
 use crate::env::scope::Environment;
 use nix::sys::resource::{RLIM_INFINITY, Resource, getrlimit, rlim_t, setrlimit};
 use oslo_base::error::Result;
@@ -88,7 +89,7 @@ pub fn builtin_ulimit(_env: &mut Environment, args: &[String]) -> Result<i32> {
                 'a' => all = true,
                 c if LIMITS.iter().any(|l| l.flag == c) => selected.push(c),
                 other => {
-                    eprintln!("oslo: ulimit: -{}: invalid option", other);
+                    eprintln!("{}ulimit: -{}: invalid option", origin_now(), other);
                     eprintln!("ulimit: usage: ulimit [-HS] [-acdefilmnqrstuvx] [limit]");
                     return Ok(2);
                 }
@@ -136,7 +137,7 @@ pub fn builtin_ulimit(_env: &mut Environment, args: &[String]) -> Result<i32> {
         match report(limit, hard) {
             Some(value) => println!("{}", value),
             None => {
-                eprintln!("oslo: ulimit: -{}: cannot read this limit", flag);
+                eprintln!("{}ulimit: -{}: cannot read this limit", origin_now(), flag);
                 status = 1;
             }
         }
@@ -204,11 +205,15 @@ fn set_one(flag: char, operand: &str, which: Which) -> i32 {
         .find(|l| l.flag == flag)
         .expect("the option run only accepts flags from the table");
     let Ok((soft, hard)) = getrlimit(resource_for(flag)) else {
-        eprintln!("oslo: ulimit: -{}: cannot read the current limit", flag);
+        eprintln!(
+            "{}ulimit: -{}: cannot read the current limit",
+            origin_now(),
+            flag
+        );
         return 1;
     };
     let Some(requested) = parse_operand(operand, limit.divisor) else {
-        eprintln!("oslo: ulimit: {}: invalid number", operand);
+        eprintln!("{}ulimit: {}: invalid number", origin_now(), operand);
         return 1;
     };
     let value = match requested {

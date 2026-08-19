@@ -19,6 +19,10 @@ on it. A script that wants to ask something should not need a second program ins
 shell to do it — and on the machine this was measured on, that second program costs **21 ms and 13.7
 MB** where this costs **0.4 ms** and is already there.
 
+<!-- demo:begin -->
+[![userin demo](https://asciinema.org/a/1263433.svg)](https://asciinema.org/a/1263433)
+<!-- demo:end -->
+
 ## How it works
 
 One body, three entry points. Every door parses argv (or a Lua table) into a *spec* — `Choice`,

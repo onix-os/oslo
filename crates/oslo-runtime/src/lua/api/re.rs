@@ -11,8 +11,8 @@
 //! pattern per line is the difference between instant and noticeable.
 
 use super::util::{list, ok, put, record, text};
-use oslo_lua::value::{Table, Value};
-use oslo_lua::{LuaError, LuaResult};
+use oslo_base::value::{LuaError, LuaResult};
+use oslo_base::value::{Table, Value};
 use regex::Regex;
 use std::cell::RefCell;
 use std::collections::HashMap;

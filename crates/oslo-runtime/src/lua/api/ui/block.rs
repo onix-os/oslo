@@ -17,8 +17,8 @@
 //! closure here ignores its first and reads from the capture.
 
 use super::super::util::{ok, put, text};
-use oslo_lua::LuaError;
-use oslo_lua::value::{Table, Value};
+use oslo_base::value::LuaError;
+use oslo_base::value::{Table, Value};
 use oslo_ui::block::{Block, Overflow};
 use oslo_ui::theme::Style;
 use std::cell::RefCell;
@@ -114,7 +114,7 @@ fn overflow_of(options: Option<&Value>) -> Result<Option<Overflow>, LuaError> {
     let Some(Value::Table(table)) = options else {
         return Ok(None);
     };
-    let named = table.borrow().get(&Value::str("overflow"));
+    let named = table.borrow().get_str("overflow");
     match named {
         Value::Nil => Ok(None),
         Value::Str(name) => Overflow::named(name.as_ref()).map(Some).ok_or_else(|| {

@@ -1,0 +1,13 @@
+local function try(name, f)
+  local ok, err = pcall(f)
+  print(string.format("%-22s %s", name, ok and "yes" or ("no  -- " .. tostring(err):gsub("^.*: ", ""):sub(1,44))))
+end
+try("coroutines", function() local c = coroutine.create(function() coroutine.yield(1) end); coroutine.resume(c) end)
+try("goto/labels", function() return load("do goto skip; ::skip:: end")() end)
+try("utf8 library", function() return utf8.char(233) end)
+try("string.char(255) len", function() assert(#string.char(255) == 1, "got " .. #string.char(255)) end)
+try("io.open", function() local f = io.open("/dev/null", "r"); assert(f, "nil"); f:close() end)
+try("string.format %g", function() assert(string.format("%g", 1/3) == "0.333333", "got " .. string.format("%g", 1/3)) end)
+try("<const> enforced", function() local ok = pcall(load, "local x <const> = 1; x = 2"); assert(not load("local x <const> = 1; x = 2"), "accepted") end)
+try("deep recursion 5k", function() local function d(n) if n == 0 then return 0 end return d(n-1) end; return d(5000) end)
+try("weak tables/GC", function() local t = setmetatable({}, {__mode="v"}); t[1] = {}; collectgarbage(); assert(t[1] == nil, "not collected") end)

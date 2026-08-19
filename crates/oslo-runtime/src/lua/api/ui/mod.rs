@@ -32,7 +32,7 @@ mod prompt;
 mod text;
 
 use super::util::{ok, put};
-use oslo_lua::value::{Number, Table, Value};
+use oslo_base::value::{Number, Table, Value};
 use oslo_ui::dropdown::width;
 use oslo_ui::theme;
 use std::io::IsTerminal;
