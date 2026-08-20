@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.4.1] - 2026-08-20
+
+### <!-- 1 -->🐛 Bug Fixes
+
+- A ctrl-c escapes the prompt
+
 ## [0.4.0] - 2026-08-20
 
 ### <!-- 0 -->⛰️  Features
