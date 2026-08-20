@@ -35,6 +35,9 @@ pub fn filter(rows: &[Record], expression: &str) -> (Vec<Record>, Option<String>
     // config defined. In a script or a `-c` command there is none, and a filter must still work —
     // so one is made for the occasion. Made once for the whole filter, not once per row.
     let engine = session_engine();
+    // `1GB` is not Lua and cannot be made into Lua, so a unit literal becomes the number the rows
+    // carry before any of this is compiled. See `super::units`.
+    let expression = super::units::expand(expression);
     let source = format!("return ({expression})");
     let compiled = match engine.load(&source, "where") {
         Ok(compiled) => compiled,
@@ -156,6 +159,7 @@ pub fn for_each(rows: &[Record], expression: &str) -> Option<String> {
     // Wrapped in a `do ... end` so a statement is as welcome as an expression: `each 'print(name)'`
     // is a call, and `each 'x = x + n'` is an assignment, and neither should need different syntax.
     let engine = session_engine();
+    let expression = super::units::expand(expression);
     let source = format!("do {expression} end");
     let compiled = match engine.load(&source, "each") {
         Ok(compiled) => compiled,
