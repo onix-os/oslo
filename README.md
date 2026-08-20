@@ -43,6 +43,7 @@ A command produces two things: text for you, rows for the next command. The pipe
 ```sh
 df | where 'free < 1e9' | sort-by free
 ps | where 'not is_kernel' | first 5 | cols name
+ls | where 'size > 1000' | sort-by size | cols name size_human
 cat /etc/passwd | parse '{user}:{x}:{uid}:{rest}' | where 'uid > 1000' | get user
 ```
 
@@ -118,6 +119,17 @@ oslo.on.pre_cmd(function(c) if c.argv[1] == "rm" then print("careful") end end)
 
 `oslo config` inspects and edits it. Every setting, hook and key is on the page for the feature it
 belongs to; the table above is the map.
+
+### The hooks
+
+Thirty-one moments a config can attach to, named `pre-`, `post-` or `on-`. `oslo hook list` prints
+the current set; [hooks.md](docs/features/hooks.md) says what each one is handed and what a return
+value means.
+
+## Tools
+
+Ten of them — `macros`, `config`, `profile`, `history`, `direnv`, `hook`, `plugin`, `scratch`,
+`userin`, `secret` — each with its own help. A script of the same name always wins.
 
 ## Building
 

@@ -1,22 +1,11 @@
 # Changelog
 
-## [0.4.5] - 2026-08-20
+## [0.4.0] - 2026-08-20
 
 ### <!-- 0 -->⛰️  Features
 
 - Pixy dust
 - Paint a coordinate, and preview what it will become
-
-### <!-- 1 -->🐛 Bug Fixes
-
-- A tool may hand over to a byte stage
-
-## [0.4.4] - 2026-08-19
-
-## [0.4.3] - 2026-08-19
-
-### <!-- 0 -->⛰️  Features
-
 - .. ranges words the way a coordinate does
 - A digit after ! is an event, a space means lua
 - {%n} is the stage, {n} is what it printed
@@ -40,50 +29,6 @@
 - ! runs one Lua line, prefix configurable
 - A calculator with units, behind the math feature
 - The prompt evaluates expressions and shows them
-
-### <!-- 1 -->🐛 Bug Fixes
-
-- Put back the globals a row borrowed
-- A coordinate goes where a brace expands
-- A conditional agrees with test
-- Obey pipefail on the coordinate path
-- Replace every coordinate, and bound the read
-- Only adjacent parens open an arithmetic command
-- The marker sits at column zero
-- Drop the renamed-key warning
-- A leading minus is arithmetic, not a flag
-- A conversion target is a unit, not the rest
-
-### <!-- 2 -->🚜 Refactor
-
-- Drop the two env vars nobody asked for
-- One completion source, two answers
-
-### <!-- 3 -->📚 Documentation
-
-- 1611 lines down to 177, and every example run
-- Sweep every page against the binary
-- A recording for the six pages that had none
-- Embed the recording
-- A demo for the coordinate page
-- A page for stream coordinates, and the renames it exposed
-
-### <!-- 4 -->⚡ Performance
-
-- Abort on panic, now that the store cannot
-- Size over speed for ui and parser
-- Drop the regex literal accelerator
-
-### <!-- 7 -->⚙️ Miscellaneous Tasks
-
-- Refactor Nix flake to simplify and optimize
-- Drop a stray file from testing
-- One version for the whole workspace
-
-## [0.4.2] - 2026-08-17
-
-### <!-- 0 -->⛰️  Features
-
 - Assignments name the script and line too
 - -v assigns, unknown options refused
 - Diagnostics name the script and line
@@ -99,49 +44,7 @@
 - A failure carries its kind, code and path
 - Fs.walk and fs.lines stream, iterators close
 - Handles are objects, with <close>
-
-### <!-- 1 -->🐛 Bug Fixes
-
-- A global that changes type moves between homes
-- Require detects a loop, os.setlocale exists
-- The README check honours the build's features
-- Subcommands refuse operands they cannot read
-- \cmd and \\cmd are commands, not escapes
-- Verbs refuse arguments they cannot read
-- Widen the fd limit so deep trees still go
-- Usage lines and quoting match bash
-- Print the message, not its category
-- Name the real reason a path will not run
-- Traverse by descriptor, not by path
-- Refuse arguments instead of ignoring
-- An unknown option is not the action
-- Walk the tree and name what failed
-- Fs.walk skips what it cannot read instead of raising
-- A script diagnostic names its file and line
-- Fs.usage counts what it cannot read instead of failing
-- No __gc backstop, because luna runs none
-
-### <!-- 2 -->🚜 Refactor
-
-- Require-ability moves to its own module
-
-### <!-- 3 -->📚 Documentation
-
-- A page for the interrupt escape
-- What §5 and §6 actually cost
-- Finalizers do run; say why no handle sets one
-- What a richer lua api would contain
-
-## [0.4.1] - 2026-08-17
-
-### <!-- 0 -->⛰️  Features
-
 - The config file is init.lua
-
-## [0.4.0] - 2026-08-16
-
-### <!-- 0 -->⛰️  Features
-
 - One config, joined by require
 - Run on a pinned luna, and re-impose the names oslo refuses
 - The shell runs on the vm, and the tree walker is gone
@@ -167,6 +70,37 @@
 
 ### <!-- 1 -->🐛 Bug Fixes
 
+- _VERSION is the language, not the vm
+- Restore the claims the readme rewrite dropped
+- A tool may hand over to a byte stage
+- Put back the globals a row borrowed
+- A coordinate goes where a brace expands
+- A conditional agrees with test
+- Obey pipefail on the coordinate path
+- Replace every coordinate, and bound the read
+- Only adjacent parens open an arithmetic command
+- The marker sits at column zero
+- Drop the renamed-key warning
+- A leading minus is arithmetic, not a flag
+- A conversion target is a unit, not the rest
+- A global that changes type moves between homes
+- Require detects a loop, os.setlocale exists
+- The README check honours the build's features
+- Subcommands refuse operands they cannot read
+- \cmd and \\cmd are commands, not escapes
+- Verbs refuse arguments they cannot read
+- Widen the fd limit so deep trees still go
+- Usage lines and quoting match bash
+- Print the message, not its category
+- Name the real reason a path will not run
+- Traverse by descriptor, not by path
+- Refuse arguments instead of ignoring
+- An unknown option is not the action
+- Walk the tree and name what failed
+- Fs.walk skips what it cannot read instead of raising
+- A script diagnostic names its file and line
+- Fs.usage counts what it cannot read instead of failing
+- No __gc backstop, because luna runs none
 - A mistyped mark is named too
 - A refused =name offers the one you meant
 - A mistyped =name is told, and quotes keep it literal
@@ -224,6 +158,9 @@
 
 ### <!-- 2 -->🚜 Refactor
 
+- Drop the two env vars nobody asked for
+- One completion source, two answers
+- Require-ability moves to its own module
 - The shell's values stop coming from the lua crate
 - The shared value type leaves the lua crate
 - Glob and tilde come from oslo-base
@@ -231,6 +168,16 @@
 
 ### <!-- 3 -->📚 Documentation
 
+- 1611 lines down to 177, and every example run
+- Sweep every page against the binary
+- A recording for the six pages that had none
+- Embed the recording
+- A demo for the coordinate page
+- A page for stream coordinates, and the renames it exposed
+- A page for the interrupt escape
+- What §5 and §6 actually cost
+- Finalizers do run; say why no handle sets one
+- What a richer lua api would contain
 - Record what panic=abort would cost
 - The interpreter page describes the vm that is there
 - The prose is checked against the binary
@@ -242,6 +189,9 @@
 
 ### <!-- 4 -->⚡ Performance
 
+- Abort on panic, now that the store cannot
+- Size over speed for ui and parser
+- Drop the regex literal accelerator
 - A literal key looks itself up in one place
 - Fold identical functions with mold
 - Drop regex's general-category tables
@@ -263,6 +213,11 @@
 
 ### <!-- 7 -->⚙️ Miscellaneous Tasks
 
+- Fold the withdrawn 0.4.x releases
+- Ignore a build directory at any depth
+- Refactor Nix flake to simplify and optimize
+- Drop a stray file from testing
+- One version for the whole workspace
 - Strip the manifest comments
 - Pin the v0.5.0 release
 - Pin the size-optimised vm
@@ -277,6 +232,8 @@
 ### Spike
 
 - Measure the reference VM against the tree walker
+
+## [0.3.13] - 2026-08-14
 
 ## [0.3.13] - 2026-08-14
 

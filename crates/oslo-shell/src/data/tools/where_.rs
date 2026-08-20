@@ -14,7 +14,7 @@
 //! The row's columns are bound as globals for the duration of the expression, so `free < 1e9`
 //! reads the way it looks. `row` is bound too, for a column whose name is not a Lua identifier.
 //! **For the duration and no longer** — whatever those names held before is put back, because a
-//! column is free to be called `type`. See [`Bound`].
+//! column is free to be called `type`. See the `Bound` guard below.
 
 use crate::data::{Record, Val};
 use oslo_base::value::{Number, Table, Value};

@@ -434,9 +434,16 @@ oslo.env.set("OSLO_DEFAULT_MODE", "lua")
     shell.wait_for_marks(4);
     shell.send(b"if true then\n");
     shell.wait_for_marks(6);
+    // **`end` does not run it; an empty line does.** A Lua block that has asked for more keeps
+    // asking until a blank line, which is Python's rule and there for Python's reason: after
+    // `local function f()` the parser is satisfied again at `end`, so running the moment it parses
+    // would mean no line after `end` could ever be typed. So this is one more continuation prompt,
+    // not the command — see `docs/features/two-languages-one-prompt.md`.
     shell.send(b"end end\n");
-    let complete = shell.wait_for_marks(10);
-    assert_eq!(kinds(&complete[..10]), "ABABABCDAB");
+    shell.wait_for_marks(8);
+    shell.send(b"\n");
+    let complete = shell.wait_for_marks(12);
+    assert_eq!(kinds(&complete[..12]), "ABABABABCDAB");
 }
 
 #[test]
