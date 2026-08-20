@@ -140,3 +140,131 @@ fn a_redirection_does_not_drop_the_pipeline_to_bytes() {
     let upstream = common::run_in(dir.path(), "cat t.txt >/dev/null | lines | length");
     assert_eq!(upstream.out().trim(), "0", "stderr: {}", upstream.stderr);
 }
+
+/// **A tool may be followed by something that is not one.**
+///
+/// This was the missing half of the seam. An external command could *lead* — `cat x | lines |
+/// length` has worked since the byte prefix was built — but a tool followed by a non-tool fell back
+/// for the whole pipeline, and on that path the verbs are not commands:
+///
+/// ```text
+/// $ ls | first 2 | cat
+/// oslo: first: command not found
+/// $ echo $?
+/// 0
+/// ```
+///
+/// Empty output reporting success, which is the failure `docs/known-gaps.md` opens by saying oslo
+/// does not have. Worse, the structured stages had already run before the fallback re-ran the line
+/// from the start, so a tool with a side effect performed it twice.
+#[test]
+fn a_tool_may_hand_over_to_a_byte_stage() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    for name in ["alpha", "beta", "gamma"] {
+        std::fs::write(dir.path().join(name), "x").expect("fixture");
+    }
+
+    let run = common::run_in(dir.path(), "ls | first 2 | cat");
+    assert!(
+        !run.stderr.contains("command not found"),
+        "the verbs must not reach the byte path: {}",
+        run.stderr
+    );
+    assert!(
+        !run.stdout.trim().is_empty(),
+        "the rows were rendered and handed over, so something must arrive"
+    );
+    assert_eq!(run.status, 0);
+
+    // The count proves the *rows* crossed rather than the whole listing being re-run.
+    let counted = common::run_in(dir.path(), "ls | first 2 | wc -l");
+    assert_eq!(counted.stdout.trim(), "2", "stderr: {}", counted.stderr);
+
+    // A verb after a verb after a non-verb: the handover is wherever the tools stop, not fixed.
+    let named = common::run_in(dir.path(), "ls | first 3 | cols name | cat");
+    assert!(named.stdout.contains("alpha"), "{}", named.stdout);
+    assert!(named.stdout.contains("gamma"), "{}", named.stdout);
+    assert!(
+        !named.stderr.contains("command not found"),
+        "{}",
+        named.stderr
+    );
+}
+
+/// **Never the drawn table.** What crosses into another program is the transport rendering — a
+/// box-drawing character on somebody's standard input is the failure the whole design exists to
+/// prevent.
+#[test]
+fn what_crosses_is_transport_not_a_table() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    std::fs::write(dir.path().join("alpha"), "x").expect("fixture");
+
+    let run = common::run_in(dir.path(), "ls | first 1 | cat");
+    for drawn in ['│', '─', '┌', '└', '├'] {
+        assert!(
+            !run.stdout.contains(drawn),
+            "a table reached another program's stdin: {:?}",
+            run.stdout
+        );
+    }
+}
+
+/// Every stage keeps its own status across the seam, so `PIPESTATUS` and `pipefail` still describe
+/// the pipeline that was written rather than the halves it happened to run in.
+#[test]
+fn status_survives_the_handover() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    std::fs::write(dir.path().join("alpha"), "x").expect("fixture");
+
+    let listed = common::run_in(
+        dir.path(),
+        r#"ls | first 1 | cat >/dev/null; echo "${PIPESTATUS[*]}""#,
+    );
+    assert_eq!(listed.stdout.trim(), "0 0 0", "stderr: {}", listed.stderr);
+
+    let failed = common::run_in(
+        dir.path(),
+        r#"ls | first 1 | false; echo "${PIPESTATUS[*]}""#,
+    );
+    assert_eq!(failed.stdout.trim(), "0 0 1", "stderr: {}", failed.stderr);
+
+    // `pipefail` is a property of the pipeline, not of the path it ran on.
+    let strict = common::run_in(dir.path(), "set -o pipefail; ls | first 1 | false");
+    assert_eq!(strict.status, 1);
+}
+
+/// **Nothing structured has run, so the byte path still gets the whole pipeline.** A bare `ls`
+/// followed by anything is coreutils, exactly as it always was — the handover must not claim a
+/// pipeline it never entered.
+#[test]
+fn a_pipeline_with_no_tool_edge_is_untouched() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    std::fs::write(dir.path().join("alpha"), "x").expect("fixture");
+
+    let run = common::run_in(dir.path(), "ls | cat");
+    assert_eq!(run.stdout.trim(), "alpha", "stderr: {}", run.stderr);
+    assert!(run.stderr.is_empty(), "{}", run.stderr);
+}
+
+/// **A tool that prints, not just one that produces rows.**
+///
+/// `to json` writes with `println!` and hands back nothing, which is how `df | to json` puts JSON on
+/// a terminal. Carrying only the *rows* across the seam therefore gave the byte suffix an empty
+/// input while the JSON went straight to the shell's own stdout — `ps | to json | jq .` printed the
+/// unfiltered document and jq silently did nothing to it.
+#[test]
+fn what_a_printing_tool_wrote_crosses_too() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    std::fs::write(dir.path().join("alpha"), "x").expect("fixture");
+
+    // `grep -c` counts what reached it; if the JSON went past the suffix this is 0.
+    let counted = common::run_in(dir.path(), "ls | first 1 | to json | grep -c name");
+    assert_eq!(counted.stdout.trim(), "1", "stderr: {}", counted.stderr);
+
+    let lines = common::run_in(dir.path(), "ls | first 1 | to json | wc -l");
+    assert_ne!(lines.stdout.trim(), "0", "the suffix read nothing");
+
+    // And with no suffix at all it still reaches the terminal rather than a scratch file.
+    let alone = common::run_in(dir.path(), "ls | first 1 | to json");
+    assert!(alone.stdout.contains("\"name\""), "{}", alone.stdout);
+}

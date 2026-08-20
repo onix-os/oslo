@@ -45,6 +45,7 @@ pub mod messages;
 pub mod nesting;
 #[cfg(feature = "vista")]
 pub mod predict;
+pub mod prompts;
 /// Whether the command now running must leave no trace of itself.
 pub mod quiet;
 #[cfg(feature = "secrets")]

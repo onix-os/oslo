@@ -33,10 +33,8 @@ use oslo_base::ast::{
 };
 use oslo_base::coords::{self, Coord};
 
-/// How many prompts back a coordinate may reach.
-///
-/// Ten is the number of things anybody keeps in their head; past that you look at the screen.
-pub const PROMPTS_KEPT: usize = 10;
+/// How many prompts back a coordinate may reach. See [`oslo_base::prompts`].
+pub use oslo_base::prompts::KEPT as PROMPTS_KEPT;
 
 /// The most of one stream that is kept, in bytes.
 ///
@@ -44,44 +42,19 @@ pub const PROMPTS_KEPT: usize = 10;
 /// would be two numbers to reason about and one of them would be wrong.
 pub use oslo_base::capture::MAX as STREAM_MAX;
 
-thread_local! {
-    /// The command lines of previous prompts, newest first.
-    ///
-    /// **Lines, not output**, and the difference is worth being plain about. A pipeline stage's
-    /// output can be captured for nothing, because a stage already writes to a pipe. A *command's*
-    /// output goes to the terminal, and standing between the two turns `isatty` false for
-    /// everything — see `capture.rs`, where that argument is made at length. What a previous prompt
-    /// does have, free and exactly, is the line that was typed:
-    ///
-    /// ```text
-    /// $ cat one.txt two.txt
-    /// $ wc -l {-1:0:1}          → wc -l one.txt
-    ///         └─ previous prompt, its only line, word 1
-    /// ```
-    ///
-    /// So `{-n:…}` addresses the command *line* — one line, its words being the command and its
-    /// arguments. `{-1:0:-1}` is the last argument, which is `!$` written in this grammar and
-    /// usable where `!$` is not: inside a script, inside a function, inside quotes.
-    static PROMPTS: std::cell::RefCell<Vec<String>> = const { std::cell::RefCell::new(Vec::new()) };
-}
-
 /// Remember the line a prompt ran, for `{-n:…}` to address.
+///
+/// The ring itself is [`oslo_base::prompts`], because the line editor previews a session
+/// coordinate before Enter and does not depend on this crate. These two names stay here so the
+/// runtime keeps calling what it always called.
 pub fn remember_prompt(line: &str) {
-    let line = line.trim();
-    if line.is_empty() {
-        return;
-    }
-    PROMPTS.with(|slot| {
-        let mut lines = slot.borrow_mut();
-        lines.insert(0, line.to_string());
-        lines.truncate(PROMPTS_KEPT);
-    });
+    oslo_base::prompts::remember(line);
 }
 
 /// Forget every remembered line. `history -c` clears this too — a line the user asked to be gone
 /// must not stay reachable by coordinate.
 pub fn forget_prompts() {
-    PROMPTS.with(|slot| slot.borrow_mut().clear());
+    oslo_base::prompts::forget();
 }
 
 /// The streams a coordinate can reach.
@@ -107,7 +80,7 @@ impl Streams {
         Streams {
             stages: Vec::new(),
             commands: Vec::new(),
-            prompts: PROMPTS.with(|slot| slot.borrow().clone()),
+            prompts: oslo_base::prompts::all(),
         }
     }
 }

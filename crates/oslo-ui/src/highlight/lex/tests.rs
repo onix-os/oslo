@@ -216,3 +216,80 @@ fn the_escaped_forms_still_reassemble() {
         assert_eq!(joined, line);
     }
 }
+
+/// **A coordinate is lit apart from the word it sits in**, and a brace group is not.
+///
+/// `{4}` is line 4 here and a literal `{4}` in bash; `{1..3}` is brace expansion in both. They are
+/// a character apart and read identically, so the colour is the only thing that can tell them
+/// apart before Enter — which means the split has to use the same parser the shell substitutes
+/// with, not a guess about braces.
+#[test]
+fn a_coordinate_is_lit_and_a_brace_group_is_not() {
+    let roles = |line: &str| -> Vec<(Role, String)> {
+        lex(line)
+            .into_iter()
+            .filter(|s| s.role != Role::Plain)
+            .map(|s| (s.role, s.text))
+            .collect()
+    };
+
+    assert_eq!(
+        roles("ssh {0:0}"),
+        vec![
+            (Role::CommandWord, "ssh".into()),
+            (Role::Coordinate, "{0:0}".into())
+        ]
+    );
+    // Text either side keeps its own role, and the coordinate is still found.
+    assert_eq!(
+        roles("ssh host-{0:0}.lan"),
+        vec![
+            (Role::CommandWord, "ssh".into()),
+            (Role::Word, "host-".into()),
+            (Role::Coordinate, "{0:0}".into()),
+            (Role::Word, ".lan".into()),
+        ]
+    );
+    // A `*` inside a coordinate belongs to the coordinate, not to the glob scan.
+    assert_eq!(roles("ping {*:0}")[1], (Role::Coordinate, "{*:0}".into()));
+    // The command axis too.
+    assert_eq!(roles("echo {%0:1}")[1], (Role::Coordinate, "{%0:1}".into()));
+
+    // Brace expansion is left alone — the parser refuses it, so no coordinate is found.
+    assert!(
+        !roles("mkdir {a,b}")
+            .iter()
+            .any(|(r, _)| *r == Role::Coordinate)
+    );
+    assert!(
+        !roles("echo {1..3}")
+            .iter()
+            .any(|(r, _)| *r == Role::Coordinate)
+    );
+    // And a brace group in front of a coordinate does not hide it.
+    assert_eq!(
+        roles("echo a{b}c{0:0}").last().unwrap(),
+        &(Role::Coordinate, "{0:0}".into())
+    );
+}
+
+/// **The two parsers overlap, and brace expansion wins the overlap.**
+///
+/// `{1..3}` and `{0..2}` are accepted by the coordinate grammar *and* by brace expansion. In a
+/// command word the brace expander runs first and turns them into several words, so the
+/// substitution never sees them — and lighting them as coordinates would promise a value that
+/// never arrives. `{4}` is the other way round: brace expansion leaves a one-item group alone, so
+/// it really is line 4 here, and really is a literal `{4}` in bash.
+#[test]
+fn brace_expansion_wins_what_both_parsers_accept() {
+    let is_coord = |line: &str| lex(line).into_iter().any(|s| s.role == Role::Coordinate);
+
+    for brace in ["echo {1..3}", "echo {0..2}", "echo {a,b}", "echo x{1,2}"] {
+        assert!(!is_coord(brace), "{brace:?} is brace expansion");
+    }
+    for coord in ["echo {4}", "echo {0:1}", "echo {-1:0:1}", "echo {*:0}"] {
+        assert!(is_coord(coord), "{coord:?} is a coordinate");
+    }
+    // A whole-line range carries the trailing colon, which brace expansion does not take.
+    assert!(is_coord("echo {0..2:}"));
+}

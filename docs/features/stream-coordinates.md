@@ -102,6 +102,39 @@ also unusable: history expansion runs over the line first, sees `!0` inside the 
 the line with `!0: event not found`. `%` survives both the lexer and history expansion, and its
 other meaning — `%1` for a job — is only ever a whole word, never something inside a brace.
 
+### Seen before it runs
+
+A coordinate is painted as one, so you can tell it from the brace group it looks like:
+
+```
+ssh {0:0} uptime      {0:0}   coloured — a coordinate
+mkdir {a,b}           {a,b}   plain    — brace expansion
+wc -l {4}             {4}     coloured — line 4 here, a literal `{4}` in bash
+echo {1..3}           {1..3}  plain    — brace expansion wins the overlap
+```
+
+The lexer asks the same two parsers the shell does, in the same order, so what is coloured is
+exactly what will be substituted.
+
+And the **session** axis is resolved as you type, drawn after the line:
+
+```
+wc -l {-1:0:1}
+                ↳ one.txt
+x {%-1:0}
+                ↳ cat
+```
+
+**Only the session axis**, and the reason is not a limitation to hide: `{n:…}` names a stage of the
+pipeline you are still typing, and that stage has not run. Resolving it would mean executing your
+upstream on every keystroke. So a pipeline coordinate answers `↳ at run time` rather than a value —
+silence would read as "not recognised", which is the one thing the preview exists to disprove. A
+coordinate reaching past the ring says `↳ nothing there`, because that is what it will do.
+
+**Drawn, never accepted.** It shares the row with the ghost suggestion and the repair, but the key
+that accepts those asks them for their own text and never for what was drawn. There is no keystroke
+that can put `↳ one.txt` into the buffer.
+
 ### One argument, whatever is in it
 
 Substitution happens on the **syntax tree**, before any expansion runs, and every value becomes a
@@ -240,12 +273,15 @@ pipeline.
 | path | what is in it |
 | --- | --- |
 | `crates/oslo-base/src/coords.rs` | the grammar — `Sel`, `Coord`, `Subject`, `parse`, `select`, `select_words` |
+| `crates/oslo-base/src/prompts.rs` | the previous-prompt ring, which the editor previews from |
 | `crates/oslo-shell/src/exec/streams.rs` | the stack — `Streams`, `substitute`, `rewrite_command`, `remember_prompt` |
 | `crates/oslo-shell/src/exec/streams/gate.rs` | `command_uses_coordinates` — the question asked before anything runs |
 | `crates/oslo-shell/src/exec/streams/quoted.rs` | `rewrite_inside_quotes` — the double-quoted half |
 | `crates/oslo-shell/src/exec/pipeline/coordinates.rs` | `uses_coordinates`, `run`, `read_bounded` — running the stages one at a time |
 | `crates/oslo-shell/src/exec/pipeline/describe.rs` | `describe_word` — what a `{%…}` word is rendered by |
 | `crates/oslo-shell/src/syntax/brush_adapter/extended_test.rs` | `Coordinates`, `operand` — why a regex keeps its `{4}` |
+| `crates/oslo-ui/src/highlight/lex.rs` | `Role::Coordinate`, `split_coordinate` — what is painted |
+| `crates/oslo-ui/src/edit/session/preview.rs` | `preview` — what is drawn after the line, and never accepted |
 | `tests/coordinate_tests.rs` | the wiring, driven through the real binary |
 | `tests/coordinate_syntax_tests.rs` | what is and is not a coordinate |
 | `tests/corpus/syntax_brace_forms_not_coordinates.sh` | the collision, checked against bash |

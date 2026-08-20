@@ -188,6 +188,10 @@ pub struct Syntax {
     pub option: Style,
     /// A glob metacharacter: `*`, `?`, `[…]`.
     pub glob: Style,
+    /// A stream coordinate: `{0:1}`, `{%0:0}`. Kin to `glob` and deliberately not the same colour —
+    /// both turn one word into others, but a glob asks the filesystem and a coordinate asks the
+    /// pipeline, and `{4}` versus bash's literal `{4}` is a distinction only colour can make here.
+    pub coordinate: Style,
     /// A bare number.
     pub number: Style,
     /// The `NAME=` of an assignment.
@@ -254,6 +258,10 @@ impl Syntax {
             glob: Style {
                 bold: true,
                 ..rgb(0xa6, 0x1c, 0x7b)
+            },
+            coordinate: Style {
+                bold: true,
+                ..rgb(0x0a, 0x69, 0x8a)
             },
             number: rgb(0x69, 0x39, 0xb8),
             variable: rgb(0x69, 0x39, 0xb8),
@@ -345,6 +353,10 @@ impl Default for Syntax {
             glob: Style {
                 bold: true,
                 ..rgb(0xff, 0x79, 0xc6)
+            },
+            coordinate: Style {
+                bold: true,
+                ..rgb(0x8b, 0xe9, 0xfd)
             },
             number: rgb(0xbd, 0x93, 0xf9),
             assignment: rgb(0x50, 0xfa, 0x7b),
@@ -517,6 +529,21 @@ pub use prompt_theme::Prompt;
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// A coordinate must not take the same colour as what it sits beside, or the highlighting
+    /// says nothing at all. `command` especially: `ssh {0:0}` puts the two next to each other.
+    #[test]
+    fn a_coordinate_is_a_colour_of_its_own() {
+        for (name, s) in [
+            ("dark", Syntax::default()),
+            ("light", Syntax::for_light_background()),
+        ] {
+            assert_ne!(s.coordinate, s.command, "{name}: reads as a command");
+            assert_ne!(s.coordinate, s.glob, "{name}: reads as a glob");
+            assert_ne!(s.coordinate, s.param, "{name}: reads as a plain parameter");
+            assert_ne!(s.coordinate, Style::default(), "{name}: unstyled");
+        }
+    }
 
     #[test]
     fn the_default_theme_paints_something_for_every_role() {

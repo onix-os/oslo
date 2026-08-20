@@ -47,8 +47,14 @@ cat /etc/passwd | parse '{user}:{x}:{uid}:{rest}' | where 'uid > 1000' | get use
 ```
 
 Filters are **Lua**, not a dialect invented for the occasion, so the escape hatch is the same
-language as the filter. The verbs run in oslo's own process, so an external command belongs *after*
-the shell rather than inside the pipeline — `oslo -c 'ps | first 5 | to json' | jq .`.
+language as the filter. An ordinary command may sit at either end — where the tools stop, what they
+made is handed on as bytes:
+
+```sh
+kubectl get pods -o json | from json | where 'status.phase == "Running"' | cols name
+ps | first 5 | to json | jq .
+```
+
 → [structured-pipelines.md](docs/features/structured-pipelines.md)
 
 ## Stream coordinates

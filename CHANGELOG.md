@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.4.5] - 2026-08-20
+
+### <!-- 0 -->⛰️  Features
+
+- Pixy dust
+- Paint a coordinate, and preview what it will become
+
+### <!-- 1 -->🐛 Bug Fixes
+
+- A tool may hand over to a byte stage
+
 ## [0.4.4] - 2026-08-19
 
 ## [0.4.3] - 2026-08-19
