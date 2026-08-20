@@ -44,7 +44,7 @@
 //! with someone's terminal or window manager is worth being able to move.
 //!
 //! **How a Lua block spanning several lines is read** — not a setting, and not the editor's job.
-//! Enter always ends the *line*. [`super::read`] accumulates lines into a block and shows the
+//! Enter always ends the *line*. `startup::read` accumulates lines into a block and shows the
 //! continuation prompt while it wants more, which is how oslo already read an unfinished `for` loop
 //! in shell and how every REPL does it. A block that has already asked for more keeps asking until
 //! an **empty line** ends it — Python's rule, and there for Python's reason: after

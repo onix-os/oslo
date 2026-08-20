@@ -17,8 +17,14 @@
 //! `oslo.builtin.rm.to_tmp` hit the same wall, and needed *two* levels because the path indexes
 //! twice.
 //!
-//! The README is the right source of truth because it is the thing a user copies from. If a line
-//! is documented, it has to work.
+//! The documentation is the right source of truth because it is the thing a user copies from. If a
+//! line is documented, it has to work.
+//!
+//! **Every page, not only the README.** The settings used to live in a 551-line Configuration
+//! section there; they now live on the page for the feature each one belongs to, and the README is
+//! a tour that shows four of them. Reading only the README after that move would have left this
+//! guarding four lines out of a hundred and reporting success — so it reads `docs/features` too,
+//! and still fails loudly if the parser ever stops matching.
 
 use oslo::env::Environment;
 use oslo::lua::engine::LuaEngine;
@@ -31,7 +37,7 @@ struct Documented {
     line: String,
 }
 
-/// Every `oslo.….… = …` line in the README, as the table each one needs to exist.
+/// Every `oslo.….… = …` line in a page, as the table each one needs to exist.
 ///
 /// Hand-parsed rather than by regex: the shape is `oslo` followed by `.name` or `["name"]`
 /// segments and then an `=`, and anything that does not look exactly like that is not a settings
@@ -48,11 +54,24 @@ fn documented_settings(readme: &str) -> Vec<Documented> {
             continue;
         };
         let target = line[..equals].trim_end();
+        // **A call is not an assignment.** `oslo.direnv.nix_develop{ hook = true }` is a function
+        // being called with a table, and the `=` belongs to the table's field — reading it as a
+        // settings path made the test demand a namespace that line never writes to.
+        if target.contains(['{', '(', ',']) {
+            continue;
+        }
         let Some(parent) = parent_of(target) else {
             continue;
         };
         // `oslo.x = …` needs nothing but `oslo`, which always exists.
         if parent == "oslo" {
+            continue;
+        }
+        // **A namespace behind a cargo feature is only there when the feature is.** `default = []`,
+        // so a plain `cargo test` builds a shell with no `oslo.nix` at all — and the page that
+        // documents `oslo.nix.inputs` describes the binary `make build` produces, which has it.
+        // Asserting against the smaller build made this fail on documentation that is correct.
+        if behind_a_feature_that_is_off(&parent) {
             continue;
         }
         found.push(Documented {
@@ -61,6 +80,18 @@ fn documented_settings(readme: &str) -> Vec<Documented> {
         });
     }
     found
+}
+
+/// Whether this namespace belongs to a cargo feature this build does not have.
+fn behind_a_feature_that_is_off(parent: &str) -> bool {
+    match parent.split('.').nth(1).unwrap_or_default() {
+        "nix" => !cfg!(feature = "nix"),
+        "direnv" => !cfg!(feature = "direnv"),
+        "secret" => !cfg!(feature = "secrets"),
+        "math" => !cfg!(feature = "math"),
+        "predict" | "repair" => !cfg!(feature = "vista"),
+        _ => false,
+    }
 }
 
 /// The index of the `=` that makes this an assignment, if it is one.
@@ -116,9 +147,21 @@ fn engine() -> LuaEngine {
 /// way to it.
 #[test]
 fn every_documented_setting_can_be_assigned() {
-    let readme = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/README.md"))
-        .expect("the README is beside Cargo.toml");
-    let documented = documented_settings(&readme);
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"));
+    let mut pages = vec![root.join("README.md")];
+    let mut features: Vec<std::path::PathBuf> = std::fs::read_dir(root.join("docs/features"))
+        .expect("docs/features")
+        .filter_map(|entry| entry.ok().map(|e| e.path()))
+        .filter(|path| path.extension().is_some_and(|e| e == "md"))
+        .collect();
+    features.sort();
+    pages.append(&mut features);
+
+    let mut documented = Vec::new();
+    for page in &pages {
+        let text = std::fs::read_to_string(page).expect("a page");
+        documented.extend(documented_settings(&text));
+    }
 
     assert!(
         documented.len() > 10,
