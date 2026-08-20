@@ -178,3 +178,16 @@ fn table_move_handles_an_overlapping_range() {
     assert_eq!(lines[1], "3,4,5,4,5", "moving down over itself: {printed}");
     assert_eq!(lines[2], "7,8", "moving into another table: {printed}");
 }
+
+/// **`_VERSION` is the language's answer, not the VM's.**
+///
+/// luna reports `"luna"`. The tree walker it replaced reported `"Lua 5.4"`, and the migration
+/// dropped the line — so every script asking the standard question got a name no Lua has ever been
+/// written against, and the release smoke test failed on it from that commit onward without anyone
+/// reading the log. oslo speaks Lua 5.4 and `docs/features/lua-interpreter.md` opens by saying so.
+#[test]
+fn the_version_is_the_language_not_the_vm() {
+    assert_eq!(lua("print(_VERSION)").trim(), "Lua 5.4");
+    // The shape the smoke test asks for, so the two cannot drift apart.
+    assert!(lua(r#"print("lua " .. _VERSION)"#).contains("lua Lua 5.4"));
+}

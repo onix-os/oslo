@@ -259,6 +259,12 @@ pub fn install(host: &dyn Host, registry: &Registry, env: Arc<Mutex<Environment>
     publish::publish(host);
     #[cfg(feature = "nix")]
     nix::add_helpers(host);
+    // **`_VERSION` is the language's, not the VM's.** luna answers `"luna"`, and the tree walker it
+    // replaced answered `"Lua 5.4"` — the migration dropped the line, and a script asking the
+    // standard question got a name no Lua script has ever been written against. oslo speaks Lua
+    // 5.4, `docs/features/lua-interpreter.md` opens by saying so, and the release smoke test has
+    // been asking for it ever since.
+    host.set_global("_VERSION", Value::str("Lua 5.4"));
     // Last, so it replaces the standard names rather than being replaced by them.
     policy::apply(host);
     // And then the shorthand: `oslo.fs` is also `fs`, `oslo.math.eval` is also `math.eval`.
