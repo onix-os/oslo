@@ -48,13 +48,16 @@
 //!   is a consequence of a failure already reported, and printing one per level buries the line
 //!   that says what is actually wrong.
 
+mod ask;
+pub use ask::confirm;
+use ask::{ask_at, ask_path};
+
 use nix::dir::Dir;
 use nix::errno::Errno;
 use nix::fcntl::{AtFlags, OFlag, openat};
 use nix::sys::stat::{FileStat, Mode, SFlag, fstatat};
-use nix::unistd::{AccessFlags, UnlinkatFlags, faccessat, unlinkat};
+use nix::unistd::{UnlinkatFlags, unlinkat};
 use std::ffi::{OsStr, OsString};
-use std::io::IsTerminal;
 use std::os::fd::{AsRawFd, FromRawFd, OwnedFd, RawFd};
 use std::os::unix::ffi::OsStrExt;
 use std::path::Path;
@@ -450,63 +453,6 @@ fn announce(shown: &str, directory: bool, walk: &Walk) {
 
 fn complain(walk: &Walk, shown: &str, e: Errno) {
     eprintln!("{}rm: cannot remove '{shown}': {}", walk.origin, e.desc());
-}
-
-/// Whether this entry may go, for something named inside an open directory.
-///
-/// **`-f` never asks, `-i` always asks, and in between there is the write-protected prompt** — the
-/// one GNU raises for a file the user cannot write to, and only when someone is at the terminal to
-/// answer it. A script's stdin is not a tty, so this is silent everywhere it would otherwise hang.
-fn ask_at(walk: &Walk, shown: &str, kind: &str, parent: &Level, name: &OsString) -> bool {
-    if walk.force {
-        return true;
-    }
-    if walk.interactive {
-        return confirm(&walk.origin, &format!("remove {kind} '{shown}'"));
-    }
-    if !std::io::stdin().is_terminal() {
-        return true;
-    }
-    let writable = faccessat(
-        Some(parent.as_raw_fd()),
-        name.as_os_str(),
-        AccessFlags::W_OK,
-        AtFlags::AT_EACCESS,
-    )
-    .is_ok();
-    writable
-        || confirm(
-            &walk.origin,
-            &format!("remove write-protected {kind} '{shown}'"),
-        )
-}
-
-/// The same question about the operand, which has a path and no parent descriptor.
-fn ask_path(walk: &Walk, shown: &str, kind: &str, path: &Path) -> bool {
-    if walk.force {
-        return true;
-    }
-    if walk.interactive {
-        return confirm(&walk.origin, &format!("remove {kind} '{shown}'"));
-    }
-    if !std::io::stdin().is_terminal() || nix::unistd::access(path, AccessFlags::W_OK).is_ok() {
-        return true;
-    }
-    confirm(
-        &walk.origin,
-        &format!("remove write-protected {kind} '{shown}'"),
-    )
-}
-
-/// Anything but a `y` answer means no, as it does in `rm` and in `find -ok`.
-pub fn confirm(origin: &str, question: &str) -> bool {
-    eprint!("{origin}rm: {question}? ");
-    let _ = std::io::Write::flush(&mut std::io::stderr());
-    let mut answer = String::new();
-    match std::io::BufRead::read_line(&mut std::io::stdin().lock(), &mut answer) {
-        Ok(0) | Err(_) => false,
-        Ok(_) => matches!(answer.trim_start().chars().next(), Some('y') | Some('Y')),
-    }
 }
 
 fn done(failures: usize, interrupted: bool) -> Outcome {

@@ -1,368 +1,17 @@
 //! Terminal semantic marks observed through the real interactive binary.
 mod common;
 
-use nix::pty::openpty;
-use std::fs::File;
-use std::io::{Read, Write};
-use std::os::fd::OwnedFd;
-use std::os::unix::process::CommandExt;
-use std::process::{Child, Command, Stdio};
-use std::sync::mpsc::{self, Receiver};
-use std::time::{Duration, Instant};
-
-const TIMEOUT: Duration = Duration::from_secs(5);
+use std::time::Duration;
 
 #[path = "terminal_semantics/veto.rs"]
 mod veto;
 
-#[derive(Debug)]
-struct Mark {
-    kind: u8,
-    body: String,
-}
+#[path = "terminal_semantics/pty.rs"]
+mod pty;
 
-impl Mark {
-    fn status(&self) -> Option<i32> {
-        (self.kind == b'D')
-            .then(|| self.body.split(';').nth(1)?.parse().ok())
-            .flatten()
-    }
-
-    fn aid(&self) -> Option<&str> {
-        self.body
-            .split(';')
-            .find_map(|field| field.strip_prefix("aid="))
-    }
-}
-
-struct PtyShell {
-    child: Child,
-    input: File,
-    output: Receiver<Vec<u8>>,
-    transcript: Vec<u8>,
-    home: tempfile::TempDir,
-}
-
-impl PtyShell {
-    fn spawn(term: &str) -> Self {
-        Self::spawn_with_options(term, false, None)
-    }
-
-    fn spawn_with_extensions(term: &str, semantic_extensions: bool) -> Self {
-        Self::spawn_with_options(term, semantic_extensions, None)
-    }
-
-    fn spawn_with_options(
-        term: &str,
-        semantic_extensions: bool,
-        term_program: Option<&str>,
-    ) -> Self {
-        Self::spawn_with_config(term, semantic_extensions, term_program, None)
-    }
-
-    fn configured(term: &str, semantic_extensions: bool, config: &str) -> Self {
-        Self::spawn_with_config(term, semantic_extensions, None, Some(config))
-    }
-
-    fn spawn_with_config(
-        term: &str,
-        semantic_extensions: bool,
-        term_program: Option<&str>,
-        config: Option<&str>,
-    ) -> Self {
-        Self::spawn_with_config_and_env(term, semantic_extensions, term_program, config, &[])
-    }
-
-    fn spawn_with_environment(term: &str, environment: &[(&str, &str)]) -> Self {
-        Self::spawn_with_config_and_env(term, false, None, None, environment)
-    }
-    fn spawn_with_config_and_env(
-        term: &str,
-        semantic_extensions: bool,
-        term_program: Option<&str>,
-        config: Option<&str>,
-        environment: &[(&str, &str)],
-    ) -> Self {
-        let pty = openpty(None, None).expect("open pty");
-        let master: File = owned_file(pty.master);
-        let slave: File = owned_file(pty.slave);
-        let stdin = slave.try_clone().expect("clone pty slave");
-        let stdout = slave.try_clone().expect("clone pty slave");
-        let home = tempfile::tempdir().expect("temporary home");
-        if let Some(config) = config {
-            let directory = home.path().join(".config/oslo");
-            std::fs::create_dir_all(&directory).expect("create config directory");
-            std::fs::write(directory.join("init.lua"), config).expect("write config");
-        }
-        let mut command = Command::new(common::oslo_bin());
-        command
-            .arg("-i")
-            .env_clear()
-            .env("HOME", home.path())
-            .env("PATH", "/usr/bin:/bin")
-            .env("TERM", term)
-            .env("COLORFGBG", "15;0")
-            .current_dir(home.path())
-            .stdin(Stdio::from(stdin))
-            .stdout(Stdio::from(stdout))
-            .stderr(Stdio::from(slave));
-        if semantic_extensions {
-            command.env("OSLO_TERMINAL_EXTENSIONS", "kitty");
-        }
-        if let Some(term_program) = term_program {
-            command.env("TERM_PROGRAM", term_program);
-        }
-        command.envs(environment.iter().copied());
-        // SAFETY: this runs after fork and only calls async-signal-safe system interfaces.
-        unsafe {
-            command.pre_exec(|| {
-                if nix::libc::setsid() == -1 {
-                    return Err(std::io::Error::last_os_error());
-                }
-                if nix::libc::ioctl(0, nix::libc::TIOCSCTTY, 0) == -1 {
-                    return Err(std::io::Error::last_os_error());
-                }
-                Ok(())
-            });
-        }
-        let child = command.spawn().expect("spawn oslo on pty");
-        let input = master.try_clone().expect("clone pty master");
-        let (send, output) = mpsc::channel();
-        std::thread::spawn(move || {
-            let mut master = master;
-            loop {
-                let mut bytes = vec![0; 4096];
-                match master.read(&mut bytes) {
-                    Ok(0) | Err(_) => break,
-                    Ok(read) => {
-                        bytes.truncate(read);
-                        if send.send(bytes).is_err() {
-                            break;
-                        }
-                    }
-                }
-            }
-        });
-        Self {
-            child,
-            input,
-            output,
-            transcript: Vec::new(),
-            home,
-        }
-    }
-
-    fn send(&mut self, bytes: &[u8]) {
-        self.input.write_all(bytes).expect("write pty input");
-        self.input.flush().expect("flush pty input");
-    }
-
-    fn wait_for_marks(&mut self, count: usize) -> Vec<Mark> {
-        let deadline = Instant::now() + TIMEOUT;
-        loop {
-            let marks = marks(&self.transcript);
-            if marks.len() >= count {
-                return marks;
-            }
-            let remaining = deadline.saturating_duration_since(Instant::now());
-            assert!(
-                !remaining.is_zero(),
-                "timed out: {:?}",
-                visible(&self.transcript)
-            );
-            match self.output.recv_timeout(remaining) {
-                Ok(bytes) => self.transcript.extend(bytes),
-                Err(error) => panic!("pty ended before {count} marks: {error:?}"),
-            }
-        }
-    }
-
-    fn wait_for_text(&mut self, text: &str) {
-        let deadline = Instant::now() + TIMEOUT;
-        while !String::from_utf8_lossy(&self.transcript).contains(text) {
-            let remaining = deadline.saturating_duration_since(Instant::now());
-            assert!(
-                !remaining.is_zero(),
-                "timed out: {:?}",
-                visible(&self.transcript)
-            );
-            match self.output.recv_timeout(remaining) {
-                Ok(bytes) => self.transcript.extend(bytes),
-                Err(error) => panic!(
-                    "pty ended before {text:?}: {error:?}: {}",
-                    visible(&self.transcript)
-                ),
-            }
-        }
-    }
-
-    /// Wait until `text` has appeared `times` times, not merely once.
-    ///
-    /// **[`Self::wait_for_text`] scans the whole transcript**, so waiting for something the shell
-    /// emits once per prompt returns instantly the second time you ask — the *first* prompt's copy
-    /// is still there. A test that then reads the transcript is really relying on a drain to
-    /// happen to catch the rest, which is a race: `vscode_selects_one_rich_lifecycle` passed on a
-    /// quiet machine for months and failed on a loaded CI runner, one prompt's marks short.
-    fn wait_for_text_count(&mut self, text: &str, times: usize) {
-        let deadline = Instant::now() + TIMEOUT;
-        while String::from_utf8_lossy(&self.transcript)
-            .matches(text)
-            .count()
-            < times
-        {
-            let remaining = deadline.saturating_duration_since(Instant::now());
-            assert!(
-                !remaining.is_zero(),
-                "timed out waiting for {times} of {text:?}: {:?}",
-                visible(&self.transcript)
-            );
-            match self.output.recv_timeout(remaining) {
-                Ok(bytes) => self.transcript.extend(bytes),
-                Err(error) => panic!(
-                    "pty ended before {times} of {text:?}: {error:?}: {}",
-                    visible(&self.transcript)
-                ),
-            }
-        }
-    }
-
-    fn wait_for_plain_text(&mut self, text: &str) {
-        let deadline = Instant::now() + TIMEOUT;
-        loop {
-            let rendered = String::from_utf8_lossy(&self.transcript);
-            let plain = oslo::ui::dropdown::width::without_escapes(&rendered);
-            if plain.contains(text) {
-                return;
-            }
-            let remaining = deadline.saturating_duration_since(Instant::now());
-            assert!(
-                !remaining.is_zero(),
-                "timed out before {text:?}: {}",
-                visible(&self.transcript)
-            );
-            match self.output.recv_timeout(remaining) {
-                Ok(bytes) => self.transcript.extend(bytes),
-                Err(error) => panic!(
-                    "pty ended before {text:?}: {error:?}: {}",
-                    visible(&self.transcript)
-                ),
-            }
-        }
-    }
-
-    fn wait_for_occurrences(&mut self, bytes: &[u8], count: usize) {
-        let deadline = Instant::now() + TIMEOUT;
-        while self
-            .transcript
-            .windows(bytes.len())
-            .filter(|window| *window == bytes)
-            .count()
-            < count
-        {
-            let remaining = deadline.saturating_duration_since(Instant::now());
-            assert!(
-                !remaining.is_zero(),
-                "timed out: {:?}",
-                visible(&self.transcript)
-            );
-            match self.output.recv_timeout(remaining) {
-                Ok(output) => self.transcript.extend(output),
-                Err(error) => panic!("pty ended before {count} matches: {error:?}"),
-            }
-        }
-    }
-
-    fn wait_for_exit(&mut self) {
-        let deadline = Instant::now() + TIMEOUT;
-        loop {
-            while let Ok(bytes) = self.output.try_recv() {
-                self.transcript.extend(bytes);
-            }
-            if self.child.try_wait().expect("wait for oslo").is_some() {
-                while let Ok(bytes) = self.output.recv_timeout(Duration::from_millis(20)) {
-                    self.transcript.extend(bytes);
-                }
-                return;
-            }
-            assert!(Instant::now() < deadline, "oslo did not exit");
-            std::thread::sleep(Duration::from_millis(10));
-        }
-    }
-
-    fn drain_for(&mut self, duration: Duration) {
-        let deadline = Instant::now() + duration;
-        while Instant::now() < deadline {
-            let remaining = deadline.saturating_duration_since(Instant::now());
-            match self.output.recv_timeout(remaining) {
-                Ok(bytes) => self.transcript.extend(bytes),
-                Err(_) => break,
-            }
-        }
-    }
-}
-
-impl Drop for PtyShell {
-    fn drop(&mut self) {
-        let _ = self.child.kill();
-        let _ = self.child.wait();
-    }
-}
-
-fn owned_file(fd: OwnedFd) -> File {
-    fd.into()
-}
-
-fn marks(bytes: &[u8]) -> Vec<Mark> {
-    let mut found = Vec::new();
-    let mut at = 0;
-    while at + 6 <= bytes.len() {
-        if bytes[at..].starts_with(b"\x1b]133;")
-            && let Some(end) = bytes[at + 6..]
-                .windows(2)
-                .position(|window| window == b"\x1b\\")
-        {
-            let body = &bytes[at + 6..at + 6 + end];
-            if let Some(kind) = body.first().copied() {
-                found.push(Mark {
-                    kind,
-                    body: String::from_utf8_lossy(body).into_owned(),
-                });
-            }
-            at += 6 + end + 2;
-        } else {
-            at += 1;
-        }
-    }
-    found
-}
-
-fn visible(bytes: &[u8]) -> String {
-    String::from_utf8_lossy(bytes).escape_debug().to_string()
-}
-
-fn kinds(marks: &[Mark]) -> String {
-    marks.iter().map(|mark| mark.kind as char).collect()
-}
-
-fn vscode_kinds(bytes: &[u8]) -> String {
-    let mut kinds = String::new();
-    let mut at = 0;
-    while at + 6 <= bytes.len() {
-        if bytes[at..].starts_with(b"\x1b]633;")
-            && let Some(end) = bytes[at + 6..]
-                .windows(2)
-                .position(|window| window == b"\x1b\\")
-        {
-            if let Some(kind @ (b'A' | b'B' | b'C' | b'D' | b'E')) = bytes.get(at + 6) {
-                kinds.push(*kind as char);
-            }
-            at += 6 + end + 2;
-        } else {
-            at += 1;
-        }
-    }
-    kinds
-}
+use pty::{PtyShell, kinds, marks, visible, vscode_kinds};
+// `terminal_input` reads this through `use super::*`.
+use std::process::Command;
 
 #[test]
 fn successful_and_failed_commands_have_balanced_stable_marks() {
@@ -581,3 +230,54 @@ fn a_nested_interactive_shell_asks_before_it_starts() {
 
 #[path = "terminal_semantics/terminal_input.rs"]
 mod terminal_input;
+
+/// **A Ctrl-C must escape `rm`'s prompt**, and this took six presses and a walk away from the desk.
+///
+/// ```text
+/// oslo: rm: remove write-protected regular file '…/objects/a6/b653…'? ^C^C^C^C^C^C
+/// ```
+///
+/// `rm` is a *builtin*: it runs in the shell process, so there is no child for the terminal driver
+/// to kill and the shell itself has to arrange the ending. SIGINT is installed without `SA_RESTART`
+/// exactly so the blocking read fails with `EINTR` — but the prompt used `BufRead::read_line`,
+/// which is `read_until`, which treats `Interrupted` as "try again". The signal arrived, the flag
+/// was set, the read went straight back to waiting, and nothing looked at the flag until an answer
+/// came that never would.
+///
+/// Driven through a pty because that is the only place the keystroke is real: the terminal driver
+/// turns `^C` into the signal, and a test writing the byte down a pipe would prove nothing.
+#[test]
+fn a_ctrl_c_escapes_the_rm_prompt() {
+    let mut shell = PtyShell::configured("xterm-256color", false, "oslo.misc.welcome = false\n");
+    shell.wait_for_marks(2);
+
+    // A file the user cannot write to, which is what makes `rm` ask without `-i`.
+    let tree = shell.home.path().join("tree");
+    std::fs::create_dir_all(&tree).expect("tree");
+    let guarded = tree.join("guarded");
+    std::fs::write(&guarded, b"x").expect("file");
+    let mut mode = std::fs::metadata(&guarded).expect("stat").permissions();
+    mode.set_readonly(true);
+    std::fs::set_permissions(&guarded, mode).expect("chmod");
+
+    shell.send(b"rm -r tree\n");
+    shell.wait_for_text("write-protected");
+
+    // **One press**, which is the whole point — the old code survived six.
+    shell.send(&[0x03]);
+
+    // The prompt comes back rather than the question being asked again for ever.
+    let after = shell.wait_for_marks(6);
+    assert_eq!(
+        kinds(&after[..6]),
+        "ABCDAB",
+        "{:?}",
+        visible(&shell.transcript)
+    );
+
+    // And nothing was removed on the way out.
+    assert!(
+        guarded.exists(),
+        "the interrupted rm removed the file anyway"
+    );
+}
