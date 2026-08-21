@@ -48,21 +48,30 @@ fn a_redraw_returns_to_the_top_of_the_block() {
 /// `ESC[J` from row 0, column 0 is an erase of the whole screen, and a terminal that keeps
 /// scrollback moves what was visible into history before clearing it — so every keystroke after a
 /// `Ctrl-L` pushed another copy of the half-typed prompt into the buffer. Ten keystrokes, ten
-/// lines, measured in tmux. The row this erases from is stepped down to first, which is the same
-/// idiom `paint.rs` and `dropdown` already use.
+/// lines, measured in tmux. The column, not the row, is what steps off the origin.
 #[test]
 fn the_erase_never_starts_at_the_screen_origin() {
     let out = redraw(0, "$ ls", at(1, 0, 4));
     let erase = out.find("\x1b[J").expect("erases");
-    let down = out.find("\x1b[B").expect("steps down before erasing");
     assert!(
-        down < erase,
-        "the erase-to-end runs before stepping off row zero: {out:?}"
+        out[..erase].ends_with("\x1b[K\x1b[C"),
+        "the erase must run from column one of this row: {out:?}"
     );
-    assert!(
-        out[..erase].ends_with("\x1b[B\r"),
-        "the erase must run from column zero of the row below: {out:?}"
-    );
+}
+
+/// **The erase never leaves the block's own row.**
+///
+/// `ESC[B` at the bottom of the screen is a no-op, so the `ESC[A` that used to pair with it moved
+/// the cursor one row above the block and the frame overwrote the line above — the last line of
+/// the previous command's output. On a full screen `ls` printed its one line and the prompt ate
+/// it, which read as a builtin that had stopped working.
+#[test]
+fn the_erase_makes_no_vertical_move() {
+    let out = redraw(0, "$ ls", at(1, 0, 4));
+    let erase = out.find("\x1b[J").expect("erases");
+    let head = &out[..erase];
+    assert!(!head.contains("\x1b[B"), "steps down to erase: {out:?}");
+    assert!(!head.contains("\x1b[A"), "steps up to erase: {out:?}");
 }
 
 /// The cursor is placed by walking up from the *last* row, because that is where writing the
