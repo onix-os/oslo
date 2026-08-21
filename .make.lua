@@ -34,7 +34,7 @@ local OURS = { "--workspace", "--exclude", "argc", "--exclude", "brush-parser",
                "--exclude", "full_moon", "--exclude", "full_moon_derive" }
 
 -- Every `.rs` the build depends on, for the recipes that declare staleness.
-local SOURCES = { "src/**/*.rs", "crates/**/*.rs", "Cargo.toml", "Cargo.lock", "rust-toolchain.toml" }
+local SOURCES = { "src/**/*.rs", "crates/**/*.rs", "Cargo.toml", "Cargo.lock" }
 
 -- `cargo(...)` with lists spliced in wherever they appear.
 --

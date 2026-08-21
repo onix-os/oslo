@@ -85,12 +85,11 @@ jobs:
   msrv:
     name: msrv (1.90)
     runs-on: ubuntu-latest
-    # **Overrides `rust-toolchain.toml`, which would otherwise decide this job.** That file pins the
-    # version everything else builds with, and it takes precedence over the toolchain the action
-    # installs — so without this the job would happily check the code against a compiler newer than
-    # the one it claims to be testing, and the MSRV would mean nothing at all.
-    env:
-      RUSTUP_TOOLCHAIN: 1.90.0
+    # The installed toolchain is the one this job checks against, and there is nothing in the tree
+    # that can override it. A `rust-toolchain.toml` used to sit in the repository root and take
+    # precedence over whatever the action installed, so this job needed `RUSTUP_TOOLCHAIN: 1.90.0`
+    # to reach the compiler its name claims — without it the MSRV meant nothing at all. The file is
+    # gone and the version lives in `flake.nix`; this job pins its own, one line below.
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@1.90.0

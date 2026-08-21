@@ -34,7 +34,19 @@
             aarch64-linux = "aarch64-unknown-linux-musl";
           }
           .${system};
-        toolchain = pkgs.rust-bin.stable."1.94.0".default.override {
+        # **The toolchain this repository builds with, pinned here and nowhere else.**
+        #
+        # There used to be a `rust-toolchain.toml` beside `flake.nix` as well, and it was a third
+        # copy of this number that nothing checked: the flake did not read it, the workflows
+        # hardcoded their own, and its only real effect was to override whatever CI had just
+        # installed — which the `msrv` and `fuzz` jobs then had to fight with `RUSTUP_TOOLCHAIN`.
+        # The devshell is how this repository is built, so the devshell is where the version lives.
+        #
+        # The CI jobs pin the same version by hand in `.github/workflows/*.yml`; bump them together.
+        # The MSRV is separate and lower — `rust-version` in `Cargo.toml` says 1.90, and the `msrv`
+        # job installs exactly that.
+        rustChannel = "1.94.0";
+        toolchain = pkgs.rust-bin.stable.${rustChannel}.default.override {
           targets = [ rustTarget ];
           extensions = [
             "rust-src"
