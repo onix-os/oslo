@@ -76,8 +76,6 @@ jobs:
       fail-fast: false
       matrix:
         target: [fuzz_parse, fuzz_lexer, fuzz_arith]
-    env:
-      RUSTUP_TOOLCHAIN: nightly
     steps:
       - uses: actions/checkout@v4
 
@@ -86,9 +84,10 @@ jobs:
       # against the current sanitizer rather than a fossil of one. This job gates nothing on the
       # default branch, so a toolchain that breaks costs a red cron and not a blocked merge.
       #
-      # `RUSTUP_TOOLCHAIN` below is what keeps it nightly: `rust-toolchain.toml` pins a stable
-      # version for everything else and takes precedence over the toolchain this action installs,
-      # which would leave cargo-fuzz asking a stable compiler for `-Zsanitizer`.
+      # This used to need `RUSTUP_TOOLCHAIN: nightly` beside it, because a `rust-toolchain.toml` in
+      # the repository root pinned a stable version and took precedence over the toolchain the
+      # action installs — leaving cargo-fuzz asking a stable compiler for `-Zsanitizer`. That file
+      # is gone, so what the action installs is what runs.
       - uses: dtolnay/rust-toolchain@nightly
 
       - uses: actions/cache@v4
