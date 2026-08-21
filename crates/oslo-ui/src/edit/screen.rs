@@ -50,10 +50,14 @@ pub fn redraw(from_row: usize, frame: &str, at: At) -> String {
     // **Never `ESC[J` from the screen's own origin.** When the block starts at row 0 — which
     // `Ctrl-L` guarantees, since it homes the cursor and clears — an erase-to-end from there is an
     // erase of the whole screen, and a terminal keeping scrollback moves what was visible into
-    // history first. One duplicate prompt line per keystroke, ten for `echo hello`. So: clear this
-    // row by itself, step down, erase the rest from a row that is never the origin, and come back.
-    // `paint.rs` and `dropdown` already erase this way.
-    out.push_str("\x1b[K\x1b[B\r\x1b[J\x1b[A\r");
+    // history first. One duplicate prompt line per keystroke, ten for `echo hello`.
+    //
+    // **And never off this row.** `ESC[B` on the last row of the screen does not move, so the
+    // matching `ESC[A` landed a row *above* the block and the frame was drawn over the last line
+    // of the previous command's output — invisible until the screen filled up, and then `ls` on a
+    // full screen printed nothing at all. So the dodge is horizontal: clear the row, step one
+    // column right, and erase from there, which is off the origin without leaving the row.
+    out.push_str("\x1b[K\x1b[C\x1b[J\r");
 
     out.push_str(frame);
 
