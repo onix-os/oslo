@@ -35,6 +35,8 @@ pub mod env;
 pub mod exec;
 pub mod expand;
 pub mod lexer;
+#[cfg(feature = "make")]
+pub mod make;
 /// The names that run only after `$PATH` has failed, gathered for the prompt to draw.
 pub mod names;
 /// A Nix dev shell, imported without entering one.

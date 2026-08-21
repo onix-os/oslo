@@ -19,6 +19,8 @@ direnv = ["oslo-shell/direnv"]
 math = ["oslo-shell/math", "dep:oslo-math"]
 # `argc` — see the note on `oslo-shell`.
 argc = ["oslo-shell/argc"]
+# `make` — see the note on `oslo-shell`.
+make = ["oslo-shell/make"]
 # `nix` — see the note on `oslo-shell`.
 nix = ["oslo-shell/nix"]
 # `secrets` — `oslo.secret`, the store from Lua. `dep:base64` is the Lua boundary for `seal` and

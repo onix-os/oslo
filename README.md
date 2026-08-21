@@ -128,8 +128,8 @@ value means.
 
 ## Tools
 
-Ten of them — `macros`, `config`, `profile`, `history`, `direnv`, `hook`, `plugin`, `scratch`,
-`userin`, `secret` — each with its own help. A script of the same name always wins.
+Eleven of them — `macros`, `config`, `profile`, `history`, `direnv`, `make`, `hook`, `plugin`,
+`scratch`, `userin`, `secret` — each with its own help. A script of the same name always wins.
 
 ## Building
 
@@ -143,12 +143,12 @@ nix build         # static musl binary
 
 ### Optional features
 
-All nine are off *by default*, and off for the same reason: a shell that is going to be `/bin/sh`
+All ten are off *by default*, and off for the same reason: a shell that is going to be `/bin/sh`
 should carry what every session needs and nothing else. `make build` turns them on; the published
 release artifact is the default build.
 
 Each cost is what turning that one feature *off* takes back out of the full build, measured on the
-static musl binary — **5,111,136 bytes with none of them, 6,320,928 with all nine**:
+static musl binary — **5,123,424 bytes with none of them, 6,357,792 with all ten**:
 
 | feature | costs | brings |
 |---|---:|---|
@@ -161,6 +161,7 @@ static musl binary — **5,111,136 bytes with none of them, 6,320,928 with all n
 | `crypt` | +72 KB | the built-in mechanism, so a fresh install encrypts without being told anything |
 | `nix` | +48 KB | `oslo.nix` — every `nix --json` answer as a Lua table, and flake-output completion |
 | `scratch` | +44 KB | named sessions that outlive their terminal, and the key that finds them |
+| `make` | +28 KB | `.make.lua` — recipes with dependencies and staleness, the `oslo make` tool and the `make` builtin |
 
 `crypt` implies `secrets`, so the two can only be removed together: 180 KB for the pair.
 
@@ -169,7 +170,7 @@ make build TYPE=minimal     # static release, none of them
 ```
 
 **There are no others**, and in particular none that serve the test suite — `--all-features` turns
-on exactly the nine above. A config is written to work either way, because a build without the
+on exactly the ten above. A config is written to work either way, because a build without the
 feature simply does not have the name:
 
 ```lua

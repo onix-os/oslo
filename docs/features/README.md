@@ -32,6 +32,10 @@ feature — the largest of the three at 164 KB, and off because it is the one pa
 reads a file on arrival in a directory and can run what it finds there. In `oslo-minimal` `cd` is
 just `cd`, and the word `direnv` falls through to `$PATH` so the real one still works.
 
+**[Build recipes](build-recipes.md) are `oslo` only**, behind the `make` cargo feature. In
+`oslo-minimal` there is no `oslo.make`, no `oslo make` tool and no `make` builtin, so the word falls
+through to `$PATH` and GNU make answers — which is what it does on every other shell.
+
 **[nix, as data](nix.md) is `oslo` only**, behind the `nix` cargo feature — every `nix --json`
 answer as a Lua table. Independent of `direnv`: what the two share, `use flake` and
 `oslo.direnv.nix_develop()`, needs both. In `oslo-minimal` there is no `oslo.nix`, and a config asks
@@ -125,6 +129,7 @@ scripts/demo/embed.sh                            # put the players back in the d
 |---|---|
 | [Directory environments](directory-environments.md) | `.envrc` read by oslo itself, not handed to direnv |
 | [nix, as data](nix.md) | Every `nix --json` answer as a Lua table, extended in Lua |
+| [Build recipes](build-recipes.md) | `.make.lua` — a justfile in the language the config is already in |
 | [The filesystem navigator](nav.md) | `nav`: type to filter, arrows to move, Esc to take the shell there |
 | [rm, and the things that can bite](rm-and-safety.md) | Recoverable at the prompt, POSIX in a script |
 | [Scratches](scratch.md) | Named sessions that outlive the terminal they were opened in |

@@ -25,6 +25,9 @@ pub use oslo_base::{ast, error, feature, hooks, macros, messages, nesting, track
 
 #[cfg(feature = "direnv")]
 pub use oslo_shell::direnv;
+/// Which directory's `.make.lua` governs this one. Running one is `oslo_runtime`'s.
+#[cfg(feature = "make")]
+pub use oslo_shell::make;
 /// The shell: syntax adaptation, expansion, execution, the builtins, the structured pipeline and
 /// directory environments.
 pub use oslo_shell::{data, env, exec, expand, lexer, names, syntax};

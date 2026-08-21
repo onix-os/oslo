@@ -33,6 +33,8 @@ mod jobs;
 mod keep;
 mod r#let;
 mod locate;
+#[cfg(feature = "make")]
+mod make;
 mod mapfile;
 mod mark;
 #[cfg(feature = "math")]
@@ -75,9 +77,11 @@ pub use hash::builtin_hash;
 pub use io::{builtin_echo, builtin_printf, builtin_read, shell_quote};
 pub use jobs::{builtin_bg, builtin_disown, builtin_fg, builtin_jobs, builtin_wait};
 pub use r#let::builtin_let;
+pub use locate::{builtin_whereis, builtin_which};
 /// `which` and `whereis`, which only a shell can answer: an alias, a builtin and a stored macro are
 /// all invisible to the programs by those names.
-pub use locate::{builtin_whereis, builtin_which};
+#[cfg(feature = "make")]
+pub use make::builtin_make;
 pub use mapfile::builtin_mapfile;
 pub use messages::builtin_messages;
 pub use process::{
@@ -154,6 +158,10 @@ pub fn register_default_builtins(env: &mut Environment) {
     // alias, builtin and stored macro in this shell. `/usr/bin/which` still answers the old way.
     env.register_custom_builtin("which", builtin_which);
     env.register_custom_builtin("whereis", builtin_whereis);
+    // `make` claims the word only at a prompt in a directory a `.make.lua` governs; everywhere
+    // else it hands over to the program. See `make.rs`.
+    #[cfg(feature = "make")]
+    env.register_custom_builtin("make", builtin_make);
     env.register_custom_builtin("eval", builtin_eval);
     env.register_custom_builtin(".", builtin_source);
     env.register_custom_builtin("source", builtin_source);

@@ -20,6 +20,9 @@ scratch = ["oslo-shell/scratch", "oslo-runtime/scratch"]
 
 direnv = ["oslo-shell/direnv", "oslo-runtime/direnv"]
 
+# `make` — `.make.lua` recipes, the `oslo make` tool and the `make` builtin.
+make = ["oslo-shell/make", "oslo-runtime/make"]
+
 nix = ["oslo-shell/nix", "oslo-runtime/nix"]
 
 # `math` — the calculator: units and dimensional analysis, as the `math` builtin and `oslo.math`.
@@ -71,7 +74,7 @@ oslo-ui = { path = "crates/oslo-ui" }
 # only one; `scripts/project-meta.sh` reads it the same way, falling back here when `[package]`
 # inherits rather than states it.
 [workspace.package]
-version = "0.4.2"
+version = "0.4.3"
 edition = "2024"
 rust-version = "1.90"
 license = "MIT"
