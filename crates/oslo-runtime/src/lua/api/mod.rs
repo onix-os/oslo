@@ -38,6 +38,8 @@ mod handle;
 mod history;
 mod json;
 mod machine;
+#[cfg(feature = "make")]
+pub mod make;
 pub(crate) mod mark;
 #[cfg(feature = "math")]
 mod math;
@@ -257,6 +259,8 @@ pub fn install(host: &dyn Host, registry: &Registry, env: Arc<Mutex<Environment>
     host.set_global("oslo", oslo);
     // After the global exists, because these are written in Lua and reach the table through it.
     publish::publish(host);
+    #[cfg(feature = "make")]
+    make::add_helpers(host);
     #[cfg(feature = "nix")]
     nix::add_helpers(host);
     // **`_VERSION` is the language's, not the VM's.** luna answers `"luna"`, and the tree walker it

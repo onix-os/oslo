@@ -16,6 +16,8 @@ pub mod help;
 pub mod history;
 pub mod hook;
 pub mod macros;
+#[cfg(feature = "make")]
+pub mod make;
 #[cfg(feature = "plugin")]
 pub mod plugin;
 pub mod profile;

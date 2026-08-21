@@ -51,6 +51,11 @@ pub const TOOLS: &[Tool] = &[
         name: "direnv",
         about: "manage per-directory environments",
     },
+    #[cfg(feature = "make")]
+    Tool {
+        name: "make",
+        about: "run a recipe from the project's .make.lua",
+    },
     Tool {
         name: "hook",
         about: "list and test the shell hooks",
@@ -148,6 +153,10 @@ pub fn run(tool: &'static Tool, args: &[String]) -> i32 {
     #[cfg(feature = "direnv")]
     if tool.name == "direnv" {
         return crate::cli::direnv::run(args);
+    }
+    #[cfg(feature = "make")]
+    if tool.name == "make" {
+        return crate::cli::make::run(args);
     }
     if tool.name == "profile" {
         return crate::cli::profile::run(args);

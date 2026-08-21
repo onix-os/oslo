@@ -21,6 +21,9 @@ math = ["dep:oslo-math"]
 # `argc` — the `argc` builtin, and the `Runtime` oslo implements for it. Off by default; a build
 # without it has no builtin of that name, so the word falls through to `$PATH`.
 argc = ["dep:argc"]
+# `make` — `.make.lua`: recipes with dependencies and staleness, run by `oslo make`. Off by
+# default; a build without it never looks for the file and has no `make` builtin.
+make = []
 # `nix` — everything that knows what a Nix dev shell is: `nix print-dev-env`, importing its
 # variables, its shell-local state and its functions. Independent of `direnv`: the two meet only
 # where a directory file asks for a dev shell, and that overlap needs both.
