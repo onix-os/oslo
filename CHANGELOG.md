@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.4.2] - 2026-08-21
+
+### <!-- 1 -->🐛 Bug Fixes
+
+- Prevent screen content from overwriting previous output
+
 ## [0.4.1] - 2026-08-20
 
 ### <!-- 1 -->🐛 Bug Fixes
