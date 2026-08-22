@@ -13,7 +13,7 @@
 //!
 //! # The sibling of `oslo.feature.when`, deliberately
 //!
-//! Same shape, same moment, same mask-not-assignment property — [`super::feature`] gates a builtin
+//! Same shape, same moment, same mask-not-assignment property — `oslo.feature.when` gates a builtin
 //! and this gates a program, and a configuration usually wants both:
 //!
 //! ```lua

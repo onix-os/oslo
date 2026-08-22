@@ -29,10 +29,10 @@
 //!
 //! # Recomputed, never restored
 //!
-//! [`apply`] takes the whole set for the directory the shell is now in, so leaving a directory is
-//! the same operation as arriving in one: ask again, get the other answer. There is no
-//! "unhide on the way out" to forget, which is the same property [`crate::feature`]'s mask has and
-//! for the same reason.
+//! [`crate::command::apply`] takes the whole set for the directory the shell is now in, so leaving
+//! a directory is the same operation as arriving in one: ask again, get the other answer. There is
+//! no "unhide on the way out" to forget, which is the same property [`crate::feature`]'s mask has
+//! and for the same reason.
 //!
 //! # Cost
 //!
