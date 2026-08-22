@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.4.5] - 2026-08-22
+
+### <!-- 0 -->⛰️  Features
+
+- Install to $PREFIX/bin and /usr/bin
+
+### <!-- 1 -->🐛 Bug Fixes
+
+- A space does not make a value a command
+
+### <!-- 7 -->⚙️ Miscellaneous Tasks
+
+- Cleanup
+
 ## [0.4.4] - 2026-08-22
 
 ### <!-- 0 -->⛰️  Features

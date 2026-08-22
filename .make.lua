@@ -63,6 +63,12 @@ local function cargo(...)
   return sh.cargo(table.unpack(flat(...)))
 end
 
+-- Whether this process can already write `/usr/bin`, so a root build does not shell out to a `sudo`
+-- that may not be installed. Asked of the kernel rather than of `$USER`, which a `su` leaves stale.
+local function as_root()
+  return oslo.run{ "id", "-u", capture = true }.out:match("^0%s*$") ~= nil
+end
+
 local function absolute(path)
   if oslo.path.is_absolute(path) then return oslo.path.normalize(path) end
   return oslo.path.normalize(oslo.path.join(oslo.fs.cwd(), path))
@@ -267,23 +273,53 @@ make.recipe{
 
 make.recipe{
   name = "install",
-  desc = "put the release binary in $PREFIX/bin",
+  desc = "put the release binary in $PREFIX/bin and in /usr/bin",
   deps = { "build" },
-  run = function()
+  params = { { "--system", desc = "yes | no — also install to /usr/bin", default = "yes" } },
+  run = function(a)
     local dest = (os.getenv("DESTDIR") or "") .. PREFIX .. "/bin"
     sh.install("-d", dest)
     sh.install("-m", "755", BIN, dest .. "/" .. NAME)
-    print("installed " .. dest .. "/" .. NAME)
+    print(oslo.ui.style("✓ ", { fg = "green" }) .. dest .. "/" .. NAME)
+
+    if a.system == "no" then return end
+    -- **`$SHELL` lives here.** A login shell is started from `/etc/passwd`, which names an absolute
+    -- path, so a copy under `$HOME` is the one you run by name and the system one is the one you
+    -- *are*. Installing only the first is how a fixed shell keeps not being fixed.
+    local system = (os.getenv("DESTDIR") or "") .. "/usr/bin/" .. NAME
+    local sudo = as_root() and {} or { "sudo" }
+    local put = oslo.run{ table.unpack(flat(sudo, "install", "-m", "755", BIN, system)) }
+    if put.ok then
+      print(oslo.ui.style("✓ ", { fg = "green" }) .. system)
+      -- The `(deleted)` inode is not cosmetic: `current_exe` is how the `make` builtin finds the
+      -- runner, so a shell whose binary was replaced under it answers `make: cannot execute`.
+      print(oslo.ui.subtitle("  shells already running keep the old binary — restart them"))
+    else
+      print(oslo.ui.style("✗ ", { fg = "yellow" }) .. system ..
+            oslo.ui.subtitle("  (not installed; --system no to skip)"))
+    end
   end,
 }
 
 make.recipe{
   name = "uninstall",
-  desc = "take it back out of $PREFIX/bin",
-  run = function()
+  desc = "take it back out of $PREFIX/bin and /usr/bin",
+  params = { { "--system", desc = "yes | no — also remove /usr/bin", default = "yes" } },
+  run = function(a)
+    -- Both, because `install` puts it in both: an uninstall that left the system copy behind would
+    -- leave you running the thing you just removed.
     local dest = (os.getenv("DESTDIR") or "") .. PREFIX .. "/bin/" .. NAME
     sh.rm("-f", dest)
-    print("removed " .. dest)
+    print(oslo.ui.style("✓ ", { fg = "green" }) .. "removed " .. dest)
+
+    if a.system == "no" then return end
+    local system = (os.getenv("DESTDIR") or "") .. "/usr/bin/" .. NAME
+    if not oslo.fs.stat(system) then return end
+    local sudo = as_root() and {} or { "sudo" }
+    local gone = oslo.run{ table.unpack(flat(sudo, "rm", "-f", system)) }
+    print(gone.ok
+      and oslo.ui.style("✓ ", { fg = "green" }) .. "removed " .. system
+      or oslo.ui.style("✗ ", { fg = "yellow" }) .. system .. oslo.ui.subtitle("  (still there)"))
   end,
 }
 

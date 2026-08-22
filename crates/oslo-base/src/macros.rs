@@ -167,10 +167,12 @@ impl Kind {
 /// * and `macros.sh`, which bash sources, can carry the first and not the second.
 pub fn is_a_value(body: &str) -> bool {
     let body = body.trim();
-    !body.is_empty()
-        && !body.contains("$(")
-        && !body.contains('`')
-        && !body.contains(char::is_whitespace)
+    // **A space does not make something a command.** `EDITOR="code --wait"`, `LS_COLORS`, and
+    // `SSH_CONNECTION="1.2.3.4 22 5.6.7.8 22"` are values that happen to contain one, and treating
+    // them as recipes meant the shell *ran* them and kept whatever came back — so `$SSH_CONNECTION`
+    // became the output of trying to execute an IP address. Substitution is what marks a recipe,
+    // and substitution has a syntax: `$(…)` or backticks.
+    !body.is_empty() && !body.contains("$(") && !body.contains('`')
 }
 
 /// One stored thing.

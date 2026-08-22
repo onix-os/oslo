@@ -228,3 +228,43 @@ fn removing_it_takes_the_recipe_back() {
     shell.macros(&["remove", "--var", "TEMPORARY"]);
     assert!(shell.at_a_prompt("echo [$TEMPORARY]").contains("[]"));
 }
+
+/// **An inherited variable containing a space survives an interactive shell.**
+///
+/// This is the regression that broke a prompt. Every exported variable is written into
+/// `elsewhere.snapshot` so the manager can list what is defined that you did not store — and that
+/// list is applied back. While a stored variable deferred to one already set, applying it was a
+/// no-op. Once stored variables started winning, the round trip became live, and `is_a_value`
+/// classified anything containing whitespace as a *recipe*: `SSH_CONNECTION` was unset and replaced
+/// by the output of trying to execute an IP address, so `$SSH_CONNECTION` came back as `1.2.3.4` and
+/// a prompt segment keyed on it went blank.
+///
+/// Interactive, because the macro store is only applied by the REPL — `oslo -c` never showed it.
+#[test]
+fn an_inherited_value_with_spaces_is_not_run_as_a_command() {
+    let shell = Shell::new();
+    let mut child = Command::new(oslo_bin())
+        .arg("-i")
+        .env("XDG_DATA_HOME", shell.data.path())
+        .env("XDG_CONFIG_HOME", shell.data.path().join("config"))
+        .env("SSH_CONNECTION", "1.2.3.4 22 5.6.7.8 22")
+        .env("WITHSPACE", "alpha beta gamma")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .expect("spawn oslo");
+    child
+        .stdin
+        .as_mut()
+        .expect("stdin")
+        .write_all(b"echo [$SSH_CONNECTION] [$WITHSPACE]\n")
+        .expect("write");
+    let out = child.wait_with_output().expect("wait");
+    let said = String::from_utf8_lossy(&out.stdout);
+    assert!(
+        said.contains("[1.2.3.4 22 5.6.7.8 22]"),
+        "the value was cut at the first space, or run as a command\n{said:?}"
+    );
+    assert!(said.contains("[alpha beta gamma]"), "{said:?}");
+}
