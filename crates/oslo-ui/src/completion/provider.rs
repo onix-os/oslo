@@ -109,6 +109,22 @@ pub fn forget() {
     ANY.with(|any| any.set(false));
 }
 
+/// Drop the provider called `name`, answering whether there was one.
+///
+/// **`ANY` is re-set from the list rather than left alone.** It is the flag every Tab press checks
+/// before paying for a walk; leaving it true once the last provider has gone means the cost stays
+/// after the reason for it is over.
+pub fn forget_named(name: &str) -> bool {
+    PROVIDERS.with(|slot| {
+        let mut providers = slot.borrow_mut();
+        let before = providers.len();
+        providers.retain(|provider| provider.name != name);
+        let removed = providers.len() != before;
+        ANY.with(|any| any.set(!providers.is_empty()));
+        removed
+    })
+}
+
 pub fn names() -> Vec<String> {
     PROVIDERS.with(|slot| slot.borrow().iter().map(|p| p.name.clone()).collect())
 }

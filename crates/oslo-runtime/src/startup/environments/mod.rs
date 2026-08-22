@@ -76,6 +76,11 @@ pub(super) fn arrive(env: &Mutex<Environment>, lua: &LuaEngine, dir: &Path) {
                 outcome
             },
             &mut || {
+                // **The file's own callbacks first, then the prompt.** A callback that installed
+                // the prompt should see it while taking it down, and both run here — before
+                // `Direnv::unload` takes the environment lock — which is what gives them the whole
+                // API rather than the handful of calls that do not reach the shell.
+                crate::lua::api::direnv::run_unload();
                 if let Some(previous) = PREVIOUS_PROMPT.with(|slot| slot.borrow_mut().take()) {
                     lua.restore_prompt(previous);
                 }
@@ -85,6 +90,10 @@ pub(super) fn arrive(env: &Mutex<Environment>, lua: &LuaEngine, dir: &Path) {
     if let Some(base) = base_prompt {
         PREVIOUS_PROMPT.with(|slot| *slot.borrow_mut() = Some(base));
     }
+    // After the whole arrival, for the reason `PREVIOUS_PROMPT` is written here rather than inside
+    // the load: the unload half runs *during* `arrive`, so anything the incoming file registered
+    // must not be visible to it.
+    crate::lua::api::direnv::promote_unload();
     for event in events.unwrap_or_default() {
         report::event(&event);
         // The detail belongs under the failure it explains, and nowhere else — a successful load
@@ -171,18 +180,44 @@ fn capturing<T>(f: impl FnOnce() -> T) -> (T, String) {
 }
 
 /// Run an `.env.lua`, which may set more than variables.
+///
+/// **The working directory is the file's own, exactly as it is for an `.envrc`.** It was not, and
+/// that was a real bug rather than an inconsistency: a `.env.lua` one directory up saying
+/// `oslo.env.path_add("./bin")`, entered as `cd ~/proj/app/src`, resolved `./bin` against
+/// `app/src` — so it put a directory that does not exist onto `$PATH`, silently, and left it there
+/// for as long as you stood in the project. Every relative path in the file had the same problem,
+/// and which answer you got depended on how deep you happened to walk in.
+///
+/// Restored afterwards whatever happens, panic included, for the reason [`source_envrc`] gives: a
+/// shell left standing in a directory the user did not walk into is a far worse outcome than a
+/// directory environment that failed.
 fn source_lua(lua: &LuaEngine, rc: &Rc) -> Result<(), String> {
     let source = std::fs::read_to_string(&rc.path).map_err(|e| e.to_string())?;
+    let Some(home) = rc.path.parent().map(Path::to_path_buf) else {
+        return Err("the file has no directory".to_string());
+    };
     // **`oslo.mark()` inside one of these means the file's directory, not the shell's.** A
     // `.env.lua` governs everything below it, so walking straight into `app/src/deep` runs
     // `app/.env.lua` with the shell three levels down — and a mark that took the shell's word for
     // it would name `deep` after the project. Dropped on the way out, raise or no raise.
-    let _loading = rc
-        .path
-        .parent()
-        .map(crate::lua::api::mark::Loading::directory);
-    lua.eval_as(&source, &rc.path.to_string_lossy())
-        .map_err(|e| e.to_string())
+    //
+    // It is also what `oslo.direnv.dir()` answers with, so the file can name its own directory
+    // rather than inferring it from a working directory that used to be somewhere else entirely.
+    let _loading = crate::lua::api::mark::Loading::directory(&home);
+
+    let came_from = std::env::current_dir().ok();
+    std::env::set_current_dir(&home).map_err(|e| e.to_string())?;
+    let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        lua.eval_as(&source, &rc.path.to_string_lossy())
+            .map_err(|e| e.to_string())
+    }));
+    if let Some(back) = came_from {
+        let _ = std::env::set_current_dir(back);
+    }
+    match outcome {
+        Ok(result) => result,
+        Err(panic) => std::panic::resume_unwind(panic),
+    }
 }
 
 /// Run an `.envrc`, which is shell, with direnv's stdlib in scope.

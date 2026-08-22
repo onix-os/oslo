@@ -26,9 +26,12 @@
 
 mod ask;
 mod block;
+mod find;
+mod heading;
 mod layout;
 mod look;
 mod prompt;
+mod styling;
 mod text;
 
 use super::util::{ok, put};
@@ -42,6 +45,9 @@ pub fn install(ui: &mut Table) {
     terminal(ui);
     text::install(ui);
     block::install(ui);
+    find::install(ui);
+    heading::install(ui);
+    styling::install(ui);
     layout::install(ui);
     ask::install(ui);
     prompt::install(ui);

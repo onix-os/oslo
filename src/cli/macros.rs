@@ -20,6 +20,17 @@ pub fn run(args: &[String]) -> i32 {
         return 0;
     };
     let rest = &args[1..];
+    // **A flag that silently does nothing is worse than one that does not exist.** `--replace` is
+    // parsed by the shared argument reader, so every subcommand accepted it — and only `import`
+    // ever read it, where it means "forget everything stored first". `oslo macros add --replace`
+    // therefore looked like it asked for something and asked for nothing. Refused here rather than
+    // in `add`, because `remove` and `edit` took it just as meaninglessly.
+    if command != "import" && rest.iter().any(|word| word == "--replace") {
+        return usage(&format!(
+            "--replace is only for `import`, where it means forget everything stored first; \
+             `{command}` has no use for it"
+        ));
+    }
     match command {
         "add" => add(rest),
         "remove" | "rm" => remove(rest),
@@ -182,6 +193,28 @@ fn add(args: &[String]) -> i32 {
         Err(problem) => return fail(&problem),
     };
 
+    // **`add` is where an ambiguous name is created, and it was the one command that allowed it.**
+    // `remove` and `edit` both refuse a name owned by more than one kind and ask which was meant —
+    // `macros.rs` calls the state "a mistake rather than a feature" — but nothing stopped it being
+    // made. So the two commands that refuse were refusing a state only this one could produce.
+    //
+    // Before the editor opens, so a refusal does not cost a writing session. Storing over the *same*
+    // kind is an ordinary update and is not this.
+    if let Some(other) = macros::kinds_of(&store, &name)
+        .into_iter()
+        .find(|owner| *owner != kind)
+    {
+        return fail(&format!(
+            "{name} is already a {}: remove that first, or choose another name",
+            other.word()
+        ));
+    }
+
+    // **Before the editor opens, the same as `edit`.** A function or a script is reached only once
+    // `$PATH` has failed, so one that `$PATH` already answers is being written for nothing — and
+    // hearing that after a writing session is hearing it too late.
+    warn_if_shadowed(kind, &name);
+
     let body = if editor_only || asked.edit || inline.is_empty() {
         let starting = if inline.is_empty() {
             macros::get(&store, kind, &name)
@@ -204,18 +237,6 @@ fn add(args: &[String]) -> i32 {
 
     if body.trim().is_empty() {
         return fail("nothing to store: the body is empty");
-    }
-    // **A stored variable is what a name means when nothing else has said**, so one that is already
-    // in the environment would never be reached — and finding that out by wondering why nothing
-    // changed is a bad afternoon. The shell will not overrule the parent that started it; saying so
-    // here is the only warning there is a place for.
-    if kind == Kind::Var
-        && let Ok(already) = std::env::var(&name)
-    {
-        eprintln!(
-            "oslo macros: {name} is already set to {already:?} by something else, so this applies \
-             only where it is not"
-        );
     }
     // The tags asked for, or — when none were — whatever it already had, so editing a macro does
     // not silently strip its labels.
@@ -401,13 +422,7 @@ fn edit(args: &[String]) -> i32 {
     // once `$PATH` has failed, so a file of the same name on `$PATH` is what actually runs — and
     // editing the stored one would be editing something the shell never reaches. Whoever asked for
     // this should know that while they still have the choice of editing the other file instead.
-    if let Some(path) = shadowing_file(kind, name) {
-        eprintln!("oslo macros: {name} runs from {path} — this is the stored copy, and `$PATH`");
-        eprintln!(
-            "oslo macros: wins over it. Edit that file, or take it off `$PATH`, if you meant"
-        );
-        eprintln!("oslo macros: the one that runs.");
-    }
+    warn_if_shadowed(kind, name);
 
     match oslo_runtime::editor::edit(&entry.body, kind.extension(&entry.body)) {
         Ok(None) => {
@@ -423,6 +438,22 @@ fn edit(args: &[String]) -> i32 {
         },
         Err(problem) => fail(&problem),
     }
+}
+
+/// Say so when `$PATH` already answers to this name, so a stored copy that can never run is not
+/// stored in silence.
+///
+/// **Called by `add` as well as `edit`, which it was not.** The message was written for `edit`
+/// only, so `oslo macros add --script date` stored something the shell would never reach and said
+/// nothing at all — and `oslo macros edit date`, afterwards, explained why. The moment worth
+/// warning at is the one where the thing is created.
+fn warn_if_shadowed(kind: Kind, name: &str) {
+    let Some(path) = shadowing_file(kind, name) else {
+        return;
+    };
+    eprintln!("oslo macros: {name} runs from {path} — this is the stored copy, and `$PATH`");
+    eprintln!("oslo macros: wins over it. Edit that file, or take it off `$PATH`, if you meant");
+    eprintln!("oslo macros: the one that runs.");
 }
 
 /// The file on `$PATH` that would answer to `name` before a stored macro does.

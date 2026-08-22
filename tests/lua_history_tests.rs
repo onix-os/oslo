@@ -165,7 +165,7 @@ impl Drop for Shell {
 const ASKING: &str = r#"
 oslo.misc.welcome = false
 
-oslo.register_builtin("mine", function()
+oslo.register_builtin{ name = "mine", run = function()
   for _, c in ipairs(oslo.history.commands{ limit = 200 }) do
     if c.line:find("marker", 1, true) then
       print("ROW " .. c.line .. " runs=" .. c.runs .. " worked=" .. tostring(c.worked)
@@ -175,12 +175,12 @@ oslo.register_builtin("mine", function()
   end
   print("ASKED")
   return 0
-end)
+end }
 
-oslo.register_builtin("drop", function(argv)
+oslo.register_builtin{ name = "drop", run = function(argv)
   print("GONE " .. oslo.history.forget(argv[2]))
   return 0
-end)
+end }
 "#;
 
 /// **What was run comes back, with the facts the tracker kept.** A flat history file could answer

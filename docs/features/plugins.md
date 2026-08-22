@@ -53,14 +53,14 @@ return {
 -- init.lua
 local db = oslo.db.open("notes")
 
-oslo.register_builtin("note", function(argv)
+oslo.register_builtin{ name = "note", run = function(argv, shell)
   if argv[2] then
     db:set(os.date("%Y-%m-%dT%H:%M:%S"), argv[2])
   else
     for _, key in ipairs(db:keys()) do print(key .. "  " .. db:get(key)) end
   end
   return 0
-end)
+end }
 ```
 
 ```sh

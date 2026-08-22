@@ -109,18 +109,44 @@ pub fn publish(entries: &[Entry]) -> Result<(), String> {
     }
     std::fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
 
+    // **A file oslo did not write is somebody else's on the way *in* as well as on the way out.**
+    // The removal loop below has always said so; this one did not, so publishing a script called
+    // `deploy` replaced a hand-placed `deploy` in this directory without a word. The manifest is
+    // the same answer to the same question, asked one step earlier.
+    let mut refused: Vec<String> = Vec::new();
+    let mut now: Vec<String> = Vec::new();
     for entry in &wanted {
-        write_one(&dir.join(&entry.name), &entry.body)?;
+        let target = dir.join(&entry.name);
+        if target.exists() && !written.contains(&entry.name) {
+            refused.push(entry.name.clone());
+            continue;
+        }
+        write_one(&target, &entry.body)?;
+        now.push(entry.name.clone());
     }
 
     // **Only what oslo wrote**, which is what the manifest is for. A file in this directory that
     // oslo did not put there is somebody else's and is left alone, even though the directory is
     // meant to be oslo's — the cost of being wrong about that is deleting a person's script.
-    let now: Vec<String> = wanted.iter().map(|entry| entry.name.clone()).collect();
     for gone in written.iter().filter(|name| !now.contains(name)) {
         let _ = std::fs::remove_file(dir.join(gone));
     }
-    write_manifest(&dir, &now)
+    write_manifest(&dir, &now)?;
+    // Reported after everything that *could* be written has been, so one refusal does not cost the
+    // rest of the publish. The script is stored either way; what it does not have is a file.
+    if refused.is_empty() {
+        return Ok(());
+    }
+    Err(format!(
+        "{} already holds {} that oslo did not write, so {} not published — rename yours, or move that file",
+        dir.display(),
+        refused.join(", "),
+        if refused.len() == 1 {
+            "it was"
+        } else {
+            "they were"
+        }
+    ))
 }
 
 /// One script, executable, replaced through a rename so nothing ever reads half of it.

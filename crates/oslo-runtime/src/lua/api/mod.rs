@@ -12,7 +12,7 @@
 //! Nothing here reimplements shell behaviour. `oslo.sys.cd` runs the `cd` builtin and `oslo.glob`
 //! calls the shell's own globber, so the two interfaces cannot drift apart.
 
-use crate::lua::engine::{BUILTIN_KEY_PREFIX, PROMPT_KEY, Registry, borrow_env, call_lua_builtin};
+use crate::lua::engine::{BUILTIN_KEY_PREFIX, PROMPT_KEY, Registry, borrow_env};
 use oslo_base::value::LuaError;
 use oslo_base::value::{Table, Value};
 use oslo_luavm::Host;
@@ -21,13 +21,16 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
+#[cfg(feature = "argc")]
+mod args;
 mod builtin;
 mod complete;
 mod convert;
 mod db;
 mod digest;
 #[cfg(feature = "direnv")]
-mod direnv;
+pub(crate) mod direnv;
+mod env;
 mod envlist;
 pub(crate) mod external;
 /// `oslo.feature` — turning parts of the shell off and on while it runs.
@@ -57,6 +60,7 @@ mod procinfo;
 pub(crate) mod prompt;
 mod publish;
 mod re;
+mod rows;
 mod run;
 #[cfg(feature = "secrets")]
 mod secret;
@@ -67,10 +71,12 @@ mod spec;
 mod state;
 mod suggest;
 mod term;
+mod theme;
 pub(crate) mod timer;
 pub(crate) mod tool;
 mod ui;
 mod watch;
+mod word;
 
 pub mod hooks;
 pub(crate) use shell::handlers as hook_handlers;
@@ -155,6 +161,10 @@ pub fn install(host: &dyn Host, registry: &Registry, env: Arc<Mutex<Environment>
     // replacing it: `oslo.history` is one subject and should not be two tables. See [`history`].
     extend(&mut oslo, "history", history::build());
 
+    // Painting, merged into the settings table of the same name: a config fills `oslo.theme` with
+    // data, and these are the two entries in it that are functions. See [`theme`].
+    extend(&mut oslo, "theme", theme::build());
+
     // `oslo.builtin` is the same thing one level deeper: it is a namespace *per builtin*, so
     // `oslo.builtin.rm.to_tmp = true` indexes twice and both tables have to be here. A new
     // builtin with settings adds a line beside `rm`.
@@ -188,6 +198,8 @@ pub fn install(host: &dyn Host, registry: &Registry, env: Arc<Mutex<Environment>
         spec::install(&mut completion.borrow_mut());
         // `oslo.completion.provider` — candidates computed at Tab time, merged with oslo's own.
         complete::install(&mut completion.borrow_mut());
+        // `oslo.completion.forget(name)` — the other half, which registration never had.
+        complete::forget::install(&mut completion.borrow_mut());
     }
     // `oslo.suggest.provider` — a ghost written in Lua. In the settings table for the same reason:
     // `oslo.suggest.sh_sources` is next to it, and the two are read together.
@@ -211,6 +223,7 @@ pub fn install(host: &dyn Host, registry: &Registry, env: Arc<Mutex<Environment>
     oslo.set_str("hex", digest::hex());
     oslo.set_str("base64", digest::base64());
     oslo.set_str("re", re::build());
+    oslo.set_str("word", word::build());
     oslo.set_str("proc", proc::build_proc());
     oslo.set_str("job", proc::build_job());
 
@@ -233,7 +246,7 @@ pub fn install(host: &dyn Host, registry: &Registry, env: Arc<Mutex<Environment>
     // to no group: `glob`, and the two `register_*` hooks that extend the shell.
     ui::install(&mut ui);
     commands(&mut process, &env);
-    variables(&mut variables_t, &env);
+    env::install(&mut variables_t, &env);
     filesystem(&mut oslo, &mut system, &env);
     shell(
         &mut oslo,
@@ -253,6 +266,8 @@ pub fn install(host: &dyn Host, registry: &Registry, env: Arc<Mutex<Environment>
     oslo.set_str("sys", Value::table(system));
     // What this terminal can do, asked of the terminal itself. See [`term`].
     oslo.set_str("term", Value::table(term::build()));
+    // The structured verbs as plain functions. See [`rows`].
+    oslo.set_str("rows", rows::build());
     oslo.set_str("ui", Value::table(ui));
     optional::install(&mut oslo, host, &env);
     let oslo = Value::table(oslo);
@@ -356,53 +371,6 @@ fn commands(oslo: &mut Table, env: &Arc<Mutex<Environment>>) {
         }
         Ok(vec![Value::table(result)])
     });
-}
-
-/// Shell and environment variables.
-fn variables(oslo: &mut Table, env: &Arc<Mutex<Environment>>) {
-    let env_get = Arc::clone(env);
-    put(oslo, "get", move |_, args| {
-        let name = text(&args, 1, "oslo.env.get")?;
-        Ok(vec![match borrow_env(&env_get)?.get_param(&name) {
-            Some(value) => Value::str(value),
-            None => Value::Nil,
-        }])
-    });
-
-    let env_set = Arc::clone(env);
-    put(oslo, "set", move |_, args| {
-        let name = text(&args, 1, "oslo.env.set")?;
-        let value = text(&args, 2, "oslo.env.set")?;
-        borrow_env(&env_set)?.set_var(&name, &value, true);
-        Ok(Vec::new())
-    });
-
-    // oslo.env.unset(name) -> true. The other half of set_var; without it a script could create a
-    // variable and never remove one.
-    let env_unset = Arc::clone(env);
-    put(oslo, "unset", move |_, args| {
-        let name = text(&args, 1, "oslo.env.unset")?;
-        borrow_env(&env_unset)?.unset_var(&name);
-        Ok(vec![Value::Bool(true)])
-    });
-
-    // oslo.env.all() -> { NAME = value, ... }, the exported environment as one table.
-    //
-    // `get_var` answers one name at a time, which cannot express "what is set?" — a script could
-    // not iterate the environment, filter it, or copy it. Exported names only: those are what a
-    // child process would see, which is the question a script is usually asking.
-    let env_all = Arc::clone(env);
-    put(oslo, "all", move |_, _| {
-        let guard = borrow_env(&env_all)?;
-        let mut table = Table::new();
-        for (name, value) in guard.exported_vars() {
-            table.set(Value::str(name), Value::str(value));
-        }
-        Ok(vec![Value::table(table)])
-    });
-
-    // `$PATH` and its relatives as the lists they are. See [`super::envlist`].
-    envlist::install(oslo, env);
 }
 
 /// The working directory and pathname expansion.
@@ -573,8 +541,14 @@ fn shell(
 
         let mut guard = borrow_env(&env_builtin)?;
         let key = declared.name.clone();
-        guard.register_dynamic_builtin(&declared.name, move |_env, args| {
-            Ok(call_lua_builtin(&key, args))
+        // **`env` is used, not discarded.** It was `|_env, args|` — a live, exclusive
+        // `&mut Environment` bound and thrown away, while the Lua body reached back for the same
+        // state through a lock the frame above was already holding. `register_dynamic_builtin`
+        // clones the callback out of the registry precisely so this closure can hold one; its own
+        // comment says so. The capability was designed in and never used.
+        let wants = declared.wants;
+        guard.register_dynamic_builtin(&declared.name, move |env, args| {
+            Ok(builtin::call::call(env, &key, wants, args))
         });
         Ok(Vec::new())
     });

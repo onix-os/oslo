@@ -419,3 +419,111 @@ make.recipe{ name = "same", run = function() end }
     );
     assert!(err(&project.make(&["same"])).contains("declared twice"));
 }
+
+/// **A rebuild inside one second is still a rebuild.**
+///
+/// `oslo.fs.stat` reported `mtime` in whole seconds and the runner compared those, so an input
+/// edited and an output written within the same second compared equal — and `oslo make` printed
+/// `· art  up to date` while the output still held the previous content. The fast inner loop is
+/// exactly where a build finishes inside one second, so it was worst where it mattered most.
+///
+/// No sleep here, deliberately: the sleep is what used to hide it.
+#[test]
+fn a_rebuild_inside_one_second_is_not_reported_up_to_date() {
+    let project = Project::new(
+        r#"
+local make = oslo.make
+make.recipe{ name = "art", inputs = { "src.txt" }, outputs = { "out.bin" },
+  run = function() sh.cp("src.txt", "out.bin") end }
+"#,
+    );
+    project.write("src.txt", "v1\n");
+    project.make(&["art"]);
+    assert_eq!(project.read("out.bin"), "v1\n");
+
+    project.write("src.txt", "v2\n");
+    let second = project.make(&["art"]);
+    assert!(
+        !out(&second).contains("up to date"),
+        "a changed input was called up to date: {}",
+        out(&second)
+    );
+    assert_eq!(
+        project.read("out.bin"),
+        "v2\n",
+        "the stale output survived the rebuild"
+    );
+}
+
+/// The nanosecond field the runner compares is on every entry, and it is a whole timestamp rather
+/// than a sub-second remainder — so two files compare with one `<`.
+#[test]
+fn stat_reports_whole_nanoseconds() {
+    let project = Project::new(
+        r#"
+local make = oslo.make
+make.recipe{ name = "probe", run = function()
+  local a = oslo.fs.stat(".make.lua")
+  print("ns=" .. tostring(a.mtime_ns) .. " s=" .. tostring(a.mtime))
+  print("integer=" .. tostring(math.type(a.mtime_ns)))
+  print("consistent=" .. tostring(a.mtime_ns // 1000000000 == a.mtime))
+end }
+"#,
+    );
+    let said = out(&project.make(&["probe"]));
+    assert!(said.contains("integer=integer"), "{said}");
+    assert!(
+        said.contains("consistent=true"),
+        "mtime_ns is not the same instant as mtime: {said}"
+    );
+}
+
+// ────────────────────────────────────────────────── background work, which did not work at all
+
+/// **The bug this closes.** `oslo.spawn` inside a recipe queued its result and nothing ever
+/// delivered it: the nudge goes into a self-pipe only the line editor polls, and `oslo make` never
+/// enters a REPL. The callback simply never ran, silently, and the recipe reported success.
+#[test]
+fn a_recipe_can_spawn_and_wait() {
+    let project = Project::new(
+        r#"
+oslo.make.recipe{ name = "parallel", run = function()
+  local job = oslo.spawn{ "sh", "-c", "echo from-a-worker" }
+  local said, status = job:wait(15000)
+  print("got=[" .. tostring(said):gsub("%s+$","") .. "] status=" .. tostring(status))
+end }
+"#,
+    );
+    let run = project.make(&["parallel"]);
+    assert!(
+        out(&run).contains("got=[from-a-worker]"),
+        "stdout={} stderr={}",
+        out(&run),
+        err(&run)
+    );
+    assert_eq!(code(&run), 0, "{}", err(&run));
+}
+
+/// And the shape a recipe actually wants: start several, then wait for all of them.
+#[test]
+fn a_recipe_can_settle_several_at_once() {
+    let project = Project::new(
+        r#"
+oslo.make.recipe{ name = "fan", run = function()
+  local done = 0
+  for i = 1, 3 do
+    oslo.spawn{ "sh", "-c", "sleep 0.1; true", on_exit = function() done = done + 1 end }
+  end
+  local r = oslo.settle{ timeout_ms = 20000 }
+  print("settled=" .. tostring(r.settled) .. " done=" .. done)
+end }
+"#,
+    );
+    let run = project.make(&["fan"]);
+    assert!(
+        out(&run).contains("settled=true done=3"),
+        "callbacks did not run inside a recipe\nstdout={} stderr={}",
+        out(&run),
+        err(&run)
+    );
+}

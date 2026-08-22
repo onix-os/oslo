@@ -24,16 +24,16 @@ use super::super::util::{ok, put};
 use oslo_base::value::{Table, Value};
 use oslo_ui::ask::chrome::{Chrome, Fit, Place};
 use oslo_ui::ask::{
-    Align, Answer, As, Border, Browse, Choice, Confirm, Entry, Input, Level, Pager, Spin, Styling,
+    Align, Answer, As, Border, Browse, Choice, Confirm, Entry, Input, Level, Pager, Spin,
     Table as Rows, Want, Write, choose, confirm, file, filter, format, horizontal, input, line,
-    pager, parse_table, spin, style, table, vertical, write,
+    pager, parse_table, spin, table, vertical, write,
 };
 use oslo_ui::theme;
 use std::cell::RefCell;
 use std::rc::Rc;
 
 /// A string field, or the empty string.
-fn field(table: &Table, name: &str) -> String {
+pub(super) fn field(table: &Table, name: &str) -> String {
     match table.get(&Value::str(name)) {
         Value::Str(s) => s.to_string(),
         _ => String::new(),
@@ -76,7 +76,7 @@ pub(super) fn size(table: &Table, name: &str, fallback: usize) -> usize {
 ///
 /// An empty table stands in for a missing argument, which is what makes every field optional
 /// without a branch at each one.
-fn spec(args: &[Value]) -> Rc<RefCell<Table>> {
+pub(super) fn spec(args: &[Value]) -> Rc<RefCell<Table>> {
     match args.first() {
         Some(Value::Table(t)) => Rc::clone(t),
         _ => Rc::new(RefCell::new(Table::new())),
@@ -473,66 +473,6 @@ pub fn install(ui: &mut Table) {
             }
             .as_str(),
         ))
-    });
-
-    // oslo.ui.style(text | {text=, …}) or oslo.ui.style(text, {…})
-    //
-    // **Both call shapes, and the second one is a bug fix.** `oslo.ui.style("hi", {fg="green"})`
-    // used to take the string, drop the spec on the floor and hand back unpainted text — every
-    // option silently ignored. It is the shape anyone writes first, and it is the shape the other
-    // `oslo.ui.style` (in `api::prompt`, which this one shadows) accepted.
-    put(ui, "style", |_, args| {
-        let mut settings = Styling::default();
-        // The spec is argument two when the text came first, and argument one otherwise.
-        let leading_text = matches!(args.first(), Some(Value::Str(_)));
-        let args: Vec<Value> = match (leading_text, args.get(1)) {
-            (true, Some(Value::Table(spec))) => {
-                // The caller's spec, with the text folded in, so everything below reads one table
-                // whichever shape was written.
-                let mut merged = Table::new();
-                for (key, value) in spec.borrow().pairs() {
-                    merged.set(key, value);
-                }
-                merged.set_str("text", args[0].clone());
-                vec![Value::table(merged)]
-            }
-            _ => args,
-        };
-        match args.first() {
-            Some(Value::Str(text)) => settings.text = text.to_string(),
-            Some(Value::Table(_)) => {
-                let t = spec(&args);
-                let t = t.borrow();
-                settings.text = field(&t, "text");
-                if let Some(name) = maybe(&t, "border") {
-                    match Border::parse(&name) {
-                        Some(border) => settings.border = border,
-                        None => {
-                            return crate::lua::api::util::failed(
-                                "oslo.ui.style",
-                                format!("{name}: not a border"),
-                            );
-                        }
-                    }
-                }
-                settings.style.fg = maybe(&t, "fg").and_then(|c| theme::Color::parse(&c));
-                settings.style.bg = maybe(&t, "bg").and_then(|c| theme::Color::parse(&c));
-                if let Some(c) = maybe(&t, "border_fg").and_then(|c| theme::Color::parse(&c)) {
-                    settings.border_style.fg = Some(c);
-                }
-                settings.style.bold = flag(&t, "bold");
-                settings.padding_x = size(&t, "padding_x", 0);
-                settings.padding_y = size(&t, "padding_y", 0);
-                settings.width = match t.get_str("width") {
-                    Value::Number(n) => n.as_int().map(|i| i.max(0) as usize),
-                    _ => None,
-                };
-            }
-            _ => {}
-        }
-        // Returned rather than printed: a caller may want to put it in a variable, and
-        // `print(oslo.ui.style{…})` is the other half of that in one more character.
-        ok(Value::str(style(&settings).as_str()))
     });
 }
 

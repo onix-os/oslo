@@ -83,5 +83,26 @@ end)
 Nothing has to ask for a redraw afterwards. A prompt whose inputs have changed is drawn again on its
 own, which is why there is no `oslo.ui.redraw` to call.
 
+## Waiting, where there is no prompt to wait at
+
+A safe point needs something to arrive at, and a script or a `.make.lua` never reaches one — so a
+spawn there used to queue its result and have nobody ever look. Two calls block until it does:
+
+```lua
+local job = oslo.spawn{ "cargo", "build" }
+local out, status = job:wait(60000)     --> out, status — or nil, why
+
+for _, crate in ipairs(crates) do oslo.spawn{ "cargo", "build", "-p", crate } end
+oslo.settle{ timeout_ms = 600000 }      --> { fired = 4, outstanding = 0, settled = true }
+```
+
+Both wait on the same descriptors the line editor polls, so they return the instant a worker
+finishes. `on_exit` still fires for a job that was also waited on — "always" would be a poor promise
+otherwise. Waiting on one that was cancelled, or whose callback already ran, answers `nil` and says
+which rather than blocking for a result that is not coming.
+
+**Interactively you want neither.** At a prompt the callback arrives on its own, and blocking the
+shell to wait for it is the thing `oslo.spawn` exists to avoid.
+
 See [hooks](hooks.md) for the other way to have code run without typing it, and
 [the Lua interpreter](lua-interpreter.md) for what the language itself is.

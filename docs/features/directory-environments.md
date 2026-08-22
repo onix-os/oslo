@@ -73,10 +73,114 @@ is to call `oslo.env.set` and friends, which take the same lock with `try_lock`,
 every one of them fail with "shell state is busy" while the load reported success. A file that
 failed half way still had its first half take effect, so the diff is taken regardless.
 
+### Both files run in their own directory
+
+`.envrc` has always been `cd`-ed to before it runs, because direnv does it and half the files in the
+world say `PATH_add ./bin`. **`.env.lua` did not**, and that was a bug rather than a difference:
+`~/proj/.env.lua` saying `oslo.direnv.path_add("./bin")`, entered as `cd ~/proj/app/src`, resolved
+`./bin` against `app/src` and put a directory that does not exist onto `$PATH` — silently, and for as
+long as you stood in the project. Which answer you got depended on how deep you walked in, so it
+worked from the project root and only ever failed for somebody in a subdirectory.
+
+Both now chdir, and both restore the shell's own directory afterwards whatever happens, panic
+included: a shell left standing somewhere the user did not walk to is a far worse outcome than an rc
+file that failed. `tests/directory_environment_tests.rs` is what keeps the two in step.
+
+`oslo.direnv.dir()` answers with that directory, for a path being *stored* rather than used — a cache
+location, a marker written into `oslo.state`, a value handed to something that runs later — where
+`"./thing"` stops meaning anything the moment the shell moves on. It is `nil` outside a directory
+environment, which is the honest answer in `init.lua` and in `oslo make`.
+
 Nearest ancestor wins outright; loading every ancestor would make an outer file's effect depend on
 how deep you happened to be standing. A directory holding both names is governed by `.env.lua`, and
 `direnv status` names the shadowed file, because being inert looks exactly like working until you
 notice that nothing it sets is set.
+
+### A question that may not take forever
+
+This file runs on the `cd` path, synchronously, before the prompt is drawn — and the things it
+naturally asks are the slow ones. `git ls-remote` against a host that is down, a cold `nix eval`, a
+`stat` on an NFS mount that has gone away: any of them hangs **every `cd` into that subtree**, with
+no way out but SIGINT.
+
+```lua
+local r = oslo.run{ "git", "ls-remote", "--heads", "origin",
+                    capture = true, timeout_ms = 800, on_timeout = "KILL" }
+if r.timed_out then oslo.env.set("BRANCH_STATE", "unknown") end
+```
+
+`timed_out` is on every result, always a boolean, so a caller can test it without having set a
+deadline. What the command wrote before the deadline is kept. `on_timeout` is `"TERM"` (the default)
+or `"KILL"`, and it is *which signal is sent*, not an escalation ladder — a caller who needs to
+outlast a `trap '' TERM` says `"KILL"`.
+
+**A deadline forces the command into a child.** Without one, a call with nothing to capture runs in
+this shell — that is what makes `sh.cd("/tmp")` move it — and there is nothing there to interrupt,
+because that path dispatches builtins and shell functions in-process. So
+`oslo.run{"cd", "/tmp", timeout_ms = 100}` runs in a child and no longer moves the shell. That is
+the honest reading of a timeout: you cannot interrupt the thing that *is* the shell.
+
+The signal goes to a process group created for the command, so it reaches what the command itself
+started rather than only the shell wrapping it.
+
+### Leaving, and what else counts as a change
+
+Variables and aliases are put back by the undo record. Everything *else* a file did had no moment at
+which to be undone, and a file could not say that anything other than itself should trigger a reload.
+
+```lua
+oslo.direnv.watch_file(".tool-versions", "flake.lock")  -- reload when these change too
+oslo.direnv.watch_dir("config")                          -- entries added or removed
+oslo.direnv.on_unload(function()                         -- a moment on the way out
+  oslo.completion.forget("projtool")
+end)
+```
+
+`on_unload` may be called more than once and runs **last-registered-first**, so a file tears down in
+the reverse of the order it set up. It runs **before the variables are put back** — the unload path
+releases the environment lock first, deliberately, so a prompt function reading a variable sees the
+directory's value — which means a callback has the *whole* API here, `oslo.env.get` and `oslo.run`
+included. One that raises is reported and the others still run: by that point the undo record is
+already being spent, and stopping half way would leave the directory's variables set with nothing
+left to remove them.
+
+`oslo.completion.forget(name)` is the other half of registering one, and answers **how many** of the
+three completion surfaces held that name — `0` when none did. Until now both registries could only
+be cleared entirely.
+
+**`watch_dir` watches the directory, not the files in it.** A directory's timestamp moves when an
+entry is added, removed or renamed and does not move when a file inside it is edited in place. So it
+notices `config/new.toml` appearing and does not notice `config/app.toml` changing. That is what
+`.envrc`'s `watch_dir` has always done; the two are one call so they cannot drift.
+
+Both watch calls are **refused outside a load**. The list is drained by the next arrival, so a call
+from a timer or a background callback would quietly attach a path to whichever unrelated project
+loaded next.
+
+### A variable the project keeps to itself
+
+`oslo.env.set` exports by default, and for a long time that was the only thing it could do — so a
+`.env.lua` could not create a variable without handing it to every child the project ever spawned.
+A project name, a chosen profile, a computed cache key: all of it reached the editor you launched
+from that directory, and then its crash report.
+
+```lua
+oslo.env.set("PROJECT", "oslo")                      -- exported, as before
+oslo.env.set("CACHE_KEY", key, { export = false })   -- this shell only
+oslo.env.all{ exported = false }                     -- everything, local included
+oslo.env.snapshot()                                  -- with the flag each one carries
+```
+
+Demoting a name that is *already* exported takes two steps inside the binding, and skipping the
+first is a silent no-op: `set_var` ORs the flag it is handed with the one the variable carries, so
+passing `false` alone changes nothing. Clearing the entry and writing it again is the only way down
+— the same dance the unload path does — guarded by a readonly check, because `unset_var` does not
+check and `set_var` does.
+
+There is deliberately **no `restore`**. Putting a snapshot back means removing what is set now and
+absent from it, and doing that across a `cd` would fight this file's own undo record — two
+mechanisms describing the same variables with no agreed order, and `PWD` alone would move the shell.
+Undoing a directory's work is what the undo record is for.
 
 ### The allow gate
 

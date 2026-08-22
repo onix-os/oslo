@@ -57,6 +57,25 @@ pub fn build_proc() -> Value {
         ok(Value::int(signal_named(&name)? as i64))
     });
 
+    // oslo.proc.parse(line) -> { { link, kind, argv, redirects }, … }, or nil
+    //
+    // **The shell's own parser, so a config stops splitting on whitespace.** A builtin or a hook
+    // handed a command line reaches for `gmatch("%S+")`, which is wrong for `cat 'a b'`, wrong for
+    // `echo $HOME`, and wrong for `a | b` — the exact three cases the parser's own header names.
+    //
+    // Pure, so it works inside a registered builtin where `oslo.run` raises. That is most of the
+    // reason to have it: the surface that cannot run a command is the one that most needs to
+    // understand one.
+    //
+    // `redirects` is a **count**, not a list — the same shape `pre-cmd` already receives, because
+    // this is that payload with a door on it. Changing it would break a documented hook.
+    put(&mut proc, "parse", |_, args| {
+        let line = text(&args, 1, "oslo.proc.parse")?;
+        // A line that does not parse answers nil rather than raising: the shell is about to report
+        // the syntax error far better than a caller could. See `crate::lua::parsed`.
+        ok(crate::lua::parsed::commands_of(&line).unwrap_or(Value::Nil))
+    });
+
     Value::table(proc)
 }
 

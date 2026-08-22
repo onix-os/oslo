@@ -111,6 +111,38 @@ A row whose expression raises is dropped and the failure is reported once — ke
 be worse, because a filter that quietly passes everything when it breaks is how a pipeline ending in
 `rm` removes the wrong thing.
 
+### The same verbs, as functions
+
+A pipeline is the only way to reach these from a *shell* line — and there is no pipeline inside
+`oslo make`, inside a registered builtin, or inside a completion provider. So a recipe that wanted
+rows sorted by a column wrote the sort again in Lua and got a different answer: `table.sort`
+compares `"100"` below `"9"`, and `sort-by` does not.
+
+```lua
+local rows = oslo.rows.from_json(oslo.run{"docker","ps","--format","json", capture=true}.out)
+local big  = oslo.rows.where(rows, "size > 1e9")
+print(oslo.rows.render(oslo.rows.sort_by(big, "name"), "table"))
+```
+
+| call | answers |
+|---|---|
+| `oslo.rows.where(rows, expr)` | the rows the expression is true for, and a message if it broke |
+| `oslo.rows.sort_by(rows, col)` / `.cols(rows, {…})` / `.get(rows, col)` | reshaped rows |
+| `oslo.rows.first(rows, n)` / `.last(rows, n)` | an end of the table |
+| `oslo.rows.length(rows)` | a **number**, not the one-row table the pipeline verb answers with |
+| `oslo.rows.group_by(rows, col)` / `.count(rows)` / `.distinct(rows, [col])` / `.stats(rows, col)` | summaries |
+| `oslo.rows.render(rows, "table"\|"text"\|"json")` | a string |
+| `oslo.rows.lines(text)` / `.parse(text, pattern)` / `.from_json(text)` | rows, read back in |
+
+A row is an ordinary Lua table, so anything that produces one — `oslo.json.decode`, a registered
+tool's handler, a table written by hand — is already input. **None of it touches the shell**, so all
+of it works in the three places a pipeline cannot go.
+
+`where` is the one worth knowing about: its expression is Lua, evaluated per row through the engine
+that is already running, so calling it from Lua re-enters the VM — and from a registered builtin,
+one frame deeper again. That works, and `tests/rows_verb_tests.rs` pins it, because the failure if it
+ever regresses is a panic in a prompt rather than a message anyone can read.
+
 ### Why a POSIX script cannot reach any of it
 
 Not care: **vocabulary disjointness**. Structure flows only between two stages that both carry a
@@ -205,6 +237,8 @@ which nothing carries rows.
   that never ends never returns.
 * **Structure cannot cross a process, a function or a compound command**, and a command name that
   comes out of an expansion — `$cmd foo` — is not known when the planner runs, so it is bytes.
+* **`oslo.rows` is not a pipeline.** It is the same verbs as functions; it does not make a script's
+  `|` carry rows, and it does not give a script the registered tools that produce them.
 * **A registered tool only exists at an interactive prompt.** `init.lua` is read by the REPL;
   `oslo -c` and `oslo script.sh` do not read it, so `hosts | where …` in a script is
   `hosts: command not found`.
@@ -230,6 +264,7 @@ which nothing carries rows.
 | `crates/oslo-shell/src/data/custom.rs` | `register`, `rows_of` — the table a config's tools live in |
 | `crates/oslo-shell/src/exec/pipeline/structured.rs` | `structured_sinks`, `run`, `capture` |
 | `crates/oslo-shell/src/exec/pipeline/mod.rs` | `run_stages` — the one line where the byte path can be left |
-| `crates/oslo-runtime/src/lua/api/tool.rs` | `oslo.register_tool` and `oslo.tools` |
+| `crates/oslo-runtime/src/lua/api/tool.rs` | `oslo.register_tool`, `oslo.tools`, and the Record↔Lua converters |
+| `crates/oslo-runtime/src/lua/api/rows.rs` | `oslo.rows` — the verbs as functions |
 | `src/main.rs` | `register_all` at startup, and `report_structured_audit` |
 | `tests/posix_stays_on_the_byte_path.rs` | the corpus assertion |

@@ -83,6 +83,11 @@ pub(crate) fn run(args: &[String]) -> i32 {
         eprintln!("oslo make: the Lua bindings could not be installed");
         return 1;
     }
+    // **Before any recipe can spawn.** A `.make.lua` never enters a REPL, so nothing was watching
+    // the pipe a finished worker nudges — `oslo.spawn` here queued its result and no callback ever
+    // ran. `job:wait()` and `oslo.settle()` are what do the looking now, and this is what gives
+    // them something to look at.
+    oslo_runtime::startup::lua_init::install_batch_delivery();
     for path in &files {
         oslo_runtime::startup::lua_init::load_config(&engine, path);
     }

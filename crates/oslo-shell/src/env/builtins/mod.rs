@@ -56,7 +56,6 @@ mod ui;
 /// `oslo userin …` — the same widgets as the `ui` builtin, for a shell that is not oslo.
 pub use ui::tool as userin_tool;
 mod ulimit;
-mod universal;
 mod variables;
 
 pub use builtin::builtin_builtin;
@@ -92,7 +91,6 @@ pub use status::builtin_status;
 pub use suspend::builtin_suspend;
 pub use times::builtin_times;
 pub use ulimit::builtin_ulimit;
-pub use universal::builtin_universal;
 pub use variables::{
     builtin_alias, builtin_export, builtin_local, builtin_readonly, builtin_set, builtin_shift,
     builtin_unalias, builtin_unset,
@@ -247,7 +245,6 @@ pub fn register_default_builtins(env: &mut Environment) {
     // `messages` — what this session said after it has scrolled off. A builtin rather than a tool
     // because the buffer is this process's memory; see its module docs.
     env.register_custom_builtin("messages", builtin_messages);
-    env.register_custom_builtin("universal", builtin_universal);
     env.register_custom_builtin("suspend", builtin_suspend);
 
     // One builtin, two names, exactly as in bash — `readarray` is the spelling that says what it
@@ -288,7 +285,6 @@ mod tests {
             "readarray",
             "caller",
             "status",
-            "universal",
             "suspend",
             "rm",
             "chain",

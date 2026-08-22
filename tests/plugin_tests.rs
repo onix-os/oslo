@@ -70,10 +70,10 @@ fn notes(home: &Home) -> PathBuf {
         "notes",
         r#"return { name = "notes", version = "1.0", builtins = { "note" } }"#,
         r#"
-oslo.register_builtin("note", function(argv)
+oslo.register_builtin{ name = "note", run = function(argv)
   print("note: " .. (argv[2] or "nothing"))
   return 0
-end)
+end }
 "#,
     )
 }
@@ -119,10 +119,10 @@ fn a_declared_builtin_runs_the_plugin_on_first_use() {
         r#"return { name = "notes", builtins = { "note" } }"#,
         r#"
 print("loading notes")
-oslo.register_builtin("note", function(argv)
+oslo.register_builtin{ name = "note", run = function(argv)
   print("note: " .. (argv[2] or "nothing"))
   return 0
-end)
+end }
 "#,
     );
     assert!(
@@ -157,7 +157,7 @@ fn a_changed_plugin_refuses_to_load_until_it_is_allowed() {
     // itself ends with the words "what changed", which a laxer assertion mistook for the plugin.
     std::fs::write(
         home.installed_dir("notes").join("init.lua"),
-        r#"oslo.register_builtin("note", function() print("EDITED-VERSION-RAN") return 0 end)"#,
+        r#"oslo.register_builtin{ name = "note", run = function() print("EDITED-VERSION-RAN") return 0 end }"#,
     )
     .expect("edit");
 
@@ -292,7 +292,7 @@ fn a_requirement_this_oslo_meets_is_no_obstacle() {
     let source = home.candidate(
         "notes",
         r#"return { name = "notes", builtins = { "note" }, requires = ">= 0.0.1" }"#,
-        r#"oslo.register_builtin("note", function() print("REQUIREMENT-MET") return 0 end)"#,
+        r#"oslo.register_builtin{ name = "note", run = function() print("REQUIREMENT-MET") return 0 end }"#,
     );
     assert!(
         home.plugin(&["install", source.to_str().unwrap(), "--yes"])
@@ -317,7 +317,7 @@ fn a_plugin_that_allocates_without_end_is_stopped_rather_than_taking_the_shell_w
         r#"
 local hoard = {}
 while true do hoard[#hoard + 1] = string.rep("x", 4096) end
-oslo.register_builtin("greed", function() return 0 end)
+oslo.register_builtin{ name = "greed", run = function() return 0 end }
 "#,
     );
     assert!(

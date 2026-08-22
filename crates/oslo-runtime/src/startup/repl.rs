@@ -94,7 +94,9 @@ pub fn run_repl(login: bool) -> ! {
     super::nested::ask_before_nesting();
     // **After the config, so the database wins.** The ordinary shell rule — the last definition of a
     // name is the one that counts — applied to sources rather than to lines. See `startup::stored`.
-    let mut macros_held = super::stored::install(&env_struct);
+    // Behind an `Arc<Mutex<…>>` because the idle servicer below shares it: two places re-read the
+    // macro store, and both must advance the same record of what this shell has applied.
+    let macros_held = Arc::new(Mutex::new(super::stored::install(&env_struct)));
     plugins::start(&env_struct);
     // A script that declares its arguments completes them. Registered after the config so
     // `oslo.completion.sources` can name it and a provider of the same name can replace it.
@@ -163,17 +165,16 @@ pub fn run_repl(login: bool) -> ! {
     let mut last_status = 0;
     let mut eof_count = 0usize;
 
-    // Universal variables, seeded once and then re-read whenever another shell writes the file.
-    // `seen` is the set this loop put there, so a name the *user* assigns afterwards is not
-    // quietly overwritten by the next reload — see `universal::apply`.
-    let mut universal_stamp = oslo_shell::env::universal::changed_at();
-    oslo_shell::env::universal::apply(&mut env_struct.lock().unwrap());
-
     // **What an idle prompt does when the background moves.** Installed here rather than in
-    // `terminal::initialize` because it needs the environment a universal refresh writes into, and
-    // the REPL is what owns it. Runs on the shell thread with no editor borrow held — see
+    // `terminal::initialize` because it needs the environment a macro refresh writes into, and the
+    // REPL is what owns it. Runs on the shell thread with no editor borrow held — see
     // `oslo_base::background`.
     let serviced = Arc::clone(&env_struct);
+    // **Shared with the loop below, which is why it is behind a lock.** The macro store is re-read
+    // from two places — here when nothing is being typed, and at each prompt and command — and both
+    // have to advance the *same* record of what this shell has applied, or one would keep undoing
+    // the other's work.
+    let held_for_service = Arc::clone(&macros_held);
     oslo_base::background::install_deadline(crate::lua::api::timer::next_due_in_ms);
     // Before anything can finish on a thread, so the descriptor is in the set the first wait polls.
     oslo_base::background::arm();
@@ -182,8 +183,11 @@ pub fn run_repl(login: bool) -> ! {
         // A timer that came due, and anything `oslo.spawn` finished on a thread. The same safe
         // point they already use at a command boundary — the shell holds nothing and Lua may run.
         let fired = timers::fire();
-        let changed = match serviced.lock() {
-            Ok(mut env) => oslo_shell::env::universal::apply_if_changed(&mut env),
+        // A macro another terminal stored — an alias, an abbreviation, a variable. Two `stat`s
+        // decide whether there is anything to read, so a wake for some other reason costs that and
+        // nothing more.
+        let changed = match held_for_service.lock() {
+            Ok(mut held) => super::stored::refresh(&serviced, &mut held),
             Err(_) => false,
         };
         // **The lock is gone by here, so anything the apply announced can run.** A hook fired while
@@ -212,7 +216,7 @@ pub fn run_repl(login: bool) -> ! {
     // wake, so the signal would buy it nothing and cost it an interrupted `read` in every library
     // call that makes one.
     oslo_ui::term::watch_for_children();
-    oslo_shell::env::universal::watch::start();
+    oslo_base::macros::watch::start();
 
     // The directory whose `.env.lua` is loaded. Seeded from the arrival above, so the first prompt
     // does not run it a second time.
@@ -259,18 +263,13 @@ pub fn run_repl(login: bool) -> ! {
             }
         });
 
-        // Another shell may have set a universal variable since the last prompt. A `stat` decides
-        // whether to read the file, so the common case — nobody changed anything — costs one
-        // syscall per prompt rather than a parse.
-        universal_stamp = timing::phase("universal", || {
-            oslo_shell::env::universal::refresh(&mut env_struct.lock().unwrap(), universal_stamp)
-        });
-
-        // And the same question about macros: another shell — or `oslo macros` in this one — may
-        // have added, removed or turned one off since the last prompt. Two `stat`s decide whether
-        // there is anything to do, which is the same bargain the line above makes.
-        macros_held = timing::phase("macros", || {
-            super::stored::refresh(&env_struct, macros_held)
+        // Another shell — or `oslo macros` in this one — may have added, removed or turned one off
+        // since the last prompt. Two `stat`s decide whether there is anything to do, so the common
+        // case, nobody changed anything, costs those and no parse.
+        timing::phase("macros", || {
+            if let Ok(mut held) = macros_held.lock() {
+                super::stored::refresh(&env_struct, &mut held);
+            }
         });
 
         timing::phase("size", || publish_terminal_size(&env_struct));
@@ -329,13 +328,12 @@ pub fn run_repl(login: bool) -> ! {
                 // answers to. Both are handed the command line as typed.
                 // Again here: this shell has been blocked in its line editor since before the
                 // command was typed, so the check at the top of the loop last ran a command ago.
-                // Without this, `universal X=1` in one terminal and `echo $X` in another shows the
-                // old value once and the new one from then on — the worst possible behaviour,
-                // since it looks like it works and does not.
-                universal_stamp = oslo_shell::env::universal::refresh(
-                    &mut env_struct.lock().unwrap(),
-                    universal_stamp,
-                );
+                // Without this, `oslo macros add --var X=1` in one terminal and `echo $X` in
+                // another shows the old value once and the new one from then on — the worst
+                // possible behaviour, since it looks like it works and does not.
+                if let Ok(mut held) = macros_held.lock() {
+                    super::stored::refresh(&env_struct, &mut held);
+                }
                 // Read here rather than below because the hook is told it: a `preexec` handler
                 // that logs where a command ran needs the directory it started in, and asking for
                 // it from inside the handler would answer after any `cd` the last command did.

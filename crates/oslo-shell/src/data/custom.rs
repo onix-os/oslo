@@ -33,7 +33,8 @@ use std::rc::Rc;
 /// `None` means the tool declared `accepts = "nothing"`, which is still the common case and still
 /// gets no input rather than an empty list — "I was given nothing" and "I was given no rows" are
 /// different, and a verb that filters wants to tell them apart.
-pub type Handler = Rc<dyn Fn(&[String], Option<&[Record]>) -> Result<Vec<Record>, String>>;
+pub type Handler =
+    Rc<dyn Fn(&[String], Option<&[Record]>, Option<&str>) -> Result<Vec<Record>, String>>;
 
 thread_local! {
     static TOOLS: RefCell<HashMap<String, Handler>> = RefCell::new(HashMap::new());
@@ -49,9 +50,10 @@ pub fn rows_of(
     name: &str,
     argv: &[String],
     input: Option<&[Record]>,
+    bytes: Option<&str>,
 ) -> Option<Result<Vec<Record>, String>> {
     let handler = TOOLS.with(|slot| slot.borrow().get(name).cloned())?;
-    Some(handler(argv, input))
+    Some(handler(argv, input, bytes))
 }
 
 /// Whether a tool of this name was registered, without running it.

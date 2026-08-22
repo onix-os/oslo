@@ -271,3 +271,89 @@ fn the_copy_is_what_another_shell_runs() {
         .expect("sh");
     assert_eq!(String::from_utf8_lossy(&out.stdout).trim(), "from-the-file");
 }
+
+// ─────────────────────────────────────────── what `add` means, made the same for every kind
+
+/// `oslo macros …` with a store of its own, answering **stderr as well as stdout** — every refusal
+/// below is written to stderr, and a helper that dropped it would pass no matter what happened.
+fn said(dirs: (&std::path::Path, &std::path::Path), args: &[&str]) -> String {
+    let out = Command::new(oslo_bin())
+        .args(args)
+        .env("XDG_DATA_HOME", dirs.0)
+        .env("OSLO_MACROS_BIN", dirs.1)
+        .stdin(std::process::Stdio::null())
+        .output()
+        .expect("spawn oslo");
+    format!(
+        "{}{}",
+        String::from_utf8_lossy(&out.stdout),
+        String::from_utf8_lossy(&out.stderr)
+    )
+}
+
+fn dirs() -> (tempfile::TempDir, tempfile::TempDir) {
+    (
+        tempfile::tempdir().expect("data"),
+        tempfile::tempdir().expect("bin"),
+    )
+}
+
+/// **`add` was the one command that could create an ambiguous name.** `remove` and `edit` both
+/// refuse a name owned by more than one kind and ask which was meant — `macros.rs` calls the state
+/// "a mistake rather than a feature" — but nothing stopped it being made, so the two commands that
+/// refused were refusing a state only this one could produce.
+#[test]
+fn adding_a_name_another_kind_owns_is_refused() {
+    let (data, bin) = dirs();
+    let at = (data.path(), bin.path());
+    said(at, &["macros", "add", "--var", "DUP=1"]);
+
+    let refused = said(at, &["macros", "add", "--alias", "DUP", "echo x"]);
+    assert!(refused.contains("already a var"), "{refused:?}");
+
+    // Storing over the *same* kind is an ordinary update and must not be caught by this.
+    let update = said(at, &["macros", "add", "--var", "DUP=2"]);
+    assert!(
+        !update.contains("already a"),
+        "an update was refused\n{update:?}"
+    );
+}
+
+/// A flag that silently does nothing is worse than one that does not exist. `--replace` is read
+/// only by `import`, and every other subcommand accepted it and ignored it.
+#[test]
+fn replace_is_refused_where_it_means_nothing() {
+    let (data, bin) = dirs();
+    let at = (data.path(), bin.path());
+    let refused = said(at, &["macros", "add", "--replace", "--var", "A=1"]);
+    assert!(refused.contains("--replace is only for"), "{refused:?}");
+    assert!(refused.contains("import"), "{refused:?}");
+}
+
+/// **A file oslo did not write is somebody else's on the way in, not only on the way out.** The
+/// removal loop always said so; the write loop replaced a hand-placed script without a word.
+#[test]
+fn publishing_will_not_overwrite_a_file_oslo_did_not_write() {
+    let (data, bin) = dirs();
+    let at = (data.path(), bin.path());
+    let theirs = bin.path().join("mine");
+    std::fs::write(&theirs, "#!/bin/sh\necho HAND-WRITTEN\n").expect("write theirs");
+
+    store(at, "script mine\n\t#!/bin/sh\n\techo from-oslo\n");
+
+    assert_eq!(
+        std::fs::read_to_string(&theirs).expect("read back"),
+        "#!/bin/sh\necho HAND-WRITTEN\n",
+        "a hand-placed script was overwritten"
+    );
+}
+
+/// And a name nothing else owns still gets its file, so the guard did not disable publishing.
+#[test]
+fn publishing_still_writes_a_name_nobody_else_holds() {
+    let (data, bin) = dirs();
+    let at = (data.path(), bin.path());
+    store(at, "script fresh\n\t#!/bin/sh\n\techo from-oslo\n");
+    let written = std::fs::read_to_string(bin.path().join("fresh")).unwrap_or_default();
+    assert!(written.contains("from-oslo"), "{written:?}");
+}

@@ -390,6 +390,15 @@ fn describe(name: &str, meta: &fs::Metadata) -> Value {
         ("size", Value::int(meta.len() as i64)),
         ("type", Value::str(kind)),
         ("mtime", Value::int(seconds(meta))),
+        // **Whole nanoseconds, because whole seconds decides builds wrongly.** A recipe whose input
+        // is edited and whose output is written inside the same second compares equal at second
+        // resolution, so `oslo make` reported "up to date" for a build that had not happened —
+        // measured, and the reason this field exists. `mtime` stays seconds because that is what a
+        // person prints; anything *comparing* two files wants this one.
+        //
+        // Safe as one number: luna keeps the integer subtype, so 1787296745123456789 and the
+        // nanosecond after it compare exactly rather than colliding the way a double would.
+        ("mtime_ns", Value::int(nanos(meta))),
         // Permission bits only: the type bits are already in `type`, and `0o100644` printed as a
         // mode is what makes people think `chmod` needs six digits.
         (
@@ -407,6 +416,19 @@ fn seconds(meta: &fs::Metadata) -> i64 {
         .ok()
         .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
         .map(|d| d.as_secs() as i64)
+        .unwrap_or(0)
+}
+
+/// The same instant, to the nanosecond — what a comparison of two files has to use.
+///
+/// `as_nanos` is a `u128` and the cast narrows it; the value is nanoseconds since 1970, so it
+/// overflows `i64` in the year 2262 and reads 0 for a file the clock cannot place. Both are the same
+/// answer `seconds` gives, at a different scale.
+fn nanos(meta: &fs::Metadata) -> i64 {
+    meta.modified()
+        .ok()
+        .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+        .and_then(|d| i64::try_from(d.as_nanos()).ok())
         .unwrap_or(0)
 }
 

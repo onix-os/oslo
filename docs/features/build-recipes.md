@@ -83,8 +83,13 @@ sh RAISED    -> shell state is busy; …
 lines RAISED -> shell state is busy; …
 ```
 
-A build runner that cannot run a command is not a build runner. [Directory
-environments](directory-environments.md) get around the same lock by taking it, snapshotting,
+A build runner that cannot run a command is not a build runner — and running commands is precisely
+what the lock covers. It is **twenty-eight calls, not the whole API**: `oslo.fs`, `oslo.json`,
+`oslo.db`, `oslo.hash`, `oslo.git` and the rest work perfectly well inside a builtin, and
+[your own tools](your-own-tools.md) has the full table. But the three above are the three a recipe
+is made of, so for *this* feature the distinction changes nothing.
+
+[Directory environments](directory-environments.md) get around the same lock by taking it, snapshotting,
 releasing it and running the file — but `direnv::arrive` is called from `startup/repl.rs`
 *between commands*, at the one moment the shell holds nothing. A builtin has no such moment: it is
 called from inside dispatch, in the middle of the state it would have to release.
@@ -150,6 +155,18 @@ make's `.PHONY`. One that declares `outputs` is skipped when it is up to date.
 |---|---|---|
 | `"mtime"` *(default)* | is any input newer than any output? | one `stat` per file |
 | `"content"` | do the inputs hash to what they hashed to last time? | one read per file |
+
+Mtime is compared to the **nanosecond**, and an output must be **strictly newer** than every input.
+Both halves are needed and each was a wrong build on its own. At second resolution an input edited
+and an output written inside the same second compare equal, so a recipe that had not been rebuilt
+reported `up to date` — and the fast inner loop is exactly where a build finishes inside one second.
+Nanoseconds alone do not fix it either, because the *filesystem* decides the resolution: tmpfs
+stamps to the jiffy, a few milliseconds, so two writes a fraction of a millisecond apart come back
+byte-identical. Equal therefore counts as stale. That costs a spurious rebuild when a build
+genuinely finishes inside one tick and buys never shipping a stale artifact.
+
+`oslo.fs.stat` gained `mtime_ns` for this — a whole timestamp, not a sub-second remainder, so two
+files compare with one `<`. `mtime` stays seconds, which is what a person prints.
 
 `"content"` is the reason to have this at all. A `git checkout` moves every mtime in the tree, so
 mtime staleness rebuilds the world after switching branches and back; a content hash does not.
@@ -222,9 +239,26 @@ hand-maintained `help:` target repeating what the recipes already say.
 
 ## What it cannot do
 
-- **No `-j`.** `oslo.spawn` delivers its callback at a safe point — a command boundary or an idle
-  prompt — and `oslo make` has no read loop, so nothing ever drains the queue. Parallelism needs a
-  blocking join, which a child process can offer safely and which is not written yet.
+- **No `-j` flag** — but a recipe can now run things in parallel itself. `oslo.spawn` used to be
+  silently useless here: it delivers at a safe point, `oslo make` has no read loop, and nothing ever
+  drained the queue, so the callback never ran and the recipe reported success anyway. A make run
+  now installs a servicer of its own, and two calls do the waiting:
+
+  ```lua
+  oslo.make.recipe{ name = "build-all", run = function()
+    for _, crate in ipairs(CRATES) do
+      oslo.spawn{ "cargo", "build", "-p", crate,
+        on_exit = function(out, status) if status ~= 0 then io.write(out) end end }
+    end
+    local r = oslo.settle{ timeout_ms = 600000 }
+    assert(r.settled, r.outstanding .. " builds did not finish in time")
+  end }
+  ```
+
+  `job:wait([timeout_ms])` answers `out, status` for one spawn, or `nil, why`. `oslo.settle` waits
+  for all of them and answers `{ fired, outstanding, settled }`. Both block on the same descriptors
+  the line editor polls, so they return the moment a worker finishes rather than on a poll interval.
+  What is still missing is oslo *scheduling* the dependency graph across cores for you.
 - **No pattern rules.** `%.o: %.c` is expressible as a recipe that declares recipes, and generating
   them at load time works, but there is nothing built in.
 - **A recipe cannot change the shell that called it.** It is a child. `cd`, `export` and setting a

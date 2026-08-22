@@ -141,7 +141,7 @@ pub(crate) fn here() -> PathBuf {
 ///
 /// Lexical on purpose: `expand_path` is documented to work on paths that do not exist yet, which is
 /// most of what a layout function builds.
-pub(crate) fn absolute(path: &str, base: &Path) -> PathBuf {
+pub fn absolute(path: &str, base: &Path) -> PathBuf {
     let expanded = match path.strip_prefix("~") {
         Some(rest) if rest.is_empty() || rest.starts_with('/') => match std::env::var("HOME") {
             Ok(home) => PathBuf::from(home).join(rest.trim_start_matches('/')),

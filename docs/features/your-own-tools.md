@@ -67,6 +67,31 @@ oslo.register_tool{ name = "count", accepts = "rows",
   rows = function(argv, input) return { { rows = #input } } end }
 ```
 
+**A third argument for a tool that declared `accepts = "bytes"`** — the raw stream, as a string:
+
+```lua
+oslo.register_tool{ name = "counted", accepts = "bytes",
+  rows = function(argv, input, bytes)
+    local n = 0
+    for _ in bytes:gmatch("[^\n]+") do n = n + 1 end
+    return { { lines = n } }
+  end }
+```
+
+```
+$ printf 'a\nb\nc\n' | counted | cols lines
+lines
+3
+```
+
+That shape was accepted by the validator and could not work: the planner routed the bytes here —
+it reads standard input for a bytes-accepting tool at the head of a pipeline — and they were dropped
+one call short of the handler, so `bytes` was always `nil`. It is `nil` for every other shape, by the
+same rule `input` follows: given nothing and given no bytes are different questions.
+
+Declaring `"bytes"` copies the whole stream into a Lua string, so a tool reading a 200 MB pipe costs
+200 MB. A tool that wants to stream takes `rows` with `lines` in front of it instead.
+
 `accepts` is still what the planner reads to decide the edge; what changed is that the input is then
 handed over rather than dropped.
 
@@ -116,19 +141,84 @@ to tell a tool that failed to register from one whose name you misspelled.
 ### A registered builtin
 
 ```lua
-oslo.register_builtin("hi", function(argv)
-  print("hi " .. (argv[2] or "there"))
-  return 0
-end)
+oslo.register_builtin{
+  name = "hi",
+  run = function(argv, shell)
+    print("hi " .. (argv[2] or "there") .. ", last command was " .. shell.status)
+    return 0
+  end,
+}
 ```
+
+**One table, and the handler takes two arguments.** The older
+`oslo.register_builtin("hi", function(argv) … end)` is gone rather than deprecated: the second
+argument is the shell itself, and a positional form had nowhere to say `wants`.
+
+`shell` is what the builtin could not otherwise see. It runs while the shell holds its own state, so
+`oslo.proc.status()` raises from in there — and the Lua global `$?` route `try_lock`s and answers
+`nil`. **A builtin could not read the exit status of the command before it by any route at all.**
+The frame above holds a live `&mut Environment` and was throwing it away; the record is built from
+it, which costs no lock.
+
+| always there | |
+|---|---|
+| `status`, `ok` | `$?`, and the predicate almost everyone actually tests |
+| `cwd`, `oldcwd` | `$PWD`, `$OLDPWD` |
+| `pid`, `last_bg_pid` | `$$`, `$!` |
+| `interactive`, `flags` | and `$-` |
+| `positional`, `argc` | `$1…$n` — **1-based, so `$1` is `positional[1]`** — and `$#` |
+| `pipestatus`, `depth` | the whole vector, and how deep in functions this is |
+
+The collections cost real work — `vars` clones every name and value *and sorts them* — so they are
+asked for by name and gathered once:
+
+```lua
+oslo.register_builtin{ name = "probe", wants = { "vars", "aliases" },
+  run = function(argv, shell) return shell.vars.HIDDEN end }
+```
+
+`wants` takes `vars` (with `exported` beside it), `aliases`, `functions`, `builtins`, `dirstack`
+and `stack`. An unknown name fails **at registration**, naming the set. And a known field that was
+not asked for **raises** rather than answering `nil` — which is what makes `wants` safe to be
+opt-in, because `shell.aliases and shell.aliases[x]` would otherwise be a silent nothing.
+
+### Changing something, by saying so
+
+A builtin cannot write to the shell directly — `oslo.env.set` raises in there and a plain
+`X = "1"` is a `try_lock` that **drops the write with no message**. So it returns what it wants
+changed, and the frame above applies it:
+
+```lua
+oslo.register_builtin{ name = "use", run = function(argv, shell)
+  return {
+    status     = 0,
+    set        = { PROFILE = argv[2] },   -- shell-local
+    export     = { TOOLCHAIN = argv[2] }, -- and to every child
+    unset      = { "STALE" },
+    alias      = { build = "make build", old = false },  -- false removes
+    positional = { "a", "b" },            -- set -- a b
+    cd         = "/srv/" .. argv[2],
+  }
+end }
+```
+
+Applied in that order, and the order is load-bearing: `unset` before `set`, or a name in both is
+silently discarded; `set` before `export`, so a name in both ends up exported; **`cd` last**,
+because it fires the change-directory hooks — which should see what this builtin just set — and
+writes `PWD` itself.
+
+An **unknown key raises and applies nothing**, so a misspelt `setenv` cannot leave the shell half
+changed. A well-formed effect the shell *refuses* — a readonly variable — is different: the shell
+already says which, and the status becomes 1. Writing `status` explicitly overrides that, because a
+builtin that insists after trying a readonly write is expressing intent.
+
+Every scalar return still means what it meant:
 
 This goes into the one builtin table `is_builtin`, the dispatcher, `type`, `command -v` and
 completion all read, so `type hi` answers *hi is a shell builtin* and `command -v hi` answers `hi`.
 `argv[1]` is the builtin's own name, as it is for every builtin written in Rust — the dispatcher
 recovers the closure from it. Redirections and pipelines work because nothing about the builtin is
 special: `hi world > /tmp/hi.txt` writes the file and `hi there | tr a-z A-Z` prints `HI THERE`.
-
-What the callback returns becomes the exit status:
 
 | returned | status |
 |---|---:|
@@ -177,6 +267,32 @@ nothing for it to join: a command in those shells produces bytes, so extending t
 program that prints. Here a tool declares a shape and the planner reads it, which is why a Lua tool
 composes with `where` and `sort-by` without either side knowing about the other.
 
+### What a locked surface *can* do
+
+A builtin and an answering hook cannot run a command, but they are handed words and asked questions
+about them — and the two rules the shell applies to a word before it runs one are now callable:
+
+```lua
+oslo.word.braces("src/{a,b}.rs")      --> { "src/a.rs", "src/b.rs" }
+oslo.word.matches("main.rs", "*.rs")  --> true
+oslo.proc.parse("cat 'a b' | grep x") --> { {link="first", kind="simple", argv={"cat","a b"}, redirects=0},
+                                      --     {link="|",     kind="simple", argv={"grep","x"},  redirects=0} }
+```
+
+All three are pure functions of a string, so they work everywhere — including the two places
+`oslo.run` raises. That is most of the reason they exist: **the surface that cannot run a command is
+the one that most needs to understand one.**
+
+Written by hand, each is subtly wrong. Splitting a line on whitespace breaks `cat 'a b'`, `echo
+$HOME` and `a | b`. Matching a glob with `string.find` after rewriting `*` to `.*` is a different
+language — `.` is a metacharacter in a Lua pattern and is not one in a shell glob, so `a?txt`
+against `a.txt` answers wrongly in both directions. Brace expansion by hand gets nesting and
+`{1..9}` wrong.
+
+`oslo.proc.parse` answers `nil` for a line that does not parse — the shell is about to report the
+syntax error better than a caller could. Its `redirects` is a **count**, not a list: it is the same
+payload `pre-cmd` already receives, with a door on it.
+
 ## Configuration
 
 There are no settings — the whole surface is three calls, made from
@@ -187,7 +303,7 @@ oslo.register_tool{ name = "mounts", accepts = "nothing", produces = "rows",
                     rows = function(argv) return { { a = 1 } } end }
 oslo.tools()                              --> { "mounts" }
 
-oslo.register_builtin("hi", function(argv) print(argv[2]) return 0 end)
+oslo.register_builtin{ name = "hi", run = function(argv, shell) print(argv[2]) return 0 end }
 ```
 
 ```sh
@@ -212,12 +328,31 @@ be *command not found*), and a tool **does** receive its input.
 - **A redirection removes both stages.** `mounts | where rw > /tmp/x` reports *mounts: command not
   found* and *where: command not found*, the built-in verb included. A redirection means bytes were
   asked for somewhere specific, and the tools have no byte form to fall back to.
-- **Nothing inside a tool or a registered builtin may reach the shell.** They run while the shell
-  holds its own state, so `oslo.proc.capture`, `oslo.run` and even setting a shell variable fail
-  with *shell state is busy*. `io.popen` is refused separately, because it would run its argument in
-  `/bin/sh` rather than this shell. Pure Lua and the non-shell parts of the API — `oslo.fs.*`,
-  `oslo.json.*` — are what a tool has. To fold an external program's output in, put it before the
-  first tool: `kubectl get pods -o json | from json | where …`.
+- **Twenty-eight calls fail inside a tool or a registered builtin** — the ones that reach the
+  shell's own state, listed below. They run while the shell holds that state, so those raise *shell
+  state is busy*. `io.popen` is refused separately, because it would run its argument in `/bin/sh`
+  rather than this shell. To fold an external program's output in, put it before the first tool:
+  `kubectl get pods -o json | from json | where …`.
+
+  **This entry used to say "nothing … may reach the shell", and that was wrong in a way that
+  mattered.** Read as written it means a builtin can do nothing, and a survey of the whole Lua
+  surface reached exactly that conclusion — proposing lock-free substitutes for capabilities that
+  were already reachable. `borrow_env`, the only thing that takes the lock, is in **seven of
+  forty-six** files under `crates/oslo-runtime/src/lua/api/`. Everything else works.
+
+  | reaches the shell — raises | free to use |
+  |---|---|
+  | `oslo.run`, `oslo.pipe`, `oslo.lines`, `sh.*` | `oslo.fs.*`, `oslo.path.*` |
+  | `oslo.env.{get,set,unset,all,alias,set_alias}` | `oslo.json.*`, `oslo.re.*`, `oslo.hash.*`, `oslo.hex.*` |
+  | `oslo.env.{path,path_add,path_remove,has_path}` | `oslo.db.*`, `oslo.state.*` |
+  | `oslo.proc.{exec,capture,status}` | `oslo.git.*`, `oslo.history.*` |
+  | `oslo.sys.{cd,user,interactive,login}` | `oslo.ui.*`, `oslo.term.*`, `oslo.messages.*` |
+  | `oslo.opts.{get,set}`, `oslo.source` | `oslo.spawn`, `oslo.after`, `oslo.every` |
+  | `oslo.direnv.*`, `oslo.repair`, `oslo.register_builtin` | `oslo.fs.watch`, and all of Lua |
+
+  `oslo.proc.status` being on the left is the one that hurts: it is `$?`, so a builtin cannot see
+  the status of the command before it — by that route or by the Lua global, which `try_lock`s and
+  answers `nil`. `tests/lua_api_surface_tests.rs` walks both columns and fails if either moves.
 - **Tools are invisible to everything that answers questions about names.** `type mounts` says not
   found, `command -v mounts` exits 1, and completion does not offer it. Only the pipeline planner
   knows the registry exists.

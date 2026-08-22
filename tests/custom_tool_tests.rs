@@ -81,3 +81,55 @@ fn a_name_nobody_registered_is_still_not_found() {
     let (_, err) = lua("oslo.proc.exec('definitelynotacommand')");
     assert!(err.contains("not found"), "{err}");
 }
+
+/// **`accepts = "bytes"` was a declared shape that could not work.**
+///
+/// The validator took it, and the planner acted on it — `exec::pipeline::structured` tests for
+/// `Shape::Bytes` and reads standard input for a bytes-accepting tool at the head of a pipeline —
+/// so the bytes really did arrive at `data::tools::run_tool`. They were then dropped one call short
+/// of the handler, because `data::custom::Handler` had only two parameters. Measured before the
+/// fix: the tool below answered `0 0 false`.
+#[test]
+fn a_tool_that_accepts_bytes_is_given_them() {
+    let (out, err) = lua(r#"
+oslo.register_tool{ name = "counted", accepts = "bytes", produces = "rows",
+  rows = function(argv, input, bytes)
+    local n = 0
+    for _ in tostring(bytes or ""):gmatch("[^\n]+") do n = n + 1 end
+    return { { lines = n, got = bytes ~= nil } }
+  end }
+oslo.proc.exec('printf "a\\nb\\nc\\n" | counted | cols lines got')
+"#);
+    assert!(
+        out.contains('3'),
+        "the bytes did not reach the tool\n{out}{err}"
+    );
+    assert!(out.contains("true"), "bytes was nil\n{out}{err}");
+}
+
+/// A tool that never asked for bytes is handed `nil`, not an empty string — the same distinction
+/// `input` already makes between "given nothing" and "given no rows".
+#[test]
+fn a_tool_that_did_not_ask_sees_nil_not_an_empty_string() {
+    let (out, err) = lua(r#"
+oslo.register_tool{ name = "asked", produces = "rows",
+  rows = function(argv, input, bytes) return { { got = bytes ~= nil } } end }
+oslo.proc.exec("asked | cols got")
+"#);
+    assert!(out.contains("false"), "{out}{err}");
+}
+
+/// **Widening the handler must not break the narrow ones.** Lua ignores arguments a function did
+/// not declare, so every `function(argv)` and `function(argv, input)` tool already written keeps
+/// running — which is the whole reason the third argument could be added at all.
+#[test]
+fn tools_declaring_fewer_arguments_still_run() {
+    let (out, err) = lua(r#"
+oslo.register_tool{ name = "one", rows = function(argv) return { { n = 1 } } end }
+oslo.register_tool{ name = "two", accepts = "rows",
+  rows = function(argv, input) return { { n = #(input or {}) } } end }
+oslo.proc.exec("one | cols n")
+oslo.proc.exec("one | two | cols n")
+"#);
+    assert!(out.contains('1'), "a one-argument tool broke\n{out}{err}");
+}

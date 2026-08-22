@@ -10,8 +10,8 @@
 //!
 //! # Where it fires
 //!
-//! The four places a *user* changes a variable: an assignment, `export`, `unset`, and the universal
-//! store — both when this shell writes it and when the store is re-read because another one did.
+//! The four places a *user* changes a variable: an assignment, `export`, `unset`, and the macro
+//! store, when it is re-read because another process wrote it.
 //! Deliberately not `Environment::set_var`, which is also how the shell maintains `PWD`, `?`, `_`
 //! and the rest: firing there would bury a config's handler in the shell's own bookkeeping.
 
@@ -29,8 +29,8 @@ pub enum Change {
 pub enum Scope {
     /// An ordinary shell variable, exported or not.
     Shell,
-    /// The store that follows you between terminals.
-    Universal,
+    /// The macro store, which follows you between terminals.
+    Stored,
 }
 
 /// Which shell did it.
@@ -63,7 +63,7 @@ pub fn announce(name: &str, change: Change, scope: Scope, source: Source) {
                 "scope",
                 match scope {
                     Scope::Shell => "shell",
-                    Scope::Universal => "universal",
+                    Scope::Stored => "stored",
                 },
             ),
             (

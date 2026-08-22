@@ -2,12 +2,12 @@
 //!
 //! # What these are for
 //!
-//! The hook's `source` field is the whole reason it exists: a universal variable changes because you
-//! typed something here or because another terminal did, and a plugin usually acts on one and not
-//! the other. A test that only proved "the hook fires" would pass with `source` hard-coded, so each
-//! case below asserts the *field*, not the event.
+//! The hook's `source` field is the whole reason it exists: a variable changes because you
+//! typed something here or because another terminal stored a macro, and a plugin usually acts on one
+//! and not the other. A test that only proved "the hook fires" would pass with `source` hard-coded,
+//! so each case below asserts the *field*, not the event.
 //!
-//! **The `remote` case is not here.** A script never re-reads the universal store — only the REPL
+//! **The `remote` case is not here.** A script never re-reads the macro store — only the REPL
 //! does, before a prompt and before a command — so the arrival can only be staged against a shell
 //! that is actually sitting at a prompt. It lives in `idle_wake_tests`, on a pty, beside the test
 //! that the same value reaches the prompt itself.
@@ -84,20 +84,5 @@ fn unset_is_announced_as_an_erase() {
     assert!(
         out.contains("DOOMED erase"),
         "the erase was not announced: {out:?} {err}"
-    );
-}
-
-/// Setting a universal here is local and universal, not remote.
-#[test]
-fn a_universal_set_here_is_local() {
-    let (out, err) = lua(r#"
-        oslo.on["on-variable-change"](function(e)
-          print(e.name .. " " .. e.scope .. " " .. e.source)
-        end)
-        oslo.proc.exec([[universal THEME=dark]])
-        "#);
-    assert!(
-        out.contains("THEME universal local"),
-        "the universal set was not announced as local: {out:?} {err}"
     );
 }

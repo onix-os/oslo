@@ -105,7 +105,11 @@ pub fn run_tool(
     // **The rows that reached this stage are handed over.** They used to be dropped here, which is
     // what made every Lua tool a source: `notes` was expressible and `redact` was not. The planner
     // was already deciding the edge from `accepts`; this is the other half of that decision.
-    if let Some(outcome) = crate::data::custom::rows_of(name, words, input.as_deref()) {
+    // **The bytes go through too.** `accepts = "bytes"` was a declared shape that could not
+    // work: the planner routed the bytes here (see `exec::pipeline::structured`, which reads
+    // standard input for a bytes-accepting tool at the head of a pipeline), and this line dropped
+    // them one call short of the handler.
+    if let Some(outcome) = crate::data::custom::rows_of(name, words, input.as_deref(), bytes) {
         return match outcome {
             Ok(rows) => Some((0, Some(rows))),
             Err(e) => {

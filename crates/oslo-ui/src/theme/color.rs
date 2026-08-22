@@ -267,6 +267,14 @@ pub struct Style {
     pub italic: bool,
     pub underline: bool,
     pub reverse: bool,
+    /// SGR 5. Widely ignored and widely hated; here because a caller asking for it should get it
+    /// rather than get nothing and wonder which layer dropped it.
+    pub blink: bool,
+    /// SGR 8 — the foreground painted as the background. For a password echo, not for secrecy: the
+    /// characters are still in the terminal's buffer and in anything scraping it.
+    pub hidden: bool,
+    /// SGR 9.
+    pub strike: bool,
 }
 
 impl Style {
@@ -304,8 +312,17 @@ impl Style {
         if self.underline {
             parts.push("4".into());
         }
+        if self.blink {
+            parts.push("5".into());
+        }
         if self.reverse {
             parts.push("7".into());
+        }
+        if self.hidden {
+            parts.push("8".into());
+        }
+        if self.strike {
+            parts.push("9".into());
         }
         if let Some(fg) = self.fg.and_then(|c| c.sgr(depth, false)) {
             parts.push(fg);

@@ -137,10 +137,18 @@ fn the_value_reaches_a_child_process() {
     assert!(out.contains("PASSED=through"), "{out:?}");
 }
 
-/// **A stored variable is what a name means when nothing else has said.** The shell does not
-/// overrule the environment it was started with, or `EDITOR=x oslo` would stop meaning anything.
+/// **A stored variable wins over the environment the shell was started with.**
+///
+/// This assertion used to run the other way, and the rule it recorded is the defect: `EDITOR`
+/// arrives from a terminal emulator or a session manager, so `oslo macros add --var EDITOR=nvim`
+/// reported success and then changed nothing, for ever. Alias and Abbrev are applied in the same
+/// loop and never deferred; the `macros.sh` rendering of the very same entry is an unguarded
+/// `export`. `Var` was the odd one out in both directions.
+///
+/// `FOO=x oslo …` still means what it always meant for every name nobody has deliberately stored,
+/// which is all of them but a handful.
 #[test]
-fn the_environment_it_was_started_with_wins() {
+fn a_stored_variable_beats_the_environment_it_was_started_with() {
     let shell = Shell::new();
     shell.macros(&["add", "--var", "ALREADY=from-the-store"]);
 
@@ -162,9 +170,51 @@ fn the_environment_it_was_started_with_wins() {
         .expect("write");
     let out = child.wait_with_output().expect("wait");
     assert!(
-        String::from_utf8_lossy(&out.stdout).contains("[from-the-parent]"),
-        "{:?}",
+        String::from_utf8_lossy(&out.stdout).contains("[from-the-store]"),
+        "the stored variable lost to the parent's environment\n{:?}",
         String::from_utf8_lossy(&out.stdout)
+    );
+}
+
+/// **The symmetry, as one assertion.** A stored var and a stored alias meet the same collision —
+/// the config sets the same name — and must come out the same way. They did not: the alias won and
+/// the var lost, and nothing distinguished the two cases but which arm of one `match` they hit.
+#[test]
+fn a_var_and_an_alias_beat_the_config_alike() {
+    let shell = Shell::new();
+    shell.macros(&["add", "--var", "GREET=from-macro"]);
+    shell.macros(&["add", "--alias", "ll", "echo from-macro"]);
+    std::fs::create_dir_all(shell.data.path().join("config/oslo")).expect("config dir");
+    std::fs::write(
+        shell.data.path().join("config/oslo/init.lua"),
+        "oslo.proc.exec('alias ll=\"echo from-init-lua\"')\n\
+         oslo.env.set(\"GREET\", \"from-init-lua\")\n",
+    )
+    .expect("init.lua");
+
+    let mut child = Command::new(oslo_bin())
+        .arg("-i")
+        .env("HOME", shell.data.path())
+        .env("XDG_DATA_HOME", shell.data.path())
+        .env("XDG_CONFIG_HOME", shell.data.path().join("config"))
+        .env("GREET", "from-environment")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .expect("spawn oslo");
+    child
+        .stdin
+        .as_mut()
+        .expect("stdin")
+        .write_all(b"echo VAR:$GREET\nll\n")
+        .expect("write");
+    let out = child.wait_with_output().expect("wait");
+    let said = String::from_utf8_lossy(&out.stdout);
+    assert!(said.contains("VAR:from-macro"), "the var lost\n{said:?}");
+    assert!(
+        said.matches("from-macro").count() >= 2,
+        "the two kinds did not agree\n{said:?}"
     );
 }
 

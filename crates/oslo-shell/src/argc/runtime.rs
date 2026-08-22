@@ -33,9 +33,14 @@ use std::path::Path;
 /// **Copy, because `argc::Runtime` demands it** — the trait is `Copy + Clone` so it can be handed to
 /// several threads at once upstream. That rules out holding `&mut Environment`, so what is carried
 /// is a raw pointer to it and the promise that this lives no longer than one builtin call.
+/// **The environment is optional, and its absence is a real case.** `oslo.args.parse` is a Lua
+/// binding that has to work from inside a registered builtin and a completion provider — the two
+/// places the shell is holding its own state and cannot be borrowed. Without a shell to ask, the
+/// process environment answers instead and a `` `_default_fn` `` computes to nothing, which is the
+/// honest result rather than a refusal: a declaration that uses neither is the overwhelming case.
 #[derive(Clone, Copy)]
 pub struct Shell {
-    env: *mut Environment,
+    env: Option<*mut Environment>,
 }
 
 impl Shell {
@@ -46,14 +51,19 @@ impl Shell {
     /// both callers — the builtin and `oslo --argc-eval` — make one from their own `&mut` and drop
     /// it before returning.
     pub fn new(env: &mut Environment) -> Shell {
-        Shell { env }
+        Shell { env: Some(env) }
+    }
+
+    /// The same, with no shell behind it — for a caller that cannot borrow one.
+    pub fn detached() -> Shell {
+        Shell { env: None }
     }
 
     #[allow(clippy::mut_from_ref)]
-    fn env(&self) -> &mut Environment {
+    fn env(&self) -> Option<&mut Environment> {
         // SAFETY: the pointer came from a `&mut Environment` in `builtin_argc`, which owns the
         // borrow for the whole call and hands out no other reference to it.
-        unsafe { &mut *self.env }
+        self.env.map(|env| unsafe { &mut *env })
     }
 }
 
@@ -87,11 +97,16 @@ impl argc::Runtime for Shell {
         args: &[String],
         envs: HashMap<String, String>,
     ) -> Option<Vec<String>> {
+        // No shell means no evaluator to run them in, and an empty answer per function is what the
+        // parser reads as "this default computed to nothing".
+        let Some(env) = self.env() else {
+            return Some(functions.iter().map(|_| String::new()).collect());
+        };
         let source = self.read_to_string(script_file)?;
         Some(
             functions
                 .iter()
-                .map(|function| super::call::capture(self.env(), &source, function, args, &envs))
+                .map(|function| super::call::capture(env, &source, function, args, &envs))
                 .collect(),
         )
     }
@@ -107,11 +122,17 @@ impl argc::Runtime for Shell {
     }
 
     fn env_vars(&self) -> HashMap<String, String> {
-        self.env().get_all_vars()
+        match self.env() {
+            Some(env) => env.get_all_vars(),
+            None => std::env::vars().collect(),
+        }
     }
 
     fn env_var(&self, name: &str) -> Option<String> {
-        self.env().get_var(name).map(str::to_string)
+        match self.env() {
+            Some(env) => env.get_var(name).map(str::to_string),
+            None => std::env::var(name).ok(),
+        }
     }
 
     /// `$PATH`, through the same table `hash` fills.
