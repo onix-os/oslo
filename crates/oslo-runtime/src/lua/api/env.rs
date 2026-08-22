@@ -11,12 +11,6 @@
 //! inside a registered builtin or an answering hook. That is not true of most of `oslo.*` — the
 //! lock is 28 functions across six files, not the whole API — and the difference is worth knowing
 //! before reaching for a workaround. See `docs/features/your-own-tools.md`.
-//!
-//! The one exception is [`universal`]: reading the universal store touches a file rather than the
-//! shell, so `oslo.env.universal()` answers from anywhere. Writing to it does not.
-
-#[path = "env/universal.rs"]
-mod universal;
 
 use super::envlist;
 use super::util::{list, put, record, text};
@@ -148,7 +142,4 @@ pub fn install(oslo: &mut Table, env: &Arc<Mutex<Environment>>) {
 
     // `$PATH` and its relatives as the lists they are. See [`super::envlist`].
     envlist::install(oslo, env);
-    // Variables that outlive this shell. See [`universal`] — reading them is the one thing in this
-    // namespace that does not take the lock.
-    universal::install(oslo, env);
 }

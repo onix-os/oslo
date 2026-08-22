@@ -127,9 +127,6 @@ const FUNCTIONS: &[&str] = &[
     "oslo.env.set",
     "oslo.env.all",
     "oslo.env.snapshot",
-    "oslo.env.universal",
-    "oslo.env.universal_set",
-    "oslo.env.universal_erase",
     "oslo.completion.forget",
     "oslo.env.path_add",
     "oslo.proc.status",
@@ -231,9 +228,6 @@ fn most_of_the_api_works_from_inside_a_builtin() {
   try("rank",  function() assert(oslo.ui.rank({"git checkout","zzz"}, "gco")[1].text) end)
   try("wrap",  function() assert(#oslo.ui.wrap("a b c d", 3) > 1) end)
   try("style", function() assert(oslo.theme.style("x", "fg:red")) end)
-  -- Reading the universal store is a file, not the shell, so it is on this side of the line while
-  -- `oslo.env.get` beside it is on the other. See `tests/universal_variable_tests.rs`.
-  try("universal", function() local _ = oslo.env.universal() end)
   -- Pure computation over records, which is why the pipeline verbs reach in here at all. `where` is
   -- the interesting one: it evaluates Lua per row through the engine already running, so this is a
   -- re-entry. See `tests/rows_verb_tests.rs`.
@@ -242,22 +236,8 @@ fn most_of_the_api_works_from_inside_a_builtin() {
 "#,
     );
     for name in [
-        "fs",
-        "glob",
-        "json",
-        "hash",
-        "state",
-        "db",
-        "path",
-        "ui",
-        "git",
-        "match",
-        "rank",
-        "wrap",
-        "style",
-        "universal",
-        "rows",
-        "where",
+        "fs", "glob", "json", "hash", "state", "db", "path", "ui", "git", "match", "rank", "wrap",
+        "style", "rows", "where",
     ] {
         assert!(
             said.contains(&format!("{name}=works")),
@@ -286,19 +266,9 @@ fn the_locked_calls_refuse_from_inside_a_builtin() {
   try("env_set", function() oslo.env.set("SURFACE", "1") end)
   try("status",  function() oslo.proc.status() end)
   try("path_add",function() oslo.env.path_add("/tmp") end)
-  -- Writing one applies it to this shell as well as the file, so it needs what reading does not.
-  -- A builtin persists through the effects table instead.
-  try("universal_set", function() oslo.env.universal_set("SURFACE", "1") end)
 "#,
     );
-    for name in [
-        "run",
-        "env_get",
-        "env_set",
-        "status",
-        "path_add",
-        "universal_set",
-    ] {
+    for name in ["run", "env_get", "env_set", "status", "path_add"] {
         assert!(
             said.contains(&format!("{name}=refused")),
             "{name} no longer refuses — if that is deliberate, this test records the old rule\n{said}"
