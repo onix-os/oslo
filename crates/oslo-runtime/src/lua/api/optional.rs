@@ -16,6 +16,8 @@ use std::sync::{Arc, Mutex};
 pub fn install(oslo: &mut Table, host: &dyn Host, env: &Arc<Mutex<Environment>>) {
     #[cfg(feature = "direnv")]
     oslo.set_str("direnv", super::direnv::build(env));
+    #[cfg(feature = "argc")]
+    oslo.set_str("args", super::args::build());
     #[cfg(feature = "nix")]
     oslo.set_str("nix", super::nix::build());
     #[cfg(feature = "make")]

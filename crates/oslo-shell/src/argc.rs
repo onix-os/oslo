@@ -179,6 +179,82 @@ fn basename(name: &str) -> String {
     name.rsplit('/').next().unwrap_or(name).to_string()
 }
 
+/// What a parse decided, with no `argc` types in it.
+///
+/// **The point of the shape is what it keeps out.** `ArgcValue` is the vendored crate's enum, and
+/// naming it in `oslo-runtime` would put the whole dependency — and its feature gate — in a second
+/// crate for the sake of one binding. This is the same information as a list of names to values.
+pub enum Parsed {
+    /// One entry per option or argument that was given a value.
+    Values(Vec<(String, Vec<String>)>),
+    /// `--help`, or a usage mistake: the text argc rendered, and the status it chose. Zero is help
+    /// that was asked for; anything else is the mistake.
+    Message(String, i32),
+}
+
+/// Parse `words` against the declaration in `source`, without touching any shell.
+///
+/// The declaration is the same `# @option` comment block the `argc` builtin reads — one syntax, so
+/// a script, a recipe and a registered builtin describe their arguments the same way. See
+/// [`Shell::detached`] for what a declaration loses by having no shell: a `` `_fn` `` default
+/// computes to nothing.
+///
+/// `words[0]` is the command's name, as argc expects — it is what the rendered help calls it.
+pub fn parse_words(source: &str, words: &[String], width: Option<usize>) -> Result<Parsed, String> {
+    let values = argc::eval(Shell::detached(), source, words, None, width)
+        .map_err(|problem| problem.to_string())?;
+    let mut out = Vec::new();
+    for value in &values {
+        match value {
+            ArgcValue::Single(name, value)
+            | ArgcValue::SingleFn(name, value)
+            | ArgcValue::PositionalSingle(name, value)
+            | ArgcValue::PositionalSingleFn(name, value) => {
+                out.push((name.clone(), vec![value.clone()]));
+            }
+            ArgcValue::Multiple(name, values) | ArgcValue::PositionalMultiple(name, values) => {
+                out.push((name.clone(), values.clone()));
+            }
+            ArgcValue::ExtraPositionalMultiple(values) => {
+                out.push(("__positionals".to_string(), values.clone()));
+            }
+            ArgcValue::Env(name, value) | ArgcValue::EnvFn(name, value) => {
+                out.push((name.clone(), vec![value.clone()]));
+            }
+            ArgcValue::Map(name, map) => {
+                let flat = map
+                    .iter()
+                    .map(|(key, values)| format!("{key}={}", values.join(",")))
+                    .collect();
+                out.push((name.clone(), flat));
+            }
+            // A subcommand the arguments selected: named, not called. **A binding must not run
+            // anything** — the caller asked what the words mean, not for them to be acted on.
+            ArgcValue::CommandFn(function) => {
+                out.push(("__command".to_string(), vec![function.clone()]));
+            }
+            ArgcValue::ParamFn(_) | ArgcValue::Hook(_) => {}
+            ArgcValue::Dotenv(_) | ArgcValue::RequireTools(_) => {}
+            ArgcValue::ExternalSubcommand(..) => {}
+            ArgcValue::Error((message, status)) => {
+                return Ok(Parsed::Message(message.clone(), *status));
+            }
+        }
+    }
+    Ok(Parsed::Values(out))
+}
+
+/// The usage text a declaration renders, without parsing anything.
+pub fn usage_of(source: &str, name: &str, width: Option<usize>) -> Result<String, String> {
+    let words = vec![name.to_string(), "--help".to_string()];
+    match parse_words(source, &words, width)? {
+        Parsed::Message(text, _) => Ok(text),
+        // `--help` always ends in an `Error` carrying the text, so this is the declaration having
+        // declared a `--help` of its own — in which case there is nothing generated to show.
+        Parsed::Values(_) => Err("the declaration defines its own --help".to_string()),
+    }
+}
+
 /// `argc_tries`, from `tries`. The prefix is argc's, and scripts are written against it.
 fn argc_name(id: &str) -> String {
     format!("argc_{}", id.replace('-', "_"))

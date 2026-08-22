@@ -21,6 +21,8 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::{Arc, Mutex};
 
+#[cfg(feature = "argc")]
+mod args;
 mod builtin;
 mod complete;
 mod convert;

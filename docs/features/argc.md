@@ -38,11 +38,12 @@ natively rather than a program you have to install beside one.
 [![argc demo](https://asciinema.org/a/1262961.svg)](https://asciinema.org/a/1262961)
 <!-- demo:end -->
 
-## Two doors, one parser
+## Three doors, one parser
 
 ```text
 bash script   →  oslo --argc-eval  →  shell code  →  eval  →  variables
 oslo script   →  argc "$@"                              →  variables
+Lua           →  oslo.args.parse(spec, argv)            →  a table
 ```
 
 ### `oslo --argc-eval`, for a script that is not oslo's
@@ -110,6 +111,46 @@ is how `--env <Tab>` came to complete `src/`. Found by recording it, not by read
 The provider is named `argc` and badged `argc`, so `oslo.completion.sh_sources` can filter it and a
 config that wants to replace it declares a provider of the same name.
 
+### `oslo.args`, for a config
+
+The same declaration, from Lua — so a registered builtin, a `.env.lua` and a `.make.lua` describe
+their arguments the way a script already does, rather than each inventing a table format.
+
+```lua
+local SPEC = [[
+# @describe  Put a build somewhere
+# @option -t --tries <NUM>   how many times to retry
+# @flag   -n --dry-run       say what would happen
+# @arg    target!            where to
+]]
+
+oslo.register_builtin{ name = "deploy", run = function(argv, shell)
+  local got, why, status = oslo.args.parse(SPEC, argv)
+  if not got then io.write(why, "\n") return status end
+  --> got.target == "prod", got.tries == "3", got.dry_run set only when given
+end }
+
+print(oslo.args.usage(SPEC, "deploy"))   -- the rendered help, without parsing
+oslo.args.check(SPEC)                    -- true, or nil + what is wrong with the declaration
+```
+
+| answer | means |
+|---|---|
+| a table | it parsed; a dash in a name is an underscore, so `--dry-run` is `got.dry_run` |
+| `nil, text, 0` | `--help` was asked for; `text` is the page |
+| `nil, text, 1` | a usage mistake; `text` says which |
+
+**Nothing here touches the shell**, which is the point: a builtin and a completion provider both run
+while the shell holds its own state, and every call that borrows it raises there. The parse uses a
+detached runtime — so it works in those places, and the one thing it gives up is a default computed
+by a shell function, which has no evaluator to run in and comes back empty.
+
+`argv` arrives with the builtin's own name at `argv[1]`, which is exactly what argc wants at
+`words[0]` — so a builtin passes what it was handed, unchanged.
+
+Present only in a build with the `argc` feature. A config asks the documented way: `if oslo.args
+then`.
+
 ## A default computed by a function
 
 A declaration can name a function instead of a literal:
@@ -167,3 +208,4 @@ switched on.
 | `crates/oslo-shell/src/argc/call.rs` | running a script's own helper functions |
 | `crates/oslo-shell/src/argc/complete.rs` | the completion provider |
 | `src/cli/argc.rs` | `oslo --argc-eval` |
+| `crates/oslo-runtime/src/lua/api/args.rs` | `oslo.args` — the Lua binding |
