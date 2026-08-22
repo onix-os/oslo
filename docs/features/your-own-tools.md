@@ -67,6 +67,31 @@ oslo.register_tool{ name = "count", accepts = "rows",
   rows = function(argv, input) return { { rows = #input } } end }
 ```
 
+**A third argument for a tool that declared `accepts = "bytes"`** — the raw stream, as a string:
+
+```lua
+oslo.register_tool{ name = "counted", accepts = "bytes",
+  rows = function(argv, input, bytes)
+    local n = 0
+    for _ in bytes:gmatch("[^\n]+") do n = n + 1 end
+    return { { lines = n } }
+  end }
+```
+
+```
+$ printf 'a\nb\nc\n' | counted | cols lines
+lines
+3
+```
+
+That shape was accepted by the validator and could not work: the planner routed the bytes here —
+it reads standard input for a bytes-accepting tool at the head of a pipeline — and they were dropped
+one call short of the handler, so `bytes` was always `nil`. It is `nil` for every other shape, by the
+same rule `input` follows: given nothing and given no bytes are different questions.
+
+Declaring `"bytes"` copies the whole stream into a Lua string, so a tool reading a 200 MB pipe costs
+200 MB. A tool that wants to stream takes `rows` with `lines` in front of it instead.
+
 `accepts` is still what the planner reads to decide the edge; what changed is that the input is then
 handed over rather than dropped.
 

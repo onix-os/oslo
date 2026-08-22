@@ -62,9 +62,11 @@ pub fn install(oslo: &mut Table) {
         // "is there a tool called this" does not mean reaching up into the Lua API. See
         // `oslo_shell::data::custom`.
         TOOLS.with(|slot| slot.borrow_mut().insert(name.to_string(), rows.clone()));
-        let handler = std::rc::Rc::new(move |argv: &[String], input: Option<&[Record]>| {
-            run_rows(&rows, argv, input)
-        });
+        let handler = std::rc::Rc::new(
+            move |argv: &[String], input: Option<&[Record]>, bytes: Option<&str>| {
+                run_rows(&rows, argv, input, bytes)
+            },
+        );
         oslo_shell::data::custom::register(&name, handler);
         oslo_shell::data::tool::register(&name, accepts, produces);
         Ok(vec![Value::Bool(true)])
@@ -116,6 +118,7 @@ fn run_rows(
     handler: &Value,
     argv: &[String],
     input: Option<&[Record]>,
+    bytes: Option<&str>,
 ) -> Result<Vec<Record>, String> {
     let mut list = Table::new();
     for (i, word) in argv.iter().enumerate() {
@@ -130,7 +133,19 @@ fn run_rows(
         None => Value::Nil,
     };
 
-    match crate::lua::engine::call_here(handler, vec![argv, given]) {
+    // The third argument, for a tool that declared `accepts = "bytes"`. `nil` for every other
+    // shape, by the same rule as `given` above: a tool that was handed no bytes and a tool that
+    // never asked for any are different situations.
+    //
+    // **This copies the whole stream into a Lua string**, which is what declaring `"bytes"` asks
+    // for. A tool reading a 200 MB pipe costs 200 MB; one that wants to stream should take `rows`
+    // from `lines` in front of it instead.
+    let raw = match bytes {
+        Some(text) => Value::str(text),
+        None => Value::Nil,
+    };
+
+    match crate::lua::engine::call_here(handler, vec![argv, given, raw]) {
         Ok(values) => Ok(records_of(values.first().unwrap_or(&Value::Nil))),
         Err(e) => Err(e.to_string()),
     }
