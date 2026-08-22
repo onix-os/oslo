@@ -85,6 +85,20 @@ pub struct Invocation {
     /// matter most here — `posix` above all — deliberately have none: `$-` must not claim a
     /// letter bash does not report.
     pub long_options: Vec<ShellOption>,
+    /// `--norc`: do not read the configuration.
+    ///
+    /// bash's flag, and honoured rather than swallowed. It is how every program that hands a
+    /// script to `bash` asks for a shell that is only a shell — direnv passes
+    /// `--noprofile --norc` before running an `.envrc`, and it is right to: the caller wants the
+    /// script's own behaviour, not whatever the person at the keyboard configured.
+    ///
+    /// This matters on a machine where `bash` on `$PATH` is a link to oslo, which is a supported
+    /// way to install it. Refusing the flag there made oslo unusable as the shell such a program
+    /// reaches for, and refusing it *by name* is the worst of the options: the caller has no way
+    /// to tell an unknown flag from a shell that is about to ignore its request.
+    pub no_rc: bool,
+    /// `--noprofile`: do not read `/etc/profile` or `~/.profile`, even as a login shell.
+    pub no_profile: bool,
 }
 
 impl Invocation {
@@ -218,6 +232,8 @@ pub fn parse(argv: &[String]) -> Result<Invocation, Exit> {
     let mut login = argv
         .first()
         .is_some_and(|argv0| argv0.starts_with('-') && argv0.len() > 1);
+    let mut no_rc = false;
+    let mut no_profile = false;
     let mut set_options = String::new();
     let mut long_options: Vec<ShellOption> = Vec::new();
     let mut unset_letters = String::new();
@@ -266,6 +282,8 @@ pub fn parse(argv: &[String]) -> Result<Invocation, Exit> {
                         unset_letters: String::new(),
                         unset_long: Vec::new(),
                         long_options: Vec::new(),
+                        no_rc: false,
+                        no_profile: false,
                     });
                 }
                 "version" => {
@@ -295,6 +313,12 @@ pub fn parse(argv: &[String]) -> Result<Invocation, Exit> {
                 // reach for — so a shell that only took `-l` failed to start under exactly the
                 // things that start a login shell.
                 "login" => login = true,
+                // bash's two "be only a shell" flags, honoured rather than swallowed — see
+                // [`Invocation::no_rc`]. `--rcfile`/`--init-file` are deliberately absent: they
+                // name a *bash* rc file, and pointing oslo at one would source shell syntax into a
+                // shell whose configuration is Lua.
+                "norc" => no_rc = true,
+                "noprofile" => no_profile = true,
                 other => match long_option(other) {
                     Some(option) => {
                         if !long_options.contains(&option) {
@@ -479,6 +503,8 @@ pub fn parse(argv: &[String]) -> Result<Invocation, Exit> {
         unset_letters,
         unset_long,
         long_options,
+        no_rc,
+        no_profile,
     })
 }
 
