@@ -30,7 +30,29 @@ pub fn build(env: &Arc<Mutex<Environment>>) -> Value {
     #[cfg(feature = "nix")]
     nix_develop(&mut it, env);
     path_add(&mut it, env);
+    dir(&mut it);
     Value::table(it)
+}
+
+/// `oslo.direnv.dir()` — the directory whose file is running.
+///
+/// # Why a file needs to be told where it is
+///
+/// It is now also the working directory, so most files never have to ask. This is for the ones that
+/// do: a path being *stored* rather than used — a cache location, a marker written into
+/// `oslo.state`, a value handed to a program that will run somewhere else later — has to be
+/// absolute, and `"./thing"` stops meaning anything the moment the shell moves on.
+///
+/// `nil` outside a directory environment, which is the honest answer in `init.lua` and in
+/// `oslo make`: no file is loading, so there is no directory speaking for one, and a caller should
+/// fall back to `oslo.fs.cwd()`.
+fn dir(it: &mut Table) {
+    put(it, "dir", |_, _| {
+        Ok(vec![match super::mark::loading_directory() {
+            Some(path) => Value::str(path),
+            None => Value::Nil,
+        }])
+    });
 }
 
 fn path_add(it: &mut Table, env: &Arc<Mutex<Environment>>) {

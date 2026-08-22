@@ -124,6 +124,15 @@ mod loading {
     }
 }
 
+#[cfg(feature = "direnv")]
+/// The directory whose environment file is running, for a caller outside this module.
+///
+/// `oslo.direnv.dir()` is the one, and it wants the same answer `oslo.mark()` uses rather than a
+/// second notion of "where the file is" that could drift from it.
+pub fn loading_directory() -> Option<String> {
+    loading::directory()
+}
+
 /// The directory `oslo.mark()` means by "this one".
 ///
 /// The environment file's own while one is loading, and the shell's otherwise — see the note at the

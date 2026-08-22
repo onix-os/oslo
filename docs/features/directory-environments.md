@@ -73,6 +73,24 @@ is to call `oslo.env.set` and friends, which take the same lock with `try_lock`,
 every one of them fail with "shell state is busy" while the load reported success. A file that
 failed half way still had its first half take effect, so the diff is taken regardless.
 
+### Both files run in their own directory
+
+`.envrc` has always been `cd`-ed to before it runs, because direnv does it and half the files in the
+world say `PATH_add ./bin`. **`.env.lua` did not**, and that was a bug rather than a difference:
+`~/proj/.env.lua` saying `oslo.direnv.path_add("./bin")`, entered as `cd ~/proj/app/src`, resolved
+`./bin` against `app/src` and put a directory that does not exist onto `$PATH` — silently, and for as
+long as you stood in the project. Which answer you got depended on how deep you walked in, so it
+worked from the project root and only ever failed for somebody in a subdirectory.
+
+Both now chdir, and both restore the shell's own directory afterwards whatever happens, panic
+included: a shell left standing somewhere the user did not walk to is a far worse outcome than an rc
+file that failed. `tests/directory_environment_tests.rs` is what keeps the two in step.
+
+`oslo.direnv.dir()` answers with that directory, for a path being *stored* rather than used — a cache
+location, a marker written into `oslo.state`, a value handed to something that runs later — where
+`"./thing"` stops meaning anything the moment the shell moves on. It is `nil` outside a directory
+environment, which is the honest answer in `init.lua` and in `oslo make`.
+
 Nearest ancestor wins outright; loading every ancestor would make an outer file's effect depend on
 how deep you happened to be standing. A directory holding both names is governed by `.env.lua`, and
 `direnv status` names the shadowed file, because being inert looks exactly like working until you
