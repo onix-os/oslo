@@ -1,5 +1,52 @@
 # Changelog
 
+## [0.4.4] - 2026-08-22
+
+### <!-- 0 -->⛰️  Features
+
+- Colouring by name, and a heading to put it under
+- The structured verbs a pipeline cannot reach
+- One declaration a config can parse with
+- Waiting for work where there is no prompt
+- A variable that outlives the shell
+- The scorer a completion provider can reach
+- A command that may not take forever
+- A builtin is handed the shell and returns effects
+- The shell as a record a builtin can be handed
+- A moment to clean up, and what else to watch
+- A variable a project keeps to itself
+- The word rules a locked surface can still ask
+
+### <!-- 1 -->🐛 Bug Fixes
+
+- Add says what edit says, and refuses what it should
+- A stored variable wins, like every other kind
+- Accepts = "bytes" is handed its bytes
+- Oslo.lines keeps stderr and the exit status
+- .env.lua runs in its own directory
+- Equal mtimes mean stale, not fresh
+
+### <!-- 2 -->🚜 Refactor
+
+- The macro store replaces universal variables
+- Oslo.env gets a file of its own
+
+### <!-- 6 -->🧪 Testing
+
+- Walk the oslo.* surface and the lock boundary
+
+### <!-- 7 -->⚙️ Miscellaneous Tasks
+
+- Aux files
+- Merge develop to main
+- Cleanup
+- Merge develop to main
+- Cleanup
+
+### <!-- 9 -->◀️ Revert
+
+- Drop the universal Lua bindings
+
 ## [0.4.3] - 2026-08-21
 
 ## [0.4.2] - 2026-08-21
