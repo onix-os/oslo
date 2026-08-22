@@ -34,6 +34,13 @@ pub fn resolve_program(name: &str) -> Option<PathBuf> {
         let path = Path::new(name);
         return path.is_file().then(|| path.to_path_buf());
     }
+    // A name this directory hides is not on `$PATH` as far as anything asking here is concerned.
+    // See `oslo_base::command`. This is the lowest of the `$PATH` searches — `command -v`, `which`
+    // and the execution fallback all arrive here — and it has to agree with `type`, which reads the
+    // same mask in `control::resolve::path_matches`.
+    if oslo_base::command::hidden(name) {
+        return None;
+    }
     // **oslo does not see its own copies.** `macros::bin` writes every stored script into a
     // directory on `$PATH` so that bash, tmux and a `.desktop` file can run one; oslo has the
     // database and needs no copy, so its own files are passed over and the macro is answered from

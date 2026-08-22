@@ -204,6 +204,11 @@ fn lookup_program(name: &str, default_path: bool) -> Option<PathBuf> {
     if !default_path || name.contains('/') {
         return resolve_program(name);
     }
+    // `-p` searches a different `$PATH`, not a different question: a hidden name is hidden here
+    // too. See `oslo_base::command`.
+    if oslo_base::command::hidden(name) {
+        return None;
+    }
     let cwd = std::env::current_dir().ok()?;
     which::which_in(name, Some(DEFAULT_PATH), cwd).ok()
 }

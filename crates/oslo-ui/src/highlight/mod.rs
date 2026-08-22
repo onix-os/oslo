@@ -266,7 +266,13 @@ fn command_token(name: &str, ctx: &Context<'_>) -> TokenType {
     // `=grep` is the shorthand for where grep lives, so it runs whenever grep does. Looked up as
     // written it resolves to nothing and the line reads as an error while running perfectly.
     if let Some(rest) = name.strip_prefix('=') {
-        return if !rest.is_empty() && !rest.contains('/') && which::which(rest).is_ok() {
+        // The same mask `expand::sugar::equals` reads, so a hidden name draws as an error here
+        // rather than as a command the line would then fail to run. See `oslo_base::command`.
+        let found = !rest.is_empty()
+            && !rest.contains('/')
+            && !oslo_base::command::hidden(rest)
+            && which::which(rest).is_ok();
+        return if found {
             TokenType::Command
         } else {
             TokenType::Error
