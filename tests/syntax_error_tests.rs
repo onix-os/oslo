@@ -259,3 +259,55 @@ fn balanced_input_at_the_same_width_still_runs() {
         assert_eq!(r.status, 0, "{opener:?}");
     }
 }
+
+/// **A here-document with an empty tag, inside a command substitution, panicked the parser.**
+///
+/// `$(<< \n)` — found by the nightly fuzzer, which had reported it for six consecutive runs. The
+/// tag is empty because of the space, so the here-document machinery reads past the `)` looking for
+/// a terminator it will never find and buffers the tokens; the closing token is then replayed from
+/// that buffer while the reader underneath is at end of input, and `consume_nested_construct`
+/// unwrapped a character that was no longer there.
+///
+/// `brush_parser` is the shell's only parser, so this killed the shell with a panic rather than
+/// reporting a syntax error. What it must do is what it does for every other unterminated
+/// construct: say so, and exit non-zero.
+#[test]
+fn an_empty_here_doc_tag_in_a_substitution_is_an_error_not_a_panic() {
+    let r = run("$(<< \n)");
+    assert!(
+        !r.err().contains("panicked"),
+        "the parser panicked instead of reporting\n{}",
+        r.err()
+    );
+    assert_ne!(r.status, 0, "unterminated input reported success");
+}
+
+/// The same shape at every nesting depth and in both spellings: one `unwrap` was fixed in three
+/// places in that function and five more elsewhere in the tokenizer, reached by other constructs.
+#[test]
+fn no_unterminated_construct_panics_the_parser() {
+    for script in [
+        "$(<< \n)",
+        "`<< `",
+        "$( << \n )",
+        "$(<< \n$(<< \n)\n)",
+        "$(case a in a) << \n esac)",
+        "${x:-$(<< \n)}",
+        "$(<<",
+        "$(<< ",
+    ] {
+        let r = run(script);
+        assert!(
+            !r.err().contains("panicked"),
+            "{script:?} panicked:\n{}",
+            r.err()
+        );
+    }
+}
+
+/// And the construct the vendored parser was patched *for* still parses, so the panic fix did not
+/// take the `case`-pattern handling with it.
+#[test]
+fn a_case_inside_a_substitution_still_parses() {
+    assert_eq!(run("echo $(case a in a) echo Y;; esac)").out(), "Y");
+}

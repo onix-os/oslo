@@ -615,6 +615,21 @@ impl<'a, R: ?Sized + std::io::BufRead> Tokenizer<'a, R> {
     /// * `nesting_open` - The character that increases nesting depth when encountered (e.g., `(` or
     ///   `[`).
     /// * `initial_nesting` - The initial nesting count (e.g., 2 for `$((`, 1 for `$[`).
+    /// # A character that is not there
+    ///
+    /// Every `next_char` here used to be `.unwrap()`ed, and one of them was a live panic in the
+    /// shell's only parser. `$(<< \n)` reaches it: an empty here-document tag, so the here-document
+    /// machinery drains input past the `)` into `pending_here_doc_tokens`, and the terminating
+    /// token is then replayed from that buffer while the reader underneath is already at end of
+    /// input. The loop breaks on a construct it believes closed, and the `unwrap` that consumes the
+    /// closing character finds nothing.
+    ///
+    /// Nightly fuzzing found it and it stood for six runs. `oslo -c '$(<< '` was a crash.
+    ///
+    /// **Appending nothing is right rather than merely safe.** Reaching this with no character left
+    /// means the character was already consumed by the drain, so there is nothing to add; and a
+    /// construct that genuinely ran out of input still ends at the `EndOfInput` arm below, which
+    /// answers `UnterminatedExpansion` — the error it always should have been.
     fn consume_nested_construct(
         &mut self,
         state: &mut TokenParseState,
@@ -698,14 +713,18 @@ impl<'a, R: ?Sized + std::io::BufRead> Tokenizer<'a, R> {
                     // A case pattern's `)` ends the pattern, not the construct.
                     if matches!(case_states.last(), Some(CaseState::Pattern)) {
                         *case_states.last_mut().unwrap() = CaseState::Body;
-                        state.append_char(self.next_char()?.unwrap());
+                        if let Some(c) = self.next_char()? {
+                            state.append_char(c);
+                        }
                         continue;
                     }
                     nesting_count -= 1;
                     if nesting_count == 0 {
                         break;
                     }
-                    state.append_char(self.next_char()?.unwrap());
+                    if let Some(c) = self.next_char()? {
+                        state.append_char(c);
+                    }
                 }
                 TokenEndReason::EndOfInput => {
                     return Err(TokenizerError::UnterminatedExpansion);
@@ -714,7 +733,9 @@ impl<'a, R: ?Sized + std::io::BufRead> Tokenizer<'a, R> {
             }
         }
 
-        state.append_char(self.next_char()?.unwrap());
+        if let Some(c) = self.next_char()? {
+            state.append_char(c);
+        }
         Ok(())
     }
 
@@ -957,14 +978,18 @@ impl<'a, R: ?Sized + std::io::BufRead> Tokenizer<'a, R> {
                             state.append_char('$');
 
                             // Consume the '(' and add it to the token.
-                            state.append_char(self.next_char()?.unwrap());
+                            if let Some(c) = self.next_char()? {
+                                state.append_char(c);
+                            }
 
                             // Check to see if this is possibly an arithmetic expression
                             // (i.e., one that starts with `$((`).
                             let (initial_nesting, is_arithmetic) =
                                 if matches!(self.peek_char()?, Some('(')) {
                                     // Consume the second '(' and add it to the token.
-                                    state.append_char(self.next_char()?.unwrap());
+                                    if let Some(c) = self.next_char()? {
+                                        state.append_char(c);
+                                    }
                                     (2, true)
                                 } else {
                                     (1, false)
@@ -986,7 +1011,9 @@ impl<'a, R: ?Sized + std::io::BufRead> Tokenizer<'a, R> {
                             state.append_char('$');
 
                             // Consume the '[' and add it to the token.
-                            state.append_char(self.next_char()?.unwrap());
+                            if let Some(c) = self.next_char()? {
+                                state.append_char(c);
+                            }
 
                             // Keep track that we're in an arithmetic expression, since
                             // some text will be interpreted differently as a result.
@@ -1002,7 +1029,9 @@ impl<'a, R: ?Sized + std::io::BufRead> Tokenizer<'a, R> {
                             state.append_char('$');
 
                             // Consume the '{' and add it to the token.
-                            state.append_char(self.next_char()?.unwrap());
+                            if let Some(c) = self.next_char()? {
+                                state.append_char(c);
+                            }
 
                             let mut pending_here_doc_tokens = vec![];
                             let mut drain_here_doc_tokens = false;
@@ -1058,7 +1087,9 @@ impl<'a, R: ?Sized + std::io::BufRead> Tokenizer<'a, R> {
                                     TokenEndReason::SpecifiedTerminatingChar => {
                                         // We hit the end brace we were looking for but did not
                                         // yet consume it. Do so now.
-                                        state.append_char(self.next_char()?.unwrap());
+                                        if let Some(c) = self.next_char()? {
+                                            state.append_char(c);
+                                        }
                                         break;
                                     }
                                     TokenEndReason::EndOfInput => {
