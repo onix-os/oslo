@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.4.9] - 2026-08-22
+
+### <!-- 1 -->🐛 Bug Fixes
+
+- Every $PATH search reads the visibility mask
+
+### <!-- 3 -->📚 Documentation
+
+- Guard the hook with type, not command -v
+
 ## [0.4.8] - 2026-08-22
 
 ### <!-- 0 -->⛰️  Features
