@@ -124,6 +124,7 @@ const FUNCTIONS: &[&str] = &[
     "oslo.env.get",
     "oslo.env.set",
     "oslo.env.all",
+    "oslo.env.snapshot",
     "oslo.env.path_add",
     "oslo.proc.status",
     "oslo.proc.exec",

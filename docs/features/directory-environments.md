@@ -96,6 +96,31 @@ how deep you happened to be standing. A directory holding both names is governed
 `direnv status` names the shadowed file, because being inert looks exactly like working until you
 notice that nothing it sets is set.
 
+### A variable the project keeps to itself
+
+`oslo.env.set` exports by default, and for a long time that was the only thing it could do — so a
+`.env.lua` could not create a variable without handing it to every child the project ever spawned.
+A project name, a chosen profile, a computed cache key: all of it reached the editor you launched
+from that directory, and then its crash report.
+
+```lua
+oslo.env.set("PROJECT", "oslo")                      -- exported, as before
+oslo.env.set("CACHE_KEY", key, { export = false })   -- this shell only
+oslo.env.all{ exported = false }                     -- everything, local included
+oslo.env.snapshot()                                  -- with the flag each one carries
+```
+
+Demoting a name that is *already* exported takes two steps inside the binding, and skipping the
+first is a silent no-op: `set_var` ORs the flag it is handed with the one the variable carries, so
+passing `false` alone changes nothing. Clearing the entry and writing it again is the only way down
+— the same dance the unload path does — guarded by a readonly check, because `unset_var` does not
+check and `set_var` does.
+
+There is deliberately **no `restore`**. Putting a snapshot back means removing what is set now and
+absent from it, and doing that across a `cd` would fight this file's own undo record — two
+mechanisms describing the same variables with no agreed order, and `PWD` alone would move the shell.
+Undoing a directory's work is what the undo record is for.
+
 ### The allow gate
 
 A file getting to run code when you walk into a directory is arbitrary code execution by anyone who
