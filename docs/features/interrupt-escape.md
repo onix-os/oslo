@@ -153,7 +153,7 @@ somebody leaving without knowing.)*
 ## From Lua
 
 ```lua
-oslo.on["on-job-escalated"](function(e)
+oslo.on.job_escalated(function(e)
   -- e.action ("stopped", "killed", "hung up", "quit")
   -- e.presses, e.pgid, e.signal, e.text
   oslo.ui.log("had to " .. e.action .. " " .. e.text)
