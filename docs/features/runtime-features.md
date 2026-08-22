@@ -47,7 +47,7 @@ those constants against the table rather than trusting them.
 
 | # | name | where the bit is read | ANDed with |
 |---|---|---|---|
-| 0 | `direnv` | `Direnv::arrive` | the files on disk: `.env.lua`, `.envrc` |
+| 0 | `direnv` | `Direnv::arrive` | the file on disk: `.env.lua` |
 | 1 | `vi` | `vi::enabled()` | `oslo.vi.enabled`, which is `false` by default |
 | 2 | `suggest` | `OsloHelper::suggest` | `oslo.suggest.sh_sources` |
 | 3 | `abbr` | the editor's expand-on-space path | `oslo.abbr` |
@@ -174,11 +174,33 @@ end
 Anything but `false` and `nil` is on, which is Lua's own truthiness and what somebody writing
 `oslo.feature.set("vi", want_vi)` means.
 
+A predicate is re-decided on arrival in every directory, including the one the shell starts in. It
+is a **mask**, so walking out asks the question again and gets the other answer — there is no
+restore step to write and none to forget.
+
 ```lua
 oslo.feature.when("direnv", function(dir)
-  return not oslo.fs.exists(dir .. "/.envrc")
+  return oslo.fs.find_up(".env.lua", dir) ~= nil
 end)
 ```
+
+Its sibling is `oslo.command.when`, which hides a program on `$PATH` by the same rule. Together they
+are how two tools that answer to the same word divide the directories between them:
+
+```lua
+-- oslo's directory environments, only where there is one of oslo's files
+oslo.feature.when("direnv", function(d) return oslo.fs.find_up(".env.lua", d) ~= nil end)
+
+-- the real direnv binary, only where there is one of its files
+oslo.command.when("direnv", function(d)
+  return oslo.fs.find_up(".envrc", d) ~= nil
+      or oslo.env.get("DIRENV_DIFF") ~= nil     -- and while it still has something to unload
+end)
+```
+
+That `DIRENV_DIFF` clause is not optional. direnv has to be *run from outside* the directory to
+unload it, so hiding the binary the moment you leave means the unload never happens and the
+project's variables stay set for the rest of the session.
 
 The names are `direnv`, `vi`, `suggest`, `abbr`, `notify`, `marks`, `finder` and `rm`. Anything else
 raises, listing the real ones — a config that turns off `direnvv` and is quietly obeyed looks

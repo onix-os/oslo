@@ -1,4 +1,4 @@
-//! Showing an `.envrc` working, while it is still working.
+//! Showing a directory environment working, while it is still working.
 //!
 //! Its output is captured to a scratch file so that it can be printed under the line naming the
 //! file — see [`super::capturing`]. That is right for a file that takes a moment and wrong for one
@@ -11,7 +11,7 @@
 //! shown; the difference is that it is drawn in oslo's own rail rather than left raw.
 //!
 //! **Nothing is shown for a file that is quick.** Printing starts only after [`QUIET`] has passed
-//! with the rc file still running, so the overwhelming majority of arrivals — an `.envrc` that
+//! with the rc file still running, so the overwhelming majority of arrivals — a file that
 //! exports four variables and returns — look exactly as they did: one block, nothing before it.
 //!
 //! **Lines are printed once.** The tail counts the bytes it has put on screen and hands the number

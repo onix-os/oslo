@@ -73,11 +73,10 @@ impl BuiltinRegistry {
 
     /// Remove a builtin, answering whether there was one.
     ///
-    /// For builtins that exist only for the length of something: direnv's stdlib is in scope while
-    /// an `.envrc` runs and nowhere else, which is direnv's own rule and also the only honest one
-    /// — `PATH_add` offered at the prompt would be a command that edits an environment no file is
-    /// holding open. Registration stays the single way in, so what this removes is exactly what
-    /// `type`, completion and the dispatcher stop seeing.
+    /// For a builtin that exists only for the length of something — a plugin being unloaded, a
+    /// name a `.env.lua` registered and the directory it belongs to being left. Registration stays
+    /// the single way in, so what this removes is exactly what `type`, completion and the
+    /// dispatcher stop seeing.
     pub fn unregister(&mut self, name: &str) -> bool {
         self.table.remove(name.trim()).is_some()
     }
@@ -112,10 +111,11 @@ impl BuiltinRegistry {
     /// turning the feature back on restores the builtin exactly as it was registered.
     ///
     /// The word then falls through to `$PATH` like any other — the same route `\direnv` already
-    /// takes; see `exec::simple::escape`. This was written for `direnv` specifically, so that an
-    /// `.envrc` directory could be handed to the real one, and that reason is gone: oslo reads
-    /// `.envrc` itself now. The mechanism stays because it is general and because handing a name
-    /// back to `$PATH` is the right way to turn any builtin off.
+    /// takes; see `exec::simple::escape`. Written for `direnv` specifically, so that an `.envrc`
+    /// directory could be handed to the real one, and that is once again exactly what it is for:
+    /// oslo reads `.env.lua` and leaves `.envrc` to direnv, so a configuration that turns the
+    /// `direnv` feature off in an `.envrc` directory gets the real binary there and oslo's builtin
+    /// everywhere else. See `oslo.feature.when`.
     fn entry(&self, name: &str) -> Option<&Builtin> {
         if oslo_base::feature::builtin_is_off(name) {
             return None;

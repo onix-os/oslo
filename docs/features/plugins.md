@@ -141,7 +141,7 @@ number and the check compares another. There is one now.
 ## Trust
 
 `install` records what the plugin's `.lua` files hashed to. Loading recomputes and compares; a
-mismatch refuses and says so. This is the model `.envrc` already uses.
+mismatch refuses and says so. This is the model direnv already uses.
 
 ```sh
 oslo plugin list          # notes   note   CHANGED — run `oslo plugin allow`

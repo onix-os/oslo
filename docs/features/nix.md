@@ -29,7 +29,7 @@ in the shell.
 > if oslo.nix then … end
 > ```
 >
-> The feature is independent of `direnv`. With both, an `.envrc` can say `use flake` and a
+> The feature is independent of `direnv`. With both, a
 > `.env.lua` can call `oslo.direnv.nix_develop()`; with `nix` alone there is no directory file to
 > ask, and `oslo.nix` is the whole of it.
 

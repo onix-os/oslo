@@ -16,7 +16,7 @@
 
 use super::util::{put, text};
 use oslo_base::value::{LuaError, Table, Value};
-use oslo_shell::direnv::stdlib;
+use oslo_shell::direnv::paths;
 use oslo_shell::env::Environment;
 #[cfg(feature = "nix")]
 use oslo_shell::nix_shell as devshell;
@@ -76,7 +76,7 @@ fn path_add(it: &mut Table, env: &Arc<Mutex<Environment>>) {
             _ => "PATH".to_string(),
         };
         let mut guard = crate::lua::engine::borrow_env(&env)?;
-        stdlib::prepend_into(&mut guard, &name, &[dir])
+        paths::prepend_into(&mut guard, &name, &[dir])
             .map_err(|e| LuaError::new(format!("oslo.direnv.path_add: {e}")))?;
         let joined = guard.get_var(&name).unwrap_or_default().to_string();
         Ok(vec![Value::str(joined)])
@@ -207,7 +207,7 @@ fn watching(it: &mut Table) {
         let mut added = 0;
         for (i, _) in args.iter().enumerate() {
             let path = text(&args, i + 1, "oslo.direnv.watch_file")?;
-            stdlib::watch(&stdlib::absolute(&path, &base));
+            paths::watch(&paths::absolute(&path, &base));
             added += 1;
         }
         if added == 0 {
@@ -226,7 +226,7 @@ fn watching(it: &mut Table) {
     put(it, "watch_dir", |_, args| {
         let base = loading_base("oslo.direnv.watch_dir")?;
         let path = text(&args, 1, "oslo.direnv.watch_dir")?;
-        stdlib::watch(&stdlib::absolute(&path, &base));
+        paths::watch(&paths::absolute(&path, &base));
         Ok(vec![Value::Bool(true)])
     });
 }

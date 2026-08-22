@@ -127,7 +127,7 @@ scripts/demo/embed.sh                            # put the players back in the d
 
 | | |
 |---|---|
-| [Directory environments](directory-environments.md) | `.envrc` read by oslo itself, not handed to direnv |
+| [Directory environments](directory-environments.md) | `.env.lua` per project, with an allow gate and an undo record |
 | [nix, as data](nix.md) | Every `nix --json` answer as a Lua table, extended in Lua |
 | [Build recipes](build-recipes.md) | `.make.lua` — a justfile in the language the config is already in |
 | [The filesystem navigator](nav.md) | `nav`: type to filter, arrows to move, Esc to take the shell there |

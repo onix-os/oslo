@@ -1,9 +1,8 @@
 //! The environment of a Nix dev shell, without entering one — direnv's `use flake` and `use nix`.
 //!
-//! Here rather than in the Lua API, where it started, because two front doors now want it: an
-//! `.envrc` writing `use flake` and a `.env.lua` writing `oslo.direnv.nix_develop()`. One of them
-//! having its own copy is how the two would come to disagree about `IGNORED`, and getting that
-//! list wrong is silent and severe — see below.
+//! Here rather than in the Lua API, where it started, because the delicate part is not the call:
+//! it is the `IGNORED` list, the variables a dev shell exports that would wreck the shell you are
+//! standing in. Getting that list wrong is silent and severe — see below.
 //!
 //! direnv's `use flake` is four lines of shell (`stdlib.sh`):
 //!
@@ -117,7 +116,7 @@ fn keeping_yours(dev: &str, outer: &str) -> String {
 /// `use flake --option warn-dirty false` work: the flags are nix's, not direnv's. Taking the first
 /// argument as the installable instead turned that line into `print-dev-env … '--option'` and nix
 /// answered "flag '--option' requires 2 argument(s), but only 0 were given" — a message about a
-/// flag the `.envrc` never asked to be alone.
+/// flag nobody asked to be alone.
 ///
 /// An empty list is left empty rather than defaulting to `.`: `print-dev-env` already resolves the
 /// current directory's flake, which is how a bare `use flake` works in direnv too.
@@ -148,8 +147,8 @@ pub fn profile() -> String {
 
 /// Run `nix print-dev-env` with `args` and apply what it exports. Answers how many.
 ///
-/// The one implementation, called by `use flake` from an `.envrc` and by
-/// `oslo.direnv.nix_develop()` from a `.env.lua`.
+/// Called by `oslo.direnv.nix_develop()` from a `.env.lua` — the same thing direnv's `use flake`
+/// does, done here so a `.env.lua` needs no direnv.
 pub fn apply(env: &mut Environment, args: &[String]) -> Result<usize, String> {
     apply_with(env, args, Want::default())
 }

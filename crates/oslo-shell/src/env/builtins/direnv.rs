@@ -54,7 +54,7 @@ fn target(argument: Option<&String>) -> Option<PathBuf> {
         return find::applicable(&here).map(|rc| rc.path);
     };
     let path = Path::new(argument);
-    // `components()` collapses the `./` in `direnv allow ./.envrc`, which is otherwise carried into
+    // `components()` collapses the `./` in `direnv allow ./.env.lua`, which is otherwise carried into
     // every message about the path.
     let path: PathBuf = if path.is_absolute() {
         path.components().collect()
@@ -70,20 +70,12 @@ fn target(argument: Option<&String>) -> Option<PathBuf> {
 
 fn permit(argument: Option<&String>, allow: bool) -> i32 {
     let Some(path) = target(argument) else {
-        eprintln!("direnv: no .env.lua or .envrc here or above");
+        eprintln!("direnv: no .env.lua here or above");
         return 1;
     };
-    // **Only the governing file may be allowed.** A directory with both names reads one and ignores
-    // the other, so a record for the ignored one grants nothing — it would sit in the store looking
-    // like a decision that had been taken while the file went on not running.
-    if let Some(governs) = find::governed_by(&path) {
-        eprintln!(
-            "direnv: {} is ignored here — {} governs this directory",
-            path.display(),
-            governs.display()
-        );
-        return 1;
-    }
+    // The "is this file shadowed by another one" check went out with `.envrc`: one name per
+    // directory means the file that is there is the file that governs it, and there is no longer a
+    // way to allow one that could never load.
     let path = &path;
     let mut status = 0;
     {
@@ -156,17 +148,6 @@ fn status() -> i32 {
                     Status::NotAllowed => "not allowed — run `direnv allow`",
                 };
                 println!("found: {} ({state})", rc.path.display());
-                // Said out loud, because being ignored looks exactly like working until you notice
-                // that nothing the file sets is set.
-                if let Some(dir) = find::owner(&rc) {
-                    for other in find::shadowed(&dir) {
-                        println!(
-                            "ignored: {} ({} governs this directory)",
-                            other.display(),
-                            rc.path.display()
-                        );
-                    }
-                }
             }
         }
         let (allowed, denied) = direnv.permissions().count();
@@ -192,7 +173,7 @@ fn prune() -> i32 {
 
 fn edit(env: &mut Environment, argument: Option<&String>) -> i32 {
     let Some(path) = target(argument) else {
-        eprintln!("direnv: no .env.lua or .envrc here or above");
+        eprintln!("direnv: no .env.lua here or above");
         return 1;
     };
     let path = &path;

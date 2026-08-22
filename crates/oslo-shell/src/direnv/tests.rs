@@ -450,8 +450,8 @@ fn an_edit_revokes_and_the_environment_comes_back_out() {
 /// **Turning the `direnv` feature off unloads what is loaded**, rather than merely declining to
 /// load the next thing.
 ///
-/// This is the case the feature exists for: a config that walks into a project using classic
-/// `.envrc` turns oslo's own directory environments off and hands the work to the real `direnv`.
+/// This is the case the feature exists for: a config that walks into a project using
+/// `.envrc` turns oslo's own directory environments off and leaves the work to the real `direnv`.
 /// If disabling only stopped the *next* load, the previous project's variables would stay set for
 /// the rest of the session — the exact leak that makes people distrust directory environments.
 ///

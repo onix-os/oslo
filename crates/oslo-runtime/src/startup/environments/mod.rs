@@ -10,7 +10,7 @@ mod report;
 
 use crate::lua::LuaEngine;
 use oslo_shell::Environment;
-use oslo_shell::direnv::find::{self, Rc};
+use oslo_shell::direnv::find::Rc;
 use oslo_shell::direnv::{self, Direnv, Event};
 use std::cell::RefCell;
 use std::io::{Read, Seek, Write};
@@ -43,7 +43,7 @@ pub(super) fn start() {
 /// Bring the environment into line with `dir`, running whatever needs running, and report.
 ///
 /// The rc file's own output is captured and printed *under* the line naming the file, rather than
-/// being left to land above a summary that does not mention it. On a real `.envrc` that is the
+/// being left to land above a summary that does not mention it. On a noisy file that is the
 /// difference between eight loose `command not found` lines and one labelled block.
 pub(super) fn arrive(env: &Mutex<Environment>, lua: &LuaEngine, dir: &Path) {
     // The `oslo.feature.when` and `oslo.command.when` predicates have already been re-decided for
@@ -61,10 +61,7 @@ pub(super) fn arrive(env: &Mutex<Environment>, lua: &LuaEngine, dir: &Path) {
             dir,
             &mut |rc| {
                 base_prompt = Some(lua.prompt_handler());
-                let (outcome, output) = capturing(|| match rc.kind {
-                    find::Kind::Lua => source_lua(lua, rc),
-                    find::Kind::Shell => source_envrc(env, rc),
-                });
+                let (outcome, output) = capturing(|| source_lua(lua, rc));
                 said.push_str(&output);
                 outcome
             },
@@ -97,7 +94,7 @@ pub(super) fn arrive(env: &Mutex<Environment>, lua: &LuaEngine, dir: &Path) {
         }
     }
     // Output from a file that did not fail is still the file's, and still worth showing: an
-    // `.envrc` that prints a warning and succeeds has said something the user chose to say.
+    // file that prints a warning and succeeds has said something the user chose to say.
     if !said.trim().is_empty() {
         report::detail(&said);
     }
@@ -106,7 +103,7 @@ pub(super) fn arrive(env: &Mutex<Environment>, lua: &LuaEngine, dir: &Path) {
 /// Run `f` with stdout and stderr redirected, and hand back what it wrote *and has not shown*.
 ///
 /// A temporary file rather than a pipe, deliberately: a pipe has a fixed capacity and nothing is
-/// draining it while the rc file runs, so an `.envrc` chatty enough to fill it would block forever
+/// draining it while the rc file runs, so a file chatty enough to fill it would block forever
 /// on its own output. A file has no such limit and the whole thing is read once at the end.
 ///
 /// **Read once at the end is not enough for a rc file that takes a minute.** `use flake` against a
@@ -174,14 +171,14 @@ fn capturing<T>(f: impl FnOnce() -> T) -> (T, String) {
 
 /// Run an `.env.lua`, which may set more than variables.
 ///
-/// **The working directory is the file's own, exactly as it is for an `.envrc`.** It was not, and
+/// **The working directory is the file's own, as direnv does it too.** It was not, and
 /// that was a real bug rather than an inconsistency: a `.env.lua` one directory up saying
 /// `oslo.env.path_add("./bin")`, entered as `cd ~/proj/app/src`, resolved `./bin` against
 /// `app/src` — so it put a directory that does not exist onto `$PATH`, silently, and left it there
 /// for as long as you stood in the project. Every relative path in the file had the same problem,
 /// and which answer you got depended on how deep you happened to walk in.
 ///
-/// Restored afterwards whatever happens, panic included, for the reason [`source_envrc`] gives: a
+/// Restored afterwards whatever happens, panic included: a
 /// shell left standing in a directory the user did not walk into is a far worse outcome than a
 /// directory environment that failed.
 fn source_lua(lua: &LuaEngine, rc: &Rc) -> Result<(), String> {
@@ -204,51 +201,6 @@ fn source_lua(lua: &LuaEngine, rc: &Rc) -> Result<(), String> {
         lua.eval_as(&source, &rc.path.to_string_lossy())
             .map_err(|e| e.to_string())
     }));
-    if let Some(back) = came_from {
-        let _ = std::env::set_current_dir(back);
-    }
-    match outcome {
-        Ok(result) => result,
-        Err(panic) => std::panic::resume_unwind(panic),
-    }
-}
-
-/// Run an `.envrc`, which is shell, with direnv's stdlib in scope.
-///
-/// Three things have to be true for a file written for direnv to behave the way it does there, and
-/// each one is a bug if it is missing:
-///
-/// * **the working directory is the file's own.** direnv `cd`s before it runs, and half the files
-///   in the world say `PATH_add ./bin` or `dotenv .env` — resolved against wherever you happened to
-///   be standing, those name nothing. Restored afterwards whatever happens, including on a panic,
-///   because a shell left in a directory the user did not walk into is a far worse outcome than an
-///   `.envrc` that failed.
-/// * **the personal `direnvrc` is sourced first**, so the `use_` and `layout_` functions it defines
-///   are there when the project's file calls them.
-/// * **the stdlib is in scope only for this**, installed here and removed on the way out.
-fn source_envrc(env: &Mutex<Environment>, rc: &Rc) -> Result<(), String> {
-    let Some(home) = rc.path.parent().map(Path::to_path_buf) else {
-        return Err("the file has no directory".to_string());
-    };
-    let came_from = std::env::current_dir().ok();
-    std::env::set_current_dir(&home).map_err(|e| e.to_string())?;
-
-    let outcome = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-        let mut guard = env.lock().map_err(|_| "the environment is locked")?;
-        direnv::stdlib::install(&mut guard);
-        direnv::rcfile::load(&mut guard);
-        let status = oslo_shell::env::builtins::builtin_source(
-            &mut guard,
-            &["source".to_string(), rc.path.to_string_lossy().into_owned()],
-        );
-        direnv::stdlib::remove(&mut guard);
-        match status {
-            Ok(0) => Ok(()),
-            Ok(code) => Err(format!("exited {code}")),
-            Err(problem) => Err(problem.to_string()),
-        }
-    }));
-
     if let Some(back) = came_from {
         let _ = std::env::set_current_dir(back);
     }

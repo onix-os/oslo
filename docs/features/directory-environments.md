@@ -1,9 +1,9 @@
 # Directory environments
 
-A `.env.lua` or a `.envrc` in a project, loaded when you walk in and taken back out exactly when you
-walk out. oslo reads both itself — no `direnv` binary, no bash subprocess, no prompt hook and no
-`eval` protocol — because most of direnv's machinery exists to let an external program talk to a
-shell it did not write, and **oslo is the shell**.
+A `.env.lua` in a project, loaded when you walk in and taken back out exactly when you walk out.
+oslo reads it itself — no `direnv` binary, no bash subprocess, no prompt hook and no `eval`
+protocol — because most of direnv's machinery exists to let an external program talk to a shell it
+did not write, and **oslo is the shell**.
 
 > ## This is in `oslo`, not in `oslo-minimal`
 >
@@ -11,7 +11,7 @@ shell it did not write, and **oslo is the shell**.
 >
 > | | `cd` into a project |
 > |---|---|
-> | `oslo` | reads `.env.lua` / `.envrc`, loads and unloads |
+> | `oslo` | reads `.env.lua`, loads and unloads |
 > | `oslo-minimal` | is just `cd` |
 >
 > ```sh
@@ -26,7 +26,7 @@ shell it did not write, and **oslo is the shell**.
 > distribution should not do it because a shell somewhere else wanted it to.
 >
 > Without the feature there is no `direnv` builtin — the word falls through to `$PATH`, so the real
-> direnv still works if it is installed — no `oslo.direnv` API, no `.env.lua` or `.envrc` reading,
+> direnv still works if it is installed — no `oslo.direnv` API, no `.env.lua` reading,
 > and no dev shell import.
 
 <!-- demo:begin -->
@@ -43,7 +43,7 @@ inside a sourced file all land here, because the prompt is when the environment 
 ```
  a directory change, by any route
    ▼
- find::applicable(dir)      walk up, nearest ancestor holding .env.lua or .envrc
+ find::applicable(dir)      walk up, nearest ancestor holding .env.lua
    │                        feature "direnv" off ⇒ answer None, which is the no-file path
    ├── same owner, nothing edited ─────────────────────────► nothing happens
    │                                    (one stat per watched file, and return)
@@ -58,7 +58,7 @@ inside a sourced file all land here, because the prompt is when the environment 
    │               └─ NotAllowed ──► Event::Blocked   (printed once per path)
    ▼ Allowed
  before = (vars, aliases)     under the environment lock
- run(rc)                      lock RELEASED — .env.lua → Lua, .envrc → shell + stdlib
+ run(rc)                      lock RELEASED — the file runs in the Lua engine
  after  = (vars, aliases)     under the lock again
    ▼
  forward = Diff::between(before, after) ─► - removed  ~ changed  + added   (the report)
@@ -73,9 +73,9 @@ is to call `oslo.env.set` and friends, which take the same lock with `try_lock`,
 every one of them fail with "shell state is busy" while the load reported success. A file that
 failed half way still had its first half take effect, so the diff is taken regardless.
 
-### Both files run in their own directory
+### The file runs in its own directory
 
-`.envrc` has always been `cd`-ed to before it runs, because direnv does it and half the files in the
+direnv has always `cd`-ed to the file's directory before running it, and half the files in the
 world say `PATH_add ./bin`. **`.env.lua` did not**, and that was a bug rather than a difference:
 `~/proj/.env.lua` saying `oslo.direnv.path_add("./bin")`, entered as `cd ~/proj/app/src`, resolved
 `./bin` against `app/src` and put a directory that does not exist onto `$PATH` — silently, and for as
@@ -92,9 +92,8 @@ location, a marker written into `oslo.state`, a value handed to something that r
 environment, which is the honest answer in `init.lua` and in `oslo make`.
 
 Nearest ancestor wins outright; loading every ancestor would make an outer file's effect depend on
-how deep you happened to be standing. A directory holding both names is governed by `.env.lua`, and
-`direnv status` names the shadowed file, because being inert looks exactly like working until you
-notice that nothing it sets is set.
+how deep you happened to be standing. A directory holding an `.envrc` as well is no concern of
+oslo's — that file is direnv's, and the two coexist without either shadowing the other.
 
 ### A question that may not take forever
 
@@ -151,7 +150,7 @@ be cleared entirely.
 **`watch_dir` watches the directory, not the files in it.** A directory's timestamp moves when an
 entry is added, removed or renamed and does not move when a file inside it is edited in place. So it
 notices `config/new.toml` appearing and does not notice `config/app.toml` changing. That is what
-`.envrc`'s `watch_dir` has always done; the two are one call so they cannot drift.
+direnv's `watch_dir` has always done; the two are one call so they cannot drift.
 
 Both watch calls are **refused outside a load**. The list is drained by the next arrival, so a call
 from a timer or a background callback would quietly attach a path to whichever unrelated project
@@ -208,8 +207,8 @@ the way through, because `[ -n "$FOO" ]` reads them differently.
 
 Twelve names are excluded as the shell's own: `_`, `BASHPID`, `EPOCHREALTIME`, `EPOCHSECONDS`,
 `LINENO`, `OLDPWD`, `PIPESTATUS`, `PPID`, `PWD`, `RANDOM`, `SECONDS`, `SHLVL`. Reading a file moves
-`LINENO`, so an `.envrc` that assigned nothing came out of the diff having "changed" it; `PWD` is
-the same mistake with teeth, since an `.envrc` runs with the working directory set to its own, and
+`LINENO`, so a file that assigned nothing came out of the diff having "changed" it; `PWD` is
+the same mistake with teeth, since the file runs with the working directory set to its own, and
 putting it "back" would be a directory environment quietly moving the shell.
 
 Removals are reported first, then changes, then additions, each row cut to the terminal with a count
@@ -235,33 +234,9 @@ carries variables and nothing else, so the child holds the project's `$PATH` whi
 its aliases or its prompt, and treating that as loaded is what made a project alias report `command
 not found` in a shell whose `$PATH` was already the project's.
 
-### direnv's stdlib, in Rust
+### The dev shell, without entering one
 
-Almost every real `.envrc` is written against direnv's functions, and a shell that reads the file
-but not those reads almost nothing. All thirty are reimplemented against direnv's documented
-interface rather than shipped as its 1.4k lines of bash:
-
-| group | names |
-|---|---|
-| paths | `PATH_add` `PATH_rm` `MANPATH_add` `path_add` `path_rm` `expand_path` `find_up` `user_rel_path` `direnv_layout_dir` |
-| sourcing | `source_env` `source_env_if_exists` `source_up` `source_up_if_exists` `dotenv` `dotenv_if_exists` |
-| nix | `use` `use_flake` `use_nix` |
-| layouts | `layout` — python (also python3, pyenv), poetry, uv, node, go, ruby, php, perl, julia |
-| the rest | `log_status` `log_error` `has` `join_args` `env_vars_required` `on_git_branch` `watch_file` `watch_dir` `strict_env` `unstrict_env` `direnv_version` |
-
-They exist while an `.envrc` is being read and nowhere else, installed and removed from one table so
-the two lists cannot drift: `PATH_add` at the prompt would edit an environment no file is holding
-open, and the undo record would never hear about it. Rust rather than bash is not only tidier —
-`PATH_add` becomes a path operation instead of string surgery on `$PATH`, and it is idempotent, so
-reloading cannot grow the variable one entry at a time.
-
-`use` and `layout` dispatch by name to `use_<thing>` and `layout_<language>`, a shell function
-winning over the builtin. That indirection is what makes your own `~/.config/direnv/direnvrc` and
-`direnv/lib/*.sh` worth having, and they are sourced before the project's file. They are not gated
-by the allow store: they are yours, and prompting for a file you wrote by hand would train the habit
-of saying yes.
-
-`use flake` and `oslo.direnv.nix_develop()` are one implementation, reading
+`oslo.direnv.nix_develop()` reads
 `nix print-dev-env --json`. The JSON is a faithful dump of the builder, so a name that would wreck
 the shell you are standing in has to be dropped here rather than relied on to be absent: `IGNORED`
 in `nix_shell.rs` is that list — `HOME`, `PWD`, `OLDPWD`, `SHELL`, `SHLVL`, `TERM`, `TZ`, the
@@ -334,7 +309,7 @@ cost of the option.
 ### While it runs
 
 Output is captured to a temporary file so it can be printed under the line naming the rc file — a
-pipe has a fixed capacity and nothing draining it, so a chatty `.envrc` would block on its own
+pipe has a fixed capacity and nothing draining it, so a chatty file would block on its own
 output. Reading it once at the end is right for a file that takes a moment and wrong for one that
 takes a minute: `use flake` against a cold store builds for as long as it takes, into a file nobody
 is reading, and a long build is then indistinguishable from a hang. So the file is also tailed:
@@ -373,14 +348,6 @@ oslo.ui.prompt(function() return "PRODUCTION> " end)
 ```
 
 ```sh
-# .envrc — works as written, no conversion
-use flake
-PATH_add ./bin
-dotenv_if_exists .env
-watch_file schema.sql
-```
-
-```sh
 direnv allow      # trust this file as it stands now         (permit, grant)
 direnv deny       # refuse this path, whatever it becomes    (block, revoke)
 direnv status     # what is loaded, what was found, whether it is trusted
@@ -395,7 +362,7 @@ Lua itself, so it leaves a reload request that the read loop carries out before 
 ```lua
 oslo.feature.set("direnv", false)          -- unloads what is loaded, not just stops it
 oslo.feature.when("direnv", function(dir)  -- re-asked on every directory change
-  return not oslo.fs.exists(dir .. "/.envrc")
+  return oslo.fs.find_up(".env.lua", dir) ~= nil
 end)
 
 oslo.on.report(function(r)                -- draw the report yourself
@@ -408,13 +375,51 @@ oslo.on.report(function(r)                -- draw the report yourself
 end)
 ```
 
-`$DIRENV_CONFIG`, then `$XDG_CONFIG_HOME`, then `~/.config` locate the personal `direnvrc`;
-`$XDG_DATA_HOME` locates the allow store; `$direnv_layout_dir` says where a layout may build,
-defaulting to `.direnv` beside the rc file.
+`$XDG_DATA_HOME` locates the allow store.
+
+## An `.envrc` project
+
+oslo does not read `.envrc`. It used to, against a reimplementation of direnv's stdlib — some 1100
+lines of Rust tracking 1.4k lines of somebody else's bash so that `use flake`, `layout python` and
+`source_up` meant here what they mean there. Every one of those is a place for the two to disagree
+in a way only a user finds, and none of it is work oslo has to do. direnv exists and is good at it.
+
+So an `.envrc` project runs direnv, from one line:
+
+```lua
+oslo.env.set("PROMPT_COMMAND", 'eval "$(direnv export bash)"')
+```
+
+`$PROMPT_COMMAND` is evaluated against the live environment before every prompt, which is exactly
+what direnv's own bash hook is built on — so this loads on the way in and unloads on the way out,
+with no oslo code in the middle. Pair it with the two predicates and each tool takes the directories
+that are its own:
+
+```lua
+oslo.feature.when("direnv", function(d) return oslo.fs.find_up(".env.lua", d) ~= nil end)
+oslo.command.when("direnv", function(d)
+  return oslo.fs.find_up(".envrc", d) ~= nil
+      or oslo.env.get("DIRENV_DIFF") ~= nil
+end)
+```
+
+The `DIRENV_DIFF` clause matters: direnv has to be **run from outside** a directory to unload it, so
+hiding the binary the moment you leave means the unload never happens and the project's variables
+stay set for the rest of the session.
+
+**If `bash` on your `$PATH` is a link to oslo**, tell direnv where a real one is — it runs `.envrc`
+through bash, and that file is bash, extglob and all:
+
+```toml
+# ~/.config/direnv/direnv.toml
+bash_path = "/usr/bin/bash"
+```
+
+`direnv status` prints the `bash_path` it is using, which is the quick way to check.
 
 ## Measurements
 
-`OSLO_TIME_PROMPT=1` against the release binary, driven through a pty, with a two-line `.envrc` in a
+`OSLO_TIME_PROMPT=1` against the release binary, driven through a pty, with a two-line `.env.lua` in a
 temporary project. The `direnv` phase of the prompt is `arrive` and nothing else:
 
 | what happened | direnv phase |
@@ -422,8 +427,8 @@ temporary project. The `direnv` phase of the prompt is `arrive` and nothing else
 | no rc file anywhere above | 0.0 ms |
 | a file was found but is not allowed | 0.1–0.3 ms |
 | leaving: unload and restore | 0.1–0.4 ms |
-| loading a two-line `.envrc` | 81.0, 81.4 ms |
-| loading an `.envrc` that also runs `sleep 0.1` | 162.2, 162.1 ms |
+| loading a two-line `.env.lua` | 81.0, 81.4 ms |
+| loading a file that also runs `sleep 0.1` | 162.2, 162.1 ms |
 
 The last two rows differ by exactly the sleep, which is the shape of a quantisation rather than of
 work: **a load in a terminal is rounded up to a multiple of the tail's 80 ms poll interval**, since
@@ -440,17 +445,14 @@ arguments and on `flake.nix`, `flake.lock`, `shell.nix` and `default.nix` as the
 - **Notice an edit while you are standing in the directory.** `arrive` runs when the directory
   differs from the last settled one, so the stamp check that catches an edited file only fires on
   the next arrival. `direnv reload` is the answer, and `direnv edit` leaves the request itself.
-- **Restore anything but variables, aliases and the Lua prompt.** A shell function an `.envrc`
+- **Restore anything but variables, aliases and the Lua prompt.** A shell function a file
   defines stays defined after you leave. Keybindings are excluded deliberately: a key meaning
   different things in different directories, with nothing on screen to say so, is worse than not
   having the feature at all.
 - **Catch an edit that keeps the file's length and lands inside the mtime granularity.** The stamp
   is `(mtime, length)` from one `stat`; the content hash catches it on the next genuine reload.
-- **Run every `.envrc` in the world.** A name outside the thirty fails as `command not found` —
-  `export_alias` is one — and `use java` or `layout elixir` work only if your `direnvrc`
-  defines them. `strict_env` as a mode is accepted and does nothing, since turning an unset variable
-  into a fatal error for the session is not a trade an `.envrc` gets to make for the shell, and
-  `direnv_version` always succeeds rather than claiming to be direnv.
+- **Read an `.envrc`.** That file is direnv's and is left to direnv — see above for the one line
+  that wires the two together.
 - **Follow a Nix dev shell exactly.** `--json` is a dump of values, so anything the bash form *does*
   besides assigning is invisible to it; two such differences have been found by hand, and a third
   is likely.
@@ -466,9 +468,9 @@ arguments and on `flake.nix`, `flake.lock`, `shell.nix` and `default.nix` as the
 | `crates/oslo-shell/src/direnv/allow.rs` | `Allow::status`/`allow`/`deny`/`prune`, both hashes |
 | `crates/oslo-shell/src/direnv/diff.rs` | `Diff::between`, `reverse`, `changes`, `Change` |
 | `crates/oslo-shell/src/direnv/carry.rs` | `OSLO_DIRENV`: `encode`, `decode` |
-| `crates/oslo-shell/src/direnv/find.rs` | `applicable`, `here`, `governed_by`, `shadowed` |
+| `crates/oslo-shell/src/direnv/find.rs` | `applicable`, `here`, `owner` |
+| `crates/oslo-shell/src/direnv/paths.rs` | `watch`, `take_watches`, `absolute`, `prepend_into` |
 | `crates/oslo-shell/src/nix_shell.rs` | `print-dev-env --json`, `IGNORED`, the cache |
-| `crates/oslo-shell/src/direnv/stdlib/` | the thirty functions, one table in `mod.rs` |
 | `crates/oslo-shell/src/env/builtins/direnv.rs` | the `direnv` builtin |
 | `crates/oslo-runtime/src/startup/environments/` | running the file, `capturing`, `live`, the block |
 | `crates/oslo-runtime/src/lua/api/direnv.rs` | `oslo.direnv.path_add`, `oslo.direnv.nix_develop` |
