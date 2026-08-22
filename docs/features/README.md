@@ -37,7 +37,7 @@ just `cd`, and the word `direnv` falls through to `$PATH` so the real one still 
 through to `$PATH` and GNU make answers — which is what it does on every other shell.
 
 **[nix, as data](nix.md) is `oslo` only**, behind the `nix` cargo feature — every `nix --json`
-answer as a Lua table. Independent of `direnv`: what the two share, `use flake` and
+answer as a Lua table. Independent of `direnv`: the one thing the two share,
 `oslo.direnv.nix_develop()`, needs both. In `oslo-minimal` there is no `oslo.nix`, and a config asks
 for it the way it asks about anything optional — `if oslo.nix then … end`.
 

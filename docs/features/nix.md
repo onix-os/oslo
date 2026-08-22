@@ -10,7 +10,7 @@ in the shell.
 >
 > | | |
 > |---|---|
-> | `oslo` | `oslo.nix`, and `use flake` in a directory environment |
+> | `oslo` | `oslo.nix`, and `oslo.direnv.nix_develop()` in a directory environment |
 > | `oslo-minimal` | neither |
 >
 > ```sh

@@ -82,9 +82,9 @@ world say `PATH_add ./bin`. **`.env.lua` did not**, and that was a bug rather th
 long as you stood in the project. Which answer you got depended on how deep you walked in, so it
 worked from the project root and only ever failed for somebody in a subdirectory.
 
-Both now chdir, and both restore the shell's own directory afterwards whatever happens, panic
+It chdirs now, and restores the shell's own directory afterwards whatever happens, panic
 included: a shell left standing somewhere the user did not walk to is a far worse outcome than an rc
-file that failed. `tests/directory_environment_tests.rs` is what keeps the two in step.
+file that failed. `tests/directory_environment_tests.rs` is what holds it.
 
 `oslo.direnv.dir()` answers with that directory, for a path being *stored* rather than used — a cache
 location, a marker written into `oslo.state`, a value handed to something that runs later — where
@@ -311,7 +311,7 @@ cost of the option.
 Output is captured to a temporary file so it can be printed under the line naming the rc file — a
 pipe has a fixed capacity and nothing draining it, so a chatty file would block on its own
 output. Reading it once at the end is right for a file that takes a moment and wrong for one that
-takes a minute: `use flake` against a cold store builds for as long as it takes, into a file nobody
+takes a minute: `oslo.direnv.nix_develop()` against a cold store builds for as long as it takes, into a file nobody
 is reading, and a long build is then indistinguishable from a hang. So the file is also tailed:
 
 ```
