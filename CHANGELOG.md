@@ -1,5 +1,24 @@
 # Changelog
 
+## [0.4.7] - 2026-08-22
+
+### <!-- 0 -->⛰️  Features
+
+- A hook under oslo.on does not repeat the prefix
+
+### <!-- 1 -->🐛 Bug Fixes
+
+- An unterminated construct is an error, not a panic
+
+### <!-- 3 -->📚 Documentation
+
+- Use the un-stuttered spelling in an example
+
+### <!-- 6 -->🧪 Testing
+
+- A child shell reads nobody's configuration
+- The writer needs the binary under test on $PATH
+
 ## [0.4.6] - 2026-08-22
 
 ### Build
