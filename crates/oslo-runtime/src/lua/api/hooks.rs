@@ -250,13 +250,32 @@ fn mark_watched(index: usize) {
 pub fn resolve(spelling: &str) -> Option<(usize, &'static str)> {
     // Underscores are the field-access spelling: `oslo.on.pre_cmd` cannot be written with a dash.
     let wanted = spelling.replace('_', "-");
+    // And the un-stuttered one — see [`spellings`]. Resolved here as well as installed there, or
+    // `oslo.on.report` and `oslo.on["report"]` would disagree about whether that hook exists.
+    let stuttered = format!("on-{wanted}");
     HOOKS.iter().enumerate().find_map(|(index, hook)| {
-        let matched = hook.name == wanted || hook.aliases.contains(&spelling);
+        let matched =
+            hook.name == wanted || hook.name == stuttered || hook.aliases.contains(&spelling);
         matched.then_some((index, hook.name))
     })
 }
 
-/// Every spelling `oslo.on` answers to: canonical, underscored, and every alias.
+/// Every spelling `oslo.on` answers to: canonical, underscored, un-stuttered, and every alias.
+///
+/// # The namespace already says `on`
+///
+/// Twenty of these hooks are called `on-something`, so reaching them through `oslo.on` read
+/// `oslo.on.on_key`, `oslo.on.on_report`, `oslo.on.on_variable_change`. `OSLO_LUA_STYLE.md` calls
+/// that a stutter and it is right: the prefix is the namespace's job, and a config full of `on.on_`
+/// is noise in front of every line that matters.
+///
+/// So a hook whose canonical name begins with `on-` also answers to the name without it —
+/// `oslo.on.key`, `oslo.on.report`, `oslo.on.variable_change`. One rule over the whole table
+/// rather than the single hand-written `key` alias that used to be the only one, which is why
+/// `oslo.on.key` worked and `oslo.on.report` did not.
+///
+/// The canonical name is untouched: `on-key` is what `oslo hook list` prints, what a plugin
+/// declares, and what `oslo.on["on-key"]` still reaches. This is about the field spelling.
 ///
 /// Built once and kept, because the setters installed on `oslo.on` outlive the call that made
 /// them — and because a config reload builds a fresh `oslo` table, so computing them each time
@@ -270,6 +289,15 @@ pub fn spellings() -> &'static [(&'static str, usize)] {
             let underscored = hook.name.replace('-', "_");
             if underscored != hook.name {
                 names.push((&*String::leak(underscored), index));
+            }
+            if let Some(bare) = hook.name.strip_prefix("on-") {
+                let bare = bare.replace('-', "_");
+                // `on-key` already carried `key` by hand, from before this was a rule. Pushing it
+                // again would make one hook answer to the same spelling twice, which
+                // `every_spelling_resolves_to_one_hook` is there to catch.
+                if !hook.aliases.contains(&&*bare) {
+                    names.push((&*String::leak(bare), index));
+                }
             }
             for alias in hook.aliases {
                 names.push((*alias, index));
@@ -372,5 +400,43 @@ mod tests {
             Some("on-history-select")
         );
         assert_eq!(resolve("nonsense"), None);
+    }
+
+    /// **A hook reached through `on` does not repeat it.** `OSLO_LUA_STYLE.md`'s naming rule: the
+    /// namespace already says `on`, so `oslo.on.on_key` stutters and `oslo.on.key` is the spelling.
+    ///
+    /// Every `on-` hook, not a hand-picked few — that was the bug this replaced. A single alias made
+    /// `oslo.on.key` work while `oslo.on.report` was nil, which is worse than neither working: it
+    /// reads as though the rule exists and then fails on the second hook somebody tries.
+    #[test]
+    fn a_hook_under_on_does_not_repeat_the_prefix() {
+        let mut checked = 0;
+        for hook in HOOKS {
+            let Some(bare) = hook.name.strip_prefix("on-") else {
+                continue;
+            };
+            let field = bare.replace('-', "_");
+            assert_eq!(
+                resolve(&field).map(|(_, n)| n),
+                Some(hook.name),
+                "oslo.on.{field} does not reach {}",
+                hook.name
+            );
+            assert!(
+                spellings().iter().any(|(name, _)| *name == field),
+                "oslo.on.{field} is not installed as a field"
+            );
+            checked += 1;
+        }
+        assert!(checked >= 20, "only {checked} hooks start with `on-`");
+    }
+
+    /// And the canonical name is untouched: it is what `oslo hook list` prints and what a plugin
+    /// declares, so dropping the prefix there would break both.
+    #[test]
+    fn the_canonical_name_keeps_its_prefix() {
+        assert_eq!(resolve("on-key").map(|(_, n)| n), Some("on-key"));
+        assert_eq!(resolve("on_key").map(|(_, n)| n), Some("on-key"));
+        assert!(HOOKS.iter().any(|h| h.name == "on-report"));
     }
 }

@@ -32,6 +32,23 @@ fn owned(fd: OwnedFd) -> fs::File {
     fs::File::from(fd)
 }
 
+/// `$PATH` with the binary under test on the front of it.
+///
+/// **The writer below runs `oslo macros add …` as a command word**, so `oslo` has to resolve — and
+/// a bare `/usr/bin:/bin` resolves it only on a machine that happens to have oslo installed. That
+/// is how these two passed here and failed on CI with `oslo: command not found`: the developer's
+/// own `/usr/bin/oslo` was answering, and CI has none.
+///
+/// Pointing at the built binary is also the more correct thing. A test that reached an *installed*
+/// oslo would be testing whatever was last installed rather than the tree it was run from.
+fn with_oslo_on_path() -> String {
+    let dir = common::oslo_bin()
+        .parent()
+        .expect("the binary has a directory")
+        .to_path_buf();
+    format!("{}:/usr/bin:/bin", dir.display())
+}
+
 /// An interactive oslo on a pty, and a way to type at it and read what came back.
 struct Shell {
     input: fs::File,
@@ -61,10 +78,10 @@ impl Shell {
         command
             .arg("-i")
             .env_clear()
+            .env("PATH", with_oslo_on_path())
             .env("HOME", home.path())
             .env("XDG_DATA_HOME", home.path())
             .env("XDG_CONFIG_HOME", home.path().join("config"))
-            .env("PATH", "/usr/bin:/bin")
             .env("TERM", "dumb")
             .current_dir(home.path())
             .stdin(Stdio::from(slave.try_clone().expect("clone")))
@@ -221,7 +238,7 @@ fn an_idle_prompt_sees_a_variable_stored_by_another_shell() {
         .arg("oslo macros add --var WOKEN=yes")
         .env("HOME", shell.home())
         .env("XDG_DATA_HOME", shell.home())
-        .env("PATH", "/usr/bin:/bin")
+        .env("PATH", with_oslo_on_path())
         .output()
         .expect("spawn the writing shell");
     assert!(
@@ -261,7 +278,7 @@ fn a_stored_variable_from_another_shell_announces_itself_as_remote() {
         .arg("oslo macros add --var MOOD=calm")
         .env("HOME", shell.home())
         .env("XDG_DATA_HOME", shell.home())
-        .env("PATH", "/usr/bin:/bin")
+        .env("PATH", with_oslo_on_path())
         .output()
         .expect("spawn the writing shell");
     assert!(
@@ -289,7 +306,7 @@ fn a_stored_variable_from_another_shell_announces_itself_as_remote() {
         .arg("oslo macros add --var OTHER=1")
         .env("HOME", shell.home())
         .env("XDG_DATA_HOME", shell.home())
-        .env("PATH", "/usr/bin:/bin")
+        .env("PATH", with_oslo_on_path())
         .output()
         .expect("spawn the writing shell");
     assert!(writer.status.success());

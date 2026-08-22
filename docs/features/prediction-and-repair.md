@@ -15,8 +15,8 @@ hundred hand-written rules and this does with none).
 > | `oslo-minimal` | no | **absent** | history, completions, `$PATH` |
 >
 > ```sh
-> make build                  # the full binary, every feature
-> make build TYPE=minimal     # the floor: no model, nothing to learn from
+> scripts/build.sh              # the full binary, every feature
+> scripts/build.sh --minimal    # the floor: no model, nothing to learn from
 > ```
 >
 > It costs 297 KB — 6,016,512 bytes without it against 6,320,928 with — on a binary meant to be

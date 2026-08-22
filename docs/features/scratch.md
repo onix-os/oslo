@@ -17,8 +17,8 @@ One key reaches all of it, and it means the same thing wherever you press it.
 > | `oslo-minimal` | unbound — does whatever it otherwise would | **read and ignored** |
 >
 > ```sh
-> make build                  # the full binary, every feature
-> make build TYPE=minimal     # the floor: no scratches, no keeper, no runtime directory
+> scripts/build.sh              # the full binary, every feature
+> scripts/build.sh --minimal    # the floor: no scratches, no keeper, no runtime directory
 > ```
 >
 > It costs **44 KB** — 6,275,872 bytes without it against 6,320,928 with — and **no dependency at

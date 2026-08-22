@@ -14,8 +14,8 @@ in the shell.
 > | `oslo-minimal` | neither |
 >
 > ```sh
-> make build                  # the full binary, every feature
-> make build TYPE=minimal     # no nix integration at all
+> scripts/build.sh              # the full binary, every feature
+> scripts/build.sh --minimal    # no nix integration at all
 > ```
 >
 > It costs **48 KB** — 6,271,776 bytes without it against 6,320,928 with — the second-smallest of
