@@ -67,6 +67,8 @@ fn run(called: &str, args: &[String]) -> i32 {
         "choose" => run_choose(rest, false),
         "filter" => run_choose(rest, true),
         "style" => run_style(rest),
+        "title" => run_heading(rest, true),
+        "subtitle" => run_heading(rest, false),
         "file" => run_file(rest),
         "format" => run_format(rest),
         "join" => run_join(rest),
@@ -252,7 +254,16 @@ fn run_style(args: &[String]) -> i32 {
             "--fg" => spec.style.fg = theme::Color::parse(&take(args, &mut at)),
             "--bg" => spec.style.bg = theme::Color::parse(&take(args, &mut at)),
             "--border-fg" => spec.border_style.fg = theme::Color::parse(&take(args, &mut at)),
+            // Every attribute the style carries, so `ui style` and `oslo.ui.style` accept the same
+            // set — `--bold` alone was the odd one out.
             "--bold" => spec.style.bold = true,
+            "--dim" => spec.style.dim = true,
+            "--italic" => spec.style.italic = true,
+            "--underline" => spec.style.underline = true,
+            "--reverse" => spec.style.reverse = true,
+            "--blink" => spec.style.blink = true,
+            "--hidden" => spec.style.hidden = true,
+            "--strike" => spec.style.strike = true,
             "--width" => spec.width = take(args, &mut at).parse().ok(),
             // `--padding "1 2"` is gum's spelling: rows then columns, as CSS does it.
             "--padding" => {
@@ -529,4 +540,53 @@ fn run_spin(args: &[String]) -> i32 {
         at += 1;
     }
     spin(&spec)
+}
+
+/// `ui title` and `ui subtitle` — a heading, and the quieter line under it.
+///
+/// The same two shapes `oslo.ui.title` and `oslo.ui.subtitle` answer with, so a `.make.lua` recipe
+/// and a bash script that calls `oslo userin title` head their output identically. Without them
+/// each caller invents a bold line and a rule of its own width, and output from one shell reads as
+/// output from three programs.
+fn run_heading(args: &[String], titled: bool) -> i32 {
+    let mut style = theme::Style {
+        bold: titled,
+        dim: !titled,
+        ..theme::Style::default()
+    };
+    let mut ruled = titled;
+    let mut width: Option<usize> = None;
+    let mut words = Vec::new();
+    let mut at = 0;
+    while at < args.len() {
+        match args[at].as_str() {
+            "--fg" => {
+                if let Some(colour) = theme::Color::parse(&take(args, &mut at)) {
+                    style.fg = Some(colour);
+                    // A colour asked for replaces the dimming, or a subtitle would be a dim green
+                    // rather than a green one.
+                    style.dim = false;
+                }
+            }
+            "--no-rule" => ruled = false,
+            "--width" => width = take(args, &mut at).parse().ok(),
+            other if other.starts_with("--") => {
+                eprintln!("{}ui: {other}: unknown option", origin_now());
+                return 2;
+            }
+            other => words.push(other.to_string()),
+        }
+        at += 1;
+    }
+    let text = words.join(" ");
+    println!("{}", oslo_ui::ink::ink(&text).styled(style));
+    if ruled {
+        // In cells, and never wider than the terminal — see `api::ui::heading`.
+        let cells = width
+            .unwrap_or_else(|| oslo_ui::dropdown::width::display_width(&text))
+            .min(oslo_ui::dropdown::width::terminal_cols())
+            .max(1);
+        println!("{}", oslo_ui::ink::ink("─".repeat(cells)).dim());
+    }
+    0
 }

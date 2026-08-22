@@ -14,6 +14,8 @@ pub mod frecency_store;
 pub mod git;
 pub mod highlight;
 mod hinting;
+/// Colouring a string by naming the colour — `colored`'s shape, over oslo's own `Style`.
+pub mod ink;
 pub mod keys;
 pub mod manager;
 pub mod marks;

@@ -146,6 +146,8 @@ const FUNCTIONS: &[&str] = &[
     "oslo.ui.match_at",
     "oslo.ui.rank",
     "oslo.ui.wrap",
+    "oslo.ui.title",
+    "oslo.ui.subtitle",
     "oslo.theme.style",
     "oslo.theme.define",
     "oslo.theme.depth",

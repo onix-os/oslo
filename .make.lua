@@ -92,14 +92,14 @@ local function grouped(n)
   return out
 end
 
--- Painted through `oslo.theme.style`, so `NO_COLOR` and a pipe both answer the plain text and the
--- caller never checks. See `docs/features/drawing.md`.
-local function paint(text, spec)
-  return oslo.theme.style(text, spec)
+-- Painted through the shell's own styling, so `NO_COLOR` and a pipe both answer the plain text and
+-- the caller never checks. See `docs/features/drawing.md`.
+local function dim(text)
+  return oslo.ui.style(text, { dim = true })
 end
 
 local function line(label, value)
-  print("  " .. paint(oslo.ui.pad(label, 7), "fg:8") .. value)
+  print(dim(oslo.ui.pad(label, 8)) .. value)
 end
 
 -- Where the binary is, what it weighs, and whether you can actually run it by name.
@@ -113,17 +113,16 @@ local function report(path)
   local megabytes = ("%.2f MB"):format(stat.size / 1048576)
 
   print("")
-  print("  " .. paint(NAME .. " " .. VERSION, "bold") .. "  " .. paint(megabytes, "fg:cyan bold"))
-  print("  " .. paint(oslo.ui.rule("─", math.min(58, oslo.ui.width() - 4)), "fg:8"))
+  print(oslo.ui.title(("%s %s   %s"):format(NAME, VERSION, megabytes)))
   line("binary", path)
   -- Bytes beside megabytes: the README argues about kilobytes, and `6.16 MB` cannot be subtracted
   -- from last week's `6.13 MB` to get one.
-  line("size", megabytes .. paint("   " .. grouped(stat.size) .. " bytes", "fg:8"))
+  line("size", megabytes .. dim("   " .. grouped(stat.size) .. " bytes"))
   if on_path(dir) then
-    line("path", paint("✓", "fg:green") .. " " .. paint("on $PATH", "fg:green") .. paint("  " .. dir, "fg:8"))
+    line("path", oslo.ui.style("✓ on $PATH", { fg = "green" }) .. dim("  " .. dir))
   else
-    line("path", paint("✗", "fg:yellow") .. " " .. paint("not on $PATH", "fg:yellow"))
-    line("", paint('add to .env.lua:  oslo.direnv.path_add("' .. dir .. '")', "fg:8"))
+    line("path", oslo.ui.style("✗ not on $PATH", { fg = "yellow" }))
+    print(oslo.ui.subtitle(('         add to .env.lua:  oslo.direnv.path_add("%s")'):format(dir)))
   end
   print("")
 end

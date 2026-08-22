@@ -140,6 +140,8 @@ and only once a command has taken `oslo.notify.after` seconds or more.
 | `oslo.ui.spin{title, command, quiet}` | the command's exit status | yes |
 | `oslo.ui.log(msg)` or `{message, level, time, fields}` | nothing; writes to stderr | no |
 | `oslo.ui.format`, `.join`, `.style` | a string, drawn nowhere | no |
+| `oslo.ui.title(s, [{fg, rule, width}])` | a bold heading and a rule under it | no |
+| `oslo.ui.subtitle(s, [{fg}])` | the quieter line under a title | no |
 | `oslo.ui.width()`, `.height()`, `.is_tty()`, `.colors()` | what the terminal is | no |
 
 The raw-mode ones are the same code the `ui` builtin runs, so a prompt is identical whether shell or
@@ -184,6 +186,52 @@ end)
 
 Without ranking, `max_items` truncates whatever order the Lua loop happened to build, which is why
 a `string.find` filter feels worse than the built-in one even when it finds the same rows.
+
+### A heading, and the line under it
+
+```lua
+print(oslo.ui.title("oslo 0.4.3   6.13 MB"))
+print(oslo.ui.subtitle("the static release binary"))
+print(oslo.ui.title("done", { rule = false, fg = "green" }))
+```
+
+```
+oslo 0.4.3   6.13 MB
+────────────────────
+the static release binary
+```
+
+The same two shapes from a shell script, and from a shell that is not oslo:
+
+```sh
+ui title "oslo 0.4.3"          # or: oslo userin title …
+ui subtitle --fg blue "static"
+```
+
+**These exist so that headings look the same.** A recipe, a plugin and a `.env.lua` each headed
+their output with a bold line and a rule of their own invention, at their own width, in their own
+colour — so output from one shell read as output from three programs. Same decision `oslo.ui.grid`
+makes about columns.
+
+The rule is the title's width **in cells**, so an emoji or a CJK character counts two and the rule
+does not come up short; it is capped at the terminal, because a rule that wraps onto a second row
+reads as a drawing mistake rather than as a long title.
+
+### Every attribute, not three of them
+
+`oslo.ui.style` read `fg`, `bg` and `bold` and dropped the rest in silence — so
+`oslo.ui.style(x, { underline = true })` answered unstyled text with nothing to say which layer had
+eaten it. All nine now apply, and `ui style` takes the matching flags:
+
+| | |
+|---|---|
+| `fg`, `bg` | any colour spelling: `"green"`, `"brightblue"`, `"#61ffca"`, `"240"` |
+| `bold`, `dim`, `italic`, `underline` | the four everybody uses |
+| `reverse`, `blink`, `hidden`, `strike` | and the four they forget exist |
+
+```sh
+ui style --fg green --italic --underline "styled"
+```
 
 ### Painting by name
 
@@ -294,3 +342,33 @@ asked.
 | `crates/oslo-shell/src/exec/job/report.rs`, `…/pipeline/timing.rs` | the `job` and `time` payloads, and `describe` |
 | `crates/oslo-shell/src/env/builtins/chain.rs` | the `chain` payload |
 | `crates/oslo-shell/src/env/builtins/ui.rs` | the `ui` builtin |
+
+## Colouring from Rust: `oslo_ui::ink`
+
+The same thing one level down, for code inside oslo. `colored`'s shape, over the `Style` oslo
+already had:
+
+```rust
+use oslo_ui::ink::ink;
+
+println!("{}", ink("done").green().bold());
+println!("{}", ink(" WARN ").black().on_yellow());
+println!("{}", ink("6.13 MB").rgb(0x61, 0xff, 0xca).underline());
+println!("{}", ink(name).named(theme_colour));      // "green", "#61ffca", "240"
+```
+
+Eight colours as `red()` / `on_red()` and their `bright_` pairs, plus `indexed`, `rgb`, `named`, and
+every attribute above. It is **not** a dependency on
+[`colored`](https://docs.rs/colored): the shape is the valuable part, and a second crate brings a
+second opinion about what "red" means and a second answer to *should this be coloured at all* —
+which is the only hard question here. oslo answers it once, in `theme::depth`, from `$NO_COLOR`,
+`$TERM` and `$COLORTERM`; two crates deciding separately is how a `NO_COLOR` run comes out
+half-painted.
+
+It resolves at `Display`, not at construction, so a value built before the depth changes is still
+right afterwards — and `.plain()` is free, because the text was never modified. `.at(depth)` paints
+at a depth you name, which is what the tests and the recordings use so they do not depend on the
+terminal they run in.
+
+**Named `ink` and not `paint`** because `oslo_ui::paint` already draws a block of rows under the
+cursor, and two things called painting in one crate is one too many.
