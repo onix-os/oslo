@@ -384,28 +384,36 @@ lines of Rust tracking 1.4k lines of somebody else's bash so that `use flake`, `
 `source_up` meant here what they mean there. Every one of those is a place for the two to disagree
 in a way only a user finds, and none of it is work oslo has to do. direnv exists and is good at it.
 
-So an `.envrc` project runs direnv, from its ordinary shell hook:
-
-```sh
-export PROMPT_COMMAND='eval "$(direnv export bash)"'
-```
-
-`$PROMPT_COMMAND` is evaluated against the live environment before every prompt, which is exactly
-what direnv's own bash hook is built on — so this loads on the way in and unloads on the way out,
-with no oslo code in the middle. Pair it with the two predicates and each tool takes the directories
-that are its own:
+So an `.envrc` project runs direnv, and the whole of it is three lines in `init.lua`:
 
 ```lua
-oslo.feature.when("direnv", function(d) return oslo.fs.find_up(".env.lua", d) ~= nil end)
-oslo.command.when("direnv", function(d)
+-- Only where `direnv` resolves to a file: a path has a slash in it, a builtin does not.
+oslo.env.set("PROMPT_COMMAND", 'command -v direnv | grep -q / && eval "$(direnv export bash)"')
+
+oslo.feature.when("direnv", function(d)          -- oslo's own, where oslo's file is
+  return oslo.fs.find_up(".env.lua", d) ~= nil
+end)
+oslo.command.when("direnv", function(d)          -- the real binary, where direnv's file is
   return oslo.fs.find_up(".envrc", d) ~= nil
       or oslo.env.get("DIRENV_DIFF") ~= nil
 end)
 ```
 
-The `DIRENV_DIFF` clause matters: direnv has to be **run from outside** a directory to unload it, so
-hiding the binary the moment you leave means the unload never happens and the project's variables
-stay set for the rest of the session.
+`$PROMPT_COMMAND` is evaluated against the live environment before every prompt, which is exactly
+what direnv's own bash hook is built on — so this loads on the way in and unloads on the way out,
+with no oslo code in the middle. `.envrc` projects are direnv's, `.env.lua` projects are oslo's, and
+a directory with neither has no `direnv` command at all.
+
+Two details, both of which fail quietly if you leave them out:
+
+- **The `command -v` guard.** The two tools answer to the same word. In a `.env.lua` directory
+  oslo's builtin holds the name, so an unguarded hook runs `direnv export bash` against the builtin
+  and gets `export: not a direnv command` on every prompt. `command -v` prints a path for a file and
+  a bare name for a builtin, and it respects `oslo.command.when`'s mask, so it is the one question
+  that distinguishes them.
+- **The `DIRENV_DIFF` clause.** direnv has to be **run from outside** a directory to unload it. Hide
+  the binary the moment you leave and the unload never happens, so the project's variables stay set
+  for the rest of the session.
 
 **If `bash` on your `$PATH` is a link to oslo**, tell direnv where a real one is — it runs `.envrc`
 through bash, and that file is bash, extglob and all:

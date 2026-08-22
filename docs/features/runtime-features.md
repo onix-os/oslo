@@ -202,6 +202,9 @@ That `DIRENV_DIFF` clause is not optional. direnv has to be *run from outside* t
 unload it, so hiding the binary the moment you leave means the unload never happens and the
 project's variables stay set for the rest of the session.
 
+The pair is only half of it — the hook that runs direnv needs a guard too, since in an `.env.lua`
+directory the word `direnv` is oslo's builtin. `directory-environments.md` has the whole recipe.
+
 The names are `direnv`, `vi`, `suggest`, `abbr`, `notify`, `marks`, `finder` and `rm`. Anything else
 raises, listing the real ones — a config that turns off `direnvv` and is quietly obeyed looks
 exactly like a config that is not being read at all. `when` refuses anything that is not a function

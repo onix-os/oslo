@@ -15,10 +15,10 @@
 //! user hits, and none of it is work oslo has to do: direnv exists, it is on the machine, and it is
 //! good at this.
 //!
-//! So an `.envrc` project runs direnv, from its ordinary shell hook:
+//! So an `.envrc` project runs direnv, from one line in `init.lua`:
 //!
-//! ```sh
-//! export PROMPT_COMMAND='eval "$(direnv export bash)"'
+//! ```lua
+//! oslo.env.set("PROMPT_COMMAND", 'eval "$(direnv export bash)"')
 //! ```
 //!
 //! `$PROMPT_COMMAND` is evaluated against the live environment before every prompt, which is what
