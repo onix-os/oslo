@@ -28,6 +28,7 @@ mod db;
 mod digest;
 #[cfg(feature = "direnv")]
 mod direnv;
+mod env;
 mod envlist;
 pub(crate) mod external;
 /// `oslo.feature` — turning parts of the shell off and on while it runs.
@@ -233,7 +234,7 @@ pub fn install(host: &dyn Host, registry: &Registry, env: Arc<Mutex<Environment>
     // to no group: `glob`, and the two `register_*` hooks that extend the shell.
     ui::install(&mut ui);
     commands(&mut process, &env);
-    variables(&mut variables_t, &env);
+    env::install(&mut variables_t, &env);
     filesystem(&mut oslo, &mut system, &env);
     shell(
         &mut oslo,
@@ -356,53 +357,6 @@ fn commands(oslo: &mut Table, env: &Arc<Mutex<Environment>>) {
         }
         Ok(vec![Value::table(result)])
     });
-}
-
-/// Shell and environment variables.
-fn variables(oslo: &mut Table, env: &Arc<Mutex<Environment>>) {
-    let env_get = Arc::clone(env);
-    put(oslo, "get", move |_, args| {
-        let name = text(&args, 1, "oslo.env.get")?;
-        Ok(vec![match borrow_env(&env_get)?.get_param(&name) {
-            Some(value) => Value::str(value),
-            None => Value::Nil,
-        }])
-    });
-
-    let env_set = Arc::clone(env);
-    put(oslo, "set", move |_, args| {
-        let name = text(&args, 1, "oslo.env.set")?;
-        let value = text(&args, 2, "oslo.env.set")?;
-        borrow_env(&env_set)?.set_var(&name, &value, true);
-        Ok(Vec::new())
-    });
-
-    // oslo.env.unset(name) -> true. The other half of set_var; without it a script could create a
-    // variable and never remove one.
-    let env_unset = Arc::clone(env);
-    put(oslo, "unset", move |_, args| {
-        let name = text(&args, 1, "oslo.env.unset")?;
-        borrow_env(&env_unset)?.unset_var(&name);
-        Ok(vec![Value::Bool(true)])
-    });
-
-    // oslo.env.all() -> { NAME = value, ... }, the exported environment as one table.
-    //
-    // `get_var` answers one name at a time, which cannot express "what is set?" — a script could
-    // not iterate the environment, filter it, or copy it. Exported names only: those are what a
-    // child process would see, which is the question a script is usually asking.
-    let env_all = Arc::clone(env);
-    put(oslo, "all", move |_, _| {
-        let guard = borrow_env(&env_all)?;
-        let mut table = Table::new();
-        for (name, value) in guard.exported_vars() {
-            table.set(Value::str(name), Value::str(value));
-        }
-        Ok(vec![Value::table(table)])
-    });
-
-    // `$PATH` and its relatives as the lists they are. See [`super::envlist`].
-    envlist::install(oslo, env);
 }
 
 /// The working directory and pathname expansion.
