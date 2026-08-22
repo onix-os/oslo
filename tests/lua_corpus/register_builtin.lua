@@ -1,16 +1,16 @@
 -- A Lua function becomes a shell builtin, ahead of PATH.
-oslo.register_builtin("greet", function(argv)
+oslo.register_builtin{ name = "greet", run = function(argv)
   print("hello " .. (argv[2] or "world") .. " (called as " .. argv[1] .. ")")
   return 0
-end)
+end }
 oslo.proc.exec("greet there")
 oslo.proc.exec("greet")
 
 -- The return value is the exit status, in each of its spellings.
-oslo.register_builtin("num", function() return 3 end)
-oslo.register_builtin("yes_", function() return true end)
-oslo.register_builtin("no_", function() return false end)
-oslo.register_builtin("void", function() end)
+oslo.register_builtin{ name = "num", run = function() return 3 end }
+oslo.register_builtin{ name = "yes_", run = function() return true end }
+oslo.register_builtin{ name = "no_", run = function() return false end }
+oslo.register_builtin{ name = "void", run = function() end }
 print("number=" .. oslo.proc.capture("num; echo $?").out)
 print("true=" .. oslo.proc.capture("yes_; echo $?").out)
 print("false=" .. oslo.proc.capture("no_; echo $?").out)

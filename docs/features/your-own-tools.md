@@ -141,19 +141,84 @@ to tell a tool that failed to register from one whose name you misspelled.
 ### A registered builtin
 
 ```lua
-oslo.register_builtin("hi", function(argv)
-  print("hi " .. (argv[2] or "there"))
-  return 0
-end)
+oslo.register_builtin{
+  name = "hi",
+  run = function(argv, shell)
+    print("hi " .. (argv[2] or "there") .. ", last command was " .. shell.status)
+    return 0
+  end,
+}
 ```
+
+**One table, and the handler takes two arguments.** The older
+`oslo.register_builtin("hi", function(argv) … end)` is gone rather than deprecated: the second
+argument is the shell itself, and a positional form had nowhere to say `wants`.
+
+`shell` is what the builtin could not otherwise see. It runs while the shell holds its own state, so
+`oslo.proc.status()` raises from in there — and the Lua global `$?` route `try_lock`s and answers
+`nil`. **A builtin could not read the exit status of the command before it by any route at all.**
+The frame above holds a live `&mut Environment` and was throwing it away; the record is built from
+it, which costs no lock.
+
+| always there | |
+|---|---|
+| `status`, `ok` | `$?`, and the predicate almost everyone actually tests |
+| `cwd`, `oldcwd` | `$PWD`, `$OLDPWD` |
+| `pid`, `last_bg_pid` | `$$`, `$!` |
+| `interactive`, `flags` | and `$-` |
+| `positional`, `argc` | `$1…$n` — **1-based, so `$1` is `positional[1]`** — and `$#` |
+| `pipestatus`, `depth` | the whole vector, and how deep in functions this is |
+
+The collections cost real work — `vars` clones every name and value *and sorts them* — so they are
+asked for by name and gathered once:
+
+```lua
+oslo.register_builtin{ name = "probe", wants = { "vars", "aliases" },
+  run = function(argv, shell) return shell.vars.HIDDEN end }
+```
+
+`wants` takes `vars` (with `exported` beside it), `aliases`, `functions`, `builtins`, `dirstack`
+and `stack`. An unknown name fails **at registration**, naming the set. And a known field that was
+not asked for **raises** rather than answering `nil` — which is what makes `wants` safe to be
+opt-in, because `shell.aliases and shell.aliases[x]` would otherwise be a silent nothing.
+
+### Changing something, by saying so
+
+A builtin cannot write to the shell directly — `oslo.env.set` raises in there and a plain
+`X = "1"` is a `try_lock` that **drops the write with no message**. So it returns what it wants
+changed, and the frame above applies it:
+
+```lua
+oslo.register_builtin{ name = "use", run = function(argv, shell)
+  return {
+    status     = 0,
+    set        = { PROFILE = argv[2] },   -- shell-local
+    export     = { TOOLCHAIN = argv[2] }, -- and to every child
+    unset      = { "STALE" },
+    alias      = { build = "make build", old = false },  -- false removes
+    positional = { "a", "b" },            -- set -- a b
+    cd         = "/srv/" .. argv[2],
+  }
+end }
+```
+
+Applied in that order, and the order is load-bearing: `unset` before `set`, or a name in both is
+silently discarded; `set` before `export`, so a name in both ends up exported; **`cd` last**,
+because it fires the change-directory hooks — which should see what this builtin just set — and
+writes `PWD` itself.
+
+An **unknown key raises and applies nothing**, so a misspelt `setenv` cannot leave the shell half
+changed. A well-formed effect the shell *refuses* — a readonly variable — is different: the shell
+already says which, and the status becomes 1. Writing `status` explicitly overrides that, because a
+builtin that insists after trying a readonly write is expressing intent.
+
+Every scalar return still means what it meant:
 
 This goes into the one builtin table `is_builtin`, the dispatcher, `type`, `command -v` and
 completion all read, so `type hi` answers *hi is a shell builtin* and `command -v hi` answers `hi`.
 `argv[1]` is the builtin's own name, as it is for every builtin written in Rust — the dispatcher
 recovers the closure from it. Redirections and pipelines work because nothing about the builtin is
 special: `hi world > /tmp/hi.txt` writes the file and `hi there | tr a-z A-Z` prints `HI THERE`.
-
-What the callback returns becomes the exit status:
 
 | returned | status |
 |---|---:|
@@ -238,7 +303,7 @@ oslo.register_tool{ name = "mounts", accepts = "nothing", produces = "rows",
                     rows = function(argv) return { { a = 1 } } end }
 oslo.tools()                              --> { "mounts" }
 
-oslo.register_builtin("hi", function(argv) print(argv[2]) return 0 end)
+oslo.register_builtin{ name = "hi", run = function(argv, shell) print(argv[2]) return 0 end }
 ```
 
 ```sh

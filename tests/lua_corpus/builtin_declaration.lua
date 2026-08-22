@@ -1,10 +1,10 @@
 -- `oslo.register_builtin` in its table form: a command that can say what it is.
 
 -- The form that has always existed still works, untouched.
-oslo.register_builtin("older", function()
+oslo.register_builtin{ name = "older", run = function()
   print("older ran")
   return 0
-end)
+end }
 
 -- The table form: the same, plus a description and its own completion.
 oslo.register_builtin {

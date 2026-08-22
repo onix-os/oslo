@@ -12,7 +12,7 @@
 //! Nothing here reimplements shell behaviour. `oslo.sys.cd` runs the `cd` builtin and `oslo.glob`
 //! calls the shell's own globber, so the two interfaces cannot drift apart.
 
-use crate::lua::engine::{BUILTIN_KEY_PREFIX, PROMPT_KEY, Registry, borrow_env, call_lua_builtin};
+use crate::lua::engine::{BUILTIN_KEY_PREFIX, PROMPT_KEY, Registry, borrow_env};
 use oslo_base::value::LuaError;
 use oslo_base::value::{Table, Value};
 use oslo_luavm::Host;
@@ -531,8 +531,14 @@ fn shell(
 
         let mut guard = borrow_env(&env_builtin)?;
         let key = declared.name.clone();
-        guard.register_dynamic_builtin(&declared.name, move |_env, args| {
-            Ok(call_lua_builtin(&key, args))
+        // **`env` is used, not discarded.** It was `|_env, args|` — a live, exclusive
+        // `&mut Environment` bound and thrown away, while the Lua body reached back for the same
+        // state through a lock the frame above was already holding. `register_dynamic_builtin`
+        // clones the callback out of the registry precisely so this closure can hold one; its own
+        // comment says so. The capability was designed in and never used.
+        let wants = declared.wants;
+        guard.register_dynamic_builtin(&declared.name, move |env, args| {
+            Ok(builtin::call::call(env, &key, wants, args))
         });
         Ok(Vec::new())
     });

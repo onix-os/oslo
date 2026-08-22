@@ -34,9 +34,9 @@ fn run(env: &Arc<Mutex<Environment>>, line: &str) -> i32 {
 fn a_registered_builtin_runs_and_its_return_value_is_the_status() {
     let (_lua, env) = shell_with_lua(
         r#"
-        oslo.register_builtin("statuser", function(argv)
+        oslo.register_builtin{ name = "statuser", run = function(argv)
             return 7
-        end)
+        end }
         "#,
     );
     assert!(env.lock().unwrap().is_builtin("statuser"));
@@ -51,10 +51,10 @@ fn a_registered_builtin_runs_and_its_return_value_is_the_status() {
 fn the_callback_receives_argv_with_its_own_name_first() {
     let (_lua, env) = shell_with_lua(
         r#"
-        oslo.register_builtin("argviewer", function(argv)
+        oslo.register_builtin{ name = "argviewer", run = function(argv)
             if table.concat(argv, ",") ~= "argviewer,one,two" then return 99 end
             return #argv
-        end)
+        end }
         "#,
     );
     assert_eq!(run(&env, "argviewer one two"), 3);
@@ -65,9 +65,9 @@ fn the_callback_receives_argv_with_its_own_name_first() {
 fn missing_and_boolean_return_values_become_a_status() {
     let (_lua, env) = shell_with_lua(
         r#"
-        oslo.register_builtin("silent", function(argv) end)
-        oslo.register_builtin("yes", function(argv) return true end)
-        oslo.register_builtin("no", function(argv) return false end)
+        oslo.register_builtin{ name = "silent", run = function(argv) end }
+        oslo.register_builtin{ name = "yes", run = function(argv) return true end }
+        oslo.register_builtin{ name = "no", run = function(argv) return false end }
         "#,
     );
     assert_eq!(run(&env, "silent"), 0);
@@ -81,9 +81,9 @@ fn missing_and_boolean_return_values_become_a_status() {
 fn an_error_inside_the_callback_is_a_failure_status() {
     let (_lua, env) = shell_with_lua(
         r#"
-        oslo.register_builtin("exploder", function(argv)
+        oslo.register_builtin{ name = "exploder", run = function(argv)
             error("deliberate")
-        end)
+        end }
         "#,
     );
     assert_eq!(run(&env, "exploder"), 1);
@@ -96,7 +96,7 @@ fn an_error_inside_the_callback_is_a_failure_status() {
 fn a_registered_name_overrides_the_native_builtin() {
     let (_lua, env) = shell_with_lua(
         r#"
-        oslo.register_builtin("true", function(argv) return 3 end)
+        oslo.register_builtin{ name = "true", run = function(argv) return 3 end }
         "#,
     );
     assert_eq!(run(&env, "true"), 3);
@@ -108,7 +108,7 @@ fn a_registered_name_overrides_the_native_builtin() {
 fn a_registered_name_is_preferred_over_the_program_on_path() {
     let (_lua, env) = shell_with_lua(
         r#"
-        oslo.register_builtin("env", function(argv) return 5 end)
+        oslo.register_builtin{ name = "env", run = function(argv) return 5 end }
         "#,
     );
     assert_eq!(run(&env, "env"), 5);
@@ -121,10 +121,10 @@ fn a_registered_name_is_preferred_over_the_program_on_path() {
 fn calling_back_into_the_oslo_api_errors_instead_of_deadlocking() {
     let (_lua, env) = shell_with_lua(
         r#"
-        oslo.register_builtin("reenter", function(argv)
+        oslo.register_builtin{ name = "reenter", run = function(argv)
             oslo.env.set("SHOULD_NOT_HAPPEN", "1")
             return 0
-        end)
+        end }
         "#,
     );
     assert_eq!(run(&env, "reenter"), 1);
@@ -139,7 +139,7 @@ fn an_empty_builtin_name_is_refused() {
     let lua = LuaEngine::new().expect("Lua init failed");
     lua.setup_bindings(Arc::clone(&env)).expect("bindings");
     let err = lua
-        .eval_script(r#"oslo.register_builtin("  ", function() end)"#)
+        .eval_script(r#"oslo.register_builtin{ name = "  ", run = function() end }"#)
         .expect_err("an empty name must be an error");
     assert!(err.to_string().contains("must not be empty"), "{err}");
 }

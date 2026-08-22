@@ -179,10 +179,10 @@ fn the_namespaces_are_also_reachable_unqualified() {
 fn inside_a_builtin(body: &str) -> String {
     lua(&format!(
         r#"
-oslo.register_builtin("probe", function(argv)
+oslo.register_builtin{{ name = "probe", run = function(argv, shell)
 {body}
   return 0
-end)
+end }}
 oslo.proc.exec("probe")
 "#
     ))
@@ -225,10 +225,11 @@ fn most_of_the_api_works_from_inside_a_builtin() {
 
 /// And what it cannot: the calls that take the lock.
 ///
-/// **`oslo.proc.status` is the one that hurts**, because it is `$?` — so a builtin cannot see the
-/// status of the command before it, by this route or by the Lua-global one (`ShellGlobals::get`
-/// `try_lock`s and answers nil). That is the defect `PLAN.md` item 1 exists to fix; when it lands,
-/// this expectation changes and the change should be deliberate.
+/// **`oslo.proc.status` is still on this list, and no longer matters.** It is `$?`, and a builtin
+/// could not reach it by any route — the `oslo.*` call raised and the Lua global answered nil. The
+/// call still refuses, because it still takes the lock; what changed is that a builtin is now
+/// *handed* the answer as `shell.status` and has no reason to ask. See
+/// `tests/lua_builtin_effects_tests.rs`.
 #[test]
 fn the_locked_calls_refuse_from_inside_a_builtin() {
     let said = inside_a_builtin(

@@ -6,7 +6,7 @@
 local db = oslo.db.open("notes")
 
 -- `note "text"` writes one down; `note` with nothing prints them.
-oslo.register_builtin("note", function(argv)
+oslo.register_builtin{ name = "note", run = function(argv)
   if argv[2] then
     db:set(os.date("!%Y-%m-%dT%H:%M:%SZ"), argv[2])
     return 0
@@ -15,7 +15,7 @@ oslo.register_builtin("note", function(argv)
     print(key .. "  " .. (db:get(key) or ""))
   end
   return 0
-end)
+end }
 
 -- The same notes as rows, so they compose: `notes | where 'note:match("shell")' | cols at`.
 --

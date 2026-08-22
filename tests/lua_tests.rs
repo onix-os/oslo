@@ -272,19 +272,30 @@ fn set_prompt_refuses_anything_that_is_not_a_function() {
 // ------------------------------------------------------------ oslo.register_builtin
 
 #[test]
-fn register_builtin_refuses_a_callback_that_is_not_callable() {
+fn register_builtin_refuses_a_declaration_it_cannot_use() {
     let (lua, env) = engine();
     // The R9.8 suite covers the callback that runs; this is the other half — a bad registration
     // must not leave a name in the builtin registry with nothing behind it.
-    assert!(
-        lua.eval_script(r#"oslo.register_builtin("zzbad", "not a function")"#)
-            .is_err()
-    );
-    assert!(
-        lua.eval_script(r#"oslo.register_builtin("zzbad")"#)
-            .is_err()
-    );
-    assert!(!env.lock().unwrap().is_builtin("zzbad"));
+    //
+    // **The two-argument spelling is one of the refusals now.** It was
+    // `oslo.register_builtin("hi", function(argv) … end)` and is a table only, because the handler
+    // takes a second argument — the shell record — and a positional form has nowhere to say
+    // `wants`. Nothing in the tree still uses it; the message names the shape to write instead.
+    for bad in [
+        r#"oslo.register_builtin("zzbad", function(argv) end)"#,
+        r#"oslo.register_builtin("zzbad", "not a function")"#,
+        r#"oslo.register_builtin("zzbad")"#,
+        r#"oslo.register_builtin{ name = "zzbad" }"#,
+        r#"oslo.register_builtin{ name = "zzbad", run = "not a function" }"#,
+        r#"oslo.register_builtin{ run = function() end }"#,
+        r#"oslo.register_builtin{ name = "zzbad", run = function() end, wants = { "variables" } }"#,
+    ] {
+        assert!(lua.eval_script(bad).is_err(), "accepted: {bad}");
+        assert!(
+            !env.lock().unwrap().is_builtin("zzbad"),
+            "a refused declaration left the name registered: {bad}"
+        );
+    }
 }
 
 // --------------------------------------------------------------- the absent bindings

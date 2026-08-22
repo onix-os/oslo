@@ -119,51 +119,12 @@ pub use hooks::{
 pub(crate) use plugin::load_plugin_file;
 pub use queue::drain as run_deferred_hooks;
 
-/// Turn whatever a Lua builtin returned into an exit status.
+/// The interpreter and registry active on this thread, if a config was loaded.
 ///
-/// Modelled on how a shell reads a command's result rather than on Lua's own truthiness: no
-/// return value at all is success (the common case — a builtin that just printed something),
-/// `false` is failure, and a number is the status the script asked for.
-fn status_from_lua(value: Option<&Value>) -> i32 {
-    match value {
-        None | Some(Value::Nil) | Some(Value::Bool(true)) => 0,
-        Some(Value::Bool(false)) => 1,
-        Some(Value::Number(n)) => n.as_float() as i32,
-        Some(Value::Str(s)) => s.parse().unwrap_or(0),
-        Some(_) => 0,
-    }
-}
-
-/// Run the Lua callback registered for `name` with `args` as its argument list.
-///
-/// Returns an exit status in every case, because a builtin that cannot run is still a command
-/// that ran: a Lua error becomes a diagnostic on stderr plus status 1, the same shape a builtin
-/// written in Rust uses to report a bad invocation. `args[0]` is the builtin's own name, so the
-/// callback sees the same argv a native builtin does.
-pub(crate) fn call_lua_builtin(name: &str, args: &[String]) -> i32 {
-    let Some((interp, registry)) = ACTIVE.with(|slot| slot.borrow().clone()) else {
-        eprintln!("oslo: {}: no Lua interpreter on this thread", name);
-        return 127;
-    };
-    let key = format!("{}{}", BUILTIN_KEY_PREFIX, name);
-    let Some(callback) = registry.borrow().get(&key).cloned() else {
-        eprintln!("oslo: {}: no Lua callback registered", name);
-        return 127;
-    };
-
-    // Argv reaches the callback as one table, which is the `function(argv)` shape the API has
-    // always documented.
-    let mut argv = Table::new();
-    for (i, arg) in args.iter().enumerate() {
-        argv.set(Value::int(i as i64 + 1), Value::str(arg));
-    }
-    match interp.call_function(&callback, vec![Value::table(argv)]) {
-        Ok(values) => status_from_lua(values.first()),
-        Err(e) => {
-            eprintln!("oslo: {}: {}", name, e);
-            1
-        }
-    }
+/// `call_lua_builtin` used to live here and reach these directly; the builtin's call path moved to
+/// `api/builtin/call.rs` when it grew the shell record, and this is the seam it needs.
+pub(crate) fn active() -> Option<(Rc<Engine>, Registry)> {
+    ACTIVE.with(|slot| slot.borrow().clone())
 }
 
 /// The shell's variables, as the evaluator's global namespace.

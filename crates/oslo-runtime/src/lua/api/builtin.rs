@@ -18,10 +18,15 @@
 //! `nargs` is deliberately absent. In a shell, arguments are words and every builtin already parses
 //! its own; a declared arity would be a second, weaker parser that disagrees with the first.
 
+pub(super) mod call;
+mod effects;
+pub(crate) mod status;
+
 use super::util::put;
 use oslo_base::value::{LuaError, LuaResult};
 use oslo_base::value::{Table, Value};
 use oslo_luavm::Host;
+use oslo_shell::env::view::Wants;
 use std::cell::RefCell;
 use std::collections::HashMap;
 
@@ -32,6 +37,8 @@ pub(super) struct Declared {
     pub run: Value,
     pub desc: Option<String>,
     pub complete: Option<Value>,
+    /// Which of the expensive collections the shell record should gather. Read once, here.
+    pub wants: Wants,
 }
 
 thread_local! {
@@ -73,25 +80,47 @@ pub(super) fn declaration(args: &[Value]) -> LuaResult<Declared> {
                 _ => None,
             },
             complete,
+            wants: wanted(&spec.get_str("wants"))?,
         });
     }
 
-    let Some(Value::Str(name)) = args.first() else {
-        return Err(LuaError::new(
-            "oslo.register_builtin: a name and a function, or one table",
-        ));
-    };
-    let Some(run @ Value::Function(_)) = args.get(1) else {
-        return Err(LuaError::new(
-            "oslo.register_builtin: the second argument must be a function",
-        ));
-    };
-    Ok(Declared {
-        name: named(name)?,
-        run: run.clone(),
-        desc: None,
-        complete: None,
-    })
+    Err(LuaError::new(
+        "oslo.register_builtin: one table — { name = \"…\", run = function(argv, shell) … end }",
+    ))
+}
+
+/// Read `wants = { "vars", … }`, once, at declaration.
+///
+/// **An unknown name is refused here rather than at call time.** A typo would otherwise be a field
+/// that is mysteriously absent from the record much later, in somebody else's builtin.
+fn wanted(value: &Value) -> LuaResult<Wants> {
+    match value {
+        Value::Nil => Ok(Wants::default()),
+        Value::Table(list) => {
+            let mut wants = Wants::default();
+            for (_, entry) in list.borrow().pairs() {
+                let Value::Str(name) = &entry else {
+                    return Err(LuaError::new(
+                        "oslo.register_builtin: wants: every entry must be a string".to_string(),
+                    ));
+                };
+                match Wants::bit(name) {
+                    Some(bit) => wants = wants.with(bit),
+                    None => {
+                        return Err(LuaError::new(format!(
+                            "oslo.register_builtin: wants: `{name}` is not one of {}",
+                            Wants::NAMES.join(", ")
+                        )));
+                    }
+                }
+            }
+            Ok(wants)
+        }
+        other => Err(LuaError::new(format!(
+            "oslo.register_builtin: wants must be a list of names, got {}",
+            other.type_name()
+        ))),
+    }
 }
 
 fn named(name: &str) -> LuaResult<String> {
