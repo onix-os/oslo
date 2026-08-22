@@ -94,6 +94,12 @@ pub fn lookup(name: &str) -> Option<PathBuf> {
     if name.contains('/') {
         return resolve_program(name);
     }
+    // A name this directory hides is not on `$PATH` as far as anything asking here is concerned.
+    // Here rather than at the call sites because this *is* the question "what would `name` run",
+    // and execution, `oslo.run`, argc's completion and the nix probe all ask it through this.
+    if oslo_base::command::hidden(name) {
+        return None;
+    }
     if let Some(path) = recall(name) {
         // A remembered path that has since been removed is worse than no cache at all: the shell
         // would report "cannot execute" for a command that a fresh `PATH` search would find in

@@ -172,6 +172,12 @@ fn parse_options(args: &[String]) -> std::result::Result<(Options, &[String]), i
 /// oslo runs the database row, and reporting a path it would never execute is the disagreement this
 /// module exists to prevent.
 fn path_matches(name: &str, all: bool) -> Vec<PathBuf> {
+    // `type` and `command -v` answer what would run, so a hidden name has to answer nothing here
+    // too. A `type` that names a path the shell would then refuse to execute is worse than either
+    // behaviour on its own.
+    if oslo_base::command::hidden(name) {
+        return Vec::new();
+    }
     let found: Vec<PathBuf> = if all {
         which::which_all(name)
             .map(|found| found.collect())

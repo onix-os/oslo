@@ -24,12 +24,30 @@ pub(super) fn start() {
 /// Load whatever `path` asks for, and unload what the last directory did.
 #[cfg(feature = "direnv")]
 pub(super) fn arrive(env: &Arc<Mutex<Environment>>, lua: &LuaEngine, path: &Path) {
+    decide(path);
     super::environments::arrive(env, lua, path);
 }
 
-/// Without the feature there is nothing to arrive into, and the arguments are the loop's own.
+/// Without the feature there is nothing to load, but a directory is still a directory.
 #[cfg(not(feature = "direnv"))]
-pub(super) fn arrive<E, L, P>(_env: &E, _lua: &L, _path: P) {}
+pub(super) fn arrive<E, L>(_env: &E, _lua: &L, path: &std::path::Path) {
+    decide(path);
+}
+
+/// Re-decide everything a configuration attached to *being somewhere*.
+///
+/// **Outside the `direnv` wall, and before it.** Neither registrar is a directory-environment
+/// concept — `oslo.feature.when` turns a builtin off in a directory and `oslo.command.when` hides a
+/// program in one, and a build without `.env.lua` has both of them and every reason to want them.
+/// `feature::decide` used to sit inside `environments::arrive`, which meant a default build read
+/// the predicate, stored it, and then never asked it: the config looked right and did nothing.
+///
+/// Before the load rather than after, because the first thing a predicate is for is deciding
+/// whether this directory's own file should be read at all.
+fn decide(path: &std::path::Path) {
+    crate::lua::api::feature::decide(path);
+    crate::lua::api::command::decide(path);
+}
 
 /// Whether `direnv allow` asked for a reload it could not do itself.
 ///

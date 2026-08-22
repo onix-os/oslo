@@ -298,6 +298,12 @@ fn scan(path: &str) -> HashSet<String> {
             }
         }
     }
+    // **Hidden names are left out of the index rather than filtered by its readers.** Six things
+    // read this — completion, hinting, highlighting, `repair`, the `=` shorthand and the
+    // did-you-mean after a failed command — and a check in each is six chances for one to disagree
+    // and offer a name that will not run. `oslo_base::command::apply` invalidates the cache when
+    // the set moves, which is what makes building it in here correct.
+    names.retain(|name| !oslo_base::command::hidden(name));
     names
 }
 
