@@ -7,12 +7,11 @@
 //!
 //! # Thin, on purpose
 //!
-//! Every function here is a call into [`oslo_shell::direnv`], which is also what an `.envrc` reaches
-//! through [`oslo_shell::direnv::stdlib`]. That matters more than it looks: `nix_develop` and `use flake`
-//! do the same delicate thing — take a dev shell's environment from `nix print-dev-env --json`
-//! while withholding the handful of variables that would wreck the shell you are standing in — and
-//! two copies of that list is two chances to get it wrong, silently, in a way nobody would think to
-//! test. See [`oslo_shell::direnv::devshell`] for what those are and why.
+//! Every function here is a call into [`oslo_shell::direnv`], and the work is there rather than in
+//! this file. `nix_develop` is the one that makes the split worth keeping: it takes a dev shell's
+//! environment from `nix print-dev-env --json` while withholding the handful of variables that
+//! would wreck the shell you are standing in, and getting that list wrong is silent and severe. See
+//! `oslo_shell::nix_shell` for what those are and why.
 
 use super::util::{put, text};
 use oslo_base::value::{LuaError, Table, Value};
