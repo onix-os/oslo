@@ -127,6 +127,41 @@ fn type_agrees_with_what_would_run() {
     );
 }
 
+/// **Every way of asking has to give the same answer**, and this is the test that was missing.
+///
+/// `type` was gated and `command -v` was not, so a directory that hid `direnv` still had
+/// `command -v direnv` printing a path — and the hook written against it, `command -v direnv |
+/// grep -q / && eval "$(direnv export bash)"`, fired in every directory and printed
+/// `direnv: command not found` at every prompt.
+///
+/// There are seven `$PATH` searches in the tree and they answer the same question. One of them
+/// disagreeing is worse than none of them being gated: it makes the shell say a command exists and
+/// then refuse to run it.
+#[test]
+fn every_way_of_asking_agrees() {
+    let dir = tree();
+    let said = run(
+        dir.path(),
+        &format!(
+            "cd {}\ntype moo\ncommand -v moo\nwhich moo\ncd {}\ntype moo\ncommand -v moo\nwhich moo\nexit\n",
+            dir.path().join("seen").display(),
+            dir.path().join("unseen").display()
+        ),
+    );
+    let bin = dir.path().join("bin/moo").display().to_string();
+    assert_eq!(
+        said.matches(&bin).count(),
+        3,
+        "type, command -v and which must each name it where it is visible\n{said}"
+    );
+    assert!(
+        said.contains("type: moo: not found"),
+        "type must not find it where it is hidden: {said}"
+    );
+    // `command -v` and `which` are silent on a miss rather than saying anything, so the assertion
+    // that they agree is that the path appears three times and not four, five or six.
+}
+
 /// A word with a slash is a path, not a search — POSIX 2.9.1.1 — so it is never hidden. The same
 /// escape hatch `command` gives for a shadowed builtin.
 #[test]

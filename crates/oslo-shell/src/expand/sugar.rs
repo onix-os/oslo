@@ -114,6 +114,11 @@ fn equals(name: &str) -> Equals {
     if name.is_empty() || name.contains('/') || name.starts_with('=') {
         return Equals::NotSugar;
     }
+    // A hidden name is not a command here, so the shorthand has nothing to expand to and falls
+    // through to the "did you mean" path like any other unknown word. See `oslo_base::command`.
+    if oslo_base::command::hidden(name) {
+        return Equals::Unknown(name.to_string());
+    }
     match which::which(name) {
         Ok(p) => Equals::Found(p.to_string_lossy().into_owned()),
         Err(_) => Equals::Unknown(name.to_string()),

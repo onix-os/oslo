@@ -133,7 +133,14 @@ fn ways_for(env: &Environment, name: &str, opts: &Options) -> Vec<Kind> {
 }
 
 /// Every file named `name` on `$PATH`, in search order and unfiltered.
+///
+/// Unfiltered of oslo's own macro copies, that is — a name this directory hides is still hidden.
+/// `which --skip-alias` asks a narrower question than `type`, not a different one, and the two
+/// disagreeing about whether a command exists is worse than either answer. See `oslo_base::command`.
 pub(super) fn binaries(name: &str) -> Vec<std::path::PathBuf> {
+    if oslo_base::command::hidden(name) {
+        return Vec::new();
+    }
     which::which_all(name)
         .map(|found| found.collect())
         .unwrap_or_default()

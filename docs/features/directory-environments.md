@@ -388,7 +388,7 @@ So an `.envrc` project runs direnv, and the whole of it is three lines in `init.
 
 ```lua
 -- Only where `direnv` resolves to a file: a path has a slash in it, a builtin does not.
-oslo.env.set("PROMPT_COMMAND", 'command -v direnv | grep -q / && eval "$(direnv export bash)"')
+oslo.env.set("PROMPT_COMMAND", 'type direnv 2>/dev/null | grep -q / && eval "$(direnv export bash)"')
 
 oslo.feature.when("direnv", function(d)          -- oslo's own, where oslo's file is
   return oslo.fs.find_up(".env.lua", d) ~= nil
@@ -406,11 +406,11 @@ a directory with neither has no `direnv` command at all.
 
 Two details, both of which fail quietly if you leave them out:
 
-- **The `command -v` guard.** The two tools answer to the same word. In a `.env.lua` directory
-  oslo's builtin holds the name, so an unguarded hook runs `direnv export bash` against the builtin
-  and gets `export: not a direnv command` on every prompt. `command -v` prints a path for a file and
-  a bare name for a builtin, and it respects `oslo.command.when`'s mask, so it is the one question
-  that distinguishes them.
+- **The `type` guard.** The two tools answer to the same word. In a `.env.lua` directory oslo's
+  builtin holds the name, so an unguarded hook runs `direnv export bash` against the builtin and
+  gets `export: not a direnv command` on every prompt. `type` writes a path for a file and
+  `is a shell builtin` for a builtin, and it respects `oslo.command.when`'s mask, so it is the one
+  question that distinguishes them.
 - **The `DIRENV_DIFF` clause.** direnv has to be **run from outside** a directory to unload it. Hide
   the binary the moment you leave and the unload never happens, so the project's variables stay set
   for the rest of the session.
