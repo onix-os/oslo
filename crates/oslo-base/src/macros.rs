@@ -542,6 +542,11 @@ pub fn publish(store: &Store) -> Result<(), String> {
         .into_iter()
         .filter_map(Result::err)
     {
+        // **Said out loud as well as recorded.** `messages::say` writes into the buffer `oslo
+        // messages` reads, and a one-shot `oslo macros add` prints that buffer to nobody — so a
+        // publish that refused to overwrite somebody's file, or a `$HOME` that could not be
+        // written, reported success and left no trace anywhere the person would look.
+        eprintln!("oslo macros: {problem}");
         crate::messages::say(
             crate::messages::Level::Warn,
             "macros",
