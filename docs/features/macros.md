@@ -64,9 +64,16 @@ would otherwise never see it. A body with `$(…)` in it waits.
 
 Two consequences worth knowing:
 
-* **The environment the shell was started with wins.** Neither kind overrules a name that is already
-  set, so `FOO=x oslo` still means what it says — and `oslo macros add --var` says so at the time if
-  the name is already taken.
+* **A stored variable wins.** It overrules the config and the environment the shell was started
+  with, the same way a stored alias and a stored abbreviation always have — they are applied in the
+  same loop, after the config, and what you store is what you get.
+
+  This ran the other way until it was noticed that it made the common case impossible: `EDITOR`
+  arrives from a terminal emulator or a session manager, so `oslo macros add --var EDITOR=nvim`
+  reported success and then changed nothing, for ever. The old rule protected `FOO=x oslo`, which
+  still means what it says for every name nobody has deliberately stored — and a name you *have*
+  stored is one you have already answered the question about. Unset it with `oslo macros remove`
+  when you want the parent back.
 * **A recipe reaches a program that reads the environment only once the name has been read.** For
   `gh` that means mentioning it — `echo "$GITHUB_TOKEN" >/dev/null` first, or writing the command as
   `gh …` after anything that expands it. A `secret run NAME -- cmd` that puts one value in one

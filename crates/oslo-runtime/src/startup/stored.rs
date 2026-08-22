@@ -119,13 +119,23 @@ fn apply(env: &Arc<Mutex<Environment>>, wanted: &[Entry], had: &Applied, now: &A
             // at every prompt would decrypt everything you own to answer a question nobody asked.
             // The shell is handed the line and runs it the first time the name is read — see
             // `oslo_shell::expand::param::materialise`.
-            // **Neither overrules the environment this shell was started with**, which is the same
-            // rule the lazy path follows and the reason `FOO=x oslo …` still means something.
-            Kind::Var if guard.get_var(&entry.name).is_some() => {}
+            //
+            // **A stored variable wins, like every other kind here.** It used to skip a name that
+            // already had a value, so `EDITOR` inherited from a terminal emulator could not be
+            // changed by storing one — the command reported success and nothing happened. Alias and
+            // Abbrev are its structural peers in this very loop and neither ever deferred, and the
+            // `macros.sh` rendering of this same entry is an unguarded `export`, so the old rule
+            // was not even consistent with itself. What you store is what you get.
             Kind::Var if oslo_base::macros::is_a_value(&entry.body) => {
                 guard.set_var(&entry.name, entry.body.trim(), true);
             }
-            Kind::Var => guard.set_lazy_var(&entry.name, &entry.body),
+            Kind::Var => {
+                // **The value goes first, or the recipe never runs.** `materialise` returns early
+                // for a name that already has one, so a lazy body registered beside an inherited
+                // value would sit there unread — the deference removed above, in a second place.
+                guard.unset_var(&entry.name);
+                guard.set_lazy_var(&entry.name, &entry.body);
+            }
             // A function or a script is found after `$PATH` fails, so neither is in the snapshot
             // and neither belongs here. See `oslo_shell::exec::stored`.
             Kind::Func | Kind::Script => {}

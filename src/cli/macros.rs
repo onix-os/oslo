@@ -205,18 +205,6 @@ fn add(args: &[String]) -> i32 {
     if body.trim().is_empty() {
         return fail("nothing to store: the body is empty");
     }
-    // **A stored variable is what a name means when nothing else has said**, so one that is already
-    // in the environment would never be reached — and finding that out by wondering why nothing
-    // changed is a bad afternoon. The shell will not overrule the parent that started it; saying so
-    // here is the only warning there is a place for.
-    if kind == Kind::Var
-        && let Ok(already) = std::env::var(&name)
-    {
-        eprintln!(
-            "oslo macros: {name} is already set to {already:?} by something else, so this applies \
-             only where it is not"
-        );
-    }
     // The tags asked for, or — when none were — whatever it already had, so editing a macro does
     // not silently strip its labels.
     let tags = if asked.tags.is_empty() {
