@@ -199,3 +199,26 @@ fn a_body_with_newlines_and_tabs_survives_the_round_trip() {
     let there = snapshot::round_trip_for_test(awkward);
     assert_eq!(there, awkward);
 }
+
+/// **A space does not make a value a command.**
+///
+/// `is_a_value` treated any whitespace as "this must be run", so `EDITOR="code --wait"` was stored
+/// as a recipe and *executed*. It stayed invisible while a stored variable deferred to one already
+/// set — and became a live bug the moment stored variables started winning, because then every
+/// inherited exported variable containing a space went through this: `SSH_CONNECTION` came back as
+/// the output of trying to execute an IP address, `LS_COLORS` likewise.
+#[test]
+fn a_value_with_spaces_is_still_a_value() {
+    assert!(super::is_a_value("code --wait"));
+    assert!(super::is_a_value("1.2.3.4 22 5.6.7.8 22"));
+    assert!(super::is_a_value("di=01;34:ln=01;36"));
+}
+
+/// Substitution is what marks a recipe, and substitution has a syntax.
+#[test]
+fn only_substitution_makes_a_recipe() {
+    assert!(!super::is_a_value("$(oslo secret get gh-token)"));
+    assert!(!super::is_a_value("`hostname`"));
+    assert!(!super::is_a_value("  "));
+    assert!(!super::is_a_value(""));
+}

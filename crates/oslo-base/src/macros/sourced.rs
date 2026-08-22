@@ -76,8 +76,11 @@ pub fn text(entries: &[Entry]) -> String {
             // `$(oslo secret get …)` written here would decrypt at every bash start — for every
             // secret, whether or not anything wanted one. Those are left out and said so in the
             // header. What is left is a plain value, which means the same thing in both shells.
+            // **Quoted**, now that a value may contain a space. `export EDITOR=code --wait` is not
+            // an assignment with an argument, it is `export` given two words — bash takes the first
+            // and treats the second as another name to export.
             Kind::Var if super::is_a_value(&entry.body) => {
-                out.push_str(&format!("export {}={}\n", entry.name, entry.body.trim()));
+                out.push_str(&format!("export {}={}\n", entry.name, quoted(&entry.body)));
             }
             _ => {}
         }
