@@ -1,5 +1,27 @@
 # Changelog
 
+## [0.4.8] - 2026-08-22
+
+### <!-- 0 -->⛰️  Features
+
+- Oslo reads .env.lua, direnv reads .envrc
+- Honour bash's --norc and --noprofile
+- Oslo.command.when hides a program per directory
+- Oslo.fs.find_up
+
+### <!-- 1 -->🐛 Bug Fixes
+
+- A configured variable is not re-read as a recipe
+
+### <!-- 3 -->📚 Documentation
+
+- The last reference to the deleted stdlib
+- Three claims that outlived .envrc support
+- Fix two unresolved intra-doc links
+- The hook line is shell, not Lua
+- Remeasure the direnv and plugin feature sizes
+- Drop the Lua style guide, now implemented
+
 ## [0.4.7] - 2026-08-22
 
 ### <!-- 0 -->⛰️  Features
