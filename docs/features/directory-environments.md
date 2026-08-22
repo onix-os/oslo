@@ -384,10 +384,10 @@ lines of Rust tracking 1.4k lines of somebody else's bash so that `use flake`, `
 `source_up` meant here what they mean there. Every one of those is a place for the two to disagree
 in a way only a user finds, and none of it is work oslo has to do. direnv exists and is good at it.
 
-So an `.envrc` project runs direnv, from one line:
+So an `.envrc` project runs direnv, from its ordinary shell hook:
 
-```lua
-oslo.env.set("PROMPT_COMMAND", 'eval "$(direnv export bash)"')
+```sh
+export PROMPT_COMMAND='eval "$(direnv export bash)"'
 ```
 
 `$PROMPT_COMMAND` is evaluated against the live environment before every prompt, which is exactly

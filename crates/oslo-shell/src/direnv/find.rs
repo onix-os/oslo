@@ -12,10 +12,10 @@
 //! `layout python` meant here what they mean there.
 //!
 //! That is direnv's job and direnv does it. An `.envrc` project works by running direnv, which is a
-//! line in `init.lua`:
+//! shell line:
 //!
-//! ```lua
-//! oslo.env.set("PROMPT_COMMAND", 'eval "$(direnv export bash)"')
+//! ```sh
+//! export PROMPT_COMMAND='eval "$(direnv export bash)"'
 //! ```
 //!
 //! `$PROMPT_COMMAND` is evaluated against the live environment before every prompt, which is
