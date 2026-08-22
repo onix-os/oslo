@@ -265,9 +265,9 @@ pub fn resolve(spelling: &str) -> Option<(usize, &'static str)> {
 /// # The namespace already says `on`
 ///
 /// Twenty of these hooks are called `on-something`, so reaching them through `oslo.on` read
-/// `oslo.on.on_key`, `oslo.on.on_report`, `oslo.on.on_variable_change`. `OSLO_LUA_STYLE.md` calls
-/// that a stutter and it is right: the prefix is the namespace's job, and a config full of `on.on_`
-/// is noise in front of every line that matters.
+/// `oslo.on.on_key`, `oslo.on.on_report`, `oslo.on.on_variable_change`. That is a stutter: the
+/// prefix is the namespace's job, and a config full of `on.on_` is noise in front of every line
+/// that matters.
 ///
 /// So a hook whose canonical name begins with `on-` also answers to the name without it —
 /// `oslo.on.key`, `oslo.on.report`, `oslo.on.variable_change`. One rule over the whole table
@@ -402,8 +402,8 @@ mod tests {
         assert_eq!(resolve("nonsense"), None);
     }
 
-    /// **A hook reached through `on` does not repeat it.** `OSLO_LUA_STYLE.md`'s naming rule: the
-    /// namespace already says `on`, so `oslo.on.on_key` stutters and `oslo.on.key` is the spelling.
+    /// **A hook reached through `on` does not repeat it.** The namespace already says `on`, so
+    /// `oslo.on.on_key` stutters and `oslo.on.key` is the spelling.
     ///
     /// Every `on-` hook, not a hand-picked few — that was the bug this replaced. A single alias made
     /// `oslo.on.key` work while `oslo.on.report` was nil, which is worse than neither working: it
