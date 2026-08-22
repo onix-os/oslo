@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.4.6] - 2026-08-22
+
+### Build
+
+- One bootstrap script, and no Makefile
+
 ## [0.4.5] - 2026-08-22
 
 ### <!-- 0 -->⛰️  Features

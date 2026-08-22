@@ -5,7 +5,7 @@
 # binary is built from. A second file repeating them is a second thing to forget, and it stayed
 # right only by luck — so it is gone, and this reads the manifest instead.
 #
-# This lives in a script rather than inline in the Makefile because the parsing needs a `#` (to
+# A script rather than inline in either build, because both read it: `.make.lua` and the bootstrap
 # skip comment lines), and GNU Make 3.81 treats a `#` inside `$(shell ...)` as the start of a Make
 # comment. It truncates the call and reports `unterminated call to function 'shell': missing ')'`,
 # which fires for *every* target and looks like the whole gate failing for no stated reason.

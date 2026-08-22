@@ -233,9 +233,15 @@ the failure mode removed.
 Both shell out through `/bin/sh`, so every recipe is one careless value away from word-splitting.
 `sh.rm(name)` is argv end to end: there is no quoting step, so there is no quoting bug.
 
-The reference comparison is oslo's own build. `Makefile` and `.make.lua` in this repository produce
-the same binary; the second has no `$$`, no backslash continuations, no `.PHONY` list, and no
-hand-maintained `help:` target repeating what the recipes already say.
+The reference comparison was oslo's own build: a `Makefile` and a `.make.lua` producing the same
+binary, the second with no `$$`, no backslash continuations, no `.PHONY` list and no hand-maintained
+`help:` target repeating what the recipes already say. **The `Makefile` has since been deleted** —
+two build files in one tree meant every change had to be made twice, and the second one rots.
+
+What replaced it is not another build tool. `scripts/build.sh` is a bootstrap and nothing else:
+cargo, one binary, stop. It exists because this file is run by the `make` builtin, which lives
+inside the shell it builds — a fresh checkout, a CI runner and a distribution packager all arrive
+with cargo and no oslo, and none of them can start here.
 
 ## What it cannot do
 
@@ -271,8 +277,11 @@ hand-maintained `help:` target repeating what the recipes already say.
 - **A row-answering command cannot fail a recipe.** Strict `sh` checks a status, and `sh.ls(…)`
   answers with rows instead. `oslo.run{…}` is the way to check one.
 - **No `--fmt`, no `--dump`.** It is Lua.
-- **The `Makefile` still works, and there is no converter.** Two build files in one tree is a
-  choice, not a migration.
+- **There is no converter from a `Makefile`.** oslo's own was deleted rather than translated, by
+  hand, once.
+- **It cannot build the shell it runs in.** The `make` builtin is inside oslo, so a machine without
+  oslo cannot reach a recipe. That first build is `scripts/build.sh`, and keeping it to exactly one
+  job — cargo, one binary — is what stops it growing back into the second build file.
 
 ## Where it lives
 
@@ -285,5 +294,7 @@ hand-maintained `help:` target repeating what the recipes already say.
 | `src/cli/make.rs` | `oslo make`: find, chdir, boot the engine, run |
 | `src/cli/tools.rs` | the row that makes `oslo make` reachable |
 | `tests/make_tests.rs` | the end-to-end suite, one temporary project per case |
+| `scripts/build.sh` | the bootstrap: cargo, one static binary, for a machine with no oslo |
+| `.make.lua` | oslo's own build, and the worked example this page describes |
 | `.make.lua` | oslo's own build, as recipes |
 | `plans/PLAN_MAKE.md` | the inventory this was designed from |
