@@ -70,6 +70,7 @@ const NAMESPACES: &[(&str, &str)] = &[
     ("oslo.path", "table"),
     ("oslo.proc", "table"),
     ("oslo.re", "table"),
+    ("oslo.rows", "table"),
     ("oslo.state", "table"),
     ("oslo.sys", "table"),
     ("oslo.term", "table"),
@@ -134,6 +135,10 @@ const FUNCTIONS: &[&str] = &[
     "oslo.proc.status",
     "oslo.proc.exec",
     "oslo.proc.parse",
+    "oslo.rows.where",
+    "oslo.rows.sort_by",
+    "oslo.rows.render",
+    "oslo.rows.from_json",
     "oslo.word.braces",
     "oslo.word.matches",
     "oslo.git.root",
@@ -229,6 +234,11 @@ fn most_of_the_api_works_from_inside_a_builtin() {
   -- Reading the universal store is a file, not the shell, so it is on this side of the line while
   -- `oslo.env.get` beside it is on the other. See `tests/universal_variable_tests.rs`.
   try("universal", function() local _ = oslo.env.universal() end)
+  -- Pure computation over records, which is why the pipeline verbs reach in here at all. `where` is
+  -- the interesting one: it evaluates Lua per row through the engine already running, so this is a
+  -- re-entry. See `tests/rows_verb_tests.rs`.
+  try("rows",  function() assert(oslo.rows.length({{a=1}}) == 1) end)
+  try("where", function() assert(#oslo.rows.where({{a=1},{a=9}}, "a > 5") == 1) end)
 "#,
     );
     for name in [
@@ -246,6 +256,8 @@ fn most_of_the_api_works_from_inside_a_builtin() {
         "wrap",
         "style",
         "universal",
+        "rows",
+        "where",
     ] {
         assert!(
             said.contains(&format!("{name}=works")),

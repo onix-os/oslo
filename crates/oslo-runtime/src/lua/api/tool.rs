@@ -155,7 +155,7 @@ fn run_rows(
 ///
 /// Column order is kept, because a record's order is not incidental: it decides what `cols` and the
 /// drawn table show, and a verb that hands its input back must not silently reorder it.
-fn rows_value(rows: &[Record]) -> Value {
+pub(super) fn rows_value(rows: &[Record]) -> Value {
     let mut list = Table::new();
     for (i, record) in rows.iter().enumerate() {
         let mut row = Table::new();
@@ -207,7 +207,7 @@ fn lua_of(value: &Val) -> Value {
 }
 
 /// A Lua list of tables as records.
-fn records_of(value: &Value) -> Vec<Record> {
+pub(super) fn records_of(value: &Value) -> Vec<Record> {
     let Value::Table(list) = value else {
         return Vec::new();
     };

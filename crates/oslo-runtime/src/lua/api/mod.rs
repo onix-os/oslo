@@ -60,6 +60,7 @@ mod procinfo;
 pub(crate) mod prompt;
 mod publish;
 mod re;
+mod rows;
 mod run;
 #[cfg(feature = "secrets")]
 mod secret;
@@ -265,6 +266,8 @@ pub fn install(host: &dyn Host, registry: &Registry, env: Arc<Mutex<Environment>
     oslo.set_str("sys", Value::table(system));
     // What this terminal can do, asked of the terminal itself. See [`term`].
     oslo.set_str("term", Value::table(term::build()));
+    // The structured verbs as plain functions. See [`rows`].
+    oslo.set_str("rows", rows::build());
     oslo.set_str("ui", Value::table(ui));
     optional::install(&mut oslo, host, &env);
     let oslo = Value::table(oslo);
