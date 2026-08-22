@@ -128,6 +128,34 @@ for line in out do if line:find("error") then break end end
 A loop that runs out cleans up on its own. A loop that `break`s does not, because luna does not
 close a `for`'s closing value — which is what `<close>` and `:close()` are for.
 
+`oslo.lines` carries two options the streaming case needs:
+
+```lua
+local build = oslo.lines{ "cargo", "build", stderr = true }
+for line in build do oslo.ui.log(line) end
+if build:status() ~= 0 then error("the build failed") end
+```
+
+**`stderr = true` merges the streams into the one pipe**, in the order the command wrote them.
+Without it `oslo.lines{"cargo","build"}` sees nothing at all, because cargo writes its progress and
+its errors to stderr — the binding used to call the non-merging form of a function whose merging
+form already existed. One pipe rather than two, because two drained separately cannot say which line
+came first. `oslo.run` and `oslo.pipe` refuse the key rather than ignoring it: they capture the
+streams separately and have `capture_err` for that.
+
+**`handle:status()` is how the command ended**, or `nil` while nobody has waited yet. It does not
+block. What a loop leaves behind depends on how it ended:
+
+| how the read ended | `status()` |
+|---|---|
+| the loop ran out | the command's own status |
+| `close()` while it was still writing | 141 — it took a `SIGPIPE`, as `cmd \| head -1` does |
+| `close()` while it was quiet | its real status, after waiting for it |
+
+That last row is worth reading twice: `close()` is not a way to cancel a sleeping command. It drops
+the read end and waits, and a child that is not writing never notices. Killing one is
+`oslo.spawn`'s business.
+
 ### A string is bytes
 
 ```lua

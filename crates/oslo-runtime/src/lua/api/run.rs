@@ -87,8 +87,17 @@ pub fn install(host: &dyn Host, oslo: &mut Table, env: &Arc<Mutex<Environment>>)
         native("oslo.lines", move |_, args| {
             let request = Request::from_lua(args.first(), "lines")?;
             let mut guard = borrow_env(&env_lines)?;
-            let (child, reader) = oslo_shell::exec::argv::spawn_reading(&mut guard, &request.argv)
-                .map_err(|e| LuaError::new(format!("oslo.lines: {e}")))?;
+            // **The merging sibling, which already existed.** `oslo.lines{"cargo","build"}` saw
+            // nothing before this: cargo writes its progress and its errors to stderr, and the
+            // binding called the non-merging form — so the streaming API could not read the command
+            // its own module doc names as the motivating case. One pipe, interleaved, because two
+            // drained separately cannot say which line came first.
+            let (child, reader) = oslo_shell::exec::argv::spawn_reading_streams(
+                &mut guard,
+                &request.argv,
+                request.merge_stderr,
+            )
+            .map_err(|e| LuaError::new(format!("oslo.lines: {e}")))?;
             drop(guard);
             Ok(vec![line_reader(child, reader)])
         }),
@@ -102,7 +111,13 @@ struct Reading {
     child: nix::unistd::Pid,
     /// Emptied once the output runs out or the reader is let go.
     source: std::cell::RefCell<Option<std::io::BufReader<std::fs::File>>>,
-    reaped: std::cell::Cell<bool>,
+    /// How the command ended, once it has been collected. `None` until then.
+    ///
+    /// **This replaces the `reaped` flag rather than joining it**: `argv::reap` always answers an
+    /// `i32`, so `status.is_some()` *is* "already reaped" and carries the answer as well. The
+    /// status used to be discarded on the floor at the one line that had it, which is why
+    /// `oslo.lines` could stream a build and never say whether it succeeded.
+    status: std::cell::Cell<Option<i32>>,
 }
 
 impl Reading {
@@ -113,8 +128,9 @@ impl Reading {
     /// which is what a shell's `head` does to the command feeding it.
     fn finish(&self) {
         self.source.borrow_mut().take();
-        if !self.reaped.replace(true) {
-            oslo_shell::exec::argv::reap(self.child);
+        if self.status.get().is_none() {
+            self.status
+                .set(Some(oslo_shell::exec::argv::reap(self.child)));
         }
     }
 
@@ -179,13 +195,47 @@ fn line_reader(child: nix::unistd::Pid, reader: std::os::fd::OwnedFd) -> Value {
     let reading = Rc::new(Reading {
         child,
         source: std::cell::RefCell::new(Some(std::io::BufReader::new(std::fs::File::from(reader)))),
-        reaped: std::cell::Cell::new(false),
+        status: std::cell::Cell::new(None),
     });
 
     let mut handle = super::handle::Handle::new("oslo.lines");
 
     let it = Rc::clone(&reading);
     handle.calls("oslo.lines", move |_, _| it.line());
+
+    // `handle:status()` — how the command ended, or `nil` while it is still being read.
+    //
+    // **A `field`, not a `verb`, and the difference is the whole point.** `verb` refuses after the
+    // handle is closed, and `out:close()` followed by `out:status()` is precisely the sequence that
+    // *has* a status to report: closing is how a caller who broke out of the loop waits for the
+    // child. Registered as a verb this compiles, passes a happy-path test, and raises on the one
+    // call anybody makes.
+    //
+    // It does not block. `nil` means nobody has waited yet — run the loop to the end, or call
+    // `close()`, and ask again. A `status()` that waited would make this two APIs.
+    //
+    // **What closing early answers depends on whether the child was still writing**, and it is
+    // worth knowing because the second case blocks. `finish` drops the read end and then waits:
+    //
+    // * a child mid-output takes a `SIGPIPE` on its next write and the status is 141 — the same
+    //   thing `cmd | head -1` does to the command feeding it;
+    // * a child that is *not* writing — sleeping, waiting on the network — never notices the closed
+    //   pipe, so the wait runs to its natural end and answers its real status. Measured:
+    //   `sh -c 'echo one; sleep 5; exit 7'` closed after the first line answers 7, five seconds
+    //   later.
+    //
+    // So `close()` is not a way to cancel a quiet command. Killing one is `oslo.spawn`'s business,
+    // not this handle's.
+    let asked = Rc::clone(&reading);
+    handle.field(
+        "status",
+        native("oslo.lines.status", move |_, _| {
+            Ok(vec![match asked.status.get() {
+                Some(code) => Value::int(code as i64),
+                None => Value::Nil,
+            }])
+        }),
+    );
 
     handle.on_close("oslo.lines.close", move || reading.finish());
 
@@ -270,6 +320,8 @@ fn sugar(env: &Arc<Mutex<Environment>>) -> Value {
 /// One `oslo.run{…}` request: the argv, and what to capture.
 struct Request {
     argv: Vec<String>,
+    /// `oslo.lines` only: both streams down the one pipe, in the order they were written.
+    merge_stderr: bool,
     capture: Capture,
 }
 
@@ -303,11 +355,26 @@ impl Request {
             argv = expand_globs(&argv);
         }
 
+        // `stderr = true` merges the two streams into the one pipe `oslo.lines` reads.
+        //
+        // **Refused on `run` and `pipe` rather than ignored.** They capture the streams separately
+        // and have `capture_err` for it, so a `stderr = true` there means the caller reached for
+        // the wrong key — and a key that is silently dropped is the failure mode this module keeps
+        // being fixed for. Naming the right one costs four lines.
+        let merge_stderr = table.get_str("stderr").truthy();
+        if merge_stderr && function != "lines" {
+            return Err(LuaError::new(format!(
+                "oslo.{function}: `stderr` merges the streams and is oslo.lines only; \
+                 this call captures them separately with `capture_err`"
+            )));
+        }
+
         // `capture = true` is the short form for both streams, which is what a caller who just
         // wants the output means. The two are separable for the caller who does not.
         let both = table.get_str("capture").truthy();
         Ok(Request {
             argv,
+            merge_stderr,
             capture: Capture {
                 stdout: both || table.get_str("capture_out").truthy(),
                 stderr: both || table.get_str("capture_err").truthy(),
