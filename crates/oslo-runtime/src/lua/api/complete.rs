@@ -160,6 +160,8 @@ fn number(table: &Table, key: &str) -> Option<f64> {
     }
 }
 
+pub(in crate::lua::api) mod forget;
+
 #[cfg(test)]
 #[path = "complete/tests.rs"]
 mod tests;

@@ -76,6 +76,11 @@ pub(super) fn arrive(env: &Mutex<Environment>, lua: &LuaEngine, dir: &Path) {
                 outcome
             },
             &mut || {
+                // **The file's own callbacks first, then the prompt.** A callback that installed
+                // the prompt should see it while taking it down, and both run here — before
+                // `Direnv::unload` takes the environment lock — which is what gives them the whole
+                // API rather than the handful of calls that do not reach the shell.
+                crate::lua::api::direnv::run_unload();
                 if let Some(previous) = PREVIOUS_PROMPT.with(|slot| slot.borrow_mut().take()) {
                     lua.restore_prompt(previous);
                 }
@@ -85,6 +90,10 @@ pub(super) fn arrive(env: &Mutex<Environment>, lua: &LuaEngine, dir: &Path) {
     if let Some(base) = base_prompt {
         PREVIOUS_PROMPT.with(|slot| *slot.borrow_mut() = Some(base));
     }
+    // After the whole arrival, for the reason `PREVIOUS_PROMPT` is written here rather than inside
+    // the load: the unload half runs *during* `arrive`, so anything the incoming file registered
+    // must not be visible to it.
+    crate::lua::api::direnv::promote_unload();
     for event in events.unwrap_or_default() {
         report::event(&event);
         // The detail belongs under the failure it explains, and nowhere else — a successful load

@@ -96,6 +96,40 @@ how deep you happened to be standing. A directory holding both names is governed
 `direnv status` names the shadowed file, because being inert looks exactly like working until you
 notice that nothing it sets is set.
 
+### Leaving, and what else counts as a change
+
+Variables and aliases are put back by the undo record. Everything *else* a file did had no moment at
+which to be undone, and a file could not say that anything other than itself should trigger a reload.
+
+```lua
+oslo.direnv.watch_file(".tool-versions", "flake.lock")  -- reload when these change too
+oslo.direnv.watch_dir("config")                          -- entries added or removed
+oslo.direnv.on_unload(function()                         -- a moment on the way out
+  oslo.completion.forget("projtool")
+end)
+```
+
+`on_unload` may be called more than once and runs **last-registered-first**, so a file tears down in
+the reverse of the order it set up. It runs **before the variables are put back** — the unload path
+releases the environment lock first, deliberately, so a prompt function reading a variable sees the
+directory's value — which means a callback has the *whole* API here, `oslo.env.get` and `oslo.run`
+included. One that raises is reported and the others still run: by that point the undo record is
+already being spent, and stopping half way would leave the directory's variables set with nothing
+left to remove them.
+
+`oslo.completion.forget(name)` is the other half of registering one, and answers **how many** of the
+three completion surfaces held that name — `0` when none did. Until now both registries could only
+be cleared entirely.
+
+**`watch_dir` watches the directory, not the files in it.** A directory's timestamp moves when an
+entry is added, removed or renamed and does not move when a file inside it is edited in place. So it
+notices `config/new.toml` appearing and does not notice `config/app.toml` changing. That is what
+`.envrc`'s `watch_dir` has always done; the two are one call so they cannot drift.
+
+Both watch calls are **refused outside a load**. The list is drained by the next arrival, so a call
+from a timer or a background callback would quietly attach a path to whichever unrelated project
+loaded next.
+
 ### A variable the project keeps to itself
 
 `oslo.env.set` exports by default, and for a long time that was the only thing it could do — so a

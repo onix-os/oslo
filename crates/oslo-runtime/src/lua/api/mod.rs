@@ -27,7 +27,7 @@ mod convert;
 mod db;
 mod digest;
 #[cfg(feature = "direnv")]
-mod direnv;
+pub(crate) mod direnv;
 mod env;
 mod envlist;
 pub(crate) mod external;
@@ -190,6 +190,8 @@ pub fn install(host: &dyn Host, registry: &Registry, env: Arc<Mutex<Environment>
         spec::install(&mut completion.borrow_mut());
         // `oslo.completion.provider` — candidates computed at Tab time, merged with oslo's own.
         complete::install(&mut completion.borrow_mut());
+        // `oslo.completion.forget(name)` — the other half, which registration never had.
+        complete::forget::install(&mut completion.borrow_mut());
     }
     // `oslo.suggest.provider` — a ghost written in Lua. In the settings table for the same reason:
     // `oslo.suggest.sh_sources` is next to it, and the two are read together.

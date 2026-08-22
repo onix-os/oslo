@@ -49,6 +49,11 @@ pub fn forget() {
     ADDED.with(|slot| slot.borrow_mut().clear());
 }
 
+/// Drop the spec declared for `name`, answering whether there was one.
+pub fn forget_named(name: &str) -> bool {
+    ADDED.with(|slot| slot.borrow_mut().remove(name).is_some())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
