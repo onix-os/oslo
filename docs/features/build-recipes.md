@@ -83,8 +83,13 @@ sh RAISED    -> shell state is busy; …
 lines RAISED -> shell state is busy; …
 ```
 
-A build runner that cannot run a command is not a build runner. [Directory
-environments](directory-environments.md) get around the same lock by taking it, snapshotting,
+A build runner that cannot run a command is not a build runner — and running commands is precisely
+what the lock covers. It is **twenty-eight calls, not the whole API**: `oslo.fs`, `oslo.json`,
+`oslo.db`, `oslo.hash`, `oslo.git` and the rest work perfectly well inside a builtin, and
+[your own tools](your-own-tools.md) has the full table. But the three above are the three a recipe
+is made of, so for *this* feature the distinction changes nothing.
+
+[Directory environments](directory-environments.md) get around the same lock by taking it, snapshotting,
 releasing it and running the file — but `direnv::arrive` is called from `startup/repl.rs`
 *between commands*, at the one moment the shell holds nothing. A builtin has no such moment: it is
 called from inside dispatch, in the middle of the state it would have to release.

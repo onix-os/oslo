@@ -212,12 +212,31 @@ be *command not found*), and a tool **does** receive its input.
 - **A redirection removes both stages.** `mounts | where rw > /tmp/x` reports *mounts: command not
   found* and *where: command not found*, the built-in verb included. A redirection means bytes were
   asked for somewhere specific, and the tools have no byte form to fall back to.
-- **Nothing inside a tool or a registered builtin may reach the shell.** They run while the shell
-  holds its own state, so `oslo.proc.capture`, `oslo.run` and even setting a shell variable fail
-  with *shell state is busy*. `io.popen` is refused separately, because it would run its argument in
-  `/bin/sh` rather than this shell. Pure Lua and the non-shell parts of the API — `oslo.fs.*`,
-  `oslo.json.*` — are what a tool has. To fold an external program's output in, put it before the
-  first tool: `kubectl get pods -o json | from json | where …`.
+- **Twenty-eight calls fail inside a tool or a registered builtin** — the ones that reach the
+  shell's own state, listed below. They run while the shell holds that state, so those raise *shell
+  state is busy*. `io.popen` is refused separately, because it would run its argument in `/bin/sh`
+  rather than this shell. To fold an external program's output in, put it before the first tool:
+  `kubectl get pods -o json | from json | where …`.
+
+  **This entry used to say "nothing … may reach the shell", and that was wrong in a way that
+  mattered.** Read as written it means a builtin can do nothing, and a survey of the whole Lua
+  surface reached exactly that conclusion — proposing lock-free substitutes for capabilities that
+  were already reachable. `borrow_env`, the only thing that takes the lock, is in **seven of
+  forty-six** files under `crates/oslo-runtime/src/lua/api/`. Everything else works.
+
+  | reaches the shell — raises | free to use |
+  |---|---|
+  | `oslo.run`, `oslo.pipe`, `oslo.lines`, `sh.*` | `oslo.fs.*`, `oslo.path.*` |
+  | `oslo.env.{get,set,unset,all,alias,set_alias}` | `oslo.json.*`, `oslo.re.*`, `oslo.hash.*`, `oslo.hex.*` |
+  | `oslo.env.{path,path_add,path_remove,has_path}` | `oslo.db.*`, `oslo.state.*` |
+  | `oslo.proc.{exec,capture,status}` | `oslo.git.*`, `oslo.history.*` |
+  | `oslo.sys.{cd,user,interactive,login}` | `oslo.ui.*`, `oslo.term.*`, `oslo.messages.*` |
+  | `oslo.opts.{get,set}`, `oslo.source` | `oslo.spawn`, `oslo.after`, `oslo.every` |
+  | `oslo.direnv.*`, `oslo.repair`, `oslo.register_builtin` | `oslo.fs.watch`, and all of Lua |
+
+  `oslo.proc.status` being on the left is the one that hurts: it is `$?`, so a builtin cannot see
+  the status of the command before it — by that route or by the Lua global, which `try_lock`s and
+  answers `nil`. `tests/lua_api_surface_tests.rs` walks both columns and fails if either moves.
 - **Tools are invisible to everything that answers questions about names.** `type mounts` says not
   found, `command -v mounts` exits 1, and completion does not offer it. Only the pipeline planner
   knows the registry exists.
