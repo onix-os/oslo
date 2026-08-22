@@ -151,6 +151,18 @@ make's `.PHONY`. One that declares `outputs` is skipped when it is up to date.
 | `"mtime"` *(default)* | is any input newer than any output? | one `stat` per file |
 | `"content"` | do the inputs hash to what they hashed to last time? | one read per file |
 
+Mtime is compared to the **nanosecond**, and an output must be **strictly newer** than every input.
+Both halves are needed and each was a wrong build on its own. At second resolution an input edited
+and an output written inside the same second compare equal, so a recipe that had not been rebuilt
+reported `up to date` — and the fast inner loop is exactly where a build finishes inside one second.
+Nanoseconds alone do not fix it either, because the *filesystem* decides the resolution: tmpfs
+stamps to the jiffy, a few milliseconds, so two writes a fraction of a millisecond apart come back
+byte-identical. Equal therefore counts as stale. That costs a spurious rebuild when a build
+genuinely finishes inside one tick and buys never shipping a stale artifact.
+
+`oslo.fs.stat` gained `mtime_ns` for this — a whole timestamp, not a sub-second remainder, so two
+files compare with one `<`. `mtime` stays seconds, which is what a person prints.
+
 `"content"` is the reason to have this at all. A `git checkout` moves every mtime in the tree, so
 mtime staleness rebuilds the world after switching branches and back; a content hash does not.
 The fingerprint is kept in [`oslo.db`](plugins.md), under a key covering the project, the recipe and

@@ -144,9 +144,13 @@ return function(make)
     return out
   end
 
+  -- **Nanoseconds, not seconds.** At second resolution an input edited and an output written inside
+  -- the same second compare equal, so a recipe that had *not* been rebuilt reported "up to date" —
+  -- the fast inner loop is exactly where a build finishes inside one second, so this was worst
+  -- where it mattered most. `oslo.fs.stat().mtime` is still the seconds a person prints.
   local function mtime_of(path)
     local st = oslo.fs.stat(path)
-    return st and st.mtime or nil
+    return st and st.mtime_ns or nil
   end
 
   local function fingerprint(paths)
@@ -201,9 +205,19 @@ return function(make)
       if t and (not newest or t > newest) then newest, which = t, path end
     end
     if not newest then return nil end
+    -- **An output has to be strictly newer, so equal timestamps mean stale.**
+    --
+    -- Nanoseconds are not enough on their own, because the filesystem decides the resolution and
+    -- some do not offer any. tmpfs stamps to the jiffy — a few milliseconds — so an output written
+    -- and an input edited in the same tick come back byte-identical, and `newest > t` then reads a
+    -- rebuild that has not happened as up to date. Measured on `/tmp`: two writes a fraction of a
+    -- millisecond apart both landed on …647243224191.
+    --
+    -- `>=` costs a spurious rebuild when a build genuinely finishes inside one tick, and buys never
+    -- shipping a stale artifact. That is the right side to be wrong on.
     for _, out in ipairs(recipe.outputs) do
       local t = mtime_of(out)
-      if t and newest > t then return make.__relative(which) .. " is newer" end
+      if t and newest >= t then return make.__relative(which) .. " is not older" end
     end
     return nil
   end

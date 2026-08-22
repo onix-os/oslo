@@ -419,3 +419,61 @@ make.recipe{ name = "same", run = function() end }
     );
     assert!(err(&project.make(&["same"])).contains("declared twice"));
 }
+
+/// **A rebuild inside one second is still a rebuild.**
+///
+/// `oslo.fs.stat` reported `mtime` in whole seconds and the runner compared those, so an input
+/// edited and an output written within the same second compared equal — and `oslo make` printed
+/// `· art  up to date` while the output still held the previous content. The fast inner loop is
+/// exactly where a build finishes inside one second, so it was worst where it mattered most.
+///
+/// No sleep here, deliberately: the sleep is what used to hide it.
+#[test]
+fn a_rebuild_inside_one_second_is_not_reported_up_to_date() {
+    let project = Project::new(
+        r#"
+local make = oslo.make
+make.recipe{ name = "art", inputs = { "src.txt" }, outputs = { "out.bin" },
+  run = function() sh.cp("src.txt", "out.bin") end }
+"#,
+    );
+    project.write("src.txt", "v1\n");
+    project.make(&["art"]);
+    assert_eq!(project.read("out.bin"), "v1\n");
+
+    project.write("src.txt", "v2\n");
+    let second = project.make(&["art"]);
+    assert!(
+        !out(&second).contains("up to date"),
+        "a changed input was called up to date: {}",
+        out(&second)
+    );
+    assert_eq!(
+        project.read("out.bin"),
+        "v2\n",
+        "the stale output survived the rebuild"
+    );
+}
+
+/// The nanosecond field the runner compares is on every entry, and it is a whole timestamp rather
+/// than a sub-second remainder — so two files compare with one `<`.
+#[test]
+fn stat_reports_whole_nanoseconds() {
+    let project = Project::new(
+        r#"
+local make = oslo.make
+make.recipe{ name = "probe", run = function()
+  local a = oslo.fs.stat(".make.lua")
+  print("ns=" .. tostring(a.mtime_ns) .. " s=" .. tostring(a.mtime))
+  print("integer=" .. tostring(math.type(a.mtime_ns)))
+  print("consistent=" .. tostring(a.mtime_ns // 1000000000 == a.mtime))
+end }
+"#,
+    );
+    let said = out(&project.make(&["probe"]));
+    assert!(said.contains("integer=integer"), "{said}");
+    assert!(
+        said.contains("consistent=true"),
+        "mtime_ns is not the same instant as mtime: {said}"
+    );
+}
