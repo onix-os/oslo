@@ -5,7 +5,6 @@ pub mod lists;
 pub mod nesting;
 pub mod options;
 pub mod scope;
-pub mod universal;
 /// The shell as one Lua record, for a caller that already holds the state.
 pub mod view;
 

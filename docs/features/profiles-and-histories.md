@@ -81,7 +81,7 @@ are asking the same question of a different history — and the bar's right end 
 │ history/<name>/hist.db            │   │ ~/.config/oslo/init.lua            │
 │   history events (the finder)     │   │ $HISTFILE, if you set one            │
 │   directory and run rows          │   │   (Up arrow, the `history` builtin)  │
-│   what `cd NAME` can jump to      │   │ oslo/universal                       │
+│   what `cd NAME` can jump to      │   │ oslo/macros                          │
 │   what Tab and the ghost recall   │   │ oslo/direnv/{allow,deny}             │
 │   how Tab ranks a command         │   │ $PATH, aliases, functions, env       │
 │ history/<name>/hist.model         │   │                                      │
@@ -240,7 +240,7 @@ machine, which is the argument for naming profiles after *roles* rather than per
   already has; taking it off the list is `rm` on that machine, not something this can reach.
 
 - **Isolate anything but the store.** Not the environment, not aliases, not `$PATH`, not direnv's
-  allow list, not universal variables, and not `$HISTFILE` unless you set it yourself.
+  allow list, not stored macros, and not `$HISTFILE` unless you set it yourself.
 - **Delete from the profile you are looking at.** The history finder's Delete acts on
   `track::store()` — this shell's own store — so pressing it after Tab-ing into another profile
   removes from yours, not from the one on screen. The row still disappears from the list, because

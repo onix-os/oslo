@@ -7,7 +7,7 @@
 //!
 //! The editor's wait now watches a set of descriptors beside the terminal, and everything that
 //! wants its attention arrives on one of them: a pipe the `SIGCHLD` handler writes a byte to, an
-//! `inotify` watch on the universal store, the queue a finished `oslo.spawn` appends to. A timer
+//! `inotify` watch on the macro store, the queue a finished `oslo.spawn` appends to. A timer
 //! is the same wait with a deadline instead of none.
 //!
 //! Every test here types nothing after the setup. That is the whole point — the shell has to
@@ -196,14 +196,14 @@ fn an_idle_prompt_notices_a_job_finishing() {
     );
 }
 
-/// **A universal variable set elsewhere reaches an idle prompt, with nothing typed.**
+/// **A variable stored elsewhere reaches an idle prompt, with nothing typed.**
 ///
 /// The store is re-read before every prompt and again before every command, so typing anything at
 /// all would pick it up — which is why this watches the *prompt* instead. `PS1` is single-quoted so
 /// it expands each time it is drawn; if the value appears in a freshly drawn prompt without a
 /// keystroke, it arrived because the editor was woken by the `inotify` watch and repainted.
 #[test]
-fn an_idle_prompt_sees_a_universal_set_by_another_shell() {
+fn an_idle_prompt_sees_a_variable_stored_by_another_shell() {
     let mut shell = Shell::start();
     assert!(shell.until(|seen| !seen.trim().is_empty(), "the first prompt"));
 
@@ -218,7 +218,7 @@ fn an_idle_prompt_sees_a_universal_set_by_another_shell() {
     // A *second* shell writes the variable, exactly as another terminal would.
     let writer = Command::new(common::oslo_bin())
         .arg("-c")
-        .arg("universal -x WOKEN=yes")
+        .arg("oslo macros add --var WOKEN=yes")
         .env("HOME", shell.home())
         .env("XDG_DATA_HOME", shell.home())
         .env("PATH", "/usr/bin:/bin")
@@ -233,11 +233,11 @@ fn an_idle_prompt_sees_a_universal_set_by_another_shell() {
     // Nothing is typed from here.
     let arrived = shell.until(
         |seen| seen[before.min(seen.len())..].contains("<yes>#"),
-        "the universal to reach the idle prompt",
+        "the stored variable to reach the idle prompt",
     );
     assert!(
         arrived,
-        "an idle prompt never saw the universal:\n{}",
+        "an idle prompt never saw the stored variable:\n{}",
         shell.text()
     );
 }
@@ -248,7 +248,7 @@ fn an_idle_prompt_sees_a_universal_set_by_another_shell() {
 /// on another terminal's change and not on its own — and this is the only place it can be proved,
 /// because a script never re-reads the store.
 #[test]
-fn a_universal_from_another_shell_announces_itself_as_remote() {
+fn a_stored_variable_from_another_shell_announces_itself_as_remote() {
     let shell = Shell::with_config(
         r#"oslo.on["on-variable-change"](function(e)
              print("CHANGED " .. e.name .. " " .. e.action .. " " .. e.scope .. " " .. e.source)
@@ -258,7 +258,7 @@ fn a_universal_from_another_shell_announces_itself_as_remote() {
 
     let writer = Command::new(common::oslo_bin())
         .arg("-c")
-        .arg("universal MOOD=calm")
+        .arg("oslo macros add --var MOOD=calm")
         .env("HOME", shell.home())
         .env("XDG_DATA_HOME", shell.home())
         .env("PATH", "/usr/bin:/bin")
@@ -273,7 +273,7 @@ fn a_universal_from_another_shell_announces_itself_as_remote() {
     // Nothing is typed from here either.
     assert!(
         shell.until(
-            |seen| seen.contains("CHANGED MOOD set universal remote"),
+            |seen| seen.contains("CHANGED MOOD set stored remote"),
             "the announcement",
         ),
         "no handler was told about the remote change:\n{}",
@@ -286,7 +286,7 @@ fn a_universal_from_another_shell_announces_itself_as_remote() {
     // did — which is the difference between an event and a heartbeat.
     let writer = Command::new(common::oslo_bin())
         .arg("-c")
-        .arg("universal OTHER=1")
+        .arg("oslo macros add --var OTHER=1")
         .env("HOME", shell.home())
         .env("XDG_DATA_HOME", shell.home())
         .env("PATH", "/usr/bin:/bin")
@@ -304,7 +304,7 @@ fn a_universal_from_another_shell_announces_itself_as_remote() {
     assert_eq!(
         shell.text().matches("CHANGED MOOD").count(),
         1,
-        "an unchanged universal was announced again:\n{}",
+        "an unchanged stored variable was announced again:\n{}",
         shell.text()
     );
 }

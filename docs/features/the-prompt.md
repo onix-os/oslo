@@ -224,7 +224,7 @@ reports where each prompt's time went, on stderr, one line per prompt.
 
 ```
 oslo: prompt 0.1ms — prompt-right 0.1 · prompt-left 0.1 · size 0.0 · prompt-command 0.0
-                   · universal 0.0 · direnv 0.0 · pre-prompt 0.0
+                   · macros 0.0 · direnv 0.0 · pre-prompt 0.0
 ```
 
 An external prompt is run **twice per prompt**: once before the editor is entered, to record the

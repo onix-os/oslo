@@ -28,6 +28,7 @@
 use oslo_base::macros::live::{Applied, Stamps};
 use oslo_base::macros::{Entry, Kind};
 use oslo_shell::env::Environment;
+use oslo_shell::env::announce::{Change, Scope, Source, announce};
 use std::sync::{Arc, Mutex};
 
 /// What this shell was last given, so the next rebuild knows what is its to take away.
@@ -46,7 +47,8 @@ pub(super) fn install(env: &Arc<Mutex<Environment>>) -> Held {
 
     let wanted = oslo_base::macros::live::want();
     let applied = Applied::of(&wanted);
-    apply(env, &wanted, &Applied::default(), &applied);
+    // Nothing is announced at startup: a shell learning what the store holds is not a change.
+    apply(env, &wanted, &Applied::default(), &applied, false);
     Held {
         applied,
         stamps: Stamps::now(),
@@ -55,25 +57,37 @@ pub(super) fn install(env: &Arc<Mutex<Environment>>) -> Held {
 
 /// Bring the shell back in step if either file has moved since the last prompt.
 ///
-/// Two `stat`s and, almost always, nothing else — the shape `universal::refresh` already has, and
-/// for the same reason: a change made in one terminal has to reach the one beside it, and reading
-/// the files every prompt to find out would cost more than the feature is worth.
-pub(super) fn refresh(env: &Arc<Mutex<Environment>>, held: Held) -> Held {
+/// Two `stat`s and, almost always, nothing else: a change made in one terminal has to reach the one
+/// beside it, and reading the files every prompt to find out would cost more than the feature is
+/// worth.
+///
+/// Answers **whether anything moved**, which is what an idle prompt needs: a prompt is expanded
+/// when it is built, not on every repaint, so a shell that woke, re-read and changed nothing must
+/// not redraw — and one that did change something must.
+pub(super) fn refresh(env: &Arc<Mutex<Environment>>, held: &mut Held) -> bool {
     let stamps = Stamps::now();
     if stamps == held.stamps {
-        return held;
+        return false;
     }
     let wanted = oslo_base::macros::live::want();
     let applied = Applied::of(&wanted);
-    apply(env, &wanted, &held.applied, &applied);
-    Held { applied, stamps }
+    // A refresh means the store moved since this shell last looked, which is a change worth a hook.
+    apply(env, &wanted, &held.applied, &applied, true);
+    *held = Held { applied, stamps };
+    true
 }
 
 /// Take away what was ours and is not wanted any more, then put the wanted set in.
 ///
 /// In that order, because a name in both lists must end up **set**: the other way round would add
 /// `gs` and then remove it again for having been in yesterday's set too.
-fn apply(env: &Arc<Mutex<Environment>>, wanted: &[Entry], had: &Applied, now: &Applied) {
+fn apply(
+    env: &Arc<Mutex<Environment>>,
+    wanted: &[Entry],
+    had: &Applied,
+    now: &Applied,
+    announce_changes: bool,
+) {
     let gone = had.gone(now);
     for name in &gone.abbrevs {
         oslo_ui::abbr::remove(name);
@@ -127,7 +141,19 @@ fn apply(env: &Arc<Mutex<Environment>>, wanted: &[Entry], had: &Applied, now: &A
             // `macros.sh` rendering of this same entry is an unguarded `export`, so the old rule
             // was not even consistent with itself. What you store is what you get.
             Kind::Var if oslo_base::macros::is_a_value(&entry.body) => {
+                // **Announced only when the value actually moved.** This runs at every prompt, so
+                // saying what it read rather than what changed would fire `on-variable-change`
+                // continuously at an idle prompt — the store says the same thing each time.
+                let arrived = guard.get_var(&entry.name) != Some(entry.body.trim());
                 guard.set_var(&entry.name, entry.body.trim(), true);
+                if arrived && announce_changes {
+                    announce(
+                        &entry.name,
+                        Change::Set { exported: true },
+                        Scope::Stored,
+                        Source::Remote,
+                    );
+                }
             }
             Kind::Var => {
                 // **The value goes first, or the recipe never runs.** `materialise` returns early

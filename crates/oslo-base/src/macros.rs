@@ -43,6 +43,7 @@ pub mod live;
 pub mod snapshot;
 pub mod sourced;
 pub mod sync;
+pub mod watch;
 
 pub use crate::track::kv::Store;
 use crate::track::stamp::Stamp;
