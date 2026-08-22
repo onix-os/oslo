@@ -15,8 +15,8 @@ shell it did not write, and **oslo is the shell**.
 > | `oslo-minimal` | is just `cd` |
 >
 > ```sh
-> make build                  # the full binary, every feature
-> make build TYPE=minimal     # no directory environments at all
+> scripts/build.sh              # the full binary, every feature
+> scripts/build.sh --minimal    # no directory environments at all
 > ```
 >
 > It costs **200 KB** — 5,808,352 bytes without it against 6,013,312 with — the largest of the four
@@ -398,7 +398,7 @@ oslo.feature.when("direnv", function(dir)  -- re-asked on every directory change
   return not oslo.fs.exists(dir .. "/.envrc")
 end)
 
-oslo.on.on_report(function(r)                -- draw the report yourself
+oslo.on.report(function(r)                -- draw the report yourself
   -- r.kind == "direnv"; r.state is loaded, unloaded, blocked, denied or failed;
   -- r.changed and r.aliases are {name=, change="added"|"changed"|"removed"}
   if r.kind == "direnv" and r.state == "loaded" then

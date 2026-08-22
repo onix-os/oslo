@@ -136,7 +136,7 @@ fn a_resize_redraws_from_the_blocking_wait() {
 /// flag and nothing was redrawn until a key was pressed.
 #[test]
 fn a_resize_redraws_from_the_timed_wait() {
-    let config = "oslo.misc.idle_timeout = 300\noslo.on.on_idle_timeout(function(i) end)\n";
+    let config = "oslo.misc.idle_timeout = 300\noslo.on.idle_timeout(function(i) end)\n";
     assert!(
         bytes_redrawn_on_resize(config) > 0,
         "a resize while an idle hook is armed must lay the line out again — \

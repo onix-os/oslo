@@ -208,7 +208,7 @@ plus the moment the macro store is re-read because another process stored a vari
 add --var THEME=dark`, from this terminal or the one beside it.
 
 ```lua
-oslo.on.on_variable_change(function(e)
+oslo.on.variable_change(function(e)
   if e.name == "THEME" and e.source == "remote" then
     reload_theme(os.getenv("THEME"))
   end
@@ -260,7 +260,7 @@ each fires on the same list as its canonical name, so no config breaks. `cd` is 
 
 Aliases are installed exactly as written, so an alias containing a dash needs bracket syntax:
 `oslo.on["command-not-found"]` works and `oslo.on.command_not_found` is nil. The underscored field
-spelling of that hook is `oslo.on.on_command_not_found`.
+spelling of that hook is `oslo.on.command_not_found`.
 
 ## What it cannot do
 

@@ -14,7 +14,7 @@ A release publishes two per architecture, and one page below describes something
 | | |
 |---|---|
 | `oslo` | every optional feature. `make build` |
-| `oslo-minimal` | none of them — the floor a distribution would ship as `/bin/sh`. `make build TYPE=minimal` |
+| `oslo-minimal` | none of them — the floor a distribution would ship as `/bin/sh`. `scripts/build.sh --minimal` |
 
 **[Prediction and repair](prediction-and-repair.md) is `oslo` only.** It is behind the `vista`
 cargo feature, so `oslo-minimal` has no model: it learns nothing, writes no `.model` file, offers no

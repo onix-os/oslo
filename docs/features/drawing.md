@@ -290,7 +290,7 @@ like `prompt.git`, a colour name, an index, or a hex triple. A name the config d
 over oslo's own, so `oslo.theme.styles["direnv.added"] = "fg:green bold"` is usable as a row style.
 
 ```lua
-oslo.on.on_report(function(r)              -- or oslo.on["on-report"](…)
+oslo.on.report(function(r)              -- or oslo.on["on-report"](…)
   if r.kind == "job" and r.ended then
     oslo.ui.block(("[%s] %s -> %d"):format(r.id, r.text, r.status)):done()
     return true                            -- handled; oslo prints nothing

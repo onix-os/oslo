@@ -2,7 +2,7 @@
 //!
 //! # What this exists to catch
 //!
-//! `oslo.on.on_command_not_found(f)` shipped, was documented, and never fired. Handlers are stored
+//! `oslo.on.command_not_found(f)` shipped, was documented, and never fired. Handlers are stored
 //! under a hook's canonical name; the one fire site asked for `"command-not-found"`, an alias. The
 //! lookup found an empty list and the executor carried on to "command not found" as though nothing
 //! were attached — which is exactly what a config with a typo in the hook name looks like, so

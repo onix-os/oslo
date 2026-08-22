@@ -340,7 +340,7 @@ for exactly the case above: a shell shortcut bound to Enter-on-an-empty-line wil
 a Lua prompt and make a block impossible to finish.
 
 ```lua
-oslo.on.on_key(function(k)
+oslo.on.key(function(k)
   if k.language ~= "sh" then return end
   if k.name == "enter" and k.text == "" then
     return { text = "ls", submit = true }

@@ -5,7 +5,7 @@
 //! could turn one off but never change it.
 //!
 //! ```lua
-//! oslo.on.on_report(function(r)
+//! oslo.on.report(function(r)
 //!   if r.kind == "job" then
 //!     oslo.ui.block(("[%s] %s"):format(r.id, r.text)):done()
 //!     return true        -- handled; oslo prints nothing

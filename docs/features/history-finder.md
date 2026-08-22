@@ -204,9 +204,9 @@ because everything above the `open` call can decline, and a hook that fired for 
 never appeared would be lying. Every field arrives as a string.
 
 ```lua
-oslo.on.on_history_open(function(h)   end)  -- { seed }
-oslo.on.on_history_select(function(h) end)  -- { line }
-oslo.on.on_history_close(function(h)  end)  -- { chosen = "true" | "false" }
+oslo.on.history_open(function(h)   end)  -- { seed }
+oslo.on.history_select(function(h) end)  -- { line }
+oslo.on.history_close(function(h)  end)  -- { chosen = "true" | "false" }
 ```
 
 A profile is chosen with the environment and nothing else:

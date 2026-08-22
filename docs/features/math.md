@@ -21,8 +21,8 @@ $ math '10 kg * 9.81 m/s^2'
 > | `oslo-minimal` | neither, and the word `math` falls through to `$PATH` |
 >
 > ```sh
-> make build                  # the full binary, every feature
-> make build TYPE=minimal     # no calculator
+> scripts/build.sh              # the full binary, every feature
+> scripts/build.sh --minimal    # no calculator
 > ```
 >
 > It costs **96 KB** — 6,222,624 bytes without it against 6,320,928 with. It is off because a
