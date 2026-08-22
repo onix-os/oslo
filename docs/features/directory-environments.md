@@ -19,8 +19,8 @@ did not write, and **oslo is the shell**.
 > scripts/build.sh --minimal    # no directory environments at all
 > ```
 >
-> It costs **200 KB** — 5,808,352 bytes without it against 6,013,312 with — the largest of the four
-> optional features, and the reason it is off is not the size. This is the one part of the shell
+> It costs **140 KB** — 5,733,104 bytes without it against 5,877,472 with — and the reason it is off
+> is not the size. This is the one part of the shell
 > that **reads a file on arrival in a directory and can run what it finds there**. That is a
 > different kind of trust from anything else oslo does unprompted, and a `/bin/sh` on a
 > distribution should not do it because a shell somewhere else wanted it to.

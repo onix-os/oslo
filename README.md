@@ -169,7 +169,7 @@ static musl binary — **5,123,424 bytes with none of them, 6,357,792 with all t
 |---|---:|---|
 | `argc` | +300 KB | a script declares its options in comments and the shell parses them; the only one that vendors a parser |
 | `vista` | +297 KB | the model: `predict` as a suggestion source, `oslo.repair`, `oslo.predict.*`, and the correction after a mistyped line |
-| `direnv` | +164 KB | `.env.lua` read on arrival in a directory, the `direnv` builtin, `oslo.direnv` |
+| `direnv` | +140 KB | `.env.lua` read on arrival in a directory, the `direnv` builtin, `oslo.direnv` |
 | `secrets` | +108 KB | the filing: `oslo secret`, several stores, `secret run`, the lazy variable, the hooks. No crypto of its own |
 | `math` | +96 KB | `math '3 km in miles'` and `oslo.math` — dimensions, so `3 km + 2 s` is a refusal |
 | `plugin` | +80 KB | `oslo plugin` — installing somebody else's Lua. `oslo.db` and the `pre-cmd` veto are in **every** build |
