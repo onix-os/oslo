@@ -477,3 +477,53 @@ end }
         "mtime_ns is not the same instant as mtime: {said}"
     );
 }
+
+// ────────────────────────────────────────────────── background work, which did not work at all
+
+/// **The bug this closes.** `oslo.spawn` inside a recipe queued its result and nothing ever
+/// delivered it: the nudge goes into a self-pipe only the line editor polls, and `oslo make` never
+/// enters a REPL. The callback simply never ran, silently, and the recipe reported success.
+#[test]
+fn a_recipe_can_spawn_and_wait() {
+    let project = Project::new(
+        r#"
+oslo.make.recipe{ name = "parallel", run = function()
+  local job = oslo.spawn{ "sh", "-c", "echo from-a-worker" }
+  local said, status = job:wait(15000)
+  print("got=[" .. tostring(said):gsub("%s+$","") .. "] status=" .. tostring(status))
+end }
+"#,
+    );
+    let run = project.make(&["parallel"]);
+    assert!(
+        out(&run).contains("got=[from-a-worker]"),
+        "stdout={} stderr={}",
+        out(&run),
+        err(&run)
+    );
+    assert_eq!(code(&run), 0, "{}", err(&run));
+}
+
+/// And the shape a recipe actually wants: start several, then wait for all of them.
+#[test]
+fn a_recipe_can_settle_several_at_once() {
+    let project = Project::new(
+        r#"
+oslo.make.recipe{ name = "fan", run = function()
+  local done = 0
+  for i = 1, 3 do
+    oslo.spawn{ "sh", "-c", "sleep 0.1; true", on_exit = function() done = done + 1 end }
+  end
+  local r = oslo.settle{ timeout_ms = 20000 }
+  print("settled=" .. tostring(r.settled) .. " done=" .. done)
+end }
+"#,
+    );
+    let run = project.make(&["fan"]);
+    assert!(
+        out(&run).contains("settled=true done=3"),
+        "callbacks did not run inside a recipe\nstdout={} stderr={}",
+        out(&run),
+        err(&run)
+    );
+}

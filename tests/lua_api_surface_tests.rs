@@ -80,6 +80,7 @@ const NAMESPACES: &[(&str, &str)] = &[
     ("oslo.pipe", "function"),
     ("oslo.lines", "function"),
     ("oslo.spawn", "function"),
+    ("oslo.settle", "function"),
     ("oslo.after", "function"),
     ("oslo.every", "function"),
     ("oslo.register_builtin", "function"),

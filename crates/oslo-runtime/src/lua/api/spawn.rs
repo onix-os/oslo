@@ -33,7 +33,7 @@ use super::util::{ok, put};
 use oslo_base::value::{LuaError, LuaResult};
 use oslo_base::value::{Table, Value};
 use std::cell::RefCell;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::{Mutex, OnceLock};
 use std::time::Duration;
 
@@ -48,6 +48,13 @@ thread_local! {
     /// Callbacks waiting for their process, by id. Never leaves the shell's thread.
     static WAITING: RefCell<HashMap<u64, Value>> = RefCell::new(HashMap::new());
     static NEXT_ID: RefCell<u64> = const { RefCell::new(1) };
+    /// Every spawn whose result nobody has taken yet, **callback or no callback**.
+    ///
+    /// Separate from `WAITING`, which holds only the ones that asked for `on_exit`. A join has to
+    /// know when there is nothing left to wait for, and `oslo.spawn{"make","sub"}` with no callback
+    /// is still work in flight — counting only the callbacks would make `oslo.settle()` answer
+    /// immediately and report everything finished.
+    static LIVE: RefCell<HashSet<u64>> = RefCell::new(HashSet::new());
 }
 
 /// What workers have finished, waiting to be handed back.
@@ -56,9 +63,12 @@ fn done() -> &'static Mutex<Vec<Finished>> {
     DONE.get_or_init(|| Mutex::new(Vec::new()))
 }
 
+mod settle;
+
 /// Add `oslo.spawn`.
 pub fn install(oslo: &mut Table) {
     put(oslo, "spawn", |_, args| start(&args));
+    settle::install(oslo);
 }
 
 /// Read the call and get the process going.
@@ -109,6 +119,7 @@ fn start(args: &[Value]) -> LuaResult<Vec<Value>> {
         *next += 1;
         id
     });
+    LIVE.with(|slot| slot.borrow_mut().insert(id));
     if let Some(handler) = on_exit {
         WAITING.with(|slot| slot.borrow_mut().insert(id, handler));
     }
@@ -138,8 +149,12 @@ fn handle(id: u64) -> Value {
 
     table.verb("cancel", move |_, _| {
         let had = WAITING.with(|slot| slot.borrow_mut().remove(&id).is_some());
+        LIVE.with(|slot| slot.borrow_mut().remove(&id));
         ok(Value::Bool(had))
     });
+
+    // job:wait([timeout_ms]) -> out, status. See [`settle`] for why this is not a sleep loop.
+    table.verb("wait", move |_, args| settle::wait(id, &args));
 
     // **`<close>` cancels, and the collector does not.** A spawn is written for its callback and
     // its handle is usually dropped on the spot, so a `__gc` that cancelled would cancel almost
@@ -221,11 +236,18 @@ fn run(program: &str, args: &[String], timeout: Option<Duration>) -> (String, i3
 /// callback may spawn again, and appending to a list being drained is how that becomes a deadlock on
 /// the mutex it is already inside.
 pub fn deliver() {
+    deliver_counting();
+}
+
+/// The same, answering how many callbacks it called — which is what `oslo.settle` reports.
+fn deliver_counting() -> usize {
     let finished: Vec<Finished> = match done().lock() {
         Ok(mut done) => std::mem::take(&mut *done),
-        Err(_) => return,
+        Err(_) => return 0,
     };
+    let mut called = 0;
     for job in finished {
+        LIVE.with(|slot| slot.borrow_mut().remove(&job.id));
         let Some(handler) = WAITING.with(|slot| slot.borrow_mut().remove(&job.id)) else {
             // Cancelled while it ran, or it never had a callback. Both are ordinary.
             continue;
@@ -234,7 +256,41 @@ pub fn deliver() {
         if let Err(problem) = crate::lua::engine::call_here(&handler, args) {
             eprintln!("oslo: spawn: {problem}");
         }
+        called += 1;
     }
+    called
+}
+
+/// Whether this spawn is still outstanding.
+pub(crate) fn is_live(id: u64) -> bool {
+    LIVE.with(|slot| slot.borrow().contains(&id))
+}
+
+/// How many spawns have not been accounted for yet.
+pub(crate) fn outstanding() -> usize {
+    LIVE.with(|slot| slot.borrow().len())
+}
+
+/// Take one job's result out of the queue, leaving everybody else's.
+///
+/// **Its callback still runs**, because `on_exit` promising "always" and then not firing for a job
+/// somebody also joined is the kind of conditional contract nobody can hold in their head.
+fn claim(id: u64) -> Option<(String, i32)> {
+    let taken = match done().lock() {
+        Ok(mut done) => done
+            .iter()
+            .position(|job| job.id == id)
+            .map(|at| done.remove(at)),
+        Err(_) => None,
+    }?;
+    LIVE.with(|slot| slot.borrow_mut().remove(&id));
+    if let Some(handler) = WAITING.with(|slot| slot.borrow_mut().remove(&id)) {
+        let args = vec![Value::str(&taken.out), Value::int(taken.status as i64)];
+        if let Err(problem) = crate::lua::engine::call_here(&handler, args) {
+            eprintln!("oslo: spawn: {problem}");
+        }
+    }
+    Some((taken.out, taken.status))
 }
 
 /// Deliver, but only pay for the lock when something is waiting.

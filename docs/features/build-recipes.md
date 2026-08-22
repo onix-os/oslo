@@ -239,9 +239,26 @@ hand-maintained `help:` target repeating what the recipes already say.
 
 ## What it cannot do
 
-- **No `-j`.** `oslo.spawn` delivers its callback at a safe point — a command boundary or an idle
-  prompt — and `oslo make` has no read loop, so nothing ever drains the queue. Parallelism needs a
-  blocking join, which a child process can offer safely and which is not written yet.
+- **No `-j` flag** — but a recipe can now run things in parallel itself. `oslo.spawn` used to be
+  silently useless here: it delivers at a safe point, `oslo make` has no read loop, and nothing ever
+  drained the queue, so the callback never ran and the recipe reported success anyway. A make run
+  now installs a servicer of its own, and two calls do the waiting:
+
+  ```lua
+  oslo.make.recipe{ name = "build-all", run = function()
+    for _, crate in ipairs(CRATES) do
+      oslo.spawn{ "cargo", "build", "-p", crate,
+        on_exit = function(out, status) if status ~= 0 then io.write(out) end end }
+    end
+    local r = oslo.settle{ timeout_ms = 600000 }
+    assert(r.settled, r.outstanding .. " builds did not finish in time")
+  end }
+  ```
+
+  `job:wait([timeout_ms])` answers `out, status` for one spawn, or `nil, why`. `oslo.settle` waits
+  for all of them and answers `{ fired, outstanding, settled }`. Both block on the same descriptors
+  the line editor polls, so they return the moment a worker finishes rather than on a poll interval.
+  What is still missing is oslo *scheduling* the dependency graph across cores for you.
 - **No pattern rules.** `%.o: %.c` is expressible as a recipe that declares recipes, and generating
   them at load time works, but there is nothing built in.
 - **A recipe cannot change the shell that called it.** It is a child. `cd`, `export` and setting a

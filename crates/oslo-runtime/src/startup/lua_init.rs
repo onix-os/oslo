@@ -97,6 +97,24 @@ pub fn install_bindings(lua: &LuaEngine, env: Arc<Mutex<Environment>>) -> bool {
     }
 }
 
+/// Make background work deliverable in a run that never enters the REPL.
+///
+/// **`oslo.spawn` was silently useless in `oslo make` and in a plain script**, and this is the half
+/// of the fix that is not in Lua. A worker queues its result and writes a byte to the self-pipe;
+/// `arm` is what creates that pipe, and without it the first nudge goes nowhere. The servicer is
+/// what a blocking join calls to actually hand the results over.
+///
+/// Skipped when something is already installed, because [`oslo_base::background::install`] keeps the
+/// first servicer and the REPL's does more than this one — reaping jobs, refreshing universals and
+/// rebuilding the prompt. A batch run has none of those to do.
+pub fn install_batch_delivery() {
+    if oslo_base::background::is_installed() {
+        return;
+    }
+    oslo_base::background::arm();
+    oslo_base::background::install(crate::lua::api::spawn::deliver_if_any);
+}
+
 /// Run the config if there is one, reporting a broken one as `oslo: <path>: <error>`.
 ///
 /// The shell carries on with its defaults afterwards either way: a config that fails half way
@@ -175,6 +193,8 @@ pub fn run_lua_source(source: &str, name: &str, args: &[String]) -> i32 {
     if !install_bindings(&lua, Arc::clone(&env)) {
         return 1;
     }
+    // A script has no REPL to deliver from, so `oslo.spawn` needs a servicer of its own.
+    install_batch_delivery();
     if let Err(e) = lua.set_script_args(name, args) {
         eprintln!("oslo: lua: {}", e);
         return 1;
