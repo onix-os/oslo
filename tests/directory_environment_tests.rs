@@ -2,9 +2,9 @@
 //!
 //! # What this exists to catch
 //!
-//! `source_envrc` chdirs to the rc file's directory before running it; `source_lua` did not. Both
-//! facts were written down — the `.envrc` path even carries a comment explaining why the chdir is
-//! required — and nothing compared them, so oslo's *own* directory-environment format was the one
+//! The `.envrc` path chdir'd to the rc file's directory before running it; `source_lua` did not.
+//! Both facts were written down — the `.envrc` path even carried a comment explaining why the
+//! chdir was required — and nothing compared them, so oslo's *own* format was the one
 //! that resolved relative paths against the wrong place.
 //!
 //! The failure is quiet and it persists. `~/proj/.env.lua` saying `path_add("./bin")`, entered as
@@ -122,7 +122,7 @@ fn a_relative_path_resolves_against_the_file_not_the_shell() {
     );
 }
 
-/// The working directory during the load is the file's own, the same promise `.envrc` already had.
+/// The working directory during the load is the file's own, which is direnv's rule too.
 #[test]
 fn the_file_runs_in_its_own_directory() {
     let sandbox = Sandbox::new("oslo.env.set(\"WHERE\", oslo.fs.cwd())\n");
@@ -136,7 +136,7 @@ fn the_file_runs_in_its_own_directory() {
 }
 
 /// **And the shell is left where the user walked to**, not where the file ran. Restoring the
-/// directory is the half of the chdir that a `.envrc` comments on at length, and getting it wrong
+/// directory is the half of the chdir that is easy to forget, and getting it wrong
 /// would move somebody's shell under them on every `cd`.
 #[test]
 fn the_shell_is_not_left_standing_in_the_projects_root() {

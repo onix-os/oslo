@@ -20,8 +20,8 @@ adds commands to the shell you type at — and nothing else in oslo had to chang
 >
 > Installing is different in kind — it fetches somebody's code, decides whether to trust it, and
 > reserves command names on their behalf. A `/bin/sh` on a distribution has no use for any of that.
-> It is behind the **`plugin`** cargo feature and costs **108 KB**: 5,902,720 bytes without it
-> against 6,013,312 with. In `oslo-minimal` the word `plugin` falls through to `$PATH`.
+> It is behind the **`plugin`** cargo feature and costs **78 KB**: 5,797,328 bytes without it
+> against 5,877,472 with. In `oslo-minimal` the word `plugin` falls through to `$PATH`.
 
 <!-- demo:begin -->
 [![plugins demo](https://asciinema.org/a/1263436.svg)](https://asciinema.org/a/1263436)
@@ -141,7 +141,7 @@ number and the check compares another. There is one now.
 ## Trust
 
 `install` records what the plugin's `.lua` files hashed to. Loading recomputes and compares; a
-mismatch refuses and says so. This is the model `.envrc` already uses.
+mismatch refuses and says so. This is the model direnv already uses.
 
 ```sh
 oslo plugin list          # notes   note   CHANGED — run `oslo plugin allow`

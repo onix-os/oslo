@@ -460,3 +460,36 @@ fn parse_with_name(argv0: &str, args: &[&str]) -> Result<Invocation, Exit> {
     argv.extend(args.iter().map(|a| a.to_string()));
     parse(&argv)
 }
+
+/// **bash's "be only a shell" flags are accepted, and mean what they say.**
+///
+/// Every program that hands a script to `bash` passes them — direnv runs `.envrc` under
+/// `--noprofile --norc` — and a machine where `bash` on `$PATH` is a link to oslo is a supported
+/// install. Refusing them by name made oslo unusable for exactly those callers, and the caller had
+/// no way to tell "unknown flag" from "about to ignore your request".
+#[test]
+fn the_bash_startup_flags_are_honoured() {
+    let inv = parse_args(&["--norc", "-c", "echo hi"]).expect("parse");
+    assert!(inv.no_rc, "--norc must be recorded");
+    assert!(!inv.no_profile, "and must not imply the other");
+
+    let inv = parse_args(&["--noprofile", "--norc", "-c", "echo hi"]).expect("parse");
+    assert!(inv.no_rc && inv.no_profile, "both, in bash's own order");
+
+    let inv = parse_args(&["-c", "echo hi"]).expect("parse");
+    assert!(
+        !inv.no_rc && !inv.no_profile,
+        "and neither is on by default"
+    );
+}
+
+/// `--rcfile` and `--init-file` stay refused: they name a *bash* rc file, and pointing oslo at one
+/// would source shell syntax into a shell whose configuration is Lua. A refusal is the honest
+/// answer, unlike for the two flags above where oslo can do what was asked.
+#[test]
+fn an_rcfile_is_still_refused() {
+    for flag in ["--rcfile", "--init-file"] {
+        let err = parse_args(&[flag, "/tmp/x", "-c", "true"]).expect_err("must be refused");
+        assert_eq!(err.status, 2, "{flag}");
+    }
+}

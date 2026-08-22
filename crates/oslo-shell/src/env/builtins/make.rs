@@ -15,7 +15,7 @@
 //! 3. `\make` and `command make` still reach the program, as they do for every builtin.
 //!
 //! A project with a `Makefile` *and* a `.make.lua` gets the Lua one at a prompt — the same rule
-//! `direnv::find` already applies to `.env.lua` over `.envrc`, for the same stated reason: a
+//! `direnv::find` applies for `.env.lua`, for the same stated reason: a
 //! repository holding both almost always has one of them for everybody else.
 //!
 //! # Why it runs a child rather than doing the work

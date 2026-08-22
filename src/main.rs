@@ -217,7 +217,7 @@ fn run_script(invocation: &cli::Invocation, path: &str) -> ! {
 /// No operand: a prompt if there is somebody there, and the program on standard input if not.
 fn run_stdin(invocation: &cli::Invocation) -> ! {
     if invocation.force_interactive || stdin_is_a_terminal() {
-        startup::repl::run_repl(invocation.login);
+        startup::repl::run_repl(invocation.login, invocation.no_rc, invocation.no_profile);
     }
     let mut script = String::new();
     if let Err(e) = std::io::stdin().read_to_string(&mut script) {
@@ -290,9 +290,12 @@ fn run_program_reading(
 
     // R9.10: a non-interactive shell still reads `$ENV` — that is what POSIX defines it for, and
     // it runs before the program so a function defined there is callable from it.
-    if let Some(status) =
-        startup::rc::load_startup_files(&mut env, invocation.force_interactive, invocation.login)
-    {
+    if let Some(status) = startup::rc::load_startup_files(
+        &mut env,
+        invocation.force_interactive,
+        invocation.login,
+        invocation.no_profile,
+    ) {
         std::process::exit(run_exit_trap(&mut env, status));
     }
 

@@ -9,7 +9,7 @@
 //! * [`exec`] — running what came out, including jobs, pipelines and redirection.
 //! * [`mod@env`] — the variable store, the options, and every builtin.
 //! * [`data`] — the structured pipeline: tools that produce rows rather than bytes.
-//! * [`direnv`] — directory environments, `.env.lua` and `.envrc`.
+//! * [`direnv`] — directory environments, `.env.lua`.
 //!
 //! # Why `exec` and `env` are one crate
 //!

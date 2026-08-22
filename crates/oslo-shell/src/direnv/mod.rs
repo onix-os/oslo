@@ -1,4 +1,4 @@
-//! Directory environments: one `.env.lua` or `.envrc` per project.
+//! Directory environments: one `.env.lua` per project.
 //!
 //! `direnv`, built in. See `docs/research/direnv.md` for what was read and what was deliberately not
 //! copied; the short version is that most of direnv's machinery exists because it is an external
@@ -6,12 +6,25 @@
 //! no prompt hook and no `eval` protocol: the state lives in memory and the load happens on the
 //! `cd` path.
 //!
-//! **Both names are read.** `.env.lua` is oslo's own, in the language the rest of the configuration
-//! is written in. `.envrc` is direnv's, and it is read because a project's `.envrc` is checked in
-//! and shared and not yours to convert — refusing it would mean every repository that already has
-//! one is a repository oslo cannot be used in. It is shell, so it runs in this shell, against
-//! direnv's stdlib reimplemented in [`stdlib`]; the personal `~/.config/direnv/direnvrc` is sourced
-//! first, from [`rcfile`]. Neither is a subprocess and neither is an `eval` protocol.
+//! **One name, and it is oslo's own.** `.env.lua`, in the language the rest of the configuration is
+//! written in.
+//!
+//! `.envrc` was read too, for a while, against a reimplementation of direnv's stdlib — 1100 lines
+//! of Rust tracking 1.4k lines of someone else's bash so that `use flake` and `layout python` meant
+//! here what they mean there. Every one of those is a place for the two to disagree in a way only a
+//! user hits, and none of it is work oslo has to do: direnv exists, it is on the machine, and it is
+//! good at this.
+//!
+//! So an `.envrc` project runs direnv, from one line in `init.lua`:
+//!
+//! ```lua
+//! oslo.env.set("PROMPT_COMMAND", 'eval "$(direnv export bash)"')
+//! ```
+//!
+//! `$PROMPT_COMMAND` is evaluated against the live environment before every prompt, which is what
+//! direnv's own bash hook is built on — load *and* unload, with no oslo code in the middle. Pair it
+//! with `oslo.command.when` and `oslo.feature.when` and each tool takes the directories that are
+//! its own.
 //!
 //! Two things *are* copied, because neither is incidental to being an external binary:
 //!
@@ -42,8 +55,7 @@ pub mod carry;
 pub mod diff;
 pub mod find;
 mod handle;
-pub mod rcfile;
-pub mod stdlib;
+pub mod paths;
 
 pub use handle::{install, installed, request_reload, take_reload_request, with};
 
@@ -62,8 +74,8 @@ struct Loaded {
     owner: PathBuf,
     /// The files as they were when they were read, so an edit to any of them reloads.
     ///
-    /// A list rather than the rc alone, because `watch_file`, `dotenv` and `source_env` each add a
-    /// file the environment now depends on. Watching only the `.envrc` is the oldest direnv bug
+    /// A list rather than the file alone, because `oslo.direnv.watch_file` adds a
+    /// file the environment now depends on. Watching only the rc file is the oldest direnv bug
     /// report there is: a project whose `.env` is edited and whose shell goes on holding the values
     /// from before it.
     watch: Vec<(PathBuf, Stamp)>,
@@ -226,7 +238,7 @@ impl Direnv {
     ) -> Vec<Event> {
         // **The `direnv` feature, read as "there is no file here".** Turning it off has to *unload*
         // whatever is currently loaded, not merely decline to load the next one — a config that
-        // walks into a classic-`.envrc` project and turns oslo's own directory environments off
+        // turns oslo's own directory environments off on the way into a project
         // would otherwise keep the last project's variables for the rest of the session.
         //
         // Answering `None` here gets that for free: the code below already unloads before it loads,
@@ -346,7 +358,7 @@ impl Direnv {
         // Whatever the file asked for while it ran: `watch_file`, and the files `dotenv` and
         // `source_env` read on its behalf. Only knowable now, which is why this is not one list.
         watch.extend(
-            stdlib::take_watches()
+            paths::take_watches()
                 .into_iter()
                 .map(|path| (stamp(&path), path))
                 .map(|(when, path)| (path, when)),
@@ -423,9 +435,9 @@ fn shell_state(env: &Environment) -> (Vars, BTreeMap<String, String>) {
 
 /// Variables the shell keeps for itself, which a directory environment neither sets nor undoes.
 ///
-/// Reading a file moves `LINENO`, so an `.envrc` that assigned nothing at all still came out of the
+/// Reading a file moves `LINENO`, so a file that assigned nothing at all still came out of the
 /// diff having "changed" it — announced on arrival and dutifully restored on the way out. `PWD` and
-/// `OLDPWD` are the same mistake with teeth: an `.envrc` runs with the working directory set to its
+/// `OLDPWD` are the same mistake with teeth: a directory file runs with the working directory set to its
 /// own, so both differ across the load by construction, and putting them "back" on the way out
 /// would be a directory environment quietly moving the shell.
 fn maintained(name: &str) -> bool {

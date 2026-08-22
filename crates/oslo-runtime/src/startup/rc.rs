@@ -33,7 +33,12 @@ pub type ExitRequest = Option<i32>;
 /// Nothing here is fatal. A startup file that does not exist is not an error (that is the normal
 /// case), and one that fails half way through leaves the shell running with whatever it managed
 /// to set — a broken rc file must not cost you your shell.
-pub fn load_startup_files(env: &mut Environment, interactive: bool, login: bool) -> ExitRequest {
+pub fn load_startup_files(
+    env: &mut Environment,
+    interactive: bool,
+    login: bool,
+    no_profile: bool,
+) -> ExitRequest {
     let mut sourced: Vec<PathBuf> = Vec::new();
 
     // The config is Lua and is loaded by `super::lua_init`, not sourced here — see `config_path`.
@@ -48,7 +53,11 @@ pub fn load_startup_files(env: &mut Environment, interactive: bool, login: bool)
     //
     // **`/etc/profile.d` is deliberately absent.** `/etc/profile` walks it itself with `run-parts`;
     // a shell that also walked it would source all seventeen of this machine's files twice.
-    if login {
+    //
+    // **`--noprofile` is honoured here.** A caller handing a script to `sh -l` and asking for no
+    // profile wants the script's own behaviour; reading the profile anyway would give it whatever
+    // the person at the keyboard put in theirs, which is the failure the flag exists to prevent.
+    if login && !no_profile {
         // Built rather than written inline: a shell with no `$HOME` still reads `/etc/profile`,
         // and an early return for the missing one would have skipped it.
         let mut profiles = vec![PathBuf::from("/etc/profile")];

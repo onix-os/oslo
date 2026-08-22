@@ -232,6 +232,8 @@ const INVOCATION: &[(&str, &str)] = &[
     ("-s", "read commands from standard input"),
     ("-i", "force interactive mode"),
     ("-l, --login", "act as a login shell"),
+    ("--norc", "do not read the configuration"),
+    ("--noprofile", "do not read /etc/profile or ~/.profile"),
 ];
 
 /// oslo's own flags. Long-only by design: the short letters belong to POSIX, which claimed the

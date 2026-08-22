@@ -9,7 +9,7 @@
 //!
 //! The machinery for the second one was already there and already drained for both file kinds;
 //! nothing on the Lua side ever filled the list, so for a `.env.lua` it was permanently empty.
-//! `.envrc` has had `watch_file` since the beginning.
+//! direnv has had `watch_file` since the beginning.
 //!
 //! # Why the callback can use the whole API
 //!

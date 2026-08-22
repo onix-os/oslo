@@ -65,9 +65,32 @@ pub fn from_elsewhere() -> Vec<Entry> {
 /// makes `oslo macros add gco …` taking effect the expected outcome rather than the surprising one.
 /// `off` names are dropped last, so turning something off uncovers the configured one underneath —
 /// which is the same rule, applied to a removal.
+///
+/// # A variable from `elsewhere` is described, never applied
+///
+/// [`from_elsewhere`] is not a list of things somebody asked for. Its variables are *every exported
+/// variable a starting shell happened to hold*, written down so `oslo macros` can show what is
+/// defined that you did not store. Applying them is a round trip that cannot add anything: the
+/// snapshot is rewritten by [`publish_elsewhere`] from this shell's own environment immediately
+/// before this function reads it, so every variable in it is one the shell already has.
+///
+/// It could, however, take something away. The apply side reads a body containing `$(…)` or a
+/// backtick as a *recipe to run on first use* rather than a value — right for a variable somebody
+/// deliberately stored with `oslo macros add --var`, wrong for a snapshot of a value, which is a
+/// value by construction. So `oslo.env.set("PROMPT_COMMAND", 'eval "$(direnv export bash)"')` was
+/// unset, re-registered as a recipe, and came back as `eval`, the rest of the line having been
+/// parsed as separate words.
+///
+/// Nothing depended on applying them. The reason `elsewhere` is merged at all is so that removing a
+/// stored entry uncovers the configured one underneath — and the removal path only ever takes back
+/// a variable's *recipe*, never a value, so for [`Kind::Var`] there was no fallback to preserve.
+/// Aliases and abbreviations do have one, and keep it.
 pub fn want() -> Vec<Entry> {
     let mut by_key: BTreeMap<(Kind, String), Entry> = BTreeMap::new();
     for entry in from_elsewhere() {
+        if entry.kind == Kind::Var {
+            continue;
+        }
         by_key.insert((entry.kind, entry.name.clone()), entry);
     }
     for entry in snapshot::read() {

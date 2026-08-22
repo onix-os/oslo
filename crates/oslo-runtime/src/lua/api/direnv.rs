@@ -7,16 +7,15 @@
 //!
 //! # Thin, on purpose
 //!
-//! Every function here is a call into [`oslo_shell::direnv`], which is also what an `.envrc` reaches
-//! through [`oslo_shell::direnv::stdlib`]. That matters more than it looks: `nix_develop` and `use flake`
-//! do the same delicate thing — take a dev shell's environment from `nix print-dev-env --json`
-//! while withholding the handful of variables that would wreck the shell you are standing in — and
-//! two copies of that list is two chances to get it wrong, silently, in a way nobody would think to
-//! test. See [`oslo_shell::direnv::devshell`] for what those are and why.
+//! Every function here is a call into [`oslo_shell::direnv`], and the work is there rather than in
+//! this file. `nix_develop` is the one that makes the split worth keeping: it takes a dev shell's
+//! environment from `nix print-dev-env --json` while withholding the handful of variables that
+//! would wreck the shell you are standing in, and getting that list wrong is silent and severe. See
+//! `oslo_shell::nix_shell` for what those are and why.
 
 use super::util::{put, text};
 use oslo_base::value::{LuaError, Table, Value};
-use oslo_shell::direnv::stdlib;
+use oslo_shell::direnv::paths;
 use oslo_shell::env::Environment;
 #[cfg(feature = "nix")]
 use oslo_shell::nix_shell as devshell;
@@ -76,7 +75,7 @@ fn path_add(it: &mut Table, env: &Arc<Mutex<Environment>>) {
             _ => "PATH".to_string(),
         };
         let mut guard = crate::lua::engine::borrow_env(&env)?;
-        stdlib::prepend_into(&mut guard, &name, &[dir])
+        paths::prepend_into(&mut guard, &name, &[dir])
             .map_err(|e| LuaError::new(format!("oslo.direnv.path_add: {e}")))?;
         let joined = guard.get_var(&name).unwrap_or_default().to_string();
         Ok(vec![Value::str(joined)])
@@ -207,7 +206,7 @@ fn watching(it: &mut Table) {
         let mut added = 0;
         for (i, _) in args.iter().enumerate() {
             let path = text(&args, i + 1, "oslo.direnv.watch_file")?;
-            stdlib::watch(&stdlib::absolute(&path, &base));
+            paths::watch(&paths::absolute(&path, &base));
             added += 1;
         }
         if added == 0 {
@@ -226,7 +225,7 @@ fn watching(it: &mut Table) {
     put(it, "watch_dir", |_, args| {
         let base = loading_base("oslo.direnv.watch_dir")?;
         let path = text(&args, 1, "oslo.direnv.watch_dir")?;
-        stdlib::watch(&stdlib::absolute(&path, &base));
+        paths::watch(&paths::absolute(&path, &base));
         Ok(vec![Value::Bool(true)])
     });
 }

@@ -370,6 +370,30 @@ fn metadata(it: &mut Table) {
         Ok(dir) => ok(Value::str(dir.to_string_lossy())),
         Err(e) => failed("cwd", e),
     });
+
+    // oslo.fs.find_up(name, from) -> the nearest `name` at or above `from`, or nil
+    //
+    // **`nil` plainly, not `nil, message`.** Every other call here answers a failure it could not
+    // control; not finding the file is the question being answered, and a caller writing
+    // `if oslo.fs.find_up(".env.lua") then` should not have to know the difference.
+    //
+    // `from` defaults to the working directory, because the caller that wants this most is a
+    // directory predicate and the directory it is asked about is already where the shell is.
+    put(it, "find_up", |_, args| {
+        let name = text(&args, 1, "oslo.fs.find_up")?;
+        let from = match opt_text(&args, 2, "oslo.fs.find_up")? {
+            Some(given) => std::path::PathBuf::from(given),
+            None => std::env::current_dir().unwrap_or_default(),
+        };
+        Ok(vec![match from
+            .ancestors()
+            .map(|ancestor| ancestor.join(&name))
+            .find(|candidate| candidate.exists())
+        {
+            Some(found) => Value::str(found.to_string_lossy()),
+            None => Value::Nil,
+        }])
+    });
 }
 
 /// One entry, as the table every listing hands back.

@@ -230,7 +230,7 @@ somebody hits: the missing separator, appending where prepending was meant so th
 loses to the system one, a reload that grows the variable every time, `./bin` resolving against
 wherever the shell later stands, and the empty entry a trailing colon leaves — which means "the
 current directory" to the dynamic linker. These were `oslo.direnv.path_add`, behind a feature; they
-are in every build now, over the same implementation `PATH_add` in an `.envrc` uses.
+are in every build now, over the same implementation `oslo.direnv.path_add` uses.
 
 ### Bytes, summarised and carried
 

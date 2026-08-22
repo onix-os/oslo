@@ -112,8 +112,7 @@ and all must hold:
 2. **A `.make.lua` governs the working directory.** No file, no claim on the name.
 3. `\make` and `command make` reach the program, as they do for every builtin.
 
-A project with a `Makefile` *and* a `.make.lua` gets the Lua one at a prompt — the same rule
-`direnv::find` applies to `.env.lua` over `.envrc`, and for the same reason: a repository holding
+A project with a `Makefile` *and* a `.make.lua` gets the Lua one at a prompt: a repository holding
 both usually has one of them for everybody else.
 
 `type make` answers *make is a shell builtin*, and `command -v make` exits 0. That is not
@@ -132,8 +131,8 @@ what `make build` does never depends on how deep in the tree you were standing.
 it is Tuesday.* That is right at a prompt and wrong in a build, where make's rule — stop at the
 first non-zero — is the only safe default.
 
-So the runner swaps `sh` for a strict one while it runs, the way direnv's stdlib exists only while
-an `.envrc` is being read. Inside a recipe `sh.cargo(…)` raises on a non-zero status and the message
+So the runner swaps `sh` for a strict one while a recipe runs, and swaps it back on the way out.
+Inside a recipe `sh.cargo(…)` raises on a non-zero status and the message
 names the command; `oslo.run{…}` keeps its ordinary manners for the caller who wants to read
 `r.status` themselves.
 

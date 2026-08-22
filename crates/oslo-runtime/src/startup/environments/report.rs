@@ -1,7 +1,7 @@
 //! Saying what the directory environment did, in a way worth reading.
 //!
 //! The first version printed one `direnv:` line per event and let the rc file's own output fall
-//! wherever it landed, which on a real `.envrc` meant eight `oslo: use: command not found` lines
+//! wherever it landed, which on a noisy file meant eight loose error lines
 //! above a summary that did not mention them. Everything here is about that: the rc file's output
 //! belongs *under* the file that produced it, repeated lines belong collapsed, and the one line
 //! that is a security decision belongs looking like one.
@@ -48,7 +48,7 @@ fn short(path: &Path) -> String {
 
 /// Repeated lines collapsed to one with a count.
 ///
-/// A real `.envrc` calling `export_alias` four times produces four identical errors, and four
+/// A file calling the same failing thing four times produces four identical errors, and four
 /// copies of one fact is three lines of noise. Order is preserved — the first occurrence keeps its
 /// place — because the sequence is how you work out which line of the file failed.
 fn collapse(output: &str) -> Vec<(String, usize)> {

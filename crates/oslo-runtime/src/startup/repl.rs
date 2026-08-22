@@ -39,7 +39,7 @@ mod precmd;
 use super::history::store::History;
 use editor::{publish_history, remember};
 
-pub fn run_repl(login: bool) -> ! {
+pub fn run_repl(login: bool, no_rc: bool, no_profile: bool) -> ! {
     // Everything downstream that behaves differently for a person than for a script — the job
     // notice, whether a background job keeps the terminal's stdin — reads this.
     // (Addressed by path rather than a re-export: `exec::mod` is being edited elsewhere.)
@@ -58,7 +58,7 @@ pub fn run_repl(login: bool) -> ! {
 
     // The config runs before anything else reads a variable, so a `HISTSIZE=` or `PS1=` in it is
     // in force for this session rather than for the next one.
-    if let Some(status) = rc::load_startup_files(&mut interactive_env, true, login) {
+    if let Some(status) = rc::load_startup_files(&mut interactive_env, true, login, no_profile) {
         std::process::exit(run_exit_trap(&mut interactive_env, status));
     }
 
@@ -73,7 +73,14 @@ pub fn run_repl(login: bool) -> ! {
     // The lock is taken and released *before* the config runs. Holding it across `load_config`
     // is a deadlock in disguise: `borrow_env` uses `try_lock`, so every `oslo.*` call in the
     // config fails with "shell state is busy" and the whole file silently does nothing.
-    let config = lua_init::config_files(&env_struct.lock().unwrap());
+    //
+    // **`--norc` skips the files, not the bindings.** `oslo.*` is what the shell *is*, and a
+    // `-c` program under `--norc` still expects it; what the flag asks for is that nobody's
+    // configuration has run first.
+    let config = match no_rc {
+        true => Vec::new(),
+        false => lua_init::config_files(&env_struct.lock().unwrap()),
+    };
     if lua_init::install_bindings(&lua, Arc::clone(&env_struct)) && !config.is_empty() {
         for path in &config {
             lua_init::load_config(&lua, path);

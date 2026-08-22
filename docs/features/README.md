@@ -28,7 +28,7 @@ opens the finder is unbound and does whatever it otherwise would; the `oslo.scra
 read and simply mean nothing, so one config works under both with nothing to ask.
 
 **[Directory environments](directory-environments.md) are `oslo` only**, behind the `direnv` cargo
-feature — the largest of the three at 164 KB, and off because it is the one part of the shell that
+feature — the largest of the three at 140 KB, and off because it is the one part of the shell that
 reads a file on arrival in a directory and can run what it finds there. In `oslo-minimal` `cd` is
 just `cd`, and the word `direnv` falls through to `$PATH` so the real one still works.
 
@@ -37,7 +37,7 @@ just `cd`, and the word `direnv` falls through to `$PATH` so the real one still 
 through to `$PATH` and GNU make answers — which is what it does on every other shell.
 
 **[nix, as data](nix.md) is `oslo` only**, behind the `nix` cargo feature — every `nix --json`
-answer as a Lua table. Independent of `direnv`: what the two share, `use flake` and
+answer as a Lua table. Independent of `direnv`: the one thing the two share,
 `oslo.direnv.nix_develop()`, needs both. In `oslo-minimal` there is no `oslo.nix`, and a config asks
 for it the way it asks about anything optional — `if oslo.nix then … end`.
 
@@ -127,7 +127,7 @@ scripts/demo/embed.sh                            # put the players back in the d
 
 | | |
 |---|---|
-| [Directory environments](directory-environments.md) | `.envrc` read by oslo itself, not handed to direnv |
+| [Directory environments](directory-environments.md) | `.env.lua` per project, with an allow gate and an undo record |
 | [nix, as data](nix.md) | Every `nix --json` answer as a Lua table, extended in Lua |
 | [Build recipes](build-recipes.md) | `.make.lua` — a justfile in the language the config is already in |
 | [The filesystem navigator](nav.md) | `nav`: type to filter, arrows to move, Esc to take the shell there |

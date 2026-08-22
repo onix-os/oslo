@@ -268,3 +268,86 @@ fn an_inherited_value_with_spaces_is_not_run_as_a_command() {
     );
     assert!(said.contains("[alpha beta gamma]"), "{said:?}");
 }
+
+/// **A variable the configuration set is a value, whatever it looks like.**
+///
+/// `oslo.env.set` stores a literal string. What broke it was a round trip: every exported variable a
+/// starting shell holds is written to `elsewhere.snapshot` so `oslo macros` can list what is defined
+/// that you did not store — and that file was then read back and *applied*. A body containing `$(…)`
+/// reads as a recipe on the way in, so the variable was unset, re-registered as a recipe, and came
+/// back as its first word.
+///
+/// `eval "$(direnv export bash)"` — the direnv hook, and the shape that found this — became `eval`.
+#[test]
+fn a_configured_value_is_not_re_read_as_a_recipe() {
+    let shell = Shell::new();
+    let config = shell.data.path().join("config/oslo");
+    std::fs::create_dir_all(&config).expect("config dir");
+    std::fs::write(
+        config.join("init.lua"),
+        "oslo.misc.welcome = false\n\
+         oslo.env.set(\"HOOKLINE\", 'eval \"$(echo inner)\"')\n\
+         oslo.env.set(\"SPACED\", \"a $(echo hi) b\")\n",
+    )
+    .expect("init.lua");
+
+    let out = shell.at_a_prompt("echo [$HOOKLINE] [$SPACED]");
+    assert!(
+        out.contains(r#"[eval "$(echo inner)"]"#),
+        "the hook line was cut or run\n{out:?}"
+    );
+    assert!(
+        out.contains("[a $(echo hi) b]"),
+        "the value was cut or run\n{out:?}"
+    );
+}
+
+/// **One shell's environment does not reach another one.**
+///
+/// This passed before `want()` stopped applying them too, and it is worth pinning anyway, because
+/// what held it up was nothing to do with intent: `elsewhere.snapshot` holds every exported
+/// variable a shell had — `PATH`, `IN_NIX_SHELL`, the `CC`/`AR`/`CONFIG_SHELL` of whatever dev
+/// shell a terminal was in, and `OSLO_DIRENV`, a directory environment's *undo record*. Two
+/// accidents kept them from travelling: a starting shell rewrites the file before it reads it, and
+/// `Stamps::now` watches the macro database and the session file but not this one, so a running
+/// shell never re-reads it. Change either and the whole environment of one terminal would arrive in
+/// the next. Now nothing in it is applied, and this says so.
+#[test]
+fn a_variable_one_shell_held_is_not_applied_to_the_next() {
+    let shell = Shell::new();
+    // The first shell publishes its environment, which is what writes the snapshot.
+    let first = shell.at_a_prompt("echo [$OSLO_T_LEAK]");
+    assert!(
+        first.contains("[]"),
+        "the marker must start unset: {first:?}"
+    );
+
+    let mut child = Command::new(oslo_bin())
+        .arg("-i")
+        .env("XDG_DATA_HOME", shell.data.path())
+        .env("XDG_CONFIG_HOME", shell.data.path().join("config"))
+        .env("OSLO_T_LEAK", "from-the-first-shell")
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::null())
+        .spawn()
+        .expect("spawn oslo");
+    child
+        .stdin
+        .as_mut()
+        .expect("stdin")
+        .write_all(b"echo [$OSLO_T_LEAK]\n")
+        .expect("write");
+    let held = child.wait_with_output().expect("wait");
+    assert!(
+        String::from_utf8_lossy(&held.stdout).contains("[from-the-first-shell]"),
+        "the shell that has it must still see it"
+    );
+
+    // A third shell, without it in its environment, must not inherit it through the store.
+    let after = shell.at_a_prompt("echo [$OSLO_T_LEAK]");
+    assert!(
+        after.contains("[]"),
+        "one shell's variable travelled to another through elsewhere.snapshot\n{after:?}"
+    );
+}
