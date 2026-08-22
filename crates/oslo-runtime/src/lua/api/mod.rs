@@ -68,6 +68,7 @@ mod spec;
 mod state;
 mod suggest;
 mod term;
+mod theme;
 pub(crate) mod timer;
 pub(crate) mod tool;
 mod ui;
@@ -156,6 +157,10 @@ pub fn install(host: &dyn Host, registry: &Registry, env: Arc<Mutex<Environment>
     // Reading what has been run, merged into the settings namespace of the same name rather than
     // replacing it: `oslo.history` is one subject and should not be two tables. See [`history`].
     extend(&mut oslo, "history", history::build());
+
+    // Painting, merged into the settings table of the same name: a config fills `oslo.theme` with
+    // data, and these are the two entries in it that are functions. See [`theme`].
+    extend(&mut oslo, "theme", theme::build());
 
     // `oslo.builtin` is the same thing one level deeper: it is a namespace *per builtin*, so
     // `oslo.builtin.rm.to_tmp = true` indexes twice and both tables have to be here. A new

@@ -12,7 +12,7 @@
 //! prompt or a dropdown corrupts the redraw that follows it. This is why the measuring lives in
 //! Rust and is shared with the dropdown rather than being left for a config to approximate.
 
-use super::super::util::{ok, put, text};
+use super::super::util::{list, ok, put, text};
 use oslo_base::value::{Number, Table, Value};
 use oslo_ui::dropdown::width;
 
@@ -68,6 +68,45 @@ pub fn install(ui: &mut Table) {
         let cut = width::truncate_to_width(&s, target);
         ok(Value::str(width::pad_to_width(&cut, target)))
     });
+
+    // oslo.ui.wrap(s, cells) -> { line, … }, broken at spaces and measured in cells
+    put(ui, "wrap", |_, args| {
+        let s = text(&args, 1, "oslo.ui.wrap")?;
+        let budget = count(&args, 1).unwrap_or(0);
+        ok(list(wrapped(&s, budget).into_iter().map(Value::str)))
+    });
+}
+
+/// Break `s` into lines no wider than `budget` cells.
+///
+/// Newlines already in `s` are kept, so a paragraph stays a paragraph. A single word wider than the
+/// budget is placed on a line of its own and left over-long rather than cut: splitting it would
+/// have to land somewhere inside a run of escapes or a grapheme cluster, and a wrapper that
+/// corrupts colour is worse than one that overflows.
+pub fn wrapped(s: &str, budget: usize) -> Vec<String> {
+    if budget == 0 {
+        return s.lines().map(str::to_string).collect();
+    }
+    let mut lines = Vec::new();
+    for paragraph in s.split('\n') {
+        let mut line = String::new();
+        for word in paragraph.split_whitespace() {
+            let would_be = if line.is_empty() {
+                width::display_width(word)
+            } else {
+                width::display_width(&line) + 1 + width::display_width(word)
+            };
+            if !line.is_empty() && would_be > budget {
+                lines.push(std::mem::take(&mut line));
+            }
+            if !line.is_empty() {
+                line.push(' ');
+            }
+            line.push_str(word);
+        }
+        lines.push(line);
+    }
+    lines
 }
 
 /// Pad `s` to `target` cells on the side `align` names.
@@ -137,5 +176,35 @@ mod tests {
     #[test]
     fn an_unknown_alignment_pads_rather_than_raising() {
         assert_eq!(align_to("ab", 4, "sideways"), "ab  ");
+    }
+
+    #[test]
+    fn wrapping_breaks_at_spaces_and_respects_the_budget() {
+        assert_eq!(
+            wrapped("the quick brown fox jumps", 10),
+            ["the quick", "brown fox", "jumps"]
+        );
+    }
+
+    /// The reason this is not a `string.gsub` in a config: colour costs no cells.
+    #[test]
+    fn colour_does_not_shorten_a_wrapped_line() {
+        let painted = wrapped("\x1b[31mthe\x1b[0m quick brown", 9);
+        assert_eq!(painted.len(), 2, "{painted:?}");
+        assert_eq!(width::display_width(&painted[0]), 9);
+    }
+
+    #[test]
+    fn newlines_already_there_are_kept() {
+        assert_eq!(wrapped("one\ntwo", 40), ["one", "two"]);
+    }
+
+    /// Over-long words overflow rather than being cut through their escapes.
+    #[test]
+    fn a_word_wider_than_the_budget_gets_its_own_line() {
+        assert_eq!(
+            wrapped("a supercalifragilistic b", 6),
+            ["a", "supercalifragilistic", "b"]
+        );
     }
 }

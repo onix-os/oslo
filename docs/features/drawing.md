@@ -160,6 +160,42 @@ work in a script or a pipeline.
 | `oslo.ui.width_of(s)` | the columns `s` occupies on screen, not its bytes |
 | `oslo.ui.strip(s)` | `s` with its escape sequences removed |
 | `oslo.ui.truncate(s, n)` / `.pad(s, n)` / `.fit(s, n)` | `s` cut, padded, or cut-and-padded to `n` columns |
+| `oslo.ui.wrap(s, n)` | a list of lines, broken at spaces, none wider than `n` columns |
+
+### Scoring, for a completion provider
+
+A provider's `answer` runs inside the line editor, which is holding the shell — so `oslo.run` and
+every other locked call refuses there. These need nothing but their arguments, and they are the
+shell's own scorer, so a Lua provider and the built-in finder agree about what `gco` means.
+
+| call | answers |
+|---|---|
+| `oslo.ui.match(candidate, typed, [mode])` | a score, or `nil` when it does not match |
+| `oslo.ui.match_at(candidate, typed)` | the byte offsets that matched, **1-based** for `string.sub` |
+| `oslo.ui.rank(candidates, typed, [{mode, limit}])` | `{ {text=, score=}, … }`, best first, non-matches dropped |
+
+`mode` is `off`, `tight`, `smart` (the default) or `loose` — the same four `oslo.finder.fuzzy` takes.
+
+```lua
+oslo.completion.for_command("deploy", function(word)
+  return oslo.ui.rank(targets(), word, { limit = 20 })
+end)
+```
+
+Without ranking, `max_items` truncates whatever order the Lua loop happened to build, which is why
+a `string.find` filter feels worse than the built-in one even when it finds the same rows.
+
+### Painting by name
+
+| call | answers |
+|---|---|
+| `oslo.theme.define(name, spec)` | true; defines `name` for every later call |
+| `oslo.theme.style(s, spec)` | `s` painted — `spec` is a defined name, or hexe's spelling: `fg:cyan bold` |
+| `oslo.theme.depth([name])` | what this terminal paints at, and sets it when given a name |
+
+Empty at `NO_COLOR`, so a caller never checks. **This is not `oslo.ui.style`**, which paints from a
+table written at the call site: this one resolves a *defined* name first, so a config names `warn`
+once and every caller follows when it changes.
 
 ```lua
 oslo.ui.print(oslo.ui.grid(

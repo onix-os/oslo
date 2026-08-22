@@ -136,6 +136,13 @@ const FUNCTIONS: &[&str] = &[
     "oslo.git.branch",
     "oslo.ui.width",
     "oslo.ui.ask",
+    "oslo.ui.match",
+    "oslo.ui.match_at",
+    "oslo.ui.rank",
+    "oslo.ui.wrap",
+    "oslo.theme.style",
+    "oslo.theme.define",
+    "oslo.theme.depth",
     "oslo.sys.cd",
     "oslo.opts.get",
     "oslo.term.size",
@@ -211,10 +218,15 @@ fn most_of_the_api_works_from_inside_a_builtin() {
   try("git",   function() local _ = oslo.git.root() end)
   try("word",  function() assert(#oslo.word.braces("{a,b}") == 2) end)
   try("parse", function() assert(oslo.proc.parse("a | b")[2].link == "|") end)
+  try("match", function() assert(oslo.ui.match("git checkout", "gco")) end)
+  try("rank",  function() assert(oslo.ui.rank({"git checkout","zzz"}, "gco")[1].text) end)
+  try("wrap",  function() assert(#oslo.ui.wrap("a b c d", 3) > 1) end)
+  try("style", function() assert(oslo.theme.style("x", "fg:red")) end)
 "#,
     );
     for name in [
-        "fs", "glob", "json", "hash", "state", "db", "path", "ui", "git",
+        "fs", "glob", "json", "hash", "state", "db", "path", "ui", "git", "match", "rank", "wrap",
+        "style",
     ] {
         assert!(
             said.contains(&format!("{name}=works")),

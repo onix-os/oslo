@@ -12,11 +12,20 @@ fn spec(fields: &[(&str, Value)]) -> Vec<Value> {
     vec![Value::table(table)]
 }
 
-/// **The form that already existed keeps working**, which is the whole reason the table form is a
-/// second shape rather than a replacement.
+/// **The pair form is gone**, and says so by name rather than complaining about argument #1.
 #[test]
-fn a_name_and_a_function_are_still_a_declaration() {
-    let read = declaration(&[Value::str("note"), a_function()]).expect("read");
+fn a_name_and_a_function_are_refused_and_told_the_shape() {
+    let refused = declaration(&[Value::str("note"), a_function()]).expect_err("should refuse");
+    assert!(refused.to_string().contains("run = function"), "{refused}");
+}
+
+#[test]
+fn a_table_with_only_the_two_required_fields_is_enough() {
+    let read = declaration(&spec(&[
+        ("name", Value::str("note")),
+        ("run", a_function()),
+    ]))
+    .expect("read");
     assert_eq!(read.name, "note");
     assert!(read.desc.is_none());
     assert!(read.complete.is_none());
@@ -77,6 +86,10 @@ fn a_complete_that_is_not_a_function_is_refused() {
 
 #[test]
 fn the_name_is_trimmed_the_way_it_always_was() {
-    let read = declaration(&[Value::str("  note  "), a_function()]).expect("read");
+    let read = declaration(&spec(&[
+        ("name", Value::str("  note  ")),
+        ("run", a_function()),
+    ]))
+    .expect("read");
     assert_eq!(read.name, "note");
 }

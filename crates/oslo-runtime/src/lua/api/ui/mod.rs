@@ -26,6 +26,7 @@
 
 mod ask;
 mod block;
+mod find;
 mod layout;
 mod look;
 mod prompt;
@@ -42,6 +43,7 @@ pub fn install(ui: &mut Table) {
     terminal(ui);
     text::install(ui);
     block::install(ui);
+    find::install(ui);
     layout::install(ui);
     ask::install(ui);
     prompt::install(ui);
