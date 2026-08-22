@@ -72,6 +72,7 @@ pub(crate) mod timer;
 pub(crate) mod tool;
 mod ui;
 mod watch;
+mod word;
 
 pub mod hooks;
 pub(crate) use shell::handlers as hook_handlers;
@@ -212,6 +213,7 @@ pub fn install(host: &dyn Host, registry: &Registry, env: Arc<Mutex<Environment>
     oslo.set_str("hex", digest::hex());
     oslo.set_str("base64", digest::base64());
     oslo.set_str("re", re::build());
+    oslo.set_str("word", word::build());
     oslo.set_str("proc", proc::build_proc());
     oslo.set_str("job", proc::build_job());
 

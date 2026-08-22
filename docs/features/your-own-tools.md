@@ -177,6 +177,32 @@ nothing for it to join: a command in those shells produces bytes, so extending t
 program that prints. Here a tool declares a shape and the planner reads it, which is why a Lua tool
 composes with `where` and `sort-by` without either side knowing about the other.
 
+### What a locked surface *can* do
+
+A builtin and an answering hook cannot run a command, but they are handed words and asked questions
+about them — and the two rules the shell applies to a word before it runs one are now callable:
+
+```lua
+oslo.word.braces("src/{a,b}.rs")      --> { "src/a.rs", "src/b.rs" }
+oslo.word.matches("main.rs", "*.rs")  --> true
+oslo.proc.parse("cat 'a b' | grep x") --> { {link="first", kind="simple", argv={"cat","a b"}, redirects=0},
+                                      --     {link="|",     kind="simple", argv={"grep","x"},  redirects=0} }
+```
+
+All three are pure functions of a string, so they work everywhere — including the two places
+`oslo.run` raises. That is most of the reason they exist: **the surface that cannot run a command is
+the one that most needs to understand one.**
+
+Written by hand, each is subtly wrong. Splitting a line on whitespace breaks `cat 'a b'`, `echo
+$HOME` and `a | b`. Matching a glob with `string.find` after rewriting `*` to `.*` is a different
+language — `.` is a metacharacter in a Lua pattern and is not one in a shell glob, so `a?txt`
+against `a.txt` answers wrongly in both directions. Brace expansion by hand gets nesting and
+`{1..9}` wrong.
+
+`oslo.proc.parse` answers `nil` for a line that does not parse — the shell is about to report the
+syntax error better than a caller could. Its `redirects` is a **count**, not a list: it is the same
+payload `pre-cmd` already receives, with a door on it.
+
 ## Configuration
 
 There are no settings — the whole surface is three calls, made from

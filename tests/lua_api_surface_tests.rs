@@ -75,6 +75,7 @@ const NAMESPACES: &[(&str, &str)] = &[
     ("oslo.term", "table"),
     ("oslo.theme", "table"),
     ("oslo.ui", "table"),
+    ("oslo.word", "table"),
     ("oslo.run", "function"),
     ("oslo.pipe", "function"),
     ("oslo.lines", "function"),
@@ -126,6 +127,9 @@ const FUNCTIONS: &[&str] = &[
     "oslo.env.path_add",
     "oslo.proc.status",
     "oslo.proc.exec",
+    "oslo.proc.parse",
+    "oslo.word.braces",
+    "oslo.word.matches",
     "oslo.git.root",
     "oslo.git.branch",
     "oslo.ui.width",
@@ -203,6 +207,8 @@ fn most_of_the_api_works_from_inside_a_builtin() {
   try("path",  function() assert(oslo.path.join("a", "b") == "a/b") end)
   try("ui",    function() assert(oslo.ui.width()) end)
   try("git",   function() local _ = oslo.git.root() end)
+  try("word",  function() assert(#oslo.word.braces("{a,b}") == 2) end)
+  try("parse", function() assert(oslo.proc.parse("a | b")[2].link == "|") end)
 "#,
     );
     for name in [
