@@ -133,18 +133,33 @@ Eleven of them — `macros`, `config`, `profile`, `history`, `direnv`, `make`, `
 
 ## Building
 
+You do not have oslo yet, so the build is a script:
+
 ```sh
-make build        # static musl release, every feature — the binary to use
-make dev          # a plain debug build, for iterating
-make verify       # fmt, line limits, README paths, tests, clippy, rustdoc — all of it
-make install      # to /usr/local/bin
-nix build         # static musl binary
+scripts/build.sh            # static musl release, every feature — the binary to use
+scripts/build.sh --minimal  # static release, none of the optional features
+scripts/build.sh --native   # this machine's target, for a quick local binary
+nix build                   # the same static musl binary, through the flake
 ```
+
+Once you have it, the build is [`.make.lua`](docs/features/build-recipes.md) and the shell runs it:
+
+```sh
+oslo make            # every recipe, with what each of them says it does
+oslo make build      # the same static release
+oslo make dev        # a plain debug build, for iterating
+oslo make verify     # fmt, line limits, README paths, tests, clippy, rustdoc — all of it
+oslo make install    # to $PREFIX/bin and /usr/bin
+```
+
+At an oslo prompt in this directory, `make` alone is enough — the builtin hands the word over to the
+program everywhere else. There is no `Makefile`: `scripts/build.sh` exists precisely because
+`.make.lua` cannot build the shell that reads it.
 
 ### Optional features
 
 All ten are off *by default*, and off for the same reason: a shell that is going to be `/bin/sh`
-should carry what every session needs and nothing else. `make build` turns them on; the published
+should carry what every session needs and nothing else. `scripts/build.sh` turns them on; the published
 release artifact is the default build.
 
 Each cost is what turning that one feature *off* takes back out of the full build, measured on the
@@ -166,7 +181,7 @@ static musl binary — **5,123,424 bytes with none of them, 6,357,792 with all t
 `crypt` implies `secrets`, so the two can only be removed together: 180 KB for the pair.
 
 ```sh
-make build TYPE=minimal     # static release, none of them
+scripts/build.sh --minimal     # static release, none of them
 ```
 
 **There are no others**, and in particular none that serve the test suite — `--all-features` turns

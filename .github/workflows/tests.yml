@@ -30,30 +30,33 @@ jobs:
           key: cargo-${{ runner.os }}-${{ hashFiles('Cargo.lock') }}
           restore-keys: |
             cargo-${{ runner.os }}-
-      # `make verify` as one step reports only "the gate failed". Splitting it means the run
-      # summary alone names the stage, which matters because reading job logs needs admin rights
-      # on this repository and the person debugging a red build usually does not have them.
+      # **The commands, not a build tool.** The gate lives in `.make.lua`, which the `make` builtin
+      # runs — and that builtin is inside the shell this job is building, so CI cannot reach it. It
+      # runs cargo directly instead; `scripts/build.sh` is the same bootstrap for the binary itself.
+      #
+      # One step per stage rather than one `verify`, because a single step reports only "the gate
+      # failed". The run summary alone naming the stage matters here: reading job logs needs admin
+      # rights on this repository and the person debugging a red build usually does not have them.
       - name: Toolchain and environment
         run: |
-          echo "make:  $(make --version | head -1)"
           echo "bash:  $(bash --version | head -1)"
           echo "sed:   $(sed --version 2>/dev/null | head -1 || echo 'BSD sed (no --version)')"
           echo "cargo: $(cargo --version)"
-          echo "PROJECT_NAME parsed by the Makefile: '$(make -s print-name)'"
+          echo "project: $(./scripts/project-meta.sh | tr '\n' ' ')"
       # Failures are re-emitted as ::error:: annotations, not just written to the log. Job logs
       # need admin rights on this repository; annotations are visible to anyone who can see the
       # run, so a red build stays diagnosable by whoever is actually looking at it.
       - name: fmt-check
         run: |
-          make fmt-check && exit 0
+          cargo fmt --all -- --check && exit 0
           cargo fmt --all -- --check 2>&1 | head -60 | while IFS= read -r l; do echo "::error::fmt: $l"; done
           exit 1
       - name: check-loc
-        run: make check-loc
+        run: ./scripts/check-loc.sh
       - name: check-readme
-        run: make check-readme
+        run: ./scripts/check-readme.sh
       - name: check
-        run: make check
+        run: cargo check --all-targets --workspace --exclude argc --exclude brush-parser --exclude full_moon --exclude full_moon_derive
       # Run before the full suite purely to surface the corpus summary. libtest captures stdout on
       # success, so without --nocapture the "N cases skipped, the oracle is bash X.Y" line never
       # reaches the log — and a runner image whose bash falls behind would quietly stop exercising
@@ -77,9 +80,9 @@ jobs:
             | head -60 | while IFS= read -r l; do echo "::error::test: $l"; done
           exit 1
       - name: clippy
-        run: make clippy
+        run: cargo clippy --all-targets --all-features --workspace --exclude argc --exclude brush-parser --exclude full_moon --exclude full_moon_derive -- -D warnings
       - name: rustdoc
-        run: make rustdoc
+        run: RUSTDOCFLAGS="-Dwarnings" cargo doc --all-features --no-deps --workspace --exclude argc --exclude brush-parser --exclude full_moon --exclude full_moon_derive
 
   # Cargo.toml claims rust-version = 1.90; this job is what makes the claim true.
   msrv:

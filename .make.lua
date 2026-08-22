@@ -1,8 +1,12 @@
 -- oslo's own build, as recipes.
 --
--- The `Makefile` beside this file still works and still ships; this is the same build written in
--- the language the rest of the configuration is written in, and it is the comparison the feature
--- was meant to be judged on. See `plans/PLAN_MAKE.md` and `docs/features/build-recipes.md`.
+-- **This replaced the `Makefile`, which is gone.** The two said the same thing in two places, and
+-- keeping both meant every change had to be made twice or the second one quietly rotted.
+--
+-- What a `Makefile` was still needed for is the bootstrap: this file is run by the `make` builtin,
+-- which lives inside the shell it builds, so a fresh checkout cannot start here. `scripts/build.sh`
+-- is that one rung — cargo and nothing else — and it builds the binary and stops. Everything past
+-- the first build is a recipe. See `docs/features/build-recipes.md`.
 --
 --   oslo make            the recipes, with what each of them says it does
 --   oslo make build      the static release binary
@@ -15,9 +19,8 @@ local make = oslo.make
 
 ---------------------------------------------------------------------------- what the build is
 
--- The one thing `Makefile` needs a helper script for. `$(shell ...)` cannot hold a literal `#`
--- without older GNU Make mis-parsing it, so the parsing moved into `scripts/project-meta.sh`;
--- here it is two lines and no script.
+-- Shared with `scripts/build.sh`, which reads the same two lines from the same script — so the
+-- bootstrap and the recipes cannot disagree about what they are building.
 local meta = oslo.run{ "./scripts/project-meta.sh", capture = true }
 assert(meta.ok, "scripts/project-meta.sh: " .. (meta.err or "failed"))
 local NAME, VERSION = meta.out:match("(%S+)%s+(%S+)")
@@ -135,9 +138,9 @@ end
 
 ---------------------------------------------------------------------------- building
 
--- `Makefile` prints its banner with `$(info …)` on every target, including `-s` and including the
--- ones whose whole output is meant to be piped. A recipe is the honest place for it: ask, and it
--- answers.
+-- The version is asked for, not announced. A build tool that prints a banner on every target prints
+-- it into the output of the ones meant to be piped, too. A recipe is the honest place for it: ask,
+-- and it answers.
 make.recipe{ name = "version", desc = "what this checkout calls itself",
              run = function() print(("%s v%s"):format(NAME, VERSION)) end }
 
