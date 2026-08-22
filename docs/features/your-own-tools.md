@@ -196,6 +196,7 @@ oslo.register_builtin{ name = "use", run = function(argv, shell)
     export     = { TOOLCHAIN = argv[2] }, -- and to every child
     unset      = { "STALE" },
     alias      = { build = "make build", old = false },  -- false removes
+    universal  = { THEME = "dark", OLD = false },        -- and outlives this shell
     positional = { "a", "b" },            -- set -- a b
     cd         = "/srv/" .. argv[2],
   }
@@ -203,9 +204,15 @@ end }
 ```
 
 Applied in that order, and the order is load-bearing: `unset` before `set`, or a name in both is
-silently discarded; `set` before `export`, so a name in both ends up exported; **`cd` last**,
+silently discarded; `set` before `export`, so a name in both ends up exported; `universal` after
+both, so a name written twice keeps the value that also survives the session; **`cd` last**,
 because it fires the change-directory hooks — which should see what this builtin just set — and
 writes `PWD` itself.
+
+`universal` is the only effect that outlives the process — it is what the `universal` builtin
+writes, and every other running oslo picks it up at its next prompt. A value may be a string
+(shell-local), `false` to erase, or `{ value = "hx", export = true }` when children should see it
+too — the same record `oslo.env.universal(name)` hands back.
 
 An **unknown key raises and applies nothing**, so a misspelt `setenv` cannot leave the shell half
 changed. A well-formed effect the shell *refuses* — a readonly variable — is different: the shell

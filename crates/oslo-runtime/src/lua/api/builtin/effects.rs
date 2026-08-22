@@ -22,6 +22,11 @@
 
 use oslo_base::value::{LuaError, LuaResult, Table, Value};
 use oslo_shell::env::Environment;
+use oslo_shell::env::announce::{Change, Scope, Source, announce};
+use oslo_shell::env::universal;
+
+/// A universal variable to write: its value, and whether children should see it.
+type Persisted = (String, bool);
 
 /// Which effects the caller is allowed to ask for.
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -41,6 +46,8 @@ pub(crate) struct Effects {
     export: Vec<(String, String)>,
     unset: Vec<String>,
     alias: Vec<(String, Option<String>)>,
+    /// `Some((value, exported))` to set, `None` to erase.
+    universal: Vec<(String, Option<Persisted>)>,
     positional: Option<Vec<String>>,
     cd: Option<String>,
     /// `pre-change-dir` only.
@@ -54,6 +61,7 @@ const KEYS: &[&str] = &[
     "export",
     "unset",
     "alias",
+    "universal",
     "positional",
     "cd",
     "refuse",
@@ -83,6 +91,7 @@ pub(crate) fn parse(table: &Table, allow: Allow, owner: &str) -> LuaResult<Effec
             "export" => it.export = pairs(&value, owner, "export")?,
             "unset" => it.unset = names(&value, owner, "unset")?,
             "alias" => it.alias = aliases(&value, owner)?,
+            "universal" => it.universal = universals(&value, owner)?,
             "positional" => it.positional = Some(names(&value, owner, "positional")?),
             "cd" => {
                 if allow == Allow::NoCd {
@@ -134,6 +143,7 @@ impl Effects {
                 }
             }
         }
+        all_applied &= self.persist(env);
         if let Some(positional) = self.positional {
             env.set_positional(positional);
         }
@@ -152,6 +162,85 @@ impl Effects {
             None => 1,
         }
     }
+
+    /// Write the universal store, and apply what was written to this shell.
+    ///
+    /// **Four steps, not one.** `universal::set` alone writes the file and leaves the shell it was
+    /// called from stale until the next prompt refreshes it — a builtin that appears to have done
+    /// nothing until you open another terminal. `env::builtins::universal` does all four and this
+    /// mirrors it, which is why a builtin persists through here rather than through a binding.
+    ///
+    /// Applied after `set` and `export`, so a name written in both ends up holding the value that
+    /// also survives the session — the only reading under which writing it twice means anything.
+    fn persist(&self, env: &mut Environment) -> bool {
+        let mut all_applied = true;
+        for (name, entry) in &self.universal {
+            match entry {
+                Some((value, exported)) => {
+                    if universal::set(name, value, *exported).is_err() {
+                        all_applied = false;
+                        continue;
+                    }
+                    all_applied &= env.set_var(name, value, *exported);
+                    universal::note_applied(name, value);
+                    announce(
+                        name,
+                        Change::Set {
+                            exported: *exported,
+                        },
+                        Scope::Universal,
+                        Source::Local,
+                    );
+                }
+                None => match universal::erase(name) {
+                    Ok(true) => {
+                        env.unset_var(name);
+                        universal::forget_applied(name);
+                        announce(name, Change::Erased, Scope::Universal, Source::Local);
+                    }
+                    // Erasing one that was never universal is not a failure worth a status of 1;
+                    // the caller asked for it to be gone and it is.
+                    Ok(false) => {}
+                    Err(_) => all_applied = false,
+                },
+            }
+        }
+        all_applied
+    }
+}
+
+/// `{ THEME = "dark", OLD = false, EDITOR = { value = "hx", export = true } }`.
+///
+/// The table form is the record [`oslo.env.universal`] hands back, so what a builtin reads is what
+/// it can write.
+fn universals(value: &Value, owner: &str) -> LuaResult<Vec<(String, Option<Persisted>)>> {
+    let Value::Table(table) = value else {
+        return Err(LuaError::new(format!(
+            "{owner}: `universal` must be a table of names to values"
+        )));
+    };
+    let table = table.borrow();
+    let mut out = Vec::new();
+    for (key, value) in table.pairs() {
+        let Value::Str(name) = &key else {
+            return Err(LuaError::new(format!(
+                "{owner}: `universal` must be keyed by name"
+            )));
+        };
+        let entry = match value {
+            Value::Bool(false) => None,
+            Value::Table(spec) => {
+                let spec = spec.borrow();
+                Some((
+                    word(&spec.get_str("value"), owner, "universal")?,
+                    spec.get_str("export").truthy(),
+                ))
+            }
+            other => Some((word(&other, owner, "universal")?, false)),
+        };
+        out.push((name.to_string(), entry));
+    }
+    Ok(out)
 }
 
 /// `{ NAME = "value" }` — a map of names to words.

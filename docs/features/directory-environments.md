@@ -182,6 +182,33 @@ absent from it, and doing that across a `cd` would fight this file's own undo re
 mechanisms describing the same variables with no agreed order, and `PWD` alone would move the shell.
 Undoing a directory's work is what the undo record is for.
 
+### A variable that outlives the shell
+
+The other axis: not this directory, not this session, but everywhere and next time. This is the
+`universal` builtin's store — one flock'd file that every running oslo picks up at its next prompt.
+
+```lua
+oslo.env.universal_set("THEME", "dark")               -- here, everywhere, and next time
+oslo.env.universal_set("EDITOR", "hx", { export = true })
+oslo.env.universal("THEME")   --> { value = "dark", exported = false }
+oslo.env.universal()          --> { THEME = { … }, EDITOR = { … } }
+oslo.env.universal_erase("THEME")
+```
+
+**Unexported by default**, the opposite of `oslo.env.set`, because a universal is written once and
+read for months — so the setting that puts it in every process on the machine is the one that has to
+be asked for.
+
+**Reading is the one thing in `oslo.env` that does not take the lock**, because the store is a file
+and not the shell: `oslo.env.universal()` answers from inside a registered builtin, an answering
+hook, and a completion provider — all places `oslo.env.get` beside it raises *shell state is busy*.
+
+Writing does take it, and cannot not: setting one is four steps — the file, *this* shell, the
+applied record, and the announcement — and a binding that wrote only the file would leave the shell
+that called it stale until the next prompt, which reads as a command that did nothing until you open
+another terminal. A builtin that needs to persist returns `{ universal = { … } }` instead; see
+[your-own-tools.md](your-own-tools.md).
+
 ### The allow gate
 
 A file getting to run code when you walk into a directory is arbitrary code execution by anyone who
