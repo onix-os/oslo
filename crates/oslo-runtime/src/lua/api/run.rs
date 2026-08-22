@@ -39,8 +39,13 @@ pub fn install(host: &dyn Host, oslo: &mut Table, env: &Arc<Mutex<Environment>>)
         native("oslo.run", move |_, args| {
             let request = Request::from_lua(args.first(), "run")?;
             let mut guard = borrow_env(&env_run)?;
-            let outcome = oslo_shell::exec::argv::run(&mut guard, &request.argv, request.capture)
-                .map_err(|e| LuaError::new(format!("oslo.run: {e}")))?;
+            let outcome = oslo_shell::exec::argv::run_limited(
+                &mut guard,
+                &request.argv,
+                request.capture,
+                request.limit,
+            )
+            .map_err(|e| LuaError::new(format!("oslo.run: {e}")))?;
             Ok(vec![result_table(&outcome)])
         }),
     );
@@ -322,6 +327,8 @@ struct Request {
     argv: Vec<String>,
     /// `oslo.lines` only: both streams down the one pipe, in the order they were written.
     merge_stderr: bool,
+    /// How long the command may take, when the caller said.
+    limit: Option<oslo_shell::exec::argv::Limit>,
     capture: Capture,
 }
 
@@ -369,12 +376,48 @@ impl Request {
             )));
         }
 
+        // `timeout_ms = n` — how long this may take. **A deadline forces the forking path**, so a
+        // non-capturing call with one runs in a child and no longer moves this shell. That is the
+        // honest reading of a timeout: the in-process path dispatches builtins and shell functions,
+        // and there is nothing there to interrupt.
+        //
+        // The motivating case is a `.env.lua`: it runs on the `cd` path, before the prompt, and the
+        // things it naturally asks are the slow ones — `git ls-remote`, a cold nix eval, a `stat` on
+        // an NFS mount that has gone away. One of those hangs every `cd` into that subtree with no
+        // way out but SIGINT.
+        let limit = match table
+            .get_str("timeout_ms")
+            .as_number()
+            .and_then(|n| n.as_int())
+        {
+            Some(ms) if ms > 0 => Some(oslo_shell::exec::argv::Limit {
+                ms: ms as u64,
+                signal: match table.get_str("on_timeout") {
+                    Value::Str(name) if name.as_ref().eq_ignore_ascii_case("kill") => {
+                        nix::sys::signal::Signal::SIGKILL
+                    }
+                    Value::Nil => nix::sys::signal::Signal::SIGTERM,
+                    Value::Str(name) if name.as_ref().eq_ignore_ascii_case("term") => {
+                        nix::sys::signal::Signal::SIGTERM
+                    }
+                    other => {
+                        return Err(LuaError::new(format!(
+                            "oslo.{function}: on_timeout is \"TERM\" or \"KILL\", got {}",
+                            other.type_name()
+                        )));
+                    }
+                },
+            }),
+            _ => None,
+        };
+
         // `capture = true` is the short form for both streams, which is what a caller who just
         // wants the output means. The two are separable for the caller who does not.
         let both = table.get_str("capture").truthy();
         Ok(Request {
             argv,
             merge_stderr,
+            limit,
             capture: Capture {
                 stdout: both || table.get_str("capture_out").truthy(),
                 stderr: both || table.get_str("capture_err").truthy(),
@@ -452,5 +495,8 @@ fn result_table(outcome: &Outcome) -> Value {
     if let Some(signal) = outcome.signal {
         table.set_str("signal", Value::int(signal as i64));
     }
+    // Always present, unlike `signal`: `r.timed_out` is a question a caller asks unconditionally,
+    // and `nil` there would read as "no" while meaning "nobody set a deadline".
+    table.set_str("timed_out", Value::Bool(outcome.timed_out));
     Value::table(table)
 }

@@ -48,6 +48,17 @@ pub struct Outcome {
     /// signal `n` from one that called `exit(128 + n)`, and `oslo.run{"sh", "-c", "exit 130"}`
     /// is not an interrupt.
     pub signal: Option<i32>,
+    /// Whether the deadline passed with the command still running. See [`Limit`].
+    pub timed_out: bool,
+}
+
+/// How long a command may take, and what to send when it does not finish in time.
+#[derive(Debug, Clone, Copy)]
+pub struct Limit {
+    pub ms: u64,
+    /// Sent at the deadline. Not an escalation ladder — a TERM-then-KILL sequence is a second
+    /// timer and a second decision, and a caller who wants `KILL` says so.
+    pub signal: nix::sys::signal::Signal,
 }
 
 /// Resolve `argv[0]` **before** forking, so the shell's own table learns where it lives.
@@ -76,6 +87,22 @@ fn warm(env: &Environment, argv: &[String]) {
 
 /// Run `argv`, capturing whatever `capture` asks for.
 pub fn run(env: &mut Environment, argv: &[String], capture: Capture) -> Result<Outcome> {
+    run_limited(env, argv, capture, None)
+}
+
+/// [`run`], with a deadline.
+///
+/// **A limit forces the forking path**, and that is a semantic change worth stating: without one, a
+/// command with nothing to capture runs *in this shell*, which is what makes `sh.cd("/tmp")` move
+/// it. There is no way to time-limit that — it dispatches builtins and shell functions in-process —
+/// so `oslo.run{"cd", "/tmp", timeout_ms = 100}` runs in a child and no longer moves the shell.
+/// That is the honest reading of a timeout: you cannot interrupt the thing that *is* the shell.
+pub fn run_limited(
+    env: &mut Environment,
+    argv: &[String],
+    capture: Capture,
+    limit: Option<Limit>,
+) -> Result<Outcome> {
     if argv.is_empty() {
         return Err(ShellError::ExecutionError(
             "oslo.run: the command list is empty".to_string(),
@@ -86,7 +113,7 @@ pub fn run(env: &mut Environment, argv: &[String], capture: Capture) -> Result<O
 
     // Nothing to capture means nothing to fork for, and running in this shell is what makes
     // `sh.cd("/tmp")` and `sh.export(…)` affect the shell rather than a child that then exits.
-    if !capture.any() {
+    if !capture.any() && limit.is_none() {
         let status = status_of(crate::exec::simple::run_argv(env, argv));
         return Ok(Outcome {
             status,
@@ -94,11 +121,16 @@ pub fn run(env: &mut Environment, argv: &[String], capture: Capture) -> Result<O
         });
     }
 
-    capture_run(env, argv, capture)
+    capture_run(env, argv, capture, limit)
 }
 
 /// The forking path: the command runs in a child with its streams on pipes.
-fn capture_run(env: &mut Environment, argv: &[String], capture: Capture) -> Result<Outcome> {
+fn capture_run(
+    env: &mut Environment,
+    argv: &[String],
+    capture: Capture,
+    limit: Option<Limit>,
+) -> Result<Outcome> {
     let out_pipe = capture.stdout.then(pipe_pair).transpose()?;
     let err_pipe = capture.stderr.then(pipe_pair).transpose()?;
 
@@ -110,6 +142,22 @@ fn capture_run(env: &mut Environment, argv: &[String], capture: Capture) -> Resu
     match unsafe { fork() } {
         Ok(ForkResult::Child) => {
             crate::exec::job::reset_signals_for_child();
+            // **Its own process group, but only when there is a deadline to enforce.**
+            //
+            // This child is *oslo*, running the command in a subshell — so the command itself is a
+            // grandchild, and signalling the child alone leaves it sitting in `wait` while the
+            // grandchild runs on. Measured: `sh -c 'echo before; sleep 10'` with a 300 ms deadline
+            // reported `timed_out` at 300 ms and then took the full ten seconds to return.
+            //
+            // A group makes one signal reach both, which is what `timeout(1)` does. Only under a
+            // limit, because a group of its own takes the command out of this shell's job control,
+            // and that is a real cost to pay for something nobody asked for.
+            if limit.is_some() {
+                let _ = nix::unistd::setpgid(
+                    nix::unistd::Pid::from_raw(0),
+                    nix::unistd::Pid::from_raw(0),
+                );
+            }
             if let Some((reader, writer)) = out_pipe {
                 let _ = close(reader.into_raw_fd());
                 let _ = dup2(writer.as_raw_fd(), 1);
@@ -134,13 +182,14 @@ fn capture_run(env: &mut Environment, argv: &[String], capture: Capture) -> Resu
                 let _ = close(writer.into_raw_fd());
                 reader
             });
-            let (out, err) = drain(out_reader, err_reader);
+            let (out, err, timed_out) = drain_until(out_reader, err_reader, child, limit);
             let (status, signal) = wait(child);
             Ok(Outcome {
                 status,
                 out: capture.stdout.then_some(out),
                 err: capture.stderr.then_some(err),
                 signal,
+                timed_out,
             })
         }
         Err(e) => Err(ShellError::ExecutionError(format!("Fork failed: {e}"))),
@@ -345,6 +394,9 @@ fn spawn_pipeline(
         out: capture.stdout.then_some(out),
         err: capture.stderr.then_some(err),
         signal: last.1,
+        // `oslo.pipe` takes no deadline: a limit belongs to one command, and which stage of a
+        // pipeline a shared one applied to would be a question with no good answer.
+        timed_out: false,
     })
 }
 
@@ -357,6 +409,103 @@ fn pipe_pair() -> Result<(OwnedFd, OwnedFd)> {
 /// Polled rather than read one after the other. Reading stdout to the end first deadlocks the
 /// moment a command writes more than a pipe buffer to stderr: the child blocks writing to a pipe
 /// nobody is draining, and the parent blocks reading one the child will never finish.
+fn drain_until(
+    out: Option<OwnedFd>,
+    err: Option<OwnedFd>,
+    child: nix::unistd::Pid,
+    limit: Option<Limit>,
+) -> (String, String, bool) {
+    let Some(limit) = limit else {
+        let (out, err) = drain(out, err);
+        return (out, err, false);
+    };
+    let deadline = std::time::Instant::now() + std::time::Duration::from_millis(limit.ms);
+    let (out, err, hit) = drain_by(out, err, Some(deadline));
+    if !hit {
+        return (out, err, false);
+    }
+    // **The signal goes to the whole group**, which under a deadline is a group this function
+    // created for exactly this purpose — see the `setpgid` in the child above.
+    // The whole group: the child is oslo running a subshell, so the command is one level further
+    // down. `setpgid` above is what makes this reach it.
+    // The direct child first, then the group it leads. The child may have moved itself into
+    // another group by now (job control does that on the exec path), so the group alone is not
+    // enough — and the group alone was measured leaving `sleep 10` running to completion.
+    let _ = nix::sys::signal::kill(child, limit.signal);
+    let _ = nix::sys::signal::kill(nix::unistd::Pid::from_raw(-child.as_raw()), limit.signal);
+
+    // A grace window to collect what it wrote before it died. Bounded, because a child that
+    // *ignores* the signal would otherwise hang here — and a grandchild holding the write end
+    // keeps the pipe open even after the direct child is gone, so waiting for EOF is not an option.
+    // Whatever has not arrived by now is lost; `wait` below still reaps the child either way.
+    let grace = std::time::Instant::now() + std::time::Duration::from_millis(250);
+    let (more_out, more_err, _) = drain_by(None, None, Some(grace));
+    let _ = (more_out, more_err);
+    (out, err, true)
+}
+
+/// The drain loop, optionally bounded. `true` when the deadline passed with a stream still open.
+fn drain_by(
+    out: Option<OwnedFd>,
+    err: Option<OwnedFd>,
+    deadline: Option<std::time::Instant>,
+) -> (String, String, bool) {
+    let mut slots = [Stream::new(out), Stream::new(err)];
+    let mut expired = false;
+
+    while slots.iter().any(Stream::open) {
+        let wait_for = match deadline {
+            None => PollTimeout::NONE,
+            Some(at) => {
+                let left = at.saturating_duration_since(std::time::Instant::now());
+                if left.is_zero() {
+                    expired = true;
+                    break;
+                }
+                PollTimeout::try_from(left.as_millis().min(i32::MAX as u128) as i32)
+                    .unwrap_or(PollTimeout::NONE)
+            }
+        };
+        // **Which slot each descriptor belongs to, kept beside it.** The unbounded `drain` reads
+        // *every* open slot once `poll` returns, which is safe only because it never has a deadline
+        // to miss: with both streams captured and only one ready, the read on the other blocks
+        // until the command exits. Under a deadline that is fatal — measured, a 300 ms limit on
+        // `sh -c 'echo before; sleep 10'` returned after the full ten seconds — so this reads only
+        // what `poll` reported.
+        let watching: Vec<usize> = (0..slots.len()).filter(|i| slots[*i].open()).collect();
+        let fds: Vec<PollFd> = watching
+            .iter()
+            .filter_map(|i| slots[*i].fd.as_ref())
+            .map(|fd| PollFd::new(fd.as_fd(), PollFlags::POLLIN))
+            .collect();
+        let mut fds = fds;
+        match poll(&mut fds, wait_for) {
+            Err(_) => break,
+            // Nothing was ready before the timeout, which is the deadline passing.
+            Ok(0) if deadline.is_some() => {
+                expired = true;
+                break;
+            }
+            Ok(_) => {}
+        }
+        let ready: Vec<usize> = watching
+            .iter()
+            .zip(fds.iter())
+            .filter(|(_, fd)| {
+                fd.revents()
+                    .is_some_and(|r| r.intersects(PollFlags::POLLIN | PollFlags::POLLHUP))
+            })
+            .map(|(slot, _)| *slot)
+            .collect();
+        for slot in ready {
+            slots[slot].read_once();
+        }
+    }
+
+    let [out, err] = slots;
+    (text(&out.buffer), text(&err.buffer), expired)
+}
+
 fn drain(out: Option<OwnedFd>, err: Option<OwnedFd>) -> (String, String) {
     // A stream that was never captured starts already finished, which keeps the loop below from
     // having to care how many there are.

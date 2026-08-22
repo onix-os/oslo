@@ -96,6 +96,33 @@ how deep you happened to be standing. A directory holding both names is governed
 `direnv status` names the shadowed file, because being inert looks exactly like working until you
 notice that nothing it sets is set.
 
+### A question that may not take forever
+
+This file runs on the `cd` path, synchronously, before the prompt is drawn — and the things it
+naturally asks are the slow ones. `git ls-remote` against a host that is down, a cold `nix eval`, a
+`stat` on an NFS mount that has gone away: any of them hangs **every `cd` into that subtree**, with
+no way out but SIGINT.
+
+```lua
+local r = oslo.run{ "git", "ls-remote", "--heads", "origin",
+                    capture = true, timeout_ms = 800, on_timeout = "KILL" }
+if r.timed_out then oslo.env.set("BRANCH_STATE", "unknown") end
+```
+
+`timed_out` is on every result, always a boolean, so a caller can test it without having set a
+deadline. What the command wrote before the deadline is kept. `on_timeout` is `"TERM"` (the default)
+or `"KILL"`, and it is *which signal is sent*, not an escalation ladder — a caller who needs to
+outlast a `trap '' TERM` says `"KILL"`.
+
+**A deadline forces the command into a child.** Without one, a call with nothing to capture runs in
+this shell — that is what makes `sh.cd("/tmp")` move it — and there is nothing there to interrupt,
+because that path dispatches builtins and shell functions in-process. So
+`oslo.run{"cd", "/tmp", timeout_ms = 100}` runs in a child and no longer moves the shell. That is
+the honest reading of a timeout: you cannot interrupt the thing that *is* the shell.
+
+The signal goes to a process group created for the command, so it reaches what the command itself
+started rather than only the shell wrapping it.
+
 ### Leaving, and what else counts as a change
 
 Variables and aliases are put back by the undo record. Everything *else* a file did had no moment at
