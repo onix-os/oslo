@@ -30,6 +30,29 @@ fn bin() -> String {
     oslo_bin().display().to_string()
 }
 
+/// Give the child a home of its own, so it reads nobody's configuration.
+///
+/// **This suite was flaky, and this is why.** It set no `HOME` and no `XDG_CONFIG_HOME`, so every
+/// child read the `init.lua` of whoever ran the tests. A config that paints the terminal — setting
+/// its palette with `OSC 10`, `OSC 11` and a run of `OSC 4;n` — put those bytes on the child's
+/// *stdout*, which is the pipe the assertion reads, and `contains("D=1")` then failed against a
+/// screenful of escapes. It passed on CI, which has no `init.lua`, and failed about half the time
+/// here.
+///
+/// The returned directory must outlive the child: dropping it removes the home out from under a
+/// shell that is still starting.
+fn a_home_of_its_own(command: &mut Command) -> tempfile::TempDir {
+    let home = tempfile::tempdir().expect("temporary home");
+    command
+        .env("HOME", home.path())
+        .env("XDG_CONFIG_HOME", home.path().join("config"))
+        .env("XDG_DATA_HOME", home.path().join("data"))
+        // Not merely unset: an `$ENV` pointing at the runner's own file is read by a
+        // POSIX-mode shell even with `HOME` moved.
+        .env_remove("ENV");
+    home
+}
+
 /// Run `line` in a `-c` shell — the kind that is plumbing and takes no level.
 fn wrapper(nested: Option<&str>, line: &str) -> String {
     let mut command = Command::new(oslo_bin());
@@ -46,6 +69,7 @@ fn wrapper(nested: Option<&str>, line: &str) -> String {
         // is: something the next shell is genuinely inside.
         command.env("OSLO_NESTED_PID", std::process::id().to_string());
     }
+    let _home = a_home_of_its_own(&mut command);
     let out = command.output().expect("spawn oslo");
     String::from_utf8_lossy(&out.stdout).to_string()
 }
@@ -68,6 +92,7 @@ fn at_a_prompt(nested: Option<&str>, line: &str) -> String {
         command.env("OSLO_NESTED", value);
         command.env("OSLO_NESTED_PID", std::process::id().to_string());
     }
+    let _home = a_home_of_its_own(&mut command);
     let mut child = command.spawn().expect("spawn oslo");
     child
         .stdin
@@ -153,6 +178,7 @@ fn a_count_from_another_terminal_is_ignored() {
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::null());
+    let _home = a_home_of_its_own(&mut command);
     let mut child = command.spawn().expect("spawn oslo");
     child
         .stdin
@@ -184,6 +210,7 @@ fn a_count_from_a_shell_that_is_gone_is_ignored() {
         .stdin(std::process::Stdio::piped())
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::null());
+    let _home = a_home_of_its_own(&mut command);
     let mut child = command.spawn().expect("spawn oslo");
     child
         .stdin

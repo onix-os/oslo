@@ -41,6 +41,10 @@ fn built_into_this_binary(name: &str) -> bool {
         "plugin" => cfg!(feature = "plugin"),
         "scratch" => cfg!(feature = "scratch"),
         "secret" => cfg!(feature = "secrets"),
+        // Added when `.make.lua` was, and missed here: a default build has no `make` tool, so
+        // without this the README naming one failed the very check that is meant to keep the two
+        // in step. The list is every gated tool, and a tool that grows a feature belongs in it.
+        "make" => cfg!(feature = "make"),
         _ => true,
     }
 }
