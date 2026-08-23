@@ -21,6 +21,10 @@ oslo.live.serve()                                     -- in init.lua, for a shel
 oslo.keys["ctrl-g"] = function() oslo.live.serve() end -- or on a key, when you decide
 ```
 
+<!-- demo:begin -->
+[![control-socket demo](https://asciinema.org/a/1263749.svg)](https://asciinema.org/a/1263749)
+<!-- demo:end -->
+
 ## Why not just read `/proc/<pid>/environ`
 
 Because it is wrong, and quietly. That file is the environment the process was **exec'd** with: it
