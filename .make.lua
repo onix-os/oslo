@@ -24,7 +24,7 @@ local make = oslo.make
 local meta = oslo.run{ "./scripts/project-meta.sh", capture = true }
 assert(meta.ok, "scripts/project-meta.sh: " .. (meta.err or "failed"))
 local NAME, VERSION = meta.out:match("(%S+)%s+(%S+)")
-assert(NAME, "PROJECT file not found or invalid")
+assert(NAME, "no name in Cargo.toml; is this an oslo checkout?")
 
 local TARGET = os.getenv("TARGET") or "x86_64-unknown-linux-musl"
 local PREFIX = os.getenv("PREFIX") or (os.getenv("HOME") .. "/.local")
