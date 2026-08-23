@@ -108,7 +108,7 @@
 
             meta = {
               description = "POSIX shell in Rust with an embedded Lua runtime";
-              homepage = "https://github.com/onix-os/oslo";
+              homepage = "https://github.com/termworks/oslo";
               license = lib.licenses.mit;
               mainProgram = binaryName;
               platforms = lib.platforms.linux;
