@@ -9,6 +9,7 @@
 
 use super::{Level, Walk};
 use nix::fcntl::AtFlags;
+use nix::libc;
 use nix::unistd::{AccessFlags, faccessat};
 use std::ffi::OsString;
 use std::io::IsTerminal;
@@ -107,41 +108,103 @@ pub fn confirm(origin: &str, question: &str) -> bool {
 /// handler, sets the flag, and leaves nothing pending: the read then blocks on a keystroke nobody
 /// is going to type. Same hang, narrower door.
 ///
-/// So the flag is tested before every read as well. That does not *close* the window — a signal can
-/// still land between the test and the `read`, which is a plain time-of-check race — but it removes
-/// the wide part of it, and under a test pinned to a single core it took the failure rate from
-/// about one run in fifteen to one in forty.
+/// Testing the flag before reading does not close that window either, it only narrows it: a signal
+/// can still land between the test and the `read`. That is a plain time-of-check race, and no
+/// re-ordering fixes it.
 ///
-/// # Why not `poll` the descriptor and close it properly
+/// So the wait is on **two** descriptors — the keystroke and the signal self-pipe
+/// ([`crate::exec::job::interrupt_fd`]) — and there is no window at all. A SIGINT that arrived
+/// before the wait began has already left its byte, so `poll` returns at once; one that arrives
+/// during it wakes the same `poll`. The flag is still tested first, because a `note_interrupt` from
+/// this thread writes no byte.
 ///
-/// Tried, and reverted: it hangs `rm -i`. `std::io::stdin()` is **buffered**, and this reads through
-/// that buffer on purpose — it is what lets `rm -i` take its answers from the same script the shell
-/// is reading, a heredoc most of all. `poll` asks the *descriptor*, which reports nothing to read
-/// while the answer is already sitting in the buffer, so the loop waits for a byte that has
-/// arrived. `rm_race_tests` goes from 0.12s to never finishing.
+/// # The descriptor is read directly, and that is not incidental
 ///
-/// Closing it for real needs the wait and the signal unblock to be one atomic step — `ppoll` with a
-/// mask, or a self-pipe the handler writes to — *and* a way to consult the buffer first. Worth
-/// doing; bigger than this comment.
+/// `std::io::stdin()` is a `BufReader`. Reading one byte through it pulls **everything available**
+/// into an 8 KiB buffer, so the *next* prompt in the same `rm -ri` polls a descriptor that is empty
+/// while its answer sits in that buffer, and waits for input that has already arrived. That is not
+/// a hypothetical: mixing `poll` with the buffered handle takes `rm_race_tests` from 0.12s to never
+/// finishing.
+///
+/// Reading the descriptor a byte at a time keeps `poll` and `read` talking about the same thing.
+/// Nothing is lost by skipping the buffer, because nothing else leaves anything in it — every other
+/// reader of stdin in the shell (`run_stdin`, `copy`, the list widgets) takes it to EOF in one
+/// `read_to_string`.
 fn answer() -> Option<String> {
-    use std::io::Read;
-
-    let mut stdin = std::io::stdin().lock();
+    let stdin = std::io::stdin();
     let mut line = Vec::new();
-    let mut byte = [0u8; 1];
     loop {
-        // Before every read, including the first: the signal may already have been and gone.
+        // A local interrupt writes no byte to the pipe, so the flag is still the first question.
         if crate::exec::job::interrupt_waiting() {
             return None;
         }
-        match stdin.read(&mut byte) {
+        if wait_for_input(&stdin) == Waited::Interrupted {
+            return None;
+        }
+        match read_one(&stdin) {
             // End of input: `rm` treats that as "no", which is what a script piping nothing means.
-            Ok(0) => break,
-            Ok(_) if byte[0] == b'\n' => break,
-            Ok(_) => line.push(byte[0]),
-            Err(e) if e.kind() == std::io::ErrorKind::Interrupted => return None,
-            Err(_) => return None,
+            Read1::Eof => break,
+            Read1::Byte(b'\n') => break,
+            Read1::Byte(byte) => line.push(byte),
+            Read1::Again => continue,
+            Read1::Failed => return None,
         }
     }
     Some(String::from_utf8_lossy(&line).into_owned())
+}
+
+enum Read1 {
+    Byte(u8),
+    Eof,
+    /// Interrupted or momentarily empty — go round, which tests the flag again.
+    Again,
+    Failed,
+}
+
+fn read_one(stdin: &std::io::Stdin) -> Read1 {
+    use std::os::fd::AsRawFd;
+    let mut byte = 0u8;
+    let read = unsafe { libc::read(stdin.as_raw_fd(), std::ptr::from_mut(&mut byte).cast(), 1) };
+    match read {
+        0 => Read1::Eof,
+        1 => Read1::Byte(byte),
+        _ => match nix::errno::Errno::last() {
+            nix::errno::Errno::EINTR | nix::errno::Errno::EAGAIN => Read1::Again,
+            _ => Read1::Failed,
+        },
+    }
+}
+
+#[derive(PartialEq, Eq)]
+enum Waited {
+    Ready,
+    Interrupted,
+}
+
+/// Wait until stdin has something, or a SIGINT arrives. No window between the two.
+fn wait_for_input(stdin: &std::io::Stdin) -> Waited {
+    use nix::poll::{PollFd, PollFlags, PollTimeout, poll};
+    use std::os::fd::AsFd;
+
+    let Some(interrupt) = crate::exec::job::interrupt_fd() else {
+        // No self-pipe means no interactive shell installed one — a test, or `-i` from a script.
+        // There is no signal to wait for, so waiting on stdin alone is the whole of it.
+        return Waited::Ready;
+    };
+    let mut fds = [
+        PollFd::new(stdin.as_fd(), PollFlags::POLLIN),
+        PollFd::new(interrupt, PollFlags::POLLIN),
+    ];
+    match poll(&mut fds, PollTimeout::NONE) {
+        // `EINTR` is the signal arriving with the handler already run: the flag says so, and the
+        // caller tests it at the top of the next round.
+        Err(_) => Waited::Interrupted,
+        Ok(_) => match fds[1].revents().is_some_and(|r| !r.is_empty()) {
+            true => {
+                crate::exec::job::drain_interrupt_fd();
+                Waited::Interrupted
+            }
+            false => Waited::Ready,
+        },
+    }
 }
