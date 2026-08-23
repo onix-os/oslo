@@ -39,6 +39,19 @@ pub(super) fn publish_terminal_size(env: &Arc<Mutex<Environment>>) {
     guard.set_var("LINES", &rows.to_string(), true);
 }
 
+/// Everything the shell says about itself before a prompt is drawn.
+///
+/// Two facts that are true of the *shell* rather than of the line about to be typed: how big the
+/// terminal is, and — for a shell that is serving — what its environment holds. Both are cheap and
+/// both are wanted at the same moment, so they share a phase rather than each having one.
+///
+/// The second returns immediately unless a control socket is bound, which is almost every shell.
+/// See `lua::api::live::publish` for why a copy is taken at all.
+pub(super) fn publish(env: &Arc<Mutex<Environment>>) {
+    publish_terminal_size(env);
+    crate::lua::api::live::publish(env);
+}
+
 /// `on-exit`, from both ways a REPL ends — `exit` and end of input.
 ///
 /// **Before the EXIT trap, not after.** The trap may itself call `exit`, and a hook that ran after
@@ -56,6 +69,11 @@ pub(super) fn fire_exit(lua: &LuaEngine, status: i32) {
             oslo_base::value::Value::int(status as i64),
         )])],
     );
+    // **After the hook, so a handler can still be asked about this shell**, and before the process
+    // goes: a socket file that outlives its listener is a path a peer connects to and is refused
+    // by. Binding tests for that and clears it, so this is tidiness rather than correctness — which
+    // is also why nothing here worries about the shell being killed outright.
+    crate::lua::api::live::stop_serving();
 }
 
 /// Leave the history in the state a shell that is not running should leave it.

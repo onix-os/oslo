@@ -15,6 +15,7 @@ pub mod direnv;
 pub mod help;
 pub mod history;
 pub mod hook;
+pub mod live;
 pub mod macros;
 #[cfg(feature = "make")]
 pub mod make;

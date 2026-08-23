@@ -128,8 +128,9 @@ value means.
 
 ## Tools
 
-Eleven of them — `macros`, `config`, `profile`, `history`, `direnv`, `make`, `hook`, `plugin`,
-`scratch`, `userin`, `secret` — each with its own help. A script of the same name always wins.
+Twelve of them — `macros`, `config`, `profile`, `history`, `direnv`, `make`, `hook`, `lua-api`,
+`plugin`, `scratch`, `userin`, `secret` — each with its own help. A script of the same name always
+wins.
 
 ## Building
 

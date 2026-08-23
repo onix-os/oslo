@@ -42,6 +42,8 @@ mod git;
 mod handle;
 mod history;
 mod json;
+/// `oslo.live` — the small surface another program may ask a running shell about.
+pub mod live;
 mod machine;
 #[cfg(feature = "make")]
 pub mod make;
@@ -221,6 +223,8 @@ pub fn install(host: &dyn Host, registry: &Registry, env: Arc<Mutex<Environment>
     oslo.set_str("state", state::build());
     // The one native the client library needs; the framing and the verbs are plain Lua on top.
     oslo.set_str("stream", stream::build());
+    // The other half: what a peer may ask *this* shell. Nothing binds until `serve()` runs.
+    oslo.set_str("live", live::build(&env));
     oslo.set_str("messages", messages::build());
     #[cfg(feature = "math")]
     oslo.set_str("math", Value::table(math::build()));

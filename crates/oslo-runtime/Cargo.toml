@@ -43,7 +43,7 @@ oslo-ui = { path = "../oslo-ui" }
 # Terminal setup at startup, the signal handling the read loop installs, and `inotify` for
 # `oslo.fs.watch`.
 nix = { version = "0.29", features = [
-    "process", "signal", "term", "fs", "user", "poll", "inotify",
+    "process", "signal", "term", "fs", "user", "poll", "inotify", "socket",
 ] }
 
 # `oslo.re`, and history's own matching.
