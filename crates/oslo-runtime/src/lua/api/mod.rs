@@ -71,6 +71,8 @@ mod shell;
 pub(crate) mod spawn;
 mod spec;
 mod state;
+/// `oslo.stream` — a unix socket, as a Lua handle.
+pub mod stream;
 mod suggest;
 mod term;
 mod theme;
@@ -217,6 +219,8 @@ pub fn install(host: &dyn Host, registry: &Registry, env: Arc<Mutex<Environment>
     problem::install(host);
     oslo.set_str("db", db::build(host));
     oslo.set_str("state", state::build());
+    // The one native the client library needs; the framing and the verbs are plain Lua on top.
+    oslo.set_str("stream", stream::build());
     oslo.set_str("messages", messages::build());
     #[cfg(feature = "math")]
     oslo.set_str("math", Value::table(math::build()));

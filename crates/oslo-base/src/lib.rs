@@ -62,5 +62,6 @@ pub mod value;
 pub mod version;
 /// Names the shell can run that `$PATH` has never heard of, for the prompt to draw.
 pub mod vocab;
+pub mod wire;
 
 pub use error::{Result, ShellError};
