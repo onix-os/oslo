@@ -130,14 +130,28 @@ static SNAPSHOT: std::sync::RwLock<Option<Vec<(String, String)>>> = std::sync::R
 ///
 /// Does nothing at all unless a socket is bound, so a shell that never serves never pays for this.
 pub fn publish(env: &Arc<Mutex<Environment>>) {
-    if server::serving().is_none() {
-        return;
-    }
-    // `try_lock`: this runs on the read loop, which is about to want the lock itself. Missing one
-    // prompt's snapshot is nothing — the next one is a keystroke away.
-    let Ok(held) = env.try_lock() else {
+    let Some(path) = server::serving() else {
         return;
     };
+    // `try_lock`: this runs on the read loop, which is about to want the lock itself. Missing one
+    // prompt's snapshot is nothing — the next one is a keystroke away.
+    let Ok(mut held) = env.try_lock() else {
+        return;
+    };
+
+    // **`$OSLO_SOCK`, so a child finds the shell that started it.** Without it a program asking
+    // "which oslo?" falls back to the newest socket in the directory, which is a guess — and once
+    // every shell serves, it is usually the wrong one. A child inherits this through `execve` and
+    // needs no discovery at all.
+    //
+    // Set here rather than in `serve()` because the two places that call `serve()` — a config line
+    // and a key handler — are both already holding this lock, and a `serve()` that waited for it
+    // would deadlock the shell that asked.
+    let sock = path.to_string_lossy();
+    if held.get_var("OSLO_SOCK") != Some(&*sock) {
+        held.set_var("OSLO_SOCK", &sock, true);
+    }
+
     let taken = held.exported_vars();
     drop(held);
     if let Ok(mut slot) = SNAPSHOT.write() {
