@@ -127,10 +127,42 @@ return function(make)
 
   ---------------------------------------------------------------------------- staleness
 
+  -- `a/**/b.rs` — every `b.rs` at any depth under `a`.
+  --
+  -- **`oslo.fs.glob` cannot do this, and must not.** It is the shell's own globber, where `**`
+  -- means exactly what `*` means: one path element. That is POSIX, it is what `sh` does without
+  -- `globstar`, and oslo's differential corpus holds it to that. A *build system* is not a shell,
+  -- though, and `inputs = { "crates/**/*.rs" }` can only sensibly mean "walk".
+  --
+  -- Getting this wrong was silent and expensive: `crates/**/*.rs` matched nothing, so `expand`
+  -- below took it for a literal filename, that name never existed, its fingerprint never changed,
+  -- and `oslo make build` answered `up to date` for a tree whose every source file had been
+  -- edited. 681 files under `crates/` were invisible to the staleness check.
+  local function walked(pattern)
+    local head, tail = pattern:match("^(.-)%*%*/(.+)$")
+    if not head then return nil end
+    head = (head == "") and "." or (head:gsub("/$", ""))
+
+    -- The head itself first, so `a/**/x` also matches `a/x` — the same reading every tool that
+    -- has `**` gives it.
+    local out = {}
+    local function gather(dir)
+      for _, hit in ipairs(oslo.fs.glob(dir .. "/" .. tail) or {}) do
+        out[#out + 1] = hit
+      end
+    end
+    gather(head)
+    for path in oslo.fs.walk(head) do
+      local found = oslo.fs.stat(path)
+      if found and found.type == "directory" then gather(path) end
+    end
+    return out
+  end
+
   local function expand(patterns)
     local seen, out = {}, {}
     for _, pattern in ipairs(patterns) do
-      local hits = oslo.fs.glob(pattern) or {}
+      local hits = walked(pattern) or oslo.fs.glob(pattern) or {}
       -- A pattern that matched nothing is a literal path, which is what every shell does without
       -- `nullglob` — and here it is also how a not-yet-created file gets counted as missing.
       if #hits == 0 then hits = { pattern } end
