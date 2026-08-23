@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.4.11] - 2026-08-23
+
+### <!-- 1 -->🐛 Bug Fixes
+
+- Find sockets from inside a sibling host
+
 ## [0.4.10] - 2026-08-23
 
 ### <!-- 0 -->⛰️  Features

@@ -314,8 +314,16 @@ local function find(where)
   -- it outright — a client running *inside* a shell would raise here rather than answering. So a
   -- host that can list a directory itself is asked first, and the shell-out is wrapped where it
   -- might not exist at all.
-  local host = _G.oslo
-  if host and host.fs and host.fs.ls then
+  -- Whichever sibling we are running inside. This file is copied between tools, so it looks for
+  -- any of the family's globals rather than only its own: inside hexe `_G.oslo` does not exist,
+  -- and checking only for that sent discovery straight to the `io.popen` below — which a sandboxed
+  -- host refuses, failing as "no oslo socket found" when one was running all along.
+  local host
+  for _, name in ipairs({ "oslo", "hexe" }) do
+    local candidate = _G[name]
+    if candidate and candidate.fs and candidate.fs.ls then host = candidate; break end
+  end
+  if host then
     local found = {}
     for _, entry in ipairs(host.fs.ls(dir) or {}) do
       if entry.name:sub(-5) == ".sock" then
