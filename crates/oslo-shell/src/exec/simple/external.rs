@@ -118,9 +118,10 @@ pub(crate) fn run_external(
                 // redirections and joined the foreground group, and a fresh shell inherits both.
                 // Interpreting here would mean running a script inside a process that is halfway
                 // through becoming something else.
-                if failed == Err(nix::errno::Errno::ENOEXEC)
-                    && let Ok(shell) = std::env::current_exe()
-                {
+                if failed == Err(nix::errno::Errno::ENOEXEC) {
+                    // The magic link, not the resolved name: an install replaces the running
+                    // binary and the name then cannot be executed. See `oslo_base::exe`.
+                    let shell = oslo_base::exe::path();
                     let c_shell = exec_cstring(shell.as_os_str().as_bytes());
                     // `argv[0]` is the shell, then the script, then whatever the caller passed
                     // after the command name — so `$0` inside the script is the path it was

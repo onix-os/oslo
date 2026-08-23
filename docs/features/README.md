@@ -135,6 +135,7 @@ scripts/demo/embed.sh                            # put the players back in the d
 | [Scratches](scratch.md) | Named sessions that outlive the terminal they were opened in |
 | [Plugins](plugins.md) | Somebody else's Lua, installed once — with a database and a trust gate |
 | [Secrets](secrets.md) | Encrypted at rest, decrypted when something asks — with the crypto itself replaceable |
+| [The control socket](control-socket.md) | Another program asking this shell a question, in Lua — bound only when asked |
 
 ## Appearance and control
 

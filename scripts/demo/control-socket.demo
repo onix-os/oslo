@@ -1,0 +1,48 @@
+# The control socket: another program asking this shell a question, in Lua.
+#
+# **Shell lines only, no `=`.** That prefix enters Lua *mode* rather than evaluating one expression,
+# so a second `=` lands inside the open block and is a syntax error. Everything here is reachable
+# from the shell, which is also the honest framing: a peer is a program, not a prompt.
+#
+# The recording shell serves because the recording user's `init.lua` calls `oslo.live.serve()`.
+# Without that line oslo binds nothing, which is why the first beat asks *where* rather than
+# *whether* — a shell that was not serving would answer with a path and no socket on it.
+cols 120
+rows 20
+speed 0.05
+
+# **In a `setup` line, not an `env` one.** The config rebuilds `$PATH` at startup, so anything the
+# launcher exported is gone by the first prompt. In front of the existing `$PATH` rather than
+# replacing it: `oslo lua-api` must be this oslo, and the rest of the line still has to work.
+setup export PATH=$OSLO_DIR:$PATH
+
+# `ask.lua` is written off camera. The demo is about one program reaching another, and watching a
+# script be composed says nothing about that.
+setup printf '%s\n' 'local lib = load(oslo.live.client())(oslo.stream)' 'local shell, why = lib.connect()' 'if not shell then print("no shell answered: " .. tostring(why)) return end' 'print("cwd        " .. shell.cwd())' 'print("MY_SECRET  " .. tostring(shell.env.get("MY_SECRET")))' 'print("run        " .. tostring(select(2, shell:call("run", "id"))))' 'shell:close()' > ask.lua
+
+# This shell is reachable, because init.lua asked it to be. Nothing binds without that line.
+run oslo lua-api --path
+wait 2.4
+
+# What a peer may ask. That is the whole surface — and there is no `run` on it.
+run oslo lua-api --verbs
+wait 4.0
+
+clear
+
+# Something only this shell knows. Not in /proc/environ, which is stale since exec.
+run export MY_SECRET=only-in-this-shell
+wait 1.2
+
+# The client is plain Lua, printed by the binary itself, so any VM can load it — hexe, pixy, PUC.
+run oslo lua-api | head -8
+wait 3.5
+
+clear
+
+# A separate process, connecting back over the socket and asking.
+run cat ask.lua
+wait 4.0
+
+run oslo ask.lua
+wait 4.5

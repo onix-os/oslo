@@ -60,6 +60,13 @@ pub const TOOLS: &[Tool] = &[
         name: "hook",
         about: "list and test the shell hooks",
     },
+    // The client library and where to reach this shell. A *tool* rather than a builtin because
+    // every caller is another program — a sibling's Lua, a script — reaching oslo through
+    // `io.popen`, where a builtin does not exist.
+    Tool {
+        name: "lua-api",
+        about: "the Lua client library another program loads",
+    },
     #[cfg(feature = "plugin")]
     Tool {
         name: "plugin",
@@ -149,6 +156,9 @@ pub fn run(tool: &'static Tool, args: &[String]) -> i32 {
     }
     if tool.name == "hook" {
         return crate::cli::hook::run(args);
+    }
+    if tool.name == "lua-api" {
+        return crate::cli::live::run(args);
     }
     #[cfg(feature = "direnv")]
     if tool.name == "direnv" {

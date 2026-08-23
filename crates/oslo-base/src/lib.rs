@@ -34,6 +34,7 @@ pub mod coords;
 /// The `@name` directory table, shared by expansion and completion.
 pub mod dirs;
 pub mod error;
+pub mod exe;
 /// Parts of the shell a config can turn off and on again while it runs.
 pub mod feature;
 /// Shell pattern matching — `*`, `?`, `[…]` — shared by expansion, `case`, and the prompt.
@@ -62,5 +63,6 @@ pub mod value;
 pub mod version;
 /// Names the shell can run that `$PATH` has never heard of, for the prompt to draw.
 pub mod vocab;
+pub mod wire;
 
 pub use error::{Result, ShellError};

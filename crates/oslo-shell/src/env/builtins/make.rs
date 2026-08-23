@@ -37,9 +37,9 @@ pub fn builtin_make(env: &mut Environment, args: &[String]) -> Result<i32> {
     // The tool, in a child of this shell: `oslo make …`. `current_exe` rather than a `$PATH` search
     // for `oslo`, because the shell you are typing at is the one whose recipes you mean — a
     // different build earlier on `$PATH` would answer with a different runner.
-    let Ok(exe) = std::env::current_exe() else {
-        return handover(args);
-    };
+    // `oslo_base::exe::path` rather than `current_exe`: an install replaces the running binary, and
+    // the resolved path then reads `… (deleted)` and cannot be executed. See that module.
+    let exe = oslo_base::exe::path();
     let mut argv = vec!["oslo".to_string(), "make".to_string()];
     argv.extend(args.iter().skip(1).cloned());
     super::spawn::run_external(&exe, &argv, "make")

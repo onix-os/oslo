@@ -279,7 +279,9 @@ pub fn run_repl(login: bool, no_rc: bool, no_profile: bool) -> ! {
             }
         });
 
-        timing::phase("size", || publish_terminal_size(&env_struct));
+        // What the shell says about itself: the terminal's size, and — only while serving — the
+        // control socket's fallback copy of the environment. See `session::publish`.
+        timing::phase("publish", || session::publish(&env_struct));
 
         // A prompt is about to be drawn. This is bash's `PROMPT_COMMAND` and zsh's `precmd`, and
         // the hook a prompt integration written in Lua needs — the shell-side one already exists
@@ -591,7 +593,7 @@ mod tests;
 mod aside;
 mod session;
 use aside::{announce, current_directory, note_command_duration, run_lua_line, title_for_command};
-use session::{fire_exit, publish_terminal_size, settle_stores};
+use session::{fire_exit, settle_stores};
 // Read from `startup::prompt` and `startup::read`, which asked `repl` for them before the split
 // and should not have to learn where they moved to.
 pub(crate) use aside::{cwd, ignore_eof_limit, last_command_duration};

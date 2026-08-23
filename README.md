@@ -105,6 +105,7 @@ and requires zero structured edges. → [posix-fidelity.md](docs/features/posix-
 | [Colours](docs/features/theme.md) · [drawing](docs/features/drawing.md) · [nav](docs/features/nav.md) | every role settable; the output widgets; the filesystem navigator |
 | [Abbreviations](docs/features/abbreviations.md) · [macros](docs/features/macros.md) · [argc](docs/features/argc.md) | `gco ` becomes `git checkout `; one store for all of it; options declared in comments |
 | [Interrupt escape](docs/features/interrupt-escape.md) · [runtime features](docs/features/runtime-features.md) | the job that will not take a Ctrl-C; turning things off at runtime |
+| [The control socket](docs/features/control-socket.md) | another program asking this shell a question, in Lua — bound only when asked |
 
 ## Configuration
 
@@ -128,8 +129,9 @@ value means.
 
 ## Tools
 
-Eleven of them — `macros`, `config`, `profile`, `history`, `direnv`, `make`, `hook`, `plugin`,
-`scratch`, `userin`, `secret` — each with its own help. A script of the same name always wins.
+Twelve of them — `macros`, `config`, `profile`, `history`, `direnv`, `make`, `hook`, `lua-api`,
+`plugin`, `scratch`, `userin`, `secret` — each with its own help. A script of the same name always
+wins.
 
 ## Building
 

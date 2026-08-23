@@ -68,6 +68,91 @@ static SIGINT_RECEIVED: AtomicBool = AtomicBool::new(false);
 
 extern "C" fn handle_sigint(_: libc::c_int) {
     SIGINT_RECEIVED.store(true, Ordering::SeqCst);
+    // **The self-pipe**, so a caller can *wait* for an interrupt rather than only ask about one
+    // afterwards. See [`interrupt_fd`] for why a flag alone cannot close the race.
+    //
+    // `write(2)` is async-signal-safe, which almost nothing else is; the byte's value carries
+    // nothing and the failure is ignored because a full pipe already says what this is trying to.
+    let fd = SIGINT_PIPE.load(Ordering::SeqCst);
+    if fd >= 0 {
+        let byte = b"\x01";
+        unsafe {
+            let _ = libc::write(fd, byte.as_ptr().cast(), 1);
+        }
+    }
+}
+
+/// The write end of the self-pipe, or `-1` before one exists.
+///
+/// An `AtomicI32` because a signal handler may read it and may touch nothing else.
+static SIGINT_PIPE: std::sync::atomic::AtomicI32 = std::sync::atomic::AtomicI32::new(-1);
+
+/// The read end, for a caller to poll. `None` until [`install_shell_signals`] has run.
+///
+/// # Why a flag is not enough
+///
+/// [`interrupt_waiting`] answers "has one arrived", which is all a *polling* caller needs. A caller
+/// that has to **block** — `rm`'s prompt waiting for a keystroke — cannot use it: testing the flag
+/// and then blocking is a time-of-check race, and a signal landing in between leaves the flag set
+/// with nothing pending to interrupt the wait. The read blocks on an answer that is never coming.
+///
+/// A descriptor has no such window. The handler writes a byte; a caller waits on the keystroke and
+/// this together. A signal that arrived *before* the wait began has already left its byte, so the
+/// wait returns immediately — which is exactly the case a flag cannot express.
+///
+/// Both remain: the flag is what a loop polls between entries, and this is what a blocking wait
+/// selects on. They report the same event by the two means it can be observed.
+pub fn interrupt_fd() -> Option<std::os::fd::BorrowedFd<'static>> {
+    let fd = SIGINT_READ.load(Ordering::SeqCst);
+    // SAFETY: set once by `install_shell_signals` from a pipe this process owns for its lifetime,
+    // and never closed. `BorrowedFd` does not close it.
+    (fd >= 0).then(|| unsafe { std::os::fd::BorrowedFd::borrow_raw(fd) })
+}
+
+/// The read end of the self-pipe, or `-1`.
+static SIGINT_READ: std::sync::atomic::AtomicI32 = std::sync::atomic::AtomicI32::new(-1);
+
+/// Take the bytes the handler has written, so one keystroke does not answer twice.
+///
+/// The flag is left alone: draining it is [`interrupt_pending`]'s, and a builtin that cleared it
+/// would leave the evaluator with no evidence the keystroke happened — the same rule
+/// [`interrupt_waiting`] states.
+pub fn drain_interrupt_fd() {
+    let fd = SIGINT_READ.load(Ordering::SeqCst);
+    if fd < 0 {
+        return;
+    }
+    let mut scratch = [0u8; 64];
+    loop {
+        let read = unsafe { libc::read(fd, scratch.as_mut_ptr().cast(), scratch.len()) };
+        if read <= 0 {
+            return;
+        }
+    }
+}
+
+/// Make the pipe, once. Non-blocking on both ends so neither the handler nor a drain can stall.
+fn open_self_pipe() {
+    if SIGINT_READ.load(Ordering::SeqCst) >= 0 {
+        return;
+    }
+    let Ok((read, write)) = nix::unistd::pipe2(nix::fcntl::OFlag::O_CLOEXEC) else {
+        return;
+    };
+    // **Non-blocking, and the write end above all.** A handler that blocked on a full pipe would
+    // stop the process inside a signal, which is the one place it must never wait.
+    use std::os::fd::AsRawFd;
+    for fd in [read.as_raw_fd(), write.as_raw_fd()] {
+        let flags = nix::fcntl::fcntl(fd, nix::fcntl::F_GETFL).unwrap_or(0);
+        let mut flags = nix::fcntl::OFlag::from_bits_truncate(flags);
+        flags.insert(nix::fcntl::OFlag::O_NONBLOCK);
+        let _ = nix::fcntl::fcntl(fd, nix::fcntl::F_SETFL(flags));
+    }
+    // Leaked deliberately: these live as long as the process, and a `BorrowedFd` handed to a
+    // handler must not be closed under it.
+    use std::os::fd::IntoRawFd;
+    SIGINT_READ.store(read.into_raw_fd(), Ordering::SeqCst);
+    SIGINT_PIPE.store(write.into_raw_fd(), Ordering::SeqCst);
 }
 
 /// Install the dispositions an interactive shell needs. Called once, from `JobManager::setup_signals`.
@@ -83,6 +168,9 @@ extern "C" fn handle_sigint(_: libc::c_int) {
 /// SIGTTOU also makes the shell's own `tcsetpgrp` safe; `without_sigttou` blocks it as well,
 /// because a `trap` may legitimately replace the disposition later.
 pub fn install_shell_signals() {
+    // Before the handler is installed, so a signal delivered a moment later already has somewhere
+    // to write. See `interrupt_fd`.
+    open_self_pipe();
     let interruptible = SigAction::new(
         SigHandler::Handler(handle_sigint),
         SaFlags::empty(),

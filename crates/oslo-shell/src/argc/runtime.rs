@@ -74,9 +74,9 @@ impl argc::Runtime for Shell {
     }
 
     fn shell_path(&self) -> argc::anyhow::Result<String> {
-        Ok(std::env::current_exe()
-            .map(|path| path.to_string_lossy().into_owned())
-            .unwrap_or_else(|_| "oslo".to_string()))
+        // Runnable rather than merely named: argc starts this, and an install replaces the running
+        // binary so its resolved path can no longer be executed. See `oslo_base::exe`.
+        Ok(oslo_base::exe::path().to_string_lossy().into_owned())
     }
 
     fn bash_path(&self) -> Option<String> {
