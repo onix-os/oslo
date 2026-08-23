@@ -99,6 +99,30 @@ pub fn confirm(origin: &str, question: &str) -> bool {
 /// the same ending for itself.
 ///
 /// So the bytes are read one at a time and `EINTR` is answered rather than retried.
+///
+/// # `EINTR` alone is not enough, and testing the flag first is not either
+///
+/// `EINTR` only reports a signal that arrived **while the process was inside `read(2)`**. One
+/// delivered a moment earlier — between printing the question and entering the read — runs the
+/// handler, sets the flag, and leaves nothing pending: the read then blocks on a keystroke nobody
+/// is going to type. Same hang, narrower door.
+///
+/// So the flag is tested before every read as well. That does not *close* the window — a signal can
+/// still land between the test and the `read`, which is a plain time-of-check race — but it removes
+/// the wide part of it, and under a test pinned to a single core it took the failure rate from
+/// about one run in fifteen to one in forty.
+///
+/// # Why not `poll` the descriptor and close it properly
+///
+/// Tried, and reverted: it hangs `rm -i`. `std::io::stdin()` is **buffered**, and this reads through
+/// that buffer on purpose — it is what lets `rm -i` take its answers from the same script the shell
+/// is reading, a heredoc most of all. `poll` asks the *descriptor*, which reports nothing to read
+/// while the answer is already sitting in the buffer, so the loop waits for a byte that has
+/// arrived. `rm_race_tests` goes from 0.12s to never finishing.
+///
+/// Closing it for real needs the wait and the signal unblock to be one atomic step — `ppoll` with a
+/// mask, or a self-pipe the handler writes to — *and* a way to consult the buffer first. Worth
+/// doing; bigger than this comment.
 fn answer() -> Option<String> {
     use std::io::Read;
 
@@ -106,6 +130,10 @@ fn answer() -> Option<String> {
     let mut line = Vec::new();
     let mut byte = [0u8; 1];
     loop {
+        // Before every read, including the first: the signal may already have been and gone.
+        if crate::exec::job::interrupt_waiting() {
+            return None;
+        }
         match stdin.read(&mut byte) {
             // End of input: `rm` treats that as "no", which is what a script piping nothing means.
             Ok(0) => break,
