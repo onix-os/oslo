@@ -1,5 +1,30 @@
 # Changelog
 
+## [0.4.10] - 2026-08-23
+
+### <!-- 0 -->⛰️  Features
+
+- Export $OSLO_SOCK so a child finds its own shell
+- A control socket, and the Lua client for it
+- Oslo.stream, the socket a client library needs
+
+### <!-- 1 -->🐛 Bug Fixes
+
+- A source under crates/ makes the build stale
+- A replaced binary can still start itself
+- A self-pipe closes the Ctrl-C race for good
+- A Ctrl-C before the read is not lost
+- The tagdata hash is for the version in the lock
+
+### <!-- 3 -->📚 Documentation
+
+- Record the control socket
+- The control socket
+
+### <!-- 7 -->⚙️ Miscellaneous Tasks
+
+- The repository moved to termworks
+
 ## [0.4.9] - 2026-08-22
 
 ### <!-- 1 -->🐛 Bug Fixes
