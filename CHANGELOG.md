@@ -1,5 +1,15 @@
 # Changelog
 
+## [0.4.12] - 2026-08-24
+
+### <!-- 0 -->⛰️  Features
+
+- Make configs installs config/ into the config dir
+
+### <!-- 3 -->📚 Documentation
+
+- Name Cargo.toml in the metadata assert
+
 ## [0.4.11] - 2026-08-23
 
 ### <!-- 1 -->🐛 Bug Fixes

@@ -121,6 +121,10 @@ oslo.on.pre_cmd(function(c) if c.argv[1] == "rm" then print("careful") end end)
 `oslo config` inspects and edits it. Every setting, hook and key is on the page for the feature it
 belongs to; the table above is the map.
 
+This repository carries its own copy in `config/`, and `make configs` installs it — `config/*`
+becomes `~/.config/oslo/*`. That is the one command between editing the config in a checkout and
+the shell reading it.
+
 ### The hooks
 
 Thirty-one moments a config can attach to, named `pre-`, `post-` or `on-`. `oslo hook list` prints
