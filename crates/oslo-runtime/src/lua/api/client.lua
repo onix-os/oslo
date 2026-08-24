@@ -254,10 +254,14 @@ function Session:close()
   return true
 end
 
---- Every name this shell will answer, asked of the shell rather than assumed.
-function Session:verbs()
-  return self:call("verbs")
-end
+--- `verbs` -- every name this shell will answer, asked of the shell rather than assumed -- is
+--- reached through SURFACE below, like every other call: `sh.verbs()`.
+---
+--- There is deliberately no `Session:verbs` method. `attach` sets every SURFACE name as a field on
+--- the instance, and a field shadows a method, so defining one would not give callers a second way
+--- to call it -- it would only advertise a form that does not work. `sh:verbs()` passes the session
+--- as the first argument and dies in the encoder with "cannot send a function", which says nothing
+--- about the cause. Every verb is called with a dot.
 
 -- The exposed surface, spelled out.
 --
