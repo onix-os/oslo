@@ -258,6 +258,11 @@ if os.getenv("HEXE_MUX_SOCKET") then
     "--size", "21,81",
     "--pass-env",
   }
+  -- **The float draws elsewhere, so the prompt behind it is still worth drawing.** Without this
+  -- `nav` blocks on the float and the prompt sits frozen for the whole visit: the spinner stops,
+  -- and a directory trek moves the shell to — over the control socket, as you walk — is not shown
+  -- until you come back. Only true of the float; the inline branch below takes the terminal.
+  oslo.builtin.nav.detached = true
 else
   oslo.builtin.nav.command = {
     "trek", "--explore", "--cwd-file", "{answer}",
