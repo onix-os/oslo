@@ -108,6 +108,36 @@ fn key_of(spec: &Spec) -> String {
     format!("{} {}", spec.command, spec.args.join(" "))
 }
 
+/// The content generation each key was last actually run at.
+///
+/// **So a tick runs nothing.** An animated segment redraws the prompt on a clock, and a redraw
+/// re-renders every key — including this one, which is a *process*. At eight frames a second that
+/// is eight spawns a second of somebody's prompt tool, for ever, on a shell nobody is typing at;
+/// with `async` it is eight overlapping runs whose output interleaves, which shows up as a prompt
+/// whose colours come apart.
+///
+/// An external prompt never asks to be re-run — only a segment can, with `every` — so it is run
+/// again when its *inputs* could have moved, which is what the content generation says. An async
+/// answer landing calls `invalidate` itself, so a late arrival still gets through.
+fn ran_at() -> &'static Mutex<HashMap<String, u64>> {
+    static AT: OnceLock<Mutex<HashMap<String, u64>>> = OnceLock::new();
+    AT.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+/// What this prompt said last time, when nothing has changed since it said it.
+fn unchanged(key: &str) -> Option<String> {
+    let now = oslo_ui::prompt::content_generation();
+    let ran = *ran_at().lock().ok()?.get(key)?;
+    (ran == now).then(|| remembered(key))?
+}
+
+/// Note that this key is being run against the content as it now stands.
+fn running_at(key: &str) {
+    if let Ok(mut at) = ran_at().lock() {
+        at.insert(key.to_string(), oslo_ui::prompt::content_generation());
+    }
+}
+
 /// The last output each command produced, so a slow or async run has something to show.
 fn cache() -> &'static Mutex<HashMap<String, String>> {
     static CACHE: OnceLock<Mutex<HashMap<String, String>>> = OnceLock::new();
@@ -171,6 +201,13 @@ pub fn render(spec: &Spec, ctx: &Context) -> Option<String> {
     // The raw args identify which prompt this is (a left and a right differ by `--right`) and stay
     // put across prompts, which is exactly the identity wanted: last output for *this* prompt.
     let key = key_of(spec);
+
+    // Nothing about this prompt has moved since it last ran — a tick asked for a redraw, not a
+    // rebuild — so draw what it said then and spawn nothing. See `unchanged`.
+    if let Some(text) = unchanged(&key) {
+        return Some(text);
+    }
+    running_at(&key);
 
     if spec.asynchronous {
         // **Wait a little, then give up — rather than never waiting at all.**
@@ -473,5 +510,32 @@ mod tests {
             .expect("a system echo");
         let out = run(echo, &["hi".to_string()], Duration::from_secs(30));
         assert_eq!(out.as_deref(), Some("hi"));
+    }
+
+    /// **A tick must not spawn anything.** An animated segment redraws the prompt on a clock, and a
+    /// redraw re-renders every prompt key — including this one, which is a process. Measured on a
+    /// prompt of one external command and one segment at `every = 120` over three seconds: without
+    /// this guard the command ran 24 times for 23 frames; with it, twice.
+    ///
+    /// Twice and not once because an `async` answer landing calls `invalidate` itself, which is the
+    /// door a late arrival is supposed to come through and must stay open.
+    #[test]
+    fn nothing_is_re_run_until_the_content_could_have_changed() {
+        let key = "prompt.test.unchanged";
+        remember(key, "drawn".to_string());
+
+        // Never run at this generation: there is no answer to reuse, whatever is remembered.
+        assert_eq!(unchanged(key), None, "it has not run yet");
+
+        running_at(key);
+        assert_eq!(
+            unchanged(key).as_deref(),
+            Some("drawn"),
+            "nothing has moved, so draw what it said"
+        );
+
+        // A real change — a directory, a variable, an async answer landing — and it runs again.
+        oslo_ui::prompt::invalidate();
+        assert_eq!(unchanged(key), None, "the content moved");
     }
 }

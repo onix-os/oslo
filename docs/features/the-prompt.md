@@ -220,6 +220,15 @@ branch. Each segment's output is kept under its name, and a frame re-runs only t
 interval has come. A spinner at ten frames a second next to a segment that shells out to `git`
 costs ten spinner calls and no `git` at all.
 
+**Nor does an external prompt.** A prompt that is a command is the same rule taken seriously: it
+never asks to be re-run, so a frame does not run it. Measured on a prompt of one external command
+beside one segment at `every = 120`, left alone for three seconds — 23 frames and **24 spawns**
+before that guard existed, 24 frames and **2** after. The two are the first render and the `async`
+answer landing, which invalidates on its own so a late arrival still gets through.
+
+Left unguarded it is not merely wasteful: with `async` the overlapping runs interleave, and what
+that looks like on the terminal is a prompt whose colours come apart.
+
 Measured, on a prompt of exactly those two segments left alone for three seconds: 29 redraws, four
 spinner frames cycling evenly, and the other segment rendered **once**.
 
