@@ -116,3 +116,32 @@ pub fn mark(begin: bool) -> String {
 #[cfg(test)]
 #[path = "transcript/tests.rs"]
 mod tests;
+
+/// How the command before this one ended, for the frame that follows its output.
+///
+/// **The frame cannot report its own command.** It is drawn between Enter and the command starting,
+/// so at that moment there is no status to show — the shell learns it once the command has ended
+/// and the output has already scrolled past the frame.
+///
+/// What it can report is the command *above* it, which is why the mark goes at the left-hand end of
+/// the rule: that end sits directly under the last line of the previous command's output, and reads
+/// as closing it off. Put beside the command instead it would say something false.
+///
+/// `None` until a command has run, so the first frame of a session carries nothing.
+static LAST: std::sync::atomic::AtomicI64 = std::sync::atomic::AtomicI64::new(NOTHING_YET);
+
+/// No command has ended in this session yet. Outside the range a real status can take.
+const NOTHING_YET: i64 = -1;
+
+/// Record how a command ended. Called once per command, by the loop that ran it.
+pub fn ended(status: i32) {
+    LAST.store(status as i64, std::sync::atomic::Ordering::Relaxed);
+}
+
+/// The status to open a frame with, or `None` before anything has run.
+pub fn last() -> Option<i32> {
+    match LAST.load(std::sync::atomic::Ordering::Relaxed) {
+        NOTHING_YET => None,
+        status => Some(status as i32),
+    }
+}

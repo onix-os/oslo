@@ -195,6 +195,7 @@ fn every_row_is_bracketed_and_only_the_first_has_a_rule() {
         "-",
         40,
         "",
+        None,
     );
     assert_eq!(rows.len(), 3);
     assert_eq!(rows[0], "----------------[ for f in *.rs; do ]---");
@@ -217,6 +218,7 @@ fn every_row_is_bracketed_and_only_the_first_has_a_rule() {
         "-",
         12,
         "",
+        None,
     );
     assert_eq!(long[0], "[ a-very-long-command-that-fills-the-row ]---");
     assert_eq!(long[1], "[ second ]");
@@ -236,4 +238,33 @@ fn a_rule_is_repeated_to_the_width_and_cut() {
 /// One row per line, as `ending` splits a command before the renderer sees it.
 fn rows_of(command: &str) -> Vec<String> {
     command.split('\n').map(str::to_string).collect()
+}
+
+/// **The frame opens with how the command above it ended.** A transcript cannot report its own
+/// command — it is drawn before that command runs — so what it carries is the status that has just
+/// landed, at the end of the rule that sits under the previous command's output.
+#[test]
+fn a_frame_opens_with_the_previous_status() {
+    let rows = framed(&rows_of("ls"), "-", 20, "", Some(0));
+    assert!(rows[0].starts_with("[ 0 ]"), "{:?}", rows[0]);
+    assert_eq!(
+        crate::prompt::printed_width(&rows[0]),
+        20,
+        "the mark comes out of the rule, not out of the width"
+    );
+
+    let failed = framed(&rows_of("cargo test"), "-", 30, "", Some(101));
+    assert!(failed[0].starts_with("[ 101 ]"), "{:?}", failed[0]);
+    assert!(failed[0].ends_with("[ cargo test ]---"), "{:?}", failed[0]);
+
+    // The rows of a multi-line command clear the mark as well as the rule.
+    let two = framed(&rows_of("one\ntwo"), "-", 30, "", Some(2));
+    assert_eq!(
+        two[1].find("[ ").expect("a bracket"),
+        two[0]
+            .find("[ two")
+            .or_else(|| two[0].rfind("[ "))
+            .expect("a bracket"),
+        "the brackets line up under the first one"
+    );
 }

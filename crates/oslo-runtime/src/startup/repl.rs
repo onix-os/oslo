@@ -526,6 +526,10 @@ pub fn run_repl(login: bool, no_rc: bool, no_profile: bool) -> ! {
                         eprintln!("oslo: {}", err);
                     }
                 }
+                // **The frame that opens the next prompt reports this.** A transcript is drawn
+                // before its own command runs, so the only status it can carry is the one that has
+                // just landed here — see `oslo_ui::transcript::last`.
+                oslo_ui::transcript::ended(last_status);
             }
         }
     }

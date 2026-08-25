@@ -182,6 +182,21 @@ follows. What scrolls back is then a record of *what was run* — which is the h
 and the half that survives being copied out of a terminal into a bug report. A prompt carrying a
 hostname, a branch, a vi mode and a duration is none of those things once the moment has passed.
 
+**The mark at the left end is how the command *above* ended.** A frame is drawn between Enter and
+the command starting, so it can never report its own status — the shell learns that once the output
+has already scrolled past. What it can report is the command before it, and the left end of the rule
+is where that is true: it sits directly under the last line of that command's output.
+
+```
+------------------------------------[ echo one ]---
+one
+[ 0 ]-------------------------------[ false ]---
+[ 1 ]-------------------------------[ echo two ]---
+two
+```
+
+The first frame of a session carries nothing, because nothing has run.
+
 **Right-aligned, because that is where the eye already is.** The command sits beside the output it
 produced rather than at the far left with a screen of rule between them, and a column of brackets
 down the scrollback reads as a list of what was run. Three cells of rule carry on past the bracket

@@ -137,7 +137,7 @@ pub fn transcript(
     let mut out = park(cursor_row);
     // Everything from here down was the prompt's and is being replaced.
     out.push_str("\x1b[J");
-    for row in framed(rows, unit, cols, style) {
+    for row in framed(rows, unit, cols, style, crate::transcript::last()) {
         out.push_str(&row);
         out.push_str("\r\n");
     }
@@ -169,7 +169,7 @@ const TAIL: usize = 3;
 ///
 /// Split out from the drawing so the arithmetic can be checked without a terminal, which is the
 /// same reason everything else in this file is a pure function.
-fn framed(rows: &[String], unit: &str, cols: usize, style: &str) -> Vec<String> {
+fn framed(rows: &[String], unit: &str, cols: usize, style: &str, was: Option<i32>) -> Vec<String> {
     let paint = |text: &str| match style.is_empty() {
         true => text.to_string(),
         false => format!("{style}{text}\x1b[0m"),
@@ -180,12 +180,18 @@ fn framed(rows: &[String], unit: &str, cols: usize, style: &str) -> Vec<String> 
         None => return Vec::new(),
     };
 
+    // How the command *above* ended, at the end of the rule that sits under its last line of
+    // output. See `crate::transcript::last` for why it cannot be this command's. Passed in rather
+    // than read here, so the arithmetic below stays a pure function of its arguments.
+    let opened = was.map_or(String::new(), |status| format!("[ {status} ]"));
+
     // `[ ` and ` ]` are four cells the command does not get to use.
     let bracketed = crate::prompt::printed_width(first) + 4;
-    let fill = cols.saturating_sub(bracketed + TAIL);
+    let fill = cols.saturating_sub(bracketed + TAIL + opened.len());
 
     let mut out = vec![format!(
-        "{}{}{first}{}",
+        "{}{}{}{first}{}",
+        paint(&opened),
         paint(&fill_width(unit, fill)),
         paint("[ "),
         paint(&format!(" ]{}", fill_width(unit, TAIL))),
@@ -193,7 +199,7 @@ fn framed(rows: &[String], unit: &str, cols: usize, style: &str) -> Vec<String> 
     for line in rest {
         out.push(format!(
             "{}{}{line}{}",
-            " ".repeat(fill),
+            " ".repeat(opened.len() + fill),
             paint("[ "),
             paint(" ]"),
         ));
