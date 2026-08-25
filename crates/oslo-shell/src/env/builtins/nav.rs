@@ -373,6 +373,9 @@ fn waited_on(
     let mut child = spawned?;
     loop {
         if let Some(status) = child.try_wait()? {
+            // Hand the block back with the cursor where it was found, or the prompt that follows
+            // is drawn a row lower than this one — see `hold::settle`.
+            oslo_ui::prompt::hold::settle();
             return Ok(status);
         }
         oslo_ui::prompt::hold::pump(oslo_ui::dropdown::terminal_cols());

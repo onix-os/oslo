@@ -29,6 +29,17 @@ type Render = fn() -> Option<(String, String)>;
 
 thread_local! {
     static RENDER: std::cell::Cell<Option<Render>> = const { std::cell::Cell::new(None) };
+
+    /// Which row of its own block the cursor is on, carried between repaints.
+    ///
+    /// **The same number the editor carries between keystrokes**, and for the same reason. A block
+    /// is redrawn by going back to its first row and writing it again — so the redraw has to be
+    /// told where the cursor is *within* it, and a repaint that always claimed "the first row"
+    /// starts one row lower every time, because that is where its own last draw left the cursor.
+    ///
+    /// Eight spinner frames while a browser was open therefore walked the prompt eight rows down
+    /// the screen. Nothing about the prompt was wrong; it was drawn eight times, each one lower.
+    static AT_ROW: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
 }
 
 /// Whether a prompt is on screen to keep alive.
@@ -46,16 +57,18 @@ pub fn renders_with(render: Render) {
 /// Say whether a prompt is on screen and worth keeping alive.
 pub fn showing(yes: bool) {
     SHOWING.store(yes, Ordering::Relaxed);
+    // A new prompt is a new block, drawn from its first row by whoever drew it.
+    AT_ROW.with(|at| at.set(0));
 }
 
 /// One turn of the editor's loop, with the keyboard taken out.
 ///
 /// Answers whether it drew, so a caller can tell a wait that did something from one that did not.
 ///
-/// **Drawn from the cursor's own row.** Where a prompt is depends on how the line that started this
-/// ended: a key bound with `erase` parks the cursor at the top of the prompt block it left, which is
-/// exactly where the block goes again. Nothing here counts rows or remembers a position, because
-/// the one thing that reliably knows is the terminal.
+/// **Redrawn in place, the way a keystroke redraws it.** The block is written again from its own
+/// first row, so the redraw has to be told which row of it the cursor is on — the number carried
+/// between repaints. A key bound with `erase` parks the cursor at the top of the block it left, so
+/// the first repaint starts there and each one after starts where the last finished.
 pub fn pump(cols: usize) -> bool {
     if !SHOWING.load(Ordering::Relaxed) {
         return false;
@@ -84,7 +97,7 @@ pub fn pump(cols: usize) -> bool {
         lead: crate::transcript::lead(),
     });
     let frame = crate::edit::screen::redraw(
-        0,
+        AT_ROW.with(|at| at.get()),
         &placed.text,
         crate::edit::screen::At {
             rows: placed.rows,
@@ -96,7 +109,31 @@ pub fn pump(cols: usize) -> bool {
     let mut out = std::io::stdout();
     let _ = out.write_all(frame.as_bytes());
     let _ = out.flush();
+    AT_ROW.with(|at| at.set(placed.cursor_row));
     true
+}
+
+/// Give the block back the way it was found: cursor at its first row.
+///
+/// **The handoff, and it is not optional.** Whoever draws next — the editor, for the prompt that
+/// follows the command — starts from the row the cursor is on and writes the block from there. A
+/// pump that stopped with the cursor one row *into* its own block therefore had the next prompt
+/// drawn one row lower, and the screen grew by one per command however carefully each repaint had
+/// been placed.
+///
+/// Nothing is erased. The rows are still the block's, and the next draw overwrites them.
+pub fn settle() {
+    if !SHOWING.load(Ordering::Relaxed) {
+        return;
+    }
+    let at = AT_ROW.replace(0);
+    if at == 0 {
+        return;
+    }
+    use std::io::Write;
+    let mut out = std::io::stdout();
+    let _ = out.write_all(crate::edit::screen::park(at).as_bytes());
+    let _ = out.flush();
 }
 
 #[cfg(test)]

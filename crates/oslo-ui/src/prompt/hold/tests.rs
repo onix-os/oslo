@@ -26,3 +26,32 @@ fn a_prompt_is_only_redrawn_when_there_is_one_to_redraw() {
     showing(false);
     assert!(!pump(80), "and turning it off is enough on its own");
 }
+
+/// **The handoff is the whole of the drift.** A repaint leaves the cursor inside its own block;
+/// whoever draws next starts from where the cursor is. Stopping without giving the block back
+/// therefore had every following prompt drawn a row lower, however carefully each repaint was
+/// placed — measured as a prompt walking eight rows down one visit to a file browser.
+#[test]
+fn settling_gives_the_block_back_from_its_first_row() {
+    showing(true);
+    assert_eq!(
+        AT_ROW.with(|at| at.get()),
+        0,
+        "a new prompt starts at its top"
+    );
+
+    AT_ROW.with(|at| at.set(3));
+    settle();
+    assert_eq!(
+        AT_ROW.with(|at| at.get()),
+        0,
+        "settling is also what forgets where it was"
+    );
+
+    // Nothing to give back, and nothing on screen to give it back to.
+    showing(false);
+    AT_ROW.with(|at| at.set(3));
+    settle();
+    assert_eq!(AT_ROW.with(|at| at.get()), 3, "not ours to move");
+    showing(false);
+}
