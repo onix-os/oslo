@@ -450,3 +450,35 @@ fn a_scratch_key_that_is_not_a_key_is_reported() {
     assert!(problems[0].contains("oslo.scratch.key"), "{problems:?}");
     assert_eq!(settings.scratch.key, Scratch::default().key);
 }
+
+/// **oslo browses with its own unless told otherwise**, which is the whole point of the setting:
+/// a browser that took over because it happened to be installed is a surprise, and one that cannot
+/// be turned off without uninstalling something is a worse one.
+#[test]
+fn nav_uses_the_builtin_browser_until_a_command_names_another() {
+    assert!(
+        Nav::default().command.is_empty(),
+        "an empty command is the built-in browser, and that is the default"
+    );
+
+    let (settings, problems) = settings_from(
+        "oslo = { builtin = { nav = { command = \
+         { 'trek', '--explore', '--cwd-file', '{answer}', '{dir}' } } } }",
+    );
+    assert!(problems.is_empty(), "{problems:?}");
+    assert_eq!(
+        settings.builtin.nav.command,
+        vec!["trek", "--explore", "--cwd-file", "{answer}", "{dir}"],
+        "the argv is the config's, verbatim — substitution happens when it runs"
+    );
+}
+
+/// Anything in the list that is not a string is dropped rather than stringified: a number or a
+/// table in an argv is a mistake, and guessing what it meant would run something nobody wrote.
+#[test]
+fn a_nav_command_keeps_only_words() {
+    let (settings, _) = settings_from(
+        "oslo = { builtin = { nav = { command = { 'trek', 7, {}, '--explore' } } } }",
+    );
+    assert_eq!(settings.builtin.nav.command, vec!["trek", "--explore"]);
+}

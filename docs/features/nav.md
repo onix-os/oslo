@@ -4,7 +4,7 @@
 and leaves the shell in whatever directory is on screen when you press Escape. It is a builtin
 because a separate process cannot reach into its parent and change the working directory: the most
 an external browser can do is *say* where it ended up, and something inside the shell has to read
-that and act on it. `nav` is that something — see [handing the job to trek](#handing-the-job-to-trek).
+that and act on it. `nav` is that something — see [browsing with something else](#browsing-with-something-else).
 
 ```sh
 nav              # start here
@@ -15,38 +15,68 @@ nav /var/log     # start somewhere else
 [![nav demo](https://asciinema.org/a/1262742.svg)](https://asciinema.org/a/1262742)
 <!-- demo:end -->
 
-## Handing the job to trek
+## Browsing with something else
 
-If **`trek`** is on `$PATH`, `nav` runs it instead of drawing its own browser. Everything around it
-is unchanged — same name, same operand, same effect on the shell:
+`nav` draws its own browser unless the config names another one:
+
+```lua
+oslo.builtin.nav.command = { "trek", "--explore", "--cwd-file", "{answer}", "{dir}" }
+```
+
+Everything around it is unchanged — same name, same operand, same effect on the shell:
 
 ```sh
-nav              # trek, if it is installed; the builtin browser if not
+nav              # whatever `command` names, or oslo's own when it names nothing
 ```
 
 The split is the point. `nav`'s job is to leave the shell in the directory you chose; drawing the
-thing you choose in is a *different* job, and one a dedicated tool does better — trek has tabs, git
-status, and a commit graph. So the builtin keeps the half only a builtin can do and delegates the
-half anyone can.
+thing you choose in is a *different* job, and one a dedicated tool may do better — trek has tabs,
+git status and a commit graph. So the builtin keeps the half only a builtin can do and hands over
+the half anyone can.
 
-trek is opened in a 60x50 viewport rather than filling the screen — a navigator is a panel, not
-a screen, and a full-width row puts the name you are reading at one end of a lot of nothing. The
-two numbers are `oslo.builtin.nav.width` and `.height`, the same ones the builtin browser reads, so
-setting them moves both; trek centres itself in whatever it is given and clamps to the terminal.
+**A setting rather than a search of `$PATH`.** This used to look for `trek` and take over whenever
+it happened to be installed. A program changing what a shell builtin does by existing is a surprise
+nobody asked for, and one that could not be turned off without uninstalling something. oslo's
+browser is the default and stays the default; choosing another is an act.
 
-They talk through a file. trek is started as `trek --explore --cwd-file <path> <start>`, writes the
-directory it finished in, and `nav` reads that back and `cd`s there. The file is created inside a
-private `0700` directory made for that one run, **not** at a predictable path under `/tmp`: the
-shell goes wherever that file says, so a path a stranger could create first is a path that chooses
-your working directory.
+### The placeholders
 
-trek is configured by trek. `nav`'s own settings — the border, the filter row, hidden files — describe
-the builtin browser and do not apply to it; a tab, a keybinding or an icon belongs in trek's config,
-not here.
+| | |
+|---|---|
+| `{answer}` | a private file the browser **must** write its final directory into |
+| `{dir}` | where to start |
+| `{width}`, `{height}` | `oslo.builtin.nav.width` and `.height`, defaulting to 60×50 |
 
-To go back to the builtin browser, take `trek` off `$PATH` for that directory. Resolution goes
-through the shell's own command table, so a directory that hides `trek` hides it from `nav` too, and
-nothing has to be uninstalled.
+They substitute *inside* an argument, not only as the whole of one — which is what lets a nested
+command line carry them through to the program that finally runs. That is how a browser is opened
+in a terminal mux's float:
+
+```lua
+-- in a hexe session: a float, so the shell behind it stays on screen
+oslo.builtin.nav.command = {
+  "hexe", "mux", "float",
+  "--command", "trek --explore --cwd-file {answer} {dir}",
+  "--cwd", "{dir}", "--title", "trek", "--size", "70x60", "--pass-env",
+}
+```
+
+`hexe mux float` waits for the float to close, so `nav` reads the answer and `cd`s exactly as it
+does for a browser that ran inline. Drop `{width}`/`{height}` there: a float already has a size, and
+two things deciding one layout is one too many.
+
+### The file they talk through
+
+The browser writes the directory it finished in; `nav` reads that back and `cd`s there. The file is
+created inside a private `0700` directory made for that one run, **not** at a predictable path under
+`/tmp`: the shell goes wherever that file says, so a path a stranger could create first is a path
+that chooses your working directory.
+
+Writing nothing there is a cancelled navigation, which is what oslo's own browser reports when you
+leave it with Escape. The browser's exit status is `nav`'s.
+
+Its own settings are its own. `nav`'s — the border, the filter row, hidden files — describe the
+builtin browser and do not apply; a tab, a keybinding or an icon belongs in that tool's config, not
+here.
 
 ## How it works
 
@@ -177,7 +207,9 @@ are already typing. It completes a *line*, and you are still where you were unti
 
 ## Configuration
 
-Everything is under `oslo.builtin.nav`. The two knobs that are not in the README's settings block:
+Everything is under `oslo.builtin.nav`. `command` is the one that decides *which* browser — see
+[browsing with something else](#browsing-with-something-else); the rest describe oslo's own. The two
+knobs that are not in the README's settings block:
 
 ```lua
 oslo.builtin.nav.icons = {
@@ -221,7 +253,7 @@ them.
 
 ## What it cannot do
 
-This describes the builtin browser. With trek installed the list is trek's, not this one.
+This describes the builtin browser. With `oslo.builtin.nav.command` set, the list is that program's.
 
 - **Be scripted.** There is no `oslo.nav()` and no way to get the chosen path into a variable;
   `nav` changes the shell's directory and that is its only output. It takes one optional path and

@@ -24,11 +24,17 @@ pub fn builtin_nav(env: &mut Environment, args: &[String]) -> Result<i32> {
     let all = settings::current();
     let configured = &all.builtin.nav;
 
-    // A better navigator on $PATH wins. `nav`'s job is to leave the shell in the directory
-    // you picked, not to draw the browser that picks it, so when one is installed this builtin
-    // runs it and reads the answer back -- same operand, same exit status, somebody else's UI.
-    if let Some(result) = delegated(env, &start, configured.width, configured.height) {
-        return result;
+    // A browser named in the config wins. `nav`'s job is to leave the shell in the directory you
+    // picked, not to draw the thing that picks it — so this runs it and reads the answer back:
+    // same operand, same exit status, somebody else's UI.
+    if !configured.command.is_empty() {
+        return run_navigator(
+            env,
+            &configured.command,
+            &start,
+            configured.width,
+            configured.height,
+        );
     }
     let mut look = Preset::History.look();
     look.filter_at = configured.filter_at;
@@ -119,22 +125,7 @@ fn change_directory(env: &mut Environment, path: PathBuf) -> Result<i32> {
     )
 }
 
-/// The navigator trek provides, when it is installed.
-///
-/// `None` means there is nothing to delegate to and the built-in browser should run. Resolution
-/// goes through the shell's own `PATH` table, so hiding `trek` in a directory hides it from `nav`
-/// too — that is the way back to the built-in browser without uninstalling anything.
-fn delegated(
-    env: &mut Environment,
-    start: &Path,
-    width: usize,
-    height: usize,
-) -> Option<Result<i32>> {
-    let program = super::hash::lookup("trek")?;
-    Some(run_navigator(env, &program, start, width, height))
-}
-
-/// The viewport trek is opened in when `oslo.builtin.nav` leaves the size at zero.
+/// The viewport a browser is given when `oslo.builtin.nav` leaves the size at zero.
 ///
 /// A navigator is a panel, not a screen: full width puts the name you are reading at one end of a
 /// long empty row. These are the same two numbers the builtin browser reads, so changing them in
@@ -142,16 +133,20 @@ fn delegated(
 const DEFAULT_WIDTH: usize = 60;
 const DEFAULT_HEIGHT: usize = 50;
 
-/// Run it, then go where it says.
+/// Run the configured browser, then go where it says.
+///
+/// The argv is the config's, verbatim but for the placeholders — see
+/// [`oslo_ui::settings::nav::Nav::command`] for what they are and why they substitute *inside* an
+/// argument rather than only as whole words.
 fn run_navigator(
     env: &mut Environment,
-    program: &Path,
+    command: &[String],
     start: &Path,
     width: usize,
     height: usize,
 ) -> Result<i32> {
-    // trek answers by writing the directory it finished in, and the shell cd's to whatever it
-    // reads back. A predictable path under /tmp would therefore let anyone who can create a file
+    // The browser answers by writing the directory it finished in, and the shell cd's to whatever
+    // it reads back. A predictable path under /tmp would therefore let anyone who can create a file
     // there choose this shell's working directory, so the answer is written inside a private
     // 0700 directory created for this one run.
     let Ok(private) = mkdtemp(&std::env::temp_dir().join("oslo-nav-XXXXXX")) else {
@@ -162,16 +157,21 @@ fn run_navigator(
 
     let width = if width == 0 { DEFAULT_WIDTH } else { width };
     let height = if height == 0 { DEFAULT_HEIGHT } else { height };
-    let status = std::process::Command::new(program)
-        .arg("--explore")
-        .arg("--cwd-file")
-        .arg(&answer)
-        .arg("--width")
-        .arg(width.to_string())
-        .arg("--height")
-        .arg(height.to_string())
-        .arg(start)
-        .status();
+    let filled: Vec<String> = command
+        .iter()
+        .map(|word| {
+            fill(
+                word,
+                &answer.to_string_lossy(),
+                &start.to_string_lossy(),
+                width,
+                height,
+            )
+        })
+        .collect();
+    let (program, rest) = filled.split_first().expect("a non-empty command");
+
+    let status = std::process::Command::new(program).args(rest).status();
 
     let written = std::fs::read_to_string(&answer).unwrap_or_default();
     let _ = std::fs::remove_dir_all(&private);
@@ -180,7 +180,7 @@ fn run_navigator(
         Ok(status) if status.success() => {}
         Ok(status) => return Ok(status.code().unwrap_or(1)),
         Err(error) => {
-            eprintln!("{}nav: {}: {error}", origin_now(), program.display());
+            eprintln!("{}nav: {program}: {error}", origin_now());
             return Ok(127);
         }
     }
@@ -191,6 +191,19 @@ fn run_navigator(
         // reports when you leave it with Esc.
         None => Ok(1),
     }
+}
+
+/// The placeholders, substituted wherever they appear in one argument.
+///
+/// **Inside the word, not only as the whole of it.** Launching a browser inside a terminal mux
+/// means a nested command line — `--command "trek --cwd-file {answer} {dir}"` — and a substitution
+/// that only replaced whole arguments would hand that string through untouched, leaving the program
+/// that finally runs with two braces and nowhere to write its answer.
+fn fill(word: &str, answer: &str, dir: &str, width: usize, height: usize) -> String {
+    word.replace("{answer}", answer)
+        .replace("{dir}", dir)
+        .replace("{width}", &width.to_string())
+        .replace("{height}", &height.to_string())
 }
 
 /// The directory trek wrote, if it is one.
@@ -235,5 +248,48 @@ mod tests {
         assert_eq!(run(&["nav", "--unknown"]), 2);
         assert_eq!(run(&["nav", "/no/such/directory"]), 1);
         assert_eq!(run(&["nav", ".", "."]), 2);
+    }
+}
+
+#[cfg(test)]
+mod command_tests {
+    use super::fill;
+
+    /// Every placeholder, and each one wherever it appears in the word.
+    #[test]
+    fn the_placeholders_are_substituted() {
+        assert_eq!(fill("{dir}", "/a", "/start", 60, 50), "/start");
+        assert_eq!(fill("{answer}", "/a", "/start", 60, 50), "/a");
+        assert_eq!(fill("{width}x{height}", "/a", "/s", 60, 50), "60x50");
+        assert_eq!(fill("--flag", "/a", "/s", 60, 50), "--flag", "left alone");
+    }
+
+    /// **Inside a word, not only as the whole of it.** A browser launched inside a terminal mux
+    /// arrives as a nested command line, and a substitution that only replaced whole arguments
+    /// would hand those braces through to the program that finally runs.
+    #[test]
+    fn a_nested_command_line_carries_them_through() {
+        let word = fill(
+            "trek --explore --cwd-file {answer} --width {width} {dir}",
+            "/run/answer",
+            "/home/me",
+            72,
+            40,
+        );
+        assert_eq!(
+            word,
+            "trek --explore --cwd-file /run/answer --width 72 /home/me"
+        );
+        assert!(!word.contains('{'), "nothing may be left unsubstituted");
+    }
+
+    /// A name that merely looks like one is not one, so a directory with braces in it survives.
+    #[test]
+    fn only_the_known_names_substitute() {
+        assert_eq!(fill("{elsewhere}", "/a", "/s", 60, 50), "{elsewhere}");
+        assert_eq!(
+            fill("/tmp/{dir}s", "/a", "/s", 60, 50),
+            "/tmp/{dir}s".replace("{dir}", "/s")
+        );
     }
 }
