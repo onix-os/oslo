@@ -24,25 +24,22 @@ pub(super) fn ending(erase: bool, line: &str, cursor_row: usize, rows: usize) ->
     }
     let settings = crate::settings::current();
     let rule = settings.transcript.rule.clone();
-    let delegated = crate::transcript::rendered(line);
-    // Neither a renderer nor a rule is the ordinary ending, and so is a line with no command in it.
-    if (delegated.is_none() && rule.is_empty()) || line.trim().is_empty() {
+    // The rule is the switch: with none there is no transcript, whatever else is configured.
+    if rule.is_empty() || line.trim().is_empty() {
         return screen::finish(cursor_row, rows);
     }
     let aside = crate::theme::current().prompt.aside;
-    let block = match delegated {
-        // **Whatever the program said, verbatim but for the line endings.** The terminal is in raw
-        // mode, so a bare `\n` steps down without returning and the second row starts under the end
-        // of the first. A renderer writing ordinary text should not have to know that.
-        Some(text) => screen::given(cursor_row, &text),
-        None => screen::transcript(
-            cursor_row,
-            &rule,
-            line,
-            crate::dropdown::terminal_cols(),
-            &aside.open(crate::theme::depth()),
-        ),
-    };
+    // **The header is the delegated half.** A renderer draws one line and oslo puts the rule under
+    // it — see [`crate::transcript`] for why one line and not the block.
+    let header = crate::transcript::rendered(line)
+        .unwrap_or_else(|| format!("{}{line}", settings.transcript.prefix));
+    let block = screen::transcript(
+        cursor_row,
+        &header,
+        &rule,
+        crate::dropdown::terminal_cols(),
+        &aside.open(crate::theme::depth()),
+    );
     format!(
         "{}{block}{}",
         crate::transcript::mark(true),

@@ -81,24 +81,37 @@ impl Default for Misc {
 /// `oslo.transcript` — what a finished line leaves on the screen in place of its prompt.
 ///
 /// ```lua
-/// oslo.transcript.rule = "- "
+/// oslo.transcript.rule = "-"
 /// ```
 ///
 /// **Empty is off, and off is the default.** With a rule set, running a line clears the prompt
-/// block and writes the rule, the command, and the rule again; the command's output follows under
-/// it. What scrolls back is then a record of *what was run*, not of what the prompt looked like at
-/// the time — which is the half of it anybody ever reads, and the half that survives being copied
-/// out of a terminal into a bug report.
+/// block and writes what was run with a rule under it; the command's output follows:
 ///
-/// The string is a **unit, repeated to the width of the terminal**, so `"- "` is a dashed rule
-/// across the screen rather than two characters in the corner. It is drawn plain, in the theme's
-/// `prompt.aside` — the slot for text that is there to be looked past.
+/// ```text
+/// >> cargo test --lib
+/// -------------------------------------------------------------
+/// running 796 tests
+/// ```
 ///
-/// A line that is only whitespace leaves nothing: there is no command to frame, and a pair of
-/// rules around an empty row is a worse transcript than no rules at all.
+/// What scrolls back is then a record of *what was run*, not of what the prompt looked like at the
+/// time — which is the half of it anybody ever reads, and the half that survives being copied out
+/// of a terminal into a bug report.
+///
+/// The string is a **unit, repeated to the width of the terminal**, so `"-"` is a solid rule across
+/// the screen rather than one character in the corner. It is drawn in the theme's `prompt.aside` —
+/// the slot for text that is there to be looked past — while the line above it is left exactly as
+/// it was typed, or exactly as a renderer drew it.
+///
+/// A line that is only whitespace leaves nothing: there is no command to frame, and a rule under an
+/// empty row is a worse transcript than no rule at all.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Transcript {
     pub rule: String,
+    /// `oslo.transcript.prefix` — what stands before the command on the line above the rule.
+    ///
+    /// `">> "` by default, because the line has to say *this was run* and not be mistaken for the
+    /// output under it. A renderer replaces the whole header, prefix included.
+    pub prefix: String,
     /// `oslo.transcript.osc` — the OSC number the frame marks are written with.
     ///
     /// See [`crate::transcript`] for why oslo has one of its own and what is refused.
@@ -110,6 +123,7 @@ impl Default for Transcript {
         Transcript {
             // Empty: a setting that changes the shape of the scrollback is asked for, never assumed.
             rule: String::new(),
+            prefix: ">> ".to_string(),
             osc: crate::transcript::DEFAULT_OSC,
         }
     }

@@ -166,32 +166,32 @@ segment that renders nothing, silently.
 ## What a finished line leaves behind
 
 ```lua
-oslo.transcript.rule = "- "     -- empty is off, which is the default
+oslo.transcript.rule   = "-"      -- empty is off, which is the default
+oslo.transcript.prefix = ">> "    -- what stands before the command
 ```
 
-With a rule set, running a line **replaces its prompt** rather than keeping it:
+With a rule set, running a line **replaces its prompt** with what was run:
 
 ```
-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-cargo test --lib
-- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
-running 792 tests
+>> cargo test --lib
+-------------------------------------------------------------
+running 796 tests
 ```
 
-The prompt block is cleared and the command is written between two rules, with the output under it.
-What scrolls back is then a record of *what was run* — which is the half anybody rereads, and the
-half that survives being copied out of a terminal into a bug report. A prompt carrying a hostname, a
+The prompt block is cleared, the command is written above a rule, and the output follows. What
+scrolls back is then a record of *what was run* — which is the half anybody rereads, and the half
+that survives being copied out of a terminal into a bug report. A prompt carrying a hostname, a
 branch, a vi mode and a duration is none of those things once the moment has passed.
 
-The string is a **unit repeated to the width** of the terminal, so `"- "` is a dashed rule across the
-screen rather than two characters in a corner. It is drawn in the theme's `prompt.aside`, the slot
-for text meant to be looked past; the command between them is left exactly as it looked while it was
-being typed.
+`rule` is a **unit repeated to the width** of the terminal, so `"-"` is a solid line across the
+screen rather than one character in a corner; `"- "` is a dashed one. It is drawn in the theme's
+`prompt.aside`, the slot for text meant to be looked past. The line above it is left exactly as it
+was typed.
 
-A line that is only whitespace leaves nothing: there is no command to frame, and two rules around an
+A line that is only whitespace leaves nothing: there is no command to frame, and a rule under an
 empty row is a worse transcript than none. A key bound with `erase` — see
 [the line editor](line-editor.md) — keeps its own ending, since a key that *is* a command was never
-meant to be seen, rules around it least of all.
+meant to be seen, a frame around it least of all.
 
 ### Letting another program draw it
 
@@ -203,10 +203,17 @@ oslo.transcript.command = {
 }
 ```
 
-Whatever it prints is the block. `$command` is substituted in `args` — the only field there is, since
-the rest of what a prompt is told stopped being interesting the moment the command started. The
-`rule` stays as the fallback: a renderer that is missing, fails or overruns leaves the dashed line
-rather than nothing.
+Whatever it prints is the **header** — the line above the rule — and oslo draws the rule itself.
+`$command` is substituted in `args`, the only field there is, since the rest of what a prompt is told
+stopped being interesting the moment the command started.
+
+**One line, because that is what such a tool can give.** pixy refuses a control byte in a rendered
+string outright, so a contract of "print the whole block" is one it could not meet; the split is
+where it has to be. Trailing line endings are cut, since a program that prints a line ends it and
+oslo is about to end it again.
+
+The prefix and the command stay as the fallback: a renderer that is missing, fails or overruns
+leaves `>> <command>` rather than nothing.
 
 **The deadline is short and there is no `async`.** This runs between Enter and the command starting.
 A frame that arrived after the output had already begun would not be a frame, and there is nothing

@@ -152,20 +152,21 @@ fn parking_returns_to_the_top_without_clearing() {
     }
 }
 
-/// The third ending: the prompt is replaced by what was run, between two rules.
+/// The third ending: the prompt is replaced by what was run, with a rule under it.
 #[test]
-fn a_transcript_clears_the_block_and_frames_the_command() {
-    let out = transcript(0, "- ", "echo hi", 6, "");
-    assert_eq!(out, "\r\x1b[J- - - \r\necho hi\r\n- - - \r\n");
+fn a_transcript_clears_the_block_and_names_the_command() {
+    let out = transcript(0, ">> echo hi", "-", 6, "");
+    assert_eq!(out, "\r\x1b[J>> echo hi\r\n------\r\n");
 
     // **Cleared, not stepped past.** The whole point is that the prompt is not what scrolls back.
     assert!(out.contains("\x1b[J"), "the block has to go: {out:?}");
-    // The command is left unstyled between two styled rules — it is the line somebody reads.
-    let painted = transcript(0, "-", "ls", 3, "\x1b[2m");
+    // The rule is styled and the header is not: the header is either the command as it was typed
+    // or something another program drew, and neither wants a second opinion about its styling.
+    let painted = transcript(0, ">> ls", "-", 3, "\x1b[2m");
     assert!(painted.contains("\x1b[2m---\x1b[0m"), "{painted:?}");
     assert!(
-        painted.contains("\r\nls\r\n"),
-        "the command is plain: {painted:?}"
+        painted.contains(">> ls\r\n"),
+        "the header is verbatim: {painted:?}"
     );
 }
 

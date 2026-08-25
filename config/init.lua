@@ -117,15 +117,27 @@ if on_path("pixy") then
   }
 end
 
--- **What a finished line leaves behind.** With a rule set, running a command clears its prompt and
--- writes the command between two rules instead. The scrollback is then a record of what was *run*
--- — the half anybody rereads, and the half that survives being pasted into an issue — rather than
--- of what the prompt looked like at the time, which is a hostname, a branch and a vi mode that
--- stopped being true the moment the command started.
+-- **What a finished line leaves behind.** Running a command clears its prompt and puts the command
+-- itself there instead, with a rule under it. The scrollback is then a record of what was *run* —
+-- the half anybody rereads, and the half that survives being pasted into an issue — rather than of
+-- what the prompt looked like at the time, which is a hostname, a branch and a vi mode that stopped
+-- being true the moment the command started.
 --
--- The string is a unit repeated to the width of the terminal, so this is a dashed rule across the
--- screen. Empty turns it off and takes the ordinary ending back.
-oslo.transcript.rule = "- "
+-- `rule` is the switch as well as the glyph: empty is off and takes the ordinary ending back. It is
+-- a unit repeated to the width of the terminal, so `"-"` is a solid line across the screen.
+--
+-- **The header is pixy's**, styled with the same background as the prompt segments beside it; oslo
+-- draws only the rule. A pixy zone is one line — it refuses a control byte in `text` — so the split
+-- is where it has to be. Without pixy, or if it fails or overruns, oslo writes `>> <command>`
+-- itself, which is what anybody who has not installed pixy gets.
+oslo.transcript.rule = "-"
+if on_path("pixy") then
+  oslo.transcript.command = {
+    command = "pixy",
+    args = { "render", "transcript", "--target=ansi", "--set", "cmd=$command" },
+    timeout_ms = 20,
+  }
+end
 
 -- Aliases used to be sourced from ~/.config/profile/aliases.sh here. They are in the oslo macro
 -- database now — `oslo macros show` — which every shell reads for itself at startup, so there is

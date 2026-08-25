@@ -114,35 +114,27 @@ pub fn park(cursor_row: usize) -> String {
 #[path = "screen/tests.rs"]
 mod tests;
 
-/// A finished line's transcript: the rule, the command, the rule, over where the prompt was.
+/// A finished line's transcript: what was run, and a rule under it.
 ///
 /// The third ending a line can have, beside [`finish`] and [`park`]. The block is cleared rather
 /// than kept, because the point is that the prompt is *not* what scrolls back — see
 /// [`crate::settings::Transcript`].
 ///
-/// `unit` is repeated to `cols` rather than printed once: a rule two characters wide in the corner
-/// of a terminal is not a rule. A `unit` that does not divide the width is cut, which is what any
-/// rule does at the edge of a screen.
-pub fn transcript(
-    cursor_row: usize,
-    unit: &str,
-    command: &str,
-    cols: usize,
-    style: &str,
-) -> String {
+/// `header` is the line naming the command; `unit` is repeated to `cols` beneath it, because a rule
+/// two characters wide in the corner of a terminal is not a rule. A `unit` that does not divide the
+/// width is cut, which is what any rule does at the edge of a screen.
+pub fn transcript(cursor_row: usize, header: &str, unit: &str, cols: usize, style: &str) -> String {
     let rule = fill_width(unit, cols);
     let painted = match style.is_empty() {
-        true => rule.clone(),
+        true => rule,
         false => format!("{style}{rule}\x1b[0m"),
     };
     let mut out = park(cursor_row);
     // Everything from here down was the prompt's and is being replaced.
     out.push_str("\x1b[J");
-    out.push_str(&painted);
-    out.push_str("\r\n");
-    // The command unstyled: it is the one line here somebody will read, and it should look the way
-    // it looked while it was being typed.
-    out.push_str(command);
+    // The header verbatim: it is either the command as it was typed or something another program
+    // drew, and neither wants a second opinion about its styling.
+    out.push_str(header);
     out.push_str("\r\n");
     out.push_str(&painted);
     out.push_str("\r\n");
@@ -167,22 +159,6 @@ fn fill_width(unit: &str, cols: usize) -> String {
             out.push(c);
             width += 1;
         }
-    }
-    out
-}
-
-/// A block another program drew, put where the prompt was.
-///
-/// The counterpart to [`transcript`] for `oslo.transcript.command`. Only two things are oslo's
-/// here: clearing the prompt, and the line endings — the terminal is in raw mode, so a bare `\n`
-/// steps down without returning and the second row would start under the end of the first. A
-/// renderer writing ordinary text should not have to know that.
-pub fn given(cursor_row: usize, text: &str) -> String {
-    let mut out = park(cursor_row);
-    out.push_str("\x1b[J");
-    for line in text.trim_end_matches('\n').split('\n') {
-        out.push_str(line.trim_end_matches('\r'));
-        out.push_str("\r\n");
     }
     out
 }

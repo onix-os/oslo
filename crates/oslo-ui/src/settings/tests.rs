@@ -499,3 +499,16 @@ fn a_transcript_rule_is_off_until_a_config_sets_one() {
         "a unit is whatever the config says, not a dash"
     );
 }
+
+/// The header stands before the command, and it is `>> ` unless a config says otherwise.
+#[test]
+fn a_transcript_header_says_this_was_run() {
+    let prefix = |source: &str| settings_from(source).0.transcript.prefix;
+    assert_eq!(prefix("oslo = {}"), ">> ", "the default says it was run");
+    assert_eq!(prefix(r#"oslo = { transcript = { prefix = "$ " } }"#), "$ ");
+    assert_eq!(
+        prefix(r#"oslo = { transcript = { prefix = "" } }"#),
+        "",
+        "empty is a bare command line, which is a choice and not a mistake"
+    );
+}

@@ -47,12 +47,19 @@ pub fn install(renderer: impl Fn(&str) -> Option<String> + Send + Sync + 'static
     let _ = RENDERER.set(Box::new(renderer));
 }
 
-/// What another program says the block should be, if one is installed and it answered.
+/// The header another program says the block should start with, if one is installed and it answered.
 ///
-/// `None` sends the caller back to the rule, which is also what a renderer that failed means: a
-/// transcript is not worth losing a command's frame over, and the rule is always drawable.
+/// **One line, and the caller adds the rule.** A renderer is line-oriented — pixy, the case this
+/// was built for, refuses a control byte in a rendered string outright — so a contract of "print
+/// the whole block" is one such a tool cannot meet. Trailing line endings are cut for the same
+/// reason: a program that prints a line ends it, and the caller is about to end it again.
+///
+/// `None` sends the caller back to the prefix and the command, which is also what a renderer that
+/// failed or overran means: a transcript is not worth losing a command's frame over.
 pub fn rendered(command: &str) -> Option<String> {
-    RENDERER.get()?(command)
+    let text = RENDERER.get()?(command)?;
+    let text = text.trim_end_matches(['\r', '\n']);
+    (!text.is_empty()).then(|| text.to_string())
 }
 
 /// The OSC number the marks are written with.

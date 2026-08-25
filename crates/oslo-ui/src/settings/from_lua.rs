@@ -444,6 +444,9 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
         if let Value::Str(rule) = table.get_str("rule") {
             settings.transcript.rule = rule.to_string();
         }
+        if let Value::Str(prefix) = table.get_str("prefix") {
+            settings.transcript.prefix = prefix.to_string();
+        }
         if let Some(number) = number(&table, "osc") {
             settings.transcript.osc = number.max(0) as u32;
         }
