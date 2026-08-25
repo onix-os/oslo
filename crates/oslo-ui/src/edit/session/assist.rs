@@ -5,7 +5,7 @@
 //! oslo-specific — highlighting, ghost hints, the completion dropdown, history, the Lua hooks —
 //! arrives here, which is what lets the state machine be tested with [`NoAssist`] and nothing else.
 
-use super::{Bound, Key, KeyHook};
+use super::{Bound, Key, KeyHook, Placed};
 use crate::term::Keys;
 
 /// What the shell supplies to an editing session.
@@ -103,13 +103,7 @@ pub trait Assist {
     ///
     /// The name is oslo's spelling — `ctrl-s`, `alt-u`, `shift-tab` — so a config's key table can
     /// be looked up directly.
-    /// The line the handler asked for, its cursor, and whether to run it.
-    fn lua_key(
-        &mut self,
-        _name: &str,
-        _line: &str,
-        _cursor: usize,
-    ) -> Option<(String, usize, bool)> {
+    fn lua_key(&mut self, _name: &str, _line: &str, _cursor: usize) -> Option<Placed> {
         None
     }
 

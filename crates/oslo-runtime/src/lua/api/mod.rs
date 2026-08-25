@@ -147,6 +147,7 @@ pub fn install(host: &dyn Host, registry: &Registry, env: Arc<Mutex<Environment>
         "keys",
         "finder",
         "misc",
+        "transcript",
         "vi",
         "notify",
         "dirs",

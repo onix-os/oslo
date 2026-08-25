@@ -27,6 +27,43 @@ pub struct Nav {
     pub icons: Icons,
     /// Whether typing a name walks into it once nothing else matches.
     pub type_nav: TypeNav,
+    /// `oslo.builtin.nav.command` — browse with something else entirely.
+    ///
+    /// ```lua
+    /// oslo.builtin.nav.command = { "trek", "--explore", "--cwd-file", "{answer}", "{dir}" }
+    /// ```
+    ///
+    /// **Empty means oslo's own browser**, which is the default and stays the default. `nav`'s job
+    /// is to leave the shell in the directory you picked, not to draw the thing that picks it — so
+    /// naming a program here swaps the drawing and keeps everything else: the same operand, the
+    /// same exit status, the same `cd` at the end.
+    ///
+    /// **And empty is also what a program that is not installed here amounts to.** One config is
+    /// read on every machine somebody logs in to; the browser it names is not on all of them. So a
+    /// command whose program cannot be found draws oslo's own browser rather than failing, and says
+    /// nothing about it — the fallback is the behaviour, not a degraded one.
+    ///
+    /// # Why a setting rather than a search of `$PATH`
+    ///
+    /// This used to look for `trek` and hand over whenever it was installed. That is a program
+    /// changing what a shell builtin does by existing, which is a surprise nobody asked for and
+    /// cannot be turned off without uninstalling something. Choosing is an act now.
+    ///
+    /// # The placeholders, which are the whole interface
+    ///
+    /// | | |
+    /// |---|---|
+    /// | `{answer}` | a private file the browser **must** write its final directory into |
+    /// | `{dir}` | where to start |
+    /// | `{width}`, `{height}` | the viewport from the settings beside this one |
+    ///
+    /// They are substituted inside each argument rather than only as whole words, so a nested
+    /// command line — `--command "trek --cwd-file {answer} {dir}"`, which is how a float is
+    /// launched — carries them through to the program that finally runs.
+    ///
+    /// `{answer}` names a file inside a `0700` directory made for one run. A browser that writes
+    /// nothing there is read as "cancelled", exactly as pressing Esc in oslo's own browser is.
+    pub command: Vec<String>,
 }
 
 /// `oslo.builtin.nav.type_nav` — filtering down to one directory enters it.
@@ -164,6 +201,8 @@ impl Default for Nav {
             scanner: true,
             icons: Icons::default(),
             type_nav: TypeNav::default(),
+            // Empty: oslo browses with its own, and choosing otherwise is a line in a config.
+            command: Vec::new(),
         }
     }
 }

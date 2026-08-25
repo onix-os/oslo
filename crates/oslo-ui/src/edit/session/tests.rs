@@ -72,7 +72,10 @@ fn enter_accepts_and_ctrl_c_interrupts() {
         vi: None,
         ..Session::new("ls", 2)
     };
-    assert_eq!(s.apply(Key::Accept, &mut NoAssist), Step::Accept);
+    assert_eq!(
+        s.apply(Key::Accept, &mut NoAssist),
+        Step::Accept { erase: false }
+    );
     assert_eq!(s.apply(Key::Abort, &mut NoAssist), Step::Interrupted);
 }
 
@@ -414,175 +417,6 @@ fn hooks_receive_raw_controls_instead_of_display_notation() {
     assert_eq!(session.buffer.text(), raw);
 }
 
-/// A Lua binding may run the line, not only fill it in.
-///
-/// zsh spells this `bindkey -s '^[a' ' _a\n'`, and the trailing newline is the whole point: the
-/// key runs something. A handler that could only set the text left the line sitting there.
-#[test]
-fn a_lua_binding_can_submit_the_line() {
-    struct Bind {
-        submit: bool,
-    }
-    impl Assist for Bind {
-        fn binding(&mut self, key: Key) -> Option<Bound> {
-            (key == Key::Alt('a')).then(|| Bound::Lua("alt-a".into()))
-        }
-        fn lua_key(&mut self, _n: &str, _l: &str, _c: usize) -> Option<(String, usize, bool)> {
-            Some((" _a".to_string(), 3, self.submit))
-        }
-    }
-
-    let mut s = Session {
-        vi: None,
-        ..Session::new("half typed", 10)
-    };
-    assert_eq!(
-        s.apply(Key::Alt('a'), &mut Bind { submit: true }),
-        Step::Accept,
-        "submit = true runs the line"
-    );
-    assert_eq!(
-        s.buffer.text(),
-        " _a",
-        "and it is the handler's line that runs"
-    );
-
-    let mut s = Session {
-        vi: None,
-        ..Session::new("half typed", 10)
-    };
-    assert_eq!(
-        s.apply(Key::Alt('a'), &mut Bind { submit: false }),
-        Step::Continue { redraw: true },
-        "without it the line is only filled in"
-    );
-    assert_eq!(s.buffer.text(), " _a");
-}
-
-/// The `key` hook sees a key before any binding, before vi, and before an ordinary character is
-/// inserted — and each of its three answers does a different thing.
-#[test]
-fn the_key_hook_sees_every_key_first() {
-    /// Swallows `x`, rewrites `!`, and lets everything else through.
-    struct Hook;
-    impl Assist for Hook {
-        fn watches_keys(&mut self) -> bool {
-            true
-        }
-        fn key_hook(&mut self, key: Key, line: &str, _cursor: usize) -> Option<KeyHook> {
-            match key {
-                Key::Char('x') => Some(KeyHook::Swallow),
-                Key::Char('!') => Some(KeyHook::Line {
-                    text: format!("sudo {line}"),
-                    cursor: 0,
-                    submit: false,
-                }),
-                _ => None,
-            }
-        }
-        // Bound too, to prove the hook is asked *before* this is.
-        fn binding(&mut self, key: Key) -> Option<Bound> {
-            (key == Key::Char('x')).then_some(Bound::ClearScreen)
-        }
-    }
-
-    let mut s = Session {
-        vi: None,
-        ..Session::new("", 0)
-    };
-    for key in typed("echo") {
-        s.apply(key, &mut Hook);
-    }
-    assert_eq!(
-        s.apply(Key::Char('x'), &mut Hook),
-        Step::Continue { redraw: false },
-        "a swallowed key beats even a binding on the same key"
-    );
-    assert_eq!(s.buffer.text(), "echo", "and never reaches the buffer");
-
-    assert_eq!(
-        s.apply(Key::Char('!'), &mut Hook),
-        Step::Continue { redraw: true }
-    );
-    assert_eq!(s.buffer.text(), "sudo echo", "the hook replaced the line");
-    assert_eq!(s.buffer.cursor(), 0, "and placed the cursor");
-}
-
-/// A hook that declines leaves the key doing exactly what it did before — including a key the
-/// config bound, which the hook is asked about first but has no opinion on.
-#[test]
-fn a_declining_key_hook_changes_nothing() {
-    struct Quiet(usize);
-    impl Assist for Quiet {
-        fn watches_keys(&mut self) -> bool {
-            true
-        }
-        fn key_hook(&mut self, _key: Key, _line: &str, _cursor: usize) -> Option<KeyHook> {
-            self.0 += 1;
-            None
-        }
-    }
-
-    let mut seen = Quiet(0);
-    let mut s = Session {
-        vi: None,
-        ..Session::new("", 0)
-    };
-    for key in typed("ls -l") {
-        s.apply(key, &mut seen);
-    }
-    assert_eq!(
-        s.apply(Key::Ctrl('w'), &mut seen),
-        Step::Continue { redraw: true }
-    );
-    assert_eq!(s.buffer.text(), "ls ", "C-w still killed the word");
-    assert_eq!(seen.0, 6, "and the hook was asked about every one of them");
-}
-
-/// **Nothing is asked when nothing is attached.** `key_hook` is the only `Assist` method on the
-/// path of ordinary typing, so a session with no handler must not even build the line to offer.
-#[test]
-fn an_unwatched_session_never_builds_the_payload() {
-    struct Never;
-    impl Assist for Never {
-        fn key_hook(&mut self, _key: Key, _line: &str, _cursor: usize) -> Option<KeyHook> {
-            panic!("asked despite watches_keys() being false");
-        }
-    }
-    let mut s = Session {
-        vi: None,
-        ..Session::new("", 0)
-    };
-    for key in typed("echo hi") {
-        s.apply(key, &mut Never);
-    }
-    assert_eq!(s.buffer.text(), "echo hi");
-}
-
-/// A hook may run the line, which is what makes it able to replace a binding outright.
-#[test]
-fn the_key_hook_can_submit() {
-    struct Go;
-    impl Assist for Go {
-        fn watches_keys(&mut self) -> bool {
-            true
-        }
-        fn key_hook(&mut self, _key: Key, _line: &str, _cursor: usize) -> Option<KeyHook> {
-            Some(KeyHook::Line {
-                text: "ll".to_string(),
-                cursor: 2,
-                submit: true,
-            })
-        }
-    }
-    let mut s = Session {
-        vi: None,
-        ..Session::new("", 0)
-    };
-    assert_eq!(s.apply(Key::Ctrl('o'), &mut Go), Step::Accept);
-    assert_eq!(s.buffer.text(), "ll");
-}
-
 #[test]
 fn multiline_paste_inserts_without_submitting() {
     let mut session = Session {
@@ -598,3 +432,23 @@ fn multiline_paste_inserts_without_submitting() {
 
 #[path = "tests/taking.rs"]
 mod taking;
+
+#[path = "tests/handlers.rs"]
+mod handlers;
+
+/// **Which ending a finished line gets.** Three of them, and the choice is worth pinning because
+/// two are opt-in and the third is what every shell has always done.
+#[test]
+fn a_blank_line_never_gets_a_transcript() {
+    // `erase` wins over everything: a key that *is* a command was never meant to be seen, rules
+    // around it least of all.
+    assert_eq!(ending(true, "nav", 0, 1), screen::park(0));
+
+    // With no rule configured — the default — a line stays where it was typed.
+    assert_eq!(ending(false, "ls -l", 0, 1), screen::finish(0, 1));
+
+    // And a line that is only whitespace takes the plain ending whatever is configured: there is
+    // no command to frame, and two rules around an empty row is a worse transcript than none.
+    assert_eq!(ending(false, "   ", 0, 1), screen::finish(0, 1));
+    assert_eq!(ending(false, "", 0, 1), screen::finish(0, 1));
+}

@@ -4,7 +4,7 @@ use crate::lua::api::hooks;
 
 mod keys;
 use keys::{hook_key_name, key_name};
-use oslo_ui::edit::session::{Assist, Bound, KeyHook};
+use oslo_ui::edit::session::{Assist, Bound, KeyHook, Placed};
 use oslo_ui::term::Key;
 use oslo_ui::{OsloHelper, abbr, dropdown, editor, settings};
 
@@ -79,14 +79,19 @@ fn char_cursor(line: &str, at: usize) -> usize {
 /// The cursor a handler gives is a byte offset, because that is what it computed with; the buffer
 /// counts characters. Defaulting to the end is what "just set the line" means, and it is by far
 /// the common case.
-fn placed(answer: editor::Answer) -> (String, usize, bool) {
+fn placed(answer: editor::Answer) -> Placed {
     let end = answer.text.chars().count();
     let cursor = answer
         .cursor
         .map(|at| char_cursor(&answer.text, at))
         .unwrap_or(end)
         .min(end);
-    (answer.text, cursor, answer.submit)
+    Placed {
+        text: answer.text,
+        cursor,
+        submit: answer.submit,
+        erase: answer.erase,
+    }
 }
 
 /// Tell a hook something happened, spelled once so the call sites read as one line each.
@@ -369,7 +374,7 @@ impl Assist for ShellAssist<'_> {
         editor::handler(&name).is_some().then_some(name)
     }
 
-    fn lua_key(&mut self, name: &str, line: &str, cursor: usize) -> Option<(String, usize, bool)> {
+    fn lua_key(&mut self, name: &str, line: &str, cursor: usize) -> Option<Placed> {
         let handler = editor::handler(name)?;
         let table = editor::line_table(line, byte_cursor(line, cursor));
         let answer = match crate::lua::engine::call_here(&handler, vec![table]) {
@@ -395,14 +400,7 @@ impl Assist for ShellAssist<'_> {
         match editor::key_outcome_from(&crate::lua::engine::key_hook_here(vec![table])?) {
             editor::KeyOutcome::Pass => None,
             editor::KeyOutcome::Swallow => Some(KeyHook::Swallow),
-            editor::KeyOutcome::Line(answer) => {
-                let (text, cursor, submit) = placed(answer);
-                Some(KeyHook::Line {
-                    text,
-                    cursor,
-                    submit,
-                })
-            }
+            editor::KeyOutcome::Line(answer) => Some(KeyHook::Line(placed(answer))),
         }
     }
 

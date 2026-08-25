@@ -450,3 +450,90 @@ fn a_scratch_key_that_is_not_a_key_is_reported() {
     assert!(problems[0].contains("oslo.scratch.key"), "{problems:?}");
     assert_eq!(settings.scratch.key, Scratch::default().key);
 }
+
+/// **oslo browses with its own unless told otherwise**, which is the whole point of the setting:
+/// a browser that took over because it happened to be installed is a surprise, and one that cannot
+/// be turned off without uninstalling something is a worse one.
+#[test]
+fn nav_uses_the_builtin_browser_until_a_command_names_another() {
+    assert!(
+        Nav::default().command.is_empty(),
+        "an empty command is the built-in browser, and that is the default"
+    );
+
+    let (settings, problems) = settings_from(
+        "oslo = { builtin = { nav = { command = \
+         { 'trek', '--explore', '--cwd-file', '{answer}', '{dir}' } } } }",
+    );
+    assert!(problems.is_empty(), "{problems:?}");
+    assert_eq!(
+        settings.builtin.nav.command,
+        vec!["trek", "--explore", "--cwd-file", "{answer}", "{dir}"],
+        "the argv is the config's, verbatim — substitution happens when it runs"
+    );
+}
+
+/// Anything in the list that is not a string is dropped rather than stringified: a number or a
+/// table in an argv is a mistake, and guessing what it meant would run something nobody wrote.
+#[test]
+fn a_nav_command_keeps_only_words() {
+    let (settings, _) = settings_from(
+        "oslo = { builtin = { nav = { command = { 'trek', 7, {}, '--explore' } } } }",
+    );
+    assert_eq!(settings.builtin.nav.command, vec!["trek", "--explore"]);
+}
+
+/// `oslo.transcript.rule` is read, and empty is off.
+///
+/// **Off by default**, because it replaces what a terminal has looked like since terminals: a
+/// setting that changes the shape of the scrollback has to be asked for.
+#[test]
+fn a_transcript_rule_is_off_until_a_config_sets_one() {
+    let rule = |source: &str| settings_from(source).0.transcript.rule;
+    assert_eq!(rule("oslo = {}"), "", "nothing configured");
+    assert_eq!(rule("oslo = { transcript = {} }"), "");
+    assert_eq!(rule(r#"oslo = { transcript = { rule = "- " } }"#), "- ");
+    assert_eq!(
+        rule(r#"oslo = { transcript = { rule = "─" } }"#),
+        "─",
+        "a unit is whatever the config says, not a dash"
+    );
+}
+
+/// Nothing stands before the command unless a config asks for it — the brackets already do.
+#[test]
+fn a_transcript_header_says_this_was_run() {
+    let prefix = |source: &str| settings_from(source).0.transcript.prefix;
+    assert_eq!(
+        prefix("oslo = {}"),
+        "",
+        "the brackets already say it was run"
+    );
+    assert_eq!(prefix(r#"oslo = { transcript = { prefix = "$ " } }"#), "$ ");
+    assert_eq!(
+        prefix(r#"oslo = { transcript = { prefix = "" } }"#),
+        "",
+        "and empty stays empty"
+    );
+}
+
+/// The divider's colour, and why the default is an index rather than a slot.
+///
+/// **`"1"` is palette entry 1**, which a terminal can retint without the shell being told — hexe's
+/// `OSC 1330` namespaces do exactly that. A theme slot would be resolved here and baked into the
+/// bytes, and no palette could reach it afterwards.
+#[test]
+fn the_divider_is_an_indexed_colour_by_default() {
+    let style = |source: &str| settings_from(source).0.transcript.style;
+    assert_eq!(style("oslo = {}"), "1");
+    assert_eq!(
+        style("oslo = { transcript = { style = \"#7c7c7c\" } }"),
+        "#7c7c7c"
+    );
+
+    // And it parses as one, which is what makes it an `ESC[38;5;1m` rather than a name nobody reads.
+    assert_eq!(
+        crate::theme::Color::parse("1"),
+        Some(crate::theme::Color::Indexed(1))
+    );
+}

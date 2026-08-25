@@ -1,5 +1,52 @@
 # Changelog
 
+## [0.4.13] - 2026-08-25
+
+### <!-- 0 -->⛰️  Features
+
+- A live shell, an animated prompt and a transcript
+- No blank row on a cleared screen
+- A blank row before the prompt
+- A blank row on each side of the block
+- Hand the whole row to the renderer
+- Draw the divider in an indexed colour
+- Lead the exit code in with the rule
+- Open a frame with the last exit code
+- Brackets on every row of a command
+- A rule that runs into the command
+- A command line and a rule under it
+- Mark and delegate the transcript block
+- A transcript rule in place of the prompt
+- Every and $frame for an external prompt
+- Let a segment animate on its own clock
+- Let a peer move the shell
+- Run a bound line without leaving it
+- Browse with a configured command
+- Open trek in a sized viewport
+- Hand the browser to trek when installed
+- Fetch() for a peer with no daemon
+
+### <!-- 1 -->🐛 Bug Fixes
+
+- Ask the renderer one row at a time
+- Tell pixy the width oslo laid out with
+- Do not re-run an external prompt on a frame
+- Keep the prompt up while an erased line runs
+- Fall back when the browser is missing
+- Drop the shadowed verbs method
+
+### <!-- 6 -->🧪 Testing
+
+- Run the repl in its throwaway home
+
+### <!-- 7 -->⚙️ Miscellaneous Tasks
+
+- Browse with trek, erase the nav line
+
+### <!-- 9 -->◀️ Revert
+
+- Leave the right prompt to pixy
+
 ## [0.4.12] - 2026-08-24
 
 ### <!-- 0 -->⛰️  Features

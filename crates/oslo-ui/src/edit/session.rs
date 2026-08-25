@@ -11,28 +11,15 @@ pub use crate::term::Key;
 use crate::term::{InputEvent, Keys, PasteError, Restore, Screen};
 use std::io::Write;
 
+mod answer;
+pub use answer::{KeyHook, Placed};
+
 mod assist;
 pub use assist::{Assist, NoAssist};
 
 mod preview;
 
 mod shortcuts;
-
-/// What a `key` hook asked the editor to do with the keystroke it just saw.
-///
-/// The third possibility — carry on as normal — is the `None` the hook answers with, so it needs
-/// no variant here.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum KeyHook {
-    /// Consume the keystroke: the editor never sees it, and the line is untouched.
-    Swallow,
-    /// Put this line in place instead, and run it if `submit`.
-    Line {
-        text: String,
-        cursor: usize,
-        submit: bool,
-    },
-}
 
 /// The line being edited, and where in history it came from.
 #[derive(Debug, Default)]
@@ -96,11 +83,17 @@ impl Session {
             Bound::AcceptHintWord => changed(self.take_hint(false, assist)),
             Bound::Lua(name) => {
                 match assist.lua_key(&name, &self.buffer.text(), self.buffer.cursor()) {
-                    Some((line, cursor, submit)) => {
-                        self.buffer.set(&line, cursor);
+                    Some(placed) => {
+                        self.buffer.set(&placed.text, placed.cursor);
                         // `submit = true` is zsh's `bindkey -s '…\n'`: the key runs the line
                         // rather than only typing it.
-                        if submit { Step::Accept } else { changed(true) }
+                        if placed.submit {
+                            Step::Accept {
+                                erase: placed.erase,
+                            }
+                        } else {
+                            changed(true)
+                        }
                     }
                     None => changed(false),
                 }
@@ -140,13 +133,15 @@ impl Session {
             return match hook {
                 // Nothing happened and nothing is redrawn — the key is simply gone.
                 KeyHook::Swallow => changed(false),
-                KeyHook::Line {
-                    text,
-                    cursor,
-                    submit,
-                } => {
-                    self.buffer.set(&text, cursor);
-                    if submit { Step::Accept } else { changed(true) }
+                KeyHook::Line(placed) => {
+                    self.buffer.set(&placed.text, placed.cursor);
+                    if placed.submit {
+                        Step::Accept {
+                            erase: placed.erase,
+                        }
+                    } else {
+                        changed(true)
+                    }
                 }
             };
         }
@@ -297,7 +292,7 @@ impl Session {
                 None => changed(false),
             },
 
-            Action::Accept => Step::Accept,
+            Action::Accept => Step::Accept { erase: false },
             Action::Abort => Step::Interrupted,
             Action::Eof => Step::Eof,
             Action::Redraw => Step::ClearScreen,
@@ -381,9 +376,14 @@ pub fn read_line(
             let _ = out.write_all(shape.as_bytes());
         }
 
+        // **A frame of an animation is a rebuild, not just a repaint.** The moving part is inside
+        // the prompt, so the string itself has to be made again — but without saying anything
+        // changed, which would drag every other segment through `git` with it. See
+        // `crate::prompt::animation`.
+        let ticked = crate::prompt::tick_due();
         // Cheap enough to ask every frame: one relaxed load, and equal almost always.
         let now = crate::prompt::generation();
-        if now != seen {
+        if now != seen || ticked {
             seen = now;
             (prompt, right) = render();
             // A prompt that rebuilt itself has to reach the screen even if the last key moved
@@ -548,23 +548,24 @@ pub fn read_line(
                 let _ = out.write_all(b"\x1b[H\x1b[2J");
                 at_row = 0;
             }
-            Step::Accept => {
-                // The next line starts in insert, so the shape must go back — otherwise a line
-                // accepted from normal mode leaves a block cursor over the one you type next.
-                crate::vi::reset();
-                if session.vi.is_some() {
-                    let shape = crate::settings::current()
-                        .vi
-                        .cursors
-                        .for_mode(crate::vi::Mode::Insert);
-                    let _ = out.write_all(shape.escape().as_bytes());
+            Step::Accept { erase } => {
+                let shape = crate::vi::back_to_insert(session.vi.is_some());
+                let _ = out.write_all(shape.as_bytes());
+                // The line still runs; it just never appears. Drawing the buffer would put `nav`
+                // on the prompt for as long as the browser is up, which is the word the binding
+                // exists to spare you.
+                let line = session.buffer.text();
+                if erase {
+                    session.buffer.set("", 0);
                 }
                 let placed = draw(prompt, right, &session, assist, false);
-                let frame = screen::redraw(at_row, &placed.text, into_at(&placed));
+                // Both endings go inside the one synchronized frame, so the terminal shows the
+                // finished block and its ending as one update rather than two.
+                let mut frame = screen::redraw(at_row, &placed.text, into_at(&placed));
+                frame.push_str(&ending(erase, &line, placed.cursor_row, placed.rows));
                 let _ = out.write_all(crate::paint::Frame::new(&frame, synchronized).as_bytes());
-                let _ = out.write_all(screen::finish(placed.cursor_row, placed.rows).as_bytes());
                 let _ = out.flush();
-                return Outcome::Line(session.buffer.text());
+                return Outcome::Line(line);
             }
             // The abandoned line stays on screen — it is what you just typed, and erasing it
             // takes away the thing you might want to look at or copy. Only the cursor moves,
@@ -592,3 +593,7 @@ pub use keys::{Bound, Step};
 #[cfg(test)]
 #[path = "session/tests.rs"]
 mod tests;
+
+#[path = "session/ending.rs"]
+mod ending;
+use ending::ending;

@@ -135,3 +135,145 @@ fn a_shorter_frame_clears_what_the_taller_one_left() {
         "nothing clears the rows below: {out:?}"
     );
 }
+
+/// The other ending: back to the top of the block and *nothing else*. The prompt has to stay on
+/// screen while the command runs — it is the shell you are still looking at when the browser opens
+/// beside it — and the next prompt overwrites it, because `redraw` erases before it draws.
+#[test]
+fn parking_returns_to_the_top_without_clearing() {
+    assert_eq!(park(0), "\r", "already on the first row");
+    assert_eq!(park(2), "\x1b[2A\r");
+    for row in 0..4 {
+        let out = park(row);
+        assert!(!out.contains("\x1b[J"), "clears the screen: {out:?}");
+        assert!(!out.contains("\x1b[K"), "clears the row: {out:?}");
+        assert!(!out.contains('\n'), "must not scroll: {out:?}");
+        assert!(!out.contains("\x1b[B"), "must not step down: {out:?}");
+    }
+}
+
+/// The third ending: the prompt is replaced by a rule running into what was run.
+#[test]
+fn a_transcript_puts_the_command_at_the_right_edge() {
+    // 20 cells: 3 of tail, `[ ls ]` is 6, so 11 of rule lead in.
+    let out = transcript(0, &["ls".into()], "-", 20, "");
+    assert_eq!(out, "\r\x1b[J-----------[ ls ]---\r\n\r\n");
+    assert_eq!(
+        crate::prompt::printed_width("-----------[ ls ]---"),
+        20,
+        "the row is exactly the width it was given"
+    );
+
+    // **Cleared, not stepped past.** The whole point is that the prompt is not what scrolls back.
+    assert!(out.contains("\x1b[J"), "the block has to go: {out:?}");
+    // A blank row under it, so the block sits apart from the output below. The one above is the
+    // prompt's, already on screen — see `BREATH`.
+    assert!(
+        out.ends_with("\r\n\r\n"),
+        "a blank row under the block: {out:?}"
+    );
+
+    // The rule and the brackets are styled; the command between them is not — it is either what
+    // was typed or what another program drew, and neither wants a second opinion.
+    let painted = transcript(0, &["ls".into()], "-", 12, "\x1b[2m");
+    assert!(
+        painted.contains("\x1b[2m[ \x1b[0mls\x1b[2m ]"),
+        "{painted:?}"
+    );
+}
+
+/// A command too wide for the row still gets its brackets, with no rule left to lead in.
+#[test]
+fn a_long_command_loses_the_rule_and_not_itself() {
+    let long = "cargo test --all-targets --no-run";
+    let out = transcript(0, &[long.to_string()], "-", 10, "");
+    assert!(out.contains(long), "the command is never cut: {out:?}");
+    assert!(!out.contains("--------"), "no room for a lead-in: {out:?}");
+}
+
+/// **Every row of a multi-line command gets its own brackets.** A paste, a continuation, a heredoc —
+/// each line was typed at a prompt, so each carries the same mark. Only the first has the rule
+/// leading into it: repeated down the block it would read as three commands rather than one.
+#[test]
+fn every_row_is_bracketed_and_only_the_first_has_a_rule() {
+    let rows = framed(
+        &rows_of("for f in *.rs; do\necho \"$f\"\ndone"),
+        "-",
+        40,
+        "",
+        None,
+    );
+    assert_eq!(rows.len(), 3);
+    assert_eq!(rows[0], "----------------[ for f in *.rs; do ]---");
+    assert_eq!(rows[1], "                [ echo \"$f\" ]");
+    assert_eq!(rows[2], "                [ done ]");
+
+    // The rule is the first row's alone, and the rest hang from where it stopped.
+    let indent = |row: &str| row.len() - row.trim_start().len();
+    assert_eq!(indent(&rows[1]), indent(&rows[2]), "the brackets line up");
+    assert_eq!(
+        indent(&rows[1]),
+        rows[0].find("[ ").expect("a bracket"),
+        "and they line up under the first one"
+    );
+
+    // A long line takes the whole row: it loses the lead-in, never itself, and the rows under it
+    // then start at the margin because there is nowhere else for them to start.
+    let long = framed(
+        &rows_of("a-very-long-command-that-fills-the-row\nsecond"),
+        "-",
+        12,
+        "",
+        None,
+    );
+    assert_eq!(long[0], "[ a-very-long-command-that-fills-the-row ]---");
+    assert_eq!(long[1], "[ second ]");
+}
+
+/// A rule is a *unit* repeated to the width, because two characters in the corner is not a rule.
+#[test]
+fn a_rule_is_repeated_to_the_width_and_cut() {
+    assert_eq!(fill_width("- ", 7), "- - - -");
+    assert_eq!(fill_width("-", 3), "---");
+    assert_eq!(fill_width("", 10), "", "nothing repeats to nothing");
+    assert_eq!(fill_width("-", 0), "", "and no width is no rule");
+    // Counted in characters, not bytes: a box-drawing rule is three bytes a cell.
+    assert_eq!(fill_width("─", 4).chars().count(), 4);
+}
+
+/// One row per line, as `ending` splits a command before the renderer sees it.
+fn rows_of(command: &str) -> Vec<String> {
+    command.split('\n').map(str::to_string).collect()
+}
+
+/// **The frame opens with how the command above it ended.** A transcript cannot report its own
+/// command — it is drawn before that command runs — so what it carries is the status that has just
+/// landed, at the end of the rule that sits under the previous command's output.
+///
+/// The same run of rule leads into it as trails the command, so the row reads as a rule with a
+/// bracket let into each end.
+#[test]
+fn a_frame_opens_with_the_previous_status() {
+    let rows = framed(&rows_of("ls"), "-", 20, "", Some(0));
+    assert!(rows[0].starts_with("---[ 0 ]"), "{:?}", rows[0]);
+    assert_eq!(
+        crate::prompt::printed_width(&rows[0]),
+        20,
+        "the mark comes out of the rule, not out of the width"
+    );
+
+    let failed = framed(&rows_of("cargo test"), "-", 30, "", Some(101));
+    assert!(failed[0].starts_with("---[ 101 ]"), "{:?}", failed[0]);
+    assert!(failed[0].ends_with("[ cargo test ]---"), "{:?}", failed[0]);
+
+    // The rows of a multi-line command clear the mark as well as the rule.
+    let two = framed(&rows_of("one\ntwo"), "-", 30, "", Some(2));
+    assert_eq!(
+        two[1].find("[ ").expect("a bracket"),
+        two[0]
+            .find("[ two")
+            .or_else(|| two[0].rfind("[ "))
+            .expect("a bracket"),
+        "the brackets line up under the first one"
+    );
+}

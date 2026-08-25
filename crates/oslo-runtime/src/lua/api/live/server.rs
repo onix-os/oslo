@@ -82,6 +82,10 @@ pub fn start(env: &Arc<Mutex<Environment>>) -> Result<PathBuf, String> {
         UnixListener::bind(&path).map_err(|e| format!("bind {}: {e}", path.display()))?;
 
     STOPPING.store(false, Ordering::SeqCst);
+    // Before the thread exists, so a peer that connects instantly has somewhere to leave a `cd`.
+    // A shell whose wake pipe could not be opened still serves every read verb; only the ones that
+    // ask it to *do* something answer that they cannot.
+    super::queued::arm();
     let served = Arc::clone(env);
     let where_ = path.clone();
     std::thread::Builder::new()

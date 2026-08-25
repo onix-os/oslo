@@ -101,3 +101,52 @@ fn an_unset_key_renders_nothing() {
     let lua = engine_with("");
     assert_eq!(lua.render_with("prompt.title", &facts()), None);
 }
+
+/// **A tick redraws the prompt; it does not rebuild it.** This is the whole economics of an
+/// animated prompt: without the cache, a spinner asking for ten frames a second would drag every
+/// other segment through `git` ten times a second with it.
+///
+/// Two segments, one animated and one not, rendered three times over with no real change in
+/// between. The animated one runs each time; the other runs once.
+#[test]
+fn only_an_animated_segment_re_runs_between_real_changes() {
+    crate::lua::api::segment::cache::forget();
+    let lua = engine_with(
+        r#"
+        spun, still = 0, 0
+        oslo.prompt.left = {
+          oslo.segment({ name = "spin", every = 60, render = function()
+            spun = spun + 1
+            return { { text = "s" .. spun } }
+          end }),
+          oslo.segment({ name = "still", render = function()
+            still = still + 1
+            return { { text = "|" .. still } }
+          end }),
+        }
+        "#,
+    );
+
+    let mut drawn = Vec::new();
+    for _ in 0..3 {
+        drawn.push(lua.render_with("prompt.left", &facts()).unwrap_or_default());
+        // Past the animated segment's interval, and nothing else has changed.
+        std::thread::sleep(std::time::Duration::from_millis(70));
+    }
+
+    assert_eq!(
+        drawn,
+        vec!["s1|1".to_string(), "s2|1".to_string(), "s3|1".to_string()],
+        "the spinner moved on every pass and the other segment ran once"
+    );
+
+    // **And a real change drops the lot.** `invalidate` means the directory or the branch moved, so
+    // a cached segment is not a cheap answer — it is a wrong one.
+    oslo_ui::prompt::invalidate();
+    assert_eq!(
+        lua.render_with("prompt.left", &facts()).as_deref(),
+        Some("s4|2"),
+        "both ran again"
+    );
+    crate::lua::api::segment::cache::forget();
+}

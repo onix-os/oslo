@@ -28,6 +28,11 @@ fn repl(input: &str, home: &Path) -> Output {
         // `oslo config which` is a subcommand of the binary, and the one under test is not the one
         // on `$PATH`.
         .env("OSLO_TEST_BIN", oslo_bin())
+        // **In the throwaway home, not the repo.** `oslo config …` is only read as a subcommand
+        // when no file of that name sits in the working directory — a real file wins, deliberately,
+        // so `oslo make` never shadows a script called `make`. This repository has a `config/`
+        // directory, so a REPL left in it resolves the word to that instead and exits 127.
+        .current_dir(home)
         .env_remove("XDG_CONFIG_HOME")
         .env_remove("ENV")
         .env_remove("PS1")

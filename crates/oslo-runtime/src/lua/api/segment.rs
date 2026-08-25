@@ -40,6 +40,7 @@ use std::rc::Rc;
 const TAG: &str = "__oslo_segment";
 
 /// One piece of a prompt, already rendered.
+#[derive(Clone)]
 pub struct Rendered {
     /// Named so a config can be told which piece was dropped, and so the tests read as prompts
     /// rather than as widths.
@@ -233,3 +234,36 @@ mod tests {
         assert_eq!(names, vec!["a", "b"]);
     }
 }
+
+/// How often a segment asks to be drawn again, in milliseconds. `None` is "only when something
+/// changed", which is every segment that does not say otherwise.
+///
+/// ```lua
+/// oslo.segment({ name = "spin", every = 100, render = function() … end })
+/// ```
+///
+/// **A floor, not a promise.** The editor redraws when it next comes up for air, which it does at
+/// least this often and sooner if a key is pressed. Asking for 1 ms gets you the floor below.
+pub fn every_ms(segment: &Value) -> Option<u64> {
+    let Value::Table(t) = segment else {
+        return None;
+    };
+    let Value::Number(n) = t.borrow().get_str("every") else {
+        return None;
+    };
+    let ms = n.as_int()?;
+    // **Zero is off, not "as fast as possible".** A segment asking for every frame with nothing to
+    // wait for would spin the shell at whatever rate the loop happens to run at, burning a core to
+    // redraw a prompt nobody is watching change.
+    (ms > 0).then(|| (ms as u64).max(MIN_EVERY_MS))
+}
+
+/// The fastest a prompt may animate.
+///
+/// Sixteen frames a second is faster than a spinner needs and slower than a terminal over ssh can
+/// paint. The cap is on the *segment*, so a config cannot ask for a rate that would make the shell
+/// unusable on a link it was not written on.
+const MIN_EVERY_MS: u64 = 60;
+
+#[path = "segment/cache.rs"]
+pub mod cache;

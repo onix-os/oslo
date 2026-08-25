@@ -51,6 +51,10 @@ pub fn apply(lua: &LuaEngine) {
 
     oslo_ui::settings::install(settings);
 
+    // **Installed rather than read**, because the block may be drawn by a program and the editor
+    // cannot run one. A config that names none installs none and the rule is drawn instead.
+    super::transcript::install(&lua.oslo_table());
+
     // Installed rather than read: unlike a theme, this one is a *function*, and it has to be
     // called once per visible row on every frame the dropdown draws.
     lua.install_column_provider();

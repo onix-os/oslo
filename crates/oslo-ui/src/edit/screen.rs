@@ -89,6 +89,186 @@ pub fn finish(cursor_row: usize, rows: usize) -> String {
     out
 }
 
+/// The escapes that leave the cursor at the top of the block without touching what is drawn there.
+///
+/// The counterpart to [`finish`], for a line nobody typed. It clears nothing: the prompt stays on
+/// screen for as long as the command runs — which is the point when the command opens a floating
+/// pane beside it — and the *next* prompt is drawn over these same rows, because [`redraw`] erases
+/// from the top of the block before it draws.
+///
+/// An earlier version cleared here instead. That took the shell off the screen the instant the key
+/// was pressed and left a hole until the browser exited.
+///
+/// **What the command prints therefore lands on the prompt.** True, and the reason this is opt-in:
+/// a key bound to something that prints wants [`finish`], which keeps the line as the record of
+/// what produced the output below it.
+pub fn park(cursor_row: usize) -> String {
+    let mut out = String::new();
+    if cursor_row > 0 {
+        out.push_str(&format!("\x1b[{cursor_row}A"));
+    }
+    out.push('\r');
+    out
+}
 #[cfg(test)]
 #[path = "screen/tests.rs"]
 mod tests;
+
+/// A finished line's transcript: a rule that runs into the command and a short tail past it.
+///
+/// ```text
+/// ------------------------------------------------[ cargo test --lib ]---
+/// ```
+///
+/// The third ending a line can have, beside [`finish`] and [`park`]. The block is cleared rather
+/// than kept, because the point is that the prompt is *not* what scrolls back — see
+/// [`crate::settings::Transcript`].
+///
+/// **Right-aligned, because that is where the eye already is.** The command lands beside the output
+/// it produced rather than at the far left with a screen of rule between them, and a column of
+/// brackets down the scrollback reads as a list of what was run.
+pub fn transcript(
+    cursor_row: usize,
+    rows: &[String],
+    unit: &str,
+    cols: usize,
+    style: &str,
+) -> String {
+    let mut out = park(cursor_row);
+    // Everything from here down was the prompt's and is being replaced.
+    out.push_str("\x1b[J");
+    for row in framed(rows, unit, cols, style, crate::transcript::last()) {
+        out.push_str(&row);
+        out.push_str("\r\n");
+    }
+    out.push_str(BREATH);
+    out
+}
+
+/// A blank row under the block.
+///
+/// The block sits between one command's output and the next, and without a gap it reads as another
+/// line of whichever it is nearer. Only the row *below* is written here: the one above is already
+/// on screen, because the prompt this block replaced was drawn with a blank row before it — see
+/// `oslo.transcript.rule` and `startup::read`. Writing both would put two there.
+const BREATH: &str = "\r\n";
+
+/// How much rule is left past the bracket. Enough to read as a rule that continues, short enough
+/// that the command still ends the line.
+const TAIL: usize = 3;
+
+/// The rows of a transcript, laid out but not yet placed on the screen.
+///
+/// One row per line of the command — a paste, a continuation, a heredoc — each in its own brackets,
+/// and only the first carrying the rule that leads into it:
+///
+/// ```text
+/// -----------------------------------------[ for f in *.rs; do ]---
+///                                          [ echo "$f" ]
+///                                          [ done ]
+/// ```
+///
+/// **Brackets on every row rather than a tree.** A stem says "this belongs to the thing above",
+/// which is what output does; a bracket says "this is a command", which is what these are. Every
+/// row of a multi-line command was typed at a prompt, so every row gets the same mark.
+///
+/// The rule is the first row's alone: repeated down the block it would read as three commands
+/// rather than one, and the block's job is to be found by eye in a screen of output. One lead-in
+/// does that, and the rows under it hang from where it stopped.
+///
+/// Split out from the drawing so the arithmetic can be checked without a terminal, which is the
+/// same reason everything else in this file is a pure function.
+fn framed(rows: &[String], unit: &str, cols: usize, style: &str, was: Option<i32>) -> Vec<String> {
+    let paint = |text: &str| match style.is_empty() {
+        true => text.to_string(),
+        false => format!("{style}{text}\x1b[0m"),
+    };
+
+    let (first, rest) = match rows.split_first() {
+        Some(split) => split,
+        None => return Vec::new(),
+    };
+
+    // How the command *above* ended, at the end of the rule that sits under its last line of
+    // output. See `crate::transcript::last` for why it cannot be this command's. Passed in rather
+    // than read here, so the arithmetic below stays a pure function of its arguments.
+    // The same run of rule leads into the status as trails the command, so the row is a rule with
+    // a bracket let into each end rather than one that starts at a bracket and ends at another.
+    let opened = was.map_or(String::new(), |status| {
+        format!("{}[ {status} ]", fill_width(unit, TAIL))
+    });
+
+    // `[ ` and ` ]` are four cells the command does not get to use.
+    let bracketed = crate::prompt::printed_width(first) + 4;
+    let fill = cols.saturating_sub(bracketed + TAIL + opened.chars().count());
+
+    let mut out = vec![format!(
+        "{}{}{}{first}{}",
+        paint(&opened),
+        paint(&fill_width(unit, fill)),
+        paint("[ "),
+        paint(&format!(" ]{}", fill_width(unit, TAIL))),
+    )];
+    for line in rest {
+        out.push(format!(
+            "{}{}{line}{}",
+            " ".repeat(opened.chars().count() + fill),
+            paint("[ "),
+            paint(" ]"),
+        ));
+    }
+    out
+}
+
+/// `unit` repeated until it reaches `cols`, cut to fit.
+///
+/// Counted in characters rather than bytes: a rule of `─` is three bytes a cell, and a byte count
+/// would draw a third of a line.
+fn fill_width(unit: &str, cols: usize) -> String {
+    if unit.is_empty() || cols == 0 {
+        return String::new();
+    }
+    let mut out = String::new();
+    let mut width = 0;
+    while width < cols {
+        for c in unit.chars() {
+            if width >= cols {
+                break;
+            }
+            out.push(c);
+            width += 1;
+        }
+    }
+    out
+}
+
+/// Rows another program drew, put where the prompt was.
+///
+/// The counterpart to [`transcript`] for `oslo.transcript.command`. Only two things stay oslo's:
+/// clearing the prompt, and the indent that lines a continuation row up under the first. That
+/// indent cannot be the renderer's — it is where the *first* row's rule stopped, and a tool asked
+/// for one row at a time has not seen the others.
+///
+/// It is computed the same way the built-in drawing computes its own, from the plain command and
+/// the width, so the two agree as long as a renderer right-aligns its brackets the way it does.
+pub fn given(
+    cursor_row: usize,
+    rows: &[String],
+    cols: usize,
+    first_command: Option<&&str>,
+) -> String {
+    let indent = first_command.map_or(0, |text| {
+        cols.saturating_sub(crate::prompt::printed_width(text) + 4 + TAIL)
+    });
+    let mut out = park(cursor_row);
+    out.push_str("\x1b[J");
+    for (at, row) in rows.iter().enumerate() {
+        if at > 0 {
+            out.push_str(&" ".repeat(indent));
+        }
+        out.push_str(row.trim_end_matches(['\r', '\n']));
+        out.push_str("\r\n");
+    }
+    out.push_str(BREATH);
+    out
+}
