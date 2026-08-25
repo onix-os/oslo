@@ -39,6 +39,33 @@ it happened to be installed. A program changing what a shell builtin does by exi
 nobody asked for, and one that could not be turned off without uninstalling something. oslo's
 browser is the default and stays the default; choosing another is an act.
 
+**A browser that draws elsewhere keeps the prompt alive.**
+
+```lua
+oslo.builtin.nav.detached = true
+```
+
+Run inline, a browser takes the terminal: oslo's prompt is not visible and there is nothing to keep
+alive. Opened in a terminal mux's float it is the opposite — oslo's own screen sits there with a
+prompt on it for the whole visit, and without this that prompt is frozen. An animated segment stops
+moving, and a directory the browser moves the shell to over
+[the control socket](control-socket.md) is not drawn until you come back.
+
+With it on, `nav` polls the browser rather than blocking on it, and between polls does what the
+editor's loop does with the keyboard taken out: service the background, and redraw the prompt if
+that changed anything. A browser can then walk the shell around and the prompt beside it says so as
+it happens.
+
+**Off by default, because being wrong about it damages the screen** — a prompt repainted over an
+inline file list lands in the middle of it. oslo cannot tell the two apart; both are a child that
+blocks. So the config says which.
+
+Two things it does not do. `$PS1` is not rebuilt while a browser is up: building it needs the shell
+state, and the browser is the thing holding it — a prompt written in Lua or handed to another
+program is rebuilt, which is every prompt this was built for. And a `cd` arriving mid-visit moves
+the *kernel's* idea of where the shell is, so the prompt shows it, while `$PWD`, the directory ring
+and `post-change-dir` are finished at the next safe point rather than half-done early.
+
 **A browser that is not installed here is no browser.** One config is read on every machine you log
 in to, and the one it names is not on all of them — so a `command` whose program cannot be found
 falls back to oslo's own browser rather than failing. Nothing is printed: the fallback is the

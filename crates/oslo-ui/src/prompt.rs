@@ -571,6 +571,9 @@ pub fn refreshing() -> bool {
     crate::pending::outstanding()
 }
 
+#[path = "prompt/hold.rs"]
+pub mod hold;
+
 #[path = "prompt/animation.rs"]
 mod animation;
 pub use animation::{animate_in, content_generation, settle as settle_animation, tick_due};

@@ -247,6 +247,11 @@ pub(super) fn read_command(
                     (left, right)
                 }
             };
+            // What a command kept detached rebuilds the prompt from — see
+            // `oslo_ui::prompt::hold`. Registered per prompt because the status and the language
+            // change, and a prompt rebuilt from last cycle's would be wrong about both.
+            prompt::keep_alive(env_struct, lua);
+            oslo_ui::prompt::hold::showing(true);
             match oslo_ui::edit::session::read_line(&mut render, (&typed, cursor), &mut assist) {
                 oslo_ui::edit::session::Outcome::Line(line) => line,
                 // Switch and reopen with the same text and cursor, so the line survives the

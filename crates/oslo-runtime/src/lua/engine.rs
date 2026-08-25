@@ -158,6 +158,7 @@ impl oslo_luavm::Globals for ShellGlobals {
     }
 }
 
+#[derive(Clone)]
 pub struct LuaEngine {
     /// `Rc` because the shell reaches back in through [`ACTIVE`] while a call is still running.
     interp: Rc<Engine>,
