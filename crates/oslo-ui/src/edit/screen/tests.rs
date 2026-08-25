@@ -157,7 +157,7 @@ fn parking_returns_to_the_top_without_clearing() {
 fn a_transcript_puts_the_command_at_the_right_edge() {
     // 20 cells: 3 of tail, `[ ls ]` is 6, so 11 of rule lead in.
     let out = transcript(0, &["ls".into()], "-", 20, "");
-    assert_eq!(out, "\r\x1b[J\r\n-----------[ ls ]---\r\n\r\n");
+    assert_eq!(out, "\r\x1b[J-----------[ ls ]---\r\n\r\n");
     assert_eq!(
         crate::prompt::printed_width("-----------[ ls ]---"),
         20,
@@ -166,10 +166,11 @@ fn a_transcript_puts_the_command_at_the_right_edge() {
 
     // **Cleared, not stepped past.** The whole point is that the prompt is not what scrolls back.
     assert!(out.contains("\x1b[J"), "the block has to go: {out:?}");
-    // A blank row above and below, so the block sits apart from the output on either side.
+    // A blank row under it, so the block sits apart from the output below. The one above is the
+    // prompt's, already on screen — see `BREATH`.
     assert!(
-        out.starts_with("\r\x1b[J\r\n") && out.ends_with("\r\n\r\n"),
-        "{out:?}"
+        out.ends_with("\r\n\r\n"),
+        "a blank row under the block: {out:?}"
     );
 
     // The rule and the brackets are styled; the command between them is not — it is either what

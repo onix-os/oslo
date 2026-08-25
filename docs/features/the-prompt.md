@@ -174,9 +174,16 @@ oslo.transcript.style  = "1"      -- the divider's colour; an index, a hex value
 With a rule set, running a line **replaces its prompt** with what was run:
 
 ```
+
 -------------------------------------------------[ cargo test --lib ]---
+
 running 798 tests
 ```
+
+A blank row sits on each side of the block, so it reads as a divider rather than as another line of
+the output above or below it. The one *above* is written before the prompt, not before the block —
+the prompt is what the block replaces, and it wants the same air whether or not the line typed at it
+turns into one.
 
 The prompt block is cleared, a rule runs into the command at the right-hand end, and the output
 follows. What scrolls back is then a record of *what was run* — which is the half anybody rereads,

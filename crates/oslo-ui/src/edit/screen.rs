@@ -137,7 +137,6 @@ pub fn transcript(
     let mut out = park(cursor_row);
     // Everything from here down was the prompt's and is being replaced.
     out.push_str("\x1b[J");
-    out.push_str(BREATH);
     for row in framed(rows, unit, cols, style, crate::transcript::last()) {
         out.push_str(&row);
         out.push_str("\r\n");
@@ -146,10 +145,12 @@ pub fn transcript(
     out
 }
 
-/// A blank row above the block and another below it.
+/// A blank row under the block.
 ///
-/// The block sits between one command's output and the next, and without this it reads as another
-/// line of whichever it is nearer. A rule can only separate what it has room to sit apart from.
+/// The block sits between one command's output and the next, and without a gap it reads as another
+/// line of whichever it is nearer. Only the row *below* is written here: the one above is already
+/// on screen, because the prompt this block replaced was drawn with a blank row before it — see
+/// `oslo.transcript.rule` and `startup::read`. Writing both would put two there.
 const BREATH: &str = "\r\n";
 
 /// How much rule is left past the bracket. Enough to read as a rule that continues, short enough
@@ -261,7 +262,6 @@ pub fn given(
     });
     let mut out = park(cursor_row);
     out.push_str("\x1b[J");
-    out.push_str(BREATH);
     for (at, row) in rows.iter().enumerate() {
         if at > 0 {
             out.push_str(&" ".repeat(indent));

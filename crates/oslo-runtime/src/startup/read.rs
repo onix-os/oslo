@@ -168,6 +168,21 @@ pub(super) fn read_command(
         // The title goes back to the directory now that nothing is running, and the working
         // directory is (re)announced — the first prompt of a session is the only chance to tell
         // the terminal where it started.
+        // **A blank row before the prompt, when a transcript is configured.** The prompt is what
+        // the transcript replaces, so this is also the row that ends up above the rule — written
+        // here rather than there because it has to survive being replaced, and because a prompt
+        // wants the same air whether or not the line typed at it turns into a block.
+        //
+        // Before the `OSC 133;A` below, not after: the mark says where the prompt starts, and a
+        // blank line is output rather than prompt.
+        let breath = match announce_prompt {
+            Some(oslo_ui::marks::PromptKind::Primary)
+                if !oslo_ui::settings::current().transcript.rule.is_empty() =>
+            {
+                "\r\n"
+            }
+            _ => "",
+        };
         let semantic_prompt = match announce_prompt.take() {
             Some(oslo_ui::marks::PromptKind::Primary) => oslo_ui::marks::prompt_start(),
             Some(oslo_ui::marks::PromptKind::Continuation) => {
@@ -177,7 +192,8 @@ pub(super) fn read_command(
             None => String::new(),
         };
         print!(
-            "{}{}{}",
+            "{}{}{}{}",
+            breath,
             oslo_ui::marks::working_directory(&crate::startup::repl::cwd()),
             oslo_ui::marks::title(
                 &lua.render_with(
