@@ -192,6 +192,39 @@ oslo.prompt.left = {
 }
 ```
 
+
+### A prompt that moves
+
+A segment may ask to be drawn again on a clock, which is what a spinner is:
+
+```lua
+local frames, n = { "⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧" }, 0
+oslo.prompt.left = {
+  oslo.segment{ name = "spin", every = 100, render = function()
+    n = n + 1
+    return { { text = frames[(n % #frames) + 1], style = "prompt.aside" } }
+  end },
+  oslo.segment{ name = "git", render = function(ctx) return ctx.branch or "" end },
+}
+```
+
+`every` is milliseconds, and a floor rather than a promise: the editor redraws when it next comes up
+for air, which it does at least this often and sooner if a key is pressed. `0` is off. Below 60 ms is
+clamped — the cap is on the segment so a config cannot ask for a rate that makes the shell unusable
+over a link it was not written on.
+
+**The other segments do not re-run.** This is the whole reason `every` is affordable. The prompt
+keeps two counters: one saying the string on screen is stale, which a frame moves, and one saying
+the *segments behind it* are, which only a real change moves — a new directory, a variable, a
+branch. Each segment's output is kept under its name, and a frame re-runs only the ones whose
+interval has come. A spinner at ten frames a second next to a segment that shells out to `git`
+costs ten spinner calls and no `git` at all.
+
+Measured, on a prompt of exactly those two segments left alone for three seconds: 29 redraws, four
+spinner frames cycling evenly, and the other segment rendered **once**.
+
+A segment with no `name` is never cached — two of them would share one entry and take turns
+overwriting it — so an animated segment needs a name to be animated cheaply.
 A style is a name. A dotted one is a theme slot — `prompt.user`, `prompt.host`, `prompt.cwd`,
 `prompt.git`, `prompt.ok`, `prompt.failed`, `prompt.aside` — and follows the colour scheme that is
 loaded; anything else is parsed as a colour, so `"cyan"` and `"#8be9fd"` work with no theme defined.

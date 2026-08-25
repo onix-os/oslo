@@ -416,7 +416,7 @@ impl LuaEngine {
             return Some(text.to_string());
         }
         if crate::lua::api::segment::is_segment_list(&value) {
-            return self.render_segments(&value, ctx);
+            return self.render_segments(key, &value, ctx);
         }
         // A prompt produced by another program — starship, hexe, anything that prints one.
         if let Some(spec) = crate::lua::api::external::spec_of(&value) {
@@ -460,7 +460,7 @@ impl LuaEngine {
     }
 
     /// Render a list of segments into one string, dropping the least important until it fits.
-    fn render_segments(&self, list: &Value, ctx: &Context) -> Option<String> {
+    fn render_segments(&self, key: &str, list: &Value, ctx: &Context) -> Option<String> {
         use crate::lua::api::segment;
         let Value::Table(table) = list else {
             return None;
@@ -468,9 +468,21 @@ impl LuaEngine {
         let count = table.borrow().length();
         let ctx_value = ctx.to_lua();
         let mut pieces = Vec::new();
+        // The fastest anything asked for, so several animated segments share one timer.
+        let mut soonest: Option<u64> = None;
         for i in 1..=count {
             let seg = table.borrow().get(&Value::int(i));
             let (name, priority) = segment::describe(&seg);
+            let every = segment::every_ms(&seg);
+            if let Some(ms) = every {
+                soonest = Some(soonest.map_or(ms, |had: u64| had.min(ms)));
+            }
+            // **Only the ones with something new to say.** Everything else is what it drew last
+            // time — which is what makes a prompt that moves affordable. See `segment::cache`.
+            if let Some(kept) = segment::cache::reuse(key, &name, every) {
+                pieces.push(kept);
+                continue;
+            }
             let Some(render) = segment::render_fn(&seg) else {
                 continue;
             };
@@ -491,12 +503,19 @@ impl LuaEngine {
                 continue;
             }
             let width = oslo_ui::prompt::printed_width(&text);
-            pieces.push(segment::Rendered {
+            let rendered = segment::Rendered {
                 name,
                 priority,
                 text,
                 width,
-            });
+            };
+            segment::cache::keep(key, &rendered.name, &rendered);
+            pieces.push(rendered);
+        }
+        // Asked for *after* rendering, so a segment that stops animating stops being woken for:
+        // the deadline is only ever re-armed by a pass that found somebody still asking.
+        if let Some(ms) = soonest {
+            oslo_ui::prompt::animate_in(std::time::Duration::from_millis(ms));
         }
         // Half the terminal at most: a prompt wider than that leaves no room to type, which is the
         // thing the prompt exists to serve.

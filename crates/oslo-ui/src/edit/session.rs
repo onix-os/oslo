@@ -376,9 +376,14 @@ pub fn read_line(
             let _ = out.write_all(shape.as_bytes());
         }
 
+        // **A frame of an animation is a rebuild, not just a repaint.** The moving part is inside
+        // the prompt, so the string itself has to be made again — but without saying anything
+        // changed, which would drag every other segment through `git` with it. See
+        // `crate::prompt::animation`.
+        let ticked = crate::prompt::tick_due();
         // Cheap enough to ask every frame: one relaxed load, and equal almost always.
         let now = crate::prompt::generation();
-        if now != seen {
+        if now != seen || ticked {
             seen = now;
             (prompt, right) = render();
             // A prompt that rebuilt itself has to reach the screen even if the last key moved
