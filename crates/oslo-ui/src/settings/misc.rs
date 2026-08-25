@@ -112,6 +112,13 @@ pub struct Transcript {
     /// is one sign too many. Set it to `"$ "` for a line that reads as a shell prompt. A renderer
     /// replaces the whole header, prefix included.
     pub prefix: String,
+    /// `oslo.transcript.style` — the colour the rule and the brackets are drawn in.
+    ///
+    /// **An indexed colour by default, not a theme slot.** `"1"` is palette entry 1, which a
+    /// terminal can retint without the shell being told — hexe's `OSC 1330` namespaces do exactly
+    /// that, so the divider can be recoloured for a whole pane after the fact. A hex value or a
+    /// name works too, and anything that is not a colour falls back to the theme's `prompt.aside`.
+    pub style: String,
     /// `oslo.transcript.osc` — the OSC number the frame marks are written with.
     ///
     /// See [`crate::transcript`] for why oslo has one of its own and what is refused.
@@ -124,6 +131,7 @@ impl Default for Transcript {
             // Empty: a setting that changes the shape of the scrollback is asked for, never assumed.
             rule: String::new(),
             prefix: String::new(),
+            style: "1".to_string(),
             osc: crate::transcript::DEFAULT_OSC,
         }
     }

@@ -168,6 +168,7 @@ segment that renders nothing, silently.
 ```lua
 oslo.transcript.rule   = "-"      -- empty is off, which is the default
 oslo.transcript.prefix = ""       -- optional, inside the brackets
+oslo.transcript.style  = "1"      -- the divider's colour; an index, a hex value or a name
 ```
 
 With a rule set, running a line **replaces its prompt** with what was run:
@@ -205,9 +206,14 @@ down the scrollback reads as a list of what was run. Three cells of rule carry o
 so the line reads as a rule the command interrupts rather than one that stops at it.
 
 `rule` is a **unit repeated to the width** of the terminal, so `"-"` is solid and `"- "` is dashed.
-It is drawn in the theme's `prompt.aside`, the slot for text meant to be looked past; the command
-between the brackets is left exactly as it was typed. A command too wide for the row keeps its
-brackets and loses the lead-in rather than being cut.
+The command between the brackets is left exactly as it was typed. A command too wide for the row
+keeps its brackets and loses the lead-in rather than being cut.
+
+**The divider is an indexed colour, not a theme slot.** `"1"` is palette entry 1, which a terminal
+can retint on its own without the shell being told — hexe's `OSC 1330` namespaces do exactly that,
+so the divider can be recoloured for a whole pane after the fact. A theme slot would be resolved
+here and baked into the bytes, and no palette could reach it afterwards. A hex value or a colour
+name works too; anything that is not a colour falls back to the theme's `prompt.aside`.
 
 **Every line of a multi-line command gets its own brackets** — a paste, a heredoc:
 

@@ -516,3 +516,24 @@ fn a_transcript_header_says_this_was_run() {
         "and empty stays empty"
     );
 }
+
+/// The divider's colour, and why the default is an index rather than a slot.
+///
+/// **`"1"` is palette entry 1**, which a terminal can retint without the shell being told — hexe's
+/// `OSC 1330` namespaces do exactly that. A theme slot would be resolved here and baked into the
+/// bytes, and no palette could reach it afterwards.
+#[test]
+fn the_divider_is_an_indexed_colour_by_default() {
+    let style = |source: &str| settings_from(source).0.transcript.style;
+    assert_eq!(style("oslo = {}"), "1");
+    assert_eq!(
+        style("oslo = { transcript = { style = \"#7c7c7c\" } }"),
+        "#7c7c7c"
+    );
+
+    // And it parses as one, which is what makes it an `ESC[38;5;1m` rather than a name nobody reads.
+    assert_eq!(
+        crate::theme::Color::parse("1"),
+        Some(crate::theme::Color::Indexed(1))
+    );
+}

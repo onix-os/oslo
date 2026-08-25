@@ -39,13 +39,17 @@ pub(super) fn ending(erase: bool, line: &str, cursor_row: usize, rows: usize) ->
                 .unwrap_or_else(|| format!("{}{row}", settings.transcript.prefix))
         })
         .collect();
-    let aside = crate::theme::current().prompt.aside;
+    // A colour rather than a theme slot, so a terminal can retint the divider on its own — see
+    // [`crate::settings::Transcript::style`]. Anything unparseable keeps the old quiet grey.
+    let painted = crate::theme::Color::parse(&settings.transcript.style)
+        .map(crate::theme::Style::fg)
+        .unwrap_or(crate::theme::current().prompt.aside);
     let block = screen::transcript(
         cursor_row,
         &drawn,
         &rule,
         crate::dropdown::terminal_cols(),
-        &aside.open(crate::theme::depth()),
+        &painted.open(crate::theme::depth()),
     );
     format!(
         "{}{block}{}",
