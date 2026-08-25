@@ -137,12 +137,20 @@ pub fn transcript(
     let mut out = park(cursor_row);
     // Everything from here down was the prompt's and is being replaced.
     out.push_str("\x1b[J");
+    out.push_str(BREATH);
     for row in framed(rows, unit, cols, style, crate::transcript::last()) {
         out.push_str(&row);
         out.push_str("\r\n");
     }
+    out.push_str(BREATH);
     out
 }
+
+/// A blank row above the block and another below it.
+///
+/// The block sits between one command's output and the next, and without this it reads as another
+/// line of whichever it is nearer. A rule can only separate what it has room to sit apart from.
+const BREATH: &str = "\r\n";
 
 /// How much rule is left past the bracket. Enough to read as a rule that continues, short enough
 /// that the command still ends the line.
@@ -253,6 +261,7 @@ pub fn given(
     });
     let mut out = park(cursor_row);
     out.push_str("\x1b[J");
+    out.push_str(BREATH);
     for (at, row) in rows.iter().enumerate() {
         if at > 0 {
             out.push_str(&" ".repeat(indent));
@@ -260,5 +269,6 @@ pub fn given(
         out.push_str(row.trim_end_matches(['\r', '\n']));
         out.push_str("\r\n");
     }
+    out.push_str(BREATH);
     out
 }
