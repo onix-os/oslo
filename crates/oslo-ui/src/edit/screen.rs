@@ -170,3 +170,19 @@ fn fill_width(unit: &str, cols: usize) -> String {
     }
     out
 }
+
+/// A block another program drew, put where the prompt was.
+///
+/// The counterpart to [`transcript`] for `oslo.transcript.command`. Only two things are oslo's
+/// here: clearing the prompt, and the line endings — the terminal is in raw mode, so a bare `\n`
+/// steps down without returning and the second row would start under the end of the first. A
+/// renderer writing ordinary text should not have to know that.
+pub fn given(cursor_row: usize, text: &str) -> String {
+    let mut out = park(cursor_row);
+    out.push_str("\x1b[J");
+    for line in text.trim_end_matches('\n').split('\n') {
+        out.push_str(line.trim_end_matches('\r'));
+        out.push_str("\r\n");
+    }
+    out
+}

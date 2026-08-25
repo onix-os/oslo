@@ -39,6 +39,7 @@ pub mod suggest;
 pub mod syntax;
 pub mod term;
 pub mod theme;
+pub mod transcript;
 pub mod vi;
 pub mod words;
 

@@ -455,6 +455,11 @@ impl LuaEngine {
     }
 
     /// Read `oslo.completion`, `oslo.suggest` and `oslo.history` as they stand.
+    /// The `oslo` table as it stands, for a reader that wants more than the settings.
+    pub fn oslo_table(&self) -> Value {
+        self.interp.global("oslo")
+    }
+
     pub fn read_settings(&self) -> (oslo_ui::settings::Settings, Vec<String>) {
         oslo_ui::settings::read_lua_settings(&self.interp.global("oslo"))
     }

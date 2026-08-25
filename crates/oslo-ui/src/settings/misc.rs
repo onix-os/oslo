@@ -96,7 +96,21 @@ impl Default for Misc {
 ///
 /// A line that is only whitespace leaves nothing: there is no command to frame, and a pair of
 /// rules around an empty row is a worse transcript than no rules at all.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Transcript {
     pub rule: String,
+    /// `oslo.transcript.osc` — the OSC number the frame marks are written with.
+    ///
+    /// See [`crate::transcript`] for why oslo has one of its own and what is refused.
+    pub osc: u32,
+}
+
+impl Default for Transcript {
+    fn default() -> Self {
+        Transcript {
+            // Empty: a setting that changes the shape of the scrollback is asked for, never assumed.
+            rule: String::new(),
+            osc: crate::transcript::DEFAULT_OSC,
+        }
+    }
 }

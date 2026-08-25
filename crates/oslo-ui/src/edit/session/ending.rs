@@ -22,17 +22,30 @@ pub(super) fn ending(erase: bool, line: &str, cursor_row: usize, rows: usize) ->
     if erase {
         return screen::park(cursor_row);
     }
-    let rule = crate::settings::current().transcript.rule.clone();
-    if rule.is_empty() || line.trim().is_empty() {
+    let settings = crate::settings::current();
+    let rule = settings.transcript.rule.clone();
+    let delegated = crate::transcript::rendered(line);
+    // Neither a renderer nor a rule is the ordinary ending, and so is a line with no command in it.
+    if (delegated.is_none() && rule.is_empty()) || line.trim().is_empty() {
         return screen::finish(cursor_row, rows);
     }
     let aside = crate::theme::current().prompt.aside;
-    let style = aside.open(crate::theme::depth());
-    screen::transcript(
-        cursor_row,
-        &rule,
-        line,
-        crate::dropdown::terminal_cols(),
-        &style,
+    let block = match delegated {
+        // **Whatever the program said, verbatim but for the line endings.** The terminal is in raw
+        // mode, so a bare `\n` steps down without returning and the second row starts under the end
+        // of the first. A renderer writing ordinary text should not have to know that.
+        Some(text) => screen::given(cursor_row, &text),
+        None => screen::transcript(
+            cursor_row,
+            &rule,
+            line,
+            crate::dropdown::terminal_cols(),
+            &aside.open(crate::theme::depth()),
+        ),
+    };
+    format!(
+        "{}{block}{}",
+        crate::transcript::mark(true),
+        crate::transcript::mark(false)
     )
 }

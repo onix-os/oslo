@@ -193,6 +193,64 @@ empty row is a worse transcript than none. A key bound with `erase` — see
 [the line editor](line-editor.md) — keeps its own ending, since a key that *is* a command was never
 meant to be seen, rules around it least of all.
 
+### Letting another program draw it
+
+```lua
+oslo.transcript.command = {
+  command    = "pixy",
+  args       = { "render", "transcript", "--set", "cmd=$command" },
+  timeout_ms = 20,      -- the default
+}
+```
+
+Whatever it prints is the block. `$command` is substituted in `args` — the only field there is, since
+the rest of what a prompt is told stopped being interesting the moment the command started. The
+`rule` stays as the fallback: a renderer that is missing, fails or overruns leaves the dashed line
+rather than nothing.
+
+**The deadline is short and there is no `async`.** This runs between Enter and the command starting.
+A frame that arrived after the output had already begun would not be a frame, and there is nothing
+sensible to draw in the meantime — so a tool that overruns is killed and the rule is used.
+
+### The frame marks
+
+A transcript already sits inside `OSC 133`'s region — between `B`, the start of input, and `C`, the
+start of output — so a terminal can fold a whole command with `A`…`D` and needs nothing new. What it
+cannot do from `OSC 133` alone is tell the *frame* apart from the prompt, which is what folding
+everything **except** the header needs. So the block is wrapped:
+
+```
+ESC ] 133  ; A                              prompt start
+ESC ] 133  ; B                              input start
+ESC ] 1440 ; frame ; begin ; aid=<session>
+- - - - - - - - - - - - - - - - - - - -
+cargo test --lib
+- - - - - - - - - - - - - - - - - - - -
+ESC ] 1440 ; frame ; end ; aid=<session>
+ESC ] 133  ; C                              output start
+running 795 tests
+ESC ] 133  ; D ; 0                          command end, with status
+```
+
+Fold from `frame;end` to `133;D` and the header stays.
+
+**Its own number, not a key inside `OSC 133`.** That vocabulary is shared with every other shell, and
+a key oslo invented there is one those shells' terminals have to guess at. 1440 is adjacent to 133
+and clear of hexe's 1330, which made the same call for its palette protocol and reserved 133 for
+exactly this reason.
+
+The verb comes first — `frame` is the only one today, so a later `fold` or `title` is another verb
+rather than another number, and a terminal that does not know a verb ignores the sequence whole,
+which is what every terminal already does with an OSC it has never heard of.
+
+Change the number with `oslo.transcript.osc`, or with `$OSLO_TRANSCRIPT_OSC` for a terminal that has
+claimed 1440 for something else without editing a config. A number a terminal already acts on — `0`,
+`7`, `133`, `1337` and the rest — is refused and the default used instead: claiming one does not add
+a mark, it takes away whatever that number did, silently and far from the line that caused it.
+
+Nothing is written at all when marks are off — a script, a pipe, `-c` — which is the same rule that
+governs `OSC 133` here.
+
 ## Configuration
 
 ```lua

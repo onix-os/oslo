@@ -415,7 +415,7 @@ fn spawn(
 }
 
 /// Run a command with a deadline, returning its stdout with the trailing newline trimmed.
-fn run(command: &str, args: &[String], timeout: Duration) -> Option<String> {
+pub(crate) fn run(command: &str, args: &[String], timeout: Duration) -> Option<String> {
     use std::process::{Command, Stdio};
     // Resolved through the shell's own table rather than left to `execvp`, which tries every
     // `$PATH` entry in turn and pays for the miss on each one. This runs from a prompt, so the

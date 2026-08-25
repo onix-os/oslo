@@ -40,3 +40,4 @@ mod terminal;
 mod timers;
 pub mod timing;
 mod tracking;
+mod transcript;
