@@ -530,6 +530,8 @@ pub fn run_repl(login: bool, no_rc: bool, no_profile: bool) -> ! {
                 // before its own command runs, so the only status it can carry is the one that has
                 // just landed here — see `oslo_ui::transcript::last`.
                 oslo_ui::transcript::ended(last_status);
+                // And whether it left the screen blank, which decides the next prompt's spacing.
+                oslo_ui::transcript::ran(&text);
             }
         }
     }

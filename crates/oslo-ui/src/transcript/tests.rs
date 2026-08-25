@@ -34,3 +34,30 @@ fn nothing_is_written_when_marks_are_off() {
     assert_eq!(mark(true), "");
     assert_eq!(mark(false), "");
 }
+
+/// **A cleared screen skips the prompt's leading blank.** `clear` puts the cursor at row one; a
+/// blank written there spends the space the clear was asked for.
+#[test]
+fn a_clearing_command_is_recognised_and_answered_once() {
+    for blanks in ["clear", "reset", "tput clear", "tput reset", "  clear  "] {
+        ran(blanks);
+        assert!(cleared(), "{blanks} blanks the screen");
+    }
+    for keeps in [
+        "ls",
+        "echo clear",
+        "clear-cache",
+        "git reset --hard",
+        "tput cols",
+        "",
+    ] {
+        ran(keeps);
+        assert!(!cleared(), "{keeps} does not");
+    }
+
+    // **Answered once.** It is true of the prompt that follows the clear and of no other, so the
+    // answer is taken rather than read — otherwise every prompt after a `clear` would lose its row.
+    ran("clear");
+    assert!(cleared());
+    assert!(!cleared(), "the next prompt gets its blank back");
+}

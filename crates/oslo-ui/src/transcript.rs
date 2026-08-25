@@ -166,3 +166,39 @@ pub fn last() -> Option<i32> {
         status => Some(status as i32),
     }
 }
+
+/// Whether the last command left the screen blank, so the next prompt skips its leading row.
+///
+/// **A blank row at the top of a cleared screen is a wasted one.** `clear` puts the cursor at row
+/// one; a prompt that then writes a blank before itself starts the session's first line on the
+/// second row, which is exactly the space the clear was asked for.
+///
+/// # Recognised by name, and that is a limit worth stating
+///
+/// The alternative is asking the terminal where the cursor is — `ESC[?6n` — before every prompt.
+/// That is a round trip per prompt on a link that may be slow, in cooked mode, for one blank line.
+/// So this matches what was *run*: `clear` and `reset`, alone or through `tput`. A screen cleared
+/// some other way — a program that does it on the way out, a `printf` of the escape — gets the
+/// blank row, which is a cosmetic miss rather than a broken prompt.
+static CLEARED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+/// Note what the command was, so the next prompt knows whether the screen is blank.
+pub fn ran(command: &str) {
+    CLEARED.store(
+        clears_the_screen(command),
+        std::sync::atomic::Ordering::Relaxed,
+    );
+}
+
+/// Whether the screen is blank, clearing the answer: it is true of one prompt and not the next.
+pub fn cleared() -> bool {
+    CLEARED.swap(false, std::sync::atomic::Ordering::Relaxed)
+}
+
+fn clears_the_screen(command: &str) -> bool {
+    let words: Vec<&str> = command.split_whitespace().collect();
+    matches!(
+        words.as_slice(),
+        ["clear"] | ["reset"] | ["tput", "clear"] | ["tput", "reset"]
+    )
+}

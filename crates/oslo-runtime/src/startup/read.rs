@@ -177,7 +177,10 @@ pub(super) fn read_command(
         // blank line is output rather than prompt.
         let breath = match announce_prompt {
             Some(oslo_ui::marks::PromptKind::Primary)
-                if !oslo_ui::settings::current().transcript.rule.is_empty() =>
+                if !oslo_ui::settings::current().transcript.rule.is_empty()
+                    // Except on a screen the last command blanked: the cursor is already at the
+                    // top, and a row spent there is the space the clear was asked for.
+                    && !oslo_ui::transcript::cleared() =>
             {
                 "\r\n"
             }

@@ -185,6 +185,12 @@ the output above or below it. The one *above* is written before the prompt, not 
 the prompt is what the block replaces, and it wants the same air whether or not the line typed at it
 turns into one.
 
+**Except after `clear`**, which puts the cursor at row one: a blank written there spends exactly the
+space the clear was asked for. `clear` and `reset` are recognised by name, alone or through `tput`.
+The alternative is asking the terminal where the cursor is before every prompt — a round trip per
+prompt, on a link that may be slow, for one blank line — so a screen blanked some other way keeps
+its row, which is a cosmetic miss rather than a broken prompt.
+
 The prompt block is cleared, a rule runs into the command at the right-hand end, and the output
 follows. What scrolls back is then a record of *what was run* — which is the half anybody rereads,
 and the half that survives being copied out of a terminal into a bug report. A prompt carrying a
