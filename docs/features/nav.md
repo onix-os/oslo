@@ -39,6 +39,13 @@ it happened to be installed. A program changing what a shell builtin does by exi
 nobody asked for, and one that could not be turned off without uninstalling something. oslo's
 browser is the default and stays the default; choosing another is an act.
 
+**A browser that is not installed here is no browser.** One config is read on every machine you log
+in to, and the one it names is not on all of them — so a `command` whose program cannot be found
+falls back to oslo's own browser rather than failing. Nothing is printed: the fallback is the
+behaviour, not a degraded one. Anything else that stops the spawn — a name that exists but is not
+executable — is a broken configuration and does say so, because silently drawing something other
+than what was asked for would leave nothing to debug with.
+
 ### The placeholders
 
 | | |
@@ -56,7 +63,7 @@ in a terminal mux's float:
 oslo.builtin.nav.command = {
   "hexe", "mux", "float",
   "--command", "trek --explore --cwd-file {answer} {dir}",
-  "--cwd", "{dir}", "--title", "trek", "--size", "70x60", "--pass-env",
+  "--cwd", "{dir}", "--title", "trek", "--size", "21,81", "--pass-env",
 }
 ```
 

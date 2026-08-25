@@ -38,6 +38,11 @@ pub struct Nav {
     /// naming a program here swaps the drawing and keeps everything else: the same operand, the
     /// same exit status, the same `cd` at the end.
     ///
+    /// **And empty is also what a program that is not installed here amounts to.** One config is
+    /// read on every machine somebody logs in to; the browser it names is not on all of them. So a
+    /// command whose program cannot be found draws oslo's own browser rather than failing, and says
+    /// nothing about it — the fallback is the behaviour, not a degraded one.
+    ///
     /// # Why a setting rather than a search of `$PATH`
     ///
     /// This used to look for `trek` and hand over whenever it was installed. That is a program

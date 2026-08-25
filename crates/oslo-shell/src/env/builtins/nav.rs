@@ -27,14 +27,21 @@ pub fn builtin_nav(env: &mut Environment, args: &[String]) -> Result<i32> {
     // A browser named in the config wins. `nav`'s job is to leave the shell in the directory you
     // picked, not to draw the thing that picks it — so this runs it and reads the answer back:
     // same operand, same exit status, somebody else's UI.
-    if !configured.command.is_empty() {
-        return run_navigator(
+    //
+    // **Unless it is not installed here.** One config is read on every machine somebody logs into,
+    // and the browser it names is not on all of them. A `nav` that answered 127 would be a shell
+    // whose directory key stopped working on the machine where you have no editor to fix it with,
+    // so a browser that cannot be found is no browser and oslo draws its own.
+    if !configured.command.is_empty()
+        && let Some(status) = run_navigator(
             env,
             &configured.command,
             &start,
             configured.width,
             configured.height,
-        );
+        )?
+    {
+        return Ok(status);
     }
     let mut look = Preset::History.look();
     look.filter_at = configured.filter_at;
@@ -138,20 +145,23 @@ const DEFAULT_HEIGHT: usize = 50;
 /// The argv is the config's, verbatim but for the placeholders — see
 /// [`oslo_ui::settings::nav::Nav::command`] for what they are and why they substitute *inside* an
 /// argument rather than only as whole words.
+///
+/// `None` means there was no such program on this machine, and the caller should draw oslo's own
+/// browser instead.
 fn run_navigator(
     env: &mut Environment,
     command: &[String],
     start: &Path,
     width: usize,
     height: usize,
-) -> Result<i32> {
+) -> Result<Option<i32>> {
     // The browser answers by writing the directory it finished in, and the shell cd's to whatever
     // it reads back. A predictable path under /tmp would therefore let anyone who can create a file
     // there choose this shell's working directory, so the answer is written inside a private
     // 0700 directory created for this one run.
     let Ok(private) = mkdtemp(&std::env::temp_dir().join("oslo-nav-XXXXXX")) else {
         eprintln!("{}nav: could not create a private directory", origin_now());
-        return Ok(2);
+        return Ok(Some(2));
     };
     let answer = private.join("cwd");
 
@@ -178,18 +188,23 @@ fn run_navigator(
 
     match status {
         Ok(status) if status.success() => {}
-        Ok(status) => return Ok(status.code().unwrap_or(1)),
+        Ok(status) => return Ok(Some(status.code().unwrap_or(1))),
+        // **Not installed is not an error.** `None` sends `nav` back to its own browser; anything
+        // else that stopped the spawn — a name that is there but not executable, a directory it
+        // cannot reach — is a broken configuration and says so, because silently drawing something
+        // other than what was asked for would leave nothing to debug with.
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
         Err(error) => {
             eprintln!("{}nav: {program}: {error}", origin_now());
-            return Ok(127);
+            return Ok(Some(127));
         }
     }
 
     match chosen(&written) {
-        Some(path) => change_directory(env, path),
+        Some(path) => change_directory(env, path).map(Some),
         // Nowhere to go is a cancelled navigation, which is what the built-in browser
         // reports when you leave it with Esc.
-        None => Ok(1),
+        None => Ok(Some(1)),
     }
 }
 
@@ -290,6 +305,46 @@ mod command_tests {
         assert_eq!(
             fill("/tmp/{dir}s", "/a", "/s", 60, 50),
             "/tmp/{dir}s".replace("{dir}", "/s")
+        );
+    }
+}
+
+#[cfg(test)]
+mod missing_browser_tests {
+    use super::*;
+
+    /// **A browser that is not installed here is no browser.** One config is read on every machine
+    /// somebody logs in to, and the one it names is not on all of them. Before this, `nav` on such
+    /// a machine answered 127 and drew nothing — the directory key silently dead on exactly the
+    /// box where fixing it is hardest.
+    ///
+    /// `2` is "no terminal available", which is as far as the built-in browser gets under a test
+    /// harness: the point is that it was reached at all, rather than 127 from the spawn.
+    #[test]
+    fn a_command_that_does_not_exist_falls_back_to_the_builtin() {
+        let mut env = Environment::new();
+        let start = std::env::temp_dir();
+        let missing = vec![
+            "oslo-no-such-browser-anywhere".to_string(),
+            "{dir}".to_string(),
+        ];
+        assert_eq!(
+            run_navigator(&mut env, &missing, &start, 0, 0).expect("nav status"),
+            None,
+            "a missing program must hand back to the caller, not report 127"
+        );
+    }
+
+    /// And one that *is* there is still run, so the fallback cannot swallow a working config.
+    #[test]
+    fn a_command_that_exists_is_still_the_one_that_runs() {
+        let mut env = Environment::new();
+        let start = std::env::temp_dir();
+        // `false` writes no answer, which `nav` reads as a cancelled navigation.
+        let real = vec!["/bin/false".to_string(), "{dir}".to_string()];
+        assert_eq!(
+            run_navigator(&mut env, &real, &start, 0, 0).expect("nav status"),
+            Some(1),
         );
     }
 }
