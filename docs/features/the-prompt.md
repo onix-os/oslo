@@ -251,10 +251,39 @@ oslo.prompt.left = {
 ```
 
 Substitutable in `args`: `$status`, `$duration_ms`, `$cwd`, `$cols`, `$jobs`, `$language`,
-`$branch`, `$vimode`, `$user`, `$host` — every field a native segment can render, which a test pins.
-An absent optional becomes the empty string; anything else is left as written. The tool's stderr is
-inherited on purpose, since its complaints belong on the terminal rather than folded into the
-prompt.
+`$branch`, `$vimode`, `$user`, `$host` — every field a native segment can render, which a test pins
+— and `$frame`, which is about the drawing rather than the shell. An absent optional becomes the
+empty string; anything else is left as written. The tool's stderr is inherited on purpose, since its
+complaints belong on the terminal rather than folded into the prompt.
+
+### An external prompt that moves
+
+`every = <ms>` re-runs the command on a clock, so a prompt you have already built — with its own
+colours, its own zones, its own layout — can grow a moving part without being rebuilt as a segment
+list somewhere else:
+
+```lua
+oslo.prompt.right = {
+  command = "pixy",
+  args    = { "render", "prompt.right", "--target=ansi", "--set", "frame=$frame" },
+  async   = true,
+  every   = 150,      -- floored at 100; 0 or absent is off
+}
+```
+
+**`$frame` is what makes it mean anything.** The tool is a fresh process every time and cannot count
+its own frames, so oslo counts them per prompt — a left and a right do not share a spinner — and the
+tool indexes its own glyph list. Without `$frame`, `every` only asks the same question faster.
+
+**It is a process per frame, and that is the price.** A segment's `every` calls a Lua function; this
+one starts a program. The floor is 100 ms rather than a segment's 60 for that reason. Nothing else in
+the prompt re-runs on a frame — see above — so this is the one cost, and it is opted into.
+
+**And it is a rate limit, not only a clock.** With `async`, the answer landing invalidates the
+prompt, and an invalidation otherwise reads as "run again" — so the prompt spawns itself as fast as
+the tool can finish. Measured at 110 spawns in three seconds where twenty were asked for. So an
+interval holds against a real change too: a new directory is drawn on the next frame rather than
+immediately, which at 100 ms nobody sees.
 
 Shell-side: `PS1`, `PS2`, `RPS1` or `RPROMPT`, `PROMPT_COMMAND`, and `$OSLO_MODE`, exported before
 the prompt is drawn so a `PS1` can say which language it is prompting for. `OSLO_TIME_PROMPT=1`

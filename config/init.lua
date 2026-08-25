@@ -99,13 +99,21 @@ if on_path("pixy") then
     async = true,
   }
 
+  -- **`every` on the right zone only.** Re-running pixy on a clock is a process spawn per frame,
+  -- so it is paid for exactly where the moving glyph is. The left prompt keeps the default and is
+  -- run when its inputs move, as everything else is.
+  --
+  -- `frame=$frame` is the counter oslo keeps per prompt; pixy is a fresh process each time and has
+  -- no memory of the last one, so the number has to arrive with the arguments. Its `prompt.right`
+  -- zone indexes its own glyph list with it.
   oslo.prompt.right = {
     command = "pixy",
     args = { "render", "prompt.right", "--target=ansi",
              "--set", "status=$status", "--set", "language=$language",
-             "--set", "vimode=$vimode" },
+             "--set", "vimode=$vimode", "--set", "frame=$frame" },
     timeout_ms = 10,
     async = true,
+    every = 150,
   }
 end
 
