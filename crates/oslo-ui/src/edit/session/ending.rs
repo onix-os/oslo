@@ -28,14 +28,21 @@ pub(super) fn ending(erase: bool, line: &str, cursor_row: usize, rows: usize) ->
     if rule.is_empty() || line.trim().is_empty() {
         return screen::finish(cursor_row, rows);
     }
+    // **A renderer is asked per row, not once for the command.** It draws one line — see
+    // [`crate::transcript`] — so handing it a pasted block whole means handing it a control byte,
+    // which such a tool refuses; the block then fell back silently and lost its styling on every
+    // row. One call per row is also what makes each row look like the single-line case.
+    let drawn: Vec<String> = line
+        .split('\n')
+        .map(|row| {
+            crate::transcript::rendered(row)
+                .unwrap_or_else(|| format!("{}{row}", settings.transcript.prefix))
+        })
+        .collect();
     let aside = crate::theme::current().prompt.aside;
-    // **The header is the delegated half.** A renderer draws one line and oslo puts the rule under
-    // it — see [`crate::transcript`] for why one line and not the block.
-    let header = crate::transcript::rendered(line)
-        .unwrap_or_else(|| format!("{}{line}", settings.transcript.prefix));
     let block = screen::transcript(
         cursor_row,
-        &header,
+        &drawn,
         &rule,
         crate::dropdown::terminal_cols(),
         &aside.open(crate::theme::depth()),

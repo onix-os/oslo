@@ -15,10 +15,12 @@
 //!
 //! # It is on the path of every command
 //!
-//! Between pressing Enter and the command starting. That is why the deadline is short and why
-//! there is no `async`: a frame that arrives after the command has already printed is not a frame,
-//! and there is nothing sensible to show in the meantime. A tool that overruns is killed and the
-//! rule is drawn instead, which is what `None` means to the caller.
+//! Between pressing Enter and the command starting, and **once per row** — a pasted block of ten
+//! lines runs it ten times, because the tool draws one line and cannot be handed a newline. That is
+//! why the deadline is short and why there is no `async`: a frame that arrives after the command
+//! has already printed is not a frame, and there is nothing sensible to show in the meantime. A
+//! tool that overruns is killed and the row is drawn as it was typed, which is what `None` means to
+//! the caller.
 
 use oslo_base::value::Value;
 use std::time::Duration;

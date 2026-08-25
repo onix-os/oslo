@@ -127,11 +127,17 @@ mod tests;
 /// **Right-aligned, because that is where the eye already is.** The command lands beside the output
 /// it produced rather than at the far left with a screen of rule between them, and a column of
 /// brackets down the scrollback reads as a list of what was run.
-pub fn transcript(cursor_row: usize, header: &str, unit: &str, cols: usize, style: &str) -> String {
+pub fn transcript(
+    cursor_row: usize,
+    rows: &[String],
+    unit: &str,
+    cols: usize,
+    style: &str,
+) -> String {
     let mut out = park(cursor_row);
     // Everything from here down was the prompt's and is being replaced.
     out.push_str("\x1b[J");
-    for row in framed(header, unit, cols, style) {
+    for row in framed(rows, unit, cols, style) {
         out.push_str(&row);
         out.push_str("\r\n");
     }
@@ -163,36 +169,36 @@ const TAIL: usize = 3;
 ///
 /// Split out from the drawing so the arithmetic can be checked without a terminal, which is the
 /// same reason everything else in this file is a pure function.
-fn framed(header: &str, unit: &str, cols: usize, style: &str) -> Vec<String> {
+fn framed(rows: &[String], unit: &str, cols: usize, style: &str) -> Vec<String> {
     let paint = |text: &str| match style.is_empty() {
         true => text.to_string(),
         false => format!("{style}{text}\x1b[0m"),
     };
 
-    let mut lines = header.split('\n');
-    let first = lines.next().unwrap_or_default();
+    let (first, rest) = match rows.split_first() {
+        Some(split) => split,
+        None => return Vec::new(),
+    };
 
     // `[ ` and ` ]` are four cells the command does not get to use.
     let bracketed = crate::prompt::printed_width(first) + 4;
     let fill = cols.saturating_sub(bracketed + TAIL);
 
-    let mut rows = vec![format!(
-        "{}{}{}{}",
+    let mut out = vec![format!(
+        "{}{}{first}{}",
         paint(&fill_width(unit, fill)),
         paint("[ "),
-        first,
         paint(&format!(" ]{}", fill_width(unit, TAIL))),
     )];
-    for line in lines {
-        rows.push(format!(
-            "{}{}{}{}",
+    for line in rest {
+        out.push(format!(
+            "{}{}{line}{}",
             " ".repeat(fill),
             paint("[ "),
-            line,
             paint(" ]"),
         ));
     }
-    rows
+    out
 }
 
 /// `unit` repeated until it reaches `cols`, cut to fit.

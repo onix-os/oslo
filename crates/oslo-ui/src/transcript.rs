@@ -34,7 +34,7 @@
 
 use std::sync::OnceLock;
 
-/// Draws the block, given the command that was run. Installed once, by startup.
+/// Draws one row of the block, given that row. Installed once, by startup.
 type Renderer = Box<dyn Fn(&str) -> Option<String> + Send + Sync>;
 
 static RENDERER: OnceLock<Renderer> = OnceLock::new();
@@ -45,17 +45,19 @@ pub fn install(renderer: impl Fn(&str) -> Option<String> + Send + Sync + 'static
     let _ = RENDERER.set(Box::new(renderer));
 }
 
-/// The header another program says the block should start with, if one is installed and it answered.
+/// What another program says **one row** of the block should read, if one is installed and answered.
 ///
-/// **One line, and the caller adds the rule.** A renderer is line-oriented — pixy, the case this
-/// was built for, refuses a control byte in a rendered string outright — so a contract of "print
-/// the whole block" is one such a tool cannot meet. Trailing line endings are cut for the same
-/// reason: a program that prints a line ends it, and the caller is about to end it again.
+/// **One row, asked for one at a time.** A renderer is line-oriented — pixy, the case this was
+/// built for, refuses a control byte in a rendered string outright — so neither "print the whole
+/// block" nor "here is a pasted command, newlines and all" is a contract such a tool can meet. The
+/// caller splits first and asks per row; the rule, the brackets and the alignment are never the
+/// renderer's. Trailing line endings are cut for the same reason: a program that prints a line ends
+/// it, and the caller is about to end it again.
 ///
-/// `None` sends the caller back to the prefix and the command, which is also what a renderer that
-/// failed or overran means: a transcript is not worth losing a command's frame over.
-pub fn rendered(command: &str) -> Option<String> {
-    let text = RENDERER.get()?(command)?;
+/// `None` sends the caller back to the prefix and the row as it was typed, which is also what a
+/// renderer that failed or overran means: a transcript is not worth losing a command's frame over.
+pub fn rendered(row: &str) -> Option<String> {
+    let text = RENDERER.get()?(row)?;
     let text = text.trim_end_matches(['\r', '\n']);
     (!text.is_empty()).then(|| text.to_string())
 }

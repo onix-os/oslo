@@ -156,7 +156,7 @@ fn parking_returns_to_the_top_without_clearing() {
 #[test]
 fn a_transcript_puts_the_command_at_the_right_edge() {
     // 20 cells: 3 of tail, `[ ls ]` is 6, so 11 of rule lead in.
-    let out = transcript(0, "ls", "-", 20, "");
+    let out = transcript(0, &["ls".into()], "-", 20, "");
     assert_eq!(out, "\r\x1b[J-----------[ ls ]---\r\n");
     assert_eq!(
         crate::prompt::printed_width("-----------[ ls ]---"),
@@ -169,7 +169,7 @@ fn a_transcript_puts_the_command_at_the_right_edge() {
 
     // The rule and the brackets are styled; the command between them is not — it is either what
     // was typed or what another program drew, and neither wants a second opinion.
-    let painted = transcript(0, "ls", "-", 12, "\x1b[2m");
+    let painted = transcript(0, &["ls".into()], "-", 12, "\x1b[2m");
     assert!(
         painted.contains("\x1b[2m[ \x1b[0mls\x1b[2m ]"),
         "{painted:?}"
@@ -180,7 +180,7 @@ fn a_transcript_puts_the_command_at_the_right_edge() {
 #[test]
 fn a_long_command_loses_the_rule_and_not_itself() {
     let long = "cargo test --all-targets --no-run";
-    let out = transcript(0, long, "-", 10, "");
+    let out = transcript(0, &[long.to_string()], "-", 10, "");
     assert!(out.contains(long), "the command is never cut: {out:?}");
     assert!(!out.contains("--------"), "no room for a lead-in: {out:?}");
 }
@@ -190,7 +190,12 @@ fn a_long_command_loses_the_rule_and_not_itself() {
 /// leading into it: repeated down the block it would read as three commands rather than one.
 #[test]
 fn every_row_is_bracketed_and_only_the_first_has_a_rule() {
-    let rows = framed("for f in *.rs; do\necho \"$f\"\ndone", "-", 40, "");
+    let rows = framed(
+        &rows_of("for f in *.rs; do\necho \"$f\"\ndone"),
+        "-",
+        40,
+        "",
+    );
     assert_eq!(rows.len(), 3);
     assert_eq!(rows[0], "----------------[ for f in *.rs; do ]---");
     assert_eq!(rows[1], "                [ echo \"$f\" ]");
@@ -208,7 +213,7 @@ fn every_row_is_bracketed_and_only_the_first_has_a_rule() {
     // A long line takes the whole row: it loses the lead-in, never itself, and the rows under it
     // then start at the margin because there is nowhere else for them to start.
     let long = framed(
-        "a-very-long-command-that-fills-the-row\nsecond",
+        &rows_of("a-very-long-command-that-fills-the-row\nsecond"),
         "-",
         12,
         "",
@@ -226,4 +231,9 @@ fn a_rule_is_repeated_to_the_width_and_cut() {
     assert_eq!(fill_width("-", 0), "", "and no width is no rule");
     // Counted in characters, not bytes: a box-drawing rule is three bytes a cell.
     assert_eq!(fill_width("─", 4).chars().count(), 4);
+}
+
+/// One row per line, as `ending` splits a command before the renderer sees it.
+fn rows_of(command: &str) -> Vec<String> {
+    command.split('\n').map(str::to_string).collect()
 }
