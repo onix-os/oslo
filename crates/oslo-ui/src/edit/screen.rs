@@ -183,11 +183,15 @@ fn framed(rows: &[String], unit: &str, cols: usize, style: &str, was: Option<i32
     // How the command *above* ended, at the end of the rule that sits under its last line of
     // output. See `crate::transcript::last` for why it cannot be this command's. Passed in rather
     // than read here, so the arithmetic below stays a pure function of its arguments.
-    let opened = was.map_or(String::new(), |status| format!("[ {status} ]"));
+    // The same run of rule leads into the status as trails the command, so the row is a rule with
+    // a bracket let into each end rather than one that starts at a bracket and ends at another.
+    let opened = was.map_or(String::new(), |status| {
+        format!("{}[ {status} ]", fill_width(unit, TAIL))
+    });
 
     // `[ ` and ` ]` are four cells the command does not get to use.
     let bracketed = crate::prompt::printed_width(first) + 4;
-    let fill = cols.saturating_sub(bracketed + TAIL + opened.len());
+    let fill = cols.saturating_sub(bracketed + TAIL + opened.chars().count());
 
     let mut out = vec![format!(
         "{}{}{}{first}{}",
@@ -199,7 +203,7 @@ fn framed(rows: &[String], unit: &str, cols: usize, style: &str, was: Option<i32
     for line in rest {
         out.push(format!(
             "{}{}{line}{}",
-            " ".repeat(opened.len() + fill),
+            " ".repeat(opened.chars().count() + fill),
             paint("[ "),
             paint(" ]"),
         ));

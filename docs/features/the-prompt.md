@@ -190,12 +190,14 @@ is where that is true: it sits directly under the last line of that command's ou
 ```
 ------------------------------------[ echo one ]---
 one
-[ 0 ]-------------------------------[ false ]---
-[ 1 ]-------------------------------[ echo two ]---
+---[ 0 ]----------------------------[ false ]---
+---[ 1 ]----------------------------[ echo two ]---
 two
 ```
 
-The first frame of a session carries nothing, because nothing has run.
+The same run of rule leads into it as trails the command, so the row reads as a rule with a bracket
+let into each end rather than one that starts at a bracket and ends at another. The first frame of a
+session carries nothing, because nothing has run.
 
 **Right-aligned, because that is where the eye already is.** The command sits beside the output it
 produced rather than at the far left with a screen of rule between them, and a column of brackets

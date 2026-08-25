@@ -243,10 +243,13 @@ fn rows_of(command: &str) -> Vec<String> {
 /// **The frame opens with how the command above it ended.** A transcript cannot report its own
 /// command — it is drawn before that command runs — so what it carries is the status that has just
 /// landed, at the end of the rule that sits under the previous command's output.
+///
+/// The same run of rule leads into it as trails the command, so the row reads as a rule with a
+/// bracket let into each end.
 #[test]
 fn a_frame_opens_with_the_previous_status() {
     let rows = framed(&rows_of("ls"), "-", 20, "", Some(0));
-    assert!(rows[0].starts_with("[ 0 ]"), "{:?}", rows[0]);
+    assert!(rows[0].starts_with("---[ 0 ]"), "{:?}", rows[0]);
     assert_eq!(
         crate::prompt::printed_width(&rows[0]),
         20,
@@ -254,7 +257,7 @@ fn a_frame_opens_with_the_previous_status() {
     );
 
     let failed = framed(&rows_of("cargo test"), "-", 30, "", Some(101));
-    assert!(failed[0].starts_with("[ 101 ]"), "{:?}", failed[0]);
+    assert!(failed[0].starts_with("---[ 101 ]"), "{:?}", failed[0]);
     assert!(failed[0].ends_with("[ cargo test ]---"), "{:?}", failed[0]);
 
     // The rows of a multi-line command clear the mark as well as the rule.
