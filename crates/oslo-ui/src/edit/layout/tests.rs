@@ -11,6 +11,7 @@ fn row<'a>(prompt: &'a str, plain: &'a str, cursor: usize, cols: usize) -> Row<'
         hint: "",
         right: "",
         cols,
+        lead: 0,
     }
 }
 
@@ -178,6 +179,7 @@ fn an_empty_line_still_places_the_cursor_after_the_prompt() {
 #[test]
 fn colour_in_the_line_is_drawn_but_not_measured() {
     let r = Row {
+        lead: 0,
         prompt: "$ ",
         text: "\x1b[32mecho\x1b[0m hi",
         plain: "echo hi",
@@ -220,4 +222,32 @@ fn click_mapping_uses_the_current_width_after_resize() {
     let line = "abcdefghij";
     assert_eq!(cursor_for_cell("$ ", line, 8, 1, 1), 7);
     assert_eq!(cursor_for_cell("$ ", line, 5, 1, 1), 4);
+}
+
+/// **Leading blanks belong to the block.** A row drawn above the prompt has to be a row the editor
+/// can take back: a blank *printed* before the prompt survives the redraw that replaces it, which
+/// left the old prompt stranded above the new one every time an `erase` binding ran a line.
+///
+/// So `lead` moves the whole block down — its height and the cursor with it — rather than being
+/// written outside it. Five behaves like one, which is the point.
+#[test]
+fn a_lead_moves_the_block_and_not_just_the_text() {
+    let flat = place(&row("$ ", "ls", 2, 40));
+    for lead in [1usize, 5] {
+        let mut with = row("$ ", "ls", 2, 40);
+        with.lead = lead;
+        let led = place(&with);
+        assert_eq!(led.rows, flat.rows + lead, "the block is taller by {lead}");
+        assert_eq!(
+            led.cursor_row,
+            flat.cursor_row + lead,
+            "and the cursor moved with it"
+        );
+        assert_eq!(led.cursor_col, flat.cursor_col, "but not sideways");
+        assert!(
+            led.text.starts_with(&"\r\n".repeat(lead)),
+            "carriage return and newline, not a bare newline: {:?}",
+            &led.text[..8.min(led.text.len())]
+        );
+    }
 }

@@ -38,10 +38,10 @@ fn nothing_is_written_when_marks_are_off() {
 /// **A cleared screen skips the prompt's leading blank.** `clear` puts the cursor at row one; a
 /// blank written there spends the space the clear was asked for.
 #[test]
-fn a_clearing_command_is_recognised_and_answered_once() {
+fn a_clearing_command_is_recognised() {
     for blanks in ["clear", "reset", "tput clear", "tput reset", "  clear  "] {
         ran(blanks);
-        assert!(cleared(), "{blanks} blanks the screen");
+        assert!(cleared_now(), "{blanks} blanks the screen");
     }
     for keeps in [
         "ls",
@@ -52,12 +52,18 @@ fn a_clearing_command_is_recognised_and_answered_once() {
         "",
     ] {
         ran(keeps);
-        assert!(!cleared(), "{keeps} does not");
+        assert!(!cleared_now(), "{keeps} does not");
     }
 
-    // **Answered once.** It is true of the prompt that follows the clear and of no other, so the
-    // answer is taken rather than read — otherwise every prompt after a `clear` would lose its row.
+    // **Read, not taken.** `lead` asks once per drawn frame, not once per prompt — so consuming the
+    // answer would give the first frame no blank row and the next keystroke one, and the prompt
+    // would grow a row under the cursor as soon as you typed. The next *command* clears it.
     ran("clear");
-    assert!(cleared());
-    assert!(!cleared(), "the next prompt gets its blank back");
+    assert!(cleared_now());
+    assert!(
+        cleared_now(),
+        "still true on the next frame of the same prompt"
+    );
+    ran("ls");
+    assert!(!cleared_now(), "and false once something else has run");
 }

@@ -190,15 +190,39 @@ pub fn ran(command: &str) {
     );
 }
 
-/// Whether the screen is blank, clearing the answer: it is true of one prompt and not the next.
-pub fn cleared() -> bool {
-    CLEARED.swap(false, std::sync::atomic::Ordering::Relaxed)
-}
-
 fn clears_the_screen(command: &str) -> bool {
     let words: Vec<&str> = command.split_whitespace().collect();
     matches!(
         words.as_slice(),
         ["clear"] | ["reset"] | ["tput", "clear"] | ["tput", "reset"]
     )
+}
+
+/// Blank rows the prompt block opens with.
+///
+/// **Part of the block, not printed before it.** A prompt is replaced by being redrawn over from
+/// its own first row; anything written outside it survives that. A blank printed ahead of the
+/// prompt therefore stranded the old prompt above the new one every time a key bound with `erase`
+/// ran a line — the block was taken back and the row above it was not.
+///
+/// One when a transcript is configured, because the row above the rule is this. None on a screen
+/// the last command blanked: the cursor is already at the top, and a row spent there is the space
+/// the clear was asked for.
+pub fn lead() -> usize {
+    if crate::settings::current().transcript.rule.is_empty() {
+        return 0;
+    }
+    match cleared_now() {
+        true => 0,
+        false => 1,
+    }
+}
+
+/// Whether the screen is blank, *without* consuming the answer.
+///
+/// Read once per drawn frame rather than once per prompt, so taking it here would answer `true` for
+/// the first frame and `false` for the next keystroke — and the prompt would grow a row under the
+/// cursor as soon as you typed.
+fn cleared_now() -> bool {
+    CLEARED.load(std::sync::atomic::Ordering::Relaxed)
 }

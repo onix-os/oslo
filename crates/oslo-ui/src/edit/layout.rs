@@ -38,6 +38,14 @@ pub struct Row<'a> {
     /// Drawn hard against the right edge of the first row, when it fits.
     pub right: &'a str,
     pub cols: usize,
+    /// Blank rows above the prompt, drawn as **part of this block**.
+    ///
+    /// **Not printed before it, which is the whole point.** A block is replaced by being redrawn
+    /// over from its own first row, and anything written outside it survives that — so a blank row
+    /// printed ahead of the prompt left the old prompt stranded above the new one every time a key
+    /// bound with `erase` ran a line. Rows the editor draws are rows the editor can take back, and
+    /// that stays true whether this is one or five.
+    pub lead: usize,
 }
 
 /// Where the row's cells landed.
@@ -88,6 +96,11 @@ pub fn place(row: &Row) -> Placed {
     let used = advance_cells(line_cells, row.hint, cols);
 
     let mut out = String::new();
+    // `\r\n` and not `\n`: the terminal is in raw mode, so a bare newline steps down without
+    // returning and the prompt would start under the end of whatever was above it.
+    for _ in 0..row.lead {
+        out.push_str("\r\n");
+    }
     out.push_str(row.prompt);
     out.push_str(row.text);
     out.push_str(row.hint);
@@ -107,7 +120,7 @@ pub fn place(row: &Row) -> Placed {
 
     // The block is as tall as the *content* needs — the hint is part of it, since it is drawn and
     // therefore occupies cells, even though the cursor never goes there.
-    let rows = physical_rows(used, cols);
+    let rows = physical_rows(used, cols) + row.lead;
 
     // **The cursor is counted the way the rows are, and that is the whole of this.** A line filled
     // to exactly the width occupies *one* row — the terminal leaves the cursor in the last column
@@ -117,8 +130,8 @@ pub fn place(row: &Row) -> Placed {
     // moved up one row too many and its `ESC[J` erased the line above — the previous command's
     // output, gone on the next keystroke, at every width the line happened to be a multiple of.
     let (cursor_row, cursor_col) = match cursor_cells {
-        0 => (0, 0),
-        n => (physical_rows(n, cols) - 1, (n - 1) % cols + 1),
+        0 => (row.lead, 0),
+        n => (physical_rows(n, cols) - 1 + row.lead, (n - 1) % cols + 1),
     };
 
     Placed {

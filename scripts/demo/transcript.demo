@@ -1,0 +1,63 @@
+# What a finished line leaves behind: the prompt replaced by a record of what was run.
+#
+# **The setting is turned on inside the recording, not in the recording user's config.** The whole
+# point of the feature is the difference between having it and not, and a shell that already had it
+# would open on the answer with nothing to compare against. So the first beats are an ordinary
+# prompt, and the rule arrives in the middle.
+#
+# `oslo.transcript.rule` is read at every accept rather than at startup, so setting it at the prompt
+# takes effect on the very next line — which is what makes this recordable at all.
+cols 100
+rows 22
+speed 0.05
+
+# Two ordinary commands. The prompt stays above each one, which is the thing about to change.
+run echo one
+wait 1.6
+
+run false
+wait 1.6
+
+clear
+
+# One line of config, and the prompt stops being what scrolls back.
+run lua oslo.transcript.rule = "-"
+wait 2.2
+
+# A rule that runs into the command, and the exit code of the command *above* it at the left end.
+# The first one carries none, because nothing has run since the rule was set.
+run echo one
+wait 2.4
+
+# `false` exits 1, and the next frame is where that shows: a frame is drawn before its own command
+# runs, so it can only ever report the one before it.
+run false
+wait 2.0
+
+run echo two
+wait 2.4
+
+clear
+
+# The block is a *terminal* record too. `ESC]1440;frame;begin` and `;end` wrap it, so a terminal can
+# fold everything between the frame and `OSC 133;D` and keep the header — which is what the marks
+# were defined for. `cat -v` is the only way to see an escape that is doing its job.
+run printf 'ls\n' | oslo -i 2>/dev/null | cat -v | grep -o '1440;frame;[a-z]*' | head -2
+wait 4.0
+
+clear
+
+# Another program can draw the row instead — pixy here — and oslo supplies only what it cannot know:
+# the width, the previous status, and whether the row leads with the rule.
+run lua oslo.transcript.command = { command = "pixy", args = { "render", "transcript", "--target=ansi", "--width", "$cols", "--set", "cmd=$command", "--set", "status=$status", "--set", "first=$first" } }
+wait 3.0
+
+run echo drawn by pixy
+wait 3.0
+
+# And back off again: empty is off, and the ordinary ending returns.
+run lua oslo.transcript.rule = ""
+wait 1.6
+
+run echo one
+wait 2.5

@@ -128,6 +128,7 @@ pub(super) fn draw(
         // Read every frame rather than cached, so a resized terminal lays out correctly on the
         // next keystroke without a `SIGWINCH` handler to get wrong.
         cols: terminal_cols(),
+        lead: crate::transcript::lead(),
     })
 }
 
