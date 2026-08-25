@@ -1,9 +1,10 @@
 # The filesystem navigator
 
 `nav` is a builtin that draws the directory you are standing in, lets you walk around it by typing,
-and leaves the shell in whatever directory is on screen when you press Escape. It exists because
-the alternative — an external file manager — is a separate process, and a separate process cannot
-change its parent's working directory.
+and leaves the shell in whatever directory is on screen when you press Escape. It is a builtin
+because a separate process cannot reach into its parent and change the working directory: the most
+an external browser can do is *say* where it ended up, and something inside the shell has to read
+that and act on it. `nav` is that something — see [handing the job to trek](#handing-the-job-to-trek).
 
 ```sh
 nav              # start here
@@ -13,6 +14,34 @@ nav /var/log     # start somewhere else
 <!-- demo:begin -->
 [![nav demo](https://asciinema.org/a/1262742.svg)](https://asciinema.org/a/1262742)
 <!-- demo:end -->
+
+## Handing the job to trek
+
+If **`trek`** is on `$PATH`, `nav` runs it instead of drawing its own browser. Everything around it
+is unchanged — same name, same operand, same effect on the shell:
+
+```sh
+nav              # trek, if it is installed; the builtin browser if not
+```
+
+The split is the point. `nav`'s job is to leave the shell in the directory you chose; drawing the
+thing you choose in is a *different* job, and one a dedicated tool does better — trek has tabs, git
+status, and a commit graph. So the builtin keeps the half only a builtin can do and delegates the
+half anyone can.
+
+They talk through a file. trek is started as `trek --explore --cwd-file <path> <start>`, writes the
+directory it finished in, and `nav` reads that back and `cd`s there. The file is created inside a
+private `0700` directory made for that one run, **not** at a predictable path under `/tmp`: the
+shell goes wherever that file says, so a path a stranger could create first is a path that chooses
+your working directory.
+
+trek is configured by trek. `nav`'s own settings — the border, the filter row, hidden files — describe
+the builtin browser and do not apply to it; a tab, a keybinding or an icon belongs in trek's config,
+not here.
+
+To go back to the builtin browser, take `trek` off `$PATH` for that directory. Resolution goes
+through the shell's own command table, so a directory that hides `trek` hides it from `nav` too, and
+nothing has to be uninstalled.
 
 ## How it works
 
@@ -186,6 +215,8 @@ The filter's matching is not a `nav` setting: it reads `oslo.completion.fuzzy`, 
 them.
 
 ## What it cannot do
+
+This describes the builtin browser. With trek installed the list is trek's, not this one.
 
 - **Be scripted.** There is no `oslo.nav()` and no way to get the chosen path into a variable;
   `nav` changes the shell's directory and that is its only output. It takes one optional path and
