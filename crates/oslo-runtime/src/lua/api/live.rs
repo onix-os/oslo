@@ -42,6 +42,7 @@ use serde_json::Value as Json;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
+pub(crate) mod queued;
 mod server;
 
 /// The client library, handed out by `oslo lua-api`.
@@ -64,6 +65,10 @@ pub const VERBS: &[(&str, &str)] = &[
     ("env.set", "set one variable in the running shell"),
     ("macros.get", "the body of one stored macro"),
     ("notify", "put a line in the shell's message log"),
+    (
+        "cd",
+        "ask the shell to move; applied at its next safe point",
+    ),
 ];
 
 /// Build the `oslo.live` table.
@@ -273,6 +278,27 @@ pub(crate) fn dispatch(
                 Some(body) => Json::String(body),
                 None => Json::Null,
             }])
+        }
+        // **Asked for, not done.** The move happens on the shell's own thread at the point it
+        // reaps children and fires timers at, because `set_current_dir` is process-wide and a
+        // server thread doing it would move the ground under a command mid-`exec`. See
+        // [`queued`], which is also where the answer to "when, then?" lives.
+        "cd" => {
+            let where_ = text(0)?;
+            let path = std::path::PathBuf::from(&where_);
+            if !path.is_dir() {
+                return Err(format!("cd: {where_}: not a directory"));
+            }
+            // Resolved here rather than on the shell thread: a relative path means relative to the
+            // *peer*, which is the only place that knows what it meant, and by the time the shell
+            // reads it the answer would be relative to wherever the shell had got to.
+            let path = path
+                .canonicalize()
+                .map_err(|e| format!("cd: {where_}: {e}"))?;
+            match queued::ask(path) {
+                true => Ok(vec![Json::Bool(true)]),
+                false => Err("cd: this shell is not able to be moved".to_string()),
+            }
         }
         "notify" => {
             let line = text(0)?;

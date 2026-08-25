@@ -18,6 +18,7 @@ mod arrival;
 pub mod config;
 #[cfg(feature = "direnv")]
 mod environments;
+mod follow;
 pub mod history;
 mod integration;
 pub mod language;
@@ -33,6 +34,7 @@ pub mod recall;
 pub mod repl;
 #[cfg(feature = "direnv")]
 mod report;
+mod servicing;
 mod stored;
 mod terminal;
 mod timers;

@@ -172,52 +172,7 @@ pub fn run_repl(login: bool, no_rc: bool, no_profile: bool) -> ! {
     let mut last_status = 0;
     let mut eof_count = 0usize;
 
-    // **What an idle prompt does when the background moves.** Installed here rather than in
-    // `terminal::initialize` because it needs the environment a macro refresh writes into, and the
-    // REPL is what owns it. Runs on the shell thread with no editor borrow held — see
-    // `oslo_base::background`.
-    let serviced = Arc::clone(&env_struct);
-    // **Shared with the loop below, which is why it is behind a lock.** The macro store is re-read
-    // from two places — here when nothing is being typed, and at each prompt and command — and both
-    // have to advance the *same* record of what this shell has applied, or one would keep undoing
-    // the other's work.
-    let held_for_service = Arc::clone(&macros_held);
-    oslo_base::background::install_deadline(crate::lua::api::timer::next_due_in_ms);
-    // Before anything can finish on a thread, so the descriptor is in the set the first wait polls.
-    oslo_base::background::arm();
-    oslo_base::background::install(move || {
-        oslo_shell::exec::job::reap_background_jobs();
-        // A timer that came due, and anything `oslo.spawn` finished on a thread. The same safe
-        // point they already use at a command boundary — the shell holds nothing and Lua may run.
-        let fired = timers::fire();
-        // A macro another terminal stored — an alias, an abbreviation, a variable. Two `stat`s
-        // decide whether there is anything to read, so a wake for some other reason costs that and
-        // nothing more.
-        let changed = match held_for_service.lock() {
-            Ok(mut held) => super::stored::refresh(&serviced, &mut held),
-            Err(_) => false,
-        };
-        // **The lock is gone by here, so anything the apply announced can run.** A hook fired while
-        // the shell's state is held is queued rather than called — it could look but not touch —
-        // and the queue is drained when the borrow that held it ends. This servicer takes the lock
-        // directly rather than through that borrow, so without this the `on-variable-change` for a
-        // value another terminal just set waited for the next command, which is the whole thing an
-        // idle wake exists to avoid.
-        crate::lua::engine::run_deferred_hooks();
-        // **A changed variable is invisible until the prompt is rebuilt.** `PS1` is expanded when
-        // the prompt is rendered, not on every repaint — so a theme another terminal just set would
-        // otherwise sit in the environment, correct and unseen, until the next command. This is the
-        // same door an asynchronous prompt already comes through.
-        //
-        // **A handler that ran is the same kind of news.** `oslo.after(1200, function() mood =
-        // "after" end)` changes what the prompt function returns, and without this the prompt was
-        // rebuilt only when a *universal variable* had also changed — so the new prompt appeared
-        // whenever something else happened to invalidate, and not otherwise.
-        if changed || fired {
-            oslo_ui::prompt::invalidate();
-        }
-        changed || fired
-    });
+    super::servicing::install(&env_struct, &macros_held);
     // Armed *after* the servicer, and only here: both checks want an interactive shell that has
     // somewhere to deliver the news. A script reaps at its command boundaries and has no editor to
     // wake, so the signal would buy it nothing and cost it an interrupted `read` in every library

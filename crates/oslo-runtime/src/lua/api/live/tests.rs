@@ -11,18 +11,27 @@ fn call(name: &str, args: &[Json]) -> Result<Vec<Json>, String> {
 /// **The list is the contract.** Every name in [`VERBS`] dispatches, and the reverse — a verb that
 /// is callable and unlisted is one nobody can discover, and one listed and uncallable is a lie the
 /// client library repeats.
+///
+/// "Dispatches" and not "succeeds": a verb is reached when it judges its own arguments, and
+/// requiring every one of them to *work* here meant the table below had to carry a valid argument
+/// for each — which for `cd` is a real directory and a real request left in a process-wide slot for
+/// whichever test ran next. What this asserts is that the name is known.
 #[test]
 fn every_listed_verb_dispatches() {
     for (name, _) in VERBS {
         let args = match *name {
             "env.get" | "macros.get" | "notify" => vec![Json::String("X".into())],
             "env.set" => vec![Json::String("X".into()), Json::String("y".into())],
+            "cd" => vec![Json::String("/no/such/directory".into())],
             _ => Vec::new(),
         };
-        let answered = call(name, &args);
+        let refused = match call(name, &args) {
+            Ok(_) => String::new(),
+            Err(why) => why,
+        };
         assert!(
-            answered.is_ok(),
-            "{name} is listed and did not dispatch: {answered:?}"
+            !refused.contains("not a verb"),
+            "{name} is listed and did not dispatch: {refused}"
         );
     }
 }

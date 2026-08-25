@@ -277,6 +277,10 @@ local SURFACE = {
   "env.get", "env.all", "env.set",
   "macros.get",
   "notify",
+  -- Asks; does not do. `sh.cd(dir)` answers true once the shell has *accepted* the move, which is
+  -- before it has made it: a shell running a foreground command gets there when that ends. Read
+  -- `sh.cwd()` back if you need to know it happened.
+  "cd",
 }
 
 local function attach(session)
