@@ -117,6 +117,16 @@ if on_path("pixy") then
   }
 end
 
+-- **What a finished line leaves behind.** With a rule set, running a command clears its prompt and
+-- writes the command between two rules instead. The scrollback is then a record of what was *run*
+-- — the half anybody rereads, and the half that survives being pasted into an issue — rather than
+-- of what the prompt looked like at the time, which is a hostname, a branch and a vi mode that
+-- stopped being true the moment the command started.
+--
+-- The string is a unit repeated to the width of the terminal, so this is a dashed rule across the
+-- screen. Empty turns it off and takes the ordinary ending back.
+oslo.transcript.rule = "- "
+
 -- Aliases used to be sourced from ~/.config/profile/aliases.sh here. They are in the oslo macro
 -- database now — `oslo macros show` — which every shell reads for itself at startup, so there is
 -- nothing to source and a change reaches the terminal beside this one before its next prompt.

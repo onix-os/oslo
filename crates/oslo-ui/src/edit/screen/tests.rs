@@ -151,3 +151,31 @@ fn parking_returns_to_the_top_without_clearing() {
         assert!(!out.contains("\x1b[B"), "must not step down: {out:?}");
     }
 }
+
+/// The third ending: the prompt is replaced by what was run, between two rules.
+#[test]
+fn a_transcript_clears_the_block_and_frames_the_command() {
+    let out = transcript(0, "- ", "echo hi", 6, "");
+    assert_eq!(out, "\r\x1b[J- - - \r\necho hi\r\n- - - \r\n");
+
+    // **Cleared, not stepped past.** The whole point is that the prompt is not what scrolls back.
+    assert!(out.contains("\x1b[J"), "the block has to go: {out:?}");
+    // The command is left unstyled between two styled rules — it is the line somebody reads.
+    let painted = transcript(0, "-", "ls", 3, "\x1b[2m");
+    assert!(painted.contains("\x1b[2m---\x1b[0m"), "{painted:?}");
+    assert!(
+        painted.contains("\r\nls\r\n"),
+        "the command is plain: {painted:?}"
+    );
+}
+
+/// A rule is a *unit* repeated to the width, because two characters in the corner is not a rule.
+#[test]
+fn a_rule_is_repeated_to_the_width_and_cut() {
+    assert_eq!(fill_width("- ", 7), "- - - -");
+    assert_eq!(fill_width("-", 3), "---");
+    assert_eq!(fill_width("", 10), "", "nothing repeats to nothing");
+    assert_eq!(fill_width("-", 0), "", "and no width is no rule");
+    // Counted in characters, not bytes: a box-drawing rule is three bytes a cell.
+    assert_eq!(fill_width("─", 4).chars().count(), 4);
+}

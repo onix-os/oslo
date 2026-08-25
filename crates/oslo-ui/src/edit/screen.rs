@@ -113,3 +113,60 @@ pub fn park(cursor_row: usize) -> String {
 #[cfg(test)]
 #[path = "screen/tests.rs"]
 mod tests;
+
+/// A finished line's transcript: the rule, the command, the rule, over where the prompt was.
+///
+/// The third ending a line can have, beside [`finish`] and [`park`]. The block is cleared rather
+/// than kept, because the point is that the prompt is *not* what scrolls back — see
+/// [`crate::settings::Transcript`].
+///
+/// `unit` is repeated to `cols` rather than printed once: a rule two characters wide in the corner
+/// of a terminal is not a rule. A `unit` that does not divide the width is cut, which is what any
+/// rule does at the edge of a screen.
+pub fn transcript(
+    cursor_row: usize,
+    unit: &str,
+    command: &str,
+    cols: usize,
+    style: &str,
+) -> String {
+    let rule = fill_width(unit, cols);
+    let painted = match style.is_empty() {
+        true => rule.clone(),
+        false => format!("{style}{rule}\x1b[0m"),
+    };
+    let mut out = park(cursor_row);
+    // Everything from here down was the prompt's and is being replaced.
+    out.push_str("\x1b[J");
+    out.push_str(&painted);
+    out.push_str("\r\n");
+    // The command unstyled: it is the one line here somebody will read, and it should look the way
+    // it looked while it was being typed.
+    out.push_str(command);
+    out.push_str("\r\n");
+    out.push_str(&painted);
+    out.push_str("\r\n");
+    out
+}
+
+/// `unit` repeated until it reaches `cols`, cut to fit.
+///
+/// Counted in characters rather than bytes: a rule of `─` is three bytes a cell, and a byte count
+/// would draw a third of a line.
+fn fill_width(unit: &str, cols: usize) -> String {
+    if unit.is_empty() || cols == 0 {
+        return String::new();
+    }
+    let mut out = String::new();
+    let mut width = 0;
+    while width < cols {
+        for c in unit.chars() {
+            if width >= cols {
+                break;
+            }
+            out.push(c);
+            width += 1;
+        }
+    }
+    out
+}

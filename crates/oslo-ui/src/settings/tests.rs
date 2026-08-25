@@ -482,3 +482,20 @@ fn a_nav_command_keeps_only_words() {
     );
     assert_eq!(settings.builtin.nav.command, vec!["trek", "--explore"]);
 }
+
+/// `oslo.transcript.rule` is read, and empty is off.
+///
+/// **Off by default**, because it replaces what a terminal has looked like since terminals: a
+/// setting that changes the shape of the scrollback has to be asked for.
+#[test]
+fn a_transcript_rule_is_off_until_a_config_sets_one() {
+    let rule = |source: &str| settings_from(source).0.transcript.rule;
+    assert_eq!(rule("oslo = {}"), "", "nothing configured");
+    assert_eq!(rule("oslo = { transcript = {} }"), "");
+    assert_eq!(rule(r#"oslo = { transcript = { rule = "- " } }"#), "- ");
+    assert_eq!(
+        rule(r#"oslo = { transcript = { rule = "─" } }"#),
+        "─",
+        "a unit is whatever the config says, not a dash"
+    );
+}

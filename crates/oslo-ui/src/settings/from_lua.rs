@@ -437,6 +437,13 @@ pub fn read_lua_settings(oslo: &Value) -> (Settings, Vec<String>) {
         settings.abbr = defined;
     }
 
+    // `oslo.transcript`. Empty stays empty, which is off.
+    if let Value::Table(table) = oslo.get_str("transcript")
+        && let Value::Str(rule) = table.borrow().get_str("rule")
+    {
+        settings.transcript.rule = rule.to_string();
+    }
+
     builtin::read(&oslo, &mut settings, &mut problems);
 
     if let Value::Table(table) = oslo.get_str("history") {

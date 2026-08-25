@@ -435,3 +435,20 @@ mod taking;
 
 #[path = "tests/handlers.rs"]
 mod handlers;
+
+/// **Which ending a finished line gets.** Three of them, and the choice is worth pinning because
+/// two are opt-in and the third is what every shell has always done.
+#[test]
+fn a_blank_line_never_gets_a_transcript() {
+    // `erase` wins over everything: a key that *is* a command was never meant to be seen, rules
+    // around it least of all.
+    assert_eq!(ending(true, "nav", 0, 1), screen::park(0));
+
+    // With no rule configured — the default — a line stays where it was typed.
+    assert_eq!(ending(false, "ls -l", 0, 1), screen::finish(0, 1));
+
+    // And a line that is only whitespace takes the plain ending whatever is configured: there is
+    // no command to frame, and two rules around an empty row is a worse transcript than none.
+    assert_eq!(ending(false, "   ", 0, 1), screen::finish(0, 1));
+    assert_eq!(ending(false, "", 0, 1), screen::finish(0, 1));
+}

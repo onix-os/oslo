@@ -162,6 +162,37 @@ The segment shape is deliberately hexe's, so a config written for one reads the 
 and a raw table is rejected for hexe's reason: a typo in a field name would otherwise produce a
 segment that renders nothing, silently.
 
+
+## What a finished line leaves behind
+
+```lua
+oslo.transcript.rule = "- "     -- empty is off, which is the default
+```
+
+With a rule set, running a line **replaces its prompt** rather than keeping it:
+
+```
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+cargo test --lib
+- - - - - - - - - - - - - - - - - - - - - - - - - - - - - - -
+running 792 tests
+```
+
+The prompt block is cleared and the command is written between two rules, with the output under it.
+What scrolls back is then a record of *what was run* — which is the half anybody rereads, and the
+half that survives being copied out of a terminal into a bug report. A prompt carrying a hostname, a
+branch, a vi mode and a duration is none of those things once the moment has passed.
+
+The string is a **unit repeated to the width** of the terminal, so `"- "` is a dashed rule across the
+screen rather than two characters in a corner. It is drawn in the theme's `prompt.aside`, the slot
+for text meant to be looked past; the command between them is left exactly as it looked while it was
+being typed.
+
+A line that is only whitespace leaves nothing: there is no command to frame, and two rules around an
+empty row is a worse transcript than none. A key bound with `erase` — see
+[the line editor](line-editor.md) — keeps its own ending, since a key that *is* a command was never
+meant to be seen, rules around it least of all.
+
 ## Configuration
 
 ```lua
