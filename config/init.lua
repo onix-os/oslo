@@ -112,6 +112,11 @@ if on_path("pixy") then
     args = { "render", "prompt.right", "--target=ansi",
              "--set", "status=$status", "--set", "language=$language",
              "--set", "vimode=$vimode", "--set", "frame=$frame",
+             -- **Told, not guessed.** Without this pixy falls back to `$PWD` — and while a browser
+             -- is open that is deliberately stale: the shell state is held by the browser, so oslo
+             -- moves the kernel's idea of where it is now and finishes `$PWD` at the next safe
+             -- point. `$cwd` is the moved one, which is what makes the prompt follow trek live.
+             "--set", "cwd=$cwd",
              "--width", "$cols" },
     timeout_ms = 10,
     async = true,
