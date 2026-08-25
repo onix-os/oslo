@@ -266,6 +266,11 @@ pub fn run_repl(login: bool, no_rc: bool, no_profile: bool) -> ! {
             Input::Nothing | Input::Interrupted => {
                 print!("{}", interaction.abort());
                 let _ = std::io::Write::flush(&mut std::io::stdout());
+                // **A line nobody ran still left the screen.** The editor moved the cursor down
+                // past the block, so a screen that was blank a moment ago is not any more — and
+                // without this the prompts after a `clear` went on skipping their blank row until
+                // something real was typed, which is the spacing changing on its own.
+                oslo_ui::transcript::wrote();
                 continue;
             }
             Input::Eof => {
@@ -318,6 +323,8 @@ pub fn run_repl(login: bool, no_rc: bool, no_profile: bool) -> ! {
                     last_status = 130;
                     print!("{}", interaction.abort());
                     let _ = std::io::Write::flush(&mut std::io::stdout());
+                    // The line was drawn and left on screen, cancelled or not.
+                    oslo_ui::transcript::wrote();
                     continue;
                 };
                 let text = answered.text;

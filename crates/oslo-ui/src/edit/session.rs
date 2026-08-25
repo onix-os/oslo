@@ -303,22 +303,9 @@ impl Session {
     }
 }
 
-/// How reading a line ended.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum Outcome {
-    Line(String),
-    /// The language toggle was pressed. The read loop switches and reopens with the same text, so
-    /// the line and the cursor survive the switch — which is the whole point of a toggle that
-    /// works mid-line.
-    ToggleLanguage {
-        text: String,
-        cursor: usize,
-    },
-    /// Ctrl-C: this line is abandoned, the shell carries on.
-    Interrupted,
-    /// Ctrl-D on an empty line, or the input ended.
-    Eof,
-}
+#[path = "session/outcome.rs"]
+mod outcome;
+pub use outcome::Outcome;
 
 /// Read one line.
 ///
@@ -547,6 +534,11 @@ pub fn read_line(
                 // Home the cursor and clear, then fall through to a normal redraw from row 0.
                 let _ = out.write_all(b"\x1b[H\x1b[2J");
                 at_row = 0;
+                // **Said out loud, because this is the one blank screen oslo does not have to guess
+                // about.** The block that redraws below opens with `transcript::lead()` blank rows,
+                // and without this it opened with one — putting the prompt on row two of a screen
+                // that was just cleared to get it to row one.
+                crate::transcript::blanked();
             }
             Step::Accept { erase } => {
                 let shape = crate::vi::back_to_insert(session.vi.is_some());

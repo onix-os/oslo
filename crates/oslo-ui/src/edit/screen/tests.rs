@@ -51,12 +51,20 @@ fn a_redraw_returns_to_the_top_of_the_block() {
 /// lines, measured in tmux. The column, not the row, is what steps off the origin.
 #[test]
 fn the_erase_never_starts_at_the_screen_origin() {
-    let out = redraw(0, "$ ls", at(1, 0, 4));
-    let erase = out.find("\x1b[J").expect("erases");
-    assert!(
-        out[..erase].ends_with("\x1b[K\x1b[C"),
-        "the erase must run from column one of this row: {out:?}"
-    );
+    // Every ending that replaces the block, not just the redraw. A transcript drawn on a cleared
+    // screen starts at row 0 with no lead, which is exactly the case this dodge exists for.
+    let endings = [
+        redraw(0, "$ ls", at(1, 0, 4)),
+        transcript(0, 0, &["ls".into()], "-", 20, ""),
+        given(0, 0, &["ls".into()], 20, Some(&"ls")),
+    ];
+    for out in endings {
+        let erase = out.find("\x1b[J").expect("erases");
+        assert!(
+            out[..erase].ends_with("\x1b[K\x1b[C"),
+            "the erase must run from column one of this row: {out:?}"
+        );
+    }
 }
 
 /// **The erase never leaves the block's own row.**
@@ -156,8 +164,8 @@ fn parking_returns_to_the_top_without_clearing() {
 #[test]
 fn a_transcript_puts_the_command_at_the_right_edge() {
     // 20 cells: 3 of tail, `[ ls ]` is 6, so 11 of rule lead in.
-    let out = transcript(0, &["ls".into()], "-", 20, "");
-    assert_eq!(out, "\r\x1b[J-----------[ ls ]---\r\n\r\n");
+    let out = transcript(0, 0, &["ls".into()], "-", 20, "");
+    assert_eq!(out, "\r\x1b[K\x1b[C\x1b[J\r-----------[ ls ]---\r\n\r\n");
     assert_eq!(
         crate::prompt::printed_width("-----------[ ls ]---"),
         20,
@@ -166,16 +174,31 @@ fn a_transcript_puts_the_command_at_the_right_edge() {
 
     // **Cleared, not stepped past.** The whole point is that the prompt is not what scrolls back.
     assert!(out.contains("\x1b[J"), "the block has to go: {out:?}");
-    // A blank row under it, so the block sits apart from the output below. The one above is the
-    // prompt's, already on screen — see `BREATH`.
+    // A blank row under it, so the block sits apart from the output below.
     assert!(
         out.ends_with("\r\n\r\n"),
         "a blank row under the block: {out:?}"
     );
 
+    // **And the block's own blank rows are put back.** They are drawn by `layout::place` as part of
+    // the block, so erasing the block erases them — and an ending that started at the rule moved
+    // the whole transcript up onto the row its own gap was meant to be. One above and one below is
+    // what a frame between two commands' output has to have; before this it had only the one below.
+    let led = transcript(1, 1, &["ls".into()], "-", 20, "");
+    assert_eq!(
+        led, "\x1b[1A\r\x1b[K\x1b[C\x1b[J\r\r\n-----------[ ls ]---\r\n\r\n",
+        "up to the top of the block, erase, then the blank row it opened with"
+    );
+
+    // On a screen the last command blanked there is no lead and no gap above — the top of a cleared
+    // screen is not something that needs separating from what is not there.
+    assert!(
+        !transcript(0, 0, &["ls".into()], "-", 20, "").starts_with("\r\x1b[K\x1b[C\x1b[J\r\r\n")
+    );
+
     // The rule and the brackets are styled; the command between them is not — it is either what
     // was typed or what another program drew, and neither wants a second opinion.
-    let painted = transcript(0, &["ls".into()], "-", 12, "\x1b[2m");
+    let painted = transcript(0, 0, &["ls".into()], "-", 12, "\x1b[2m");
     assert!(
         painted.contains("\x1b[2m[ \x1b[0mls\x1b[2m ]"),
         "{painted:?}"
@@ -186,7 +209,7 @@ fn a_transcript_puts_the_command_at_the_right_edge() {
 #[test]
 fn a_long_command_loses_the_rule_and_not_itself() {
     let long = "cargo test --all-targets --no-run";
-    let out = transcript(0, &[long.to_string()], "-", 10, "");
+    let out = transcript(0, 0, &[long.to_string()], "-", 10, "");
     assert!(out.contains(long), "the command is never cut: {out:?}");
     assert!(!out.contains("--------"), "no room for a lead-in: {out:?}");
 }

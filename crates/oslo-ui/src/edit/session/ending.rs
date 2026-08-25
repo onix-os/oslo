@@ -29,6 +29,9 @@ pub(super) fn ending(erase: bool, line: &str, cursor_row: usize, rows: usize) ->
         return screen::finish(cursor_row, rows);
     }
     let cols = crate::dropdown::terminal_cols();
+    // The same read the frame this replaces was laid out with, in the same frame — so the rows the
+    // ending puts back are the rows the block actually opened with. See `screen::reopen`.
+    let lead = crate::transcript::lead();
     let was = crate::transcript::last();
     let lines: Vec<&str> = line.split('\n').collect();
 
@@ -51,7 +54,7 @@ pub(super) fn ending(erase: bool, line: &str, cursor_row: usize, rows: usize) ->
     let block = match drawn {
         // Placed as it came, but for the indent that lines a continuation row up under the first —
         // which is oslo's because only oslo knows where the first row's rule stopped.
-        Some(rendered) => screen::given(cursor_row, &rendered, cols, lines.first()),
+        Some(rendered) => screen::given(cursor_row, lead, &rendered, cols, lines.first()),
         // Nothing installed, or a row it declined: oslo draws them all itself.
         None => {
             let painted = crate::theme::Color::parse(&settings.transcript.style)
@@ -63,6 +66,7 @@ pub(super) fn ending(erase: bool, line: &str, cursor_row: usize, rows: usize) ->
                 .collect();
             screen::transcript(
                 cursor_row,
+                lead,
                 &own,
                 &rule,
                 cols,

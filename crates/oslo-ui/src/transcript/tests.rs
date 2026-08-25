@@ -37,11 +37,21 @@ fn nothing_is_written_when_marks_are_off() {
 
 /// **A cleared screen skips the prompt's leading blank.** `clear` puts the cursor at row one; a
 /// blank written there spends the space the clear was asked for.
+///
+/// **A fact about the screen, not about the last command**, which is the second half below. Set
+/// from the command name alone it was wrong in both directions, and both showed as the spacing
+/// changing on its own: it stayed `true` across a blank Enter and a `Ctrl-C` — neither runs a
+/// command — so every prompt after a `clear` went on skipping its blank row until something real
+/// was typed; and it stayed `false` through `Ctrl-L`, the one blank screen oslo does not have to
+/// guess about, so the prompt landed on row two of a screen just cleared to get it to row one.
+///
+/// One test, because the flag is process-wide and libtest runs test functions on threads: split in
+/// two they would take each other's answer.
 #[test]
 fn a_clearing_command_is_recognised() {
     for blanks in ["clear", "reset", "tput clear", "tput reset", "  clear  "] {
         ran(blanks);
-        assert!(cleared_now(), "{blanks} blanks the screen");
+        assert!(blank_now(), "{blanks} blanks the screen");
     }
     for keeps in [
         "ls",
@@ -52,18 +62,28 @@ fn a_clearing_command_is_recognised() {
         "",
     ] {
         ran(keeps);
-        assert!(!cleared_now(), "{keeps} does not");
+        assert!(!blank_now(), "{keeps} does not");
     }
 
     // **Read, not taken.** `lead` asks once per drawn frame, not once per prompt — so consuming the
     // answer would give the first frame no blank row and the next keystroke one, and the prompt
     // would grow a row under the cursor as soon as you typed. The next *command* clears it.
     ran("clear");
-    assert!(cleared_now());
+    assert!(blank_now());
     assert!(
-        cleared_now(),
+        blank_now(),
         "still true on the next frame of the same prompt"
     );
     ran("ls");
-    assert!(!cleared_now(), "and false once something else has run");
+    assert!(!blank_now(), "and false once something else has run");
+
+    // The other two writers, which a command name cannot speak for.
+    ran("clear");
+    // What a line nobody ran leaves behind: the editor stepped the cursor past the block.
+    wrote();
+    assert!(!blank_now(), "a blank Enter is still a row used");
+    // And what the editor does itself, which needs no guessing at all.
+    blanked();
+    assert!(blank_now(), "Ctrl-L cleared it");
+    wrote();
 }
