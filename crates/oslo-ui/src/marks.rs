@@ -42,6 +42,10 @@ pub fn enabled() -> bool {
     ENABLED.load(Ordering::Relaxed) && oslo_base::feature::on(oslo_base::feature::at::MARKS)
 }
 
+pub(crate) fn session_aid() -> String {
+    aid()
+}
+
 fn aid() -> String {
     oslo_base::track::session::id()
         .chars()

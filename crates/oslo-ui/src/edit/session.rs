@@ -376,9 +376,14 @@ pub fn read_line(
             let _ = out.write_all(shape.as_bytes());
         }
 
+        // **A frame of an animation is a rebuild, not just a repaint.** The moving part is inside
+        // the prompt, so the string itself has to be made again — but without saying anything
+        // changed, which would drag every other segment through `git` with it. See
+        // `crate::prompt::animation`.
+        let ticked = crate::prompt::tick_due();
         // Cheap enough to ask every frame: one relaxed load, and equal almost always.
         let now = crate::prompt::generation();
-        if now != seen {
+        if now != seen || ticked {
             seen = now;
             (prompt, right) = render();
             // A prompt that rebuilt itself has to reach the screen even if the last key moved
@@ -557,11 +562,7 @@ pub fn read_line(
                 // Both endings go inside the one synchronized frame, so the terminal shows the
                 // finished block and its ending as one update rather than two.
                 let mut frame = screen::redraw(at_row, &placed.text, into_at(&placed));
-                frame.push_str(&if erase {
-                    screen::park(placed.cursor_row)
-                } else {
-                    screen::finish(placed.cursor_row, placed.rows)
-                });
+                frame.push_str(&ending(erase, &line, placed.cursor_row, placed.rows));
                 let _ = out.write_all(crate::paint::Frame::new(&frame, synchronized).as_bytes());
                 let _ = out.flush();
                 return Outcome::Line(line);
@@ -592,3 +593,7 @@ pub use keys::{Bound, Step};
 #[cfg(test)]
 #[path = "session/tests.rs"]
 mod tests;
+
+#[path = "session/ending.rs"]
+mod ending;
+use ending::ending;

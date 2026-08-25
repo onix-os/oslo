@@ -535,6 +535,8 @@ static PROMPT_GENERATION: std::sync::atomic::AtomicU64 = std::sync::atomic::Atom
 /// re-place a stale one.
 pub fn invalidate() {
     PROMPT_GENERATION.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    // And that the segments behind it are stale, which a tick never says. See `animation`.
+    animation::content_changed();
     // And tell the editor the frame is stale. Two counters rather than one because they answer
     // different questions: this one decides whether the *prompt* is rebuilt, and `pending`'s
     // decides whether the editor redraws at all — a suggestion landing moves the second and must
@@ -568,6 +570,10 @@ pub fn refresh_finished() {
 pub fn refreshing() -> bool {
     crate::pending::outstanding()
 }
+
+#[path = "prompt/animation.rs"]
+mod animation;
+pub use animation::{animate_in, content_generation, settle as settle_animation, tick_due};
 
 #[path = "prompt/continuation.rs"]
 mod continuation;

@@ -482,3 +482,58 @@ fn a_nav_command_keeps_only_words() {
     );
     assert_eq!(settings.builtin.nav.command, vec!["trek", "--explore"]);
 }
+
+/// `oslo.transcript.rule` is read, and empty is off.
+///
+/// **Off by default**, because it replaces what a terminal has looked like since terminals: a
+/// setting that changes the shape of the scrollback has to be asked for.
+#[test]
+fn a_transcript_rule_is_off_until_a_config_sets_one() {
+    let rule = |source: &str| settings_from(source).0.transcript.rule;
+    assert_eq!(rule("oslo = {}"), "", "nothing configured");
+    assert_eq!(rule("oslo = { transcript = {} }"), "");
+    assert_eq!(rule(r#"oslo = { transcript = { rule = "- " } }"#), "- ");
+    assert_eq!(
+        rule(r#"oslo = { transcript = { rule = "─" } }"#),
+        "─",
+        "a unit is whatever the config says, not a dash"
+    );
+}
+
+/// Nothing stands before the command unless a config asks for it — the brackets already do.
+#[test]
+fn a_transcript_header_says_this_was_run() {
+    let prefix = |source: &str| settings_from(source).0.transcript.prefix;
+    assert_eq!(
+        prefix("oslo = {}"),
+        "",
+        "the brackets already say it was run"
+    );
+    assert_eq!(prefix(r#"oslo = { transcript = { prefix = "$ " } }"#), "$ ");
+    assert_eq!(
+        prefix(r#"oslo = { transcript = { prefix = "" } }"#),
+        "",
+        "and empty stays empty"
+    );
+}
+
+/// The divider's colour, and why the default is an index rather than a slot.
+///
+/// **`"1"` is palette entry 1**, which a terminal can retint without the shell being told — hexe's
+/// `OSC 1330` namespaces do exactly that. A theme slot would be resolved here and baked into the
+/// bytes, and no palette could reach it afterwards.
+#[test]
+fn the_divider_is_an_indexed_colour_by_default() {
+    let style = |source: &str| settings_from(source).0.transcript.style;
+    assert_eq!(style("oslo = {}"), "1");
+    assert_eq!(
+        style("oslo = { transcript = { style = \"#7c7c7c\" } }"),
+        "#7c7c7c"
+    );
+
+    // And it parses as one, which is what makes it an `ESC[38;5;1m` rather than a name nobody reads.
+    assert_eq!(
+        crate::theme::Color::parse("1"),
+        Some(crate::theme::Color::Indexed(1))
+    );
+}

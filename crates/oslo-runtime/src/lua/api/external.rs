@@ -27,7 +27,7 @@ use crate::lua::context::Context;
 use oslo_base::value::Value;
 use std::collections::{HashMap, HashSet};
 use std::sync::{Mutex, OnceLock};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 /// What a config asked for.
 pub struct Spec {
@@ -35,6 +35,21 @@ pub struct Spec {
     pub args: Vec<String>,
     pub timeout: Duration,
     pub asynchronous: bool,
+    /// `every = <ms>` — re-run this prompt on a clock, so the tool drawing it can animate.
+    ///
+    /// ```lua
+    /// oslo.prompt.left = { command = "pixy", args = { … }, async = true, every = 150 }
+    /// ```
+    ///
+    /// **Off unless asked for, and asked for is a real cost.** Every other prompt is re-run when
+    /// its *inputs* could have moved; this one is re-run because time passed, which for a command
+    /// means a process spawn per frame for as long as the shell is open. It exists because a prompt
+    /// somebody has already built — with its own colours, its own zones, its own layout — cannot
+    /// grow a moving part any other way: the alternative is replacing it with a segment list, which
+    /// means rebuilding all of it somewhere else to gain one turning glyph.
+    ///
+    /// So the tool draws the frame. oslo only decides when to ask again.
+    pub every: Option<Duration>,
 }
 
 /// Read the external-prompt form out of a Lua table, or `None` if it is not one.
@@ -63,13 +78,31 @@ pub fn spec_of(value: &Value) -> Option<Spec> {
         // pause rather than as a dead shell.
         _ => 200,
     };
+    // **A floor above a segment's.** A segment that animates calls a Lua function; this spawns a
+    // process. Sixty milliseconds is reasonable for the first and sixteen spawns a second is not
+    // reasonable for the second, so the two have different floors and this is the higher one.
+    let every = match t.get_str("every") {
+        Value::Number(n) => n
+            .as_int()
+            .filter(|ms| *ms > 0)
+            .map(|ms| Duration::from_millis((ms as u64).max(MIN_EVERY_MS))),
+        _ => None,
+    };
     Some(Spec {
         command: command.to_string(),
         args,
         timeout: Duration::from_millis(timeout),
         asynchronous: t.get_str("async").truthy(),
+        every,
     })
 }
+
+/// The fastest an external prompt may be re-run.
+///
+/// Ten frames a second, which is a spinner that reads as smooth and a hundred process spawns every
+/// ten seconds. Below this the shell spends more time starting the tool than the terminal spends
+/// drawing what it said.
+const MIN_EVERY_MS: u64 = 100;
 
 /// Substitute `$name` in an argument from the context.
 ///
@@ -81,7 +114,7 @@ pub fn spec_of(value: &Value) -> Option<Spec> {
 ///
 /// An absent optional becomes the **empty string**, not the word `none`: the receiving program is
 /// being told "no answer", and every argument parser already knows what an empty value means.
-fn fill(arg: &str, ctx: &Context) -> String {
+fn fill(arg: &str, ctx: &Context, frame: u64) -> String {
     let mut out = arg.to_string();
     for (name, value) in [
         ("$status", ctx.status.to_string()),
@@ -94,10 +127,29 @@ fn fill(arg: &str, ctx: &Context) -> String {
         ("$vimode", ctx.vimode.clone().unwrap_or_default()),
         ("$user", ctx.user.clone()),
         ("$host", ctx.host.clone()),
+        // **Which frame this is.** Every other field is a fact about the shell; this one is a fact
+        // about the drawing, and it is here because a tool run afresh for each frame has no memory
+        // of the last one. Without it `every` can only ask the same question faster.
+        ("$frame", frame.to_string()),
     ] {
         out = out.replace(name, &value);
     }
     out
+}
+
+/// How many times each prompt has been run, so `$frame` can say which one this is.
+///
+/// Wraps rather than saturating: a spinner indexes into a list of frames with it, and a counter
+/// that stopped at the top would leave one stuck on the last glyph after a few weeks of uptime.
+fn next_frame(key: &str) -> u64 {
+    static FRAMES: OnceLock<Mutex<HashMap<String, u64>>> = OnceLock::new();
+    let frames = FRAMES.get_or_init(|| Mutex::new(HashMap::new()));
+    let Ok(mut frames) = frames.lock() else {
+        return 0;
+    };
+    let at = frames.entry(key.to_string()).or_insert(0);
+    *at = at.wrapping_add(1);
+    *at
 }
 
 /// Which prompt an answer belongs to.
@@ -106,6 +158,54 @@ fn fill(arg: &str, ctx: &Context) -> String {
 /// not move when the shell's state does. See the note in [`render`].
 fn key_of(spec: &Spec) -> String {
     format!("{} {}", spec.command, spec.args.join(" "))
+}
+
+/// The content generation each key was last actually run at.
+///
+/// **So a tick runs nothing.** An animated segment redraws the prompt on a clock, and a redraw
+/// re-renders every key — including this one, which is a *process*. At eight frames a second that
+/// is eight spawns a second of somebody's prompt tool, for ever, on a shell nobody is typing at;
+/// with `async` it is eight overlapping runs whose output interleaves, which shows up as a prompt
+/// whose colours come apart.
+///
+/// An external prompt never asks to be re-run — only a segment can, with `every` — so it is run
+/// again when its *inputs* could have moved, which is what the content generation says. An async
+/// answer landing calls `invalidate` itself, so a late arrival still gets through.
+fn ran_at() -> &'static Mutex<HashMap<String, (u64, Instant)>> {
+    static AT: OnceLock<Mutex<HashMap<String, (u64, Instant)>>> = OnceLock::new();
+    AT.get_or_init(|| Mutex::new(HashMap::new()))
+}
+
+/// What this prompt said last time, when nothing has happened since that would change it.
+///
+/// The two answers to "would change it" are different, and that is the point:
+///
+/// * **Without `every`**, a run is owed when the content generation has moved — the directory, a
+///   variable, the branch, or an `async` answer landing, which invalidates on its own.
+/// * **With `every`**, a run is owed when that long has passed *and not before* — a rate limit as
+///   much as a clock. An animated `async` prompt otherwise spawns itself in a loop: the answer
+///   lands, the landing invalidates, the invalidation reads as "run again", and it does, as fast as
+///   the tool can finish. Measured at 110 spawns in three seconds where twenty were asked for.
+///
+/// The cost of the rate limit is that a real change waits for the next frame. At the floor of
+/// 100 ms that is not a wait anybody can see.
+fn unchanged(key: &str, every: Option<Duration>) -> Option<String> {
+    let (ran, at) = *ran_at().lock().ok()?.get(key)?;
+    let fresh = match every {
+        Some(every) => at.elapsed() < every,
+        None => ran == oslo_ui::prompt::content_generation(),
+    };
+    fresh.then(|| remembered(key))?
+}
+
+/// Note that this key is being run, against the content and the clock as they now stand.
+fn running_at(key: &str) {
+    if let Ok(mut at) = ran_at().lock() {
+        at.insert(
+            key.to_string(),
+            (oslo_ui::prompt::content_generation(), Instant::now()),
+        );
+    }
 }
 
 /// The last output each command produced, so a slow or async run has something to show.
@@ -157,7 +257,6 @@ fn note_deadline(key: &str, in_time: bool) {
 /// `None` when it could not be run at all, so the caller falls back to a prompt of its own rather
 /// than drawing an empty line.
 pub fn render(spec: &Spec, ctx: &Context) -> Option<String> {
-    let args: Vec<String> = spec.args.iter().map(|a| fill(a, ctx)).collect();
     // **Keyed on the spec, not on the arguments it was filled with.**
     //
     // This is what makes `async` usable. The promise is "whatever it said last time, now" — but
@@ -171,6 +270,27 @@ pub fn render(spec: &Spec, ctx: &Context) -> Option<String> {
     // The raw args identify which prompt this is (a left and a right differ by `--right`) and stay
     // put across prompts, which is exactly the identity wanted: last output for *this* prompt.
     let key = key_of(spec);
+
+    // **Armed before the guard, not after it.** A prompt that animates says so in its spec, and it
+    // says so whether or not *this* render is the one that runs the command. Arming only on a run
+    // meant a frame arriving a hair early — the deadline and the last run measured from moments
+    // that are not quite the same — found nothing to do, re-armed nothing, and the animation
+    // stopped for good after exactly one frame.
+    if let Some(every) = spec.every {
+        oslo_ui::prompt::animate_in(every);
+    }
+
+    // Nothing about this prompt has moved since it last ran — a tick asked for a redraw, not a
+    // rebuild — so draw what it said then and spawn nothing. See `unchanged`.
+    if let Some(text) = unchanged(&key, spec.every) {
+        return Some(text);
+    }
+    running_at(&key);
+    // **One frame per run, and only for a run that happens.** Counted here rather than beside the
+    // substitution so a prompt with three arguments does not advance a spinner three glyphs, and
+    // after the guard so a frame nobody drew does not consume one.
+    let frame = next_frame(&key);
+    let args: Vec<String> = spec.args.iter().map(|a| fill(a, ctx, frame)).collect();
 
     if spec.asynchronous {
         // **Wait a little, then give up — rather than never waiting at all.**
@@ -295,7 +415,7 @@ fn spawn(
 }
 
 /// Run a command with a deadline, returning its stdout with the trailing newline trimmed.
-fn run(command: &str, args: &[String], timeout: Duration) -> Option<String> {
+pub(crate) fn run(command: &str, args: &[String], timeout: Duration) -> Option<String> {
     use std::process::{Command, Stdio};
     // Resolved through the shell's own table rather than left to `execvp`, which tries every
     // `$PATH` entry in turn and pays for the miss on each one. This runs from a prompt, so the
@@ -349,129 +469,5 @@ fn run(command: &str, args: &[String], timeout: Duration) -> Option<String> {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn ctx() -> Context {
-        Context {
-            status: 3,
-            duration_ms: Some(1500),
-            cwd: "/tmp/x".to_string(),
-            cols: 100,
-            language: "lua".to_string(),
-            ..Context::default()
-        }
-    }
-
-    /// **The cache key does not move when the shell's state does.**
-    ///
-    /// This is the whole of `async`. Keyed on the filled arguments, a prompt passing `$status` or
-    /// `$duration_ms` — which is every prompt worth writing — missed on every lookup, answered
-    /// `None`, and was replaced by the shell's own fallback. The only way to see such a tool at
-    /// all was `async = false`, paying its full cost between every keystroke and the screen.
-    #[test]
-    fn an_asynchronous_prompt_is_found_again_after_the_status_changes() {
-        let spec = Spec {
-            command: "hexe".to_string(),
-            args: vec!["prompt".to_string(), "--status=$status".to_string()],
-            timeout: Duration::from_millis(400),
-            asynchronous: true,
-        };
-        let first = key_of(&spec);
-
-        let mut later = ctx();
-        later.status = 127;
-        later.duration_ms = Some(90_000);
-        assert_eq!(
-            first,
-            key_of(&spec),
-            "a failed command must not lose the prompt its own tool drew"
-        );
-
-        // And two prompts are still told apart, or a right prompt would answer with a left one.
-        let right = Spec {
-            command: "hexe".to_string(),
-            args: vec![
-                "prompt".to_string(),
-                "--right".to_string(),
-                "--status=$status".to_string(),
-            ],
-            timeout: Duration::from_millis(400),
-            asynchronous: true,
-        };
-        assert_ne!(first, key_of(&right));
-    }
-
-    /// The tool is told what the shell knows, without the config plumbing it through the
-    /// environment by hand.
-    #[test]
-    fn arguments_are_filled_from_the_context() {
-        assert_eq!(fill("--status=$status", &ctx()), "--status=3");
-        assert_eq!(
-            fill("--cmd-duration=$duration_ms", &ctx()),
-            "--cmd-duration=1500"
-        );
-        assert_eq!(
-            fill("--terminal-width=$cols", &ctx()),
-            "--terminal-width=100"
-        );
-        // A name that is not a placeholder is left exactly as written.
-        assert_eq!(fill("--keep-$this", &ctx()), "--keep-$this");
-    }
-
-    /// **Every renderable field can be named.** A field that a Lua segment can read but an
-    /// external prompt cannot ask for is a field that works in one prompt and silently vanishes in
-    /// the other — which is how `$vimode` came to exist on `Context` and be unreachable from
-    /// starship or hexe. If a field is added to `Context`, it is added here too.
-    #[test]
-    fn every_context_field_a_prompt_can_render_is_substitutable() {
-        let mut facts = ctx();
-        facts.vimode = Some("normal".to_string());
-        facts.user = "ada".to_string();
-        facts.host = "lovelace".to_string();
-        facts.language = "lua".to_string();
-        facts.branch = Some("main".to_string());
-
-        assert_eq!(fill("$vimode", &facts), "normal");
-        assert_eq!(fill("$user@$host", &facts), "ada@lovelace");
-        assert_eq!(fill("$language", &facts), "lua");
-        assert_eq!(fill("$branch", &facts), "main");
-
-        // An absent optional is the empty string, so `--vimode=` reaches the program as "no
-        // answer" rather than as the literal word `none` it would then have to special-case.
-        facts.vimode = None;
-        facts.branch = None;
-        assert_eq!(fill("--vimode=$vimode", &facts), "--vimode=");
-        assert_eq!(fill("--branch=$branch", &facts), "--branch=");
-    }
-
-    /// A tool that never finishes must not become a shell that never prompts.
-    #[test]
-    fn a_command_that_overruns_is_killed_and_reported_as_nothing() {
-        let started = std::time::Instant::now();
-        let sleep = ["/bin/sleep", "/usr/bin/sleep"]
-            .into_iter()
-            .find(|p| std::path::Path::new(p).exists())
-            .expect("a system sleep");
-        let out = run(sleep, &["10".to_string()], Duration::from_millis(60));
-        assert!(out.is_none(), "an overrun produces nothing, not a hang");
-        assert!(
-            started.elapsed() < Duration::from_secs(2),
-            "the deadline was not honoured: waited {:?}",
-            started.elapsed()
-        );
-    }
-
-    /// What it printed, without the newline every tool ends with.
-    #[test]
-    fn output_is_taken_verbatim_less_the_trailing_newline() {
-        // An absolute path, not `echo`: other tests in this binary mutate the process-wide
-        // `$PATH`, and a bare name would make this test depend on whichever of them ran first.
-        let echo = ["/bin/echo", "/usr/bin/echo"]
-            .into_iter()
-            .find(|p| std::path::Path::new(p).exists())
-            .expect("a system echo");
-        let out = run(echo, &["hi".to_string()], Duration::from_secs(30));
-        assert_eq!(out.as_deref(), Some("hi"));
-    }
-}
+#[path = "external/tests.rs"]
+mod tests;

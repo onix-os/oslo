@@ -74,6 +74,26 @@ own — that one function is the whole porting job.
 | `env.set` | set one variable in the running shell |
 | `macros.get` | the body of one stored macro |
 | `notify` | put a line in the shell's message log |
+| `cd` | ask the shell to move; applied at its next safe point |
+
+**`cd` is asked for, not done.** Every other verb answers on the server thread and is finished when
+it replies. This one cannot: `set_current_dir` is process-wide, so a server thread making the move
+would shift the ground under a command part-way through resolving a path for `exec` — a command
+that runs in the wrong directory, occasionally. So the request is recorded, the shell is woken down
+a pipe its input wait already polls, and the shell makes the move on its own thread between
+keystrokes, holding nothing.
+
+The reply therefore means **accepted**. A shell at a prompt gets there in a millisecond; one running
+a build gets there when the build ends. Read `cwd` back if you need to know it happened.
+
+It goes through `cd` itself, not through a second route: `$PWD` and `$OLDPWD` move with it, the
+directory ring records it, and `post-change-dir` fires — so a hook cannot tell a peer's move from a
+typed one. The prompt is rebuilt and redrawn where it stands, with **no keystroke**, through the
+same door an asynchronous prompt already comes through.
+
+What it does *not* do is run the new directory's `.env.lua`. That is a prompt-boundary concern on
+purpose — arriving mid-line would change `$PATH` under a completion already in flight — so a peer's
+move is picked up by the same check that catches every other route, at the next prompt.
 
 **There is no `run`.** A socket that executes what a caller sends is remote code execution on
 somebody's session, and every later decision would be made in that shadow. Adding one is a separate
