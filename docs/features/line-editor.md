@@ -28,7 +28,7 @@ key
  │                        nobody pressed it, and a prompt that measured the old
  │                        width is wrong at the new one.
  ├─ watches_keys() ─────► Assist::key_hook(key, text, cursor)
- │   (one atomic load)      Swallow │ Line{text,cursor,submit} │ None = carry on
+ │   (one atomic load)      Swallow │ Line{text,cursor,submit,erase} │ None = carry on
  ├─ Assist::binding(key)─► oslo.keys, then suggest.accept*, then oslo's defaults
  │                         ► Bound::{ToggleLanguage, ClearScreen, SearchHistory,
  │                                   AcceptHint, AcceptHintWord, Interrupt,
@@ -152,6 +152,13 @@ the same for the same reason — Tab opens the dropdown when there is a choice t
 `fish_cursor_*`, in fish's vocabulary, so a config need not be translated word by word. A Lua key
 handler answering `submit = true` is zsh's `bindkey -s '…\n'` — the key runs the line rather than
 only typing it — and both `$RPS1` and `$RPROMPT` are read, because both are in people's fingers.
+
+Adding `erase = true` to that runs it without leaving it on screen: the prompt block is cleared
+instead of stepped past, and the next prompt is drawn on the same rows. An accepted line normally
+stays where it was typed because it is the record of what produced the output beneath it — but a
+key that *is* a command has no such record to keep, and pressing it repeatedly would otherwise
+stack one `$ nav` and one prompt per keypress. Only meaningful alongside `submit`; on its own it
+would erase the line you are still editing, so it does nothing.
 
 ## Configuration
 

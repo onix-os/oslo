@@ -135,3 +135,16 @@ fn a_shorter_frame_clears_what_the_taller_one_left() {
         "nothing clears the rows below: {out:?}"
     );
 }
+
+/// The other ending: back to the top of the block and clear, so the next prompt lands on the same
+/// rows rather than under a line nobody typed.
+#[test]
+fn erasing_goes_back_to_the_top_of_the_block() {
+    assert_eq!(erase(0), "\r\x1b[J", "already on the first row");
+    assert_eq!(erase(2), "\x1b[2A\r\x1b[J");
+    for row in 0..4 {
+        let out = erase(row);
+        assert!(!out.contains('\n'), "must not scroll: {out:?}");
+        assert!(!out.contains("\x1b[B"), "must not step down: {out:?}");
+    }
+}

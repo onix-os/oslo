@@ -150,6 +150,23 @@ pub struct Answer {
     /// the key run something rather than type it. Without a way to say so, every binding could
     /// only ever fill the line in and wait.
     pub submit: bool,
+    /// `erase = true`: run it without leaving it on screen.
+    ///
+    /// ```lua
+    /// return { text = "nav", submit = true, erase = true }
+    /// ```
+    ///
+    /// An accepted line normally stays where it was typed and the next prompt is drawn below it,
+    /// which is right for a command somebody typed: it is the record of what produced the output
+    /// underneath. A key that *is* the command has no such record to keep — pressing it twice
+    /// leaves two `$ nav` lines and two prompts for something that only ever changed a directory.
+    ///
+    /// So this erases the prompt block instead of stepping past it, and the next prompt lands on
+    /// the same rows. What the command prints, if it prints, starts there too.
+    ///
+    /// **Only with `submit`.** Erasing a line the editor is still editing would take away what you
+    /// are typing, so on its own it does nothing.
+    pub erase: bool,
 }
 
 pub fn answer_from(answer: &Value) -> Option<Answer> {
@@ -159,6 +176,7 @@ pub fn answer_from(answer: &Value) -> Option<Answer> {
             text: text.to_string(),
             cursor: None,
             submit: false,
+            erase: false,
         }),
         Value::Table(t) => {
             let t = t.borrow();
@@ -169,10 +187,12 @@ pub fn answer_from(answer: &Value) -> Option<Answer> {
                 Value::Number(n) => n.as_int().map(|i| i.max(0) as usize),
                 _ => None,
             };
+            let submit = matches!(t.get_str("submit"), Value::Bool(true));
             Some(Answer {
                 text: text.to_string(),
                 cursor,
-                submit: matches!(t.get_str("submit"), Value::Bool(true)),
+                submit,
+                erase: submit && matches!(t.get_str("erase"), Value::Bool(true)),
             })
         }
         _ => None,
@@ -301,5 +321,25 @@ mod tests {
         assert_eq!(word_bounds(line, 18), (11, 18), "at the end of the line");
         // A cursor past the end is clamped rather than panicking.
         assert_eq!(word_bounds(line, 999), (11, 18));
+    }
+
+    /// **`erase` is a rider on `submit`.** A key that *is* a command wants its line taken back off
+    /// the screen; a handler that only fills the line in must not erase what is still being typed.
+    #[test]
+    fn erase_needs_submit_to_mean_anything() {
+        let answer = |submit: bool, erase: bool| {
+            let mut t = Table::new();
+            t.set_str("text", Value::str("nav"));
+            t.set_str("submit", Value::Bool(submit));
+            t.set_str("erase", Value::Bool(erase));
+            let a = answer_from(&Value::Table(Rc::new(RefCell::new(t)))).expect("an answer");
+            (a.submit, a.erase)
+        };
+        assert_eq!(answer(true, true), (true, true));
+        assert_eq!(answer(false, true), (false, false), "nothing to erase yet");
+        assert_eq!(answer(true, false), (true, false));
+        // A plain string is neither, so the common case keeps its line.
+        let bare = answer_from(&Value::str("nav")).expect("an answer");
+        assert!(!bare.submit && !bare.erase);
     }
 }

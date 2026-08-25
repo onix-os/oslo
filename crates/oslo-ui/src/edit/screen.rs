@@ -89,6 +89,20 @@ pub fn finish(cursor_row: usize, rows: usize) -> String {
     out
 }
 
+/// The escapes that take a finished line back off the screen, leaving the cursor where it began.
+///
+/// The counterpart to [`finish`], for a line nobody typed: a key that *is* a command has no
+/// transcript worth keeping, and stepping past it would stack a prompt per keypress. Up to the
+/// first row of the block, then clear from there down, so the next prompt is drawn on the same
+/// rows — and anything the command prints starts there too.
+pub fn erase(cursor_row: usize) -> String {
+    let mut out = String::new();
+    if cursor_row > 0 {
+        out.push_str(&format!("\x1b[{cursor_row}A"));
+    }
+    out.push_str("\r\x1b[J");
+    out
+}
 #[cfg(test)]
 #[path = "screen/tests.rs"]
 mod tests;

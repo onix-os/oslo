@@ -11,28 +11,15 @@ pub use crate::term::Key;
 use crate::term::{InputEvent, Keys, PasteError, Restore, Screen};
 use std::io::Write;
 
+mod answer;
+pub use answer::{KeyHook, Placed};
+
 mod assist;
 pub use assist::{Assist, NoAssist};
 
 mod preview;
 
 mod shortcuts;
-
-/// What a `key` hook asked the editor to do with the keystroke it just saw.
-///
-/// The third possibility — carry on as normal — is the `None` the hook answers with, so it needs
-/// no variant here.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum KeyHook {
-    /// Consume the keystroke: the editor never sees it, and the line is untouched.
-    Swallow,
-    /// Put this line in place instead, and run it if `submit`.
-    Line {
-        text: String,
-        cursor: usize,
-        submit: bool,
-    },
-}
 
 /// The line being edited, and where in history it came from.
 #[derive(Debug, Default)]
@@ -96,11 +83,17 @@ impl Session {
             Bound::AcceptHintWord => changed(self.take_hint(false, assist)),
             Bound::Lua(name) => {
                 match assist.lua_key(&name, &self.buffer.text(), self.buffer.cursor()) {
-                    Some((line, cursor, submit)) => {
-                        self.buffer.set(&line, cursor);
+                    Some(placed) => {
+                        self.buffer.set(&placed.text, placed.cursor);
                         // `submit = true` is zsh's `bindkey -s '…\n'`: the key runs the line
                         // rather than only typing it.
-                        if submit { Step::Accept } else { changed(true) }
+                        if placed.submit {
+                            Step::Accept {
+                                erase: placed.erase,
+                            }
+                        } else {
+                            changed(true)
+                        }
                     }
                     None => changed(false),
                 }
@@ -140,13 +133,15 @@ impl Session {
             return match hook {
                 // Nothing happened and nothing is redrawn — the key is simply gone.
                 KeyHook::Swallow => changed(false),
-                KeyHook::Line {
-                    text,
-                    cursor,
-                    submit,
-                } => {
-                    self.buffer.set(&text, cursor);
-                    if submit { Step::Accept } else { changed(true) }
+                KeyHook::Line(placed) => {
+                    self.buffer.set(&placed.text, placed.cursor);
+                    if placed.submit {
+                        Step::Accept {
+                            erase: placed.erase,
+                        }
+                    } else {
+                        changed(true)
+                    }
                 }
             };
         }
@@ -297,7 +292,7 @@ impl Session {
                 None => changed(false),
             },
 
-            Action::Accept => Step::Accept,
+            Action::Accept => Step::Accept { erase: false },
             Action::Abort => Step::Interrupted,
             Action::Eof => Step::Eof,
             Action::Redraw => Step::ClearScreen,
@@ -548,7 +543,7 @@ pub fn read_line(
                 let _ = out.write_all(b"\x1b[H\x1b[2J");
                 at_row = 0;
             }
-            Step::Accept => {
+            Step::Accept { erase } => {
                 // The next line starts in insert, so the shape must go back — otherwise a line
                 // accepted from normal mode leaves a block cursor over the one you type next.
                 crate::vi::reset();
@@ -560,9 +555,16 @@ pub fn read_line(
                     let _ = out.write_all(shape.escape().as_bytes());
                 }
                 let placed = draw(prompt, right, &session, assist, false);
-                let frame = screen::redraw(at_row, &placed.text, into_at(&placed));
+                // Both endings go inside the one synchronized frame. An erase written after the
+                // frame closed would show the line for a moment before taking it away, which is
+                // the flicker the whole thing exists to avoid.
+                let mut frame = screen::redraw(at_row, &placed.text, into_at(&placed));
+                frame.push_str(&if erase {
+                    screen::erase(placed.cursor_row)
+                } else {
+                    screen::finish(placed.cursor_row, placed.rows)
+                });
                 let _ = out.write_all(crate::paint::Frame::new(&frame, synchronized).as_bytes());
-                let _ = out.write_all(screen::finish(placed.cursor_row, placed.rows).as_bytes());
                 let _ = out.flush();
                 return Outcome::Line(session.buffer.text());
             }
