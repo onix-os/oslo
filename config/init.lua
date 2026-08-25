@@ -92,6 +92,7 @@ if on_path("pixy") then
   oslo.prompt.left = {
     command = "pixy",
     args = { "render", "prompt.left", "--target=ansi",
+             "--width", "$cols",
              "--set", "status=$status", "--set", "duration_ms=$duration_ms",
              "--set", "jobs=$jobs", "--set", "language=$language",
              "--set", "vimode=$vimode" },
@@ -110,7 +111,8 @@ if on_path("pixy") then
     command = "pixy",
     args = { "render", "prompt.right", "--target=ansi",
              "--set", "status=$status", "--set", "language=$language",
-             "--set", "vimode=$vimode", "--set", "frame=$frame" },
+             "--set", "vimode=$vimode", "--set", "frame=$frame",
+             "--width", "$cols" },
     timeout_ms = 10,
     async = true,
     every = 150,
