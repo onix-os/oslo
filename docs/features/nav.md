@@ -60,6 +60,26 @@ it happens.
 inline file list lands in the middle of it. oslo cannot tell the two apart; both are a child that
 blocks. So the config says which.
 
+**And the prompt is handed back where the terminal says it is, not where oslo counted.** A block is
+redrawn by going up to its first row and writing it again, so every repaint needs one number: how
+many rows above the cursor that row is. While the editor is the only thing writing, counting it is
+exact. It stops being exact the moment a browser has had the screen — and a count one row out
+either deletes a line that is not the prompt's or leaves a stale copy of it behind, which is what a
+prompt walking down the screen one row per visit actually was.
+
+So at the one boundary where the count is known to be unreliable, oslo asks instead. `OSC 133;A`
+already marked the row the prompt starts on and the terminal still has it; oslo asks for it back
+with a private report of its own, `CSI ? 1440 n`, and a terminal that keeps prompt marks answers
+how far up it is. Any number of rows may then be added above the prompt or below it, and anything
+at all may move the cursor in between: the answer is read off the mark rather than reconstructed.
+
+This is the same split [kitty settled on](https://sw.kovidgoyal.net/kitty/shell-integration/) for
+redrawing prompts across a resize — the terminal can see the screen, so it owns the position, and
+the shell owns the drawing. It is pulled rather than pushed, which needs no signal and cannot race
+the redraw it is for. Nothing answers on an ordinary terminal, the request times out in 20ms, and
+the counted number stands in — so this is better where it is understood and no worse where it is
+not. It is asked once per browser visit, never per keystroke.
+
 Two things it does not do. `$PS1` is not rebuilt while a browser is up: building it needs the shell
 state, and the browser is the thing holding it — a prompt written in Lua or handed to another
 program is rebuilt, which is every prompt this was built for. And a `cd` arriving mid-visit moves
@@ -321,7 +341,9 @@ This describes the builtin browser. With `oslo.builtin.nav.command` set, the lis
 | `crates/oslo-ui/src/nav/tests.rs` | the type-and-navigate tests, including the leak |
 | `crates/oslo-ui/src/settings/nav.rs` | `Nav`, `TypeNav`, `Icons`, `Icons::of` |
 | `crates/oslo-ui/src/settings/from_lua.rs` | reading `oslo.builtin.nav` |
-| `crates/oslo-shell/src/env/builtins/nav.rs` | `builtin_nav`, the `rm` closure, `change_directory` |
+| `crates/oslo-shell/src/env/builtins/nav.rs` | `builtin_nav`, the `rm` closure, `change_directory`, `waited_on` |
+| `crates/oslo-ui/src/prompt/hold.rs` | `pump` and `settle` — the prompt kept alive, and the handoff |
+| `crates/oslo-ui/src/term/anchor.rs` | `CSI ? 1440 n` — asking the terminal where the block begins |
 | `crates/oslo-shell/src/env/builtins/remove.rs` | what Delete actually calls |
 | `crates/oslo-ui/src/ask/look.rs` | `Preset::History`, `Look`, `Step` — the rows and the arrows |
 | `crates/oslo-ui/src/ask/chrome.rs` | the border, the placement, the legend |

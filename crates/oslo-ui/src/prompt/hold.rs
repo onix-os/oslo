@@ -121,12 +121,18 @@ pub fn pump(cols: usize) -> bool {
 /// drawn one row lower, and the screen grew by one per command however carefully each repaint had
 /// been placed.
 ///
+/// **And the row is measured here, not counted.** This is the one moment where the count is known
+/// to be unreliable: something else has just had the terminal, and the number carried between
+/// repaints describes a screen that may have moved underneath it. So the terminal is asked — see
+/// [`crate::term::anchor`] — and only where nothing answers does the count stand in.
+///
 /// Nothing is erased. The rows are still the block's, and the next draw overwrites them.
 pub fn settle() {
     if !SHOWING.load(Ordering::Relaxed) {
         return;
     }
-    let at = AT_ROW.replace(0);
+    let at = measured().unwrap_or_else(|| AT_ROW.get());
+    AT_ROW.set(0);
     if at == 0 {
         return;
     }
@@ -134,6 +140,20 @@ pub fn settle() {
     let mut out = std::io::stdout();
     let _ = out.write_all(crate::edit::screen::park(at).as_bytes());
     let _ = out.flush();
+}
+
+/// What the terminal says, and `None` on any terminal that does not keep prompt marks.
+///
+/// Bytes that came back and were not the answer are put where the next editor session picks them
+/// up: something typed while a browser was closing is a keystroke, not noise, and the query has no
+/// business eating it.
+fn measured() -> Option<usize> {
+    if !nix::unistd::isatty(nix::libc::STDIN_FILENO).unwrap_or(false) {
+        return None;
+    }
+    let (rows, pending) = crate::term::anchor::rows_above(nix::libc::STDIN_FILENO);
+    crate::term::query::preserve_startup_input(pending);
+    rows
 }
 
 #[cfg(test)]

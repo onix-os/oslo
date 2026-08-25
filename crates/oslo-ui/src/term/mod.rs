@@ -188,6 +188,7 @@ impl Drop for Restore {
     }
 }
 
+pub mod anchor;
 pub mod capability;
 mod child;
 mod input;
